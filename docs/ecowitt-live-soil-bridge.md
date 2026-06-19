@@ -118,3 +118,94 @@ bun remove mqtt
 
 No remote state was changed by adding the bridge — uninstall is
 zero-impact.
+
+---
+
+## Official Verdant EcoWitt rollout order
+
+Follow these five steps in order. **Do not skip to the EcoWitt cloud
+API.** Local custom-upload / MQTT is preferred because it keeps raw
+telemetry on the LAN, avoids vendor cloud secrets, and is fully
+auditable from `scripts/ecowitt-live-soil-bridge.ts`.
+
+1. **Stand up the local EcoWitt custom upload / MQTT bridge.**
+   EcoWitt gateway → `ecowitt2mqtt` → Mosquitto → bridge script. No
+   cloud calls, no API keys.
+2. **Dry-run a normalized payload.** Use
+   `scripts/ecowitt-live-soil-dry-run.ts` against
+   `fixtures/ecowitt-live-soil-sample.json`. Confirm the redacted
+   canonical payload, derived `vpd_kpa`, soil channels, and source label
+   look correct **before** sending anything to Verdant.
+3. **Send to the Verdant ingest webhook with the Verdant bridge token.**
+   Run the bridge without `--dry-run` and post exactly one reading.
+4. **Confirm in Verdant.** Open the affected tent and verify: live
+   reading appears, source is labeled correctly, charts render, and VPD
+   is derived from valid temp + RH.
+5. **Only if local bridge cannot meet a real need**, evaluate the
+   EcoWitt cloud API. This slice intentionally does **not** add cloud
+   API keys, cloud secrets, or cloud polling. Deferred.
+
+### Why local first
+
+- No third-party cloud credentials live in Verdant.
+- Bridge owner can inspect / redact every byte before it reaches the
+  ingest webhook.
+- `ecowitt2mqtt` already speaks the gateway's native custom-upload
+  protocol; adding a cloud round-trip would only increase latency and
+  blast radius.
+- Cloud API would introduce a long-lived API key — out of scope for V0.
+
+### Required local tools
+
+| Tool | Purpose |
+| --- | --- |
+| EcoWitt gateway (e.g. GW1200/GW2000) | Source of raw soil/environment readings. |
+| `ecowitt2mqtt` (or equivalent) | Translates the gateway's custom-upload HTTP push into MQTT JSON. |
+| Mosquitto | Local MQTT broker on the LAN. Auth optional but recommended. |
+| MQTT Explorer or `mosquitto_sub` | Inspect raw topic traffic during dry-run. |
+| `scripts/ecowitt-live-soil-bridge.ts` | Verdant-side normalizer + forwarder. |
+
+### Required Verdant environment variables
+
+| Var | Required | Purpose |
+| --- | --- | --- |
+| `VERDANT_INGEST_URL` | Required (non dry-run) | Verdant `sensor-ingest-webhook` URL. |
+| `VERDANT_BRIDGE_TOKEN` | Required (non dry-run) | `vbt_…` bridge token issued for this bridge. |
+| `VERDANT_TENT_ID` | Required for air/env metrics | Fallback tent UUID when no channel map covers a metric. |
+| `VERDANT_PLANT_ID` | Optional | Fallback plant UUID. |
+| `ECOWITT_SOIL_CHANNEL_MAP_JSON` | Optional | Per-probe tent/plant routing. Unmapped probes are dropped. |
+
+### Dry-run command (no network, no Supabase)
+
+```bash
+VERDANT_TENT_ID=<tent-uuid> \
+bun run scripts/ecowitt-live-soil-dry-run.ts \
+  --fixture fixtures/ecowitt-live-soil-sample.json --dry-run
+```
+
+The script:
+
+- reads a sanitized fixture (or `--stdin`),
+- runs it through the pure normalizer,
+- prints the redacted canonical payload(s) with derived `vpd_kpa`,
+- **never** posts to Verdant, Supabase, or any network endpoint,
+- exits non-zero if the payload is invalid or rejected.
+
+### Security warnings — read every time
+
+- **Never** paste bridge tokens, EcoWitt API keys, `PASSKEY`, gateway
+  `MAC`, station serials/IDs, private LAN IPs, Wi-Fi passwords, or any
+  secret into chat, screenshots, commits, issue trackers, or
+  documentation.
+- If an EcoWitt cloud API key has ever been exposed (chat, screenshot,
+  commit, log), **rotate it immediately** in the EcoWitt account
+  dashboard. Verdant cannot rotate vendor keys for you.
+- EcoWitt cloud API integration is **deferred** — this slice
+  intentionally adds no cloud API keys, no cloud polling, and no cloud
+  secrets.
+- The bridge performs **no direct Supabase writes** and **never uses
+  the service-role key**. All persistence goes through the existing
+  `sensor-ingest-webhook` Edge Function.
+- The bridge performs **no device control** and **no automation**.
+  Invalid telemetry is dropped or labeled invalid — never surfaced as
+  healthy live data.

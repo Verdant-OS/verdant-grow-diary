@@ -34,8 +34,11 @@ import {
 } from "@/lib/sensorMetricStateRules";
 import {
   deriveVpd,
+  formatVpdKpa,
   VPD_DERIVED_NOTE,
+  VPD_ROUNDING_NOTE,
 } from "@/lib/vpdCalculationRules";
+import SensorSourceLegendCompact from "@/components/SensorSourceLegendCompact";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },

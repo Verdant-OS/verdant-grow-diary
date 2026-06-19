@@ -195,6 +195,7 @@ describe("PremiumLiveSensorGate — no current free sensor surface is wrapped", 
       resolve(ROOT, "src/components/PremiumLiveSensorGate.tsx"),
       resolve(ROOT, "src/test/premium-live-sensor-gate.test.tsx"),
       resolve(ROOT, "src/test/premium-live-sensor-gate-hardening.test.tsx"),
+      resolve(ROOT, "src/test/live-sensor-server-gate.test.ts"),
     ]);
     const offenders: string[] = [];
     for (const f of walkSrc(resolve(ROOT, "src"))) {

@@ -167,3 +167,31 @@ export function formatTemperatureDisplay(
   const symbol = displayUnit === "fahrenheit" ? "°F" : "°C";
   return `${displayed.toFixed(digits)}${symbol}`;
 }
+
+/**
+ * Symbol-only helper for chips that already split value/unit slots.
+ * Honors the saved preference (or the explicit override).
+ */
+export function getTemperatureUnitSymbol(
+  unit?: TemperatureUnitPreference,
+): "°F" | "°C" {
+  const displayUnit = unit ?? loadTemperatureUnitPreference();
+  return displayUnit === "fahrenheit" ? "°F" : "°C";
+}
+
+/**
+ * Convert a canonical-Celsius stored value into the preferred display
+ * unit as a raw number. Never invents data — returns null on
+ * null/undefined/NaN/Infinity. Never double-converts (input is always
+ * treated as Celsius — the canonical store).
+ */
+export function convertCelsiusForDisplay(
+  celsius: number | null | undefined,
+  unit?: TemperatureUnitPreference,
+): number | null {
+  if (celsius === null || celsius === undefined) return null;
+  const n = typeof celsius === "number" ? celsius : Number(celsius);
+  if (!Number.isFinite(n)) return null;
+  const displayUnit = unit ?? loadTemperatureUnitPreference();
+  return displayUnit === "fahrenheit" ? celsiusToFahrenheit(n) : n;
+}

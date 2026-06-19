@@ -44,10 +44,12 @@ describe("paid-launch entitlement blocker doc", () => {
     expect(doc).toMatch(/AI Coach[\s\S]*SERVER-VALIDATED/);
   });
 
-  it("marks Environment Summary Report as PAID-LAUNCH BLOCKED", () => {
+  it("marks Environment Summary Report as SERVER-VALIDATED (paid-launch blocker fixed)", () => {
     expect(doc).toMatch(
-      /Environment Summary Report[\s\S]*PAID-LAUNCH BLOCKED/,
+      /Environment Summary Report[\s\S]*SERVER-VALIDATED/,
     );
+    // And references the dedicated edge function that re-resolves entitlement.
+    expect(doc).toMatch(/environment-summary-report-entitlement/);
   });
 
   it("marks Premium CSV / report exporters as PAID-LAUNCH BLOCKED", () => {

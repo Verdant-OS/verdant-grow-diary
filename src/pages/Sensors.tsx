@@ -113,18 +113,51 @@ export default function Sensors() {
       />
       <div className="grid lg:grid-cols-2 gap-4">
         {METRICS.map((m) => {
+          const metricKey = m.key as SensorMetricKey;
+          // Resolve raw value for this metric from the latest reading.
+          const rawValue: number | null | undefined = latest
+            ? (latest as unknown as Record<string, number | null | undefined>)[
+                metricKey
+              ]
+            : null;
+          // Derive VPD from temp + RH when no VPD value is present.
+          let value: number | null | undefined = rawValue;
+          let isDerived = false;
+          if (
+            metricKey === "vpd" &&
+            (value == null || !Number.isFinite(value as number)) &&
+            latest
+          ) {
+            const derived = deriveVpd({
+              temperature: latest.temp ?? null,
+              humidity: latest.rh ?? null,
+              temperatureUnit: "C",
+            });
+            if (derived.kind === "derived") {
+              value = derived.vpdKpa;
+              isDerived = true;
+            }
+          }
+          const state = classifySensorMetricState({
+            metric: metricKey,
+            value: value ?? null,
+            source: latestSource,
+            hasAnyReading: hasReadings,
+            isDerived,
+          });
+
           // Stage-aware status pill for Temperature/Humidity using the
           // latest reading + the selected tent's stage. Stale or missing
           // stage never reads as ok. Pure presenter; no writes.
           let envStatus: "ok" | "warn" | "bad" | null = null;
           let envLabel: string | null = null;
-          if (m.key === "temp" && latest) {
+          if (metricKey === "temp" && latest) {
             const r = classifyTempAgainstStage(latest.temp ?? null, {
               stage: selectedTentStage,
             });
             envStatus = environmentMetricChipStatus(r);
             envLabel = r.label;
-          } else if (m.key === "rh" && latest) {
+          } else if (metricKey === "rh" && latest) {
             const r = classifyRhAgainstStage(latest.rh ?? null, {
               stage: selectedTentStage,
             });
@@ -137,34 +170,62 @@ export default function Sensors() {
               : envStatus === "warn"
                 ? "border-[hsl(var(--warning))] text-[hsl(var(--warning))]"
                 : "border-destructive/60 text-destructive";
+
+          const stateToneClass =
+            state.tone === "caution"
+              ? "border-[hsl(var(--warning))] text-[hsl(var(--warning))]"
+              : "border-border/60 text-muted-foreground";
+
           return (
-            <div key={m.key} className="glass rounded-2xl p-4">
+            <div key={metricKey} className="glass rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2 gap-2">
                 <div className="flex items-center gap-2">
                   <h3 className="font-display font-semibold">{m.label}</h3>
                   {envStatus && envLabel && (
                     <span
-                      data-testid={`sensors-stage-status-${m.key}`}
+                      data-testid={`sensors-stage-status-${metricKey}`}
                       className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] ${envToneClass}`}
                       title={envLabel}
                     >
                       {envLabel}
                     </span>
                   )}
+                  <span
+                    data-testid={`sensors-metric-state-${metricKey}`}
+                    data-kind={state.kind}
+                    data-tone={state.tone}
+                    className={cn(
+                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px]",
+                      stateToneClass,
+                    )}
+                    title={state.message}
+                  >
+                    {state.label}
+                  </span>
                 </div>
-                <GrowDataSourceBadge classification={classification} />
+                {state.tone === "caution" && (
+                  <GrowDataSourceBadge classification={classification} />
+                )}
               </div>
-              {!hasReadings ? (
+              {state.showChart ? (
+                <SensorChart data={filtered} metric={metricKey} height={200} />
+              ) : (
                 <p
                   className="text-xs text-muted-foreground py-6 text-center"
-                  data-testid={`sensors-empty-${m.key}`}
+                  data-testid={`sensors-empty-${metricKey}`}
                 >
-                  No reading available.
+                  {state.message}
                 </p>
-              ) : (
-                <SensorChart data={filtered} metric={m.key} height={200} />
               )}
-              {m.key === "vpd" && (
+              {metricKey === "vpd" && isDerived && (
+                <p
+                  className="text-[11px] text-muted-foreground mt-2"
+                  data-testid="sensors-vpd-derived-note"
+                >
+                  {VPD_DERIVED_NOTE}
+                </p>
+              )}
+              {metricKey === "vpd" && (
                 <p
                   className="text-[11px] text-muted-foreground mt-2"
                   data-testid="sensors-vpd-stage-hint"
@@ -172,7 +233,7 @@ export default function Sensors() {
                   {VPD_STAGE_HELPER_TEXT}
                 </p>
               )}
-              {m.key === "vpd" && vpdStageMissing && (
+              {metricKey === "vpd" && vpdStageMissing && (
                 <VpdStageMissingBadge
                   testId="sensors-vpd-stage-missing-badge"
                   className="mt-2"

@@ -284,8 +284,11 @@ if (isMain) {
       if (err) log("error", "mqtt_subscribe_failed", { message: err.message });
     });
   });
-  client.on("error", (err) => log("error", "mqtt_error", { message: err.message }));
-  client.on("message", async (_t, msg) => {
+  client.on("error", (err: unknown) =>
+    log("error", "mqtt_error", { message: (err as Error)?.message ?? String(err) }),
+  );
+  client.on("message", async (...args: unknown[]) => {
+    const msg = args[1] as { toString: (enc: string) => string };
     await handleMqttMessage(msg.toString("utf8"), {
       env,
       forward: (p) =>

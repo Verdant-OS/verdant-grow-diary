@@ -12,6 +12,7 @@ import {
   type SensorSnapshotInput,
   type ResolveOptions,
 } from "@/lib/sensorSnapshotFreshnessRules";
+import { applyTemperatureUnitToSnapshotMetrics } from "@/lib/sensorSnapshotTemperatureUnitView";
 
 export interface SensorSnapshotCardProps {
   /** Raw input — resolver will normalize and freshness-classify it. */
@@ -58,9 +59,15 @@ export default function SensorSnapshotCard({
   className,
   testId = "sensor-snapshot-card",
 }: SensorSnapshotCardProps) {
-  const model: SensorSnapshotDisplayModel | null =
+  const rawModel: SensorSnapshotDisplayModel | null =
     display ??
     (snapshot ? resolveSensorSnapshotDisplay(snapshot, resolveOptions) : null);
+  const model: SensorSnapshotDisplayModel | null = rawModel
+    ? {
+        ...rawModel,
+        metrics: applyTemperatureUnitToSnapshotMetrics(rawModel.metrics),
+      }
+    : null;
 
   if (!model) {
     return (

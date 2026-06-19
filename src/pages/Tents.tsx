@@ -16,7 +16,10 @@ import { useGrowPlants } from "@/hooks/useGrowData";
 import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { tentDetailPath, tentsPath } from "@/lib/routes";
-import { tempFFromC } from "@/lib/temperatureUnits";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+} from "@/lib/temperatureUnitPreference";
 import { formatTentLightStatus } from "@/lib/lightScheduleFormat";
 import { deriveTentHealthChip } from "@/lib/tentHealthChip";
 import {
@@ -96,7 +99,7 @@ export default function Tents() {
                   </div>
 
                   <div className="flex flex-wrap gap-1.5">
-                    {last && <MetricChip label="T" value={(tempFFromC(last.temp) ?? 0).toFixed(1)} unit="°F" status={environmentMetricChipStatus(classifyTempAgainstStage(last.temp ?? null, { stage: t.stage }))} />}
+                    {last && <MetricChip label="T" value={(convertCelsiusForDisplay(last.temp) ?? 0).toFixed(1)} unit={getTemperatureUnitSymbol()} status={environmentMetricChipStatus(classifyTempAgainstStage(last.temp ?? null, { stage: t.stage }))} />}
                     {last && <MetricChip label="RH" value={last.rh} unit="%" status={environmentMetricChipStatus(classifyRhAgainstStage(last.rh ?? null, { stage: t.stage }))} />}
                     {last && vpdClassification && <MetricChip label="VPD" value={last.vpd} unit=" kPa" status={vpdMetricChipStatus(vpdClassification)} />}
                   </div>

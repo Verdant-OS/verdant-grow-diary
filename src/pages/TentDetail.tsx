@@ -41,7 +41,10 @@ import {
   buildTentSensorChartSeries,
   buildTentSensorHeaderView,
 } from "@/lib/tentSensorChartRules";
-import { tempFFromC } from "@/lib/temperatureUnits";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+} from "@/lib/temperatureUnitPreference";
 import { formatSensorValue } from "@/lib/sensorFormat";
 import {
   filterVisiblePlants,
@@ -293,7 +296,7 @@ export default function TentDetail() {
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
         {snap?.temp !== null && snap?.temp !== undefined && (
-          <MetricChip label="T" value={(tempFFromC(snap.temp) ?? 0).toFixed(1)} unit="°F" status={environmentMetricChipStatus(classifyTempAgainstStage(snap.temp, { stage: tent.stage, stale: header.stale }))} />
+          <MetricChip label="T" value={(convertCelsiusForDisplay(snap.temp) ?? 0).toFixed(1)} unit={getTemperatureUnitSymbol()} status={environmentMetricChipStatus(classifyTempAgainstStage(snap.temp, { stage: tent.stage, stale: header.stale }))} />
         )}
         {snap?.rh !== null && snap?.rh !== undefined && (
           <MetricChip label="RH" value={snap.rh} unit="%" status={environmentMetricChipStatus(classifyRhAgainstStage(snap.rh, { stage: tent.stage, stale: header.stale }))} />

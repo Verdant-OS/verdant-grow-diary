@@ -92,7 +92,7 @@ import {
 import { buildSensorSourceDisplayLabel } from "@/lib/sensorSourceDisplayLabel";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
-import { tempFFromC, formatTempFFromC } from "@/lib/temperatureUnits";
+import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
 
 
 import type { SensorReadingRow } from "@/lib/db";
@@ -743,12 +743,12 @@ export default function Dashboard() {
               </div>
               <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
                 {[
-                  { label: "Temperature", value: formatTempFFromC(sensorState.snapshot.temp) },
+                  { label: "Temperature", value: formatTemperatureDisplay(sensorState.snapshot.temp, { digits: 1 }) },
                   { label: "Humidity", value: formatValue(sensorState.snapshot.rh, "%") },
                   { label: "VPD", value: formatValue(sensorState.snapshot.vpd, " kPa", 2) },
                   { label: "Soil water", value: formatValue(sensorState.snapshot.soil, "%") },
                   { label: "Soil EC", value: formatValue(sensorState.snapshot.soil_ec, " mS/cm", 2) },
-                  { label: "Soil temp", value: formatTempFFromC(sensorState.snapshot.soil_temp) },
+                  { label: "Soil temp", value: formatTemperatureDisplay(sensorState.snapshot.soil_temp, { digits: 1 }) },
                   { label: "PPFD", value: formatValue(sensorState.snapshot.ppfd, " µmol", 0) },
                 ].map((m) => (
                   <div
@@ -908,8 +908,8 @@ export default function Dashboard() {
                 {[
                   {
                     label: "Temperature",
-                    avg: formatTempFFromC(trendsState.trends.temp.avg),
-                    range: `${formatTempFFromC(trendsState.trends.temp.min)} – ${formatTempFFromC(trendsState.trends.temp.max)}`,
+                    avg: formatTemperatureDisplay(trendsState.trends.temp.avg, { digits: 1 }),
+                    range: `${formatTemperatureDisplay(trendsState.trends.temp.min, { digits: 1 })} – ${formatTemperatureDisplay(trendsState.trends.temp.max, { digits: 1 })}`,
                   },
                   {
                     label: "Humidity",

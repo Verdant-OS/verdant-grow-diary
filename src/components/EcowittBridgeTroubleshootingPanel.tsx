@@ -25,6 +25,9 @@ export default function EcowittBridgeTroubleshootingPanel({
   className,
 }: EcowittBridgeTroubleshootingPanelProps) {
   const vm = buildTroubleshootingPanelViewModel(input);
+  const noReadings = !input.lastReading;
+  const tokenStatus = input.env?.bridgeTokenStatus ?? "unknown";
+  const tentIdConfigured = input.env?.tentIdConfigured;
   return (
     <section
       data-testid="ecowitt-bridge-troubleshooting-panel"
@@ -42,6 +45,33 @@ export default function EcowittBridgeTroubleshootingPanel({
           {vm.overallLabel}
         </span>
       </header>
+      {noReadings && (
+        <div
+          data-testid="troubleshooting-empty-no-readings"
+          className="rounded border border-border/60 bg-muted/20 p-2 text-[11px] text-muted-foreground space-y-1"
+        >
+          <p className="text-foreground font-medium">No EcoWitt readings found yet.</p>
+          <p>Run the dry-run command first, then send one webhook reading.</p>
+          <p>Check MQTT Explorer for <span className="font-mono">ecowitt/#</span> before posting to Verdant.</p>
+          <p>This panel does not start the bridge or verify local MQTT by itself.</p>
+        </div>
+      )}
+      {tokenStatus === "unknown" && (
+        <p
+          data-testid="troubleshooting-token-unknown-note"
+          className="text-[11px] text-amber-700 dark:text-amber-300"
+        >
+          Token status unknown — needs verification before being treated as healthy.
+        </p>
+      )}
+      {tentIdConfigured === false && (
+        <p
+          data-testid="troubleshooting-missing-tent-id-note"
+          className="text-[11px] text-amber-700 dark:text-amber-300"
+        >
+          Missing VERDANT_TENT_ID — set it locally before running the bridge.
+        </p>
+      )}
       <ul className="flex flex-col gap-1">
         {vm.report.checks.map((c) => (
           <li

@@ -1,10 +1,5 @@
-/**
- * Wiring smoke test for the saved AI Doctor Phase 1 evidence card in the
- * QuickLog timeline section. The hook is mocked so this test only
- * verifies the presenter branch and the read-only safety boundary.
- */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
@@ -27,8 +22,6 @@ vi.mock("@/hooks/useQuickLogGroupedTimeline", () => ({
   QUICK_LOG_GROUPED_TIMELINE_DEFAULT_LIMIT: 200,
 }));
 
-// Avoid pulling the QuickLogV2Sheet (and its heavy dependency graph)
-// into this wiring smoke test.
 vi.mock("@/components/QuickLogV2Sheet", () => ({
   default: () => null,
 }));
@@ -43,6 +36,7 @@ function renderSection() {
         <QuickLogGroupedTimelineSection
           scope="plant"
           plantId="plant-1"
+          growId="grow-1"
           tentId="tent-1"
         />
       </MemoryRouter>
@@ -110,6 +104,9 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
     expect(
       within(card).getByText("Leaves yellowing on lower nodes."),
     ).toBeInTheDocument();
+    expect(
+      within(card).getByTestId("ai-doctor-phase1-timeline-evidence-card-metadata"),
+    ).toHaveTextContent("Saved date:");
     const link = within(card).getByTestId(
       "ai-doctor-phase1-timeline-evidence-card-review-link",
     ) as HTMLAnchorElement;
@@ -129,6 +126,34 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
     ).toHaveTextContent("Just a normal grower note.");
   });
 
+  it("filters the timeline to saved AI Doctor evidence entries", () => {
+    entriesRef.current = [normalNoteEntry, aiEvidenceEntry];
+    renderSection();
+    fireEvent.click(
+      screen.getByTestId("quick-log-grouped-timeline-filter-ai-doctor-evidence"),
+    );
+    expect(screen.getByTestId("ai-doctor-phase1-timeline-evidence-card")).toBeInTheDocument();
+    expect(screen.queryByText("Just a normal grower note.")).toBeNull();
+  });
+
+  it("shows an AI Doctor evidence empty state with a results link", () => {
+    entriesRef.current = [normalNoteEntry];
+    renderSection();
+    fireEvent.click(
+      screen.getByTestId("quick-log-grouped-timeline-filter-ai-doctor-evidence"),
+    );
+    expect(
+      screen.getByTestId("quick-log-grouped-timeline-ai-evidence-empty"),
+    ).toBeInTheDocument();
+    const link = screen.getByTestId(
+      "quick-log-grouped-timeline-ai-evidence-results-link",
+    ) as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toContain("/operator/ai-doctor-phase1");
+    expect(link.getAttribute("href")).toContain("plantId=plant-1");
+    expect(link.getAttribute("href")).toContain("growId=grow-1");
+    expect(link.getAttribute("href")).toContain("tentId=tent-1");
+  });
+
   it("preserves ordering and produces one row per saved evidence (no duplicates)", () => {
     entriesRef.current = [aiEvidenceEntry, normalNoteEntry];
     renderSection();
@@ -137,18 +162,14 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
       list.querySelectorAll<HTMLLIElement>(":scope > li"),
     );
     expect(items).toHaveLength(2);
-    // First item is the AI Doctor evidence card
     expect(
       within(items[0]).getByTestId("ai-doctor-phase1-timeline-evidence-card"),
     ).toBeInTheDocument();
-
-    // Second item is the normal note
     expect(
       within(items[1]).queryByTestId(
         "ai-doctor-phase1-timeline-evidence-card",
       ),
     ).toBeNull();
-    // No second evidence card anywhere
     expect(
       screen.getAllByTestId("ai-doctor-phase1-timeline-evidence-card"),
     ).toHaveLength(1);
@@ -171,7 +192,6 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
     expect(
       screen.queryByTestId("ai-doctor-phase1-timeline-evidence-card"),
     ).toBeNull();
-    // The generic note UI still renders (note text falls through).
     expect(screen.getByTestId("quick-log-grouped-action-note")).toBeInTheDocument();
   });
 
@@ -180,8 +200,6 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
       resolve(process.cwd(), "src/hooks/useQuickLogGroupedTimeline.ts"),
       "utf8",
     );
-    // Strip block + line comments so safety-contract documentation lines
-    // are not mistaken for actual write/RPC/AI calls.
     const src = raw
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/(^|\s)\/\/[^\n]*/g, "");
@@ -206,7 +224,6 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
       expect(src, `hook must not contain ${term}`).not.toContain(term);
     }
   });
-
 
   it("(static) merge helper is pure — no Supabase / AI / device imports", () => {
     const src = readFileSync(

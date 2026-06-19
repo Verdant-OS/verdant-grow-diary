@@ -140,3 +140,28 @@ Added in the save-evidence slice.
   schema/RLS change).
 - Rollback: removing the button + hook + draft + wiring is sufficient; no
   schema, RLS, or policy needs to be reverted.
+
+## Saved Phase 1 evidence on the plant timeline (read-only render)
+
+- Saved AI Doctor Phase 1 evidence entries appear on the plant timeline
+  as a dedicated **evidence-only** card when the fetched event surfaces
+  `details.kind === "ai_doctor_phase1_evidence"`.
+- The card is read-only:
+  - badges: "AI Doctor Phase 1" and "Evidence only"
+  - summary, optional likely issue / confidence / risk level
+  - evidence count and missing-context count
+  - saved timestamp
+  - disclaimer: "Saved as evidence only. This is not an approved action
+    and does not control equipment."
+  - single CTA "Review AI Doctor context" → deep links to
+    `/operator/ai-doctor-phase1?plantId=...&growId=...&tentId=...`
+- The card has no approve, send, execute, save, Action Queue, alert, or
+  device-control controls. No additional fetches, AI calls, or mutations.
+- Discriminator data source: `diary_entries.details` (the RPC also writes
+  a paired `grow_events` row with `event_type='observation'` for chronology).
+- **Wiring status**: the existing plant timeline fetch
+  (`useQuickLogGroupedTimeline`) reads `grow_events` only and does not yet
+  surface the `details` payload, so the live timeline currently shows the
+  saved entry as a generic Quick Log note. Promoting it to the styled
+  evidence card requires a follow-up fetch slice that joins
+  `diary_entries.details` (no schema change required).

@@ -122,7 +122,7 @@ describe("OperatorAiDoctorPhase1 — page + routing", () => {
         .getByTestId("ai-doctor-phase1-plant-option-plant-a")
         .getAttribute("data-selected"),
     ).toBe("true");
-    expect(screen.getByTestId("ai-doctor-phase1-deep-link-href").textContent).toContain(
+    expect(screen.getByTestId("ai-doctor-phase1-internal-link-href").textContent).toContain(
       "plantId=plant-a",
     );
   });
@@ -170,7 +170,7 @@ describe("OperatorAiDoctorPhase1 — page + routing", () => {
       plants: PLANTS,
     });
     fireEvent.click(screen.getByTestId("ai-doctor-phase1-plant-option-plant-b"));
-    expect(screen.getByTestId("ai-doctor-phase1-deep-link-href").textContent).toContain(
+    expect(screen.getByTestId("ai-doctor-phase1-internal-link-href").textContent).toContain(
       "plantId=plant-b",
     );
   });

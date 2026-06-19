@@ -206,5 +206,63 @@ export function normalizeIngestPayload(
   });
 
   if (errors.length > 0) return { ok: false, rows: [], errors };
+
+  // Derive vpd_kpa from valid temperature_c + humidity_pct on the same
+  // captured_at when the payload did not already supply a vpd_kpa row.
+  // Pure: never throws, returns null for invalid telemetry. Missing/invalid
+  // VPD must stay missing — never written as 0 or a fake value.
+  const derived = deriveVpdRowsFromNormalized(rows);
+  for (const drow of derived) rows.push(drow);
+
   return { ok: true, rows, errors: [] };
+}
+
+/**
+ * For each (tent_id, ts) group, if temperature_c + humidity_pct are present
+ * but vpd_kpa is not, emit a derived vpd_kpa row. Marks raw_payload with
+ * `{ calculated: true, derived_from: ["temperature_c", "humidity_pct"] }`.
+ * Pure helper — used both by `normalizeIngestPayload` and exposed for tests.
+ */
+export function deriveVpdRowsFromNormalized(
+  rows: ReadonlyArray<NormalizedSensorReadingDraft>,
+): NormalizedSensorReadingDraft[] {
+  type Slot = {
+    temp?: NormalizedSensorReadingDraft;
+    rh?: NormalizedSensorReadingDraft;
+    hasVpd: boolean;
+  };
+  const groups = new Map<string, Slot>();
+  for (const r of rows) {
+    const key = `${r.tent_id ?? ""}|${r.ts}`;
+    const slot = groups.get(key) ?? { hasVpd: false };
+    if (r.metric === "temperature_c" && !slot.temp) slot.temp = r;
+    else if (r.metric === "humidity_pct" && !slot.rh) slot.rh = r;
+    else if (r.metric === "vpd_kpa") slot.hasVpd = true;
+    groups.set(key, slot);
+  }
+  const out: NormalizedSensorReadingDraft[] = [];
+  for (const slot of groups.values()) {
+    if (slot.hasVpd) continue;
+    if (!slot.temp || !slot.rh) continue;
+    const vpd = calculateAirVpdKpa({
+      tempC: slot.temp.value as number,
+      rhPercent: slot.rh.value as number,
+    });
+    if (vpd === null) continue;
+    out.push({
+      tent_id: slot.temp.tent_id,
+      metric: "vpd_kpa",
+      value: vpd,
+      source: slot.temp.source,
+      ts: slot.temp.ts,
+      quality: slot.temp.quality ?? "ok",
+      device_id: slot.temp.device_id ?? null,
+      captured_at: slot.temp.captured_at ?? null,
+      raw_payload: {
+        calculated: true,
+        derived_from: ["temperature_c", "humidity_pct"],
+      } as NormalizedSensorReadingDraft["raw_payload"],
+    });
+  }
+  return out;
 }

@@ -231,52 +231,150 @@ function freshnessOf(capturedAt: string | null, now: Date, staleMs: number): "fr
   return age <= staleMs ? "fresh" : "stale";
 }
 
+/**
+ * Heuristic: refuse any display-id candidate that *looks* like
+ * MAC / IP / hex token / JWT / bearer / passkey. Caps length so a
+ * surprise value cannot leak via a chip.
+ */
+const DEVICE_DISPLAY_MAX = 32;
+const UNSAFE_DEVICE_PATTERNS: RegExp[] = [
+  /\b[A-Fa-f0-9]{2}(:[A-Fa-f0-9]{2}){5}\b/,
+  /\b\d{1,3}(\.\d{1,3}){3}\b/,
+  /^[A-Fa-f0-9]{16,}$/,
+  /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{6,}/,
+  /Bearer\s+/i,
+  /passkey/i,
+];
+
+export function deriveSafeDeviceDisplayId(rawPayload: unknown): string | null {
+  const candidates = [
+    readMetaString(rawPayload, "device_name", "deviceName"),
+    readMetaString(rawPayload, "station_name", "stationName"),
+    readMetaString(rawPayload, "display_id", "displayId"),
+    readMetaString(rawPayload, "model"),
+  ];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    if (UNSAFE_DEVICE_PATTERNS.some((re) => re.test(trimmed))) continue;
+    // Whitelist plain printable label chars only.
+    const safe = trimmed.replace(/[^\w .\-]+/g, "").trim();
+    if (!safe) continue;
+    return safe.length > DEVICE_DISPLAY_MAX
+      ? `${safe.slice(0, DEVICE_DISPLAY_MAX - 1)}…`
+      : safe;
+  }
+  return null;
+}
+
+function timestampMs(s: string | null): number | null {
+  if (!s) return null;
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? t : null;
+}
+
+function inRange(ms: number | null, fromMs: number | null, toMs: number | null): boolean {
+  if (fromMs !== null) {
+    if (ms === null) return false;
+    if (ms < fromMs) return false;
+  }
+  if (toMs !== null) {
+    if (ms === null) return false;
+    if (ms > toMs) return false;
+  }
+  return true;
+}
+
+function rowMatchesFilters(row: SensorIngestAuditRow, f: AuditReportFilters): boolean {
+  if (f.provider && f.provider !== "all") {
+    const want = f.provider.toLowerCase();
+    const have = (row.provider ?? "").toLowerCase();
+    const matchUnknown = want === "unknown" && !row.provider;
+    if (!matchUnknown && have !== want) return false;
+  }
+  const fromMs = timestampMs(f.capturedFromIso ?? null);
+  const toMs = timestampMs(f.capturedToIso ?? null);
+  if ((fromMs !== null || toMs !== null) && !inRange(row.acceptedAtMs, fromMs, toMs)) {
+    return false;
+  }
+  if (f.deviceStationQuery && f.deviceStationQuery.trim()) {
+    const q = f.deviceStationQuery.trim().toLowerCase();
+    const display = (row.deviceStationDisplayId ?? "").toLowerCase();
+    if (!display.includes(q)) return false;
+  }
+  return true;
+}
+
+function projectRow(r: RawSensorReadingRow, idx: number, now: Date, staleMs: number): SensorIngestAuditRow {
+  const capturedAt = r.captured_at ?? r.ts ?? null;
+  const source = canonicalizeSource(r.source);
+  const provider = readMetaString(r.raw_payload, "provider", "vendor");
+  const transport = readMetaString(r.raw_payload, "transport");
+  const plantId = readMetaString(r.raw_payload, "plant_id");
+  const vpd = readMetaNumber(r.raw_payload, "vpd_kpa");
+  const soil = readMetaNumber(r.raw_payload, "soil_moisture_pct");
+  const humidity = readMetaNumber(r.raw_payload, "humidity_pct", "humidity", "rh", "rh_percent");
+  const tempC = readMetaNumber(r.raw_payload, "air_temperature_c", "temperature_c", "temp_c", "tempC");
+  const value = typeof r.value === "number" && Number.isFinite(r.value) ? r.value : null;
+  const metricSummary = r.metric && value !== null ? `${r.metric}=${value}` : r.metric ?? "—";
+  const confidence = readMetaNumber(r.raw_payload, "confidence");
+
+  return {
+    id: r.id ?? `row-${idx}`,
+    capturedAt,
+    acceptedAtMs: timestampMs(capturedAt),
+    accepted: true,
+    reason: "Persisted accepted reading",
+    source,
+    provider: provider ? provider.toLowerCase() : null,
+    transport,
+    tentId: r.tent_id ?? null,
+    plantId,
+    metricSummary,
+    vpdKpa: vpd === 0 ? null : vpd,
+    soilMoisturePct: soil,
+    humidityPct: humidity,
+    airTemperatureC: tempC,
+    freshness: freshnessOf(capturedAt, now, staleMs),
+    confidence,
+    rawPayloadRedacted: redactPayload(r.raw_payload),
+    deviceStationDisplayId: deriveSafeDeviceDisplayId(r.raw_payload),
+  };
+}
+
 export function buildAuditReport(input: AuditReportInput): AuditReport {
   const pageSize = input.pageSize ?? AUDIT_REPORT_DEFAULT_PAGE_SIZE;
   const now = input.now ?? new Date();
   const staleMs = input.staleMs ?? DEFAULT_STALE_MS;
+  const filters = input.filters ?? {};
 
-  const sorted = [...input.rows].sort((a, b) => {
-    const ta = Date.parse(a.captured_at ?? a.ts ?? "");
-    const tb = Date.parse(b.captured_at ?? b.ts ?? "");
-    const aOk = Number.isFinite(ta);
-    const bOk = Number.isFinite(tb);
-    if (!aOk && !bOk) return 0;
-    if (!aOk) return 1;
-    if (!bOk) return -1;
+  const projected = input.rows.map((r, idx) => projectRow(r, idx, now, staleMs));
+  const providerSet = new Set<string>();
+  let hasMissingProvider = false;
+  for (const p of projected) {
+    if (p.provider) providerSet.add(p.provider);
+    else hasMissingProvider = true;
+  }
+  const availableProviders = [...providerSet].sort();
+  if (hasMissingProvider) availableProviders.push("unknown");
+
+  const filtered = projected.filter((r) => rowMatchesFilters(r, filters));
+  const sorted = [...filtered].sort((a, b) => {
+    const ta = a.acceptedAtMs;
+    const tb = b.acceptedAtMs;
+    if (ta === null && tb === null) return 0;
+    if (ta === null) return 1;
+    if (tb === null) return -1;
     return tb - ta;
   });
+  const rows = sorted.slice(0, pageSize);
 
-  const rows: SensorIngestAuditRow[] = sorted.slice(0, pageSize).map((r, idx) => {
-    const capturedAt = r.captured_at ?? r.ts ?? null;
-    const source = canonicalizeSource(r.source);
-    const provider = readMetaString(r.raw_payload, "provider", "vendor");
-    const transport = readMetaString(r.raw_payload, "transport");
-    const plantId = readMetaString(r.raw_payload, "plant_id");
-    const vpd = readMetaNumber(r.raw_payload, "vpd_kpa");
-    const soil = readMetaNumber(r.raw_payload, "soil_moisture_pct");
-    const value = typeof r.value === "number" && Number.isFinite(r.value) ? r.value : null;
-    const metricSummary = r.metric && value !== null ? `${r.metric}=${value}` : r.metric ?? "—";
-    const confidence = readMetaNumber(r.raw_payload, "confidence");
-
-    return {
-      id: r.id ?? `row-${idx}`,
-      capturedAt,
-      accepted: true,
-      reason: "Persisted accepted reading",
-      source,
-      provider,
-      transport,
-      tentId: r.tent_id ?? null,
-      plantId,
-      metricSummary,
-      vpdKpa: vpd === 0 ? null : vpd,
-      soilMoisturePct: soil,
-      freshness: freshnessOf(capturedAt, now, staleMs),
-      confidence,
-      rawPayloadRedacted: redactPayload(r.raw_payload),
-    };
-  });
-
-  return { rows, pageSize, note: REJECTED_NOT_PERSISTED_NOTE };
+  return {
+    rows,
+    pageSize,
+    note: REJECTED_NOT_PERSISTED_NOTE,
+    availableProviders,
+    filteredTotal: sorted.length,
+  };
 }

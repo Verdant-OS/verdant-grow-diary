@@ -280,7 +280,7 @@ if (isMain) {
 
   client.on("connect", () => {
     log("info", "mqtt_connected", { url, topic });
-    client.subscribe(topic, (err) => {
+    client.subscribe(topic, (err: Error | null) => {
       if (err) log("error", "mqtt_subscribe_failed", { message: err.message });
     });
   });

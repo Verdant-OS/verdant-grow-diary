@@ -476,6 +476,23 @@ export function compileAiDoctorContextPayloadFromRows(
   };
 }
 
+/**
+ * Compatibility wrapper.
+ *
+ * Forwards to `compileAiDoctorContextPayloadFromRows` without modifying
+ * behavior. The legacy `aiDoctorEngine.ts` exports an identically named
+ * function with a different shape; that legacy export is intentionally
+ * untouched. Consumers that want the Phase 1 foundation shape can import
+ * this wrapper explicitly from this module.
+ */
+export function compileAiDoctorContextFromRows(
+  input: CompileAiDoctorContextPayloadFromRowsInput,
+): AiDoctorContextPayload {
+  return compileAiDoctorContextPayloadFromRows(input);
+}
+
+
+
 // ---------------------------------------------------------------------------
 // Stubbed executor
 // ---------------------------------------------------------------------------

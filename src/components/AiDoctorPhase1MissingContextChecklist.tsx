@@ -323,8 +323,9 @@ export function AiDoctorPhase1MissingContextChecklist(
               {item.cta && (
                 <Link
                   to={item.cta.to}
+                  aria-label={ariaLabelForChecklistCta(item.cta.id, props.plantName)}
                   data-testid={`ai-doctor-phase1-checklist-cta-${item.id}-${item.cta.id}`}
-                  className="mt-1 flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-xs text-secondary-foreground sm:inline-flex sm:w-auto"
+                  className="mt-1 flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-xs text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:inline-flex sm:w-auto"
                 >
                   {item.cta.label}
                 </Link>

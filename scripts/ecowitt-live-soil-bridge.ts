@@ -219,7 +219,7 @@ const isMain =
     ? (import.meta as unknown as { main?: boolean }).main === true
     : false;
 
-if (isMain) {
+async function runCli(): Promise<void> {
   const env = readBridgeEnv(process.env, process.argv);
   const log = (level: "info" | "warn" | "error", msg: string, extra?: unknown) => {
     // eslint-disable-next-line no-console
@@ -247,9 +247,6 @@ if (isMain) {
     channels: Object.keys(env.channelMap),
   });
 
-  // Dynamic import keeps the script importable in test environments
-  // where `mqtt` is not installed. Operators install `mqtt` locally
-  // (the bridge runs on the operator's LAN, not in the web app).
   interface MqttLike {
     connect: (url: string, opts: Record<string, unknown>) => {
       on: (event: string, cb: (...args: unknown[]) => void) => void;
@@ -259,11 +256,11 @@ if (isMain) {
   let mqttMod: MqttLike;
   try {
     const modName = ["m", "q", "t", "t"].join("");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mqttMod = (await import(/* @vite-ignore */ modName)) as MqttLike;
   } catch {
     log("error", "mqtt package not installed — run `bun add mqtt` locally");
     process.exit(2);
+    return;
   }
 
   const url =
@@ -301,4 +298,8 @@ if (isMain) {
       soilHistory,
     });
   });
+}
+
+if (isMain) {
+  void runCli();
 }

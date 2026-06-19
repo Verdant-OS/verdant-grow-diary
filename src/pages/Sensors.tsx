@@ -9,6 +9,7 @@ import GrowDataSourceBadge from "@/components/GrowDataSourceBadge";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import SensorBridgeHealthCard from "@/components/SensorBridgeHealthCard";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
+import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
 import SensorsTestbenchPanel from "@/components/SensorsTestbenchPanel";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { useTents as useTentRows } from "@/hooks/use-tents";
@@ -347,6 +348,17 @@ export default function Sensors() {
         ) : (
           <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
         )}
+      </div>
+      <div
+        id="csv-import"
+        className="mt-4 max-w-xl scroll-mt-24"
+        data-testid="sensors-csv-import-anchor"
+      >
+        <EnvironmentCsvImportLauncher
+          growId={selectedGrowId}
+          tentId={tentId}
+          testIdPrefix="sensors-csv-import"
+        />
       </div>
       <div
         className="mt-4 max-w-xl rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground"

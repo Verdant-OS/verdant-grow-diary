@@ -82,7 +82,9 @@ CREATE POLICY "Users insert own soil moisture calibrations"
     )
     AND EXISTS (
       SELECT 1 FROM public.tents t
-      WHERE t.id = tent_id AND t.user_id = auth.uid()
+      WHERE t.id = tent_id
+        AND t.user_id = auth.uid()
+        AND t.grow_id = grow_id
     )
     AND (
       plant_id IS NULL
@@ -109,7 +111,9 @@ CREATE POLICY "Users update own soil moisture calibrations"
     )
     AND EXISTS (
       SELECT 1 FROM public.tents t
-      WHERE t.id = tent_id AND t.user_id = auth.uid()
+      WHERE t.id = tent_id
+        AND t.user_id = auth.uid()
+        AND t.grow_id = grow_id
     )
     AND (
       plant_id IS NULL

@@ -180,3 +180,43 @@ describe("AiDoctorPhase1EvidenceShortcuts — mobile polish", () => {
     expect(text).not.toMatch(/Approve|Execute|Save|Send|Run AI/i);
   });
 });
+
+describe("AiDoctorPhase1EvidenceShortcuts — accessibility polish", () => {
+  it("diary shortcut Links include focus-visible ring + aria-label with plant name", () => {
+    renderWithRouter(
+      <AiDoctorPhase1EvidenceShortcuts
+        items={[row("x", "2026-06-10T00:00:00Z", { event_type: "note", notes: "n" })]}
+        context={{ ...CTX, plantName: "Plant A" }}
+      />,
+    );
+    const a = screen.getByTestId("ai-doctor-phase1-diary-shortcut-x");
+    const cls = a.getAttribute("class") ?? "";
+    expect(cls).toMatch(/focus-visible:ring-2/);
+    expect(cls).toMatch(/focus-visible:ring-offset-2/);
+    const aria = a.getAttribute("aria-label") ?? "";
+    expect(aria).toMatch(/for Plant A/);
+  });
+
+  it("uses generic aria-label when plantName is unavailable", () => {
+    renderWithRouter(
+      <AiDoctorPhase1EvidenceShortcuts
+        items={[row("x", "2026-06-10T00:00:00Z")]}
+        context={CTX}
+      />,
+    );
+    const a = screen.getByTestId("ai-doctor-phase1-diary-shortcut-x");
+    expect(a.getAttribute("aria-label") ?? "").toMatch(/for selected plant/);
+  });
+
+  it("aria labels never imply write/execute actions", () => {
+    renderWithRouter(
+      <AiDoctorPhase1EvidenceShortcuts
+        items={[row("x", "2026-06-10T00:00:00Z")]}
+        context={{ ...CTX, plantName: "Plant A" }}
+      />,
+    );
+    const aria =
+      screen.getByTestId("ai-doctor-phase1-diary-shortcut-x").getAttribute("aria-label") ?? "";
+    expect(aria).not.toMatch(/Approve|Send|Execute|Run equipment|Control device/i);
+  });
+});

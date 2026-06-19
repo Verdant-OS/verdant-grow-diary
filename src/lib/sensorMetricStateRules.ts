@@ -117,18 +117,50 @@ export function isOptionalMetricInvalid(
  * Soil-moisture "stuck at bound" detector. Only classifies as stuck when
  * 3+ recent values are all exactly 0 or all exactly 100. Anything less
  * conservative would risk false positives on a single zero reading.
+ *
+ * IMPORTANT: a missing/undefined recentValues window NEVER classifies as
+ * stuck. The caller must explicitly provide a window for stuck detection
+ * to engage.
  */
 export function isSoilMoistureStuck(
   recentValues: readonly (number | null | undefined)[] | undefined,
 ): boolean {
-  if (!recentValues || recentValues.length < 3) return false;
+  return describeSoilMoistureStuckWindow(recentValues) !== null;
+}
+
+export interface SoilMoistureStuckWindow {
+  /** The bound the window is stuck at. */
+  value: 0 | 100;
+  /** How many finite recent readings were considered. */
+  windowLength: number;
+  /** Calm, actionable explanation copy for the UI. */
+  message: string;
+}
+
+/**
+ * Pure helper. Returns a window-aware explanation when soil moisture is
+ * stuck, otherwise null. Window length reflects the count of finite
+ * recent values used (e.g. "last 4 readings" for 4 consecutive zeros).
+ */
+export function describeSoilMoistureStuckWindow(
+  recentValues: readonly (number | null | undefined)[] | undefined,
+): SoilMoistureStuckWindow | null {
+  if (!Array.isArray(recentValues)) return null;
+  if (recentValues.length < 3) return null;
   const finite = recentValues.filter(
     (v): v is number => typeof v === "number" && Number.isFinite(v),
   );
-  if (finite.length < 3) return false;
+  if (finite.length < 3) return null;
   const allZero = finite.every((v) => v === 0);
   const allMax = finite.every((v) => v === 100);
-  return allZero || allMax;
+  if (!allZero && !allMax) return null;
+  const value: 0 | 100 = allZero ? 0 : 100;
+  const windowLength = finite.length;
+  return {
+    value,
+    windowLength,
+    message: `Soil moisture appears stuck at ${value}% across the last ${windowLength} readings. Check the sensor or mapping.`,
+  };
 }
 
 /** Core metrics that are always expected from a working tent. */
@@ -225,9 +257,12 @@ export function classifySensorMetricState(
   // Auto-detect invalid for optional metrics from value bounds.
   const autoInvalid =
     isOptionalMetric(metric) && isOptionalMetricInvalid(metric, value);
-  // Soil moisture stuck-at-bound only triggers on enough history.
-  const autoStuck =
-    metric === "soil" && isSoilMoistureStuck(input.recentValues);
+  // Soil moisture stuck-at-bound only triggers when caller provides
+  // an explicit recent-values window with enough finite history.
+  const stuckWindow =
+    metric === "soil"
+      ? describeSoilMoistureStuckWindow(input.recentValues)
+      : null;
 
   // Cautionary takes priority over "we have a value".
   if (input.isInvalid || autoInvalid) {
@@ -235,13 +270,8 @@ export function classifySensorMetricState(
       INVALID_COPY[metric] ?? "Invalid telemetry detected.";
     return makeState("invalid", metric, copy, false);
   }
-  if (autoStuck) {
-    return makeState(
-      "invalid",
-      metric,
-      STUCK_COPY.soil ?? "Soil moisture appears stuck.",
-      true,
-    );
+  if (stuckWindow) {
+    return makeState("invalid", metric, stuckWindow.message, true);
   }
   if (hasValue && input.isStale) {
     return makeState(

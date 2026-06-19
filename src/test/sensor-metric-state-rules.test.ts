@@ -365,3 +365,97 @@ describe("stale vs invalid caution-tone coverage", () => {
   );
 });
 
+
+import { describeSoilMoistureStuckWindow } from "@/lib/sensorMetricStateRules";
+
+describe("describeSoilMoistureStuckWindow (window-aware)", () => {
+  it("returns null for undefined", () => {
+    expect(describeSoilMoistureStuckWindow(undefined)).toBeNull();
+  });
+  it("returns null for empty array", () => {
+    expect(describeSoilMoistureStuckWindow([])).toBeNull();
+  });
+  it("returns null for fewer than 3 finite values", () => {
+    expect(describeSoilMoistureStuckWindow([0, 0])).toBeNull();
+    expect(describeSoilMoistureStuckWindow([0, null, 0])).toBeNull();
+  });
+  it("[0,0,0] -> stuck at 0%, last 3 readings", () => {
+    const w = describeSoilMoistureStuckWindow([0, 0, 0]);
+    expect(w).not.toBeNull();
+    expect(w!.value).toBe(0);
+    expect(w!.windowLength).toBe(3);
+    expect(w!.message).toContain("0%");
+    expect(w!.message).toContain("last 3 readings");
+  });
+  it("[100,100,100] -> stuck at 100%, last 3 readings", () => {
+    const w = describeSoilMoistureStuckWindow([100, 100, 100]);
+    expect(w!.value).toBe(100);
+    expect(w!.message).toContain("100%");
+    expect(w!.message).toContain("last 3 readings");
+  });
+  it("[0,0,0,0] reports last 4 readings", () => {
+    const w = describeSoilMoistureStuckWindow([0, 0, 0, 0]);
+    expect(w!.windowLength).toBe(4);
+    expect(w!.message).toContain("last 4 readings");
+  });
+  it("[100,100,100,100,100] reports last 5 readings", () => {
+    const w = describeSoilMoistureStuckWindow([100, 100, 100, 100, 100]);
+    expect(w!.windowLength).toBe(5);
+    expect(w!.message).toContain("last 5 readings");
+  });
+  it("mixed values do not classify as stuck", () => {
+    expect(describeSoilMoistureStuckWindow([0, 1, 0])).toBeNull();
+    expect(describeSoilMoistureStuckWindow([100, 0, 100])).toBeNull();
+  });
+});
+
+describe("soil stuck classifier integration (window-aware)", () => {
+  it("missing recentValues + single 0 reading is NOT stuck", () => {
+    const s = classifySensorMetricState({
+      metric: "soil",
+      value: 0,
+      hasAnyReading: true,
+    });
+    expect(s.message).not.toMatch(/stuck/i);
+  });
+  it("missing recentValues + single 100 reading is NOT stuck", () => {
+    const s = classifySensorMetricState({
+      metric: "soil",
+      value: 100,
+      hasAnyReading: true,
+    });
+    expect(s.message).not.toMatch(/stuck/i);
+  });
+  it("[0,0,0,0] produces window-aware copy mentioning last 4 readings", () => {
+    const s = classifySensorMetricState({
+      metric: "soil",
+      value: 0,
+      hasAnyReading: true,
+      recentValues: [0, 0, 0, 0],
+    });
+    expect(s.kind).toBe("invalid");
+    expect(s.tone).toBe("caution");
+    expect(s.message).toContain("0%");
+    expect(s.message).toContain("last 4 readings");
+  });
+  it("valid soil moisture stays calm", () => {
+    for (const v of [15, 45, 80]) {
+      const s = classifySensorMetricState({
+        metric: "soil",
+        value: v,
+        hasAnyReading: true,
+        recentValues: [v, v - 1, v + 1],
+      });
+      expect(s.tone).toBe("calm");
+    }
+  });
+  it("missing soil moisture stays calm", () => {
+    const s = classifySensorMetricState({
+      metric: "soil",
+      value: null,
+      hasAnyReading: false,
+    });
+    expect(s.tone).toBe("calm");
+    expect(s.kind).toBe("not_connected");
+  });
+});

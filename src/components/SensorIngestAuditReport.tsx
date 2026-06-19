@@ -13,9 +13,10 @@
  * - Never writes. Never stores or logs raw payloads. Never puts raw
  *   payload in data-* attributes.
  */
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { formatVpdKpa } from "@/lib/vpdCalculationRules";
 import CanonicalSourceBadge from "@/components/CanonicalSourceBadge";
+import CanonicalSourceLegend from "@/components/CanonicalSourceLegend";
 import {
   buildSensorIngestAuditReportViewModel,
   AUDIT_REPORT_EMPTY_NO_READINGS,
@@ -32,9 +33,15 @@ import {
   type AuditReportFilters,
 } from "@/lib/sensorIngestAuditReportRules";
 import {
-  AUDIT_CSV_FILENAME,
   buildSensorIngestAuditCsv,
+  buildSensorIngestAuditCsvFilename,
 } from "@/lib/sensorIngestAuditReportCsvExport";
+import {
+  applyAuditUrlState,
+  isSafeDeviceQuery,
+  parseAuditUrlState,
+  type AuditUrlState,
+} from "@/lib/sensorIngestAuditReportQueryParams";
 
 export interface SensorIngestAuditReportProps {
   input: Omit<AuditReportInput, "pageSize" | "filters">;
@@ -45,6 +52,18 @@ export interface SensorIngestAuditReportProps {
   /** Enables CSV export. Pass true ONLY from operator-gated surfaces. */
   operatorMode?: boolean;
   className?: string;
+  /**
+   * Optional URL-state binding. When provided AND `operatorMode` is true,
+   * filter state is initialized from `searchParams` and serialized back
+   * via `onSearchParamsChange` on every local filter change.
+   *
+   * The binding is pure: it never triggers a refetch and never alters
+   * row data. Unsafe device queries are dropped before being persisted.
+   */
+  urlBinding?: {
+    searchParams: URLSearchParams;
+    onSearchParamsChange: (next: URLSearchParams) => void;
+  };
 }
 
 function isPageSize(n: number): n is AuditReportPageSize {
@@ -57,13 +76,30 @@ export default function SensorIngestAuditReport({
   onPageSizeChange,
   operatorMode = false,
   className,
+  urlBinding,
 }: SensorIngestAuditReportProps) {
-  const [pageSize, setPageSize] = useState<AuditReportPageSize>(initialPageSize);
+  const urlEnabled = operatorMode && !!urlBinding;
+  // Initialize from URL only when operator-gated binding is provided.
+  const initialFromUrl: AuditUrlState | null = urlEnabled
+    ? parseAuditUrlState(urlBinding!.searchParams)
+    : null;
+
+  const [pageSize, setPageSize] = useState<AuditReportPageSize>(
+    initialFromUrl?.pageSize ?? initialPageSize,
+  );
   const [openRowId, setOpenRowId] = useState<string | null>(null);
-  const [providerFilter, setProviderFilter] = useState<string>("all");
-  const [capturedFrom, setCapturedFrom] = useState<string>("");
-  const [capturedTo, setCapturedTo] = useState<string>("");
-  const [deviceQuery, setDeviceQuery] = useState<string>("");
+  const [providerFilter, setProviderFilter] = useState<string>(
+    initialFromUrl?.provider ?? "all",
+  );
+  const [capturedFrom, setCapturedFrom] = useState<string>(
+    initialFromUrl?.fromDateInput ?? "",
+  );
+  const [capturedTo, setCapturedTo] = useState<string>(
+    initialFromUrl?.toDateInput ?? "",
+  );
+  const [deviceQuery, setDeviceQuery] = useState<string>(
+    initialFromUrl?.deviceQuery ?? "",
+  );
 
   const filters: AuditReportFilters = {
     provider: providerFilter,
@@ -74,8 +110,30 @@ export default function SensorIngestAuditReport({
 
   const vm = useMemo(
     () => buildSensorIngestAuditReportViewModel({ ...input, pageSize, filters }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [input, pageSize, providerFilter, capturedFrom, capturedTo, deviceQuery],
   );
+
+  // Sync filter state -> URL when operator URL binding is active. We skip
+  // the very first render so we don't immediately re-write what we just
+  // parsed (avoids noisy history entries / loops).
+  const firstSyncRef = useRef<boolean>(true);
+  useEffect(() => {
+    if (!urlEnabled || !urlBinding) return;
+    if (firstSyncRef.current) {
+      firstSyncRef.current = false;
+      return;
+    }
+    const next = applyAuditUrlState(urlBinding.searchParams, {
+      provider: providerFilter,
+      fromDateInput: capturedFrom,
+      toDateInput: capturedTo,
+      deviceQuery,
+      pageSize,
+    });
+    urlBinding.onSearchParamsChange(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlEnabled, providerFilter, capturedFrom, capturedTo, deviceQuery, pageSize]);
 
   const rawById = useMemo(() => {
     const m = new Map<string, unknown>();
@@ -87,9 +145,13 @@ export default function SensorIngestAuditReport({
   }, [input.rows]);
 
   function handleCsvExport() {
-    const { csv, filename } = buildSensorIngestAuditCsv(vm.report.rows, {
-      filename: AUDIT_CSV_FILENAME,
+    const filename = buildSensorIngestAuditCsvFilename({
+      provider: providerFilter,
+      capturedFromIso: filters.capturedFromIso,
+      capturedToIso: filters.capturedToIso,
+      // Device search text is intentionally omitted from filenames.
     });
+    const { csv } = buildSensorIngestAuditCsv(vm.report.rows, { filename });
     try {
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
@@ -105,6 +167,12 @@ export default function SensorIngestAuditReport({
     }
   }
 
+  // Reject unsafe device search inputs entirely (never enter state).
+  function handleDeviceQueryChange(value: string) {
+    if (!isSafeDeviceQuery(value)) return;
+    setDeviceQuery(value);
+  }
+
   return (
     <section
       data-testid="sensor-ingest-audit-report"
@@ -116,7 +184,10 @@ export default function SensorIngestAuditReport({
         .join(" ")}
     >
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">Sensor ingest audit</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-medium">Sensor ingest audit</h3>
+          <CanonicalSourceLegend testId="audit-source-legend" />
+        </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <label htmlFor="audit-provider-filter" className="text-muted-foreground">
             Provider
@@ -167,7 +238,8 @@ export default function SensorIngestAuditReport({
             placeholder="safe display id"
             className="bg-background border rounded px-1 py-0.5"
             value={deviceQuery}
-            onChange={(e) => setDeviceQuery(e.target.value)}
+            onChange={(e) => handleDeviceQueryChange(e.target.value)}
+            maxLength={64}
           />
           <label htmlFor="audit-page-size" className="text-muted-foreground">
             Show last

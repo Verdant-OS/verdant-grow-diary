@@ -20,6 +20,7 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
 import type { AiDoctorContextPayload } from "@/lib/aiDoctorEnginePhase1Foundation";
+import { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } from "@/lib/aiDoctorPhase1A11yClassNames";
 
 export type AiDoctorPhase1ChecklistStatus =
   | "available"

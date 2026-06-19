@@ -19,6 +19,7 @@ import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import EnvironmentCheckTimelineBadge from "@/components/EnvironmentCheckTimelineBadge";
+import EnvironmentCheckSnapshotLinkButton from "@/components/EnvironmentCheckSnapshotLinkButton";
 import AiDoctorCheckInTimelineBadge from "@/components/AiDoctorCheckInTimelineBadge";
 import {
   buildEnvironmentCheckDiaryViewModel,
@@ -936,7 +937,29 @@ export default function Timeline() {
                                     vpdKpa: num("vpd_kpa") ?? num("vpdKpa"),
                                   },
                                 });
-                                return <EnvironmentCheckTimelineBadge viewModel={vm} />;
+                                return (
+                                  <>
+                                    <EnvironmentCheckTimelineBadge viewModel={vm} />
+                                    <EnvironmentCheckSnapshotLinkButton
+                                      entry={{
+                                        id: e.id,
+                                        tentId: e.tent_id ?? null,
+                                        plantId: e.plant_id ?? null,
+                                        capturedAt: String(
+                                          (e as { occurred_at?: string; created_at?: string }).occurred_at ??
+                                            (e as { created_at?: string }).created_at ??
+                                            "",
+                                        ),
+                                        sensorSnapshotId:
+                                          typeof (details as { sensor_snapshot_id?: unknown }).sensor_snapshot_id === "string"
+                                            ? ((details as { sensor_snapshot_id?: string }).sensor_snapshot_id ?? null)
+                                            : null,
+                                        source: typeof src === "string" ? src : null,
+                                      }}
+                                      snapshots={[]}
+                                    />
+                                  </>
+                                );
                               })()}
                             </>
                           );

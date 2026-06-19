@@ -59,8 +59,12 @@ describe("paid-launch entitlement blocker doc", () => {
     expect(doc).toMatch(/premium-export-entitlement/);
   });
 
-  it("marks Live sensor surfaces as PAID-LAUNCH BLOCKED", () => {
-    expect(doc).toMatch(/Live sensor surfaces[\s\S]*PAID-LAUNCH BLOCKED/);
+  it("marks Live sensor surfaces as DOCUMENTED / NO ACTIVE PREMIUM SURFACE with server gate scaffold", () => {
+    expect(doc).toMatch(
+      /Live sensor surfaces[\s\S]*DOCUMENTED \/ NO ACTIVE PREMIUM LIVE-SENSOR SURFACE/,
+    );
+    expect(doc).toMatch(/live-sensor-entitlement/);
+    expect(doc).toMatch(/useLiveSensorServerGate/);
   });
 
   it("asserts founder-lifetime bypass is server-validated, not client-trustable", () => {

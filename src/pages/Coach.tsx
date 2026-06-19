@@ -6,7 +6,7 @@ import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Camera, Loader2, Wand2, ListChecks, Plus } from "lucide-react";
+import { Sparkles, Camera, Loader2, Wand2, ListChecks, Plus, Upload } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGrowPlants,

@@ -13,7 +13,7 @@
  * - Never writes. Never stores or logs raw payloads. Never puts raw
  *   payload in data-* attributes.
  */
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { formatVpdKpa } from "@/lib/vpdCalculationRules";
 import CanonicalSourceBadge from "@/components/CanonicalSourceBadge";
 import {

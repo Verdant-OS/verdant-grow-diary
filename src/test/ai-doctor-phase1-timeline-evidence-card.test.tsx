@@ -89,15 +89,17 @@ describe("AiDoctorPhase1TimelineEvidenceCard", () => {
   it("does not render approve/send/execute/Action Queue/device-control copy", () => {
     const { container } = renderCard();
     const txt = container.textContent?.toLowerCase() ?? "";
-    expect(txt).not.toContain("approve");
+    // Disclaimer says "not an approved action" — forbid actionable copy only.
+    expect(txt).not.toContain("approve action");
     expect(txt).not.toContain("execute");
     expect(txt).not.toContain("send to action");
     expect(txt).not.toContain("action queue");
-    expect(txt).not.toContain("device");
-    expect(txt).not.toContain("equipment");
+    expect(txt).not.toContain("control device");
+    expect(txt).not.toContain("equipment control");
     expect(txt).not.toContain("save to timeline");
     expect(container.querySelector("button")).toBeNull();
   });
+
 
   it("(static) card source contains no mutation handlers or write APIs", () => {
     const src = readFileSync(

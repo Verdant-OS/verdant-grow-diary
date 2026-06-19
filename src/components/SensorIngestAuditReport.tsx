@@ -250,9 +250,8 @@ export default function SensorIngestAuditReport({
               const isOpen = openRowId === r.id;
               const preview = isOpen ? buildSafeRawPayloadPreview(rawById.get(r.id)) : null;
               return (
-                <>
+                <Fragment key={r.id}>
                   <tr
-                    key={r.id}
                     data-testid={`audit-row-${r.id}`}
                     data-source={r.source}
                     data-provider={r.provider ?? ""}

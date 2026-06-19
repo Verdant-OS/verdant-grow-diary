@@ -566,6 +566,28 @@ function useDerivedAiDoctorPhase1Bundle(
   return { context, result };
 }
 
+function mapDiaryRowsToRecentActivity(
+  rows: ReadonlyArray<Record<string, unknown>>,
+): AiDoctorPhase1RecentActivityRow[] {
+  const out: AiDoctorPhase1RecentActivityRow[] = [];
+  for (const row of rows ?? []) {
+    if (!row) continue;
+    const id = typeof row.id === "string" ? row.id : null;
+    const occurred_at =
+      (typeof row.entry_at === "string" ? row.entry_at : null) ??
+      (typeof row.created_at === "string" ? row.created_at : null);
+    if (!id || !occurred_at) continue;
+    out.push({
+      id,
+      occurred_at,
+      event_type:
+        typeof row.entry_type === "string" ? row.entry_type : null,
+      notes: typeof row.notes === "string" ? row.notes : null,
+    });
+  }
+  return out;
+}
+
 function OperatorAiDoctorPhase1SmartView(props: {
   plants: ReadonlyArray<AiDoctorPhase1PlantOption>;
   rawPlants: ReadonlyArray<RawPlantRow>;
@@ -575,14 +597,28 @@ function OperatorAiDoctorPhase1SmartView(props: {
   const selectedRaw =
     props.rawPlants.find((p) => p.id === plantId) ?? null;
   const bundle = useDerivedAiDoctorPhase1Bundle(selectedRaw);
+  const diary = usePlantRecentActivity(selectedRaw?.id ?? null);
+  const recentActivity = React.useMemo(
+    () => mapDiaryRowsToRecentActivity(
+      (diary.data ?? []) as ReadonlyArray<Record<string, unknown>>,
+    ),
+    [diary.data],
+  );
   const getResultForPlant = React.useCallback(
     (id: string) => (selectedRaw && id === selectedRaw.id ? bundle : null),
     [selectedRaw, bundle],
   );
+  const getRecentActivityForPlant = React.useCallback(
+    (id: string) => (selectedRaw && id === selectedRaw.id ? recentActivity : []),
+    [selectedRaw, recentActivity],
+  );
+  const isDerivingResult = !!selectedRaw && !bundle;
   return (
     <OperatorAiDoctorPhase1
       plants={props.plants}
       getResultForPlant={getResultForPlant}
+      getRecentActivityForPlant={getRecentActivityForPlant}
+      isDerivingResult={isDerivingResult}
     />
   );
 }

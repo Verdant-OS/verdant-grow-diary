@@ -19,6 +19,7 @@ import EnvironmentSummaryPrintCoverPage from "@/components/EnvironmentSummaryPri
 import PaywallCta from "@/components/PaywallCta";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { useEnvironmentSummaryReportServerGate } from "@/hooks/useEnvironmentSummaryReportServerGate";
 import { buildPaywallCtaViewModel } from "@/lib/paywallCtaViewModel";
 import {
   buildEnvironmentCheckDiaryViewModel,

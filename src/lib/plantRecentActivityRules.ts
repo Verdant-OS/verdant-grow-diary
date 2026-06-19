@@ -47,7 +47,7 @@ export interface PlantRecentActivityRow {
    * "Visual record · no AI analysis" label. False when entry is linked
    * to a saved AI Doctor session/result.
    */
-  showPhotoNonDiagnosticLabel: boolean;
+  showPhotoNonDiagnosticLabel?: boolean;
 }
 
 const NOTE_PREVIEW_MAX = 140;

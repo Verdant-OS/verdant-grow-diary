@@ -527,6 +527,7 @@ export default function PlantDetail() {
             growId: plant.growId ?? null,
             lastNote: plant.lastNote,
             isArchived: plant.isArchived ?? false,
+            photo: plant.photo ?? null,
           }}
           variant="row"
           hideView

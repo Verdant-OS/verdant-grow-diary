@@ -683,6 +683,7 @@ export default function TentDetail() {
                         growId: p.growId ?? tent.growId ?? null,
                         lastNote: p.lastNote,
                         isArchived: p.isArchived ?? false,
+                        photo: p.photo ?? null,
                       }}
                     />
                   </div>

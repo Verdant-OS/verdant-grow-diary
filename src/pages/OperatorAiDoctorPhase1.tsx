@@ -29,6 +29,7 @@ import {
   type AiDoctorPhase1RecentActivityRow,
 } from "@/components/AiDoctorPhase1EvidenceShortcuts";
 import { AiDoctorPhase1MissingContextChecklist } from "@/components/AiDoctorPhase1MissingContextChecklist";
+import { AiDoctorPhase1SaveEvidenceButton } from "@/components/AiDoctorPhase1SaveEvidenceButton";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";

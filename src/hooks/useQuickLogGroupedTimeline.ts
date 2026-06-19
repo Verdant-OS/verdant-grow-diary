@@ -130,16 +130,8 @@ export function useQuickLogGroupedTimeline(
     enabled: scope !== null,
     queryFn: async (): Promise<QuickLogTimelineEntry[]> => {
       if (!scope) return [];
-      const [rows, diaryRows] = await Promise.all([
-        fetchRows(scope, limit),
-        fetchAiDoctorPhase1DiaryRows(scope, limit),
-      ]);
+      const rows = await fetchRows(scope, limit);
       const { actions, environmentRows } = partitionQuickLogRows(rows);
-      const evidenceIndex = buildAiDoctorPhase1EvidenceIndex(diaryRows);
-      const enrichedActions = attachAiDoctorPhase1EvidenceToActionEvents(
-        actions,
-        evidenceIndex,
-      );
       const vmScope =
         scope.kind === "plant"
           ? ({
@@ -149,19 +141,53 @@ export function useQuickLogGroupedTimeline(
             } as QuickLogV2SnapshotScope)
           : ({ kind: "tent", tentId: scope.tentId } as QuickLogV2SnapshotScope);
       return groupQuickLogTimelineEntries({
-        actions: enrichedActions,
+        actions,
         environmentRows,
         scope: vmScope,
       });
     },
-
   });
+
+  // Read-only AI Doctor Phase 1 evidence enrichment runs as a separate
+  // query so that:
+  //  - the primary timeline still renders if diary enrichment fails;
+  //  - existing tests that mock only the `grow_events` fetch path keep
+  //    working without modification.
+  const diaryQuery = useQuery<RawDiaryEntryRow[]>({
+    queryKey: [
+      "quick_log_grouped_timeline__ai_doctor_phase1_evidence",
+      scope?.kind ?? "none",
+      scope?.kind === "plant" ? scope.plantId : null,
+      scope?.kind === "tent" ? scope.tentId : null,
+      limit,
+    ],
+    enabled: scope !== null,
+    queryFn: async () => (scope ? fetchAiDoctorPhase1DiaryRows(scope, limit) : []),
+  });
+
+  const baseEntries = query.data ?? [];
+  const diaryRows = diaryQuery.data ?? [];
+  const evidenceIndex = buildAiDoctorPhase1EvidenceIndex(diaryRows);
+  const entries =
+    evidenceIndex.size === 0
+      ? baseEntries
+      : baseEntries.map((entry) => {
+          if (entry.kind === "environment") return entry;
+          const enriched = attachAiDoctorPhase1EvidenceToActionEvents(
+            [entry.action],
+            evidenceIndex,
+          )[0];
+          if (enriched === entry.action) return entry;
+          return { ...entry, action: enriched };
+        });
+
   return {
-    entries: query.data ?? [],
+    entries,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,
     error: query.error,
   };
 }
+
 

@@ -39,6 +39,8 @@ describe("buildSoilMoistureReadingViewModel", () => {
     expect(vm.rawValue).toBe(45);
     expect(vm.calibratedValue).toBe(52);
     expect(vm.primaryLine).toBe("Soil moisture: 52% calibrated");
+    expect(vm.calibrationBadgeLabel).toBe("Calibrated");
+    expect(vm.calibrationBadgeTone).toBe("ok");
   });
 
   it("labels calibrated value separately from raw value", () => {
@@ -63,6 +65,8 @@ describe("buildSoilMoistureReadingViewModel", () => {
     expect(vm.primaryLine).toBe("Soil moisture: 45% raw");
     expect(vm.calibrationLine).toBe("Calibration: Not applied");
     expect(vm.rawLine).toBeNull();
+    expect(vm.calibrationBadgeLabel).toBe("Uncalibrated");
+    expect(vm.calibrationBadgeTone).toBe("muted");
   });
 
   it("labels invalid calibration as unavailable and keeps raw display", () => {
@@ -81,6 +85,8 @@ describe("buildSoilMoistureReadingViewModel", () => {
     expect(vm.calibratedValue).toBeNull();
     expect(vm.primaryLine).toBe("Soil moisture: 45% raw");
     expect(vm.calibrationLine).toBe("Calibration unavailable — invalid baseline");
+    expect(vm.calibrationBadgeLabel).toBe("Calibration unavailable");
+    expect(vm.calibrationBadgeTone).toBe("caution");
   });
 
   it("keeps demo source labeling visible and does not promote it to live", () => {

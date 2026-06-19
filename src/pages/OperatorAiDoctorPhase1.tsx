@@ -358,6 +358,7 @@ export default function OperatorAiDoctorPhase1(
           <AiDoctorPhase1MissingContextChecklist
             context={null}
             ctaContext={ctaContext}
+            plantName={plantNameForAria}
           />
         </>
       )}

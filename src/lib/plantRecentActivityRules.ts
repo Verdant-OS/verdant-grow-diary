@@ -88,6 +88,10 @@ function toRow(
     warnings: entry.warnings,
     hasHardwareReadings: split.hasHardwareBlock,
     hardwareReadingLines: split.hardwareLines,
+    showPhotoNonDiagnosticLabel: shouldShowPhotoNonDiagnosticLabel({
+      hasPhoto: !!entry.photoUrl,
+      details: entry.details.extras,
+    }),
   };
 }
 

@@ -252,7 +252,7 @@ export function mapPlantsToPickerOptions(
     if (t?.id && typeof t.name === "string") tentNameById.set(t.id, t.name);
   }
   return plants
-    .filter((p): p is RawPlantRow => !!p && typeof p.id === "string")
+    .filter((p): p is RawPlantRow => !!p && typeof p.id === "string" && p.id.length > 0)
     .map((p) => ({
       id: p.id,
       name: p.name ?? p.id,

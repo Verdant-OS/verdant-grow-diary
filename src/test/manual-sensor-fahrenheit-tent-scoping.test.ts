@@ -89,15 +89,22 @@ describe("Manual sensor temperature is collected and labeled in Fahrenheit", () 
   });
 });
 
-describe("UI surfaces render stored Celsius as user-facing Fahrenheit", () => {
-  it("Dashboard, TentDetail, and plant env rules use °F + tempFFromC", () => {
+describe("UI surfaces render stored Celsius via the preferred display unit", () => {
+  it("Dashboard uses the centralized temperatureUnitPreference helper", () => {
     const dashVm = read("src/lib/dashboardEnvironmentSnapshotViewModel.ts");
-    const dashAll = DASHBOARD + "\n" + dashVm;
-    for (const src of [dashAll, TENT_DETAIL]) {
-      expect(src).toMatch(/°F/);
-      expect(src).toMatch(/tempFFromC/);
-      expect(src).not.toMatch(/°C/);
-    }
+    // The view-model still computes a Fahrenheit number internally for
+    // legacy consumers, but the Dashboard page now formats via the
+    // preference-aware helper so user preference flows end-to-end.
+    expect(dashVm).toMatch(/tempFFromC/);
+    expect(DASHBOARD).toMatch(/formatTemperatureDisplay/);
+    expect(DASHBOARD).toMatch(/@\/lib\/temperatureUnitPreference/);
+  });
+
+  it("TentDetail metric chip uses convertCelsiusForDisplay + getTemperatureUnitSymbol", () => {
+    expect(TENT_DETAIL).toMatch(/convertCelsiusForDisplay\(snap\.temp\)/);
+    expect(TENT_DETAIL).toMatch(/getTemperatureUnitSymbol\(\)/);
+    expect(TENT_DETAIL).toMatch(/@\/lib\/temperatureUnitPreference/);
+  });
     const panelRules = read("src/lib/plantTentEnvironmentRules.ts");
     expect(panelRules).toMatch(/"°F"/);
     expect(panelRules).toMatch(/tempFFromC/);

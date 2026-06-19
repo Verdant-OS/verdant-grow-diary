@@ -448,18 +448,12 @@ export default function QuickLogV2Sheet({
     // local-state Timeline page can refetch. Dispatched once per
     // successful save, after every required write (log + optional photo)
     // has resolved.
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("verdant:entry-created", {
-          detail: {
-            createdAt: new Date().toISOString(),
-            growEventId:
-              (res as { growEventId?: string | null }).growEventId ?? null,
-            source: "quick_log_v2",
-          },
-        }),
-      );
-    }
+    dispatchQuickLogV2EntryCreated({
+      createdAt: new Date().toISOString(),
+      growEventId:
+        (res as { growEventId?: string | null }).growEventId ?? null,
+      source: "quick_log_v2",
+    });
     resetPhotoSelection();
     onOpenChange(false);
   };

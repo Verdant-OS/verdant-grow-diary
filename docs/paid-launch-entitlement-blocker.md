@@ -56,10 +56,30 @@ status for any other surface.
   error page, no client-side bypass path.
 - Client-side entitlement state is not authoritative.
 
-### Premium CSV / report exporters (`src/lib/*Export*`)
-- **Status:** PAID-LAUNCH BLOCKED — CLIENT-ONLY.
-- All current export builders run in the browser. No server-side gate.
-- Same risk class as Environment Summary Report.
+### Premium CSV / report exporters (`src/lib/*Export*`, AI Doctor PDF/CSV/Package)
+- **Status:** SERVER-GATED PREFLIGHT (paid-launch blocker fixed for this surface).
+- Path: download button click → `checkPremiumExportEntitlement(feature)` →
+  `supabase.functions.invoke('premium-export-entitlement', { body: { feature } })` →
+  edge function verifies JWT (`auth.getUser`) → reads
+  `public.billing_subscriptions` (RLS select-own; no service_role) →
+  runs the pure `resolveEntitlements()` server-side → returns 200 only when
+  `capabilities.advancedExports === true`. All other outcomes return 403
+  (`upgrade_required`) or fail closed.
+- Premium exports currently in scope:
+  `ai_doctor_report` (AI Doctor PDF), `ai_doctor_evidence_csv`,
+  `ai_doctor_report_package`. Generation runs client-side only AFTER the
+  server preflight returns `ok: true` for the matching feature label.
+- Failure mode on denial: the panel renders the inline paywall copy
+  ("Premium exports are a Pro feature. Upgrade required to export this
+  report.") via the existing `package-message` slot. No crash, no generic
+  error, no client-side bypass — the download functions are never invoked
+  when the gate denies.
+- **Remaining residual risk:** the actual PDF/CSV bytes are still generated
+  in the browser from already-redacted view-model inputs (the same inputs
+  used for on-screen rendering). A determined attacker who has somehow
+  evaded auth could not benefit from the preflight, but also could not
+  read any premium-only data they did not already see on screen.
+- Client-side entitlement state is not authoritative.
 
 ### Live sensor surfaces (`capabilities.liveSensors`)
 - **Status:** PAID-LAUNCH BLOCKED — CLIENT-GATED ONLY.

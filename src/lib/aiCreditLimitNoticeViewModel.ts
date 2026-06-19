@@ -102,12 +102,32 @@ export interface AiCreditLimitNoticeInput {
   surface?: AiCreditLimitNoticeSurface;
 }
 
+export interface AiCreditLimitNoticeInput {
+  credit: AiCreditDenial;
+  currentPlanLabel?: string;
+  /** Defaults to "doctor" to preserve S3.0 behavior. */
+  surface?: AiCreditLimitNoticeSurface;
+  /**
+   * Optional viewer entitlement. When provided, paid/founder viewers
+   * bypass the "free → upsell" branch defensively, even if the server
+   * denial mis-tagged plan_id="free". Never grants credits; only
+   * downgrades upsell copy to plan-neutral "wait" copy.
+   */
+  viewerEntitlement?: ResolvedEntitlement | null;
+}
+
 export function buildAiCreditLimitNoticeViewModel(
   input: AiCreditLimitNoticeInput,
 ): AiCreditLimitNoticeViewModel {
   const surface: AiCreditLimitNoticeSurface = input.surface ?? "doctor";
   const copy = copyFor(surface);
-  const planId = input.credit?.plan_id;
+  const viewerView: AiDoctorEntitlementView = resolveAiDoctorEntitlementView({
+    entitlement: input.viewerEntitlement ?? null,
+  });
+  const planId = reconcileAiCreditDenialPlanId({
+    denialPlanId: input.credit?.plan_id,
+    view: viewerView,
+  });
 
   if (planId === "free") {
     const paywallVm = buildPaywallCtaViewModel({

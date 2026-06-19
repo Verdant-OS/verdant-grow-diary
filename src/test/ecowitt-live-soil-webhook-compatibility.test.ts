@@ -162,16 +162,24 @@ describe("EcoWitt bridge → ingest webhook compatibility (mocked)", () => {
   });
 });
 
-describe("EcoWitt webhook-compat test file safety", () => {
-  const self = readFileSync(__filename, "utf8");
-  it("does not import @supabase/supabase-js", () => {
-    expect(self).not.toMatch(/@supabase\/supabase-js/);
+describe("EcoWitt webhook-compat — bridge + dry-run script safety", () => {
+  const bridgeSrc = readFileSync(
+    resolve(__dirname, "../../scripts/ecowitt-live-soil-bridge.ts"),
+    "utf8",
+  );
+  const drySrc = readFileSync(
+    resolve(__dirname, "../../scripts/ecowitt-live-soil-dry-run.ts"),
+    "utf8",
+  );
+  it("bridge does not import @supabase/supabase-js", () => {
+    expect(bridgeSrc).not.toMatch(/from\s+["']@supabase\/supabase-js["']/);
+    expect(drySrc).not.toMatch(/from\s+["']@supabase\/supabase-js["']/);
   });
-  it("does not reference service_role", () => {
-    expect(self).not.toMatch(/service_role/i);
-    expect(self).not.toMatch(/SERVICE_ROLE/);
+  it("bridge does not reference service_role secrets", () => {
+    expect(bridgeSrc).not.toMatch(/SERVICE_ROLE_KEY/);
+    expect(drySrc).not.toMatch(/SERVICE_ROLE_KEY/);
   });
-  it("does not call the real fetch (no top-level fetch( call)", () => {
-    expect(self).not.toMatch(/^\s*fetch\s*\(/m);
+  it("dry-run script never calls real fetch", () => {
+    expect(drySrc).not.toMatch(/\bfetch\s*\(/);
   });
 });

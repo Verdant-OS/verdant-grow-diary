@@ -29,6 +29,16 @@ const NEEDS_LABEL = "Needs temperature + humidity";
 
 export const VPD_NEEDS_INPUTS_LABEL = NEEDS_LABEL;
 export const VPD_DERIVED_NOTE = "Calculated from temperature and humidity.";
+export const VPD_ROUNDING_NOTE = "Rounded to 2 decimals.";
+
+/**
+ * Format a VPD value as kPa with a stable 2-decimal precision.
+ * Returns "—" for invalid/non-finite input rather than throwing.
+ */
+export function formatVpdKpa(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+  return `${value.toFixed(2)} kPa`;
+}
 
 function isFiniteNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);

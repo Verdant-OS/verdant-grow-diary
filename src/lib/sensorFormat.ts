@@ -23,6 +23,10 @@
  */
 import type { SensorFieldKey } from "@/constants/sensorFields";
 import { celsiusToFahrenheit } from "@/lib/temperatureUnits";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+} from "@/lib/temperatureUnitPreference";
 
 const UNIT_BY_FIELD: Record<SensorFieldKey, string> = {
   air_temp_c: "°F",
@@ -55,6 +59,9 @@ const TEMPERATURE_FIELDS = new Set<SensorFieldKey>(["air_temp_c", "soil_temp_c"]
 export const DERIVED_LABEL = "Derived" as const;
 
 export function sensorFieldUnit(field: SensorFieldKey | string): string {
+  if (TEMPERATURE_FIELDS.has(field as SensorFieldKey)) {
+    return getTemperatureUnitSymbol();
+  }
   return UNIT_BY_FIELD[field as SensorFieldKey] ?? "";
 }
 
@@ -68,7 +75,9 @@ export function sensorFieldDecimals(field: SensorFieldKey | string): number {
  * null/undefined/non-finite. Never appends a "derived" marker.
  *
  * Temperature fields (`air_temp_c`, `soil_temp_c`) are converted from
- * the stored Celsius value to user-facing Fahrenheit before formatting.
+ * the stored Celsius value to the user's preferred display unit
+ * (default Fahrenheit) at this presenter boundary. Stored values are
+ * never mutated and conversion happens exactly once.
  */
 export function formatSensorValue(
   field: SensorFieldKey | string,
@@ -78,13 +87,20 @@ export function formatSensorValue(
     return "—";
   }
   const digits = sensorFieldDecimals(field);
-  const unit = sensorFieldUnit(field);
-  const display = TEMPERATURE_FIELDS.has(field as SensorFieldKey)
-    ? celsiusToFahrenheit(value as number)
+  const isTemp = TEMPERATURE_FIELDS.has(field as SensorFieldKey);
+  const unit = isTemp
+    ? getTemperatureUnitSymbol()
+    : (UNIT_BY_FIELD[field as SensorFieldKey] ?? "");
+  const display = isTemp
+    ? (convertCelsiusForDisplay(value as number) as number)
     : (value as number);
   const num = display.toFixed(digits);
   return unit ? `${num} ${unit}` : num;
 }
+
+// Retained re-export to avoid breaking any callers that import the
+// legacy conversion symbol from this module.
+export { celsiusToFahrenheit };
 
 export interface FormattedSensorReading {
   value: string;

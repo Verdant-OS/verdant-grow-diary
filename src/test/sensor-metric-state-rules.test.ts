@@ -5,6 +5,9 @@ import {
   classifySensorMetricState,
   isOptionalMetric,
   isCoreMetric,
+  isOptionalMetricInvalid,
+  isSoilMoistureStuck,
+  type SensorMetricKey,
 } from "@/lib/sensorMetricStateRules";
 
 describe("sensorMetricStateRules", () => {

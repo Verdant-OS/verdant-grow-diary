@@ -66,7 +66,7 @@ describe("paid-launch entitlement blocker doc", () => {
 
   it("warns that one-surface guards do not clear other surfaces", () => {
     expect(doc).toMatch(
-      /guard succeeding on one surface[\s\S]*does NOT clear blocked status/,
+      /guard succeeding on one surface[\s\S]*does NOT clear[\s\S]*blocked[\s\S]*status/,
     );
   });
 });

@@ -44,6 +44,7 @@ export interface RawSensorReadingRow {
 export interface SensorIngestAuditRow {
   id: string;
   capturedAt: string | null;
+  acceptedAtMs: number | null;
   accepted: boolean;
   reason: string;
   source: CanonicalSource | "unknown";
@@ -54,9 +55,26 @@ export interface SensorIngestAuditRow {
   metricSummary: string;
   vpdKpa: number | null;
   soilMoisturePct: number | null;
+  humidityPct: number | null;
+  airTemperatureC: number | null;
   freshness: "fresh" | "stale" | "unknown";
   confidence: number | null;
   rawPayloadRedacted: string;
+  /** Safe/redacted device or station display ID; null when unsafe/missing. */
+  deviceStationDisplayId: string | null;
+}
+
+export interface AuditReportFilters {
+  /** Provider key (e.g. "ecowitt"). "all" or undefined = no filter. */
+  provider?: string | "all" | null;
+  /** ISO captured_at range (local-only filter). */
+  capturedFromIso?: string | null;
+  capturedToIso?: string | null;
+  /**
+   * Free-text search over the safe/redacted device/station display ID
+   * ONLY. Never against raw payload secrets.
+   */
+  deviceStationQuery?: string | null;
 }
 
 export interface AuditReportInput {
@@ -64,12 +82,17 @@ export interface AuditReportInput {
   pageSize?: AuditReportPageSize;
   now?: Date;
   staleMs?: number;
+  filters?: AuditReportFilters;
 }
 
 export interface AuditReport {
   rows: SensorIngestAuditRow[];
   pageSize: AuditReportPageSize;
   note: typeof REJECTED_NOT_PERSISTED_NOTE;
+  /** Distinct provider keys observed in the supplied rows (lowercased). */
+  availableProviders: string[];
+  /** Total rows after filtering, before last-N slicing. */
+  filteredTotal: number;
 }
 
 const DEFAULT_STALE_MS = 15 * 60 * 1000;

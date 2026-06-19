@@ -228,6 +228,58 @@ export function buildMeasurementHistory(
   });
 }
 
+function normalizeRecentText(value: string): string {
+  return value.replace(/\s+/gu, " ").trim();
+}
+
+function recentCompanionKey(row: QuickLogHistoryRow): string | null {
+  const note = normalizeRecentText(row.noteBody);
+  if (!row.occurredAt || !row.eventType || !note) return null;
+  return [
+    row.plantId ?? "",
+    row.tentId ?? "",
+    row.occurredAt,
+    row.eventType,
+    note,
+  ].join("||");
+}
+
+function recentRowRichness(row: QuickLogHistoryRow): number {
+  let score = 0;
+  if (row.manualHandheld) score += 4;
+  if (row.photoUrl) score += 2;
+  if (row.noteBody.trim()) score += 1;
+  return score;
+}
+
+/**
+ * A Quick Log can legitimately exist as a parent `grow_events` row plus a
+ * richer companion `diary_entries` row. Recent activity should show the richer
+ * companion once, not both rows. Only exact plant/tent/timestamp/event/note
+ * matches are collapsed; orphan diary rows and grow_event-only rows still show.
+ */
+export function dedupeRecentQuickLogCompanionRows(
+  rows: readonly QuickLogHistoryRow[],
+): QuickLogHistoryRow[] {
+  const keyed = new Map<string, QuickLogHistoryRow>();
+  const passthrough: QuickLogHistoryRow[] = [];
+
+  for (const row of rows) {
+    const key = recentCompanionKey(row);
+    if (!key) {
+      passthrough.push(row);
+      continue;
+    }
+
+    const existing = keyed.get(key);
+    if (!existing || recentRowRichness(row) > recentRowRichness(existing)) {
+      keyed.set(key, row);
+    }
+  }
+
+  return [...keyed.values(), ...passthrough];
+}
+
 /**
  * The top-of-page "Recent activity" feed — newest Quick Log entries
  * regardless of lane. Used so growers always see what they just saved.
@@ -236,7 +288,7 @@ export function buildRecentQuickLogActivity(
   entries: readonly NormalizedDiaryEntry[],
   limit = 10,
 ): QuickLogHistoryRow[] {
-  const rows = entries.map(toRow);
+  const rows = dedupeRecentQuickLogCompanionRows(entries.map(toRow));
   rows.sort(compareNewestFirst);
   return rows.slice(0, Math.max(0, limit));
 }

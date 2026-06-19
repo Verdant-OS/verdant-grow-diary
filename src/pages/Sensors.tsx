@@ -438,6 +438,7 @@ export default function Sensors() {
             }}
           />
           <SensorIngestAuditReport
+            operatorMode
             input={{
               rows: filtered.map((r, i) => ({
                 id: (r as unknown as { id?: string }).id ?? `r-${i}`,

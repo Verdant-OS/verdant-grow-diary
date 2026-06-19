@@ -28,6 +28,7 @@ import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDiscl
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useGrows } from "@/store/grows";
 import OnboardingChecklistCard from "@/components/OnboardingChecklistCard";
+import FirstRunChecklist from "@/components/FirstRunChecklist";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
 
@@ -277,6 +278,17 @@ export default function Dashboard() {
       <div className="my-3">
         <OnboardingChecklistCard vm={onboardingVm} />
       </div>
+
+      <div className="my-3">
+        <FirstRunChecklist
+          growCount={grows.length}
+          tentCount={tents.length}
+          plantCount={plants.length}
+          quickLogCount={diaryRecentCount}
+          sensorSnapshotCount={rawReadings.length}
+        />
+      </div>
+
 
       {/* Dashboard intentionally has a single Quick Log entry point (QuickLogV2Fab).
           The "Log your first plant memory" CTA was a duplicate entry point and was removed.

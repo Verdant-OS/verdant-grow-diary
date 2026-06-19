@@ -499,9 +499,12 @@ const MATRIX: readonly MatrixRow[] = [
 describe("photo-context matrix", () => {
   for (const row of MATRIX) {
     it(row.label, async () => {
-      const sensorReadings: NonNullable<
-        CompileAiDoctorContextPayloadFromRowsInput["sensorReadings"]
-      > = [];
+      const sensorReadings: Array<{
+        metric: AiDoctorMetricKey;
+        value: number;
+        captured_at: string;
+        source: AiDoctorSensorSource;
+      }> = [];
       if (row.validSensor) {
         sensorReadings.push({
           metric: "temperature_c",
@@ -518,18 +521,15 @@ describe("photo-context matrix", () => {
           source: "invalid",
         });
       }
-      const photos: NonNullable<
-        CompileAiDoctorContextPayloadFromRowsInput["photos"]
-      > = [];
+      const photos: Array<{ captured_at: string }> = [];
       if (row.recentPhoto) photos.push({ captured_at: iso(120_000) });
       if (row.oldPhotoOnly) {
         photos.push({ captured_at: iso(40 * 24 * 60 * 60 * 1000) });
       }
-      const logs: NonNullable<
-        CompileAiDoctorContextPayloadFromRowsInput["logs"]
-      > = row.recentLog
-        ? [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }]
-        : [];
+      const logs: Array<{ occurred_at: string; event_type: string; source: string }> =
+        row.recentLog
+          ? [{ occurred_at: iso(60_000), event_type: "watering", source: "manual" }]
+          : [];
 
       const ctx = compileAiDoctorContextPayloadFromRows(
         basePlant({ logs, photos, sensorReadings }),

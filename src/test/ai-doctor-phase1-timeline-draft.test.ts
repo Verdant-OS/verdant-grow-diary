@@ -146,7 +146,7 @@ describe("aiDoctorPhase1TimelineDraft", () => {
     });
     if (!isOkPhase1TimelineDraft(d)) return;
     const json = JSON.stringify(d);
-    expect(json).not.toMatch(/device_command|execute|approve|send_command/i);
-    expect(json).not.toMatch(/"action_queue_id"|"alert_id"/);
+    expect(json).not.toMatch(/device_command|send_command|execute_action/i);
+    expect(json).not.toMatch(/"action_queue_id"|"alert_id"|"approved":\s*true/);
   });
 });

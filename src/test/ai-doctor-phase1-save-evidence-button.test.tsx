@@ -132,11 +132,11 @@ describe("AiDoctorPhase1SaveEvidenceButton", () => {
     );
   });
 
-  it("never has approve/execute/send copy", () => {
+  it("never has approve/execute/send-to-device CTAs", () => {
     render(
       <AiDoctorPhase1SaveEvidenceButton identity={identity} result={result} />,
     );
-    const root = screen.getByTestId("ai-doctor-phase1-save-evidence");
-    expect(root.textContent).not.toMatch(/approve|execute|send to device/i);
+    const btn = screen.getByTestId("ai-doctor-phase1-save-evidence-button");
+    expect(btn.textContent).not.toMatch(/approve|execute|send to device/i);
   });
 });

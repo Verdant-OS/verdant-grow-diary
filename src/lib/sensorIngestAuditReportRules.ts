@@ -94,6 +94,30 @@ const REDACT_KEYS = new Set([
   "ip_address",
 ]);
 
+/**
+ * Heuristics for "this looks like a secret value we cannot confidently
+ * redact". If any such value appears in a *non*-redacted key, the safe
+ * preview should be hidden entirely.
+ */
+const SUSPICIOUS_VALUE_PATTERNS: RegExp[] = [
+  /Bearer\s+[A-Za-z0-9._-]{8,}/i,
+  /\b[A-Fa-f0-9]{2}(:[A-Fa-f0-9]{2}){5}\b/,
+  /\b(?:10|127|192\.168|172\.(?:1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}(?:\.\d{1,3})?\b/,
+  /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{6,}/,
+  /sk_(?:live|test)_[A-Za-z0-9]{16,}/,
+];
+
+export interface SafeRawPayloadPreview {
+  safe: boolean;
+  preview: string | null;
+  reason: string;
+}
+
+export const RAW_PAYLOAD_HIDDEN_COPY =
+  "Raw payload hidden because it may contain sensitive values." as const;
+export const RAW_PAYLOAD_SAFE_NOTE =
+  "Redacted preview — sensitive keys removed." as const;
+
 export function redactPayload(value: unknown): string {
   try {
     const seen = new WeakSet<object>();
@@ -102,6 +126,19 @@ export function redactPayload(value: unknown): string {
   } catch {
     return "[unserializable]";
   }
+}
+
+export function buildSafeRawPayloadPreview(value: unknown): SafeRawPayloadPreview {
+  if (value === null || value === undefined) {
+    return { safe: false, preview: null, reason: "No raw payload available." };
+  }
+  const redacted = redactPayload(value);
+  for (const re of SUSPICIOUS_VALUE_PATTERNS) {
+    if (re.test(redacted)) {
+      return { safe: false, preview: null, reason: RAW_PAYLOAD_HIDDEN_COPY };
+    }
+  }
+  return { safe: true, preview: redacted, reason: RAW_PAYLOAD_SAFE_NOTE };
 }
 
 function walk(value: unknown, seen: WeakSet<object>): unknown {

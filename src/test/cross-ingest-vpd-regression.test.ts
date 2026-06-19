@@ -182,7 +182,7 @@ describe("cross-ingest VPD regression guard", () => {
       );
     });
 
-    it("does NOT derive vpd_kpa when RH is 0", () => {
+    it("does NOT derive vpd_kpa when RH is out of range (>100)", () => {
       expect(route.invalidRhVpd()).toBeNull();
     });
 

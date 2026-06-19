@@ -248,10 +248,18 @@ if (isMain) {
   });
 
   // Dynamic import keeps the script importable in test environments
-  // where `mqtt` is not installed. Operators install `mqtt` locally.
-  let mqttMod: typeof import("mqtt");
+  // where `mqtt` is not installed. Operators install `mqtt` locally
+  // (the bridge runs on the operator's LAN, not in the web app).
+  interface MqttLike {
+    connect: (url: string, opts: Record<string, unknown>) => {
+      on: (event: string, cb: (...args: unknown[]) => void) => void;
+      subscribe: (topic: string, cb: (err: Error | null) => void) => void;
+    };
+  }
+  let mqttMod: MqttLike;
   try {
-    mqttMod = await import("mqtt");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mqttMod = (await import(/* @vite-ignore */ "mqtt" as any)) as MqttLike;
   } catch {
     log("error", "mqtt package not installed — run `bun add mqtt` locally");
     process.exit(2);

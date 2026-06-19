@@ -49,6 +49,12 @@ review.
       surface or hardware-write path has shipped.
 - [ ] Action Queue still requires explicit user approval for every
       state transition.
+- [ ] Mobile alert/recommendation review is reachable through the
+      `Alerts` navigation item and `/alerts`; this does not count as
+      Action Queue reachability.
+- [ ] Dedicated Action Queue mobile reachability uses the real `/actions`
+      route/page only. If `/actions` is missing or no mobile entry points
+      to it, keep this launch item blocked instead of relabeling `/alerts`.
 
 ## 4. SEO, social, and crawler readiness
 

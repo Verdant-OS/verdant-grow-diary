@@ -114,12 +114,13 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     }
     setBusy(true);
     const photoNorm = normalizePlantProfilePhotoInput(form.photo_url);
-    if (!photoNorm.ok) {
+    if (photoNorm.ok === false) {
       setBusy(false);
+      const reason = photoNorm.reason;
       toast.error(
-        photoNorm.reason === "unsupported-protocol"
+        reason === "unsupported-protocol"
           ? "Photo URL must start with http:// or https://"
-          : photoNorm.reason === "too-long"
+          : reason === "too-long"
             ? "Photo URL is too long"
             : "Photo URL is not valid",
       );

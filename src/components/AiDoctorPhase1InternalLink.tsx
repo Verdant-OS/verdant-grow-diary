@@ -84,7 +84,7 @@ export function AiDoctorPhase1InternalLink(
           data-testid="ai-doctor-phase1-internal-link-copied"
           className="ml-2 text-muted-foreground"
         >
-          Copied
+          Copied!
         </span>
       )}
       {copied === "unavailable" && (

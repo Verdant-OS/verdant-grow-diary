@@ -16,7 +16,10 @@ import { useGrowPlants } from "@/hooks/useGrowData";
 import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { tentDetailPath, tentsPath } from "@/lib/routes";
-import { tempFFromC } from "@/lib/temperatureUnits";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+} from "@/lib/temperatureUnitPreference";
 import { formatTentLightStatus } from "@/lib/lightScheduleFormat";
 import { deriveTentHealthChip } from "@/lib/tentHealthChip";
 import {

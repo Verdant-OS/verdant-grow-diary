@@ -62,8 +62,15 @@ describe("pheno hunt slice — static safety", () => {
 
   it("delete path in phenoHuntService never deletes plant rows", () => {
     const src = sources["src/lib/phenoHuntService.ts"];
-    // Allow `.from("pheno_hunts").delete()` but reject `.from("plants").delete`.
-    expect(src).not.toMatch(/from\(["']plants["']\)[^]*?\.delete\(/);
+    // Split on each `.from(...)` so we only check chained operations on
+    // the same target table — not unrelated `.delete()` calls elsewhere.
+    const segments = src.split(/\.from\(/);
+    for (const seg of segments.slice(1)) {
+      const m = seg.match(/^["']([^"']+)["']\)([\s\S]*?)(?=\.from\(|$)/);
+      if (m && m[1] === "plants") {
+        expect(m[2]).not.toMatch(/\.delete\(/);
+      }
+    }
   });
 
   it("uses no public/customer-mode language", () => {

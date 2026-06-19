@@ -53,6 +53,7 @@ import {
   mapGrowEventsToRecentRawEntries,
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
+import { mergeTimelineSources } from "@/lib/timelineMergeRules";
 import {
   deriveTimelineEventTypeOptions,
   deriveTimelinePlantOptions,
@@ -350,14 +351,59 @@ export default function Timeline() {
     if (lightboxPhotoId !== null && lightboxIndex < 0) setLightboxPhotoId(null);
   }, [lightboxPhotoId, lightboxIndex]);
 
-  // Merge `grow_events` (Quick Log v2 manual saves) into the raw entries
-  // passed to the Recent Quick Logs panel so just-saved entries surface at
-  // the top. `buildRecentQuickLogActivity` sorts newest-first by entry_at,
-  // so the merged stream is correctly ordered without extra logic.
-  const recentLaneRawEntries = useMemo(
-    () => [...entries, ...mapGrowEventsToRecentRawEntries(growEvents)],
-    [entries, growEvents],
-  );
+  // Merge `grow_events` (Quick Log v2 manual saves) and `diary_entries`
+  // through the tested `mergeTimelineSources` helper so the Recent Quick
+  // Logs panel receives a deterministic, deduplicated, newest-first
+  // stream. The helper enforces:
+  //   - exact-duplicate dedup by (source_table, source_id)
+  //   - logical dedup when a diary row mirrors a grow_event via
+  //     `details.grow_event_id`
+  //   - stable tie-breakers (grow_events first on equal timestamps,
+  //     then source_id lexical)
+  // We then re-hydrate each merged entry back into its original loose
+  // shape so the existing RecentQuickLogActivityPanel normalizer
+  // continues to see the same fields it always has.
+  const recentLaneRawEntries = useMemo(() => {
+    const diaryInputs = entries.map((e) => {
+      const details = (e.details ?? null) as Record<string, unknown> | null;
+      const grow_event_id =
+        details && typeof details["grow_event_id"] === "string"
+          ? (details["grow_event_id"] as string)
+          : null;
+      return {
+        id: e.id,
+        entry_at: e.entry_at,
+        plant_id: e.plant_id,
+        tent_id: e.tent_id,
+        stage: e.stage,
+        note: e.note,
+        photo_url: e.photo_url,
+        details,
+        grow_event_id,
+      };
+    });
+    const merged = mergeTimelineSources({
+      diaryEntries: diaryInputs,
+      growEvents,
+    });
+    const diaryById = new Map(entries.map((e) => [e.id, e] as const));
+    const growMappedById = new Map(
+      mapGrowEventsToRecentRawEntries(growEvents).map(
+        (r) => [r.id, r] as const,
+      ),
+    );
+    const out: Array<Entry | ReturnType<typeof mapGrowEventsToRecentRawEntries>[number]> = [];
+    for (const m of merged) {
+      if (m.source_table === "diary_entries") {
+        const e = diaryById.get(m.source_id);
+        if (e) out.push(e);
+      } else {
+        const g = growMappedById.get(m.source_id);
+        if (g) out.push(g);
+      }
+    }
+    return out;
+  }, [entries, growEvents]);
 
 
   // Pure normalized timeline view-model. Drives per-entry tags/warnings and a

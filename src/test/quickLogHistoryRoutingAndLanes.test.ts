@@ -51,6 +51,7 @@ function rawEntry(o: {
   note?: string;
   at?: string;
   plant_id?: string | null;
+  tent_id?: string | null;
   photo_url?: string | null;
   details?: Record<string, unknown>;
   stage?: string | null;
@@ -60,7 +61,7 @@ function rawEntry(o: {
     id: o.id,
     grow_id: o.grow_id ?? "grow-1",
     plant_id: o.plant_id ?? null,
-    tent_id: null,
+    tent_id: o.tent_id ?? null,
     stage: o.stage ?? "veg",
     entry_at: o.at ?? FIXED_NOW_ISO,
     entry_type: o.event_type,
@@ -220,6 +221,67 @@ describe("Quick Log per-lane builders", () => {
     const rows = buildRecentQuickLogActivity(dated, 2);
     expect(rows.map((r) => r.id)).toEqual(["c", "b"]);
   });
+
+  it("Recent Quick Log activity collapses companion diary and grow_event rows once", () => {
+    const at = "2026-06-19T06:06:26.969Z";
+    const baseNote = "Smoke Test 2026-06-19: Plant observed in Flower tent.";
+    const rows = buildRecentQuickLogActivity(
+      normalize([
+        rawEntry({
+          id: "grow-event-parent",
+          event_type: "observation",
+          note: baseNote,
+          at,
+          plant_id: "3e4da59d-9e84-47e5-8e53-bd72042ede50",
+          tent_id: "eec6f7b3-b745-44ad-bab2-ed4ad79f88f5",
+        }),
+        rawEntry({
+          id: "diary-companion",
+          event_type: "observation",
+          note: appendHardwareReadingsToNote(baseNote, {
+            inputPh: "6.1",
+            inputEc: "1.4",
+          }),
+          at,
+          plant_id: "3e4da59d-9e84-47e5-8e53-bd72042ede50",
+          tent_id: "eec6f7b3-b745-44ad-bab2-ed4ad79f88f5",
+        }),
+      ]),
+      10,
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe("diary-companion");
+    expect(rows[0].noteBody).toBe(baseNote);
+    expect(rows[0].manualHandheld).not.toBeNull();
+    expect(rows[0].manualHandheld!.inputPh).toBe("6.1");
+  });
+
+  it("Recent Quick Log activity keeps orphan diary and grow_event-only rows", () => {
+    const rows = buildRecentQuickLogActivity(
+      normalize([
+        rawEntry({
+          id: "orphan-diary",
+          event_type: "observation",
+          note: "Standalone diary note",
+          at: "2026-06-19T06:07:00.000Z",
+          plant_id: "plant-a",
+          tent_id: "tent-a",
+        }),
+        rawEntry({
+          id: "grow-event-only",
+          event_type: "observation",
+          note: "Grow event fallback note",
+          at: "2026-06-19T06:06:00.000Z",
+          plant_id: "plant-a",
+          tent_id: "tent-a",
+        }),
+      ]),
+      10,
+    );
+
+    expect(rows.map((r) => r.id)).toEqual(["orphan-diary", "grow-event-only"]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -243,6 +305,11 @@ describe("Logs page wiring (Timeline.tsx)", () => {
 
   it("measurement filter detects handheld readings in note text", () => {
     expect(TIMELINE).toMatch(/hasManualHandheldReadings\(e\.note\)/);
+  });
+
+  it("dedupes recent Quick Log companion rows in pure rules", () => {
+    expect(RULES).toMatch(/dedupeRecentQuickLogCompanionRows/);
+    expect(RULES).toMatch(/buildRecentQuickLogActivity/);
   });
 
   it("does not introduce automation / device-control / pi-ingest / service_role / edge function surface", () => {

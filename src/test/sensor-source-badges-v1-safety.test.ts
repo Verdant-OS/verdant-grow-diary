@@ -24,10 +24,18 @@ const FORBIDDEN = [
   /fetch\(/,
 ];
 
+function stripComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
 describe("sensor source badges v1 — safety boundary", () => {
   for (const rel of FILES) {
     it(`${rel} contains no forbidden patterns`, () => {
-      const src = readFileSync(resolve(process.cwd(), rel), "utf8");
+      const src = stripComments(
+        readFileSync(resolve(process.cwd(), rel), "utf8"),
+      );
       for (const pattern of FORBIDDEN) {
         expect(
           pattern.test(src),

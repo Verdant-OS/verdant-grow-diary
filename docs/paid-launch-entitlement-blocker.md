@@ -109,8 +109,6 @@ status for any other surface.
   silently mark them shipped).
 
 ## What this slice did NOT fix
-- Environment Summary Report still has no server-side guard.
-- Premium CSV/report exporters still have no server-side guard.
 - Live sensor surfaces still have no server-side plan check.
 
 These remain individually paid-launch-blocked.

@@ -1,18 +1,3 @@
-/**
- * SensorIngestAuditReport — presenter-only. Read-only.
- * - Local-only filters: provider, captured_at range, device/station
- *   search (safe display id only). Filtering operates ONLY on rows
- *   already supplied to the component — never triggers a refetch.
- * - Last-N selector (10 / 25 / 50, default 25).
- * - Raw-payload preview is collapsed by default; opened previews are
- *   ALWAYS run through buildSafeRawPayloadPreview, which hides anything
- *   that still looks secret after redaction.
- * - Operator-only CSV export (gated by `operatorMode` prop). Export
- *   uses the currently filtered/selected rows; rejected ingest attempts
- *   are never persisted and therefore never exported.
- * - Never writes. Never stores or logs raw payloads. Never puts raw
- *   payload in data-* attributes.
- */
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { formatVpdKpa } from "@/lib/vpdCalculationRules";
 import CanonicalSourceBadge from "@/components/CanonicalSourceBadge";
@@ -27,6 +12,7 @@ import {
   AUDIT_REPORT_DEFAULT_PAGE_SIZE,
   AUDIT_REPORT_PAGE_SIZES,
   REJECTED_NOT_PERSISTED_NOTE,
+  CANONICAL_SOURCES,
   buildSafeRawPayloadPreview,
   type AuditReportInput,
   type AuditReportPageSize,
@@ -38,6 +24,8 @@ import {
 } from "@/lib/sensorIngestAuditReportCsvExport";
 import {
   applyAuditUrlState,
+  buildOperatorAuditLink,
+  hasAuditUrlState,
   isSafeDeviceQuery,
   parseAuditUrlState,
   type AuditUrlState,
@@ -45,29 +33,54 @@ import {
 
 export interface SensorIngestAuditReportProps {
   input: Omit<AuditReportInput, "pageSize" | "filters">;
-  /** Optional initial page size; defaults to 25. */
   initialPageSize?: AuditReportPageSize;
-  /** Optional callback when operator changes page size (for refetch). */
   onPageSizeChange?: (n: AuditReportPageSize) => void;
-  /** Enables CSV export. Pass true ONLY from operator-gated surfaces. */
   operatorMode?: boolean;
   className?: string;
-  /**
-   * Optional URL-state binding. When provided AND `operatorMode` is true,
-   * filter state is initialized from `searchParams` and serialized back
-   * via `onSearchParamsChange` on every local filter change.
-   *
-   * The binding is pure: it never triggers a refetch and never alters
-   * row data. Unsafe device queries are dropped before being persisted.
-   */
   urlBinding?: {
     searchParams: URLSearchParams;
     onSearchParamsChange: (next: URLSearchParams) => void;
   };
 }
 
+const AUDIT_LOCAL_STORAGE_KEY = "verdant.operator.sensor-ingest-audit.v1";
+
 function isPageSize(n: number): n is AuditReportPageSize {
   return (AUDIT_REPORT_PAGE_SIZES as ReadonlyArray<number>).includes(n);
+}
+
+function parseStoredAuditState(raw: string | null): AuditUrlState | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<AuditUrlState>;
+    return parseAuditUrlState({
+      audit_provider: typeof parsed.provider === "string" ? parsed.provider : "",
+      audit_from: typeof parsed.fromDateInput === "string" ? parsed.fromDateInput : "",
+      audit_to: typeof parsed.toDateInput === "string" ? parsed.toDateInput : "",
+      audit_q: typeof parsed.deviceQuery === "string" ? parsed.deviceQuery : "",
+      audit_n: parsed.pageSize ? String(parsed.pageSize) : "",
+    });
+  } catch {
+    return null;
+  }
+}
+
+function readStoredAuditState(): AuditUrlState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return parseStoredAuditState(window.localStorage.getItem(AUDIT_LOCAL_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredAuditState(state: AuditUrlState) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(AUDIT_LOCAL_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Storage may be unavailable; URL state still works.
+  }
 }
 
 export default function SensorIngestAuditReport({
@@ -79,26 +92,33 @@ export default function SensorIngestAuditReport({
   urlBinding,
 }: SensorIngestAuditReportProps) {
   const urlEnabled = operatorMode && !!urlBinding;
-  // Initialize from URL only when operator-gated binding is provided.
   const initialFromUrl: AuditUrlState | null = urlEnabled
     ? parseAuditUrlState(urlBinding!.searchParams)
     : null;
+  const hasInitialStateRef = useRef(false);
+  const initialStateRef = useRef<AuditUrlState | null>(null);
+  if (!hasInitialStateRef.current) {
+    const shouldPreferUrl = urlEnabled && hasAuditUrlState(urlBinding!.searchParams);
+    initialStateRef.current = shouldPreferUrl ? initialFromUrl : initialFromUrl ?? readStoredAuditState();
+    hasInitialStateRef.current = true;
+  }
+  const initialState = initialStateRef.current;
 
   const [pageSize, setPageSize] = useState<AuditReportPageSize>(
-    initialFromUrl?.pageSize ?? initialPageSize,
+    initialState?.pageSize ?? initialPageSize,
   );
   const [openRowId, setOpenRowId] = useState<string | null>(null);
   const [providerFilter, setProviderFilter] = useState<string>(
-    initialFromUrl?.provider ?? "all",
+    initialState?.provider ?? "all",
   );
   const [capturedFrom, setCapturedFrom] = useState<string>(
-    initialFromUrl?.fromDateInput ?? "",
+    initialState?.fromDateInput ?? "",
   );
   const [capturedTo, setCapturedTo] = useState<string>(
-    initialFromUrl?.toDateInput ?? "",
+    initialState?.toDateInput ?? "",
   );
   const [deviceQuery, setDeviceQuery] = useState<string>(
-    initialFromUrl?.deviceQuery ?? "",
+    initialState?.deviceQuery ?? "",
   );
 
   const filters: AuditReportFilters = {
@@ -108,15 +128,20 @@ export default function SensorIngestAuditReport({
     deviceStationQuery: deviceQuery || null,
   };
 
+  const auditState: AuditUrlState = {
+    provider: providerFilter,
+    fromDateInput: capturedFrom,
+    toDateInput: capturedTo,
+    deviceQuery,
+    pageSize,
+  };
+
   const vm = useMemo(
     () => buildSensorIngestAuditReportViewModel({ ...input, pageSize, filters }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [input, pageSize, providerFilter, capturedFrom, capturedTo, deviceQuery],
   );
 
-  // Sync filter state -> URL when operator URL binding is active. We skip
-  // the very first render so we don't immediately re-write what we just
-  // parsed (avoids noisy history entries / loops).
   const firstSyncRef = useRef<boolean>(true);
   useEffect(() => {
     if (!urlEnabled || !urlBinding) return;
@@ -124,16 +149,16 @@ export default function SensorIngestAuditReport({
       firstSyncRef.current = false;
       return;
     }
-    const next = applyAuditUrlState(urlBinding.searchParams, {
-      provider: providerFilter,
-      fromDateInput: capturedFrom,
-      toDateInput: capturedTo,
-      deviceQuery,
-      pageSize,
-    });
+    const next = applyAuditUrlState(urlBinding.searchParams, auditState);
     urlBinding.onSearchParamsChange(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlEnabled, providerFilter, capturedFrom, capturedTo, deviceQuery, pageSize]);
+
+  useEffect(() => {
+    if (!operatorMode) return;
+    writeStoredAuditState(auditState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operatorMode, providerFilter, capturedFrom, capturedTo, deviceQuery, pageSize]);
 
   const rawById = useMemo(() => {
     const m = new Map<string, unknown>();
@@ -149,7 +174,6 @@ export default function SensorIngestAuditReport({
       provider: providerFilter,
       capturedFromIso: filters.capturedFromIso,
       capturedToIso: filters.capturedToIso,
-      // Device search text is intentionally omitted from filenames.
     });
     const { csv } = buildSensorIngestAuditCsv(vm.report.rows, { filename });
     try {
@@ -167,7 +191,22 @@ export default function SensorIngestAuditReport({
     }
   }
 
-  // Reject unsafe device search inputs entirely (never enter state).
+  function handleCopyOperatorLink() {
+    if (!operatorMode || typeof window === "undefined") return;
+    const current = urlBinding?.searchParams ?? new URLSearchParams(window.location.search);
+    const href = buildOperatorAuditLink({
+      origin: window.location.origin,
+      pathname: window.location.pathname,
+      currentSearchParams: current,
+      state: auditState,
+    });
+    try {
+      void window.navigator.clipboard?.writeText(href);
+    } catch {
+      // Clipboard can be unavailable in tests or non-secure contexts.
+    }
+  }
+
   function handleDeviceQueryChange(value: string) {
     if (!isSafeDeviceQuery(value)) return;
     setDeviceQuery(value);
@@ -264,20 +303,55 @@ export default function SensorIngestAuditReport({
             ))}
           </select>
           {operatorMode && (
-            <button
-              type="button"
-              data-testid="audit-csv-export"
-              onClick={handleCsvExport}
-              className="border rounded px-2 py-0.5 text-muted-foreground hover:text-foreground"
-            >
-              Export CSV
-            </button>
+            <>
+              <button
+                type="button"
+                data-testid="audit-copy-operator-link"
+                onClick={handleCopyOperatorLink}
+                className="border rounded px-2 py-0.5 text-muted-foreground hover:text-foreground"
+              >
+                Copy operator link
+              </button>
+              <button
+                type="button"
+                data-testid="audit-csv-export"
+                onClick={handleCsvExport}
+                className="border rounded px-2 py-0.5 text-muted-foreground hover:text-foreground"
+              >
+                Export CSV
+              </button>
+            </>
           )}
         </div>
       </header>
       <p data-testid="audit-rejected-note" className="text-[11px] text-muted-foreground">
         {REJECTED_NOT_PERSISTED_NOTE}
       </p>
+      {operatorMode && (
+        <div
+          data-testid="audit-operator-summary"
+          className="rounded border border-border/60 bg-muted/20 p-2 text-[11px] text-muted-foreground"
+        >
+          <p className="font-medium text-foreground">Operator summary</p>
+          <p>
+            Current window: {vm.operatorSummary.shownRows} shown / {vm.operatorSummary.filteredRows} filtered.
+          </p>
+          <p>
+            Accepted persisted: {vm.operatorSummary.acceptedPersistedRows}; rejected visible: {vm.operatorSummary.rejectedVisibleRows}; rejected omitted: {vm.operatorSummary.rejectedAttemptsOmitted ? "yes" : "no"}; raw payloads omitted from CSV: {vm.operatorSummary.rawPayloadsOmittedFromCsv}.
+          </p>
+          <div className="flex flex-wrap gap-1 pt-1">
+            {[...CANONICAL_SOURCES, "unknown"].map((source) => (
+              <span
+                key={source}
+                data-testid={`audit-summary-source-${source}`}
+                className="rounded border border-border/60 px-1.5 py-0.5"
+              >
+                {source}: {vm.operatorSummary.bySource[source] ?? 0}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       {vm.isEmptyInput && (
         <div
           data-testid="audit-empty-no-readings"

@@ -92,7 +92,7 @@ import {
 import { buildSensorSourceDisplayLabel } from "@/lib/sensorSourceDisplayLabel";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
-import { tempFFromC, formatTempFFromC } from "@/lib/temperatureUnits";
+import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
 
 
 import type { SensorReadingRow } from "@/lib/db";

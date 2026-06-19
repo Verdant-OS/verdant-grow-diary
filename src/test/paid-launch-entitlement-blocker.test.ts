@@ -52,8 +52,11 @@ describe("paid-launch entitlement blocker doc", () => {
     expect(doc).toMatch(/environment-summary-report-entitlement/);
   });
 
-  it("marks Premium CSV / report exporters as PAID-LAUNCH BLOCKED", () => {
-    expect(doc).toMatch(/Premium CSV[\s\S]*PAID-LAUNCH BLOCKED/);
+  it("marks Premium CSV / report exporters as SERVER-GATED PREFLIGHT (paid-launch blocker fixed)", () => {
+    expect(doc).toMatch(
+      /Premium CSV[\s\S]*SERVER-GATED PREFLIGHT/,
+    );
+    expect(doc).toMatch(/premium-export-entitlement/);
   });
 
   it("marks Live sensor surfaces as PAID-LAUNCH BLOCKED", () => {

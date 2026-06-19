@@ -40,17 +40,21 @@ status for any other surface.
   as AI Doctor. Refund-on-failure via `ai_credit_refund`.
 
 ### Environment Summary Report (`src/pages/EnvironmentSummaryReportPage.tsx`)
-- **Status:** PAID-LAUNCH BLOCKED — CLIENT-GATED ONLY.
-- Gate: `entitlement.capabilities.advancedExports === true` evaluated in
-  the React render path. A tampered client can bypass this gate and read
-  whatever the RLS layer allows (per-user sensor / environment rows).
-- Mitigation today: RLS already restricts to own rows; the gate only
-  protects the *premium aggregation/report UX*, not access to raw rows.
-- Remaining risk: a client with `advancedExports=false` could still
-  re-implement the report client-side from RLS-allowed rows.
-- Required before paid launch: move report aggregation into an edge
-  function that re-resolves entitlement via `billing_subscriptions` and
-  returns 403 for non-premium plans.
+- **Status:** SERVER-VALIDATED (paid-launch blocker fixed for this surface).
+- Path: page mounts → `useEnvironmentSummaryReportServerGate` →
+  `supabase.functions.invoke('environment-summary-report-entitlement')` →
+  edge function verifies JWT (`auth.getUser`) → reads
+  `public.billing_subscriptions` (RLS select-own; no service_role) →
+  runs the pure `resolveEntitlements()` server-side → returns 200 only when
+  `capabilities.advancedExports === true`. All other outcomes return 403
+  (`upgrade_required`) or fail closed.
+- Client-side `useMyEntitlements` remains presentation-only. Tampered client
+  state cannot unlock the report — the page hides report content unless the
+  server response is `ok: true`.
+- Failure mode on denial: the page renders the upgrade/paywall state with
+  copy "Environment Summary Report is a Pro feature." No crash, no generic
+  error page, no client-side bypass path.
+- Client-side entitlement state is not authoritative.
 
 ### Premium CSV / report exporters (`src/lib/*Export*`)
 - **Status:** PAID-LAUNCH BLOCKED — CLIENT-ONLY.

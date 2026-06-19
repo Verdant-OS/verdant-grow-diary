@@ -224,12 +224,16 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     // display-name constants (e.g. pi_bridge: "Pi Bridge", mqtt: "MQTT"). The
     // literal "mqtt" inside that map is a label key, not a device-control call.
     const PROVIDER_LABELS_PATH = resolve(ROOT, "src/constants/sensorProviderLabels.ts");
+    // Also allow-list: src/constants/sensorIngestProvenance.ts holds read-only
+    // sensor provenance constants (e.g. raspberry_pi_bridge), not device control.
+    const SENSOR_INGEST_PROVENANCE_PATH = resolve(ROOT, "src/constants/sensorIngestProvenance.ts");
     const piContexts = [...ALL_PROD_CODE.matchAll(/pi[_-]bridge/gi)];
     for (const m of piContexts) {
       const ctx = ALL_PROD_CODE.slice(Math.max(0, m.index! - 60), m.index! + 60);
-      // Scoped skip: if the match is inside the read-only constants file,
-      // the surrounding "mqtt" is a map key string, not a control surface.
-      if (fileAtIndex(m.index!) === PROVIDER_LABELS_PATH) continue;
+      // Scoped skip: if the match is inside a read-only constants file,
+      // the surrounding text is a map key / constant string, not a control surface.
+      const path = fileAtIndex(m.index!);
+      if (path === PROVIDER_LABELS_PATH || path === SENSOR_INGEST_PROVENANCE_PATH) continue;
       expect(ctx, `pi_bridge reference must not be a control call: ${ctx}`).not.toMatch(
         /fetch|http|mqtt|publish|post|send|trigger/i,
       );

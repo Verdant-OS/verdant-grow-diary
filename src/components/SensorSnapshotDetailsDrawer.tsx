@@ -46,7 +46,7 @@ function fmtNum(v: number | null, suffix = ""): string {
   return `${v}${suffix}`;
 }
 
-function Row({ label, value, testId }: { label: string; value: React.ReactNode; testId?: string }) {
+function Row({ label, value, testId }: { label: string; value: import("react").ReactNode; testId?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1 border-b border-border/40">
       <span className="text-xs text-muted-foreground">{label}</span>

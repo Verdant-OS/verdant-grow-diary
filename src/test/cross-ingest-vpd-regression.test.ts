@@ -254,6 +254,7 @@ describe("calculateAirVpdKpa usage guard (ingest mappers only)", () => {
         else if (/\.(ts|tsx)$/.test(e.name) && !/\.test\./.test(e.name)) {
           if (NON_INGEST_FILENAME.test(e.name)) continue;
           const src = await fs.readFile(p, "utf8");
+          if (/^vpdRules\.ts$/.test(e.name)) continue; // definition site
           if (/\bcalculateAirVpdKpa\b/.test(src)) importers.push(p);
         }
       }

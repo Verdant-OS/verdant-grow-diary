@@ -105,6 +105,10 @@ function toRow(entry: NormalizedDiaryEntry): PhotoHistoryRow | null {
     photoUrl: sanitized.url,
     caption: previewCaption(entry.note),
     warnings,
+    showPhotoNonDiagnosticLabel: shouldShowPhotoNonDiagnosticLabel({
+      hasPhoto: sanitized.url !== null,
+      details: entry.details.extras,
+    }),
   };
 }
 

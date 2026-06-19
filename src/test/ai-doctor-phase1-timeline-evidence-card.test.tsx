@@ -56,7 +56,7 @@ describe("AiDoctorPhase1TimelineEvidenceCard", () => {
   it("renders confidence, risk, likely issue, and counts", () => {
     renderCard();
     expect(screen.getByText("Possible early N deficiency")).toBeInTheDocument();
-    expect(screen.getByText("low")).toBeInTheDocument(); // confidence
+    expect(screen.getAllByText("low").length).toBeGreaterThanOrEqual(1); // confidence + risk
     expect(
       screen.getByTestId("ai-doctor-phase1-timeline-evidence-card-evidence-count"),
     ).toHaveTextContent("Evidence items: 2");

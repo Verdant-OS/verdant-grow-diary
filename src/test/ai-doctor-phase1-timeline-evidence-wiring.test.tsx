@@ -133,12 +133,15 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
     entriesRef.current = [aiEvidenceEntry, normalNoteEntry];
     renderSection();
     const list = screen.getByTestId("quick-log-grouped-timeline-list");
-    const items = within(list).getAllByRole("listitem");
+    const items = Array.from(
+      list.querySelectorAll<HTMLLIElement>(":scope > li"),
+    );
     expect(items).toHaveLength(2);
     // First item is the AI Doctor evidence card
     expect(
       within(items[0]).getByTestId("ai-doctor-phase1-timeline-evidence-card"),
     ).toBeInTheDocument();
+
     // Second item is the normal note
     expect(
       within(items[1]).queryByTestId(

@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import MobileNav from "@/components/MobileNav";
 
 describe("MobileNav Action Queue link", () => {
-  it("renders Actions in the More sheet", () => {
+  it("renders Actions in the More sheet", async () => {
     render(
       <MemoryRouter>
         <MobileNav />
@@ -21,12 +21,16 @@ describe("MobileNav Action Queue link", () => {
 
     // Open the More sheet
     const moreBtn = screen.getByText("More");
-    moreBtn.click();
+    await act(async () => {
+      moreBtn.click();
+    });
 
     // Actions link is present and points to /actions
-    const actionsLink = screen.getByText("Actions");
-    expect(actionsLink).toBeInTheDocument();
-    expect(actionsLink.closest("a")).toHaveAttribute("href", "/actions");
+    await waitFor(() => {
+      const actionsLink = screen.getByText("Actions");
+      expect(actionsLink).toBeInTheDocument();
+      expect(actionsLink.closest("a")).toHaveAttribute("href", "/actions");
+    });
 
     // Other More items still present
     expect(screen.getByText("Daily Grow Check")).toBeInTheDocument();

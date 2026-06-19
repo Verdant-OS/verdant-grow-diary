@@ -21,8 +21,8 @@ vi.mock("@/lib/aiDoctorReportRules", async () => {
   const actual: any = await vi.importActual("@/lib/aiDoctorReportRules");
   return {
     ...actual,
-    buildAiDoctorReportPdfBytes: (...args: unknown[]) => buildPdfSpy(...args),
-    downloadAiDoctorReportPdf: (...args: unknown[]) => downloadPdfSpy(...args),
+    buildAiDoctorReportPdfBytes: (...args: any[]) => buildPdfSpy.apply(null, args as []),
+    downloadAiDoctorReportPdf: (...args: any[]) => downloadPdfSpy.apply(null, args as []),
   };
 });
 vi.mock("@/lib/aiDoctorEvidenceCsvExportRules", async () => {
@@ -31,8 +31,8 @@ vi.mock("@/lib/aiDoctorEvidenceCsvExportRules", async () => {
   );
   return {
     ...actual,
-    buildAiDoctorEvidenceCsv: (...args: unknown[]) => buildCsvSpy(...args),
-    downloadAiDoctorEvidenceCsv: (...args: unknown[]) => downloadCsvSpy(...args),
+    buildAiDoctorEvidenceCsv: (...args: any[]) => buildCsvSpy.apply(null, args as []),
+    downloadAiDoctorEvidenceCsv: (...args: any[]) => downloadCsvSpy.apply(null, args as []),
   };
 });
 

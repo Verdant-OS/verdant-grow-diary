@@ -457,6 +457,16 @@ export default function OperatorAiDoctorPhase1(
               result={resultBundle.result}
             />
           </div>
+
+          <AiDoctorPhase1SaveEvidenceButton
+            identity={{
+              plant_id: selectedPlant.id,
+              tent_id: selectedPlant.tent_id ?? null,
+              grow_id: selectedPlant.grow_id ?? null,
+              plant_name: selectedPlant.name ?? null,
+            }}
+            result={resultBundle.result}
+          />
         </>
       )}
 

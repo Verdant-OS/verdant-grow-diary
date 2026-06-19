@@ -32,7 +32,7 @@ describe("Coach AI Doctor photo intake — mobile take + upload", () => {
 
   it("has a take-photo file input that may use capture=\"environment\"", () => {
     const block = SOURCE.match(
-      /coach-photo-take-input[\s\S]{0,400}?\/>/,
+      /<input[\s\S]*?coach-photo-take-input[\s\S]*?\/>/,
     )?.[0];
     expect(block, "take-photo input not found").toBeTruthy();
     expect(block!).toMatch(/type="file"/);
@@ -42,7 +42,7 @@ describe("Coach AI Doctor photo intake — mobile take + upload", () => {
 
   it("has an upload file input that does NOT use the capture attribute", () => {
     const block = SOURCE.match(
-      /coach-photo-upload-input[\s\S]{0,400}?\/>/,
+      /<input[\s\S]*?coach-photo-upload-input[\s\S]*?\/>/,
     )?.[0];
     expect(block, "upload input not found").toBeTruthy();
     expect(block!).toMatch(/type="file"/);

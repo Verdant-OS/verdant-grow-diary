@@ -7,6 +7,7 @@
 
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
 import { toFiniteNumber } from "@/lib/sensorSnapshot";
+import { calculateAirVpdKpa } from "@/lib/vpdRules";
 
 export interface EnvironmentSample {
   ts: string;

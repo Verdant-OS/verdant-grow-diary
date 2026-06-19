@@ -104,3 +104,39 @@ Also: No diary/timeline writes.
 - Photo-specific hook / source.
 - AI Doctor session history.
 - Export / share outside protected Operator Mode.
+
+## H. Save to timeline (grower-initiated evidence)
+
+Added in the save-evidence slice.
+
+- Control: `AiDoctorPhase1SaveEvidenceButton` (`src/components/`).
+- Pure draft builder: `src/lib/aiDoctorPhase1TimelineDraft.ts` —
+  `buildAiDoctorPhase1TimelineDraft(input)` shapes a `quicklog_save_manual`
+  RPC payload (existing safe write path).
+- Hook: `src/hooks/useSaveAiDoctorPhase1TimelineEvidence.ts` — wraps the RPC
+  call and tracks idempotency keys seen this session for duplicate protection.
+- Saved as a `note`-action grow event with `details.kind = "ai_doctor_phase1_evidence"`.
+- Idempotency key: `ai_doctor_phase1_evidence:<plantId>:phase1:v1:<contextHash>`.
+- Button is gated to render only when:
+  - selected plant is valid
+  - a derived result exists
+  - not loading / unknown / no-result
+- States: `idle → saving → saved | duplicate | error`.
+- Disclaimer: "Saved as evidence only. This is not an approved action and
+  does not control equipment."
+- No Action Queue write. No alert write. No device control. No Edge Function.
+  No live model call. No auto-save.
+
+### Audit (existing write path used)
+
+- Table/path: `public.grow_events` via `quicklog_save_manual` RPC + `diary_entries`
+  side-effect (handled by the RPC itself). No new table, no schema change.
+- `user_id` is resolved server-side via `auth.uid()` inside the RPC.
+- Plant / grow / tent ownership is re-validated server-side by the RPC.
+- AI Doctor metadata is stored in `p_details` (the RPC strips user/grow/tent
+  ID fields if present).
+- Duplicate protection: in-session `Set<idempotency_key>` in the hook. Pure
+  client-side dedupe; cross-session DB dedupe is out of scope (would need a
+  schema/RLS change).
+- Rollback: removing the button + hook + draft + wiring is sufficient; no
+  schema, RLS, or policy needs to be reverted.

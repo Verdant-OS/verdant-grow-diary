@@ -13,6 +13,7 @@ const primary = [
 ];
 
 const more = [
+  { to: "/actions", label: "Actions", icon: ClipboardList },
   { to: "/daily-check", label: "Daily Grow Check", icon: ClipboardCheck },
   { to: "/tasks", label: "Tasks", icon: ListChecks },
   { to: "/sensors", label: "Sensor Data", icon: Activity },

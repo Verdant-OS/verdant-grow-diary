@@ -105,12 +105,13 @@ describe("UI surfaces render stored Celsius via the preferred display unit", () 
     expect(TENT_DETAIL).toMatch(/getTemperatureUnitSymbol\(\)/);
     expect(TENT_DETAIL).toMatch(/@\/lib\/temperatureUnitPreference/);
   });
+
+  it("plant tent env rules + chart axis still default to °F (legacy view-models)", () => {
     const panelRules = read("src/lib/plantTentEnvironmentRules.ts");
     expect(panelRules).toMatch(/"°F"/);
     expect(panelRules).toMatch(/tempFFromC/);
     // Metric unit table moved to the shared axis-rules helper so the
-    // legend, tooltip, and axis can never drift apart. SensorChart must
-    // still source °F from it.
+    // legend, tooltip, and axis can never drift apart.
     const axisRules = read("src/lib/sensorChartAxisRules.ts");
     expect(axisRules).toMatch(/unit:\s*"°F"/);
     const chart = read("src/components/SensorChart.tsx");

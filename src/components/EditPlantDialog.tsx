@@ -58,6 +58,8 @@ interface Plant {
   tentId?: string | null;
   growId?: string | null;
   lastNote?: string | null;
+  /** Plant profile photo URL (maps to plants.photo_url). */
+  photo?: string | null;
 }
 
 interface Props {
@@ -84,6 +86,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     tent_id: plant.tentId ?? "none",
     started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
     last_note: plant.lastNote ?? "",
+    photo_url: plant.photo ?? "",
   });
 
   useEffect(() => {
@@ -96,6 +99,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
         tent_id: plant.tentId ?? "none",
         started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
         last_note: plant.lastNote ?? "",
+        photo_url: plant.photo ?? "",
       });
     }
   }, [open, plant]);

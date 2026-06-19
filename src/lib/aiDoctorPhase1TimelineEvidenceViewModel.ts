@@ -3,7 +3,7 @@
  *
  * Detects and shapes a saved AI Doctor Phase 1 evidence entry for display
  * on a plant's timeline. This is a READ-ONLY presenter helper; it never
- * mutates data, writes Action Queue items, creates alerts, calls AI
+ * mutates data, writes Action Queue items, raises notifications, calls AI
  * models, or controls equipment.
  *
  * Hard constraints:

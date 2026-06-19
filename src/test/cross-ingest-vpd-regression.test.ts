@@ -264,7 +264,7 @@ describe("calculateAirVpdKpa usage guard (ingest mappers only)", () => {
     for (const file of importers) {
       const src = await fs.readFile(file, "utf8");
       expect(
-        \\\\bvpd_kpa\\\\b|'vpd_kpa'/.test(src),
+        /\bvpd_kpa\b/.test(src),
         `${file} imports calculateAirVpdKpa but never references the "vpd_kpa" metric. ` +
           `If this is an ingest mapper, derive vpd_kpa. If it is a display/presenter, ` +
           `rename it (add 'ViewModel'/'Display'/'Chart'/'Status'/'Presenter') so the guard skips it.`,

@@ -59,6 +59,6 @@ describe("EnvironmentCheckSnapshotLinkButton", () => {
     );
     const wrap = screen.getByTestId("env-check-snapshot-link");
     expect(wrap.getAttribute("data-source")).toBe("unknown");
-    expect(screen.getByTestId("env-check-source-badge").textContent).toMatch(/unknown/);
+    expect(screen.getByTestId("env-check-source-badge").textContent).toMatch(/Unknown source/i);
   });
 });

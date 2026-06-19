@@ -78,7 +78,7 @@ describe("aiDoctorPhase1TimelineDraft", () => {
       now,
     });
     expect(d.ok).toBe(false);
-    if (d.ok) return;
+    if (isOkPhase1TimelineDraft(d)) return;
     expect(d.reasons).toContain("missing_plant_id");
   });
 
@@ -89,7 +89,7 @@ describe("aiDoctorPhase1TimelineDraft", () => {
       now,
     });
     expect(d.ok).toBe(false);
-    if (d.ok) return;
+    if (isOkPhase1TimelineDraft(d)) return;
     expect(d.reasons).toContain("missing_grow_id");
   });
 
@@ -100,7 +100,7 @@ describe("aiDoctorPhase1TimelineDraft", () => {
       now,
     });
     expect(d.ok).toBe(false);
-    if (d.ok) return;
+    if (isOkPhase1TimelineDraft(d)) return;
     expect(d.reasons).toContain("missing_result");
   });
 

@@ -127,8 +127,16 @@ export function useQuickLogGroupedTimeline(
     enabled: scope !== null,
     queryFn: async (): Promise<QuickLogTimelineEntry[]> => {
       if (!scope) return [];
-      const rows = await fetchRows(scope, limit);
+      const [rows, diaryRows] = await Promise.all([
+        fetchRows(scope, limit),
+        fetchAiDoctorPhase1DiaryRows(scope, limit),
+      ]);
       const { actions, environmentRows } = partitionQuickLogRows(rows);
+      const evidenceIndex = buildAiDoctorPhase1EvidenceIndex(diaryRows);
+      const enrichedActions = attachAiDoctorPhase1EvidenceToActionEvents(
+        actions,
+        evidenceIndex,
+      );
       const vmScope =
         scope.kind === "plant"
           ? ({
@@ -138,11 +146,12 @@ export function useQuickLogGroupedTimeline(
             } as QuickLogV2SnapshotScope)
           : ({ kind: "tent", tentId: scope.tentId } as QuickLogV2SnapshotScope);
       return groupQuickLogTimelineEntries({
-        actions,
+        actions: enrichedActions,
         environmentRows,
         scope: vmScope,
       });
     },
+
   });
   return {
     entries: query.data ?? [],

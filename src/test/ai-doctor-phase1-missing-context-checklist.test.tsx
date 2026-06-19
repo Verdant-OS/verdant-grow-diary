@@ -432,3 +432,78 @@ describe("AiDoctorPhase1MissingContextChecklist — helper text rendering + mobi
     expect(cls).toMatch(/\bmin-h-10\b/);
   });
 });
+
+describe("AiDoctorPhase1MissingContextChecklist — accessibility polish", () => {
+  it("CTAs include focus-visible ring and aria-label with plant name", () => {
+    renderWithRouter(
+      <AiDoctorPhase1MissingContextChecklist
+        context={emptyContext()}
+        ctaContext={CTA_CTX}
+        plantName="Plant A"
+      />,
+    );
+    const photo = screen.getByTestId(
+      "ai-doctor-phase1-checklist-cta-recent_photo-add-photo",
+    );
+    const cls = photo.getAttribute("class") ?? "";
+    expect(cls).toMatch(/focus-visible:ring-2/);
+    expect(cls).toMatch(/focus-visible:ring-offset-2/);
+    expect(photo.getAttribute("aria-label") ?? "").toBe(
+      "Add photo evidence for Plant A",
+    );
+    expect(
+      screen
+        .getByTestId("ai-doctor-phase1-checklist-cta-recent_diary-add-quick-log")
+        .getAttribute("aria-label"),
+    ).toBe("Add Quick Log evidence for Plant A");
+    expect(
+      screen
+        .getByTestId(
+          "ai-doctor-phase1-checklist-cta-fresh_sensor-check-environment",
+        )
+        .getAttribute("aria-label"),
+    ).toBe("Check environment readings for Plant A");
+    expect(
+      screen
+        .getByTestId("ai-doctor-phase1-checklist-cta-stage-update-plant-context")
+        .getAttribute("aria-label"),
+    ).toBe("Update plant context for Plant A");
+  });
+
+  it("falls back to 'for selected plant' when plantName is missing", () => {
+    renderWithRouter(
+      <AiDoctorPhase1MissingContextChecklist
+        context={emptyContext()}
+        ctaContext={CTA_CTX}
+      />,
+    );
+    expect(
+      screen
+        .getByTestId("ai-doctor-phase1-checklist-cta-recent_photo-add-photo")
+        .getAttribute("aria-label"),
+    ).toBe("Add photo evidence for selected plant");
+  });
+
+  it("aria labels never use disallowed action verbs", () => {
+    renderWithRouter(
+      <AiDoctorPhase1MissingContextChecklist
+        context={emptyContext()}
+        ctaContext={CTA_CTX}
+        plantName="Plant A"
+      />,
+    );
+    const ctas = [
+      "recent_photo-add-photo",
+      "recent_diary-add-quick-log",
+      "fresh_sensor-check-environment",
+      "stage-update-plant-context",
+    ];
+    for (const id of ctas) {
+      const aria =
+        screen
+          .getByTestId(`ai-doctor-phase1-checklist-cta-${id}`)
+          .getAttribute("aria-label") ?? "";
+      expect(aria).not.toMatch(/Approve|Send|Execute|Run equipment|Control device/i);
+    }
+  });
+});

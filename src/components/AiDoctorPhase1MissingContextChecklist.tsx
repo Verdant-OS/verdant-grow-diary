@@ -53,6 +53,8 @@ export interface AiDoctorPhase1MissingContextChecklistProps {
   /** Derived diagnosis result's missing_information, if any. */
   missing_information?: readonly string[];
   ctaContext: AiDoctorPhase1ChecklistCtaContext;
+  /** Optional plant name used to enrich aria-label copy. */
+  plantName?: string | null;
 }
 
 function ctaQuery(ctx: AiDoctorPhase1ChecklistCtaContext): string {
@@ -239,6 +241,32 @@ export function helperTextForChecklistItem(
   }
 }
 
+/**
+ * Builds a context-rich aria-label for a checklist CTA. Never implies
+ * the action is executed from this read-only screen — labels describe
+ * navigation intent only ("Add … evidence", "Check … readings",
+ * "Update plant context"). When the plant name is unavailable, falls
+ * back to "for selected plant".
+ */
+export function ariaLabelForChecklistCta(
+  ctaId: string,
+  plantName?: string | null,
+): string {
+  const who = plantName ? `for ${plantName}` : "for selected plant";
+  switch (ctaId) {
+    case "add-photo":
+      return `Add photo evidence ${who}`;
+    case "add-quick-log":
+      return `Add Quick Log evidence ${who}`;
+    case "check-environment":
+      return `Check environment readings ${who}`;
+    case "update-plant-context":
+      return `Update plant context ${who}`;
+    default:
+      return `Open evidence shortcut ${who}`;
+  }
+}
+
 export function AiDoctorPhase1MissingContextChecklist(
   props: AiDoctorPhase1MissingContextChecklistProps,
 ): JSX.Element {
@@ -295,8 +323,9 @@ export function AiDoctorPhase1MissingContextChecklist(
               {item.cta && (
                 <Link
                   to={item.cta.to}
+                  aria-label={ariaLabelForChecklistCta(item.cta.id, props.plantName)}
                   data-testid={`ai-doctor-phase1-checklist-cta-${item.id}-${item.cta.id}`}
-                  className="mt-1 flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-xs text-secondary-foreground sm:inline-flex sm:w-auto"
+                  className="mt-1 flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-xs text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:inline-flex sm:w-auto"
                 >
                   {item.cta.label}
                 </Link>

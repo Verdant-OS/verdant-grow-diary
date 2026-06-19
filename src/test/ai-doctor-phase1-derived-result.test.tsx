@@ -418,3 +418,128 @@ describe("static safety — derived result wiring", () => {
     expect(SRC).not.toMatch(/service_role|bridge[_-]?token/i);
   });
 });
+
+describe("OperatorAiDoctorPhase1 — mobile sticky bar + a11y", () => {
+  it("renders the mobile sticky shortcut bar when plant + result exist (sm:hidden, aria-hidden)", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: PLANTS,
+      getResultForPlant: (id) => ({ context: baseContext(id), result: baseResult() }),
+      getRecentActivityForPlant: () => [
+        { id: "p1", occurred_at: "2026-06-18T00:00:00Z", event_type: "photo" },
+      ],
+    });
+    const bar = screen.getByTestId("ai-doctor-phase1-mobile-sticky-bar");
+    const cls = bar.getAttribute("class") ?? "";
+    expect(cls).toMatch(/\bsm:hidden\b/);
+    expect(cls).toMatch(/\bfixed\b/);
+    expect(cls).toMatch(/overflow-x-hidden/);
+    expect(bar.getAttribute("aria-hidden")).toBe("true");
+
+    const stickyPhoto = screen.getByTestId(
+      "ai-doctor-phase1-mobile-sticky-shortcut-view-recent-photo",
+    );
+    const mainPhoto = screen.getByTestId(
+      "ai-doctor-phase1-shortcut-view-recent-photo",
+    );
+    expect(stickyPhoto.getAttribute("href")).toBe(mainPhoto.getAttribute("href"));
+
+    const stickySensor = screen.getByTestId(
+      "ai-doctor-phase1-mobile-sticky-shortcut-open-sensor-summary",
+    );
+    expect(stickySensor.getAttribute("href")).toBe(
+      `#${AI_DOCTOR_PHASE1_SENSOR_ANCHOR_ID}`,
+    );
+  });
+
+  it("does not render the sticky bar without a selected plant", () => {
+    renderAt(OPERATOR_AI_DOCTOR_PHASE1_ROUTE, { plants: PLANTS });
+    expect(screen.queryByTestId("ai-doctor-phase1-mobile-sticky-bar")).toBeNull();
+  });
+
+  it("does not render the sticky bar for unknown plant ids", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=nope`, {
+      plants: PLANTS,
+    });
+    expect(screen.queryByTestId("ai-doctor-phase1-mobile-sticky-bar")).toBeNull();
+  });
+
+  it("does not render the sticky bar when no result is available", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: PLANTS,
+      getResultForPlant: () => null,
+    });
+    expect(screen.queryByTestId("ai-doctor-phase1-mobile-sticky-bar")).toBeNull();
+  });
+
+  it("hides the photo sticky link when no photo activity exists", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: PLANTS,
+      getResultForPlant: (id) => ({ context: baseContext(id), result: baseResult() }),
+      getRecentActivityForPlant: () => [
+        { id: "n1", occurred_at: "2026-06-18T00:00:00Z", event_type: "note" },
+      ],
+    });
+    expect(
+      screen.queryByTestId(
+        "ai-doctor-phase1-mobile-sticky-shortcut-view-recent-photo",
+      ),
+    ).toBeNull();
+    expect(
+      screen.getByTestId(
+        "ai-doctor-phase1-mobile-sticky-shortcut-open-sensor-summary",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("page container adds mobile bottom padding only when sticky bar can render", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: PLANTS,
+      getResultForPlant: (id) => ({ context: baseContext(id), result: baseResult() }),
+    });
+    const page = screen.getByTestId("operator-ai-doctor-phase1-page");
+    expect(page.getAttribute("class") ?? "").toMatch(/pb-24/);
+  });
+
+  it("in-page evidence shortcut aria-labels include plant name and focus ring", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: PLANTS,
+      getResultForPlant: (id) => ({ context: baseContext(id), result: baseResult() }),
+      getRecentActivityForPlant: () => [
+        { id: "p1", occurred_at: "2026-06-18T00:00:00Z", event_type: "photo" },
+      ],
+    });
+    const photo = screen.getByTestId("ai-doctor-phase1-shortcut-view-recent-photo");
+    expect(photo.getAttribute("aria-label")).toBe(
+      "View recent photo evidence for Plant A",
+    );
+    expect(photo.getAttribute("class") ?? "").toMatch(/focus-visible:ring-2/);
+    const sensor = screen.getByTestId(
+      "ai-doctor-phase1-shortcut-open-sensor-summary",
+    );
+    expect(sensor.getAttribute("aria-label")).toBe(
+      "Open sensor summary for Plant A",
+    );
+    expect(sensor.getAttribute("class") ?? "").toMatch(/focus-visible:ring-2/);
+  });
+
+  it("mobile sticky shortcuts contain no write/action labels and no onClick", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: PLANTS,
+      getResultForPlant: (id) => ({ context: baseContext(id), result: baseResult() }),
+      getRecentActivityForPlant: () => [
+        { id: "p1", occurred_at: "2026-06-18T00:00:00Z", event_type: "photo" },
+      ],
+    });
+    const bar = screen.getByTestId("ai-doctor-phase1-mobile-sticky-bar");
+    const text = bar.textContent ?? "";
+    expect(text).not.toMatch(/Approve|Send|Execute|Run equipment|Control device|Save/i);
+    for (const id of [
+      "ai-doctor-phase1-mobile-sticky-shortcut-view-recent-photo",
+      "ai-doctor-phase1-mobile-sticky-shortcut-open-sensor-summary",
+    ]) {
+      const el = screen.getByTestId(id);
+      expect(el.tagName.toLowerCase()).toMatch(/^(a)$/);
+      expect(el.getAttribute("onclick")).toBeNull();
+    }
+  });
+});

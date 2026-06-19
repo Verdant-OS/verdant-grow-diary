@@ -200,3 +200,34 @@ describe("AiDoctorPhase1LoadingState — premium shimmer", () => {
     ).toBeTruthy();
   });
 });
+
+describe("AiDoctorPhase1LoadingState — reduced motion + non-animated fallback", () => {
+  it("skeleton bars include motion-reduce:animate-none", () => {
+    render(<AiDoctorPhase1LoadingState />);
+    const bars = screen.getAllByTestId("ai-doctor-phase1-loading-skeleton-bar");
+    for (const bar of bars) {
+      const cls = bar.getAttribute("class") ?? "";
+      expect(cls).toMatch(/motion-reduce:animate-none/);
+    }
+  });
+
+  it("skeleton bars retain visible non-animated styling (bg/border)", () => {
+    render(<AiDoctorPhase1LoadingState />);
+    const bars = screen.getAllByTestId("ai-doctor-phase1-loading-skeleton-bar");
+    for (const bar of bars) {
+      const cls = bar.getAttribute("class") ?? "";
+      expect(cls).toMatch(/\bbg-muted\b/);
+      expect(cls).toMatch(/\bborder\b/);
+    }
+  });
+
+  it("preserves role and aria-busy alongside the loading copy", () => {
+    render(<AiDoctorPhase1LoadingState />);
+    const root = screen.getByTestId("ai-doctor-phase1-loading-state");
+    expect(root.getAttribute("role")).toBe("status");
+    expect(root.getAttribute("aria-busy")).toBe("true");
+    expect(
+      screen.getByTestId("ai-doctor-phase1-loading-title").textContent,
+    ).toBeTruthy();
+  });
+});

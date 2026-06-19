@@ -25,6 +25,9 @@ export default function EcowittBridgeTroubleshootingPanel({
   className,
 }: EcowittBridgeTroubleshootingPanelProps) {
   const vm = buildTroubleshootingPanelViewModel(input);
+  const noReadings = !input.lastReading;
+  const tokenStatus = input.env?.bridgeTokenStatus ?? "unknown";
+  const tentIdConfigured = input.env?.tentIdConfigured;
   return (
     <section
       data-testid="ecowitt-bridge-troubleshooting-panel"

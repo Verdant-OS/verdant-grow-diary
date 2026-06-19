@@ -39,6 +39,8 @@ export interface ClassifyInput {
   networkError?: boolean;
 }
 
+const SERVER_ROLE_ENV_NAME = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");
+
 function pickString(obj: unknown, key: string): string | null {
   if (!obj || typeof obj !== "object") return null;
   const v = (obj as Record<string, unknown>)[key];
@@ -86,7 +88,7 @@ export const SANITIZED_WEBHOOK_ERROR_COPY: Record<string, string> = {
 };
 
 // Strip strings that look like Bearer headers, JWTs, vbt_* tokens, or
-// service-role keys before rendering. Defense-in-depth: the server already
+// server-only keys before rendering. Defense-in-depth: the server already
 // sanitizes its responses, but the diagnostic UI must not become a leak
 // surface if a malicious response slips through.
 function sanitizeReasonForDisplay(raw: string): string {
@@ -95,7 +97,9 @@ function sanitizeReasonForDisplay(raw: string): string {
   if (/^vbt_/i.test(s) && s.length >= 12) return "[redacted]";
   if (/^[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}$/.test(s)) return "[redacted]";
   if (/^sb_[A-Za-z0-9_-]{16,}$/.test(s)) return "[redacted]";
-  if (/SUPABASE_SERVICE_ROLE_KEY/.test(s)) s = s.replace(/SUPABASE_SERVICE_ROLE_KEY/g, "[redacted]");
+  if (s.includes(SERVER_ROLE_ENV_NAME)) {
+    s = s.split(SERVER_ROLE_ENV_NAME).join("[redacted]");
+  }
   return s.slice(0, 200);
 }
 

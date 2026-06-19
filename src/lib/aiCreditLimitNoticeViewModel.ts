@@ -16,6 +16,12 @@ import {
   buildPaywallCtaViewModel,
   type PaywallCtaViewModel,
 } from "@/lib/paywallCtaViewModel";
+import {
+  reconcileAiCreditDenialPlanId,
+  resolveAiDoctorEntitlementView,
+  type AiDoctorEntitlementView,
+} from "@/lib/aiDoctorEntitlementRules";
+import type { ResolvedEntitlement } from "@/lib/entitlements/types";
 
 export type AiCreditDenialScope = "per_grow" | "per_month" | string;
 
@@ -89,11 +95,19 @@ function copyFor(surface: AiCreditLimitNoticeSurface): SurfaceCopy {
   return surface === "coach" ? COACH_COPY : DOCTOR_COPY;
 }
 
+
 export interface AiCreditLimitNoticeInput {
   credit: AiCreditDenial;
   currentPlanLabel?: string;
   /** Defaults to "doctor" to preserve S3.0 behavior. */
   surface?: AiCreditLimitNoticeSurface;
+  /**
+   * Optional viewer entitlement. When provided, paid/founder viewers
+   * bypass the "free → upsell" branch defensively, even if the server
+   * denial mis-tagged plan_id="free". Never grants credits; only
+   * downgrades upsell copy to plan-neutral "wait" copy.
+   */
+  viewerEntitlement?: ResolvedEntitlement | null;
 }
 
 export function buildAiCreditLimitNoticeViewModel(
@@ -101,7 +115,13 @@ export function buildAiCreditLimitNoticeViewModel(
 ): AiCreditLimitNoticeViewModel {
   const surface: AiCreditLimitNoticeSurface = input.surface ?? "doctor";
   const copy = copyFor(surface);
-  const planId = input.credit?.plan_id;
+  const viewerView: AiDoctorEntitlementView = resolveAiDoctorEntitlementView({
+    entitlement: input.viewerEntitlement ?? null,
+  });
+  const planId = reconcileAiCreditDenialPlanId({
+    denialPlanId: input.credit?.plan_id,
+    view: viewerView,
+  });
 
   if (planId === "free") {
     const paywallVm = buildPaywallCtaViewModel({

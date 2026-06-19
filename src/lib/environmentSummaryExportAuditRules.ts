@@ -8,6 +8,9 @@
  * `idFactory` are injectable for deterministic tests.
  */
 
+import { assertExportSafe } from "./exportRedactionRules";
+
+
 export const ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY =
   "verdant.environmentSummaryExportAudit.v1";
 
@@ -148,12 +151,19 @@ export function recordEnvironmentSummaryExportAuditEvent(
     -ENVIRONMENT_SUMMARY_EXPORT_AUDIT_MAX_EVENTS,
   );
   try {
+    const serialized = JSON.stringify(next);
+    // Guardrail at the persist boundary — even though events only carry
+    // typed audit fields, route the serialized payload through the export
+    // redaction helper so any future field addition that smuggles a
+    // forbidden key or sensitive value fails loudly instead of being
+    // silently written to local storage.
+    assertExportSafe(serialized, "environment-summary-export-audit");
     storage.setItem(
       ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY,
-      JSON.stringify(next),
+      serialized,
     );
   } catch {
-    // Quota / unavailable → swallow; in-memory event still returned.
+    // Quota / unavailable / contamination → swallow; in-memory event still returned.
   }
   return evt;
 }

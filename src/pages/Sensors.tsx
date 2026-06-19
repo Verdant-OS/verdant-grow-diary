@@ -140,12 +140,18 @@ export default function Sensors() {
               isDerived = true;
             }
           }
+          // Recent values for soil stuck-at-bound detection (last 3).
+          const recentValues =
+            m.key === "soil"
+              ? filtered.slice(-3).map((r) => r.soil ?? null)
+              : undefined;
           const state = classifySensorMetricState({
             metric: m.key as SensorMetricKey,
             value: value ?? null,
             source: latestSource,
             hasAnyReading: hasReadings,
             isDerived,
+            recentValues,
           });
 
           // Stage-aware status pill for Temperature/Humidity using the

@@ -1,7 +1,3 @@
-/**
- * manualSnapshotTimelineMerge — deterministic merge of diary entries and
- * manual snapshot cards.
- */
 import { describe, it, expect } from "vitest";
 
 import { validateManualSnapshot } from "@/lib/manualSensorSnapshotRules";
@@ -53,6 +49,21 @@ describe("mergeTimelineItems", () => {
       "diary:z-diary",
       "manual-snapshot:a-snap",
       "manual-snapshot:z-snap",
+    ]);
+  });
+
+  it("keeps one item per stable kind and key", () => {
+    const ts = "2026-01-01T00:00:00.000Z";
+    const merged = mergeTimelineItems({
+      diaryEntries: [
+        { key: "repeat", occurredAt: ts },
+        { key: "repeat", occurredAt: ts },
+      ],
+      manualSnapshots: [mkCard("repeat", ts), mkCard("repeat", ts)],
+    });
+    expect(merged.map((m) => `${m.kind}:${m.key}`)).toEqual([
+      "diary:repeat",
+      "manual-snapshot:repeat",
     ]);
   });
 

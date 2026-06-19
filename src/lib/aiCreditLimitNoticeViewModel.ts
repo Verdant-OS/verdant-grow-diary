@@ -95,12 +95,6 @@ function copyFor(surface: AiCreditLimitNoticeSurface): SurfaceCopy {
   return surface === "coach" ? COACH_COPY : DOCTOR_COPY;
 }
 
-export interface AiCreditLimitNoticeInput {
-  credit: AiCreditDenial;
-  currentPlanLabel?: string;
-  /** Defaults to "doctor" to preserve S3.0 behavior. */
-  surface?: AiCreditLimitNoticeSurface;
-}
 
 export interface AiCreditLimitNoticeInput {
   credit: AiCreditDenial;

@@ -1,0 +1,62 @@
+# AI Doctor Phase 1 — Read-Only QA Checklist
+
+Manual QA for `/operator/ai-doctor-phase1`. Read-only flow — confirm no writes,
+no live AI/model calls, no Action Queue writes, no device control.
+
+## A. Route and selection
+
+- [ ] Open `/operator/ai-doctor-phase1` (requires Operator Mode).
+- [ ] No-plants state renders cleanly.
+- [ ] Selecting a plant updates the URL with `plantId`.
+- [ ] Reloading the deep link restores the same plant.
+- [ ] Unknown plantId blocks result rendering and shows guidance.
+- [ ] Clearing selection returns to picker.
+
+## B. Deep links
+
+- [ ] Internal link includes `plantId` (and `growId`/`tentId` when available).
+- [ ] Copy action shows "Copied!" confirmation.
+- [ ] "Back to plant" navigates to the plant.
+- [ ] "View plant context" navigates correctly.
+
+## C. Result derivation
+
+- [ ] Loading skeleton appears while deriving.
+- [ ] No blank page during derivation.
+- [ ] No fake diagnosis appears while loading.
+- [ ] Result renders only for a valid selected plant/context.
+- [ ] No-result state appears when no context is available.
+
+## D. Evidence
+
+- [ ] Recent diary shortcuts render newest-first.
+- [ ] Recent photo shortcut appears only when photo activity exists.
+- [ ] Sensor summary anchor scrolls to the sensor section.
+- [ ] Mobile sticky bar appears only when result/evidence exists.
+- [ ] Sticky bar does not duplicate screen-reader announcements
+      (`aria-hidden`).
+
+## E. Missing context
+
+- [ ] Checklist shows: photo, diary, sensor, watering/feeding, stage, medium,
+      pot size items.
+- [ ] Helper text is local-facts-only (no nutrient/equipment advice).
+- [ ] Stale/invalid sensors show needs-review.
+- [ ] CTAs navigate only — they never create data.
+
+## F. Accessibility
+
+- [ ] Keyboard Tab reaches the skip link first.
+- [ ] Skip link jumps focus to evidence shortcuts.
+- [ ] Focus rings visible on all CTAs.
+- [ ] Aria labels make sense (include plant name when available).
+- [ ] Reduced-motion disables shimmer animation while skeleton stays visible.
+
+## G. Safety checks
+
+- [ ] No save / attach / approve / send / execute buttons present.
+- [ ] No Action Queue row created.
+- [ ] No diary/timeline row created.
+- [ ] No alert row created.
+- [ ] No AI/model request made (check network).
+- [ ] No device-control copy or behavior anywhere on the page.

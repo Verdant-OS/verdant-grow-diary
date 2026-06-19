@@ -6,7 +6,8 @@
  * `live-sensor-entitlement` edge function has returned `ok: true`.
  *
  * V0 safety contract:
- *  - Never reads or trusts `useMyEntitlements` / `capabilities.liveSensors`.
+ *  - Never reads or trusts client-side entitlement hooks or the live
+ *    sensor capability flag. The server gate is the authority.
  *  - Never renders premium children before the server says `allowed`.
  *  - Loading, denied, invalid_request, and network_error states show
  *    safe, screen-reader-friendly copy with text labels (not icon-only).

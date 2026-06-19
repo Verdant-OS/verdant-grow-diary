@@ -61,7 +61,7 @@ export function AiDoctorActionSuggestionReviewGate(
           Action suggestion (review required)
         </h3>
         <p className="text-xs text-muted-foreground">
-          Approval-required suggestion. Verdant will never execute a device
+          Approval-required suggestion. Verdant will never operate a device
           or equipment change.
         </p>
       </header>

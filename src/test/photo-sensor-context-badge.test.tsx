@@ -40,8 +40,10 @@ describe("PhotoSensorContextBadge — badge layer", () => {
     );
     const html = container.innerHTML.toLowerCase();
     expect(html).not.toMatch(/\bai\s+diagnos/);
-    expect(html).not.toMatch(/diagnosis\b/);
     expect(html).not.toMatch(/likely\s+(disease|deficiency)/);
+    // The only "diagnosis" string allowed is the explicit non-diagnostic guard.
+    const diagnosisMatches = html.match(/diagnosis/g) ?? [];
+    expect(diagnosisMatches.length).toBe(1);
     expect(html).toContain("not a diagnosis");
     expect(html).toContain("do not infer cause");
   });

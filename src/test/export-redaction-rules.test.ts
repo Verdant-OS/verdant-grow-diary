@@ -28,6 +28,8 @@ import {
   findForbiddenHeaders,
   detectExportLeaks,
   getExportAllowlist,
+  assertExportSafe,
+  assertExportHeadersSafe,
   SENSITIVE_DEVICE_PATTERNS,
 } from "@/lib/exportRedactionRules";
 
@@ -276,5 +278,95 @@ describe("exportRedactionRules — static scan of export builders", () => {
       );
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hard-fail guardrail helpers — `assertExportSafe` / `assertExportHeadersSafe`
+// ---------------------------------------------------------------------------
+
+describe("assertExportSafe / assertExportHeadersSafe", () => {
+  it("passes a clean CSV body", () => {
+    const csv =
+      `metric,value,unit,source,captured_at\n` +
+      `temp_c,22,C,live,2026-05-27T10:00:00Z\n`;
+    expect(() => assertExportSafe(csv, "test")).not.toThrow();
+  });
+
+  it("throws when a MAC-like value contaminates the body", () => {
+    const csv = `metric,value,source\n` + `temp_c,22,${MAC}\n`;
+    expect(() => assertExportSafe(csv, "test")).toThrowError(
+      /export-redaction.*test.*mac_address/,
+    );
+  });
+
+  it("throws when a forbidden key appears in headers", () => {
+    expect(() =>
+      assertExportHeadersSafe(
+        ["metric", "value", "target_device"],
+        "test",
+      ),
+    ).toThrowError(/target_device/);
+  });
+
+  it("passes a clean header list", () => {
+    expect(() =>
+      assertExportHeadersSafe(
+        ["metric", "value", "unit", "source", "captured_at"],
+        "test",
+      ),
+    ).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Retrofit verification — each enumerated builder now imports + calls the
+// centralized guardrail at its serialization boundary.
+// ---------------------------------------------------------------------------
+
+const RETROFIT_FILES: Array<{ file: string; needsHeaders: boolean }> = [
+  { file: "src/lib/aiDoctorEvidenceCsvExportRules.ts", needsHeaders: true },
+  {
+    file: "src/lib/cost/aiDoctorPromptMeasurementCsvExport.ts",
+    needsHeaders: true,
+  },
+  { file: "src/lib/ecowittCloudCanaryExport.ts", needsHeaders: true },
+  { file: "src/lib/csvSensorPreviewPdf.ts", needsHeaders: false },
+  {
+    file: "src/lib/environmentSummaryExportReceiptView.ts",
+    needsHeaders: false,
+  },
+  {
+    file: "src/lib/environmentSummaryExportAuditRules.ts",
+    needsHeaders: false,
+  },
+];
+
+describe("retrofit — every enumerated export builder routes through the centralized helper", () => {
+  for (const { file, needsHeaders } of RETROFIT_FILES) {
+    it(`${file} imports and calls assertExportSafe`, () => {
+      const abs = join(process.cwd(), file);
+      const src = readFileSync(abs, "utf8");
+      expect(src).toMatch(/from\s+["']\.\.?\/exportRedactionRules["']|from\s+["']@\/lib\/exportRedactionRules["']/);
+      expect(src).toMatch(/assertExportSafe\s*\(/);
+      if (needsHeaders) {
+        expect(src).toMatch(/assertExportHeadersSafe\s*\(/);
+      }
+    });
+  }
+
+  it("verdantGeneticsImportPreviewRules.ts is documented as not-an-export (import preview only)", () => {
+    // Sanity: this file remains untouched by the retrofit because it is
+    // an *import preview* of user-supplied CSV cells, not an export of
+    // DB rows. If a future change starts emitting DB rows from it, this
+    // test should be updated to require the same guardrail wiring.
+    const abs = join(
+      process.cwd(),
+      "src/lib/verdantGeneticsImportPreviewRules.ts",
+    );
+    const src = readFileSync(abs, "utf8");
+    // No DB-row egress markers expected.
+    expect(src).not.toMatch(/from\s+["'].*supabase.*["']/);
+    expect(src).not.toMatch(/raw_payload|target_device|bridge_token/);
   });
 });

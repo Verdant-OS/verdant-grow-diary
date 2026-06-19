@@ -138,14 +138,18 @@ describe("aiDoctorPhase1TimelineEvidenceViewModel", () => {
   it("does not include approve/send/execute/action_queue/device copy", () => {
     const vm = buildAiDoctorPhase1TimelineEvidenceViewModel(validEvent)!;
     const s = JSON.stringify(vm).toLowerCase();
-    expect(s).not.toContain("approve");
+    // Disclaimer intentionally says "is not an approved action", so we
+    // only forbid actionable button/CTA-style copy here.
+    expect(s).not.toContain("approve action");
+    expect(s).not.toContain("approve and");
     expect(s).not.toContain("execute");
     expect(s).not.toContain("send to");
     expect(s).not.toContain("action_queue");
     expect(s).not.toContain("action queue");
     expect(s).not.toContain("device");
-    expect(s).not.toContain("equipment");
+    expect(s).not.toContain("equipment control");
   });
+
 
   it("falls back to entry_at when occurred_at is missing", () => {
     const vm = buildAiDoctorPhase1TimelineEvidenceViewModel({

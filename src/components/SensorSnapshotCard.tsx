@@ -67,11 +67,14 @@ export default function SensorSnapshotCard({
       <div
         data-testid={`${testId}-empty`}
         className={cn(
-          "rounded-md border border-dashed border-muted-foreground/30 bg-muted/30 px-3 py-2 text-xs text-muted-foreground",
+          "rounded-md border border-dashed border-muted-foreground/30 bg-muted/30 px-3 py-2 text-xs text-muted-foreground space-y-1",
           className,
         )}
       >
-        No sensor snapshot available.
+        <p>No sensor snapshot available.</p>
+        <p className="text-[11px]">
+          Enter a manual reading or check latest sensor ingestion.
+        </p>
       </div>
     );
   }

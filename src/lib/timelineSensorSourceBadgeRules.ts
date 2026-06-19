@@ -17,14 +17,12 @@
  *    is present. If no fallback is provided, the result is "invalid".
  *  - No I/O. No randomness. Deterministic.
  */
+import {
+  CANONICAL_SENSOR_SOURCES,
+  type CanonicalSensorSource,
+} from "@/constants/sensorIngestProvenance";
 
-export type TimelineSensorSourceKind =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type TimelineSensorSourceKind = CanonicalSensorSource;
 
 export interface TimelineSensorSourceBadge {
   kind: TimelineSensorSourceKind;
@@ -46,14 +44,9 @@ export interface ClassifyTimelineSensorSourceInput {
   fallback?: TimelineSensorSourceKind;
 }
 
-const ALLOWED: ReadonlySet<TimelineSensorSourceKind> = new Set([
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-]);
+const ALLOWED: ReadonlySet<TimelineSensorSourceKind> = new Set(
+  CANONICAL_SENSOR_SOURCES,
+);
 
 const LABELS: Record<TimelineSensorSourceKind, string> = {
   live: "Source: live",
@@ -65,7 +58,7 @@ const LABELS: Record<TimelineSensorSourceKind, string> = {
 };
 
 const DESCRIPTIONS: Record<TimelineSensorSourceKind, string> = {
-  live: "Reading from a connected live ingest source.",
+  live: "Reading from a connected live source.",
   manual: "Reading entered manually by the grower.",
   csv: "Historical CSV context — not live sensor data.",
   demo: "Demo data — not a real sensor reading.",
@@ -77,9 +70,9 @@ function normalize(raw: string | null | undefined): TimelineSensorSourceKind | n
   if (typeof raw !== "string") return null;
   const v = raw.trim().toLowerCase();
   if (v.length === 0) return null;
-  if (v === "live" || v === "ingest" || v === "sensor" || v === "supabase") return "live";
+  if (v === "live" || v === "sensor" || v === "supabase") return "live";
   if (v === "manual" || v === "user" || v === "entry" || v === "log") return "manual";
-  if (v === "csv" || v === "import" || v === "imported") return "csv";
+  if (v === "csv") return "csv";
   if (v === "demo" || v === "mock" || v === "fake" || v === "sample" || v === "fixture") return "demo";
   if (v === "stale") return "stale";
   if (v === "invalid") return "invalid";

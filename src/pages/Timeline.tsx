@@ -69,6 +69,11 @@ import {
   buildTimelinePhotoAltText,
 } from "@/lib/timelinePhotoLightboxRules";
 import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
+import {
+  PHOTO_NON_DIAGNOSTIC_LABEL,
+  PHOTO_NON_DIAGNOSTIC_TESTID,
+  shouldShowPhotoNonDiagnosticLabel,
+} from "@/lib/photoEventNonDiagnosticLabelRules";
 import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
 import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
@@ -710,21 +715,35 @@ export default function Timeline() {
                           const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
                           const item = idx >= 0 ? lightboxItems[idx] : null;
                           const alt = buildTimelinePhotoAltText(item);
+                          const showNonDiagnostic = shouldShowPhotoNonDiagnosticLabel({
+                            hasPhoto: true,
+                            details: e.details,
+                          });
                           return (
-                            <button
-                              type="button"
-                              onClick={() => { if (idx >= 0) setLightboxPhotoId(e.id); }}
-                              aria-label={`Open photo: ${alt}`}
-                              data-testid="timeline-photo-open"
-                              className="block w-full focus:outline-none focus:ring-2 focus:ring-primary/60"
-                            >
-                              <img
-                                src={e.photo_url}
-                                className="w-full aspect-[4/3] object-cover"
-                                alt={alt}
-                                loading="lazy"
-                              />
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => { if (idx >= 0) setLightboxPhotoId(e.id); }}
+                                aria-label={`Open photo: ${alt}`}
+                                data-testid="timeline-photo-open"
+                                className="block w-full focus:outline-none focus:ring-2 focus:ring-primary/60"
+                              >
+                                <img
+                                  src={e.photo_url}
+                                  className="w-full aspect-[4/3] object-cover"
+                                  alt={alt}
+                                  loading="lazy"
+                                />
+                              </button>
+                              {showNonDiagnostic && (
+                                <div
+                                  data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
+                                  className="px-3 py-1.5 text-[11px] text-muted-foreground bg-secondary/30 border-t border-border/30"
+                                >
+                                  {PHOTO_NON_DIAGNOSTIC_LABEL}
+                                </div>
+                              )}
+                            </>
                           );
                         })()
                       ) : (

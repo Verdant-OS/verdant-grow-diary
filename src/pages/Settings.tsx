@@ -17,6 +17,14 @@ import {
   getStartScreenChoiceOrDefault,
   setStartScreenChoice,
 } from "@/lib/startScreenPreferences";
+import {
+  DEFAULT_TEMPERATURE_UNIT,
+  TEMPERATURE_UNIT_OPTIONS,
+  type TemperatureUnitPreference,
+  loadTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+  clearTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 interface TileProps {
   name: string;

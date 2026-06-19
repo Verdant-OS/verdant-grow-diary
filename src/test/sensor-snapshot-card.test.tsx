@@ -86,16 +86,14 @@ describe("SensorSnapshotCard", () => {
   });
 
   it("never renders raw_payload or secret-like strings", () => {
+    const evilSnapshot = {
+      source: "live",
+      capturedAt: isoMinusMs(0),
+      raw_payload: { api_key: "abcd1234", secret: "shh" },
+    } as unknown as Parameters<typeof SensorSnapshotCard>[0]["snapshot"];
     const { container } = render(
       <SensorSnapshotCard
-        snapshot={
-          {
-            source: "live",
-            capturedAt: isoMinusMs(0),
-            // @ts-expect-error — defensive: ensure unknown keys never render
-            raw_payload: { api_key: "abcd1234", secret: "shh" },
-          } as never
-        }
+        snapshot={evilSnapshot}
         resolveOptions={{ now: NOW }}
       />,
     );

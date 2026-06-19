@@ -21,8 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Pencil } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import { toast } from "sonner";
+import PlantPhoto from "@/components/PlantPhoto";
+import { normalizePlantProfilePhotoInput } from "@/lib/plantProfilePhotoRules";
 
 /**
  * Edits an existing plant's user-facing fields (name, strain, stage,

@@ -41,7 +41,10 @@ import {
   buildTentSensorChartSeries,
   buildTentSensorHeaderView,
 } from "@/lib/tentSensorChartRules";
-import { tempFFromC } from "@/lib/temperatureUnits";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+} from "@/lib/temperatureUnitPreference";
 import { formatSensorValue } from "@/lib/sensorFormat";
 import {
   filterVisiblePlants,

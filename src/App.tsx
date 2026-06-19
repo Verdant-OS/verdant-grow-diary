@@ -28,6 +28,7 @@ import Grows from "./pages/Grows";
 import GrowDetail from "./pages/GrowDetail";
 import PhenoHuntNew from "./pages/PhenoHuntNew";
 import Reports from "./pages/Reports";
+import PostGrowLearningReport from "./pages/PostGrowLearningReport";
 
 import Coach from "./pages/Coach";
 import AiDoctorSessionDetail from "./pages/AiDoctorSessionDetail";
@@ -139,6 +140,7 @@ const App = () => (
                 <Route path="/grows/:growId" element={<GrowDetail />} />
                 <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
                 <Route path="/reports" element={<Reports />} />
+                <Route path="/reports/post-grow/:growId" element={<PostGrowLearningReport />} />
                 <Route
                   path="/diary/environment-summary"
                   element={<EnvironmentSummaryReportPage />}

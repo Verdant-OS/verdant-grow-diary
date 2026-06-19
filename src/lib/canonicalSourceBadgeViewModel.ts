@@ -56,21 +56,9 @@ import { deriveProviderLabel } from "@/constants/sensorProviderLabels";
 
 
 const UNKNOWN_LABEL = "Unknown source" as const;
-const PROVIDER_MAX = 32;
 
 function normalizeProvider(p: string | null | undefined): string | null {
-  if (typeof p !== "string") return null;
-  const t = p.trim();
-  if (!t) return null;
-  const key = t.toLowerCase().replace(/-/g, "_");
-  if (PROVIDER_LABEL[key]) return PROVIDER_LABEL[key];
-  const safe = key.replace(/[^a-z0-9_ ]+/g, "").replace(/_/g, " ").trim();
-  if (!safe) return null;
-  const titled = safe
-    .split(/\s+/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-  return titled.length > PROVIDER_MAX ? `${titled.slice(0, PROVIDER_MAX - 1)}…` : titled;
+  return deriveProviderLabel(p);
 }
 
 export interface BuildCanonicalSourceBadgeInput {

@@ -103,26 +103,17 @@ export default function EnvironmentCheckSnapshotLinkButton({
       )}
       {result.matchKind !== "none" && drawerData ? (
         <>
-          <button
-            type="button"
+          <a
+            href={result.href ?? "#"}
             data-testid="env-check-snapshot-cta"
-            onClick={() => setOpen(true)}
+            onClick={(e) => {
+              e.preventDefault();
+              setOpen(true);
+            }}
             className="inline-flex items-center gap-1 underline text-foreground/90 hover:text-foreground"
           >
             View sensor snapshot <ExternalLink className="h-3 w-3" />
-          </button>
-          {/* Deterministic href hint for tests / right-click. */}
-          {result.href && (
-            <a
-              href={result.href}
-              data-testid="env-check-snapshot-href"
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden="true"
-            >
-              tent={entry.tentId}
-            </a>
-          )}
+          </a>
           <SensorSnapshotDetailsDrawer
             open={open}
             onOpenChange={setOpen}

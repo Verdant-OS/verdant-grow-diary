@@ -2,18 +2,23 @@
  * alertStatusTransitionRules — pure helpers that build the column patches
  * sent to `public.alerts` for status transitions.
  *
- * Why this exists:
- *   The `alerts` table enforces two CHECK constraints:
- *     - alerts_acknowledged_at_status_check:
- *         (acknowledged_at IS NULL) OR (status = 'acknowledged')
- *     - alerts_resolved_at_status_check:
- *         (resolved_at     IS NULL) OR (status = 'resolved')
+ * Status model (post-fix):
+ *   - `acknowledged_at` is a HISTORICAL timestamp. Once an alert is
+ *     acknowledged, the timestamp is preserved through later
+ *     resolve/dismiss transitions so the audit trail stays intact.
+ *   - `resolved_at` is a current-state timestamp; the existing
+ *     `alerts_resolved_at_status_check` (resolved_at IS NULL OR
+ *     status = 'resolved') still applies, so transitions AWAY FROM
+ *     `resolved` must clear it.
+ *   - The `alerts` table has no `dismissed_at` column.
  *
- *   That means any transition AWAY FROM `acknowledged` must clear
- *   `acknowledged_at`, and any transition AWAY FROM `resolved` must clear
- *   `resolved_at`. Building these patches in one deterministic place avoids
- *   the "Resolve violates constraint" regression observed when resolving an
- *   acknowledged alert (the row already had a non-null acknowledged_at).
+ * Database CHECK constraints (post-migration):
+ *   - alerts_acknowledged_at_status_check:
+ *       status='open'                       → acknowledged_at IS NULL
+ *       status='acknowledged'               → acknowledged_at IS NOT NULL
+ *       status IN ('resolved','dismissed')  → acknowledged_at unrestricted
+ *   - alerts_resolved_at_status_check:
+ *       resolved_at IS NULL OR status='resolved'
  *
  * Safety:
  *   - Pure, deterministic, no React, no I/O, no Supabase imports.
@@ -27,10 +32,13 @@ export type AlertTransitionStatus =
   | "resolved"
   | "dismissed";
 
+/**
+ * Resolve patch intentionally OMITS `acknowledged_at` so any historical
+ * value on the row is preserved by the database update.
+ */
 export interface AlertResolvePatch {
   status: "resolved";
   resolved_at: string;
-  acknowledged_at: null;
 }
 
 export interface AlertAcknowledgePatch {
@@ -39,9 +47,13 @@ export interface AlertAcknowledgePatch {
   resolved_at: null;
 }
 
+/**
+ * Dismiss patch intentionally OMITS `acknowledged_at` so any historical
+ * value on the row is preserved. Clears `resolved_at` to satisfy the
+ * unchanged `alerts_resolved_at_status_check`.
+ */
 export interface AlertDismissPatch {
   status: "dismissed";
-  acknowledged_at: null;
   resolved_at: null;
 }
 
@@ -57,18 +69,20 @@ function nowIso(now?: Date | string | null): string {
   return new Date().toISOString();
 }
 
-/** Resolving must clear `acknowledged_at` to satisfy the CHECK constraint. */
+/**
+ * Resolve transition. Preserves any historical `acknowledged_at` on the
+ * row by NOT including the column in the patch.
+ */
 export function buildResolveAlertPatch(
   now?: Date | string | null,
 ): AlertResolvePatch {
   return {
     status: "resolved",
     resolved_at: nowIso(now),
-    acknowledged_at: null,
   };
 }
 
-/** Acknowledging clears any stale `resolved_at` to satisfy the CHECK constraint. */
+/** Acknowledging clears any stale `resolved_at` to satisfy the resolved CHECK. */
 export function buildAcknowledgeAlertPatch(
   now?: Date | string | null,
 ): AlertAcknowledgePatch {
@@ -79,11 +93,13 @@ export function buildAcknowledgeAlertPatch(
   };
 }
 
-/** Dismissing must clear both timestamps — neither matches `dismissed`. */
+/**
+ * Dismiss transition. Preserves any historical `acknowledged_at` on the
+ * row by NOT including the column in the patch.
+ */
 export function buildDismissAlertPatch(): AlertDismissPatch {
   return {
     status: "dismissed",
-    acknowledged_at: null,
     resolved_at: null,
   };
 }

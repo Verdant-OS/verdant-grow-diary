@@ -150,6 +150,9 @@ export default function OperatorAiDoctorPhase1(
     tentId: selectedPlant?.tent_id ?? null,
     hash: "photos",
   });
+  const hasPhotoActivity = recentActivity.some((row) =>
+    typeof row.event_type === "string" && /photo/i.test(row.event_type),
+  );
 
   return (
     <main

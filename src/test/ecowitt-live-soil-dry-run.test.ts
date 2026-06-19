@@ -205,3 +205,24 @@ describe("ecowitt-live-soil dry-run script safety", () => {
     expect(script).not.toMatch(/\bfetch\s*\(/);
   });
 });
+
+describe("ecowitt-live-soil dry-run CLI canonical source labeling", () => {
+  it("CLI JSON output shows canonical source='live' for accepted readings (never 'ecowitt')", () => {
+    const { execSync } = require("node:child_process") as typeof import("node:child_process");
+    const TENT_UUID = "11111111-1111-1111-1111-111111111111";
+    const stdout = execSync(
+      `bun run scripts/ecowitt-live-soil-dry-run.ts --fixture fixtures/ecowitt-live-soil-sample.json --dry-run`,
+      { env: { ...process.env, VERDANT_TENT_ID: TENT_UUID }, encoding: "utf8" },
+    );
+    const parsed = JSON.parse(stdout) as {
+      payloads: { source: string; provider: string; transport: string }[];
+    };
+    expect(parsed.payloads.length).toBeGreaterThan(0);
+    for (const p of parsed.payloads) {
+      expect(p.source).toBe("live");
+      expect(p.source).not.toBe("ecowitt");
+      expect(p.provider).toBe("ecowitt");
+      expect(p.transport).toBe("mqtt");
+    }
+  });
+});

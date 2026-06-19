@@ -75,3 +75,28 @@ describe("vpdCalculationRules", () => {
     );
   });
 });
+
+import {
+  formatVpdKpa,
+  VPD_DERIVED_NOTE,
+  VPD_ROUNDING_NOTE,
+} from "@/lib/vpdCalculationRules";
+
+describe("formatVpdKpa", () => {
+  it("formats 1.206 as '1.21 kPa'", () => {
+    expect(formatVpdKpa(1.206)).toBe("1.21 kPa");
+  });
+  it("formats whole numbers with 2 decimals", () => {
+    expect(formatVpdKpa(1)).toBe("1.00 kPa");
+  });
+  it("returns '—' for null/undefined/NaN/Infinity", () => {
+    expect(formatVpdKpa(null)).toBe("—");
+    expect(formatVpdKpa(undefined)).toBe("—");
+    expect(formatVpdKpa(Number.NaN)).toBe("—");
+    expect(formatVpdKpa(Number.POSITIVE_INFINITY)).toBe("—");
+  });
+  it("exports stable derived + rounding notes", () => {
+    expect(VPD_DERIVED_NOTE).toBe("Calculated from temperature and humidity.");
+    expect(VPD_ROUNDING_NOTE).toBe("Rounded to 2 decimals.");
+  });
+});

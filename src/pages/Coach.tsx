@@ -76,6 +76,8 @@ export default function Coach() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CoachResponse | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
   const [queuedIdx, setQueuedIdx] = useState<Set<number>>(new Set());
   const [queuingIdx, setQueuingIdx] = useState<number | null>(null);
   // Persisted AI Doctor session id for the *currently rendered* diagnosis.

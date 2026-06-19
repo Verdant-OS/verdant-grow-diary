@@ -8,6 +8,8 @@ const NEW_FILES = [
   "src/lib/canonicalSourceBadgeViewModel.ts",
   "src/lib/sensorIngestAuditReportCsvExport.ts",
   "src/lib/sensorIngestAuditReportQueryParams.ts",
+  "src/lib/sensorIngestAuditReportViewModel.ts",
+  "src/lib/sensorSnapshotDetailsDrawerCsvExport.ts",
   "src/lib/sensorSnapshotDiaryLinkRules.ts",
 ];
 

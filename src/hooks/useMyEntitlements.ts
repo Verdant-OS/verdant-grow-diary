@@ -52,8 +52,12 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
       }
 
       setLoading(true);
+      // Generated Supabase types include billing_subscriptions; no cast needed.
+      // This read is RLS-protected (select-own) and PRESENTATION-ONLY.
+      // Authoritative entitlement is enforced server-side (see
+      // docs/paid-launch-entitlement-blocker.md).
       const { data, error } = await supabase
-        .from("billing_subscriptions" as never)
+        .from("billing_subscriptions")
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle();

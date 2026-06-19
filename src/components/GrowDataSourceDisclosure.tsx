@@ -41,7 +41,7 @@ interface Props {
   /** Optional welcome action (e.g. create button) for the empty state. */
   welcomeAction?: React.ReactNode;
   /** Optional sensor snapshot source — when "sim", appends a simulated-data
-   * notice so the UI never presents simulated readings as live. */
+   * notice so the UI never presents simulated readings as current hardware data. */
   snapshotSource?: SnapshotSource;
   className?: string;
   testId?: string;
@@ -72,7 +72,7 @@ export default function GrowDataSourceDisclosure({
   };
 
   const description: Record<Label, string> = {
-    Live: `Current grow data — ${resource} saved in your Verdant workspace. Not live sensor readings.`,
+    Live: `Current grow data — ${resource} saved in your Verdant workspace. Sensor readings are labeled in their own sections below.`,
     Demo: `Showing demo ${resource}. Connect real ${resource} to replace it.`,
     Mixed: `Some ${resource} are real, some are demo or manual. Add or connect more to replace the demo data.`,
     Unavailable: `No ${resource} data available yet.`,
@@ -81,7 +81,7 @@ export default function GrowDataSourceDisclosure({
   const helpCopyByLabel: Record<Label, { title: string; body: string }> = {
     Live: {
       title: "Current grow data",
-      body: `Plants, tents, and ${resource} you saved in your Verdant workspace. This is your grow record, not a live sensor reading. Live sensor data shows up separately on the dashboard and tent detail.`,
+      body: `Plants, tents, and ${resource} saved in your Verdant workspace. Sensor readings are labeled separately in the Environment and sensor sections.`,
     },
     Demo: {
       title: "Demo data",

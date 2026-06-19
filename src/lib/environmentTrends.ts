@@ -7,6 +7,7 @@
 
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
 import { toFiniteNumber } from "@/lib/sensorSnapshot";
+import { calculateAirVpdKpa } from "@/lib/vpdRules";
 
 export interface EnvironmentSample {
   ts: string;
@@ -159,6 +160,16 @@ export function samplesFromReadings(
       const v = toFiniteNumber(r.value);
       if (v !== null) s[field] = v;
     }
+  }
+  // Read-time VPD fallback for historical rows that have valid temp + rh
+  // but no persisted vpd_kpa. Derived only — never written back. Does NOT
+  // override a persisted vpd_kpa value. Returns null (not 0) for invalid
+  // inputs so missing VPD stays missing.
+  for (const s of byKey.values()) {
+    if (s.vpd !== null) continue;
+    if (s.temp === null || s.rh === null) continue;
+    const derived = calculateAirVpdKpa({ tempC: s.temp, rhPercent: s.rh });
+    if (derived !== null) s.vpd = derived;
   }
   return Array.from(byKey.values());
 }

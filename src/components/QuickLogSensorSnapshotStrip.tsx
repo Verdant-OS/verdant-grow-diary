@@ -21,6 +21,8 @@ import {
   type QuickLogSnapshotStripStatus,
 } from "@/lib/quickLogSnapshotStripAdapter";
 import SnapshotTrustBadge from "@/components/SnapshotTrustBadge";
+import { buildQuickLogSensorSnapshotViewModel } from "@/lib/quickLogSensorSnapshotViewModel";
+import { adaptQuickLogSensorContextInput } from "@/lib/quickLogSensorSnapshotViewModelAdapter";
 
 
 interface Props {
@@ -61,7 +63,7 @@ const PILL_ARIA: Record<QuickLogSnapshotStripStatus, string> = {
   no_data: "Sensor snapshot status: no data",
 };
 
-export default function QuickLogSensorSnapshotStrip({ tentId, attached = true }: Props) {
+export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, attached = true }: Props) {
   const state = useLatestTentSensorSnapshot(tentId ?? null);
   const view = buildQuickLogStripFromTentState({
     status: state.status,
@@ -69,6 +71,24 @@ export default function QuickLogSensorSnapshotStrip({ tentId, attached = true }:
     hasTent: !!tentId,
     attached,
   });
+
+  // Additive: derive a single consistent freshness/empty advisory line
+  // from the new pure view-model so growers see one canonical warning
+  // copy before saving. This does NOT change the save path.
+  const vm = buildQuickLogSensorSnapshotViewModel(
+    adaptQuickLogSensorContextInput({
+      state: { status: state.status, snapshot: state.snapshot },
+      tentId: tentId ?? null,
+      attached,
+    }),
+  );
+  const advisory =
+    vm.display && vm.display.freshness === "fresh" ? null : vm.warning ?? vm.emptyCopy;
+  const advisoryKind = vm.display
+    ? vm.display.freshness
+    : vm.emptyCopy
+      ? "missing"
+      : null;
 
   return (
     <section
@@ -110,6 +130,17 @@ export default function QuickLogSensorSnapshotStrip({ tentId, attached = true }:
       </div>
 
       <p className="text-[12px] text-muted-foreground leading-snug">{view.description}</p>
+
+      {advisory && (
+        <p
+          data-testid="quicklog-sensor-snapshot-advisory"
+          data-advisory-kind={advisoryKind ?? "missing"}
+          role="note"
+          className="text-[11px] leading-snug text-muted-foreground"
+        >
+          {advisory}
+        </p>
+      )}
 
       {(view.ageLabel || view.metrics.length > 0) && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">

@@ -24,6 +24,8 @@ import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
+import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
+import PlantDetailHarvestEvidenceReportMount from "@/components/PlantDetailHarvestEvidenceReportMount";
 import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
 import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadiness";
 import PlantDetailDoctorContextPreview from "@/components/PlantDetailDoctorContextPreview";
@@ -37,7 +39,7 @@ import PlantProfileContextCard from "@/components/PlantProfileContextCard";
 import { updatePlantProfileMetadata } from "@/lib/plantProfileMetadataUpdate";
 import PlantDetailTimelineEvidenceReadinessLaunch from "@/components/PlantDetailTimelineEvidenceReadinessLaunch";
 import PlantDetailAskDoctorHelper from "@/components/PlantDetailAskDoctorHelper";
-import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
+import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID, PLANT_PHOTOS_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
 import { PLANT_DETAIL_SECTION_ANCHORS } from "@/lib/plantDetailSectionAnchors";
 
@@ -407,11 +409,18 @@ export default function PlantDetail() {
         hasDoctorSection
         hasAssignedTent={!!plant.tentId}
       />
-      <PlantDetailPhotoStrip
-        plantId={plant.id}
-        growId={plant.growId ?? null}
-        onUploadPhoto={() => setQuickLogOpen(true)}
-      />
+      <div
+        id={PLANT_PHOTOS_ANCHOR_ID}
+        tabIndex={-1}
+        aria-label="Plant photos section"
+        className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+      >
+        <PlantDetailPhotoStrip
+          plantId={plant.id}
+          growId={plant.growId ?? null}
+          onUploadPhoto={() => setQuickLogOpen(true)}
+        />
+      </div>
 
       <PlantDetailWhatsMissing
         plantId={plant.id}
@@ -423,6 +432,11 @@ export default function PlantDetail() {
         plantId={plant.id}
         onAddQuickCheck={() => setQuickLogOpen(true)}
       />
+      <PlantDetailHarvestWatchCard
+        plantId={plant.id}
+        hasPlantPhoto={!!plant.photo}
+      />
+      <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
       <PlantDetailAiDoctorReadiness
         plantId={plant.id}
         growId={plant.growId ?? null}
@@ -513,6 +527,7 @@ export default function PlantDetail() {
             growId: plant.growId ?? null,
             lastNote: plant.lastNote,
             isArchived: plant.isArchived ?? false,
+            photo: plant.photo ?? null,
           }}
           variant="row"
           hideView

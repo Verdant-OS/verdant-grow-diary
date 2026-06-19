@@ -29,6 +29,7 @@ import {
 } from "@/lib/routes";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import ActionOutcomeLearningReport from "@/components/ActionOutcomeLearningReport";
+import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 
 /**
  * Read-only grow detail hub. Presentational only — all data loading +
@@ -114,6 +115,10 @@ export default function GrowDetail() {
           <Field label="Updated" value={new Date(grow.updated_at).toLocaleString()} />
           <Field label="Grow ID" value={grow.id} mono />
         </dl>
+
+        <div className="mt-4">
+          <StartPhenoHuntButton growId={grow.id} />
+        </div>
       </header>
 
       <GrowStatusCard status={status} growId={growId} />

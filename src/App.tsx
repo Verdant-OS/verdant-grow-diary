@@ -26,6 +26,7 @@ import Settings from "./pages/Settings";
 import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
 import GrowDetail from "./pages/GrowDetail";
+import PhenoHuntNew from "./pages/PhenoHuntNew";
 import Reports from "./pages/Reports";
 
 import Coach from "./pages/Coach";
@@ -60,6 +61,8 @@ import EcowittLiveBringup from "./pages/EcowittLiveBringup";
 import EnvironmentSummaryReportPage from "./pages/EnvironmentSummaryReportPage";
 import OperatorOneTentLoopSmokeTest from "./pages/OperatorOneTentLoopSmokeTest";
 import OperatorGgsRealPayloadIngest from "./pages/OperatorGgsRealPayloadIngest";
+import CustomerModeGuide from "./pages/CustomerModeGuide";
+import { OperatorAiDoctorPhase1Page } from "./pages/OperatorAiDoctorPhase1";
 
 const queryClient = new QueryClient();
 
@@ -96,6 +99,10 @@ const App = () => (
               <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/billing/:plan" element={<BillingPlaceholder />} />
+              {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
+                  no operator chrome (header, Quick Log) renders. */}
+              <Route path="/customer/:shareId" element={<CustomerModeGuide />} />
+              
               
 
               <Route element={<AppShell />}>
@@ -130,6 +137,7 @@ const App = () => (
                 <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                 <Route path="/grows" element={<Grows />} />
                 <Route path="/grows/:growId" element={<GrowDetail />} />
+                <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route
                   path="/diary/environment-summary"
@@ -139,6 +147,10 @@ const App = () => (
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />
                 <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
+                <Route
+                  path="/operator/ai-doctor-phase1"
+                  element={<OperatorAiDoctorPhase1Page />}
+                />
                 <Route path="/operator/one-tent-proof-record" element={<OneTentProofRecord />} />
                 <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />
                 <Route path="/operator/ecowitt-bridge-debug" element={<EcowittBridgeDebug />} />

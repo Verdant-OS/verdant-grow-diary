@@ -1,0 +1,229 @@
+/**
+ * HarvestEvidenceReportExportButton — mounted + safety tests.
+ *
+ * Mounts the export button with both empty and populated reports and
+ * asserts:
+ *   - button renders, label, disabled-while-loading
+ *   - clicking triggers window.print()
+ *   - hidden print section includes title, generated-at, scope, totals,
+ *     plant/window content, caution + no-actions + footer
+ *   - empty report renders empty-evidence state in the print section
+ *   - print section never includes plant_id / grow_id / tent_id /
+ *     user_id / raw_payload / sensor_readings
+ *   - source file does NOT import Supabase write helpers, AI helpers,
+ *     alerts/, action queue, device control, or external fetch
+ *   - no forbidden harvest-instruction copy
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import * as path from "node:path";
+import * as fs from "node:fs";
+
+import HarvestEvidenceReportExportButton from "@/components/HarvestEvidenceReportExportButton";
+import {
+  buildHarvestEvidenceReport,
+  type HarvestEvidenceReportPlantInput,
+} from "@/lib/harvestEvidenceReportViewModel";
+
+const NOW = new Date("2026-06-18T12:34:56.789Z");
+
+const INPUTS_WITH_EVIDENCE: HarvestEvidenceReportPlantInput[] = [
+  {
+    plantId: "secret-plant-id-1",
+    plantName: "Sour Diesel",
+    strain: "Sour D Auto",
+    stage: "flower",
+    rows: [
+      {
+        id: "n1",
+        note: "Checked trichomes — about 30% cloudy across the top colas.",
+        eventType: "observation",
+        occurredAt: "2026-06-15T10:00:00.000Z",
+        occurredAtLabel: "Jun 15",
+        hasPhoto: false,
+      },
+      {
+        id: "n2",
+        note: "Pistils about 50% receded on lower buds.",
+        eventType: "observation",
+        occurredAt: "2026-06-16T10:00:00.000Z",
+        occurredAtLabel: "Jun 16",
+        hasPhoto: false,
+      },
+    ],
+  },
+];
+
+const EMPTY_REPORT = buildHarvestEvidenceReport([]);
+const POPULATED_REPORT = buildHarvestEvidenceReport(INPUTS_WITH_EVIDENCE);
+
+beforeEach(() => {
+  // jsdom does not implement window.print; stub it.
+  window.print = vi.fn();
+});
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+describe("HarvestEvidenceReportExportButton", () => {
+  it("renders the Export PDF button", () => {
+    render(
+      <HarvestEvidenceReportExportButton report={EMPTY_REPORT} now={NOW} />,
+    );
+    const btn = screen.getByTestId("harvest-evidence-report-export-button");
+    expect(btn).toBeInTheDocument();
+    expect(btn).toHaveTextContent(/Export PDF/);
+  });
+
+  it("is disabled while loading", () => {
+    render(
+      <HarvestEvidenceReportExportButton
+        report={EMPTY_REPORT}
+        isLoading
+        now={NOW}
+      />,
+    );
+    expect(
+      screen.getByTestId("harvest-evidence-report-export-button"),
+    ).toBeDisabled();
+  });
+
+  it("is enabled when report has evidence", () => {
+    render(
+      <HarvestEvidenceReportExportButton
+        report={POPULATED_REPORT}
+        now={NOW}
+      />,
+    );
+    expect(
+      screen.getByTestId("harvest-evidence-report-export-button"),
+    ).not.toBeDisabled();
+  });
+
+  it("invokes window.print() on click", () => {
+    render(
+      <HarvestEvidenceReportExportButton
+        report={POPULATED_REPORT}
+        now={NOW}
+      />,
+    );
+    fireEvent.click(
+      screen.getByTestId("harvest-evidence-report-export-button"),
+    );
+    expect(window.print).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders required print-section content (title, generated, scope, totals, footer)", () => {
+    render(
+      <HarvestEvidenceReportExportButton
+        report={POPULATED_REPORT}
+        now={NOW}
+      />,
+    );
+    const section = screen.getByTestId(
+      "harvest-evidence-report-print-section",
+    );
+    expect(section).toHaveAttribute(
+      "data-print-section",
+      "harvest-evidence-report",
+    );
+    expect(section.textContent ?? "").toMatch(/Harvest Evidence Report/);
+    expect(
+      screen.getByTestId("harvest-evidence-report-print-generated-at")
+        .textContent ?? "",
+    ).toMatch(/2026-06-18T12:34:56Z/);
+    expect(
+      screen.getByTestId("harvest-evidence-report-print-scope").textContent ??
+        "",
+    ).toMatch(/Sour Diesel/);
+    expect(
+      screen.getByTestId("harvest-evidence-report-print-totals").textContent ??
+        "",
+    ).toMatch(/Trichome inspections:/);
+    expect(
+      screen.getByTestId("harvest-evidence-report-print-caution").textContent ??
+        "",
+    ).toMatch(/Harvest Evidence Report is diary evidence only/);
+    expect(
+      screen.getByTestId("harvest-evidence-report-print-no-actions")
+        .textContent ?? "",
+    ).toMatch(/does not create alerts, Action Queue items, or harvest instructions/);
+    expect(
+      screen.getByTestId("harvest-evidence-report-print-footer").textContent ??
+        "",
+    ).toMatch(/Generated by Verdant/);
+  });
+
+  it("renders empty-evidence state when no evidence present", () => {
+    render(
+      <HarvestEvidenceReportExportButton report={EMPTY_REPORT} now={NOW} />,
+    );
+    expect(
+      screen.getByTestId("harvest-evidence-report-print-empty").textContent ??
+        "",
+    ).toMatch(/No harvest evidence has been logged yet/);
+  });
+
+  it("print section never includes plant_id / grow_id / tent_id / user_id / raw_payload / sensor_readings text", () => {
+    render(
+      <HarvestEvidenceReportExportButton
+        report={POPULATED_REPORT}
+        now={NOW}
+      />,
+    );
+    const text =
+      screen.getByTestId("harvest-evidence-report-print-section").textContent ??
+      "";
+    expect(text).not.toMatch(/plant_id/i);
+    expect(text).not.toMatch(/grow_id/i);
+    expect(text).not.toMatch(/tent_id/i);
+    expect(text).not.toMatch(/user_id/i);
+    expect(text).not.toMatch(/raw_payload/i);
+    expect(text).not.toMatch(/sensor_readings/i);
+    expect(text).not.toMatch(/secret-plant-id-1/);
+  });
+
+  it("export source does not import Supabase write helpers, AI, alerts, action queue, device control, or external fetch", () => {
+    const files = [
+      "src/components/HarvestEvidenceReportExportButton.tsx",
+      "src/lib/harvestEvidenceReportExportRules.ts",
+    ];
+    for (const file of files) {
+      const src = fs.readFileSync(path.resolve(process.cwd(), file), "utf8");
+      expect(src).not.toMatch(/from "@\/integrations\/supabase\//);
+      expect(src).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
+      expect(src).not.toMatch(/ai-doctor|aiDoctor|ai_doctor/i);
+      expect(src).not.toMatch(/alerts?\//i);
+      expect(src).not.toMatch(/action[_-]?queue/i);
+      expect(src).not.toMatch(/device[_-]?control/i);
+      expect(src).not.toMatch(/sensor_readings/i);
+      expect(src).not.toMatch(/\bfetch\s*\(/);
+      expect(src).not.toMatch(/XMLHttpRequest/);
+    }
+  });
+
+  it("does not render forbidden harvest-instruction copy", () => {
+    render(
+      <HarvestEvidenceReportExportButton
+        report={POPULATED_REPORT}
+        now={NOW}
+      />,
+    );
+    const text = (document.body.textContent ?? "").toLowerCase();
+    const forbidden = [
+      "harvest now",
+      "ready to harvest",
+      "guaranteed",
+      "chop",
+      "flush",
+      "dark period",
+      "fix immediately",
+      "plant is unhealthy",
+    ];
+    for (const phrase of forbidden) {
+      expect(text).not.toContain(phrase);
+    }
+  });
+});

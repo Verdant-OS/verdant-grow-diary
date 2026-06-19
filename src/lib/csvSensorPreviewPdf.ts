@@ -23,6 +23,7 @@ import {
   CSV_PREVIEW_WARNING_COPY,
   type FlagCode,
 } from "@/lib/csvSensorPreviewWarningCopy";
+import { assertExportSafe } from "@/lib/exportRedactionRules";
 
 const PAGE_WIDTH = 612; // US Letter, 72dpi
 const PAGE_HEIGHT = 792;
@@ -176,6 +177,14 @@ export function buildCsvPreviewReportPdfBytes(
 
   pushHeading(lines, "Safety");
   for (const s of SAFE_BY_DESIGN_NOTE) pushBody(lines, s);
+
+  // Final-content guardrail: scan the entire assembled text body before
+  // rasterizing to PDF. Catches any upstream contamination (e.g. a header
+  // string that accidentally carries a MAC) at the export boundary.
+  assertExportSafe(
+    lines.map((l) => l.text).join("\n"),
+    "csv-sensor-preview-pdf",
+  );
 
   return renderPdfFromLines(lines);
 }

@@ -9,8 +9,9 @@
  *  - Sensitive fields are redacted via `redactRawPayload` before render.
  *  - Empty / loading / error states are explicit.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
@@ -18,6 +19,12 @@ import {
   buildEcowittAuditPageViewModel,
   ECOWITT_AUDIT_EMPTY_MESSAGE,
 } from "@/lib/ecowittRawPayloadAuditViewModel";
+import {
+  applyEcowittAuditTentIdToSearch,
+  readEcowittAuditTentIdFromSearch,
+  resolveEcowittAuditSelectedTent,
+  ECOWITT_AUDIT_EMPTY_FOR_TENT_COPY,
+} from "@/lib/ecowittAuditTentSelectionRules";
 import type { EcowittSensorReadingRow } from "@/lib/ecowittLatestSnapshotFilter";
 import { EcowittIngestValidationPanel } from "@/components/EcowittIngestValidationPanel";
 import type { DiaryEnvironmentCheckDraft } from "@/lib/ecowittDiaryEnvironmentCheckRules";
@@ -51,9 +58,44 @@ export function useEcowittAuditRows(tentId: string | null | undefined) {
 
 export default function EcowittIngestAudit() {
   const { data: tents = [] } = useTents();
-  const [tentId, setTentId] = useState<string | null>(null);
-  const effectiveTentId =
-    tentId ?? (tents.length > 0 ? (tents[0] as { id: string }).id : null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [userSelectedTentId, setUserSelectedTentId] = useState<string | null>(
+    null,
+  );
+  const urlTentId = readEcowittAuditTentIdFromSearch(searchParams);
+  const selection = useMemo(
+    () =>
+      resolveEcowittAuditSelectedTent({
+        urlTentId,
+        availableTents: tents as Array<{ id: string }>,
+        userSelectedTentId,
+      }),
+    [urlTentId, tents, userSelectedTentId],
+  );
+  const effectiveTentId = selection.selectedTentId;
+
+  // Keep the URL in sync with the resolved selection on initial load so
+  // refresh + share links open the same tent. Do NOT rewrite the URL when
+  // the operator explicitly requested an invalid tent — keep the warning
+  // visible until they pick another tent from the dropdown.
+  useEffect(() => {
+    if (!effectiveTentId) return;
+    if (selection.invalidRequested) return;
+    if (urlTentId === effectiveTentId) return;
+    setSearchParams(
+      (current) =>
+        applyEcowittAuditTentIdToSearch(current, effectiveTentId),
+      { replace: true },
+    );
+  }, [effectiveTentId, urlTentId, selection.invalidRequested, setSearchParams]);
+
+  const handleTentChange = (next: string | null) => {
+    setUserSelectedTentId(next);
+    setSearchParams(
+      (current) => applyEcowittAuditTentIdToSearch(current, next),
+      { replace: true },
+    );
+  };
 
   const query = useEcowittAuditRows(effectiveTentId);
   const { save: saveQuickLog, saving: isLogging } = useQuickLogV2Save();
@@ -142,7 +184,7 @@ export default function EcowittIngestAudit() {
           data-testid="ecowitt-audit-tent-select"
           className="rounded-md border border-border bg-background px-2 py-1 text-sm"
           value={effectiveTentId ?? ""}
-          onChange={(e) => setTentId(e.target.value || null)}
+          onChange={(e) => handleTentChange(e.target.value || null)}
         >
           {tents.length === 0 ? (
             <option value="">No tents</option>
@@ -154,6 +196,17 @@ export default function EcowittIngestAudit() {
           ))}
         </select>
       </section>
+
+      {selection.invalidRequested && selection.invalidCopy ? (
+        <p
+          data-testid="ecowitt-audit-invalid-tent"
+          role="status"
+          className="text-sm text-amber-600 dark:text-amber-400"
+        >
+          {selection.invalidCopy}
+        </p>
+      ) : null}
+
 
       <EcowittIngestValidationPanel
         input={{
@@ -196,7 +249,9 @@ export default function EcowittIngestAudit() {
           data-testid="ecowitt-audit-empty"
           className="text-sm text-muted-foreground"
         >
-          {vm.emptyStateMessage ?? ECOWITT_AUDIT_EMPTY_MESSAGE}
+          {effectiveTentId
+            ? ECOWITT_AUDIT_EMPTY_FOR_TENT_COPY
+            : (vm.emptyStateMessage ?? ECOWITT_AUDIT_EMPTY_MESSAGE)}
         </p>
       ) : null}
 

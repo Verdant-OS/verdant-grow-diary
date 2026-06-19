@@ -32,6 +32,14 @@ import {
   readEnvironmentSummaryExportAuditEvents,
 } from "@/lib/environmentSummaryExportAuditRules";
 
+vi.mock("@/hooks/useEnvironmentSummaryReportServerGate", () => ({
+  useEnvironmentSummaryReportServerGate: () => ({
+    status: "allowed",
+    reason: null,
+    displayPlanId: "pro_monthly",
+  }),
+}));
+
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: false,

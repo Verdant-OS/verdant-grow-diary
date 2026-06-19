@@ -41,26 +41,53 @@ export interface EcowittLatestSnapshotFilter {
  *  `raw_payload.vendor`. */
 const ECOWITT_SOURCES = new Set<string>(["ecowitt", "live", "manual"]);
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function readFiniteMetric(
+  metrics: Record<string, unknown>,
+  key: string,
+): number | null {
+  const raw = metrics[key];
+  const value = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+function celsiusToFahrenheit(celsius: number): number {
+  return celsius * (9 / 5) + 32;
+}
+
+function isEcowittLineageValue(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  // Accept canonical "ecowitt" and vendor lineage starting with ecowitt
+  // (e.g. "ecowitt_windows_testbench").
+  return normalized === "ecowitt" || normalized.startsWith("ecowitt");
+}
+
 function isEcowittRow(row: EcowittSensorReadingRow): boolean {
   const src = (row.source ?? "").trim().toLowerCase();
   if (src === "ecowitt") return true;
   const raw = row.raw_payload;
-  if (raw && typeof raw === "object") {
-    const r = raw as {
-      vendor?: unknown;
-      source?: unknown;
-      transport_source?: unknown;
-    };
-    const lineageFields: unknown[] = [r.vendor, r.source, r.transport_source];
-    for (const field of lineageFields) {
-      if (typeof field === "string") {
-        const f = field.trim().toLowerCase();
-        // Accept canonical "ecowitt" and any vendor lineage starting with
-        // "ecowitt" (e.g. "ecowitt_windows_testbench") so live-forwarded
-        // rows stored as source="live" still resolve as EcoWitt-derived.
-        if (f === "ecowitt" || f.startsWith("ecowitt")) return true;
-      }
-    }
+  if (isRecord(raw)) {
+    const metadata = isRecord(raw.metadata) ? raw.metadata : null;
+    const lineageFields: unknown[] = [
+      raw.vendor,
+      raw.source,
+      raw.transport_source,
+      metadata?.vendor,
+      metadata?.source,
+      metadata?.transport,
+      metadata?.transport_source,
+    ];
+    if (lineageFields.some(isEcowittLineageValue)) return true;
   }
   // Canonical V0 "live" source rows are EcoWitt-derived only when their
   // raw_payload carries EcoWitt vendor lineage (handled above). We do NOT
@@ -78,6 +105,68 @@ function resolveCandidateSource(
   // Treat all listener-tagged EcoWitt rows as "live" candidates; the
   // view-model will demote stale ones to "stale" via freshness.
   return "live";
+}
+
+function buildCandidatePayload(
+  row: EcowittSensorReadingRow,
+  raw: Record<string, unknown>,
+): Record<string, unknown> {
+  const metrics = isRecord(raw.metrics) ? raw.metrics : null;
+  if (!metrics) return raw;
+
+  const next: Record<string, unknown> = { ...raw };
+  let mappedAnyMetric = false;
+
+  const tempF = readFiniteMetric(metrics, "temp_f");
+  if (tempF !== null) {
+    next.temp1f = tempF;
+    mappedAnyMetric = true;
+  } else {
+    const tempC = readFiniteMetric(metrics, "temperature_c");
+    if (tempC !== null) {
+      next.temp1f = celsiusToFahrenheit(tempC);
+      mappedAnyMetric = true;
+    }
+  }
+
+  const humidityPct = readFiniteMetric(metrics, "humidity_pct");
+  if (humidityPct !== null) {
+    next.humidity1 = humidityPct;
+    mappedAnyMetric = true;
+  }
+
+  const soilMoisturePct = readFiniteMetric(metrics, "soil_moisture_pct");
+  if (soilMoisturePct !== null) {
+    next.soilmoisture1 = soilMoisturePct;
+    mappedAnyMetric = true;
+  }
+
+  const co2Ppm = readFiniteMetric(metrics, "co2_ppm");
+  if (co2Ppm !== null) {
+    next.co2 = co2Ppm;
+    mappedAnyMetric = true;
+  }
+
+  if (!mappedAnyMetric) return raw;
+
+  const metadata = isRecord(raw.metadata) ? raw.metadata : null;
+  const capturedAt =
+    readString(raw.captured_at) ??
+    readString(row.captured_at) ??
+    readString(row.ts);
+  if (capturedAt) next.dateutc = capturedAt;
+
+  const transport =
+    readString(raw.transport) ??
+    readString(metadata?.transport) ??
+    readString(metadata?.transport_source);
+  if (transport) next.transport = transport;
+
+  if (raw.test_sender === true || metadata?.test_sender === true) {
+    next.test_sender = true;
+  }
+
+  return next;
 }
 
 /**
@@ -101,10 +190,10 @@ export function selectEcowittCandidates(
     if (!isEcowittRow(row)) continue;
 
     const raw = row.raw_payload;
-    if (!raw || typeof raw !== "object") continue;
+    if (!isRecord(raw)) continue;
 
     out.push({
-      payload: raw,
+      payload: buildCandidatePayload(row, raw),
       source: resolveCandidateSource(row),
       receivedAt:
         (typeof row.captured_at === "string" && row.captured_at) ||

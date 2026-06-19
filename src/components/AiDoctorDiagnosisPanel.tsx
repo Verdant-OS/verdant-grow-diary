@@ -46,6 +46,10 @@ import {
   EVIDENCE_SEARCH_INPUT_LABEL,
   type EvidenceSearchItem,
 } from "@/lib/aiDoctorEvidenceSearchRules";
+import {
+  checkPremiumExportEntitlement,
+  PREMIUM_EXPORT_PAYWALL_COPY,
+} from "@/hooks/usePremiumExportServerGate";
 
 export const AI_DOCTOR_DIAGNOSIS_EMPTY_COPY =
   "No AI Doctor 2.0 diagnosis available yet.";
@@ -149,8 +153,15 @@ export default function AiDoctorDiagnosisPanel({
     );
   }, [view, citedRecs]);
 
-  const handleDownloadReport = useCallback(() => {
+  const [packageMessage, setPackageMessage] = useState<string | null>(null);
+
+  const handleDownloadReport = useCallback(async () => {
     if (!view || !reportInput) return;
+    const gate = await checkPremiumExportEntitlement("ai_doctor_report");
+    if (!gate.ok) {
+      setPackageMessage(PREMIUM_EXPORT_PAYWALL_COPY);
+      return;
+    }
     const bytes = buildAiDoctorReportPdfBytes({
       ...reportInput,
       summary: reportInput.summary || view.summary,
@@ -159,8 +170,13 @@ export default function AiDoctorDiagnosisPanel({
     downloadAiDoctorReportPdf(bytes, "ai-doctor-report.pdf");
   }, [view, reportInput, buildRecsForReport]);
 
-  const handleDownloadCsv = useCallback(() => {
+  const handleDownloadCsv = useCallback(async () => {
     if (!view || !reportInput) return;
+    const gate = await checkPremiumExportEntitlement("ai_doctor_evidence_csv");
+    if (!gate.ok) {
+      setPackageMessage(PREMIUM_EXPORT_PAYWALL_COPY);
+      return;
+    }
     const csv = buildAiDoctorEvidenceCsv({
       ...reportInput,
       summary: reportInput.summary || view.summary,
@@ -178,10 +194,16 @@ export default function AiDoctorDiagnosisPanel({
     };
   }, [view, reportInput, buildRecsForReport]);
 
-  const [packageMessage, setPackageMessage] = useState<string | null>(null);
   const handleDownloadPackage = useCallback(async () => {
     const full = buildFullReportInput();
     if (!full) return;
+    const gate = await checkPremiumExportEntitlement(
+      "ai_doctor_report_package",
+    );
+    if (!gate.ok) {
+      setPackageMessage(PREMIUM_EXPORT_PAYWALL_COPY);
+      return;
+    }
     let zipCtor: any = null;
     try {
       const mod = await import("jszip");

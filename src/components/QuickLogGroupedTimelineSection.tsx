@@ -30,6 +30,9 @@ import type {
   QuickLogActionEvent,
   QuickLogTimelineEntry,
 } from "@/lib/quickLogTimelineGroupingViewModel";
+import { AiDoctorPhase1TimelineEvidenceCard } from "@/components/AiDoctorPhase1TimelineEvidenceCard";
+import { buildAiDoctorPhase1TimelineEvidenceViewModel } from "@/lib/aiDoctorPhase1TimelineEvidenceViewModel";
+
 import {
   QUICK_LOG_GROUPED_TIMELINE_FILTERS,
   QUICK_LOG_GROUPED_TIMELINE_FILTER_LABELS,

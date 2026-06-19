@@ -30,24 +30,25 @@ describe("Coach AI Doctor photo intake — mobile take + upload", () => {
     expect(SOURCE).toMatch(/data-testid="coach-photo-upload"/);
   });
 
+  function findInputBlock(testid: string): string {
+    const blocks = SOURCE.split(/<input\b/).slice(1).map((b) => "<input" + b.split("/>")[0] + "/>");
+    return blocks.find((b) => b.includes(testid)) ?? "";
+  }
+
   it("has a take-photo file input that may use capture=\"environment\"", () => {
-    const block = SOURCE.match(
-      /<input[\s\S]*?coach-photo-take-input[\s\S]*?\/>/,
-    )?.[0];
+    const block = findInputBlock("coach-photo-take-input");
     expect(block, "take-photo input not found").toBeTruthy();
-    expect(block!).toMatch(/type="file"/);
-    expect(block!).toMatch(/accept="image\/\*"/);
-    expect(block!).toMatch(/capture="environment"/);
+    expect(block).toMatch(/type="file"/);
+    expect(block).toMatch(/accept="image\/\*"/);
+    expect(block).toMatch(/capture="environment"/);
   });
 
   it("has an upload file input that does NOT use the capture attribute", () => {
-    const block = SOURCE.match(
-      /<input[\s\S]*?coach-photo-upload-input[\s\S]*?\/>/,
-    )?.[0];
+    const block = findInputBlock("coach-photo-upload-input");
     expect(block, "upload input not found").toBeTruthy();
-    expect(block!).toMatch(/type="file"/);
-    expect(block!).toMatch(/accept="image\/\*"/);
-    expect(block!).not.toMatch(/capture=/);
+    expect(block).toMatch(/type="file"/);
+    expect(block).toMatch(/accept="image\/\*"/);
+    expect(block).not.toMatch(/capture=/);
   });
 
   it("routes both inputs through the same handleFile preview pipeline", () => {

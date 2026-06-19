@@ -12,6 +12,7 @@ import {
   type SensorSnapshotInput,
   type ResolveOptions,
 } from "@/lib/sensorSnapshotFreshnessRules";
+import { applyTemperatureUnitToSnapshotMetrics } from "@/lib/sensorSnapshotTemperatureUnitView";
 
 export interface SensorSnapshotCardProps {
   /** Raw input — resolver will normalize and freshness-classify it. */

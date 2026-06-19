@@ -348,6 +348,6 @@ describe("mapPlantsToPickerOptions — adapter", () => {
       ],
       [],
     );
-    expect(options.map((o) => o.id)).toEqual(["", "p1"]);
+    expect(options.map((o) => o.id)).toEqual(["p1"]);
   });
 });

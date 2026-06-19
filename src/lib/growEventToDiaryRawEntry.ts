@@ -15,6 +15,7 @@
  *   - Never invents live/sensor labels.
  *   - Pure / deterministic.
  */
+import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
 
 export interface GrowEventRowForRecent {
   id: string;
@@ -30,13 +31,69 @@ export interface GrowEventRowForRecent {
 
 export interface RecentLaneRawEntry {
   id: string;
-  grow_id: string | null;
-  plant_id: string | null;
-  tent_id: string | null;
+  grow_id?: string | null;
+  plant_id?: string | null;
+  tent_id?: string | null;
+  stage?: string | null;
   entry_type: string;
   entry_at: string;
   note: string;
-  details: { event_type: string; source: string | null };
+  photo_url?: string | null;
+  details: Record<string, unknown>;
+}
+
+function normalizedTimestamp(value: string | null | undefined): string {
+  if (!value) return "";
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) return value.trim();
+  return new Date(ms).toISOString();
+}
+
+function normalizedBaseNote(value: string | null | undefined): string {
+  return splitHardwareReadingsFromNote(value).body.replace(/\s+/g, " ").trim();
+}
+
+function entryEventType(entry: Pick<RecentLaneRawEntry, "entry_type" | "details">): string {
+  const detailType = entry.details?.event_type;
+  return typeof detailType === "string" && detailType.trim()
+    ? detailType.trim()
+    : entry.entry_type;
+}
+
+function companionKey(parts: {
+  plant_id?: string | null;
+  tent_id?: string | null;
+  entry_at: string;
+  entry_type: string;
+  note: string | null | undefined;
+}): string {
+  return [
+    parts.plant_id ?? "",
+    parts.tent_id ?? "",
+    normalizedTimestamp(parts.entry_at),
+    parts.entry_type,
+    normalizedBaseNote(parts.note),
+  ].join("\u001f");
+}
+
+function diaryCompanionKey(entry: RecentLaneRawEntry): string {
+  return companionKey({
+    plant_id: entry.plant_id,
+    tent_id: entry.tent_id,
+    entry_at: entry.entry_at,
+    entry_type: entryEventType(entry),
+    note: entry.note,
+  });
+}
+
+function growEventCompanionKey(row: GrowEventRowForRecent): string {
+  return companionKey({
+    plant_id: row.plant_id,
+    tent_id: row.tent_id,
+    entry_at: row.occurred_at,
+    entry_type: row.event_type,
+    note: row.note,
+  });
 }
 
 export function mapGrowEventToRecentRawEntry(
@@ -63,4 +120,23 @@ export function mapGrowEventsToRecentRawEntries(
   return rows
     .filter((r) => r && r.id && r.occurred_at && r.is_deleted !== true)
     .map(mapGrowEventToRecentRawEntry);
+}
+
+/**
+ * Recent Quick Logs receives two read streams: legacy/rich `diary_entries`
+ * rows and Quick Log v2 `grow_events` rows. A manual Quick Log save may
+ * legitimately create a parent grow_event plus a richer companion diary row
+ * at the same plant/tent/timestamp/event type. Render the richer diary row
+ * once and suppress only that mapped parent event.
+ */
+export function buildRecentLaneRawEntries(
+  diaryRows: ReadonlyArray<RecentLaneRawEntry>,
+  growEventRows: ReadonlyArray<GrowEventRowForRecent>,
+): RecentLaneRawEntry[] {
+  const companionKeys = new Set(diaryRows.map(diaryCompanionKey));
+  const mappedGrowEvents = growEventRows
+    .filter((row) => !companionKeys.has(growEventCompanionKey(row)))
+    .map(mapGrowEventToRecentRawEntry);
+
+  return [...diaryRows, ...mappedGrowEvents];
 }

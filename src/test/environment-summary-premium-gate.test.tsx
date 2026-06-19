@@ -128,10 +128,12 @@ describe("EnvironmentSummaryReportPage — premium gate", () => {
     expect(link.getAttribute("href")).toBe("/pricing");
   });
 
-  it("premium user sees the report and Download PDF button", () => {
+  it("premium user sees the report and Download PDF button once server gate allows", async () => {
     entitlementMock.current = "pro";
     renderPage();
-    expect(screen.getByTestId("environment-summary-report-page")).toBeTruthy();
+    expect(
+      await screen.findByTestId("environment-summary-report-page"),
+    ).toBeTruthy();
     expect(screen.getByTestId("env-report-range-controls")).toBeTruthy();
     expect(screen.getByTestId("env-report-print-section")).toBeTruthy();
     expect(screen.getByTestId("env-report-download-pdf")).toBeTruthy();

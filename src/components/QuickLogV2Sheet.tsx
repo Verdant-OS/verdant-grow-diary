@@ -449,11 +449,6 @@ export default function QuickLogV2Sheet({
       targetId: resolved.targetId as string,
       tentId: resolved.tentId ?? null,
     });
-    applyQuickLogV2Refresh(queryClient, {
-      targetType: resolved.targetType as "plant" | "tent",
-      targetId: resolved.targetId as string,
-      tentId: resolved.tentId ?? null,
-    });
     // Notify Timeline-style listeners that a new entry exists so the
     // local-state Timeline page can refetch. Dispatched once per
     // successful save, after every required write (log + optional photo)

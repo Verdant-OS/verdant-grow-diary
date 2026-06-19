@@ -63,7 +63,7 @@ function severityIcon(severity: TimelineSnapshotSummary["severity"]) {
   return null;
 }
 
-export default function TimelineSensorSnapshotSummary({ input, className }: Props) {
+export default function TimelineSensorSnapshotSummary({ input, now, className }: Props) {
   if (!input) {
     return (
       <p
@@ -85,6 +85,22 @@ export default function TimelineSensorSnapshotSummary({ input, className }: Prop
 
   const status = qualityToStatus(summary.quality.quality);
 
+  // Captured-at / age line. Pure presenter: ISO comes from the view-model;
+  // age uses the canonical `formatAgeLabel` from sensorSnapshotFreshnessRules.
+  let capturedAtMs: number | null = null;
+  if (summary.capturedAtIso) {
+    const parsed = Date.parse(summary.capturedAtIso);
+    if (Number.isFinite(parsed)) capturedAtMs = parsed;
+  }
+  const nowMs =
+    now instanceof Date
+      ? now.getTime()
+      : typeof now === "number" && Number.isFinite(now)
+        ? now
+        : Date.now();
+  const ageMs = capturedAtMs !== null ? nowMs - capturedAtMs : null;
+  const ageLabel = formatAgeLabel(ageMs);
+
   return (
     <section
       data-testid="timeline-snapshot-summary"
@@ -92,6 +108,7 @@ export default function TimelineSensorSnapshotSummary({ input, className }: Prop
       data-source-label={summary.sourceLabel}
       data-severity={summary.severity}
       data-trustworthy={summary.trustworthy ? "true" : "false"}
+      data-captured-at={summary.capturedAtIso ?? ""}
       aria-label="Sensor snapshot summary"
       className={cn(
         "rounded-md border bg-secondary/10 p-2 space-y-2",
@@ -120,6 +137,24 @@ export default function TimelineSensorSnapshotSummary({ input, className }: Prop
           </Badge>
         )}
       </header>
+
+      {summary.capturedAtIso && (
+        <p
+          data-testid="timeline-snapshot-summary-captured-at"
+          className="text-[11px] text-muted-foreground"
+        >
+          <span className="mr-1">Captured</span>
+          <time dateTime={summary.capturedAtIso}>{summary.capturedAtIso}</time>
+          {ageLabel && (
+            <span
+              data-testid="timeline-snapshot-summary-age"
+              className="ml-1"
+            >
+              · {ageLabel}
+            </span>
+          )}
+        </p>
+      )}
 
       {hasMetrics ? (
         <ul

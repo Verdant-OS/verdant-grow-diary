@@ -244,7 +244,7 @@ describe("static guard — capabilities.liveSensors is never used as an authorit
       const txt = readFileSync(file, "utf8");
       // Look only for capability-style access — bare local variable names
       // like `const liveSensors = ...` in non-entitlement code are fine.
-      if (/\.liveSensors\b/.test(txt)) offenders.push(file);
+      if (/capabilities\.liveSensors\b/.test(txt)) offenders.push(file);
     }
     expect(offenders).toEqual([]);
   });

@@ -357,6 +357,21 @@ export default function QuickLogV2Sheet({
         targetId: resolved.targetId as string,
         tentId: resolved.tentId ?? null,
       });
+      // Notify Timeline-style listeners that a new entry exists so the
+      // local-state Timeline page can refetch. Fires only after the save
+      // succeeded (no early/duplicate dispatch on the failure paths above).
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("verdant:entry-created", {
+            detail: {
+              createdAt: new Date().toISOString(),
+              growEventId:
+                (result as { growEventId?: string | null }).growEventId ?? null,
+              source: "quick_log_v2_feed",
+            },
+          }),
+        );
+      }
       onOpenChange(false);
       return;
     }
@@ -434,6 +449,27 @@ export default function QuickLogV2Sheet({
       targetId: resolved.targetId as string,
       tentId: resolved.tentId ?? null,
     });
+    applyQuickLogV2Refresh(queryClient, {
+      targetType: resolved.targetType as "plant" | "tent",
+      targetId: resolved.targetId as string,
+      tentId: resolved.tentId ?? null,
+    });
+    // Notify Timeline-style listeners that a new entry exists so the
+    // local-state Timeline page can refetch. Dispatched once per
+    // successful save, after every required write (log + optional photo)
+    // has resolved.
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("verdant:entry-created", {
+          detail: {
+            createdAt: new Date().toISOString(),
+            growEventId:
+              (res as { growEventId?: string | null }).growEventId ?? null,
+            source: "quick_log_v2",
+          },
+        }),
+      );
+    }
     resetPhotoSelection();
     onOpenChange(false);
   };

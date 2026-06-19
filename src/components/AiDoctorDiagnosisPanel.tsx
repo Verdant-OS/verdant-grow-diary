@@ -154,36 +154,61 @@ export default function AiDoctorDiagnosisPanel({
   }, [view, citedRecs]);
 
   const [packageMessage, setPackageMessage] = useState<string | null>(null);
+  const [pendingExport, setPendingExport] = useState<
+    null | "report" | "csv" | "package"
+  >(null);
+  const exportInFlightRef = useRef(false);
+
+  const runGated = useCallback(
+    async (
+      kind: "report" | "csv" | "package",
+      feature:
+        | "ai_doctor_report"
+        | "ai_doctor_evidence_csv"
+        | "ai_doctor_report_package",
+      onAllowed: () => Promise<void> | void,
+    ) => {
+      if (exportInFlightRef.current) return;
+      exportInFlightRef.current = true;
+      setPendingExport(kind);
+      try {
+        const gate = await checkPremiumExportEntitlement(feature);
+        if (!gate.ok) {
+          setPackageMessage(PREMIUM_EXPORT_PAYWALL_COPY);
+          return;
+        }
+        await onAllowed();
+      } finally {
+        exportInFlightRef.current = false;
+        setPendingExport(null);
+      }
+    },
+    [],
+  );
 
   const handleDownloadReport = useCallback(async () => {
     if (!view || !reportInput) return;
-    const gate = await checkPremiumExportEntitlement("ai_doctor_report");
-    if (!gate.ok) {
-      setPackageMessage(PREMIUM_EXPORT_PAYWALL_COPY);
-      return;
-    }
-    const bytes = buildAiDoctorReportPdfBytes({
-      ...reportInput,
-      summary: reportInput.summary || view.summary,
-      recommendations: buildRecsForReport(),
+    await runGated("report", "ai_doctor_report", () => {
+      const bytes = buildAiDoctorReportPdfBytes({
+        ...reportInput,
+        summary: reportInput.summary || view.summary,
+        recommendations: buildRecsForReport(),
+      });
+      downloadAiDoctorReportPdf(bytes, "ai-doctor-report.pdf");
     });
-    downloadAiDoctorReportPdf(bytes, "ai-doctor-report.pdf");
-  }, [view, reportInput, buildRecsForReport]);
+  }, [view, reportInput, buildRecsForReport, runGated]);
 
   const handleDownloadCsv = useCallback(async () => {
     if (!view || !reportInput) return;
-    const gate = await checkPremiumExportEntitlement("ai_doctor_evidence_csv");
-    if (!gate.ok) {
-      setPackageMessage(PREMIUM_EXPORT_PAYWALL_COPY);
-      return;
-    }
-    const csv = buildAiDoctorEvidenceCsv({
-      ...reportInput,
-      summary: reportInput.summary || view.summary,
-      recommendations: buildRecsForReport(),
+    await runGated("csv", "ai_doctor_evidence_csv", () => {
+      const csv = buildAiDoctorEvidenceCsv({
+        ...reportInput,
+        summary: reportInput.summary || view.summary,
+        recommendations: buildRecsForReport(),
+      });
+      downloadAiDoctorEvidenceCsv(csv);
     });
-    downloadAiDoctorEvidenceCsv(csv);
-  }, [view, reportInput, buildRecsForReport]);
+  }, [view, reportInput, buildRecsForReport, runGated]);
 
   const buildFullReportInput = useCallback((): AiDoctorReportInput | null => {
     if (!view || !reportInput) return null;
@@ -197,23 +222,18 @@ export default function AiDoctorDiagnosisPanel({
   const handleDownloadPackage = useCallback(async () => {
     const full = buildFullReportInput();
     if (!full) return;
-    const gate = await checkPremiumExportEntitlement(
-      "ai_doctor_report_package",
-    );
-    if (!gate.ok) {
-      setPackageMessage(PREMIUM_EXPORT_PAYWALL_COPY);
-      return;
-    }
-    let zipCtor: any = null;
-    try {
-      const mod = await import("jszip");
-      zipCtor = (mod as any).default ?? (mod as any).JSZip ?? null;
-    } catch {
-      zipCtor = null;
-    }
-    const r = await downloadAiDoctorReportPackage(full, { zipCtor });
-    setPackageMessage(r.message);
-  }, [buildFullReportInput]);
+    await runGated("package", "ai_doctor_report_package", async () => {
+      let zipCtor: any = null;
+      try {
+        const mod = await import("jszip");
+        zipCtor = (mod as any).default ?? (mod as any).JSZip ?? null;
+      } catch {
+        zipCtor = null;
+      }
+      const r = await downloadAiDoctorReportPackage(full, { zipCtor });
+      setPackageMessage(r.message);
+    });
+  }, [buildFullReportInput, runGated]);
 
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
   const previewInput = useMemo(

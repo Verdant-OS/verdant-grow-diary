@@ -16,6 +16,10 @@ import {
   buildPlantRecentActivity,
   type PlantRecentActivityRow,
 } from "@/lib/plantRecentActivityRules";
+import {
+  PHOTO_NON_DIAGNOSTIC_LABEL,
+  PHOTO_NON_DIAGNOSTIC_TESTID,
+} from "@/lib/photoEventNonDiagnosticLabelRules";
 
 interface Props {
   plantId: string | null | undefined;

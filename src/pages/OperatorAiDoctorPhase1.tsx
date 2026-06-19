@@ -23,6 +23,12 @@ import {
 import { AiDoctorPhase1ResultPanel } from "@/components/AiDoctorPhase1ResultPanel";
 import { AiDoctorPhase1InternalLink } from "@/components/AiDoctorPhase1InternalLink";
 import { AiDoctorPhase1EmptyStateActions } from "@/components/AiDoctorPhase1EmptyStateActions";
+import { AiDoctorPhase1LoadingState } from "@/components/AiDoctorPhase1LoadingState";
+import {
+  AiDoctorPhase1EvidenceShortcuts,
+  type AiDoctorPhase1RecentActivityRow,
+} from "@/components/AiDoctorPhase1EvidenceShortcuts";
+import { AiDoctorPhase1MissingContextChecklist } from "@/components/AiDoctorPhase1MissingContextChecklist";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
@@ -47,6 +53,18 @@ export interface OperatorAiDoctorPhase1Props {
   getResultForPlant?: (
     plantId: string,
   ) => { context: AiDoctorContextPayload; result: AiDoctorDiagnosisResult } | null;
+  /**
+   * Optional pure selector for recent diary/activity rows for a plant.
+   * Used by the read-only recent-diary evidence shortcuts.
+   */
+  getRecentActivityForPlant?: (
+    plantId: string,
+  ) => ReadonlyArray<AiDoctorPhase1RecentActivityRow>;
+  /**
+   * When true and a plant is selected but no result is available yet,
+   * render the loading skeleton instead of the no-result state.
+   */
+  isDerivingResult?: boolean;
 }
 
 /**
@@ -103,6 +121,17 @@ export default function OperatorAiDoctorPhase1(
 
   const resultBundle =
     selectedPlant ? getResultForPlant(selectedPlant.id) : null;
+
+  const recentActivity: ReadonlyArray<AiDoctorPhase1RecentActivityRow> =
+    selectedPlant && props.getRecentActivityForPlant
+      ? props.getRecentActivityForPlant(selectedPlant.id) ?? []
+      : [];
+
+  const isDerivingResult = !!(
+    selectedPlant &&
+    !resultBundle &&
+    props.isDerivingResult
+  );
 
   const ctaContext = {
     plantId: selectedPlant?.id ?? null,
@@ -296,23 +325,31 @@ export default function OperatorAiDoctorPhase1(
         />
       )}
 
-      {selectedPlant && !resultBundle && (
-        <section
-          data-testid="ai-doctor-phase1-no-result-state"
-          className="rounded-md border border-border bg-muted p-4 text-sm"
-        >
-          <h2 className="text-base font-semibold text-foreground">
-            No AI Doctor result available
-          </h2>
-          <p className="text-muted-foreground">Next steps:</p>
-          <ul className="ml-4 list-disc text-muted-foreground">
-            <li>Add a Quick Log</li>
-            <li>Add or attach a plant photo</li>
-            <li>Add a manual or live sensor snapshot</li>
-            <li>Then run AI Doctor when the context is ready</li>
-          </ul>
-          <AiDoctorPhase1EmptyStateActions kind="no-result" context={ctaContext} />
-        </section>
+      {isDerivingResult && <AiDoctorPhase1LoadingState />}
+
+      {selectedPlant && !resultBundle && !isDerivingResult && (
+        <>
+          <section
+            data-testid="ai-doctor-phase1-no-result-state"
+            className="rounded-md border border-border bg-muted p-4 text-sm"
+          >
+            <h2 className="text-base font-semibold text-foreground">
+              No AI Doctor result available
+            </h2>
+            <p className="text-muted-foreground">Next steps:</p>
+            <ul className="ml-4 list-disc text-muted-foreground">
+              <li>Add a Quick Log</li>
+              <li>Add or attach a plant photo</li>
+              <li>Add a manual or live sensor snapshot</li>
+              <li>Then run AI Doctor when the context is ready</li>
+            </ul>
+            <AiDoctorPhase1EmptyStateActions kind="no-result" context={ctaContext} />
+          </section>
+          <AiDoctorPhase1MissingContextChecklist
+            context={null}
+            ctaContext={ctaContext}
+          />
+        </>
       )}
 
       {selectedPlant && resultBundle && (
@@ -347,6 +384,12 @@ export default function OperatorAiDoctorPhase1(
             </section>
           )}
 
+          <AiDoctorPhase1MissingContextChecklist
+            context={resultBundle.context}
+            missing_information={resultBundle.result.missing_information}
+            ctaContext={ctaContext}
+          />
+
           <section
             data-testid="ai-doctor-phase1-evidence-shortcuts"
             aria-label="Evidence shortcuts"
@@ -370,6 +413,11 @@ export default function OperatorAiDoctorPhase1(
               Open sensor summary
             </a>
           </section>
+
+          <AiDoctorPhase1EvidenceShortcuts
+            items={recentActivity}
+            context={ctaContext}
+          />
 
           <div id={AI_DOCTOR_PHASE1_SENSOR_ANCHOR_ID}>
             <AiDoctorPhase1ResultPanel
@@ -518,6 +566,28 @@ function useDerivedAiDoctorPhase1Bundle(
   return { context, result };
 }
 
+function mapDiaryRowsToRecentActivity(
+  rows: ReadonlyArray<Record<string, unknown>>,
+): AiDoctorPhase1RecentActivityRow[] {
+  const out: AiDoctorPhase1RecentActivityRow[] = [];
+  for (const row of rows ?? []) {
+    if (!row) continue;
+    const id = typeof row.id === "string" ? row.id : null;
+    const occurred_at =
+      (typeof row.entry_at === "string" ? row.entry_at : null) ??
+      (typeof row.created_at === "string" ? row.created_at : null);
+    if (!id || !occurred_at) continue;
+    out.push({
+      id,
+      occurred_at,
+      event_type:
+        typeof row.entry_type === "string" ? row.entry_type : null,
+      notes: typeof row.notes === "string" ? row.notes : null,
+    });
+  }
+  return out;
+}
+
 function OperatorAiDoctorPhase1SmartView(props: {
   plants: ReadonlyArray<AiDoctorPhase1PlantOption>;
   rawPlants: ReadonlyArray<RawPlantRow>;
@@ -527,14 +597,28 @@ function OperatorAiDoctorPhase1SmartView(props: {
   const selectedRaw =
     props.rawPlants.find((p) => p.id === plantId) ?? null;
   const bundle = useDerivedAiDoctorPhase1Bundle(selectedRaw);
+  const diary = usePlantRecentActivity(selectedRaw?.id ?? null);
+  const recentActivity = React.useMemo(
+    () => mapDiaryRowsToRecentActivity(
+      (diary.data ?? []) as ReadonlyArray<Record<string, unknown>>,
+    ),
+    [diary.data],
+  );
   const getResultForPlant = React.useCallback(
     (id: string) => (selectedRaw && id === selectedRaw.id ? bundle : null),
     [selectedRaw, bundle],
   );
+  const getRecentActivityForPlant = React.useCallback(
+    (id: string) => (selectedRaw && id === selectedRaw.id ? recentActivity : []),
+    [selectedRaw, recentActivity],
+  );
+  const isDerivingResult = !!selectedRaw && !bundle;
   return (
     <OperatorAiDoctorPhase1
       plants={props.plants}
       getResultForPlant={getResultForPlant}
+      getRecentActivityForPlant={getRecentActivityForPlant}
+      isDerivingResult={isDerivingResult}
     />
   );
 }

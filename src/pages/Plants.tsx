@@ -510,6 +510,7 @@ export default function Plants() {
                       growId: p.growId ?? null,
                       lastNote: p.lastNote ?? null,
                       isArchived: p.isArchived ?? false,
+                      photo: p.photo ?? null,
                     }}
                   />
                 </div>

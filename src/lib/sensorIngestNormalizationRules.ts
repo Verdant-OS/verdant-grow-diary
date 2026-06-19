@@ -244,9 +244,13 @@ export function deriveVpdRowsFromNormalized(
   for (const slot of groups.values()) {
     if (slot.hasVpd) continue;
     if (!slot.temp || !slot.rh) continue;
+    // Spec: do not derive when humidity is 0 (stuck sensor). > 100 and
+    // missing temp/rh are already rejected by calculateAirVpdKpa.
+    const rh = slot.rh.value as number;
+    if (!(rh > 0)) continue;
     const vpd = calculateAirVpdKpa({
       tempC: slot.temp.value as number,
-      rhPercent: slot.rh.value as number,
+      rhPercent: rh,
     });
     if (vpd === null) continue;
     out.push({

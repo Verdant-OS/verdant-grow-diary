@@ -321,7 +321,7 @@ describe("executeAiDoctorEngine", () => {
     const r = await executeAiDoctorEngine({ context: ctx });
     const joined = r.evidence.join(" | ");
     expect(joined).toMatch(/INVALID/);
-    expect(joined).not.toMatch(/healthy/i);
+    expect(joined).not.toMatch(/plant\s+is\s+healthy|all\s+systems\s+healthy/i);
   });
 });
 

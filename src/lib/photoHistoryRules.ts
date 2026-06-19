@@ -27,7 +27,7 @@ export interface PhotoHistoryRow {
    * label. False when the entry is linked to a saved AI Doctor session/result,
    * so we never show contradictory copy alongside an analysis surface.
    */
-  showPhotoNonDiagnosticLabel: boolean;
+  showPhotoNonDiagnosticLabel?: boolean;
 }
 
 const CAPTION_PREVIEW_MAX = 200;

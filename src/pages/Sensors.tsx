@@ -113,7 +113,6 @@ export default function Sensors() {
       />
       <div className="grid lg:grid-cols-2 gap-4">
         {METRICS.map((m) => {
-          const m.key = m.key as SensorMetricKey;
           // Resolve raw value for this metric from the latest reading.
           const rawValue: number | null | undefined = latest
             ? (latest as unknown as Record<string, number | null | undefined>)[
@@ -139,7 +138,7 @@ export default function Sensors() {
             }
           }
           const state = classifySensorMetricState({
-            metric: m.key,
+            metric: m.key as SensorMetricKey,
             value: value ?? null,
             source: latestSource,
             hasAnyReading: hasReadings,

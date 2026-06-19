@@ -78,6 +78,14 @@ function Card({ row }: { row: PhotoHistoryRow }) {
             Stage: <span className="text-foreground/80">{row.stage}</span>
           </div>
         )}
+        {row.showPhotoNonDiagnosticLabel && (
+          <div
+            data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
+            className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground/80"
+          >
+            {PHOTO_NON_DIAGNOSTIC_LABEL}
+          </div>
+        )}
         {row.caption && (
           <p className="mt-1 text-xs text-foreground/80 line-clamp-3 whitespace-pre-wrap">
             {row.caption}

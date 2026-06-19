@@ -224,8 +224,16 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     // display-name constants (e.g. pi_bridge: "Pi Bridge", mqtt: "MQTT"). The
     // literal "mqtt" inside that map is a label key, not a device-control call.
     const PROVIDER_LABELS_PATH = resolve(ROOT, "src/constants/sensorProviderLabels.ts");
-    // Also allow-list: src/constants/sensorIngestProvenance.ts holds read-only
-    // sensor provenance constants (e.g. raspberry_pi_bridge), not device control.
+    // Also allow-list (EXACT FILE PATH ONLY — never a directory wildcard):
+    // src/constants/sensorIngestProvenance.ts holds read-only sensor provenance
+    // constants (e.g. `raspberry_pi_bridge`). It is:
+    //   - read-only sensor provenance constants
+    //   - NOT a device-control surface
+    //   - NOT an Action Queue execution path
+    //   - NOT a sensor ingest behavior surface
+    // The allow-list MUST stay file-specific. Broad patterns like
+    // `src/constants/*` are explicitly forbidden — see the "pi_bridge
+    // scanner allow-list hardening" suite at the bottom of this file.
     const SENSOR_INGEST_PROVENANCE_PATH = resolve(ROOT, "src/constants/sensorIngestProvenance.ts");
     const piContexts = [...ALL_PROD_CODE.matchAll(/pi[_-]bridge/gi)];
     for (const m of piContexts) {

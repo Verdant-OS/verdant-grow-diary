@@ -18,7 +18,8 @@ function SkeletonBar(props: { width?: string; height?: string }): JSX.Element {
   return (
     <div
       aria-hidden
-      className="animate-pulse rounded bg-muted"
+      data-testid="ai-doctor-phase1-loading-skeleton-bar"
+      className="animate-pulse animate-shimmer rounded bg-gradient-to-r from-muted via-muted/40 to-muted bg-[length:200%_100%]"
       style={{ width: props.width ?? "100%", height: props.height ?? "0.75rem" }}
     />
   );

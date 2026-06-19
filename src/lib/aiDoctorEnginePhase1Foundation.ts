@@ -588,19 +588,19 @@ export async function executeAiDoctorEngine(
         : "No clear single issue identified from available evidence.";
 
   // Risk level: stale/invalid telemetry escalates to medium; otherwise low.
+  // (Typed wider than the current branches so future logic may emit "high".)
   const risk_level: AiDoctorRiskLevel = degradedMetrics.some(
     (m) => m.is_invalid || m.is_stale,
   )
-    ? "medium"
-    : "low";
+    ? ("medium" as AiDoctorRiskLevel)
+    : ("low" as AiDoctorRiskLevel);
 
   // Action Queue suggestion — strict guard: only medium/high risk AND enough
   // context; never an executable command; always approval-required.
   let action_queue_suggestion: AiDoctorActionQueueSuggestion | null = null;
-  if (
-    (risk_level === "medium" || risk_level === "high") &&
-    confidence !== "low"
-  ) {
+  const isElevatedRisk: boolean =
+    risk_level === "medium" || risk_level === "high";
+  if (isElevatedRisk && confidence !== "low") {
     action_queue_suggestion = {
       title: "Review sensor freshness and capture a fresh manual snapshot",
       rationale:

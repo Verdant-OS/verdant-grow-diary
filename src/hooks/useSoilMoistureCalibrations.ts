@@ -41,7 +41,17 @@ export function useSoilMoistureCalibrations(args: {
     enabled,
     queryFn: async () => {
       if (!growId || !tentId) return [];
-      const { data, error } = await supabase
+      // soil_moisture_calibrations is not in the generated Supabase types
+      // (no migration yet). Cast the client to bypass the table-name guard
+      // without introducing a schema change.
+      const client = supabase as unknown as {
+        from: (table: string) => {
+          select: (cols: string) => {
+            eq: (col: string, val: unknown) => any;
+          };
+        };
+      };
+      const { data, error } = await client
         .from("soil_moisture_calibrations")
         .select(
           "id,grow_id,tent_id,plant_id,device_id,dry_raw,wet_raw,source,is_active,created_at,updated_at",

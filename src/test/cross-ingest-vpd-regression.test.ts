@@ -74,10 +74,11 @@ const piRoute: IngestRoute = {
   validVpd: () => {
     const r = normalizeIngestPayload({
       tent_id: TENT,
-      source: "live",
+      source: "pi_bridge",
+      captured_at: TS,
       readings: [
-        { metric: "temperature_c", value: VALID_TEMP_C, unit: "C", captured_at: TS },
-        { metric: "humidity_pct", value: VALID_RH, unit: "%", captured_at: TS },
+        { metric: "temperature_c", value: VALID_TEMP_C, unit: "C" },
+        { metric: "humidity_pct", value: VALID_RH, unit: "%" },
       ],
     });
     const vpd = r.rows.find((row) => row.metric === "vpd_kpa");
@@ -86,10 +87,11 @@ const piRoute: IngestRoute = {
   invalidRhVpd: () => {
     const r = normalizeIngestPayload({
       tent_id: TENT,
-      source: "live",
+      source: "pi_bridge",
+      captured_at: TS,
       readings: [
-        { metric: "temperature_c", value: VALID_TEMP_C, unit: "C", captured_at: TS },
-        { metric: "humidity_pct", value: 0, unit: "%", captured_at: TS },
+        { metric: "temperature_c", value: VALID_TEMP_C, unit: "C" },
+        { metric: "humidity_pct", value: 0, unit: "%" },
       ],
     });
     return r.rows.find((row) => row.metric === "vpd_kpa")?.value ?? null;
@@ -97,9 +99,10 @@ const piRoute: IngestRoute = {
   missingHumidityVpd: () => {
     const r = normalizeIngestPayload({
       tent_id: TENT,
-      source: "live",
+      source: "pi_bridge",
+      captured_at: TS,
       readings: [
-        { metric: "temperature_c", value: VALID_TEMP_C, unit: "C", captured_at: TS },
+        { metric: "temperature_c", value: VALID_TEMP_C, unit: "C" },
       ],
     });
     return r.rows.find((row) => row.metric === "vpd_kpa")?.value ?? null;
@@ -107,11 +110,11 @@ const piRoute: IngestRoute = {
   invalidTempVpd: () => {
     const r = normalizeIngestPayload({
       tent_id: TENT,
-      source: "live",
+      source: "pi_bridge",
+      captured_at: TS,
       readings: [
-        // 9999°C is unrealistic; the normalizer's unit guards should drop it.
-        { metric: "temperature_c", value: 9999, unit: "C", captured_at: TS },
-        { metric: "humidity_pct", value: VALID_RH, unit: "%", captured_at: TS },
+        { metric: "temperature_c", value: 9999, unit: "C" },
+        { metric: "humidity_pct", value: VALID_RH, unit: "%" },
       ],
     });
     return r.rows.find((row) => row.metric === "vpd_kpa")?.value ?? null;

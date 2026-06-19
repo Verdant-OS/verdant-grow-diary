@@ -25,6 +25,7 @@ import {
   dashboardPath,
   logsPath,
   plantsPath,
+  postGrowLearningReportPath,
   tentsPath,
 } from "@/lib/routes";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
@@ -89,6 +90,7 @@ export default function GrowDetail() {
     );
   }
 
+  const showPostGrowReport = grow.is_archived || grow.stage === "harvest" || grow.stage === "drying";
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -172,6 +174,16 @@ export default function GrowDetail() {
           count="unavailable"
           countLabel="dashboard"
         />
+        {showPostGrowReport && (
+          <HubLink
+            to={postGrowLearningReportPath(grow.id)}
+            icon={<Leaf className="h-4 w-4" />}
+            title="Post-Grow Report"
+            description="Review lessons, stability, photos, and post-harvest notes."
+            count={counts.diary}
+            countLabel="records"
+          />
+        )}
       </section>
 
       <section className="glass rounded-2xl p-4 mt-4" aria-label="Recent activity">

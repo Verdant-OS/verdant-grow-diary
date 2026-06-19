@@ -1,4 +1,4 @@
-#!/usr/bin/env -S bun run
+// shebang stripped for vitest compatibility — run with: bun run scripts/ecowitt-live-soil-bridge.ts
 /**
  * EcoWitt Live Soil Bridge
  * ------------------------

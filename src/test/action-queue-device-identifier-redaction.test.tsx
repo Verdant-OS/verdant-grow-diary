@@ -48,7 +48,7 @@ const ROW_WITH_MAC = {
   plant_id: null,
   source: "ai_doctor",
   action_type: "raise_light",
-  target_metric: "general",
+  target_metric: null,
   target_device: MAC,
   suggested_change: "Raise the light by 10 cm",
   reason: "Reduce radiant load.",

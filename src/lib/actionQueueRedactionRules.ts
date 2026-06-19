@@ -67,11 +67,12 @@ export const SENSITIVE_DEVICE_PATTERNS: ReadonlyArray<SensitiveDevicePattern> =
   [
     // MAC address — colon or dash separated
     { name: "mac_address", regex: /\b[0-9A-Fa-f]{2}([:-][0-9A-Fa-f]{2}){5}\b/ },
-    // Bridge-token-like opaque string: brg_/bridge_/tok_/token_ prefix + >=12 base62 chars
+    // Bridge-token-like opaque string: brg_/bridge_/tok_/token_/sk_/secret_ prefix
+    // + >=12 chars from base62 plus _ and - (tokens commonly include separators).
     {
       name: "bridge_token",
       regex:
-        /\b(?:brg|bridge|tok|token|sk|secret)[_-][A-Za-z0-9]{12,}\b/i,
+        /\b(?:brg|bridge|tok|token|sk|secret)[_-][A-Za-z0-9_-]{12,}\b/i,
     },
     // Vendor id-like: vendor_/vnd_/device_/dev_ prefix + alnum
     {

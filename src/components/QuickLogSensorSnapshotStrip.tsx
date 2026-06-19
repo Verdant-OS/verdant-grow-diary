@@ -63,7 +63,7 @@ const PILL_ARIA: Record<QuickLogSnapshotStripStatus, string> = {
   no_data: "Sensor snapshot status: no data",
 };
 
-export default function QuickLogSensorSnapshotStrip({ tentId, attached = true }: Props) {
+export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, attached = true }: Props) {
   const state = useLatestTentSensorSnapshot(tentId ?? null);
   const view = buildQuickLogStripFromTentState({
     status: state.status,
@@ -71,6 +71,24 @@ export default function QuickLogSensorSnapshotStrip({ tentId, attached = true }:
     hasTent: !!tentId,
     attached,
   });
+
+  // Additive: derive a single consistent freshness/empty advisory line
+  // from the new pure view-model so growers see one canonical warning
+  // copy before saving. This does NOT change the save path.
+  const vm = buildQuickLogSensorSnapshotViewModel(
+    adaptQuickLogSensorContextInput({
+      state: { status: state.status, snapshot: state.snapshot },
+      tentId: tentId ?? null,
+      attached,
+    }),
+  );
+  const advisory =
+    vm.display && vm.display.freshness === "fresh" ? null : vm.warning ?? vm.emptyCopy;
+  const advisoryKind = vm.display
+    ? vm.display.freshness
+    : vm.emptyCopy
+      ? "missing"
+      : null;
 
   return (
     <section

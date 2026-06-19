@@ -46,6 +46,10 @@ import {
   EVIDENCE_SEARCH_INPUT_LABEL,
   type EvidenceSearchItem,
 } from "@/lib/aiDoctorEvidenceSearchRules";
+import {
+  checkPremiumExportEntitlement,
+  PREMIUM_EXPORT_PAYWALL_COPY,
+} from "@/hooks/usePremiumExportServerGate";
 
 export const AI_DOCTOR_DIAGNOSIS_EMPTY_COPY =
   "No AI Doctor 2.0 diagnosis available yet.";

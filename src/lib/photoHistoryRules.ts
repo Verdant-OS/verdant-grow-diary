@@ -22,6 +22,12 @@ export interface PhotoHistoryRow {
   photoUrl: string | null;
   caption: string;
   warnings: string[];
+  /**
+   * True when this photo card should render the "Visual record · no AI analysis"
+   * label. False when the entry is linked to a saved AI Doctor session/result,
+   * so we never show contradictory copy alongside an analysis surface.
+   */
+  showPhotoNonDiagnosticLabel: boolean;
 }
 
 const CAPTION_PREVIEW_MAX = 200;

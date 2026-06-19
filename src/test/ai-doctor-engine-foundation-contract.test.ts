@@ -584,3 +584,80 @@ describe("static safety — aiDoctorEnginePhase1Foundation.ts (contract suite)",
     expect(SOURCE).not.toMatch(/executeDeviceCommand|deviceControl|sendDeviceCommand/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Strict result contract (Phase 1 read-only surface)
+// ---------------------------------------------------------------------------
+
+describe("AiDoctorDiagnosisResult — strict shipped contract", () => {
+  async function run(): Promise<AiDoctorDiagnosisResult> {
+    const ctx = compileAiDoctorContextPayloadFromRows(
+      basePlant({
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 23,
+            captured_at: iso(60_000),
+            source: "invalid",
+          },
+        ],
+        photos: [{ captured_at: iso(60_000) }],
+        logs: [
+          { occurred_at: iso(60_000), event_type: "watering", source: "manual" },
+        ],
+      }),
+    );
+    return executeAiDoctorEngine({ context: ctx });
+  }
+
+  it("exposes exactly the documented top-level keys", async () => {
+    const r = await run();
+    const required = [
+      "summary",
+      "likely_issue",
+      "confidence",
+      "evidence",
+      "missing_information",
+      "possible_causes",
+      "immediate_action",
+      "what_not_to_do",
+      "follow_up_24h",
+      "recovery_plan_3_day",
+      "risk_level",
+      "action_queue_suggestion",
+    ] as const;
+    for (const key of required) {
+      expect(r).toHaveProperty(key);
+    }
+  });
+
+  it("uses array shapes for the documented list fields", async () => {
+    const r = await run();
+    expect(Array.isArray(r.evidence)).toBe(true);
+    expect(Array.isArray(r.missing_information)).toBe(true);
+    expect(Array.isArray(r.possible_causes)).toBe(true);
+    expect(Array.isArray(r.what_not_to_do)).toBe(true);
+  });
+
+  it("uses string shapes for action plan fields", async () => {
+    const r = await run();
+    expect(typeof r.immediate_action).toBe("string");
+    expect(typeof r.follow_up_24h).toBe("string");
+    expect(typeof r.recovery_plan_3_day).toBe("string");
+  });
+
+  it("emits an approval-required suggestion shape when present", async () => {
+    const r = await run();
+    expect(r.action_queue_suggestion).not.toBeNull();
+    const s = r.action_queue_suggestion!;
+    // Current shipped fields: title, rationale, approval_required, risk_level.
+    expect(s).toHaveProperty("title");
+    expect(s).toHaveProperty("rationale");
+    expect(s).toHaveProperty("approval_required");
+    expect(s).toHaveProperty("risk_level");
+    expect(s.approval_required).toBe(true);
+    expect(typeof s.title).toBe("string");
+    expect(typeof s.rationale).toBe("string");
+    expect(["low", "medium", "high"]).toContain(s.risk_level);
+  });
+});

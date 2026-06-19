@@ -19,7 +19,6 @@ import {
   classifyRhAgainstStage,
   environmentMetricChipStatus,
 } from "@/lib/environmentStageTargetRules";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
@@ -29,6 +28,14 @@ import {
   SENSOR_SOURCES_PARAM,
   parseSensorSourcesParam,
 } from "@/lib/sensorSourceUrlRules";
+import {
+  classifySensorMetricState,
+  type SensorMetricKey,
+} from "@/lib/sensorMetricStateRules";
+import {
+  deriveVpd,
+  VPD_DERIVED_NOTE,
+} from "@/lib/vpdCalculationRules";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },

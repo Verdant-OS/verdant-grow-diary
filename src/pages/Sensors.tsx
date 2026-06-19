@@ -19,7 +19,6 @@ import {
   classifyRhAgainstStage,
   environmentMetricChipStatus,
 } from "@/lib/environmentStageTargetRules";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
@@ -29,6 +28,14 @@ import {
   SENSOR_SOURCES_PARAM,
   parseSensorSourcesParam,
 } from "@/lib/sensorSourceUrlRules";
+import {
+  classifySensorMetricState,
+  type SensorMetricKey,
+} from "@/lib/sensorMetricStateRules";
+import {
+  deriveVpd,
+  VPD_DERIVED_NOTE,
+} from "@/lib/vpdCalculationRules";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },
@@ -106,6 +113,38 @@ export default function Sensors() {
       />
       <div className="grid lg:grid-cols-2 gap-4">
         {METRICS.map((m) => {
+          // Resolve raw value for this metric from the latest reading.
+          const rawValue: number | null | undefined = latest
+            ? (latest as unknown as Record<string, number | null | undefined>)[
+                m.key
+              ]
+            : null;
+          // Derive VPD from temp + RH when no VPD value is present.
+          let value: number | null | undefined = rawValue;
+          let isDerived = false;
+          if (
+            m.key === "vpd" &&
+            (value == null || !Number.isFinite(value as number)) &&
+            latest
+          ) {
+            const derived = deriveVpd({
+              temperature: latest.temp ?? null,
+              humidity: latest.rh ?? null,
+              temperatureUnit: "C",
+            });
+            if (derived.kind === "derived") {
+              value = derived.vpdKpa;
+              isDerived = true;
+            }
+          }
+          const state = classifySensorMetricState({
+            metric: m.key as SensorMetricKey,
+            value: value ?? null,
+            source: latestSource,
+            hasAnyReading: hasReadings,
+            isDerived,
+          });
+
           // Stage-aware status pill for Temperature/Humidity using the
           // latest reading + the selected tent's stage. Stale or missing
           // stage never reads as ok. Pure presenter; no writes.
@@ -130,6 +169,12 @@ export default function Sensors() {
               : envStatus === "warn"
                 ? "border-[hsl(var(--warning))] text-[hsl(var(--warning))]"
                 : "border-destructive/60 text-destructive";
+
+          const stateToneClass =
+            state.tone === "caution"
+              ? "border-[hsl(var(--warning))] text-[hsl(var(--warning))]"
+              : "border-border/60 text-muted-foreground";
+
           return (
             <div key={m.key} className="glass rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2 gap-2">
@@ -144,18 +189,40 @@ export default function Sensors() {
                       {envLabel}
                     </span>
                   )}
+                  <span
+                    data-testid={`sensors-metric-state-${m.key}`}
+                    data-kind={state.kind}
+                    data-tone={state.tone}
+                    className={cn(
+                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px]",
+                      stateToneClass,
+                    )}
+                    title={state.message}
+                  >
+                    {state.label}
+                  </span>
                 </div>
-                <GrowDataSourceBadge classification={classification} />
+                {state.tone === "caution" && (
+                  <GrowDataSourceBadge classification={classification} />
+                )}
               </div>
-              {!hasReadings ? (
+              {state.showChart ? (
+                <SensorChart data={filtered} metric={m.key} height={200} />
+              ) : (
                 <p
                   className="text-xs text-muted-foreground py-6 text-center"
                   data-testid={`sensors-empty-${m.key}`}
                 >
-                  No reading available.
+                  {state.message}
                 </p>
-              ) : (
-                <SensorChart data={filtered} metric={m.key} height={200} />
+              )}
+              {m.key === "vpd" && isDerived && (
+                <p
+                  className="text-[11px] text-muted-foreground mt-2"
+                  data-testid="sensors-vpd-derived-note"
+                >
+                  {VPD_DERIVED_NOTE}
+                </p>
               )}
               {m.key === "vpd" && (
                 <p

@@ -55,7 +55,7 @@ export default function Sensors() {
   // be written to via RLS. The display list above may include mock tents.
   const { data: realTents = [] } = useTentRows();
   const [tentId, setTentId] = useState<string>(tents[0]?.id ?? "t1");
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const urlSensorSources = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
   const filtered = readings.filter((r) => r.tentId === tentId);
   const latest = filtered.length > 0 ? filtered[filtered.length - 1] : null;
@@ -439,6 +439,10 @@ export default function Sensors() {
           />
           <SensorIngestAuditReport
             operatorMode
+            urlBinding={{
+              searchParams,
+              onSearchParamsChange: (next) => setSearchParams(next, { replace: true }),
+            }}
             input={{
               rows: filtered.map((r, i) => ({
                 id: (r as unknown as { id?: string }).id ?? `r-${i}`,

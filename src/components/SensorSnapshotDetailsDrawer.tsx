@@ -3,12 +3,25 @@
  * a matched SensorSnapshot's safe fields. Read-only. No writes. No
  * network. No raw payload, no station/MAC/passkey/token/private IP.
  *
+ * Accessibility:
+ *   - Wraps Radix Dialog (via shadcn Sheet) which provides role="dialog",
+ *     aria-modal="true", focus trap, Escape-to-close, and focus
+ *     restoration to the trigger on close.
+ *   - Adds an explicit close button with a clear accessible label.
+ *   - Wires aria-labelledby / aria-describedby to predictable IDs.
+ *
  * Missing VPD always renders "Not available", never 0. EcoWitt is a
  * provider, never a canonical source; non-canonical sources render via
  * CanonicalSourceBadge as "Unknown source".
+ *
+ * Optional related diary/timeline links are matched DETERMINISTICALLY
+ * against already-supplied candidates only — never fetched here.
  */
+import { useId } from "react";
+import { X } from "lucide-react";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -16,6 +29,14 @@ import {
 } from "@/components/ui/sheet";
 import CanonicalSourceBadge from "@/components/CanonicalSourceBadge";
 import { formatVpdKpa } from "@/lib/vpdCalculationRules";
+import {
+  matchSnapshotDiaryLinks,
+  DIARY_LINK_EMPTY_LABEL,
+  type DiaryTimelineCandidate,
+} from "@/lib/sensorSnapshotDiaryLinkRules";
+
+export const SNAPSHOT_DRAWER_CLOSE_LABEL =
+  "Close sensor snapshot details" as const;
 
 export interface SensorSnapshotDetailsDrawerData {
   snapshotId: string;
@@ -39,6 +60,12 @@ export interface SensorSnapshotDetailsDrawerProps {
   data: SensorSnapshotDetailsDrawerData | null;
   /** Optional secondary deep-link to the existing sensor surface. */
   detailsHref?: string | null;
+  /**
+   * Optional diary/timeline candidates the parent has already loaded.
+   * The drawer NEVER fetches; it only deterministically matches.
+   * When omitted, the related-links section renders nothing.
+   */
+  relatedCandidates?: DiaryTimelineCandidate[];
 }
 
 function fmtNum(v: number | null, suffix = ""): string {
@@ -46,7 +73,15 @@ function fmtNum(v: number | null, suffix = ""): string {
   return `${v}${suffix}`;
 }
 
-function Row({ label, value, testId }: { label: string; value: import("react").ReactNode; testId?: string }) {
+function Row({
+  label,
+  value,
+  testId,
+}: {
+  label: string;
+  value: import("react").ReactNode;
+  testId?: string;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1 border-b border-border/40">
       <span className="text-xs text-muted-foreground">{label}</span>
@@ -62,18 +97,50 @@ export default function SensorSnapshotDetailsDrawer({
   onOpenChange,
   data,
   detailsHref,
+  relatedCandidates,
 }: SensorSnapshotDetailsDrawerProps) {
+  const titleId = useId();
+  const descriptionId = useId();
+  const relatedLinks = data && relatedCandidates
+    ? matchSnapshotDiaryLinks({
+        snapshot: {
+          snapshotId: data.snapshotId,
+          tentId: data.tentId,
+          plantId: data.plantId,
+          capturedAt: data.capturedAt,
+        },
+        candidates: relatedCandidates,
+      })
+    : [];
+  const showRelatedSection =
+    Array.isArray(relatedCandidates) && relatedCandidates.length >= 0 && !!data;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" data-testid="sensor-snapshot-details-drawer">
+      <SheetContent
+        side="right"
+        data-testid="sensor-snapshot-details-drawer"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+      >
         {data ? (
           <>
             <SheetHeader>
-              <SheetTitle>Sensor snapshot</SheetTitle>
-              <SheetDescription>
+              <SheetTitle id={titleId}>Sensor snapshot</SheetTitle>
+              <SheetDescription id={descriptionId}>
                 Matched fields only. Raw payload, station IDs, and secrets are never shown here.
               </SheetDescription>
             </SheetHeader>
+            <SheetClose
+              data-testid="snapshot-drawer-close"
+              aria-label={SNAPSHOT_DRAWER_CLOSE_LABEL}
+              className="absolute right-12 top-4 rounded-sm border border-border/60 px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <span className="inline-flex items-center gap-1">
+                <X className="h-3 w-3" /> Close
+              </span>
+            </SheetClose>
             <div className="mt-4 flex flex-col gap-1">
               <div className="pb-2">
                 <CanonicalSourceBadge
@@ -87,8 +154,16 @@ export default function SensorSnapshotDetailsDrawer({
                 value={data.capturedAt ?? "Not available"}
                 testId="snapshot-drawer-captured-at"
               />
-              <Row label="transport" value={data.transport ?? "Not available"} testId="snapshot-drawer-transport" />
-              <Row label="tent_id" value={data.tentId ?? "Not available"} testId="snapshot-drawer-tent-id" />
+              <Row
+                label="transport"
+                value={data.transport ?? "Not available"}
+                testId="snapshot-drawer-transport"
+              />
+              <Row
+                label="tent_id"
+                value={data.tentId ?? "Not available"}
+                testId="snapshot-drawer-tent-id"
+              />
               {data.plantId && (
                 <Row label="plant_id" value={data.plantId} testId="snapshot-drawer-plant-id" />
               )}
@@ -138,12 +213,53 @@ export default function SensorSnapshotDetailsDrawer({
                   Open in sensor view
                 </a>
               )}
+              {showRelatedSection && (
+                <div
+                  className="mt-3 border-t border-border/40 pt-2"
+                  data-testid="snapshot-drawer-related-section"
+                >
+                  <p className="text-[11px] text-muted-foreground mb-1">
+                    Related diary / timeline items
+                  </p>
+                  {relatedLinks.length === 0 ? (
+                    <p
+                      data-testid="snapshot-drawer-related-empty"
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      {DIARY_LINK_EMPTY_LABEL}
+                    </p>
+                  ) : (
+                    <ul className="flex flex-col gap-1">
+                      {relatedLinks.map((l) => (
+                        <li key={`${l.kind}:${l.id}`}>
+                          <a
+                            href={l.href}
+                            data-testid={`snapshot-drawer-related-${l.kind}`}
+                            data-match-kind={l.matchKind}
+                            className="text-[11px] underline text-foreground/90 hover:text-foreground"
+                          >
+                            {l.label}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           </>
         ) : (
-          <p className="text-xs text-muted-foreground" data-testid="snapshot-drawer-empty">
-            Sensor snapshot not linked.
-          </p>
+          <>
+            <SheetHeader>
+              <SheetTitle id={titleId}>Sensor snapshot</SheetTitle>
+              <SheetDescription id={descriptionId}>
+                Sensor snapshot details panel.
+              </SheetDescription>
+            </SheetHeader>
+            <p className="text-xs text-muted-foreground" data-testid="snapshot-drawer-empty">
+              Sensor snapshot not linked.
+            </p>
+          </>
         )}
       </SheetContent>
     </Sheet>

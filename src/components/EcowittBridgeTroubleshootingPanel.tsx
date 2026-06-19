@@ -7,6 +7,7 @@ import {
   TROUBLESHOOTING_STATUS_LABEL,
 } from "@/lib/ecowittBridgeTroubleshootingViewModel";
 import type { TroubleshootingInput, TroubleshootingStatus } from "@/lib/ecowittBridgeTroubleshootingRules";
+import CanonicalSourceLegend from "@/components/CanonicalSourceLegend";
 
 const STATUS_CLASS: Record<TroubleshootingStatus, string> = {
   ok: "text-emerald-300 border-emerald-500/30 bg-emerald-500/10",
@@ -36,8 +37,11 @@ export default function EcowittBridgeTroubleshootingPanel({
         .filter(Boolean)
         .join(" ")}
     >
-      <header className="flex items-center justify-between">
-        <h3 className="text-sm font-medium">EcoWitt bridge troubleshooting</h3>
+      <header className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="text-sm font-medium">EcoWitt bridge troubleshooting</h3>
+          <CanonicalSourceLegend testId="troubleshooting-source-legend" />
+        </div>
         <span
           data-testid="troubleshooting-overall"
           className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border ${STATUS_CLASS[vm.report.overall]}`}

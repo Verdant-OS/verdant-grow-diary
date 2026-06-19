@@ -3,9 +3,12 @@ import { readFileSync } from "node:fs";
 
 const NEW_FILES = [
   "src/components/CanonicalSourceBadge.tsx",
+  "src/components/CanonicalSourceLegend.tsx",
   "src/components/SensorSnapshotDetailsDrawer.tsx",
   "src/lib/canonicalSourceBadgeViewModel.ts",
   "src/lib/sensorIngestAuditReportCsvExport.ts",
+  "src/lib/sensorIngestAuditReportQueryParams.ts",
+  "src/lib/sensorSnapshotDiaryLinkRules.ts",
 ];
 
 const FORBIDDEN = [

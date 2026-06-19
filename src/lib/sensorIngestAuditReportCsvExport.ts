@@ -17,8 +17,64 @@
 import type { SensorIngestAuditRow } from "@/lib/sensorIngestAuditReportRules";
 import { REJECTED_NOT_PERSISTED_NOTE } from "@/lib/sensorIngestAuditReportRules";
 
-export const AUDIT_CSV_FILENAME = "verdant-sensor-ingest-audit.csv" as const;
+export const AUDIT_CSV_FILENAME_BASE = "verdant-sensor-ingest-audit" as const;
+export const AUDIT_CSV_FILENAME = `${AUDIT_CSV_FILENAME_BASE}.csv` as const;
 export const AUDIT_CSV_REJECTED_HEADER = `# ${REJECTED_NOT_PERSISTED_NOTE}` as const;
+
+/** Sanitized provider key — lowercase, safe charset, capped length. */
+function sanitizeProviderForFilename(provider: string | null | undefined): string | null {
+  if (!provider) return null;
+  const v = String(provider).trim().toLowerCase();
+  if (!v || v === "all") return null;
+  if (!/^[a-z0-9_.-]{1,24}$/.test(v)) return null;
+  return v;
+}
+
+/** Accept any ISO-ish date; emit YYYY-MM-DD only or null. */
+function sanitizeDateForFilename(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (!match) return null;
+  const t = Date.parse(`${match[1]}T00:00:00Z`);
+  if (!Number.isFinite(t)) return null;
+  return match[1];
+}
+
+export interface AuditCsvFilenameFilters {
+  provider?: string | null;
+  capturedFromIso?: string | null;
+  capturedToIso?: string | null;
+  /**
+   * Device/station search text is intentionally NOT included in the
+   * filename, even when sanitized — see operator polish slice notes.
+   */
+  deviceStationQuery?: string | null;
+}
+
+/**
+ * Deterministic filename builder for the operator audit CSV export.
+ *
+ * Examples:
+ *   verdant-sensor-ingest-audit.csv
+ *   verdant-sensor-ingest-audit_provider-ecowitt.csv
+ *   verdant-sensor-ingest-audit_from-2026-06-01_to-2026-06-19.csv
+ *   verdant-sensor-ingest-audit_provider-ecowitt_from-2026-06-01_to-2026-06-19.csv
+ */
+export function buildSensorIngestAuditCsvFilename(
+  filters: AuditCsvFilenameFilters = {},
+): string {
+  const parts: string[] = [AUDIT_CSV_FILENAME_BASE];
+  const provider = sanitizeProviderForFilename(filters.provider ?? null);
+  if (provider) parts.push(`provider-${provider}`);
+  const from = sanitizeDateForFilename(filters.capturedFromIso ?? null);
+  const to = sanitizeDateForFilename(filters.capturedToIso ?? null);
+  if (from && to) parts.push(`from-${from}_to-${to}`);
+  else if (from) parts.push(`from-${from}`);
+  else if (to) parts.push(`to-${to}`);
+  return `${parts.join("_")}.csv`;
+}
 
 export const AUDIT_CSV_COLUMNS = [
   "captured_at",

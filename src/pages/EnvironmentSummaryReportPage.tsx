@@ -79,7 +79,9 @@ export default function EnvironmentSummaryReportPage() {
   }, [startParam, endParam]);
 
   const { entitlement, loading: entitlementLoading } = useMyEntitlements();
-  const isPremium = entitlement.capabilities.advancedExports === true;
+  const clientIsPremium = entitlement.capabilities.advancedExports === true;
+  // Authoritative gate. The client hint above is presentation-only.
+  const serverGate = useEnvironmentSummaryReportServerGate();
 
   const diaryQuery = useDiaryEntries();
   const entries = diaryQuery.data ?? [];

@@ -220,12 +220,26 @@ export default function Sensors() {
                 </p>
               )}
               {m.key === "vpd" && isDerived && (
-                <p
-                  className="text-[11px] text-muted-foreground mt-2"
-                  data-testid="sensors-vpd-derived-note"
-                >
-                  {VPD_DERIVED_NOTE}
-                </p>
+                <>
+                  <p
+                    className="text-[11px] text-muted-foreground mt-2"
+                    data-testid="sensors-vpd-derived-value"
+                  >
+                    {formatVpdKpa(value as number)}
+                  </p>
+                  <p
+                    className="text-[11px] text-muted-foreground mt-1"
+                    data-testid="sensors-vpd-derived-note"
+                  >
+                    {VPD_DERIVED_NOTE}
+                  </p>
+                  <p
+                    className="text-[10px] text-muted-foreground mt-0.5"
+                    data-testid="sensors-vpd-rounding-note"
+                  >
+                    {VPD_ROUNDING_NOTE}
+                  </p>
+                </>
               )}
               {m.key === "vpd" && (
                 <p

@@ -352,7 +352,7 @@ function shuffle<T>(arr: readonly T[], seed: number): T[] {
 }
 
 function buildFuzzRows(): CompileAiDoctorContextPayloadFromRowsInput["sensorReadings"] {
-  const rows: NonNullable<CompileAiDoctorContextPayloadFromRowsInput["sensorReadings"]> = [];
+  const rows: Array<{ metric: AiDoctorMetricKey; value: number; captured_at: string; source: AiDoctorSensorSource }> = [];
   // Two readings per (metric, source) at varying ages within the 7d window.
   let ageMs = 30_000;
   for (const metric of ALL_METRICS) {

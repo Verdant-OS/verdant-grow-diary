@@ -39,6 +39,14 @@ import {
   type AiDoctorContextPayload,
   type AiDoctorDiagnosisResult,
 } from "@/lib/aiDoctorEnginePhase1Foundation";
+import {
+  AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES,
+  AI_DOCTOR_PHASE1_SKIP_LINK_CLASSES,
+} from "@/lib/aiDoctorPhase1A11yClassNames";
+
+export const AI_DOCTOR_PHASE1_EVIDENCE_SHORTCUTS_ANCHOR_ID =
+  "ai-doctor-phase1-evidence-shortcuts";
+
 
 export const OPERATOR_AI_DOCTOR_PHASE1_ROUTE = "/operator/ai-doctor-phase1";
 export const AI_DOCTOR_PHASE1_SENSOR_ANCHOR_ID = "ai-doctor-phase1-sensor-summary";

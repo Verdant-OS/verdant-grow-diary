@@ -243,8 +243,18 @@ export interface CompileAiDoctorContextPayloadFromRowsInput {
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const LOG_WINDOW_DAYS = 14;
 const SENSOR_WINDOW_DAYS = 7;
-/** Reading older than this (vs. `now`) is treated as stale-by-time. */
-const SENSOR_FRESH_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 hours
+/**
+ * Sensor freshness window in hours. A reading whose age exceeds this
+ * window (strictly greater than) is treated as stale-by-time. A reading
+ * whose age is exactly equal to the window is still considered fresh.
+ */
+export const AI_DOCTOR_SENSOR_STALENESS_WINDOW_HOURS = 6;
+/** Same window expressed in milliseconds; derived, do not duplicate. */
+export const AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS =
+  AI_DOCTOR_SENSOR_STALENESS_WINDOW_HOURS * 60 * 60 * 1000;
+/** Internal alias kept for readability in the compiler. */
+const SENSOR_FRESH_MAX_AGE_MS = AI_DOCTOR_SENSOR_STALENESS_WINDOW_MS;
+
 
 function parseTime(iso: string): number | null {
   const t = Date.parse(iso);

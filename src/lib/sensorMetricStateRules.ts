@@ -211,6 +211,10 @@ export function isCoreMetric(metric: SensorMetricKey): boolean {
 
 /**
  * Classify a metric's presentation state. Pure & deterministic.
+ *
+ * Cautionary tone is reserved for `stale` and `invalid` only. Optional
+ * metrics that are simply not connected use a calm tone. Soil moisture
+ * uses an optional `recentValues` history to detect stuck-at-bound.
  */
 export function classifySensorMetricState(
   input: ClassifyMetricInput,
@@ -218,9 +222,26 @@ export function classifySensorMetricState(
   const { metric, value, hasAnyReading } = input;
   const hasValue = typeof value === "number" && Number.isFinite(value);
 
+  // Auto-detect invalid for optional metrics from value bounds.
+  const autoInvalid =
+    isOptionalMetric(metric) && isOptionalMetricInvalid(metric, value);
+  // Soil moisture stuck-at-bound only triggers on enough history.
+  const autoStuck =
+    metric === "soil" && isSoilMoistureStuck(input.recentValues);
+
   // Cautionary takes priority over "we have a value".
-  if (input.isInvalid) {
-    return makeState("invalid", metric, "Invalid telemetry detected.", false);
+  if (input.isInvalid || autoInvalid) {
+    const copy =
+      INVALID_COPY[metric] ?? "Invalid telemetry detected.";
+    return makeState("invalid", metric, copy, false);
+  }
+  if (autoStuck) {
+    return makeState(
+      "invalid",
+      metric,
+      STUCK_COPY.soil ?? "Soil moisture appears stuck.",
+      true,
+    );
   }
   if (hasValue && input.isStale) {
     return makeState(
@@ -247,7 +268,6 @@ export function classifySensorMetricState(
   if (isOptionalMetric(metric)) {
     return makeState("not_connected", metric, CALM_EMPTY_COPY[metric], false);
   }
-  // Core metric (temp/rh/vpd) with no reading.
   if (metric === "vpd") {
     return makeState("no_reading_yet", metric, CALM_EMPTY_COPY.vpd, false);
   }

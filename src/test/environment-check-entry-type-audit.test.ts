@@ -167,7 +167,7 @@ describe("Environment Check Quick Log — timeline rendering", () => {
     expect(vm!.sourceLabel.toLowerCase()).toContain("not live");
     // Provenance is the manual / Quick Log lineage, never "live".
     expect(vm!.provenanceCopy.toLowerCase()).toContain("manual");
-    expect(vm!.provenanceCopy.toLowerCase()).not.toContain("live sensor telemetry.");
+    expect(vm!.provenanceCopy.toLowerCase()).toContain("never live");
   });
 
   it("never leaks raw_payload / secrets / private fields through the view model", () => {

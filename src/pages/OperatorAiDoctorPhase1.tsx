@@ -53,6 +53,18 @@ export interface OperatorAiDoctorPhase1Props {
   getResultForPlant?: (
     plantId: string,
   ) => { context: AiDoctorContextPayload; result: AiDoctorDiagnosisResult } | null;
+  /**
+   * Optional pure selector for recent diary/activity rows for a plant.
+   * Used by the read-only recent-diary evidence shortcuts.
+   */
+  getRecentActivityForPlant?: (
+    plantId: string,
+  ) => ReadonlyArray<AiDoctorPhase1RecentActivityRow>;
+  /**
+   * When true and a plant is selected but no result is available yet,
+   * render the loading skeleton instead of the no-result state.
+   */
+  isDerivingResult?: boolean;
 }
 
 /**

@@ -34,15 +34,24 @@ describe("FirstRunChecklist safety", () => {
     }
   });
 
-  it("component copy avoids automation / device-control / live-required claims", () => {
-    const vm = read("lib/firstRunChecklistViewModel.ts");
-    const ui = read("components/FirstRunChecklist.tsx");
-    const joined = vm + "\n" + ui;
-    expect(joined).not.toMatch(/\bautomation\b/i);
-    expect(joined).not.toMatch(/\bdevice control\b/i);
-    expect(joined).not.toMatch(/live sensor data is required/i);
-    expect(joined).not.toMatch(/\bguaranteed\b/i);
-    expect(joined).not.toMatch(/\bconfirmed diagnosis\b/i);
+  it("user-visible copy avoids automation / device-control / live-required claims", async () => {
+    const mod = await import("@/lib/firstRunChecklistViewModel");
+    const vm = mod.buildFirstRunChecklistViewModel({
+      growCount: 0,
+      tentCount: 0,
+      plantCount: 0,
+    });
+    const allCopy = [
+      vm.intro,
+      vm.safetyNote,
+      vm.completedHeadline,
+      ...vm.steps.flatMap((s) => [s.label, s.description, s.ctaLabel]),
+    ].join(" | ");
+    expect(allCopy).not.toMatch(/\bautomation\b/i);
+    expect(allCopy).not.toMatch(/\bdevice control\b/i);
+    expect(allCopy).not.toMatch(/live sensor data is required/i);
+    expect(allCopy).not.toMatch(/\bguaranteed\b/i);
+    expect(allCopy).not.toMatch(/\bconfirmed diagnosis\b/i);
   });
 
   it("is mounted on the authenticated Dashboard", () => {

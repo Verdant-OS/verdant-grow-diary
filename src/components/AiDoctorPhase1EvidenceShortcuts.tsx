@@ -11,6 +11,7 @@
  */
 import * as React from "react";
 import { Link } from "react-router-dom";
+import { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } from "@/lib/aiDoctorPhase1A11yClassNames";
 
 export interface AiDoctorPhase1RecentActivityRow {
   id: string;
@@ -125,7 +126,7 @@ export function AiDoctorPhase1EvidenceShortcuts(
                   to={href}
                   aria-label={aria}
                   data-testid={`ai-doctor-phase1-diary-shortcut-${row.id}`}
-                  className="flex min-h-10 w-full items-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:w-auto sm:inline-flex"
+                  className={`flex min-h-10 w-full items-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground underline ${AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES} sm:w-auto sm:inline-flex`}
                 >
                   {label}
                 </Link>

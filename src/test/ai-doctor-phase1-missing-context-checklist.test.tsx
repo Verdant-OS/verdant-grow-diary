@@ -507,3 +507,24 @@ describe("AiDoctorPhase1MissingContextChecklist — accessibility polish", () =>
     }
   });
 });
+
+describe("AiDoctorPhase1MissingContextChecklist — shared a11y utility", () => {
+  it("CTA className contains the shared focus-visible recipe", async () => {
+    const { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } = await import(
+      "@/lib/aiDoctorPhase1A11yClassNames"
+    );
+    renderWithRouter(
+      <AiDoctorPhase1MissingContextChecklist
+        context={emptyContext()}
+        ctaContext={CTA_CTX}
+      />,
+    );
+    const cls =
+      screen
+        .getByTestId("ai-doctor-phase1-checklist-cta-recent_photo-add-photo")
+        .getAttribute("class") ?? "";
+    for (const token of AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES.split(/\s+/)) {
+      expect(cls).toContain(token);
+    }
+  });
+});

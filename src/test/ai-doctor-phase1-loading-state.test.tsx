@@ -231,3 +231,31 @@ describe("AiDoctorPhase1LoadingState — reduced motion + non-animated fallback"
     ).toBeTruthy();
   });
 });
+
+describe("AiDoctorPhase1LoadingState — strengthened reduced-motion assertions", () => {
+  it("every shimmer block includes motion-reduce:animate-none + visible static fallback", () => {
+    render(<AiDoctorPhase1LoadingState />);
+    const bars = screen.getAllByTestId("ai-doctor-phase1-loading-skeleton-bar");
+    expect(bars.length).toBeGreaterThan(0);
+    for (const bar of bars) {
+      const cls = bar.getAttribute("class") ?? "";
+      expect(cls).toMatch(/\banimate-shimmer\b/);
+      expect(cls).toMatch(/\bmotion-reduce:animate-none\b/);
+      expect(cls).toMatch(/\bbg-muted\b/);
+      expect(cls).toMatch(/\bborder\b/);
+    }
+  });
+
+  it("loading copy remains visible/readable during reduced-motion", () => {
+    render(<AiDoctorPhase1LoadingState />);
+    expect(
+      (screen.getByTestId("ai-doctor-phase1-loading-title").textContent ?? "").length,
+    ).toBeGreaterThan(0);
+    expect(
+      (screen.getByTestId("ai-doctor-phase1-loading-body").textContent ?? "").length,
+    ).toBeGreaterThan(0);
+    expect(
+      (screen.getByTestId("ai-doctor-phase1-loading-safety").textContent ?? "").length,
+    ).toBeGreaterThan(0);
+  });
+});

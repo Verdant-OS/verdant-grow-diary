@@ -543,3 +543,80 @@ describe("OperatorAiDoctorPhase1 — mobile sticky bar + a11y", () => {
     }
   });
 });
+
+describe("OperatorAiDoctorPhase1 — skip to evidence shortcuts link", () => {
+  it("renders when a valid plant + result exist, with correct href and sr-only classes", async () => {
+    const { AI_DOCTOR_PHASE1_EVIDENCE_SHORTCUTS_ANCHOR_ID } = await import(
+      "@/pages/OperatorAiDoctorPhase1"
+    );
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: PLANTS,
+      getResultForPlant: (id) => ({ context: baseContext(id), result: baseResult() }),
+    });
+    const link = screen.getByTestId("ai-doctor-phase1-skip-to-evidence-shortcuts");
+    expect(link.tagName.toLowerCase()).toBe("a");
+    expect(link.getAttribute("href")).toBe(
+      `#${AI_DOCTOR_PHASE1_EVIDENCE_SHORTCUTS_ANCHOR_ID}`,
+    );
+    const cls = link.getAttribute("class") ?? "";
+    expect(cls).toMatch(/\bsr-only\b/);
+    expect(cls).toMatch(/\bfocus:not-sr-only\b/);
+    expect(link.getAttribute("onclick")).toBeNull();
+
+    const target = document.getElementById(
+      AI_DOCTOR_PHASE1_EVIDENCE_SHORTCUTS_ANCHOR_ID,
+    );
+    expect(target).not.toBeNull();
+    expect(target?.getAttribute("tabIndex")).toBe("-1");
+  });
+
+  it("does not render in unknown-plant state", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=nope`, {
+      plants: PLANTS,
+    });
+    expect(
+      screen.queryByTestId("ai-doctor-phase1-skip-to-evidence-shortcuts"),
+    ).toBeNull();
+  });
+
+  it("does not render without a selected plant", () => {
+    renderAt(OPERATOR_AI_DOCTOR_PHASE1_ROUTE, { plants: PLANTS });
+    expect(
+      screen.queryByTestId("ai-doctor-phase1-skip-to-evidence-shortcuts"),
+    ).toBeNull();
+  });
+
+  it("does not render when no result is available", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: PLANTS,
+      getResultForPlant: () => null,
+    });
+    expect(
+      screen.queryByTestId("ai-doctor-phase1-skip-to-evidence-shortcuts"),
+    ).toBeNull();
+  });
+
+  it("page-level photo/sensor shortcut links use the shared focus-visible recipe", async () => {
+    const { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } = await import(
+      "@/lib/aiDoctorPhase1A11yClassNames"
+    );
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: PLANTS,
+      getResultForPlant: (id) => ({ context: baseContext(id), result: baseResult() }),
+      getRecentActivityForPlant: () => [
+        { id: "p1", occurred_at: "2026-06-18T00:00:00Z", event_type: "photo" },
+      ],
+    });
+    for (const id of [
+      "ai-doctor-phase1-shortcut-view-recent-photo",
+      "ai-doctor-phase1-shortcut-open-sensor-summary",
+      "ai-doctor-phase1-mobile-sticky-shortcut-view-recent-photo",
+      "ai-doctor-phase1-mobile-sticky-shortcut-open-sensor-summary",
+    ]) {
+      const cls = screen.getByTestId(id).getAttribute("class") ?? "";
+      for (const token of AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES.split(/\s+/)) {
+        expect(cls, `${id} missing ${token}`).toContain(token);
+      }
+    }
+  });
+});

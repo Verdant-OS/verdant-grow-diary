@@ -26,6 +26,8 @@ export interface AiDoctorPhase1EvidenceShortcutsContext {
   plantId?: string | null;
   growId?: string | null;
   tentId?: string | null;
+  /** Optional plant name used to enrich aria-label copy. */
+  plantName?: string | null;
 }
 
 export const AI_DOCTOR_PHASE1_DIARY_SHORTCUTS_MAX = 3;

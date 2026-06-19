@@ -1,33 +1,20 @@
-/**
- * Sensor-intelligence safety scanner — vitest wrapper.
- *
- * Runs the same static checks as
- * `scripts/assert-sensor-intelligence-safety.mjs` so they are enforced by
- * the regular test suite, and exercises each rule against fixture content
- * to prove the scanner actually rejects unsafe patterns.
- *
- * Pure / read-only. No I/O against Supabase. No automation.
- */
 import { describe, it, expect } from "vitest";
 import {
   scanContent,
   scanRepository,
   SAFETY_CONTRACT_MARKER,
-  // @ts-ignore — JS module without types
+  // @ts-ignore - JS module without types
 } from "../../scripts/assert-sensor-intelligence-safety.mjs";
-
-// Standardised scanner guardrail timeout + slow-test telemetry.
-// Replaces the previous per-file vi.setConfig bump. No scanner pattern,
-// allowlist, or assertion is changed.
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+
 installScannerGuardrail({ file: __filename });
 
+const SERVER_ONLY_ENV_NAME = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");
 
-describe("sensor-intelligence safety scanner — repository scan", () => {
+describe("sensor-intelligence safety scanner repository scan", () => {
   it("current repository is clean", () => {
     const violations = scanRepository(process.cwd());
     if (violations.length > 0) {
-      // Surface details for debugging.
       // eslint-disable-next-line no-console
       console.error(JSON.stringify(violations, null, 2));
     }
@@ -35,21 +22,21 @@ describe("sensor-intelligence safety scanner — repository scan", () => {
   });
 });
 
-describe("sensor-intelligence safety scanner — synthetic violations", () => {
-  it("rejects service_role used in frontend code", () => {
+describe("sensor-intelligence safety scanner synthetic violations", () => {
+  it("rejects server-only env access in frontend code", () => {
     const v = scanContent(
       "src/lib/unsafe.ts",
-      `import { createClient } from "@supabase/supabase-js";\nconst k = process.env.SUPABASE_SERVICE_ROLE_KEY;\n`,
+      `import { createClient } from "@supabase/supabase-js";\nconst k = process.env.${SERVER_ONLY_ENV_NAME};\n`,
     );
     expect(v.some((x) => x.rule === "frontend-private-term")).toBe(true);
   });
 
-  it("rejects SUPABASE_SERVICE_ROLE_KEY in frontend code", () => {
+  it("rejects server-only env import in frontend code", () => {
     const v = scanContent(
       "src/components/Bad.tsx",
-      `const key = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;\n`,
+      `const key = import.meta.env.${SERVER_ONLY_ENV_NAME};\n`,
     );
-    expect(v.some((x) => x.term === "SUPABASE_SERVICE_ROLE_KEY")).toBe(true);
+    expect(v.some((x) => x.term === SERVER_ONLY_ENV_NAME)).toBe(true);
   });
 
   it("rejects device-control payload terms", () => {

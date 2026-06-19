@@ -16,6 +16,12 @@ import {
   buildPaywallCtaViewModel,
   type PaywallCtaViewModel,
 } from "@/lib/paywallCtaViewModel";
+import {
+  reconcileAiCreditDenialPlanId,
+  resolveAiDoctorEntitlementView,
+  type AiDoctorEntitlementView,
+} from "@/lib/aiDoctorEntitlementRules";
+import type { ResolvedEntitlement } from "@/lib/entitlements/types";
 
 export type AiCreditDenialScope = "per_grow" | "per_month" | string;
 

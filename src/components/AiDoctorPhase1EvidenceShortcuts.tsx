@@ -102,6 +102,10 @@ export function AiDoctorPhase1EvidenceShortcuts(
     );
   }
 
+  const plantLabel = props.context.plantName
+    ? `for ${props.context.plantName}`
+    : "for selected plant";
+
   return (
     <section
       data-testid="ai-doctor-phase1-diary-shortcuts"
@@ -113,13 +117,15 @@ export function AiDoctorPhase1EvidenceShortcuts(
         {sorted.map((row) => {
           const href = buildDiaryHref(props.context, row.id);
           const label = previewLabel(row);
+          const aria = `Open recent diary entry ${label} ${plantLabel}`;
           return (
             <li key={row.id}>
               {href ? (
                 <Link
                   to={href}
+                  aria-label={aria}
                   data-testid={`ai-doctor-phase1-diary-shortcut-${row.id}`}
-                  className="flex min-h-10 w-full items-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground underline sm:w-auto sm:inline-flex"
+                  className="flex min-h-10 w-full items-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:w-auto sm:inline-flex"
                 >
                   {label}
                 </Link>

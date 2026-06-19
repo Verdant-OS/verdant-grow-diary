@@ -22,6 +22,7 @@ export type PlantRow = Tables<"plants">;
 export type DiaryEntryRow = Tables<"diary_entries">;
 export type HarvestRow = Tables<"harvests">;
 export type SensorReadingRow = Tables<"sensor_readings">;
+export type SoilMoistureCalibrationRow = Tables<"soil_moisture_calibrations">;
 export type ProfileRow = Tables<"profiles">;
 export type UnlockRow = Tables<"unlocks">;
 export type UserQuestRow = Tables<"user_quests">;

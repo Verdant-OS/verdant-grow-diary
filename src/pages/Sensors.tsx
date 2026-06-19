@@ -12,6 +12,7 @@ import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import SensorsTestbenchPanel from "@/components/SensorsTestbenchPanel";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { useTents as useTentRows } from "@/hooks/use-tents";
+import { useSoilMoistureCalibrations } from "@/hooks/useSoilMoistureCalibrations";
 import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
 import { VPD_STAGE_HELPER_TEXT, normalizeVpdStage } from "@/lib/vpdStageTargetRules";
 import {
@@ -24,14 +25,8 @@ import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 import SensorSourceInlineLegend from "@/components/SensorSourceInlineLegend";
 import { useSearchParams } from "react-router-dom";
-import {
-  SENSOR_SOURCES_PARAM,
-  parseSensorSourcesParam,
-} from "@/lib/sensorSourceUrlRules";
-import {
-  classifySensorMetricState,
-  type SensorMetricKey,
-} from "@/lib/sensorMetricStateRules";
+import { SENSOR_SOURCES_PARAM, parseSensorSourcesParam } from "@/lib/sensorSourceUrlRules";
+import { classifySensorMetricState, type SensorMetricKey } from "@/lib/sensorMetricStateRules";
 import {
   deriveVpd,
   formatVpdKpa,
@@ -39,6 +34,7 @@ import {
   VPD_ROUNDING_NOTE,
 } from "@/lib/vpdCalculationRules";
 import SensorSourceLegendCompact from "@/components/SensorSourceLegendCompact";
+import { buildSoilMoistureReadingViewModel } from "@/lib/soilMoistureReadingViewModel";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },
@@ -57,12 +53,15 @@ export default function Sensors() {
   const { data: realTents = [] } = useTentRows();
   const [tentId, setTentId] = useState<string>(tents[0]?.id ?? "t1");
   const [searchParams] = useSearchParams();
-  const urlSensorSources = parseSensorSourcesParam(
-    searchParams.get(SENSOR_SOURCES_PARAM),
-  );
+  const urlSensorSources = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
   const filtered = readings.filter((r) => r.tentId === tentId);
   const latest = filtered.length > 0 ? filtered[filtered.length - 1] : null;
   const selectedTent = tents.find((t) => t.id === tentId) ?? null;
+  const selectedGrowId = selectedTent?.growId ?? null;
+  const { data: soilMoistureCalibrations = [] } = useSoilMoistureCalibrations({
+    growId: selectedGrowId,
+    tentId,
+  });
   const selectedTentStage =
     (selectedTent as unknown as { stage?: string | null } | null)?.stage ?? null;
   const vpdStageMissing = latest?.vpd != null && normalizeVpdStage(selectedTentStage) === "unknown";
@@ -74,8 +73,7 @@ export default function Sensors() {
   // `useGrowSensorReadings` currently silently falls back to mock data
   // (documented in docs/grow-os-architecture.md); when the slice is empty we
   // honestly classify it as Unavailable rather than fabricating a source.
-  const latestSourceRaw =
-    (latest as unknown as { source?: string | null } | null)?.source ?? null;
+  const latestSourceRaw = (latest as unknown as { source?: string | null } | null)?.source ?? null;
   const latestSource =
     typeof latestSourceRaw === "string" && latestSourceRaw.length > 0
       ? latestSourceRaw
@@ -97,11 +95,23 @@ export default function Sensors() {
 
   return (
     <div>
-      <PageHeader title="Sensor Data" description="Environmental telemetry across tents." icon={<Activity className="h-5 w-5" />} />
+      <PageHeader
+        title="Sensor Data"
+        description="Environmental telemetry across tents."
+        icon={<Activity className="h-5 w-5" />}
+      />
       <div className="flex flex-wrap items-center gap-1.5 mb-4">
         {tents.map((t) => (
-          <button key={t.id} onClick={() => setTentId(t.id)}
-            className={cn("text-xs px-2.5 py-1 rounded-full border transition", tentId === t.id ? "bg-primary text-primary-foreground border-primary" : "bg-secondary/50 border-border/50 hover:bg-secondary")}>
+          <button
+            key={t.id}
+            onClick={() => setTentId(t.id)}
+            className={cn(
+              "text-xs px-2.5 py-1 rounded-full border transition",
+              tentId === t.id
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-secondary/50 border-border/50 hover:bg-secondary",
+            )}
+          >
             {t.name}
           </button>
         ))}
@@ -118,18 +128,12 @@ export default function Sensors() {
         {METRICS.map((m) => {
           // Resolve raw value for this metric from the latest reading.
           const rawValue: number | null | undefined = latest
-            ? (latest as unknown as Record<string, number | null | undefined>)[
-                m.key
-              ]
+            ? (latest as unknown as Record<string, number | null | undefined>)[m.key]
             : null;
           // Derive VPD from temp + RH when no VPD value is present.
           let value: number | null | undefined = rawValue;
           let isDerived = false;
-          if (
-            m.key === "vpd" &&
-            (value == null || !Number.isFinite(value as number)) &&
-            latest
-          ) {
+          if (m.key === "vpd" && (value == null || !Number.isFinite(value as number)) && latest) {
             const derived = deriveVpd({
               temperature: latest.temp ?? null,
               humidity: latest.rh ?? null,
@@ -142,9 +146,7 @@ export default function Sensors() {
           }
           // Recent values for soil stuck-at-bound detection (last 3).
           const recentValues =
-            m.key === "soil"
-              ? filtered.slice(-3).map((r) => r.soil ?? null)
-              : undefined;
+            m.key === "soil" ? filtered.slice(-3).map((r) => r.soil ?? null) : undefined;
           const state = classifySensorMetricState({
             metric: m.key as SensorMetricKey,
             value: value ?? null,
@@ -153,6 +155,20 @@ export default function Sensors() {
             isDerived,
             recentValues,
           });
+          const soilMoistureView =
+            m.key === "soil" && latest
+              ? buildSoilMoistureReadingViewModel({
+                  rawSoilMoisture: latest.soil ?? null,
+                  rawSource: latestSource,
+                  context: {
+                    growId: selectedGrowId,
+                    tentId,
+                    plantId: null,
+                    deviceId: null,
+                  },
+                  calibrations: soilMoistureCalibrations,
+                })
+              : null;
 
           // Stage-aware status pill for Temperature/Humidity using the
           // latest reading + the selected tent's stage. Stale or missing
@@ -247,6 +263,28 @@ export default function Sensors() {
                   </p>
                 </>
               )}
+              {m.key === "soil" && soilMoistureView && (
+                <div
+                  className="mt-2 space-y-1 text-[11px] text-muted-foreground"
+                  data-testid="sensors-soil-moisture-calibration-display"
+                >
+                  <p data-testid="sensors-soil-moisture-primary">{soilMoistureView.primaryLine}</p>
+                  {soilMoistureView.rawLine && (
+                    <p data-testid="sensors-soil-moisture-raw">{soilMoistureView.rawLine}</p>
+                  )}
+                  <p data-testid="sensors-soil-moisture-calibration">
+                    {soilMoistureView.calibrationLine}
+                  </p>
+                  <p data-testid="sensors-soil-moisture-raw-source">
+                    {soilMoistureView.rawSourceLine}
+                  </p>
+                  {soilMoistureView.calibrationSourceLine && (
+                    <p data-testid="sensors-soil-moisture-calibration-source">
+                      {soilMoistureView.calibrationSourceLine}
+                    </p>
+                  )}
+                </div>
+              )}
               {m.key === "vpd" && (
                 <p
                   className="text-[11px] text-muted-foreground mt-2"
@@ -256,21 +294,19 @@ export default function Sensors() {
                 </p>
               )}
               {m.key === "vpd" && vpdStageMissing && (
-                <VpdStageMissingBadge
-                  testId="sensors-vpd-stage-missing-badge"
-                  className="mt-2"
-                />
+                <VpdStageMissingBadge testId="sensors-vpd-stage-missing-badge" className="mt-2" />
               )}
             </div>
           );
         })}
       </div>
-      <div id="manual-reading" className="mt-4 max-w-xl scroll-mt-24" data-testid="sensors-manual-reading-anchor">
+      <div
+        id="manual-reading"
+        className="mt-4 max-w-xl scroll-mt-24"
+        data-testid="sensors-manual-reading-anchor"
+      >
         {manualTents.length === 0 ? (
-          <FirstTentSetupEmptyState
-            surface="sensor_pairing"
-            testId="sensors-first-tent-setup"
-          />
+          <FirstTentSetupEmptyState surface="sensor_pairing" testId="sensors-first-tent-setup" />
         ) : (
           <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
         )}
@@ -284,10 +320,9 @@ export default function Sensors() {
           <SensorSourceLegendTooltip testIdSuffix="sensors" />
         </div>
         <p>
-          Verdant can show live ingest readings, grower-entered manual
-          readings, explicitly labeled csv history, or demo data in demo
-          mode. Stale or invalid telemetry is flagged and should not be
-          treated as healthy current data.
+          Verdant can show live ingest readings, grower-entered manual readings, explicitly labeled
+          csv history, or demo data in demo mode. Stale or invalid telemetry is flagged and should
+          not be treated as healthy current data.
         </p>
         <div className="mt-2">
           <SensorSourceInlineLegend
@@ -296,10 +331,7 @@ export default function Sensors() {
           />
         </div>
       </div>
-      <SensorSourceLegendCompact
-        className="mt-4 max-w-xl"
-        testId="sensors-source-legend-compact"
-      />
+      <SensorSourceLegendCompact className="mt-4 max-w-xl" testId="sensors-source-legend-compact" />
       <SensorSourceSummaryWidget
         className="mt-4 max-w-xl"
         readings={filtered.map((r) => ({
@@ -314,10 +346,7 @@ export default function Sensors() {
       </div>
       {manualTents.find((t) => t.id === tentId) && (
         <div className="mt-4 max-w-2xl">
-          <SensorsTestbenchPanel
-            tentId={tentId}
-            tentName={selectedTent?.name ?? null}
-          />
+          <SensorsTestbenchPanel tentId={tentId} tentName={selectedTent?.name ?? null} />
         </div>
       )}
     </div>

@@ -1,11 +1,14 @@
 import { describe, it, expect } from "vitest";
-import {
-  scanContent,
-  scanRepository,
-  SAFETY_CONTRACT_MARKER,
-  // @ts-ignore - JS module without types
-} from "../../scripts/assert-sensor-intelligence-safety.mjs";
+// @ts-ignore - JS module without types
+import * as scanner from "../../scripts/assert-sensor-intelligence-safety.mjs";
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+
+const scanContent = scanner.scanContent as (
+  relPath: string,
+  content: string,
+) => Array<{ rule?: string; term?: string }>;
+const scanRepository = scanner.scanRepository as (root?: string) => Array<unknown>;
+const SAFETY_CONTRACT_MARKER = scanner.SAFETY_CONTRACT_MARKER as string;
 
 installScannerGuardrail({ file: __filename });
 
@@ -15,7 +18,6 @@ describe("sensor-intelligence safety scanner repository scan", () => {
   it("current repository is clean", () => {
     const violations = scanRepository(process.cwd());
     if (violations.length > 0) {
-      // eslint-disable-next-line no-console
       console.error(JSON.stringify(violations, null, 2));
     }
     expect(violations).toEqual([]);

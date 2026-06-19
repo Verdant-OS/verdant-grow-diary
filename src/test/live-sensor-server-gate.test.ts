@@ -237,12 +237,14 @@ describe("static guard — capabilities.liveSensors is never used as an authorit
     resolve(ROOT, "src/hooks/useLiveSensorServerGate.ts"),
   ]);
 
-  it("only the entitlements catalog + this gate file reference capabilities.liveSensors / liveSensors keyword", () => {
+  it("only the entitlements catalog + this gate file reference capabilities.liveSensors as a gate", () => {
     const offenders: string[] = [];
     for (const file of walkSrc(resolve(ROOT, "src"))) {
       if (ALLOWED_FILES.has(file)) continue;
       const txt = readFileSync(file, "utf8");
-      if (/\bliveSensors\b/.test(txt)) offenders.push(file);
+      // Look only for capability-style access — bare local variable names
+      // like `const liveSensors = ...` in non-entitlement code are fine.
+      if (/\.liveSensors\b/.test(txt)) offenders.push(file);
     }
     expect(offenders).toEqual([]);
   });

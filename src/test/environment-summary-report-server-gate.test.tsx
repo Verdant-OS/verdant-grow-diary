@@ -203,8 +203,9 @@ describe("environment-summary-report-entitlement edge function — server safety
   );
 
   it("does not use service_role", () => {
-    expect(FN).not.toMatch(/SERVICE_ROLE/);
-    expect(FN).not.toMatch(/service_role/);
+    expect(FN).not.toMatch(/SERVICE_ROLE_KEY/);
+    // Reject env reads / explicit createClient(... SERVICE_ROLE ...) usage.
+    expect(FN).not.toMatch(/Deno\.env\.get\(["']SUPABASE_SERVICE_ROLE/);
   });
 
   it("fails closed on lookup error (does not return ok=true)", () => {

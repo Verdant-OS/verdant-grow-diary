@@ -278,6 +278,17 @@ export default function Dashboard() {
         <OnboardingChecklistCard vm={onboardingVm} />
       </div>
 
+      <div className="my-3">
+        <FirstRunChecklist
+          growCount={grows.length}
+          tentCount={tents.length}
+          plantCount={plants.length}
+          quickLogCount={diaryRecentCount}
+          sensorSnapshotCount={rawReadings.length}
+        />
+      </div>
+
+
       {/* Dashboard intentionally has a single Quick Log entry point (QuickLogV2Fab).
           The "Log your first plant memory" CTA was a duplicate entry point and was removed.
           The same CTA remains on TentDetail where it is contextually unique. */}

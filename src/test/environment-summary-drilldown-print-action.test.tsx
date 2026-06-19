@@ -23,6 +23,14 @@ import {
 
 const planMock = vi.hoisted(() => ({ current: "pro" as "free" | "pro" }));
 
+vi.mock("@/hooks/useEnvironmentSummaryReportServerGate", () => ({
+  useEnvironmentSummaryReportServerGate: () => ({
+    status: "allowed",
+    reason: null,
+    displayPlanId: "pro_monthly",
+  }),
+}));
+
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => {
     const row =

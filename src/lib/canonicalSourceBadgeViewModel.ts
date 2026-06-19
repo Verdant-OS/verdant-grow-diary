@@ -52,13 +52,8 @@ const SOURCE_LABEL: Record<CanonicalBadgeSource, string> = {
   invalid: "Invalid",
 };
 
-const PROVIDER_LABEL: Record<string, string> = {
-  ecowitt: "EcoWitt",
-  mqtt: "MQTT",
-  home_assistant: "Home Assistant",
-  pi_bridge: "Pi Bridge",
-  spider_farmer: "Spider Farmer",
-};
+import { deriveProviderLabel } from "@/constants/sensorProviderLabels";
+
 
 const UNKNOWN_LABEL = "Unknown source" as const;
 const PROVIDER_MAX = 32;

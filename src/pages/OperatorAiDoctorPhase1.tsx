@@ -23,6 +23,12 @@ import {
 import { AiDoctorPhase1ResultPanel } from "@/components/AiDoctorPhase1ResultPanel";
 import { AiDoctorPhase1InternalLink } from "@/components/AiDoctorPhase1InternalLink";
 import { AiDoctorPhase1EmptyStateActions } from "@/components/AiDoctorPhase1EmptyStateActions";
+import { AiDoctorPhase1LoadingState } from "@/components/AiDoctorPhase1LoadingState";
+import {
+  AiDoctorPhase1EvidenceShortcuts,
+  type AiDoctorPhase1RecentActivityRow,
+} from "@/components/AiDoctorPhase1EvidenceShortcuts";
+import { AiDoctorPhase1MissingContextChecklist } from "@/components/AiDoctorPhase1MissingContextChecklist";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";

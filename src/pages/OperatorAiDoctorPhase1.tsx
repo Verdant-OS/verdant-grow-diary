@@ -398,6 +398,7 @@ export default function OperatorAiDoctorPhase1(
             context={resultBundle.context}
             missing_information={resultBundle.result.missing_information}
             ctaContext={ctaContext}
+            plantName={plantNameForAria}
           />
 
           <section
@@ -409,16 +410,18 @@ export default function OperatorAiDoctorPhase1(
             {hasPhotoActivity && recentPhotoHref && (
               <Link
                 to={recentPhotoHref}
+                aria-label={`View recent photo evidence ${ariaWho}`}
                 data-testid="ai-doctor-phase1-shortcut-view-recent-photo"
-                className="flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground sm:inline-flex sm:w-auto"
+                className="flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:inline-flex sm:w-auto"
               >
                 View recent photo
               </Link>
             )}
             <a
               href={`#${AI_DOCTOR_PHASE1_SENSOR_ANCHOR_ID}`}
+              aria-label={`Open sensor summary ${ariaWho}`}
               data-testid="ai-doctor-phase1-shortcut-open-sensor-summary"
-              className="flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground sm:inline-flex sm:w-auto"
+              className="flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:inline-flex sm:w-auto"
             >
               Open sensor summary
             </a>
@@ -426,7 +429,7 @@ export default function OperatorAiDoctorPhase1(
 
           <AiDoctorPhase1EvidenceShortcuts
             items={recentActivity}
-            context={ctaContext}
+            context={{ ...ctaContext, plantName: plantNameForAria }}
           />
 
           <div id={AI_DOCTOR_PHASE1_SENSOR_ANCHOR_ID}>
@@ -436,6 +439,36 @@ export default function OperatorAiDoctorPhase1(
             />
           </div>
         </>
+      )}
+
+      {showMobileStickyBar && (
+        <div
+          data-testid="ai-doctor-phase1-mobile-sticky-bar"
+          aria-hidden="true"
+          className="fixed bottom-0 left-0 right-0 z-40 max-w-full overflow-x-hidden border-t border-border bg-card/95 p-2 backdrop-blur sm:hidden"
+          style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
+        >
+          <div className="mx-auto flex max-w-4xl items-stretch gap-2">
+            {hasPhotoActivity && recentPhotoHref && (
+              <Link
+                to={recentPhotoHref}
+                tabIndex={-1}
+                data-testid="ai-doctor-phase1-mobile-sticky-shortcut-view-recent-photo"
+                className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-xs text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                View recent photo
+              </Link>
+            )}
+            <a
+              href={`#${AI_DOCTOR_PHASE1_SENSOR_ANCHOR_ID}`}
+              tabIndex={-1}
+              data-testid="ai-doctor-phase1-mobile-sticky-shortcut-open-sensor-summary"
+              className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-xs text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              Open sensor summary
+            </a>
+          </div>
+        </div>
       )}
     </main>
   );

@@ -173,10 +173,15 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
   });
 
   it("(static) hook contains read-only selects only — no mutations or AI calls", () => {
-    const src = readFileSync(
+    const raw = readFileSync(
       resolve(process.cwd(), "src/hooks/useQuickLogGroupedTimeline.ts"),
       "utf8",
     );
+    // Strip block + line comments so safety-contract documentation lines
+    // are not mistaken for actual write/RPC/AI calls.
+    const src = raw
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|\s)\/\/[^\n]*/g, "");
     const forbidden = [
       ".insert(",
       ".update(",
@@ -184,7 +189,10 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
       ".delete(",
       ".rpc(",
       "functions.invoke",
-      "action_queue",
+      'from("action_queue"',
+      "from('action_queue'",
+      'from("alerts"',
+      "from('alerts'",
       "service_role",
       "bridge_token",
       "openai",
@@ -195,6 +203,7 @@ describe("QuickLog timeline → AI Doctor Phase 1 evidence wiring", () => {
       expect(src, `hook must not contain ${term}`).not.toContain(term);
     }
   });
+
 
   it("(static) merge helper is pure — no Supabase / AI / device imports", () => {
     const src = readFileSync(

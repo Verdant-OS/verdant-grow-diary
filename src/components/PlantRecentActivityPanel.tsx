@@ -76,6 +76,14 @@ function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?:
       ) : !row.hasHardwareReadings ? (
         <p className="mt-2 text-xs text-muted-foreground italic">No note</p>
       ) : null}
+      {row.hasPhoto && row.showPhotoNonDiagnosticLabel ? (
+        <div
+          data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
+          className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground/80"
+        >
+          {PHOTO_NON_DIAGNOSTIC_LABEL}
+        </div>
+      ) : null}
       {row.hasHardwareReadings ? (
         <div
           className="mt-2 rounded-md border border-dashed bg-muted/40 p-2"

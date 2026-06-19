@@ -373,6 +373,13 @@ export default function OperatorAiDoctorPhase1(
 
       {selectedPlant && resultBundle && (
         <>
+          <a
+            href={`#${AI_DOCTOR_PHASE1_EVIDENCE_SHORTCUTS_ANCHOR_ID}`}
+            data-testid="ai-doctor-phase1-skip-to-evidence-shortcuts"
+            className={AI_DOCTOR_PHASE1_SKIP_LINK_CLASSES}
+          >
+            Skip to evidence shortcuts
+          </a>
           {resultBundle.result.missing_information.length > 0 && (
             <section
               data-testid="ai-doctor-phase1-missing-context-guidance"

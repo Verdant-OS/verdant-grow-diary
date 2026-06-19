@@ -1,22 +1,3 @@
-/**
- * SensorSnapshotDetailsDrawer — presenter-only slide-over that surfaces
- * a matched SensorSnapshot's safe fields. Read-only. No writes. No
- * network. No raw payload, no station/MAC/passkey/token/private IP.
- *
- * Accessibility:
- *   - Wraps Radix Dialog (via shadcn Sheet) which provides role="dialog",
- *     aria-modal="true", focus trap, Escape-to-close, and focus
- *     restoration to the trigger on close.
- *   - Adds an explicit close button with a clear accessible label.
- *   - Wires aria-labelledby / aria-describedby to predictable IDs.
- *
- * Missing VPD always renders "Not available", never 0. EcoWitt is a
- * provider, never a canonical source; non-canonical sources render via
- * CanonicalSourceBadge as "Unknown source".
- *
- * Optional related diary/timeline links are matched DETERMINISTICALLY
- * against already-supplied candidates only — never fetched here.
- */
 import { useId } from "react";
 import { X } from "lucide-react";
 import {
@@ -31,9 +12,15 @@ import CanonicalSourceBadge from "@/components/CanonicalSourceBadge";
 import { formatVpdKpa } from "@/lib/vpdCalculationRules";
 import {
   matchSnapshotDiaryLinks,
+  describeSnapshotDiaryLinkAttempt,
   DIARY_LINK_EMPTY_LABEL,
   type DiaryTimelineCandidate,
 } from "@/lib/sensorSnapshotDiaryLinkRules";
+import {
+  buildSensorSnapshotDetailsDrawerCsv,
+  SNAPSHOT_DRAWER_CSV_FILENAME,
+  type SensorSnapshotDrawerCsvRow,
+} from "@/lib/sensorSnapshotDetailsDrawerCsvExport";
 
 export const SNAPSHOT_DRAWER_CLOSE_LABEL =
   "Close sensor snapshot details" as const;
@@ -54,18 +41,19 @@ export interface SensorSnapshotDetailsDrawerData {
   staleOrInvalid: boolean;
 }
 
+export interface SensorSnapshotDetailsDrawerCsvExportRows {
+  environmentCheckRows?: SensorSnapshotDrawerCsvRow[];
+  ingestAuditRows?: SensorSnapshotDrawerCsvRow[];
+  filename?: string;
+}
+
 export interface SensorSnapshotDetailsDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   data: SensorSnapshotDetailsDrawerData | null;
-  /** Optional secondary deep-link to the existing sensor surface. */
   detailsHref?: string | null;
-  /**
-   * Optional diary/timeline candidates the parent has already loaded.
-   * The drawer NEVER fetches; it only deterministically matches.
-   * When omitted, the related-links section renders nothing.
-   */
   relatedCandidates?: DiaryTimelineCandidate[];
+  csvExport?: SensorSnapshotDetailsDrawerCsvExportRows;
 }
 
 function fmtNum(v: number | null, suffix = ""): string {
@@ -98,9 +86,11 @@ export default function SensorSnapshotDetailsDrawer({
   data,
   detailsHref,
   relatedCandidates,
+  csvExport,
 }: SensorSnapshotDetailsDrawerProps) {
   const titleId = useId();
   const descriptionId = useId();
+  const linkAttempt = describeSnapshotDiaryLinkAttempt();
   const relatedLinks = data && relatedCandidates
     ? matchSnapshotDiaryLinks({
         snapshot: {
@@ -114,6 +104,29 @@ export default function SensorSnapshotDetailsDrawer({
     : [];
   const showRelatedSection =
     Array.isArray(relatedCandidates) && relatedCandidates.length >= 0 && !!data;
+
+  function handleDownloadCsv() {
+    if (!data || !csvExport) return;
+    const filename = csvExport.filename ?? SNAPSHOT_DRAWER_CSV_FILENAME;
+    const csv = buildSensorSnapshotDetailsDrawerCsv({
+      snapshot: data,
+      environmentCheckRows: csvExport.environmentCheckRows,
+      ingestAuditRows: csvExport.ingestAuditRows,
+    });
+    try {
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      // No fallback storage or network path.
+    }
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -129,7 +142,7 @@ export default function SensorSnapshotDetailsDrawer({
             <SheetHeader>
               <SheetTitle id={titleId}>Sensor snapshot</SheetTitle>
               <SheetDescription id={descriptionId}>
-                Matched fields only. Raw payload, station IDs, and secrets are never shown here.
+                Matched fields only. Raw payload and unsafe identifiers are never shown here.
               </SheetDescription>
             </SheetHeader>
             <SheetClose
@@ -204,6 +217,16 @@ export default function SensorSnapshotDetailsDrawer({
                   Snapshot is stale or invalid — do not treat as healthy current data.
                 </p>
               )}
+              {csvExport && (
+                <button
+                  type="button"
+                  data-testid="snapshot-drawer-download-csv"
+                  onClick={handleDownloadCsv}
+                  className="mt-3 inline-flex w-fit items-center rounded border border-border/60 px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Download CSV
+                </button>
+              )}
               {detailsHref && (
                 <a
                   href={detailsHref}
@@ -222,12 +245,20 @@ export default function SensorSnapshotDetailsDrawer({
                     Related diary / timeline items
                   </p>
                   {relatedLinks.length === 0 ? (
-                    <p
-                      data-testid="snapshot-drawer-related-empty"
-                      className="text-[11px] text-muted-foreground"
-                    >
-                      {DIARY_LINK_EMPTY_LABEL}
-                    </p>
+                    <div className="space-y-1">
+                      <p
+                        data-testid="snapshot-drawer-related-empty"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        {DIARY_LINK_EMPTY_LABEL}
+                      </p>
+                      <p
+                        data-testid="snapshot-drawer-related-attempted-fields"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        {linkAttempt.attemptedFieldsLabel}
+                      </p>
+                    </div>
                   ) : (
                     <ul className="flex flex-col gap-1">
                       {relatedLinks.map((l) => (

@@ -2,7 +2,7 @@
  * GgsSentinelEvidenceTimelineCard — presenter for the derived
  * GGS Sentinel evidence view-model. Read-only.
  *
- * NEVER renders raw_payload bodies or private identifiers.
+ * NEVER renders private payload bodies or private identifiers.
  * NEVER writes Supabase / AI / alerts / Action Queue / device control.
  */
 import type { GgsSentinelEvidenceViewModel } from "@/lib/ggsSentinelEvidenceViewModel";

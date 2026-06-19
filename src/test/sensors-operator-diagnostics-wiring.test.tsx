@@ -8,6 +8,9 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Sensors from "@/pages/Sensors";
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import Sensors from "@/pages/Sensors";
+
 vi.mock("@/hooks/useGrowData", () => ({
   useGrowTents: () => ({ data: [{ id: "t1", name: "Tent 1", growId: "g1" }] }),
   useGrowSensorReadings: () => ({ data: [] }),
@@ -16,12 +19,24 @@ vi.mock("@/hooks/use-tents", () => ({ useTents: () => ({ data: [] }) }));
 vi.mock("@/hooks/useSoilMoistureCalibrations", () => ({
   useSoilMoistureCalibrations: () => ({ data: [] }),
 }));
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({ user: null, session: null, loading: false }),
+}));
+vi.mock("@/components/EnvironmentCsvImportLauncher", () => ({
+  default: () => null,
+}));
+vi.mock("@/components/SensorBridgeHealthCard", () => ({ default: () => null }));
+vi.mock("@/components/SensorChart", () => ({ default: () => null }));
+vi.mock("@/components/SensorsTestbenchPanel", () => ({ default: () => null }));
 
 function renderAt(url: string) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={[url]}>
-      <Sensors />
-    </MemoryRouter>,
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={[url]}>
+        <Sensors />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

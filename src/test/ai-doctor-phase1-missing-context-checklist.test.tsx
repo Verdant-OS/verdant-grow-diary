@@ -271,3 +271,164 @@ describe("static safety — AiDoctorPhase1MissingContextChecklist", () => {
     expect(SRC).not.toMatch(/service_role|bridge[_-]?token/i);
   });
 });
+
+describe("helperTextForChecklistItem — local-facts-only helper copy", () => {
+  it("renders the expected helper for each missing item and stale sensor", async () => {
+    const { helperTextForChecklistItem } = await import(
+      "@/components/AiDoctorPhase1MissingContextChecklist"
+    );
+    const cases: Array<[string, "missing" | "needs_review", RegExp]> = [
+      ["recent_photo", "missing", /No recent plant photo/i],
+      ["recent_diary", "missing", /No recent diary or Quick Log entry/i],
+      ["fresh_sensor", "missing", /No fresh live or manual sensor snapshot/i],
+      ["fresh_sensor", "needs_review", /stale, invalid, or degraded/i],
+      ["watering_feeding", "missing", /No recent watering or feeding/i],
+      ["stage", "missing", /Plant stage is not available/i],
+      ["medium", "missing", /Medium is not available/i],
+      ["pot_size", "missing", /Pot size is not available/i],
+    ];
+    for (const [id, status, re] of cases) {
+      const helper = helperTextForChecklistItem({
+        id: id as never,
+        label: id,
+        status,
+        next_step: "",
+        cta: null,
+      });
+      expect(helper, `helper for ${id}/${status}`).toMatch(re);
+    }
+  });
+
+  it("returns null for available items", async () => {
+    const { helperTextForChecklistItem } = await import(
+      "@/components/AiDoctorPhase1MissingContextChecklist"
+    );
+    const helper = helperTextForChecklistItem({
+      id: "recent_photo",
+      label: "x",
+      status: "available",
+      next_step: "",
+      cta: null,
+    });
+    expect(helper).toBeNull();
+  });
+
+  it("contains no nutrient/equipment/stress/action advice", async () => {
+    const { helperTextForChecklistItem } = await import(
+      "@/components/AiDoctorPhase1MissingContextChecklist"
+    );
+    const ids = [
+      "recent_photo",
+      "recent_diary",
+      "fresh_sensor",
+      "watering_feeding",
+      "stage",
+      "medium",
+      "pot_size",
+    ] as const;
+    for (const id of ids) {
+      for (const status of ["missing", "needs_review"] as const) {
+        const helper = helperTextForChecklistItem({
+          id,
+          label: id,
+          status,
+          next_step: "",
+          cta: null,
+        });
+        if (helper) {
+          expect(helper).not.toMatch(
+            /\b(increase|raise|defoliate|transplant|flush|nute|ppm|EC|train|topping|fimming)\b|turn on|turn off|switch off|run pump/i,
+          );
+        }
+      }
+    }
+  });
+});
+
+describe("AiDoctorPhase1MissingContextChecklist — helper text rendering + mobile CTA", () => {
+  it("renders helper text for each missing item and stale sensor", () => {
+    const ctx = {
+      ...emptyContext(),
+      sensor_summary: [
+        metric("temperature_c", {
+          latest_source: "stale",
+          is_stale: true,
+          is_degraded: true,
+        }),
+      ],
+    };
+    renderWithRouter(
+      <AiDoctorPhase1MissingContextChecklist context={ctx} ctaContext={CTA_CTX} />,
+    );
+    for (const id of [
+      "recent_photo",
+      "recent_diary",
+      "fresh_sensor",
+      "watering_feeding",
+      "stage",
+      "medium",
+      "pot_size",
+    ]) {
+      expect(
+        screen.getByTestId(`ai-doctor-phase1-checklist-helper-${id}`),
+      ).toBeTruthy();
+    }
+    expect(
+      screen.getByTestId("ai-doctor-phase1-checklist-helper-fresh_sensor")
+        .textContent,
+    ).toMatch(/stale, invalid, or degraded/i);
+  });
+
+  it("does not render helper text for available items", () => {
+    const ctx = {
+      ...emptyContext(),
+      stage: "veg",
+      medium: "soil",
+      pot_size: "5gal",
+      recent_photos_count: 1,
+      recent_logs: [
+        { occurred_at: "2026-06-18T00:00:00Z", event_type: "note", source: "manual", note: null },
+      ],
+      recent_watering_events: 1,
+      sensor_summary: [metric("temperature_c")],
+    };
+    renderWithRouter(
+      <AiDoctorPhase1MissingContextChecklist context={ctx} ctaContext={CTA_CTX} />,
+    );
+    for (const id of [
+      "recent_photo",
+      "recent_diary",
+      "fresh_sensor",
+      "watering_feeding",
+      "stage",
+      "medium",
+      "pot_size",
+    ]) {
+      expect(
+        screen.queryByTestId(`ai-doctor-phase1-checklist-helper-${id}`),
+      ).toBeNull();
+    }
+  });
+
+  it("safely renders helpers under a null context", () => {
+    renderWithRouter(
+      <AiDoctorPhase1MissingContextChecklist context={null} ctaContext={CTA_CTX} />,
+    );
+    expect(
+      screen.getByTestId("ai-doctor-phase1-checklist-helper-recent_photo"),
+    ).toBeTruthy();
+  });
+
+  it("CTAs use mobile-stacking, full-width, thumb-friendly classes", () => {
+    renderWithRouter(
+      <AiDoctorPhase1MissingContextChecklist context={emptyContext()} ctaContext={CTA_CTX} />,
+    );
+    const cta = screen.getByTestId(
+      "ai-doctor-phase1-checklist-cta-recent_photo-add-photo",
+    );
+    const cls = cta.getAttribute("class") ?? "";
+    expect(cls).toMatch(/\bw-full\b/);
+    expect(cls).toMatch(/\bsm:w-auto\b/);
+    expect(cls).toMatch(/\bmin-h-10\b/);
+  });
+});

@@ -270,13 +270,16 @@ describe("OperatorAiDoctorPhase1 — unknown plant state", () => {
 });
 
 describe("OperatorAiDoctorPhase1 — evidence shortcuts", () => {
-  it("renders shortcut links with preserved IDs and sensor anchor when result exists", () => {
+  it("renders shortcut links with preserved IDs and sensor anchor when result + photo activity exist", () => {
     renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
       plants: PLANTS,
       getResultForPlant: (id) => ({
         context: baseContext(id),
         result: baseResult(),
       }),
+      getRecentActivityForPlant: () => [
+        { id: "p1", occurred_at: "2026-06-18T00:00:00Z", event_type: "photo" },
+      ],
     });
     const photo = screen.getByTestId(
       "ai-doctor-phase1-shortcut-view-recent-photo",
@@ -297,6 +300,25 @@ describe("OperatorAiDoctorPhase1 — evidence shortcuts", () => {
     ).not.toBeNull();
   });
 
+  it("does not render the photo shortcut when no photo activity exists", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: PLANTS,
+      getResultForPlant: (id) => ({
+        context: baseContext(id),
+        result: baseResult(),
+      }),
+      getRecentActivityForPlant: () => [
+        { id: "n1", occurred_at: "2026-06-18T00:00:00Z", event_type: "note" },
+      ],
+    });
+    expect(
+      screen.queryByTestId("ai-doctor-phase1-shortcut-view-recent-photo"),
+    ).toBeNull();
+    expect(
+      screen.getByTestId("ai-doctor-phase1-shortcut-open-sensor-summary"),
+    ).toBeTruthy();
+  });
+
   it("does not render shortcuts when no result is available", () => {
     renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
       plants: PLANTS,
@@ -314,12 +336,20 @@ describe("OperatorAiDoctorPhase1 — evidence shortcuts", () => {
         context: baseContext(id),
         result: baseResult(),
       }),
+      getRecentActivityForPlant: () => [
+        { id: "p1", occurred_at: "2026-06-18T00:00:00Z", event_type: "photo" },
+      ],
     });
     const sensor = screen.getByTestId(
       "ai-doctor-phase1-shortcut-open-sensor-summary",
     );
     expect(sensor.tagName.toLowerCase()).toBe("a");
     expect(sensor.getAttribute("onclick")).toBeNull();
+    const photo = screen.getByTestId(
+      "ai-doctor-phase1-shortcut-view-recent-photo",
+    );
+    expect(photo.tagName.toLowerCase()).toBe("a");
+    expect(photo.getAttribute("onclick")).toBeNull();
   });
 });
 

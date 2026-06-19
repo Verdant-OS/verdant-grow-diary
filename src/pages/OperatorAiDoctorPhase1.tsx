@@ -150,6 +150,9 @@ export default function OperatorAiDoctorPhase1(
     tentId: selectedPlant?.tent_id ?? null,
     hash: "photos",
   });
+  const hasPhotoActivity = recentActivity.some((row) =>
+    typeof row.event_type === "string" && /photo/i.test(row.event_type),
+  );
 
   return (
     <main
@@ -393,14 +396,14 @@ export default function OperatorAiDoctorPhase1(
           <section
             data-testid="ai-doctor-phase1-evidence-shortcuts"
             aria-label="Evidence shortcuts"
-            className="flex flex-wrap gap-2 rounded-md border border-border bg-card p-3 text-xs"
+            className="space-y-2 rounded-md border border-border bg-card p-3 text-xs sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:space-y-0"
           >
             <span className="text-muted-foreground">Evidence shortcuts:</span>
-            {recentPhotoHref && (
+            {hasPhotoActivity && recentPhotoHref && (
               <Link
                 to={recentPhotoHref}
                 data-testid="ai-doctor-phase1-shortcut-view-recent-photo"
-                className="rounded border border-border bg-secondary px-2 py-1 text-secondary-foreground"
+                className="flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground sm:inline-flex sm:w-auto"
               >
                 View recent photo
               </Link>
@@ -408,7 +411,7 @@ export default function OperatorAiDoctorPhase1(
             <a
               href={`#${AI_DOCTOR_PHASE1_SENSOR_ANCHOR_ID}`}
               data-testid="ai-doctor-phase1-shortcut-open-sensor-summary"
-              className="rounded border border-border bg-secondary px-2 py-1 text-secondary-foreground"
+              className="flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground sm:inline-flex sm:w-auto"
             >
               Open sensor summary
             </a>

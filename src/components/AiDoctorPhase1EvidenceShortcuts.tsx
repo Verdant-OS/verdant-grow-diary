@@ -107,7 +107,7 @@ export function AiDoctorPhase1EvidenceShortcuts(
       className="space-y-2 rounded-md border border-border bg-card p-3 text-xs"
     >
       <div className="font-medium text-foreground">Recent diary evidence</div>
-      <ul className="flex flex-col gap-1">
+      <ul className="flex flex-col gap-2">
         {sorted.map((row) => {
           const href = buildDiaryHref(props.context, row.id);
           const label = previewLabel(row);
@@ -117,14 +117,14 @@ export function AiDoctorPhase1EvidenceShortcuts(
                 <Link
                   to={href}
                   data-testid={`ai-doctor-phase1-diary-shortcut-${row.id}`}
-                  className="text-secondary-foreground underline"
+                  className="flex min-h-10 w-full items-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground underline sm:w-auto sm:inline-flex"
                 >
                   {label}
                 </Link>
               ) : (
                 <span
                   data-testid={`ai-doctor-phase1-diary-shortcut-${row.id}-unavailable`}
-                  className="text-muted-foreground"
+                  className="flex min-h-10 w-full items-center rounded-md border border-border bg-muted px-3 py-2 text-muted-foreground sm:w-auto sm:inline-flex"
                 >
                   {label}
                 </span>

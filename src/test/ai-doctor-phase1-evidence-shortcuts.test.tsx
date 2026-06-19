@@ -153,3 +153,30 @@ describe("static safety — AiDoctorPhase1EvidenceShortcuts", () => {
     expect(SRC).not.toMatch(/service_role|bridge[_-]?token/i);
   });
 });
+
+describe("AiDoctorPhase1EvidenceShortcuts — mobile polish", () => {
+  it("CTAs use mobile-stacking, full-width, thumb-friendly classes", () => {
+    renderWithRouter(
+      <AiDoctorPhase1EvidenceShortcuts
+        items={[row("only", "2026-06-10T00:00:00Z")]}
+        context={CTX}
+      />,
+    );
+    const anchor = screen.getByTestId("ai-doctor-phase1-diary-shortcut-only");
+    const cls = anchor.getAttribute("class") ?? "";
+    expect(cls).toMatch(/\bw-full\b/);
+    expect(cls).toMatch(/\bsm:w-auto\b/);
+    expect(cls).toMatch(/\bmin-h-10\b/);
+  });
+
+  it("renders no write/action labels", () => {
+    const { container } = renderWithRouter(
+      <AiDoctorPhase1EvidenceShortcuts
+        items={[row("only", "2026-06-10T00:00:00Z")]}
+        context={CTX}
+      />,
+    );
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/Approve|Execute|Save|Send|Run AI/i);
+  });
+});

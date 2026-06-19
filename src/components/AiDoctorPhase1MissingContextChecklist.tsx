@@ -206,6 +206,39 @@ function statusCopy(status: AiDoctorPhase1ChecklistStatus): string {
   }
 }
 
+/**
+ * Returns local-facts-only helper copy explaining why a checklist item
+ * is missing or needs review. Returns null for available items. Never
+ * recommends nutrients, irrigation, equipment, stress training, or
+ * device actions. Never infers causes from missing data.
+ */
+export function helperTextForChecklistItem(
+  item: AiDoctorPhase1ChecklistItem,
+): string | null {
+  if (item.status === "available") return null;
+  if (item.id === "fresh_sensor" && item.status === "needs_review") {
+    return "Sensor data is stale, invalid, or degraded and should not be treated as healthy.";
+  }
+  switch (item.id) {
+    case "recent_photo":
+      return "No recent plant photo is available for this context window.";
+    case "recent_diary":
+      return "No recent diary or Quick Log entry was found for this plant.";
+    case "fresh_sensor":
+      return "No fresh live or manual sensor snapshot is available within the freshness window.";
+    case "watering_feeding":
+      return "No recent watering or feeding context was found in the available logs.";
+    case "stage":
+      return "Plant stage is not available in the selected plant context.";
+    case "medium":
+      return "Medium is not available in the selected plant context.";
+    case "pot_size":
+      return "Pot size is not available in the selected plant context.";
+    default:
+      return null;
+  }
+}
+
 export function AiDoctorPhase1MissingContextChecklist(
   props: AiDoctorPhase1MissingContextChecklistProps,
 ): JSX.Element {
@@ -224,42 +257,53 @@ export function AiDoctorPhase1MissingContextChecklist(
           Read-only checklist — no equipment is changed from this view.
         </p>
       </header>
-      <ul className="space-y-2">
-        {items.map((item) => (
-          <li
-            key={item.id}
-            data-testid={`ai-doctor-phase1-checklist-item-${item.id}`}
-            data-status={item.status}
-            className="rounded border border-border bg-background p-2"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-foreground">
-                {item.label}
-              </span>
-              <span
-                data-testid={`ai-doctor-phase1-checklist-status-${item.id}`}
-                className="rounded border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-              >
-                {statusCopy(item.status)}
-              </span>
-            </div>
-            <p
-              data-testid={`ai-doctor-phase1-checklist-next-step-${item.id}`}
-              className="text-xs text-muted-foreground"
+      <ul className="space-y-3">
+        {items.map((item) => {
+          const helper = helperTextForChecklistItem(item);
+          return (
+            <li
+              key={item.id}
+              data-testid={`ai-doctor-phase1-checklist-item-${item.id}`}
+              data-status={item.status}
+              className="space-y-1.5 rounded border border-border bg-background p-3"
             >
-              {item.next_step}
-            </p>
-            {item.cta && (
-              <Link
-                to={item.cta.to}
-                data-testid={`ai-doctor-phase1-checklist-cta-${item.id}-${item.cta.id}`}
-                className="mt-1 inline-block rounded-md border border-border bg-secondary px-2 py-1 text-xs text-secondary-foreground"
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-sm font-medium text-foreground">
+                  {item.label}
+                </span>
+                <span
+                  data-testid={`ai-doctor-phase1-checklist-status-${item.id}`}
+                  className="self-start rounded border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground sm:self-auto"
+                >
+                  {statusCopy(item.status)}
+                </span>
+              </div>
+              <p
+                data-testid={`ai-doctor-phase1-checklist-next-step-${item.id}`}
+                className="text-xs text-muted-foreground"
               >
-                {item.cta.label}
-              </Link>
-            )}
-          </li>
-        ))}
+                {item.next_step}
+              </p>
+              {helper && (
+                <p
+                  data-testid={`ai-doctor-phase1-checklist-helper-${item.id}`}
+                  className="text-xs text-muted-foreground"
+                >
+                  Why this is missing: {helper}
+                </p>
+              )}
+              {item.cta && (
+                <Link
+                  to={item.cta.to}
+                  data-testid={`ai-doctor-phase1-checklist-cta-${item.id}-${item.cta.id}`}
+                  className="mt-1 flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-xs text-secondary-foreground sm:inline-flex sm:w-auto"
+                >
+                  {item.cta.label}
+                </Link>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

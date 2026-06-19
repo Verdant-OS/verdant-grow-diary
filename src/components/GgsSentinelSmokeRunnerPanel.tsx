@@ -141,6 +141,17 @@ export default function GgsSentinelSmokeRunnerPanel() {
           </Button>
         </div>
 
+        {!evaluation && !running && !error && (
+          <Alert data-testid="ggs-sentinel-panel-not-run-yet">
+            <Clock3 className="h-4 w-4" />
+            <AlertTitle>Not run yet</AlertTitle>
+            <AlertDescription>
+              Select a tent and run the smoke check. Read-only — no alerts, Action Queue, or
+              device control will be written.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {error && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
@@ -148,6 +159,7 @@ export default function GgsSentinelSmokeRunnerPanel() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+
 
         {evaluation && (
           <div className="space-y-3">

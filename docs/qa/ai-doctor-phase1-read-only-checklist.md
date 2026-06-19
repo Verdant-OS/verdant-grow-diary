@@ -60,3 +60,18 @@ no live AI/model calls, no Action Queue writes, no device control.
 - [ ] No alert row created.
 - [ ] No AI/model request made (check network).
 - [ ] No device-control copy or behavior anywhere on the page.
+
+## H. Save to timeline (evidence-only)
+
+- [ ] "Save to timeline" button appears only when a derived result exists.
+- [ ] Button is hidden in loading / unknown plant / no-result states.
+- [ ] Helper copy reads: "Saves this AI Doctor result as plant evidence
+      only. No Action Queue item is created."
+- [ ] Click → "Saved to timeline" appears, button disables.
+- [ ] Clicking again with the same result does NOT create a second row
+      (duplicate / disabled state).
+- [ ] On error: "Could not save evidence. Nothing else was changed." appears.
+- [ ] No "Approve", "Execute", or "Send to device" CTAs anywhere.
+- [ ] No Action Queue row, alert row, or device command is created.
+- [ ] Network: only `quicklog_save_manual` RPC is invoked (no Edge Function,
+      no AI/model endpoint).

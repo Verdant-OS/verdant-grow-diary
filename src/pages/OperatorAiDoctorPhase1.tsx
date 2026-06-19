@@ -29,6 +29,7 @@ import {
   type AiDoctorPhase1RecentActivityRow,
 } from "@/components/AiDoctorPhase1EvidenceShortcuts";
 import { AiDoctorPhase1MissingContextChecklist } from "@/components/AiDoctorPhase1MissingContextChecklist";
+import { AiDoctorPhase1SaveEvidenceButton } from "@/components/AiDoctorPhase1SaveEvidenceButton";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
@@ -456,6 +457,16 @@ export default function OperatorAiDoctorPhase1(
               result={resultBundle.result}
             />
           </div>
+
+          <AiDoctorPhase1SaveEvidenceButton
+            identity={{
+              plant_id: selectedPlant.id,
+              tent_id: selectedPlant.tent_id ?? null,
+              grow_id: selectedPlant.grow_id ?? null,
+              plant_name: selectedPlant.name ?? null,
+            }}
+            result={resultBundle.result}
+          />
         </>
       )}
 

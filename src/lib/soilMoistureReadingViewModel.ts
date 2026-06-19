@@ -8,6 +8,7 @@ import {
 } from "@/lib/soilMoistureCalibrationSelectionRules";
 
 export type SoilMoistureRawSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
+export type SoilMoistureBadgeTone = "muted" | "ok" | "caution";
 
 export interface SoilMoistureReadingViewModelInput {
   rawSoilMoisture: number | null | undefined;
@@ -25,6 +26,8 @@ export interface SoilMoistureReadingViewModel {
   calibrationLine: string;
   rawSourceLine: string;
   calibrationSourceLine: string | null;
+  calibrationBadgeLabel: string;
+  calibrationBadgeTone: SoilMoistureBadgeTone;
   selection: SoilMoistureCalibrationSelection;
 }
 
@@ -73,10 +76,12 @@ export function buildSoilMoistureReadingViewModel(
   const selection = selectSoilMoistureCalibration(input.context, input.calibrations);
 
   if (selection.status !== "selected") {
-    const calibrationLine =
-      selection.status === "unavailable"
-        ? "Calibration unavailable — invalid baseline"
-        : "Calibration: Not applied";
+    const isUnavailable = selection.status === "unavailable";
+    const calibrationLine = isUnavailable
+      ? "Calibration unavailable — invalid baseline"
+      : "Calibration: Not applied";
+    const calibrationBadgeLabel = isUnavailable ? "Calibration unavailable" : "Uncalibrated";
+    const calibrationBadgeTone: SoilMoistureBadgeTone = isUnavailable ? "caution" : "muted";
     return {
       rawValue,
       calibratedValue: null,
@@ -86,6 +91,8 @@ export function buildSoilMoistureReadingViewModel(
       calibrationLine,
       rawSourceLine: `Raw source: ${rawSource}`,
       calibrationSourceLine: selection.source ? `Calibration source: ${selection.source}` : null,
+      calibrationBadgeLabel,
+      calibrationBadgeTone,
       selection,
     };
   }
@@ -109,6 +116,8 @@ export function buildSoilMoistureReadingViewModel(
           : "Calibration unavailable — invalid raw reading",
       rawSourceLine: `Raw source: ${rawSource}`,
       calibrationSourceLine: `Calibration source: ${selection.source}`,
+      calibrationBadgeLabel: "Calibration unavailable",
+      calibrationBadgeTone: "caution",
       selection,
     };
   }
@@ -122,6 +131,8 @@ export function buildSoilMoistureReadingViewModel(
     calibrationLine: `Calibration: ${calibrationLabel(selection.source)}`,
     rawSourceLine: `Raw source: ${rawSource}`,
     calibrationSourceLine: `Calibration source: ${selection.source}`,
+    calibrationBadgeLabel: "Calibrated",
+    calibrationBadgeTone: "ok",
     selection,
   };
 }

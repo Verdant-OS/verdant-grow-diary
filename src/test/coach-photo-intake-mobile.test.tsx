@@ -52,12 +52,8 @@ describe("Coach AI Doctor photo intake — mobile take + upload", () => {
   });
 
   it("routes both inputs through the same handleFile preview pipeline", () => {
-    const takeBlock = SOURCE.match(
-      /coach-photo-take-input[\s\S]{0,400}?\/>/,
-    )?.[0] ?? "";
-    const uploadBlock = SOURCE.match(
-      /coach-photo-upload-input[\s\S]{0,400}?\/>/,
-    )?.[0] ?? "";
+    const takeBlock = findInputBlock("coach-photo-take-input");
+    const uploadBlock = findInputBlock("coach-photo-upload-input");
     expect(takeBlock).toMatch(/handleFile\(/);
     expect(uploadBlock).toMatch(/handleFile\(/);
   });

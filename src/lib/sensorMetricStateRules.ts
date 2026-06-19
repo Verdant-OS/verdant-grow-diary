@@ -257,9 +257,12 @@ export function classifySensorMetricState(
   // Auto-detect invalid for optional metrics from value bounds.
   const autoInvalid =
     isOptionalMetric(metric) && isOptionalMetricInvalid(metric, value);
-  // Soil moisture stuck-at-bound only triggers on enough history.
-  const autoStuck =
-    metric === "soil" && isSoilMoistureStuck(input.recentValues);
+  // Soil moisture stuck-at-bound only triggers when caller provides
+  // an explicit recent-values window with enough finite history.
+  const stuckWindow =
+    metric === "soil"
+      ? describeSoilMoistureStuckWindow(input.recentValues)
+      : null;
 
   // Cautionary takes priority over "we have a value".
   if (input.isInvalid || autoInvalid) {
@@ -267,13 +270,8 @@ export function classifySensorMetricState(
       INVALID_COPY[metric] ?? "Invalid telemetry detected.";
     return makeState("invalid", metric, copy, false);
   }
-  if (autoStuck) {
-    return makeState(
-      "invalid",
-      metric,
-      STUCK_COPY.soil ?? "Soil moisture appears stuck.",
-      true,
-    );
+  if (stuckWindow) {
+    return makeState("invalid", metric, stuckWindow.message, true);
   }
   if (hasValue && input.isStale) {
     return makeState(

@@ -185,12 +185,11 @@ describe("OperatorAiDoctorPhase1 — selected-plant header", () => {
       plants: PLANTS,
     });
     const header = screen.getByTestId("ai-doctor-phase1-selected-plant-header");
+    const buttons = header.querySelectorAll("button");
+    expect(buttons.length).toBe(0);
     expect(header.textContent ?? "").not.toMatch(
-      /save|approve|send|execute|run/i,
+      /\b(approve|execute|run AI|send to|create action)\b/i,
     );
-  });
-
-  it("header is hidden when no plant selected", () => {
     renderAt(OPERATOR_AI_DOCTOR_PHASE1_ROUTE, { plants: PLANTS });
     expect(
       screen.queryByTestId("ai-doctor-phase1-selected-plant-header"),

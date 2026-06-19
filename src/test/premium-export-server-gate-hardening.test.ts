@@ -174,7 +174,7 @@ describe("audit doc — confirmed premium export surfaces", () => {
   it("Environment Summary Report remains fixed", () => {
     expect(DOC).toMatch(/Environment Summary Report[\s\S]{0,200}SERVER-VALIDATED/);
   });
-  it("Live sensor surfaces remain blocked", () => {
-    expect(DOC).toMatch(/Live sensor surfaces[\s\S]{0,200}PAID-LAUNCH BLOCKED/);
+  it("Live sensor surfaces have server gate scaffold (no active premium surface today)", () => {
+    expect(DOC).toMatch(/Live sensor surfaces[\s\S]{0,400}DOCUMENTED \/ NO ACTIVE PREMIUM LIVE-SENSOR SURFACE/);
   });
 });

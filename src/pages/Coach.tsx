@@ -390,16 +390,70 @@ export default function Coach() {
 
 
       <div className="glass rounded-2xl p-4 space-y-4">
-        <button type="button" onClick={() => fileRef.current?.click()}
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          aria-label="Add or replace plant photo"
           className="relative aspect-video w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/40 hover:border-primary/60 transition">
-          {preview ? <img src={preview} className="h-full w-full object-cover" alt="" /> : (
+          {preview ? <img src={preview} className="h-full w-full object-cover" alt="Selected plant photo preview" /> : (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
               <Camera className="h-8 w-8" /><span className="text-sm">Add photo to diagnose</span>
             </div>
           )}
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden"
-            onChange={(e) => handleFile(e.target.files?.[0] ?? null)} />
+          {/* Default tap target keeps existing single-tap behavior (no capture, so picker can offer camera or library on mobile). */}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            aria-label="Choose plant photo"
+            onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+          />
         </button>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => cameraRef.current?.click()}
+            data-testid="coach-photo-take"
+          >
+            <Camera className="h-4 w-4" />Take photo
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => uploadRef.current?.click()}
+            data-testid="coach-photo-upload"
+          >
+            <Upload className="h-4 w-4" />Upload from device
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Use a fresh canopy or leaf photo, or select one you already took.
+        </p>
+        {/* Take photo input — capture hints camera on mobile. */}
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          aria-label="Take a new plant photo with camera"
+          data-testid="coach-photo-take-input"
+          onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+        />
+        {/* Upload input — must NOT include capture so mobile opens the photo library/files picker. */}
+        <input
+          ref={uploadRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          aria-label="Upload an existing plant photo from your device"
+          data-testid="coach-photo-upload-input"
+          onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+        />
+
 
         <Textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Optional: ask a question, e.g. 'why are leaves curling?'" rows={2} />
 

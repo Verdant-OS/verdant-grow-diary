@@ -411,6 +411,8 @@ export default function OperatorAiDoctorPhase1(
           />
 
           <section
+            id={AI_DOCTOR_PHASE1_EVIDENCE_SHORTCUTS_ANCHOR_ID}
+            tabIndex={-1}
             data-testid="ai-doctor-phase1-evidence-shortcuts"
             aria-label="Evidence shortcuts"
             className="space-y-2 rounded-md border border-border bg-card p-3 text-xs sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:space-y-0"
@@ -421,7 +423,7 @@ export default function OperatorAiDoctorPhase1(
                 to={recentPhotoHref}
                 aria-label={`View recent photo evidence ${ariaWho}`}
                 data-testid="ai-doctor-phase1-shortcut-view-recent-photo"
-                className="flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:inline-flex sm:w-auto"
+                className={`flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground ${AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES} sm:inline-flex sm:w-auto`}
               >
                 View recent photo
               </Link>
@@ -430,7 +432,7 @@ export default function OperatorAiDoctorPhase1(
               href={`#${AI_DOCTOR_PHASE1_SENSOR_ANCHOR_ID}`}
               aria-label={`Open sensor summary ${ariaWho}`}
               data-testid="ai-doctor-phase1-shortcut-open-sensor-summary"
-              className="flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:inline-flex sm:w-auto"
+              className={`flex min-h-10 w-full items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-secondary-foreground ${AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES} sm:inline-flex sm:w-auto`}
             >
               Open sensor summary
             </a>

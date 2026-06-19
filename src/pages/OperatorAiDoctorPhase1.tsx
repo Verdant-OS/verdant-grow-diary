@@ -154,10 +154,17 @@ export default function OperatorAiDoctorPhase1(
     typeof row.event_type === "string" && /photo/i.test(row.event_type),
   );
 
+  const showMobileStickyBar =
+    !!selectedPlant && !unknownPlantId && !!resultBundle;
+  const plantNameForAria = selectedPlant?.name ?? null;
+  const ariaWho = plantNameForAria
+    ? `for ${plantNameForAria}`
+    : "for selected plant";
+
   return (
     <main
       data-testid="operator-ai-doctor-phase1-page"
-      className="mx-auto max-w-4xl space-y-4 p-4"
+      className={`mx-auto max-w-4xl space-y-4 p-4 ${showMobileStickyBar ? "pb-24 sm:pb-4" : ""}`}
     >
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold text-foreground">

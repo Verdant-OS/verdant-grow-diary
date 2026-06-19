@@ -42,6 +42,12 @@ export interface PlantRecentActivityRow {
   hasHardwareReadings: boolean;
   /** Trimmed lines from the hardware readings block. Display-only. */
   hardwareReadingLines: string[];
+  /**
+   * True when this row's photo (if any) should render the
+   * "Visual record · no AI analysis" label. False when entry is linked
+   * to a saved AI Doctor session/result.
+   */
+  showPhotoNonDiagnosticLabel: boolean;
 }
 
 const NOTE_PREVIEW_MAX = 140;

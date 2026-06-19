@@ -50,6 +50,8 @@ interface Props {
    * note renders.
    */
   input: TimelineSnapshotInput | null | undefined;
+  /** Wall clock for deterministic age rendering in tests. */
+  now?: Date | number;
   className?: string;
 }
 

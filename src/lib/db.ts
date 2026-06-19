@@ -22,7 +22,22 @@ export type PlantRow = Tables<"plants">;
 export type DiaryEntryRow = Tables<"diary_entries">;
 export type HarvestRow = Tables<"harvests">;
 export type SensorReadingRow = Tables<"sensor_readings">;
-export type SoilMoistureCalibrationRow = Tables<"soil_moisture_calibrations">;
+// Note: soil_moisture_calibrations is not yet in the Supabase schema, so the
+// generated `Tables<>` lookup excludes it. We declare the row shape locally
+// until/unless a migration adds the table.
+export type SoilMoistureCalibrationRow = {
+  id: string;
+  grow_id: string;
+  tent_id: string;
+  plant_id: string | null;
+  device_id: string | null;
+  dry_raw: number;
+  wet_raw: number;
+  source: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
 export type ProfileRow = Tables<"profiles">;
 export type UnlockRow = Tables<"unlocks">;
 export type UserQuestRow = Tables<"user_quests">;

@@ -474,7 +474,7 @@ export default function OperatorAiDoctorPhase1(
               href={`#${AI_DOCTOR_PHASE1_SENSOR_ANCHOR_ID}`}
               tabIndex={-1}
               data-testid="ai-doctor-phase1-mobile-sticky-shortcut-open-sensor-summary"
-              className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-xs text-secondary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className={`flex min-h-11 flex-1 items-center justify-center rounded-md border border-border bg-secondary px-3 py-2 text-xs text-secondary-foreground ${AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES}`}
             >
               Open sensor summary
             </a>

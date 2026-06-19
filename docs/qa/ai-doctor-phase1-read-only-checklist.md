@@ -75,3 +75,16 @@ no live AI/model calls, no Action Queue writes, no device control.
 - [ ] No Action Queue row, alert row, or device command is created.
 - [ ] Network: only `quicklog_save_manual` RPC is invoked (no Edge Function,
       no AI/model endpoint).
+
+## I. Saved evidence on plant timeline (read-only render)
+
+- [ ] Saved Phase 1 evidence renders as a dedicated evidence card on the
+      plant timeline (once the fetch surfaces `details.kind`).
+- [ ] Card shows "AI Doctor Phase 1" and "Evidence only" badges.
+- [ ] Card shows the disclaimer "Saved as evidence only. This is not an
+      approved action and does not control equipment."
+- [ ] "Review AI Doctor context" CTA links to
+      `/operator/ai-doctor-phase1?plantId=...&growId=...&tentId=...`.
+- [ ] Card has no Approve, Send, Execute, Save, or Action Queue buttons.
+- [ ] Card never creates Action Queue items, alert rows, or device commands.
+- [ ] Card performs no AI/model requests and no additional Supabase writes.

@@ -62,7 +62,7 @@ import EnvironmentSummaryReportPage from "./pages/EnvironmentSummaryReportPage";
 import OperatorOneTentLoopSmokeTest from "./pages/OperatorOneTentLoopSmokeTest";
 import OperatorGgsRealPayloadIngest from "./pages/OperatorGgsRealPayloadIngest";
 import CustomerModeGuide from "./pages/CustomerModeGuide";
-import OperatorAiDoctorPhase1 from "./pages/OperatorAiDoctorPhase1";
+import { OperatorAiDoctorPhase1Page } from "./pages/OperatorAiDoctorPhase1";
 
 const queryClient = new QueryClient();
 
@@ -149,7 +149,7 @@ const App = () => (
                 <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
                 <Route
                   path="/operator/ai-doctor-phase1"
-                  element={<OperatorAiDoctorPhase1 />}
+                  element={<OperatorAiDoctorPhase1Page />}
                 />
                 <Route path="/operator/one-tent-proof-record" element={<OneTentProofRecord />} />
                 <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />

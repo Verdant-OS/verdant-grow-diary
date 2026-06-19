@@ -13,6 +13,8 @@ export interface AiDoctorPhase1PlantOption {
   strain?: string | null;
   stage?: string | null;
   tent_name?: string | null;
+  tent_id?: string | null;
+  grow_id?: string | null;
 }
 
 export interface AiDoctorPhase1PlantPickerProps {

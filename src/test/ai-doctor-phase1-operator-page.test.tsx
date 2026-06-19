@@ -122,7 +122,7 @@ describe("OperatorAiDoctorPhase1 — page + routing", () => {
         .getByTestId("ai-doctor-phase1-plant-option-plant-a")
         .getAttribute("data-selected"),
     ).toBe("true");
-    expect(screen.getByTestId("ai-doctor-phase1-deep-link-href").textContent).toContain(
+    expect(screen.getByTestId("ai-doctor-phase1-internal-link-href").textContent).toContain(
       "plantId=plant-a",
     );
   });
@@ -170,7 +170,7 @@ describe("OperatorAiDoctorPhase1 — page + routing", () => {
       plants: PLANTS,
     });
     fireEvent.click(screen.getByTestId("ai-doctor-phase1-plant-option-plant-b"));
-    expect(screen.getByTestId("ai-doctor-phase1-deep-link-href").textContent).toContain(
+    expect(screen.getByTestId("ai-doctor-phase1-internal-link-href").textContent).toContain(
       "plantId=plant-b",
     );
   });
@@ -227,5 +227,127 @@ describe("static safety — OperatorAiDoctorPhase1 page", () => {
     expect(SRC).not.toMatch(/alert.*\.(insert|update|upsert|delete)/i);
     expect(SRC).not.toMatch(/executeDeviceCommand|deviceControl|sendDeviceCommand/i);
     expect(SRC).not.toMatch(/service_role/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wiring polish — deep link query enrichment + adapter + CTAs
+// ---------------------------------------------------------------------------
+
+import { mapPlantsToPickerOptions } from "@/pages/OperatorAiDoctorPhase1";
+
+describe("OperatorAiDoctorPhase1 — deep link enrichment", () => {
+  const ENRICHED: AiDoctorPhase1PlantOption[] = [
+    { id: "plant-a", name: "Plant A", grow_id: "grow-1", tent_id: "tent-1" },
+    { id: "plant-b", name: "Plant B", grow_id: "grow-2", tent_id: "tent-2" },
+  ];
+
+  it("internal link includes growId and tentId when selected plant carries them", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: ENRICHED,
+    });
+    const href =
+      screen.getByTestId("ai-doctor-phase1-internal-link-href").textContent ?? "";
+    expect(href).toContain("plantId=plant-a");
+    expect(href).toContain("growId=grow-1");
+    expect(href).toContain("tentId=tent-1");
+  });
+
+  it("selecting a plant writes plantId + growId + tentId to the URL", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: ENRICHED,
+    });
+    fireEvent.click(screen.getByTestId("ai-doctor-phase1-plant-option-plant-b"));
+    const search = screen.getByTestId("probe-location").getAttribute("data-search") ?? "";
+    expect(search).toContain("plantId=plant-b");
+    expect(search).toContain("growId=grow-2");
+    expect(search).toContain("tentId=tent-2");
+  });
+});
+
+describe("OperatorAiDoctorPhase1 — empty-state CTAs", () => {
+  it("no-result state renders Add Quick Log / Add Photo / Check Environment CTAs", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: PLANTS,
+      getResultForPlant: () => null,
+    });
+    expect(screen.getByTestId("ai-doctor-phase1-cta-add-quick-log")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-phase1-cta-add-photo")).toBeTruthy();
+    expect(screen.getByTestId("ai-doctor-phase1-cta-check-environment")).toBeTruthy();
+  });
+
+  it("no-result CTAs do not show any fake diagnosis content", () => {
+    const { container } = renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: PLANTS,
+      getResultForPlant: () => null,
+    });
+    // No result panel rendered.
+    expect(screen.queryByTestId("ai-doctor-phase1-result-panel")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-result-summary")).toBeNull();
+    expect(container.textContent ?? "").not.toMatch(/Likely issue:/);
+  });
+
+  it("missing-context block surfaces evidence-first CTAs that include plantId", () => {
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-a`, {
+      plants: PLANTS,
+      getResultForPlant: (id) => ({
+        context: baseContext(id),
+        result: baseResult({
+          missing_information: ["recent photo (14d)", "recent trustworthy sensor reading (7d)"],
+        }),
+      }),
+    });
+    expect(screen.getByTestId("ai-doctor-phase1-missing-context-guidance")).toBeTruthy();
+    const photoCta = screen.getByTestId("ai-doctor-phase1-cta-add-photo");
+    expect(photoCta.getAttribute("href")).toContain("plantId=plant-a");
+    expect(screen.getByTestId("ai-doctor-phase1-cta-check-environment")).toBeTruthy();
+  });
+
+  it("no fake content leaks across plant selections", () => {
+    const getResultForPlant = (id: string) =>
+      id === "plant-a"
+        ? { context: baseContext(id), result: baseResult({ summary: "Plant A summary" }) }
+        : null;
+    renderAt(`${OPERATOR_AI_DOCTOR_PHASE1_ROUTE}?plantId=plant-b`, {
+      plants: PLANTS,
+      getResultForPlant,
+    });
+    expect(screen.getByTestId("ai-doctor-phase1-no-result-state")).toBeTruthy();
+    expect(screen.queryByText("Plant A summary")).toBeNull();
+  });
+});
+
+describe("mapPlantsToPickerOptions — adapter", () => {
+  it("maps real plant rows to picker options, resolving tent name by tent_id", () => {
+    const options = mapPlantsToPickerOptions(
+      [
+        { id: "p1", name: "P1", strain: "S1", stage: "veg", tent_id: "t1", grow_id: "g1" },
+        { id: "p2", name: null, strain: null, stage: null, tent_id: null, grow_id: null },
+      ],
+      [{ id: "t1", name: "Main Tent" }],
+    );
+    expect(options).toHaveLength(2);
+    expect(options[0]).toMatchObject({
+      id: "p1",
+      name: "P1",
+      strain: "S1",
+      stage: "veg",
+      tent_name: "Main Tent",
+      tent_id: "t1",
+      grow_id: "g1",
+    });
+    expect(options[1].tent_name).toBeNull();
+    expect(options[1].grow_id).toBeNull();
+  });
+
+  it("skips plants without an id", () => {
+    const options = mapPlantsToPickerOptions(
+      [
+        { id: "", name: "broken" } as unknown as { id: string },
+        { id: "p1", name: "ok" },
+      ],
+      [],
+    );
+    expect(options.map((o) => o.id)).toEqual(["p1"]);
   });
 });

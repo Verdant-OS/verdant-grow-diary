@@ -296,6 +296,10 @@ export default function Sensors() {
           />
         </div>
       </div>
+      <SensorSourceLegendCompact
+        className="mt-4 max-w-xl"
+        testId="sensors-source-legend-compact"
+      />
       <SensorSourceSummaryWidget
         className="mt-4 max-w-xl"
         readings={filtered.map((r) => ({

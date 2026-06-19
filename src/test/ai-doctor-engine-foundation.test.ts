@@ -326,10 +326,15 @@ describe("executeAiDoctorEngine", () => {
 });
 
 describe("static safety — aiDoctorEnginePhase1Foundation.ts", () => {
-  const SOURCE = readFileSync(
+  const RAW = readFileSync(
     resolve(__dirname, "../lib/aiDoctorEnginePhase1Foundation.ts"),
     "utf8",
   );
+  // Strip block + line comments so that the safety regexes match real code,
+  // not the file's own self-describing safety notes.
+  const SOURCE = RAW
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
 
   it("does not import Supabase, alerts, action queue writers, or device control", () => {
     expect(SOURCE).not.toMatch(/from\s+["']@\/integrations\/supabase/);

@@ -120,6 +120,7 @@ export default function SensorSnapshotDetailsDrawer({
       <SheetContent
         side="right"
         data-testid="sensor-snapshot-details-drawer"
+        aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
       >

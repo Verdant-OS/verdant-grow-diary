@@ -50,6 +50,27 @@ describe("Primary navigation: Tents and Plants are emphasized", () => {
   });
 });
 
+describe("MobileNav alert/action labels stay honest", () => {
+  it("/alerts is labeled as alert review, not Action Queue", () => {
+    const alertItems = [...MOBILE.matchAll(/\{\s*to:\s*"\/alerts"[\s\S]*?\}/g)].map(
+      (match) => match[0],
+    );
+
+    expect(alertItems.length).toBeGreaterThan(0);
+    for (const item of alertItems) {
+      expect(item).not.toMatch(/label:\s*"Action Queue"/);
+      expect(item).toMatch(/label:\s*"(Alerts|Review Alerts|Alerts & Recommendations)"/);
+    }
+  });
+
+  it("More menu does not use /alerts as an Action Queue shortcut", () => {
+    const moreMenu = MOBILE.match(/const more = \[([\s\S]*?)\];/)?.[1] ?? "";
+
+    expect(moreMenu).not.toMatch(/to:\s*"\/alerts"[\s\S]*label:\s*"Action Queue"/);
+    expect(moreMenu).not.toMatch(/label:\s*"Action Queue"[\s\S]*to:\s*"\/alerts"/);
+  });
+});
+
 describe("QuickLog reads plant/tent-first, not grow-first", () => {
   it("renames the grow selector label to 'Current Setup'", () => {
     expect(QUICKLOG).toMatch(/<Label[^>]*>Current Setup<\/Label>/);
@@ -102,7 +123,14 @@ describe("No user-facing grow_id leakage in primary surfaces", () => {
 });
 
 describe("Safety: UX pass introduces no risky surfaces", () => {
-  const FORBIDDEN = ["service_role", "mqtt", "home_assistant", "pi_bridge", "actuator", "device_control"];
+  const FORBIDDEN = [
+    "service_role",
+    "mqtt",
+    "home_assistant",
+    "pi_bridge",
+    "actuator",
+    "device_control",
+  ];
   const FILES: Array<[string, string]> = [
     ["AppSidebar", SIDEBAR],
     ["MobileNav", MOBILE],
@@ -123,7 +151,11 @@ describe("Safety: UX pass introduces no risky surfaces", () => {
   it("no new migrations were created for this UX pass", () => {
     const dir = resolve(ROOT, "supabase/migrations");
     let entries: string[] = [];
-    try { entries = readdirSync(dir); } catch { entries = []; }
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      entries = [];
+    }
     expect(entries.every((f) => !f.includes("ux-language-pass"))).toBe(true);
   });
 });

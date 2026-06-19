@@ -55,6 +55,13 @@ describe("QuickLogGroupedTimelineSection — updating indicator", () => {
             }),
         ),
       );
+    // Any further `from()` calls (e.g. the separate read-only AI Doctor
+    // Phase 1 evidence enrichment query against `diary_entries`) resolve
+    // to empty so they never interfere with the indicator timing checks.
+    fromMock.mockImplementation(() =>
+      buildQueryStub(() => Promise.resolve([])),
+    );
+
 
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },

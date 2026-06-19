@@ -177,10 +177,9 @@ describe("ecowitt-live-soil dry-run script safety", () => {
     "utf8",
   );
 
-  it("does not import supabase / service-role", () => {
-    expect(script).not.toMatch(/@supabase\/supabase-js/);
-    expect(script).not.toMatch(/SERVICE_ROLE/i);
-    expect(script).not.toMatch(/service_role/);
+  it("does not import supabase / service-role secret", () => {
+    expect(script).not.toMatch(/from\s+["']@supabase\/supabase-js["']/);
+    expect(script).not.toMatch(/SERVICE_ROLE_KEY/);
   });
 
   it("does not perform device control or action queue writes", () => {

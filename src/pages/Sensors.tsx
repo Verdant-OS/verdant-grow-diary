@@ -200,6 +200,15 @@ export default function Sensors() {
               ? "border-[hsl(var(--warning))] text-[hsl(var(--warning))]"
               : "border-border/60 text-muted-foreground";
 
+          const soilBadgeToneClass =
+            m.key === "soil" && soilMoistureView
+              ? soilMoistureView.calibrationBadgeTone === "ok"
+                ? "border-[hsl(var(--success))]/60 text-[hsl(var(--success))]"
+                : soilMoistureView.calibrationBadgeTone === "caution"
+                  ? "border-[hsl(var(--warning))] text-[hsl(var(--warning))]"
+                  : "border-border/60 text-muted-foreground"
+              : null;
+
           return (
             <div key={m.key} className="glass rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2 gap-2">
@@ -226,6 +235,15 @@ export default function Sensors() {
                   >
                     {state.label}
                   </span>
+                  {m.key === "soil" && soilMoistureView && soilBadgeToneClass && (
+                    <span
+                      data-testid="sensors-soil-moisture-calibration-badge"
+                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] ${soilBadgeToneClass}`}
+                      title={soilMoistureView.calibrationBadgeLabel}
+                    >
+                      {soilMoistureView.calibrationBadgeLabel}
+                    </span>
+                  )}
                 </div>
                 {state.tone === "caution" && (
                   <GrowDataSourceBadge classification={classification} />
@@ -265,21 +283,40 @@ export default function Sensors() {
               )}
               {m.key === "soil" && soilMoistureView && (
                 <div
-                  className="mt-2 space-y-1 text-[11px] text-muted-foreground"
+                  className="mt-2 space-y-1"
                   data-testid="sensors-soil-moisture-calibration-display"
                 >
-                  <p data-testid="sensors-soil-moisture-primary">{soilMoistureView.primaryLine}</p>
+                  <p
+                    className="text-[12px] text-foreground font-medium"
+                    data-testid="sensors-soil-moisture-primary"
+                  >
+                    {soilMoistureView.primaryLine}
+                  </p>
                   {soilMoistureView.rawLine && (
-                    <p data-testid="sensors-soil-moisture-raw">{soilMoistureView.rawLine}</p>
+                    <p
+                      className="text-[11px] text-muted-foreground"
+                      data-testid="sensors-soil-moisture-raw"
+                    >
+                      {soilMoistureView.rawLine}
+                    </p>
                   )}
-                  <p data-testid="sensors-soil-moisture-calibration">
+                  <p
+                    className="text-[11px] text-muted-foreground"
+                    data-testid="sensors-soil-moisture-calibration"
+                  >
                     {soilMoistureView.calibrationLine}
                   </p>
-                  <p data-testid="sensors-soil-moisture-raw-source">
+                  <p
+                    className="text-[11px] text-muted-foreground"
+                    data-testid="sensors-soil-moisture-raw-source"
+                  >
                     {soilMoistureView.rawSourceLine}
                   </p>
                   {soilMoistureView.calibrationSourceLine && (
-                    <p data-testid="sensors-soil-moisture-calibration-source">
+                    <p
+                      className="text-[11px] text-muted-foreground"
+                      data-testid="sensors-soil-moisture-calibration-source"
+                    >
                       {soilMoistureView.calibrationSourceLine}
                     </p>
                   )}

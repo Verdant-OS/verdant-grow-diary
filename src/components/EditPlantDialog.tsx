@@ -113,6 +113,18 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       return;
     }
     setBusy(true);
+    const photoNorm = normalizePlantProfilePhotoInput(form.photo_url);
+    if (!photoNorm.ok) {
+      setBusy(false);
+      toast.error(
+        photoNorm.reason === "unsupported-protocol"
+          ? "Photo URL must start with http:// or https://"
+          : photoNorm.reason === "too-long"
+            ? "Photo URL is too long"
+            : "Photo URL is not valid",
+      );
+      return;
+    }
     const payload: Record<string, unknown> = {
       name: form.name.trim(),
       strain: form.strain.trim(),
@@ -120,6 +132,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       health: form.health,
       tent_id: form.tent_id === "none" ? null : form.tent_id,
       last_note: form.last_note.trim() || null,
+      photo_url: photoNorm.photo_url,
     };
     if (form.started_at) {
       payload.started_at = new Date(form.started_at).toISOString();

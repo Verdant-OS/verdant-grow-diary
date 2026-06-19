@@ -170,3 +170,34 @@ describe("static safety — AiDoctorPhase1LoadingState", () => {
     expect(SRC).not.toMatch(/service_role|bridge[_-]?token/i);
   });
 });
+
+describe("AiDoctorPhase1LoadingState — premium shimmer", () => {
+  it("skeleton bars include the shimmer animation class", () => {
+    render(<AiDoctorPhase1LoadingState />);
+    const bars = screen.getAllByTestId("ai-doctor-phase1-loading-skeleton-bar");
+    expect(bars.length).toBeGreaterThan(0);
+    for (const bar of bars) {
+      const cls = bar.getAttribute("class") ?? "";
+      expect(cls).toMatch(/animate-shimmer/);
+    }
+  });
+
+  it("does not import any external animation library", () => {
+    const SRC = readFileSync(
+      resolve(__dirname, "../components/AiDoctorPhase1LoadingState.tsx"),
+      "utf8",
+    );
+    expect(SRC).not.toMatch(/framer-motion|react-spring|lottie|gsap/i);
+    expect(SRC).not.toMatch(/^\s*import[^;]+from\s+["'](?!react$|@\/)[^"']+["']/m);
+  });
+
+  it("loading copy remains readable without relying on animation alone", () => {
+    render(<AiDoctorPhase1LoadingState />);
+    expect(
+      screen.getByTestId("ai-doctor-phase1-loading-title").textContent,
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId("ai-doctor-phase1-loading-body").textContent,
+    ).toBeTruthy();
+  });
+});

@@ -1,22 +1,5 @@
-/**
- * QuickLogGroupedTimelineSection — presenter that renders QuickLog v2
- * manual action + sibling environment events as a grouped or standalone
- * timeline list.
- *
- * Hard constraints:
- *  - Presenter-only. All grouping/pairing logic lives in
- *    `quickLogTimelineGroupingViewModel`. All filter logic lives in
- *    `quickLogGroupedTimelineFilterViewModel`. No business rules here.
- *  - Reuses `<ManualSnapshotTimelineCard>` for environment rendering.
- *  - Real source label is always "Manual" — never live/synced/connected/imported.
- *  - Demo/sample entries (never produced by the live hook) render with an
- *    explicit "Demo data" or "Sample timeline entry" label so they can
- *    never be mistaken for real plant memory.
- *  - No writes, no automation, no device control.
- *  - The "Create Quick Log" button opens the existing QuickLogV2Sheet
- *    flow without prefilling or submitting anything.
- */
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Droplets, NotebookPen, History, PlusCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,8 +14,10 @@ import type {
   QuickLogTimelineEntry,
 } from "@/lib/quickLogTimelineGroupingViewModel";
 import { AiDoctorPhase1TimelineEvidenceCard } from "@/components/AiDoctorPhase1TimelineEvidenceCard";
-import { buildAiDoctorPhase1TimelineEvidenceViewModel } from "@/lib/aiDoctorPhase1TimelineEvidenceViewModel";
-
+import {
+  buildAiDoctorPhase1TimelineEvidenceViewModel,
+  buildAiDoctorPhase1TimelineReviewHref,
+} from "@/lib/aiDoctorPhase1TimelineEvidenceViewModel";
 import {
   QUICK_LOG_GROUPED_TIMELINE_FILTERS,
   QUICK_LOG_GROUPED_TIMELINE_FILTER_LABELS,
@@ -40,6 +25,9 @@ import {
   QUICK_LOG_GROUPED_TIMELINE_EMPTY_FILTERED_TEXT,
   QUICK_LOG_GROUPED_TIMELINE_EMPTY_TITLE_TEXT,
   QUICK_LOG_GROUPED_TIMELINE_EMPTY_HINT_TEXT,
+  QUICK_LOG_GROUPED_TIMELINE_AI_EVIDENCE_EMPTY_TITLE_TEXT,
+  QUICK_LOG_GROUPED_TIMELINE_AI_EVIDENCE_EMPTY_HINT_TEXT,
+  QUICK_LOG_GROUPED_TIMELINE_AI_EVIDENCE_RESULTS_BUTTON_LABEL,
   QUICK_LOG_GROUPED_TIMELINE_CREATE_BUTTON_LABEL,
   QUICK_LOG_MANUAL_SOURCE_LABEL,
   QUICK_LOG_DEMO_SOURCE_LABEL,
@@ -66,14 +54,8 @@ import {
   reviewTriggerLabel,
 } from "@/lib/quickLogGroupedReviewViewModel";
 
-/**
- * A demo/sample timeline entry. Never produced by the live hook — used
- * only by explicit demo surfaces or fixtures. Must always render with an
- * explicit demo/sample label, never "Manual".
- */
 export interface DemoQuickLogTimelineEntry {
   entry: QuickLogTimelineEntry;
-  /** "demo" → "Demo data" badge. "sample" → "Sample timeline entry" badge. */
   variant: "demo" | "sample";
 }
 
@@ -82,11 +64,13 @@ type Props =
       scope: "plant";
       plantId: string | null | undefined;
       tentId: string | null | undefined;
+      growId?: string | null | undefined;
       demoEntries?: ReadonlyArray<DemoQuickLogTimelineEntry>;
     }
   | {
       scope: "tent";
       tentId: string | null | undefined;
+      growId?: string | null | undefined;
       demoEntries?: ReadonlyArray<DemoQuickLogTimelineEntry>;
     };
 
@@ -172,9 +156,7 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
     "data-demo-variant": demoVariant ?? "",
   } as const;
 
-  // Audit toggle: local UI state, only on grouped entries.
   const [auditExpanded, setAuditExpanded] = useState(false);
-  // In-place Review Panel: independent local UI state, only on grouped entries.
   const [reviewOpen, setReviewOpen] = useState(false);
   const auditable = isAuditableQuickLogEntry(entry);
   const reviewable =
@@ -184,9 +166,6 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
       ? buildQuickLogReviewActionSection(entry)
       : null;
 
-  // AI Doctor Phase 1 evidence card override (presenter-only). Builds a
-  // safe, redacted view-model from the attached diary_entries.details and
-  // renders the read-only evidence card in place of the generic note.
   const evidence =
     entry.kind === "action" || entry.kind === "grouped"
       ? entry.action.aiDoctorPhase1Evidence ?? null
@@ -223,7 +202,6 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
   if (entry.kind === "grouped") {
     return (
       <Card
-
         {...commonDataAttrs}
         data-entry-kind="grouped"
         data-action-id={entry.action.id}
@@ -381,6 +359,7 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
       </Card>
     );
   }
+
   if (entry.kind === "action") {
     return (
       <Card
@@ -405,6 +384,7 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
       </Card>
     );
   }
+
   return (
     <div
       {...commonDataAttrs}
@@ -443,6 +423,14 @@ function defaultTargetKeyFor(props: Props): string | null {
   return props.tentId ? `tent:${props.tentId}` : null;
 }
 
+function aiDoctorResultsHrefFor(props: Props): string {
+  return buildAiDoctorPhase1TimelineReviewHref({
+    plantId: props.scope === "plant" ? props.plantId ?? null : null,
+    growId: props.growId ?? null,
+    tentId: props.tentId ?? null,
+  }).href;
+}
+
 export const QUICK_LOG_GROUPED_TIMELINE_UPDATING_LABEL =
   "Updating QuickLog timeline…";
 
@@ -453,9 +441,6 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
   const [filter, setFilter] = useState<QuickLogGroupedTimelineFilter>("all");
   const [quickLogOpen, setQuickLogOpen] = useState(false);
 
-  // Combine real entries with explicit demo/sample fixtures. Demo entries
-  // keep their variant so the badge stays honest. Real entries always
-  // render with "Manual".
   type Wrapped = { entry: QuickLogTimelineEntry; demoVariant?: "demo" | "sample" };
   const wrapped: Wrapped[] = useMemo(() => {
     const real: Wrapped[] = entries.map((e) => ({ entry: e }));
@@ -475,6 +460,8 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
   );
 
   const hasAnyEntries = wrapped.length > 0;
+  const aiDoctorResultsHref = aiDoctorResultsHrefFor(props);
+  const isAiDoctorEvidenceFilter = filter === "ai-doctor-evidence";
 
   return (
     <Card
@@ -545,6 +532,32 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
           >
             Couldn't load QuickLog memory right now.
           </p>
+        ) : isAiDoctorEvidenceFilter && filteredWrapped.length === 0 ? (
+          <div
+            className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-3"
+            data-testid="quick-log-grouped-timeline-ai-evidence-empty"
+          >
+            <p
+              className="text-sm font-medium text-foreground"
+              data-testid="quick-log-grouped-timeline-ai-evidence-empty-title"
+            >
+              {QUICK_LOG_GROUPED_TIMELINE_AI_EVIDENCE_EMPTY_TITLE_TEXT}
+            </p>
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="quick-log-grouped-timeline-ai-evidence-empty-hint"
+            >
+              {QUICK_LOG_GROUPED_TIMELINE_AI_EVIDENCE_EMPTY_HINT_TEXT}
+            </p>
+            <Button asChild size="sm" variant="outline">
+              <Link
+                to={aiDoctorResultsHref}
+                data-testid="quick-log-grouped-timeline-ai-evidence-results-link"
+              >
+                {QUICK_LOG_GROUPED_TIMELINE_AI_EVIDENCE_RESULTS_BUTTON_LABEL}
+              </Link>
+            </Button>
+          </div>
         ) : !hasAnyEntries ? (
           <div
             className="space-y-3"

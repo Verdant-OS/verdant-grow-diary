@@ -253,8 +253,22 @@ export default function EnvironmentSummaryReportPage() {
       )
     : null;
 
-  // ----- Non-premium upgrade prompt -----
-  if (!entitlementLoading && !isPremium) {
+  // ----- Server-authoritative gate -----
+  // The server-side edge function `environment-summary-report-entitlement`
+  // re-resolves entitlement from `billing_subscriptions` and returns 403
+  // for non-premium plans. Client `useMyEntitlements` is only a hint.
+  const serverDecided =
+    serverGate.status === "allowed" ||
+    serverGate.status === "denied" ||
+    serverGate.status === "error";
+  const showLocked =
+    serverDecided
+      ? serverGate.status !== "allowed"
+      // While the server is still deciding, fall back to the (non-authoritative)
+      // client hint to avoid a flash of report content for free users.
+      : !entitlementLoading && !clientIsPremium;
+
+  if (showLocked) {
     const vm = buildPaywallCtaViewModel({
       featureTitle: "Unlock Environment Summary Reports",
       requiredPlanLabel: "Pro",
@@ -268,17 +282,44 @@ export default function EnvironmentSummaryReportPage() {
       secondaryCopy:
         "Reports are read-only. Verdant does not control equipment or automate changes.",
     });
+    const lockedMessage =
+      serverGate.status === "error"
+        ? "We couldn't verify your plan right now. Environment Summary Report is a Pro feature — please try again in a moment."
+        : "Environment Summary Report is a Pro feature. Upgrade required to generate this report.";
     return (
       <div
         className="container max-w-3xl py-6 space-y-4"
         data-testid="environment-summary-report-page-locked"
+        data-server-gate-status={serverGate.status}
       >
         <PageHeader
           title="Environment Summary"
           description="Premium report — aggregated greenhouse rule results over a date range."
           icon={<FileBarChart className="h-5 w-5" />}
         />
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="env-report-server-gate-message"
+        >
+          {lockedMessage}
+        </p>
         <PaywallCta vm={vm} data-testid="env-report-paywall" />
+      </div>
+    );
+  }
+
+  if (!serverDecided) {
+    return (
+      <div
+        className="container max-w-3xl py-6 space-y-4"
+        data-testid="environment-summary-report-page-loading"
+      >
+        <PageHeader
+          title="Environment Summary"
+          description="Verifying access…"
+          icon={<FileBarChart className="h-5 w-5" />}
+        />
+        <p className="text-sm text-muted-foreground">Checking your plan…</p>
       </div>
     );
   }

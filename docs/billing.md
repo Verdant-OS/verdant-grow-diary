@@ -37,10 +37,12 @@ all laws applicable to cultivation in their own jurisdiction.
 | Plan              | Price          | Cadence    | Slug               |
 | ----------------- | -------------- | ---------- | ------------------ |
 | Pro Monthly       | $12            | / month    | `pro-monthly`      |
-| Pro Annual        | $115           | / year     | `pro-annual`       |
+| Pro Annual        | $99            | / year     | `pro-annual`       |
 | Founder Lifetime  | $129 (one-time)| one-time   | `founder-lifetime` |
 
-Founder Lifetime is limited to the first 75 buyers.
+Founder Lifetime is limited to the first 75 buyers. Founder Lifetime includes
+100 AI Doctor credits per month; additional credit packs are planned later but
+are not live yet.
 
 ## Configuration
 
@@ -86,8 +88,8 @@ Before flipping to live Paddle:
 - [ ] Complete Paddle live verification (merchant of record onboarding).
 - [ ] Confirm acceptable use policy fit for Verdant (software-only).
 - [ ] Add server-side entitlement updater that consumes verified events
-      from `paddle_events` and writes to a dedicated `entitlements` table
-      with RLS.
+      from `paddle_events` and writes to `public.billing_subscriptions`
+      with service role.
 - [ ] Add end-to-end sandbox checkout test through Paddle.js.
 - [ ] Add refund / chargeback / cancellation event handling.
 - [ ] Add billing portal / "manage subscription" surface for the grower.

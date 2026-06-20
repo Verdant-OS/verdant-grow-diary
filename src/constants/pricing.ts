@@ -64,7 +64,7 @@ export const PRICING = {
     features: [
       "Lifetime Pro access",
       "100 AI Doctor credits / month",
-      "Overage applies",
+      "Additional credit packs planned later",
       "Founder badge / early supporter positioning",
     ],
   },

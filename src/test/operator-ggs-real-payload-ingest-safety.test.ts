@@ -60,13 +60,7 @@ const FORBIDDEN_WRITE_TOKENS = [
   "ggs_csv",
 ];
 
-const FORBIDDEN_AI_TOKENS = [
-  "@/lib/ai/",
-  "ai-doctor-review",
-  "ai-coach",
-  "openai",
-  "anthropic",
-];
+const FORBIDDEN_AI_TOKENS = ["@/lib/ai/", "ai-doctor-review", "ai-coach", "openai", "anthropic"];
 
 const REAL_PAYLOAD_PANEL = stripBlockComments(read("src/components/GgsRealPayloadIngestPanel.tsx"));
 const REAL_PAYLOAD_PAGE = stripBlockComments(read("src/pages/OperatorGgsRealPayloadIngest.tsx"));
@@ -116,7 +110,9 @@ describe("static safety — pure modules stay pure", () => {
     expect(SENTINEL_VM).not.toMatch(/@\/integrations\/supabase\/client/);
   });
   it("rules module exports no command/control symbols", () => {
-    expect(SENTINEL_RULES).not.toMatch(/export\s+(function|const)\s+\w*(command|control|setpoint|write|publish)/i);
+    expect(SENTINEL_RULES).not.toMatch(
+      /export\s+(function|const)\s+\w*(command|control|setpoint|write|publish)/i,
+    );
   });
 });
 
@@ -152,7 +148,12 @@ describe("operator GGS real-payload ingest — static safety", () => {
   });
 
   it("nothing emits ggs_live or ggs_csv source values", () => {
-    for (const src of [REAL_PAYLOAD_PANEL, REAL_PAYLOAD_PAGE, REAL_PAYLOAD_COMMIT, REAL_PAYLOAD_VM]) {
+    for (const src of [
+      REAL_PAYLOAD_PANEL,
+      REAL_PAYLOAD_PAGE,
+      REAL_PAYLOAD_COMMIT,
+      REAL_PAYLOAD_VM,
+    ]) {
       expect(src).not.toMatch(/"ggs_live"/);
       expect(src).not.toMatch(/"ggs_csv"/);
     }
@@ -179,9 +180,10 @@ describe("operator GGS real-payload ingest — static safety", () => {
     }
   });
 
-  it("page guards on useHasRole('operator') before rendering the panel", () => {
-    expect(REAL_PAYLOAD_PAGE).toMatch(/useHasRole\(\s*["']operator["']\s*\)/);
-    // Panel render is gated on granted status.
+  it("page gates panel rendering on operator role status", () => {
+    expect(REAL_PAYLOAD_PAGE).toMatch(/Operator access required/);
+    expect(REAL_PAYLOAD_PAGE).toMatch(/role\.status\s*===\s*["']denied["']/);
+    expect(REAL_PAYLOAD_PAGE).toMatch(/role\.status\s*===\s*["']unauthenticated["']/);
     expect(REAL_PAYLOAD_PAGE).toMatch(/role\.status\s*===\s*["']granted["']/);
   });
 

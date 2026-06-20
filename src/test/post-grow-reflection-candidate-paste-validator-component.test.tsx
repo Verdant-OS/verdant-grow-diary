@@ -7,6 +7,8 @@ import {
   createValidPostGrowReflectionOutput,
 } from "@/lib/ai/postGrowReflectionOutputFixtures";
 
+const envelopeKind = "post_grow_reflection_candidate";
+
 describe("PostGrowReflectionCandidatePasteValidator", () => {
   it("renders textarea and validation controls", () => {
     render(<PostGrowReflectionCandidatePasteValidator />);
@@ -15,6 +17,7 @@ describe("PostGrowReflectionCandidatePasteValidator", () => {
     expect(screen.getByText("Validate pasted candidate")).toBeTruthy();
     expect(screen.getByText("Clear")).toBeTruthy();
     expect(screen.getByText("Manual paste")).toBeTruthy();
+    expect(screen.getByText("Envelope supported")).toBeTruthy();
     expect(screen.getByText("Not saved")).toBeTruthy();
     expect(screen.getByText("No live AI call")).toBeTruthy();
   });
@@ -54,6 +57,45 @@ describe("PostGrowReflectionCandidatePasteValidator", () => {
     expect(screen.getByText("Gaps")).toBeTruthy();
   });
 
+  it("validates a candidate envelope and renders safe metadata", () => {
+    render(<PostGrowReflectionCandidatePasteValidator />);
+
+    fireEvent.change(screen.getByLabelText("Candidate JSON"), {
+      target: {
+        value: JSON.stringify({
+          kind: envelopeKind,
+          candidate: createValidPostGrowReflectionOutput(),
+          metadata: {
+            sourceLabel: "manual envelope sample",
+            requestLabel: "candidate-envelope-001",
+            createdAt: "2026-06-20T15:00:00.000Z",
+          },
+        }),
+      },
+    });
+    fireEvent.click(screen.getByText("Validate pasted candidate"));
+
+    expect(screen.getByText("Envelope paste")).toBeTruthy();
+    expect(screen.getByText("Envelope metadata")).toBeTruthy();
+    expect(screen.getByText(/sourceLabel=manual envelope sample/)).toBeTruthy();
+    expect(screen.getByText(/candidateFormat=object/)).toBeTruthy();
+    expect(screen.getByText("Confidence: High")).toBeTruthy();
+  });
+
+  it("shows envelope issue codes when the envelope contract rejects first", () => {
+    render(<PostGrowReflectionCandidatePasteValidator />);
+
+    fireEvent.change(screen.getByLabelText("Candidate JSON"), {
+      target: { value: JSON.stringify({ kind: envelopeKind }) },
+    });
+    fireEvent.click(screen.getByText("Validate pasted candidate"));
+
+    expect(screen.getAllByText("Rejected candidate").length).toBeGreaterThan(0);
+    expect(screen.getByText("Envelope paste")).toBeTruthy();
+    expect(screen.getByText(/missing_candidate/)).toBeTruthy();
+    expect(screen.getByText(/rejected before reflection validation/)).toBeTruthy();
+  });
+
   it("shows issue codes for rejected candidate text", () => {
     render(<PostGrowReflectionCandidatePasteValidator />);
 
@@ -78,7 +120,7 @@ describe("PostGrowReflectionCandidatePasteValidator", () => {
 
     fireEvent.click(screen.getByText("Clear"));
     expect(screen.queryByText("Invalid JSON")).toBeNull();
-    expect(screen.getByText(/Paste a candidate ReflectionOutput JSON/)).toBeTruthy();
+    expect(screen.getByText(/Paste a candidate ReflectionOutput JSON or candidate envelope/)).toBeTruthy();
     expect((screen.getByLabelText("Candidate JSON") as HTMLTextAreaElement).value).toBe("");
   });
 });

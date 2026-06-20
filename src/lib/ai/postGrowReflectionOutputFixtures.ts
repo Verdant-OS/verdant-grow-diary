@@ -14,7 +14,7 @@ export function createValidPostGrowReflectionOutput(): ReflectionOutput {
       "Keep moderate feed strength after week 4 because the notes report no unresolved late-flower pest or stress flags.",
     ],
     adjust_or_avoid: [
-      "Avoid treating the strong harvest as proof that one action caused the result; keep comparing timing across future runs.",
+      "Avoid treating the strong harvest as a single-action explanation; keep comparing timing across future runs.",
     ],
     post_harvest_specific_insights: [
       "Weight loss slowed near day 11, ending at 389 g after starting at 1420 g, which suggests the dry was not rushed in this run.",

@@ -101,6 +101,10 @@ export default function OperatorPostGrowReflectionDryRun() {
         </CardContent>
       </Card>
 
+      <PostGrowReflectionPreviewCard viewModel={previewViewModel} />
+
+
+
       <Card>
         <CardHeader>
           <CardTitle>Operator guardrails</CardTitle>

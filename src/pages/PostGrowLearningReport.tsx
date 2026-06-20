@@ -27,8 +27,10 @@ import {
 import { usePostGrowLearningReportData } from "@/hooks/usePostGrowLearningReportData";
 import { growDetailPath } from "@/lib/routes";
 
-function resultMessage(result: { message?: string }, fallback: string): string {
-  return typeof result.message === "string" && result.message.length > 0 ? result.message : fallback;
+function resultMessage(result: unknown, fallback: string): string {
+  if (typeof result !== "object" || result === null || !("message" in result)) return fallback;
+  const message = (result as { message?: unknown }).message;
+  return typeof message === "string" && message.length > 0 ? message : fallback;
 }
 
 export default function PostGrowLearningReport() {
@@ -93,48 +95,58 @@ export default function PostGrowLearningReport() {
         <EmptyState
           icon={<Leaf className="h-6 w-6" />}
           title="Post-grow report not ready"
-          description="Reports are available once a grow is completed, drying, or archived."
+          description={report.ineligibleReason ?? "Archive or complete this grow before generating a report."}
         />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6" data-testid="post-grow-learning-report">
-      <Button asChild variant="ghost" size="sm">
+    <div className="mx-auto max-w-5xl pb-10" data-testid="post-grow-report-page">
+      <Button asChild variant="ghost" size="sm" className="mb-3">
         <Link to={growDetailPath(report.header.growId)}>
           <ArrowLeft className="mr-1 h-4 w-4" /> Back to grow
         </Link>
       </Button>
 
-      <PageHeader
-        title="Post-Grow Learning Report"
-        description={`${report.header.growName} • ${report.header.status} • ${report.header.plantCount} plants`}
-      />
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="secondary">Completed grow</Badge>
-        <DataCompletenessBadge badge={report.dataCompleteness} />
+      <div className="glass rounded-3xl p-4 sm:p-6 mb-4 border-primary/20">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <PageHeader
+            title="Post-Grow Learning Report"
+            description="Plant memory, sensor truth, and lessons for the next run."
+            icon={<Leaf className="h-5 w-5" />}
+          />
+          <ExportSummaryButtons vm={report} />
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          <Badge variant="outline">{report.header.growName}</Badge>
+          <Badge variant="outline">{report.header.stageLabel}</Badge>
+          {report.header.archived && <Badge variant="outline">Archived</Badge>}
+          {report.header.yieldGrams !== null && (
+            <Badge variant="outline">Yield {report.header.yieldGrams.toFixed(1)} g</Badge>
+          )}
+        </div>
       </div>
 
-      <PostGrowExecutiveSummaryCard summary={report.executiveSummary} />
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <EnvironmentStabilityCard stability={report.environmentStability} />
-        <PostHarvestPerformanceCard performance={report.postHarvestPerformance} />
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_18rem] gap-4 mb-4">
+        <PostGrowExecutiveSummaryCard vm={report} />
+        <DataCompletenessBadge vm={report} />
       </div>
 
-      <ActionEffectivenessCard summary={report.actionEffectiveness} />
-      <LessonsCard
-        lesson={lesson}
-        onLessonChange={setLesson}
-        onSave={handleSaveLesson}
-        onApply={handleApplyLesson}
-        busy={busy}
-        canApply={lesson.trim().length > 0}
-      />
-      <PhotoGridCard photos={report.photos} />
-      <ExportSummaryButtons report={report} />
+      <div className="grid grid-cols-1 gap-4">
+        <EnvironmentStabilityCard metrics={report.environment} />
+        <PostHarvestPerformanceCard vm={report} />
+        <ActionEffectivenessCard vm={report} />
+        <LessonsCard
+          vm={report}
+          lesson={lesson}
+          onLessonChange={setLesson}
+          onSave={handleSaveLesson}
+          onApply={handleApplyLesson}
+          busy={busy}
+        />
+        <PhotoGridCard vm={report} />
+      </div>
     </div>
   );
 }

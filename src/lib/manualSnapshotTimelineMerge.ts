@@ -34,10 +34,18 @@ function tsValue(iso: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function stableDedupKey(item: MergedTimelineItem<MergeDiaryInput>): string {
+  return `${item.kind}:${item.key}`;
+}
+
 /**
  * Merge diary entries and manual snapshot cards into a single descending
  * timeline. Ties break by `kind` (diary before manual-snapshot) and then
  * by `key` for full determinism.
+ *
+ * Deduplication key: `${kind}:${key}`. This keeps diary entries and manual
+ * snapshots in separate namespaces while preventing repeated rows with the
+ * same stable source id from rendering twice.
  */
 export function mergeTimelineItems<TDiary extends MergeDiaryInput>(
   args: MergeArgs<TDiary>,
@@ -54,7 +62,16 @@ export function mergeTimelineItems<TDiary extends MergeDiaryInput>(
       card: c,
     });
   }
-  items.sort((a, b) => {
+
+  const seen = new Set<string>();
+  const deduped = items.filter((item) => {
+    const key = stableDedupKey(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  deduped.sort((a, b) => {
     const at = tsValue(a.occurredAt);
     const bt = tsValue(b.occurredAt);
     if (at !== bt) return bt - at;
@@ -63,5 +80,5 @@ export function mergeTimelineItems<TDiary extends MergeDiaryInput>(
     if (a.key > b.key) return 1;
     return 0;
   });
-  return items;
+  return deduped;
 }

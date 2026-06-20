@@ -52,6 +52,33 @@ describe("csvParser — dynamic header detection", () => {
       expect(r.detectedColumns.humidity).not.toBeNull();
     }
   });
+
+  it("detects Spider Farmer columns including vpd, co2, and ppfd", () => {
+    const csv =
+      "\uFEFFdeviceSerialnum,temperature(°C),humidity,vpd,temperature(°F),co2,Timestamp,ppfd\n" +
+      "80F1B2B452B8,25.7,52.4,1.57,78.3,775,2026-05-31 19:00:00,925\n";
+    const r = parseEnvironmentCSVText(csv);
+    expect(r.errors).toEqual([]);
+    expect(r.detectedColumns.temperature).toBe("temperature(°C)");
+    expect(r.detectedColumns.humidity).toBe("humidity");
+    expect(r.detectedColumns.vpd).toBe("vpd");
+    expect(r.detectedColumns.co2).toBe("co2");
+    expect(r.detectedColumns.ppfd).toBe("ppfd");
+    expect(r.validRows).toHaveLength(1);
+    expect(r.validRows[0]).toMatchObject({
+      temperature_c: 25.7,
+      humidity_pct: 52.4,
+      vpd_kpa: 1.57,
+      co2_ppm: 775,
+      ppfd: 925,
+      raw_temperature: 25.7,
+      raw_temp_unit: "C",
+      vpd_source: "csv",
+      source_tag: "csv",
+    });
+    expect(r.validRows[0].captured_at).toBe("2026-05-31T19:00:00.000Z");
+    expect(r.validRows[0].raw_payload.deviceSerialnum).toBe("80F1B2B452B8");
+  });
 });
 
 describe("csvParser — unit normalization", () => {
@@ -104,9 +131,17 @@ describe("csvParser — raw preservation + VPD", () => {
     expect(r.validRows[0].vpd_kpa).toBeCloseTo(computeVpdKpa(25, 50), 3);
     expect(r.validRows[0].vpd_kpa).toBeGreaterThan(1.5);
     expect(r.validRows[0].vpd_kpa!).toBeLessThan(1.7);
+    expect(r.validRows[0].vpd_source).toBe("derived");
   });
 
-  it("vpd_kpa is null when temp or RH missing (test 11)", () => {
+  it("uses CSV VPD when provided instead of overwriting it", () => {
+    const csv = "Timestamp,Temp(°C),RH,VPD\n2026-06-01T10:00:00Z,25,50,1.23\n";
+    const r = parseEnvironmentCSVText(csv);
+    expect(r.validRows[0].vpd_kpa).toBe(1.23);
+    expect(r.validRows[0].vpd_source).toBe("csv");
+  });
+
+  it("vpd_kpa is null when temp or RH missing and no CSV VPD exists (test 11)", () => {
     const csv = "Timestamp,Temp(°C),RH\n2026-06-01T10:00:00Z,25,\n2026-06-01T11:00:00Z,,50\n";
     const r = parseEnvironmentCSVText(csv);
     expect(r.validRows).toHaveLength(2);

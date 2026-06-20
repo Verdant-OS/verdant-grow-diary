@@ -13,7 +13,9 @@ import BrandLogo from "./BrandLogo";
 import GlobalFastAddButton from "./GlobalFastAddButton";
 import AuthStatusIndicator from "./AuthStatusIndicator";
 import SignOutConfirmDialog from "./SignOutConfirmDialog";
+import VerificationPendingBanner from "./VerificationPendingBanner";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
 
 
 export default function AppShell() {
@@ -66,11 +68,14 @@ export default function AppShell() {
                   <Search className="h-4 w-4" /><span className="hidden lg:inline">Search…</span>
                   <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">⌘K</kbd>
                 </button>
-                
+                {/* Quick Log is the single grower-facing logging entry
+                    point on desktop. The dropdown surfaces event-type
+                    presets (diary note, watering, feeding, training,
+                    photo, environment, diagnosis, harvest) and opens the
+                    existing Quick Log sheet via the wired window event.
+                    The previous standalone "Quick log" button has been
+                    removed to eliminate duplicate add/log CTAs. */}
                 <GlobalFastAddButton className="hidden md:inline-flex" />
-                <Button variant="outline" size="sm" onClick={() => { setPrefill(null); setOpenLog(true); }} className="hidden md:inline-flex">
-                  <Plus className="h-4 w-4" /> Quick log
-                </Button>
                 <Button variant="ghost" size="icon" onClick={() => nav("/alerts")} aria-label="Alerts" className="relative">
                   <Bell className="h-4 w-4" />
                   {unread > 0 && (
@@ -91,14 +96,19 @@ export default function AppShell() {
           </header>
 
           <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">
-            <Outlet />
+            {isEmailVerificationPending(user) ? (
+              <VerificationPendingBanner email={user.email ?? ""} />
+            ) : (
+              <Outlet />
+            )}
           </main>
         </div>
 
         {/* Mobile floating + */}
         <button
           onClick={() => { setPrefill(null); setOpenLog(true); }}
-          aria-label="Quick log"
+          aria-label="Open Quick Log"
+          data-testid="mobile-quick-log-fab"
           className="md:hidden fixed z-40 bottom-20 right-4 h-14 w-14 rounded-full gradient-leaf shadow-elevated flex items-center justify-center text-primary-foreground hover:scale-105 transition active:scale-95 glow-accent"
         >
           <Plus className="h-6 w-6" />

@@ -105,6 +105,9 @@ describe("alertActionQueueDedupeRules", () => {
       expect(d.existingActionId).toBeNull();
       expect(d.reasonCode).toBe("ok_can_add");
       expect(d.label).toBe("Add to Action Queue");
+      expect(d.headline).toBe("Ready for grower review");
+      expect(d.helper).toMatch(/enough context/i);
+      expect(d.helper).toMatch(/will not execute equipment changes/i);
     });
 
     it("returns already_exists with the matching row id", () => {
@@ -114,6 +117,9 @@ describe("alertActionQueueDedupeRules", () => {
       });
       expect(d.state).toBe("already_exists");
       expect(d.existingActionId).toBe("act-1");
+      expect(d.headline).toBe("Already in Action Queue");
+      expect(d.helper).toMatch(/already exists/i);
+      expect(d.helper).toMatch(/grower review/i);
       expect(d.label).not.toContain("[alert:");
       expect(d.label).not.toContain("alert-1");
     });
@@ -125,12 +131,39 @@ describe("alertActionQueueDedupeRules", () => {
       });
       expect(d.state).toBe("ineligible");
       expect(d.reasonCode).toBe("alert_not_eligible");
+      expect(d.headline).toBe("Cannot queue this alert");
+      expect(d.helper).toMatch(/only open alerts/i);
     });
 
     it("returns ineligible for missing alert", () => {
       const d = decideAddButtonState({ alert: null });
       expect(d.state).toBe("ineligible");
       expect(d.reasonCode).toBe("missing_alert");
+      expect(d.headline).toBe("No alert loaded");
+      expect(d.helper).toMatch(/load an alert/i);
+    });
+
+    it("returns specific blocked copy for missing grow context", () => {
+      const d = decideAddButtonState({
+        alert: { ...OPEN_ALERT, grow_id: null },
+        existingRows: [],
+      });
+      expect(d.state).toBe("ineligible");
+      expect(d.headline).toBe("Missing grow context");
+      expect(d.helper).toMatch(/cannot create a safe approval item/i);
+    });
+
+    it("returns specific blocked copy for missing metric or reason", () => {
+      const missingMetric = decideAddButtonState({
+        alert: { ...OPEN_ALERT, metric: null },
+        existingRows: [],
+      });
+      const missingReason = decideAddButtonState({
+        alert: { ...OPEN_ALERT, reason: "" },
+        existingRows: [],
+      });
+      expect(missingMetric.headline).toBe("Missing alert context");
+      expect(missingReason.headline).toBe("Missing alert context");
     });
 
     it("prefers already_exists over eligibility check (safer)", () => {
@@ -141,15 +174,18 @@ describe("alertActionQueueDedupeRules", () => {
       expect(d.state).toBe("already_exists");
     });
 
-    it("never leaks raw tokens or ids in label", () => {
-      const d = decideAddButtonState({
-        alert: OPEN_ALERT,
-        existingRows: [matchingPending],
-      });
-      const blob = d.label.toLowerCase();
-      expect(blob).not.toContain("alert-1");
-      expect(blob).not.toContain("grow-1");
-      expect(blob).not.toContain("[alert:");
+    it("never leaks raw tokens or ids in label/headline/helper", () => {
+      const decisions = [
+        decideAddButtonState({ alert: OPEN_ALERT, existingRows: [matchingPending] }),
+        decideAddButtonState({ alert: OPEN_ALERT, existingRows: [] }),
+        decideAddButtonState({ alert: { ...OPEN_ALERT, status: "resolved" }, existingRows: [] }),
+      ];
+      for (const d of decisions) {
+        const blob = `${d.label} ${d.headline} ${d.helper}`.toLowerCase();
+        expect(blob).not.toContain("alert-1");
+        expect(blob).not.toContain("grow-1");
+        expect(blob).not.toContain("[alert:");
+      }
     });
   });
 

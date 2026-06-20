@@ -3,7 +3,7 @@
  *
  * Verifies the diary `event_type` vocabulary stays consistent across:
  *   - UI forms / pickers          (src/lib/diary.ts → EVENT_TYPES)
- *   - Insert payload builders     (Fast Add, legacy QuickLog save)
+ *   - Insert payload builders     (Quick Log, legacy QuickLog save)
  *   - Timeline rendering          (getEventType fallback)
  *   - Timeline classification     (timelineEntryClassification)
  *   - Mounted route pages         (APP_ROUTES manifest)
@@ -43,7 +43,7 @@ describe("Insert payload builders ↔ diary EVENT_TYPES alignment", () => {
       (a) => [a.id, a.quickLogEventType!] as const,
     ),
   )(
-    "Fast Add '%s' produces eventType '%s' which exists in EVENT_TYPES",
+    "Quick Log '%s' produces eventType '%s' which exists in EVENT_TYPES",
     (_id, eventType) => {
       expect(DIARY_VALUES.has(eventType)).toBe(true);
     },

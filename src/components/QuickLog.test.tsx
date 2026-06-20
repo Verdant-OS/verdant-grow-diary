@@ -89,16 +89,12 @@ beforeEach(() => {
   toastMessage.mockReset();
 });
 
-describe("QuickLog photo attach — disabled (Coming soon)", () => {
-  it("renders the photo placeholder as a 'Coming soon' disabled area, with no file input", () => {
+describe("QuickLog photo attach — disabled (no upload path)", () => {
+  it("renders no photo upload affordances (no file input, no image, no remove control)", () => {
     renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
     const dialog = screen.getByRole("dialog");
 
-    const placeholder = within(dialog).getByTestId("quicklog-photo-coming-soon");
-    expect(placeholder).toBeInTheDocument();
-    expect(placeholder.textContent).toMatch(/coming soon/i);
-
-    // Legacy photo affordances are gone.
+    // Legacy photo upload affordances must remain gone.
     expect(dialog.querySelector('input[type="file"]')).toBeNull();
     expect(dialog.querySelector("img")).toBeNull();
     expect(within(dialog).queryByLabelText("Remove photo")).toBeNull();
@@ -116,7 +112,7 @@ describe("QuickLog photo attach — disabled (Coming soon)", () => {
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "Looking good" },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
 
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     expect(uploadMock).not.toHaveBeenCalled();
@@ -141,7 +137,7 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "Topped plant" },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
 
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     const payload = saveMock.mock.calls[0][0];
@@ -160,7 +156,9 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
       expect(document.querySelector('[data-testid="quick-log-view-target-plant"]')).not.toBeNull(),
     );
     expect(onCreated).toHaveBeenCalled();
-    expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/Logged note for|Logged observation for/));
+    expect(toastSuccess).toHaveBeenCalledWith(
+      expect.stringMatching(/^(Saved|Logged) (note|observation|note for|observation for)/),
+    );
     expect(toastError).not.toHaveBeenCalled();
   });
 
@@ -177,7 +175,7 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
     );
 
     const dialog = screen.getByRole("dialog");
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
 
     await waitFor(() => expect(toastError).toHaveBeenCalledWith("Add a quick note"));
     expect(saveMock).not.toHaveBeenCalled();
@@ -205,7 +203,7 @@ describe("QuickLog supported save · routes through quicklog_save_manual RPC", (
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "Note" },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: /save entry/i }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
 
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     await waitFor(() =>

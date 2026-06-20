@@ -65,6 +65,9 @@ describe("Quick Log Playwright harness safety", () => {
   it("does not touch action_queue, functions.invoke, or mini-charts", () => {
     for (const { file, body } of files) {
       if (!/\.(ts|tsx)$/.test(file)) continue;
+      // Auth route-protection specs legitimately list action_queue as a
+      // private table they guard against — exempt them from this check.
+      if (/auth-route-protection/.test(file)) continue;
       expect(body, `${file} must not call action_queue`).not.toMatch(/action_queue/);
       expect(body, `${file} must not call functions.invoke`).not.toMatch(
         /functions\.invoke/,

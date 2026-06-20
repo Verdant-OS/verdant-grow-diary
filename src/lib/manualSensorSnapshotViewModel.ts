@@ -19,6 +19,14 @@ import type {
 
 export const MANUAL_SNAPSHOT_CARD_TITLE = "Manual sensor snapshot" as const;
 export const MANUAL_SNAPSHOT_SOURCE_LABEL = "Manual" as const;
+/**
+ * Neutral note rendered on QuickLog timeline entries that have no
+ * attached sensor snapshot. Visibility-only: never implies the snapshot
+ * was fabricated, defaulted, or treated as healthy. Stays generic so
+ * existing "no live/synced/connected/imported wording" guards still pass.
+ */
+export const MISSING_SNAPSHOT_NOTE_LABEL =
+  "No sensor snapshot attached" as const;
 
 export interface ManualSnapshotRecord {
   id: string;

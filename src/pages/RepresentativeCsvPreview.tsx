@@ -15,6 +15,7 @@ import {
 import {
   applyCsvMappingTemplate,
   CSV_MAPPING_TEMPLATES,
+  detectCsvMappingTemplate,
   getCsvMappingTemplate,
   type CsvMappingTemplateId,
 } from "@/lib/csvMappingTemplates";
@@ -120,8 +121,39 @@ export default function RepresentativeCsvPreview() {
     try {
       const fileText = await file.text();
       const parsed = parseCsv(fileText);
+      const nextHeaders = [...parsed.headers];
       setText(fileText);
-      setHeaders([...parsed.headers]);
+      setHeaders(nextHeaders);
+
+      // Auto-detect a matching template from the header signature.
+      // The grower can always override via the template picker. We never
+      // label data as live, never write — this only pre-fills the mapping.
+      const detected = detectCsvMappingTemplate(nextHeaders);
+      if (detected) {
+        const tpl = getCsvMappingTemplate(detected.templateId);
+        const applied = tpl ? applyCsvMappingTemplate(tpl, nextHeaders) : null;
+        if (tpl && applied && !applied.blocked) {
+          setMapping(applied.mapping);
+          setTemplateId(tpl.id);
+          const confidenceLabel =
+            detected.confidence === "high" ? "exact header signature" : "best match";
+          const parts: string[] = [
+            `Auto-detected template "${tpl.name}" (${confidenceLabel}). Review before trusting.`,
+          ];
+          if (applied.ambiguousFields.length > 0) {
+            parts.push(
+              `Multiple headers matched — review: ${applied.ambiguousFields.join(", ")}.`,
+            );
+          }
+          if (applied.unmatchedFields.length > 0) {
+            parts.push(
+              `No header found for: ${applied.unmatchedFields.join(", ")}.`,
+            );
+          }
+          setTemplateNotice(parts.join(" "));
+          return;
+        }
+      }
       setMapping(defaultMappingFromHeaders(parsed.headers));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to parse CSV";

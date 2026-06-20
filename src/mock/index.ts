@@ -27,6 +27,10 @@ export interface Plant {
   lastNote: string;
   growId?: string | null;
   isArchived?: boolean;
+  /** Growing medium when recorded on the plant profile (e.g. "soil", "coco"). */
+  medium?: string | null;
+  /** Container / pot size when recorded on the plant profile (e.g. "3 gal"). */
+  potSize?: string | null;
 }
 
 /**

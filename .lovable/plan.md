@@ -1,103 +1,84 @@
-## Verdant Command Center — Build Plan
+# GGS 3-in-1 Soil Sensor Pro — Audit Findings + Minimal Slice Plan
 
-A modern, dark, AI-powered grow command center. Existing Supabase pages stay live; new pages use mock data behind a clean abstraction so they can swap to real data later.
+## Audit findings (existing patterns reused, no duplication)
 
-### Navigation & shell
+**Sensor normalization & GGS mapping**
+- `src/lib/spiderFarmerGgsMappingRules.ts` already normalizes Spider Farmer GGS payloads (the parent product line for the 3-in-1 Soil Sensor Pro). It supports `soil_water_content`, `soil_ec`, `soil_temp_c`, `soil_temp_f`, plus alias tolerance, bounds checks, stale window (`SPIDER_FARMER_GGS_STALE_MS = 15min`), `source ∈ live | stale | invalid`, `raw_payload` preservation, and warnings instead of throws.
+- `src/lib/sensors/normalizeSensorReading.ts`, `src/lib/sensorIngestNormalizationRules.ts`, `src/lib/sensorValidation.ts` define the canonical reading shape and metric list.
+- DB trigger `public.validate_sensor_reading` already accepts metrics `soil_moisture_pct`, `ec`, plus the canonical source labels (`live | manual | csv | demo | stale | invalid`).
 
-Single shell with two nav surfaces:
-- **Desktop (≥md):** collapsible left sidebar (icon rail when collapsed), grouped sections.
-- **Mobile (<md):** bottom tab bar with the 5 most-used items (Dashboard, Tents, Logs, Tasks, Alerts) + "More" sheet for the rest.
-- Top header: workspace switcher placeholder, global search, alerts bell with unread dot, user menu.
+**Ingest paths (no new edge function needed)**
+- `supabase/functions/sensor-ingest-webhook/` — generic per-tent bridge webhook.
+- `supabase/functions/pi-ingest-readings/` — Pi/local bridge using `pi_ingest_commit_batch` RPC.
+- `supabase/functions/ecowitt-ingest/`, `ecowitt-real-ingest/` — vendor adapters.
+- The GGS 3-in-1 Soil Sensor Pro is delivered through the same Spider Farmer GGS local bridge (MQTT / Home Assistant / Pi bridge), so it rides the **existing `sensor-ingest-webhook` + Pi bridge** path — no new edge function.
 
-Sidebar groups:
-```text
-OVERVIEW       Dashboard
-GROW           Tents · Plants · Cameras
-DATA           Sensor Data · Grow Logs
-OPERATIONS     Tasks · Alerts
-INTELLIGENCE   AI Grow Doctor · Rewards
-ACCOUNT        Settings
-```
+**Provider labels & source badges**
+- `src/constants/sensorProviderLabels.ts` already includes `spider_farmer_ggs → "Spider Farmer GGS"`.
+- `src/components/TimelineSensorSourceBadge.tsx` + `src/lib/timelineSensorSourceBadgeRules.ts` already render canonical source badges, and Evidence Drawer reuses the same component.
 
-### Pages
+**Quick Log snapshot attach**
+- `src/lib/latestSensorSnapshotRules.ts` builds the latest tent snapshot from long-format `sensor_readings`. Quick Log reads it through `src/components/QuickLogSensorSnapshotStrip.tsx` and attaches via existing `quicklog_save_event` / `quicklog_save_manual` RPCs. Quick Log never inserts sensor readings.
+- `manualSensorSnapshotQualityRules.ts` already classifies fresh/stale/invalid and blocks bad attachments.
 
-1. **Dashboard** — KPI cards (active tents, plants, open alerts, tasks due today), environment summary strip (avg temp/RH/VPD across tents), 24 h sensor sparklines, "Needs attention" list (alerts + overdue tasks), recent log feed, quick-actions.
-2. **Tents** — Grid of tent cards (name, stage, plant count, live temp/RH/VPD chip, light status, alert badge). Click → tent detail drawer with sensors, plants in tent, camera, lighting schedule.
-3. **Plants** — Filterable table/grid (by tent, strain, stage, age). Plant card shows photo, strain, stage, age, last log, health flag. Detail page with timeline, measurements, photos.
-4. **Sensor Data** — Multi-series chart (temp, RH, VPD, CO₂, soil moisture) with tent + range filters (24 h / 7 d / 30 d), threshold bands, downloadable CSV (mock).
-5. **Grow Logs** — Reuses existing Timeline UX (stage progression, filters, edit dialog) — kept on Supabase. New "Log entry" CTA reuses QuickLog.
-6. **Tasks** — Kanban (Today / Upcoming / Done) + list view toggle; recurring task templates (water, feed, defoliate, flush); per-task tent/plant link.
-7. **Cameras** — Grid of live tiles (mock stills), per-camera detail with timelapse strip and snapshot history. Placeholder for Pi bridge.
-8. **Alerts** — Severity-grouped list (critical/warning/info), source (sensor/task/AI), acknowledge & snooze, rule editor (threshold + duration).
-9. **AI Grow Doctor** — Reuses existing Coach (Lovable AI) chat, plus structured "Diagnose photo" flow with mock symptom checklist and recommendation cards.
-10. **Settings** — Profile, units (°C/°F, EC/PPM), notification prefs, integrations stub (Spider Farmer / AC Infinity / Vivosun / Pi 5 — display-only badges), danger zone.
+**What is missing (the minimal slice)**
+1. A thin GGS-soil-only adapter that converts a normalized `SpiderFarmerGgsDraft` (or raw payload) into canonical long-format `sensor_readings` drafts limited to the soil probe metrics, and asserts tent context.
+2. Whitelist `spider_farmer_ggs` in the snapshot/provider trust path so Quick Log shows the correct source chip + Live/stale state.
+3. Tests + static-safety guards.
 
-Existing Supabase pages folded in:
-- **Timeline → Grow Logs** route `/logs` (re-export of current page).
-- **Coach → AI Grow Doctor** route `/doctor`.
-- **Grows** stays as a sub-section under Tents (a tent can have an active grow).
-- **Rewards** stays accessible under Intelligence.
+## File-level plan (additive, minimal)
 
-### Mock data layer
+**New**
+- `src/lib/ggsSoilSensorReadingNormalizer.ts` — pure helper. Input: unknown payload. Output: `{ status: "accepted" | "degraded" | "invalid", source: "live"|"stale"|"invalid", provider: "spider_farmer_ggs", tent_id, plant_id?, captured_at, confidence: "high"|"medium"|"low", readings: { soil_moisture_pct?, soil_temp_c?, ec? }, raw_payload, warnings[] }`. Internally delegates to `normalizeSpiderFarmerGgsPayload` for parsing/bounds and adds soil-only canonical mapping (incl. EC unit-mismatch heuristic, missing-tent rejection, manual-vs-live source rules, NaN/Infinity rejection).
+- `src/lib/ggsSoilSensorSnapshotAttach.ts` — pure adapter that takes the latest validated GGS soil readings for a tent/plant and produces a Quick Log snapshot draft compatible with the existing snapshot attach contract. Never writes.
+- `src/test/ggs-soil-sensor-reading-normalizer.test.ts` — alias coverage (snake + camelCase), missing tent rejection, missing source ≠ live, NaN/Infinity, EC unit-mismatch flag, stale classification, raw_payload preserved but never rendered.
+- `src/test/ggs-soil-sensor-snapshot-attach.test.ts` — latest valid GGS attaches with `source: live`; stale → blocked or visibly marked stale; invalid → blocked; no sensor_readings insert.
+- `src/test/ggs-soil-sensor-ingest-wiring-safety.test.ts` — static safety: no new edge function, no UI `.insert/.update/.delete/.upsert/.rpc/functions.invoke`, no service role / bridge token literal, no XLSX import surface reintroduced, no `raw_payload` rendered, no AI/alert/action-queue writes, no device-control verbs.
+- `src/test/ggs-soil-sensor-timeline-badge.test.tsx` — Timeline + Evidence Drawer render the `spider_farmer_ggs` provider chip with the correct canonical source badge.
 
-- `src/mock/` exports typed fixtures: `tents`, `plants`, `sensorReadings`, `cameras`, `tasks`, `alerts`, `aiInsights`.
-- `src/hooks/useMockData.ts` returns React-Query-style results so swapping to Supabase later is a one-file change.
-- Sensor readings generated as 7-day sine-wave + jitter for realistic charts.
+**Edited (presenters only, no logic duplication)**
+- `src/components/QuickLogSensorSnapshotStrip.tsx` — recognize `provider === "spider_farmer_ggs"` for the soil probe so the provider chip + freshness reuse the existing rules. (Likely already works through `deriveProviderLabel`; will only edit if a test exposes a gap.)
 
-### Reusable components
+**Not touched**
+- No schema/RLS/Edge changes.
+- No new edge function.
+- No UI rewrites.
+- No XLSX/import surfaces.
+- No AI/alerts/action-queue/device-control code.
 
-- `KpiCard`, `MetricChip` (temp/RH/VPD pill with status color), `SensorSparkline`, `EnvironmentChart` (Recharts), `StatusDot`, `SeverityBadge`, `EmptyState`, `PageHeader`, `SectionCard`, `DataTable` wrapper around shadcn Table.
-- `TentCard`, `PlantCard`, `CameraTile`, `TaskCard`, `AlertRow`, `AIInsightCard`.
+## Source & provenance behavior
 
-### Design system
+| Condition | source | confidence |
+|---|---|---|
+| Fresh (<15 min) payload via bridge, tent valid, values in bounds | `live` | `high` |
+| Some metrics valid, others out of bounds/missing | `live` | `medium` (warnings recorded) |
+| Captured_at older than stale window | `stale` | `low` |
+| Malformed / NaN / impossible values / missing tent / unknown source / EC unit mismatch | `invalid` | `low` |
+| Manually entered GGS values | `manual` | per existing manual rules |
 
-Dark premium aesthetic, cannabis-tech accent. All colors via HSL tokens in `index.css` and `tailwind.config.ts`:
-- Background: deep charcoal-green (`hsl(150 12% 6%)`).
-- Surface/glass: layered translucency over background.
-- Primary: vivid leaf green (`hsl(142 70% 48%)`) with glow variant.
-- Accents: amber for warnings, rose for critical, cyan for info.
-- Display font: existing `font-display`; body Inter.
-- Existing `glass`, `gradient-leaf` utilities reused.
+`raw_payload` is preserved on the reading draft; UI guard tests assert it is never rendered.
 
-### Routing (new)
+## Current grow E2E smoke
 
-```text
-/              Dashboard
-/tents         /tents/:id
-/plants        /plants/:id
-/sensors
-/logs          (existing Timeline)
-/tasks
-/cameras       /cameras/:id
-/alerts
-/doctor        (existing Coach + diagnose tab)
-/grows         (existing)
-/rewards       (existing)
-/settings
-```
+- Confirm via `supabase--read_query` whether the signed-in test grow has any `sensor_readings` rows with `source = 'spider_farmer_ggs'`.
+- If yes: run the read-only Quick Log attach path against the latest soil reading and verify Timeline + Evidence Drawer badges.
+- If no: use an explicitly labeled fixture (`source: 'demo'` or test fixture passed directly to the normalizer), and report Sentinel sign-off blocked on a real bridge reading.
 
-### Build order
+## Validation commands
 
-1. Shell: sidebar + mobile bottom nav + header, route scaffolding, design tokens refresh.
-2. Mock data layer + shared components (KpiCard, charts, badges).
-3. Dashboard.
-4. Tents (list + detail) → Plants (list + detail) — share TentContext.
-5. Sensor Data charts.
-6. Tasks (kanban + list).
-7. Alerts (list + rule editor stub).
-8. Cameras (grid + detail).
-9. Settings.
-10. AI Grow Doctor: add diagnose tab next to existing chat.
-11. Polish pass: empty states, loading skeletons, mobile spacing, keyboard nav.
+- `bunx vitest run src/test/ggs-soil-sensor-reading-normalizer.test.ts src/test/ggs-soil-sensor-snapshot-attach.test.ts src/test/ggs-soil-sensor-ingest-wiring-safety.test.ts src/test/ggs-soil-sensor-timeline-badge.test.tsx`
+- `bunx vitest run src/test/spider-farmer-ggs-mapping-rules.test.ts src/test/timeline-sensor-source-badge-component.test.tsx src/test/sensor-source-summary-rules.test.ts`
+- `bun run typecheck` (3 pre-existing ecowitt errors expected, unrelated)
 
-### Out of scope (per your earlier note)
+## Safety verdict (pre-commit, will re-state post-implementation)
 
-- Raspberry Pi 5 bridge, real sensor ingestion, real camera streams — all mocked behind the data layer for a clean swap later.
+- New write path: **no** — normalizer + snapshot adapter are pure.
+- Bypasses ingest validation: **no** — payloads still flow through `validate_sensor_reading` + existing webhook auth.
+- Quick Log inserts sensor readings: **no** — attach only.
+- Alerts / Action Queue / AI / device control: **no**.
+- GGS data clearly labeled `live | manual | stale | invalid`: **yes**.
 
-### Technical notes
+## Risk / rollback
 
-- Charts: Recharts (already in deps).
-- State: React Query for mock async; existing Zustand-style stores for auth/grows/nugs untouched.
-- Mobile nav: shadcn `Sheet` for "More"; bottom bar is a fixed `nav` with safe-area padding.
-- Sidebar: shadcn `Sidebar` with `collapsible="icon"`; active route via `NavLink`.
-- No business-logic changes to existing Supabase tables.
+- Risk: low — additive pure helpers + tests, no schema or edge changes.
+- Rollback: delete the new files and revert any minor `QuickLogSensorSnapshotStrip.tsx` edit.

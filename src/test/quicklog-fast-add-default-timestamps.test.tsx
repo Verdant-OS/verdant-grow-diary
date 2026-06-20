@@ -1,5 +1,5 @@
 /**
- * Tests — Fast Add Quick Log default timestamps.
+ * Tests — Quick Log default timestamps.
  *
  * Pure helper tests. No I/O, no model calls, no Supabase writes.
  */
@@ -29,7 +29,7 @@ describe("buildFastAddTimestampDefaults", () => {
     expect(d.captured_at).toBeUndefined();
   });
 
-  it("Environment Check defaults both captured_at and occurred_at", () => {
+  it("Environment defaults both captured_at and occurred_at", () => {
     const d = buildFastAddTimestampDefaults("environment", now);
     expect(d.occurred_at).toBe(FIXED.toISOString());
     expect(d.captured_at).toBe(FIXED.toISOString());

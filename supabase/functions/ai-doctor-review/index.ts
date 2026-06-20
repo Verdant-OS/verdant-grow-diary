@@ -14,6 +14,12 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateAiDoctorReviewResult } from "./contract.ts";
+import { buildAiDoctorPromptMessages } from "../../../src/lib/aiDoctorPromptAssembly.ts";
+// Measurement-only cost wiring. Pure helpers; no persistence, no I/O.
+import {
+  attachProviderResponseUsageToAiDoctorPromptMeasurement,
+  buildAiDoctorPromptMeasurement,
+} from "../../../src/lib/cost/index.ts";
 
 const TIMEOUT_MS = 25_000;
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -22,14 +28,9 @@ const MODEL = "google/gemini-3-flash-preview";
 const FEATURE = "ai_doctor_review";
 const MODEL_TIER = "standard";
 
-const SYSTEM_PROMPT =
-  "You are a cautious cannabis grow assistant. Reply ONLY through the " +
-  "submit_ai_doctor_review tool. Use grounded, hedged language. Never " +
-  "claim certainty. Never instruct the user to turn on, switch off, " +
-  "toggle, or otherwise control fans, heaters, humidifiers, dehumidifiers, " +
-  "pumps, lights, valves, controllers, or any other equipment. Use " +
-  "advisory phrasing such as 'Avoid…' or 'Do not…' for cautions. Keep all " +
-  "arrays to at most 12 items and at most one short sentence per item.";
+// Base system prompt is composed inside buildAiDoctorPromptMessages so
+// imported CSV/XLSX history guidance and missing-live-readings notes can
+// be appended deterministically without duplicating copy in this file.
 
 const TOOL_SCHEMA = {
   type: "function" as const,
@@ -195,6 +196,15 @@ Deno.serve(async (req) => {
 
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    // Build the prompt once so the assembled text can feed both the upstream
+    // call AND an in-memory cost measurement. Measurement is local-only;
+    // never persisted, logged, or returned to the client.
+    const promptMessages = buildAiDoctorPromptMessages(packet);
+    const promptMeasurement = buildAiDoctorPromptMeasurement({
+      promptName: FEATURE,
+      recordedAt: new Date().toISOString(),
+      userPromptText: promptMessages.user,
+    }).measurement;
     let upstream: Response;
     try {
       upstream = await fetch(GATEWAY_URL, {
@@ -207,12 +217,8 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: MODEL,
           messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            {
-              role: "user",
-              content:
-                "Grower context packet (JSON):\n" + JSON.stringify(packet),
-            },
+            { role: "system", content: promptMessages.system },
+            { role: "user", content: promptMessages.user },
           ],
           tools: [TOOL_SCHEMA],
           tool_choice: {
@@ -244,6 +250,20 @@ Deno.serve(async (req) => {
       await refund("upstream_parse");
       return calmFailure("parse");
     }
+
+    // Provider response boundary: attach provider-reported token usage to the
+    // in-memory prompt measurement. Pure, immutable; never persisted, never
+    // logged, never returned. Raw `payload` is NOT stored anywhere downstream.
+    const measurementWithProviderUsage =
+      attachProviderResponseUsageToAiDoctorPromptMeasurement(
+        promptMeasurement,
+        payload,
+      );
+    // Reference the result so future safe consumers (none yet) can extend
+    // this boundary without changing the call site. No persistence here.
+    void measurementWithProviderUsage;
+
+
 
     const toolArgsStr = readToolArguments(payload);
     if (!toolArgsStr) {

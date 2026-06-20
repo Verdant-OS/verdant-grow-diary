@@ -16,6 +16,7 @@ describe("sensorSourceLabelViewModel", () => {
     expect(b.isManual).toBe(true);
     expect(b.isDegraded).toBe(false);
     expect(b.label.toLowerCase()).not.toContain("live");
+    expect(b.truthCopyGuard.canDescribeAsLive).toBe(false);
   });
 
   it("appends a manual device note when provided", () => {
@@ -48,6 +49,15 @@ describe("sensorSourceLabelViewModel", () => {
     expect(b.label).toBe("Live sensor");
     expect(b.tone).toBe("live");
     expect(b.isDegraded).toBe(false);
+    expect(b.truthCopyGuard.canDescribeAsHealthyLive).toBe(false);
+  });
+
+  it("allows healthy-live copy only when live source also has usable status", () => {
+    const b = buildSensorSourceBadge({ source: "live", status: "usable" });
+    expect(b.truthCopyGuard.verdict).toBe("healthy_live");
+    expect(b.truthCopyGuard.canDescribeAsLive).toBe(true);
+    expect(b.truthCopyGuard.canDescribeAsCurrent).toBe(true);
+    expect(b.truthCopyGuard.canDescribeAsHealthyLive).toBe(true);
   });
 
   it("promotes recognised vendor only for live readings", () => {
@@ -64,6 +74,7 @@ describe("sensorSourceLabelViewModel", () => {
       expect(b.tone).toBe(source);
       expect(b.isDegraded).toBe(true);
       expect(b.label.toLowerCase()).not.toContain("live");
+      expect(b.truthCopyGuard.canDescribeAsHealthyLive).toBe(false);
     },
   );
 
@@ -84,6 +95,7 @@ describe("sensorSourceLabelViewModel", () => {
     expect(b1.label).toBe("Unknown source");
     expect(b1.tone).toBe("unknown");
     expect(b1.isDegraded).toBe(true);
+    expect(b1.truthCopyGuard.verdict).toBe("unknown_blocked");
 
     const b2 = buildSensorSourceBadge({ source: null });
     expect(b2.label).toBe("Unknown source");
@@ -120,5 +132,7 @@ describe("sensorSourceLabelViewModel", () => {
     expect(b.label).toBe("CSV import");
     expect(b.tone).toBe("csv");
     expect(b.isDegraded).toBe(false);
+    expect(b.truthCopyGuard.verdict).toBe("historical_context");
+    expect(b.truthCopyGuard.canDescribeAsLive).toBe(false);
   });
 });

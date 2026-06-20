@@ -21,6 +21,11 @@ import {
   type BlockedRowContext,
 } from "@/lib/csvImportPlanReport";
 import type { CsvPreviewParseResult } from "@/lib/csvSensorPreviewRules";
+import { SensorNormalizationPreviewPanel } from "@/components/SensorNormalizationPreviewPanel";
+import {
+  buildSensorNormalizationPreviewViewModel,
+  type SensorNormalizationPreviewViewModel,
+} from "@/lib/sensors/sensorNormalizationPreviewViewModel";
 
 /**
  * CsvPreviewReviewGate — presentational-only review gate + import plan summary
@@ -151,6 +156,67 @@ function downloadJsonBlob(filename: string, jsonText: string): void {
   URL.revokeObjectURL(url);
 }
 
+// Map csv preview ImportMetric (from FieldMapping.field) to canonical
+// normalizer payload keys understood by normalizeSensorReading.
+const CSV_FIELD_TO_NORMALIZER_KEY: Record<string, string> = {
+  temperature: "temperature_c",
+  humidity: "humidity_pct",
+  vpd: "vpd_kpa",
+  co2: "co2_ppm",
+  vwc: "soil_moisture_pct",
+  ec: "reservoir_ec_ms_cm",
+  substrate_temperature: "soil_temperature_c",
+  ph: "reservoir_ph",
+  ppfd: "ppfd_umol_m2_s",
+};
+
+function buildCsvNormalizationPreview(
+  result: CsvPreviewParseResult,
+  tentId: string,
+  plantId: string,
+  now: Date,
+): SensorNormalizationPreviewViewModel | null {
+  const dataRows = result.rows ?? [];
+  if (dataRows.length === 0) return null;
+
+  const tsIdx = result.mappings.findIndex((m) => m.field === "captured_at");
+  let chosenRow: string[] | null = null;
+  for (const r of dataRows) {
+    if (tsIdx >= 0 && r[tsIdx]) {
+      chosenRow = r;
+      break;
+    }
+  }
+  if (!chosenRow) chosenRow = dataRows[0];
+
+  const payload: Record<string, unknown> = {};
+  result.mappings.forEach((m, colIdx) => {
+    if (!m.field || m.field === "captured_at") return;
+    const key = CSV_FIELD_TO_NORMALIZER_KEY[m.field as string];
+    if (!key) return;
+    const raw = chosenRow![colIdx];
+    if (raw == null || raw === "") return;
+    payload[key] = raw;
+  });
+
+  const capturedAt = tsIdx >= 0 ? (chosenRow[tsIdx] ?? null) : null;
+  const trimmedTent = tentId.trim();
+  const trimmedPlant = plantId.trim();
+
+  return buildSensorNormalizationPreviewViewModel({
+    payload,
+    options: {
+      source: "csv",
+      sourceIdentity: "csv_import",
+      transport: "csv",
+      tentId: trimmedTent ? trimmedTent : null,
+      plantId: trimmedPlant ? trimmedPlant : null,
+      capturedAt: capturedAt || null,
+      now,
+    },
+  });
+}
+
 export function CsvPreviewReviewGate({
   hasHardBlockedRows,
   hasAcceptedRows,
@@ -178,6 +244,13 @@ export function CsvPreviewReviewGate({
   }, [previewResult, growId, tentId, plantId, effectiveNow]);
 
   const plan = built?.plan ?? null;
+
+  const acceptedRowCount = plan?.acceptedWrites.length ?? (hasAcceptedRows ? 1 : 0);
+  const normalizationPreview = useMemo<SensorNormalizationPreviewViewModel | null>(() => {
+    if (!previewResult || !previewResult.ok) return null;
+    if (acceptedRowCount === 0) return null;
+    return buildCsvNormalizationPreview(previewResult, tentId, plantId, effectiveNow);
+  }, [previewResult, tentId, plantId, effectiveNow, acceptedRowCount]);
 
   const [diaryDate, setDiaryDate] = useState<string>(() =>
     effectiveNow.toISOString().slice(0, 16),
@@ -538,6 +611,37 @@ export function CsvPreviewReviewGate({
           </div>
         </div>
       )}
+
+      <section
+        data-testid="csv-normalization-preview-section"
+        data-writes-enabled="false"
+        aria-label="CSV normalization preview"
+        className="rounded-md border border-border bg-muted/10 p-3 space-y-2"
+      >
+        <header className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="text-sm font-semibold">CSV normalization preview</h3>
+          <span
+            data-testid="csv-normalization-preview-section-disclaimer"
+            className="text-xs text-muted-foreground"
+          >
+            Preview only — no sensor readings will be saved.
+          </span>
+        </header>
+        {normalizationPreview ? (
+          <SensorNormalizationPreviewPanel
+            viewModel={normalizationPreview}
+            title="CSV normalization preview"
+            variant="compact"
+          />
+        ) : (
+          <p
+            data-testid="csv-normalization-preview-empty"
+            className="text-xs text-muted-foreground"
+          >
+            No accepted CSV rows are available for normalization preview.
+          </p>
+        )}
+      </section>
 
       <ul data-testid="csv-gate-checklist" className="text-xs text-muted-foreground space-y-0.5">
         <li data-testid="csv-gate-check-grow" data-ok={checks.growSelected}>Grow selected: {checks.growSelected ? "yes" : "no"}</li>

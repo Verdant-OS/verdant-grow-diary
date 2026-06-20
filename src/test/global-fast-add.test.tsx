@@ -26,14 +26,14 @@ function renderAt(pathname: string, props: Parameters<typeof GlobalFastAddButton
 }
 
 describe("fastAddActionRules", () => {
-  it("defines all 8 Fast Add actions in stable order", () => {
+  it("defines all 8 Quick Log presets in stable order", () => {
     expect(FAST_ADD_ACTIONS.map((a) => a.id)).toEqual([
       "diary_note",
+      "photo",
       "watering",
       "feeding",
-      "training",
-      "photo",
       "environment",
+      "training",
       "diagnosis",
       "harvest",
     ]);
@@ -88,7 +88,7 @@ describe("fastAddActionRules", () => {
 });
 
 describe("GlobalFastAddButton", () => {
-  it("renders the Fast Add trigger globally", () => {
+  it("renders the Quick Log trigger globally", () => {
     renderAt("/");
     expect(screen.getByTestId("global-fast-add-trigger")).toBeTruthy();
   });

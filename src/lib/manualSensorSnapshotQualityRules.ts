@@ -1,0 +1,409 @@
+/**
+ * manualSensorSnapshotQualityRules — pure helper that classifies a manual /
+ * current sensor snapshot for grower-facing trust badges.
+ *
+ * Hard constraints:
+ *  - Pure logic. No React, no Supabase, no I/O, no model calls.
+ *  - Read-only classification — never writes Action Queue rows, never
+ *    triggers device control, never creates alerts.
+ *  - Conservative: unknown source can never resolve to "usable".
+ *  - Never classifies invalid / stale / demo telemetry as healthy.
+ */
+
+import {
+  AIR_TEMP_C_RANGE,
+  EC_SUSPICIOUS_MSCM_MAX,
+  HUMIDITY_RANGE,
+  HUMIDITY_STUCK_VALUES,
+  PH_REALISTIC_RANGE,
+  SUBSTRATE_TEMP_C_RANGE,
+  VWC_RANGE,
+} from "@/constants/csvValidationRanges";
+
+/** Default staleness threshold for "current" room confidence. */
+export const MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 6;
+/** Realistic VPD window for indoor grow rooms (kPa). */
+export const VPD_REALISTIC_RANGE = { min: 0.2, max: 2.5 } as const;
+
+export type ManualSnapshotQuality =
+  | "usable"
+  | "needs_review"
+  | "invalid"
+  | "missing";
+
+export type ManualSnapshotSourceLabel =
+  | "manual"
+  | "live"
+  | "csv"
+  | "demo"
+  | "stale"
+  | "invalid"
+  | "unknown";
+
+export interface ManualSensorSnapshotInput {
+  readonly source?: string | null;
+  readonly captured_at?: string | number | Date | null;
+  readonly temperature_c?: number | null;
+  readonly humidity_pct?: number | null;
+  readonly vpd_kpa?: number | null;
+  readonly soil_temp_c?: number | null;
+  readonly soil_moisture_pct?: number | null;
+  readonly soil_ec_mscm?: number | null;
+  readonly ph?: number | null;
+}
+
+export interface ManualSensorSnapshotQuality {
+  readonly quality: ManualSnapshotQuality;
+  readonly sourceLabel: ManualSnapshotSourceLabel;
+  readonly summary: string;
+  readonly reasons: ReadonlyArray<string>;
+  readonly invalidFields: ReadonlyArray<string>;
+  readonly missingFields: ReadonlyArray<string>;
+  readonly canSupportAiDoctorCurrentContext: boolean;
+  readonly canSupportActionSuggestionPreview: boolean;
+}
+
+const KNOWN_SOURCES: ReadonlyArray<ManualSnapshotSourceLabel> = [
+  "manual",
+  "live",
+  "csv",
+  "demo",
+  "stale",
+  "invalid",
+  "unknown",
+];
+
+function normalizeSource(raw: unknown): ManualSnapshotSourceLabel {
+  if (typeof raw !== "string") return "unknown";
+  const s = raw.trim().toLowerCase();
+  return (KNOWN_SOURCES as ReadonlyArray<string>).includes(s)
+    ? (s as ManualSnapshotSourceLabel)
+    : "unknown";
+}
+
+function toMs(v: ManualSensorSnapshotInput["captured_at"]): number | null {
+  if (v == null) return null;
+  if (v instanceof Date) {
+    const t = v.getTime();
+    return Number.isFinite(t) ? t : null;
+  }
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  const t = Date.parse(String(v));
+  return Number.isFinite(t) ? t : null;
+}
+
+function inRange(n: number, r: { min: number; max: number }): boolean {
+  return n >= r.min && n <= r.max;
+}
+
+export interface EvaluateOptions {
+  readonly nowMs?: number;
+  readonly staleHours?: number;
+  /**
+   * Display mode. "current" (default) applies the staleness clock and may
+   * support AI Doctor / Action Queue current-room eligibility. "historical"
+   * evaluates a captured-moment reading for timeline/history surfaces: it
+   * skips the time-based stale rule, never claims current-room support,
+   * and uses historical-phrased summary copy.
+   */
+  readonly mode?: "current" | "historical";
+}
+
+export function evaluateManualSensorSnapshotQuality(
+  input: ManualSensorSnapshotInput | null | undefined,
+  options: EvaluateOptions = {},
+): ManualSensorSnapshotQuality {
+  const reasons: string[] = [];
+  const invalidFields: string[] = [];
+  const missingFields: string[] = [];
+
+  if (!input || typeof input !== "object") {
+    return {
+      quality: "missing",
+      sourceLabel: "unknown",
+      summary: "Missing current reading",
+      reasons: ["No sensor snapshot provided."],
+      invalidFields: [],
+      missingFields: ["snapshot"],
+      canSupportAiDoctorCurrentContext: false,
+      canSupportActionSuggestionPreview: false,
+    };
+  }
+
+  const sourceLabel = normalizeSource(input.source);
+  const capturedMs = toMs(input.captured_at);
+  const nowMs = options.nowMs ?? Date.now();
+  const staleHours = options.staleHours ?? MANUAL_SNAPSHOT_CURRENT_STALE_HOURS;
+  const mode = options.mode ?? "current";
+
+  if (capturedMs == null) {
+    missingFields.push("captured_at");
+    reasons.push("Missing captured-at timestamp.");
+  }
+
+  // Numeric range checks (only when value is present)
+  const checkNum = (
+    field: string,
+    value: number | null | undefined,
+    range: { min: number; max: number },
+    label: string,
+  ) => {
+    if (value == null || !Number.isFinite(value)) return;
+    if (!inRange(value, range)) {
+      invalidFields.push(field);
+      reasons.push(`${label} outside realistic range.`);
+    }
+  };
+
+  checkNum(
+    "temperature_c",
+    input.temperature_c,
+    AIR_TEMP_C_RANGE,
+    "Air temperature",
+  );
+  checkNum(
+    "soil_temp_c",
+    input.soil_temp_c,
+    SUBSTRATE_TEMP_C_RANGE,
+    "Soil temperature",
+  );
+  checkNum("vpd_kpa", input.vpd_kpa, VPD_REALISTIC_RANGE, "VPD");
+  checkNum("ph", input.ph, PH_REALISTIC_RANGE, "pH");
+
+  if (input.humidity_pct != null && Number.isFinite(input.humidity_pct)) {
+    if (!inRange(input.humidity_pct, HUMIDITY_RANGE)) {
+      invalidFields.push("humidity_pct");
+      reasons.push("Humidity outside 0–100%.");
+    } else if (HUMIDITY_STUCK_VALUES.includes(input.humidity_pct)) {
+      invalidFields.push("humidity_pct");
+      reasons.push("Humidity appears stuck at 0 or 100%.");
+    }
+  }
+
+  if (
+    input.soil_moisture_pct != null &&
+    Number.isFinite(input.soil_moisture_pct)
+  ) {
+    if (!inRange(input.soil_moisture_pct, VWC_RANGE)) {
+      invalidFields.push("soil_moisture_pct");
+      reasons.push("Soil moisture outside 0–100%.");
+    } else if (
+      input.soil_moisture_pct === 0 ||
+      input.soil_moisture_pct === 100
+    ) {
+      invalidFields.push("soil_moisture_pct");
+      reasons.push("Soil moisture appears stuck at 0 or 100%.");
+    }
+  }
+
+  if (input.soil_ec_mscm != null && Number.isFinite(input.soil_ec_mscm)) {
+    if (input.soil_ec_mscm < 0) {
+      invalidFields.push("soil_ec_mscm");
+      reasons.push("Soil EC cannot be negative.");
+    } else if (input.soil_ec_mscm > EC_SUSPICIOUS_MSCM_MAX) {
+      invalidFields.push("soil_ec_mscm");
+      reasons.push("Soil EC value looks like µS/cm reported as mS/cm.");
+    }
+  }
+
+  // Stale check — only applies to "current" mode. Historical/timeline
+  // surfaces must not mislead growers by marking captured-moment readings
+  // as stale just because time has passed.
+  let isStaleByTime = false;
+  if (mode === "current" && capturedMs != null) {
+    const ageMs = nowMs - capturedMs;
+    const staleMs = staleHours * 60 * 60 * 1000;
+    if (ageMs > staleMs) {
+      isStaleByTime = true;
+      reasons.push(`Reading older than ${staleHours}h.`);
+    }
+  }
+
+  // Source-driven gates
+  const sourceBlocksCurrent =
+    sourceLabel === "csv" ||
+    sourceLabel === "demo" ||
+    sourceLabel === "stale" ||
+    sourceLabel === "invalid" ||
+    sourceLabel === "unknown";
+
+  let quality: ManualSnapshotQuality;
+  let summary: string;
+
+  const isHistorical = mode === "historical";
+
+  if (sourceLabel === "invalid" || invalidFields.length > 0) {
+    quality = "invalid";
+    summary = isHistorical
+      ? "Historical invalid reading — review before use"
+      : "Invalid reading";
+  } else if (capturedMs == null) {
+    quality = "missing";
+    summary = isHistorical
+      ? "Missing captured timestamp"
+      : "Missing current reading";
+  } else if (sourceLabel === "unknown") {
+    quality = "needs_review";
+    summary = isHistorical ? "Historical reading needs review" : "Needs review";
+    reasons.unshift("Sensor source unknown.");
+  } else if (sourceLabel === "csv") {
+    quality = "needs_review";
+    summary = isHistorical ? "Historical reading needs review" : "Needs review";
+    reasons.unshift("CSV history only — not a current-room reading.");
+  } else if (sourceLabel === "demo") {
+    quality = "needs_review";
+    summary = isHistorical ? "Historical reading needs review" : "Needs review";
+    reasons.unshift("Demo data — not a current-room reading.");
+  } else if (sourceLabel === "stale" || isStaleByTime) {
+    quality = "needs_review";
+    summary = isHistorical ? "Historical reading needs review" : "Needs review";
+    if (sourceLabel === "stale") {
+      reasons.unshift("Snapshot labeled stale.");
+    }
+  } else {
+    quality = "usable";
+    summary = isHistorical ? "Historical review reading" : "Usable current reading";
+  }
+
+  if (isHistorical) {
+    // Historical-mode surfaces must never claim current-room support, even
+    // when the captured values themselves look fine.
+    reasons.push("Not current-room guidance.");
+  }
+
+  const canSupportAiDoctorCurrentContext =
+    !isHistorical && quality === "usable" && !sourceBlocksCurrent;
+  const canSupportActionSuggestionPreview = canSupportAiDoctorCurrentContext;
+
+  return {
+    quality,
+    sourceLabel,
+    summary,
+    reasons: Object.freeze([...reasons]),
+    invalidFields: Object.freeze([...invalidFields]),
+    missingFields: Object.freeze([...missingFields]),
+    canSupportAiDoctorCurrentContext,
+    canSupportActionSuggestionPreview,
+  };
+}
+
+export const MANUAL_SNAPSHOT_QUALITY_SOURCE_LABELS: Readonly<
+  Record<ManualSnapshotSourceLabel, string>
+> = Object.freeze({
+  manual: "Source: manual",
+  live: "Source: live",
+  csv: "Source: csv — history only",
+  demo: "Source: demo",
+  stale: "Source: stale",
+  invalid: "Source: invalid",
+  unknown: "Source: unknown",
+});
+
+// ---------------------------------------------------------------------------
+// AI Doctor context → sanitized current-snapshot derivation
+// ---------------------------------------------------------------------------
+
+/** Minimal reading shape accepted from AI Doctor context sensor groups. */
+interface CurrentSnapshotReadingLike {
+  readonly captured_at?: string | null;
+  readonly metric?: string | null;
+  readonly value?: number | null;
+  readonly source_tag?: string | null;
+}
+
+interface CurrentSnapshotGroupLike {
+  readonly source?: string | null;
+  readonly readings?: ReadonlyArray<CurrentSnapshotReadingLike> | null;
+}
+
+interface CurrentSnapshotContextLike {
+  readonly sensor_groups?: ReadonlyArray<CurrentSnapshotGroupLike> | null;
+}
+
+const SOURCE_PRIORITY: ReadonlyArray<ManualSnapshotSourceLabel> = [
+  "live",
+  "manual",
+  "stale",
+  "demo",
+  "csv",
+  "invalid",
+];
+
+const METRIC_MAP: Readonly<
+  Record<string, keyof ManualSensorSnapshotInput>
+> = Object.freeze({
+  temperature_c: "temperature_c",
+  humidity_pct: "humidity_pct",
+  vpd_kpa: "vpd_kpa",
+  soil_temp_c: "soil_temp_c",
+  soil_moisture_pct: "soil_moisture_pct",
+  soil_ec_mscm: "soil_ec_mscm",
+  ph: "ph",
+});
+
+/**
+ * Build a sanitized ManualSensorSnapshotInput from an AI Doctor context.
+ * Only well-known numeric metric fields and the captured_at timestamp are
+ * propagated. Vendor metadata, raw payloads, tokens, filenames, private
+ * IDs, and unknown metrics are never forwarded.
+ *
+ * Returns null when no live/manual/stale/csv/demo/invalid group with at
+ * least one reading is available — caller should treat as "missing".
+ */
+export function deriveCurrentSnapshotFromAiDoctorContext(
+  context: CurrentSnapshotContextLike | null | undefined,
+): ManualSensorSnapshotInput | null {
+  const groups = context?.sensor_groups ?? [];
+  if (!Array.isArray(groups) || groups.length === 0) return null;
+
+  let chosen: CurrentSnapshotGroupLike | null = null;
+  let chosenPriority = SOURCE_PRIORITY.length;
+  for (const g of groups) {
+    if (!g || !Array.isArray(g.readings) || g.readings.length === 0) continue;
+    const src = normalizeSource(g.source);
+    const p = SOURCE_PRIORITY.indexOf(src);
+    if (p === -1) continue;
+    if (p < chosenPriority) {
+      chosen = g;
+      chosenPriority = p;
+    }
+  }
+  if (!chosen || !chosen.readings) return null;
+
+  const fields: Record<string, unknown> = {};
+  let latestCapturedMs: number | null = null;
+  let latestCapturedIso: string | null = null;
+
+  // Walk newest-first per metric.
+  const sorted = [...chosen.readings]
+    .filter((r) => r && typeof r.captured_at === "string")
+    .sort((a, b) => {
+      const ta = Date.parse(String(a.captured_at));
+      const tb = Date.parse(String(b.captured_at));
+      return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
+    });
+
+  for (const r of sorted) {
+    const metric = typeof r.metric === "string" ? r.metric : "";
+    const key = METRIC_MAP[metric];
+    if (!key) continue;
+    if (fields[key] !== undefined) continue;
+    if (typeof r.value !== "number" || !Number.isFinite(r.value)) continue;
+    fields[key] = r.value;
+    const ts = Date.parse(String(r.captured_at));
+    if (Number.isFinite(ts) && (latestCapturedMs == null || ts > latestCapturedMs)) {
+      latestCapturedMs = ts;
+      latestCapturedIso = String(r.captured_at);
+    }
+  }
+
+  if (latestCapturedIso == null && Object.keys(fields).length === 0) {
+    return null;
+  }
+
+  return {
+    source: normalizeSource(chosen.source),
+    captured_at: latestCapturedIso,
+    ...(fields as ManualSensorSnapshotInput),
+  };
+}

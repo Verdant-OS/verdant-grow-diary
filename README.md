@@ -1,5 +1,9 @@
 # Verdant
 
+[![Quick Log Playwright smoke](https://github.com/Verdant-OS/verdant-grow-diary/actions/workflows/quicklog-smoke.yml/badge.svg?branch=verdant-grow-diary)](https://github.com/Verdant-OS/verdant-grow-diary/actions/workflows/quicklog-smoke.yml)
+
+Quick links: [Workflow](https://github.com/Verdant-OS/verdant-grow-diary/actions/workflows/quicklog-smoke.yml) · [Latest run](https://github.com/Verdant-OS/verdant-grow-diary/actions/workflows/quicklog-smoke.yml?query=branch%3Averdant-grow-diary) · Artifacts are attached to each completed run under `quicklog-smoke-artifacts` (open the run page → Artifacts).
+
 Verdant is a standalone Grow Room Operating System. It turns grow logs, plant photos, sensor readings, alerts, and AI-assisted analysis into safer grow decisions and better harvest outcomes.
 
 The current product priority is the V0 operating loop:
@@ -66,11 +70,60 @@ npm run build
 
 All existing tests must pass. New behavior must ship with new tests.
 
+Scanner guardrail changes must also run the CI-equivalent sentinel:
+
+```bash
+bun run test:scanner-guardrails:ci
+```
+
+See [`docs/testing/scanner-guardrails.md`](docs/testing/scanner-guardrails.md) for `scannerIt`, `installScannerGuardrail`, cached scanner walks, and slow-test telemetry rules.
+
 Watch-mode tests:
 
 ```bash
 npx vitest
 ```
+
+### Scanner guardrail sentinel
+
+The scanner guardrail suite walks the filesystem and is the most likely
+source of environmental timeout flakes. A 5000ms slow-test sentinel
+appends offenders to `test-results/scanner-guardrail-slow-tests.jsonl`.
+
+```bash
+bun run test:scanner-guardrails           # raw scanner sentinel (vitest)
+bun run test:scanner-guardrails:ci        # CI-equivalent wrapper:
+                                          #   - deletes the stale report
+                                          #   - runs the scanner suite
+                                          #   - validates JSONL row contract
+                                          #   - fails the build if any slow
+                                          #     row was emitted
+bun run test:scanner-guardrails:ci -- --verbose
+                                          # also prints report path, threshold,
+                                          # stale-report removal state,
+                                          # post-run report presence, row count,
+                                          # validation stats (valid/invalid/slow),
+                                          # and the value-preview truncation limit
+bun run test:scanner-guardrails:clean                # remove the default report
+bun run test:scanner-guardrails:clean -- <path>      # remove a specific report file
+```
+
+Report path: `test-results/scanner-guardrail-slow-tests.jsonl`.
+
+Diagnostics behavior:
+
+- Under `GITHUB_ACTIONS=true`, the CI wrapper emits one `::error`
+  annotation per invalid or slow telemetry row (not just the first).
+  Annotations include report path, JSONL line number, suite/test/file,
+  `durationMs`/`thresholdMs`, and the failed-fields list.
+- Field diffs are compact and per-row. Each value is run through a
+  truncating preview capped at the configured limit (80 characters by
+  default) so log output stays small and never dumps full payloads.
+- Local terminal output remains readable; only the `::error` lines are
+  added under GitHub Actions.
+
+See [`docs/testing/scanner-guardrails.md`](docs/testing/scanner-guardrails.md)
+for the full contract.
 
 ## Development workflow & safety standards
 
@@ -130,6 +183,9 @@ covers signed-bridge happy-path, replay/idempotency, tampered signature, and
 unknown-bridge cases. The contract that runbook verifies lives in
 [`docs/pi-ingest-write-transaction-contract.md`](docs/pi-ingest-write-transaction-contract.md).
 
+Windows EcoWitt local testbench: see
+[`docs/ecowitt-windows-testbench.md`](docs/ecowitt-windows-testbench.md).
+
 ## Safety philosophy
 
 Verdant follows a read-only, no-write, no-control architecture for advisory
@@ -151,10 +207,12 @@ regression checklist.
 
 ## Documentation
 
+- [AI Doctor Phase 1 Contract](docs/ai-doctor-phase1-contract.md) — deterministic offline pipeline, source-truth rules, confidence caps, golden cases, and view model contract
 - [BuildOps Kit](docs/buildops-kit/README.md) — product context, safety rules, fixtures, templates
 - [Glossary](docs/glossary.md)
 - [One-Tent Loop](docs/one-tent-loop.md)
 - [QA regression checklist](docs/qa-regression-checklist.md)
 - [Launch checklist](docs/launch-checklist.md)
 - [Security checklist](docs/security-checklist.md)
+- [Scanner guardrail harness](docs/testing/scanner-guardrails.md) — scannerIt/installScannerGuardrail usage and slow-test telemetry contract
 - [Pi-ingest smoke runbook](docs/pi-ingest-smoke-runbook.md)

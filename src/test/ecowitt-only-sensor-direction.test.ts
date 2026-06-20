@@ -8,8 +8,17 @@
  * Pure / read-only. No I/O against Supabase. No automation.
  */
 import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { readFileSync } from "node:fs";
+import { relative, resolve, sep } from "node:path";
+
+// Standardised scanner guardrail timeout + slow-test telemetry.
+// Replaces the previous per-file vi.setConfig bump. No scanner pattern,
+// allowlist, or assertion is changed.
+import {
+  getCachedScannerFiles,
+  installScannerGuardrail,
+} from "./support/scannerGuardrailHarness";
+installScannerGuardrail({ file: __filename });
 
 const ROOT = resolve(__dirname, "../..");
 
@@ -46,6 +55,9 @@ const ALLOWED = new Set([
   "docs/ecowitt-only-sensor-direction.md",
   "src/test/ecowitt-only-sensor-direction.test.ts",
   ".github/workflows/ecowitt-only-safety-scan.yml",
+  // Intentional: the stop-ship checklist *defines* the safety scan and
+  // uses SwitchBot as an example of a retired brand to watch for.
+  "docs/v0-sentinel-stop-ship-checklist.md",
 ]);
 
 const PATTERN = /switch[\s_-]?bot/i;
@@ -77,9 +89,18 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+// Memoise the repo walk across `it`s in this file. The scanner only
+// reads files — it never mutates them — so a per-worker cache is safe.
+let cachedScanFiles: string[] | null = null;
+function getScanFiles(): string[] {
+  if (cachedScanFiles) return cachedScanFiles;
+  cachedScanFiles = SCAN_DIRS.flatMap((d) => walk(join(ROOT, d)));
+  return cachedScanFiles;
+}
+
 describe("EcoWitt-only sensor direction", () => {
   it("contains zero SwitchBot references outside the explicit allow-list", () => {
-    const files = SCAN_DIRS.flatMap((d) => walk(join(ROOT, d)));
+    const files = getScanFiles();
     const offenders: string[] = [];
     for (const f of files) {
       const rel = relative(ROOT, f).split(sep).join("/");

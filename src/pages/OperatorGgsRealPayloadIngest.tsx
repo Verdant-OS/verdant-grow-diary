@@ -74,38 +74,38 @@ export default function OperatorGgsRealPayloadIngest() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Tent</CardTitle>
-          <CardDescription>Select a tent. RLS still applies — you only see tents you own.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <select
-            aria-label="Select tent for GGS Sentinel"
-            data-testid="ggs-sentinel-tent-select"
-            className="rounded-md border bg-background px-3 py-2 text-sm"
-            value={selectedTentId}
-            onChange={(e) => setSelectedTentId(e.target.value)}
-          >
-            <option value="">Select tent…</option>
-            {tents.map((t: { id: string; name: string }) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-          {ggsRowsQ.isLoading && (
-            <div className="text-xs text-muted-foreground">Loading latest GGS rows…</div>
-          )}
-          {ggsRowsQ.isError && (
-            <div className="text-xs text-destructive" data-testid="ggs-sentinel-fetch-error">
-              Could not load GGS rows. Read-only query failed; check RLS / network.
+      {(role.status === "denied" || role.status === "unauthenticated") && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <ShieldOff className="h-5 w-5 text-destructive" />
+              <CardTitle>Operator access required</CardTitle>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <CardDescription>
+              This screen is restricted to operators with the <code>admin</code> role.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            If you believe this is a mistake, ask an existing admin to grant the role.
+          </CardContent>
+        </Card>
+      )}
 
-      <GgsSentinelSmokeRunnerPanel viewModel={panelVm} />
+      {role.status === "error" && (
+        <Alert variant="destructive">
+          <AlertTitle>Could not verify operator role</AlertTitle>
+          <AlertDescription>
+            {role.error ?? "Role check failed."} The ingest panel is disabled.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {role.status === "granted" && (
+        <>
+          <GgsRealPayloadIngestPanel />
+          <GgsSentinelSmokeRunnerPanel />
+        </>
+      )}
     </div>
   );
 }

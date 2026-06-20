@@ -72,3 +72,128 @@ Any actionable output flows through the Approval-Required Action Queue.
 
 A single photo or single reading is never sufficient for `high` confidence.
 Diagnoses from one input must be `low` or `medium` with populated `missing_info`.
+
+## Imported history safety
+
+Imported CSV/XLSX sensor history is **background only** — never live
+telemetry. The safety contract for AI Doctor's handling of imported
+history is documented and QA-tracked separately:
+
+- Runbook: [`runbooks/ai-doctor-imported-history.md`](./runbooks/ai-doctor-imported-history.md)
+- QA checklist: [`qa/ai-doctor-imported-history-safety-checklist.md`](./qa/ai-doctor-imported-history-safety-checklist.md)
+- Release note: [`releases/ai-doctor-imported-history-safety.md`](./releases/ai-doctor-imported-history-safety.md)
+
+This is documentation, QA, and safety validation only — no new AI
+diagnosis behavior shipped.
+
+## Current sensor snapshot quality
+
+The **Manual Sensor Snapshot quality badge** is a presenter/readiness
+context component that tells growers whether a current sensor snapshot
+can support AI Doctor current-room context and Action Queue suggestion
+preview eligibility.
+
+What it is:
+- A **read-only quality indicator** (`usable`, `needs_review`, `invalid`, `missing`).
+- Derived from a **sanitized** snapshot containing only whitelisted numeric
+  metrics (`temperature_c`, `humidity_pct`, `ph`, `ec_ms_cm`, `vpd_kpa`, `soil_moisture_pct`).
+- Rendered next to current readings in the AI Doctor context readiness panel.
+
+What it is NOT:
+- It does **not** create Action Queue rows.
+- It does **not** call Supabase, Edge Functions, or models.
+- It does **not** render raw payloads, vendor secrets, bridge tokens, or private IDs.
+
+Eligibility by source:
+- `live` and `manual` current readings can support AI Doctor current context
+  and Action Queue suggestion preview **when values pass validation**.
+- `csv` is **history-only** — never treated as current live telemetry.
+- `demo`, `stale`, `invalid`, and `unknown` sources **cannot** support
+  current-room decisions.
+
+Validation rules:
+- **Stale threshold**: `MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 6`.
+  Readings older than 6 hours are treated as stale and cannot support
+  current context.
+- **Humidity stuck at 0 or 100 %** → flagged invalid or needs review.
+- **Soil moisture stuck at 0 or 100 %** → flagged invalid or needs review.
+- **EC > 50 mS/cm** → treated as likely unit mismatch, flagged invalid or
+  needs review.
+- **pH outside realistic range** → flagged invalid or needs review.
+- **Temperature / VPD out of range** → flagged invalid or needs review.
+- **Missing or unparseable timestamp** → flagged missing or invalid.
+
+Sanitization boundary:
+- Only known, safe, numeric metrics are mapped to the badge input.
+- `raw_payload`, `service_role`, tokens, vendor metadata, and internal IDs
+  are explicitly stripped during derivation.
+- The presenter (`ManualSensorSnapshotQualityBadge`) never renders raw
+  payload fields or private strings.
+
+Validation:
+- Helper tests: `src/test/manual-sensor-snapshot-quality-rules.test.ts`
+- Presenter tests: `src/test/manual-sensor-snapshot-quality-badge.test.tsx`
+- Integration tests: `src/test/ai-doctor-context-readiness-panel-current-snapshot-quality.test.tsx`
+- Known good results: 18/18 helper + badge tests pass; 65/65 related
+  readiness/imported-history/action-preview tests pass; 5/5 integration
+  tests pass.
+
+## Action Queue suggestion preview
+
+The Action Queue suggestion preview is a read-only, context-only
+presenter embedded inside the AI Doctor readiness panel. It tells the
+grower whether the current context is sufficient to later support a safe,
+approval-required Action Queue suggestion.
+
+What it does:
+- Evaluates eligibility based on current live/manual sensor readings and
+  plant/tent/stage context.
+- Shows deterministic status chips (`eligible`, `needs_current_reading`,
+  `missing_context`, `blocked_invalid_data`, `blocked_device_command_risk`).
+- Lists missing context fields and invalid/unknown telemetry fields
+  explicitly so growers know what to add or review.
+- Renders conservative suggested copy and safety notes
+  (`Approval required`, `No device control`, `Preview only`).
+
+What it does NOT do:
+- **Never creates an Action Queue row.**
+- **Never calls Supabase, Edge Functions, or any model.**
+- **Never emits executable device commands.**
+- **Never promotes imported CSV history to live telemetry.**
+- **Never classifies invalid or unknown telemetry as healthy.**
+
+Eligibility rules:
+- `eligible` requires plant context (plant, tent, stage) AND at least one
+  current live or manual sensor snapshot.
+- `needs_current_reading` is returned when only imported CSV history is
+  available. Imported history is treated as background only.
+- `missing_context` is returned when plant, tent, or stage is absent.
+- `blocked_invalid_data` is returned when critical telemetry is flagged
+  invalid or unknown.
+- `blocked_device_command_risk` is returned when candidate suggestion text
+  matches device-command patterns (e.g. "turn on", "pump", "dose",
+  "setpoint", "mqtt publish").
+
+UI safety boundaries:
+- Safety notes always include: `Approval required`, `No device control`,
+  `Preview only — no Action Queue item is created.`
+- Suggested copy is conservative and avoids nutrient, irrigation, and
+  equipment-control language.
+- A UI-level `isUnsafePreviewText` filter drops any string containing
+  `approved`, `queued`, `executed`, `turn on/off`, `pump`, `dose`,
+  `set temp`, `set humidity`, or `mqtt publish` before it reaches the DOM.
+- The preview card is a `<section>` with `aria-labelledby` and
+  `aria-describedby`, including a `role="status"` screen-reader summary.
+- No `<button>` elements are rendered inside the preview card.
+
+Validation:
+- Helper tests: `src/test/ai-doctor-action-suggestion-preview-rules.test.ts`
+- Presenter tests: `src/test/ai-doctor-action-suggestion-preview-panel.test.tsx`
+- Known good results: 27/27 helper + presenter tests pass; 38/38
+  imported-history + readiness regression tests pass.
+
+See also:
+- Manual snapshot quality: `src/lib/manualSensorSnapshotQualityRules.ts`
+- Runbook: `runbooks/ai-doctor-action-suggestion-preview-qa.md`
+- QA checklist: `qa/ai-doctor-imported-history-safety-checklist.md`
+- Release note: `releases/ai-doctor-imported-history-safety.md`

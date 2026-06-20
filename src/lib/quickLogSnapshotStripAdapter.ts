@@ -20,6 +20,10 @@ import {
 } from "@/lib/sensorSnapshotStatusContract";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
 import { deriveProviderLabel } from "@/constants/sensorProviderLabels";
+import {
+  classifySnapshotTrustBadge,
+  type SnapshotTrustBadgeView,
+} from "@/lib/sensorSnapshotTrustBadgeRules";
 
 export type QuickLogSnapshotStripStatus =
   | "usable"
@@ -56,6 +60,13 @@ export interface QuickLogSnapshotStripViewModel {
    * by this chip. Pure presentation; never widens trust.
    */
   providerLabel: string | null;
+  /**
+   * Trust badge view (Live/Stale/Invalid/Manual/Demo/CSV) derived from
+   * `sensorSnapshotTrustBadgeRules`. Provider/vendor identity is rendered
+   * separately and never substituted for trust. Stale/invalid/unknown
+   * snapshots are never attachable as Live context.
+   */
+  trustBadge: SnapshotTrustBadgeView;
 }
 
 const TITLES: Record<QuickLogSnapshotStripStatus, string> = {
@@ -170,6 +181,7 @@ export function buildQuickLogSnapshotStrip(
       action: actionFor("no_data"),
       classification,
       providerLabel: null,
+      trustBadge: classifySnapshotTrustBadge({ empty: true, source: snapshot?.source ?? null }),
     };
   }
 
@@ -219,6 +231,19 @@ export function buildQuickLogSnapshotStrip(
     action: finalAction,
     classification,
     providerLabel: deriveProviderLabel(src),
+    trustBadge: classifySnapshotTrustBadge({
+      resolverStatus:
+        status === "usable"
+          ? src === "live"
+            ? "fresh_live"
+            : "fresh_non_live"
+          : status === "stale"
+            ? "stale"
+            : status === "invalid"
+              ? "invalid"
+              : "empty",
+      source: src,
+    }),
   };
 }
 
@@ -329,6 +354,7 @@ export function buildQuickLogStripFromTentState(
       action: actionFor("no_data"),
       classification: synthClassification("no_data", "No sensor data yet"),
       providerLabel: null,
+      trustBadge: classifySnapshotTrustBadge({ empty: true, source: snapshot.source ?? null }),
     };
   }
 
@@ -357,5 +383,9 @@ export function buildQuickLogStripFromTentState(
     action,
     classification: synthClassification(status, snapshot.badge_label),
     providerLabel: deriveProviderLabel(snapshot.source),
+    trustBadge: classifySnapshotTrustBadge({
+      resolverStatus: snapshot.status,
+      source: snapshot.source,
+    }),
   };
 }

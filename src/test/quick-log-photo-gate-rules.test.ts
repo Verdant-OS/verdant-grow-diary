@@ -5,28 +5,22 @@ import {
 } from "@/lib/quickLogPhotoGateRules";
 
 describe("quickLogPhotoGateRules", () => {
-  it("isQuickLogPhotoSavingSupported returns false in Gate 1", () => {
-    expect(isQuickLogPhotoSavingSupported()).toBe(false);
+  it("isQuickLogPhotoSavingSupported returns true for active Quick Log attachments", () => {
+    expect(isQuickLogPhotoSavingSupported()).toBe(true);
   });
 
-  it("buildQuickLogPhotoGateState returns supported=false", () => {
+  it("buildQuickLogPhotoGateState returns supported=true", () => {
     const gate = buildQuickLogPhotoGateState();
-    expect(gate.supported).toBe(false);
-    expect(gate.reason).toBe("photo_saving_not_enabled");
+    expect(gate.supported).toBe(true);
+    expect(gate.reason).toBe("enabled");
   });
 
-  it("gate state includes calm disabled copy", () => {
+  it("enabled gate state has no disabled copy", () => {
     const gate = buildQuickLogPhotoGateState();
-    expect(gate.disabledTitle).toBe("Photo saving is not enabled yet");
-    expect(gate.disabledCopy).toMatch(/not enabled yet/i);
-    expect(gate.disabledCopy).not.toMatch(/upload works/i);
-    expect(gate.disabledCopy).not.toMatch(/live/i);
-  });
-
-  it("gate state includes aria label and helper text", () => {
-    const gate = buildQuickLogPhotoGateState();
-    expect(gate.ariaLabel).toMatch(/unavailable/i);
-    expect(gate.helperText).toMatch(/not be stored/i);
+    expect(gate.disabledTitle).toBe("");
+    expect(gate.disabledCopy).toBe("");
+    expect(gate.helperText).toBe("");
+    expect(gate.ariaLabel).toBe("Photo saving is available");
   });
 
   it("gate state includes future action label", () => {
@@ -34,7 +28,7 @@ describe("quickLogPhotoGateRules", () => {
     expect(gate.futureActionLabel).toBe("Add photo");
   });
 
-  it("gate state exposes active picker labels for PlantQuickLog reuse", () => {
+  it("gate state exposes active picker labels", () => {
     const gate = buildQuickLogPhotoGateState();
     expect(gate.takePhotoLabel).toBe("Take Photo");
     expect(gate.chooseLibraryLabel).toBe("Choose from Library");
@@ -42,16 +36,6 @@ describe("quickLogPhotoGateRules", () => {
     expect(gate.pickerHelperText).toMatch(/optional/i);
     expect(gate.cameraInputAriaLabel).toMatch(/camera/i);
     expect(gate.libraryInputAriaLabel).toMatch(/library/i);
-  });
-
-  it("active picker labels are present regardless of supported flag", () => {
-    // Even while photo saving is gated off in QuickLogV2Sheet, PlantQuickLog
-    // still renders the active picker, so labels must always be populated.
-    const gate = buildQuickLogPhotoGateState();
-    expect(gate.takePhotoLabel.length).toBeGreaterThan(0);
-    expect(gate.chooseLibraryLabel.length).toBeGreaterThan(0);
-    expect(gate.cameraInputAriaLabel.length).toBeGreaterThan(0);
-    expect(gate.libraryInputAriaLabel.length).toBeGreaterThan(0);
   });
 
   it("gate state is deterministic (same output every call)", () => {

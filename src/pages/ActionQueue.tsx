@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -22,12 +22,27 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Check, X, FlaskConical, ListChecks, History, CheckCircle2, Ban } from "lucide-react";
+import { Loader2, Check, X, FlaskConical, ListChecks, History, CheckCircle2, Ban, RefreshCw } from "lucide-react";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
-import { buildActionRowAriaLabel, buildActionButtonAriaLabel, buildStatusBadgeAriaLabel, sanitizeActionCopy } from "@/lib/actionQueueRowView";
+import {
+  buildActionRowAriaLabel,
+  buildActionButtonAriaLabel,
+  buildStatusBadgeAriaLabel,
+  sanitizeActionCopy,
+  formatActionTargetLabel,
+  APPROVE_DIALOG_REASSURANCE,
+} from "@/lib/actionQueueRowView";
+import {
+  buildActionEvidenceViewModel,
+  ACTION_QUEUE_EMPTY_PENDING_TITLE,
+  ACTION_QUEUE_EMPTY_PENDING_HELP,
+  type ActionEvidenceViewModel,
+} from "@/lib/actionQueueEvidenceViewModel";
+import { formatLastUpdatedAgo } from "@/lib/lastUpdatedAgo";
+
 import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
 import {
@@ -178,6 +193,34 @@ function LinkedAlertLink({
   );
 }
 
+const EVIDENCE_TONE_VARIANT: Record<ActionEvidenceViewModel["rowEvidenceStatusTone"], string> = {
+  ok: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  neutral: "text-muted-foreground border-border/60",
+  caution: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+};
+
+/**
+ * Compact evidence-status badge for Action Queue rows.
+ * Scan-friendly: growers see at a glance whether evidence is available,
+ * unavailable, or missing — without raw payloads, IDs, or automation copy.
+ */
+function EvidenceStatusBadge({ vm }: { vm: ActionEvidenceViewModel }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Badge
+        variant="outline"
+        className={`text-[10px] uppercase ${EVIDENCE_TONE_VARIANT[vm.rowEvidenceStatusTone]}`}
+        data-testid={`action-queue-row-evidence-status-${vm.rowEvidenceStatus}`}
+        aria-label={`Evidence: ${vm.rowEvidenceStatusLabel}. ${vm.rowEvidenceStatusHelp}`}
+        title={vm.rowEvidenceStatusHelp}
+      >
+        {vm.rowEvidenceStatusLabel}
+      </Badge>
+      <span className="sr-only">{vm.rowEvidenceStatusHelp}</span>
+    </span>
+  );
+}
+
 
 
 
@@ -194,6 +237,9 @@ export default function ActionQueue() {
   const [rows, setRows] = useState<ActionRow[]>([]);
   const [events, setEvents] = useState<Record<string, EventRow[]>>({});
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [noteDialog, setNoteDialog] = useState<
     { row: ActionRow; kind: "approve" | "reject" | "simulate" | "complete" | "cancel" } | null
@@ -239,7 +285,14 @@ export default function ActionQueue() {
 
   const load = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    // Distinguish initial load from background refetch so existing rows
+    // are never cleared/replaced by a skeleton. Refresh is presenter-only
+    // — it never fakes data and never blocks approval controls.
+    if (hasLoadedOnceRef.current) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     const q = supabase
       .from("action_queue")
       .select(
@@ -248,7 +301,11 @@ export default function ActionQueue() {
       .order("created_at", { ascending: false })
       .limit(100);
     const { data, error } = effectiveGrowId ? await q.eq("grow_id", effectiveGrowId) : await q;
-    if (error) toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setLastUpdatedAt(Date.now());
+    }
     const list = (data ?? []) as ActionRow[];
     setRows(list);
 
@@ -268,7 +325,16 @@ export default function ActionQueue() {
       setEvents({});
     }
     setLoading(false);
+    setIsRefreshing(false);
+    hasLoadedOnceRef.current = true;
   }, [user, effectiveGrowId]);
+
+  // Reset the initial-load gate when grow scope changes so the user gets
+  // the full skeleton (not just a subtle refresh) on a scope switch.
+  useEffect(() => {
+    hasLoadedOnceRef.current = false;
+    setLastUpdatedAt(null);
+  }, [effectiveGrowId]);
 
   useEffect(() => {
     load();
@@ -359,7 +425,7 @@ export default function ActionQueue() {
     if (kind === "simulate") {
       // Simulation NEVER sends device commands. Status + audit only.
       toast.message("Simulated (no device command sent)", {
-        description: `${row.action_type} → ${row.target_metric ?? row.target_device}`,
+        description: `${row.action_type} → ${formatActionTargetLabel(row.target_metric, row.target_device)}`,
       });
     }
     const patch = buildTransitionPatch(kind);
@@ -383,7 +449,8 @@ export default function ActionQueue() {
     approve: {
       title: "Approve Action",
       description:
-        "Approved actions are recorded for future manual or controlled execution. No equipment command is sent.",
+        "Approved actions are recorded for future manual or controlled execution. No equipment command is sent. " +
+        APPROVE_DIALOG_REASSURANCE,
       label: "Approval note",
       placeholder: "Optional — why are you approving?",
       confirmLabel: "Approve",
@@ -480,11 +547,32 @@ export default function ActionQueue() {
         <h1 className="text-2xl font-display font-bold flex items-center gap-2">
           <ListChecks className="h-5 w-5 text-primary" />
           Action Queue
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={load}
+            disabled={loading || isRefreshing}
+            aria-label="Refresh Action Queue"
+            data-testid="action-queue-refresh-button"
+            className="ml-auto"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} aria-hidden="true" />
+            <span>Refresh</span>
+          </Button>
         </h1>
         <p className="text-sm text-muted-foreground">
           Suggestions are <span className="text-foreground">approval-gated</span>.
           Verdant never sends commands to equipment.
         </p>
+        {lastUpdatedAt !== null && (
+          <p
+            className="text-[11px] text-muted-foreground mt-1"
+            data-testid="action-queue-last-updated"
+            aria-label={formatLastUpdatedAgo(lastUpdatedAt, Date.now())}
+          >
+            {formatLastUpdatedAgo(lastUpdatedAt, Date.now())}
+          </p>
+        )}
         <div
           className="mt-2 rounded-lg border border-border/60 bg-secondary/30 px-3 py-2"
           data-testid="action-queue-grow-context-hint"
@@ -691,9 +779,22 @@ export default function ActionQueue() {
       ) : (
       <>
       <section className="glass rounded-2xl p-4 mb-4" aria-label="Needs Review">
-        <h2 className="text-sm font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
-          Needs Review ({pending.length})
-        </h2>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Needs Review ({pending.length})
+          </h2>
+          {!loading && isRefreshing && (
+            <span
+              role="status"
+              aria-live="polite"
+              data-testid="action-queue-refreshing-indicator"
+              className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground"
+            >
+              <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+              Refreshing actions…
+            </span>
+          )}
+        </div>
         {loading ? (
           <div
             role="status"
@@ -723,23 +824,30 @@ export default function ActionQueue() {
           </div>
         ) : pending.length === 0 ? (
           <div className="py-4" data-testid="action-queue-empty-pending">
-            <p className="text-sm text-foreground">
-              {filtersActive ? "No actions match these filters." : "No pending actions."}
+            <p className="text-sm text-foreground" data-testid="action-queue-empty-pending-title">
+              {filtersActive ? "No actions match these filters." : ACTION_QUEUE_EMPTY_PENDING_TITLE}
             </p>
             {!filtersActive && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Verdant will list grower-reviewed recommendations here when
-                they appear. Review before acting — grower approval is always
-                required.
+              <p
+                className="text-xs text-muted-foreground mt-1"
+                data-testid="action-queue-empty-pending-help"
+              >
+                {ACTION_QUEUE_EMPTY_PENDING_HELP}
               </p>
             )}
           </div>
+
         ) : (
           <ul className="space-y-3">
             {pending.map((row) => {
               const titleId = `aq-pending-title-${row.id}`;
               const descId = `aq-pending-desc-${row.id}`;
               const isFocused = focusedActionId === row.id;
+              const ev = buildActionEvidenceViewModel({
+                source: row.source,
+                action_type: row.action_type,
+                captured_at: row.created_at,
+              });
               return (
               <li
                 key={row.id}
@@ -768,6 +876,7 @@ export default function ActionQueue() {
                       <Badge variant="outline" className={RISK_VARIANT[row.risk_level]} aria-label={`Risk: ${row.risk_level}`}>
                         {row.risk_level}
                       </Badge>
+                      <EvidenceStatusBadge vm={ev} />
                       {isAlertDerived(row) && (
                         <Badge
                           variant="outline"
@@ -798,8 +907,8 @@ export default function ActionQueue() {
                       )}
 
 
-                      <span className="text-xs text-muted-foreground">
-                        {row.target_metric ?? row.target_device}
+                      <span className="text-xs text-muted-foreground" data-testid="action-queue-row-target-label">
+                        {formatActionTargetLabel(row.target_metric, row.target_device)}
                       </span>
                     </div>
                     <p className="text-sm mt-1">{sanitizeActionCopy(row.suggested_change)}</p>
@@ -808,6 +917,13 @@ export default function ActionQueue() {
                       <AiDoctorSessionLink row={row} />
                       <LinkedAlertLink row={row} />
                     </div>
+                    <p
+                      className="mt-1 text-[11px] text-muted-foreground"
+                      data-testid="action-queue-row-evidence-quality"
+                    >
+                      {ev.evidenceQualityLabel}
+                    </p>
+
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">
@@ -878,6 +994,11 @@ export default function ActionQueue() {
               const titleId = `aq-reviewed-title-${row.id}`;
               const descId = `aq-reviewed-desc-${row.id}`;
               const isFocused = focusedActionId === row.id;
+              const ev = buildActionEvidenceViewModel({
+                source: row.source,
+                action_type: row.action_type,
+                captured_at: row.created_at,
+              });
               return (
               <li
                 key={row.id}
@@ -902,6 +1023,7 @@ export default function ActionQueue() {
                   <Badge variant="outline" className={`text-[10px] uppercase ${RISK_VARIANT[row.risk_level]}`} aria-label={`Risk: ${row.risk_level}`}>
                     {row.risk_level}
                   </Badge>
+                  <EvidenceStatusBadge vm={ev} />
                   {isAlertDerived(row) && (
                     <Badge
                       variant="outline"

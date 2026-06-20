@@ -626,36 +626,60 @@ export type Database = {
       feeding_events: {
         Row: {
           created_at: string
+          ec_in: number | null
           ec_ms_cm: number | null
+          ec_out: number | null
           event_id: string
+          line_id: string
           nutrient_brand: string | null
           ph: number | null
+          products: Json
           recipe: Json
+          runoff_ec: number | null
+          runoff_ml: number | null
+          runoff_ph: number | null
           schedule_week: number | null
           user_id: string
           volume_ml: number | null
+          water_temp_c: number | null
         }
         Insert: {
           created_at?: string
+          ec_in?: number | null
           ec_ms_cm?: number | null
+          ec_out?: number | null
           event_id: string
+          line_id: string
           nutrient_brand?: string | null
           ph?: number | null
+          products?: Json
           recipe?: Json
+          runoff_ec?: number | null
+          runoff_ml?: number | null
+          runoff_ph?: number | null
           schedule_week?: number | null
           user_id: string
           volume_ml?: number | null
+          water_temp_c?: number | null
         }
         Update: {
           created_at?: string
+          ec_in?: number | null
           ec_ms_cm?: number | null
+          ec_out?: number | null
           event_id?: string
+          line_id?: string
           nutrient_brand?: string | null
           ph?: number | null
+          products?: Json
           recipe?: Json
+          runoff_ec?: number | null
+          runoff_ml?: number | null
+          runoff_ph?: number | null
           schedule_week?: number | null
           user_id?: string
           volume_ml?: number | null
+          water_temp_c?: number | null
         }
         Relationships: [
           {
@@ -1057,6 +1081,51 @@ export type Database = {
         }
         Relationships: []
       }
+      pheno_hunts: {
+        Row: {
+          created_at: string
+          grow_id: string
+          id: string
+          name: string
+          tent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          grow_id: string
+          id?: string
+          name: string
+          tent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          grow_id?: string
+          id?: string
+          name?: string
+          tent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_hunts_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_hunts_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       photo_events: {
         Row: {
           caption: string | null
@@ -1205,14 +1274,18 @@ export type Database = {
       }
       plants: {
         Row: {
+          candidate_label: string | null
           created_at: string
           grow_id: string | null
           health: string
           id: string
           is_archived: boolean
           last_note: string | null
+          medium: string | null
           name: string
+          pheno_hunt_id: string | null
           photo_url: string | null
+          pot_size: string | null
           schema_version: number
           stage: string
           started_at: string
@@ -1222,14 +1295,18 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          candidate_label?: string | null
           created_at?: string
           grow_id?: string | null
           health?: string
           id?: string
           is_archived?: boolean
           last_note?: string | null
+          medium?: string | null
           name: string
+          pheno_hunt_id?: string | null
           photo_url?: string | null
+          pot_size?: string | null
           schema_version?: number
           stage?: string
           started_at?: string
@@ -1239,14 +1316,18 @@ export type Database = {
           user_id: string
         }
         Update: {
+          candidate_label?: string | null
           created_at?: string
           grow_id?: string | null
           health?: string
           id?: string
           is_archived?: boolean
           last_note?: string | null
+          medium?: string | null
           name?: string
+          pheno_hunt_id?: string | null
           photo_url?: string | null
+          pot_size?: string | null
           schema_version?: number
           stage?: string
           started_at?: string
@@ -1261,6 +1342,13 @@ export type Database = {
             columns: ["grow_id"]
             isOneToOne: false
             referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plants_pheno_hunt_id_fkey"
+            columns: ["pheno_hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
             referencedColumns: ["id"]
           },
         ]
@@ -1294,6 +1382,57 @@ export type Database = {
           nugs_total?: number
           tier?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      quicklog_audit_events: {
+        Row: {
+          created_at: string
+          grow_event_id: string | null
+          id: string
+          idempotency_key: string | null
+          reason: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          grow_event_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          reason?: string | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          grow_event_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          reason?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      quicklog_idempotency: {
+        Row: {
+          created_at: string
+          grow_event_id: string
+          idempotency_key: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          grow_event_id: string
+          idempotency_key: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          grow_event_id?: string
+          idempotency_key?: string
           user_id?: string
         }
         Relationships: []
@@ -1669,6 +1808,25 @@ export type Database = {
           tier: string
         }[]
       }
+      create_feeding_event: {
+        Args: {
+          _ec_in?: number
+          _ec_out?: number
+          _grow_id: string
+          _line_id: string
+          _note?: string
+          _occurred_at?: string
+          _ph?: number
+          _plant_id?: string
+          _products: Json
+          _runoff_ec?: number
+          _runoff_ml?: number
+          _runoff_ph?: number
+          _tent_id?: string
+          _water_temp_c?: number
+        }
+        Returns: string
+      }
       create_watering_event: {
         Args: {
           _ec_ms_cm?: number
@@ -1702,6 +1860,10 @@ export type Database = {
           sample_count: number
         }[]
       }
+      get_latest_tent_sensor_snapshot: {
+        Args: { _tent_id: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1725,6 +1887,21 @@ export type Database = {
           inserted: number
           rejected: number
         }[]
+      }
+      quicklog_save_event: {
+        Args: {
+          p_details?: Json
+          p_event_type: string
+          p_grow_id: string
+          p_idempotency_key: string
+          p_note?: string
+          p_occurred_at?: string
+          p_photo_url?: string
+          p_plant_id?: string
+          p_sensor_snapshot?: Json
+          p_tent_id?: string
+        }
+        Returns: Json
       }
       quicklog_save_manual: {
         Args: {

@@ -29,11 +29,15 @@ export interface FeedingHistoryRow {
   runoffPh: number | null;
   runoffEc: number | null;
   runoffTds: number | null;
+  /** Reservoir / water temperature in Celsius from saved feeding extras. */
+  waterTempC: number | null;
   nutrients: FeedingNutrient[];
   /** Optional recipe label pulled from the sanitized `extras` bag. */
   recipe: string | null;
   notePreview: string;
   warnings: string[];
+  /** Quick Log feedings are always grower-entered → manual. */
+  sourceLabel: "manual";
 }
 
 const NOTE_PREVIEW_MAX = 140;
@@ -122,6 +126,17 @@ function pickRunoffMl(entry: NormalizedDiaryEntry): number | null {
   return pickNumber(extras.runoff_ml) ?? pickNumber(extras.runoffMl) ?? null;
 }
 
+function pickWaterTempC(entry: NormalizedDiaryEntry): number | null {
+  const extras = entry.details.extras;
+  if (!extras) return null;
+  return (
+    pickNumber(extras.water_temp_c) ??
+    pickNumber(extras.waterTempC) ??
+    pickNumber(extras.waterTempCelsius) ??
+    null
+  );
+}
+
 function toNutrients(entry: NormalizedDiaryEntry): FeedingNutrient[] {
   const src = entry.details.nutrients;
   if (!src || src.length === 0) return [];
@@ -184,10 +199,12 @@ function toRow(entry: NormalizedDiaryEntry): FeedingHistoryRow {
     runoffPh,
     runoffEc,
     runoffTds,
+    waterTempC: pickWaterTempC(entry),
     nutrients: toNutrients(entry),
     recipe: pickRecipe(entry),
     notePreview: previewNote(entry.note),
     warnings,
+    sourceLabel: "manual",
   };
 }
 

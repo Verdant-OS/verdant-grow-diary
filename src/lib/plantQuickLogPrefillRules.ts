@@ -29,6 +29,8 @@ export interface PlantQuickLogPrefill {
   eventType: "observation";
   /** Suggest enabling the sensor snapshot toggle since a tent is assigned. */
   suggestSnapshot: true;
+  /** Optional draft note text to prefill into the QuickLog note field. */
+  note?: string;
 }
 
 export const PLANT_QUICKLOG_PREFILL_EVENT = "verdant:open-quicklog" as const;

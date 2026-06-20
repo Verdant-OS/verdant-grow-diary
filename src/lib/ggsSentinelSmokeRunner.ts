@@ -1,26 +1,27 @@
 /**
- * ggsSentinelSmokeRunner — pure, read-only "is the GGS ingest path
- * actually producing live, canonical, fresh readings?" verdict.
+ * ggsSentinelSmokeRunner — pure evaluator that decides whether a tent's
+ * recent sensor data clears the live Sentinel sign-off for the Spider
+ * Farmer GGS 3-in-1 Soil Sensor Pro path.
  *
- * Hard constraints:
- *  - Pure function. No I/O, no React, no timers, no network, no Supabase.
- *  - Read-only. NEVER emits device commands, setpoints, or anything that
- *    could control Spider Farmer hardware.
- *  - Freshness guidance (`MetricFreshnessAssessment`) is EXPLANATORY
- *    ONLY. It MUST NOT change the verdict precedence. Aging metrics do
- *    not flip the verdict to BLOCKED_STALE_READING.
- *  - Unknown / missing / non-canonical data is never classified as
- *    PASS_LIVE_SENTINEL_READY.
- *  - `raw_payload` is never returned in the verdict surface. The
- *    presenter has no path to render it; the safety scan pins this.
+ * HARD CONSTRAINTS (stop-ship if violated):
+ *   - Pure. No I/O, no Supabase, no fetch, no timers, no console.
+ *   - Read-only. NEVER returns rows that would mutate state.
+ *   - NEVER surfaces `raw_payload.payload` bodies — only the safe
+ *     `source_app` provenance tag, captured_at, source, metric, value.
+ *   - Source classification is read from the rows; we never promote a
+ *     non-canonical source (`ggs_live`, `ggs_csv`, etc.) to `live`.
+ *   - Freshness threshold matches `SPIDER_FARMER_GGS_STALE_MS` (15min).
  */
+import { SPIDER_FARMER_GGS_STALE_MS } from "@/lib/spiderFarmerGgsMappingRules";
+import { GGS_REAL_PAYLOAD_SOURCE_APP } from "@/lib/ggsRealPayloadIngestRules";
 
-import { SPIDER_FARMER_GGS_PROVIDER, SPIDER_FARMER_GGS_STALE_MS } from "./spiderFarmerGgsMappingRules";
+export const GGS_SENTINEL_METRICS = ["soil_moisture_pct", "ec", "soil_temp_c"] as const;
+export type GgsSentinelMetric = (typeof GGS_SENTINEL_METRICS)[number];
 
-/** Halfway to stale. Aging is explanatory only — never a blocker. */
-export const SPIDER_FARMER_GGS_AGING_MS = Math.floor(SPIDER_FARMER_GGS_STALE_MS / 2);
+export const CANONICAL_LIVE_SOURCES = new Set(["live"]);
+export const FORBIDDEN_NON_CANONICAL_SOURCES = new Set(["ggs_live", "ggs_csv"]);
 
-export type SentinelState =
+export type GgsSentinelState =
   | "PASS_LIVE_SENTINEL_READY"
   | "BLOCKED_NO_GGS_ROWS"
   | "BLOCKED_NO_SOIL_TEMP_C"
@@ -28,240 +29,406 @@ export type SentinelState =
   | "BLOCKED_VENDOR_PROVENANCE_MISSING"
   | "BLOCKED_SOURCE_NOT_CANONICAL"
   | "BLOCKED_STALE_READING"
-  | "BLOCKED_VALIDATION_ERROR"
-  | "BLOCKED_RAW_PAYLOAD_RENDER_RISK";
+  | "BLOCKED_RAW_PAYLOAD_RENDER_RISK"
+  | "BLOCKED_VALIDATION_ERROR";
 
-export type MetricFreshnessState = "fresh" | "fresh_but_aging" | "stale" | "missing";
-
-export type RequiredMetricKey = "soil_temp_c" | "soil_ec";
-
-export const REQUIRED_METRIC_KEYS: ReadonlyArray<RequiredMetricKey> = [
-  "soil_temp_c",
-  "soil_ec",
-];
-
-export const REQUIRED_METRIC_LABELS: Readonly<Record<RequiredMetricKey, string>> = {
-  soil_temp_c: "Soil temp",
-  soil_ec: "Soil EC",
-};
-
-/** Closed vocabulary of `quality` values the runner accepts as canonical. */
-export const CANONICAL_QUALITY_VALUES: ReadonlySet<string> = new Set(["live", "stale", "invalid"]);
-
-/**
- * The minimum row shape the runner reads from `sensor_readings`. A wider
- * row (with `tent_id`, `device_id`, `user_id`, `raw_payload`, ...) is
- * acceptable, but the runner deliberately ignores everything not on this
- * interface so it can never accidentally surface untrusted fields.
- */
-export interface SentinelSensorRow {
+/** Minimal row shape consumed by the evaluator. Pulled from sensor_readings. */
+export interface GgsSentinelInputRow {
   metric: string;
-  value: number | null | undefined;
-  source: string | null | undefined;
-  quality: string | null | undefined;
+  value: number | null;
+  source: string | null;
+  captured_at: string;
+  raw_payload: unknown;
+}
+
+/** Shape of `get_latest_tent_sensor_snapshot` RPC return. */
+export interface GgsSentinelSnapshot {
   captured_at: string | null;
+  source: string | null;
+  soil_moisture?: number | null;
+  soil_temp?: number | null;
+  soil_ec?: number | null;
+  temperature?: number | null;
+  humidity?: number | null;
+  vpd?: number | null;
+  ppfd?: number | null;
 }
 
-export interface MetricFreshnessAssessment {
-  metric: RequiredMetricKey;
+export type GgsSentinelCheckStatus = "pass" | "fail" | "warn" | "skipped";
+export interface GgsSentinelCheck {
+  id: string;
   label: string;
-  state: MetricFreshnessState;
-  ageMs: number | null;
+  status: GgsSentinelCheckStatus;
+  detail?: string;
+}
+
+export type GgsFreshnessStatus = "fresh" | "aging" | "stale" | "missing";
+
+export interface GgsSentinelMetricFreshness {
+  metric: GgsSentinelMetric;
   capturedAt: string | null;
-  nextAction: string;
+  ageMs: number | null;
+  ageLabel: string;
+  freshnessWindowMs: number;
+  freshnessWindowLabel: string;
+  freshnessStatus: GgsFreshnessStatus;
+  fresh: boolean;
+  stale: boolean;
+  missing: boolean;
+  nextActionLabel: string;
 }
 
-export interface SentinelSmokeRunnerInput {
-  rows: ReadonlyArray<SentinelSensorRow>;
-  now: Date;
+export interface GgsSentinelSafeMetricSummary {
+  metric: GgsSentinelMetric;
+  value: number;
+  source: string;
+  vendor: string | null;
+  captured_at: string;
+  age_seconds: number;
+  freshness: GgsSentinelMetricFreshness;
 }
 
-export interface SentinelSmokeRunnerVerdict {
-  state: SentinelState;
-  reasonCodes: ReadonlyArray<string>;
-  freshness: ReadonlyArray<MetricFreshnessAssessment>;
+export interface GgsSentinelEvaluation {
+  state: GgsSentinelState;
+  checks: GgsSentinelCheck[];
+  safeMetrics: GgsSentinelSafeMetricSummary[];
+  metricFreshness: GgsSentinelMetricFreshness[];
+  snapshot: {
+    captured_at: string | null;
+    source: string | null;
+    age_seconds: number | null;
+    soil_moisture: number | null;
+    soil_temp: number | null;
+    soil_ec: number | null;
+  } | null;
+  /** True only when no failed checks remain. */
+  passed: boolean;
 }
 
-const NEXT_ACTION_BY_STATE: Readonly<Record<MetricFreshnessState, string>> = {
-  fresh: "No action needed",
-  fresh_but_aging: "Confirm bridge is still publishing on schedule",
-  stale: "Ingest a new real GGS reading",
-  missing: "Paste/ingest a real GGS payload",
+export interface GgsSentinelEvaluateInput {
+  rows: GgsSentinelInputRow[];
+  snapshot: GgsSentinelSnapshot | null;
+  now?: Date;
+  /** Freshness threshold; defaults to GGS 15-minute stale window. */
+  staleMs?: number;
+}
+
+export const GGS_METRIC_FRIENDLY_NAME: Record<GgsSentinelMetric, string> = {
+  soil_moisture_pct: "soil moisture",
+  ec: "EC",
+  soil_temp_c: "soil temperature",
 };
 
-function ageMsFrom(capturedAt: string | null, now: Date): number | null {
-  if (capturedAt === null) return null;
-  const ts = Date.parse(capturedAt);
-  if (!Number.isFinite(ts)) return null;
-  return now.getTime() - ts;
-}
-
-function classifyAge(ageMs: number | null): MetricFreshnessState {
-  if (ageMs === null) return "missing";
-  if (ageMs > SPIDER_FARMER_GGS_STALE_MS) return "stale";
-  if (ageMs > SPIDER_FARMER_GGS_AGING_MS) return "fresh_but_aging";
-  return "fresh";
-}
-
-function latestRowForMetric(
-  rows: ReadonlyArray<SentinelSensorRow>,
-  metric: RequiredMetricKey,
-): SentinelSensorRow | null {
-  let best: SentinelSensorRow | null = null;
-  let bestTs = -Infinity;
-  for (const row of rows) {
-    if (row.metric !== metric) continue;
-    if (row.value === null || row.value === undefined || !Number.isFinite(row.value)) continue;
-    if (row.captured_at === null) continue;
-    const ts = Date.parse(row.captured_at);
-    if (!Number.isFinite(ts)) continue;
-    if (ts > bestTs) {
-      bestTs = ts;
-      best = row;
-    }
+export function formatGgsAgeLabel(ageMs: number): string {
+  if (!Number.isFinite(ageMs) || ageMs < 0) return "just now";
+  const totalSec = Math.round(ageMs / 1000);
+  if (totalSec === 0) return "0m ago";
+  if (totalSec < 60) return `${totalSec}s ago`;
+  const totalMin = Math.floor(totalSec / 60);
+  const remainingSec = totalSec % 60;
+  if (totalMin < 60) {
+    return remainingSec === 0
+      ? `${totalMin}m ago`
+      : `${totalMin}m ${remainingSec}s ago`;
   }
-  return best;
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  return mins === 0 ? `${hours}h ago` : `${hours}h ${mins}m ago`;
 }
 
-export function assessMetricFreshness(
-  row: SentinelSensorRow | null,
-  metric: RequiredMetricKey,
+export function formatGgsWindowLabel(ms: number): string {
+  const mins = Math.round(ms / 60000);
+  return `${mins} min`;
+}
+
+function buildFreshness(
+  metric: GgsSentinelMetric,
+  capturedAt: string | null,
   now: Date,
-): MetricFreshnessAssessment {
-  if (row === null) {
+  windowMs: number,
+): GgsSentinelMetricFreshness {
+  const windowLabel = formatGgsWindowLabel(windowMs);
+  if (!capturedAt) {
     return {
       metric,
-      label: REQUIRED_METRIC_LABELS[metric],
-      state: "missing",
-      ageMs: null,
       capturedAt: null,
-      nextAction: NEXT_ACTION_BY_STATE.missing,
+      ageMs: null,
+      ageLabel: "—",
+      freshnessWindowMs: windowMs,
+      freshnessWindowLabel: windowLabel,
+      freshnessStatus: "missing",
+      fresh: false,
+      stale: false,
+      missing: true,
+      nextActionLabel: `Missing — no recent GGS ${GGS_METRIC_FRIENDLY_NAME[metric]} row found.`,
     };
   }
-  const ageMs = ageMsFrom(row.captured_at, now);
-  const state = classifyAge(ageMs);
+  const t = new Date(capturedAt).getTime();
+  const ageMs = Number.isFinite(t) ? Math.max(0, now.getTime() - t) : Number.POSITIVE_INFINITY;
+  const ageLabel = formatGgsAgeLabel(ageMs);
+  if (ageMs > windowMs) {
+    return {
+      metric,
+      capturedAt,
+      ageMs,
+      ageLabel,
+      freshnessWindowMs: windowMs,
+      freshnessWindowLabel: windowLabel,
+      freshnessStatus: "stale",
+      fresh: false,
+      stale: true,
+      missing: false,
+      nextActionLabel: `Stale — captured ${ageLabel}. Ingest a new real GGS reading to clear live Sentinel.`,
+    };
+  }
+  const aging = ageMs > windowMs * 0.75;
+  if (aging) {
+    return {
+      metric,
+      capturedAt,
+      ageMs,
+      ageLabel,
+      freshnessWindowMs: windowMs,
+      freshnessWindowLabel: windowLabel,
+      freshnessStatus: "aging",
+      fresh: true,
+      stale: false,
+      missing: false,
+      nextActionLabel: `Fresh but aging — captured ${ageLabel}. Recheck soon; stale at ${windowLabel}.`,
+    };
+  }
   return {
     metric,
-    label: REQUIRED_METRIC_LABELS[metric],
-    state,
+    capturedAt,
     ageMs,
-    capturedAt: row.captured_at,
-    nextAction: NEXT_ACTION_BY_STATE[state],
+    ageLabel,
+    freshnessWindowMs: windowMs,
+    freshnessWindowLabel: windowLabel,
+    freshnessStatus: "fresh",
+    fresh: true,
+    stale: false,
+    missing: false,
+    nextActionLabel: `Fresh — captured ${ageLabel}. Valid for live Sentinel.`,
   };
 }
 
-function hasGgsRows(rows: ReadonlyArray<SentinelSensorRow>): boolean {
-  for (const row of rows) {
-    if (typeof row.source === "string" && row.source === SPIDER_FARMER_GGS_PROVIDER) return true;
-  }
-  return false;
+function ageSeconds(capturedAt: string, now: Date): number {
+  const t = new Date(capturedAt).getTime();
+  if (!Number.isFinite(t)) return Number.POSITIVE_INFINITY;
+  return Math.round((now.getTime() - t) / 1000);
 }
 
-function anyNonCanonicalSource(rows: ReadonlyArray<SentinelSensorRow>): boolean {
-  for (const row of rows) {
-    if (typeof row.source !== "string") return true;
-    if (row.source !== SPIDER_FARMER_GGS_PROVIDER) return true;
-  }
-  return false;
+function readVendor(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const v = (raw as Record<string, unknown>).source_app;
+  return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
-function anyNonCanonicalQuality(rows: ReadonlyArray<SentinelSensorRow>): boolean {
-  for (const row of rows) {
-    if (typeof row.quality !== "string") return true;
-    if (!CANONICAL_QUALITY_VALUES.has(row.quality)) return true;
-  }
-  return false;
-}
-
-function anyValidationError(rows: ReadonlyArray<SentinelSensorRow>): boolean {
-  for (const row of rows) {
-    if (typeof row.metric !== "string" || row.metric.length === 0) return true;
-    if (row.value === null || row.value === undefined || !Number.isFinite(row.value)) return true;
-    if (row.captured_at !== null) {
-      const ts = Date.parse(row.captured_at);
-      if (!Number.isFinite(ts)) return true;
-    }
-  }
-  return false;
-}
-
-function anyStaleOrInvalidQuality(rows: ReadonlyArray<SentinelSensorRow>): boolean {
-  for (const row of rows) {
-    if (row.quality === "stale" || row.quality === "invalid") return true;
-  }
-  return false;
+function check(
+  id: string,
+  label: string,
+  status: GgsSentinelCheckStatus,
+  detail?: string,
+): GgsSentinelCheck {
+  return detail === undefined ? { id, label, status } : { id, label, status, detail };
 }
 
 /**
- * Compute the Sentinel smoke verdict.
- *
- * Verdict precedence — evaluated in order; the first matching code wins.
- * Freshness assessment is computed in parallel but never enters this
- * ladder (explanatory only).
- *
- *   1. BLOCKED_NO_GGS_ROWS                  no rows at all
- *   2. BLOCKED_VENDOR_PROVENANCE_MISSING    no row tagged spider_farmer_ggs
- *   3. BLOCKED_SOURCE_NOT_CANONICAL         any row carries a different source
- *   4. BLOCKED_VALIDATION_ERROR             any row missing/invalid metric/value/captured_at
- *   5. BLOCKED_NO_SOIL_TEMP_C               required metric missing
- *   6. BLOCKED_NO_EC                        required metric missing
- *   7. BLOCKED_STALE_READING                latest required metric beyond stale threshold
- *                                            OR any row carries quality=stale|invalid
- *   8. BLOCKED_RAW_PAYLOAD_RENDER_RISK      unreachable by construction; pinned by test
- *   9. PASS_LIVE_SENTINEL_READY             all required metrics fresh, canonical, valid
+ * Evaluate Sentinel readiness from already-fetched rows + snapshot.
+ * Read-only. Deterministic. Safe to call from tests with fixtures.
  */
-export function runGgsSentinelSmoke(input: SentinelSmokeRunnerInput): SentinelSmokeRunnerVerdict {
-  const { rows, now } = input;
-  const reasonCodes: string[] = [];
+export function evaluateGgsSentinelReadiness(
+  input: GgsSentinelEvaluateInput,
+): GgsSentinelEvaluation {
+  const now = input.now ?? new Date();
+  const staleMs = input.staleMs ?? SPIDER_FARMER_GGS_STALE_MS;
+  const checks: GgsSentinelCheck[] = [];
 
-  const freshness: MetricFreshnessAssessment[] = REQUIRED_METRIC_KEYS.map((metric) =>
-    assessMetricFreshness(latestRowForMetric(rows, metric), metric, now),
+  const rows = Array.isArray(input.rows) ? input.rows : [];
+  // Bucket the latest row per canonical metric, preferring vendor-tagged rows.
+  const latestByMetric = new Map<GgsSentinelMetric, GgsSentinelInputRow>();
+  for (const r of rows) {
+    if (!r || typeof r.metric !== "string") continue;
+    if (!GGS_SENTINEL_METRICS.includes(r.metric as GgsSentinelMetric)) continue;
+    if (typeof r.value !== "number" || !Number.isFinite(r.value)) continue;
+    const metric = r.metric as GgsSentinelMetric;
+    const existing = latestByMetric.get(metric);
+    if (!existing) {
+      latestByMetric.set(metric, r);
+      continue;
+    }
+    if (new Date(r.captured_at).getTime() > new Date(existing.captured_at).getTime()) {
+      latestByMetric.set(metric, r);
+    }
+  }
+
+  const hasAny = latestByMetric.size > 0;
+  checks.push(
+    check(
+      "ggs_rows_exist",
+      "Recent GGS sensor rows exist",
+      hasAny ? "pass" : "fail",
+      hasAny ? `${latestByMetric.size}/3 canonical metrics present` : "no rows found",
+    ),
   );
 
-  if (rows.length === 0) {
-    return { state: "BLOCKED_NO_GGS_ROWS", reasonCodes: ["no_rows"], freshness };
+  if (!hasAny) {
+    return {
+      state: "BLOCKED_NO_GGS_ROWS",
+      checks,
+      safeMetrics: [],
+      metricFreshness: GGS_SENTINEL_METRICS.map((m) =>
+        buildFreshness(m, null, now, staleMs),
+      ),
+      snapshot: summarizeSnapshot(input.snapshot, now),
+      passed: false,
+    };
   }
 
-  if (!hasGgsRows(rows)) {
-    reasonCodes.push("no_spider_farmer_ggs_rows");
-    return { state: "BLOCKED_VENDOR_PROVENANCE_MISSING", reasonCodes, freshness };
-  }
 
-  if (anyNonCanonicalSource(rows)) {
-    reasonCodes.push("non_canonical_source");
-    return { state: "BLOCKED_SOURCE_NOT_CANONICAL", reasonCodes, freshness };
-  }
+  const hasSoilTemp = latestByMetric.has("soil_temp_c");
+  checks.push(
+    check(
+      "soil_temp_c_present",
+      "soil_temp_c row present",
+      hasSoilTemp ? "pass" : "fail",
+    ),
+  );
+  const hasEc = latestByMetric.has("ec");
+  checks.push(check("ec_present", "ec row present", hasEc ? "pass" : "fail"));
+  const hasMoisture = latestByMetric.has("soil_moisture_pct");
+  checks.push(
+    check(
+      "soil_moisture_pct_present",
+      "soil_moisture_pct row present",
+      hasMoisture ? "pass" : "fail",
+    ),
+  );
 
-  if (anyNonCanonicalQuality(rows)) {
-    reasonCodes.push("non_canonical_quality");
-    return { state: "BLOCKED_SOURCE_NOT_CANONICAL", reasonCodes, freshness };
-  }
+  // Source canonical + vendor provenance on the rows we DO have.
+  let sawForbiddenSource: string | null = null;
+  let missingVendorFor: GgsSentinelMetric | null = null;
+  let staleMetric: { metric: GgsSentinelMetric; age: number } | null = null;
+  const safeMetrics: GgsSentinelSafeMetricSummary[] = [];
 
-  if (anyValidationError(rows)) {
-    reasonCodes.push("validation_error");
-    return { state: "BLOCKED_VALIDATION_ERROR", reasonCodes, freshness };
-  }
-
-  for (const metric of REQUIRED_METRIC_KEYS) {
-    const row = latestRowForMetric(rows, metric);
-    if (row === null) {
-      const code = metric === "soil_temp_c" ? "BLOCKED_NO_SOIL_TEMP_C" : "BLOCKED_NO_EC";
-      reasonCodes.push(metric === "soil_temp_c" ? "missing_soil_temp_c" : "missing_soil_ec");
-      return { state: code, reasonCodes, freshness };
+  for (const metric of GGS_SENTINEL_METRICS) {
+    const row = latestByMetric.get(metric);
+    if (!row) continue;
+    const src = (row.source ?? "").trim();
+    if (FORBIDDEN_NON_CANONICAL_SOURCES.has(src)) {
+      sawForbiddenSource = src;
     }
-  }
-
-  if (anyStaleOrInvalidQuality(rows)) {
-    reasonCodes.push("quality_marked_stale_or_invalid");
-    return { state: "BLOCKED_STALE_READING", reasonCodes, freshness };
-  }
-
-  for (const assessment of freshness) {
-    if (assessment.state === "stale" || assessment.state === "missing") {
-      reasonCodes.push(`${assessment.metric}_${assessment.state}`);
-      return { state: "BLOCKED_STALE_READING", reasonCodes, freshness };
+    const vendor = readVendor(row.raw_payload);
+    if (vendor !== GGS_REAL_PAYLOAD_SOURCE_APP) {
+      missingVendorFor = metric;
     }
+    const age = ageSeconds(row.captured_at, now);
+    if (age * 1000 > staleMs) {
+      if (!staleMetric || age > staleMetric.age) staleMetric = { metric, age };
+    }
+    const freshness = buildFreshness(metric, row.captured_at, now, staleMs);
+    safeMetrics.push({
+      metric,
+      value: row.value as number,
+      source: src,
+      vendor,
+      captured_at: row.captured_at,
+      age_seconds: age,
+      freshness,
+    });
   }
 
-  return { state: "PASS_LIVE_SENTINEL_READY", reasonCodes: [], freshness };
+  const metricFreshness: GgsSentinelMetricFreshness[] = GGS_SENTINEL_METRICS.map((m) => {
+    const found = safeMetrics.find((s) => s.metric === m);
+    return found ? found.freshness : buildFreshness(m, null, now, staleMs);
+  });
+
+
+  checks.push(
+    check(
+      "source_canonical",
+      "All GGS rows use canonical source",
+      sawForbiddenSource ? "fail" : "pass",
+      sawForbiddenSource ? `forbidden source: ${sawForbiddenSource}` : undefined,
+    ),
+  );
+  checks.push(
+    check(
+      "vendor_provenance",
+      `raw_payload.source_app = "${GGS_REAL_PAYLOAD_SOURCE_APP}"`,
+      missingVendorFor ? "fail" : "pass",
+      missingVendorFor ? `missing/invalid for ${missingVendorFor}` : undefined,
+    ),
+  );
+  checks.push(
+    check(
+      "freshness",
+      `Rows fresh within ${Math.round(staleMs / 60000)} min`,
+      staleMetric ? "fail" : "pass",
+      staleMetric ? `${staleMetric.metric} age ${staleMetric.age}s` : undefined,
+    ),
+  );
+
+  // Snapshot RPC checks.
+  const snapshot = summarizeSnapshot(input.snapshot, now);
+  const snapMoisture = snapshot?.soil_moisture ?? null;
+  const snapTemp = snapshot?.soil_temp ?? null;
+  const snapEc = snapshot?.soil_ec ?? null;
+  checks.push(
+    check(
+      "snapshot_populated",
+      "Snapshot RPC populated for moisture / EC / soil temp",
+      snapMoisture !== null && snapTemp !== null && snapEc !== null ? "pass" : "warn",
+      JSON.stringify({
+        soil_moisture: snapMoisture,
+        soil_temp: snapTemp,
+        soil_ec: snapEc,
+      }),
+    ),
+  );
+
+  // Decide terminal state in priority order.
+  let state: GgsSentinelState;
+  if (sawForbiddenSource) {
+    state = "BLOCKED_SOURCE_NOT_CANONICAL";
+  } else if (missingVendorFor) {
+    state = "BLOCKED_VENDOR_PROVENANCE_MISSING";
+  } else if (!hasSoilTemp) {
+    state = "BLOCKED_NO_SOIL_TEMP_C";
+  } else if (!hasEc) {
+    state = "BLOCKED_NO_EC";
+  } else if (!hasMoisture) {
+    // Treat as BLOCKED_NO_GGS_ROWS-ish, but more specific: moisture missing.
+    state = "BLOCKED_NO_GGS_ROWS";
+  } else if (staleMetric) {
+    state = "BLOCKED_STALE_READING";
+  } else {
+    state = "PASS_LIVE_SENTINEL_READY";
+  }
+
+  return {
+    state,
+    checks,
+    safeMetrics,
+    metricFreshness,
+    snapshot,
+    passed: state === "PASS_LIVE_SENTINEL_READY",
+  };
+}
+
+
+function summarizeSnapshot(
+  snapshot: GgsSentinelSnapshot | null,
+  now: Date,
+): GgsSentinelEvaluation["snapshot"] {
+  if (!snapshot) return null;
+  const capturedAt = snapshot.captured_at ?? null;
+  return {
+    captured_at: capturedAt,
+    source: snapshot.source ?? null,
+    age_seconds: capturedAt ? ageSeconds(capturedAt, now) : null,
+    soil_moisture: snapshot.soil_moisture ?? null,
+    soil_temp: snapshot.soil_temp ?? null,
+    soil_ec: snapshot.soil_ec ?? null,
+  };
 }

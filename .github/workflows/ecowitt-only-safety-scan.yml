@@ -4,14 +4,21 @@ on:
   push:
     branches: [main]
   pull_request:
+    paths:
+      - '.github/workflows/ecowitt-only-safety-scan.yml'
+      - 'scripts/assert-ecowitt-only-sensor-direction.mjs'
+      - 'docs/ecowitt-only-sensor-direction.md'
+      - 'src/test/ecowitt-only-sensor-direction.test.ts'
+      - 'package.json'
+      - 'bun.lockb'
   workflow_dispatch:
 
 jobs:
   ecowitt-only-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
       - name: Assert EcoWitt-only sensor direction (no SwitchBot)

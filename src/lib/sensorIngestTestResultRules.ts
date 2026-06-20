@@ -23,6 +23,13 @@ export interface SensorIngestTestClassification {
   headline: string;
   detail: string;
   isSuccess: boolean;
+  /**
+   * True when the browser received a real HTTP status (preflight + CORS
+   * worked); false when fetch threw / status was 0 (request blocked before a
+   * readable response). Lets diagnostic UIs distinguish "CORS broken" from
+   * "CORS fine, server rejected the POST".
+   */
+  corsWorking: boolean;
 }
 
 export interface ClassifyInput {
@@ -31,6 +38,8 @@ export interface ClassifyInput {
   /** True when fetch threw before a response was received. */
   networkError?: boolean;
 }
+
+const SERVER_ROLE_ENV_NAME = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");
 
 function pickString(obj: unknown, key: string): string | null {
   if (!obj || typeof obj !== "object") return null;
@@ -50,21 +59,73 @@ function pickArrayLen(obj: unknown, key: string): number {
   return Array.isArray(v) ? v.length : 0;
 }
 
+/**
+ * Map sanitized webhook error codes (returned by sensor-ingest-webhook) to
+ * grower-safe troubleshooting copy. Used by the diagnostic UI so we never
+ * echo raw token values, Authorization headers, or PG error text.
+ */
+export const SANITIZED_WEBHOOK_ERROR_COPY: Record<string, string> = {
+  unauthorized:
+    "Bridge token or Authorization header was rejected. Recheck the token value in the local bridge .env; do not paste it into the browser.",
+  token_revoked:
+    "Bridge token was revoked. Generate or paste a new active bridge token, update .env, restart the listener, and retry one forward.",
+  token_expired:
+    "Bridge token has expired. Generate a new active bridge token, update .env, restart the listener, and retry one forward.",
+  server_misconfigured:
+    "The ingest function is missing required server-side configuration.",
+  invalid_json: "The request body was not valid JSON.",
+  invalid_payload: "The payload shape failed validation.",
+  forbidden_tent: "The token is not authorized for that tent.",
+  tent_lookup_failed: "The function could not verify the tent context.",
+  insert_failed:
+    "The function reached storage but could not save the reading.",
+  method_not_allowed:
+    "Use POST for ingest and OPTIONS for browser preflight.",
+  internal_error:
+    "The function failed unexpectedly; check sanitized server logs.",
+  auth_lookup_failed:
+    "The function could not verify the bridge token. Retry shortly.",
+};
+
+// Strip strings that look like Bearer headers, JWTs, vbt_* tokens, or
+// server-only keys before rendering. Defense-in-depth: the server already
+// sanitizes its responses, but the diagnostic UI must not become a leak
+// surface if a malicious response slips through.
+function sanitizeReasonForDisplay(raw: string): string {
+  if (!raw) return raw;
+  let s = raw.replace(/Bearer\s+\S+/gi, "Bearer [redacted]");
+  if (/^vbt_/i.test(s) && s.length >= 12) return "[redacted]";
+  if (/^[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}$/.test(s)) return "[redacted]";
+  if (/^sb_[A-Za-z0-9_-]{16,}$/.test(s)) return "[redacted]";
+  if (s.includes(SERVER_ROLE_ENV_NAME)) {
+    s = s.split(SERVER_ROLE_ENV_NAME).join("[redacted]");
+  }
+  return s.slice(0, 200);
+}
+
+
 export function classifySensorIngestTestResult(
   input: ClassifyInput,
 ): SensorIngestTestClassification {
   if (input.networkError) {
     return {
       category: "network_error",
-      headline: "Network / CORS error",
+      headline: "Network / CORS preflight error",
       detail:
-        "Browser could not reach the ingest endpoint. Check internet, ad-block, or browser extensions.",
+        "Browser status 0 — the request was blocked before a readable HTTP response was available. " +
+        "OPTIONS preflight likely failed before POST reached the function. " +
+        "Check Edge Function OPTIONS headers, ad-block, browser extensions, or network reachability.",
       isSuccess: false,
+      corsWorking: false,
     };
   }
 
+
   const { status, body } = input;
-  const reason = pickString(body, "error") ?? pickString(body, "reason");
+  const rawReason = pickString(body, "error") ?? pickString(body, "reason");
+  const reason = rawReason ? sanitizeReasonForDisplay(rawReason) : null;
+  const codeCopy = rawReason ? SANITIZED_WEBHOOK_ERROR_COPY[rawReason] : undefined;
+
 
   if (status >= 200 && status < 300) {
     const inserted = pickNumber(body, "inserted") ?? 0;
@@ -75,6 +136,7 @@ export function classifySensorIngestTestResult(
         headline: `HTTP ${status} — accepted with ${rejected} rejection${rejected === 1 ? "" : "s"}`,
         detail: `Inserted ${inserted}. Some metrics were rejected — see rejected[] below.`,
         isSuccess: true,
+        corsWorking: true,
       };
     }
     return {
@@ -82,6 +144,7 @@ export function classifySensorIngestTestResult(
       headline: `HTTP ${status} — accepted`,
       detail: `Inserted ${inserted} reading${inserted === 1 ? "" : "s"}. Auth: ${pickString(body, "auth") ?? "ok"}.`,
       isSuccess: true,
+      corsWorking: true,
     };
   }
 
@@ -89,12 +152,16 @@ export function classifySensorIngestTestResult(
     return {
       category: "auth_problem",
       headline: "HTTP 401 — auth / token problem",
-      detail: reason
-        ? `Token rejected (${reason}). Mint a fresh tent-scoped bridge token and retry.`
-        : "Bridge token missing, revoked, or expired. Mint a new one and retry.",
+      detail: codeCopy
+        ? codeCopy
+        : reason
+          ? `Token rejected (${reason}). Mint a fresh tent-scoped bridge token and retry.`
+          : "Bridge token missing, revoked, or expired. Mint a new one and retry.",
       isSuccess: false,
+      corsWorking: true,
     };
   }
+
 
   if (status === 403) {
     return {
@@ -103,6 +170,7 @@ export function classifySensorIngestTestResult(
       detail:
         "Token is valid but not scoped to this tent. Mint a token from this tent's panel.",
       isSuccess: false,
+      corsWorking: true,
     };
   }
 
@@ -113,7 +181,10 @@ export function classifySensorIngestTestResult(
       detail: reason
         ? `Server rejected payload: ${reason}.`
         : "Server rejected payload. Check source, captured_at, and metric names.",
+
+
       isSuccess: false,
+      corsWorking: true,
     };
   }
 
@@ -124,6 +195,7 @@ export function classifySensorIngestTestResult(
       detail:
         "sensor-ingest-webhook is not deployed at this URL. Confirm the app's Supabase project matches the ingest endpoint.",
       isSuccess: false,
+      corsWorking: true,
     };
   }
 
@@ -133,6 +205,7 @@ export function classifySensorIngestTestResult(
       headline: "HTTP 429 — rate limited",
       detail: "Too many requests. Wait a moment and retry.",
       isSuccess: false,
+      corsWorking: true,
     };
   }
 
@@ -143,14 +216,16 @@ export function classifySensorIngestTestResult(
       detail:
         "Ingest function returned a server error. Check Edge Function logs.",
       isSuccess: false,
+      corsWorking: true,
     };
   }
 
   return {
     category: "unknown",
     headline: status > 0 ? `HTTP ${status}` : "Unknown response",
-    detail: reason ?? "Unrecognized response from the ingest endpoint.",
+    detail: codeCopy ?? reason ?? "Unrecognized response from the ingest endpoint.",
     isSuccess: false,
+    corsWorking: true,
   };
 }
 

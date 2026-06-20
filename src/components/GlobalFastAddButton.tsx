@@ -1,18 +1,22 @@
 /**
- * GlobalFastAddButton — presenter-only Fast Add menu for authenticated
- * surfaces. Surfaces 8 grower-friendly logging entry points and routes
- * them to the existing Quick Log / AI Doctor flows.
+ * GlobalFastAddButton — presenter-only Quick Log menu for authenticated
+ * surfaces. Surfaces 8 grower-friendly logging presets and routes them
+ * to the existing Quick Log / AI Doctor flows.
+ *
+ * NOTE: Internal component/file name retained for code stability. The
+ * grower-facing label is "Quick Log" — the single consolidated logging
+ * entry point. There is no separate "Fast Add" surface.
  *
  * Hard constraints:
  *  - Never inserts diary, sensor, alert, Action Queue, or device rows.
- *  - Diagnosis action navigates to the AI Doctor surface only; it does
+ *  - Diagnosis preset navigates to the AI Doctor surface only; it does
  *    NOT call any model or edge function.
- *  - Without a selected plant/tent, all actions show a calm context copy.
+ *  - Without a selected plant/tent, all presets show a calm context copy.
  *  - All business rules live in `@/lib/fastAddActionRules`.
  */
 import { useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, Zap } from "lucide-react";
 import {
   FAST_ADD_ACTIONS,
   FAST_ADD_NO_CONTEXT_COPY,
@@ -21,6 +25,13 @@ import {
   type FastAddActionId,
   type FastAddSelectionContext,
 } from "@/lib/fastAddActionRules";
+import HyperLogModal, { type HyperLogAction, type HyperLogDemoFormState } from "@/components/HyperLogModal";
+import {
+  buildHyperLogQuickLogPrefill,
+  HYPERLOG_QUICKLOG_EVENT_NAME,
+} from "@/lib/hyperLogDraftRules";
+
+
 
 export interface GlobalFastAddButtonProps {
   /**
@@ -45,6 +56,16 @@ export default function GlobalFastAddButton({
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [hyperLogOpen, setHyperLogOpen] = useState(false);
+  const [hyperLogAction, setHyperLogAction] = useState<HyperLogAction | null>(null);
+
+  const openHyperLog = useCallback((action: HyperLogAction | null) => {
+    setHyperLogAction(action);
+    setHyperLogOpen(true);
+    setOpen(false);
+    setNotice(null);
+  }, []);
+
 
   const context = useMemo<FastAddSelectionContext | null>(() => {
     if (contextProp !== undefined) return contextProp;
@@ -90,23 +111,26 @@ export default function GlobalFastAddButton({
           setNotice(null);
           setOpen((v) => !v);
         }}
-        aria-label="Fast Add"
+        aria-label="Quick Log"
         aria-haspopup="menu"
         aria-expanded={open}
         data-testid="global-fast-add-trigger"
         className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/40 px-4 min-h-11 min-w-11 text-sm font-medium hover:bg-secondary/70 active:bg-secondary/80 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background touch-manipulation"
       >
         <Plus className="h-5 w-5" aria-hidden="true" />
-        Fast Add
+        Quick Log
       </button>
 
       {open ? (
         <div
           role="menu"
-          aria-label="Fast Add actions"
+          aria-label="Quick Log actions"
           data-testid="global-fast-add-menu"
           className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1rem)] rounded-xl border border-border/60 bg-popover shadow-elevated p-1.5 z-50"
         >
+          <p className="px-3 py-1.5 text-xs text-muted-foreground">
+            Choose what you want to log.
+          </p>
           <ul className="space-y-1">
             {FAST_ADD_ACTIONS.map((a) => (
               <li key={a.id}>
@@ -123,6 +147,33 @@ export default function GlobalFastAddButton({
               </li>
             ))}
           </ul>
+
+          {/* Operator Mode HyperLog quick-create — presenter-only, demo. */}
+          <div
+            data-testid="global-fast-add-hyperlog-section"
+            className="mt-1 border-t border-border/40 pt-2 px-1"
+          >
+            <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.15em] text-muted-foreground/80 flex items-center gap-1.5">
+              <Zap className="h-3 w-3" aria-hidden="true" />
+              HyperLog · demo
+            </p>
+            <div className="grid grid-cols-2 gap-1">
+              {(["water", "feed", "defoliate", "note", "environment"] as HyperLogAction[]).map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  role="menuitem"
+                  data-testid={`global-fast-add-hyperlog-${a}`}
+                  onClick={() => openHyperLog(a)}
+                  className="text-left px-2 min-h-10 flex items-center rounded-md text-xs hover:bg-secondary/60 active:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation capitalize"
+                >
+                  {a === "environment" ? "Env Check" : a}
+                </button>
+              ))}
+            </div>
+          </div>
+
+
 
           {notice ? (
             <div
@@ -168,6 +219,48 @@ export default function GlobalFastAddButton({
       <span className="sr-only" data-testid="global-fast-add-needs-context-copy">
         {FAST_ADD_NO_CONTEXT_COPY}
       </span>
+
+      <HyperLogModal
+        open={hyperLogOpen}
+        onOpenChange={setHyperLogOpen}
+        initialAction={hyperLogAction}
+        onCommit={(
+          action: HyperLogAction,
+          form: HyperLogDemoFormState,
+          extras?: { photoCount: number },
+        ) => {
+          // Handoff: map the HyperLog demo draft to the existing Quick
+          // Log prefill payload and dispatch the already-wired window
+          // event. The grower still confirms + saves inside Quick Log.
+          // No writes happen here; demo sensor snapshot values are
+          // intentionally NOT carried over. Photo files stay local in
+          // the HyperLog modal — only the count is forwarded so the
+          // Quick Log preview can show the "Photo preview only" copy.
+          const prefill = buildHyperLogQuickLogPrefill({
+            action,
+            form,
+            photoCount: extras?.photoCount ?? 0,
+            context: context
+              ? {
+                  plantId: context.plantId ?? null,
+                  plantName: context.plantName ?? null,
+                  growId: context.growId ?? null,
+                  tentId: context.tentId ?? null,
+                  tentName: context.tentName ?? null,
+                }
+              : null,
+          });
+          if (!prefill) return;
+          if (onDispatchEvent) {
+            onDispatchEvent(HYPERLOG_QUICKLOG_EVENT_NAME, prefill);
+          } else if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent(HYPERLOG_QUICKLOG_EVENT_NAME, { detail: prefill }),
+            );
+          }
+        }}
+      />
     </div>
   );
 }
+

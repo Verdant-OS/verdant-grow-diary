@@ -53,6 +53,6 @@ describe("SignOutConfirmDialog", () => {
     // last one is the AlertDialogAction
     fireEvent.click(buttons[buttons.length - 1]);
     await waitFor(() => expect(signOutMock).toHaveBeenCalledTimes(1));
-    expect(navMock).toHaveBeenCalledWith("/auth", { replace: true });
+    expect(navMock).toHaveBeenCalledWith("/welcome", { replace: true });
   });
 });

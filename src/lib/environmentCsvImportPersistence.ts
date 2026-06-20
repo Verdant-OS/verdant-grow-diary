@@ -14,6 +14,13 @@ import { CSV_SOURCE_TAG } from "@/lib/csvParser";
 
 export const CSV_SENSOR_SOURCE = "csv" as const;
 
+type CsvSensorMetric =
+  | "temperature_c"
+  | "humidity_pct"
+  | "vpd_kpa"
+  | "co2_ppm"
+  | "ppfd";
+
 export interface CsvInsertScope {
   user_id: string;
   grow_id: string;
@@ -25,7 +32,7 @@ export interface SensorReadingInsert {
   user_id: string;
   tent_id: string;
   source: typeof CSV_SENSOR_SOURCE;
-  metric: "temperature_c" | "humidity_pct" | "vpd_kpa";
+  metric: CsvSensorMetric;
   value: number;
   captured_at: string;
   raw_payload: {
@@ -60,39 +67,28 @@ export function buildSensorReadingInserts(
       raw_row: r.raw_payload,
     } as const;
 
-    if (r.temperature_c != null && Number.isFinite(r.temperature_c)) {
+    function pushMetric(
+      metric: CsvSensorMetric,
+      value: number | null,
+      extraPayload: Partial<SensorReadingInsert["raw_payload"]> = {},
+    ) {
+      if (value == null || !Number.isFinite(value)) return;
       out.push({
         user_id: scope.user_id,
         tent_id: scope.tent_id,
         source: CSV_SENSOR_SOURCE,
-        metric: "temperature_c",
-        value: r.temperature_c,
+        metric,
+        value,
         captured_at: r.captured_at,
-        raw_payload: { ...basePayload },
+        raw_payload: { ...basePayload, ...extraPayload },
       });
     }
-    if (r.humidity_pct != null && Number.isFinite(r.humidity_pct)) {
-      out.push({
-        user_id: scope.user_id,
-        tent_id: scope.tent_id,
-        source: CSV_SENSOR_SOURCE,
-        metric: "humidity_pct",
-        value: r.humidity_pct,
-        captured_at: r.captured_at,
-        raw_payload: { ...basePayload },
-      });
-    }
-    if (r.vpd_kpa != null && Number.isFinite(r.vpd_kpa)) {
-      out.push({
-        user_id: scope.user_id,
-        tent_id: scope.tent_id,
-        source: CSV_SENSOR_SOURCE,
-        metric: "vpd_kpa",
-        value: r.vpd_kpa,
-        captured_at: r.captured_at,
-        raw_payload: { ...basePayload, vpd_source: "derived" },
-      });
-    }
+
+    pushMetric("temperature_c", r.temperature_c);
+    pushMetric("humidity_pct", r.humidity_pct);
+    pushMetric("vpd_kpa", r.vpd_kpa, r.vpd_source ? { vpd_source: r.vpd_source } : {});
+    pushMetric("co2_ppm", r.co2_ppm);
+    pushMetric("ppfd", r.ppfd);
   }
   return out;
 }

@@ -17,6 +17,7 @@ import {
   resolveSensorSourceLabel,
   type ResolvedSourceLabel,
 } from "@/lib/sensorSourceLabelRules";
+import { tempFFromC } from "@/lib/temperatureUnits";
 
 export type TimelineSensorChipMetric =
   | "temp_f"
@@ -96,8 +97,10 @@ function readSource(raw: unknown): SensorReadingSource | null {
  *     co2|co2_ppm,
  *     source, vendor, metadata: { vendor } }
  *
- * Temperature unit preference: if Fahrenheit field present → °F chip,
- * otherwise if Celsius field present → °C chip. Never both.
+ * Temperature display convention on this branch: explicit Fahrenheit fields
+ * render as-is; explicit Celsius fields convert once to Fahrenheit at the
+ * chip build layer. Generic temperature fields keep the caller-provided unit
+ * via `preferUnit` because their source unit is not knowable here.
  */
 export function buildTimelineSensorSnapshotViewModel(
   input: unknown,
@@ -128,7 +131,7 @@ export function buildTimelineSensorSnapshotViewModel(
 
   const chips: TimelineSensorChip[] = [];
 
-  // Temperature chip — prefer explicit unit, fall back to preferUnit for generic.
+  // Temperature chip — never double-convert explicit Fahrenheit values.
   if (isFiniteNumber(tempF)) {
     const v = roundTo(tempF, 1);
     chips.push({
@@ -139,14 +142,28 @@ export function buildTimelineSensorSnapshotViewModel(
       display: `${v}°F`,
     });
   } else if (isFiniteNumber(tempC)) {
-    const v = roundTo(tempC, 1);
-    chips.push({
-      metric: "temp_c",
-      label: "Temp",
-      value: v,
-      unit: "°C",
-      display: `${v}°C`,
-    });
+    if (options.preferUnit === "C") {
+      const v = roundTo(tempC, 1);
+      chips.push({
+        metric: "temp_c",
+        label: "Temp",
+        value: v,
+        unit: "°C",
+        display: `${v}°C`,
+      });
+    } else {
+      const converted = tempFFromC(tempC);
+      if (isFiniteNumber(converted)) {
+        const v = roundTo(converted, 1);
+        chips.push({
+          metric: "temp_f",
+          label: "Temp",
+          value: v,
+          unit: "°F",
+          display: `${v}°F`,
+        });
+      }
+    }
   } else if (isFiniteNumber(tempGeneric)) {
     const v = roundTo(tempGeneric, 1);
     const unit = options.preferUnit === "C" ? "°C" : "°F";

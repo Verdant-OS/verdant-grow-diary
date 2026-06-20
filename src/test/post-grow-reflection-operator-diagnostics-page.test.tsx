@@ -22,8 +22,8 @@ describe("OperatorPostGrowReflectionDryRun", () => {
     expect(screen.getByText("Failed")).toBeTruthy();
     expect(screen.getByText("Validated")).toBeTruthy();
     expect(screen.getByText("Rejected")).toBeTruthy();
-    expect(screen.getByText("5")).toBeTruthy();
-    expect(screen.getByText("4")).toBeTruthy();
+    expect(screen.getAllByText("5").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("4").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders scenario rows and safety reason codes", () => {

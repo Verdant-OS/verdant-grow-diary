@@ -142,12 +142,11 @@ describe("reopenAlert helper (alerts lib)", () => {
   it("exports reopenAlert", () => {
     expect(ALERTS_LIB).toMatch(/export\s+async\s+function\s+reopenAlert/);
   });
-  it("reopen clears acknowledged_at and resolved_at to satisfy CHECK constraints", () => {
+  it("reopen delegates to buildReopenAlertPatch (clears both timestamps)", () => {
     const idx = ALERTS_LIB.indexOf("function reopenAlert");
     const block = ALERTS_LIB.slice(idx, idx + 500);
-    expect(block).toMatch(/status:\s*["']open["']/);
-    expect(block).toMatch(/acknowledged_at:\s*null/);
-    expect(block).toMatch(/resolved_at:\s*null/);
+    expect(block).toMatch(/buildReopenAlertPatch\(\)/);
+    expect(ALERTS_LIB).toMatch(/import\s*\{[^}]*buildReopenAlertPatch/);
   });
   it("exports getAlertById that uses maybeSingle (safe not-found)", () => {
     expect(ALERTS_LIB).toMatch(/export\s+async\s+function\s+getAlertById/);

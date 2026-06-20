@@ -113,6 +113,66 @@ describe("ecowittLatestSnapshotFilter", () => {
     expect(vm.hasReading).toBe(true);
   });
 
+  it("recognises EcoWitt lineage from nested metadata on canonical live rows", () => {
+    const rows: EcowittSensorReadingRow[] = [
+      {
+        tent_id: TENT_A,
+        source: "live",
+        captured_at: FRESH_AT,
+        raw_payload: {
+          source: "webhook",
+          metrics: { temp_f: 78.6, humidity_pct: 56.2 },
+          captured_at: FRESH_AT,
+          metadata: { transport_source: "ecowitt" },
+        },
+      },
+    ];
+    const vm = buildEcowittLatestSnapshot(rows, { tentId: TENT_A }, { now: NOW });
+    expect(vm.hasReading).toBe(true);
+    expect(vm.sourceLabel?.label).toBe("Ecowitt");
+  });
+
+  it("renders persisted sensor-ingest-webhook EcoWitt metric bags as latest snapshots", () => {
+    const rows: EcowittSensorReadingRow[] = [
+      {
+        tent_id: TENT_A,
+        source: "live",
+        captured_at: FRESH_AT,
+        raw_payload: {
+          source: "ecowitt",
+          vendor: "ecowitt",
+          captured_at: FRESH_AT,
+          metrics: {
+            temp_f: 78.6,
+            humidity_pct: 56.2,
+            soil_moisture_pct: 45,
+            co2_ppm: 966,
+            vpd_kpa: 1.46,
+          },
+          metadata: {
+            transport: "mqtt_local_test",
+            test_sender: true,
+          },
+        },
+      },
+    ];
+
+    const vm = buildEcowittLatestSnapshot(rows, { tentId: TENT_A }, { now: NOW });
+
+    expect(vm.hasReading).toBe(true);
+    expect(vm.source).toBe("live");
+    expect(vm.sourceLabel?.label).toBe("Ecowitt");
+    expect(vm.metrics.temp_f).toBeCloseTo(78.6, 1);
+    expect(vm.metrics.humidity_pct).toBe(56.2);
+    expect(vm.metrics.soil_moisture_pct).toBe(45);
+    expect(vm.metrics.co2_ppm).toBe(966);
+    expect(vm.snapshot?.rawPayload).toMatchObject({
+      test_sender: true,
+      transport: "mqtt_local_test",
+      dateutc: FRESH_AT,
+    });
+  });
+
   it("preserves raw payload on the chosen snapshot", () => {
     const payload = { temp1f: 77, humidity1: 55, dateutc: FRESH_AT };
     const vm = buildEcowittLatestSnapshot(

@@ -12,6 +12,7 @@ const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 const ROBOTS = read("public/robots.txt");
 const SITEMAP = read("public/sitemap.xml");
 const CHECKLIST = read("docs/launch-checklist.md");
+const V0_AUDIT = read("docs/verdant-v0-zip-strategy-audit.md");
 const README = read("README.md");
 
 describe("robots.txt", () => {
@@ -25,9 +26,7 @@ describe("robots.txt", () => {
   });
 
   it("references the production sitemap", () => {
-    expect(ROBOTS).toMatch(
-      /Sitemap:\s*https:\/\/verdantgrowdiary\.com\/sitemap\.xml/,
-    );
+    expect(ROBOTS).toMatch(/Sitemap:\s*https:\/\/verdantgrowdiary\.com\/sitemap\.xml/);
   });
 });
 
@@ -41,12 +40,8 @@ describe("sitemap.xml", () => {
   });
 
   it("includes only safe public routes (/ and /welcome)", () => {
-    expect(SITEMAP).toMatch(
-      /<loc>https:\/\/verdantgrowdiary\.com\/<\/loc>/,
-    );
-    expect(SITEMAP).toMatch(
-      /<loc>https:\/\/verdantgrowdiary\.com\/welcome<\/loc>/,
-    );
+    expect(SITEMAP).toMatch(/<loc>https:\/\/verdantgrowdiary\.com\/<\/loc>/);
+    expect(SITEMAP).toMatch(/<loc>https:\/\/verdantgrowdiary\.com\/welcome<\/loc>/);
   });
 
   it("excludes private authenticated routes", () => {
@@ -68,9 +63,7 @@ describe("sitemap.xml", () => {
       "/auth",
     ];
     for (const p of privatePaths) {
-      expect(SITEMAP).not.toMatch(
-        new RegExp(`<loc>https://verdantgrowdiary\\.com${p}(/|<)`),
-      );
+      expect(SITEMAP).not.toMatch(new RegExp(`<loc>https://verdantgrowdiary\\.com${p}(/|<)`));
     }
   });
 
@@ -100,6 +93,19 @@ describe("docs/launch-checklist.md", () => {
   it("does not introduce service_role or external-control strings", () => {
     expect(CHECKLIST).not.toMatch(/service_role/);
     expect(CHECKLIST).not.toMatch(/external[-_ ]control/i);
+  });
+
+  it("separates mobile alert review from dedicated Action Queue reachability", () => {
+    expect(CHECKLIST).toMatch(/Mobile alert\/recommendation review is reachable/);
+    expect(CHECKLIST).toMatch(/\/alerts/);
+    expect(CHECKLIST).toMatch(/Dedicated Action Queue mobile reachability/i);
+    expect(CHECKLIST).toMatch(/\/actions/);
+    expect(CHECKLIST).toMatch(/relabeling `\/alerts`/);
+
+    expect(V0_AUDIT).toMatch(/Mobile alert\/recommendation review is reachable/);
+    expect(V0_AUDIT).toMatch(/Dedicated Action Queue mobile reachability/i);
+    expect(V0_AUDIT).toMatch(/blocked/i);
+    expect(V0_AUDIT).toMatch(/`\/alerts` is not Action Queue reachability/);
   });
 });
 

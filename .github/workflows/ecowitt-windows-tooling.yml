@@ -2,6 +2,15 @@ name: EcoWitt Windows tooling
 
 on:
   pull_request:
+    paths:
+      - '.github/workflows/ecowitt-windows-tooling.yml'
+      - 'src/test/ecowitt-windows-*.test.ts'
+      - 'src/test/ecowitt-local-bridge-smoke.test.ts'
+      - 'src/test/ecowitt-http-local-bridge.test.ts'
+      - 'tools/ecowitt-testbench/**'
+      - 'scripts/**ecowitt**'
+      - 'package.json'
+      - 'bun.lockb'
   workflow_dispatch:
 
 permissions:

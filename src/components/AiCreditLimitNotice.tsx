@@ -10,6 +10,7 @@ import {
   type AiCreditDenial,
   type AiCreditLimitNoticeSurface,
 } from "@/lib/aiCreditLimitNoticeViewModel";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 
 export interface AiCreditLimitNoticeProps {
   credit: AiCreditDenial;
@@ -26,7 +27,16 @@ export default function AiCreditLimitNotice({
   ...rest
 }: AiCreditLimitNoticeProps) {
   const testId = rest["data-testid"] ?? "ai-credit-limit-notice";
-  const vm = buildAiCreditLimitNoticeViewModel({ credit, currentPlanLabel, surface });
+  // Defensive client-side bypass: founder/paid viewers never see the
+  // upsell prompt even if the server denial mis-tagged plan_id="free".
+  // Server usage logging is unaffected — this only changes notice copy.
+  const { entitlement } = useMyEntitlements();
+  const vm = buildAiCreditLimitNoticeViewModel({
+    credit,
+    currentPlanLabel,
+    surface,
+    viewerEntitlement: entitlement,
+  });
 
 
   if (vm.kind === "upsell" && vm.paywallVm) {

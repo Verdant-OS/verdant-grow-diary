@@ -20,6 +20,10 @@ import {
   isEcowittMissingMetricCode,
   type EcowittMissingMetricCode,
 } from "@/constants/ecowittMissingMetricCodes";
+import {
+  assertExportHeadersSafe,
+  assertExportSafe,
+} from "@/lib/exportRedactionRules";
 
 export interface CloudCanaryExportRow {
   fixture_name: string;
@@ -178,6 +182,10 @@ function formatCodesCell(codes: ReadonlyArray<string>): string {
 
 /** CSV with a header comment line, column header row, fixture rows, and a TOTAL row. */
 export function serializeCloudCanaryExportToCsv(exp: CloudCanaryExport): string {
+  assertExportHeadersSafe(
+    CLOUD_CANARY_EXPORT_COLUMNS as unknown as ReadonlyArray<string>,
+    "ecowitt-cloud-canary-csv",
+  );
   const lines: string[] = [];
   // Honest, non-banned header line.
   lines.push(
@@ -207,10 +215,14 @@ export function serializeCloudCanaryExportToCsv(exp: CloudCanaryExport): string 
       formatCodesCell(exp.missing_metric_codes),
     ].join(","),
   );
-  return lines.join("\n") + "\n";
+  const out = lines.join("\n") + "\n";
+  assertExportSafe(out, "ecowitt-cloud-canary-csv");
+  return out;
 }
 
 export function serializeCloudCanaryExportToJson(exp: CloudCanaryExport): string {
-  return JSON.stringify(exp, null, 2);
+  const out = JSON.stringify(exp, null, 2);
+  assertExportSafe(out, "ecowitt-cloud-canary-json");
+  return out;
 }
 

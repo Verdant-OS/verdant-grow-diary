@@ -16,6 +16,10 @@ import {
   buildPlantRecentActivity,
   type PlantRecentActivityRow,
 } from "@/lib/plantRecentActivityRules";
+import {
+  PHOTO_NON_DIAGNOSTIC_LABEL,
+  PHOTO_NON_DIAGNOSTIC_TESTID,
+} from "@/lib/photoEventNonDiagnosticLabelRules";
 
 interface Props {
   plantId: string | null | undefined;
@@ -71,6 +75,14 @@ function EntryRow({ row, plantName }: { row: PlantRecentActivityRow; plantName?:
         <p className="mt-2 text-sm leading-snug">{row.notePreview}</p>
       ) : !row.hasHardwareReadings ? (
         <p className="mt-2 text-xs text-muted-foreground italic">No note</p>
+      ) : null}
+      {row.hasPhoto && row.showPhotoNonDiagnosticLabel ? (
+        <div
+          data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
+          className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground/80"
+        >
+          {PHOTO_NON_DIAGNOSTIC_LABEL}
+        </div>
       ) : null}
       {row.hasHardwareReadings ? (
         <div

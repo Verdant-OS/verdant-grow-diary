@@ -11,6 +11,10 @@
  */
 
 import type { CapturedAiDoctorPromptMeasurement } from "./aiDoctorPromptMeasurementCaptureStore";
+import {
+  assertExportHeadersSafe,
+  assertExportSafe,
+} from "../exportRedactionRules";
 
 export const AI_DOCTOR_PROMPT_MEASUREMENT_CSV_COLUMNS = [
   "recordedAt",
@@ -82,12 +86,18 @@ function rowFor(c: CapturedAiDoctorPromptMeasurement): readonly unknown[] {
 export function serializeAiDoctorPromptMeasurementsToCsv(
   captured: readonly CapturedAiDoctorPromptMeasurement[],
 ): string {
+  assertExportHeadersSafe(
+    AI_DOCTOR_PROMPT_MEASUREMENT_CSV_COLUMNS,
+    "ai-doctor-prompt-measurement-csv",
+  );
   const header = AI_DOCTOR_PROMPT_MEASUREMENT_CSV_COLUMNS.join(",");
   const lines = [header];
   for (const c of captured) {
     lines.push(rowFor(c).map(escapeCell).join(","));
   }
-  return lines.join("\n") + "\n";
+  const out = lines.join("\n") + "\n";
+  assertExportSafe(out, "ai-doctor-prompt-measurement-csv");
+  return out;
 }
 
 export const AI_DOCTOR_PROMPT_MEASUREMENT_CSV_FILENAME =

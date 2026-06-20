@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+    paths:
+      - '.github/workflows/ecowitt-testbench-safety.yml'
+      - 'tools/ecowitt-testbench/**'
+      - 'src/test/ecowitt-windows-testbench-static-safety.test.ts'
+      - 'scripts/**ecowitt**'
+      - 'package.json'
+      - 'bun.lockb'
   workflow_dispatch:
 
 jobs:
@@ -105,4 +112,3 @@ jobs:
           path: artifacts/ecowitt-testbench/
           retention-days: 14
           if-no-files-found: warn
-

@@ -79,6 +79,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/alerts/:alertId", access: "auth" },
   { path: "/auth", access: "public" },
   { path: "/billing/:plan", access: "public", description: "Billing placeholder." },
+  { path: "/customer/:shareId", access: "public", description: "Customer Mode QR guide shell (read-only, no private grow data)." },
   { path: "/daily-check", access: "auth" },
   { path: "/demo", access: "redirect", description: "→ /welcome" },
   { path: "/diagnostics", access: "operator" },
@@ -108,8 +109,10 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/operator/ecowitt-bridge-status", access: "operator", description: "EcoWitt bridge status." },
   { path: "/operator/ecowitt-live-bringup", access: "operator", description: "EcoWitt live bring-up operator checklist." },
   { path: "/operator/ecowitt-tent-preview", access: "operator", description: "EcoWitt multi-tent read-only normalizer preview." },
-  
+  { path: "/operator/ggs-real-payload-ingest", access: "operator", description: "GGS real payload ingest operator tool (read-only preview)." },
+  { path: "/operator/one-tent-loop-smoke-test", access: "operator", description: "One-tent loop smoke-test operator checklist (read-only)." },
   { path: "/operator/one-tent-proof-record", access: "operator", description: "One-tent proof record export." },
+  { path: "/operator/post-grow-reflection-dry-run", access: "operator", description: "Post-Grow Reflection dry-run diagnostics panel (read-only)." },
   
   { path: "/pi-ingest-status", access: "operator" },
   { path: "/plants", access: "auth" },

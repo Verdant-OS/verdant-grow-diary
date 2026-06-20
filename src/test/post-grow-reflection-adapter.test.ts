@@ -65,8 +65,7 @@ describe("adaptPostGrowReflectionCandidate", () => {
     });
 
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.status).toBe("validated");
+    if (result.status === "validated") {
       expect(result.output.executive_reflection).toContain("1.21 kPa");
       expect(result.issues).toEqual([]);
     }
@@ -82,7 +81,7 @@ describe("adaptPostGrowReflectionCandidate", () => {
     });
 
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.output.confidence).toBe("High");
+    if (result.status === "validated") expect(result.output.confidence).toBe("High");
   });
 
   it("returns structured failure for malformed candidates", () => {
@@ -95,8 +94,8 @@ describe("adaptPostGrowReflectionCandidate", () => {
     });
 
     expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.status).toBe("validation_failed");
+    expect(result.status).toBe("validation_failed");
+    if (result.status === "validation_failed") {
       expect(result.output).toBeNull();
       expect(result.failureReason).toContain("invalid_type");
       expect(result.issues.length).toBeGreaterThan(0);
@@ -113,7 +112,8 @@ describe("adaptPostGrowReflectionCandidate", () => {
     });
 
     expect(result.ok).toBe(false);
-    if (!result.ok) {
+    expect(result.status).toBe("validation_failed");
+    if (result.status === "validation_failed") {
       expect(result.failureReason).toContain("unsafe_language");
       expect(result.issues.some((issue) => issue.code === "unsafe_language")).toBe(true);
     }
@@ -129,6 +129,9 @@ describe("adaptPostGrowReflectionCandidate", () => {
     });
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.failureReason).toContain("high_confidence_with_thin_data");
+    expect(result.status).toBe("validation_failed");
+    if (result.status === "validation_failed") {
+      expect(result.failureReason).toContain("high_confidence_with_thin_data");
+    }
   });
 });

@@ -108,7 +108,7 @@ export function buildPostGrowReflectionOperatorDiagnosticsViewModel(
     safetyRules: [
       "Operator-only route. Do not add grower-facing navigation.",
       "Fixture harness only. Do not call a model or provider.",
-      "No Supabase, persistence, schema, or report UI wiring in this slice.",
+      "No database reads/writes, persistence, schema, or report UI wiring in this slice.",
       "Rejected scenarios must stay visible so unsafe output is not mistaken for healthy output.",
     ],
   };

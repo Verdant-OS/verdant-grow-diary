@@ -33,6 +33,10 @@ import {
   environmentMetricChipStatus,
 } from "@/lib/environmentStageTargetRules";
 
+function formatTentPlantHealthCopy(copy: string): string {
+  return copy.replace(/^●\s*/, "");
+}
+
 export default function Tents() {
   // Shared URL `?growId=` resolution against RLS-loaded grows.
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
@@ -122,6 +126,7 @@ export default function Tents() {
                         : health.variant === "healthy"
                           ? "text-[hsl(var(--success))]"
                           : "text-muted-foreground";
+                    const plantHealthCopy = formatTentPlantHealthCopy(health.copy);
                     return (
                       <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/40">
                         <span>{plantCount} plants</span>
@@ -133,8 +138,10 @@ export default function Tents() {
                           className={healthCls}
                           data-testid="tent-card-health-chip"
                           data-variant={health.variant}
+                          aria-label={`Plant health status: ${plantHealthCopy}. Sensor status is shown separately.`}
+                          title="Plant health only — sensor status is shown separately."
                         >
-                          {health.copy}
+                          Plant health: {plantHealthCopy}
                         </span>
                       </div>
                     );

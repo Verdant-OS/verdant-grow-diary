@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { PostGrowReflectionReviewPacketCard } from "@/components/PostGrowReflectionReviewPacketCard";
 import {
   validatePostGrowReflectionCandidatePaste,
   type PostGrowReflectionCandidatePasteResult,
@@ -13,6 +14,7 @@ import {
   type PostGrowReflectionCandidateValidationSummary,
 } from "@/lib/ai/postGrowReflectionCandidateValidationSummary";
 import { findPostGrowReflectionEnvelopeSample } from "@/lib/ai/postGrowReflectionEnvelopeSamples";
+import { buildPostGrowReflectionReviewPacket } from "@/lib/ai/postGrowReflectionReviewPacket";
 import type { PostGrowReflectionPreviewSectionRow } from "@/lib/ai/postGrowReflectionPreviewViewModel";
 
 function SectionBlock({ section }: { section: PostGrowReflectionPreviewSectionRow }) {
@@ -48,7 +50,11 @@ function EnvelopeMetadata({ result }: { result: PostGrowReflectionCandidatePaste
   );
 }
 
-function ValidationSummaryPanel({ summary }: { summary: PostGrowReflectionCandidateValidationSummary }) {
+function ValidationSummaryPanel({
+  summary,
+}: {
+  summary: PostGrowReflectionCandidateValidationSummary;
+}) {
   if (summary.status === "idle" || summary.status === "empty") return null;
 
   return (
@@ -155,7 +161,9 @@ function ResultPanel({ result }: { result: PostGrowReflectionCandidatePasteResul
         ))}
       </div>
       <div className="rounded-md border bg-muted/30 p-3">
-        <div className="text-xs font-medium uppercase text-muted-foreground">Validation options</div>
+        <div className="text-xs font-medium uppercase text-muted-foreground">
+          Validation options
+        </div>
         <p className="mt-1 text-xs text-muted-foreground">{result.validationOptions.label}</p>
       </div>
     </div>
@@ -168,6 +176,7 @@ export function PostGrowReflectionCandidatePasteValidator() {
     validatePostGrowReflectionCandidatePaste(),
   );
   const summary = buildPostGrowReflectionCandidateValidationSummary(result);
+  const reviewPacket = buildPostGrowReflectionReviewPacket(result);
 
   function validateCandidate() {
     setResult(validatePostGrowReflectionCandidatePaste(rawText));
@@ -204,7 +213,11 @@ export function PostGrowReflectionCandidatePasteValidator() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => loadEnvelopeSample("valid_envelope")}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => loadEnvelopeSample("valid_envelope")}
+          >
             Load valid envelope sample
           </Button>
           <Button
@@ -232,6 +245,7 @@ export function PostGrowReflectionCandidatePasteValidator() {
         </div>
         <ResultPanel result={result} />
         <ValidationSummaryPanel summary={summary} />
+        <PostGrowReflectionReviewPacketCard packet={reviewPacket} />
       </CardContent>
     </Card>
   );

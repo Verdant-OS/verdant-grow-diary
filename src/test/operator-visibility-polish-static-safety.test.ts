@@ -4,10 +4,13 @@ import { readFileSync } from "node:fs";
 const NEW_FILES = [
   "src/components/CanonicalSourceBadge.tsx",
   "src/components/CanonicalSourceLegend.tsx",
+  "src/components/SensorIngestAuditReport.tsx",
   "src/components/SensorSnapshotDetailsDrawer.tsx",
   "src/lib/canonicalSourceBadgeViewModel.ts",
   "src/lib/sensorIngestAuditReportCsvExport.ts",
   "src/lib/sensorIngestAuditReportQueryParams.ts",
+  "src/lib/sensorIngestAuditReportViewModel.ts",
+  "src/lib/sensorSnapshotDetailsDrawerCsvExport.ts",
   "src/lib/sensorSnapshotDiaryLinkRules.ts",
 ];
 

@@ -16,6 +16,8 @@
 export const DIARY_LINK_TOLERANCE_MS = 60 * 1000;
 export const DIARY_LINK_EMPTY_LABEL =
   "No matching diary or timeline items found." as const;
+export const DIARY_LINK_ATTEMPTED_FIELDS_LABEL =
+  "Attempted match fields: snapshot_id, tent/plant, captured_at." as const;
 
 export type DiaryLinkKind = "diary" | "timeline";
 
@@ -48,6 +50,18 @@ export interface MatchSnapshotDiaryLinksInput {
   snapshot: SensorSnapshotLinkKey;
   candidates: DiaryTimelineCandidate[];
   toleranceMs?: number;
+}
+
+export interface SnapshotDiaryLinkAttemptSummary {
+  attemptedFields: readonly ["snapshot_id", "tent/plant", "captured_at"];
+  attemptedFieldsLabel: typeof DIARY_LINK_ATTEMPTED_FIELDS_LABEL;
+}
+
+export function describeSnapshotDiaryLinkAttempt(): SnapshotDiaryLinkAttemptSummary {
+  return {
+    attemptedFields: ["snapshot_id", "tent/plant", "captured_at"],
+    attemptedFieldsLabel: DIARY_LINK_ATTEMPTED_FIELDS_LABEL,
+  };
 }
 
 function labelFor(kind: DiaryLinkKind): string {

@@ -130,8 +130,13 @@ export function runPostGrowReflectionDryRunHarness(
       context: scenario.context,
       candidate: scenario.candidate,
     });
-    const actualStatus: PostGrowReflectionDryRunExpectedStatus = adapterResult.ok ? "validated" : "rejected";
+    const actualStatus: PostGrowReflectionDryRunExpectedStatus =
+      adapterResult.status === "validated" ? "validated" : "rejected";
     const codes = issueCodes(adapterResult.issues);
+    const failureReason =
+      adapterResult.status === "validation_failed" ? adapterResult.failureReason : null;
+    const outputConfidence =
+      adapterResult.status === "validated" ? adapterResult.output.confidence : null;
 
     return {
       id: scenario.id,
@@ -142,8 +147,8 @@ export function runPostGrowReflectionDryRunHarness(
       actualStatus,
       passed: actualStatus === scenario.expectedStatus,
       issueCodes: codes,
-      failureReason: adapterResult.ok ? null : adapterResult.failureReason,
-      outputConfidence: adapterResult.ok ? adapterResult.output.confidence : null,
+      failureReason,
+      outputConfidence,
       validationOptions: adapterResult.request.validationOptions,
     };
   });

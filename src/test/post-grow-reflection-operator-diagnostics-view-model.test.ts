@@ -56,6 +56,6 @@ describe("buildPostGrowReflectionOperatorDiagnosticsViewModel", () => {
 
     expect(viewModel.safetyRules.join("\n")).toMatch(/Operator-only route/i);
     expect(viewModel.safetyRules.join("\n")).toMatch(/Do not call a model or provider/i);
-    expect(viewModel.safetyRules.join("\n")).toMatch(/No Supabase, persistence, schema, or report UI wiring/i);
+    expect(viewModel.safetyRules.join("\n")).toMatch(/No database reads\/writes, persistence, schema, or report UI wiring/i);
   });
 });

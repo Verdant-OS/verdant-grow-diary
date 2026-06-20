@@ -6,8 +6,15 @@ function readProjectFile(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
 }
 
+function stripSourceComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|\s)\/\/.*$/gm, "$1");
+}
+
 const PRICING_CONSTANTS = readProjectFile("src/constants/pricing.ts");
 const BILLING_PLACEHOLDER = readProjectFile("src/pages/BillingPlaceholder.tsx");
+const BILLING_PLACEHOLDER_RUNTIME_SOURCE = stripSourceComments(BILLING_PLACEHOLDER);
 const BILLING_DOC = readProjectFile("docs/billing.md");
 
 describe("pricing entitlement copy alignment", () => {
@@ -47,16 +54,16 @@ describe("pricing entitlement copy alignment", () => {
     expect(BILLING_DOC).toMatch(/writes to `public\.billing_subscriptions`/);
     expect(BILLING_DOC).toMatch(/with service role/);
     expect(BILLING_PLACEHOLDER).toMatch(/verified billing event/);
-    expect(BILLING_PLACEHOLDER).not.toMatch(/grantPro|setPro|isPro\s*=\s*true/i);
-    expect(BILLING_PLACEHOLDER).not.toMatch(/\.from\(["']billing_subscriptions["']\)/);
+    expect(BILLING_PLACEHOLDER_RUNTIME_SOURCE).not.toMatch(/grantPro|setPro|isPro\s*=\s*true/i);
+    expect(BILLING_PLACEHOLDER_RUNTIME_SOURCE).not.toMatch(/\.from\(["']billing_subscriptions["']\)/);
   });
 
   it("does not introduce checkout, webhook, or entitlement write behavior", () => {
-    expect(BILLING_PLACEHOLDER).not.toMatch(/Paddle\.Checkout\.open\(/);
-    expect(BILLING_PLACEHOLDER).not.toMatch(/functions\.invoke/);
-    expect(BILLING_PLACEHOLDER).not.toMatch(/\.insert\(/);
-    expect(BILLING_PLACEHOLDER).not.toMatch(/\.update\(/);
-    expect(BILLING_PLACEHOLDER).not.toMatch(/\.delete\(/);
-    expect(BILLING_PLACEHOLDER).not.toMatch(/\.upsert\(/);
+    expect(BILLING_PLACEHOLDER_RUNTIME_SOURCE).not.toMatch(/Paddle\.Checkout\.open\(/);
+    expect(BILLING_PLACEHOLDER_RUNTIME_SOURCE).not.toMatch(/functions\.invoke/);
+    expect(BILLING_PLACEHOLDER_RUNTIME_SOURCE).not.toMatch(/\.insert\(/);
+    expect(BILLING_PLACEHOLDER_RUNTIME_SOURCE).not.toMatch(/\.update\(/);
+    expect(BILLING_PLACEHOLDER_RUNTIME_SOURCE).not.toMatch(/\.delete\(/);
+    expect(BILLING_PLACEHOLDER_RUNTIME_SOURCE).not.toMatch(/\.upsert\(/);
   });
 });

@@ -106,6 +106,11 @@ Current status:
 
 - Existing outcome recording and audit history behavior supports this lane.
 - No additional Action Queue writes were added in recent builds.
+- Mobile alert/recommendation review is reachable through `/alerts` and is
+  labeled as Alerts, not Action Queue.
+- Dedicated Action Queue mobile reachability remains blocked unless a real
+  Action Queue route/page exists and MobileNav points to that route.
+  `/alerts` is not Action Queue reachability.
 
 ### 5. AI Doctor context and RAG
 

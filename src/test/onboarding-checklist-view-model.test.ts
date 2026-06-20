@@ -95,6 +95,16 @@ describe("buildOnboardingChecklistViewModel — activation states", () => {
 
 describe("checklist links point to safe existing routes", () => {
   const vm = buildOnboardingChecklistViewModel(base);
+
+  it("keeps the one-tent setup order: Grow → Tent → Plant → Quick Log", () => {
+    expect(vm.steps.map((s) => s.key)).toEqual([
+      "create_grow",
+      "add_tent",
+      "add_plant",
+      "first_log",
+    ]);
+  });
+
   it.each([
     ["create_grow", "/grows"],
     ["add_tent", "/tents"],
@@ -103,6 +113,13 @@ describe("checklist links point to safe existing routes", () => {
   ] as const)("%s → %s", (key, expected) => {
     expect(vm.steps.find((s) => s.key === key)?.href).toBe(expected);
     expect(ONBOARDING_ROUTES[key]).toBe(expected);
+  });
+
+  it("first log step routes to Dashboard where QuickLogV2Fab opens the sheet", () => {
+    const firstLog = vm.steps.find((s) => s.key === "first_log");
+
+    expect(firstLog?.href).toBe("/");
+    expect(firstLog?.title).toMatch(/log/i);
   });
 
   it("never links to automation/device-control or admin routes", () => {

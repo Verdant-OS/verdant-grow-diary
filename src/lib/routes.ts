@@ -24,6 +24,9 @@ export const dashboardPath = (growId?: string | null): string => withGrowId("/da
 export const alertsPath = (growId?: string | null): string => withGrowId("/alerts", growId);
 export const sensorsPath = (growId?: string | null): string => withGrowId("/sensors", growId);
 
+export const postGrowLearningReportPath = (growId: string): string =>
+  `/reports/post-grow/${encodeURIComponent(growId)}`;
+
 export const actionDetailPath = (actionId: string): string =>
   `/actions/${encodeURIComponent(actionId)}`;
 
@@ -84,5 +87,3 @@ export const tentDetailPath = (tentId: string): string =>
 
 export const aiDoctorSessionDetailPath = (sessionId: string): string =>
   `/doctor/sessions/${encodeURIComponent(sessionId)}`;
-
-

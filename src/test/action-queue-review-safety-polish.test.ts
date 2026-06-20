@@ -35,6 +35,21 @@ describe("formatActionTargetLabel — safe target_device fallback", () => {
     expect(formatActionTargetLabel("", "humidifier-3")).toBe("Grow-room equipment");
   });
 
+  it("never returns UUIDs, MACs, IPs, passkeys, or bridge-token-looking targets as-is", () => {
+    const unsafeTargets = [
+      "550e8400-e29b-41d4-a716-446655440000",
+      "aa:bb:cc:dd:ee:ff",
+      "192.168.1.24",
+      "PASSKEY=abc123",
+      "vbt_secret_bridge_token",
+    ];
+
+    for (const target of unsafeTargets) {
+      expect(formatActionTargetLabel(null, target)).toBe("Grow-room equipment");
+      expect(formatActionTargetLabel(null, target)).not.toBe(target);
+    }
+  });
+
   it("falls back to a manual-review label when neither is set", () => {
     expect(formatActionTargetLabel(null, null)).toBe("Manual review target");
     expect(formatActionTargetLabel("", "")).toBe("Manual review target");

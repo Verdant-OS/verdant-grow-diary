@@ -105,12 +105,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/logs", access: "auth" },
   { path: "/onboarding", access: "auth", description: "Post-sign-in start-screen choice (diary-first default)." },
   { path: "/operator/ecowitt", access: "operator", description: "Cloud Canary preview." },
-  { path: "/operator/ecowitt-bridge-debug", access: "operator", description: "EcoWitt bridge debug (localhost-only diagnostics)." },
-  { path: "/operator/ecowitt-bridge-status", access: "operator", description: "EcoWitt bridge status." },
-  { path: "/operator/ecowitt-live-bringup", access: "operator", description: "EcoWitt live bring-up operator checklist." },
-  { path: "/operator/ecowitt-tent-preview", access: "operator", description: "EcoWitt multi-tent read-only normalizer preview." },
-  { path: "/operator/ggs-real-payload-ingest", access: "operator", description: "GGS real payload ingest operator tool (read-only preview)." },
-  { path: "/operator/one-tent-loop-smoke-test", access: "operator", description: "One-tent loop smoke-test operator checklist (read-only)." },
+  { path: "/operator/ggs-real-payload-ingest", access: "operator", description: "GGS Sentinel smoke runner verdict over real Spider Farmer GGS rows." },
   { path: "/operator/one-tent-proof-record", access: "operator", description: "One-tent proof record export." },
   { path: "/operator/post-grow-reflection-dry-run", access: "operator", description: "Post-Grow Reflection dry-run diagnostics panel (read-only)." },
   

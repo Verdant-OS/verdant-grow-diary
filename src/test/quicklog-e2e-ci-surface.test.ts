@@ -68,6 +68,38 @@ describe("Quick Log Playwright CI surface", () => {
     expect(wf).toMatch(/quicklog-smoke-artifacts/);
     expect(wf).toMatch(/e2e\/results\/quicklog-smoke-report\.json/);
     expect(wf).toMatch(/retention-days:\s*30/);
+    // PR trigger to verdant-grow-diary, but never pull_request_target
+    expect(wf).toMatch(/pull_request:\s*\n\s*branches:\s*\[\s*verdant-grow-diary\s*\]/);
+    expect(wf).not.toMatch(/pull_request_target/);
+    // push trigger must target verdant-grow-diary, not main
+    expect(wf).toMatch(/push:\s*\n\s*branches:\s*\[\s*verdant-grow-diary\s*\]/);
+    expect(wf).not.toMatch(/push:\s*\n\s*branches:\s*\[\s*main\s*\]/);
+  });
+
+  it("README documents required vars/secrets, artifact paths, retention, and branch target", () => {
+    const readme = read("e2e/README.md");
+    expect(readme).toMatch(/CI handoff: Quick Log smoke/);
+    for (const v of [
+      "E2E_BASE_URL",
+      "E2E_GROW_1_PLANT_URL",
+      "E2E_GROW_2_PLANT_NAME",
+      "E2E_TEST_EMAIL",
+      "E2E_TEST_PASSWORD",
+    ]) {
+      expect(readme, `missing ${v} in README`).toMatch(new RegExp(v));
+    }
+    expect(readme).toMatch(/quicklog-smoke-artifacts/);
+    expect(readme).toMatch(/30 days/);
+    expect(readme).toMatch(/e2e\/results\/quicklog-smoke-report\.json/);
+    expect(readme).toMatch(/e2e\/results\/quicklog-smoke-report\.txt/);
+    expect(readme).toMatch(/playwright-report\//);
+    expect(readme).toMatch(/test-results\//);
+    expect(readme).toMatch(/verdant-grow-diary/);
+    expect(readme).toMatch(/Branch note.*verdant-grow-diary/);
+  });
+
+
+  it("CI workflow has no hardcoded credentials, tokens, or service_role", () => {
     // Must target the real Lovable sync branch, not main
     expect(wf).toMatch(/branches:\s*\[verdant-grow-diary\]/);
     expect(wf).not.toMatch(/branches:\s*\[main\]/);

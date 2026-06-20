@@ -1,47 +1,75 @@
 /**
- * Operator: Spider Farmer GGS real-payload ingest.
+ * Operator GGS Real-Payload Ingest page.
  *
- * Dev/operator-only screen, behind:
- *   1. AppShell auth gate (route is inside the protected layout in App.tsx).
- *   2. Server-side `has_role(auth.uid(), 'admin')` check via useHasRole.
- *
- * If the role check is loading, denied, or errors, the ingest panel is NOT
- * rendered — a blocked screen is shown instead. This page can write live
- * sensor telemetry through the existing validated ingest path, so we do not
- * rely on /operator/* routing alone.
- *
- * NEVER renders raw_payload. NEVER emits alerts / Action Queue / AI / device
- * control side effects.
+ * Read-only diagnostics. No Supabase writes, no rpc, no Edge function
+ * invocations, no alerts/Action-Queue mutation, no AI calls, no device
+ * control, no raw-payload rendering, no MQTT publishing.
  */
-import { useEffect } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useTents } from "@/hooks/use-tents";
+import { useAuth } from "@/store/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, ShieldOff } from "lucide-react";
-import GgsRealPayloadIngestPanel from "@/components/GgsRealPayloadIngestPanel";
-import GgsSentinelSmokeRunnerPanel from "@/components/GgsSentinelSmokeRunnerPanel";
-import { useHasRole } from "@/hooks/useHasRole";
+import { GgsSentinelSmokeRunnerPanel } from "@/components/GgsSentinelSmokeRunnerPanel";
+import {
+  runGgsSentinelSmoke,
+  REQUIRED_METRIC_KEYS,
+  type SentinelSensorRow,
+} from "@/lib/ggsSentinelSmokeRunner";
+import { buildGgsSentinelSmokeRunnerPanelViewModel } from "@/lib/ggsSentinelSmokeRunnerViewModel";
+import { SPIDER_FARMER_GGS_PROVIDER } from "@/lib/spiderFarmerGgsMappingRules";
+
+const ROW_FETCH_LIMIT = 50;
 
 export default function OperatorGgsRealPayloadIngest() {
-  const role = useHasRole("operator");
-  useEffect(() => { document.title = "Operator · GGS real-payload ingest"; }, []);
+  const auth = useAuth();
+  const authAvailable = !!auth?.user?.id;
+  const tentsQ = useTents();
+  const tents = tentsQ.data ?? [];
+
+  const [selectedTentId, setSelectedTentId] = useState<string>("");
+
+  const ggsRowsQ = useQuery({
+    queryKey: ["operator-ggs-real-payload", selectedTentId],
+    enabled: authAvailable && !!selectedTentId,
+    queryFn: async (): Promise<SentinelSensorRow[]> => {
+      const { data, error } = await supabase
+        .from("sensor_readings")
+        .select("metric,value,source,quality,captured_at")
+        .eq("tent_id", selectedTentId)
+        .eq("source", SPIDER_FARMER_GGS_PROVIDER)
+        .in("metric", [...REQUIRED_METRIC_KEYS])
+        .order("captured_at", { ascending: false })
+        .limit(ROW_FETCH_LIMIT);
+      if (error) throw error;
+      return (data ?? []) as SentinelSensorRow[];
+    },
+  });
+
+  const verdict = useMemo(
+    () =>
+      runGgsSentinelSmoke({
+        rows: ggsRowsQ.data ?? [],
+        now: new Date(),
+      }),
+    [ggsRowsQ.data],
+  );
+  const panelVm = useMemo(() => buildGgsSentinelSmokeRunnerPanelViewModel(verdict), [verdict]);
 
   return (
-    <div className="container mx-auto max-w-3xl space-y-4 p-4">
-
-
-
+    <div className="container mx-auto max-w-3xl space-y-6 p-4 md:p-6" data-testid="operator-ggs-real-payload-ingest">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">Spider Farmer GGS real-payload ingest</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">GGS Real-Payload Ingest</h1>
         <p className="text-sm text-muted-foreground">
-          Dev/operator-only. Routes one real GGS 3-in-1 Soil Sensor Pro payload through the
-          existing validated ingest path. No new write path. No raw payload rendering.
+          Operator Mode · Read-only Sentinel verdict over real Spider Farmer GGS rows.
         </p>
       </header>
 
-      {role.status === "loading" && (
+      {!authAvailable && (
         <Card>
-          <CardContent className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Checking operator permissions…
+          <CardContent className="pt-6 text-sm text-muted-foreground">
+            Sentinel verdict requires an authenticated operator session.
           </CardContent>
         </Card>
       )}

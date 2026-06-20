@@ -377,7 +377,7 @@ Triggers:
   ```
   and the job completes successfully.
 
-Required GitHub configuration:
+## CI handoff: Quick Log smoke
 
 - Secrets:
   - `E2E_TEST_EMAIL`
@@ -391,10 +391,56 @@ Required GitHub configuration:
 Artifacts (uploaded with `if: always()` under the name
 `quicklog-smoke-artifacts`, retained for 30 days):
 
-- `e2e/results/quicklog-smoke-report.json`
-- `e2e/results/quicklog-smoke-report.txt`
-- `playwright-report/`
-- `test-results/`
+### Required GitHub Actions Secrets
+
+- `E2E_TEST_EMAIL` — login email for the dedicated smoke test account
+- `E2E_TEST_PASSWORD` — login password for the dedicated smoke test account
+
+### Workflow
+
+File: `.github/workflows/quicklog-smoke.yml`
+
+- Manual run: **Actions → Quick Log Playwright smoke → Run workflow**
+- Pull request run: runs automatically on PRs targeting `verdant-grow-diary`,
+  and skips cleanly if required secrets/vars are unavailable (e.g. forked PRs).
+
+Branch note: Lovable currently syncs to `verdant-grow-diary`, so the Quick Log
+smoke workflow targets that branch for `push` and `pull_request` events. If the
+protected branch changes later, update the workflow and this README together.
+
+### Artifact
+
+- Name: `quicklog-smoke-artifacts`
+- Retention: **30 days**
+- Uploaded with `if: always()` so failures still produce a report.
+- Expected paths:
+  - `e2e/results/quicklog-smoke-report.json`
+  - `e2e/results/quicklog-smoke-report.txt`
+  - `playwright-report/`
+  - `test-results/`
+
+`e2e/.auth/user.json` is gitignored and is **never** uploaded as part of
+the artifact bundle.
+
+### Failure triage
+
+1. Open `e2e/results/quicklog-smoke-report.txt` first — it lists the
+   failed step number, label, and evidence.
+2. Inspect the Playwright HTML report under `playwright-report/`, plus
+   traces, screenshots, and videos under `test-results/`.
+3. Paste the `.txt` report back into the project thread for diagnosis.
+
+### Safety note
+
+- The smoke creates real Quick Log diary entries through the normal
+  authenticated UI.
+- Use a dedicated test account and a dedicated test plant.
+- Do not run against a real grower account.
+- Do not commit `e2e/.auth/user.json`.
+- Do not use service role keys.
+- Do not add auth bypasses.
+
+Find artifacts under the workflow run summary → Artifacts.
 
 Find them under the workflow run summary → Artifacts.
 

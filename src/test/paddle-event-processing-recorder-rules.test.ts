@@ -161,6 +161,7 @@ describe("paddle event processing recorder rules", () => {
       PROCESS_DECISION,
     );
 
+    expect(payload.paddle_event_id).toBe("00000000-0000-4000-8000-000000000001");
     expect(payload.event_id).toBe("evt_trimmed");
     expect(payload.event_type).toBe("subscription.updated");
     expect(payload.environment).toBe("sandbox");

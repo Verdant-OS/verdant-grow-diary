@@ -21,9 +21,9 @@ describe("AI credit SQL effective entitlement hardening", () => {
     expect(MIGRATION).toContain("IMMUTABLE");
   });
 
-  it("degrades inactive, unknown, and elapsed billing rows to free", () => {
-    expect(MIGRATION).toContain("p_plan_id NOT IN ('free','pro_monthly','pro_annual','founder_lifetime') THEN 'free'");
-    expect(MIGRATION).toContain("p_status <> 'active' THEN 'free'");
+  it("degrades inactive, unknown, null, and elapsed billing rows to free", () => {
+    expect(MIGRATION).toContain("p_plan_id IS NULL OR p_plan_id NOT IN ('free','pro_monthly','pro_annual','founder_lifetime') THEN 'free'");
+    expect(MIGRATION).toContain("p_status IS DISTINCT FROM 'active' THEN 'free'");
     expect(MIGRATION).toContain("p_current_period_end IS NOT NULL AND p_current_period_end <= p_now THEN 'free'");
   });
 

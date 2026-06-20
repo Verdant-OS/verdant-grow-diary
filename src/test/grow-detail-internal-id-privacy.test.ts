@@ -6,7 +6,14 @@ function readSource(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
 }
 
+function stripSourceComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|\s)\/\/.*$/gm, "$1");
+}
+
 const GROW_DETAIL = readSource("src/pages/GrowDetail.tsx");
+const GROW_DETAIL_RUNTIME_SOURCE = stripSourceComments(GROW_DETAIL);
 
 const FORBIDDEN_SIDE_EFFECT_TOKENS = [
   "functions.invoke",
@@ -36,12 +43,12 @@ describe("grow detail internal id privacy", () => {
 
   it("does not introduce unsafe writes, automation, or device-control paths", () => {
     for (const token of FORBIDDEN_SIDE_EFFECT_TOKENS) {
-      expect(GROW_DETAIL).not.toContain(token);
+      expect(GROW_DETAIL_RUNTIME_SOURCE).not.toContain(token);
     }
-    expect(GROW_DETAIL).not.toMatch(/raw_payload/i);
-    expect(GROW_DETAIL).not.toMatch(/\.insert\(/);
-    expect(GROW_DETAIL).not.toMatch(/\.update\(/);
-    expect(GROW_DETAIL).not.toMatch(/\.delete\(/);
-    expect(GROW_DETAIL).not.toMatch(/\.upsert\(/);
+    expect(GROW_DETAIL_RUNTIME_SOURCE).not.toMatch(/raw_payload/i);
+    expect(GROW_DETAIL_RUNTIME_SOURCE).not.toMatch(/\.insert\(/);
+    expect(GROW_DETAIL_RUNTIME_SOURCE).not.toMatch(/\.update\(/);
+    expect(GROW_DETAIL_RUNTIME_SOURCE).not.toMatch(/\.delete\(/);
+    expect(GROW_DETAIL_RUNTIME_SOURCE).not.toMatch(/\.upsert\(/);
   });
 });

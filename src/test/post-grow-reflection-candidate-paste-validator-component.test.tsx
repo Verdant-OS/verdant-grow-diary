@@ -10,16 +10,48 @@ import {
 const envelopeKind = "post_grow_reflection_candidate";
 
 describe("PostGrowReflectionCandidatePasteValidator", () => {
-  it("renders textarea and validation controls", () => {
+  it("renders textarea, validation controls, and local sample controls", () => {
     render(<PostGrowReflectionCandidatePasteValidator />);
 
     expect(screen.getByLabelText("Candidate JSON")).toBeTruthy();
     expect(screen.getByText("Validate pasted candidate")).toBeTruthy();
     expect(screen.getByText("Clear")).toBeTruthy();
+    expect(screen.getByText("Load valid envelope sample")).toBeTruthy();
+    expect(screen.getByText("Load rejected envelope sample")).toBeTruthy();
     expect(screen.getByText("Manual paste")).toBeTruthy();
     expect(screen.getByText("Envelope supported")).toBeTruthy();
+    expect(screen.getByText("Local samples")).toBeTruthy();
     expect(screen.getByText("Not saved")).toBeTruthy();
     expect(screen.getByText("No live AI call")).toBeTruthy();
+  });
+
+  it("loads and validates the valid envelope sample", () => {
+    render(<PostGrowReflectionCandidatePasteValidator />);
+
+    fireEvent.click(screen.getByText("Load valid envelope sample"));
+    expect((screen.getByLabelText("Candidate JSON") as HTMLTextAreaElement).value).toContain(
+      "local deterministic envelope sample",
+    );
+
+    fireEvent.click(screen.getByText("Validate pasted candidate"));
+    expect(screen.getByText("Envelope paste")).toBeTruthy();
+    expect(screen.getByText("Envelope metadata")).toBeTruthy();
+    expect(screen.getByText(/sourceLabel=local deterministic envelope sample/)).toBeTruthy();
+    expect(screen.getByText("Confidence: High")).toBeTruthy();
+  });
+
+  it("loads and validates the rejected envelope sample", () => {
+    render(<PostGrowReflectionCandidatePasteValidator />);
+
+    fireEvent.click(screen.getByText("Load rejected envelope sample"));
+    expect((screen.getByLabelText("Candidate JSON") as HTMLTextAreaElement).value).toContain(
+      "local deterministic rejected envelope sample",
+    );
+
+    fireEvent.click(screen.getByText("Validate pasted candidate"));
+    expect(screen.getAllByText("Rejected candidate").length).toBeGreaterThan(0);
+    expect(screen.getByText("Envelope paste")).toBeTruthy();
+    expect(screen.getByText(/missing_candidate/)).toBeTruthy();
   });
 
   it("rejects invalid JSON visibly", () => {

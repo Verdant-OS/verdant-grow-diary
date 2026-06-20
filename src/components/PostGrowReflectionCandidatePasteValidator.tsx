@@ -8,6 +8,7 @@ import {
   validatePostGrowReflectionCandidatePaste,
   type PostGrowReflectionCandidatePasteResult,
 } from "@/lib/ai/postGrowReflectionCandidatePasteValidator";
+import { findPostGrowReflectionEnvelopeSample } from "@/lib/ai/postGrowReflectionEnvelopeSamples";
 import type { PostGrowReflectionPreviewSectionRow } from "@/lib/ai/postGrowReflectionPreviewViewModel";
 
 function SectionBlock({ section }: { section: PostGrowReflectionPreviewSectionRow }) {
@@ -148,6 +149,12 @@ export function PostGrowReflectionCandidatePasteValidator() {
     setResult(validatePostGrowReflectionCandidatePaste());
   }
 
+  function loadEnvelopeSample(id: "valid_envelope" | "contract_rejected_missing_candidate") {
+    const sample = findPostGrowReflectionEnvelopeSample(id);
+    setRawText(sample.jsonText);
+    setResult(validatePostGrowReflectionCandidatePaste());
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -156,6 +163,7 @@ export function PostGrowReflectionCandidatePasteValidator() {
           <Badge variant="outline">Operator-only</Badge>
           <Badge variant="outline">Manual paste</Badge>
           <Badge variant="outline">Envelope supported</Badge>
+          <Badge variant="outline">Local samples</Badge>
           <Badge variant="outline">Not saved</Badge>
           <Badge variant="outline">No live AI call</Badge>
         </div>
@@ -165,6 +173,18 @@ export function PostGrowReflectionCandidatePasteValidator() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => loadEnvelopeSample("valid_envelope")}>
+            Load valid envelope sample
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => loadEnvelopeSample("contract_rejected_missing_candidate")}
+          >
+            Load rejected envelope sample
+          </Button>
+        </div>
         <Textarea
           aria-label="Candidate JSON"
           value={rawText}

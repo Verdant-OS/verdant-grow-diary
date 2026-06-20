@@ -68,6 +68,7 @@ export interface PlantDetailQuickActionsInput {
 }
 
 export const PLANT_RELATIVE_TIMELINE_ANCHOR_ID = "plant-relative-timeline" as const;
+export const PLANT_PHOTOS_ANCHOR_ID = "plant-photos" as const;
 
 const LABELS: Record<
   PlantDetailQuickActionKind,

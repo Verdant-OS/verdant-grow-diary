@@ -64,6 +64,7 @@ const groups: { label: string; items: NavItem[] }[] = [
     label: "Intelligence",
     items: [
       { to: "/doctor", label: "AI Grow Doctor", icon: Stethoscope },
+      { to: "/operator/ai-doctor-phase1", label: "AI Doctor Results", icon: Stethoscope },
       { to: "/reports", label: "Grow Learning Hub", icon: LineChart },
     ],
   },

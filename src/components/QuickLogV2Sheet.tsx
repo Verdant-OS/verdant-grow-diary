@@ -36,6 +36,7 @@ import {
 } from "@/lib/quickLogV2Rules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
+import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 import {
   EMPTY_QUICKLOG_FEEDING_FORM,
@@ -357,6 +358,15 @@ export default function QuickLogV2Sheet({
         targetId: resolved.targetId as string,
         tentId: resolved.tentId ?? null,
       });
+      // Notify Timeline-style listeners that a new entry exists so the
+      // local-state Timeline page can refetch. Fires only after the save
+      // succeeded (no early/duplicate dispatch on the failure paths above).
+      dispatchQuickLogV2EntryCreated({
+        createdAt: new Date().toISOString(),
+        growEventId:
+          (result as { growEventId?: string | null }).growEventId ?? null,
+        source: "quick_log_v2_feed",
+      });
       onOpenChange(false);
       return;
     }
@@ -433,6 +443,16 @@ export default function QuickLogV2Sheet({
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,
       tentId: resolved.tentId ?? null,
+    });
+    // Notify Timeline-style listeners that a new entry exists so the
+    // local-state Timeline page can refetch. Dispatched once per
+    // successful save, after every required write (log + optional photo)
+    // has resolved.
+    dispatchQuickLogV2EntryCreated({
+      createdAt: new Date().toISOString(),
+      growEventId:
+        (res as { growEventId?: string | null }).growEventId ?? null,
+      source: "quick_log_v2",
     });
     resetPhotoSelection();
     onOpenChange(false);

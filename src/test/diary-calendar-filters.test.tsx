@@ -47,14 +47,16 @@ describe("filterDiaryCalendarGroups", () => {
     expect(diaryCalendarEmptyTitleFor("all")).toMatch(/watering, feeding, or diagnosis/);
   });
 
-  it("exposes all four filter buttons", () => {
+  it("exposes all filter buttons including environment", () => {
     expect(DIARY_CALENDAR_FILTERS.map((f) => f.value)).toEqual([
       "all",
       "watering",
       "feeding",
       "diagnosis",
+      "environment",
     ]);
   });
+
 });
 
 describe("DiaryCalendarSection — filter chips UI", () => {

@@ -26,6 +26,13 @@ import EnvironmentSummaryPrePrintModal from "@/components/EnvironmentSummaryPreP
 
 const planMock = vi.hoisted(() => ({ current: "pro" as "free" | "pro" }));
 
+vi.mock("@/hooks/useEnvironmentSummaryReportServerGate", () => ({
+  useEnvironmentSummaryReportServerGate: () =>
+    planMock.current === "pro"
+      ? { status: "allowed", reason: null, displayPlanId: "pro_monthly" }
+      : { status: "denied", reason: "upgrade_required", displayPlanId: "free" },
+}));
+
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => {
     const row =

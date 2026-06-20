@@ -51,10 +51,14 @@ describe("DiaryCalendarSection", () => {
         ]}
       />,
     );
-    // Older day is collapsed; click to expand.
-    const buttons = screen.getAllByRole("button", { expanded: false });
-    expect(buttons.length).toBeGreaterThan(0);
-    fireEvent.click(buttons[0]);
+    // Older day is collapsed; click its day header to expand. Scope to the
+    // diary-calendar-day containers so the insights-panel toggle is ignored.
+    const days = screen.getAllByTestId("diary-calendar-day");
+    const collapsedDay = days.find((d) =>
+      within(d).queryAllByRole("button", { expanded: false }).length > 0,
+    );
+    expect(collapsedDay).toBeDefined();
+    fireEvent.click(within(collapsedDay!).getAllByRole("button", { expanded: false })[0]);
     expect(screen.getByText(/200ml pH 6\.3/)).toBeInTheDocument();
     expect(screen.getByText(/Plant A/)).toBeInTheDocument();
   });

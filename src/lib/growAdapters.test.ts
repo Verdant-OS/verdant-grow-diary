@@ -42,6 +42,8 @@ const plantRow = {
   schema_version: 1,
   medium: null,
   pot_size: null,
+  pheno_hunt_id: null,
+  candidate_label: null,
   created_at: "2026-02-10T00:00:00Z",
   updated_at: "2026-05-01T00:00:00Z",
 } as const;

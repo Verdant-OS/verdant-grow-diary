@@ -5,6 +5,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { resolveEntitlements } from "@/lib/entitlements";
 
 // Premium-gated page: stub entitlements to Pro so the detailed report renders.
+vi.mock("@/hooks/useEnvironmentSummaryReportServerGate", () => ({
+  useEnvironmentSummaryReportServerGate: () => ({
+    status: "allowed",
+    reason: null,
+    displayPlanId: "pro_monthly",
+  }),
+}));
+
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: false,

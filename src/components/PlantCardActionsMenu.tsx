@@ -51,6 +51,7 @@ interface Plant {
   growId?: string | null;
   lastNote?: string | null;
   isArchived?: boolean | null;
+  photo?: string | null;
 }
 
 interface Props {

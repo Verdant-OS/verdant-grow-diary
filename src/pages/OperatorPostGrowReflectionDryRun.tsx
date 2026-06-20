@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PostGrowReflectionCandidatePasteValidator } from "@/components/PostGrowReflectionCandidatePasteValidator";
 import { PostGrowReflectionPreviewCard } from "@/components/PostGrowReflectionPreviewCard";
 import { buildPostGrowReflectionOperatorDiagnosticsViewModel } from "@/lib/ai/postGrowReflectionOperatorDiagnosticsViewModel";
 import { buildPostGrowReflectionPreviewViewModel } from "@/lib/ai/postGrowReflectionPreviewViewModel";
@@ -103,7 +104,7 @@ export default function OperatorPostGrowReflectionDryRun() {
 
       <PostGrowReflectionPreviewCard viewModel={previewViewModel} />
 
-
+      <PostGrowReflectionCandidatePasteValidator />
 
       <Card>
         <CardHeader>

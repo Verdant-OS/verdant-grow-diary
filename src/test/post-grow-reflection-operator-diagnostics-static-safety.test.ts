@@ -35,7 +35,7 @@ describe("Post-Grow Reflection operator diagnostics static safety", () => {
   it("does not add runtime provider, persistence, schema, or device-control surfaces", () => {
     const all = [PAGE, VIEW_MODEL, DOCS].join("\n");
 
-    expect(all).not.toMatch(/functions\.invoke|openai|anthropic|gemini/i);
+    expect(all).not.toMatch(/supabase|functions\.invoke|openai|anthropic|gemini/i);
     expect(all).not.toMatch(/create table|alter table|enable row level security/i);
     expect(all).not.toMatch(/from\("action_queue"\)|insert\(|update\(|delete\(/i);
     expect(all).not.toMatch(/target_device|raw_payload|service_role|bridge_token/i);

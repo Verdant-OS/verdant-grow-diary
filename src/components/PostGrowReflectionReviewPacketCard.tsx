@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,12 @@ interface Props {
 
 export function PostGrowReflectionReviewPacketCard({ packet }: Props) {
   const [copyState, setCopyState] = useState<CopyState>("idle");
+
+  useEffect(() => {
+    if (copyState === "idle") return;
+    const timeout = window.setTimeout(() => setCopyState("idle"), 2500);
+    return () => window.clearTimeout(timeout);
+  }, [copyState]);
 
   if (packet.status === "idle") return null;
 
@@ -42,6 +48,18 @@ export function PostGrowReflectionReviewPacketCard({ packet }: Props) {
   }
 
   const hasContent = packet.status !== "empty";
+  const copyButtonLabel =
+    copyState === "copied"
+      ? "Copied!"
+      : copyState === "unavailable"
+        ? "Copy unavailable"
+        : "Copy sanitized packet";
+  const copyStatusMessage =
+    copyState === "copied"
+      ? "Copied sanitized review packet to clipboard."
+      : copyState === "unavailable"
+        ? "Clipboard not available. Download the sanitized packet instead."
+        : "";
 
   return (
     <Card className="border-dashed">
@@ -123,17 +141,27 @@ export function PostGrowReflectionReviewPacketCard({ packet }: Props) {
             )}
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
-                Copy sanitized packet
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCopy}
+                data-testid="copy-sanitized-review-packet"
+              >
+                {copyButtonLabel}
               </Button>
               <Button type="button" variant="outline" size="sm" onClick={handleDownload}>
                 Download sanitized packet
               </Button>
-              {copyState === "copied" && (
-                <span className="text-xs text-muted-foreground">Copied</span>
-              )}
-              {copyState === "unavailable" && (
-                <span className="text-xs text-muted-foreground">Clipboard not available</span>
+              {copyStatusMessage && (
+                <span
+                  className="text-xs text-muted-foreground"
+                  role="status"
+                  aria-live="polite"
+                  data-testid="copy-sanitized-review-packet-status"
+                >
+                  {copyStatusMessage}
+                </span>
               )}
             </div>
 

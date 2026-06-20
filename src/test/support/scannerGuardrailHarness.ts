@@ -20,15 +20,7 @@
  */
 import { vi, beforeEach, afterEach, it as vitestIt } from "vitest";
 import { appendFileSync, mkdirSync, readdirSync, statSync } from "node:fs";
-import {
-  basename,
-  dirname,
-  isAbsolute,
-  join,
-  relative,
-  resolve,
-  sep,
-} from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export const SCANNER_GUARDRAIL_TIMEOUT_MS = 30_000;
 export const SLOW_SCANNER_THRESHOLD_MS = 5_000;
@@ -48,44 +40,6 @@ export interface ScannerSlowTestReportRow {
   thresholdMs: number;
   recordedAt: string;
 }
-
-/**
- * Pure builder for a JSONL row. Exported so harness self-tests can
- * validate the row shape deterministically without depending on real
- * test timing.
- */
-export function buildScannerSlowTestReportRow(input: {
-  test: string;
-  suite: string;
-  file: string;
-  durationMs: number;
-  recordedAt?: string;
-}): ScannerSlowTestReportRow {
-  const test = input.test.trim();
-  const suite = input.suite.trim();
-  const file = input.file.trim();
-  if (!test) throw new Error("scanner slow-test row: empty test name");
-  if (!suite) throw new Error("scanner slow-test row: empty suite label");
-  if (!file) throw new Error("scanner slow-test row: empty file path");
-  if (!Number.isFinite(input.durationMs)) {
-    throw new Error("scanner slow-test row: non-finite durationMs");
-  }
-  return {
-    test,
-    suite,
-    file,
-    durationMs: Math.round(input.durationMs),
-    thresholdMs: SLOW_SCANNER_THRESHOLD_MS,
-    recordedAt: input.recordedAt ?? new Date().toISOString(),
-  };
-}
-
-/**
- * Optional alias for new scanner suites. Existing suites may keep importing
- * Vitest's `it`; the per-file timeout/telemetry comes from
- * installScannerGuardrail either way.
- */
-export const scannerIt = it;
 
 export type ScannerGuardrailSlowTestReportRow = Readonly<{
   /** Vitest `it(...)` label. */
@@ -137,11 +91,7 @@ export function buildScannerSlowTestReportRow(input: {
   suiteLabel?: string;
   recordedAt?: string;
 }): ScannerGuardrailSlowTestReportRow {
-  const suite = (
-    input.suiteLabel ??
-    input.suite ??
-    deriveSuiteLabel(input.file)
-  ).trim();
+  const suite = (input.suiteLabel ?? input.suite ?? deriveSuiteLabel(input.file)).trim();
   return {
     test: input.test || "(unknown test)",
     suite: suite || "scanner-guardrail",
@@ -179,8 +129,7 @@ export function installScannerGuardrail(opts: {
 
   beforeEach((ctx) => {
     startedAt = performance.now();
-    const task = (ctx as { task?: { name?: string; suite?: { name?: string } } })
-      .task;
+    const task = (ctx as { task?: { name?: string; suite?: { name?: string } } }).task;
     currentName = task?.name ?? "";
     currentSuite = task?.suite?.name ?? "";
   });
@@ -195,8 +144,8 @@ export function installScannerGuardrail(opts: {
         file: opts.file,
         durationMs,
       });
-      mkdirSync(dirname(REPORT_PATH), { recursive: true });
-      appendFileSync(REPORT_PATH, JSON.stringify(row) + "\n");
+      mkdirSync(dirname(SCANNER_GUARDRAIL_SLOW_TEST_REPORT_PATH), { recursive: true });
+      appendFileSync(SCANNER_GUARDRAIL_SLOW_TEST_REPORT_PATH, JSON.stringify(row) + "\n");
     } catch {
       // Informational only — never fail a guardrail because of report I/O.
     }
@@ -226,10 +175,7 @@ export function getCachedScannerFiles(opts: {
   const root = resolve(opts.root);
   const dirs = [...(opts.dirs ?? ["."])].sort();
   const exts = new Set(opts.exts ?? [".ts", ".tsx"]);
-  const skipDirs = new Set([
-    ...DEFAULT_SCANNER_SKIP_DIRS,
-    ...(opts.skipDirs ?? []),
-  ]);
+  const skipDirs = new Set([...DEFAULT_SCANNER_SKIP_DIRS, ...(opts.skipDirs ?? [])]);
   const key = JSON.stringify({
     root,
     dirs,
@@ -287,11 +233,9 @@ export const scannerIt = ((
   fn?: (...args: unknown[]) => unknown,
   timeout?: number,
 ) => {
-  return (vitestIt as unknown as (
-    n: string,
-    f?: (...args: unknown[]) => unknown,
-    t?: number,
-  ) => unknown)(name, fn, timeout ?? SCANNER_GUARDRAIL_TIMEOUT_MS);
+  return (
+    vitestIt as unknown as (n: string, f?: (...args: unknown[]) => unknown, t?: number) => unknown
+  )(name, fn, timeout ?? SCANNER_GUARDRAIL_TIMEOUT_MS);
 }) as unknown as typeof vitestIt;
 
 /**
@@ -303,10 +247,7 @@ export const scannerIt = ((
  */
 const walkCache = new Map<string, string[]>();
 
-export function getCachedTsFiles(
-  root: string,
-  exts: RegExp = /\.(ts|tsx)$/,
-): string[] {
+export function getCachedTsFiles(root: string, exts: RegExp = /\.(ts|tsx)$/): string[] {
   const key = `${root}::${exts.source}`;
   const hit = walkCache.get(key);
   if (hit) return hit;

@@ -11,6 +11,7 @@
  * rules, no Supabase, no AI calls, no writes, no raw-payload surface,
  * no device control.
  */
+import React from "react";
 import { CircleHelp, ClockAlert, ShieldAlert, ShieldCheck, TimerReset } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +20,11 @@ import type {
   FreshnessTone,
   GgsSentinelSmokeRunnerPanelViewModel,
 } from "@/lib/ggsSentinelSmokeRunnerViewModel";
-import type { MetricFreshnessState } from "@/lib/ggsSentinelSmokeRunner";
+import type {
+  GgsSentinelMetricFreshness,
+  MetricFreshnessState,
+} from "@/lib/ggsSentinelSmokeRunner";
+import { cn } from "@/lib/utils";
 
 const TONE_CLASSES: Readonly<Record<FreshnessTone, string>> = {
   primary: "bg-primary/15 text-primary border-primary/40",
@@ -49,7 +54,9 @@ function FreshnessRow({ row }: { row: FreshnessRowViewModel }) {
         <Icon aria-hidden="true" className="h-3.5 w-3.5" />
         <span>{row.label}</span>
       </span>
-      <span aria-hidden="true" className="text-muted-foreground">·</span>
+      <span aria-hidden="true" className="text-muted-foreground">
+        ·
+      </span>
       <span
         data-testid={`ggs-sentinel-status-${row.metric}`}
         aria-label={`Status: ${row.statusLabel}`}
@@ -57,19 +64,28 @@ function FreshnessRow({ row }: { row: FreshnessRowViewModel }) {
       >
         {row.statusLabel}
       </span>
-      <span aria-hidden="true" className="text-muted-foreground">·</span>
+      <span aria-hidden="true" className="text-muted-foreground">
+        ·
+      </span>
       <span data-testid={`ggs-sentinel-age-${row.metric}`} className="text-muted-foreground">
         {row.ageText}
       </span>
       {row.capturedText && (
         <>
-          <span aria-hidden="true" className="text-muted-foreground">·</span>
-          <span data-testid={`ggs-sentinel-captured-${row.metric}`} className="font-mono text-[11px] text-muted-foreground">
+          <span aria-hidden="true" className="text-muted-foreground">
+            ·
+          </span>
+          <span
+            data-testid={`ggs-sentinel-captured-${row.metric}`}
+            className="font-mono text-[11px] text-muted-foreground"
+          >
             {row.capturedText}
           </span>
         </>
       )}
-      <span aria-hidden="true" className="text-muted-foreground">·</span>
+      <span aria-hidden="true" className="text-muted-foreground">
+        ·
+      </span>
       <span
         data-testid={`ggs-sentinel-next-${row.metric}`}
         className="basis-full text-muted-foreground sm:basis-auto"
@@ -77,6 +93,52 @@ function FreshnessRow({ row }: { row: FreshnessRowViewModel }) {
         {row.nextAction}
       </span>
     </li>
+  );
+}
+
+export interface GgsSentinelFreshnessGuidanceListProps {
+  metricFreshness: GgsSentinelMetricFreshness[];
+}
+
+/** Compact per-metric freshness guidance list. Reads directly from the domain model. */
+export function GgsSentinelFreshnessGuidanceList({
+  metricFreshness,
+}: GgsSentinelFreshnessGuidanceListProps): React.ReactElement | null {
+  if (metricFreshness.length === 0) return null;
+  return (
+    <div data-testid="ggs-freshness-compact-list" className="space-y-2">
+      <p data-testid="ggs-freshness-priority-note" className="text-xs text-muted-foreground">
+        Freshness guidance explains metric timing only
+      </p>
+      <ul className="overflow-hidden rounded-md border bg-muted/20">
+        {metricFreshness.map((f) => (
+          <li
+            key={f.metric}
+            data-testid={`ggs-freshness-row-${f.freshnessStatus}`}
+            className={cn(
+              "flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-l-4 border-t px-2 py-1.5 text-xs first:border-t-0",
+              f.missing && "border-dashed border-l-transparent",
+              f.stale && "border-l-destructive",
+              !f.missing && !f.stale && "border-l-transparent",
+            )}
+          >
+            {f.stale && <span aria-label="row expired" className="sr-only" />}
+            {f.missing && <span aria-label="no row found" className="sr-only" />}
+            <span className="font-medium text-foreground">{f.ageLabel}</span>
+            <span className="text-muted-foreground">{f.nextActionLabel}</span>
+            <button
+              type="button"
+              aria-label={`${f.freshnessStatus} freshness details`}
+              className="ml-auto rounded border px-1.5 py-0.5 text-xs"
+            >
+              <span data-testid={`ggs-freshness-badge-${f.freshnessStatus}`}>
+                {f.freshnessStatus}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -119,10 +181,7 @@ export function GgsSentinelSmokeRunnerPanel({ viewModel }: GgsSentinelSmokeRunne
               Freshness guidance
             </h3>
           </div>
-          <p
-            data-testid="ggs-sentinel-freshness-note"
-            className="text-xs text-muted-foreground"
-          >
+          <p data-testid="ggs-sentinel-freshness-note" className="text-xs text-muted-foreground">
             {freshnessNote}
           </p>
           <ul

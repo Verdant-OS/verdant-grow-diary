@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import {
   buildManualSensorSnapshot,
   buildQuickLogInsertDraft,
@@ -101,10 +102,7 @@ export default function PlantQuickLog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const currentCapturedAt = useMemo(
-    () => new Date().toISOString(),
-    [open, logs],
-  );
+  const currentCapturedAt = useMemo(() => new Date().toISOString(), [open, logs]);
 
   useEffect(() => {
     return () => {
@@ -247,9 +245,7 @@ export default function PlantQuickLog({
         return;
       }
 
-      const { error: insErr } = await supabase
-        .from("diary_entries")
-        .insert(result.draft as never);
+      const { error: insErr } = await supabase.from("diary_entries").insert(result.draft as never);
 
       if (insErr) {
         console.error("PlantQuickLog diary insert failed", insErr);
@@ -264,9 +260,11 @@ export default function PlantQuickLog({
       }
 
       toast.success("Log saved to timeline.");
-      queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
-      queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
-      queryClient.invalidateQueries({ queryKey: ["plant_manual_sensor_history"] });
+      applyQuickLogV2Refresh(queryClient, {
+        targetType: "plant",
+        targetId: plantId,
+        tentId: tentId ?? null,
+      });
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", {
           detail: { plantId, createdAt: new Date().toISOString() },
@@ -319,7 +317,10 @@ export default function PlantQuickLog({
             <h3 id="plant-quick-log-plant-heading" className="text-sm font-semibold">
               1. Plant
             </h3>
-            <p className="mt-1 text-sm text-foreground" aria-label="Selected plant for this Quick Log">
+            <p
+              className="mt-1 text-sm text-foreground"
+              aria-label="Selected plant for this Quick Log"
+            >
               {plantName || "Selected plant"}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -347,7 +348,10 @@ export default function PlantQuickLog({
                   type="button"
                   variant="outline"
                   aria-label={`Log action ${chip}`}
-                  data-testid={`plant-quick-log-action-${chip.toLowerCase().replace(/\s*\/\s*/g, "-").replace(/\s+/g, "-")}`}
+                  data-testid={`plant-quick-log-action-${chip
+                    .toLowerCase()
+                    .replace(/\s*\/\s*/g, "-")
+                    .replace(/\s+/g, "-")}`}
                   onClick={() => handleActionChip(chip)}
                   className="min-h-11 rounded-xl px-2 text-sm font-semibold"
                 >
@@ -391,7 +395,11 @@ export default function PlantQuickLog({
                 Use this when you are checking how the plant responded after a previous change.
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-2" role="group" aria-label="Plant response after a previous change">
+            <div
+              className="grid grid-cols-3 gap-2"
+              role="group"
+              aria-label="Plant response after a previous change"
+            >
               {RESPONSE_CHECK_STATUSES.map((status) => (
                 <Button
                   key={status}
@@ -472,9 +480,7 @@ export default function PlantQuickLog({
                       {photoGate.chooseLibraryLabel}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    A photo can be enough for today.
-                  </p>
+                  <p className="text-xs text-muted-foreground">A photo can be enough for today.</p>
                 </div>
               )}
               <input
@@ -509,9 +515,7 @@ export default function PlantQuickLog({
               data-testid="plant-quick-log-sensors"
               aria-describedby="plant-quick-log-manual-readings-helper"
             >
-              <legend className="col-span-2 mb-1 text-sm font-medium">
-                Manual readings
-              </legend>
+              <legend className="col-span-2 mb-1 text-sm font-medium">Manual readings</legend>
               <p
                 id="plant-quick-log-manual-readings-helper"
                 className="col-span-2 mb-1 text-xs text-muted-foreground"
@@ -589,9 +593,7 @@ export default function PlantQuickLog({
             >
               {saveHelper}
             </p>
-            <p className="mb-2 text-xs text-muted-foreground">
-              {SAVE_DETAIL_HELPER}
-            </p>
+            <p className="mb-2 text-xs text-muted-foreground">{SAVE_DETAIL_HELPER}</p>
             <Button
               type="button"
               onClick={() => void handleSave()}

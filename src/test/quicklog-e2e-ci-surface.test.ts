@@ -52,7 +52,6 @@ describe("Quick Log Playwright CI surface", () => {
     expect(readme).toMatch(/no\s+(scheduled|nightly)/i);
   });
 
-
   it("ignores .auth/ and results/ in e2e/.gitignore", () => {
     const ig = read("e2e/.gitignore");
     expect(ig).toMatch(/^\.auth\/$/m);
@@ -98,8 +97,8 @@ describe("Quick Log Playwright CI surface", () => {
     expect(readme).toMatch(/Branch note.*verdant-grow-diary/);
   });
 
-
   it("CI workflow has no hardcoded credentials, tokens, or service_role", () => {
+    const wf = read(".github/workflows/quicklog-smoke.yml");
     // Must target the real Lovable sync branch, not main
     expect(wf).toMatch(/branches:\s*\[verdant-grow-diary\]/);
     expect(wf).not.toMatch(/branches:\s*\[main\]/);
@@ -120,9 +119,7 @@ describe("Quick Log Playwright CI surface", () => {
     // Must not echo secret values to logs
     expect(wf).not.toMatch(/echo\s+["']?\$\{?\s*E2E_TEST_PASSWORD/);
     expect(wf).not.toMatch(/echo\s+["']?\$\{?\s*E2E_TEST_EMAIL/);
-    expect(wf).not.toMatch(
-      /echo\s+["']?\$\{\{\s*secrets\.E2E_TEST_(EMAIL|PASSWORD)\s*\}\}/,
-    );
+    expect(wf).not.toMatch(/echo\s+["']?\$\{\{\s*secrets\.E2E_TEST_(EMAIL|PASSWORD)\s*\}\}/);
   });
 
   it("CI workflow uploads exactly the expected artifact paths and excludes storageState", () => {
@@ -136,7 +133,7 @@ describe("Quick Log Playwright CI surface", () => {
     const paths = pathBlock
       .split("\n")
       .map((l) => l.trim())
-      .filter((l) => l.length > 0 && !l.startsWith("-") /* skip nothing */ || l.length > 0)
+      .filter((l) => (l.length > 0 && !l.startsWith("-")) /* skip nothing */ || l.length > 0)
       .filter((l) => l.length > 0);
     const expected = [
       "e2e/results/quicklog-smoke-report.json",
@@ -175,9 +172,9 @@ describe("Quick Log Playwright CI surface", () => {
   it("CI workflow path filters are exact for push and pull_request", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
     const expectedPaths = [
-      'e2e/**',
-      'playwright.config.ts',
-      '.github/workflows/quicklog-smoke.yml',
+      "e2e/**",
+      "playwright.config.ts",
+      ".github/workflows/quicklog-smoke.yml",
     ];
     // Extract paths: blocks that use list items (not the pipe block used by upload-artifact)
     const pathBlocks = Array.from(wf.matchAll(/paths:\s*\n((?:\s+-\s+".+"\n)+)/g));
@@ -187,10 +184,8 @@ describe("Quick Log Playwright CI surface", () => {
         expect(block).toContain(`- "${p}"`);
       }
       // Must not contain unexpected extra paths
-      const lines = block.split('\n').filter(l => l.trim().startsWith('-'));
-      expect(lines.map(l => l.trim())).toEqual(
-        expectedPaths.map(p => `- "${p}"`),
-      );
+      const lines = block.split("\n").filter((l) => l.trim().startsWith("-"));
+      expect(lines.map((l) => l.trim())).toEqual(expectedPaths.map((p) => `- "${p}"`));
     }
   });
 
@@ -337,9 +332,7 @@ describe("Quick Log Playwright CI surface", () => {
 
   it("CI workflow precheck exposes sanitized missing_config names only", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
-    const precheck = wf.match(
-      /-\s*name:\s*Verify required configuration[\s\S]*?(?=\n {6}- name:)/,
-    );
+    const precheck = wf.match(/-\s*name:\s*Verify required configuration[\s\S]*?(?=\n {6}- name:)/);
     expect(precheck, "precheck step missing").toBeTruthy();
     const block = precheck![0];
     expect(block).toMatch(/missing_config=.*>>\s*"\$GITHUB_OUTPUT"/);
@@ -361,7 +354,9 @@ describe("Quick Log Playwright CI surface", () => {
     expect(verifyStep, "Verify Quick Log smoke artifacts step missing").toBeTruthy();
     const block = verifyStep![0];
     // Runs only when smoke actually executed, but on always() so post-failure still verifies
-    expect(block).toMatch(/if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/);
+    expect(block).toMatch(
+      /if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
+    );
     // Required artifact checks
     expect(block).toContain("e2e/results/quicklog-smoke-report.json");
     expect(block).toContain("playwright-report");
@@ -375,12 +370,12 @@ describe("Quick Log Playwright CI surface", () => {
 
   it("CI workflow upload step still uses if: always() && should_run == 'true' and retains 30-day retention", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
-    const uploadStep = wf.match(
-      /-\s*name:\s*Upload smoke artifacts[\s\S]*?(?=\n {6}- name:)/,
-    );
+    const uploadStep = wf.match(/-\s*name:\s*Upload smoke artifacts[\s\S]*?(?=\n {6}- name:)/);
     expect(uploadStep, "upload step missing").toBeTruthy();
     const block = uploadStep![0];
-    expect(block).toMatch(/if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/);
+    expect(block).toMatch(
+      /if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
+    );
     expect(block).toMatch(/retention-days:\s*30/);
     expect(block).toContain("quicklog-smoke-artifacts");
   });
@@ -445,17 +440,13 @@ describe("Quick Log Playwright CI surface", () => {
       "docs/RELEASE_NOTES.md",
       "docs/release-notes.md",
     ];
-    const existingCanonical = canonicalCandidates.filter((p) =>
-      fs.existsSync(path.join(ROOT, p)),
-    );
+    const existingCanonical = canonicalCandidates.filter((p) => fs.existsSync(path.join(ROOT, p)));
     const rootChangelogExists = fs.existsSync(path.join(ROOT, "CHANGELOG.md"));
     expect(
       existingCanonical.length > 0 || rootChangelogExists,
       "expected a changelog/release-notes file to host the branch-alignment entry",
     ).toBe(true);
-    const target = existingCanonical[0]
-      ? read(existingCanonical[0])
-      : read("CHANGELOG.md");
+    const target = existingCanonical[0] ? read(existingCanonical[0]) : read("CHANGELOG.md");
     expect(target).toMatch(/verdant-grow-diary/);
     expect(target.toLowerCase()).toContain("quick log");
   });
@@ -507,7 +498,9 @@ describe("Quick Log Playwright CI surface", () => {
     expect(metaStep, "metadata-capture step missing").toBeTruthy();
     const block = metaStep![0];
     expect(block).toMatch(/id:\s*smoke_meta/);
-    expect(block).toMatch(/if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/);
+    expect(block).toMatch(
+      /if:\s*always\(\)\s*&&\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
+    );
     expect(block).toContain("bunx playwright --version");
     expect(block).toContain("e2e/results/quicklog-smoke-report.json");
     expect(block).toMatch(/smoke_counts_available=(true|false)/);
@@ -519,9 +512,7 @@ describe("Quick Log Playwright CI surface", () => {
   it("CI workflow has Bun and Playwright browser caches with safe scope", () => {
     const wf = read(".github/workflows/quicklog-smoke.yml");
     // Playwright browser cache
-    const pwCache = wf.match(
-      /-\s*name:\s*Cache Playwright browsers[\s\S]*?(?=\n {6}- name:)/,
-    );
+    const pwCache = wf.match(/-\s*name:\s*Cache Playwright browsers[\s\S]*?(?=\n {6}- name:)/);
     expect(pwCache, "Playwright browser cache step missing").toBeTruthy();
     const pwBlock = pwCache![0];
     expect(pwBlock).toMatch(/uses:\s*actions\/cache@[0-9a-f]{40} # v4/);
@@ -530,9 +521,7 @@ describe("Quick Log Playwright CI surface", () => {
     expect(pwBlock).toMatch(/hashFiles\(\s*'bun\.lock',\s*'bun\.lockb',\s*'package\.json'\s*\)/);
 
     // Bun cache
-    const bunCache = wf.match(
-      /-\s*name:\s*Cache Bun packages[\s\S]*?(?=\n {6}- name:)/,
-    );
+    const bunCache = wf.match(/-\s*name:\s*Cache Bun packages[\s\S]*?(?=\n {6}- name:)/);
     expect(bunCache, "Bun cache step missing").toBeTruthy();
     const bunBlock = bunCache![0];
     expect(bunBlock).toMatch(/uses:\s*actions\/cache@[0-9a-f]{40} # v4/);
@@ -542,7 +531,10 @@ describe("Quick Log Playwright CI surface", () => {
     // (The regex blocks above may include trailing comment lines belonging
     // to the following step, so assert specifically on each step's path
     // line — that is the actual cache scope.)
-    for (const [label, block] of [["pw", pwBlock], ["bun", bunBlock]] as const) {
+    for (const [label, block] of [
+      ["pw", pwBlock],
+      ["bun", bunBlock],
+    ] as const) {
       const pathLineMatch = block.match(/\n\s*path:\s*(.+)/);
       expect(pathLineMatch, `${label} cache step missing path: line`).toBeTruthy();
       const pathLine = pathLineMatch![1];
@@ -595,7 +587,7 @@ describe("Quick Log Playwright CI surface", () => {
   // ---------- Hardened cache guardrails ----------
 
   function extractStepBlocks(wf: string): string[] {
-    const re = /^( {6}-\s*name:[\s\S]*?)(?=^ {6}-\s*name:|\Z)/gms;
+    const re = /^( {6}-\s*name:[\s\S]*?)(?=^ {6}-\s*name:|$)/gms;
     const out: string[] = [];
     let m: RegExpExecArray | null;
     while ((m = re.exec(wf)) !== null) out.push(m[1]);
@@ -607,7 +599,10 @@ describe("Quick Log Playwright CI surface", () => {
     const blocks = extractStepBlocks(wf).filter((b) =>
       /uses:\s*actions\/cache@[0-9a-f]{40} # v4/.test(b),
     );
-    expect(blocks.length, "expected at least 2 cache blocks (Bun + Playwright)").toBeGreaterThanOrEqual(2);
+    expect(
+      blocks.length,
+      "expected at least 2 cache blocks (Bun + Playwright)",
+    ).toBeGreaterThanOrEqual(2);
 
     const forbidden = [
       "e2e/.auth",
@@ -623,15 +618,10 @@ describe("Quick Log Playwright CI surface", () => {
       "service_role",
     ];
 
-    const allowedPaths = new Set([
-      "~/.bun/install/cache",
-      "~/.cache/ms-playwright",
-    ]);
+    const allowedPaths = new Set(["~/.bun/install/cache", "~/.cache/ms-playwright"]);
 
     for (const block of blocks) {
-      expect(block).toMatch(
-        /if:\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/,
-      );
+      expect(block).toMatch(/if:\s*steps\.e2e_config\.outputs\.should_run\s*==\s*'true'/);
 
       const keyMatch = block.match(/\n\s*key:\s*(.+)/);
       expect(keyMatch, "cache step missing key:").toBeTruthy();
@@ -647,10 +637,7 @@ describe("Quick Log Playwright CI surface", () => {
       const pathMatch = block.match(/\n\s*path:\s*(.+)/);
       expect(pathMatch, "cache step missing path:").toBeTruthy();
       const pathValue = pathMatch![1].trim();
-      expect(
-        allowedPaths.has(pathValue),
-        `cache path '${pathValue}' not in allowlist`,
-      ).toBe(true);
+      expect(allowedPaths.has(pathValue), `cache path '${pathValue}' not in allowlist`).toBe(true);
 
       // Strip YAML comment lines before checking forbidden tokens —
       // comments documenting the rule (e.g. "never caches storageState")
@@ -713,12 +700,8 @@ describe("Quick Log Playwright CI surface", () => {
     expect(block).toContain(
       "Report JSON missing: smoke count parsing could not run because the report JSON was not produced.",
     );
-    expect(block).toContain(
-      "Report parsing failed: smoke counts could not be extracted from",
-    );
-    expect(block).toContain(
-      "Report parsing succeeded: smoke counts were extracted from",
-    );
+    expect(block).toContain("Report parsing failed: smoke counts could not be extracted from");
+    expect(block).toContain("Report parsing succeeded: smoke counts were extracted from");
 
     expect(block).toContain("REPORT_JSON_PRESENT");
     expect(block).toContain("REPORT_PARSE_STATUS");
@@ -740,9 +723,7 @@ describe("Quick Log Playwright CI surface", () => {
       "playwright-report/",
       "test-results/",
     ]);
-    const bundled = wf.match(
-      /-\s*name:\s*Upload smoke artifacts[\s\S]*?(?=\n {6}- name:)/,
-    );
+    const bundled = wf.match(/-\s*name:\s*Upload smoke artifacts[\s\S]*?(?=\n {6}- name:)/);
     expect(bundled).toBeTruthy();
     expect(bundled![0]).toMatch(/retention-days:\s*30/);
   });

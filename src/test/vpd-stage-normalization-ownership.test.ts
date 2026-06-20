@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, cpSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, cpSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -41,7 +41,7 @@ function runRealRepoScanner(): ScannerRun {
 // Memoise the (slow) real-repo scanner run so the two `it`s that both
 // just expect "exit 0 against ROOT" don't pay for the spawn twice.
 // Same command, same cwd, deterministic output — safe to cache.
-let cachedRootRun: ReturnType<typeof spawnSync> | null = null;
+let cachedRootRun: ScannerRun | null = null;
 function runScannerInRoot() {
   if (cachedRootRun) return cachedRootRun;
   cachedRootRun = runScannerIn(ROOT);
@@ -50,11 +50,8 @@ function runScannerInRoot() {
 
 describe("scripts/assert-vpd-stage-normalization-ownership.mjs", () => {
   it("the scanner file and package script exist", () => {
-    expect(() => require("node:fs").readFileSync(resolve(ROOT, SCRIPT), "utf8"))
-      .not.toThrow();
-    const pkg = JSON.parse(
-      require("node:fs").readFileSync(resolve(ROOT, "package.json"), "utf8"),
-    );
+    expect(() => readFileSync(resolve(ROOT, SCRIPT), "utf8")).not.toThrow();
+    const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
     expect(pkg.scripts["test:vpd-stage-normalization-ownership"]).toMatch(
       /assert-vpd-stage-normalization-ownership\.mjs/,
     );
@@ -63,9 +60,7 @@ describe("scripts/assert-vpd-stage-normalization-ownership.mjs", () => {
   it("passes against the real repo", () => {
     const res = runScannerInRoot();
     if (res.status !== 0) {
-      throw new Error(
-        "Scanner unexpectedly failed:\n" + res.stdout + "\n" + res.stderr,
-      );
+      throw new Error("Scanner unexpectedly failed:\n" + res.stdout + "\n" + res.stderr);
     }
     expect(res.status).toBe(0);
     expect(res.stdout).toMatch(/VPD stage mapping ownership OK/);
@@ -82,10 +77,7 @@ describe("scripts/assert-vpd-stage-normalization-ownership.mjs", () => {
       mkdirSync(join(tmp, "scripts"), { recursive: true });
 
       // Copy the real scanner so it runs against the tmp repo.
-      cpSync(
-        resolve(ROOT, SCRIPT),
-        join(tmp, SCRIPT),
-      );
+      cpSync(resolve(ROOT, SCRIPT), join(tmp, SCRIPT));
 
       // Synthetic violation: a UI file duplicates the mapping pair.
       writeFileSync(

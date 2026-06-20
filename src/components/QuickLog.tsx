@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
+import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { STAGES } from "@/lib/grow";
 import { EC_UNITS, EC_UNIT_LABEL, type EcUnit } from "@/constants/units";
 import { usePlants } from "@/hooks/use-plants";
@@ -246,8 +247,7 @@ export default function QuickLog({
   const [envHumidityPct, setEnvHumidityPct] = useState<string>("");
   const [envVpdKpa, setEnvVpdKpa] = useState<string>("");
   const [envWaterTempValue, setEnvWaterTempValue] = useState<string>("");
-  const [envWaterTempUnit, setEnvWaterTempUnit] =
-    useState<EnvironmentCheckWaterTempUnit>("F");
+  const [envWaterTempUnit, setEnvWaterTempUnit] = useState<EnvironmentCheckWaterTempUnit>("F");
   const [envEcMscm, setEnvEcMscm] = useState<string>("");
   const [harvestPhotoAngle, setHarvestPhotoAngle] = useState<HarvestPhotoAngle | "">("");
   const [harvestPhotoLighting, setHarvestPhotoLighting] = useState<HarvestPhotoLighting | "">("");
@@ -270,7 +270,7 @@ export default function QuickLog({
     // Seed a starter note only when the grower has not yet typed anything,
     // so we never overwrite in-progress text on re-open.
     if (typeof prefill.note === "string" && prefill.note.length > 0) {
-      setNote((prev) => (prev.trim().length === 0 ? prefill.note ?? "" : prev));
+      setNote((prev) => (prev.trim().length === 0 ? (prefill.note ?? "") : prev));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -343,7 +343,7 @@ export default function QuickLog({
   useEffect(() => {
     if (!open) return;
     snapshotUserTouchedRef.current = false;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [open, selectedPlant?.tent_id]);
 
   useEffect(() => {
@@ -532,8 +532,9 @@ export default function QuickLog({
               note: null,
             })
           : null;
-      const environmentCheckRecord: Record<string, unknown> | null =
-        environmentCheckEnvelope ? { ...environmentCheckEnvelope } : null;
+      const environmentCheckRecord: Record<string, unknown> | null = environmentCheckEnvelope
+        ? { ...environmentCheckEnvelope }
+        : null;
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
         noteWithHardware,
@@ -587,9 +588,11 @@ export default function QuickLog({
       });
       onCreated?.();
       setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
-      queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
-      queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
-      queryClient.invalidateQueries({ queryKey: ["grow_events"] });
+      applyQuickLogV2Refresh(queryClient, {
+        targetType: "plant",
+        targetId: selectedPlant.id,
+        tentId: selectedPlant.tent_id ?? null,
+      });
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", {
           detail: { createdAt: new Date().toISOString() },
@@ -608,14 +611,20 @@ export default function QuickLog({
   const snapshotUsable = stripView.status === "usable";
   const attachDisabled = !selectedPlant || !snapshotUsable;
   const showMismatch = !!(
-    prefill?.plantId && selectedPlant && selectedPlant.id !== prefill.plantId
+    prefill?.plantId &&
+    selectedPlant &&
+    selectedPlant.id !== prefill.plantId
   );
   const showStaleHelper = !!(
-    selectedPlant && !snapshotUsable && stripView.status !== "no_data" && !tentSetupRequired
+    selectedPlant &&
+    !snapshotUsable &&
+    stripView.status !== "no_data" &&
+    !tentSetupRequired
   );
   const showWateringErr = !!wateringError;
   const targetGrowName = activeGrow?.name ?? "No setup selected";
-  const targetTentName = selectedTent?.name ?? (selectedPlant?.tent_id ? "Assigned tent" : "No tent assigned");
+  const targetTentName =
+    selectedTent?.name ?? (selectedPlant?.tent_id ? "Assigned tent" : "No tent assigned");
 
   return (
     <Dialog
@@ -752,9 +761,7 @@ export default function QuickLog({
                       </Label>
                       <Select
                         value={harvestPhotoAngle}
-                        onValueChange={(v) =>
-                          setHarvestPhotoAngle(v as HarvestPhotoAngle)
-                        }
+                        onValueChange={(v) => setHarvestPhotoAngle(v as HarvestPhotoAngle)}
                       >
                         <SelectTrigger
                           id="ql-harvest-angle"
@@ -785,9 +792,7 @@ export default function QuickLog({
                       </Label>
                       <Select
                         value={harvestPhotoLighting}
-                        onValueChange={(v) =>
-                          setHarvestPhotoLighting(v as HarvestPhotoLighting)
-                        }
+                        onValueChange={(v) => setHarvestPhotoLighting(v as HarvestPhotoLighting)}
                       >
                         <SelectTrigger
                           id="ql-harvest-lighting"
@@ -875,13 +880,22 @@ export default function QuickLog({
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   Logging to
                 </p>
-                <p data-testid="quick-log-target-plant" className="text-base font-semibold text-foreground">
+                <p
+                  data-testid="quick-log-target-plant"
+                  className="text-base font-semibold text-foreground"
+                >
                   {selectedPlant?.name ?? "Choose a plant"}
                 </p>
-                <p data-testid="quick-log-target-tent" className="text-[12px] text-muted-foreground">
+                <p
+                  data-testid="quick-log-target-tent"
+                  className="text-[12px] text-muted-foreground"
+                >
                   {selectedPlant ? targetTentName : "Plant required before save"}
                 </p>
-                <p data-testid="quick-log-target-grow" className="text-[12px] text-muted-foreground">
+                <p
+                  data-testid="quick-log-target-grow"
+                  className="text-[12px] text-muted-foreground"
+                >
                   {targetGrowName}
                 </p>
               </div>
@@ -969,10 +983,13 @@ export default function QuickLog({
               <span>
                 Logging to <strong className="font-semibold">{selectedPlant.name}</strong>
                 {prefill.plantName ? (
-                  <>, not <strong className="font-semibold">{prefill.plantName}</strong></>
+                  <>
+                    , not <strong className="font-semibold">{prefill.plantName}</strong>
+                  </>
                 ) : (
                   ", not the plant currently open"
-                )}.
+                )}
+                .
               </span>
             </div>
           )}
@@ -1001,7 +1018,10 @@ export default function QuickLog({
                       : "No data"}
               </span>
             </div>
-            <p data-testid="quick-log-truth-copy" className="text-[12px] text-muted-foreground leading-snug">
+            <p
+              data-testid="quick-log-truth-copy"
+              className="text-[12px] text-muted-foreground leading-snug"
+            >
               {stripView.status === "usable"
                 ? snapshot
                   ? "Sensor context is usable and will attach to this log."
@@ -1016,7 +1036,11 @@ export default function QuickLog({
                 data-testid="quick-log-snapshot-tent-required"
                 className="rounded-lg border border-border/60 bg-secondary/30 p-3 text-[12px] text-muted-foreground"
               >
-                Sensor snapshots need a tent first. <a href="/tents" className="underline text-primary">Create your first tent</a> to attach environment context to logs.
+                Sensor snapshots need a tent first.{" "}
+                <a href="/tents" className="underline text-primary">
+                  Create your first tent
+                </a>{" "}
+                to attach environment context to logs.
               </p>
             ) : (
               <>
@@ -1192,9 +1216,7 @@ export default function QuickLog({
                             role="radio"
                             aria-checked={selected}
                             data-testid={`quick-log-early-stage-milestone-${m.value}`}
-                            onClick={() =>
-                              setEarlyMilestone(selected ? null : m.value)
-                            }
+                            onClick={() => setEarlyMilestone(selected ? null : m.value)}
                             className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                               selected
                                 ? "border-primary bg-primary/15 text-foreground"
@@ -1258,219 +1280,215 @@ export default function QuickLog({
             );
           })()}
 
-          {eventType === "environment" && (() => {
-            const hasMeasurement = hasAnyEnvironmentCheckMeasurement({
-              roomTempF: envRoomTempF,
-              humidityPct: envHumidityPct,
-              vpdKpa: envVpdKpa,
-              waterTempValue: envWaterTempValue,
-              waterTempUnit: envWaterTempUnit,
-              ecMscm: envEcMscm,
-            });
-            const previewTempC = resolvePreviewWaterTempC({
-              waterTempValue: envWaterTempValue,
-              waterTempUnit: envWaterTempUnit,
-            });
-            const ecPreview = buildEcCompensationPreview({
-              ec: envEcMscm,
-              ecUnit: "mS/cm",
-              waterTempC: previewTempC,
-              sourceLabel: "manual",
-            });
-            const sensorContext = buildEnvironmentCheckSensorContext({
-              tentId: sensorTentId,
-              plantId: selectedPlant?.id ?? null,
-              sourceLabel: "manual",
-              hasMeasurements: hasMeasurement,
-            });
-            const ctxTone =
-              sensorContext.status === "valid"
-                ? "border-emerald-500/40 bg-emerald-500/10"
-                : sensorContext.status === "blocked"
-                  ? "border-destructive/40 bg-destructive/10"
-                  : sensorContext.status === "warning"
-                    ? "border-amber-500/40 bg-amber-500/10"
-                    : "border-border/60 bg-secondary/30";
-            return (
-              <section
-                data-testid="quick-log-environment-check-section"
-                aria-label={ENVIRONMENT_CHECK_SECTION_TITLE}
-                className="rounded-xl border border-border/60 bg-secondary/20 p-3 space-y-2"
-              >
-                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {ENVIRONMENT_CHECK_SECTION_TITLE}
-                </h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs" htmlFor="quick-log-env-room-temp-f">
-                      Room temperature (°F)
-                    </Label>
-                    <Input
-                      id="quick-log-env-room-temp-f"
-                      data-testid="quick-log-env-room-temp-f"
-                      inputMode="decimal"
-                      value={envRoomTempF}
-                      onChange={(e) => setEnvRoomTempF(e.target.value)}
-                      placeholder="76"
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs" htmlFor="quick-log-env-humidity">
-                      Humidity (%)
-                    </Label>
-                    <Input
-                      id="quick-log-env-humidity"
-                      data-testid="quick-log-env-humidity"
-                      inputMode="decimal"
-                      value={envHumidityPct}
-                      onChange={(e) => setEnvHumidityPct(e.target.value)}
-                      placeholder="55"
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs" htmlFor="quick-log-env-vpd">
-                      VPD (kPa)
-                    </Label>
-                    <Input
-                      id="quick-log-env-vpd"
-                      data-testid="quick-log-env-vpd"
-                      inputMode="decimal"
-                      value={envVpdKpa}
-                      onChange={(e) => setEnvVpdKpa(e.target.value)}
-                      placeholder="1.1"
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs" htmlFor="quick-log-env-ec">
-                      EC (mS/cm)
-                    </Label>
-                    <Input
-                      id="quick-log-env-ec"
-                      data-testid="quick-log-env-ec"
-                      inputMode="decimal"
-                      value={envEcMscm}
-                      onChange={(e) => setEnvEcMscm(e.target.value)}
-                      placeholder="1.4"
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs" htmlFor="quick-log-env-water-temp">
-                      Water/root-zone temperature
-                    </Label>
-                    <Input
-                      id="quick-log-env-water-temp"
-                      data-testid="quick-log-env-water-temp"
-                      inputMode="decimal"
-                      value={envWaterTempValue}
-                      onChange={(e) => setEnvWaterTempValue(e.target.value)}
-                      placeholder={envWaterTempUnit === "F" ? "68" : "20"}
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Water temp unit</Label>
-                    <Select
-                      value={envWaterTempUnit}
-                      onValueChange={(v) =>
-                        setEnvWaterTempUnit(v as EnvironmentCheckWaterTempUnit)
-                      }
-                    >
-                      <SelectTrigger data-testid="quick-log-env-water-temp-unit">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="F">°F</SelectItem>
-                        <SelectItem value="C">°C</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                {!hasMeasurement && (
-                  <p
-                    data-testid="quick-log-env-helper"
-                    className="text-[11px] text-muted-foreground"
-                  >
-                    {ENVIRONMENT_CHECK_HELPER_COPY}
-                  </p>
-                )}
-                {sensorContext.status !== "not_applicable" && (
-                  <div
-                    data-testid="quick-log-env-sensor-context"
-                    data-status={sensorContext.status}
-                    data-reason={sensorContext.reasonCode}
-                    className={`rounded-lg border p-2.5 space-y-0.5 ${ctxTone}`}
-                  >
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground">
-                      {sensorContext.title}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {sensorContext.message}
-                    </p>
-                    <p
-                      data-testid="quick-log-env-sensor-context-source"
-                      className="text-[11px] text-muted-foreground"
-                    >
-                      Source: {sensorContext.sourceLabel}
-                    </p>
-                  </div>
-                )}
-                {ecPreview.visible && (
-                  <div
-                    data-testid="quick-log-env-ec-preview"
-                    data-tone={ecPreview.tone}
-                    className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 space-y-0.5"
-                  >
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                      {ecPreview.label}
-                    </p>
-                    <p className="text-sm font-medium text-foreground">
-                      {ecPreview.valueDisplay}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {EC_COMPENSATION_PREVIEW_DISCLAIMER}
-                    </p>
-                  </div>
-                )}
-                {hasMeasurement && (() => {
-                  const normPreviewVm = buildSensorNormalizationPreviewViewModel({
-                    payload: {
-                      temperature_f: envRoomTempF || undefined,
-                      humidity_pct: envHumidityPct || undefined,
-                      vpd_kpa: envVpdKpa || undefined,
-                      soil_ec_ms_cm: envEcMscm || undefined,
-                      [envWaterTempUnit === "C" ? "soil_temperature_c" : "soil_temperature_f"]:
-                        envWaterTempValue || undefined,
-                    },
-                    options: {
-                      source: "manual",
-                      sourceIdentity: "manual_entry",
-                      transport: "manual",
-                      tentId: sensorTentId,
-                      plantId: selectedPlant?.id ?? null,
-                      capturedAt: new Date().toISOString(),
-                    },
-                  });
-                  return (
-                    <div data-testid="quick-log-env-normalization-preview-slot">
-                      <SensorNormalizationPreviewPanel
-                        viewModel={normPreviewVm}
-                        variant="compact"
-                        title="Sensor normalization preview"
+          {eventType === "environment" &&
+            (() => {
+              const hasMeasurement = hasAnyEnvironmentCheckMeasurement({
+                roomTempF: envRoomTempF,
+                humidityPct: envHumidityPct,
+                vpdKpa: envVpdKpa,
+                waterTempValue: envWaterTempValue,
+                waterTempUnit: envWaterTempUnit,
+                ecMscm: envEcMscm,
+              });
+              const previewTempC = resolvePreviewWaterTempC({
+                waterTempValue: envWaterTempValue,
+                waterTempUnit: envWaterTempUnit,
+              });
+              const ecPreview = buildEcCompensationPreview({
+                ec: envEcMscm,
+                ecUnit: "mS/cm",
+                waterTempC: previewTempC,
+                sourceLabel: "manual",
+              });
+              const sensorContext = buildEnvironmentCheckSensorContext({
+                tentId: sensorTentId,
+                plantId: selectedPlant?.id ?? null,
+                sourceLabel: "manual",
+                hasMeasurements: hasMeasurement,
+              });
+              const ctxTone =
+                sensorContext.status === "valid"
+                  ? "border-emerald-500/40 bg-emerald-500/10"
+                  : sensorContext.status === "blocked"
+                    ? "border-destructive/40 bg-destructive/10"
+                    : sensorContext.status === "warning"
+                      ? "border-amber-500/40 bg-amber-500/10"
+                      : "border-border/60 bg-secondary/30";
+              return (
+                <section
+                  data-testid="quick-log-environment-check-section"
+                  aria-label={ENVIRONMENT_CHECK_SECTION_TITLE}
+                  className="rounded-xl border border-border/60 bg-secondary/20 p-3 space-y-2"
+                >
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {ENVIRONMENT_CHECK_SECTION_TITLE}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs" htmlFor="quick-log-env-room-temp-f">
+                        Room temperature (°F)
+                      </Label>
+                      <Input
+                        id="quick-log-env-room-temp-f"
+                        data-testid="quick-log-env-room-temp-f"
+                        inputMode="decimal"
+                        value={envRoomTempF}
+                        onChange={(e) => setEnvRoomTempF(e.target.value)}
+                        placeholder="76"
+                        autoComplete="off"
                       />
                     </div>
-                  );
-                })()}
-              </section>
-            );
-          })()}
-
-
-
-
+                    <div>
+                      <Label className="text-xs" htmlFor="quick-log-env-humidity">
+                        Humidity (%)
+                      </Label>
+                      <Input
+                        id="quick-log-env-humidity"
+                        data-testid="quick-log-env-humidity"
+                        inputMode="decimal"
+                        value={envHumidityPct}
+                        onChange={(e) => setEnvHumidityPct(e.target.value)}
+                        placeholder="55"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs" htmlFor="quick-log-env-vpd">
+                        VPD (kPa)
+                      </Label>
+                      <Input
+                        id="quick-log-env-vpd"
+                        data-testid="quick-log-env-vpd"
+                        inputMode="decimal"
+                        value={envVpdKpa}
+                        onChange={(e) => setEnvVpdKpa(e.target.value)}
+                        placeholder="1.1"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs" htmlFor="quick-log-env-ec">
+                        EC (mS/cm)
+                      </Label>
+                      <Input
+                        id="quick-log-env-ec"
+                        data-testid="quick-log-env-ec"
+                        inputMode="decimal"
+                        value={envEcMscm}
+                        onChange={(e) => setEnvEcMscm(e.target.value)}
+                        placeholder="1.4"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs" htmlFor="quick-log-env-water-temp">
+                        Water/root-zone temperature
+                      </Label>
+                      <Input
+                        id="quick-log-env-water-temp"
+                        data-testid="quick-log-env-water-temp"
+                        inputMode="decimal"
+                        value={envWaterTempValue}
+                        onChange={(e) => setEnvWaterTempValue(e.target.value)}
+                        placeholder={envWaterTempUnit === "F" ? "68" : "20"}
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Water temp unit</Label>
+                      <Select
+                        value={envWaterTempUnit}
+                        onValueChange={(v) =>
+                          setEnvWaterTempUnit(v as EnvironmentCheckWaterTempUnit)
+                        }
+                      >
+                        <SelectTrigger data-testid="quick-log-env-water-temp-unit">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="F">°F</SelectItem>
+                          <SelectItem value="C">°C</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {!hasMeasurement && (
+                    <p
+                      data-testid="quick-log-env-helper"
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      {ENVIRONMENT_CHECK_HELPER_COPY}
+                    </p>
+                  )}
+                  {sensorContext.status !== "not_applicable" && (
+                    <div
+                      data-testid="quick-log-env-sensor-context"
+                      data-status={sensorContext.status}
+                      data-reason={sensorContext.reasonCode}
+                      className={`rounded-lg border p-2.5 space-y-0.5 ${ctxTone}`}
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                        {sensorContext.title}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">{sensorContext.message}</p>
+                      <p
+                        data-testid="quick-log-env-sensor-context-source"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        Source: {sensorContext.sourceLabel}
+                      </p>
+                    </div>
+                  )}
+                  {ecPreview.visible && (
+                    <div
+                      data-testid="quick-log-env-ec-preview"
+                      data-tone={ecPreview.tone}
+                      className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 space-y-0.5"
+                    >
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        {ecPreview.label}
+                      </p>
+                      <p className="text-sm font-medium text-foreground">
+                        {ecPreview.valueDisplay}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {EC_COMPENSATION_PREVIEW_DISCLAIMER}
+                      </p>
+                    </div>
+                  )}
+                  {hasMeasurement &&
+                    (() => {
+                      const normPreviewVm = buildSensorNormalizationPreviewViewModel({
+                        payload: {
+                          temperature_f: envRoomTempF || undefined,
+                          humidity_pct: envHumidityPct || undefined,
+                          vpd_kpa: envVpdKpa || undefined,
+                          soil_ec_ms_cm: envEcMscm || undefined,
+                          [envWaterTempUnit === "C" ? "soil_temperature_c" : "soil_temperature_f"]:
+                            envWaterTempValue || undefined,
+                        },
+                        options: {
+                          source: "manual",
+                          sourceIdentity: "manual_entry",
+                          transport: "manual",
+                          tentId: sensorTentId,
+                          plantId: selectedPlant?.id ?? null,
+                          capturedAt: new Date().toISOString(),
+                        },
+                      });
+                      return (
+                        <div data-testid="quick-log-env-normalization-preview-slot">
+                          <SensorNormalizationPreviewPanel
+                            viewModel={normPreviewVm}
+                            variant="compact"
+                            title="Sensor normalization preview"
+                          />
+                        </div>
+                      );
+                    })()}
+                </section>
+              );
+            })()}
 
           {eventType === "reminder" && (
             <div>
@@ -1526,7 +1544,13 @@ export default function QuickLog({
               </div>
               <div>
                 <Label className="text-xs" htmlFor="quicklog-watering-ml">
-                  Watering (ml){eventType === "watering" ? <span aria-hidden="true" className="text-destructive"> *</span> : null}
+                  Watering (ml)
+                  {eventType === "watering" ? (
+                    <span aria-hidden="true" className="text-destructive">
+                      {" "}
+                      *
+                    </span>
+                  ) : null}
                 </Label>
                 <Input
                   id="quicklog-watering-ml"
@@ -1613,7 +1637,8 @@ export default function QuickLog({
                   data-testid="quicklog-hardware-helper"
                   className="text-[11px] text-muted-foreground leading-snug"
                 >
-                  Manual handheld readings — not live sensor data. EC fields are EC mS/cm only. Use the optional EC value above to record other scales.
+                  Manual handheld readings — not live sensor data. EC fields are EC mS/cm only. Use
+                  the optional EC value above to record other scales.
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -1690,7 +1715,8 @@ export default function QuickLog({
                 <ul className="space-y-1">
                   {preview.warnings.map((w) => {
                     const Icon = w.severity === "warning" ? AlertTriangle : Info;
-                    const tone = w.severity === "warning" ? "text-amber-300" : "text-muted-foreground";
+                    const tone =
+                      w.severity === "warning" ? "text-amber-300" : "text-muted-foreground";
                     return (
                       <li
                         key={w.code}
@@ -1726,7 +1752,10 @@ export default function QuickLog({
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save log"}
           </Button>
-          <p data-testid="quick-log-save-helper" className="text-[11px] text-muted-foreground -mt-2">
+          <p
+            data-testid="quick-log-save-helper"
+            className="text-[11px] text-muted-foreground -mt-2"
+          >
             Failed saves keep your input in place. You can add more detail later from the timeline.
           </p>
 
@@ -1742,7 +1771,8 @@ export default function QuickLog({
                 <div>
                   <p className="text-sm font-semibold text-foreground">Saved</p>
                   <p className="text-[12px] text-muted-foreground">
-                    Logged {savedVerb(savedTarget.eventType)} to <strong className="text-foreground font-semibold">{savedTarget.name}</strong>
+                    Logged {savedVerb(savedTarget.eventType)} to{" "}
+                    <strong className="text-foreground font-semibold">{savedTarget.name}</strong>
                     {savedTarget.tentName ? <> · {savedTarget.tentName}</> : null}
                     {savedTarget.growName ? <> · {savedTarget.growName}</> : null}
                     {" · just now"}

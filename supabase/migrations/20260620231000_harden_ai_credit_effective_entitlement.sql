@@ -23,8 +23,8 @@ IMMUTABLE
 SET search_path = public, pg_temp
 AS $$
   SELECT CASE
-    WHEN p_plan_id NOT IN ('free','pro_monthly','pro_annual','founder_lifetime') THEN 'free'
-    WHEN p_status <> 'active' THEN 'free'
+    WHEN p_plan_id IS NULL OR p_plan_id NOT IN ('free','pro_monthly','pro_annual','founder_lifetime') THEN 'free'
+    WHEN p_status IS DISTINCT FROM 'active' THEN 'free'
     WHEN p_current_period_end IS NOT NULL AND p_current_period_end <= p_now THEN 'free'
     ELSE p_plan_id
   END;

@@ -9,6 +9,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { more } from "@/components/MobileNav";
+
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
@@ -68,6 +70,13 @@ describe("MobileNav alert/action labels stay honest", () => {
 
     expect(moreMenu).not.toMatch(/to:\s*"\/alerts"[\s\S]*label:\s*"Action Queue"/);
     expect(moreMenu).not.toMatch(/label:\s*"Action Queue"[\s\S]*to:\s*"\/alerts"/);
+  });
+
+  it("More menu includes a real Action Queue route", () => {
+    const actionItem = more.find((item) => item.to === "/actions");
+
+    expect(actionItem).toBeDefined();
+    expect(actionItem?.label).toMatch(/^(Actions|Action Queue)$/);
   });
 });
 

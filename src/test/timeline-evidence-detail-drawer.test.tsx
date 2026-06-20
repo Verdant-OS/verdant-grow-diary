@@ -35,6 +35,29 @@ type Row = {
 const ROWS: Row[] = [
   { id: "e1", note: "Watered today", photo_url: "https://x/1.jpg", stage: "veg", plant_id: "p1", tent_id: "t1", details: { event_type: "watering", plant_name: "Blue Dream" }, entry_at: "2025-01-01T00:00:00Z" },
   { id: "e2", note: "No photo entry", photo_url: null, stage: "veg", plant_id: "p1", tent_id: "t1", details: { event_type: "note", plant_name: "Blue Dream" }, entry_at: "2025-01-02T00:00:00Z" },
+  {
+    id: "e3",
+    note: "Maturity check",
+    photo_url: null,
+    stage: "flower",
+    plant_id: "p1",
+    tent_id: "t1",
+    details: {
+      event_type: "note",
+      plant_name: "Blue Dream",
+      maturity_evidence: {
+        source: "manual",
+        evidence_type: "quick_log_maturity_evidence",
+        advisory_only: true,
+        observed_at: "2025-01-03T00:00:00Z",
+        cloudy_pct: 70,
+        amber_pct: 20,
+        color_note: "mostly turned",
+        grower_note: "watch again tomorrow",
+      },
+    },
+    entry_at: "2025-01-03T00:00:00Z",
+  },
 ];
 
 function Harness() {
@@ -121,6 +144,19 @@ describe("Timeline evidence drawer integration", () => {
     fireEvent.click(screen.getByTestId("entry-body-e2"));
     const ctx = screen.getByTestId("timeline-evidence-drawer-context");
     expect(ctx.textContent).toContain("Missing photo/sensor context");
+  });
+
+  it("drawer surfaces maturity evidence without making a decision", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByTestId("entry-body-e3"));
+    const section = screen.getByTestId("timeline-maturity-evidence");
+    expect(section.textContent).toContain("Cloudy 70%");
+    expect(section.textContent).toContain("Amber 20%");
+    expect(section.textContent).toContain("Color");
+    expect(section.textContent).toContain("mostly turned");
+    expect(section.textContent).toContain("Evidence only — grower decides");
+    expect(section.textContent).not.toMatch(/ready to harvest/i);
+    expect(section.textContent).not.toMatch(/harvest now/i);
   });
 
   it("closing the drawer preserves search + filters", () => {

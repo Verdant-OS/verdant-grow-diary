@@ -7,10 +7,14 @@
  */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { ShieldOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTents } from "@/hooks/use-tents";
 import { useAuth } from "@/store/auth";
+import { useHasRole } from "@/hooks/useHasRole";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import GgsRealPayloadIngestPanel from "@/components/GgsRealPayloadIngestPanel";
 import { GgsSentinelSmokeRunnerPanel } from "@/components/GgsSentinelSmokeRunnerPanel";
 import {
   runGgsSentinelSmoke,
@@ -25,6 +29,7 @@ const ROW_FETCH_LIMIT = 50;
 export default function OperatorGgsRealPayloadIngest() {
   const auth = useAuth();
   const authAvailable = !!auth?.user?.id;
+  const role = useHasRole("operator");
   const tentsQ = useTents();
   const tents = tentsQ.data ?? [];
 
@@ -58,7 +63,10 @@ export default function OperatorGgsRealPayloadIngest() {
   const panelVm = useMemo(() => buildGgsSentinelSmokeRunnerPanelViewModel(verdict), [verdict]);
 
   return (
-    <div className="container mx-auto max-w-3xl space-y-6 p-4 md:p-6" data-testid="operator-ggs-real-payload-ingest">
+    <div
+      className="container mx-auto max-w-3xl space-y-6 p-4 md:p-6"
+      data-testid="operator-ggs-real-payload-ingest"
+    >
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">GGS Real-Payload Ingest</h1>
         <p className="text-sm text-muted-foreground">
@@ -103,7 +111,7 @@ export default function OperatorGgsRealPayloadIngest() {
       {role.status === "granted" && (
         <>
           <GgsRealPayloadIngestPanel />
-          <GgsSentinelSmokeRunnerPanel />
+          <GgsSentinelSmokeRunnerPanel viewModel={panelVm} />
         </>
       )}
     </div>

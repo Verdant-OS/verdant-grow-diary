@@ -8,29 +8,18 @@
  * Pure / read-only. No I/O against Supabase. No automation.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { relative, resolve, sep } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 
 // Standardised scanner guardrail timeout + slow-test telemetry.
 // Replaces the previous per-file vi.setConfig bump. No scanner pattern,
 // allowlist, or assertion is changed.
-import {
-  getCachedScannerFiles,
-  installScannerGuardrail,
-} from "./support/scannerGuardrailHarness";
+import { getCachedScannerFiles, installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
 
 const ROOT = resolve(__dirname, "../..");
 
-const SCAN_DIRS = [
-  "src",
-  "docs",
-  "scripts",
-  "fixtures",
-  "supabase",
-  "templates",
-  ".github",
-];
+const SCAN_DIRS = ["src", "docs", "scripts", "fixtures", "supabase", "templates", ".github"];
 
 const SCAN_EXTS = new Set([
   ".ts",
@@ -113,16 +102,10 @@ describe("EcoWitt-only sensor direction", () => {
 
   it("ships the static safety scanner and CI workflow", () => {
     expect(() =>
-      readFileSync(
-        resolve(ROOT, "scripts/assert-ecowitt-only-sensor-direction.mjs"),
-        "utf8",
-      ),
+      readFileSync(resolve(ROOT, "scripts/assert-ecowitt-only-sensor-direction.mjs"), "utf8"),
     ).not.toThrow();
     expect(() =>
-      readFileSync(
-        resolve(ROOT, ".github/workflows/ecowitt-only-safety-scan.yml"),
-        "utf8",
-      ),
+      readFileSync(resolve(ROOT, ".github/workflows/ecowitt-only-safety-scan.yml"), "utf8"),
     ).not.toThrow();
   });
 });

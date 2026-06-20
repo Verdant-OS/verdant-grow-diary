@@ -56,7 +56,7 @@ function basePayload(
 ): PaddleEventProcessingInsertPayload {
   assertSource(source);
   return {
-    paddle_event_id: source.id,
+    paddle_event_id: source.id.trim(),
     event_id: source.event_id.trim(),
     event_type: source.event_type.trim(),
     environment: source.environment.trim(),

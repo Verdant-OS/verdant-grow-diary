@@ -1,5 +1,7 @@
 import {
+  buildPostGrowReflectionDryRunScenarios,
   runPostGrowReflectionDryRunHarness,
+  type PostGrowReflectionDryRunScenario,
   type PostGrowReflectionDryRunScenarioResult,
   type PostGrowReflectionDryRunSummary,
 } from "./postGrowReflectionDryRunHarness";
@@ -7,10 +9,6 @@ import {
   adaptPostGrowReflectionCandidate,
   type PostGrowReflectionAdapterResult,
 } from "./postGrowReflectionAdapter";
-import {
-  buildPostGrowReflectionDryRunScenarios,
-  type PostGrowReflectionDryRunScenario,
-} from "./postGrowReflectionDryRunHarness";
 import type { ReflectionConfidence, ReflectionOutput } from "./postGrowReflectionTypes";
 
 export const POST_GROW_REFLECTION_PREVIEW_VIEW_MODEL_VERSION =

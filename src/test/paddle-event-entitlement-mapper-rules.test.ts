@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   mapRecordedPaddleEventToEntitlementDecision,
   type PaddleEntitlementPriceConfig,
@@ -10,6 +12,11 @@ const PRICE_CONFIG: PaddleEntitlementPriceConfig = {
   proAnnualPriceId: "pri_pro_annual",
   founderLifetimePriceId: "pri_founder_lifetime",
 };
+
+const MAPPER_SOURCE = readFileSync(
+  resolve(process.cwd(), "src/lib/paddleEventEntitlementMapperRules.ts"),
+  "utf8",
+);
 
 function recorded(event_type: string, data: Record<string, unknown>): RecordedPaddleEventLike {
   return {
@@ -242,5 +249,18 @@ describe("mapRecordedPaddleEventToEntitlementDecision", () => {
     );
 
     expect(result).toMatchObject({ state: "ignore", reason: "unsupported_event_type" });
+  });
+
+  it("is pure mapping logic with no network, database, storage, or entitlement writes", () => {
+    expect(MAPPER_SOURCE).not.toMatch(/supabase/i);
+    expect(MAPPER_SOURCE).not.toMatch(/fetch\(/);
+    expect(MAPPER_SOURCE).not.toMatch(/localStorage|sessionStorage/);
+    expect(MAPPER_SOURCE).not.toMatch(/\.from\(/);
+    expect(MAPPER_SOURCE).not.toMatch(/\.insert\(/);
+    expect(MAPPER_SOURCE).not.toMatch(/\.update\(/);
+    expect(MAPPER_SOURCE).not.toMatch(/\.delete\(/);
+    expect(MAPPER_SOURCE).not.toMatch(/\.upsert\(/);
+    expect(MAPPER_SOURCE).not.toMatch(/functions\.invoke/);
+    expect(MAPPER_SOURCE).not.toMatch(/service_role/i);
   });
 });

@@ -39,6 +39,14 @@ import { buildDashboardDailyGrowCheckPanel } from "@/lib/dashboardDailyGrowCheck
 import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
 import { useNavigate } from "react-router-dom";
 
+function formatPlantHealthLabel(health: string | null | undefined): string {
+  return `Plant health: ${health ?? "unknown"}`;
+}
+
+function formatPlantHealthAriaLabel(health: string | null | undefined): string {
+  return `Plant health status: ${health ?? "unknown"}. Sensor status is shown separately.`;
+}
+
 export default function Plants() {
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const navigate = useNavigate();
@@ -412,9 +420,14 @@ export default function Plants() {
                         {archivedLabel.kind === "merged" ? "Merged / Archived" : "Archived"}
                       </Badge>
                     )}
-                    <div className="flex items-center gap-2 mt-2 text-[11px] text-muted-foreground">
-                      <span className={cn("h-1.5 w-1.5 rounded-full", dot)} />
-                      <span className="capitalize">{p.health}</span>
+                    <div
+                      className="flex items-center gap-2 mt-2 text-[11px] text-muted-foreground"
+                      data-testid="plant-card-health-chip"
+                      aria-label={formatPlantHealthAriaLabel(p.health)}
+                      title="Plant health only — sensor status is shown separately."
+                    >
+                      <span className={cn("h-1.5 w-1.5 rounded-full", dot)} aria-hidden="true" />
+                      <span>{formatPlantHealthLabel(p.health)}</span>
                       {tent && <span>· {tent.name}</span>}
                     </div>
                     {showDailyCheckBadge && (

@@ -118,19 +118,20 @@ export interface ValidatePostGrowReflectionCandidatePasteOptions {
 const BASE_TITLE = "Candidate Paste Validator";
 const BASE_SUBTITLE =
   "Manual operator check for pasted ReflectionOutput JSON or candidate envelope. Local validation only, not saved, and no live AI call.";
-const ENVELOPE_KIND = "post_grow_reflection_candidate";
 
-function labels(inputKind: "raw_candidate" | "envelope" | null, includeRejected: boolean): PostGrowReflectionCandidatePasteLabel[] {
+type CandidatePasteInputKind = "raw_candidate" | "envelope" | null;
+
+function labels(inputKind: CandidatePasteInputKind, includeRejected: boolean): PostGrowReflectionCandidatePasteLabel[] {
   const keys: PostGrowReflectionCandidatePasteLabelKey[] = ["operatorCandidate", "manualPaste"];
   if (inputKind === "envelope") keys.push("envelopePaste");
   keys.push(includeRejected ? "rejectedCandidate" : "validatedOutput", "notSaved", "noLiveAiCall");
   return keys.map((key) => ({ key, text: POST_GROW_REFLECTION_CANDIDATE_PASTE_LABELS[key] }));
 }
 
-function base(
-  inputKind: "raw_candidate" | "envelope" | null = null,
+function base<K extends CandidatePasteInputKind>(
+  inputKind: K,
   includeRejected = false,
-): BaseCandidatePasteResult {
+): BaseCandidatePasteResult & { inputKind: K } {
   return {
     validatorVersion: POST_GROW_REFLECTION_CANDIDATE_PASTE_VALIDATOR_VERSION,
     title: BASE_TITLE,
@@ -258,7 +259,7 @@ export function validatePostGrowReflectionCandidatePaste(
 ): PostGrowReflectionCandidatePasteResult {
   if (rawText === undefined) {
     return {
-      ...base(),
+      ...base(null),
       status: "idle",
       message: "Paste a candidate ReflectionOutput JSON or candidate envelope and validate it locally.",
     };
@@ -289,7 +290,6 @@ export function validatePostGrowReflectionCandidatePaste(
       ...base("envelope", true),
       status: "envelope_rejected",
       message: "Pasted candidate envelope was rejected before reflection validation.",
-      inputKind: "envelope",
       issueCodes: candidate.issueCodes,
       failureReason: candidate.failureReason,
     };
@@ -305,7 +305,6 @@ export function validatePostGrowReflectionCandidatePaste(
       ...base(candidate.inputKind, true),
       status: "validation_failed",
       message: "Pasted candidate was rejected by the reflection validator.",
-      inputKind: candidate.inputKind,
       issueCodes: issueCodes(adapterResult),
       failureReason: adapterResult.failureReason,
       validationOptions: validationOptions(adapterResult),
@@ -317,7 +316,6 @@ export function validatePostGrowReflectionCandidatePaste(
     ...base(candidate.inputKind),
     status: "validated",
     message: "Pasted candidate passed local validation.",
-    inputKind: candidate.inputKind,
     confidence: adapterResult.output.confidence,
     confidenceLabel: `Confidence: ${adapterResult.output.confidence}`,
     sections: sections(adapterResult.output),

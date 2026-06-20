@@ -27,6 +27,22 @@ function SectionBlock({ section }: { section: PostGrowReflectionPreviewSectionRo
   );
 }
 
+function EnvelopeMetadata({ result }: { result: PostGrowReflectionCandidatePasteResult }) {
+  if (
+    (result.status !== "validated" && result.status !== "validation_failed") ||
+    !result.envelopeMetadata
+  ) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-md border bg-muted/30 p-3">
+      <div className="text-xs font-medium uppercase text-muted-foreground">Envelope metadata</div>
+      <p className="mt-1 text-xs text-muted-foreground">{result.envelopeMetadata.label}</p>
+    </div>
+  );
+}
+
 function ResultPanel({ result }: { result: PostGrowReflectionCandidatePasteResult }) {
   if (result.status === "idle" || result.status === "empty") {
     return <p className="text-sm text-muted-foreground">{result.message}</p>;
@@ -38,6 +54,30 @@ function ResultPanel({ result }: { result: PostGrowReflectionCandidatePasteResul
         <div className="text-sm font-medium">Invalid JSON</div>
         <p className="mt-1 text-sm text-muted-foreground">{result.message}</p>
         <p className="mt-2 text-xs text-muted-foreground">{result.parseError}</p>
+      </div>
+    );
+  }
+
+  if (result.status === "envelope_rejected") {
+    return (
+      <div className="space-y-3 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="destructive">Rejected candidate</Badge>
+          {result.labels.map((label) => (
+            <Badge key={label.key} variant="outline">
+              {label.text}
+            </Badge>
+          ))}
+        </div>
+        <p className="text-sm text-muted-foreground">{result.message}</p>
+        <div className="text-sm">
+          <span className="font-medium">Issue codes: </span>
+          {result.issueCodes.length > 0 ? result.issueCodes.join(", ") : "none"}
+        </div>
+        <div className="text-sm">
+          <span className="font-medium">Failure reason: </span>
+          {result.failureReason}
+        </div>
       </div>
     );
   }
@@ -62,6 +102,7 @@ function ResultPanel({ result }: { result: PostGrowReflectionCandidatePasteResul
           <span className="font-medium">Failure reason: </span>
           {result.failureReason}
         </div>
+        <EnvelopeMetadata result={result} />
         <p className="text-xs text-muted-foreground">{result.validationOptions.label}</p>
       </div>
     );
@@ -78,6 +119,7 @@ function ResultPanel({ result }: { result: PostGrowReflectionCandidatePasteResul
         <Badge variant="secondary">{result.confidenceLabel}</Badge>
       </div>
       <p className="text-sm text-muted-foreground">{result.message}</p>
+      <EnvelopeMetadata result={result} />
       <div className="grid gap-3">
         {result.sections.map((section) => (
           <SectionBlock key={section.key} section={section} />
@@ -113,12 +155,13 @@ export function PostGrowReflectionCandidatePasteValidator() {
           <CardTitle>Candidate Paste Validator</CardTitle>
           <Badge variant="outline">Operator-only</Badge>
           <Badge variant="outline">Manual paste</Badge>
+          <Badge variant="outline">Envelope supported</Badge>
           <Badge variant="outline">Not saved</Badge>
           <Badge variant="outline">No live AI call</Badge>
         </div>
         <CardDescription>
-          Paste a candidate ReflectionOutput JSON and run the same local validator used by the
-          dry-run adapter boundary.
+          Paste a candidate ReflectionOutput JSON or candidate envelope and run the same local
+          validator used by the dry-run adapter boundary.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -126,7 +169,7 @@ export function PostGrowReflectionCandidatePasteValidator() {
           aria-label="Candidate JSON"
           value={rawText}
           onChange={(event) => setRawText(event.target.value)}
-          placeholder="Paste ReflectionOutput JSON here"
+          placeholder="Paste ReflectionOutput JSON or candidate envelope here"
           rows={8}
         />
         <div className="flex flex-wrap gap-2">

@@ -8,11 +8,13 @@ import {
   createValidPostGrowReflectionOutput,
 } from "@/lib/ai/postGrowReflectionOutputFixtures";
 
+const envelopeKind = "post_grow_reflection_candidate";
+
 describe("validatePostGrowReflectionCandidatePaste", () => {
   it("returns idle before the operator validates a paste", () => {
     const result = validatePostGrowReflectionCandidatePaste();
     expect(result.status).toBe("idle");
-    expect(result.message).toMatch(/Paste a candidate ReflectionOutput JSON/);
+    expect(result.message).toMatch(/Paste a candidate ReflectionOutput JSON or candidate envelope/);
   });
 
   it("returns empty state for blank pasted text", () => {
@@ -29,12 +31,14 @@ describe("validatePostGrowReflectionCandidatePaste", () => {
     expect(result.parseError.length).toBeGreaterThan(0);
   });
 
-  it("validates a known good candidate", () => {
+  it("validates a known good raw candidate", () => {
     const result = validatePostGrowReflectionCandidatePaste(
       JSON.stringify(createValidPostGrowReflectionOutput()),
     );
     expect(result.status).toBe("validated");
     if (result.status !== "validated") return;
+    expect(result.inputKind).toBe("raw_candidate");
+    expect(result.envelopeMetadata).toBeNull();
     expect(result.confidence).toBe("High");
     expect(result.confidenceLabel).toBe("Confidence: High");
     expect(result.sections.map((section) => section.key)).toEqual([
@@ -50,12 +54,54 @@ describe("validatePostGrowReflectionCandidatePaste", () => {
     expect(result.validationOptions.label).toMatch(/sensorCoveragePct=/);
   });
 
+  it("validates a candidate envelope and exposes safe metadata", () => {
+    const result = validatePostGrowReflectionCandidatePaste(
+      JSON.stringify({
+        kind: envelopeKind,
+        candidate: createValidPostGrowReflectionOutput(),
+        metadata: {
+          sourceLabel: "manual envelope sample",
+          requestLabel: "candidate-envelope-001",
+          createdAt: "2026-06-20T15:00:00.000Z",
+        },
+      }),
+    );
+
+    expect(result.status).toBe("validated");
+    if (result.status !== "validated") return;
+    expect(result.inputKind).toBe("envelope");
+    expect(result.labels.map((label) => label.text)).toContain("Envelope paste");
+    expect(result.envelopeMetadata).toEqual({
+      sourceLabel: "manual envelope sample",
+      requestLabel: "candidate-envelope-001",
+      createdAt: "2026-06-20T15:00:00.000Z",
+      candidateFormat: "object",
+      label:
+        "sourceLabel=manual envelope sample; requestLabel=candidate-envelope-001; createdAt=2026-06-20T15:00:00.000Z; candidateFormat=object",
+    });
+  });
+
+  it("rejects an invalid candidate envelope before reflection validation", () => {
+    const result = validatePostGrowReflectionCandidatePaste(
+      JSON.stringify({
+        kind: envelopeKind,
+        metadata: { sourceLabel: "missing candidate" },
+      }),
+    );
+
+    expect(result.status).toBe("envelope_rejected");
+    if (result.status !== "envelope_rejected") return;
+    expect(result.issueCodes).toContain("missing_candidate");
+    expect(result.failureReason).toMatch(/missing candidate/i);
+  });
+
   it("rejects malformed candidate shape", () => {
     const result = validatePostGrowReflectionCandidatePaste(
       JSON.stringify(createMalformedPostGrowReflectionOutput()),
     );
     expect(result.status).toBe("validation_failed");
     if (result.status !== "validation_failed") return;
+    expect(result.inputKind).toBe("raw_candidate");
     expect(result.issueCodes).toContain("invalid_type");
     expect(result.failureReason).toContain("invalid_type");
   });

@@ -5,6 +5,12 @@ import BrandLogo from "@/components/BrandLogo";
 import PaywallCta from "@/components/PaywallCta";
 import { buildPaywallCtaViewModel } from "@/lib/paywallCtaViewModel";
 import {
+  FOUNDER_LIFETIME_LIMIT,
+  FOUNDER_LIFETIME_PRICE_USD,
+  PRO_ANNUAL_PRICE_USD,
+  PRO_MONTHLY_PRICE_USD,
+} from "@/constants/pricing";
+import {
   resolvePaddleConfig,
   unavailableMessage,
   type PaddlePlanSlug,
@@ -36,23 +42,23 @@ const PLANS: Record<
 > = {
   "pro-monthly": {
     name: "Verdant Pro — Monthly",
-    price: "$12",
+    price: `$${PRO_MONTHLY_PRICE_USD}`,
     cadence: "/ month",
     blurb:
       "Cloud sync, multi-tent support, deeper grow history, and priority support.",
   },
   "pro-annual": {
     name: "Verdant Pro — Annual",
-    price: "$115",
+    price: `$${PRO_ANNUAL_PRICE_USD}`,
     cadence: "/ year",
     blurb: "All of Pro, billed once a year.",
   },
   "founder-lifetime": {
     name: "Founder Lifetime Deal",
-    price: "$129",
+    price: `$${FOUNDER_LIFETIME_PRICE_USD}`,
     cadence: "one-time",
     blurb:
-      "Pro features for the life of the product. Limited to the first 75 buyers.",
+      `Pro features for the life of the product. Limited to the first ${FOUNDER_LIFETIME_LIMIT} buyers. Additional credit packs are planned later but are not live yet.`,
   },
 };
 

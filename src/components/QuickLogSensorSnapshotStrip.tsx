@@ -63,6 +63,10 @@ const PILL_ARIA: Record<QuickLogSnapshotStripStatus, string> = {
   no_data: "Sensor snapshot status: no data",
 };
 
+function shouldRenderTrustBadge(status: QuickLogSnapshotStripStatus, trustLabel: string): boolean {
+  return trustLabel.trim().toLowerCase() !== PILL_LABEL[status].toLowerCase();
+}
+
 export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, attached = true }: Props) {
   const state = useLatestTentSensorSnapshot(tentId ?? null);
   const view = buildQuickLogStripFromTentState({
@@ -89,6 +93,7 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
     : vm.emptyCopy
       ? "missing"
       : null;
+  const showTrustBadge = shouldRenderTrustBadge(view.status, view.trustBadge.label);
 
   return (
     <section
@@ -123,7 +128,7 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
             {PILL_LABEL[view.status]}
           </span>
 
-          <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />
+          {showTrustBadge && <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />}
 
 
         </div>

@@ -115,7 +115,6 @@ export default function GrowDetail() {
           <Field label="Started" value={new Date(grow.started_at).toLocaleString()} />
           <Field label="Created" value={new Date(grow.created_at).toLocaleString()} />
           <Field label="Updated" value={new Date(grow.updated_at).toLocaleString()} />
-          <Field label="Grow ID" value={grow.id} mono />
         </dl>
 
         <div className="mt-4">

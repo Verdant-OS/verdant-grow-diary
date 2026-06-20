@@ -112,6 +112,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/operator/ggs-real-payload-ingest", access: "operator", description: "GGS real payload ingest operator tool (read-only preview)." },
   { path: "/operator/one-tent-loop-smoke-test", access: "operator", description: "One-tent loop smoke-test operator checklist (read-only)." },
   { path: "/operator/one-tent-proof-record", access: "operator", description: "One-tent proof record export." },
+  { path: "/operator/post-grow-reflection-dry-run", access: "operator", description: "Post-Grow Reflection dry-run diagnostics panel (read-only)." },
   
   { path: "/pi-ingest-status", access: "operator" },
   { path: "/plants", access: "auth" },

@@ -27,6 +27,12 @@ import {
 import { usePostGrowLearningReportData } from "@/hooks/usePostGrowLearningReportData";
 import { growDetailPath } from "@/lib/routes";
 
+function resultMessage(result: unknown, fallback: string): string {
+  if (typeof result !== "object" || result === null || !("message" in result)) return fallback;
+  const message = (result as { message?: unknown }).message;
+  return typeof message === "string" && message.length > 0 ? message : fallback;
+}
+
 export default function PostGrowLearningReport() {
   const { growId } = useParams<{ growId: string }>();
   const { status, report, error, saveLesson, applyLessonToNextGrow } =
@@ -43,7 +49,7 @@ export default function PostGrowLearningReport() {
     const result = await saveLesson(lesson);
     setBusy(false);
     if (result.ok) toast.success("Lesson saved");
-    else toast.error(result.message);
+    else toast.error(resultMessage(result, "Lesson could not be saved."));
   }
 
   async function handleApplyLesson() {
@@ -51,7 +57,7 @@ export default function PostGrowLearningReport() {
     const result = await applyLessonToNextGrow(lesson);
     setBusy(false);
     if (result.ok) toast.success("Added to Action Queue for review");
-    else toast.error(result.message);
+    else toast.error(resultMessage(result, "Lesson could not be added to the Action Queue."));
   }
 
   if (status === "loading" || status === "idle") {

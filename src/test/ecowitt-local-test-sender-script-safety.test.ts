@@ -64,9 +64,9 @@ describe("ecowitt local test sender — safety", () => {
     expect(SCRIPT).toMatch(/redactBridgeToken\(token\)/);
     // The script must never console.log the raw `token` identifier
     // unwrapped — only the redacted form is permitted.
-    const rawTokenLogs = (CODE.match(
+    const rawTokenLogs = ((CODE.match(
       /console\.log\([^)]*\btoken\b[^)]*\)/g,
-    ) ?? []).filter((line) => !line.includes("redactBridgeToken"));
+    ) ?? []) as string[]).filter((line) => !line.includes("redactBridgeToken"));
     expect(rawTokenLogs).toEqual([]);
   });
 

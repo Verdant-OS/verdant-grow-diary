@@ -1,144 +1,101 @@
-# Scanner guardrail harness
+# Scanner guardrail test harness
 
-Verdant has several repository-wide scanner suites that walk large parts of the repo looking for unsafe patterns: leaked secrets, device-control wording, raw payload exposure, retired integration references, and ownership drift.
+Static safety scanners (Shelly H&T retirement, EcoWitt-only sensor direction,
+Pi-Ingest secret strategy, VPD stage ownership, typed-watering flag, etc.)
+walk the repo filesystem from inside Vitest. Under full-suite parallel load
+the default 5s `it` timeout can be exceeded purely from I/O contention,
+producing **environmental** failures that have nothing to do with the
+scanner's safety pattern.
 
-Use the shared harness for any new filesystem-scanning Vitest suite. It keeps scanner tests readable without weakening any regex, allowlist, or assertion.
+The shared harness in `src/test/support/scannerGuardrailHarness.ts`
+standardises three things so every scanner suite behaves the same way:
 
-## When to use it
+1. **Per-file timeout** — `SCANNER_GUARDRAIL_TIMEOUT_MS = 30_000`, applied
+   via `vi.setConfig({ testTimeout, hookTimeout })`. The **global** Vitest
+   timeout is unchanged.
+2. **Slow-test telemetry** — every `it` is timed in a `beforeEach`/
+   `afterEach` pair. Tests slower than `SLOW_SCANNER_THRESHOLD_MS = 5_000`
+   append one JSONL row to `test-results/scanner-guardrail-slow-tests.jsonl`.
+   This is **informational only** and never fails a test.
+3. **Cached repo walks** — `getCachedTsFiles(root)` memoises recursive
+   `.ts`/`.tsx` walks per Vitest worker so multiple scanner `it`s in the
+   same file (or future shared scanner) don't re-walk `src/` repeatedly.
 
-Use `installScannerGuardrail` when a test file:
-
-- recursively walks `src`, `docs`, `scripts`, `supabase`, `.github`, or fixtures
-- shells out to a repo-wide scanner script
-- scans many files with `readFileSync`
-- is safety/ownership/static-regression focused instead of product behavior focused
-
-Do not use it for normal unit, render, hook, or route tests.
-
-## Basic pattern
+## Usage
 
 ```ts
 import { describe, expect } from "vitest";
 import {
   installScannerGuardrail,
   scannerIt,
+  getCachedTsFiles,
 } from "./support/scannerGuardrailHarness";
 
-installScannerGuardrail({
-  file: __filename,
-  suite: "my-scanner-name",
-});
+installScannerGuardrail({ file: __filename });
 
-describe("my scanner", () => {
-  scannerIt("current repository is clean", () => {
-    // keep existing scanner regexes, allowlists, and assertions unchanged
-    expect([]).toEqual([]);
+describe("my safety scanner", () => {
+  scannerIt("does not leak X anywhere in src/", () => {
+    const files = getCachedTsFiles("src");
+    // ...assert...
   });
 });
 ```
 
-Existing scanner files may keep importing Vitest's normal `it`. The important part is that the file calls `installScannerGuardrail({ file: __filename })` once near the top. `scannerIt` is only a readability alias for new scanner suites.
+### `installScannerGuardrail({ file, timeoutMs? })`
 
-## Cached filesystem walks
+Call **once** at module scope, before any `describe`. `file` should be
+`__filename` so slow-test rows are traceable back to the source. Pass
+`timeoutMs` only if a single scanner genuinely needs more than 30s — do
+not raise this casually.
 
-Prefer the shared cache when a suite needs a reusable file list:
+### `scannerIt(name, fn, timeout?)`
 
-```ts
-import { getCachedTsFiles } from "./support/scannerGuardrailHarness";
+A thin wrapper around `it` that defaults `timeout` to
+`SCANNER_GUARDRAIL_TIMEOUT_MS`. Prefer it for **new** scanner tests so
+the standardised per-test timeout cannot quietly be lost by future
+refactors. Existing scanner suites already get the same timeout via
+`installScannerGuardrail` — migrating them to `scannerIt` is optional.
 
-const sourceFiles = getCachedTsFiles(resolve(process.cwd(), "src"));
-```
+### `getCachedTsFiles(root, exts?)`
 
-For non-TypeScript scans, use the generic helper:
+Returns a memoised list of `.ts`/`.tsx` paths under `root`. Identical
+calls return the **same array reference** within a Vitest worker. Treat
+the array as read-only.
 
-```ts
-import { getCachedScannerFiles } from "./support/scannerGuardrailHarness";
+### `buildScannerSlowTestReportRow(input)`
 
-const files = getCachedScannerFiles({
-  root: process.cwd(),
-  dirs: ["src", "docs", "scripts", "supabase", ".github"],
-  exts: [".ts", ".tsx", ".js", ".mjs", ".md", ".yml", ".yaml"],
-});
-```
+Pure builder for the JSONL row contract. Exported so the harness
+self-test can validate row shape without relying on real test timing.
+Throws on empty `test`/`suite`/`file` or non-finite `durationMs`.
 
-Only cache file lists. Do not cache scanner conclusions unless the same exact scanner command is intentionally reused inside one test file.
+## Slow-test JSONL report
 
-## Timeout telemetry report
+Path: `test-results/scanner-guardrail-slow-tests.jsonl`
 
-The harness emits a JSONL row only when an individual scanner test exceeds `SLOW_SCANNER_THRESHOLD_MS`.
+Each line is one row of:
 
-Report path:
+| field         | type    | notes                                     |
+| ------------- | ------- | ----------------------------------------- |
+| `test`        | string  | `it` label, non-empty                     |
+| `suite`       | string  | enclosing `describe` label, non-empty     |
+| `file`        | string  | absolute path to the test file            |
+| `durationMs`  | number  | integer milliseconds                      |
+| `thresholdMs` | number  | always `5000` (current threshold)         |
+| `recordedAt`  | string  | ISO-8601 timestamp                        |
 
-```txt
-test-results/scanner-guardrail-slow-tests.jsonl
-```
+The report is **append-only** within a run, regenerated across runs,
+and consumed by the CI "Scanner guardrail timeout sentinel" step which
+uploads it as an artifact. The report **must never gate CI** — it
+exists to surface scanners that are creeping toward the 5s threshold
+before they become flaky.
 
-Each line is one JSON object:
+## Hard rules
 
-```json
-{
-  "test": "current repository is clean",
-  "suite": "sensor-intelligence-safety",
-  "file": "src/test/sensor-intelligence-safety.test.ts",
-  "durationMs": 6123,
-  "thresholdMs": 5000,
-  "recordedAt": "2026-06-16T00:00:00.000Z"
-}
-```
-
-Field meanings:
-
-| Field | Meaning |
-|---|---|
-| `test` | The Vitest `it(...)` label that crossed the slow threshold |
-| `suite` | Stable scanner label, either passed explicitly or derived from the test filename |
-| `file` | Stable repo-relative POSIX scanner test file path |
-| `durationMs` | Rounded runtime in milliseconds |
-| `thresholdMs` | Threshold that caused the row to be emitted |
-| `recordedAt` | ISO timestamp for triage only |
-
-An empty or missing report means no scanner test crossed the slow threshold in that run. That is a good result, not a failure.
-
-## Local validation
-
-Run the CI-equivalent scanner command:
-
-```bash
-bun run test:scanner-guardrails:ci
-```
-
-This single command:
-
-1. deletes any stale local slow-test report,
-2. runs the full scanner guardrail suite, including `scanner-guardrail-harness.test.ts`,
-3. validates the JSONL field contract if a report exists, and
-4. fails if any slow scanner row is emitted at or above the 5000ms threshold.
-
-For ad hoc scanner debugging, you can still run only the sentinel:
-
-```bash
-bun run test:scanner-guardrails
-```
-
-Then inspect the report if it exists:
-
-```bash
-cat test-results/scanner-guardrail-slow-tests.jsonl
-```
-
-`recordedAt` is expected to change between runs; do not use it for deterministic assertions.
-
-## CI behavior
-
-CI runs `bun run test:scanner-guardrails:ci`. If the report is missing, CI treats that as healthy. If the report contains any row, CI validates the contract and fails the build because at least one scanner crossed the slow threshold.
-
-The workflow uploads `test-results/scanner-guardrail-slow-tests.jsonl` as the `scanner-guardrail-slow-tests` artifact whenever the file exists, including failed runs.
-
-## Guardrails
-
-- Do not change scanner regexes while optimizing filesystem walks.
-- Do not broaden allowlists as a performance fix.
-- Do not skip scanner tests.
-- Do not change global Vitest timeout.
-- Do not classify a timeout-only problem as a safety pass.
-- Keep scanner output informational unless an existing assertion or CI telemetry check fails.
+- Never raise `testTimeout` globally to mask a slow scanner — fix the
+  scanner (cache walks, narrow scan dirs, hoist out of `it`).
+- Never weaken a scanner regex, allowlist, or assertion to make a slow
+  test fit under the threshold.
+- Never `it.skip` a scanner. If a scanner is wrong, fix it or delete
+  it deliberately with a documented rationale.
+- Never add an intentionally slow test just to force the report to be
+  written; the empty-report case is the healthy state.

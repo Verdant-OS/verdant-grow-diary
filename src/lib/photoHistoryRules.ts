@@ -6,6 +6,7 @@
  * module's output and MUST NOT reach into raw `details` JSON.
  */
 import type { NormalizedDiaryEntry } from "./diaryEntryRules";
+import { shouldShowPhotoNonDiagnosticLabel } from "./photoEventNonDiagnosticLabelRules";
 
 export interface PhotoHistoryRow {
   id: string;
@@ -21,6 +22,12 @@ export interface PhotoHistoryRow {
   photoUrl: string | null;
   caption: string;
   warnings: string[];
+  /**
+   * True when this photo card should render the "Visual record · no AI analysis"
+   * label. False when the entry is linked to a saved AI Doctor session/result,
+   * so we never show contradictory copy alongside an analysis surface.
+   */
+  showPhotoNonDiagnosticLabel?: boolean;
 }
 
 const CAPTION_PREVIEW_MAX = 200;
@@ -98,6 +105,10 @@ function toRow(entry: NormalizedDiaryEntry): PhotoHistoryRow | null {
     photoUrl: sanitized.url,
     caption: previewCaption(entry.note),
     warnings,
+    showPhotoNonDiagnosticLabel: shouldShowPhotoNonDiagnosticLabel({
+      hasPhoto: sanitized.url !== null,
+      details: entry.details.extras,
+    }),
   };
 }
 

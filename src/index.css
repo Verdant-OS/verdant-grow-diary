@@ -171,8 +171,11 @@
   .print-only { display: block !important; }
   body * { visibility: hidden; }
   [data-print-section="environment-summary-report"],
-  [data-print-section="environment-summary-report"] * { visibility: visible; }
-  [data-print-section="environment-summary-report"] {
+  [data-print-section="environment-summary-report"] *,
+  [data-print-section="harvest-evidence-report"],
+  [data-print-section="harvest-evidence-report"] * { visibility: visible; }
+  [data-print-section="environment-summary-report"],
+  [data-print-section="harvest-evidence-report"] {
     position: absolute;
     inset: 0;
     padding: 16px;

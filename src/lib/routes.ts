@@ -24,6 +24,9 @@ export const dashboardPath = (growId?: string | null): string => withGrowId("/da
 export const alertsPath = (growId?: string | null): string => withGrowId("/alerts", growId);
 export const sensorsPath = (growId?: string | null): string => withGrowId("/sensors", growId);
 
+export const postGrowLearningReportPath = (growId: string): string =>
+  `/reports/post-grow/${encodeURIComponent(growId)}`;
+
 export const actionDetailPath = (actionId: string): string =>
   `/actions/${encodeURIComponent(actionId)}`;
 
@@ -47,13 +50,40 @@ export const actionQueueAlertContextPath = (alertId: string): string =>
 export const alertDetailPath = (alertId: string): string =>
   `/alerts/${encodeURIComponent(alertId)}`;
 
-export const plantDetailPath = (plantId: string): string =>
-  `/plants/${encodeURIComponent(plantId)}`;
+/**
+ * Plant detail route. The canonical shape is `/plants/:id` and remains
+ * the source of truth — `opts` only appends additive, read-only query
+ * params used by the presenter for navigation context and read-only
+ * surfaces.
+ *
+ * - `tentId`: tent context so blocked states (loading-slow / error) can
+ *   render a safe "Back to tent" link even when the plant query never
+ *   resolves.
+ * - `mode`: optional read-only display mode. Currently only
+ *   `"archived-timeline"`, which lets the grower inspect an archived
+ *   plant's preserved history without exposing write surfaces.
+ */
+export type PlantDetailMode = "archived-timeline";
+
+export const plantDetailPath = (
+  plantId: string,
+  opts?: { tentId?: string | null; mode?: PlantDetailMode | null },
+): string => {
+  const base = `/plants/${encodeURIComponent(plantId)}`;
+  if (!opts) return base;
+  const params = new URLSearchParams();
+  if (typeof opts.tentId === "string" && opts.tentId.length > 0) {
+    params.set("tentId", opts.tentId);
+  }
+  if (typeof opts.mode === "string" && opts.mode.length > 0) {
+    params.set("mode", opts.mode);
+  }
+  const qs = params.toString();
+  return qs ? `${base}?${qs}` : base;
+};
 
 export const tentDetailPath = (tentId: string): string =>
   `/tents/${encodeURIComponent(tentId)}`;
 
 export const aiDoctorSessionDetailPath = (sessionId: string): string =>
   `/doctor/sessions/${encodeURIComponent(sessionId)}`;
-
-

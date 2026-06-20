@@ -79,8 +79,11 @@ describe("PlantDetail AI Doctor readiness call sites pass plant.tentId", () => {
     // resolve from plant.tentId (never an inferred/default tent). If this
     // breaks, fix the call site, do not infer from active/first-loaded tent.
     const tentIdAssignments = src.match(/tentId[=:]\s*[^,\n}]+/g) ?? [];
+    // TS type field declarations (e.g. `tentId: string | null;`) are not
+    // runtime assignments — exclude them from the heuristic.
+    const TS_TYPE_FIELD = /^tentId:\s*(?:string|number|boolean|null|undefined|\s|\|)+;?\s*$/;
     const offenders = tentIdAssignments.filter(
-      (line) => !/plant\.tentId|plant\?\.tentId/.test(line),
+      (line) => !/plant\.tentId|plant\?\.tentId/.test(line) && !TS_TYPE_FIELD.test(line),
     );
     expect(offenders, `offending tentId assignments:\n${offenders.join("\n")}`).toEqual([]);
   });

@@ -13,6 +13,12 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useInRouterContext, useNavigate } from "react-router-dom";
+import {
+  buildQuickLogTimelineNavTarget,
+  QUICK_LOG_TIMELINE_CTA_LABEL,
+} from "@/lib/quickLogTimelineNavigationTarget";
+import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -30,6 +36,7 @@ import {
 } from "@/lib/quickLogV2Rules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
+import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 import {
   EMPTY_QUICKLOG_FEEDING_FORM,
@@ -41,12 +48,19 @@ import {
 } from "@/lib/quickLogFeedingFormViewModel";
 import { writeFeedingTypedEvent } from "@/lib/writeFeedingTypedEvent";
 import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
+import QuickLogMaturityEvidenceFields from "@/components/QuickLogMaturityEvidenceFields";
 import {
   buildFeedingDefaults,
   applyFeedingDefaultsToForm,
   FEEDING_DEFAULTS_LABEL,
 } from "@/lib/feedingDefaultsViewModel";
 import { useRecentFeedingsForDefaults } from "@/hooks/useRecentFeedingsForDefaults";
+import {
+  EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM,
+  buildQuickLogMaturityEvidenceDetails,
+  quickLogMaturityEvidenceReasonToMessage,
+  type QuickLogMaturityEvidenceFormState,
+} from "@/lib/quickLogMaturityEvidenceRules";
 
 interface Props {
   open: boolean;
@@ -79,11 +93,54 @@ export default function QuickLogV2Sheet({
   const plants = (plantsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[1]) ?? [];
   const tents = (tentsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[0]) ?? [];
   const queryClient = useQueryClient();
+  const inRouter = useInRouterContext();
+  // `useNavigate` throws when called outside a Router. The sheet is
+  // always mounted inside the app's Router in production, but some
+  // tests mount it bare — fall back to a no-op navigator in that case.
+  // Hook order is preserved because `inRouter` is stable across renders.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const navigate = inRouter ? useNavigate() : null;
   const { save, saving } = useQuickLogV2Save();
+
+  function navigateToTimeline(href: string, hash: string, path: string) {
+    navigateToTimelineAnchor(
+      { path, hash, href },
+      {
+        navigate: navigate ?? null,
+        currentPath:
+          typeof window !== "undefined" ? window.location?.pathname ?? null : null,
+      },
+    );
+  }
+
+  function showTimelineConfirmation(
+    message: string,
+    scope: {
+      targetType: "plant" | "tent";
+      targetId: string;
+      tentId: string | null;
+      growEventId?: string | null;
+    },
+  ) {
+    const nav = buildQuickLogTimelineNavTarget({
+      targetType: scope.targetType,
+      targetId: scope.targetId,
+      growEventId: scope.growEventId ?? null,
+    });
+    toast.success(message, {
+      action: {
+        label: QUICK_LOG_TIMELINE_CTA_LABEL,
+        onClick: () => navigateToTimeline(nav.href, nav.hash, nav.path),
+      },
+    });
+  }
 
   const [form, setForm] = useState<QuickLogV2FormState>(EMPTY_QUICKLOG_V2_FORM);
   const [feedingForm, setFeedingForm] = useState<QuickLogFeedingFormState>(
     EMPTY_QUICKLOG_FEEDING_FORM,
+  );
+  const [maturityEvidenceForm, setMaturityEvidenceForm] = useState<QuickLogMaturityEvidenceFormState>(
+    EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM,
   );
   const [feedingSaving, setFeedingSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -139,6 +196,8 @@ export default function QuickLogV2Sheet({
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
   const noteLength = form.note.length;
   const volumeMissing = form.action === "water" && form.volumeMl.trim() === "";
+  const showMaturityEvidence =
+    form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
   const saveHelper = getSaveHelperMessage({
     contextBlocked,
     isLoadingContext,
@@ -163,6 +222,7 @@ export default function QuickLogV2Sheet({
         selectedKey: defaultTargetKey ?? null,
       });
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+      setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
       setLocalError(null);
       setSaveStatus("");
@@ -300,16 +360,40 @@ export default function QuickLogV2Sheet({
         return;
       }
       setSaveStatus(FEEDING_SAVE_SUCCESS_MESSAGE);
-      toast.success(FEEDING_SAVE_SUCCESS_MESSAGE);
+      showTimelineConfirmation(FEEDING_SAVE_SUCCESS_MESSAGE, {
+        targetType: resolved.targetType as "plant" | "tent",
+        targetId: resolved.targetId as string,
+        tentId: resolved.tentId ?? null,
+        growEventId: null,
+      });
       applyQuickLogV2Refresh(queryClient, {
         targetType: resolved.targetType as "plant" | "tent",
         targetId: resolved.targetId as string,
         tentId: resolved.tentId ?? null,
       });
+      // Notify Timeline-style listeners that a new entry exists so the
+      // local-state Timeline page can refetch. Fires only after the save
+      // succeeded (no early/duplicate dispatch on the failure paths above).
+      dispatchQuickLogV2EntryCreated({
+        createdAt: new Date().toISOString(),
+        growEventId:
+          (result as { growEventId?: string | null }).growEventId ?? null,
+        source: "quick_log_v2_feed",
+      });
       onOpenChange(false);
       return;
     }
 
+    const maturityEvidence = buildQuickLogMaturityEvidenceDetails({
+      form: maturityEvidenceForm,
+      targetType: resolved.targetType ?? null,
+      observedAt: new Date().toISOString(),
+    });
+    if (maturityEvidence.ok !== true) {
+      setLocalError(quickLogMaturityEvidenceReasonToMessage(maturityEvidence.reason));
+      setSaveStatus("");
+      return;
+    }
 
     let uploadedPath: string | null = null;
     if (photoFile) {
@@ -335,6 +419,7 @@ export default function QuickLogV2Sheet({
       temperatureC: form.temperatureC,
       humidityPct: form.humidityPct,
       vpdKpa: form.vpdKpa,
+      details: maturityEvidence.details,
     });
     if (built.ok !== true) {
       if (uploadedPath) {
@@ -372,11 +457,26 @@ export default function QuickLogV2Sheet({
 
     const successMessage = photoFile ? "Log and photo saved" : "Log saved";
     setSaveStatus(successMessage);
-    toast.success(successMessage);
+    showTimelineConfirmation(successMessage, {
+      targetType: resolved.targetType as "plant" | "tent",
+      targetId: resolved.targetId as string,
+      tentId: resolved.tentId ?? null,
+      growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
+    });
     applyQuickLogV2Refresh(queryClient, {
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,
       tentId: resolved.tentId ?? null,
+    });
+    // Notify Timeline-style listeners that a new entry exists so the
+    // local-state Timeline page can refetch. Dispatched once per
+    // successful save, after every required write (log + optional photo)
+    // has resolved.
+    dispatchQuickLogV2EntryCreated({
+      createdAt: new Date().toISOString(),
+      growEventId:
+        (res as { growEventId?: string | null }).growEventId ?? null,
+      source: "quick_log_v2",
     });
     resetPhotoSelection();
     onOpenChange(false);
@@ -671,6 +771,16 @@ export default function QuickLogV2Sheet({
           </div>
           )}
 
+          <QuickLogMaturityEvidenceFields
+            value={maturityEvidenceForm}
+            onChange={(next) => {
+              setMaturityEvidenceForm(next);
+              setLocalError(null);
+            }}
+            visible={showMaturityEvidence}
+            disabled={saving || feedingSaving}
+          />
+
           {form.action !== "feed" && (
           <details className="rounded-md border border-border p-3">
             <summary className="cursor-pointer text-sm font-medium">
@@ -716,9 +826,20 @@ export default function QuickLogV2Sheet({
               role="alert"
               aria-live="assertive"
               data-testid="qlv2-error"
-              className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive"
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive flex items-center justify-between gap-2"
             >
-              {localError}
+              <span>{localError}</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                data-testid="qlv2-save-retry"
+                aria-label="Retry saving Quick Log"
+                disabled={saving || feedingSaving || contextBlocked}
+                onClick={handleSave}
+              >
+                Retry
+              </Button>
             </div>
           )}
 

@@ -240,28 +240,6 @@ export default function Diagnostics() {
             </Button>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="space-y-2 pb-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base">Genetics XLSX Import</CardTitle>
-              <Badge variant="outline">Operator</Badge>
-              <Badge variant="secondary">Preview-only</Badge>
-              <Badge variant="outline">No data saved until confirmed</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>
-              Validate a genetics XLSX spreadsheet in-browser before any import. Row-numbered
-              errors, missing-field highlights, and a downloadable validation report. No writes, no
-              AI, no Action Queue, no device control. Batch linking is not enabled yet.
-            </p>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/operator/genetics-import" data-testid="operator-nav-genetics-import">
-                Open Genetics Import
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
       </section>
 
       <section aria-labelledby="internal-previews-heading" className="space-y-3">

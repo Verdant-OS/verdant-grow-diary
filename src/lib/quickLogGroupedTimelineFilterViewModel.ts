@@ -1,21 +1,3 @@
-/**
- * quickLogGroupedTimelineFilterViewModel — pure filter rules for the
- * QuickLog v2 grouped timeline UX polish slice.
- *
- * Hard constraints:
- *  - Pure: no I/O, no Supabase, no React, no timers, no globals.
- *  - Display-only. Filters never mutate entries and never write data.
- *  - Filter state lives in the UI only; this module is stateless.
- *  - No "live/synced/connected/imported" wording. Sources stay honest.
- *  - Filter rules live OUTSIDE JSX so the presenter stays presenter-only.
- *
- * Filter semantics:
- *  - "all"         → every entry
- *  - "water"       → grouped Water + standalone Water
- *  - "note"        → grouped Note + standalone Note
- *  - "environment" → standalone environment snapshots AND grouped cards
- *                    (because grouped cards always carry environment context).
- */
 import type { QuickLogTimelineEntry } from "@/lib/quickLogTimelineGroupingViewModel";
 
 export const QUICK_LOG_GROUPED_TIMELINE_FILTERS = [
@@ -23,6 +5,7 @@ export const QUICK_LOG_GROUPED_TIMELINE_FILTERS = [
   "water",
   "note",
   "environment",
+  "ai-doctor-evidence",
 ] as const;
 
 export type QuickLogGroupedTimelineFilter =
@@ -36,6 +19,7 @@ export const QUICK_LOG_GROUPED_TIMELINE_FILTER_LABELS: Record<
   water: "Water",
   note: "Note",
   environment: "Environment",
+  "ai-doctor-evidence": "AI Doctor evidence",
 };
 
 export function isQuickLogGroupedTimelineFilter(
@@ -47,11 +31,21 @@ export function isQuickLogGroupedTimelineFilter(
   );
 }
 
+export function entryHasAiDoctorPhase1Evidence(
+  entry: QuickLogTimelineEntry,
+): boolean {
+  if (entry.kind === "environment") return false;
+  return !!entry.action.aiDoctorPhase1Evidence;
+}
+
 export function entryMatchesQuickLogGroupedTimelineFilter(
   entry: QuickLogTimelineEntry,
   filter: QuickLogGroupedTimelineFilter,
 ): boolean {
   if (filter === "all") return true;
+  if (filter === "ai-doctor-evidence") {
+    return entryHasAiDoctorPhase1Evidence(entry);
+  }
   if (filter === "water") {
     if (entry.kind === "grouped") return entry.action.kind === "water";
     if (entry.kind === "action") return entry.action.kind === "water";
@@ -62,7 +56,6 @@ export function entryMatchesQuickLogGroupedTimelineFilter(
     if (entry.kind === "action") return entry.action.kind === "note";
     return false;
   }
-  // environment: standalone env + any grouped (grouped always has env context)
   if (entry.kind === "environment") return true;
   if (entry.kind === "grouped") return true;
   return false;
@@ -81,33 +74,24 @@ export const QUICK_LOG_GROUPED_TIMELINE_EMPTY_OVERALL_TEXT =
   "No QuickLog entries yet.";
 export const QUICK_LOG_GROUPED_TIMELINE_EMPTY_FILTERED_TEXT =
   "No QuickLog entries match this filter.";
+export const QUICK_LOG_GROUPED_TIMELINE_AI_EVIDENCE_EMPTY_TITLE_TEXT =
+  "No AI Doctor Phase 1 evidence yet.";
+export const QUICK_LOG_GROUPED_TIMELINE_AI_EVIDENCE_EMPTY_HINT_TEXT =
+  "Saved Phase 1 evidence will appear here after you review AI Doctor context and save it as evidence.";
+export const QUICK_LOG_GROUPED_TIMELINE_AI_EVIDENCE_RESULTS_BUTTON_LABEL =
+  "Open AI Doctor Results";
 export const QUICK_LOG_GROUPED_TIMELINE_CREATE_BUTTON_LABEL =
   "Create Quick Log";
-/**
- * Plant Timeline empty-state copy. Surfaced alongside the existing
- * QuickLog memory empty text so a grower lands on a clear, honest,
- * non-automated next step: log something manually.
- */
+
 export const QUICK_LOG_GROUPED_TIMELINE_EMPTY_TITLE_TEXT =
   "No timeline entries yet.";
 export const QUICK_LOG_GROUPED_TIMELINE_EMPTY_HINT_TEXT =
   "Add a Quick Log to start this plant's history.";
 
-/**
- * Source labels are kept honest. Real entries are always "Manual".
- * Demo/sample fixtures (never produced by the live hook) are labeled
- * explicitly so they cannot be mistaken for real plant memory.
- */
 export const QUICK_LOG_MANUAL_SOURCE_LABEL = "Manual";
 export const QUICK_LOG_DEMO_SOURCE_LABEL = "Demo data";
 export const QUICK_LOG_SAMPLE_SOURCE_LABEL = "Sample timeline entry";
 
-/**
- * Canonical user-facing labels for QuickLog v2 action kinds. The grouped
- * timeline only supports "water" and "note"; other event types are
- * handled by the diary timeline rules (see `growDiaryTimelineRules`).
- * Keeping this map in the view-model prevents JSX from duplicating it.
- */
 export const QUICK_LOG_ACTION_LABELS = {
   water: "Watering",
   note: "Note",
@@ -117,12 +101,6 @@ export function quickLogActionLabel(kind: "water" | "note"): string {
   return QUICK_LOG_ACTION_LABELS[kind];
 }
 
-/**
- * Deterministic, locale-stable display formatting for an ISO occurred_at
- * timestamp. Uses UTC so server-rendered text matches test snapshots
- * across machines/timezones. Returns the input unchanged when it is not
- * a parseable ISO string (no invented dates).
- */
 export function formatQuickLogOccurredAt(
   iso: string | null | undefined,
 ): string {
@@ -144,18 +122,12 @@ export function formatQuickLogOccurredAt(
   }
 }
 
-/** Screen-reader label for a source badge, e.g. "Source: Manual". */
 export function quickLogSourceAccessibleLabel(sourceLabel: string): string {
   return `Source: ${sourceLabel}`;
 }
 
-/**
- * Screen-reader label for the occurred_at line, e.g.
- * "Occurred at Mar 15, 2026 09:00 UTC".
- */
 export function quickLogOccurredAtAccessibleLabel(
   formattedOccurredAt: string,
 ): string {
   return `Occurred at ${formattedOccurredAt}`;
 }
-

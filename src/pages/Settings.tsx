@@ -17,6 +17,14 @@ import {
   getStartScreenChoiceOrDefault,
   setStartScreenChoice,
 } from "@/lib/startScreenPreferences";
+import {
+  DEFAULT_TEMPERATURE_UNIT,
+  TEMPERATURE_UNIT_OPTIONS,
+  type TemperatureUnitPreference,
+  loadTemperatureUnitPreference,
+  saveTemperatureUnitPreference,
+  clearTemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 interface TileProps {
   name: string;
@@ -140,6 +148,100 @@ function StartScreenTile({ userId }: { userId: string }) {
   );
 }
 
+function TemperatureUnitTile() {
+  const [choice, setChoice] = useState<TemperatureUnitPreference>(
+    DEFAULT_TEMPERATURE_UNIT,
+  );
+  const [saved, setSaved] = useState<string | null>(null);
+
+  useEffect(() => {
+    setChoice(loadTemperatureUnitPreference());
+  }, []);
+
+  function onSave() {
+    saveTemperatureUnitPreference(choice);
+    setSaved("Display temperature preference saved.");
+  }
+  function onReset() {
+    clearTemperatureUnitPreference();
+    setChoice(DEFAULT_TEMPERATURE_UNIT);
+    setSaved("Reverted to Fahrenheit default.");
+  }
+
+  return (
+    <Tile name="Units" state="available">
+      <p className="text-sm text-muted-foreground mb-1">
+        Display temperature as
+      </p>
+      <p className="text-xs text-muted-foreground mb-3">
+        Stored sensor values are unchanged.
+      </p>
+      <fieldset
+        className="grid gap-2"
+        aria-label="Display temperature unit"
+        data-testid="temperature-unit-fieldset"
+      >
+        <legend className="sr-only">Display temperature unit</legend>
+        {TEMPERATURE_UNIT_OPTIONS.map((opt) => (
+          <label
+            key={opt.key}
+            className="flex items-start gap-2 text-sm cursor-pointer"
+          >
+            <input
+              type="radio"
+              name="temperature-unit"
+              value={opt.key}
+              checked={choice === opt.key}
+              onChange={() => {
+                setChoice(opt.key);
+                setSaved(null);
+              }}
+              data-testid={`temperature-unit-option-${opt.key}`}
+              className="mt-1"
+            />
+            <span>
+              <span className="font-medium">
+                {opt.label}
+                {opt.recommended ? (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    (default)
+                  </span>
+                ) : null}
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                {opt.description}
+              </span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      <div className="flex flex-wrap gap-2 mt-3">
+        <Button size="sm" onClick={onSave} data-testid="temperature-unit-save">
+          Save
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onReset}
+          data-testid="temperature-unit-reset"
+        >
+          Use Fahrenheit default
+        </Button>
+      </div>
+      {saved ? (
+        <p
+          role="status"
+          aria-live="polite"
+          data-testid="temperature-unit-saved"
+          className="text-xs text-muted-foreground mt-3"
+        >
+          {saved}
+        </p>
+      ) : null}
+    </Tile>
+  );
+}
+
 export default function Settings() {
   const { user, signOut } = useAuth();
   const integrations = ["Spider Farmer", "AC Infinity", "Vivosun", "Raspberry Pi 5"];
@@ -162,9 +264,7 @@ export default function Settings() {
 
         {user?.id ? <StartScreenTile userId={user.id} /> : null}
 
-        <Tile name="Units" state="coming_soon">
-          <p className="text-sm text-muted-foreground">Temperature: °F · Nutrients: EC</p>
-        </Tile>
+        <TemperatureUnitTile />
 
         <Tile name="Notifications" state="coming_soon">
           <p className="text-sm text-muted-foreground">

@@ -1081,6 +1081,51 @@ export type Database = {
         }
         Relationships: []
       }
+      pheno_hunts: {
+        Row: {
+          created_at: string
+          grow_id: string
+          id: string
+          name: string
+          tent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          grow_id: string
+          id?: string
+          name: string
+          tent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          grow_id?: string
+          id?: string
+          name?: string
+          tent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_hunts_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_hunts_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       photo_events: {
         Row: {
           caption: string | null
@@ -1229,14 +1274,18 @@ export type Database = {
       }
       plants: {
         Row: {
+          candidate_label: string | null
           created_at: string
           grow_id: string | null
           health: string
           id: string
           is_archived: boolean
           last_note: string | null
+          medium: string | null
           name: string
+          pheno_hunt_id: string | null
           photo_url: string | null
+          pot_size: string | null
           schema_version: number
           stage: string
           started_at: string
@@ -1246,14 +1295,18 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          candidate_label?: string | null
           created_at?: string
           grow_id?: string | null
           health?: string
           id?: string
           is_archived?: boolean
           last_note?: string | null
+          medium?: string | null
           name: string
+          pheno_hunt_id?: string | null
           photo_url?: string | null
+          pot_size?: string | null
           schema_version?: number
           stage?: string
           started_at?: string
@@ -1263,14 +1316,18 @@ export type Database = {
           user_id: string
         }
         Update: {
+          candidate_label?: string | null
           created_at?: string
           grow_id?: string | null
           health?: string
           id?: string
           is_archived?: boolean
           last_note?: string | null
+          medium?: string | null
           name?: string
+          pheno_hunt_id?: string | null
           photo_url?: string | null
+          pot_size?: string | null
           schema_version?: number
           stage?: string
           started_at?: string
@@ -1285,6 +1342,13 @@ export type Database = {
             columns: ["grow_id"]
             isOneToOne: false
             referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plants_pheno_hunt_id_fkey"
+            columns: ["pheno_hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
             referencedColumns: ["id"]
           },
         ]

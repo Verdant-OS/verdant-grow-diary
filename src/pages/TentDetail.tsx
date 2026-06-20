@@ -3,8 +3,9 @@ import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import TentAiDoctorSessionsPanel from "@/components/TentAiDoctorSessionsPanel";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
-import { useParams, Link } from "react-router-dom";
-import { useState } from "react";
+import { useParams, Link, useSearchParams } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { useAuth } from "@/store/auth";
 import { formatDistanceToNow } from "date-fns";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -27,7 +28,7 @@ import TentManualSnapshotHistoryList from "@/components/TentManualSnapshotHistor
 import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
 import TimelineMemorySection from "@/components/TimelineMemorySection";
 import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
-import TentCsvImportCard from "@/components/TentCsvImportCard";
+
 import ImportedSensorHistoryPanel from "@/components/ImportedSensorHistoryPanel";
 import TentSensorWebhookSettingsCard from "@/components/TentSensorWebhookSettingsCard";
 import TentBridgeTokensCard from "@/components/TentBridgeTokensCard";
@@ -40,7 +41,10 @@ import {
   buildTentSensorChartSeries,
   buildTentSensorHeaderView,
 } from "@/lib/tentSensorChartRules";
-import { tempFFromC } from "@/lib/temperatureUnits";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+} from "@/lib/temperatureUnitPreference";
 import { formatSensorValue } from "@/lib/sensorFormat";
 import {
   filterVisiblePlants,
@@ -62,12 +66,70 @@ import {
 import { cn } from "@/lib/utils";
 import FirstPlantMemoryCta from "@/components/FirstPlantMemoryCta";
 import { buildPlantQuickLogPrefill } from "@/lib/plantQuickLogPrefillRules";
+import TentPlantRosterPanel from "@/components/TentPlantRosterPanel";
+import { buildTentPlantRosterViewModel } from "@/lib/tentPlantRosterViewModel";
+import { useTentPlantRosterActivity } from "@/hooks/useTentPlantRosterActivity";
+import TentPlantTabs from "@/components/TentPlantTabs";
+import { buildTentPlantTabsViewModel } from "@/lib/tentPlantTabsViewModel";
+import TentPlantActivityPanels from "@/components/TentPlantActivityPanels";
+import { buildTentPlantActivityPanelsViewModel } from "@/lib/tentPlantActivityPanelsViewModel";
+import {
+  readTentPlantRosterIncludeArchived,
+  writeTentPlantRosterIncludeArchived,
+} from "@/lib/tentPlantRosterPreferences";
+import {
+  readTentPlantTabsSelectedPlantId,
+  writeTentPlantTabsSelectedPlantId,
+} from "@/lib/tentPlantTabsPreferences";
+import {
+  readTentPlantTabsUrlPlantId,
+  applyTentPlantTabsUrlPlantId,
+} from "@/lib/tentPlantTabsUrlState";
+
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";
+import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 
 export default function TentDetail() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [showArchived, setShowArchived] = useState(false);
+  const [rosterIncludeArchived, setRosterIncludeArchived] = useState<boolean>(() =>
+    readTentPlantRosterIncludeArchived(id ?? null),
+  );
+  useEffect(() => {
+    setRosterIncludeArchived(readTentPlantRosterIncludeArchived(id ?? null));
+  }, [id]);
+  const handleToggleRosterIncludeArchived = (next: boolean) => {
+    setRosterIncludeArchived(next);
+    writeTentPlantRosterIncludeArchived(id ?? null, next);
+  };
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedPlantTabId, setSelectedPlantTabIdState] = useState<string | null>(
+    () =>
+      readTentPlantTabsUrlPlantId(searchParams) ??
+      readTentPlantTabsSelectedPlantId(id ?? null),
+  );
+  // Track which tent we've initialized for so re-renders don't clobber state
+  // with the URL value mid-session.
+  const initializedTentIdRef = useRef<string | null>(id ?? null);
+  useEffect(() => {
+    if (initializedTentIdRef.current === (id ?? null)) return;
+    initializedTentIdRef.current = id ?? null;
+    setSelectedPlantTabIdState(
+      readTentPlantTabsUrlPlantId(searchParams) ??
+        readTentPlantTabsSelectedPlantId(id ?? null),
+    );
+  }, [id, searchParams]);
+  const setSelectedPlantTabId = (next: string | null) => {
+    setSelectedPlantTabIdState(next);
+    writeTentPlantTabsSelectedPlantId(id ?? null, next);
+    setSearchParams(
+      (current) => applyTentPlantTabsUrlPlantId(current, next),
+      { replace: true },
+    );
+  };
+
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { data: tent, isLoading, isError, refetch } = useGrowTent(id);
   const { data: activePlants = [] } = useGrowPlants(id);
@@ -80,6 +142,29 @@ export default function TentDetail() {
   const activeCount = getActivePlantCount(activePlants);
   const hasArchived = shouldShowArchivedToggle(allPlants);
   const visiblePlants = filterVisiblePlants(allPlants, { showArchived });
+  const rosterActivity = useTentPlantRosterActivity(allPlants);
+
+  // Reconcile persisted/URL selected tab against currently visible plants.
+  // If the restored plant id no longer exists, or is archived while archived
+  // plants are hidden, fall back to "All plants" and clear storage + URL.
+  useEffect(() => {
+    if (selectedPlantTabId == null) return;
+    if (!Array.isArray(allPlants) || allPlants.length === 0) return;
+    const match = allPlants.find((p) => p.id === selectedPlantTabId);
+    const isVisible = match
+      ? rosterIncludeArchived || match.isArchived !== true
+      : false;
+    if (!isVisible) {
+      setSelectedPlantTabIdState(null);
+      writeTentPlantTabsSelectedPlantId(id ?? null, null);
+      setSearchParams(
+        (current) => applyTentPlantTabsUrlPlantId(current, null),
+        { replace: true },
+      );
+    }
+  }, [selectedPlantTabId, allPlants, rosterIncludeArchived, id, setSearchParams]);
+
+
 
   if (isLoading) {
     return (
@@ -190,7 +275,7 @@ export default function TentDetail() {
         testId="tent-detail-data-source-disclosure"
       />
 
-      <div className="mb-3">
+      <div className="mb-3 flex items-center gap-2 flex-wrap">
         <TentCardActionsMenu
           tent={{
             id: tent.id,
@@ -204,11 +289,14 @@ export default function TentDetail() {
           variant="row"
           hideView
         />
+        {tent.growId ? (
+          <StartPhenoHuntButton growId={tent.growId} tentId={tent.id} />
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
         {snap?.temp !== null && snap?.temp !== undefined && (
-          <MetricChip label="T" value={(tempFFromC(snap.temp) ?? 0).toFixed(1)} unit="°F" status={environmentMetricChipStatus(classifyTempAgainstStage(snap.temp, { stage: tent.stage, stale: header.stale }))} />
+          <MetricChip label="T" value={(convertCelsiusForDisplay(snap.temp) ?? 0).toFixed(1)} unit={getTemperatureUnitSymbol()} status={environmentMetricChipStatus(classifyTempAgainstStage(snap.temp, { stage: tent.stage, stale: header.stale }))} />
         )}
         {snap?.rh !== null && snap?.rh !== undefined && (
           <MetricChip label="RH" value={snap.rh} unit="%" status={environmentMetricChipStatus(classifyRhAgainstStage(snap.rh, { stage: tent.stage, stale: header.stale }))} />
@@ -349,9 +437,6 @@ export default function TentDetail() {
 
       <TimelineMemorySection scope="tent" tentId={id ?? null} />
 
-      {id && (
-        <TentCsvImportCard tentId={id} growId={tent.growId ?? null} />
-      )}
 
       <ImportedSensorHistoryPanel tentId={id ?? null} readings={readings} />
 
@@ -375,6 +460,94 @@ export default function TentDetail() {
         });
         return <FirstPlantMemoryCta prefill={prefill} testId="tent-detail-first-plant-memory-cta" />;
       })()}
+
+      {(() => {
+        const tabsVm = buildTentPlantTabsViewModel({
+          plants: allPlants.map((p) => ({
+            id: p.id,
+            name: p.name,
+            isArchived: p.isArchived,
+          })),
+          includeArchived: rosterIncludeArchived,
+          selectedPlantId: selectedPlantTabId,
+        });
+        const rosterPlantSource =
+          tabsVm.selectedPlantId == null
+            ? allPlants
+            : allPlants.filter((p) => p.id === tabsVm.selectedPlantId);
+        return (
+          <div className="space-y-3">
+            <TentPlantTabs
+              viewModel={tabsVm}
+              onSelect={setSelectedPlantTabId}
+            />
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="tent-plant-tabs-current-scope"
+            >
+              {tabsVm.selectedPlantCopy ?? tabsVm.allPlantsCopy}
+            </p>
+            <p
+              className="text-[11px] text-muted-foreground"
+              data-testid="tent-plant-tabs-shared-env-reminder"
+            >
+              {tabsVm.sharedEnvironmentReminderCopy}
+            </p>
+            <TentPlantRosterPanel
+              onToggleIncludeArchived={handleToggleRosterIncludeArchived}
+              quickActionContext={{
+                tentId: id ?? null,
+                tentName: tent.name ?? null,
+                growId: tent.growId ?? null,
+              }}
+              viewModel={buildTentPlantRosterViewModel({
+                tentId: id ?? null,
+                includeArchived: rosterIncludeArchived,
+                plants: rosterPlantSource.map((p) => {
+                  const a = rosterActivity.byPlantId[p.id];
+                  return {
+                    id: p.id,
+                    name: p.name,
+                    strain: p.strain,
+                    stage: p.stage,
+                    tentId: p.tentId,
+                    isArchived: p.isArchived,
+                    latestLogAt: a?.latestLogAt ?? null,
+                    hasRecentPhoto: a?.hasRecentPhoto ?? false,
+                    harvestWatchPublicState:
+                      a?.harvestWatchPublicState ?? null,
+                  };
+                }),
+                tentSensorContextLabel: header.sourceLabel ?? null,
+              })}
+            />
+            <TentPlantActivityPanels
+              isLoading={rosterActivity.isLoading}
+              viewModel={buildTentPlantActivityPanelsViewModel({
+                plants: allPlants.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  strain: p.strain,
+                  stage: p.stage,
+                  isArchived: p.isArchived,
+                })),
+                activityByPlantId: rosterActivity.byPlantId,
+                includeArchived: rosterIncludeArchived,
+                selectedPlantId: tabsVm.selectedPlantId,
+                tentId: id ?? null,
+                tentName: tent.name ?? null,
+                growId: tent.growId ?? null,
+              })}
+              viewer={{ currentUserId: user?.id ?? null }}
+              tentId={id ?? null}
+              growId={tent.growId ?? null}
+            />
+
+          </div>
+        );
+      })()}
+
+
 
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
@@ -474,7 +647,7 @@ export default function TentDetail() {
                   data-archived={isInactive ? "true" : "false"}
                   data-archived-kind={archivedLabel.kind}
                 >
-                  <Link to={plantDetailPath(p.id)} className="block">
+                  <Link to={plantDetailPath(p.id, { tentId: id ?? null })} className="block">
                     <PlantPhoto src={p.photo} alt={p.name} className="aspect-video" caption="No plant photo yet" />
                     <div className="p-3">
                       <div className="flex items-center justify-between gap-2 pr-8">
@@ -513,6 +686,7 @@ export default function TentDetail() {
                         growId: p.growId ?? tent.growId ?? null,
                         lastNote: p.lastNote,
                         isArchived: p.isArchived ?? false,
+                        photo: p.photo ?? null,
                       }}
                     />
                   </div>

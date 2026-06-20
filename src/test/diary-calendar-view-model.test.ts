@@ -31,7 +31,7 @@ describe("buildDiaryCalendarViewModel", () => {
     expect(groups[1].counts.feeding).toBe(1);
   });
 
-  it("ignores unrelated event kinds (photo, observation, environment, unknown)", () => {
+  it("ignores unrelated event kinds (photo, observation, unknown); accepts environment", () => {
     const groups = buildDiaryCalendarViewModel([
       { id: "p", entry_at: "2026-06-12T10:00:00Z", event_type: "photo" },
       { id: "o", entry_at: "2026-06-12T11:00:00Z", event_type: "observation" },
@@ -40,8 +40,10 @@ describe("buildDiaryCalendarViewModel", () => {
       { id: "w", entry_at: "2026-06-12T14:00:00Z", event_type: "watering" },
     ]);
     expect(groups).toHaveLength(1);
-    expect(groups[0].events.map((e) => e.id)).toEqual(["w"]);
+    // env + watering accepted; others ignored.
+    expect(groups[0].events.map((e) => e.id).sort()).toEqual(["e", "w"]);
   });
+
 
   it("returns an empty array for empty/invalid input and degrades for bad dates", () => {
     expect(buildDiaryCalendarViewModel([])).toEqual([]);
@@ -95,7 +97,7 @@ describe("summarizeDiaryCalendar", () => {
     expect(summarizeDiaryCalendar([])).toEqual({
       totalEvents: 0,
       totalDays: 0,
-      counts: { watering: 0, feeding: 0, diagnosis: 0 },
+      counts: { watering: 0, feeding: 0, diagnosis: 0, environment: 0 },
     });
   });
 
@@ -108,8 +110,9 @@ describe("summarizeDiaryCalendar", () => {
     const s = summarizeDiaryCalendar(groups);
     expect(s.totalDays).toBe(2);
     expect(s.totalEvents).toBe(3);
-    expect(s.counts).toEqual({ watering: 1, feeding: 1, diagnosis: 1 });
+    expect(s.counts).toEqual({ watering: 1, feeding: 1, diagnosis: 1, environment: 0 });
   });
+
 });
 
 describe("diary calendar empty-state copy", () => {

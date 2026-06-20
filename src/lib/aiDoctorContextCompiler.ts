@@ -170,38 +170,28 @@ export interface PlantContextPayload {
   plant_name: string | null;
   strain: string | null;
   stage: string | null;
+  /**
+   * Growing medium carried directly from the plant/profile row. Null
+   * when missing, empty, or blank. Never inferred from notes/strain.
+   */
+  medium: string | null;
+  /**
+   * Container / pot size label carried directly from the plant/profile
+   * row. Null when missing, empty, or blank. Never inferred.
+   */
+  pot_size: string | null;
   recent_grow_events: readonly RecentGrowEvent[];
   recentSensorReadings: readonly RecentSensorReading[];
   sensor_groups: readonly SensorSourceGroup[];
   averages_7d: SensorRollingAverages;
   notable_deviations: readonly string[];
   source_tags: readonly SensorSourceTag[];
-  /**
-   * Safe, read-only summary of imported CSV/XLSX sensor history.
-   * Present only when at least one CSV row contributed. Never used as
-   * a substitute for current/live telemetry.
-   */
   imported_sensor_history: ImportedSensorHistorySection | null;
-  /**
-   * True only when at least one trustworthy live reading exists in the
-   * compiled context. CSV history NEVER flips this flag to true.
-   */
   hasLiveSensorReadings: boolean;
-  /**
-   * True when no current/live sensor evidence exists. Stays true even
-   * when CSV history is present, so AI Doctor still surfaces the
-   * missing-live-readings caveat.
-   */
   missingLiveSensorReadings: boolean;
-  /**
-   * Optional, additive early-stage (germination/seedling) memory compiled
-   * from saved Quick Log / diary `details.early_stage` envelopes. Null
-   * when no early-stage memory exists. Safe-by-construction: never
-   * carries raw payloads, tokens, privileged backend keys, or unknown
-   * enum strings.
-   */
   early_stage_memory: EarlyStageAiDoctorContext | null;
 }
+
 
 
 // ---------------------------------------------------------------------------
@@ -216,6 +206,16 @@ export interface PlantRowLike {
   strain?: string | null;
   stage?: string | null;
   growth_stage?: string | null;
+  /**
+   * Growing medium (e.g. "soil", "coco", "hydro"). Carried forward as
+   * evidence only — never inferred from notes / strain / freeform text.
+   */
+  medium?: string | null;
+  /**
+   * Container / pot size label (e.g. "3 gal", "11 L"). Free string; the
+   * compiler only normalizes whitespace and rejects blanks.
+   */
+  pot_size?: string | null;
 }
 
 export interface GrowEventRowLike {
@@ -271,6 +271,17 @@ function toFiniteNumber(v: unknown): number | null {
   if (v === null || v === undefined) return null;
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Normalize a plant/profile string field (e.g. medium, pot_size). Returns
+ * a trimmed string or null when the input is missing, non-string, blank,
+ * or otherwise unusable. Never infers values.
+ */
+function cleanPlantString(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const trimmed = v.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function avg(nums: readonly number[]): number | null {
@@ -418,14 +429,15 @@ export function compilePlantContextFromRows(
   // ----- early-stage (germination/seedling) memory, additive & safe -----
   const earlyStage = buildEarlyStageAiDoctorContext({
     diaryRows: input.growEvents ?? [],
-    // Compiler knows live sensor presence; pass it explicitly so the
-    // helper can surface a missing-sensor caveat only when known false.
     hasRecentSensorSnapshot: hasLiveSensorReadings,
-    // No photo signal exists in the compiler context — leave undefined.
   });
   const early_stage_memory: EarlyStageAiDoctorContext | null =
     earlyStage.hasEarlyStageMemory ? earlyStage : null;
 
+  // Medium / pot size carried directly from the plant row. Whitespace-
+  // normalized; blank / non-string inputs collapse to null. Never inferred.
+  const medium = cleanPlantString(plant?.medium);
+  const pot_size = cleanPlantString(plant?.pot_size);
 
   return {
     grow_id: plant?.grow_id ?? null,
@@ -434,6 +446,8 @@ export function compilePlantContextFromRows(
     plant_name: plant?.name ?? null,
     strain: plant?.strain ?? null,
     stage: plant?.stage ?? plant?.growth_stage ?? null,
+    medium,
+    pot_size,
     recent_grow_events: Object.freeze(recent_grow_events),
     recentSensorReadings: Object.freeze(recentSensorReadings),
     sensor_groups: Object.freeze(sensor_groups),

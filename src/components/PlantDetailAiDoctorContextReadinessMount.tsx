@@ -32,6 +32,19 @@ export interface PlantDetailAiDoctorContextReadinessMountProps {
   plantName?: string | null;
   strain?: string | null;
   stage?: string | null;
+  /**
+   * Optional pass-through for growing medium. The Plant Detail data
+   * source (`useGrowPlant` / `plants` table) does NOT yet expose this
+   * field — callers may thread it in when a future profile/metadata
+   * source provides it. Never inferred from notes / strain / freeform.
+   */
+  medium?: string | null;
+  /**
+   * Optional pass-through for container / pot size. Same provenance
+   * rules as `medium` — null when the underlying data source has no
+   * value to surface.
+   */
+  potSize?: string | null;
 }
 
 function FallbackShell({
@@ -59,6 +72,8 @@ export default function PlantDetailAiDoctorContextReadinessMount({
   plantName,
   strain,
   stage,
+  medium,
+  potSize,
 }: PlantDetailAiDoctorContextReadinessMountProps) {
   const recentActivity = usePlantRecentActivity(plantId);
   const manualLogs = usePlantManualSensorLogs(plantId);
@@ -74,8 +89,12 @@ export default function PlantDetailAiDoctorContextReadinessMount({
       stage: stage ?? null,
       grow_id: growId,
       tent_id: tentId,
+      // Optional pass-through; the compiler normalizes blanks → null.
+      // No inference: undefined stays unknown on the context payload.
+      medium: medium ?? null,
+      pot_size: potSize ?? null,
     }),
-    [plantId, plantName, strain, stage, growId, tentId],
+    [plantId, plantName, strain, stage, growId, tentId, medium, potSize],
   );
 
   const built = useMemo(() => {
@@ -95,6 +114,33 @@ export default function PlantDetailAiDoctorContextReadinessMount({
       };
     }
   }, [plantRow, recentActivity.data, manualLogs.data]);
+
+  // NOTE: All hooks below MUST be called unconditionally on every render.
+  // Previously `useMemo(auditIdentity)` and `useCallback(openManualSensorEntry)`
+  // lived AFTER the early returns for !plantId / isLoading / built.error,
+  // which caused "Rendered more hooks than during the previous render."
+  // when context flipped from missing/loading to available. Keep these
+  // declarations above any conditional return.
+  const auditIdentity = useMemo(
+    () => ({
+      plantId,
+      plantName: plantName ?? null,
+      growId,
+      tentId,
+      tentName: null as string | null,
+    }),
+    [plantId, plantName, growId, tentId],
+  );
+
+  const openManualSensorEntry = useCallback(
+    (prefill: { plantId: string; growId: string; tentId: string }) => {
+      if (typeof window === "undefined") return;
+      window.dispatchEvent(
+        new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }),
+      );
+    },
+    [],
+  );
 
   if (!plantId) {
     return (
@@ -125,26 +171,15 @@ export default function PlantDetailAiDoctorContextReadinessMount({
 
   const auditLogs = (manualLogs.data ?? []) as ReadonlyArray<ManualSensorLog>;
 
-  const auditIdentity = useMemo(
-    () => ({
-      plantId,
-      plantName: plantName ?? null,
-      growId,
-      tentId,
-      tentName: null,
-    }),
-    [plantId, plantName, growId, tentId],
-  );
-
-  const openManualSensorEntry = useCallback(
-    (prefill: { plantId: string; growId: string; tentId: string }) => {
-      if (typeof window === "undefined") return;
-      window.dispatchEvent(
-        new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }),
-      );
-    },
-    [],
-  );
+  const safeOpenQuickLog =
+    growId && tentId
+      ? () =>
+          openManualSensorEntry({
+            plantId,
+            growId,
+            tentId,
+          })
+      : undefined;
 
   return (
     <div
@@ -154,6 +189,16 @@ export default function PlantDetailAiDoctorContextReadinessMount({
       <AiDoctorContextReadinessPanel
         context={built.context}
         openAlertsCount={alerts.rows.length}
+        quickActions={{
+          // Watering / Feeding route into the existing QuickLog prefill
+          // surface; the grower still confirms and saves. No writes here.
+          onAddWatering: safeOpenQuickLog,
+          onAddFeeding: safeOpenQuickLog,
+          // Fast Add Photo and Add Sensor Snapshot have no safe single-
+          // tap entry yet — leave undefined so the panel renders them
+          // disabled with clear "coming soon" copy rather than inventing
+          // a route.
+        }}
       />
       <PlantSensorContextAuditPanel
         logs={auditLogs}
@@ -164,3 +209,4 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     </div>
   );
 }
+

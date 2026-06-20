@@ -24,3 +24,9 @@ dist-ssr
 *.sw?
 .one-tent-loop-smoke-report.json
 tmp/
+
+# Verdant EcoWitt Windows Testbench (local-only)
+tools/ecowitt-testbench/.env
+tools/ecowitt-testbench/.venv/
+tools/ecowitt-testbench/ecowitt_raw_log.jsonl
+tools/ecowitt-testbench/__pycache__/

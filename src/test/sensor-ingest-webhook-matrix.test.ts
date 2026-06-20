@@ -471,7 +471,8 @@ describe("ingest matrix — static safety guards on edge function source", () =>
   });
 
   it("stamps server-resolved user_id on every insert row", () => {
-    expect(SRC).toMatch(/user_id:\s*auth\.userId/);
+    // Either inline (user_id: auth.userId) or via buildStoredRow({ userId: auth.userId, ... }).
+    expect(SRC).toMatch(/user_id:\s*auth\.userId|userId:\s*auth\.userId/);
   });
 
   it("does not use service_role before authentication completes", () => {
@@ -485,9 +486,9 @@ describe("ingest matrix — static safety guards on edge function source", () =>
   });
 
   it("returns clean JSON error responses (no stack traces leaked)", () => {
-    expect(SRC).toMatch(/json\(\s*\{\s*error:\s*["']unauthorized["']/);
-    expect(SRC).toMatch(/json\(\s*\{\s*error:\s*["']invalid_json["']/);
-    expect(SRC).toMatch(/json\(\s*\{\s*error:\s*["']invalid_payload["']/);
-    expect(SRC).toMatch(/json\(\s*\{\s*error:\s*["']forbidden_tent["']/);
+    expect(SRC).toMatch(/json\(\s*req\s*,\s*\{\s*error:\s*["']unauthorized["']/);
+    expect(SRC).toMatch(/json\(\s*req\s*,\s*\{\s*error:\s*["']invalid_json["']/);
+    expect(SRC).toMatch(/json\(\s*req\s*,\s*\{\s*error:\s*["']invalid_payload["']/);
+    expect(SRC).toMatch(/json\(\s*req\s*,\s*\{\s*error:\s*["']forbidden_tent["']/);
   });
 });

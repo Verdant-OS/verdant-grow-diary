@@ -64,7 +64,7 @@ describe("ecowitt-http-local-bridge — static safety", () => {
   it("redacts MQTT password and token-like strings in logs", () => {
     expect(SRC).toMatch(/password\|token\|secret/);
     // No raw console.log of mqttPassword.
-    const rawPwdLogs = (CODE.match(/console\.log\([^)]*mqttPassword[^)]*\)/g) ?? [])
+    const rawPwdLogs = ((CODE.match(/console\.log\([^)]*mqttPassword[^)]*\)/g) ?? []) as string[])
       .filter((l) => !l.includes("redacted"));
     expect(rawPwdLogs).toEqual([]);
   });

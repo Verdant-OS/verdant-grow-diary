@@ -62,13 +62,45 @@ const ALLOWED = new Set([
 
 const PATTERN = /switch[\s_-]?bot/i;
 
+function walk(dir: string, out: string[] = []): string[] {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return out;
+  }
+  for (const name of entries) {
+    const p = join(dir, name);
+    let s;
+    try {
+      s = statSync(p);
+    } catch {
+      continue;
+    }
+    if (s.isDirectory()) {
+      if (name === "node_modules" || name === ".git" || name === "dist") continue;
+      walk(p, out);
+    } else {
+      const dot = name.lastIndexOf(".");
+      const ext = dot >= 0 ? name.slice(dot) : "";
+      if (SCAN_EXTS.has(ext)) out.push(p);
+    }
+  }
+  return out;
+}
+
+// Memoise the repo walk across `it`s in this file. The scanner only
+// reads files — it never mutates them — so a per-worker cache is safe.
+let cachedScanFiles: string[] | null = null;
+function getScanFiles(): string[] {
+  if (cachedScanFiles) return cachedScanFiles;
+  cachedScanFiles = SCAN_DIRS.flatMap((d) => walk(join(ROOT, d)));
+  return cachedScanFiles;
+}
+
 describe("EcoWitt-only sensor direction", () => {
   it("contains zero SwitchBot references outside the explicit allow-list", () => {
-    const files = getCachedScannerFiles({
-      root: ROOT,
-      dirs: SCAN_DIRS,
-      exts: SCAN_EXTS,
-    });
+    const files = getScanFiles();
     const offenders: string[] = [];
     for (const f of files) {
       const rel = relative(ROOT, f).split(sep).join("/");

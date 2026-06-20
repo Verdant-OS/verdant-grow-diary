@@ -24,6 +24,8 @@ import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
+import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
+import PlantDetailHarvestEvidenceReportMount from "@/components/PlantDetailHarvestEvidenceReportMount";
 import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
 import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadiness";
 import PlantDetailDoctorContextPreview from "@/components/PlantDetailDoctorContextPreview";
@@ -33,9 +35,11 @@ import PlantDetailAiDoctorSafeReviewStart from "@/components/PlantDetailAiDoctor
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
 import PlantDetailAiDoctorLiveReview from "@/components/PlantDetailAiDoctorLiveReview";
 import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
+import PlantProfileContextCard from "@/components/PlantProfileContextCard";
+import { updatePlantProfileMetadata } from "@/lib/plantProfileMetadataUpdate";
 import PlantDetailTimelineEvidenceReadinessLaunch from "@/components/PlantDetailTimelineEvidenceReadinessLaunch";
 import PlantDetailAskDoctorHelper from "@/components/PlantDetailAskDoctorHelper";
-import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
+import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID, PLANT_PHOTOS_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
 import { PLANT_DETAIL_SECTION_ANCHORS } from "@/lib/plantDetailSectionAnchors";
 
@@ -54,20 +58,217 @@ import { format, formatDistanceToNow } from "date-fns";
 
 import PlantQuickLog from "@/components/PlantQuickLog";
 import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshnessCard";
-import { useState } from "react";
+import PlantSensorSourceBreakdownCard from "@/components/PlantSensorSourceBreakdownCard";
+import { useEffect, useState } from "react";
 import { Zap } from "lucide-react";
 
 import { logsPath, plantDetailPath, plantsPath, tentDetailPath } from "@/lib/routes";
+import {
+  PLANT_DETAIL_LOAD_TIMEOUT_MS,
+  classifyPlantDetailLoadState,
+} from "@/lib/plantDetailLoadTimeoutRules";
+import {
+  derivePlantDetailBlockedStateView,
+  type PlantDetailBlockedStateAction,
+  type PlantDetailBlockedStateView,
+} from "@/lib/plantDetailBlockedStateViewModel";
+import { useSearchParams } from "react-router-dom";
+
+function BlockedStateBackLink({
+  action,
+}: {
+  action: PlantDetailBlockedStateAction;
+}) {
+  return (
+    <Button asChild variant="ghost" className="min-h-11">
+      <Link to={action.path} data-testid={action.testId}>
+        <ArrowLeft className="h-4 w-4" /> {action.label}
+      </Link>
+    </Button>
+  );
+}
+
+function BlockedStateView({
+  view,
+  onRetry,
+}: {
+  view: PlantDetailBlockedStateView;
+  onRetry?: () => void;
+}) {
+  const isMissingLike =
+    view.kind === "not-found" || view.kind === "archived";
+  return (
+    <div
+      data-testid={view.testId}
+      role={view.kind === "loading-slow" ? "alert" : undefined}
+    >
+      <EmptyState
+        icon={
+          isMissingLike ? (
+            view.kind === "archived" ? (
+              <Archive className="h-6 w-6" />
+            ) : (
+              <Sprout className="h-6 w-6" />
+            )
+          ) : (
+            <AlertTriangle className="h-6 w-6" />
+          )
+        }
+        title={view.title}
+        description={view.description}
+        action={
+          <div className="flex flex-wrap gap-2">
+            {view.showRetry && onRetry && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onRetry}
+                data-testid={
+                  view.kind === "loading-slow"
+                    ? "plant-detail-loading-slow-retry"
+                    : "plant-detail-error-retry"
+                }
+                className="min-h-11"
+              >
+                Retry
+              </Button>
+            )}
+            {view.kind === "archived" && view.archivedTimelineAction && (
+              <Button asChild variant="outline" className="min-h-11">
+                <Link
+                  to={view.archivedTimelineAction.path}
+                  data-testid={view.archivedTimelineAction.testId}
+                >
+                  {view.archivedTimelineAction.label}
+                </Link>
+              </Button>
+            )}
+            <BlockedStateBackLink action={view.primaryBack} />
+            {view.secondaryBack && (
+              <BlockedStateBackLink action={view.secondaryBack} />
+            )}
+          </div>
+        }
+      />
+    </div>
+  );
+}
+
+function ArchivedTimelineReadOnlyView({
+  plant,
+  tentName,
+  backAction,
+}: {
+  plant: {
+    id: string;
+    name: string;
+    strain: string;
+    stage: string;
+    startedAt: string;
+    tentId: string | null;
+    growId: string | null;
+  };
+  tentName: string | null;
+  backAction: PlantDetailBlockedStateAction;
+}) {
+  return (
+    <div data-testid="plant-detail-archived-timeline-readonly">
+      <Button asChild variant="ghost" size="sm" className="mb-3">
+        <Link to={backAction.path} data-testid={backAction.testId}>
+          <ArrowLeft className="h-4 w-4" /> {backAction.label}
+        </Link>
+      </Button>
+      <div
+        role="status"
+        data-testid="plant-detail-archived-timeline-banner"
+        className="my-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100"
+      >
+        <div className="flex items-start gap-2">
+          <Archive className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-medium">Archived timeline — read-only</div>
+            <p className="text-xs text-amber-200/80 mt-0.5">
+              Showing preserved history for {plant.name}. No write actions are
+              available in this view.
+            </p>
+          </div>
+        </div>
+      </div>
+      <PageHeader
+        title={plant.name}
+        description={plant.strain}
+        icon={<Sprout className="h-5 w-5" />}
+        actions={<StageBadge stage={plant.stage} />}
+      />
+      <div className="grid lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 glass rounded-2xl p-5 space-y-3">
+          <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
+          <PlantRelativeTimelineSection
+            plantId={plant.id}
+            plantStartedAt={plant.startedAt}
+            currentStage={plant.stage}
+            plantName={plant.name}
+            tentName={tentName}
+            growId={plant.growId}
+            tentId={plant.tentId}
+          />
+          <ManualSnapshotTimelineSection scope="plant" plantId={plant.id} />
+          <QuickLogGroupedTimelineSection
+            scope="plant"
+            plantId={plant.id}
+            tentId={plant.tentId}
+          />
+          <TimelineMemorySection scope="plant" plantId={plant.id} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 export default function PlantDetail() {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const contextTentId = searchParams.get("tentId");
   const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
   const { data: tent } = useGrowTent(plant?.tentId);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null]);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null]);
 
-  if (isLoading) {
+  // Bounded-loading guard: if the plant query never settles (slow network,
+  // hung Supabase request, etc.) we must not leave the grower on a blank
+  // skeleton. After PLANT_DETAIL_LOAD_TIMEOUT_MS, promote the loading
+  // state to a retryable failure surface. Reset whenever the id changes
+  // or the query is no longer pending.
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadTimedOut(false);
+      return;
+    }
+    setLoadTimedOut(false);
+    const handle = setTimeout(
+      () => setLoadTimedOut(true),
+      PLANT_DETAIL_LOAD_TIMEOUT_MS,
+    );
+    return () => clearTimeout(handle);
+  }, [id, isLoading]);
+
+  const loadState = classifyPlantDetailLoadState({
+    isLoading,
+    isError,
+    hasPlant: !!plant,
+    loadTimedOut,
+  });
+
+  const blockedView = derivePlantDetailBlockedStateView({
+    loadState,
+    plant: plant ?? null,
+    contextTentId,
+  });
+
+  if (loadState === "loading") {
     return (
       <div
         role="status"
@@ -78,36 +279,24 @@ export default function PlantDetail() {
       />
     );
   }
-  if (isError) {
+
+  if (blockedView && blockedView.kind === "loading-slow") {
     return (
-      <div data-testid="plant-detail-error">
-        <EmptyState
-          icon={<AlertTriangle className="h-6 w-6" />}
-          title="Couldn't load this plant"
-          description="Something went wrong while loading plant details. Check your connection and retry."
-          action={
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => refetch()}
-                data-testid="plant-detail-error-retry"
-                className="min-h-11"
-              >
-                Retry
-              </Button>
-              <Button asChild variant="ghost" className="min-h-11">
-                <Link to={plantsPath()}>
-                  <ArrowLeft className="h-4 w-4" /> Back to plants
-                </Link>
-              </Button>
-            </div>
-          }
-        />
-      </div>
+      <BlockedStateView
+        view={blockedView}
+        onRetry={() => {
+          setLoadTimedOut(false);
+          void refetch();
+        }}
+      />
     );
   }
-  if (!plant) {
+
+  if (blockedView && blockedView.kind === "error") {
+    return <BlockedStateView view={blockedView} onRetry={() => refetch()} />;
+  }
+
+  if (blockedView && blockedView.kind === "not-found") {
     return (
       <div>
         <GrowDataSourceDisclosure
@@ -116,21 +305,45 @@ export default function PlantDetail() {
           metas={[plantMeta]}
           testId="plant-detail-data-source-disclosure"
         />
-        <EmptyState
-          icon={<Sprout className="h-6 w-6" />}
-          title="Plant not found"
-          description="This plant isn't in your tracked plants yet."
-          action={
-            <Button asChild variant="outline" className="min-h-11">
-              <Link to={plantsPath()}>
-                <ArrowLeft className="h-4 w-4" /> Back to plants
-              </Link>
-            </Button>
-          }
-        />
+        <BlockedStateView view={blockedView} />
       </div>
     );
   }
+
+  const archivedTimelineMode =
+    searchParams.get("mode") === "archived-timeline";
+
+  if (blockedView && blockedView.kind === "archived") {
+    if (archivedTimelineMode && plant) {
+      return (
+        <ArchivedTimelineReadOnlyView
+          plant={{
+            id: plant.id,
+            name: plant.name,
+            strain: plant.strain,
+            stage: plant.stage,
+            startedAt: plant.startedAt,
+            tentId: plant.tentId ?? null,
+            growId: plant.growId ?? null,
+          }}
+          tentName={tent?.name ?? null}
+          backAction={blockedView.primaryBack}
+        />
+      );
+    }
+    return (
+      <div>
+        <PlantDetailDataSourceDisclosure
+          metas={[plantMeta, tentMeta]}
+          testId="plant-detail-data-source-disclosure"
+        />
+        <BlockedStateView view={blockedView} />
+      </div>
+    );
+  }
+
+
+
 
   const ageDays = Math.floor((Date.now() - new Date(plant.startedAt).getTime()) / 86400000);
   return (
@@ -196,11 +409,18 @@ export default function PlantDetail() {
         hasDoctorSection
         hasAssignedTent={!!plant.tentId}
       />
-      <PlantDetailPhotoStrip
-        plantId={plant.id}
-        growId={plant.growId ?? null}
-        onUploadPhoto={() => setQuickLogOpen(true)}
-      />
+      <div
+        id={PLANT_PHOTOS_ANCHOR_ID}
+        tabIndex={-1}
+        aria-label="Plant photos section"
+        className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+      >
+        <PlantDetailPhotoStrip
+          plantId={plant.id}
+          growId={plant.growId ?? null}
+          onUploadPhoto={() => setQuickLogOpen(true)}
+        />
+      </div>
 
       <PlantDetailWhatsMissing
         plantId={plant.id}
@@ -212,12 +432,28 @@ export default function PlantDetail() {
         plantId={plant.id}
         onAddQuickCheck={() => setQuickLogOpen(true)}
       />
+      <PlantDetailHarvestWatchCard
+        plantId={plant.id}
+        hasPlantPhoto={!!plant.photo}
+      />
+      <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
       <PlantDetailAiDoctorReadiness
         plantId={plant.id}
         growId={plant.growId ?? null}
         stage={plant.stage ?? null}
         hasPlantPhoto={!!plant.photo}
       />
+      <PlantProfileContextCard
+        stage={plant.stage ?? null}
+        strain={plant.strain ?? null}
+        medium={plant.medium ?? null}
+        potSize={plant.potSize ?? null}
+        onSave={async ({ medium, potSize }) => {
+          await updatePlantProfileMetadata(plant.id, { medium, potSize });
+          await refetch();
+        }}
+      />
+
       <PlantDetailAiDoctorContextReadinessMount
         plantId={plant.id}
         growId={plant.growId ?? null}
@@ -225,6 +461,8 @@ export default function PlantDetail() {
         plantName={plant.name}
         strain={plant.strain}
         stage={plant.stage ?? null}
+        medium={plant.medium ?? null}
+        potSize={plant.potSize ?? null}
       />
       <PlantDetailTimelineEvidenceReadinessLaunch
         plantId={plant.id}
@@ -289,6 +527,7 @@ export default function PlantDetail() {
             growId: plant.growId ?? null,
             lastNote: plant.lastNote,
             isArchived: plant.isArchived ?? false,
+            photo: plant.photo ?? null,
           }}
           variant="row"
           hideView
@@ -414,6 +653,10 @@ export default function PlantDetail() {
           <PlantManualSensorFreshnessCard
             plantId={plant.id}
             onUpdate={() => setQuickLogOpen(true)}
+          />
+          <PlantSensorSourceBreakdownCard
+            plantId={plant.id}
+            className="mt-1"
           />
           <PlantTentEnvironmentPanel
             tentId={plant.tentId ?? null}

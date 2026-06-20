@@ -64,12 +64,22 @@ export interface BuildXlsxAuditInputArgs {
   adapterResult: VerdantGeneticsXlsxInsertRowsResult;
   tentIdBySensorGroup: Record<string, string>;
   tentOptions: ReadonlyArray<TentOption>;
+  /** Optional duplicate-aware counts from the batch insert orchestrator. */
+  insertedRowCount?: number;
+  duplicateRowCount?: number;
 }
 
 export function buildVerdantGeneticsXlsxAuditInput(
   args: BuildXlsxAuditInputArgs,
 ): RecordSensorHistoryImportAuditInput | null {
-  const { previewVm, adapterResult, tentIdBySensorGroup, tentOptions } = args;
+  const {
+    previewVm,
+    adapterResult,
+    tentIdBySensorGroup,
+    tentOptions,
+    insertedRowCount,
+    duplicateRowCount,
+  } = args;
   if (adapterResult.blocked) return null;
   if (adapterResult.acceptedRowCount <= 0) return null;
   const mappedSensorGroups = previewVm.detectedGroups.filter(
@@ -83,6 +93,8 @@ export function buildVerdantGeneticsXlsxAuditInput(
     fileType: "xlsx",
     acceptedRowCount: adapterResult.acceptedRowCount,
     rejectedRowCount: adapterResult.rejectedRowCount,
+    ...(typeof insertedRowCount === "number" ? { insertedRowCount } : {}),
+    ...(typeof duplicateRowCount === "number" ? { duplicateRowCount } : {}),
     dateRange: previewVm.dateRange ?? null,
     mappedTentLabels: uniqueTentLabels(mappedTentIds, tentOptions),
     mappedSensorGroups,
@@ -97,12 +109,21 @@ export interface BuildRegistryCsvAuditInputArgs {
   adapterResult: RegistryAdapterResult;
   tentId: string;
   tentOptions: ReadonlyArray<TentOption>;
+  insertedRowCount?: number;
+  duplicateRowCount?: number;
 }
 
 export function buildRegistryCsvAuditInput(
   args: BuildRegistryCsvAuditInputArgs,
 ): RecordSensorHistoryImportAuditInput | null {
-  const { sourceAppId, adapterResult, tentId, tentOptions } = args;
+  const {
+    sourceAppId,
+    adapterResult,
+    tentId,
+    tentOptions,
+    insertedRowCount,
+    duplicateRowCount,
+  } = args;
   if (adapterResult.blocked) return null;
   if (adapterResult.acceptedRowCount <= 0) return null;
   const range = dateRangeFromRows(
@@ -115,6 +136,8 @@ export function buildRegistryCsvAuditInput(
     fileType: "csv",
     acceptedRowCount: adapterResult.acceptedRowCount,
     rejectedRowCount: adapterResult.rejectedRowCount,
+    ...(typeof insertedRowCount === "number" ? { insertedRowCount } : {}),
+    ...(typeof duplicateRowCount === "number" ? { duplicateRowCount } : {}),
     dateRange: range,
     mappedTentLabels: uniqueTentLabels([tentId], tentOptions),
     mappedSensorGroups: [],

@@ -109,6 +109,21 @@ export function SensorHistoryImportAuditLedger(
                   Rejected: {evt.rejectedRowCount}
                 </span>
               </div>
+              <div className="mt-1" data-testid="ledger-insert-summary">
+                <span data-testid="ledger-inserted-count">
+                  Inserted:{" "}
+                  {typeof evt.insertedRowCount === "number"
+                    ? evt.insertedRowCount
+                    : "—"}
+                </span>
+                <span className="mx-1 text-muted-foreground">·</span>
+                <span data-testid="ledger-duplicate-count">
+                  Skipped duplicates:{" "}
+                  {typeof evt.duplicateRowCount === "number"
+                    ? evt.duplicateRowCount
+                    : "—"}
+                </span>
+              </div>
               {evt.dateRange ? (
                 <div
                   data-testid="ledger-date-range"

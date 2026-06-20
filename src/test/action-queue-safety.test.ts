@@ -224,12 +224,24 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     // display-name constants (e.g. pi_bridge: "Pi Bridge", mqtt: "MQTT"). The
     // literal "mqtt" inside that map is a label key, not a device-control call.
     const PROVIDER_LABELS_PATH = resolve(ROOT, "src/constants/sensorProviderLabels.ts");
+    // Also allow-list (EXACT FILE PATH ONLY — never a directory wildcard):
+    // src/constants/sensorIngestProvenance.ts holds read-only sensor provenance
+    // constants (e.g. `raspberry_pi_bridge`). It is:
+    //   - read-only sensor provenance constants
+    //   - NOT a device-control surface
+    //   - NOT an Action Queue execution path
+    //   - NOT a sensor ingest behavior surface
+    // The allow-list MUST stay file-specific. Broad patterns like
+    // `src/constants/*` are explicitly forbidden — see the "pi_bridge
+    // scanner allow-list hardening" suite at the bottom of this file.
+    const SENSOR_INGEST_PROVENANCE_PATH = resolve(ROOT, "src/constants/sensorIngestProvenance.ts");
     const piContexts = [...ALL_PROD_CODE.matchAll(/pi[_-]bridge/gi)];
     for (const m of piContexts) {
       const ctx = ALL_PROD_CODE.slice(Math.max(0, m.index! - 60), m.index! + 60);
-      // Scoped skip: if the match is inside the read-only constants file,
-      // the surrounding "mqtt" is a map key string, not a control surface.
-      if (fileAtIndex(m.index!) === PROVIDER_LABELS_PATH) continue;
+      // Scoped skip: if the match is inside a read-only constants file,
+      // the surrounding text is a map key / constant string, not a control surface.
+      const path = fileAtIndex(m.index!);
+      if (path === PROVIDER_LABELS_PATH || path === SENSOR_INGEST_PROVENANCE_PATH) continue;
       expect(ctx, `pi_bridge reference must not be a control call: ${ctx}`).not.toMatch(
         /fetch|http|mqtt|publish|post|send|trigger/i,
       );
@@ -584,4 +596,98 @@ describe("Action Queue safety — same-grow lineage (plants/tents must share gro
       expect(combined).not.toMatch(/mqtt|home[\s_-]?assistant|webhook|pi[\s_-]?bridge\.(local|lan|home|io|net|com)/i);
     },
   );
+});
+
+/**
+ * pi_bridge scanner allow-list hardening.
+ *
+ * These tests guard the narrow allow-list used by the pi_bridge / raspberry_pi_bridge
+ * context scan above. The allow-list MUST stay file-specific (exact file paths only).
+ * It must NEVER expand into a directory-level wildcard such as `src/constants/*`,
+ * because that would silently allow any future constants file to bypass the
+ * Action Queue / device-control safety scanner.
+ *
+ * This is test-hardening only. No production behavior, schema, RLS, Edge Functions,
+ * auth, AI, Action Queue writes, sensor ingest, automation, or device control are
+ * affected.
+ */
+describe("pi_bridge scanner allow-list hardening", () => {
+  const THIS_TEST_SRC = readFileSync(
+    resolve(ROOT, "src/test/action-queue-safety.test.ts"),
+    "utf8",
+  );
+  // Isolate just the pi_bridge scanner region so unrelated text in this file
+  // (e.g. these very assertions) can't accidentally satisfy or violate checks.
+  const PI_REGION_START = THIS_TEST_SRC.indexOf("pi_bridge appears ONLY");
+  const PI_REGION_END = THIS_TEST_SRC.indexOf(
+    "10. no simulation/auto-execute path",
+  );
+  const PI_REGION =
+    PI_REGION_START >= 0 && PI_REGION_END > PI_REGION_START
+      ? THIS_TEST_SRC.slice(PI_REGION_START, PI_REGION_END)
+      : "";
+
+  it("keeps pi_bridge allow-list file-specific", () => {
+    expect(PI_REGION.length).toBeGreaterThan(0);
+    // Both allow-listed files must appear as exact resolve(ROOT, "...ts") paths.
+    expect(PI_REGION).toMatch(
+      /resolve\(ROOT,\s*["']src\/constants\/sensorIngestProvenance\.ts["']\)/,
+    );
+    expect(PI_REGION).toMatch(
+      /resolve\(ROOT,\s*["']src\/constants\/sensorProviderLabels\.ts["']\)/,
+    );
+    // The skip MUST be an exact equality check (`path === ...`), never a
+    // startsWith / includes / glob match against a directory prefix.
+    expect(PI_REGION).toMatch(/path === PROVIDER_LABELS_PATH/);
+    expect(PI_REGION).toMatch(/path === SENSOR_INGEST_PROVENANCE_PATH/);
+    expect(PI_REGION).not.toMatch(/\.startsWith\(/);
+    expect(PI_REGION).not.toMatch(/\.includes\(/);
+    expect(PI_REGION).not.toMatch(/minimatch|micromatch|globby|fast-glob/i);
+  });
+
+  it("rejects directory-level constants allow-list patterns", () => {
+    const FORBIDDEN_PATTERNS: RegExp[] = [
+      /["']src\/constants\/\*/,
+      /["']src\/constants\/["']/,
+      /["']src\/constants["']/,
+      /["']constants\/\*/,
+      /["']\*\*\/constants\//,
+      /["']src\/constants\/\*\*/,
+    ];
+    for (const re of FORBIDDEN_PATTERNS) {
+      expect(
+        PI_REGION,
+        `pi_bridge allow-list must not include broad pattern: ${re}`,
+      ).not.toMatch(re);
+    }
+  });
+
+  it("allows raspberry_pi_bridge only from read-only provenance constants", () => {
+    // The constants file referenced by the allow-list must actually exist
+    // and must contain the raspberry_pi_bridge token (i.e. the allow-list
+    // is justified by a real read-only provenance constant, not a stale path).
+    const provenanceSrc = readFileSync(
+      resolve(ROOT, "src/constants/sensorIngestProvenance.ts"),
+      "utf8",
+    );
+    expect(provenanceSrc).toMatch(/raspberry_pi_bridge/);
+    // And the file must not itself contain device-control surfaces.
+    expect(provenanceSrc).not.toMatch(
+      /fetch\(|mqtt:\/\/|mqtt\.connect|\.publish\(|\.post\(|\.trigger\(|http:\/\/|https:\/\//i,
+    );
+  });
+
+  it("keeps sensorProviderLabels.ts allowed only as an exact file path", () => {
+    const matches = [
+      ...PI_REGION.matchAll(/sensorProviderLabels\.ts/g),
+    ];
+    expect(matches.length).toBeGreaterThan(0);
+    // Every occurrence must be inside a resolve(ROOT, "src/constants/sensorProviderLabels.ts") call.
+    const exactRefCount = (
+      PI_REGION.match(
+        /resolve\(ROOT,\s*["']src\/constants\/sensorProviderLabels\.ts["']\)/g,
+      ) ?? []
+    ).length;
+    expect(exactRefCount).toBeGreaterThanOrEqual(1);
+  });
 });

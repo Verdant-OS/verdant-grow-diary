@@ -46,7 +46,25 @@ describe("buildTimelineSensorSnapshotViewModel", () => {
     if (b.kind !== "chips") return;
     expect(b.chips.find((c) => c.metric === "soil_moisture")?.display).toBe("42%");
     expect(b.chips.find((c) => c.metric === "co2")?.display).toBe("851 ppm");
-    expect(b.chips.find((c) => c.metric === "temp_c")?.display).toBe("24°C");
+    expect(b.chips.find((c) => c.metric === "temp_f")?.display).toBe("75.2°F");
+  });
+
+  it("does not double-convert explicit Fahrenheit values", () => {
+    const vm = buildTimelineSensorSnapshotViewModel({ temp_f: 75.2, temp_c: 24 });
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    const temp = vm.chips.find((c) => c.label === "Temp");
+    expect(temp?.metric).toBe("temp_f");
+    expect(temp?.display).toBe("75.2°F");
+  });
+
+  it("can preserve explicit Celsius when the caller requests Celsius", () => {
+    const vm = buildTimelineSensorSnapshotViewModel({ temp_c: 24 }, { preferUnit: "C" });
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    const temp = vm.chips.find((c) => c.label === "Temp");
+    expect(temp?.metric).toBe("temp_c");
+    expect(temp?.display).toBe("24°C");
   });
 
   it("omits non-finite sensor values", () => {

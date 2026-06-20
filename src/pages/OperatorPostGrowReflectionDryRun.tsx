@@ -1,9 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PostGrowReflectionPreviewCard } from "@/components/PostGrowReflectionPreviewCard";
 import { buildPostGrowReflectionOperatorDiagnosticsViewModel } from "@/lib/ai/postGrowReflectionOperatorDiagnosticsViewModel";
+import { buildPostGrowReflectionPreviewViewModel } from "@/lib/ai/postGrowReflectionPreviewViewModel";
 
 export default function OperatorPostGrowReflectionDryRun() {
   const viewModel = buildPostGrowReflectionOperatorDiagnosticsViewModel();
+  const previewViewModel = buildPostGrowReflectionPreviewViewModel();
 
   return (
     <div className="container mx-auto max-w-6xl p-6 space-y-6">

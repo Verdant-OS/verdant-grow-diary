@@ -54,7 +54,10 @@ const DISALLOWED_METADATA_KEYS = new Set([
   "token",
 ]);
 
-function rejected(issueCodes: string[], failureReason: string): PostGrowReflectionProviderCandidateEnvelopeRejected {
+function rejected(
+  issueCodes: string[],
+  failureReason: string,
+): PostGrowReflectionProviderCandidateEnvelopeRejected {
   return {
     ok: false,
     status: "rejected",
@@ -70,7 +73,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function parseEnvelope(input: unknown): { ok: true; value: unknown } | { ok: false; issue: string } {
+function parseEnvelope(
+  input: unknown,
+): { ok: true; value: unknown } | { ok: false; issue: string } {
   if (typeof input !== "string") return { ok: true, value: input };
   const trimmed = input.trim();
   if (trimmed.length === 0) return { ok: false, issue: "empty_envelope" };
@@ -107,7 +112,10 @@ export function normalizePostGrowReflectionProviderCandidateEnvelope(
   input: unknown,
 ): PostGrowReflectionProviderCandidateEnvelopeResult {
   const parsedEnvelope = parseEnvelope(input);
-  if (!parsedEnvelope.ok) return rejected([parsedEnvelope.issue], parsedEnvelope.issue);
+  if (!parsedEnvelope.ok) {
+    const p = parsedEnvelope as { issue: string };
+    return rejected([p.issue], p.issue);
+  }
 
   if (!isPlainObject(parsedEnvelope.value)) {
     return rejected(["invalid_envelope"], "Candidate envelope must be an object.");
@@ -134,10 +142,17 @@ export function normalizePostGrowReflectionProviderCandidateEnvelope(
     return rejected(["unsafe_metadata_key"], "Candidate metadata contains a blocked private key.");
   }
 
-  const sourceLabel = normalizeText(metadataValue(envelope.metadata, "sourceLabel"), MAX_LABEL_LENGTH) ??
+  const sourceLabel =
+    normalizeText(metadataValue(envelope.metadata, "sourceLabel"), MAX_LABEL_LENGTH) ??
     "external candidate";
-  const requestLabel = normalizeText(metadataValue(envelope.metadata, "requestLabel"), MAX_REQUEST_LABEL_LENGTH);
-  const createdAt = normalizeText(metadataValue(envelope.metadata, "createdAt"), MAX_REQUEST_LABEL_LENGTH);
+  const requestLabel = normalizeText(
+    metadataValue(envelope.metadata, "requestLabel"),
+    MAX_REQUEST_LABEL_LENGTH,
+  );
+  const createdAt = normalizeText(
+    metadataValue(envelope.metadata, "createdAt"),
+    MAX_REQUEST_LABEL_LENGTH,
+  );
 
   return {
     ok: true,

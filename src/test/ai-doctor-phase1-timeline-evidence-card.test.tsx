@@ -19,6 +19,7 @@ function makeVm(): AiDoctorPhase1TimelineEvidenceViewModel {
     occurred_at: "2026-06-19T12:00:00.000Z",
     details: {
       kind: AI_DOCTOR_PHASE1_TIMELINE_KIND,
+      internal_raw_details_payload: "do-not-render-this-secret",
       result: {
         summary: "Leaves yellowing on lower nodes.",
         likely_issue: "Possible early N deficiency",
@@ -53,10 +54,22 @@ describe("AiDoctorPhase1TimelineEvidenceCard", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders read-only saved metadata without raw details payload", () => {
+    const { container } = renderCard();
+    expect(
+      screen.getByTestId("ai-doctor-phase1-timeline-evidence-card-metadata"),
+    ).toHaveTextContent("Saved date:");
+    expect(
+      screen.getByTestId("ai-doctor-phase1-timeline-evidence-card-metadata"),
+    ).toHaveTextContent("Jun 19, 2026");
+    expect(container.textContent).not.toContain("internal_raw_details_payload");
+    expect(container.textContent).not.toContain("do-not-render-this-secret");
+  });
+
   it("renders confidence, risk, likely issue, and counts", () => {
     renderCard();
     expect(screen.getByText("Possible early N deficiency")).toBeInTheDocument();
-    expect(screen.getAllByText("low").length).toBeGreaterThanOrEqual(1); // confidence + risk
+    expect(screen.getAllByText("low").length).toBeGreaterThanOrEqual(1);
     expect(
       screen.getByTestId("ai-doctor-phase1-timeline-evidence-card-evidence-count"),
     ).toHaveTextContent("Evidence items: 2");
@@ -74,6 +87,7 @@ describe("AiDoctorPhase1TimelineEvidenceCard", () => {
     expect(link.getAttribute("href")).toContain("plantId=plant-1");
     expect(link.getAttribute("href")).toContain("growId=grow-1");
     expect(link.getAttribute("href")).toContain("tentId=tent-1");
+    expect(link).toHaveTextContent("Review AI Doctor Phase 1 results");
   });
 
   it("renders safely for a minimal/degraded view-model", () => {
@@ -89,7 +103,6 @@ describe("AiDoctorPhase1TimelineEvidenceCard", () => {
   it("does not render approve/send/execute/Action Queue/device-control copy", () => {
     const { container } = renderCard();
     const txt = container.textContent?.toLowerCase() ?? "";
-    // Disclaimer says "not an approved action" — forbid actionable copy only.
     expect(txt).not.toContain("approve action");
     expect(txt).not.toContain("execute");
     expect(txt).not.toContain("send to action");
@@ -99,7 +112,6 @@ describe("AiDoctorPhase1TimelineEvidenceCard", () => {
     expect(txt).not.toContain("save to timeline");
     expect(container.querySelector("button")).toBeNull();
   });
-
 
   it("(static) card source contains no mutation handlers or write APIs", () => {
     const src = readFileSync(

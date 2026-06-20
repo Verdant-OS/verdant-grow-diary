@@ -28,6 +28,7 @@ import Grows from "./pages/Grows";
 import GrowDetail from "./pages/GrowDetail";
 import PhenoHuntNew from "./pages/PhenoHuntNew";
 import Reports from "./pages/Reports";
+import PostGrowLearningReport from "./pages/PostGrowLearningReport";
 
 import Coach from "./pages/Coach";
 import AiDoctorSessionDetail from "./pages/AiDoctorSessionDetail";
@@ -61,6 +62,7 @@ import EcowittLiveBringup from "./pages/EcowittLiveBringup";
 import EnvironmentSummaryReportPage from "./pages/EnvironmentSummaryReportPage";
 import OperatorOneTentLoopSmokeTest from "./pages/OperatorOneTentLoopSmokeTest";
 import OperatorGgsRealPayloadIngest from "./pages/OperatorGgsRealPayloadIngest";
+import OperatorPostGrowReflectionDryRun from "./pages/OperatorPostGrowReflectionDryRun";
 import CustomerModeGuide from "./pages/CustomerModeGuide";
 import { OperatorAiDoctorPhase1Page } from "./pages/OperatorAiDoctorPhase1";
 
@@ -139,6 +141,7 @@ const App = () => (
                 <Route path="/grows/:growId" element={<GrowDetail />} />
                 <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
                 <Route path="/reports" element={<Reports />} />
+                <Route path="/reports/post-grow/:growId" element={<PostGrowLearningReport />} />
                 <Route
                   path="/diary/environment-summary"
                   element={<EnvironmentSummaryReportPage />}
@@ -163,6 +166,10 @@ const App = () => (
                 <Route
                   path="/operator/one-tent-loop-smoke-test"
                   element={<OperatorOneTentLoopSmokeTest />}
+                />
+                <Route
+                  path="/operator/post-grow-reflection-dry-run"
+                  element={<OperatorPostGrowReflectionDryRun />}
                 />
                 <Route
                   path="/operator/ggs-real-payload-ingest"

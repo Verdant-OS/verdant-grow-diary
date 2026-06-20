@@ -1,10 +1,10 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Box, NotebookText, ListChecks, Bell, MoreHorizontal, Sprout, Activity, Stethoscope, Settings, ClipboardCheck } from "lucide-react";
+import { LayoutDashboard, Box, NotebookText, ListChecks, Bell, MoreHorizontal, Sprout, Activity, Stethoscope, Settings, ClipboardCheck, ClipboardList } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
-const primary = [
+export const primary = [
   { to: "/", label: "Home", icon: LayoutDashboard, end: true },
   { to: "/tents", label: "Tents", icon: Box },
   { to: "/plants", label: "Plants", icon: Sprout },
@@ -12,9 +12,10 @@ const primary = [
   { to: "/alerts", label: "Alerts", icon: Bell },
 ];
 
-const more = [
+export const more = [
   { to: "/daily-check", label: "Daily Grow Check", icon: ClipboardCheck },
   { to: "/tasks", label: "Tasks", icon: ListChecks },
+  { to: "/actions", label: "Actions", icon: ListChecks },
   { to: "/sensors", label: "Sensor Data", icon: Activity },
   { to: "/doctor", label: "AI Grow Doctor", icon: Stethoscope },
   { to: "/grows", label: "Harvest Archive", icon: Sprout },

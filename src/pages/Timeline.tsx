@@ -19,6 +19,7 @@ import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import EnvironmentCheckTimelineBadge from "@/components/EnvironmentCheckTimelineBadge";
+import EnvironmentCheckSnapshotLinkButton from "@/components/EnvironmentCheckSnapshotLinkButton";
 import AiDoctorCheckInTimelineBadge from "@/components/AiDoctorCheckInTimelineBadge";
 import {
   buildEnvironmentCheckDiaryViewModel,
@@ -53,6 +54,7 @@ import {
   mapGrowEventsToRecentRawEntries,
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
+import { mergeTimelineSources } from "@/lib/timelineMergeRules";
 import {
   deriveTimelineEventTypeOptions,
   deriveTimelinePlantOptions,
@@ -69,6 +71,11 @@ import {
   buildTimelinePhotoAltText,
 } from "@/lib/timelinePhotoLightboxRules";
 import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
+import {
+  PHOTO_NON_DIAGNOSTIC_LABEL,
+  PHOTO_NON_DIAGNOSTIC_TESTID,
+  shouldShowPhotoNonDiagnosticLabel,
+} from "@/lib/photoEventNonDiagnosticLabelRules";
 import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
 import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
@@ -345,14 +352,59 @@ export default function Timeline() {
     if (lightboxPhotoId !== null && lightboxIndex < 0) setLightboxPhotoId(null);
   }, [lightboxPhotoId, lightboxIndex]);
 
-  // Merge `grow_events` (Quick Log v2 manual saves) into the raw entries
-  // passed to the Recent Quick Logs panel so just-saved entries surface at
-  // the top. `buildRecentQuickLogActivity` sorts newest-first by entry_at,
-  // so the merged stream is correctly ordered without extra logic.
-  const recentLaneRawEntries = useMemo(
-    () => [...entries, ...mapGrowEventsToRecentRawEntries(growEvents)],
-    [entries, growEvents],
-  );
+  // Merge `grow_events` (Quick Log v2 manual saves) and `diary_entries`
+  // through the tested `mergeTimelineSources` helper so the Recent Quick
+  // Logs panel receives a deterministic, deduplicated, newest-first
+  // stream. The helper enforces:
+  //   - exact-duplicate dedup by (source_table, source_id)
+  //   - logical dedup when a diary row mirrors a grow_event via
+  //     `details.grow_event_id`
+  //   - stable tie-breakers (grow_events first on equal timestamps,
+  //     then source_id lexical)
+  // We then re-hydrate each merged entry back into its original loose
+  // shape so the existing RecentQuickLogActivityPanel normalizer
+  // continues to see the same fields it always has.
+  const recentLaneRawEntries = useMemo(() => {
+    const diaryInputs = entries.map((e) => {
+      const details = (e.details ?? null) as Record<string, unknown> | null;
+      const grow_event_id =
+        details && typeof details["grow_event_id"] === "string"
+          ? (details["grow_event_id"] as string)
+          : null;
+      return {
+        id: e.id,
+        entry_at: e.entry_at,
+        plant_id: e.plant_id,
+        tent_id: e.tent_id,
+        stage: e.stage,
+        note: e.note,
+        photo_url: e.photo_url,
+        details,
+        grow_event_id,
+      };
+    });
+    const merged = mergeTimelineSources({
+      diaryEntries: diaryInputs,
+      growEvents,
+    });
+    const diaryById = new Map(entries.map((e) => [e.id, e] as const));
+    const growMappedById = new Map(
+      mapGrowEventsToRecentRawEntries(growEvents).map(
+        (r) => [r.id, r] as const,
+      ),
+    );
+    const out: Array<Entry | ReturnType<typeof mapGrowEventsToRecentRawEntries>[number]> = [];
+    for (const m of merged) {
+      if (m.source_table === "diary_entries") {
+        const e = diaryById.get(m.source_id);
+        if (e) out.push(e);
+      } else {
+        const g = growMappedById.get(m.source_id);
+        if (g) out.push(g);
+      }
+    }
+    return out;
+  }, [entries, growEvents]);
 
 
   // Pure normalized timeline view-model. Drives per-entry tags/warnings and a
@@ -710,21 +762,35 @@ export default function Timeline() {
                           const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
                           const item = idx >= 0 ? lightboxItems[idx] : null;
                           const alt = buildTimelinePhotoAltText(item);
+                          const showNonDiagnostic = shouldShowPhotoNonDiagnosticLabel({
+                            hasPhoto: true,
+                            details: e.details,
+                          });
                           return (
-                            <button
-                              type="button"
-                              onClick={() => { if (idx >= 0) setLightboxPhotoId(e.id); }}
-                              aria-label={`Open photo: ${alt}`}
-                              data-testid="timeline-photo-open"
-                              className="block w-full focus:outline-none focus:ring-2 focus:ring-primary/60"
-                            >
-                              <img
-                                src={e.photo_url}
-                                className="w-full aspect-[4/3] object-cover"
-                                alt={alt}
-                                loading="lazy"
-                              />
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => { if (idx >= 0) setLightboxPhotoId(e.id); }}
+                                aria-label={`Open photo: ${alt}`}
+                                data-testid="timeline-photo-open"
+                                className="block w-full focus:outline-none focus:ring-2 focus:ring-primary/60"
+                              >
+                                <img
+                                  src={e.photo_url}
+                                  className="w-full aspect-[4/3] object-cover"
+                                  alt={alt}
+                                  loading="lazy"
+                                />
+                              </button>
+                              {showNonDiagnostic && (
+                                <div
+                                  data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
+                                  className="px-3 py-1.5 text-[11px] text-muted-foreground bg-secondary/30 border-t border-border/30"
+                                >
+                                  {PHOTO_NON_DIAGNOSTIC_LABEL}
+                                </div>
+                              )}
+                            </>
                           );
                         })()
                       ) : (
@@ -871,7 +937,29 @@ export default function Timeline() {
                                     vpdKpa: num("vpd_kpa") ?? num("vpdKpa"),
                                   },
                                 });
-                                return <EnvironmentCheckTimelineBadge viewModel={vm} />;
+                                return (
+                                  <>
+                                    <EnvironmentCheckTimelineBadge viewModel={vm} />
+                                    <EnvironmentCheckSnapshotLinkButton
+                                      entry={{
+                                        id: e.id,
+                                        tentId: e.tent_id ?? null,
+                                        plantId: e.plant_id ?? null,
+                                        capturedAt: String(
+                                          (e as { occurred_at?: string; created_at?: string }).occurred_at ??
+                                            (e as { created_at?: string }).created_at ??
+                                            "",
+                                        ),
+                                        sensorSnapshotId:
+                                          typeof (details as { sensor_snapshot_id?: unknown }).sensor_snapshot_id === "string"
+                                            ? ((details as { sensor_snapshot_id?: string }).sensor_snapshot_id ?? null)
+                                            : null,
+                                        source: typeof src === "string" ? src : null,
+                                      }}
+                                      snapshots={[]}
+                                    />
+                                  </>
+                                );
                               })()}
                             </>
                           );

@@ -21,8 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Pencil } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import { toast } from "sonner";
+import PlantPhoto from "@/components/PlantPhoto";
+import { normalizePlantProfilePhotoInput } from "@/lib/plantProfilePhotoRules";
 
 /**
  * Edits an existing plant's user-facing fields (name, strain, stage,
@@ -58,6 +60,8 @@ interface Plant {
   tentId?: string | null;
   growId?: string | null;
   lastNote?: string | null;
+  /** Plant profile photo URL (maps to plants.photo_url). */
+  photo?: string | null;
 }
 
 interface Props {
@@ -84,6 +88,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     tent_id: plant.tentId ?? "none",
     started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
     last_note: plant.lastNote ?? "",
+    photo_url: plant.photo ?? "",
   });
 
   useEffect(() => {
@@ -96,6 +101,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
         tent_id: plant.tentId ?? "none",
         started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
         last_note: plant.lastNote ?? "",
+        photo_url: plant.photo ?? "",
       });
     }
   }, [open, plant]);
@@ -107,6 +113,19 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       return;
     }
     setBusy(true);
+    const photoNorm = normalizePlantProfilePhotoInput(form.photo_url);
+    if (photoNorm.ok === false) {
+      setBusy(false);
+      const reason = photoNorm.reason;
+      toast.error(
+        reason === "unsupported-protocol"
+          ? "Photo URL must start with http:// or https://"
+          : reason === "too-long"
+            ? "Photo URL is too long"
+            : "Photo URL is not valid",
+      );
+      return;
+    }
     const payload: Record<string, unknown> = {
       name: form.name.trim(),
       strain: form.strain.trim(),
@@ -114,6 +133,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       health: form.health,
       tent_id: form.tent_id === "none" ? null : form.tent_id,
       last_note: form.last_note.trim() || null,
+      photo_url: photoNorm.photo_url,
     };
     if (form.started_at) {
       payload.started_at = new Date(form.started_at).toISOString();
@@ -158,6 +178,52 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
           <DialogTitle className="font-display">Edit plant</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-3">
+          <div>
+            <Label>Profile photo</Label>
+            <div className="flex items-start gap-3">
+              <div className="h-16 w-16 rounded-lg overflow-hidden border border-border/60 flex-shrink-0">
+                <PlantPhoto
+                  src={form.photo_url}
+                  alt={form.name || plant.name}
+                  className="h-full w-full"
+                  iconClassName="h-4 w-4"
+                  caption=""
+                  ctaLabel={null}
+                  testId="edit-plant-photo-preview"
+                />
+              </div>
+              <div className="flex-1 grid gap-2">
+                <Input
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://… (paste an image URL)"
+                  value={form.photo_url}
+                  onChange={(e) =>
+                    setForm({ ...form, photo_url: e.target.value })
+                  }
+                  data-testid="edit-plant-photo-url"
+                  aria-label="Plant profile photo URL"
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 gap-1"
+                    onClick={() => setForm({ ...form, photo_url: "" })}
+                    disabled={!form.photo_url}
+                    data-testid="edit-plant-photo-clear"
+                  >
+                    <X className="h-3.5 w-3.5" /> Clear photo
+                  </Button>
+                  <span className="text-[11px] text-muted-foreground">
+                    Stored as the plant's profile photo. Existing uploaded
+                    photos are not deleted.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
           <div>
             <Label>Name</Label>
             <Input

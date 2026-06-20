@@ -50,8 +50,6 @@ export function PostGrowReflectionPreviewCard({ viewModel }: Props) {
                 Scenario: <code>{viewModel.scenarioId}</code>
               </span>
               <span>·</span>
-              <span>{viewModel.scenarioLabel}</span>
-              <span>·</span>
               <span>
                 Grow: <code>{viewModel.growId}</code>
               </span>

@@ -65,6 +65,7 @@ const SAFE_DETAIL_KEYS: ReadonlySet<string> = new Set([
   "watering_ml",
   "feeding_ec",
   "feeding_ph",
+  "maturity_evidence",
 ]);
 
 const TIMELINE_DETAIL_STALE_MS = 30 * 60 * 1000;
@@ -96,13 +97,28 @@ export interface TimelineEvidencePhotoSummary {
   altText: string;
 }
 
+export interface TimelineMaturityEvidenceNote {
+  label: string;
+  value: string;
+}
+
+export interface TimelineMaturityEvidenceSummary {
+  observedAt: string | null;
+  advisoryOnly: boolean;
+  clearPct: number | null;
+  cloudyPct: number | null;
+  amberPct: number | null;
+  notes: TimelineMaturityEvidenceNote[];
+}
+
 export type TimelineEvidenceBadge =
   | "photo"
   | "sensor"
   | "note"
   | "watering"
   | "feeding"
-  | "stale_sensor";
+  | "stale_sensor"
+  | "maturity_evidence";
 
 export type TimelineEvidenceContext =
   | "strong"
@@ -132,6 +148,7 @@ export interface TimelineEvidenceDetailViewModel {
   sourceLabels: string[];
   watering: { volumeMl: number | null } | null;
   feeding: { ec: number | null; ph: number | null } | null;
+  maturityEvidence: TimelineMaturityEvidenceSummary | null;
   remindAt: string | null;
   badges: TimelineEvidenceBadge[];
   contextHint: TimelineEvidenceContextHint;
@@ -189,6 +206,47 @@ function readSensor(
     co2Ppm: safeNumber(obj.co2 ?? obj.co2_ppm),
     soilPercent: safeNumber(obj.soil ?? obj.soil_percent),
   };
+}
+
+function readMaturityEvidence(
+  details: Record<string, unknown> | null | undefined,
+): TimelineMaturityEvidenceSummary | null {
+  const raw = readSafeDetail(details, "maturity_evidence");
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const obj = raw as Record<string, unknown>;
+  if (safeString(obj.evidence_type) !== "quick_log_maturity_evidence") return null;
+
+  const notes: TimelineMaturityEvidenceNote[] = [];
+  const noteFields: Array<[string, string]> = [
+    ["color_note", "Color"],
+    ["recession_note", "Recession"],
+    ["swell_note", "Swell"],
+    ["aroma_note", "Aroma"],
+    ["fade_note", "Fade"],
+    ["grower_note", "Grower note"],
+  ];
+  for (const [key, label] of noteFields) {
+    const value = safeString(obj[key]);
+    if (value) notes.push({ label, value });
+  }
+
+  const summary: TimelineMaturityEvidenceSummary = {
+    observedAt: safeString(obj.observed_at),
+    advisoryOnly: obj.advisory_only === true,
+    clearPct: safeNumber(obj.clear_pct),
+    cloudyPct: safeNumber(obj.cloudy_pct),
+    amberPct: safeNumber(obj.amber_pct),
+    notes,
+  };
+
+  const hasAnyEvidence =
+    summary.clearPct !== null ||
+    summary.cloudyPct !== null ||
+    summary.amberPct !== null ||
+    summary.notes.length > 0 ||
+    summary.observedAt !== null;
+
+  return hasAnyEvidence ? summary : null;
 }
 
 function buildAltText(
@@ -264,6 +322,7 @@ export function buildTimelineEvidenceDetailViewModel(
     : null;
 
   const sensor = readSensor(details, entryAt, nowMs);
+  const maturityEvidence = readMaturityEvidence(details);
 
   const declaredSource = normalizeSource(readSafeDetail(details, "source"));
   const sources: TimelineEvidenceSource[] = [];
@@ -293,6 +352,7 @@ export function buildTimelineEvidenceDetailViewModel(
   if (note.trim()) badges.push("note");
   if (watering) badges.push("watering");
   if (feeding) badges.push("feeding");
+  if (maturityEvidence) badges.push("maturity_evidence");
   if (sensor && sensor.isStale) badges.push("stale_sensor");
 
   const contextHint = decideContext(hasPhoto, !!sensor, !!sensor?.isStale);
@@ -319,6 +379,7 @@ export function buildTimelineEvidenceDetailViewModel(
     sourceLabels,
     watering,
     feeding,
+    maturityEvidence,
     remindAt: safeString(readSafeDetail(details, "remind_at")),
     badges,
     contextHint,

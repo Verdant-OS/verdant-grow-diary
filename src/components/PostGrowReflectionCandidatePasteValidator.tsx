@@ -8,6 +8,10 @@ import {
   validatePostGrowReflectionCandidatePaste,
   type PostGrowReflectionCandidatePasteResult,
 } from "@/lib/ai/postGrowReflectionCandidatePasteValidator";
+import {
+  buildPostGrowReflectionCandidateValidationSummary,
+  type PostGrowReflectionCandidateValidationSummary,
+} from "@/lib/ai/postGrowReflectionCandidateValidationSummary";
 import { findPostGrowReflectionEnvelopeSample } from "@/lib/ai/postGrowReflectionEnvelopeSamples";
 import type { PostGrowReflectionPreviewSectionRow } from "@/lib/ai/postGrowReflectionPreviewViewModel";
 
@@ -40,6 +44,30 @@ function EnvelopeMetadata({ result }: { result: PostGrowReflectionCandidatePaste
     <div className="rounded-md border bg-muted/30 p-3">
       <div className="text-xs font-medium uppercase text-muted-foreground">Envelope metadata</div>
       <p className="mt-1 text-xs text-muted-foreground">{result.envelopeMetadata.label}</p>
+    </div>
+  );
+}
+
+function ValidationSummaryPanel({ summary }: { summary: PostGrowReflectionCandidateValidationSummary }) {
+  if (summary.status === "idle" || summary.status === "empty") return null;
+
+  return (
+    <div className="rounded-md border bg-muted/30 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="text-xs font-medium uppercase text-muted-foreground">{summary.title}</div>
+        <Badge variant="outline">{summary.outcomeLabel}</Badge>
+        <Badge variant="outline">{summary.inputKindLabel}</Badge>
+        <Badge variant="outline">Not saved</Badge>
+      </div>
+      <dl className="mt-3 grid gap-2 text-xs md:grid-cols-2">
+        {summary.rows.map((row) => (
+          <div key={row.label} className="rounded border bg-background/60 p-2">
+            <dt className="font-medium text-muted-foreground">{row.label}</dt>
+            <dd className="mt-1 break-words">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-xs text-muted-foreground">{summary.note}</p>
     </div>
   );
 }
@@ -139,6 +167,7 @@ export function PostGrowReflectionCandidatePasteValidator() {
   const [result, setResult] = useState<PostGrowReflectionCandidatePasteResult>(() =>
     validatePostGrowReflectionCandidatePaste(),
   );
+  const summary = buildPostGrowReflectionCandidateValidationSummary(result);
 
   function validateCandidate() {
     setResult(validatePostGrowReflectionCandidatePaste(rawText));
@@ -164,6 +193,7 @@ export function PostGrowReflectionCandidatePasteValidator() {
           <Badge variant="outline">Manual paste</Badge>
           <Badge variant="outline">Envelope supported</Badge>
           <Badge variant="outline">Local samples</Badge>
+          <Badge variant="outline">Sanitized summary</Badge>
           <Badge variant="outline">Not saved</Badge>
           <Badge variant="outline">No live AI call</Badge>
         </div>
@@ -201,6 +231,7 @@ export function PostGrowReflectionCandidatePasteValidator() {
           </Button>
         </div>
         <ResultPanel result={result} />
+        <ValidationSummaryPanel summary={summary} />
       </CardContent>
     </Card>
   );

@@ -8,15 +8,17 @@
  * Pure / read-only. No I/O against Supabase. No automation.
  */
 import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { readFileSync } from "node:fs";
+import { relative, resolve, sep } from "node:path";
 
 // Standardised scanner guardrail timeout + slow-test telemetry.
 // Replaces the previous per-file vi.setConfig bump. No scanner pattern,
 // allowlist, or assertion is changed.
-import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+import {
+  getCachedScannerFiles,
+  installScannerGuardrail,
+} from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
-
 
 const ROOT = resolve(__dirname, "../..");
 

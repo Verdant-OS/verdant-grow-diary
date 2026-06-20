@@ -14,15 +14,28 @@ import { tmpdir } from "node:os";
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
 
-
 const ROOT = resolve(__dirname, "../..");
 const SCRIPT = "scripts/assert-vpd-stage-normalization-ownership.mjs";
 
-function runScannerIn(cwd: string) {
-  return spawnSync("node", [resolve(ROOT, SCRIPT)], {
+type ScannerRun = Readonly<{
+  status: number | null;
+  stdout: string;
+  stderr: string;
+}>;
+
+let cachedRealRepoScannerRun: ScannerRun | null = null;
+
+function runScannerIn(cwd: string): ScannerRun {
+  const res = spawnSync("node", [resolve(ROOT, SCRIPT)], {
     cwd,
     encoding: "utf8",
   });
+  return { status: res.status, stdout: res.stdout, stderr: res.stderr };
+}
+
+function runRealRepoScanner(): ScannerRun {
+  cachedRealRepoScannerRun ??= runScannerIn(ROOT);
+  return cachedRealRepoScannerRun;
 }
 
 // Memoise the (slow) real-repo scanner run so the two `it`s that both

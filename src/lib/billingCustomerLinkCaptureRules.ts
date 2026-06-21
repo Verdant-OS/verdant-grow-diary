@@ -149,7 +149,7 @@ export function buildBillingCustomerLinkCapturePlan(
     input.providerCustomerIds,
     "ambiguous_provider_customer_id",
   );
-  if (!customer.ok) return block(customer.reason);
+  if (customer.ok === false) return block(customer.reason);
   if (!customer.value) return block("missing_provider_customer_id");
 
   const subscription = oneExplicitString(
@@ -157,21 +157,21 @@ export function buildBillingCustomerLinkCapturePlan(
     input.providerSubscriptionIds,
     "ambiguous_provider_subscription_id",
   );
-  if (!subscription.ok) return block(subscription.reason);
+  if (subscription.ok === false) return block(subscription.reason);
 
   const checkout = oneExplicitString(
     input.providerCheckoutId,
     input.providerCheckoutIds,
     "ambiguous_provider_checkout_id",
   );
-  if (!checkout.ok) return block(checkout.reason);
+  if (checkout.ok === false) return block(checkout.reason);
 
   const eventReference = oneExplicitString(
     input.lastPaddleEventId,
     input.lastPaddleEventIds,
     "ambiguous_event_reference",
   );
-  if (!eventReference.ok) return block(eventReference.reason);
+  if (eventReference.ok === false) return block(eventReference.reason);
 
   const linkSource = parseSource(input.linkSource);
   if (!linkSource) return block("invalid_link_source");

@@ -265,8 +265,11 @@ function customerIdFromData(data: Record<string, unknown>): string | null {
   return firstStringPath(data, [["customer_id"], ["customer", "id"]]);
 }
 
-function subscriptionIdFromData(data: Record<string, unknown>): string | null {
-  return firstStringPath(data, [["subscription_id"], ["subscription", "id"], ["id"]]);
+function subscriptionIdFromData(data: Record<string, unknown>, eventType: string): string | null {
+  const explicit = firstStringPath(data, [["subscription_id"], ["subscription", "id"]]);
+  if (explicit) return explicit;
+
+  return eventType.startsWith("subscription.") ? firstStringPath(data, [["id"]]) : null;
 }
 
 export function mapRecordedPaddleEventToEntitlementDecision(
@@ -305,13 +308,13 @@ export function mapRecordedPaddleEventToEntitlementDecision(
   if (!data) return block(ctx, "payload_data_required");
 
   const selectedPlan = selectPlan(data, config);
-  if (!selectedPlan.ok) return block(ctx, selectedPlan.reason);
+  if (selectedPlan.ok === false) return block(ctx, selectedPlan.reason);
 
   const customerId = customerIdFromData(data);
   if (!customerId) return block(ctx, "missing_customer_id");
 
   const isFounderCandidate = selectedPlan.planId === "founder_lifetime";
-  const subscriptionId = subscriptionIdFromData(data);
+  const subscriptionId = subscriptionIdFromData(data, ctx.eventType);
   if (!isFounderCandidate && !subscriptionId) return block(ctx, "missing_subscription_id");
 
   return {

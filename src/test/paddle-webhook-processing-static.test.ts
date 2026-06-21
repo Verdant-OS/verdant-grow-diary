@@ -10,20 +10,20 @@ const WEBHOOK_SRC = readProjectFile("supabase/functions/paddle-webhook/index.ts"
 const MAPPER_SRC = readProjectFile("src/lib/paddleEventEntitlementMapperRules.ts");
 
 describe("paddle webhook processing recorder", () => {
-  it("keeps raw-body signature verification before JSON parsing and database writes", () => {
+  it("keeps raw-body signature verification before JSON parsing and runtime event processing", () => {
     const rawIdx = WEBHOOK_SRC.indexOf("req.text()");
     const verifyIdx = WEBHOOK_SRC.indexOf("constantTimeEqual(expected, parsed.h1)");
     const parseIdx = WEBHOOK_SRC.indexOf("JSON.parse(rawBody)");
     const clientIdx = WEBHOOK_SRC.indexOf("createClient(SUPABASE_URL, SERVICE_ROLE");
     const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');
-    const processingInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_event_processing").insert');
+    const processingCallIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, insertedEvent as RecordedPaddleEventRow)");
 
     expect(rawIdx).toBeGreaterThan(-1);
     expect(verifyIdx).toBeGreaterThan(rawIdx);
     expect(parseIdx).toBeGreaterThan(verifyIdx);
     expect(clientIdx).toBeGreaterThan(parseIdx);
     expect(eventInsertIdx).toBeGreaterThan(clientIdx);
-    expect(processingInsertIdx).toBeGreaterThan(eventInsertIdx);
+    expect(processingCallIdx).toBeGreaterThan(eventInsertIdx);
   });
 
   it("records processing rows only after paddle_events insert or duplicate fetch", () => {

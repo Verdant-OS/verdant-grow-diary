@@ -223,6 +223,13 @@ function candidateStatus(eventType: string): NonNullable<ProcessingPayload["cand
   }
 }
 
+function subscriptionIdFromData(data: Record<string, unknown>, eventType: string): string | null {
+  const explicit = firstStringPath(data, [["subscription_id"], ["subscription", "id"]]);
+  if (explicit) return explicit;
+
+  return eventType.startsWith("subscription.") ? firstStringPath(data, [["id"]]) : null;
+}
+
 function baseProcessingPayload(
   row: RecordedPaddleEventRow,
   status: ProcessingPayload["status"],
@@ -296,7 +303,7 @@ function buildProcessingPayload(row: RecordedPaddleEventRow): ProcessingPayload 
   if (!customerId) return blockedProcessingPayload(row, "missing_customer_id");
 
   const isFounderCandidate = selectedPlan.planId === "founder_lifetime";
-  const subscriptionId = firstStringPath(data, [["subscription_id"], ["subscription", "id"], ["id"]]);
+  const subscriptionId = subscriptionIdFromData(data, row.event_type);
   if (!isFounderCandidate && !subscriptionId) {
     return blockedProcessingPayload(row, "missing_subscription_id");
   }

@@ -10,16 +10,23 @@
 //   4. Store the event in `public.paddle_events` idempotently (unique
 //      event_id) BEFORE any other processing.
 //   5. Store one audit/replay row in `public.paddle_event_processing`.
-//   6. Do NOT change any user entitlement here yet. Entitlement flips are
+//   6. Capture a server-owned `public.billing_customer_links` row only when
+//      signed event metadata contains explicit, deterministic Verdant user
+//      attribution.
+//   7. Do NOT change any user entitlement here yet. Entitlement flips are
 //      intentionally deferred until a separate, reviewed change.
 //
 // Notes:
-//   - This function does not trust any client-provided user_id.
+//   - This function does not trust browser completion state.
 //   - It never reads or writes private grow/plant/tent/sensor/alert data.
 //   - It uses the service role only inside this trusted server context.
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  buildBillingCustomerLinkCapturePlan,
+  type BillingCustomerLinkInsertPayload,
+} from "../../../src/lib/billingCustomerLinkCaptureRules.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -86,6 +93,18 @@ type ProcessingPayload = {
   is_founder_candidate: boolean;
   details: Record<string, unknown>;
 };
+
+type ExistingBillingCustomerLinkRow = {
+  id: string;
+  user_id: string;
+};
+
+type LinkCaptureResult =
+  | { status: "captured" }
+  | { status: "updated" }
+  | { status: "duplicate" }
+  | { status: "blocked"; reason: string }
+  | { status: "failed"; reason: string };
 
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -158,8 +177,33 @@ function firstStringPath(root: Record<string, unknown>, paths: string[][]): stri
   return null;
 }
 
+function uniqueStrings(values: Array<string | null>): string[] {
+  const out = new Set<string>();
+  for (const value of values) {
+    if (value) out.add(value);
+  }
+  return [...out];
+}
+
 function payloadData(payload: Record<string, unknown>): Record<string, unknown> {
   return isRecord(payload.data) ? payload.data : payload;
+}
+
+function customDataCandidates(payload: Record<string, unknown>, data: Record<string, unknown>): Record<string, unknown>[] {
+  const candidates: Record<string, unknown>[] = [];
+  const dataCustom = data.custom_data;
+  if (isRecord(dataCustom)) candidates.push(dataCustom);
+  const payloadCustom = payload.custom_data;
+  if (isRecord(payloadCustom)) candidates.push(payloadCustom);
+  return candidates;
+}
+
+function metadataUserIds(payload: Record<string, unknown>, data: Record<string, unknown>): string[] {
+  const ids: Array<string | null> = [];
+  for (const custom of customDataCandidates(payload, data)) {
+    ids.push(firstStringPath(custom, [["verdant_user_id"], ["user_id"], ["auth_user_id"], ["verdant_auth_user_id"]]));
+  }
+  return uniqueStrings(ids);
 }
 
 function priceIdsFromObject(obj: Record<string, unknown>): string[] {
@@ -230,6 +274,10 @@ function subscriptionIdFromData(data: Record<string, unknown>, eventType: string
   return eventType.startsWith("subscription.") ? firstStringPath(data, [["id"]]) : null;
 }
 
+function providerCheckoutIdFromData(data: Record<string, unknown>): string | null {
+  return firstStringPath(data, [["checkout_id"], ["checkout", "id"], ["checkout", "checkout_id"]]);
+}
+
 function baseProcessingPayload(
   row: RecordedPaddleEventRow,
   status: ProcessingPayload["status"],
@@ -297,7 +345,7 @@ function buildProcessingPayload(row: RecordedPaddleEventRow): ProcessingPayload 
 
   const data = payloadData(payload);
   const selectedPlan = selectPlan(data);
-  if (!selectedPlan.ok) return blockedProcessingPayload(row, selectedPlan.reason);
+  if (selectedPlan.ok === false) return blockedProcessingPayload(row, selectedPlan.reason);
 
   const customerId = firstStringPath(data, [["customer_id"], ["customer", "id"]]);
   if (!customerId) return blockedProcessingPayload(row, "missing_customer_id");
@@ -333,6 +381,36 @@ function buildProcessingPayload(row: RecordedPaddleEventRow): ProcessingPayload 
   };
 }
 
+function buildLinkCapturePlan(row: RecordedPaddleEventRow): ReturnType<typeof buildBillingCustomerLinkCapturePlan> | { ok: false; reason: "ambiguous_user_id" } {
+  const payload = row.payload;
+  const data = payloadData(payload);
+  const userIds = metadataUserIds(payload, data);
+  if (userIds.length > 1) return { ok: false, reason: "ambiguous_user_id" };
+
+  return buildBillingCustomerLinkCapturePlan({
+    authenticatedUserId: userIds[0] ?? null,
+    provider: "paddle",
+    providerCustomerId: firstStringPath(data, [["customer_id"], ["customer", "id"]]),
+    providerSubscriptionId: subscriptionIdFromData(data, row.event_type),
+    providerCheckoutId: providerCheckoutIdFromData(data),
+    lastPaddleEventId: row.event_id,
+    linkSource: "webhook",
+    linkStatus: "linked",
+    confidence: "verified",
+  });
+}
+
+function linkUpdatePatch(payload: BillingCustomerLinkInsertPayload): Partial<BillingCustomerLinkInsertPayload> {
+  return {
+    provider_subscription_id: payload.provider_subscription_id ?? undefined,
+    provider_checkout_id: payload.provider_checkout_id ?? undefined,
+    link_status: payload.link_status,
+    link_source: payload.link_source,
+    confidence: payload.confidence,
+    last_paddle_event_id: payload.last_paddle_event_id ?? undefined,
+  };
+}
+
 async function insertProcessingPayload(
   supabase: SupabaseClient,
   payload: ProcessingPayload,
@@ -358,6 +436,53 @@ async function recordProcessing(
     console.error("paddle-webhook processing_insert_failed", error);
     return await insertProcessingPayload(supabase, failedProcessingPayload(row, "processing_insert_failed"));
   }
+}
+
+async function captureBillingCustomerLink(
+  supabase: SupabaseClient,
+  row: RecordedPaddleEventRow,
+): Promise<LinkCaptureResult> {
+  const plan = buildLinkCapturePlan(row);
+  if (!plan.ok) return { status: "blocked", reason: plan.reason };
+
+  const payload = plan.payload;
+  const { data: existing, error: existingError } = await supabase
+    .from("billing_customer_links")
+    .select("id,user_id")
+    .eq("provider", payload.provider)
+    .eq("provider_customer_id", payload.provider_customer_id)
+    .maybeSingle();
+
+  if (existingError) {
+    console.error("paddle-webhook link_lookup_failed", existingError);
+    return { status: "failed", reason: "link_lookup_failed" };
+  }
+
+  const existingRow = existing as ExistingBillingCustomerLinkRow | null;
+  if (existingRow && existingRow.user_id !== payload.user_id) {
+    return { status: "blocked", reason: "conflicting_customer_link" };
+  }
+
+  if (existingRow) {
+    const { error } = await supabase
+      .from("billing_customer_links")
+      .update(linkUpdatePatch(payload))
+      .eq("id", existingRow.id);
+    if (error) {
+      console.error("paddle-webhook link_update_failed", error);
+      return { status: "failed", reason: "link_update_failed" };
+    }
+    return { status: "updated" };
+  }
+
+  const { error } = await supabase.from("billing_customer_links").insert(payload);
+  if (!error) return { status: "captured" };
+
+  const code = (error as { code?: string }).code;
+  if (code === "23505") return { status: "duplicate" };
+
+  console.error("paddle-webhook link_insert_failed", error);
+  return { status: "failed", reason: "link_insert_failed" };
 }
 
 async function fetchExistingPaddleEvent(
@@ -436,7 +561,7 @@ Deno.serve(async (req) => {
   });
 
   // Idempotent insert. If event_id already exists, treat as duplicate-OK and
-  // re-use the existing recorded event row for processing-state recording.
+  // re-use the existing recorded event row for processing-state and link capture.
   const { data: insertedEvent, error } = await supabase.from("paddle_events").insert({
     event_id: eventId,
     event_type: eventType,
@@ -451,16 +576,25 @@ Deno.serve(async (req) => {
       const existingEvent = await fetchExistingPaddleEvent(supabase, eventId);
       if (!existingEvent) return jsonResponse({ error: "duplicate_fetch_failed" }, 500);
       const processing = await recordProcessing(supabase, existingEvent);
-      return jsonResponse({ ok: true, duplicate: true, processing }, 200);
+      const linkCapture = await captureBillingCustomerLink(supabase, existingEvent);
+      if (linkCapture.status === "failed") {
+        return jsonResponse({ error: "link_capture_failed", duplicate: true, processing, linkCapture }, 500);
+      }
+      return jsonResponse({ ok: true, duplicate: true, processing, linkCapture }, 200);
     }
     console.error("paddle-webhook insert_failed", error);
     return jsonResponse({ error: "insert_failed" }, 500);
   }
 
-  const processing = await recordProcessing(supabase, insertedEvent as RecordedPaddleEventRow);
+  const recordedEvent = insertedEvent as RecordedPaddleEventRow;
+  const processing = await recordProcessing(supabase, recordedEvent);
+  const linkCapture = await captureBillingCustomerLink(supabase, recordedEvent);
+  if (linkCapture.status === "failed") {
+    return jsonResponse({ error: "link_capture_failed", recorded: true, processing, linkCapture }, 500);
+  }
 
   // NOTE: No entitlement changes here. Pro access is intentionally NOT
   // granted from this function until a reviewed follow-up change wires
   // entitlement updates against verified events.
-  return jsonResponse({ ok: true, recorded: true, processing }, 200);
+  return jsonResponse({ ok: true, recorded: true, processing, linkCapture }, 200);
 });

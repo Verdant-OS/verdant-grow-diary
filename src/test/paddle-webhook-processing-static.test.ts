@@ -16,7 +16,7 @@ describe("paddle webhook processing recorder", () => {
     const parseIdx = WEBHOOK_SRC.indexOf("JSON.parse(rawBody)");
     const clientIdx = WEBHOOK_SRC.indexOf("createClient(SUPABASE_URL, SERVICE_ROLE");
     const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');
-    const processingCallIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, insertedEvent as RecordedPaddleEventRow)");
+    const processingCallIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, recordedEvent)");
 
     expect(rawIdx).toBeGreaterThan(-1);
     expect(verifyIdx).toBeGreaterThan(rawIdx);
@@ -27,7 +27,8 @@ describe("paddle webhook processing recorder", () => {
   });
 
   it("records processing rows only after paddle_events insert or duplicate fetch", () => {
-    expect(WEBHOOK_SRC).toContain("recordProcessing(supabase, insertedEvent as RecordedPaddleEventRow)");
+    expect(WEBHOOK_SRC).toContain("const recordedEvent = insertedEvent as RecordedPaddleEventRow");
+    expect(WEBHOOK_SRC).toContain("recordProcessing(supabase, recordedEvent)");
     expect(WEBHOOK_SRC).toContain("fetchExistingPaddleEvent(supabase, eventId)");
     expect(WEBHOOK_SRC).toContain("recordProcessing(supabase, existingEvent)");
     expect(WEBHOOK_SRC).toContain("paddle_event_processing");

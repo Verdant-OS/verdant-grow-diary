@@ -42,10 +42,10 @@ describe("paddle webhook processing recorder", () => {
   });
 
   it("maps process, ignored, blocked, and failed processing states", () => {
-    expect(WEBHOOK_SRC).toContain('status: "processed"');
-    expect(WEBHOOK_SRC).toContain('status: "ignored"');
-    expect(WEBHOOK_SRC).toContain('status: "blocked"');
-    expect(WEBHOOK_SRC).toContain('status: "failed"');
+    expect(WEBHOOK_SRC).toContain('baseProcessingPayload(row, "processed"');
+    expect(WEBHOOK_SRC).toContain('baseProcessingPayload(row, "ignored"');
+    expect(WEBHOOK_SRC).toContain('baseProcessingPayload(row, "blocked"');
+    expect(WEBHOOK_SRC).toContain('baseProcessingPayload(row, "failed"');
     expect(WEBHOOK_SRC).toContain("non_granting_transaction_event");
     expect(WEBHOOK_SRC).toContain("adjustment_event_requires_policy");
     expect(WEBHOOK_SRC).toContain("unknown_price_id");

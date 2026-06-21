@@ -308,7 +308,7 @@ export function mapRecordedPaddleEventToEntitlementDecision(
   if (!data) return block(ctx, "payload_data_required");
 
   const selectedPlan = selectPlan(data, config);
-  if (!selectedPlan.ok) return block(ctx, selectedPlan.reason);
+  if (selectedPlan.ok === false) return block(ctx, selectedPlan.reason);
 
   const customerId = customerIdFromData(data);
   if (!customerId) return block(ctx, "missing_customer_id");

@@ -4,6 +4,11 @@ import { useHasRole } from "@/hooks/useHasRole";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  parseBillingCustomerLinkAuditResponse,
+  type BillingCustomerLinkAuditStatus,
+  type BillingCustomerLinkAuditViewModel,
+} from "@/lib/billingCustomerLinkAuditViewModel";
+import {
   formatPaddleProcessingPlan,
   formatPaddleProcessingStatus,
   parsePaddleProcessingAuditResponse,
@@ -12,10 +17,14 @@ import {
 } from "@/lib/paddleEventProcessingAuditViewModel";
 
 type PaddleAuditRpcClient = {
-  rpc: (
+  rpc(
     fn: "paddle_event_processing_operator_audit",
     args: { p_limit: number },
-  ) => Promise<{ data: unknown; error: { message?: string } | null }>;
+  ): Promise<{ data: unknown; error: { message?: string } | null }>;
+  rpc(
+    fn: "billing_customer_link_operator_audit",
+    args: { p_limit: number },
+  ): Promise<{ data: unknown; error: { message?: string } | null }>;
 };
 
 const ROW_LIMIT = 50;
@@ -30,6 +39,20 @@ function StatusPill({ status }: { status: PaddleProcessingAuditStatus }) {
   return (
     <span className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-semibold ${cls[status]}`}>
       {formatPaddleProcessingStatus(status)}
+    </span>
+  );
+}
+
+function LinkStatusPill({ status, label }: { status: BillingCustomerLinkAuditStatus; label: string }) {
+  const cls: Record<BillingCustomerLinkAuditStatus, string> = {
+    linked: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    pending_review: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    blocked: "border-destructive/40 bg-destructive/10 text-destructive",
+    inactive: "border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+  };
+  return (
+    <span className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-semibold ${cls[status]}`}>
+      {label}
     </span>
   );
 }
@@ -54,6 +77,15 @@ async function fetchProcessingAudit(): Promise<PaddleProcessingAuditViewModel> {
   return parsePaddleProcessingAuditResponse(data);
 }
 
+async function fetchLinkAudit(): Promise<BillingCustomerLinkAuditViewModel> {
+  const { data, error } = await (supabase as unknown as PaddleAuditRpcClient).rpc(
+    "billing_customer_link_operator_audit",
+    { p_limit: ROW_LIMIT },
+  );
+  if (error) throw new Error(error.message ?? "billing_link_audit_failed");
+  return parseBillingCustomerLinkAuditResponse(data);
+}
+
 export default function OperatorPaddleProcessingAudit() {
   const role = useHasRole("operator");
   const auditQuery = useQuery({
@@ -62,8 +94,16 @@ export default function OperatorPaddleProcessingAudit() {
     enabled: role.granted,
     staleTime: 30_000,
   });
+  const linkAuditQuery = useQuery({
+    queryKey: ["operator", "billing-link-audit", ROW_LIMIT],
+    queryFn: fetchLinkAudit,
+    enabled: role.granted,
+    staleTime: 30_000,
+  });
 
   const audit = auditQuery.data;
+  const linkAudit = linkAuditQuery.data;
+  const isRefreshing = auditQuery.isFetching || linkAuditQuery.isFetching;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
@@ -77,18 +117,21 @@ export default function OperatorPaddleProcessingAudit() {
               Paddle processing audit
             </h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              Read-only view of verified Paddle event processing outcomes. This surface shows sanitized
-              processing state only: no raw payload, no provider customer IDs, no subscription IDs, and no
+              Read-only view of verified Paddle event processing and billing link capture. This surface shows
+              sanitized state only: no raw payload, no provider customer IDs, no subscription IDs, and no
               entitlement writes.
             </p>
           </div>
           <Button
             type="button"
             variant="outline"
-            onClick={() => auditQuery.refetch()}
-            disabled={!role.granted || auditQuery.isFetching}
+            onClick={() => {
+              auditQuery.refetch();
+              linkAuditQuery.refetch();
+            }}
+            disabled={!role.granted || isRefreshing}
           >
-            {auditQuery.isFetching ? "Refreshing…" : "Refresh"}
+            {isRefreshing ? "Refreshing…" : "Refresh"}
           </Button>
         </div>
       </section>
@@ -113,7 +156,7 @@ export default function OperatorPaddleProcessingAudit() {
           <CardHeader>
             <CardTitle>Operator access required</CardTitle>
             <CardDescription>
-              This audit surface is hidden from non-operator accounts. No processing data was requested.
+              This audit surface is hidden from non-operator accounts. No processing or link data was requested.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -122,7 +165,7 @@ export default function OperatorPaddleProcessingAudit() {
       {role.granted && auditQuery.isError && (
         <Card>
           <CardHeader>
-            <CardTitle>Audit lookup failed</CardTitle>
+            <CardTitle>Processing audit lookup failed</CardTitle>
             <CardDescription>
               The read-only processing audit RPC failed. No entitlement data was changed.
             </CardDescription>
@@ -133,17 +176,118 @@ export default function OperatorPaddleProcessingAudit() {
         </Card>
       )}
 
+      {role.granted && linkAuditQuery.isError && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Link audit lookup failed</CardTitle>
+            <CardDescription>
+              The read-only billing link audit RPC failed. No entitlement data was changed.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            {linkAuditQuery.error instanceof Error ? linkAuditQuery.error.message : "Unknown error"}
+          </CardContent>
+        </Card>
+      )}
+
       {role.granted && audit && !audit.ok && (
         <Card>
           <CardHeader>
-            <CardTitle>Audit unavailable</CardTitle>
+            <CardTitle>Processing audit unavailable</CardTitle>
             <CardDescription>{audit.reasonLabel ?? "Operator audit is not available."}</CardDescription>
           </CardHeader>
         </Card>
       )}
 
+      {role.granted && linkAudit && !linkAudit.ok && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Link audit unavailable</CardTitle>
+            <CardDescription>{linkAudit.reasonLabel ?? "Operator link audit is not available."}</CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
+      {role.granted && linkAudit?.ok && (
+        <section className="space-y-4" aria-label="Billing link capture audit">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">Billing link capture</h2>
+            <p className="text-sm text-muted-foreground">
+              Sanitized visibility into Paddle customer-link attribution. Raw provider identifiers are hidden.
+            </p>
+          </div>
+          <section className="grid gap-3 md:grid-cols-4" aria-label="Billing link counts">
+            <CountCard label="Total links" value={linkAudit.counts.total} />
+            <CountCard label="Linked" value={linkAudit.counts.linked} />
+            <CountCard label="Pending review" value={linkAudit.counts.pendingReview} />
+            <CountCard label="Blocked" value={linkAudit.counts.blocked} />
+          </section>
+          <section className="grid gap-3 md:grid-cols-3" aria-label="Billing link confidence counts">
+            <CountCard label="Verified confidence" value={linkAudit.counts.verified} />
+            <CountCard label="Review required" value={linkAudit.counts.reviewRequired} />
+            <CountCard label="Blocked confidence" value={linkAudit.counts.blockedConfidence} />
+          </section>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Latest link rows</CardTitle>
+              <CardDescription>
+                Showing up to {linkAudit.limit || ROW_LIMIT} sanitized rows. Provider IDs, customer IDs,
+                subscription IDs, checkout IDs, and event references are represented only as presence flags.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {linkAudit.latest.length === 0 ? (
+                <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
+                  No billing customer links recorded yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[860px] text-left text-sm">
+                    <thead className="border-b text-xs uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="py-2 pr-3">Created</th>
+                        <th className="py-2 pr-3">Provider</th>
+                        <th className="py-2 pr-3">Status</th>
+                        <th className="py-2 pr-3">Source</th>
+                        <th className="py-2 pr-3">Confidence</th>
+                        <th className="py-2 pr-3">Evidence present</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {linkAudit.latest.map((row, index) => (
+                        <tr key={`${row.createdAt ?? "link"}-${index}`} className="border-b last:border-0">
+                          <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
+                            {row.createdAt ?? "—"}
+                          </td>
+                          <td className="py-3 pr-3 font-mono text-xs">{row.provider}</td>
+                          <td className="py-3 pr-3">
+                            <LinkStatusPill status={row.linkStatus} label={row.linkStatusLabel} />
+                          </td>
+                          <td className="py-3 pr-3">{row.linkSourceLabel}</td>
+                          <td className="py-3 pr-3">{row.confidenceLabel}</td>
+                          <td className="py-3 pr-3 text-xs text-muted-foreground">
+                            customer: {row.hasCustomerId ? "yes" : "no"} · subscription: {row.hasSubscriptionId ? "yes" : "no"} · checkout: {row.hasCheckoutId ? "yes" : "no"} · event: {row.hasEventReference ? "yes" : "no"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
       {role.granted && audit?.ok && (
-        <>
+        <section className="space-y-4" aria-label="Paddle processing audit">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">Event processing</h2>
+            <p className="text-sm text-muted-foreground">
+              Sanitized visibility into verified Paddle event mapper outcomes.
+            </p>
+          </div>
           <section className="grid gap-3 md:grid-cols-5" aria-label="Processing counts">
             <CountCard label="Total" value={audit.counts.total} />
             <CountCard label="Processed" value={audit.counts.processed} />
@@ -207,7 +351,7 @@ export default function OperatorPaddleProcessingAudit() {
               )}
             </CardContent>
           </Card>
-        </>
+        </section>
       )}
     </main>
   );

@@ -6,9 +6,8 @@
 --
 -- Scope guard:
 -- - No direct client grants on public.paddle_event_processing.
--- - No raw Paddle payloads.
--- - No details JSON exposure.
--- - No provider customer/subscription IDs.
+-- - No sensitive event body fields in the response.
+-- - No external provider identifiers in the response.
 -- - No public.billing_subscriptions reads or writes.
 -- - No checkout/live-mode changes.
 -- - No grow/plant/tent/sensor/alert/action/AI writes.

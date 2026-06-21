@@ -7,6 +7,7 @@ import {
   formatPaddleProcessingPlan,
   formatPaddleProcessingStatus,
   parsePaddleProcessingAuditResponse,
+  type PaddleProcessingAuditStatus,
   type PaddleProcessingAuditViewModel,
 } from "@/lib/paddleEventProcessingAuditViewModel";
 
@@ -19,8 +20,8 @@ type PaddleAuditRpcClient = {
 
 const ROW_LIMIT = 50;
 
-function StatusPill({ status }: { status: "processed" | "ignored" | "blocked" | "failed" }) {
-  const cls: Record<typeof status, string> = {
+function StatusPill({ status }: { status: PaddleProcessingAuditStatus }) {
+  const cls: Record<PaddleProcessingAuditStatus, string> = {
     processed: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
     ignored: "border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300",
     blocked: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",

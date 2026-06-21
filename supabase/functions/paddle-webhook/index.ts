@@ -17,7 +17,7 @@
 //      intentionally deferred until a separate, reviewed change.
 //
 // Notes:
-//   - This function does not trust any client success-page state.
+//   - This function does not trust browser completion state.
 //   - It never reads or writes private grow/plant/tent/sensor/alert data.
 //   - It uses the service role only inside this trusted server context.
 

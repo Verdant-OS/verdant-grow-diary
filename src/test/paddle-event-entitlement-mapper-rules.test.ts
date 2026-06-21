@@ -18,15 +18,19 @@ const MAPPER_SOURCE = readFileSync(
   "utf8",
 );
 
+function eventKey(eventType: string): string {
+  return eventType.split(".").join("_");
+}
+
 function recorded(event_type: string, data: Record<string, unknown>): RecordedPaddleEventLike {
   return {
-    event_id: `evt_${event_type.replaceAll(".", "_")}`,
+    event_id: `evt_${eventKey(event_type)}`,
     event_type,
     environment: "sandbox",
     signature_verified: true,
     received_at: "2026-06-20T00:00:00.000Z",
     payload: {
-      event_id: `evt_${event_type.replaceAll(".", "_")}`,
+      event_id: `evt_${eventKey(event_type)}`,
       event_type,
       occurred_at: "2026-06-20T00:00:01.000Z",
       data,

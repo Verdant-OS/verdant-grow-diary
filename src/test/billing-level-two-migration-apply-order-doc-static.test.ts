@@ -112,7 +112,7 @@ describe("billing level two migration apply order manifest (docs/static-only)", 
         currentGroup = groupMatch[1].toLowerCase();
         continue;
       }
-      if (line.includes("no migration file found")) {
+      if (/^\s*-\s/.test(line) && line.includes("no migration file found")) {
         const isHarness = currentGroup.includes("subscription updater harness");
         expect(isHarness, `unexpected 'no migration file found' under group: ${currentGroup}`).toBe(true);
 

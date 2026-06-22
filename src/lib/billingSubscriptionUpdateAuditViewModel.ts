@@ -4,9 +4,9 @@
  *
  * Strict safety contract:
  *   - Only displays sanitized fields (status/reason/plan/status/timestamp).
- *   - Never surfaces provider IDs, payloads, raw_payload, details, or
- *     provider_price_id, even if a future server change accidentally
- *     returns them.
+ *   - Never surfaces raw provider identifiers or webhook bodies, even if a
+ *     future server change accidentally returns them. The forbidden field
+ *     list lives in BILLING_SUBSCRIPTION_UPDATE_AUDIT_FORBIDDEN_KEYS.
  */
 
 export type BillingSubscriptionUpdateAuditStatus =
@@ -40,6 +40,53 @@ export interface BillingSubscriptionUpdateAuditCounts {
   total: number;
 }
 
+/**
+ * Narrow, sanitized row shape returned by the operator audit RPC. This is
+ * the ONLY shape the parser will ever emit upstream of display mapping.
+ *
+ * The field list is closed: adding raw provider/payload fields here must
+ * be a deliberate review-gated change. Forbidden keys are also asserted at
+ * compile time (see _assertSafeOperatorRow / _assertSafeDisplayRow below)
+ * and at runtime via a static test on this file's source.
+ */
+export type BillingSubscriptionUpdateAuditOperatorRow = {
+  readonly created_at: string | null;
+  readonly result_status: BillingSubscriptionUpdateAuditStatus;
+  readonly result_reason: string | null;
+  readonly candidate_plan_id: BillingSubscriptionUpdateAuditPlanId | null;
+  readonly candidate_status: BillingSubscriptionUpdateAuditSubscriptionStatus | null;
+  readonly subscription_status: BillingSubscriptionUpdateAuditSubscriptionStatus | null;
+};
+
+export const BILLING_SUBSCRIPTION_UPDATE_AUDIT_OPERATOR_ROW_KEYS = [
+  "created_at",
+  "result_status",
+  "result_reason",
+  "candidate_plan_id",
+  "candidate_status",
+  "subscription_status",
+] as const satisfies ReadonlyArray<keyof BillingSubscriptionUpdateAuditOperatorRow>;
+
+/**
+ * Forbidden field names that must never appear on the sanitized operator
+ * row or its display row. Kept as a const tuple so it can drive both
+ * compile-time assertions and the runtime static test.
+ */
+export const BILLING_SUBSCRIPTION_UPDATE_AUDIT_FORBIDDEN_KEYS = [
+  "provider_customer_id",
+  "provider_subscription_id",
+  "provider_price_id",
+  "payload",
+  "raw_payload",
+  "details",
+  "event_id",
+  "processing_id",
+  "user_id",
+] as const;
+
+export type BillingSubscriptionUpdateAuditForbiddenKey =
+  typeof BILLING_SUBSCRIPTION_UPDATE_AUDIT_FORBIDDEN_KEYS[number];
+
 export interface BillingSubscriptionUpdateAuditRow {
   createdAt: string | null;
   resultStatus: BillingSubscriptionUpdateAuditStatus;
@@ -54,6 +101,29 @@ export interface BillingSubscriptionUpdateAuditRow {
   subscriptionStatusLabel: string;
 }
 
+/**
+ * Display row exposed to the UI. Alias of the parsed row; declared
+ * separately so future presenter-only fields can be added without
+ * weakening the operator row contract.
+ */
+export type BillingSubscriptionUpdateAuditDisplayRow = BillingSubscriptionUpdateAuditRow;
+
+/**
+ * Compile-time guard: any forbidden key appearing on the operator or
+ * display row makes this type resolve to `never`, breaking the build.
+ */
+type AssertNoForbiddenKeys<T> = Extract<
+  keyof T,
+  BillingSubscriptionUpdateAuditForbiddenKey
+> extends never
+  ? true
+  : never;
+
+const _assertSafeOperatorRow: AssertNoForbiddenKeys<BillingSubscriptionUpdateAuditOperatorRow> = true;
+const _assertSafeDisplayRow: AssertNoForbiddenKeys<BillingSubscriptionUpdateAuditDisplayRow> = true;
+void _assertSafeOperatorRow;
+void _assertSafeDisplayRow;
+
 export interface BillingSubscriptionUpdateAuditViewModel {
   ok: boolean;
   reason: string | null;
@@ -62,7 +132,7 @@ export interface BillingSubscriptionUpdateAuditViewModel {
   limit: number;
   counts: BillingSubscriptionUpdateAuditCounts;
   countsSummary: string;
-  latest: BillingSubscriptionUpdateAuditRow[];
+  latest: BillingSubscriptionUpdateAuditDisplayRow[];
 }
 
 const DEFAULT_COUNTS: BillingSubscriptionUpdateAuditCounts = {
@@ -226,28 +296,38 @@ export function parseBillingSubscriptionUpdateAuditResponse(
   };
 
   const rowsRaw = Array.isArray(input.latest) ? input.latest : [];
-  const latest: BillingSubscriptionUpdateAuditRow[] = rowsRaw
+  const latest: BillingSubscriptionUpdateAuditDisplayRow[] = rowsRaw
     .filter(isRecord)
     .map((row) => {
-      const resultStatus = asStatus(row.result_status);
-      const resultReason = asString(row.result_reason);
-      const candidatePlanId = asPlan(row.candidate_plan_id);
-      const candidateStatus = asSubStatus(row.candidate_status);
-      const subscriptionStatus = asSubStatus(row.subscription_status);
-      return {
-        createdAt: asString(row.created_at),
-        resultStatus,
-        resultStatusLabel: formatBillingSubscriptionUpdateAuditStatus(resultStatus),
-        resultReason,
-        resultReasonLabel: formatBillingSubscriptionUpdateAuditReason(resultReason),
-        candidatePlanId,
-        candidatePlanLabel: formatBillingSubscriptionUpdateAuditPlan(candidatePlanId),
-        candidateStatus,
-        candidateStatusLabel: formatBillingSubscriptionUpdateAuditSubscriptionStatus(candidateStatus),
-        subscriptionStatus,
-        subscriptionStatusLabel:
-          formatBillingSubscriptionUpdateAuditSubscriptionStatus(subscriptionStatus),
-      };
+      // Explicit allow-list narrowing: we never spread `row`. The
+      // sanitized operator row contains only fields validated above.
+      const operatorRow: BillingSubscriptionUpdateAuditOperatorRow = {
+        created_at: asString(row.created_at),
+        result_status: asStatus(row.result_status),
+        result_reason: asString(row.result_reason),
+        candidate_plan_id: asPlan(row.candidate_plan_id),
+        candidate_status: asSubStatus(row.candidate_status),
+        subscription_status: asSubStatus(row.subscription_status),
+      } satisfies BillingSubscriptionUpdateAuditOperatorRow;
+
+      const displayRow: BillingSubscriptionUpdateAuditDisplayRow = {
+        createdAt: operatorRow.created_at,
+        resultStatus: operatorRow.result_status,
+        resultStatusLabel: formatBillingSubscriptionUpdateAuditStatus(operatorRow.result_status),
+        resultReason: operatorRow.result_reason,
+        resultReasonLabel: formatBillingSubscriptionUpdateAuditReason(operatorRow.result_reason),
+        candidatePlanId: operatorRow.candidate_plan_id,
+        candidatePlanLabel: formatBillingSubscriptionUpdateAuditPlan(operatorRow.candidate_plan_id),
+        candidateStatus: operatorRow.candidate_status,
+        candidateStatusLabel: formatBillingSubscriptionUpdateAuditSubscriptionStatus(
+          operatorRow.candidate_status,
+        ),
+        subscriptionStatus: operatorRow.subscription_status,
+        subscriptionStatusLabel: formatBillingSubscriptionUpdateAuditSubscriptionStatus(
+          operatorRow.subscription_status,
+        ),
+      } satisfies BillingSubscriptionUpdateAuditDisplayRow;
+      return displayRow;
     });
 
   return {

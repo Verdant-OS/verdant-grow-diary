@@ -13,8 +13,9 @@
 //   6. Capture a server-owned `public.billing_customer_links` row only when
 //      signed event metadata contains explicit, deterministic Verdant user
 //      attribution.
-//   7. Do NOT change any user entitlement here yet. Entitlement flips are
-//      intentionally deferred until a separate, reviewed change.
+//   7. Hand off recurring subscription updates to the reviewed service-role-only
+//      RPC only after event storage, processing, and link capture complete.
+//      Founder allocation remains deferred.
 //
 // Notes:
 //   - This function does not trust browser completion state.
@@ -94,6 +95,12 @@ type ProcessingPayload = {
   details: Record<string, unknown>;
 };
 
+type ProcessingResult = {
+  id: string | null;
+  status: ProcessingPayload["status"];
+  duplicate: boolean;
+};
+
 type ExistingBillingCustomerLinkRow = {
   id: string;
   user_id: string;
@@ -104,6 +111,11 @@ type LinkCaptureResult =
   | { status: "updated" }
   | { status: "duplicate" }
   | { status: "blocked"; reason: string }
+  | { status: "failed"; reason: string };
+
+type SubscriptionUpdateResult =
+  | { status: "attempted"; result: unknown }
+  | { status: "skipped"; reason: string }
   | { status: "failed"; reason: string };
 
 function jsonResponse(body: unknown, status: number): Response {
@@ -411,16 +423,44 @@ function linkUpdatePatch(payload: BillingCustomerLinkInsertPayload): Partial<Bil
   };
 }
 
+async function fetchExistingProcessing(
+  supabase: SupabaseClient,
+  paddleEventId: string,
+): Promise<ProcessingResult | null> {
+  const { data, error } = await supabase
+    .from("paddle_event_processing")
+    .select("id,status")
+    .eq("paddle_event_id", paddleEventId)
+    .maybeSingle();
+
+  if (error || !data) {
+    console.error("paddle-webhook processing_duplicate_fetch_failed", error);
+    return null;
+  }
+
+  const row = data as { id: string; status: ProcessingPayload["status"] };
+  return { id: row.id, status: row.status, duplicate: true };
+}
+
 async function insertProcessingPayload(
   supabase: SupabaseClient,
   payload: ProcessingPayload,
-): Promise<{ status: ProcessingPayload["status"]; duplicate: boolean }> {
-  const { error } = await supabase.from("paddle_event_processing").insert(payload);
-  if (!error) return { status: payload.status, duplicate: false };
+): Promise<ProcessingResult> {
+  const { data, error } = await supabase
+    .from("paddle_event_processing")
+    .insert(payload)
+    .select("id,status")
+    .single();
+  if (!error && data) {
+    const row = data as { id: string; status: ProcessingPayload["status"] };
+    return { id: row.id, status: row.status, duplicate: false };
+  }
 
-  const code = (error as { code?: string }).code;
+  const code = (error as { code?: string } | null)?.code;
   if (code === "23505") {
-    return { status: payload.status, duplicate: true };
+    const existing = await fetchExistingProcessing(supabase, payload.paddle_event_id);
+    if (existing) return existing;
+    return { id: null, status: payload.status, duplicate: true };
   }
 
   throw error;
@@ -429,7 +469,7 @@ async function insertProcessingPayload(
 async function recordProcessing(
   supabase: SupabaseClient,
   row: RecordedPaddleEventRow,
-): Promise<{ status: ProcessingPayload["status"]; duplicate: boolean }> {
+): Promise<ProcessingResult> {
   try {
     return await insertProcessingPayload(supabase, buildProcessingPayload(row));
   } catch (error) {
@@ -483,6 +523,39 @@ async function captureBillingCustomerLink(
 
   console.error("paddle-webhook link_insert_failed", error);
   return { status: "failed", reason: "link_insert_failed" };
+}
+
+function linkCaptureReadyForSubscriptionUpdate(linkCapture: LinkCaptureResult): boolean {
+  return linkCapture.status === "captured" || linkCapture.status === "updated" || linkCapture.status === "duplicate";
+}
+
+async function applyPaddleSubscriptionUpdate(
+  supabase: SupabaseClient,
+  processing: ProcessingResult,
+  linkCapture: LinkCaptureResult,
+): Promise<SubscriptionUpdateResult> {
+  if (processing.status !== "processed") {
+    return { status: "skipped", reason: "processing_not_processed" };
+  }
+
+  if (!processing.id) {
+    return { status: "skipped", reason: "processing_id_missing" };
+  }
+
+  if (!linkCaptureReadyForSubscriptionUpdate(linkCapture)) {
+    return { status: "skipped", reason: "link_capture_not_ready" };
+  }
+
+  const { data, error } = await supabase.rpc("apply_paddle_subscription_update", {
+    p_processing_id: processing.id,
+  });
+
+  if (error) {
+    console.error("paddle-webhook subscription_update_failed", error);
+    return { status: "failed", reason: "subscription_update_failed" };
+  }
+
+  return { status: "attempted", result: data };
 }
 
 async function fetchExistingPaddleEvent(
@@ -561,7 +634,8 @@ Deno.serve(async (req) => {
   });
 
   // Idempotent insert. If event_id already exists, treat as duplicate-OK and
-  // re-use the existing recorded event row for processing-state and link capture.
+  // re-use the existing recorded event row for processing-state, link capture,
+  // and guarded recurring subscription update handoff.
   const { data: insertedEvent, error } = await supabase.from("paddle_events").insert({
     event_id: eventId,
     event_type: eventType,
@@ -580,7 +654,11 @@ Deno.serve(async (req) => {
       if (linkCapture.status === "failed") {
         return jsonResponse({ error: "link_capture_failed", duplicate: true, processing, linkCapture }, 500);
       }
-      return jsonResponse({ ok: true, duplicate: true, processing, linkCapture }, 200);
+      const subscriptionUpdate = await applyPaddleSubscriptionUpdate(supabase, processing, linkCapture);
+      if (subscriptionUpdate.status === "failed") {
+        return jsonResponse({ error: "subscription_update_failed", duplicate: true, processing, linkCapture, subscriptionUpdate }, 500);
+      }
+      return jsonResponse({ ok: true, duplicate: true, processing, linkCapture, subscriptionUpdate }, 200);
     }
     console.error("paddle-webhook insert_failed", error);
     return jsonResponse({ error: "insert_failed" }, 500);
@@ -593,8 +671,10 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "link_capture_failed", recorded: true, processing, linkCapture }, 500);
   }
 
-  // NOTE: No entitlement changes here. Pro access is intentionally NOT
-  // granted from this function until a reviewed follow-up change wires
-  // entitlement updates against verified events.
-  return jsonResponse({ ok: true, recorded: true, processing, linkCapture }, 200);
+  const subscriptionUpdate = await applyPaddleSubscriptionUpdate(supabase, processing, linkCapture);
+  if (subscriptionUpdate.status === "failed") {
+    return jsonResponse({ error: "subscription_update_failed", recorded: true, processing, linkCapture, subscriptionUpdate }, 500);
+  }
+
+  return jsonResponse({ ok: true, recorded: true, processing, linkCapture, subscriptionUpdate }, 200);
 });

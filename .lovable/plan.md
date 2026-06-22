@@ -1,84 +1,73 @@
-# GGS 3-in-1 Soil Sensor Pro — Audit Findings + Minimal Slice Plan
 
-## Audit findings (existing patterns reused, no duplication)
+# Verdant V0 Audit — Plan
 
-**Sensor normalization & GGS mapping**
-- `src/lib/spiderFarmerGgsMappingRules.ts` already normalizes Spider Farmer GGS payloads (the parent product line for the 3-in-1 Soil Sensor Pro). It supports `soil_water_content`, `soil_ec`, `soil_temp_c`, `soil_temp_f`, plus alias tolerance, bounds checks, stale window (`SPIDER_FARMER_GGS_STALE_MS = 15min`), `source ∈ live | stale | invalid`, `raw_payload` preservation, and warnings instead of throws.
-- `src/lib/sensors/normalizeSensorReading.ts`, `src/lib/sensorIngestNormalizationRules.ts`, `src/lib/sensorValidation.ts` define the canonical reading shape and metric list.
-- DB trigger `public.validate_sensor_reading` already accepts metrics `soil_moisture_pct`, `ec`, plus the canonical source labels (`live | manual | csv | demo | stale | invalid`).
+## Summary
+Read-only audit by a senior product engineer / QA lead / safety reviewer. No code changes. Output is a written report in Verdant's 9-section format plus a P0/P1/P2 severity table with file references and a sequenced fix plan. Scope defaults to the full One-Tent Loop spine, sensor truth, static-safety surfaces, and the recently shipped Action Queue trace-link / keyboard-nav / a11y slice (since that is the most recent change surface).
 
-**Ingest paths (no new edge function needed)**
-- `supabase/functions/sensor-ingest-webhook/` — generic per-tent bridge webhook.
-- `supabase/functions/pi-ingest-readings/` — Pi/local bridge using `pi_ingest_commit_batch` RPC.
-- `supabase/functions/ecowitt-ingest/`, `ecowitt-real-ingest/` — vendor adapters.
-- The GGS 3-in-1 Soil Sensor Pro is delivered through the same Spider Farmer GGS local bridge (MQTT / Home Assistant / Pi bridge), so it rides the **existing `sensor-ingest-webhook` + Pi bridge** path — no new edge function.
+## Requirements / assumptions
+- Plan mode → no edits, no installs, no state-changing commands. Read-only inspection only.
+- Defaults chosen because the user skipped scoping questions:
+  - Scope: full V0 loop + recent Action Queue trace slice + sensor truth + safety scanners.
+  - Depth: audit + prioritized fix plan, no implementation this turn.
+  - Format: Verdant 9-section narrative + P0/P1/P2 severity table.
+- Authority order on conflicts: project knowledge > workspace knowledge > skill > general guidance.
+- Hard stop-ship rules (from `docs/v0-sentinel-stop-ship-checklist.md`) are non-negotiable evaluation gates.
+- No schema, RLS, edge, auth, or device-control changes will be proposed as part of the audit itself.
 
-**Provider labels & source badges**
-- `src/constants/sensorProviderLabels.ts` already includes `spider_farmer_ggs → "Spider Farmer GGS"`.
-- `src/components/TimelineSensorSourceBadge.tsx` + `src/lib/timelineSensorSourceBadgeRules.ts` already render canonical source badges, and Evidence Drawer reuses the same component.
+## Audit scope (what will be inspected)
+1. **One-Tent Loop spine**
+   - Quick Log writer + sensor snapshot validation (`src/lib/quick-log/*`).
+   - Timeline rendering, highlight, auto-scroll, reduced-motion, "View in Actions" / "Back to Actions".
+   - Sensor snapshot surfaces and source labels (`src/constants/sensorSourceLabels.ts`, `src/lib/sensor/*`).
+   - AI Doctor output contract vs. `docs/qa-regression-checklist.md` 8-field rule.
+   - Alert → Action Queue handoff (approval-required, provenance).
+2. **Action Queue recent slice**
+   - `src/lib/actionQueueTraceLinkCopyRules.ts`
+   - `src/lib/actionQueueKeyboardNavigationRules.ts`
+   - `src/components/CopyTraceLinkButton.tsx`
+   - `src/components/ActionQueueDetailDrawer.tsx`
+   - `src/pages/ActionQueue.tsx`, `src/pages/Timeline.tsx`
+   - Integrated test isolation (`action-queue-highlight-keyboard-integrated.test.tsx`) — coverage gaps left by removing DOM assertions to dodge Radix/jsdom hang.
+3. **Safety surfaces**
+   - `docs/safety/static-safety-scans.md` invariants vs. recently edited files.
+   - `docs/action-queue-safety-rules.md` (approval-required, no device control, no executable payloads).
+   - `docs/sensor-truth-rules.md` and EcoWitt-only scan (`scripts/assert-ecowitt-only-sensor-direction.mjs`).
+   - Secret exposure (`service_role`, bridge tokens) in `src/**`.
+4. **RLS posture**
+   - `docs/qa-rls-checklist.md` adherence in any hooks touched by the recent slice (read-only check; no DB calls).
+5. **Engineering layering**
+   - Business logic placement: pure rules in `src/lib/*Rules.ts` vs leakage into `.tsx`.
+   - Determinism, null-safety, typing of new helpers.
 
-**Quick Log snapshot attach**
-- `src/lib/latestSensorSnapshotRules.ts` builds the latest tent snapshot from long-format `sensor_readings`. Quick Log reads it through `src/components/QuickLogSensorSnapshotStrip.tsx` and attaches via existing `quicklog_save_event` / `quicklog_save_manual` RPCs. Quick Log never inserts sensor readings.
-- `manualSensorSnapshotQualityRules.ts` already classifies fresh/stale/invalid and blocks bad attachments.
+## Method
+- Codebase reading only: `code--view`, `code--list_dir`, `rg` via read-only inspection patterns.
+- Cross-reference each touched file against the relevant `docs/*` rule doc and stop-ship checklist.
+- For the recent slice, re-derive the trace-link copy contract (same-origin, allow-listed `actionsReturn`, no raw UUIDs in visible text) and verify against the rule file + component.
+- For the integrated test gap, document exactly which behaviors are now only covered by pure-rule tests and which are no longer asserted at the DOM level; recommend the smallest follow-up coverage that doesn't reintroduce the jsdom hang.
+- No Playwright runs, no `vitest`, no `tsc` — audit is read-only this turn. Validation commands will be listed for the follow-up implementation phase.
 
-**What is missing (the minimal slice)**
-1. A thin GGS-soil-only adapter that converts a normalized `SpiderFarmerGgsDraft` (or raw payload) into canonical long-format `sensor_readings` drafts limited to the soil probe metrics, and asserts tent context.
-2. Whitelist `spider_farmer_ggs` in the snapshot/provider trust path so Quick Log shows the correct source chip + Live/stale state.
-3. Tests + static-safety guards.
+## Deliverable structure (what the audit report will contain)
+1. **Summary** — one-paragraph verdict.
+2. **Requirements / assumptions** — scope, defaults, authority order.
+3. **File-level findings** — grouped by area (Loop / Action Queue slice / Safety / Sensor truth / Layering), each with file path + line refs.
+4. **Severity table** — P0 (stop-ship), P1 (must-fix before next release), P2 (cleanup), with file refs and one-line fix sketch.
+5. **Implementation notes** — sequenced fix plan as small slices, each scoped to one PR with the smallest-correct-change principle.
+6. **Tests added/updated** — recommended targeted tests per slice (happy / edge / null / determinism / regression / safety fence).
+7. **Validation commands** — `bun run test:static-safety`, `bunx vitest run --reporter=dot`, `bunx tsc --noEmit`, `node scripts/assert-ecowitt-only-sensor-direction.mjs`, `bun run test:one-tent-loop-smoke`, relevant Playwright specs.
+8. **Safety verdict** — per stop-ship rule, pass/fail with citation.
+9. **Risk / rollback notes** — for each proposed fix slice.
 
-## File-level plan (additive, minimal)
+## Explicitly out of scope
+- No code edits, no migrations, no edge-function changes, no RLS edits.
+- No schema or auth changes.
+- No new features. No paywall / entitlement work.
+- No device-control or automation surfaces.
+- No Supabase writes during the audit.
 
-**New**
-- `src/lib/ggsSoilSensorReadingNormalizer.ts` — pure helper. Input: unknown payload. Output: `{ status: "accepted" | "degraded" | "invalid", source: "live"|"stale"|"invalid", provider: "spider_farmer_ggs", tent_id, plant_id?, captured_at, confidence: "high"|"medium"|"low", readings: { soil_moisture_pct?, soil_temp_c?, ec? }, raw_payload, warnings[] }`. Internally delegates to `normalizeSpiderFarmerGgsPayload` for parsing/bounds and adds soil-only canonical mapping (incl. EC unit-mismatch heuristic, missing-tent rejection, manual-vs-live source rules, NaN/Infinity rejection).
-- `src/lib/ggsSoilSensorSnapshotAttach.ts` — pure adapter that takes the latest validated GGS soil readings for a tent/plant and produces a Quick Log snapshot draft compatible with the existing snapshot attach contract. Never writes.
-- `src/test/ggs-soil-sensor-reading-normalizer.test.ts` — alias coverage (snake + camelCase), missing tent rejection, missing source ≠ live, NaN/Infinity, EC unit-mismatch flag, stale classification, raw_payload preserved but never rendered.
-- `src/test/ggs-soil-sensor-snapshot-attach.test.ts` — latest valid GGS attaches with `source: live`; stale → blocked or visibly marked stale; invalid → blocked; no sensor_readings insert.
-- `src/test/ggs-soil-sensor-ingest-wiring-safety.test.ts` — static safety: no new edge function, no UI `.insert/.update/.delete/.upsert/.rpc/functions.invoke`, no service role / bridge token literal, no XLSX import surface reintroduced, no `raw_payload` rendered, no AI/alert/action-queue writes, no device-control verbs.
-- `src/test/ggs-soil-sensor-timeline-badge.test.tsx` — Timeline + Evidence Drawer render the `spider_farmer_ggs` provider chip with the correct canonical source badge.
+## Risk / rollback notes
+- Audit itself is read-only → zero runtime risk.
+- Risk lives in the *follow-up* fix slices; each will be proposed as an independently revertible PR with its own validation and rollback note.
+- If the audit surfaces a P0 (e.g. fake-live data path, unapproved Action Queue write, exposed secret), the report will recommend stop-ship and a single minimal hotfix slice before anything else lands.
 
-**Edited (presenters only, no logic duplication)**
-- `src/components/QuickLogSensorSnapshotStrip.tsx` — recognize `provider === "spider_farmer_ggs"` for the soil probe so the provider chip + freshness reuse the existing rules. (Likely already works through `deriveProviderLabel`; will only edit if a test exposes a gap.)
-
-**Not touched**
-- No schema/RLS/Edge changes.
-- No new edge function.
-- No UI rewrites.
-- No XLSX/import surfaces.
-- No AI/alerts/action-queue/device-control code.
-
-## Source & provenance behavior
-
-| Condition | source | confidence |
-|---|---|---|
-| Fresh (<15 min) payload via bridge, tent valid, values in bounds | `live` | `high` |
-| Some metrics valid, others out of bounds/missing | `live` | `medium` (warnings recorded) |
-| Captured_at older than stale window | `stale` | `low` |
-| Malformed / NaN / impossible values / missing tent / unknown source / EC unit mismatch | `invalid` | `low` |
-| Manually entered GGS values | `manual` | per existing manual rules |
-
-`raw_payload` is preserved on the reading draft; UI guard tests assert it is never rendered.
-
-## Current grow E2E smoke
-
-- Confirm via `supabase--read_query` whether the signed-in test grow has any `sensor_readings` rows with `source = 'spider_farmer_ggs'`.
-- If yes: run the read-only Quick Log attach path against the latest soil reading and verify Timeline + Evidence Drawer badges.
-- If no: use an explicitly labeled fixture (`source: 'demo'` or test fixture passed directly to the normalizer), and report Sentinel sign-off blocked on a real bridge reading.
-
-## Validation commands
-
-- `bunx vitest run src/test/ggs-soil-sensor-reading-normalizer.test.ts src/test/ggs-soil-sensor-snapshot-attach.test.ts src/test/ggs-soil-sensor-ingest-wiring-safety.test.ts src/test/ggs-soil-sensor-timeline-badge.test.tsx`
-- `bunx vitest run src/test/spider-farmer-ggs-mapping-rules.test.ts src/test/timeline-sensor-source-badge-component.test.tsx src/test/sensor-source-summary-rules.test.ts`
-- `bun run typecheck` (3 pre-existing ecowitt errors expected, unrelated)
-
-## Safety verdict (pre-commit, will re-state post-implementation)
-
-- New write path: **no** — normalizer + snapshot adapter are pure.
-- Bypasses ingest validation: **no** — payloads still flow through `validate_sensor_reading` + existing webhook auth.
-- Quick Log inserts sensor readings: **no** — attach only.
-- Alerts / Action Queue / AI / device control: **no**.
-- GGS data clearly labeled `live | manual | stale | invalid`: **yes**.
-
-## Risk / rollback
-
-- Risk: low — additive pure helpers + tests, no schema or edge changes.
-- Rollback: delete the new files and revert any minor `QuickLogSensorSnapshotStrip.tsx` edit.
+## Next step after approval
+On approval, switch to build mode and produce the written audit report (no code changes), then await direction on which fix slices (if any) to implement.

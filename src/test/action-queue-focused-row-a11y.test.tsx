@@ -53,7 +53,9 @@ describe("Action Queue focused row a11y", () => {
     expect(li.getAttribute("aria-labelledby")).toBe(
       `aq-pending-title-${row.id}`,
     );
-    li.focus();
+    act(() => {
+      li.focus();
+    });
     expect(li.getAttribute("aria-labelledby")).toBe(
       `aq-pending-title-${row.id}`,
     );
@@ -68,7 +70,9 @@ describe("Action Queue focused row a11y", () => {
       </ul>,
     );
     const li = getByTestId("row");
-    li.focus();
+    act(() => {
+      li.focus();
+    });
     const desc = li.getAttribute("aria-describedby") ?? "";
     expect(desc).toContain(`aq-pending-desc-${row.id}`);
     expect(desc).toContain(`aq-pending-desc-${row.id}-focused`);
@@ -85,11 +89,13 @@ describe("Action Queue focused row a11y", () => {
       </ul>,
     );
     const li = getByTestId("row");
-    li.focus();
-    fireEvent.focus(li);
+    act(() => {
+      li.focus();
+    });
     // Visible text shows action_type only.
     expect(li.textContent ?? "").not.toContain(row.id);
     // aria-label is absent so it cannot contain the UUID.
     expect(li.getAttribute("aria-label")).toBeNull();
   });
 });
+

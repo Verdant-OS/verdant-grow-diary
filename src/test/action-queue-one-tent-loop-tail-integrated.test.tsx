@@ -55,7 +55,28 @@ function makeRow(i: number) {
 const ROWS = Array.from({ length: 12 }, (_, i) => makeRow(i + 1));
 
 vi.mock("@/integrations/supabase/client", () => {
-  const aqResult = { data: ROWS, error: null };
+  const rows = Array.from({ length: 12 }, (_, i) => ({
+    id: `aq-${i + 1}`,
+    grow_id: "g1",
+    tent_id: null,
+    plant_id: null,
+    source: "ai_coach",
+    action_type: "lower_humidity",
+    target_metric: "humidity_pct",
+    target_device: null,
+    suggested_change: `Lower humidity step ${i + 1}`,
+    reason: i === 0 ? "Mold risk rising." : `Reason ${i + 1}`,
+    risk_level: "low",
+    status: "pending_approval",
+    approved_at: null,
+    rejected_at: null,
+    completed_at: null,
+    cancelled_at: null,
+    simulated_at: null,
+    created_at: `2026-05-${String(11 + i).padStart(2, "0")}T10:00:00Z`,
+    updated_at: `2026-05-${String(11 + i).padStart(2, "0")}T10:00:00Z`,
+  }));
+  const aqResult = { data: rows, error: null };
   const emptyResult = { data: [], error: null };
   const makeChain = (result: { data: unknown; error: null }) => {
     const chain: Record<string, unknown> = {

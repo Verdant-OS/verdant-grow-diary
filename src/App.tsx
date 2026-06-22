@@ -38,6 +38,7 @@ import ActionQueue from "./pages/ActionQueue";
 import OperatorEcowittCanary from "./pages/OperatorEcowittCanary";
 import OperatorEcowittTentPreview from "./pages/OperatorEcowittTentPreview";
 import OperatorPaddleProcessingAudit from "./pages/OperatorPaddleProcessingAudit";
+import OperatorBillingSubscriptionUpdateAudit from "./pages/OperatorBillingSubscriptionUpdateAudit";
 
 import EcowittBridgeStatus from "./pages/EcowittBridgeStatus";
 import EcowittBridgeDebug from "./pages/EcowittBridgeDebug";

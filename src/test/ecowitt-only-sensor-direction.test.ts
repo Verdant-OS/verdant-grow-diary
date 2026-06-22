@@ -121,4 +121,27 @@ describe("EcoWitt-only sensor direction", () => {
       readFileSync(resolve(ROOT, ".github/workflows/ecowitt-only-safety-scan.yml"), "utf8"),
     ).not.toThrow();
   });
+
+  it("allow-list never silently exempts production code paths", () => {
+    // Only docs, scripts, CI workflows, and test files may be
+    // allow-listed. A future allow-list addition under src/lib,
+    // src/components, src/pages, src/hooks, or src/integrations
+    // would silently reintroduce a banned vendor into production
+    // code under the guise of "exempt".
+    const forbiddenPrefixes = [
+      "src/lib/",
+      "src/components/",
+      "src/pages/",
+      "src/hooks/",
+      "src/integrations/",
+      "src/constants/",
+      "src/store/",
+      "supabase/functions/",
+      "supabase/migrations/",
+    ];
+    const leaked = [...ALLOWED].filter((entry) =>
+      forbiddenPrefixes.some((prefix) => entry.startsWith(prefix)),
+    );
+    expect(leaked).toEqual([]);
+  });
 });

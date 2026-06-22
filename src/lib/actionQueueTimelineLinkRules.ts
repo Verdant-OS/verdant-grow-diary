@@ -69,10 +69,18 @@ export const JUMP_TO_HIGHLIGHTED_TRACE_TESTID =
  * Build a safe "Jump to highlighted trace" link directly from the raw
  * highlight token (e.g. parsed from /actions ?highlight=...). Returns
  * null for malformed/unsafe tokens. Visible label never includes IDs.
+ *
+ * Optional `currentActionsParams` carries the current /actions URL
+ * search params so the resulting /timeline link can include a safe
+ * `actionsReturn` round-trip path that restores the exact /actions
+ * state (search, status, trace, page, pageSize, allow-listed view).
+ * Only allow-listed keys are preserved — see
+ * `actionQueueReturnLinkRules.ACTIONS_RETURN_ALLOWED_KEYS`.
  */
 export function buildJumpToHighlightedTraceLink(
   rawHighlight: string | null | undefined,
-): { href: string; label: string; highlight: string } | null {
+  currentActionsParams?: URLSearchParams | null,
+): { href: string; label: string; highlight: string; actionsReturn?: string } | null {
   if (typeof rawHighlight !== "string") return null;
   const parts = rawHighlight.split(":");
   if (parts.length !== 3) return null;
@@ -80,6 +88,29 @@ export function buildJumpToHighlightedTraceLink(
   if (prefix !== "action-queue") return null;
   if (!SAFE_ID_RE.test(actionId)) return null;
   if (kind !== "approved" && kind !== "rejected") return null;
-  const href = `/timeline?${TIMELINE_HIGHLIGHT_PARAM}=${encodeURIComponent(rawHighlight)}`;
-  return { href, label: JUMP_TO_HIGHLIGHTED_TRACE_LABEL, highlight: rawHighlight };
+  const qs = new URLSearchParams();
+  qs.set(TIMELINE_HIGHLIGHT_PARAM, rawHighlight);
+  let actionsReturn: string | undefined;
+  if (currentActionsParams) {
+    // Lazy require to keep this module dependency-light; both files
+    // are pure helpers with no React/Supabase imports.
+    const {
+      buildActionsReturnRelativePath,
+      ACTIONS_RETURN_PARAM,
+    } = require("./actionQueueReturnLinkRules") as typeof import("./actionQueueReturnLinkRules");
+    const ret = buildActionsReturnRelativePath(currentActionsParams);
+    // Only attach when the return path carries query state worth
+    // restoring. Bare `/actions` is the default and adds no value.
+    if (ret && ret !== "/actions") {
+      qs.set(ACTIONS_RETURN_PARAM, ret);
+      actionsReturn = ret;
+    }
+  }
+  const href = `/timeline?${qs.toString()}`;
+  return {
+    href,
+    label: JUMP_TO_HIGHLIGHTED_TRACE_LABEL,
+    highlight: rawHighlight,
+    actionsReturn,
+  };
 }

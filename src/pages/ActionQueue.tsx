@@ -1344,20 +1344,24 @@ export default function ActionQueue() {
           ),
         }}
         busy={!!drawerRow && busyId === drawerRow.id}
+        loading={drawerHistoryLoading && drawerHistory === null}
         canApprove={!!drawerRow && !isTerminalStatus(drawerRow.status)}
         canReject={!!drawerRow && drawerRow.status === "pending_approval"}
+        statusHistory={drawerHistory ?? []}
+        traceFailed={!!drawerRow && traceFailure?.actionId === drawerRow.id}
+        retrying={retryingTrace}
         onApprove={(r) => {
           const found = rows.find((row) => row.id === r.id);
-          if (found) {
-            setDrawerRow(null);
-            approve(found);
-          }
+          if (found) approve(found);
         }}
         onReject={(r) => {
           const found = rows.find((row) => row.id === r.id);
-          if (found) {
-            setDrawerRow(null);
-            reject(found);
+          if (found) reject(found);
+        }}
+        onRetryTrace={(r) => {
+          const found = rows.find((row) => row.id === r.id);
+          if (found && traceFailure?.actionId === found.id) {
+            void retryTimelineTrace(found, traceFailure.kind);
           }
         }}
       />

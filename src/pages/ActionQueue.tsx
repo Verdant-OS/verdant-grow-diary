@@ -98,6 +98,22 @@ import {
   applyActionQueueListPipeline,
   type ActionListExtraFilter,
 } from "@/lib/actionQueueFilterRules";
+import {
+  buildRetryTraceViewModel,
+} from "@/lib/actionQueueRetryTraceViewModel";
+import {
+  paginateActionQueue,
+  ACTION_QUEUE_PAGE_SIZE_OPTIONS,
+  ACTION_QUEUE_DEFAULT_PAGE_SIZE,
+  type ActionQueuePageSize,
+} from "@/lib/actionQueuePaginationRules";
+import {
+  parseActionQueueUrlState,
+  serializeActionQueueUrlState,
+  ACTION_QUEUE_URL_DEFAULTS,
+  ACTION_QUEUE_URL_KEYS,
+} from "@/lib/actionQueueUrlStateRules";
+
 import { Input } from "@/components/ui/input";
 
 
@@ -279,8 +295,72 @@ function TraceStatusBadge({ state }: { state: ActionTraceBadgeState }) {
   );
 }
 
+/**
+ * RetryTraceFailureRegion — calm, trace-specific failure banner for a
+ * single row. Renders nothing unless this row's diary trace insert is
+ * known to have failed. The retry button only repairs the trace; it
+ * NEVER repeats the approve/reject status update.
+ */
+function RetryTraceFailureRegion({
+  row,
+  traceFailure,
+  retrying,
+  onRetry,
+}: {
+  row: { id: string };
+  traceFailure: { actionId: string; kind: ActionQueueTraceKind } | null;
+  retrying: boolean;
+  onRetry: (row: { id: string }, kind: ActionQueueTraceKind) => void;
+}) {
+  const isThisRow = !!traceFailure && traceFailure.actionId === row.id;
+  const vm = buildRetryTraceViewModel({
+    traceFailed: isThisRow,
+    retrying: isThisRow && retrying,
+  });
+  if (!vm.showFailureRegion) return null;
+  return (
+    <div
+      role="alert"
+      data-testid="action-queue-row-retry-trace-region"
+      data-trace-state={vm.state}
+      className="mt-2 flex flex-wrap items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-foreground"
+    >
+      <div className="flex-1 space-y-1">
+        {vm.explanationLines.map((line, i) => (
+          <p
+            key={i}
+            data-testid={
+              i === 0
+                ? "action-queue-row-retry-trace-explain-primary"
+                : "action-queue-row-retry-trace-explain-secondary"
+            }
+          >
+            {line}
+          </p>
+        ))}
+      </div>
+      {!vm.buttonHidden && vm.buttonLabel && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={vm.buttonDisabled}
+          onClick={() => {
+            if (traceFailure) onRetry(row, traceFailure.kind);
+          }}
+          data-testid="action-queue-row-retry-trace-button"
+          aria-label="Retry diary trace"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          {vm.buttonLabel}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 
 export default function ActionQueue() {
+
   const { user } = useAuth();
   const { grows, activeGrowId, activeGrow } = useGrows();
   // Shared URL `?growId=` resolution against RLS-loaded grows. urlGrowId precedence
@@ -348,18 +428,37 @@ export default function ActionQueue() {
     void loadDrawerHistory(drawerRow);
   }, [drawerRow, loadDrawerHistory]);
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  // URL is the source of truth for search/status/trace/page/pageSize.
+  // We initialize local state from it on mount and mirror state→URL via
+  // a single replace-history effect below (no extra history entries).
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Read once on mount; subsequent URL→state syncs are handled explicitly.
+  const initialUrlState = useMemo(
+    () => parseActionQueueUrlState(searchParams),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(
+    initialUrlState.status as StatusFilter,
+  );
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   // Pure presenter state. Search is case-insensitive, client-side, and
   // never reaches payload bytes or hidden metadata.
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [traceExtraFilter, setTraceExtraFilter] = useState<ActionListExtraFilter>("none");
+  const [searchQuery, setSearchQuery] = useState<string>(initialUrlState.q);
+  const [traceExtraFilter, setTraceExtraFilter] = useState<ActionListExtraFilter>(
+    initialUrlState.trace === "failed" ? "trace_failed" : "none",
+  );
+  const [page, setPage] = useState<number>(initialUrlState.page);
+  const [pageSize, setPageSize] = useState<ActionQueuePageSize>(
+    initialUrlState.pageSize,
+  );
 
 
   // Deep-link focus: /actions?focus=<action_id>. Presenter-only; never mutates rows.
-  const [searchParams, setSearchParams] = useSearchParams();
+
   const focusedActionId = searchParams.get("focus");
 
   // Alert context chip + client-side filter: /actions?alert=<alert_id>.
@@ -464,6 +563,38 @@ export default function ActionQueue() {
       el.scrollIntoView({ block: "center", behavior: "smooth" });
     }
   }, [focusedActionId, loading, rows.length]);
+
+  // Reset to page 1 whenever search/filters/page size change. The page
+  // value itself is excluded from the dep list on purpose so manual
+  // page navigation doesn't get clobbered.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, statusFilter, traceExtraFilter, pageSize]);
+
+  // Mirror state → URL via replace-history so typing doesn't spam the
+  // back stack. Unrelated params (growId, focus, alert, sensorSources…)
+  // are preserved by serializeActionQueueUrlState.
+  useEffect(() => {
+    const urlStatus = (statusFilter as string) === "pending"
+      ? "pending"
+      : (statusFilter as string);
+    const next = serializeActionQueueUrlState(searchParams, {
+      q: searchQuery,
+      status: urlStatus as typeof ACTION_QUEUE_URL_DEFAULTS.status,
+      trace: traceExtraFilter === "trace_failed" ? "failed" : "all",
+      page,
+      pageSize,
+    });
+    // Only write when something actually changes — avoids replace loops.
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, statusFilter, traceExtraFilter, page, pageSize]);
+
+
+
 
 
 
@@ -731,14 +862,23 @@ export default function ActionQueue() {
   }, [rows, alertContextId, statusFilter, riskFilter, sourceFilter, sortOrder, searchQuery, traceExtraFilter, traceFailure]);
 
 
+  // Pagination is applied to the merged `filtered` list AFTER existing
+  // status/risk/source/alert + search/trace filters. Deterministic.
+  const paginated = useMemo(
+    () => paginateActionQueue(filtered, page, pageSize),
+    [filtered, page, pageSize],
+  );
+  const visibleRows = paginated.items;
   const pending = useMemo(
-    () => filtered.filter((r) => r.status === "pending_approval"),
-    [filtered],
+    () => visibleRows.filter((r) => r.status === "pending_approval"),
+    [visibleRows],
   );
   const reviewed = useMemo(
-    () => filtered.filter((r) => r.status !== "pending_approval"),
-    [filtered],
+    () => visibleRows.filter((r) => r.status !== "pending_approval"),
+    [visibleRows],
   );
+
+
 
   const filtersActive =
     statusFilter !== "all" ||
@@ -995,6 +1135,97 @@ export default function ActionQueue() {
           className="h-9 w-full sm:w-[220px]"
         />
       </div>
+
+      {/* Pagination controls. Pure presenter; no writes, no AI calls. */}
+      <div
+        className="glass rounded-2xl p-3 mb-4 flex flex-wrap items-center gap-3 text-xs"
+        data-testid="action-queue-pagination"
+        role="navigation"
+        aria-label="Action queue pagination"
+      >
+        <span
+          className="text-muted-foreground"
+          data-testid="action-queue-pagination-range"
+        >
+          {paginated.totalItems === 0
+            ? "0 of 0"
+            : `Showing ${paginated.rangeStart}–${paginated.rangeEnd} of ${paginated.totalItems}`}
+        </span>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1 text-muted-foreground">
+            <span>Per page</span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(v) => {
+                const n = Number.parseInt(v, 10);
+                if (ACTION_QUEUE_PAGE_SIZE_OPTIONS.includes(n as ActionQueuePageSize)) {
+                  setPageSize(n as ActionQueuePageSize);
+                }
+              }}
+            >
+              <SelectTrigger
+                className="h-8 w-[80px]"
+                aria-label="Page size"
+                data-testid="action-queue-page-size"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ACTION_QUEUE_PAGE_SIZE_OPTIONS.map((n) => (
+                  <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!paginated.hasPrev}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Previous page"
+            data-testid="action-queue-pagination-prev"
+          >
+            Previous
+          </Button>
+          <span
+            className="text-muted-foreground tabular-nums"
+            data-testid="action-queue-pagination-page-indicator"
+          >
+            Page {paginated.page} of {paginated.totalPages}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!paginated.hasNext}
+            onClick={() => setPage((p) => Math.min(paginated.totalPages, p + 1))}
+            aria-label="Next page"
+            data-testid="action-queue-pagination-next"
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+
+      {!loading && filtered.length === 0 && (
+        <div
+          className="glass rounded-2xl p-4 mb-4"
+          role="status"
+          data-testid="action-queue-no-results"
+        >
+          <p className="text-sm text-foreground">
+            {rows.length === 0
+              ? "No actions yet."
+              : "No matching actions found."}
+          </p>
+          {rows.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Clear the search box or change filters to see more actions.
+            </p>
+          )}
+        </div>
+      )}
+
+
 
 
       {alertContextId && !loading && filtered.length === 0 && (
@@ -1257,7 +1488,17 @@ export default function ActionQueue() {
                     View Details
                   </Link>
                 </div>
+                <RetryTraceFailureRegion
+                  row={row}
+                  traceFailure={traceFailure}
+                  retrying={retryingTrace}
+                  onRetry={(_r, kind) => {
+                    void retryTimelineTrace(row, kind);
+                  }}
+
+                />
                 <EventHistory items={events[row.id]} />
+
               </li>
               );
             })}
@@ -1419,7 +1660,16 @@ export default function ActionQueue() {
                   })()}
                 </div>
 
+                <RetryTraceFailureRegion
+                  row={row}
+                  traceFailure={traceFailure}
+                  retrying={retryingTrace}
+                  onRetry={(_r, kind) => {
+                    void retryTimelineTrace(row, kind);
+                  }}
+                />
                 <EventHistory items={events[row.id]} />
+
               </li>
               );
             })}

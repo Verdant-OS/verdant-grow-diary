@@ -84,6 +84,17 @@ import { classifyTimelineSensorSource, type TimelineSensorSourceKind } from "@/l
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 import { SENSOR_SOURCE_KINDS, SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
+import {
+  parseTimelineHighlightToken,
+  diaryEntryMatchesHighlight,
+  highlightIsMissingFromList,
+  TIMELINE_HIGHLIGHT_PARAM,
+  TIMELINE_HIGHLIGHT_TESTID,
+  TIMELINE_HIGHLIGHT_NOT_VISIBLE_COPY,
+  TIMELINE_HIGHLIGHT_NOT_VISIBLE_TESTID,
+  TIMELINE_HIGHLIGHT_ARIA_LABEL,
+} from "@/lib/timelineHighlightRules";
+
 
 
 
@@ -188,6 +199,13 @@ export default function Timeline() {
   // query param so the Sensors page summary widget can link directly into
   // a pre-filtered Timeline without introducing app-wide global state.
   const [searchParams, setSearchParams] = useSearchParams();
+  // Read-only diary-trace highlight from ?highlight=action-queue:<id>:<kind>.
+  // Pure parse; never alters sorting or fetches.
+  const highlight = useMemo(
+    () => parseTimelineHighlightToken(searchParams.get(TIMELINE_HIGHLIGHT_PARAM)),
+    [searchParams],
+  );
+
   const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>(
     () => parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM)),
   );
@@ -638,7 +656,17 @@ export default function Timeline() {
           Showing {filtered.length} of {entries.length}{" "}
           {entries.length === 1 ? "entry" : "entries"}
         </p>
+        {highlight && highlightIsMissingFromList(filtered, highlight) && (
+          <p
+            className="text-xs text-muted-foreground"
+            role="status"
+            data-testid={TIMELINE_HIGHLIGHT_NOT_VISIBLE_TESTID}
+          >
+            {TIMELINE_HIGHLIGHT_NOT_VISIBLE_COPY}
+          </p>
+        )}
       </div>
+
 
 
       {/* Filters */}

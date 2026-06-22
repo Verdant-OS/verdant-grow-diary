@@ -46,6 +46,7 @@ import { formatLastUpdatedAgo } from "@/lib/lastUpdatedAgo";
 import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
 import ActionQueueDetailDrawer from "@/components/ActionQueueDetailDrawer";
 import ActionQueueLoadingSkeleton from "@/components/ActionQueueLoadingSkeleton";
+import ActionQueueTraceStatusAnnouncer from "@/components/ActionQueueTraceStatusAnnouncer";
 import {
   buildActionQueueTraceDraft,
   buildActionQueueTraceIdempotencyKey,
@@ -1432,6 +1433,13 @@ export default function ActionQueue() {
                           retryingTrace: retryingTrace && traceFailure?.actionId === row.id,
                         })}
                       />
+                      <ActionQueueTraceStatusAnnouncer
+                        state={deriveActionTraceBadgeState({
+                          actionId: row.id,
+                          traceFailureActionId: traceFailure?.actionId ?? null,
+                          retryingTrace: retryingTrace && traceFailure?.actionId === row.id,
+                        })}
+                      />
 
                       {isAlertDerived(row) && (
                         <Badge
@@ -1666,6 +1674,7 @@ export default function ActionQueue() {
                       status: row.status,
                       actionId: row.id,
                       traceFailed: traceFailedHere,
+                      currentActionsParams: searchParams,
                     });
                     if (link) {
                       return (
@@ -1769,6 +1778,7 @@ export default function ActionQueue() {
         statusHistory={drawerHistory ?? []}
         traceFailed={!!drawerRow && traceFailure?.actionId === drawerRow.id}
         retrying={retryingTrace}
+        currentActionsParams={searchParams}
         onApprove={(r) => {
           const found = rows.find((row) => row.id === r.id);
           if (found) approve(found);

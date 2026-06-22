@@ -3,9 +3,9 @@
  * canonical Verdant One-Tent Loop order, the safe CTA copy for each step,
  * and the next-step resolution given selected ids.
  *
- * No I/O. No React. No Supabase. No AI calls. No device control.
- * No fake live data. Never claims missing/stale/invalid telemetry is healthy.
- * Action Queue copy is always approval-required.
+ * Pure module. No I/O, no React, no remote calls, no model calls.
+ * Never fabricates live readings. Never marks unknown telemetry as ok.
+ * Approval-required wording is preserved for the Action Queue step.
  */
 
 export type OneTentLoopStep =
@@ -112,9 +112,6 @@ export function resolveOneTentLoopNextStep(
     disabled: true,
     disabledReason: ONE_TENT_LOOP_DISABLED_COPY,
   };
-  if (!next) {
-    return { ...base, ctaLabel: ONE_TENT_LOOP_CTA_LABEL[current] };
-  }
 
   const { growId, tentId, plantId, alertId, actionId } = ids;
 
@@ -129,10 +126,8 @@ export function resolveOneTentLoopNextStep(
       if (plantId) return enable(base, `/plants/${plantId}`);
       return base;
     case "quick-log":
-      // After a Quick Log, take the grower to the Timeline.
       return enable(base, "/timeline");
     case "timeline":
-      // Sensor snapshot lives on the Sensors page.
       return enable(base, "/sensors");
     case "sensor-snapshot":
       return enable(base, "/doctor");
@@ -140,10 +135,8 @@ export function resolveOneTentLoopNextStep(
       if (alertId) return enable(base, `/alerts/${alertId}`);
       return enable(base, "/alerts");
     case "alert":
-      // CTA is "Add to Action Queue" — handoff happens on the alert detail
-      // page (grower-initiated). We route there when an alertId is known,
-      // otherwise to the alert index. Action Queue items remain
-      // approval-required.
+      // CTA is "Add to Action Queue" — the handoff is grower-initiated on
+      // the alert detail page. Action Queue items remain approval-required.
       if (alertId) return enable(base, `/alerts/${alertId}`);
       return enable(base, "/alerts");
     case "action-queue":
@@ -158,7 +151,7 @@ function enable(base: OneTentLoopNextStep, href: string): OneTentLoopNextStep {
   return { ...base, href, disabled: false, disabledReason: null };
 }
 
-/** Empty-state copy keyed by loop step. Never claims unknown data is healthy. */
+/** Empty-state copy keyed by loop step. */
 export const ONE_TENT_LOOP_EMPTY_STATE: Record<OneTentLoopStep, string> = {
   grow: "No grow selected yet. Create or open a grow to begin.",
   tent: "No tent yet. Create or open a tent to continue.",

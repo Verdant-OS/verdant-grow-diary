@@ -21,7 +21,8 @@ describe("OneTentLoopNextStepCard", () => {
     );
     const cta = screen.getByTestId("one-tent-loop-next-step-card-cta");
     expect(cta).toHaveTextContent("Open plant");
-    expect(cta.querySelector("a")?.getAttribute("href")).toBe("/tents/t1");
+    const anchor = cta.tagName === "A" ? cta : cta.querySelector("a");
+    expect(anchor?.getAttribute("href")).toBe("/tents/t1");
   });
 
   it("uses approval-required wording when on the action-queue step CTA", () => {

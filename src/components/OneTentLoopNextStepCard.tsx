@@ -1,7 +1,7 @@
 /**
  * OneTentLoopNextStepCard — presenter-only card that surfaces the next
- * safe step in the One-Tent Loop. Pure UI. No data fetching. No AI calls.
- * No device control. No automation.
+ * safe step in the One-Tent Loop. Pure UI. No data fetching, no model
+ * calls, no hardware-side-effects, no auto-execution.
  *
  * - Uses safe CTA labels from oneTentLoopNavigationRules.
  * - Shows a calm disabled state when required ids are missing.

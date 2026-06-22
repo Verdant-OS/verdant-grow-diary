@@ -1,4 +1,5 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
+import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useState } from "react";

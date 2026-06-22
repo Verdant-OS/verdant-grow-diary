@@ -21,6 +21,7 @@ import { ArrowLeft, Box, Lightbulb, Plus, Archive, GitMerge, NotebookPen } from 
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import AddExistingPlantDialog from "@/components/AddExistingPlantDialog";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
+import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import PlantPhoto from "@/components/PlantPhoto";
 import TentManualSnapshotChangeContext from "@/components/TentManualSnapshotChangeContext";
@@ -274,6 +275,17 @@ export default function TentDetail() {
         metas={[tentMeta]}
         testId="tent-detail-data-source-disclosure"
       />
+
+      {/* One-Tent Loop continuity card. No plant is "selected" on this
+          page, so we intentionally render the calm safe disabled state
+          instead of inventing a plant route. */}
+      <OneTentLoopNextStepCard
+        current="tent"
+        ids={{ growId: tent.growId ?? null }}
+        testId="tent-detail-one-tent-loop-next-step-card"
+        className="mb-3"
+      />
+
 
       <div className="mb-3 flex items-center gap-2 flex-wrap">
         <TentCardActionsMenu

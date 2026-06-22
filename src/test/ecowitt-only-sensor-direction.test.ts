@@ -47,6 +47,19 @@ const ALLOWED = new Set([
   // Intentional: the stop-ship checklist *defines* the safety scan and
   // uses SwitchBot as an example of a retired brand to watch for.
   "docs/v0-sentinel-stop-ship-checklist.md",
+  // Negative-guard tests: each line containing the term is inside a
+  // `expect(...).not.toMatch(/...|switchbot|.../)` regex that proves
+  // the surface does NOT mention the banned vendor. These tests
+  // enforce the EcoWitt-only direction; removing the term would
+  // silently weaken them.
+  "src/test/one-tent-loop-static-safety.test.ts",
+  "src/test/ai-doctor-one-tent-loop-card.test.tsx",
+  "src/test/alerts-one-tent-loop-card.test.tsx",
+  "src/test/grow-detail-one-tent-loop-card.test.tsx",
+  "src/test/plant-detail-one-tent-loop-card.test.tsx",
+  "src/test/sensors-one-tent-loop-card.test.tsx",
+  "src/test/tent-detail-one-tent-loop-card.test.tsx",
+  "src/test/timeline-one-tent-loop-card.test.tsx",
 ]);
 
 const PATTERN = /switch[\s_-]?bot/i;

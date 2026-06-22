@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useHasRole } from "@/hooks/useHasRole";
@@ -86,7 +87,12 @@ export default function OperatorBillingSubscriptionUpdateAudit() {
               and internal extra fields are intentionally hidden.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild type="button" variant="outline">
+              <Link to="/operator/billing-entitlement-resolution">
+                View entitlement resolution
+              </Link>
+            </Button>
             <label className="text-xs text-muted-foreground" htmlFor="sub-update-audit-limit">
               Rows
             </label>

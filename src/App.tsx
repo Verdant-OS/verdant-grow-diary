@@ -39,6 +39,7 @@ import OperatorEcowittCanary from "./pages/OperatorEcowittCanary";
 import OperatorEcowittTentPreview from "./pages/OperatorEcowittTentPreview";
 import OperatorPaddleProcessingAudit from "./pages/OperatorPaddleProcessingAudit";
 import OperatorBillingSubscriptionUpdateAudit from "./pages/OperatorBillingSubscriptionUpdateAudit";
+import OperatorBillingEntitlementResolutionAudit from "./pages/OperatorBillingEntitlementResolutionAudit";
 
 import EcowittBridgeStatus from "./pages/EcowittBridgeStatus";
 import EcowittBridgeDebug from "./pages/EcowittBridgeDebug";
@@ -163,6 +164,10 @@ const App = () => (
                 <Route
                   path="/operator/billing-subscription-updates"
                   element={<OperatorBillingSubscriptionUpdateAudit />}
+                />
+                <Route
+                  path="/operator/billing-entitlement-resolution"
+                  element={<OperatorBillingEntitlementResolutionAudit />}
                 />
                 <Route path="/operator/one-tent-proof-record" element={<OneTentProofRecord />} />
                 <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />

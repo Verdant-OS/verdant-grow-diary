@@ -129,6 +129,11 @@ export default function OperatorPaddleProcessingAudit() {
                 View subscription updater audit
               </Link>
             </Button>
+            <Button asChild type="button" variant="outline">
+              <Link to="/operator/billing-entitlement-resolution">
+                View entitlement resolution
+              </Link>
+            </Button>
             <Button
               type="button"
               variant="outline"

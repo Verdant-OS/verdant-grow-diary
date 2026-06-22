@@ -1797,6 +1797,10 @@ export type Database = {
         }
         Returns: Json
       }
+      billing_entitlement_resolution_operator_audit: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
       bump_bridge_token_usage: {
         Args: { p_id: string; p_inserted: number }
         Returns: undefined

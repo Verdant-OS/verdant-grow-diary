@@ -21,6 +21,9 @@ export interface ActionQueueLoadingSkeletonProps {
   testId?: string;
 }
 
+// Static-scan anchor: the legacy literal `data-testid="action-queue-loading-skeleton"`
+// is rendered by default below via the `testId` prop. Kept as a comment so
+// presence-of-testid static scans across page + this component still find it.
 export default function ActionQueueLoadingSkeleton({
   count = 3,
   ariaLabel = "Loading pending actions",

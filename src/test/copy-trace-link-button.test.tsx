@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, fireEvent, waitFor, act } from "@testing-library/react";
 import CopyTraceLinkButton from "@/components/CopyTraceLinkButton";
 import {
   COPY_TRACE_LINK_SUCCESS_COPY,

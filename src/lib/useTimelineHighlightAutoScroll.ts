@@ -28,6 +28,27 @@ export interface AutoScrollEntryLike extends DiaryEntryDetailsLike {
 export interface UseTimelineHighlightAutoScrollOptions {
   /** Override for tests / SSR: defaults to `document.getElementById`. */
   getNodeById?: (id: string) => HTMLElement | null;
+  /**
+   * Inject reduced-motion state for tests / SSR. Defaults to reading
+   * `window.matchMedia('(prefers-reduced-motion: reduce)').matches`.
+   * When true, the hook skips `scrollIntoView` entirely (motion-heavy)
+   * but still focuses the highlighted entry so keyboard users can find
+   * it. When matchMedia is unavailable, defaults to false (no change
+   * from prior behavior).
+   */
+  prefersReducedMotion?: boolean;
+}
+
+/** Pure detector. Safe in SSR / non-browser environments. */
+export function isReducedMotionPreferred(): boolean {
+  if (typeof window === "undefined") return false;
+  const mm = (window as Window & { matchMedia?: typeof window.matchMedia }).matchMedia;
+  if (typeof mm !== "function") return false;
+  try {
+    return !!mm.call(window, "(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
 }
 
 export function useTimelineHighlightAutoScroll(
@@ -53,13 +74,17 @@ export function useTimelineHighlightAutoScroll(
     const node = lookup(`timeline-entry-${match.id}`);
     if (!node) return;
     scrolledTokenRef.current = highlight.idempotencyKey;
-    try {
-      node.scrollIntoView({ behavior: "smooth", block: "center" });
-    } catch {
+    const reducedMotion =
+      options.prefersReducedMotion ?? isReducedMotionPreferred();
+    if (!reducedMotion) {
       try {
-        node.scrollIntoView();
+        node.scrollIntoView({ behavior: "smooth", block: "center" });
       } catch {
-        // ignore: jsdom may not implement scrollIntoView at all
+        try {
+          node.scrollIntoView();
+        } catch {
+          // ignore: jsdom may not implement scrollIntoView at all
+        }
       }
     }
     try {
@@ -71,5 +96,5 @@ export function useTimelineHighlightAutoScroll(
         // ignore
       }
     }
-  }, [highlight, entries, options.getNodeById]);
+  }, [highlight, entries, options.getNodeById, options.prefersReducedMotion]);
 }

@@ -106,6 +106,10 @@ import {
   BACK_TO_ACTIONS_LABEL,
   BACK_TO_ACTIONS_TESTID,
 } from "@/lib/actionQueueReturnLinkRules";
+import {
+  buildViewInActionsLinkFromDiaryDetails,
+  VIEW_IN_ACTIONS_TESTID,
+} from "@/lib/actionQueueTimelineLinkRules";
 import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoScroll";
 
 
@@ -999,6 +1003,27 @@ export default function Timeline() {
 
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>
+                              {(() => {
+                                const viewLink = buildViewInActionsLinkFromDiaryDetails(
+                                  e.details as { kind?: unknown; idempotency_key?: unknown } | null,
+                                  { actionsReturn: backToActions.wasProvided ? backToActions.href : null },
+                                );
+                                if (!viewLink) return null;
+                                return (
+                                  <div className="mt-2">
+                                    <Link
+                                      to={viewLink.href}
+                                      data-testid={VIEW_IN_ACTIONS_TESTID}
+                                      data-view-in-actions-highlight={viewLink.highlight}
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                      onClick={(ev) => ev.stopPropagation()}
+                                    >
+                                      <ListChecks className="h-3 w-3" aria-hidden />
+                                      {viewLink.label}
+                                    </Link>
+                                  </div>
+                                );
+                              })()}
                               {remindAt && (
                                 <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-300">
                                   <Bell className="h-3 w-3" />Remind {format(new Date(remindAt), "PPp")}

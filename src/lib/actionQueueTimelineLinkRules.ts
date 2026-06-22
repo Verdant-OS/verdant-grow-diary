@@ -34,6 +34,12 @@ export interface BuildActionDiaryTraceLinkInput {
   actionId: string;
   /** True when the page knows the trace insert for this action failed. */
   traceFailed?: boolean;
+  /**
+   * Optional current /actions URLSearchParams. When provided, the
+   * outgoing /timeline link includes a safe `actionsReturn` round-trip
+   * so the grower can return to the exact /actions URL state.
+   */
+  currentActionsParams?: URLSearchParams | null;
 }
 
 export interface ActionDiaryTraceLink {
@@ -42,6 +48,8 @@ export interface ActionDiaryTraceLink {
   /** Deterministic key; opaque to the timeline today, safe to expose in URL. */
   highlight: string;
   kind: ActionDiaryTraceLinkKind;
+  /** Present only when a non-default actionsReturn was preserved. */
+  actionsReturn?: string;
 }
 
 const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -61,8 +69,18 @@ export function buildActionDiaryTraceLink(
   const kind = statusToKind(input.status);
   if (!kind) return null;
   const highlight = buildActionQueueTraceIdempotencyKey(input.actionId, kind);
-  const href = `/timeline?${TIMELINE_HIGHLIGHT_PARAM}=${encodeURIComponent(highlight)}`;
-  return { href, label: TIMELINE_TRACE_LINK_LABEL, highlight, kind };
+  const qs = new URLSearchParams();
+  qs.set(TIMELINE_HIGHLIGHT_PARAM, highlight);
+  let actionsReturn: string | undefined;
+  if (input.currentActionsParams) {
+    const ret = buildActionsReturnRelativePath(input.currentActionsParams);
+    if (ret && ret !== "/actions") {
+      qs.set(ACTIONS_RETURN_PARAM, ret);
+      actionsReturn = ret;
+    }
+  }
+  const href = `/timeline?${qs.toString()}`;
+  return { href, label: TIMELINE_TRACE_LINK_LABEL, highlight, kind, actionsReturn };
 }
 
 export const JUMP_TO_HIGHLIGHTED_TRACE_LABEL = "Jump to highlighted trace";
@@ -109,4 +127,58 @@ export function buildJumpToHighlightedTraceLink(
     highlight: rawHighlight,
     actionsReturn,
   };
+}
+
+export const VIEW_IN_ACTIONS_LABEL = "View in Actions";
+export const VIEW_IN_ACTIONS_TESTID = "timeline-view-in-actions";
+
+const HIGHLIGHT_TOKEN_RE = /^action-queue:([A-Za-z0-9_-]{1,64}):(approved|rejected)$/;
+
+export interface DiaryTraceDetailsLike {
+  kind?: unknown;
+  idempotency_key?: unknown;
+}
+
+export interface ViewInActionsLink {
+  href: string;
+  label: string;
+  highlight: string;
+}
+
+/**
+ * Derive a safe "View in Actions" link from a diary entry's details
+ * column. Returns null unless `details.kind === "action_queue_trace"`
+ * and `details.idempotency_key` matches the safe shape
+ * `action-queue:<safeId>:<approved|rejected>`.
+ *
+ * When a safe `actionsReturn` path is supplied (already validated by
+ * the caller via parseActionsReturnParam), it is used verbatim and the
+ * highlight is added so the row remains marked on arrival. Otherwise a
+ * default `/actions?highlight=...` link is built.
+ *
+ * Visible copy ("View in Actions") never includes raw IDs.
+ */
+export function buildViewInActionsLinkFromDiaryDetails(
+  details: DiaryTraceDetailsLike | null | undefined,
+  options?: { actionsReturn?: string | null },
+): ViewInActionsLink | null {
+  if (!details || typeof details !== "object") return null;
+  if ((details as { kind?: unknown }).kind !== "action_queue_trace") return null;
+  const key = (details as { idempotency_key?: unknown }).idempotency_key;
+  if (typeof key !== "string") return null;
+  if (!HIGHLIGHT_TOKEN_RE.test(key)) return null;
+  const ret = options?.actionsReturn;
+  // Default: /actions?highlight=<token>.
+  let href = `/actions?${TIMELINE_HIGHLIGHT_PARAM}=${encodeURIComponent(key)}`;
+  if (typeof ret === "string" && /^\/actions(?:$|[?#])/.test(ret)) {
+    // Merge highlight into the safe actionsReturn path so the operator
+    // returns to their exact /actions URL state AND the row stays
+    // marked. Strip an existing `highlight=` so it can't conflict.
+    const [path, search = ""] = ret.split("?");
+    const qs = new URLSearchParams(search);
+    qs.delete(TIMELINE_HIGHLIGHT_PARAM);
+    qs.set(TIMELINE_HIGHLIGHT_PARAM, key);
+    href = `${path}?${qs.toString()}`;
+  }
+  return { href, label: VIEW_IN_ACTIONS_LABEL, highlight: key };
 }

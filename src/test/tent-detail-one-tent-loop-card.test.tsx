@@ -107,4 +107,61 @@ describe("TentDetail One-Tent Loop next-step card wiring", () => {
     expect(text).not.toMatch(/relay|actuator|switchbot/);
     expect(text).not.toMatch(/auto[- ]?run|auto[- ]?execute/);
   });
+
+  it("shows disabled copy when no plant is available (zero-plant fixture)", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="tent"
+        ids={{ growId: "g1", plantId: null }}
+        testId="tent-detail-one-tent-loop-next-step-card"
+      />,
+    );
+    expect(
+      screen.getByTestId("tent-detail-one-tent-loop-next-step-card-disabled"),
+    ).toHaveTextContent("Next step unavailable until this record is selected.");
+  });
+
+  it("shows Open plant CTA when exactly one safe plant fixture is passed", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="tent"
+        ids={{ growId: "g1", plantId: "p1" }}
+        testId="tent-detail-one-tent-loop-next-step-card"
+      />,
+    );
+    const cta = screen.getByTestId(
+      "tent-detail-one-tent-loop-next-step-card-cta",
+    );
+    expect(cta).toHaveTextContent(/Open plant/i);
+  });
+
+  it("with one safe plant fixture, visible text hides UUID-looking ids", () => {
+    const uuid = "11111111-2222-3333-4444-555555555555";
+    const { container } = renderCard(
+      <OneTentLoopNextStepCard
+        current="tent"
+        ids={{ growId: uuid, plantId: uuid }}
+        testId="tent-detail-one-tent-loop-next-step-card"
+      />,
+    );
+    expect(container.textContent ?? "").not.toContain(uuid);
+  });
+
+  it("ensures Tent Detail no-plants empty-state copy is defined as a literal", async () => {
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile("src/pages/TentDetail.tsx", "utf8");
+    expect(src).toContain(
+      "Add or open a plant to continue the One-Tent Loop.",
+    );
+  });
+
+  it("Tent Detail source does not introduce AI/Supabase write or device-control calls in this slice", async () => {
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile("src/pages/TentDetail.tsx", "utf8");
+    // No new fetch/Supabase write/device-control imports added by the
+    // One-Tent Loop card wiring.
+    expect(src).not.toMatch(/supabase\.from\([^)]*\)\.(insert|update|delete|upsert)/);
+    expect(src).not.toMatch(/switchbot|relay-control|device-control|auto-execute/i);
+    expect(src).not.toMatch(/openai|anthropic|lovable-ai/i);
+  });
 });

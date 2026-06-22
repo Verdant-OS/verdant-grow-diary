@@ -473,8 +473,8 @@ export default function ActionQueue() {
   // never mutates state, never re-runs approve/reject, never inserts.
   const rawHighlightParam = searchParams.get("highlight");
   const jumpHighlightLink = useMemo(
-    () => buildJumpToHighlightedTraceLink(rawHighlightParam),
-    [rawHighlightParam],
+    () => buildJumpToHighlightedTraceLink(rawHighlightParam, searchParams),
+    [rawHighlightParam, searchParams],
   );
 
 

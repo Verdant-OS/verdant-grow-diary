@@ -46,6 +46,21 @@ describe("PlantDetail One-Tent Loop next-step card wiring", () => {
     expect(cta).toHaveTextContent(/Add quick log/i);
   });
 
+  it("CTA href uses the existing /plants/:plantId route pattern (no invented route)", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="plant"
+        ids={{ plantId: "p1" }}
+        testId="plant-detail-one-tent-loop-next-step-card"
+      />,
+    );
+    const cta = screen.getByTestId(
+      "plant-detail-one-tent-loop-next-step-card-cta",
+    );
+    const anchor = cta.tagName === "A" ? cta : cta.querySelector("a");
+    expect(anchor?.getAttribute("href")).toBe("/plants/p1");
+  });
+
   it("falls back to the safe disabled state when ids are missing", () => {
     renderCard(
       <OneTentLoopNextStepCard

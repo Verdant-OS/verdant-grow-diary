@@ -207,6 +207,9 @@ describe("billing_subscription_update_audit retention purge migration", () => {
     expect(RETENTION_MIGRATION).toContain("'ok'");
     expect(RETENTION_MIGRATION).toContain("'retention_days'");
     expect(RETENTION_MIGRATION).toContain("'deleted_count'");
+    // Strip SQL line comments so documentation that names forbidden tokens
+    // (e.g. "no provider IDs returned") does not trip the guard.
+    const codeOnly = RETENTION_MIGRATION.replace(/--[^\n]*/g, "");
     for (const forbidden of [
       "provider_customer_id",
       "provider_subscription_id",
@@ -219,7 +222,7 @@ describe("billing_subscription_update_audit retention purge migration", () => {
       "user_id",
       "RETURNING",
     ]) {
-      expect(RETENTION_MIGRATION).not.toContain(forbidden);
+      expect(codeOnly).not.toContain(forbidden);
     }
   });
 

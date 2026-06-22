@@ -149,7 +149,27 @@ describe("buildCopyableTraceLinkFromDiaryDetails", () => {
         idempotency_key: "garbage",
       }),
     ).toBeNull();
+    // wrong kind / oversize id / bare UUID — all unsafe in the details payload
+    expect(
+      buildCopyableTraceLinkFromDiaryDetails({
+        kind: "action_queue_trace",
+        idempotency_key: "action-queue:aq-1:completed",
+      }),
+    ).toBeNull();
+    expect(
+      buildCopyableTraceLinkFromDiaryDetails({
+        kind: "action_queue_trace",
+        idempotency_key: `action-queue:${"a".repeat(65)}:approved`,
+      }),
+    ).toBeNull();
+    expect(
+      buildCopyableTraceLinkFromDiaryDetails({
+        kind: "action_queue_trace",
+        idempotency_key: "11111111-2222-3333-4444-555555555555",
+      }),
+    ).toBeNull();
   });
+
 
   it("builds a link for valid action_queue_trace details", () => {
     const link = buildCopyableTraceLinkFromDiaryDetails(

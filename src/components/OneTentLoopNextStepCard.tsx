@@ -13,6 +13,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ONE_TENT_LOOP_STEP_LABEL,
+  ONE_TENT_LOOP_HELPER_COPY,
   resolveOneTentLoopNextStep,
   type OneTentLoopIds,
   type OneTentLoopStep,

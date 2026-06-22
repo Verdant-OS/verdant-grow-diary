@@ -165,3 +165,107 @@ describe("billingSubscriptionUpdateAuditViewModel — parse response", () => {
     expect("details" in row).toBe(false);
   });
 });
+
+describe("billingSubscriptionUpdateAuditViewModel — sanitized type contract", () => {
+  it("operator row key allow-list contains only safe fields", () => {
+    expect([...BILLING_SUBSCRIPTION_UPDATE_AUDIT_OPERATOR_ROW_KEYS].sort()).toEqual(
+      [
+        "candidate_plan_id",
+        "candidate_status",
+        "created_at",
+        "result_reason",
+        "result_status",
+        "subscription_status",
+      ],
+    );
+  });
+
+  it("forbidden-key tuple covers known provider/payload exfil vectors", () => {
+    for (const k of [
+      "provider_customer_id",
+      "provider_subscription_id",
+      "provider_price_id",
+      "payload",
+      "raw_payload",
+      "details",
+      "event_id",
+      "processing_id",
+      "user_id",
+    ]) {
+      expect(BILLING_SUBSCRIPTION_UPDATE_AUDIT_FORBIDDEN_KEYS).toContain(k);
+    }
+  });
+
+  it("operator row key allow-list and forbidden-key tuple are disjoint", () => {
+    const forbidden = new Set<string>(BILLING_SUBSCRIPTION_UPDATE_AUDIT_FORBIDDEN_KEYS);
+    for (const key of BILLING_SUBSCRIPTION_UPDATE_AUDIT_OPERATOR_ROW_KEYS) {
+      expect(forbidden.has(key)).toBe(false);
+    }
+  });
+
+  it("parser display rows expose only the documented safe key set", () => {
+    const vm = parseBillingSubscriptionUpdateAuditResponse({
+      ok: true,
+      latest: [
+        {
+          created_at: "2026-06-22T00:00:00Z",
+          result_status: "created",
+          candidate_plan_id: "pro_annual",
+          candidate_status: "active",
+          subscription_status: "active",
+          provider_customer_id: "cus_LEAK",
+          payload: { x: 1 },
+          details: { y: 2 },
+        },
+      ],
+    });
+    const keys = Object.keys(vm.latest[0]).sort();
+    expect(keys).toEqual(
+      [
+        "candidatePlanId",
+        "candidatePlanLabel",
+        "candidateStatus",
+        "candidateStatusLabel",
+        "createdAt",
+        "resultReason",
+        "resultReasonLabel",
+        "resultStatus",
+        "resultStatusLabel",
+        "subscriptionStatus",
+        "subscriptionStatusLabel",
+      ],
+    );
+  });
+});
+
+describe("billingSubscriptionUpdateAuditViewModel — source-level static guards", () => {
+  const VM_SOURCE = readFileSync(
+    resolve(process.cwd(), "src/lib/billingSubscriptionUpdateAuditViewModel.ts"),
+    "utf8",
+  );
+
+  it("view-model module does not name forbidden fields inside exported row types", () => {
+    // The forbidden-key tuple itself contains these strings; strip its
+    // declaration block before scanning so only "real" field references
+    // would trip this guard.
+    const sanitized = VM_SOURCE.replace(
+      /BILLING_SUBSCRIPTION_UPDATE_AUDIT_FORBIDDEN_KEYS[\s\S]*?\] as const;/,
+      "",
+    );
+    for (const forbidden of [
+      "provider_customer_id",
+      "provider_subscription_id",
+      "provider_price_id",
+      "raw_payload",
+      "event_id",
+      "processing_id",
+    ]) {
+      expect(sanitized).not.toContain(forbidden);
+    }
+  });
+
+  it("view-model module does not read/write billing_subscriptions or use spread mapping from raw rows", () => {
+    expect(VM_SOURCE).not.toMatch(/\.from\(["']billing_subscriptions["']\)/);
+    expect(VM_SOURCE).not.toMatch(/\.\.\.row\b/);
+  });
+});

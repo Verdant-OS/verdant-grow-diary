@@ -110,6 +110,8 @@ import {
   buildViewInActionsLinkFromDiaryDetails,
   VIEW_IN_ACTIONS_TESTID,
 } from "@/lib/actionQueueTimelineLinkRules";
+import { buildCopyableTraceLinkFromDiaryDetails } from "@/lib/actionQueueTraceLinkCopyRules";
+import CopyTraceLinkButton from "@/components/CopyTraceLinkButton";
 import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoScroll";
 
 
@@ -1004,23 +1006,38 @@ export default function Timeline() {
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>
                               {(() => {
+                                const actionsReturn = backToActions.wasProvided
+                                  ? backToActions.href
+                                  : null;
                                 const viewLink = buildViewInActionsLinkFromDiaryDetails(
                                   e.details as { kind?: unknown; idempotency_key?: unknown } | null,
-                                  { actionsReturn: backToActions.wasProvided ? backToActions.href : null },
+                                  { actionsReturn },
                                 );
-                                if (!viewLink) return null;
+                                const copyLink = buildCopyableTraceLinkFromDiaryDetails(
+                                  e.details as { kind?: unknown; idempotency_key?: unknown } | null,
+                                  { actionsReturn },
+                                );
+                                if (!viewLink && !copyLink) return null;
                                 return (
-                                  <div className="mt-2">
-                                    <Link
-                                      to={viewLink.href}
-                                      data-testid={VIEW_IN_ACTIONS_TESTID}
-                                      data-view-in-actions-highlight={viewLink.highlight}
-                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-                                      onClick={(ev) => ev.stopPropagation()}
-                                    >
-                                      <ListChecks className="h-3 w-3" aria-hidden />
-                                      {viewLink.label}
-                                    </Link>
+                                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                                    {viewLink && (
+                                      <Link
+                                        to={viewLink.href}
+                                        data-testid={VIEW_IN_ACTIONS_TESTID}
+                                        data-view-in-actions-highlight={viewLink.highlight}
+                                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                        onClick={(ev) => ev.stopPropagation()}
+                                      >
+                                        <ListChecks className="h-3 w-3" aria-hidden />
+                                        {viewLink.label}
+                                      </Link>
+                                    )}
+                                    {copyLink && (
+                                      <CopyTraceLinkButton
+                                        url={copyLink.url}
+                                        testIdSuffix={`timeline-${e.id}`}
+                                      />
+                                    )}
                                   </div>
                                 );
                               })()}

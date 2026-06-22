@@ -97,6 +97,11 @@ import {
   JUMP_TO_HIGHLIGHTED_TRACE_TESTID,
   TIMELINE_TRACE_UNAVAILABLE_COPY,
 } from "@/lib/actionQueueTimelineLinkRules";
+import { parseTimelineHighlightToken } from "@/lib/timelineHighlightRules";
+import {
+  isActionQueueNavigationKey,
+  resolveActionQueueNavIntent,
+} from "@/lib/actionQueueKeyboardNavigationRules";
 import {
   applyActionQueueListPipeline,
   type ActionListExtraFilter,
@@ -389,6 +394,11 @@ export default function ActionQueue() {
   // Slide-over drawer that explains a single Action Queue item.
   // Presenter-only state. Opening it never triggers a write or AI call.
   const [drawerRow, setDrawerRow] = useState<ActionRow | null>(null);
+  /**
+   * Refs to the visible pending-row <li> nodes, keyed by action id, used
+   * by keyboard navigation (ArrowUp/Down/Home/End/Enter). Presenter-only.
+   */
+  const pendingRowRefs = useRef<Map<string, HTMLLIElement>>(new Map());
   const [drawerHistory, setDrawerHistory] = useState<
     ActionQueueStatusHistoryEntry[] | null
   >(null);
@@ -477,6 +487,13 @@ export default function ActionQueue() {
     () => buildJumpToHighlightedTraceLink(rawHighlightParam, searchParams),
     [rawHighlightParam, searchParams],
   );
+  // Parsed `?highlight=action-queue:<id>:<kind>` is used to mark the
+  // matching /actions row with a static, reduced-motion-safe ring.
+  // Presenter-only; never mutates rows or re-runs approve/reject.
+  const highlightedActionId = useMemo(() => {
+    const parsed = parseTimelineHighlightToken(rawHighlightParam);
+    return parsed?.actionId ?? null;
+  }, [rawHighlightParam]);
 
 
   const clearFocus = useCallback(() => {
@@ -1388,10 +1405,11 @@ export default function ActionQueue() {
 
         ) : (
           <ul className="space-y-3">
-            {pending.map((row) => {
+            {pending.map((row, rowIndex) => {
               const titleId = `aq-pending-title-${row.id}`;
               const descId = `aq-pending-desc-${row.id}`;
               const isFocused = focusedActionId === row.id;
+              const isHighlightedTrace = highlightedActionId === row.id;
               const ev = buildActionEvidenceViewModel({
                 source: row.source,
                 action_type: row.action_type,
@@ -1400,21 +1418,61 @@ export default function ActionQueue() {
               return (
               <li
                 key={row.id}
+                ref={(node) => {
+                  if (node) pendingRowRefs.current.set(row.id, node);
+                  else pendingRowRefs.current.delete(row.id);
+                }}
+                tabIndex={0}
                 data-testid="action-queue-row"
                 data-action-id={row.id}
                 data-focused={isFocused ? "true" : undefined}
+                data-highlighted-trace={isHighlightedTrace ? "true" : undefined}
                 aria-label={isFocused ? "Focused action" : undefined}
                 aria-labelledby={isFocused ? undefined : titleId}
                 aria-describedby={isFocused ? undefined : descId}
-                className={`rounded-xl border border-border/60 bg-secondary/30 p-3 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background ${
+                onKeyDown={(e) => {
+                  if (!isActionQueueNavigationKey(e.key)) return;
+                  // Only handle when focus is on the row itself; never
+                  // hijack keys for nested controls (Approve/Reject/Retry).
+                  if (e.target !== e.currentTarget) return;
+                  const intent = resolveActionQueueNavIntent({
+                    currentIndex: rowIndex,
+                    listLength: pending.length,
+                    key: e.key,
+                  });
+                  if (!intent) return;
+                  e.preventDefault();
+                  if (intent.kind === "open-drawer") {
+                    setDrawerRow(pending[intent.index] ?? row);
+                    return;
+                  }
+                  const next = pending[intent.index];
+                  if (next) {
+                    pendingRowRefs.current.get(next.id)?.focus();
+                  }
+                }}
+                className={`rounded-xl border bg-secondary/30 p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background ${
+                  isHighlightedTrace
+                    ? "border-primary/60 bg-primary/5 ring-2 ring-primary/70 ring-offset-2 ring-offset-background"
+                    : "border-border/60"
+                } ${
                   isFocused
                     ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                     : ""
                 }`}
               >
+                {isHighlightedTrace && (
+                  <span
+                    className="sr-only"
+                    data-testid="action-queue-highlighted-trace-row"
+                  >
+                    Highlighted Action Queue trace
+                  </span>
+                )}
                 <span id={descId} className="sr-only">
                   {buildActionRowAriaLabel(row)}
                 </span>
+
 
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
@@ -1577,6 +1635,7 @@ export default function ActionQueue() {
               const titleId = `aq-reviewed-title-${row.id}`;
               const descId = `aq-reviewed-desc-${row.id}`;
               const isFocused = focusedActionId === row.id;
+              const isHighlightedTrace = highlightedActionId === row.id;
               const ev = buildActionEvidenceViewModel({
                 source: row.source,
                 action_type: row.action_type,
@@ -1588,18 +1647,32 @@ export default function ActionQueue() {
                 data-testid="action-queue-row"
                 data-action-id={row.id}
                 data-focused={isFocused ? "true" : undefined}
+                data-highlighted-trace={isHighlightedTrace ? "true" : undefined}
                 aria-label={isFocused ? "Focused action" : undefined}
                 aria-labelledby={isFocused ? undefined : titleId}
                 aria-describedby={isFocused ? undefined : descId}
-                className={`rounded-lg border border-border/40 bg-secondary/20 p-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background ${
+                className={`rounded-lg border bg-secondary/20 p-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background ${
+                  isHighlightedTrace
+                    ? "border-primary/60 bg-primary/5 ring-2 ring-primary/70 ring-offset-2 ring-offset-background"
+                    : "border-border/40"
+                } ${
                   isFocused
                     ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                     : ""
                 }`}
               >
+                {isHighlightedTrace && (
+                  <span
+                    className="sr-only"
+                    data-testid="action-queue-highlighted-trace-row"
+                  >
+                    Highlighted Action Queue trace
+                  </span>
+                )}
                 <span id={descId} className="sr-only">
                   {buildActionRowAriaLabel(row)}
                 </span>
+
                 <div className="flex items-center gap-3 flex-wrap">
 
                   <Badge variant="outline" className="text-[10px] uppercase" aria-label={buildStatusBadgeAriaLabel(row.status)}>{row.status}</Badge>

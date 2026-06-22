@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
   Loader2,
@@ -9,6 +11,7 @@ import {
   ListChecks,
   Sparkles,
   Bell,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useGrowDetailData, type GrowOutcomesState } from "@/hooks/useGrowDetailData";
 import {
@@ -32,6 +35,8 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import ActionOutcomeLearningReport from "@/components/ActionOutcomeLearningReport";
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
+import GrowTargetsEditor from "@/components/GrowTargetsEditor";
+
 
 /**
  * Read-only grow detail hub. Presentational only — all data loading +

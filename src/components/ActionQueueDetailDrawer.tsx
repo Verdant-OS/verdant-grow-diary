@@ -32,6 +32,16 @@ import {
   STATUS_HISTORY_EMPTY_COPY,
   type ActionQueueStatusHistoryEntry,
 } from "@/lib/actionQueueStatusHistoryRules";
+import {
+  deriveActionTraceBadgeState,
+  ACTION_TRACE_BADGE_LABEL,
+  ACTION_TRACE_BADGE_HELP,
+} from "@/lib/actionQueueTraceStatusRules";
+import {
+  buildActionDiaryTraceLink,
+  TIMELINE_TRACE_UNAVAILABLE_COPY,
+} from "@/lib/actionQueueTimelineLinkRules";
+
 
 export interface ActionQueueDetailDrawerProps {
   open: boolean;
@@ -203,7 +213,65 @@ function ActionQueueDetailDrawerBody({
         >
           Source: {vm.sourceLabel}
         </Badge>
+        {(() => {
+          const traceState = deriveActionTraceBadgeState({
+            actionId: (row as { id?: string }).id ?? "",
+            traceFailureActionId: traceFailed ? ((row as { id?: string }).id ?? null) : null,
+            retryingTrace: retrying,
+          });
+          return (
+            <Badge
+              variant="outline"
+              data-testid={`action-queue-detail-drawer-trace-badge-${traceState}`}
+              data-trace-state={traceState}
+              title={ACTION_TRACE_BADGE_HELP[traceState]}
+              aria-label={`${ACTION_TRACE_BADGE_LABEL[traceState]}. ${ACTION_TRACE_BADGE_HELP[traceState]}`}
+            >
+              {ACTION_TRACE_BADGE_LABEL[traceState]}
+            </Badge>
+          );
+        })()}
       </div>
+
+      {/* View diary trace — pure helper decides availability. */}
+      <div data-testid="action-queue-detail-drawer-diary-trace-row">
+        {(() => {
+          const rowId = (row as { id?: string }).id;
+          const rowStatus = (row as { status?: string }).status;
+          if (!rowId) return null;
+          const link = buildActionDiaryTraceLink({
+            status: rowStatus,
+            actionId: rowId,
+            traceFailed,
+          });
+          if (link) {
+            return (
+              <a
+                href={link.href}
+                data-testid="action-queue-detail-drawer-diary-trace-link"
+                data-trace-highlight={link.highlight}
+                data-trace-kind={link.kind}
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+              >
+                <ExternalLink className="h-3 w-3" aria-hidden />
+                {link.label}
+              </a>
+            );
+          }
+          if (rowStatus === "approved" || rowStatus === "rejected") {
+            return (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="action-queue-detail-drawer-diary-trace-unavailable"
+              >
+                {TIMELINE_TRACE_UNAVAILABLE_COPY}
+              </p>
+            );
+          }
+          return null;
+        })()}
+      </div>
+
 
       {/* Go to source — pure helper decides safety. */}
       <div data-testid="action-queue-detail-drawer-source-link-row">

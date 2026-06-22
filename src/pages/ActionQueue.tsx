@@ -84,6 +84,24 @@ import {
   parseAlertContextParam,
   filterActionsByAlertContext,
 } from "@/lib/actionQueueAlertContextFilter";
+import {
+  deriveActionTraceBadgeState,
+  ACTION_TRACE_BADGE_LABEL,
+  ACTION_TRACE_BADGE_HELP,
+  type ActionTraceBadgeState,
+} from "@/lib/actionQueueTraceStatusRules";
+import {
+  buildActionDiaryTraceLink,
+  TIMELINE_TRACE_UNAVAILABLE_COPY,
+} from "@/lib/actionQueueTimelineLinkRules";
+import {
+  applyActionQueueListPipeline,
+  type ActionListExtraFilter,
+} from "@/lib/actionQueueFilterRules";
+import { Input } from "@/components/ui/input";
+
+
+
 
 
 
@@ -236,12 +254,39 @@ function EvidenceStatusBadge({ vm }: { vm: ActionEvidenceViewModel }) {
 
 
 
+
+
+const TRACE_BADGE_VARIANT: Record<ActionTraceBadgeState, string> = {
+  idle: "text-muted-foreground border-border/60",
+  retrying: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  failed: "bg-red-500/15 text-red-300 border-red-500/30",
+};
+
+function TraceStatusBadge({ state }: { state: ActionTraceBadgeState }) {
+  const label = ACTION_TRACE_BADGE_LABEL[state];
+  const help = ACTION_TRACE_BADGE_HELP[state];
+  return (
+    <Badge
+      variant="outline"
+      className={`text-[10px] uppercase ${TRACE_BADGE_VARIANT[state]}`}
+      data-testid={`action-queue-row-trace-badge-${state}`}
+      data-trace-state={state}
+      aria-label={`${label}. ${help}`}
+      title={help}
+    >
+      {label}
+    </Badge>
+  );
+}
+
+
 export default function ActionQueue() {
   const { user } = useAuth();
   const { grows, activeGrowId, activeGrow } = useGrows();
   // Shared URL `?growId=` resolution against RLS-loaded grows. urlGrowId precedence
   // over activeGrowId is preserved exactly as before.
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
+
   const effectiveGrowId = urlGrowId ?? activeGrowId;
   // URL provided a grow id, but it does not resolve to a grow the viewer
   // owns. Showing every action would be misleading — render a calm prompt.
@@ -307,6 +352,11 @@ export default function ActionQueue() {
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
+  // Pure presenter state. Search is case-insensitive, client-side, and
+  // never reaches payload bytes or hidden metadata.
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [traceExtraFilter, setTraceExtraFilter] = useState<ActionListExtraFilter>("none");
+
 
   // Deep-link focus: /actions?focus=<action_id>. Presenter-only; never mutates rows.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -661,14 +711,24 @@ export default function ActionQueue() {
       .filter((r) => matchesStatus(r.status))
       .filter((r) => riskFilter === "all" || r.risk_level === riskFilter)
       .filter((r) => sourceFilter === "all" || (r.source ?? "") === sourceFilter);
-    const sorted = [...list].sort((a, b) => {
+    // Compose: trace-failed filter first, then search match.
+    const piped = applyActionQueueListPipeline({
+      rows: list,
+      query: searchQuery,
+      traceFilter: traceExtraFilter,
+      traceFailure: traceFailure ? { actionId: traceFailure.actionId } : null,
+      lookups: {
+        sourceLabelFor: (r) => getActionQueueSourceLabel(r as ActionRow),
+      },
+    });
+    const sorted = [...piped].sort((a, b) => {
       if (sortOrder === "risk") return RISK_RANK[b.risk_level] - RISK_RANK[a.risk_level];
       const ta = new Date(a.created_at).getTime();
       const tb = new Date(b.created_at).getTime();
       return sortOrder === "oldest" ? ta - tb : tb - ta;
     });
     return sorted;
-  }, [rows, alertContextId, statusFilter, riskFilter, sourceFilter, sortOrder]);
+  }, [rows, alertContextId, statusFilter, riskFilter, sourceFilter, sortOrder, searchQuery, traceExtraFilter, traceFailure]);
 
 
   const pending = useMemo(
@@ -684,7 +744,10 @@ export default function ActionQueue() {
     statusFilter !== "all" ||
     riskFilter !== "all" ||
     sourceFilter !== "all" ||
-    sortOrder !== "newest";
+    sortOrder !== "newest" ||
+    traceExtraFilter !== "none" ||
+    searchQuery.trim() !== "";
+
 
 
   // AUD-008: deterministic grow-context hint built from URL scope, active
@@ -901,6 +964,16 @@ export default function ActionQueue() {
 
 
 
+        <Select value={traceExtraFilter} onValueChange={(v) => setTraceExtraFilter(v as ActionListExtraFilter)}>
+          <SelectTrigger className="h-9 w-[170px]" aria-label="Trace filter" data-testid="action-queue-trace-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">All trace states</SelectItem>
+            <SelectItem value="trace_failed">Trace failed</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
           <SelectTrigger className="h-9 w-[170px]" aria-label="Sort order">
             <SelectValue />
@@ -911,7 +984,18 @@ export default function ActionQueue() {
             <SelectItem value="risk">Highest risk first</SelectItem>
           </SelectContent>
         </Select>
+
+        <Input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search actions…"
+          aria-label="Search actions"
+          data-testid="action-queue-search-input"
+          className="h-9 w-full sm:w-[220px]"
+        />
       </div>
+
 
       {alertContextId && !loading && filtered.length === 0 && (
         <div
@@ -1075,6 +1159,14 @@ export default function ActionQueue() {
                         {row.risk_level}
                       </Badge>
                       <EvidenceStatusBadge vm={ev} />
+                      <TraceStatusBadge
+                        state={deriveActionTraceBadgeState({
+                          actionId: row.id,
+                          traceFailureActionId: traceFailure?.actionId ?? null,
+                          retryingTrace: retryingTrace && traceFailure?.actionId === row.id,
+                        })}
+                      />
+
                       {isAlertDerived(row) && (
                         <Badge
                           variant="outline"
@@ -1231,6 +1323,14 @@ export default function ActionQueue() {
                     {row.risk_level}
                   </Badge>
                   <EvidenceStatusBadge vm={ev} />
+                  <TraceStatusBadge
+                    state={deriveActionTraceBadgeState({
+                      actionId: row.id,
+                      traceFailureActionId: traceFailure?.actionId ?? null,
+                      retryingTrace: retryingTrace && traceFailure?.actionId === row.id,
+                    })}
+                  />
+
                   {isAlertDerived(row) && (
                     <Badge
                       variant="outline"
@@ -1284,7 +1384,41 @@ export default function ActionQueue() {
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                   <AiDoctorSessionLink row={row} />
                   <LinkedAlertLink row={row} />
+                  {(() => {
+                    const traceFailedHere = traceFailure?.actionId === row.id;
+                    const link = buildActionDiaryTraceLink({
+                      status: row.status,
+                      actionId: row.id,
+                      traceFailed: traceFailedHere,
+                    });
+                    if (link) {
+                      return (
+                        <Link
+                          to={link.href}
+                          className="text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                          data-testid="action-queue-row-diary-trace-link"
+                          data-trace-highlight={link.highlight}
+                          data-trace-kind={link.kind}
+                          aria-describedby={titleId}
+                        >
+                          {link.label}
+                        </Link>
+                      );
+                    }
+                    if (row.status === "approved" || row.status === "rejected") {
+                      return (
+                        <span
+                          className="text-xs text-muted-foreground"
+                          data-testid="action-queue-row-diary-trace-unavailable"
+                        >
+                          {TIMELINE_TRACE_UNAVAILABLE_COPY}
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
+
                 <EventHistory items={events[row.id]} />
               </li>
               );

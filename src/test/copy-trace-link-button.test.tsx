@@ -63,4 +63,57 @@ describe("CopyTraceLinkButton", () => {
     expect(btn.getAttribute("aria-label")).not.toMatch(/aq-|[0-9a-f]{8}-/i);
     expect(btn.textContent ?? "").not.toMatch(/aq-|[0-9a-f]{8}-/i);
   });
+
+  describe("timeout cleanup", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("clears pending reset timeout on unmount (no state-after-unmount warning)", async () => {
+      vi.useFakeTimers();
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const writeText = vi.fn(async () => {});
+      const { getByTestId, unmount } = render(
+        <CopyTraceLinkButton url="/x" clipboard={{ writeText }} />,
+      );
+      await act(async () => {
+        fireEvent.click(getByTestId(COPY_TRACE_LINK_TESTID));
+        await Promise.resolve();
+      });
+      // Unmount BEFORE the 2.5s reset fires.
+      unmount();
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      // No "state update on unmounted component" warning should have been emitted.
+      const offenders = errSpy.mock.calls.filter((args) =>
+        String(args[0] ?? "").includes("unmounted"),
+      );
+      expect(offenders).toHaveLength(0);
+      errSpy.mockRestore();
+    });
+
+    it("repeated clicks do not leak overlapping reset timeouts", async () => {
+      vi.useFakeTimers();
+      const writeText = vi.fn(async () => {});
+      const { getByTestId } = render(
+        <CopyTraceLinkButton url="/x" clipboard={{ writeText }} />,
+      );
+      const btn = getByTestId(COPY_TRACE_LINK_TESTID);
+      for (let i = 0; i < 3; i += 1) {
+        await act(async () => {
+          fireEvent.click(btn);
+          await Promise.resolve();
+        });
+      }
+      // After the final 2.5s window the status must reset exactly once.
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      // Button is back to idle and not stuck "busy".
+      expect(btn.getAttribute("data-copy-state")).toBe("idle");
+      expect((btn as HTMLButtonElement).disabled).toBe(false);
+    });
+  });
 });
+

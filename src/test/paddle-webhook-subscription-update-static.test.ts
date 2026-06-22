@@ -11,7 +11,7 @@ const WEBHOOK_SRC = readProjectFile("supabase/functions/paddle-webhook/index.ts"
 describe("paddle webhook subscription update handoff", () => {
   it("hands off to the reviewed updater RPC only after event storage, processing, and link capture", () => {
     expect(WEBHOOK_SRC).toContain("function applyPaddleSubscriptionUpdate");
-    expect(WEBHOOK_SRC).toContain('supabase.rpc("apply_paddle_subscription_update"');
+    expect(WEBHOOK_SRC).toContain('supabase.rpc("apply_paddle_subscription_update_with_audit"');
 
     const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');
     const processingIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, recordedEvent)");

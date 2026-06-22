@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useHasRole } from "@/hooks/useHasRole";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -122,17 +123,24 @@ export default function OperatorPaddleProcessingAudit() {
               entitlement writes.
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              auditQuery.refetch();
-              linkAuditQuery.refetch();
-            }}
-            disabled={!role.granted || isRefreshing}
-          >
-            {isRefreshing ? "Refreshing…" : "Refresh"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild type="button" variant="outline">
+              <Link to="/operator/billing-subscription-updates">
+                View subscription updater audit
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                auditQuery.refetch();
+                linkAuditQuery.refetch();
+              }}
+              disabled={!role.granted || isRefreshing}
+            >
+              {isRefreshing ? "Refreshing…" : "Refresh"}
+            </Button>
+          </div>
         </div>
       </section>
 

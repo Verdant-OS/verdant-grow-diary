@@ -125,10 +125,21 @@ export default function GrowDetail() {
           <Field label="Updated" value={new Date(grow.updated_at).toLocaleString()} />
         </dl>
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2">
           <StartPhenoHuntButton growId={grow.id} />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setTargetsEditorOpen(true)}
+            data-testid="grow-detail-edit-targets"
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            Edit targets
+          </Button>
         </div>
       </header>
+
 
       {/* One-Tent Loop continuity card. No specific tent is "selected"
           on the grow hub, so this intentionally renders the calm safe

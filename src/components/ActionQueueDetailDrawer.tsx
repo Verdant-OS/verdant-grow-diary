@@ -41,6 +41,8 @@ import {
   buildActionDiaryTraceLink,
   TIMELINE_TRACE_UNAVAILABLE_COPY,
 } from "@/lib/actionQueueTimelineLinkRules";
+import { buildRetryTraceViewModel } from "@/lib/actionQueueRetryTraceViewModel";
+
 
 
 export interface ActionQueueDetailDrawerProps {
@@ -403,32 +405,54 @@ function ActionQueueDetailDrawerBody({
         )}
       </section>
 
-      {traceFailed && (
-        <div
-          role="alert"
-          className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-foreground"
-          data-testid="action-queue-detail-drawer-trace-failure"
-        >
-          <AlertTriangle
-            className="h-4 w-4 shrink-0 text-destructive"
-            aria-hidden
-          />
-          <div className="flex-1 space-y-1">
-            <p>Status saved, but timeline trace failed.</p>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={retrying}
-              onClick={() => onRetryTrace?.(row)}
-              data-testid="action-queue-detail-drawer-retry-trace"
-              aria-label="Retry timeline trace"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              {retrying ? "Retrying…" : "Retry trace"}
-            </Button>
+      {(() => {
+        const retryVm = buildRetryTraceViewModel({
+          traceFailed: !!traceFailed,
+          retrying: !!retrying,
+        });
+        if (!retryVm.showFailureRegion) return null;
+        return (
+          <div
+            role="alert"
+            data-testid="action-queue-detail-drawer-trace-failure"
+            data-trace-state={retryVm.state}
+            className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-foreground"
+          >
+            <AlertTriangle
+              className="h-4 w-4 shrink-0 text-destructive"
+              aria-hidden
+            />
+            <div className="flex-1 space-y-1">
+              {retryVm.explanationLines.map((line, i) => (
+                <p
+                  key={i}
+                  data-testid={
+                    i === 0
+                      ? "action-queue-detail-drawer-trace-explain-primary"
+                      : "action-queue-detail-drawer-trace-explain-secondary"
+                  }
+                >
+                  {line}
+                </p>
+              ))}
+              {!retryVm.buttonHidden && retryVm.buttonLabel && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={retryVm.buttonDisabled}
+                  onClick={() => onRetryTrace?.(row)}
+                  data-testid="action-queue-detail-drawer-retry-trace"
+                  aria-label="Retry diary trace"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  {retryVm.buttonLabel}
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
 
       <div
         className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground"

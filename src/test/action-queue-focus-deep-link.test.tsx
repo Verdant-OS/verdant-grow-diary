@@ -274,7 +274,7 @@ describe("ActionQueue — focus chip + Clear focus", () => {
   });
 
   it("Clear focus preserves other query params (filters, growId, page)", async () => {
-    renderAt("/actions?focus=aq-1&growId=g1&page=2&q=mold");
+    renderAt("/actions?focus=aq-1&growId=g1&page=2&view=card");
     await waitFor(() =>
       expect(screen.getByTestId("action-queue-clear-focus")).toBeTruthy(),
     );
@@ -288,7 +288,7 @@ describe("ActionQueue — focus chip + Clear focus", () => {
     expect(url).not.toContain("focus=");
     expect(url).toContain("growId=g1");
     expect(url).toContain("page=2");
-    expect(url).toContain("q=mold");
+    expect(url).toContain("view=card");
 
   });
 

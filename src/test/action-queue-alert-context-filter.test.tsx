@@ -338,7 +338,7 @@ describe("ActionQueue — client-side ?alert filter", () => {
 
   it("Clear alert filter restores all rows and preserves focus/growId/page/q", async () => {
     renderAt(
-      "/actions?alert=alert-xyz&focus=aq-alert-1&growId=g1&page=2&q=mold",
+      "/actions?alert=alert-xyz&focus=aq-alert-1&growId=g1&page=2&view=card",
     );
     await waitFor(() => expect(visibleRowIds().length).toBe(2));
 
@@ -350,7 +350,7 @@ describe("ActionQueue — client-side ?alert filter", () => {
     expect(url).toContain("focus=aq-alert-1");
     expect(url).toContain("growId=g1");
     expect(url).toContain("page=2");
-    expect(url).toContain("q=mold");
+    expect(url).toContain("view=card");
     // Focus chip still rendered after clearing alert.
     expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy();
   });

@@ -84,6 +84,17 @@ import { classifyTimelineSensorSource, type TimelineSensorSourceKind } from "@/l
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 import { SENSOR_SOURCE_KINDS, SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
+import {
+  parseTimelineHighlightToken,
+  diaryEntryMatchesHighlight,
+  highlightIsMissingFromList,
+  TIMELINE_HIGHLIGHT_PARAM,
+  TIMELINE_HIGHLIGHT_TESTID,
+  TIMELINE_HIGHLIGHT_NOT_VISIBLE_COPY,
+  TIMELINE_HIGHLIGHT_NOT_VISIBLE_TESTID,
+  TIMELINE_HIGHLIGHT_ARIA_LABEL,
+} from "@/lib/timelineHighlightRules";
+
 
 
 
@@ -188,6 +199,13 @@ export default function Timeline() {
   // query param so the Sensors page summary widget can link directly into
   // a pre-filtered Timeline without introducing app-wide global state.
   const [searchParams, setSearchParams] = useSearchParams();
+  // Read-only diary-trace highlight from ?highlight=action-queue:<id>:<kind>.
+  // Pure parse; never alters sorting or fetches.
+  const highlight = useMemo(
+    () => parseTimelineHighlightToken(searchParams.get(TIMELINE_HIGHLIGHT_PARAM)),
+    [searchParams],
+  );
+
   const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>(
     () => parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM)),
   );
@@ -638,7 +656,17 @@ export default function Timeline() {
           Showing {filtered.length} of {entries.length}{" "}
           {entries.length === 1 ? "entry" : "entries"}
         </p>
+        {highlight && highlightIsMissingFromList(filtered, highlight) && (
+          <p
+            className="text-xs text-muted-foreground"
+            role="status"
+            data-testid={TIMELINE_HIGHLIGHT_NOT_VISIBLE_TESTID}
+          >
+            {TIMELINE_HIGHLIGHT_NOT_VISIBLE_COPY}
+          </p>
+        )}
       </div>
+
 
 
       {/* Filters */}
@@ -759,13 +787,25 @@ export default function Timeline() {
                   <div className="h-px flex-1 bg-border/50" />
                 </div>
                 <ul className="space-y-3">
-                  {group.items.map((e) => (
+                  {group.items.map((e) => {
+                    const isHighlighted = diaryEntryMatchesHighlight(e, highlight);
+                    return (
                     <li
                       key={e.id}
                       id={`timeline-entry-${e.id}`}
-                      data-testid="timeline-entry"
-                      className="glass rounded-2xl overflow-hidden animate-fade-in"
+                      data-testid={
+                        isHighlighted
+                          ? TIMELINE_HIGHLIGHT_TESTID
+                          : "timeline-entry"
+                      }
+                      data-highlight={isHighlighted ? "action-queue-trace" : undefined}
+                      aria-label={isHighlighted ? TIMELINE_HIGHLIGHT_ARIA_LABEL : undefined}
+                      className={cn(
+                        "glass rounded-2xl overflow-hidden animate-fade-in",
+                        isHighlighted && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                      )}
                     >
+
                       {e.photo_url ? (
                         (() => {
                           const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
@@ -975,7 +1015,9 @@ export default function Timeline() {
                         })()}
                       </div>
                     </li>
-                  ))}
+                  );
+                  })}
+
                 </ul>
               </section>
             ))}

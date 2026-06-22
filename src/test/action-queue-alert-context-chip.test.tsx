@@ -198,7 +198,7 @@ describe("ActionQueue — ?alert context chip", () => {
   });
 
   it("Clear alert filter removes only ?alert and preserves ?focus + others", async () => {
-    renderAt("/actions?focus=aq-1&alert=alert-xyz&growId=g1&page=2&q=mold");
+    renderAt("/actions?focus=aq-1&alert=alert-xyz&growId=g1&page=2&view=card");
     await waitFor(() =>
       expect(screen.getByTestId("action-queue-clear-alert-context")).toBeTruthy(),
     );
@@ -213,7 +213,7 @@ describe("ActionQueue — ?alert context chip", () => {
     expect(url).toContain("focus=aq-1");
     expect(url).toContain("growId=g1");
     expect(url).toContain("page=2");
-    expect(url).toContain("q=mold");
+    expect(url).toContain("view=card");
     // Focus chip still present.
     expect(screen.getByTestId("action-queue-focus-chip")).toBeTruthy();
   });

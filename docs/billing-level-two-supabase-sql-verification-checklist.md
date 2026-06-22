@@ -17,8 +17,7 @@ resolution logic.
 
 ## Preconditions
 
-- Run only against a sandbox / non-production Supabase project. Do not
-  run against production.
+- Run only against a sandbox / non-production Supabase project. Do not run against production.
 - Do not print service-role keys in the SQL editor, logs, terminal
   scrollback, CI output, or screenshots.
 - Do not paste Paddle secrets into the SQL editor.

@@ -296,28 +296,38 @@ export function parseBillingSubscriptionUpdateAuditResponse(
   };
 
   const rowsRaw = Array.isArray(input.latest) ? input.latest : [];
-  const latest: BillingSubscriptionUpdateAuditRow[] = rowsRaw
+  const latest: BillingSubscriptionUpdateAuditDisplayRow[] = rowsRaw
     .filter(isRecord)
     .map((row) => {
-      const resultStatus = asStatus(row.result_status);
-      const resultReason = asString(row.result_reason);
-      const candidatePlanId = asPlan(row.candidate_plan_id);
-      const candidateStatus = asSubStatus(row.candidate_status);
-      const subscriptionStatus = asSubStatus(row.subscription_status);
-      return {
-        createdAt: asString(row.created_at),
-        resultStatus,
-        resultStatusLabel: formatBillingSubscriptionUpdateAuditStatus(resultStatus),
-        resultReason,
-        resultReasonLabel: formatBillingSubscriptionUpdateAuditReason(resultReason),
-        candidatePlanId,
-        candidatePlanLabel: formatBillingSubscriptionUpdateAuditPlan(candidatePlanId),
-        candidateStatus,
-        candidateStatusLabel: formatBillingSubscriptionUpdateAuditSubscriptionStatus(candidateStatus),
-        subscriptionStatus,
-        subscriptionStatusLabel:
-          formatBillingSubscriptionUpdateAuditSubscriptionStatus(subscriptionStatus),
-      };
+      // Explicit allow-list narrowing: we never spread `row`. The
+      // sanitized operator row contains only fields validated above.
+      const operatorRow: BillingSubscriptionUpdateAuditOperatorRow = {
+        created_at: asString(row.created_at),
+        result_status: asStatus(row.result_status),
+        result_reason: asString(row.result_reason),
+        candidate_plan_id: asPlan(row.candidate_plan_id),
+        candidate_status: asSubStatus(row.candidate_status),
+        subscription_status: asSubStatus(row.subscription_status),
+      } satisfies BillingSubscriptionUpdateAuditOperatorRow;
+
+      const displayRow: BillingSubscriptionUpdateAuditDisplayRow = {
+        createdAt: operatorRow.created_at,
+        resultStatus: operatorRow.result_status,
+        resultStatusLabel: formatBillingSubscriptionUpdateAuditStatus(operatorRow.result_status),
+        resultReason: operatorRow.result_reason,
+        resultReasonLabel: formatBillingSubscriptionUpdateAuditReason(operatorRow.result_reason),
+        candidatePlanId: operatorRow.candidate_plan_id,
+        candidatePlanLabel: formatBillingSubscriptionUpdateAuditPlan(operatorRow.candidate_plan_id),
+        candidateStatus: operatorRow.candidate_status,
+        candidateStatusLabel: formatBillingSubscriptionUpdateAuditSubscriptionStatus(
+          operatorRow.candidate_status,
+        ),
+        subscriptionStatus: operatorRow.subscription_status,
+        subscriptionStatusLabel: formatBillingSubscriptionUpdateAuditSubscriptionStatus(
+          operatorRow.subscription_status,
+        ),
+      } satisfies BillingSubscriptionUpdateAuditDisplayRow;
+      return displayRow;
     });
 
   return {

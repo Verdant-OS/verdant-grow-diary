@@ -65,7 +65,7 @@ describe("paddle webhook processing recorder", () => {
     expect(MAPPER_SRC).not.toContain('firstStringPath(data, [["subscription_id"], ["subscription", "id"], ["id"]])');
   });
 
-  it("still does not write entitlement source-of-truth rows", () => {
+  it("does not directly write entitlement source-of-truth rows", () => {
     expect(WEBHOOK_SRC).not.toMatch(/\.from\(["']billing_subscriptions["']\)/);
     expect(WEBHOOK_SRC).not.toMatch(/INSERT\s+INTO\s+public\.billing_subscriptions/i);
     expect(WEBHOOK_SRC).not.toMatch(/UPDATE\s+public\.billing_subscriptions/i);

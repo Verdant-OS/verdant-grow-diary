@@ -120,6 +120,7 @@ export function resolveOneTentLoopNextStep(
       if (growId) return enable(base, `/grows/${growId}`);
       return base;
     case "tent":
+      if (plantId) return enable(base, `/plants/${plantId}`);
       if (tentId) return enable(base, `/tents/${tentId}`);
       return base;
     case "plant":

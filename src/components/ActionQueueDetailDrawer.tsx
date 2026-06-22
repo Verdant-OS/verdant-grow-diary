@@ -169,6 +169,7 @@ function ActionQueueDetailDrawerBody({
   statusHistory,
   traceFailed = false,
   retrying = false,
+  currentActionsParams = null,
   onApprove,
   onReject,
   onRetryTrace,
@@ -182,6 +183,7 @@ function ActionQueueDetailDrawerBody({
     | "statusHistory"
     | "traceFailed"
     | "retrying"
+    | "currentActionsParams"
     | "onApprove"
     | "onReject"
     | "onRetryTrace"
@@ -252,7 +254,7 @@ function ActionQueueDetailDrawerBody({
             status: rowStatus,
             actionId: rowId,
             traceFailed,
-            currentActionsParams: props.currentActionsParams ?? null,
+            currentActionsParams,
           });
           if (link) {
             return (

@@ -393,38 +393,9 @@ export default function Timeline() {
   }, [lightboxPhotoId, lightboxIndex]);
 
   // Auto-scroll/focus the highlighted diary trace entry once per
-  // highlight token. Read-only DOM behaviour. Safe to call repeatedly
-  // because `scrolledTokenRef` gates re-entry. Resets when the token
-  // changes or clears so a follow-up jump re-scrolls.
-  useEffect(() => {
-    if (!highlight) {
-      scrolledTokenRef.current = null;
-      return;
-    }
-    if (scrolledTokenRef.current === highlight.idempotencyKey) return;
-    const match = filtered.find((e) =>
-      diaryEntryMatchesHighlight(e, highlight),
-    );
-    if (!match) return;
-    const node = document.getElementById(
-      `timeline-entry-${match.id}`,
-    ) as HTMLElement | null;
-    if (!node) return;
-    scrolledTokenRef.current = highlight.idempotencyKey;
-    try {
-      node.scrollIntoView({ behavior: "smooth", block: "center" });
-    } catch {
-      node.scrollIntoView();
-    }
-    // Move focus to the highlighted wrapper for keyboard/AT users.
-    // tabIndex={-1} on the <li> makes it focusable without entering
-    // the tab order.
-    try {
-      node.focus({ preventScroll: true });
-    } catch {
-      // jsdom / older browsers may not support options; ignore.
-    }
-  }, [highlight, filtered]);
+  // highlight token. The hook owns the gating ref so repeated renders
+  // never steal focus.
+  useTimelineHighlightAutoScroll(highlight, filtered);
 
   // Merge `grow_events` (Quick Log v2 manual saves) and `diary_entries`
   // through the tested `mergeTimelineSources` helper so the Recent Quick

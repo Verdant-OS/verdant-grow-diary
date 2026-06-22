@@ -87,8 +87,9 @@ describe("Paddle subscription update RPC migration", () => {
     expect(MIGRATION).not.toContain("raw_payload");
   });
 
-  it("does not wire the webhook to the updater yet", () => {
-    expect(WEBHOOK).not.toContain("apply_paddle_subscription_update");
+  it("webhook calls the audited wrapper, never the raw updater RPC directly", () => {
+    expect(WEBHOOK).toContain('apply_paddle_subscription_update_with_audit');
+    expect(WEBHOOK).not.toMatch(/rpc\(\s*["']apply_paddle_subscription_update["']/);
     expect(WEBHOOK).not.toContain("apply_paddle_entitlement_update");
   });
 });

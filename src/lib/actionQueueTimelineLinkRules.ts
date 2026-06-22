@@ -34,6 +34,12 @@ export interface BuildActionDiaryTraceLinkInput {
   actionId: string;
   /** True when the page knows the trace insert for this action failed. */
   traceFailed?: boolean;
+  /**
+   * Optional current /actions URLSearchParams. When provided, the
+   * outgoing /timeline link includes a safe `actionsReturn` round-trip
+   * so the grower can return to the exact /actions URL state.
+   */
+  currentActionsParams?: URLSearchParams | null;
 }
 
 export interface ActionDiaryTraceLink {
@@ -42,6 +48,8 @@ export interface ActionDiaryTraceLink {
   /** Deterministic key; opaque to the timeline today, safe to expose in URL. */
   highlight: string;
   kind: ActionDiaryTraceLinkKind;
+  /** Present only when a non-default actionsReturn was preserved. */
+  actionsReturn?: string;
 }
 
 const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -61,8 +69,18 @@ export function buildActionDiaryTraceLink(
   const kind = statusToKind(input.status);
   if (!kind) return null;
   const highlight = buildActionQueueTraceIdempotencyKey(input.actionId, kind);
-  const href = `/timeline?${TIMELINE_HIGHLIGHT_PARAM}=${encodeURIComponent(highlight)}`;
-  return { href, label: TIMELINE_TRACE_LINK_LABEL, highlight, kind };
+  const qs = new URLSearchParams();
+  qs.set(TIMELINE_HIGHLIGHT_PARAM, highlight);
+  let actionsReturn: string | undefined;
+  if (input.currentActionsParams) {
+    const ret = buildActionsReturnRelativePath(input.currentActionsParams);
+    if (ret && ret !== "/actions") {
+      qs.set(ACTIONS_RETURN_PARAM, ret);
+      actionsReturn = ret;
+    }
+  }
+  const href = `/timeline?${qs.toString()}`;
+  return { href, label: TIMELINE_TRACE_LINK_LABEL, highlight, kind, actionsReturn };
 }
 
 export const JUMP_TO_HIGHLIGHTED_TRACE_LABEL = "Jump to highlighted trace";

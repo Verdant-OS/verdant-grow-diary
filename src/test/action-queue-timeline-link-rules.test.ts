@@ -36,6 +36,35 @@ describe("buildActionDiaryTraceLink", () => {
     }
   });
 
+  it("rejects non-approved/rejected statuses (completed/pending/executed/etc.)", () => {
+    for (const status of [
+      "completed",
+      "pending",
+      "pending_approval",
+      "simulated",
+      "executed",
+      "retried",
+      "cancelled",
+      "APPROVED",
+    ]) {
+      expect(
+        buildActionDiaryTraceLink({ status, actionId: safeId }),
+      ).toBeNull();
+    }
+  });
+
+  it("safe-id boundary: 64 chars accepted, 65 chars rejected", () => {
+    const at64 = "a".repeat(64);
+    const over = "a".repeat(65);
+    expect(
+      buildActionDiaryTraceLink({ status: "approved", actionId: at64 }),
+    ).not.toBeNull();
+    expect(
+      buildActionDiaryTraceLink({ status: "approved", actionId: over }),
+    ).toBeNull();
+  });
+
+
   it("returns approved link with deterministic highlight key", () => {
     const link = buildActionDiaryTraceLink({
       status: "approved",

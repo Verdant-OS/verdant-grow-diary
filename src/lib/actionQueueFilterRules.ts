@@ -6,7 +6,7 @@
  *  - Deterministic. Case-insensitive search. Filters compose predictably:
  *    `applyActionQueueListPipeline` runs the trace filter first, then
  *    the search match.
- *  - NEVER searches raw_payload, hidden metadata, service keys, bridge
+ *  - NEVER searches payload raw bytes, hidden metadata, service keys, bridge
  *    tokens, or internal UUIDs. Only grower-visible fields and the
  *    caller-provided source/plant labels are searched.
  *  - `[alert:<id>]` / `[session:<id>]` back-pointer tokens are stripped
@@ -45,7 +45,7 @@ export function normalizeActionSearchQuery(
 
 /**
  * Returns the grower-visible, search-safe fields for a row. Exposed so
- * tests can assert raw_payload and internal IDs are not in the index.
+ * tests can assert payload raw bytes and internal IDs are not in the index.
  */
 export function collectActionSearchFields(
   row: ActionSearchRowLike,

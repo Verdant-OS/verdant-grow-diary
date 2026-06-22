@@ -14,6 +14,7 @@ function findMigration(substring: string): string {
 }
 
 const MIGRATION = findMigration("billing_subscription_update_audit");
+const RETENTION_MIGRATION = findMigration("billing_subscription_update_audit_retention");
 const WEBHOOK = readProjectFile("supabase/functions/paddle-webhook/index.ts");
 
 describe("billing_subscription_update_audit migration", () => {
@@ -142,5 +143,108 @@ describe("paddle webhook -> audited wrapper handoff", () => {
     ]) {
       expect(WEBHOOK).not.toContain(forbidden);
     }
+  });
+});
+
+describe("billing_subscription_update_audit retention purge migration", () => {
+  it("creates a SECURITY DEFINER purge RPC with locked search_path", () => {
+    expect(RETENTION_MIGRATION).toContain(
+      "CREATE OR REPLACE FUNCTION public.purge_billing_subscription_update_audit",
+    );
+    expect(RETENTION_MIGRATION).toContain("SECURITY DEFINER");
+    expect(RETENTION_MIGRATION).toContain("SET search_path = public, pg_temp");
+    expect(RETENTION_MIGRATION).toContain("RETURNS jsonb");
+  });
+
+  it("is service-role-only: revokes from PUBLIC/anon/authenticated, grants only service_role", () => {
+    expect(RETENTION_MIGRATION).toContain(
+      "REVOKE ALL ON FUNCTION public.purge_billing_subscription_update_audit(integer) FROM PUBLIC",
+    );
+    expect(RETENTION_MIGRATION).toContain(
+      "REVOKE ALL ON FUNCTION public.purge_billing_subscription_update_audit(integer) FROM anon",
+    );
+    expect(RETENTION_MIGRATION).toContain(
+      "REVOKE ALL ON FUNCTION public.purge_billing_subscription_update_audit(integer) FROM authenticated",
+    );
+    expect(RETENTION_MIGRATION).toContain(
+      "GRANT EXECUTE ON FUNCTION public.purge_billing_subscription_update_audit(integer) TO service_role",
+    );
+    expect(RETENTION_MIGRATION).not.toMatch(
+      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.purge_billing_subscription_update_audit\(integer\)\s+TO\s+(anon|authenticated|PUBLIC)/i,
+    );
+  });
+
+  it("clamps retention days between 90 and 2555", () => {
+    expect(RETENTION_MIGRATION).toContain(
+      "LEAST(GREATEST(COALESCE(p_retention_days, 365), 90), 2555)",
+    );
+  });
+
+  it("deletes only from billing_subscription_update_audit, never from entitlement or grow-room tables", () => {
+    expect(RETENTION_MIGRATION).toMatch(
+      /DELETE\s+FROM\s+public\.billing_subscription_update_audit/i,
+    );
+    for (const forbidden of [
+      "DELETE FROM public.billing_subscriptions",
+      "DELETE FROM public.paddle_events",
+      "DELETE FROM public.paddle_event_processing",
+      "DELETE FROM public.billing_customer_links",
+      "DELETE FROM public.grows",
+      "DELETE FROM public.plants",
+      "DELETE FROM public.tents",
+      "DELETE FROM public.sensor_readings",
+      "DELETE FROM public.alerts",
+      "DELETE FROM public.action_queue",
+      "DELETE FROM public.ai_doctor_sessions",
+      "DELETE FROM public.grow_events",
+      "DELETE FROM public.diary_entries",
+    ]) {
+      expect(RETENTION_MIGRATION).not.toContain(forbidden);
+    }
+  });
+
+  it("returns only sanitized counts, no raw IDs or payloads", () => {
+    expect(RETENTION_MIGRATION).toContain("'ok'");
+    expect(RETENTION_MIGRATION).toContain("'retention_days'");
+    expect(RETENTION_MIGRATION).toContain("'deleted_count'");
+    // Strip SQL line comments so documentation that names forbidden tokens
+    // (e.g. "no provider IDs returned") does not trip the guard.
+    const codeOnly = RETENTION_MIGRATION.replace(/--[^\n]*/g, "");
+    for (const forbidden of [
+      "provider_customer_id",
+      "provider_subscription_id",
+      "provider_price_id",
+      "raw_payload",
+      "payload",
+      "details",
+      "event_id",
+      "processing_id",
+      "user_id",
+      "RETURNING",
+    ]) {
+      expect(codeOnly).not.toContain(forbidden);
+    }
+  });
+
+  it("does not touch grow-room or device-control surfaces", () => {
+    for (const forbidden of [
+      "sensor_readings",
+      "action_queue",
+      "ai_doctor_sessions",
+      "grow_events",
+      "diary_entries",
+      "alerts",
+      "mqtt",
+      "device_control",
+      "device-control",
+    ]) {
+      expect(RETENTION_MIGRATION).not.toContain(forbidden);
+    }
+  });
+
+  it("documents scheduling: either an existing cron pattern or a service-role manual schedule note", () => {
+    const hasCron = /pg_cron|cron\.schedule/i.test(RETENTION_MIGRATION);
+    const hasManualNote = /service-role scheduled maintenance/i.test(RETENTION_MIGRATION);
+    expect(hasCron || hasManualNote).toBe(true);
   });
 });

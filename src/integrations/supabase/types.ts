@@ -1888,6 +1888,10 @@ export type Database = {
           rejected: number
         }[]
       }
+      purge_billing_subscription_update_audit: {
+        Args: { p_retention_days?: number }
+        Returns: Json
+      }
       quicklog_save_event: {
         Args: {
           p_details?: Json

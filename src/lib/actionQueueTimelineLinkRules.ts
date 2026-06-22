@@ -128,3 +128,57 @@ export function buildJumpToHighlightedTraceLink(
     actionsReturn,
   };
 }
+
+export const VIEW_IN_ACTIONS_LABEL = "View in Actions";
+export const VIEW_IN_ACTIONS_TESTID = "timeline-view-in-actions";
+
+const HIGHLIGHT_TOKEN_RE = /^action-queue:([A-Za-z0-9_-]{1,64}):(approved|rejected)$/;
+
+export interface DiaryTraceDetailsLike {
+  kind?: unknown;
+  idempotency_key?: unknown;
+}
+
+export interface ViewInActionsLink {
+  href: string;
+  label: string;
+  highlight: string;
+}
+
+/**
+ * Derive a safe "View in Actions" link from a diary entry's details
+ * column. Returns null unless `details.kind === "action_queue_trace"`
+ * and `details.idempotency_key` matches the safe shape
+ * `action-queue:<safeId>:<approved|rejected>`.
+ *
+ * When a safe `actionsReturn` path is supplied (already validated by
+ * the caller via parseActionsReturnParam), it is used verbatim and the
+ * highlight is added so the row remains marked on arrival. Otherwise a
+ * default `/actions?highlight=...` link is built.
+ *
+ * Visible copy ("View in Actions") never includes raw IDs.
+ */
+export function buildViewInActionsLinkFromDiaryDetails(
+  details: DiaryTraceDetailsLike | null | undefined,
+  options?: { actionsReturn?: string | null },
+): ViewInActionsLink | null {
+  if (!details || typeof details !== "object") return null;
+  if ((details as { kind?: unknown }).kind !== "action_queue_trace") return null;
+  const key = (details as { idempotency_key?: unknown }).idempotency_key;
+  if (typeof key !== "string") return null;
+  if (!HIGHLIGHT_TOKEN_RE.test(key)) return null;
+  const ret = options?.actionsReturn;
+  // Default: /actions?highlight=<token>.
+  let href = `/actions?${TIMELINE_HIGHLIGHT_PARAM}=${encodeURIComponent(key)}`;
+  if (typeof ret === "string" && /^\/actions(?:$|[?#])/.test(ret)) {
+    // Merge highlight into the safe actionsReturn path so the operator
+    // returns to their exact /actions URL state AND the row stays
+    // marked. Strip an existing `highlight=` so it can't conflict.
+    const [path, search = ""] = ret.split("?");
+    const qs = new URLSearchParams(search);
+    qs.delete(TIMELINE_HIGHLIGHT_PARAM);
+    qs.set(TIMELINE_HIGHLIGHT_PARAM, key);
+    href = `${path}?${qs.toString()}`;
+  }
+  return { href, label: VIEW_IN_ACTIONS_LABEL, highlight: key };
+}

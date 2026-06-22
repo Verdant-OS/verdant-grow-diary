@@ -16,7 +16,7 @@ describe("paddle webhook subscription update handoff", () => {
     const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');
     const processingIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, recordedEvent)");
     const linkCaptureIdx = WEBHOOK_SRC.indexOf("captureBillingCustomerLink(supabase, recordedEvent)");
-    const updateIdx = WEBHOOK_SRC.indexOf("applyPaddleSubscriptionUpdate(supabase, processing, linkCapture)");
+    const updateIdx = WEBHOOK_SRC.lastIndexOf("applyPaddleSubscriptionUpdate(supabase, processing, linkCapture)");
 
     expect(eventInsertIdx).toBeGreaterThan(-1);
     expect(processingIdx).toBeGreaterThan(eventInsertIdx);

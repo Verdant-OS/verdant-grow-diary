@@ -179,8 +179,8 @@ export default function OperatorBillingSubscriptionUpdateAudit() {
             <CardHeader>
               <CardTitle>Latest sanitized rows</CardTitle>
               <CardDescription>
-                Showing up to {audit.limit || limit} sanitized rows. Provider customer IDs,
-                subscription IDs, price IDs, and webhook payloads are not displayed.
+                Showing up to {audit.limit || limit} sanitized rows. Provider customer identifiers,
+                subscription identifiers, price identifiers, and webhook bodies are not displayed.
               </CardDescription>
             </CardHeader>
             <CardContent>

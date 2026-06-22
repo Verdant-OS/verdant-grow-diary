@@ -22,9 +22,11 @@ safely and predictably.
 
 ## Apply Order
 
-Apply migrations in the dependency order below. When an exact filename is
-not confidently verified in `supabase/migrations/`, the entry is marked
-`filename to verify in repo` rather than invented.
+Apply migrations in the dependency order below. Filenames have been
+verified against `supabase/migrations/`. When a dependency group has no
+matching migration file in the repo, the entry is marked
+`no migration file found — verify before apply` rather than invented.
+
 
 1. Billing subscription source-of-truth foundation
    (`public.billing_subscriptions` table + RLS)

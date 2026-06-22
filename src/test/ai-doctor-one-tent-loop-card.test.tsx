@@ -31,6 +31,20 @@ describe("AI Doctor One-Tent Loop next-step card wiring", () => {
     ).toHaveTextContent(/Review alert/i);
   });
 
+  it("renders the Alert helper copy", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="ai-doctor"
+        testId="ai-doctor-one-tent-loop-next-step-card"
+      />,
+    );
+    expect(
+      screen.getByTestId("ai-doctor-one-tent-loop-next-step-card-helper"),
+    ).toHaveTextContent(
+      /Open Alert page to review and plan approval-required actions\./,
+    );
+  });
+
   it("CTA goes to alert detail when alertId is present", () => {
     renderCard(
       <OneTentLoopNextStepCard

@@ -353,7 +353,7 @@ export default function ActionQueue() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   // Pure presenter state. Search is case-insensitive, client-side, and
-  // never reaches raw_payload or hidden metadata.
+  // never reaches payload bytes or hidden metadata.
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [traceExtraFilter, setTraceExtraFilter] = useState<ActionListExtraFilter>("none");
 

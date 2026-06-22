@@ -895,9 +895,10 @@ export default function Timeline() {
                       }
                       data-highlight={isHighlighted ? "action-queue-trace" : undefined}
                       aria-label={isHighlighted ? TIMELINE_HIGHLIGHT_ARIA_LABEL : undefined}
+                      tabIndex={isHighlighted ? -1 : undefined}
                       className={cn(
                         "glass rounded-2xl overflow-hidden animate-fade-in",
-                        isHighlighted && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                        isHighlighted && "ring-2 ring-primary ring-offset-2 ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                       )}
                     >
 

@@ -546,7 +546,7 @@ async function applyPaddleSubscriptionUpdate(
     return { status: "skipped", reason: "link_capture_not_ready" };
   }
 
-  const { data, error } = await supabase.rpc("apply_paddle_subscription_update", {
+  const { data, error } = await supabase.rpc("apply_paddle_subscription_update_with_audit", {
     p_processing_id: processing.id,
   });
 

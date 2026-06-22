@@ -58,9 +58,9 @@ describe("buildActionQueueStatusHistory", () => {
   it("sorts deterministically by timestamp DESC, then kind, then key", () => {
     const out = buildActionQueueStatusHistory(
       [
-        traceRow({ id: "d1", entry_at: "2026-06-10T10:00:00Z", kind: "rejected" }),
-        traceRow({ id: "d2", entry_at: "2026-06-12T10:00:00Z", kind: "approved" }),
-        traceRow({ id: "d3", entry_at: "2026-06-11T10:00:00Z", kind: "approved" }),
+        traceRow({ id: "d1", entry_at: "2026-06-10T10:00:00Z", kind: "rejected", idempotency_key: "k1" }),
+        traceRow({ id: "d2", entry_at: "2026-06-12T10:00:00Z", kind: "approved", idempotency_key: "k2" }),
+        traceRow({ id: "d3", entry_at: "2026-06-11T10:00:00Z", kind: "approved", idempotency_key: "k3" }),
       ],
       ACTION_ID,
     );

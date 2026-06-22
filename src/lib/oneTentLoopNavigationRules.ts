@@ -59,6 +59,27 @@ export const ONE_TENT_LOOP_STEP_LABEL: Record<OneTentLoopStep, string> = {
 export const ONE_TENT_LOOP_DISABLED_COPY =
   "Next step unavailable until this record is selected.";
 
+/**
+ * Cautious helper copy describing why the next step matters. Presenter-only.
+ * Must never imply automation, device control, or guaranteed action.
+ * Action Queue wording stays approval-required. Empty string means no helper.
+ */
+export const ONE_TENT_LOOP_HELPER_COPY: Record<OneTentLoopStep, string> = {
+  grow: "",
+  tent: "",
+  plant: "",
+  "quick-log": "",
+  timeline:
+    "Open Sensor Snapshot from Timeline to cross-check telemetry and proceed.",
+  "sensor-snapshot":
+    "Open AI Doctor page to review available context and prepare for next actions.",
+  "ai-doctor":
+    "Open Alert page to review and plan approval-required actions.",
+  alert:
+    "Review the approval-required Action Queue before taking action.",
+  "action-queue": "",
+};
+
 /** Sensor source labels the loop must always preserve. */
 export const ONE_TENT_LOOP_SENSOR_SOURCES = [
   "live",

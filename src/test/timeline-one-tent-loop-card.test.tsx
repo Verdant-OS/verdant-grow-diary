@@ -42,6 +42,20 @@ describe("Timeline One-Tent Loop next-step card wiring", () => {
     ).toHaveTextContent(/Review sensor snapshot/i);
   });
 
+  it("renders the Sensor Snapshot helper copy", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="timeline"
+        testId="timeline-one-tent-loop-next-step-card"
+      />,
+    );
+    expect(
+      screen.getByTestId("timeline-one-tent-loop-next-step-card-helper"),
+    ).toHaveTextContent(
+      /Open Sensor Snapshot from Timeline to cross-check telemetry and proceed\./,
+    );
+  });
+
   it("does not call fetch", () => {
     renderCard(
       <OneTentLoopNextStepCard

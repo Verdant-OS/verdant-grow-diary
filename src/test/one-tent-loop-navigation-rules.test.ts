@@ -4,6 +4,7 @@ import {
   ONE_TENT_LOOP_CTA_LABEL,
   ONE_TENT_LOOP_DISABLED_COPY,
   ONE_TENT_LOOP_EMPTY_STATE,
+  ONE_TENT_LOOP_HELPER_COPY,
   ONE_TENT_LOOP_SENSOR_SOURCES,
   getNextLoopStep,
   resolveOneTentLoopNextStep,
@@ -107,6 +108,35 @@ describe("oneTentLoopNavigationRules", () => {
   it("empty-state copy never calls missing sensor data healthy", () => {
     for (const step of Object.values(ONE_TENT_LOOP_EMPTY_STATE)) {
       expect(step.toLowerCase()).not.toMatch(/healthy/);
+    }
+  });
+
+  it("has helper copy for downstream steps with the expected cautious wording", () => {
+    expect(ONE_TENT_LOOP_HELPER_COPY.timeline).toBe(
+      "Open Sensor Snapshot from Timeline to cross-check telemetry and proceed.",
+    );
+    expect(ONE_TENT_LOOP_HELPER_COPY["sensor-snapshot"]).toBe(
+      "Open AI Doctor page to review available context and prepare for next actions.",
+    );
+    expect(ONE_TENT_LOOP_HELPER_COPY["ai-doctor"]).toBe(
+      "Open Alert page to review and plan approval-required actions.",
+    );
+    expect(ONE_TENT_LOOP_HELPER_COPY.alert).toBe(
+      "Review the approval-required Action Queue before taking action.",
+    );
+  });
+
+  it("leaves upstream helper copy empty to avoid noisy duplication", () => {
+    for (const step of ["grow", "tent", "plant", "quick-log", "action-queue"] as const) {
+      expect(ONE_TENT_LOOP_HELPER_COPY[step]).toBe("");
+    }
+  });
+
+  it("helper copy never calls missing telemetry healthy or implies automation", () => {
+    for (const copy of Object.values(ONE_TENT_LOOP_HELPER_COPY)) {
+      const lower = copy.toLowerCase();
+      expect(lower).not.toMatch(/healthy/);
+      expect(lower).not.toMatch(/auto[- ]?(run|execute|apply)|relay|actuator/);
     }
   });
 });

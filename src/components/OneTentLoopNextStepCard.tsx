@@ -13,6 +13,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ONE_TENT_LOOP_STEP_LABEL,
+  ONE_TENT_LOOP_HELPER_COPY,
   resolveOneTentLoopNextStep,
   type OneTentLoopIds,
   type OneTentLoopStep,
@@ -53,6 +54,14 @@ export default function OneTentLoopNextStepCard({
         <div className="text-sm">
           Next step: <span className="font-medium">{nextLabel}</span>
         </div>
+      )}
+      {ONE_TENT_LOOP_HELPER_COPY[current] && (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid={`${resolvedTestId}-helper`}
+        >
+          {ONE_TENT_LOOP_HELPER_COPY[current]}
+        </p>
       )}
       {step.disabled ? (
         <p

@@ -34,6 +34,20 @@ describe("Sensors One-Tent Loop next-step card wiring", () => {
     ).toHaveTextContent(/Open AI Doctor/i);
   });
 
+  it("renders the AI Doctor helper copy", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="sensor-snapshot"
+        testId="sensors-one-tent-loop-next-step-card"
+      />,
+    );
+    expect(
+      screen.getByTestId("sensors-one-tent-loop-next-step-card-helper"),
+    ).toHaveTextContent(
+      /Open AI Doctor page to review available context and prepare for next actions\./,
+    );
+  });
+
   it("never describes telemetry as healthy", () => {
     renderCard(
       <OneTentLoopNextStepCard

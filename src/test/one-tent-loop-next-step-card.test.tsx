@@ -45,4 +45,35 @@ describe("OneTentLoopNextStepCard", () => {
     );
     expect(container.textContent ?? "").not.toContain("secret-plant-id-12345");
   });
+
+  it("renders helper copy for downstream steps and omits it for upstream steps", () => {
+    const { unmount } = renderCard(
+      <OneTentLoopNextStepCard current="timeline" />,
+    );
+    expect(screen.getByTestId("one-tent-loop-next-step-card-helper")).toHaveTextContent(
+      /Open Sensor Snapshot from Timeline to cross-check telemetry and proceed\./,
+    );
+    unmount();
+
+    renderCard(<OneTentLoopNextStepCard current="sensor-snapshot" />);
+    expect(screen.getByTestId("one-tent-loop-next-step-card-helper")).toHaveTextContent(
+      /Open AI Doctor page to review available context/,
+    );
+  });
+
+  it("renders approval-required helper copy on the alert step", () => {
+    renderCard(<OneTentLoopNextStepCard current="alert" />);
+    expect(screen.getByTestId("one-tent-loop-next-step-card-helper")).toHaveTextContent(
+      /approval-required Action Queue/i,
+    );
+  });
+
+  it("does not render helper copy for upstream steps (no noisy duplication)", () => {
+    renderCard(
+      <OneTentLoopNextStepCard current="grow" ids={{ growId: "g1" }} />,
+    );
+    expect(
+      screen.queryByTestId("one-tent-loop-next-step-card-helper"),
+    ).toBeNull();
+  });
 });

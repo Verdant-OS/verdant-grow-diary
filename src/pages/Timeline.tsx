@@ -757,9 +757,36 @@ export default function Timeline() {
                   {TIMELINE_HIGHLIGHT_CLEAR_FILTERS_LABEL}
                 </Button>
               )}
+              {highlight && backToActions.wasProvided && (
+                <div>
+                  <Link
+                    to={backToActions.href}
+                    className="text-xs text-primary hover:underline"
+                    data-testid={BACK_TO_ACTIONS_TESTID}
+                  >
+                    {BACK_TO_ACTIONS_LABEL}
+                  </Link>
+                </div>
+              )}
             </div>
           );
         })()}
+        {/* Always-on Back to Actions affordance when a safe return path
+            and highlight token are present, even if the entry is found
+            and visible. Keeps the round-trip discoverable. */}
+        {highlight &&
+          !highlightIsMissingFromList(filtered, highlight) &&
+          backToActions.wasProvided && (
+            <div className="mt-1">
+              <Link
+                to={backToActions.href}
+                className="text-xs text-primary hover:underline"
+                data-testid={`${BACK_TO_ACTIONS_TESTID}-visible`}
+              >
+                {BACK_TO_ACTIONS_LABEL}
+              </Link>
+            </div>
+          )}
       </div>
 
 

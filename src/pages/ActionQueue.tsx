@@ -255,6 +255,47 @@ export default function ActionQueue() {
   // Slide-over drawer that explains a single Action Queue item.
   // Presenter-only state. Opening it never triggers a write or AI call.
   const [drawerRow, setDrawerRow] = useState<ActionRow | null>(null);
+  const [drawerHistory, setDrawerHistory] = useState<
+    ActionQueueStatusHistoryEntry[] | null
+  >(null);
+  const [drawerHistoryLoading, setDrawerHistoryLoading] = useState(false);
+  const [traceFailure, setTraceFailure] = useState<
+    { actionId: string; kind: ActionQueueTraceKind } | null
+  >(null);
+  const [retryingTrace, setRetryingTrace] = useState(false);
+
+  // Load existing approve/reject diary trace rows for the open drawer
+  // row. Pure read; never inserts.
+  const loadDrawerHistory = useCallback(
+    async (row: ActionRow) => {
+      if (!user) return;
+      setDrawerHistoryLoading(true);
+      const { data } = await supabase
+        .from("diary_entries")
+        .select("id, entry_at, created_at, note, details")
+        .eq("user_id", user.id)
+        .eq("grow_id", row.grow_id)
+        .contains("details", { action_id: row.id, kind: "action_queue_trace" });
+      setDrawerHistory(
+        buildActionQueueStatusHistory(
+          (data as DiaryTraceRowLike[] | null) ?? [],
+          row.id,
+        ),
+      );
+      setDrawerHistoryLoading(false);
+    },
+    [user],
+  );
+
+  // When a drawer row opens, fetch its status history once.
+  useEffect(() => {
+    if (!drawerRow) {
+      setDrawerHistory(null);
+      setDrawerHistoryLoading(false);
+      return;
+    }
+    void loadDrawerHistory(drawerRow);
+  }, [drawerRow, loadDrawerHistory]);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");

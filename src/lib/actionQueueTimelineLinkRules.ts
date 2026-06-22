@@ -96,15 +96,7 @@ export function buildJumpToHighlightedTraceLink(
   qs.set(TIMELINE_HIGHLIGHT_PARAM, rawHighlight);
   let actionsReturn: string | undefined;
   if (currentActionsParams) {
-    // Lazy require to keep this module dependency-light; both files
-    // are pure helpers with no React/Supabase imports.
-    const {
-      buildActionsReturnRelativePath,
-      ACTIONS_RETURN_PARAM,
-    } = require("./actionQueueReturnLinkRules") as typeof import("./actionQueueReturnLinkRules");
     const ret = buildActionsReturnRelativePath(currentActionsParams);
-    // Only attach when the return path carries query state worth
-    // restoring. Bare `/actions` is the default and adds no value.
     if (ret && ret !== "/actions") {
       qs.set(ACTIONS_RETURN_PARAM, ret);
       actionsReturn = ret;

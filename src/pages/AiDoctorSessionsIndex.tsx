@@ -10,6 +10,7 @@
  *   - Rows deep-link to the existing historical detail page.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { Link, useSearchParams } from "react-router-dom";
 import { Stethoscope, Link2, Check, AlertCircle, Bookmark, Trash2, ShieldAlert, Info } from "lucide-react";
 import { format } from "date-fns";
@@ -553,6 +554,17 @@ export default function AiDoctorSessionsIndex() {
 
   return (
     <div data-testid="ai-doctor-sessions-index-page" className="space-y-4">
+      <OneTentLoopNextStepCard
+        current="ai-doctor"
+        ids={{}}
+        testId="ai-doctor-one-tent-loop-next-step-card"
+      />
+      <p
+        className="text-[11px] text-muted-foreground"
+        data-testid="ai-doctor-one-tent-loop-cautious-note"
+      >
+        AI Doctor uses available context. Missing context will be shown.
+      </p>
       <Card>
         <CardHeader className="space-y-1">
           <div className="flex items-start justify-between gap-2">

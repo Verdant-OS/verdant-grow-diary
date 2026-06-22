@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from "react";
+import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { Link } from "react-router-dom";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
@@ -194,6 +195,18 @@ export default function Alerts() {
         description="Persistent environment alerts. Read-only insights — no automation."
         icon={<Bell className="h-5 w-5" />}
       />
+      <OneTentLoopNextStepCard
+        current="alert"
+        ids={{ growId: urlGrowId ?? null }}
+        testId="alerts-one-tent-loop-next-step-card"
+        className="mb-3"
+      />
+      <p
+        className="text-[11px] text-muted-foreground mb-3"
+        data-testid="alerts-one-tent-loop-approval-note"
+      >
+        Action Queue items are approval-required.
+      </p>
       {urlGrowId && (
         <ScopedGrowBanner
           growId={urlGrowId}

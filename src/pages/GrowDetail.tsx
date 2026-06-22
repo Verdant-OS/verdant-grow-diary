@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
   Loader2,
@@ -9,6 +11,7 @@ import {
   ListChecks,
   Sparkles,
   Bell,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useGrowDetailData, type GrowOutcomesState } from "@/hooks/useGrowDetailData";
 import {
@@ -32,6 +35,8 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import ActionOutcomeLearningReport from "@/components/ActionOutcomeLearningReport";
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
+import GrowTargetsEditor from "@/components/GrowTargetsEditor";
+
 
 /**
  * Read-only grow detail hub. Presentational only — all data loading +
@@ -40,6 +45,8 @@ import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
  */
 export default function GrowDetail() {
   const { grow, growId, loading, notFound, error, counts, recent, status, outcomes, refetch } = useGrowDetailData();
+  const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
+
 
   if (loading) {
     return (
@@ -118,10 +125,21 @@ export default function GrowDetail() {
           <Field label="Updated" value={new Date(grow.updated_at).toLocaleString()} />
         </dl>
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2">
           <StartPhenoHuntButton growId={grow.id} />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setTargetsEditorOpen(true)}
+            data-testid="grow-detail-edit-targets"
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            Edit targets
+          </Button>
         </div>
       </header>
+
 
       {/* One-Tent Loop continuity card. No specific tent is "selected"
           on the grow hub, so this intentionally renders the calm safe
@@ -251,9 +269,17 @@ export default function GrowDetail() {
         report={outcomes.learning}
         status={outcomes.status}
       />
+
+      <GrowTargetsEditor
+        open={targetsEditorOpen}
+        onOpenChange={setTargetsEditorOpen}
+        growId={grow.id}
+        growName={grow.name}
+      />
     </div>
   );
 }
+
 
 function RecentOutcomesCard({ outcomes }: { outcomes: GrowOutcomesState }) {
   const { status, summary, recent } = outcomes;

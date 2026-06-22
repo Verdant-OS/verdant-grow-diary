@@ -269,9 +269,17 @@ export default function GrowDetail() {
         report={outcomes.learning}
         status={outcomes.status}
       />
+
+      <GrowTargetsEditor
+        open={targetsEditorOpen}
+        onOpenChange={setTargetsEditorOpen}
+        growId={grow.id}
+        growName={grow.name}
+      />
     </div>
   );
 }
+
 
 function RecentOutcomesCard({ outcomes }: { outcomes: GrowOutcomesState }) {
   const { status, summary, recent } = outcomes;

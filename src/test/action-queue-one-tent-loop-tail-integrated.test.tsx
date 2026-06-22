@@ -28,31 +28,8 @@ import {
 
 // --- Fixtures ---------------------------------------------------------------
 
-function makeRow(i: number) {
-  return {
-    id: `aq-${i}`,
-    grow_id: "g1",
-    tent_id: null,
-    plant_id: null,
-    source: "ai_coach",
-    action_type: "lower_humidity",
-    target_metric: "humidity_pct",
-    target_device: null,
-    suggested_change: `Lower humidity step ${i}`,
-    reason: i === 1 ? "Mold risk rising." : `Reason ${i}`,
-    risk_level: "low",
-    status: "pending_approval",
-    approved_at: null,
-    rejected_at: null,
-    completed_at: null,
-    cancelled_at: null,
-    simulated_at: null,
-    created_at: `2026-05-${String(10 + i).padStart(2, "0")}T10:00:00Z`,
-    updated_at: `2026-05-${String(10 + i).padStart(2, "0")}T10:00:00Z`,
-  };
-}
-
-const ROWS = Array.from({ length: 12 }, (_, i) => makeRow(i + 1));
+// Fixtures are defined inside the vi.mock factory below to satisfy
+// the vitest module-mock hoisting requirement.
 
 vi.mock("@/integrations/supabase/client", () => {
   const rows = Array.from({ length: 12 }, (_, i) => ({

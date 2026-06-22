@@ -21,8 +21,8 @@ against that order; it does not redefine it.
 ## Preconditions
 
 - Confirm current branch is the intended branch.
-- Confirm target Supabase project is sandbox / non-production (not
-  production).
+- Confirm target Supabase project is sandbox / non-production (not production).
+
 - Confirm Paddle environment is sandbox.
 - Confirm service-role keys and Paddle secrets are not printed or pasted
   into logs, terminal scrollback, CI output, screenshots, or shared

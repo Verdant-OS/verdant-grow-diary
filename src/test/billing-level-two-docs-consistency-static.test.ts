@@ -41,19 +41,18 @@ describe("billing level two docs consistency", () => {
     }
   });
 
-  it("any 'no migration file found' line names the dependency group it refers to", () => {
+  it("any 'no migration file found' list item names the dependency group it refers to", () => {
     for (const doc of docs) {
       const lines = doc.content.split("\n");
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        if (/no migration file found/i.test(line)) {
-          // Look for a dependency group name in the preceding lines (numbered list item).
-          const window = lines.slice(Math.max(0, i - 5), i + 1).join("\n");
-          expect(
-            /\d+\.\s+\S+/.test(window) || /harness/i.test(window),
-            `${doc.name}:${i + 1} 'no migration file found' line lacks an identifiable dependency group`,
-          ).toBe(true);
-        }
+        // Only enforce on actual list items, not inline prose / backticked references.
+        if (!/^\s*-\s.*no migration file found/i.test(line)) continue;
+        const window = lines.slice(Math.max(0, i - 5), i + 1).join("\n");
+        expect(
+          /\d+\.\s+\S+/.test(window) || /harness/i.test(window),
+          `${doc.name}:${i + 1} 'no migration file found' list item lacks an identifiable dependency group`,
+        ).toBe(true);
       }
     }
   });

@@ -461,6 +461,14 @@ export default function Timeline() {
         current={isLogsRoute ? "Logs" : "Timeline"}
         section={isLogsRoute ? "logs" : "timeline"}
       />
+
+      <OneTentLoopNextStepCard
+        current="timeline"
+        ids={{ growId: activeGrowId ?? null }}
+        testId="timeline-one-tent-loop-next-step-card"
+        className="mb-3"
+      />
+      
       
       
       {activeGrow && (

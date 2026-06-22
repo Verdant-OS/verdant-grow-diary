@@ -106,6 +106,7 @@ import {
   BACK_TO_ACTIONS_LABEL,
   BACK_TO_ACTIONS_TESTID,
 } from "@/lib/actionQueueReturnLinkRules";
+import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoScroll";
 
 
 

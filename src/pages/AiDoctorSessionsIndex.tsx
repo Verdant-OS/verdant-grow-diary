@@ -10,6 +10,7 @@
  *   - Rows deep-link to the existing historical detail page.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { Link, useSearchParams } from "react-router-dom";
 import { Stethoscope, Link2, Check, AlertCircle, Bookmark, Trash2, ShieldAlert, Info } from "lucide-react";
 import { format } from "date-fns";

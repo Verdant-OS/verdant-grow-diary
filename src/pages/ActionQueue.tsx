@@ -44,6 +44,12 @@ import {
 import { formatLastUpdatedAgo } from "@/lib/lastUpdatedAgo";
 
 import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
+import ActionQueueDetailDrawer from "@/components/ActionQueueDetailDrawer";
+import {
+  buildActionQueueTraceDraft,
+  buildActionQueueTraceIdempotencyKey,
+  type ActionQueueTraceKind,
+} from "@/lib/actionQueueTimelineTraceRules";
 import { toast } from "sonner";
 import {
   type ActionStatus,
@@ -246,6 +252,10 @@ export default function ActionQueue() {
   >(null);
   const [noteDraft, setNoteDraft] = useState("");
 
+  // Slide-over drawer that explains a single Action Queue item.
+  // Presenter-only state. Opening it never triggers a write or AI call.
+  const [drawerRow, setDrawerRow] = useState<ActionRow | null>(null);
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
@@ -385,6 +395,62 @@ export default function ActionQueue() {
     return true;
   }
 
+  /**
+   * Idempotent timeline trace for approve/reject transitions.
+   *
+   * Writes a labeled `diary_entries` row so the grower's timeline shows
+   * the approval decision. Uses a deterministic idempotency key inside
+   * `details` so a repeat click (or React re-render race) does not
+   * create a duplicate trace row.
+   *
+   * NEVER includes device commands, raw payloads, service-role context,
+   * or internal back-pointer tokens.
+   */
+  async function writeTimelineTrace(
+    row: ActionRow,
+    kind: ActionQueueTraceKind,
+  ): Promise<void> {
+    if (!user) return;
+    const key = buildActionQueueTraceIdempotencyKey(row.id, kind);
+    // Idempotency probe: skip if a trace row with this key already exists.
+    const probe = await supabase
+      .from("diary_entries")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("grow_id", row.grow_id)
+      .contains("details", { idempotency_key: key })
+      .limit(1);
+    if (Array.isArray(probe.data) && probe.data.length > 0) return;
+    const draft = buildActionQueueTraceDraft({
+      action_id: row.id,
+      user_id: user.id,
+      grow_id: row.grow_id,
+      tent_id: row.tent_id,
+      plant_id: row.plant_id,
+      action_type: row.action_type,
+      suggested_change: row.suggested_change,
+      reason: row.reason,
+      source: row.source,
+      kind,
+    });
+    // Cast: `details` is a structured presenter-built object; Supabase
+    // generated types want a `Json`-shaped record. Shape is asserted by
+    // the pure helper's tests.
+    const insertPayload = {
+      ...draft,
+      details: draft.details as unknown as Record<string, unknown>,
+    };
+    const { error } = await supabase
+      .from("diary_entries")
+      .insert(insertPayload as never);
+    if (error) {
+      // Trace failure must not block the approval/rejection itself.
+      toast.warning("Approval saved, but timeline trace failed", {
+        description: error.message,
+      });
+    }
+  }
+
   async function transition(
     row: ActionRow,
     next: Partial<ActionRow>,
@@ -403,6 +469,11 @@ export default function ActionQueue() {
       return;
     }
     await logEvent(row, event_type, new_status, note);
+    if (new_status === "approved") {
+      await writeTimelineTrace(row, "approved");
+    } else if (new_status === "rejected") {
+      await writeTimelineTrace(row, "rejected");
+    }
     setBusyId(null);
     await load();
   }
@@ -871,6 +942,35 @@ export default function ActionQueue() {
                 No approval-required actions are pending.
               </p>
             )}
+            {!filtersActive && (
+              <div
+                className="mt-3 rounded-lg border border-border/60 bg-secondary/30 p-3 space-y-2"
+                data-testid="action-queue-empty-next-steps"
+              >
+                <p className="text-xs text-foreground">
+                  Actions appear here after Verdant or the grower creates a review item.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  To create better recommendations, add timeline logs and sensor snapshots first.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Link
+                    to="/timeline"
+                    className="text-xs text-primary hover:underline rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    data-testid="action-queue-empty-next-steps-timeline"
+                  >
+                    View Timeline
+                  </Link>
+                  <Link
+                    to="/sensors"
+                    className="text-xs text-primary hover:underline rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    data-testid="action-queue-empty-next-steps-sensors"
+                  >
+                    Add Sensor Snapshot
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
 
         ) : (
@@ -986,9 +1086,18 @@ export default function ActionQueue() {
                     );
                   })()}
 
+                  <button
+                    type="button"
+                    onClick={() => setDrawerRow(row)}
+                    className="ml-auto text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm self-center"
+                    data-testid="action-queue-row-explain"
+                    aria-describedby={titleId}
+                  >
+                    Explain
+                  </button>
                   <Link
                     to={actionDetailPath(row.id)}
-                    className="ml-auto text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm self-center"
+                    className="text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm self-center"
                     aria-describedby={titleId}
                   >
                     View Details
@@ -1160,6 +1269,36 @@ export default function ActionQueue() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ActionQueueDetailDrawer
+        open={!!drawerRow}
+        onOpenChange={(open) => {
+          if (!open) setDrawerRow(null);
+        }}
+        row={drawerRow}
+        lookups={{
+          growsById: Object.fromEntries(
+            grows.map((g) => [g.id, { name: g.name }]),
+          ),
+        }}
+        busy={!!drawerRow && busyId === drawerRow.id}
+        canApprove={!!drawerRow && !isTerminalStatus(drawerRow.status)}
+        canReject={!!drawerRow && drawerRow.status === "pending_approval"}
+        onApprove={(r) => {
+          const found = rows.find((row) => row.id === r.id);
+          if (found) {
+            setDrawerRow(null);
+            approve(found);
+          }
+        }}
+        onReject={(r) => {
+          const found = rows.find((row) => row.id === r.id);
+          if (found) {
+            setDrawerRow(null);
+            reject(found);
+          }
+        }}
+      />
     </div>
   );
 }

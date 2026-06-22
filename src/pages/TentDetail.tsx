@@ -288,7 +288,6 @@ export default function TentDetail() {
             current="tent"
             ids={{
               growId: tent.growId ?? null,
-              tentId: tent.id ?? null,
               plantId: safePlantId,
             }}
             testId="tent-detail-one-tent-loop-next-step-card"

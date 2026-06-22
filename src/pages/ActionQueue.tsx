@@ -92,6 +92,8 @@ import {
 } from "@/lib/actionQueueTraceStatusRules";
 import {
   buildActionDiaryTraceLink,
+  buildJumpToHighlightedTraceLink,
+  JUMP_TO_HIGHLIGHTED_TRACE_TESTID,
   TIMELINE_TRACE_UNAVAILABLE_COPY,
 } from "@/lib/actionQueueTimelineLinkRules";
 import {
@@ -465,6 +467,15 @@ export default function ActionQueue() {
   // Presenter-only; never mutates rows or hits the DB.
   const rawAlertParam = searchParams.get("alert");
   const alertContextId = parseAlertContextParam(rawAlertParam);
+
+  // Optional safe jump affordance when /actions is opened with
+  // ?highlight=action-queue:<id>:<approved|rejected>. Presenter-only;
+  // never mutates state, never re-runs approve/reject, never inserts.
+  const rawHighlightParam = searchParams.get("highlight");
+  const jumpHighlightLink = useMemo(
+    () => buildJumpToHighlightedTraceLink(rawHighlightParam),
+    [rawHighlightParam],
+  );
 
 
   const clearFocus = useCallback(() => {
@@ -1022,6 +1033,25 @@ export default function ActionQueue() {
           >
             Clear focus
           </Button>
+        </div>
+      )}
+
+      {jumpHighlightLink && (
+        <div
+          className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-secondary/30 px-3 py-2"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="text-xs text-muted-foreground">
+            Highlighted diary trace available.
+          </span>
+          <Link
+            to={jumpHighlightLink.href}
+            className="text-xs text-primary hover:underline"
+            data-testid={JUMP_TO_HIGHLIGHTED_TRACE_TESTID}
+          >
+            {jumpHighlightLink.label}
+          </Link>
         </div>
       )}
 

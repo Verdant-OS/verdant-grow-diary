@@ -88,10 +88,16 @@ import {
   parseTimelineHighlightToken,
   diaryEntryMatchesHighlight,
   highlightIsMissingFromList,
+  detectTimelineHighlightBlockers,
+  formatTimelineHighlightBlockersLine,
   TIMELINE_HIGHLIGHT_PARAM,
   TIMELINE_HIGHLIGHT_TESTID,
   TIMELINE_HIGHLIGHT_NOT_VISIBLE_COPY,
+  TIMELINE_HIGHLIGHT_NO_BLOCKERS_COPY,
   TIMELINE_HIGHLIGHT_NOT_VISIBLE_TESTID,
+  TIMELINE_HIGHLIGHT_BLOCKERS_TESTID,
+  TIMELINE_HIGHLIGHT_CLEAR_FILTERS_TESTID,
+  TIMELINE_HIGHLIGHT_CLEAR_FILTERS_LABEL,
   TIMELINE_HIGHLIGHT_ARIA_LABEL,
 } from "@/lib/timelineHighlightRules";
 
@@ -656,15 +662,52 @@ export default function Timeline() {
           Showing {filtered.length} of {entries.length}{" "}
           {entries.length === 1 ? "entry" : "entries"}
         </p>
-        {highlight && highlightIsMissingFromList(filtered, highlight) && (
-          <p
-            className="text-xs text-muted-foreground"
-            role="status"
-            data-testid={TIMELINE_HIGHLIGHT_NOT_VISIBLE_TESTID}
-          >
-            {TIMELINE_HIGHLIGHT_NOT_VISIBLE_COPY}
-          </p>
-        )}
+        {highlight && highlightIsMissingFromList(filtered, highlight) && (() => {
+          const blockers = detectTimelineHighlightBlockers({
+            searchQuery,
+            stageFilter,
+            eventFilter,
+            eventTypeFilter,
+            plantFilter,
+            tentFilter,
+            sensorSourceCount: sensorSourceFilter.length,
+          });
+          const blockersLine = formatTimelineHighlightBlockersLine(blockers);
+          const handleClear = () => {
+            clearEvidenceFilters();
+            setStageFilter("all");
+            setEventFilter("all");
+            // Preserve highlight (and any other) query params untouched.
+          };
+          return (
+            <div
+              className="mt-1 space-y-1"
+              role="status"
+              aria-label={TIMELINE_HIGHLIGHT_ARIA_LABEL}
+              data-testid={TIMELINE_HIGHLIGHT_NOT_VISIBLE_TESTID}
+            >
+              <p className="text-xs text-muted-foreground">
+                {TIMELINE_HIGHLIGHT_NOT_VISIBLE_COPY}
+              </p>
+              <p
+                className="text-[11px] text-muted-foreground"
+                data-testid={TIMELINE_HIGHLIGHT_BLOCKERS_TESTID}
+              >
+                {blockersLine ?? TIMELINE_HIGHLIGHT_NO_BLOCKERS_COPY}
+              </p>
+              {blockers.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleClear}
+                  data-testid={TIMELINE_HIGHLIGHT_CLEAR_FILTERS_TESTID}
+                >
+                  {TIMELINE_HIGHLIGHT_CLEAR_FILTERS_LABEL}
+                </Button>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
 

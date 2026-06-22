@@ -61,15 +61,14 @@ describe("OperatorBillingSubscriptionUpdateAudit render", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("Created")).toBeInTheDocument();
+      expect(screen.getByText("Pro Monthly")).toBeInTheDocument();
     });
     expect(rpcMock).toHaveBeenCalledWith(
       "billing_subscription_update_operator_audit",
       { p_limit: 50 },
     );
-    expect(screen.getByText("Pro Monthly")).toBeInTheDocument();
+    expect(screen.getAllByText("Created").length).toBeGreaterThan(0);
     expect(screen.getByText("new_subscription")).toBeInTheDocument();
-    // total is 7
     expect(screen.getByText("7")).toBeInTheDocument();
   });
 

@@ -863,6 +863,14 @@ export default function ActionQueue() {
                 {ACTION_QUEUE_EMPTY_PENDING_HELP}
               </p>
             )}
+            {!filtersActive && (
+              <p
+                className="text-xs text-muted-foreground mt-1"
+                data-testid="one-tent-loop-action-queue-empty"
+              >
+                No approval-required actions are pending.
+              </p>
+            )}
           </div>
 
         ) : (

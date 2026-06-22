@@ -92,6 +92,8 @@ import {
 } from "@/lib/actionQueueTraceStatusRules";
 import {
   buildActionDiaryTraceLink,
+  buildJumpToHighlightedTraceLink,
+  JUMP_TO_HIGHLIGHTED_TRACE_TESTID,
   TIMELINE_TRACE_UNAVAILABLE_COPY,
 } from "@/lib/actionQueueTimelineLinkRules";
 import {

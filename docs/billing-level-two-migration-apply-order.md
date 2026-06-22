@@ -22,16 +22,18 @@ safely and predictably.
 
 ## Apply Order
 
-Apply migrations in the dependency order below. When an exact filename is
-not confidently verified in `supabase/migrations/`, the entry is marked
-`filename to verify in repo` rather than invented.
+Apply migrations in the dependency order below. Filenames have been
+verified against `supabase/migrations/`. When a dependency group has no
+matching migration file in the repo, the entry is marked
+`no migration file found — verify before apply` rather than invented.
+
 
 1. Billing subscription source-of-truth foundation
    (`public.billing_subscriptions` table + RLS)
-   - filename to verify in repo
+   - `supabase/migrations/20260605223431_2bb04500-2fca-40a7-83b8-a6e3086fdbfe.sql`
 2. Paddle events table
    (`public.paddle_events` raw event ledger)
-   - filename to verify in repo
+   - `supabase/migrations/20260602090359_efebb43a-e4da-4f0e-8ffd-accce65ccffa.sql`
 3. Paddle event processing table
    - `supabase/migrations/20260620234500_add_paddle_event_processing.sql`
    - `supabase/migrations/20260621003000_paddle_event_processing_operator_audit.sql`
@@ -40,13 +42,14 @@ not confidently verified in `supabase/migrations/`, the entry is marked
 5. Subscription updater RPC
    - `supabase/migrations/20260621015000_apply_paddle_subscription_update_rpc.sql`
 6. Subscription updater harness, if migration-backed
-   - filename to verify in repo
+   - no migration file found — verify before apply
 7. Subscription updater audit table, audited wrapper RPC, and operator audit RPC
    - `supabase/migrations/20260622170000_billing_subscription_update_audit.sql`
 8. Subscription updater audit retention purge RPC
    - `supabase/migrations/20260622171621_billing_subscription_update_audit_retention.sql`
 9. Entitlement resolution operator audit RPC
    - `supabase/migrations/20260622174913_61dbedcc-3cd8-45e5-ae08-e241346822a0.sql`
+
 
 Related supporting migration (apply before any AI-credit-touching billing
 work):

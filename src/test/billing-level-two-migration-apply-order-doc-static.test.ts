@@ -90,4 +90,55 @@ describe("billing level two migration apply order manifest (docs/static-only)", 
     // No raw JSON blob examples (curly-brace blocks with quoted keys).
     expect(doc).not.toMatch(/\{\s*"[a-z_]+"\s*:/i);
   });
+
+  it("does not contain unresolved 'filename to verify in repo' placeholders", () => {
+    expect(lower).not.toContain("filename to verify in repo");
+  });
+
+  it("only uses 'no migration file found' lines for groups with no repo match", () => {
+    const { readdirSync } = require("node:fs") as typeof import("node:fs");
+    const migrationsDir = resolve(__dirname, "..", "..", "supabase", "migrations");
+    const files = existsSync(migrationsDir) ? readdirSync(migrationsDir) : [];
+
+    // Each numbered group entry whose bullet says "no migration file found"
+    // must not have a clearly matching migration filename in the repo.
+    // We assert the only allowed unmatched group in this slice is the
+    // subscription updater harness group.
+    const lines = doc.split(/\r?\n/);
+    let currentGroup = "";
+    for (const line of lines) {
+      const groupMatch = line.match(/^\d+\.\s+(.*)$/);
+      if (groupMatch) {
+        currentGroup = groupMatch[1].toLowerCase();
+        continue;
+      }
+      if (/^\s*-\s/.test(line) && line.includes("no migration file found")) {
+        const isHarness = currentGroup.includes("subscription updater harness");
+        expect(isHarness, `unexpected 'no migration file found' under group: ${currentGroup}`).toBe(true);
+
+        // Sanity check: confirm no obvious harness migration exists in repo.
+        const harnessLike = files.filter(
+          (f) => /subscription_update.*harness|paddle.*harness/i.test(f),
+        );
+        expect(harnessLike).toEqual([]);
+      }
+    }
+  });
+
+  it("required dependency groups remain present after filename verification", () => {
+    const requiredGroups = [
+      "billing subscription source-of-truth foundation",
+      "paddle events table",
+      "paddle event processing table",
+      "billing customer links",
+      "subscription updater rpc",
+      "subscription updater harness",
+      "subscription updater audit",
+      "subscription updater audit retention purge rpc",
+      "entitlement resolution operator audit rpc",
+    ];
+    for (const g of requiredGroups) {
+      expect(lower).toContain(g);
+    }
+  });
 });

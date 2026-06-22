@@ -41,6 +41,8 @@ import {
   buildActionDiaryTraceLink,
   TIMELINE_TRACE_UNAVAILABLE_COPY,
 } from "@/lib/actionQueueTimelineLinkRules";
+import { buildCopyableTraceLinkFromHighlight } from "@/lib/actionQueueTraceLinkCopyRules";
+import CopyTraceLinkButton from "@/components/CopyTraceLinkButton";
 import { buildRetryTraceViewModel } from "@/lib/actionQueueRetryTraceViewModel";
 
 
@@ -257,17 +259,28 @@ function ActionQueueDetailDrawerBody({
             currentActionsParams,
           });
           if (link) {
+            const copy = buildCopyableTraceLinkFromHighlight(link.highlight, {
+              actionsReturn: link.actionsReturn ?? null,
+            });
             return (
-              <a
-                href={link.href}
-                data-testid="action-queue-detail-drawer-diary-trace-link"
-                data-trace-highlight={link.highlight}
-                data-trace-kind={link.kind}
-                className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-              >
-                <ExternalLink className="h-3 w-3" aria-hidden />
-                {link.label}
-              </a>
+              <div className="flex flex-wrap items-center gap-3">
+                <a
+                  href={link.href}
+                  data-testid="action-queue-detail-drawer-diary-trace-link"
+                  data-trace-highlight={link.highlight}
+                  data-trace-kind={link.kind}
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                >
+                  <ExternalLink className="h-3 w-3" aria-hidden />
+                  {link.label}
+                </a>
+                {copy && (
+                  <CopyTraceLinkButton
+                    url={copy.url}
+                    testIdSuffix="drawer"
+                  />
+                )}
+              </div>
             );
           }
           if (rowStatus === "approved" || rowStatus === "rejected") {

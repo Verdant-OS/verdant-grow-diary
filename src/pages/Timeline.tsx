@@ -226,10 +226,6 @@ export default function Timeline() {
     [searchParams],
   );
 
-  // Track which highlight token we have already scrolled/focused to so
-  // re-renders never repeatedly steal focus. Resets when the token
-  // changes (or clears).
-  const scrolledTokenRef = useRef<string | null>(null);
 
   const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>(
     () => parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM)),

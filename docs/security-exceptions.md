@@ -71,6 +71,83 @@ The following controls are enforced by migration and verified by tests:
 
 ---
 
+## Exception 3 — `public.paddle_events` has no client-side policies
+
+- **Scanner finding:** "Paddle webhook payloads have no SELECT policy — data
+  access is fully blocked but INSERT/UPDATE are also missing"
+  (`paddle_events_no_select_policy`)
+- **Decision:** intentionally accepted — **do not add client policies**
+- **Reason:** `paddle_events` stores raw Paddle billing webhook bodies
+  including customer PII and subscription details. The table is written
+  exclusively by the `paddle-webhook` Edge Function using `service_role` and is
+  never read or written by the client. No `SELECT` / `INSERT` / `UPDATE` /
+  `DELETE` policies exist for `anon` or `authenticated`, which correctly fails
+  closed at the Data API. The finding text itself notes "No action needed if
+  server-only access is confirmed and intentional" — that is the case here.
+
+### Safety controls
+
+- RLS enabled on the table; zero client-facing policies.
+- All writes flow through the `paddle-webhook` Edge Function under
+  `service_role` in a trusted server context.
+- No client code imports, selects, or renders `paddle_events` or its `payload`
+  column.
+- Billing entitlement reads go through `public.billing_subscriptions`, not
+  `paddle_events`.
+
+### Tests / guards
+
+- Static-safety guard: no `from("paddle_events")` reference exists outside
+  `supabase/functions/paddle-webhook/`.
+
+---
+
+## Exception 4 — `public.sensor_readings.raw_payload` is owner-scoped
+
+- **Scanner finding:** "sensor_readings.raw_payload is readable by the row
+  owner and may contain unredacted device data"
+  (`sensor_readings_raw_payload_exposure`)
+- **Decision:** intentionally accepted — owner-only read with
+  client-side redaction
+- **Reason:** `raw_payload` is required for operator diagnostic surfaces
+  (Ingest Inspector, EcoWitt Ingest Audit) that must show the original
+  payload shape to debug sensor truth issues. Access is already tightly
+  constrained:
+  - RLS restricts every `SELECT` on `sensor_readings` to
+    `auth.uid() = user_id` — a user can only see their own ingest rows.
+  - All client surfaces that display `raw_payload` route through
+    `redactRawPayload` / `redactEcoWittRawPayload` first; the raw bytes
+    are never rendered.
+  - The general action-queue / evidence / AI-doctor view-models have
+    regression tests asserting that `raw_payload`, `service_role`,
+    `bridge_token`, and similar markers never leak into normal UI.
+
+  Migrating to a redacted view would either break the operator
+  diagnostic pages or require a parallel server-side redaction
+  pipeline. The current owner-scoped + client-redacted design is
+  deliberate.
+
+### Safety controls
+
+- RLS `SELECT` policy is strictly `auth.uid() = user_id`. No anon read.
+- Diagnostic pages call `redactRawPayload` / `redactEcoWittRawPayload`
+  before any display.
+- Static-safety tests assert `raw_payload` does not appear in non-operator
+  view-models (see `src/test/action-queue-evidence-provenance-leakage.test.ts`,
+  `src/test/action-queue-evidence-view-model.test.ts`,
+  `src/test/action-detail-missing-evidence-review-link.test.ts`).
+- AI Doctor / Action Queue evidence pipelines do not select `raw_payload`.
+
+### Future hardening (not blocking)
+
+If operator diagnostic flows are moved server-side, replace direct
+`raw_payload` reads with a `SECURITY DEFINER` RPC that returns a
+pre-redacted payload, then `REVOKE SELECT (raw_payload) ON
+public.sensor_readings FROM authenticated`. That work is out of scope
+for this exception.
+
+---
+
 ## Resolved finding — Verdant storage bucket owner-scoped `UPDATE` / `DELETE`
 
 - **Scanner finding:** "Storage bucket `verdant` missing UPDATE/DELETE

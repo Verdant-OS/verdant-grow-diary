@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
@@ -100,6 +100,13 @@ import {
   TIMELINE_HIGHLIGHT_CLEAR_FILTERS_LABEL,
   TIMELINE_HIGHLIGHT_ARIA_LABEL,
 } from "@/lib/timelineHighlightRules";
+import {
+  resolveBackToActionsHref,
+  ACTIONS_RETURN_PARAM,
+  BACK_TO_ACTIONS_LABEL,
+  BACK_TO_ACTIONS_TESTID,
+} from "@/lib/actionQueueReturnLinkRules";
+import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoScroll";
 
 
 
@@ -211,6 +218,14 @@ export default function Timeline() {
     () => parseTimelineHighlightToken(searchParams.get(TIMELINE_HIGHLIGHT_PARAM)),
     [searchParams],
   );
+
+  // Resolve a safe "Back to Actions" href from the optional
+  // ?actionsReturn= round-trip param. Hidden when no safe value.
+  const backToActions = useMemo(
+    () => resolveBackToActionsHref(searchParams.get(ACTIONS_RETURN_PARAM)),
+    [searchParams],
+  );
+
 
   const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>(
     () => parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM)),
@@ -376,6 +391,11 @@ export default function Timeline() {
   useEffect(() => {
     if (lightboxPhotoId !== null && lightboxIndex < 0) setLightboxPhotoId(null);
   }, [lightboxPhotoId, lightboxIndex]);
+
+  // Auto-scroll/focus the highlighted diary trace entry once per
+  // highlight token. The hook owns the gating ref so repeated renders
+  // never steal focus.
+  useTimelineHighlightAutoScroll(highlight, filtered);
 
   // Merge `grow_events` (Quick Log v2 manual saves) and `diary_entries`
   // through the tested `mergeTimelineSources` helper so the Recent Quick
@@ -705,9 +725,36 @@ export default function Timeline() {
                   {TIMELINE_HIGHLIGHT_CLEAR_FILTERS_LABEL}
                 </Button>
               )}
+              {highlight && backToActions.wasProvided && (
+                <div>
+                  <Link
+                    to={backToActions.href}
+                    className="text-xs text-primary hover:underline"
+                    data-testid={BACK_TO_ACTIONS_TESTID}
+                  >
+                    {BACK_TO_ACTIONS_LABEL}
+                  </Link>
+                </div>
+              )}
             </div>
           );
         })()}
+        {/* Always-on Back to Actions affordance when a safe return path
+            and highlight token are present, even if the entry is found
+            and visible. Keeps the round-trip discoverable. */}
+        {highlight &&
+          !highlightIsMissingFromList(filtered, highlight) &&
+          backToActions.wasProvided && (
+            <div className="mt-1">
+              <Link
+                to={backToActions.href}
+                className="text-xs text-primary hover:underline"
+                data-testid={`${BACK_TO_ACTIONS_TESTID}-visible`}
+              >
+                {BACK_TO_ACTIONS_LABEL}
+              </Link>
+            </div>
+          )}
       </div>
 
 
@@ -843,9 +890,10 @@ export default function Timeline() {
                       }
                       data-highlight={isHighlighted ? "action-queue-trace" : undefined}
                       aria-label={isHighlighted ? TIMELINE_HIGHLIGHT_ARIA_LABEL : undefined}
+                      tabIndex={isHighlighted ? -1 : undefined}
                       className={cn(
                         "glass rounded-2xl overflow-hidden animate-fade-in",
-                        isHighlighted && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                        isHighlighted && "ring-2 ring-primary ring-offset-2 ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                       )}
                     >
 

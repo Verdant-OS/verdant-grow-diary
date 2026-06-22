@@ -148,6 +148,40 @@ describe("Integrated — Action Queue URL restore + jump + pagination", () => {
       screen.queryByTestId("action-queue-jump-to-highlighted-trace"),
     ).toBeNull();
   });
+
+
+  it("jump link includes a safe actionsReturn round-trip when /actions has state", async () => {
+    renderAt(
+      "/actions?highlight=action-queue:aq-1:approved&q=mold&status=pending&page=2&pageSize=10",
+    );
+    const jump = await waitFor(() =>
+      screen.getByTestId("action-queue-jump-to-highlighted-trace"),
+    );
+    const href = jump.getAttribute("href") ?? "";
+    expect(href).toContain("/timeline?");
+    const url = new URL(`http://x${href}`);
+    expect(url.searchParams.get("highlight")).toBe(
+      "action-queue:aq-1:approved",
+    );
+    const ret = url.searchParams.get("actionsReturn") ?? "";
+    expect(ret).toContain("/actions?");
+    expect(ret).toContain("q=mold");
+    expect(ret).toContain("status=pending");
+    expect(ret).toContain("page=2");
+    expect(ret).toContain("pageSize=10");
+    // No raw UUIDs / protocol URLs leak into href.
+    expect(href).not.toMatch(/javascript:/i);
+    expect(href).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/i);
+  });
+
+  it("jump link omits actionsReturn when /actions carries only the highlight", async () => {
+    renderAt("/actions?highlight=action-queue:aq-1:approved");
+    const jump = await waitFor(() =>
+      screen.getByTestId("action-queue-jump-to-highlighted-trace"),
+    );
+    const url = new URL(`http://x${jump.getAttribute("href") ?? ""}`);
+    expect(url.searchParams.get("actionsReturn")).toBeNull();
+  });
 });
 
 describe("Integrated — retry trace failure copy is wired in", () => {

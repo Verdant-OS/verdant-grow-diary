@@ -4,9 +4,9 @@
  *
  * Strict safety contract:
  *   - Only displays sanitized fields (status/reason/plan/status/timestamp).
- *   - Never surfaces provider IDs, payloads, raw_payload, details, or
- *     provider_price_id, even if a future server change accidentally
- *     returns them.
+ *   - Never surfaces raw provider identifiers or webhook bodies, even if a
+ *     future server change accidentally returns them. The forbidden field
+ *     list lives in BILLING_SUBSCRIPTION_UPDATE_AUDIT_FORBIDDEN_KEYS.
  */
 
 export type BillingSubscriptionUpdateAuditStatus =

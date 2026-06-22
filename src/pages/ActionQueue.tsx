@@ -1471,6 +1471,11 @@ export default function ActionQueue() {
                 <span id={descId} className="sr-only">
                   {buildActionRowAriaLabel(row)}
                 </span>
+                {isFocused && (
+                  <span id={`${descId}-focused`} className="sr-only">
+                    Focused
+                  </span>
+                )}
 
 
                 <div className="flex items-start gap-3">

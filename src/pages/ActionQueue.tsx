@@ -468,6 +468,15 @@ export default function ActionQueue() {
   const rawAlertParam = searchParams.get("alert");
   const alertContextId = parseAlertContextParam(rawAlertParam);
 
+  // Optional safe jump affordance when /actions is opened with
+  // ?highlight=action-queue:<id>:<approved|rejected>. Presenter-only;
+  // never mutates state, never re-runs approve/reject, never inserts.
+  const rawHighlightParam = searchParams.get("highlight");
+  const jumpHighlightLink = useMemo(
+    () => buildJumpToHighlightedTraceLink(rawHighlightParam),
+    [rawHighlightParam],
+  );
+
 
   const clearFocus = useCallback(() => {
     // Remove ONLY the `focus` query param. Preserve every other param

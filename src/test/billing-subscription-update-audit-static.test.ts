@@ -14,6 +14,7 @@ function findMigration(substring: string): string {
 }
 
 const MIGRATION = findMigration("billing_subscription_update_audit");
+const RETENTION_MIGRATION = findMigration("billing_subscription_update_audit_retention");
 const WEBHOOK = readProjectFile("supabase/functions/paddle-webhook/index.ts");
 
 describe("billing_subscription_update_audit migration", () => {

@@ -45,6 +45,8 @@ import GrowTargetsEditor from "@/components/GrowTargetsEditor";
  */
 export default function GrowDetail() {
   const { grow, growId, loading, notFound, error, counts, recent, status, outcomes, refetch } = useGrowDetailData();
+  const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
+
 
   if (loading) {
     return (

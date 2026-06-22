@@ -10,16 +10,28 @@
  *    keys, or `[alert:<id>]` / `[session:<id>]` back-pointer tokens.
  *  - Always renders the safety reminder so the grower sees that no
  *    equipment is controlled from this surface.
+ *  - When status history / context is still loading, renders a stable
+ *    skeleton — never placeholder claims like "safe", "healthy", or
+ *    "approved".
  */
-import { Check, X, ShieldCheck } from "lucide-react";
+import { Check, X, ShieldCheck, ExternalLink, AlertTriangle, RefreshCw } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   buildActionDrawerViewModel,
   type ActionDrawerInput,
   type DrawerContextLookups,
 } from "@/lib/actionQueueViewModel";
+import {
+  buildActionQueueSourceLink,
+  SOURCE_LINK_UNAVAILABLE_COPY,
+} from "@/lib/actionQueueSourceLinkRules";
+import {
+  STATUS_HISTORY_EMPTY_COPY,
+  type ActionQueueStatusHistoryEntry,
+} from "@/lib/actionQueueStatusHistoryRules";
 
 export interface ActionQueueDetailDrawerProps {
   open: boolean;
@@ -28,24 +40,24 @@ export interface ActionQueueDetailDrawerProps {
   lookups?: DrawerContextLookups;
   /** True while a transition (approve/reject) is in flight for this row. */
   busy?: boolean;
+  /** True while related context / status history is still loading. */
+  loading?: boolean;
   /** Optional gate so terminal rows hide Approve/Reject controls. */
   canApprove?: boolean;
   canReject?: boolean;
+  /** Normalized status history rows (already filtered to this action). */
+  statusHistory?: ActionQueueStatusHistoryEntry[];
+  /** True after approve/reject succeeded but the timeline trace failed. */
+  traceFailed?: boolean;
+  /** True while a trace-only retry is in flight. */
+  retrying?: boolean;
   onApprove?: (row: ActionDrawerInput) => void;
   onReject?: (row: ActionDrawerInput) => void;
+  onRetryTrace?: (row: ActionDrawerInput) => void;
 }
 
-export default function ActionQueueDetailDrawer({
-  open,
-  onOpenChange,
-  row,
-  lookups,
-  busy = false,
-  canApprove = true,
-  canReject = true,
-  onApprove,
-  onReject,
-}: ActionQueueDetailDrawerProps) {
+export default function ActionQueueDetailDrawer(props: ActionQueueDetailDrawerProps) {
+  const { open, onOpenChange, row, loading = false } = props;
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -54,15 +66,11 @@ export default function ActionQueueDetailDrawer({
         data-testid="action-queue-detail-drawer"
       >
         {row ? (
-          <ActionQueueDetailDrawerBody
-            row={row}
-            lookups={lookups}
-            busy={busy}
-            canApprove={canApprove}
-            canReject={canReject}
-            onApprove={onApprove}
-            onReject={onReject}
-          />
+          loading ? (
+            <DrawerSkeleton />
+          ) : (
+            <ActionQueueDetailDrawerBody {...props} row={row} />
+          )
         ) : (
           <p
             className="text-sm text-muted-foreground"
@@ -76,19 +84,98 @@ export default function ActionQueueDetailDrawer({
   );
 }
 
+/**
+ * Drawer skeleton — preserves structure (header, source/reason,
+ * related context, status history, safety reminder) so the body does
+ * not jump when real data arrives. Renders NO claim text.
+ */
+function DrawerSkeleton() {
+  return (
+    <div
+      className="space-y-4"
+      role="status"
+      aria-busy="true"
+      aria-live="polite"
+      aria-label="Loading action details"
+      data-testid="action-queue-detail-drawer-skeleton"
+    >
+      <span className="sr-only">Loading action details…</span>
+      <SheetHeader>
+        <Skeleton className="h-5 w-2/3" data-testid="action-queue-detail-drawer-skeleton-title" />
+      </SheetHeader>
+      <div className="flex flex-wrap items-center gap-2">
+        <Skeleton className="h-5 w-20" />
+        <Skeleton className="h-5 w-20" />
+        <Skeleton className="h-5 w-24" />
+      </div>
+      <Skeleton
+        className="h-3 w-1/3"
+        data-testid="action-queue-detail-drawer-skeleton-source"
+      />
+      <Skeleton
+        className="h-12 w-full"
+        data-testid="action-queue-detail-drawer-skeleton-reason"
+      />
+      <div className="space-y-1" data-testid="action-queue-detail-drawer-skeleton-context">
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-5/6" />
+      </div>
+      <div className="space-y-1" data-testid="action-queue-detail-drawer-skeleton-history">
+        <Skeleton className="h-3 w-1/4" />
+        <Skeleton className="h-3 w-3/4" />
+        <Skeleton className="h-3 w-2/3" />
+      </div>
+      <Skeleton
+        className="h-10 w-full rounded-lg"
+        data-testid="action-queue-detail-drawer-skeleton-safety"
+      />
+    </div>
+  );
+}
+
+function formatHistoryTimestamp(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
 function ActionQueueDetailDrawerBody({
   row,
   lookups,
-  busy,
-  canApprove,
-  canReject,
+  busy = false,
+  canApprove = true,
+  canReject = true,
+  statusHistory,
+  traceFailed = false,
+  retrying = false,
   onApprove,
   onReject,
-}: Required<
-  Pick<ActionQueueDetailDrawerProps, "row" | "busy" | "canApprove" | "canReject">
-> &
-  Pick<ActionQueueDetailDrawerProps, "lookups" | "onApprove" | "onReject">) {
-  const vm = buildActionDrawerViewModel(row as ActionDrawerInput, lookups);
+  onRetryTrace,
+}: Required<Pick<ActionQueueDetailDrawerProps, "row">> &
+  Pick<
+    ActionQueueDetailDrawerProps,
+    | "lookups"
+    | "busy"
+    | "canApprove"
+    | "canReject"
+    | "statusHistory"
+    | "traceFailed"
+    | "retrying"
+    | "onApprove"
+    | "onReject"
+    | "onRetryTrace"
+  >) {
+  const vm = buildActionDrawerViewModel(row, lookups);
+  const sourceLink = buildActionQueueSourceLink({
+    source: row.source ?? null,
+    reason: row.reason ?? null,
+    grow_id: row.grow_id ?? null,
+    tent_id: row.tent_id ?? null,
+    plant_id: row.plant_id ?? null,
+  });
+  const history = Array.isArray(statusHistory) ? statusHistory : [];
   return (
     <div className="space-y-4">
       <SheetHeader>
@@ -116,6 +203,28 @@ function ActionQueueDetailDrawerBody({
         >
           Source: {vm.sourceLabel}
         </Badge>
+      </div>
+
+      {/* Go to source — pure helper decides safety. */}
+      <div data-testid="action-queue-detail-drawer-source-link-row">
+        {sourceLink ? (
+          <a
+            href={sourceLink.href}
+            data-testid="action-queue-detail-drawer-source-link"
+            data-source-kind={sourceLink.kind}
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+          >
+            <ExternalLink className="h-3 w-3" aria-hidden />
+            {sourceLink.label}
+          </a>
+        ) : (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="action-queue-detail-drawer-source-link-unavailable"
+          >
+            {SOURCE_LINK_UNAVAILABLE_COPY}
+          </p>
+        )}
       </div>
 
       {vm.recommendationText && (
@@ -193,6 +302,66 @@ function ActionQueueDetailDrawerBody({
         )}
       </section>
 
+      <section>
+        <h3 className="text-xs uppercase tracking-wider text-muted-foreground">
+          Status history
+        </h3>
+        {history.length === 0 ? (
+          <p
+            className="text-sm mt-1 text-muted-foreground"
+            data-testid="action-queue-detail-drawer-history-empty"
+          >
+            {STATUS_HISTORY_EMPTY_COPY}
+          </p>
+        ) : (
+          <ul
+            className="text-sm mt-1 space-y-1"
+            data-testid="action-queue-detail-drawer-history"
+          >
+            {history.map((h) => (
+              <li
+                key={h.idempotency_key}
+                data-testid="action-queue-detail-drawer-history-item"
+                data-trace-kind={h.kind}
+                className="flex items-center justify-between gap-2"
+              >
+                <span>{h.label}</span>
+                <span className="text-xs text-muted-foreground">
+                  {formatHistoryTimestamp(h.at)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {traceFailed && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-foreground"
+          data-testid="action-queue-detail-drawer-trace-failure"
+        >
+          <AlertTriangle
+            className="h-4 w-4 shrink-0 text-destructive"
+            aria-hidden
+          />
+          <div className="flex-1 space-y-1">
+            <p>Status saved, but timeline trace failed.</p>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={retrying}
+              onClick={() => onRetryTrace?.(row)}
+              data-testid="action-queue-detail-drawer-retry-trace"
+              aria-label="Retry timeline trace"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              {retrying ? "Retrying…" : "Retry trace"}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div
         className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground"
         role="note"
@@ -207,7 +376,7 @@ function ActionQueueDetailDrawerBody({
           <Button
             size="sm"
             disabled={busy}
-            onClick={() => onApprove?.(row as ActionDrawerInput)}
+            onClick={() => onApprove?.(row)}
             className="gradient-leaf text-primary-foreground"
             data-testid="action-queue-detail-drawer-approve"
             aria-label="Approve action"
@@ -220,7 +389,7 @@ function ActionQueueDetailDrawerBody({
             size="sm"
             variant="ghost"
             disabled={busy}
-            onClick={() => onReject?.(row as ActionDrawerInput)}
+            onClick={() => onReject?.(row)}
             data-testid="action-queue-detail-drawer-reject"
             aria-label="Reject action"
           >

@@ -1036,6 +1036,25 @@ export default function ActionQueue() {
         </div>
       )}
 
+      {jumpHighlightLink && (
+        <div
+          className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-secondary/30 px-3 py-2"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="text-xs text-muted-foreground">
+            Highlighted diary trace available.
+          </span>
+          <Link
+            to={jumpHighlightLink.href}
+            className="text-xs text-primary hover:underline"
+            data-testid={JUMP_TO_HIGHLIGHTED_TRACE_TESTID}
+          >
+            {jumpHighlightLink.label}
+          </Link>
+        </div>
+      )}
+
       {alertContextId && (
         <div
           className="glass rounded-2xl p-3 mb-4 flex flex-wrap items-center gap-3"

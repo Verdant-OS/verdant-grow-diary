@@ -32,7 +32,16 @@ import {
 } from "@/lib/actionQueueEvidenceViewModel";
 
 const ROOT = resolve(__dirname, "../..");
-const ACTION_QUEUE_SRC = readFileSync(resolve(ROOT, "src/pages/ActionQueue.tsx"), "utf8");
+// The pending skeleton was extracted into a reusable component; concat
+// the page + component source so legacy presence-of-testid + aria
+// assertions continue to hold no matter where the markup lives.
+const ACTION_QUEUE_SRC = [
+  readFileSync(resolve(ROOT, "src/pages/ActionQueue.tsx"), "utf8"),
+  readFileSync(
+    resolve(ROOT, "src/components/ActionQueueLoadingSkeleton.tsx"),
+    "utf8",
+  ),
+].join("\n\n/* --- joined for static scan --- */\n\n");
 const ACTION_DETAIL_SRC = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8");
 
 const UNSAFE_PATTERNS: ReadonlyArray<RegExp> = [

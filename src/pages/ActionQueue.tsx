@@ -398,10 +398,10 @@ export default function ActionQueue() {
   /**
    * Idempotent timeline trace for approve/reject transitions.
    *
-   * Writes a labeled `diary_entries` row so the grower's timeline shows
-   * the approval decision. Uses a deterministic idempotency key inside
-   * `details` so a repeat click (or React re-render race) does not
-   * create a duplicate trace row.
+   * Returns `true` on success (or when an existing row was found via
+   * the idempotency probe) and `false` on insert failure. Callers use
+   * the boolean to surface a retry affordance — the approval/rejection
+   * itself is never rolled back.
    *
    * NEVER includes device commands, raw payloads, service-role context,
    * or internal back-pointer tokens.
@@ -409,8 +409,8 @@ export default function ActionQueue() {
   async function writeTimelineTrace(
     row: ActionRow,
     kind: ActionQueueTraceKind,
-  ): Promise<void> {
-    if (!user) return;
+  ): Promise<boolean> {
+    if (!user) return false;
     const key = buildActionQueueTraceIdempotencyKey(row.id, kind);
     // Idempotency probe: skip if a trace row with this key already exists.
     const probe = await supabase
@@ -420,7 +420,7 @@ export default function ActionQueue() {
       .eq("grow_id", row.grow_id)
       .contains("details", { idempotency_key: key })
       .limit(1);
-    if (Array.isArray(probe.data) && probe.data.length > 0) return;
+    if (Array.isArray(probe.data) && probe.data.length > 0) return true;
     const draft = buildActionQueueTraceDraft({
       action_id: row.id,
       user_id: user.id,
@@ -443,11 +443,44 @@ export default function ActionQueue() {
     const { error } = await supabase
       .from("diary_entries")
       .insert(insertPayload as never);
-    if (error) {
-      // Trace failure must not block the approval/rejection itself.
-      toast.warning("Approval saved, but timeline trace failed", {
-        description: error.message,
-      });
+    return !error;
+  }
+
+  /**
+   * Surface a clear, retry-able warning when the approval/rejection
+   * succeeded but the timeline trace insert failed. Status update is
+   * NEVER repeated by the retry — only the trace insert is.
+   */
+  function reportTraceFailure(row: ActionRow, kind: ActionQueueTraceKind) {
+    setTraceFailure({ actionId: row.id, kind });
+    toast.warning("Status saved, but timeline trace failed", {
+      description: "Tap Retry trace in the action details to try again.",
+      action: {
+        label: "Retry trace",
+        onClick: () => {
+          void retryTimelineTrace(row, kind);
+        },
+      },
+    });
+  }
+
+  async function retryTimelineTrace(
+    row: ActionRow,
+    kind: ActionQueueTraceKind,
+  ) {
+    if (retryingTrace) return;
+    setRetryingTrace(true);
+    const ok = await writeTimelineTrace(row, kind);
+    setRetryingTrace(false);
+    if (ok) {
+      setTraceFailure(null);
+      toast.success("Timeline trace recorded");
+      if (drawerRow && drawerRow.id === row.id) {
+        await loadDrawerHistory(row);
+      }
+    } else {
+      // Calm error copy; do not duplicate the trace row.
+      toast.error("Timeline trace still failing");
     }
   }
 
@@ -469,14 +502,21 @@ export default function ActionQueue() {
       return;
     }
     await logEvent(row, event_type, new_status, note);
-    if (new_status === "approved") {
-      await writeTimelineTrace(row, "approved");
-    } else if (new_status === "rejected") {
-      await writeTimelineTrace(row, "rejected");
+    let traceKind: ActionQueueTraceKind | null = null;
+    if (new_status === "approved") traceKind = "approved";
+    else if (new_status === "rejected") traceKind = "rejected";
+    if (traceKind) {
+      const ok = await writeTimelineTrace(row, traceKind);
+      if (!ok) reportTraceFailure(row, traceKind);
+      else setTraceFailure((prev) => (prev?.actionId === row.id ? null : prev));
     }
     setBusyId(null);
     await load();
+    if (drawerRow && drawerRow.id === row.id) {
+      await loadDrawerHistory(row);
+    }
   }
+
 
   function openNoteDialog(row: ActionRow, kind: TransitionKind) {
     // SECURITY: terminal states cannot be transitioned again.

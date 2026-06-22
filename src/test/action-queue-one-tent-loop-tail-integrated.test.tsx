@@ -147,6 +147,8 @@ describe("Integrated — Action Queue URL restore + jump + pagination", () => {
     expect(
       screen.queryByTestId("action-queue-jump-to-highlighted-trace"),
     ).toBeNull();
+  });
+
 
   it("jump link includes a safe actionsReturn round-trip when /actions has state", async () => {
     renderAt(

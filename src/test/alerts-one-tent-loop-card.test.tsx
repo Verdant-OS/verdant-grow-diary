@@ -48,7 +48,7 @@ describe("Alerts One-Tent Loop next-step card wiring", () => {
     );
   });
 
-  it("routes to alerts index when no alertId is provided (safe fallback)", () => {
+  it("routes Add to Action Queue to the /actions surface (never back to /alerts)", () => {
     renderCard(
       <OneTentLoopNextStepCard
         current="alert"
@@ -56,7 +56,23 @@ describe("Alerts One-Tent Loop next-step card wiring", () => {
       />,
     );
     const cta = screen.getByTestId("alerts-one-tent-loop-next-step-card-cta");
-    expect(cta.getAttribute("href")).toBe("/alerts");
+    expect(cta.getAttribute("href")).toBe("/actions");
+    // Regression: CTA must not misleadingly land on /alerts while saying
+    // "Add to Action Queue".
+    expect(cta.getAttribute("href")).not.toMatch(/^\/alerts/);
+    expect(cta).toHaveTextContent(/Add to Action Queue/i);
+  });
+
+  it("routes to /actions even when an alertId is present (Add to Action Queue is an action-queue navigation)", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="alert"
+        ids={{ alertId: "a1" }}
+        testId="alerts-one-tent-loop-next-step-card"
+      />,
+    );
+    const cta = screen.getByTestId("alerts-one-tent-loop-next-step-card-cta");
+    expect(cta.getAttribute("href")).toBe("/actions");
   });
 
   it("does not call fetch on render", () => {

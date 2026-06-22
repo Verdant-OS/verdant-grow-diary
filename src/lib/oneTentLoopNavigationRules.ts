@@ -138,7 +138,10 @@ export function resolveOneTentLoopNextStep(
 
   switch (current) {
     case "grow":
-      if (growId) return enable(base, `/grows/${growId}`);
+      // CTA is "Open tent" — must route to an actual tent, never self-link
+      // back to Grow Detail. When no tentId is selected, stay disabled so
+      // the operator is not misled into thinking a tent is opened.
+      if (tentId) return enable(base, `/tents/${tentId}`);
       return base;
     case "tent":
       if (plantId) return enable(base, `/plants/${plantId}`);
@@ -154,13 +157,18 @@ export function resolveOneTentLoopNextStep(
     case "sensor-snapshot":
       return enable(base, "/doctor");
     case "ai-doctor":
+      // When a specific alertId is available, deep-link to that alert.
+      // Otherwise fall back to the alerts index AND relabel the CTA so
+      // the operator knows they are reviewing alerts, not opening one.
       if (alertId) return enable(base, `/alerts/${alertId}`);
-      return enable(base, "/alerts");
+      return { ...enable(base, "/alerts"), ctaLabel: "Review alerts" };
     case "alert":
-      // CTA is "Add to Action Queue" — the handoff is grower-initiated on
-      // the alert detail page. Action Queue items remain approval-required.
-      if (alertId) return enable(base, `/alerts/${alertId}`);
-      return enable(base, "/alerts");
+      // CTA is "Add to Action Queue" — must route to the Action Queue
+      // surface (/actions), not back to alerts. Action Queue items
+      // remain approval-required; this CTA does NOT create or approve
+      // anything automatically — it only navigates the operator there.
+      if (actionId) return enable(base, `/actions/${actionId}`);
+      return enable(base, "/actions");
     case "action-queue":
       if (actionId) return enable(base, `/actions/${actionId}`);
       return enable(base, "/actions");

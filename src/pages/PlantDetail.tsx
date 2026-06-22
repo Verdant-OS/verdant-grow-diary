@@ -44,6 +44,7 @@ import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
 import { PLANT_DETAIL_SECTION_ANCHORS } from "@/lib/plantDetailSectionAnchors";
 
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
+import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import PlantAiDoctorSessionsPanel from "@/components/PlantAiDoctorSessionsPanel";
 import PlantPhoto from "@/components/PlantPhoto";
 import { Badge } from "@/components/ui/badge";
@@ -408,6 +409,15 @@ export default function PlantDetail() {
         hasActionsSection
         hasDoctorSection
         hasAssignedTent={!!plant.tentId}
+      />
+      <OneTentLoopNextStepCard
+        current="plant"
+        ids={{
+          plantId: plant.id,
+          tentId: plant.tentId ?? null,
+          growId: plant.growId ?? null,
+        }}
+        testId="plant-detail-one-tent-loop-next-step-card"
       />
       <div
         id={PLANT_PHOTOS_ANCHOR_ID}

@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { useState } from "react";
-import { render, fireEvent } from "@testing-library/react";
+import { render, act } from "@testing-library/react";
 
 function Row({ row }: { row: { id: string; action_type: string } }) {
   const titleId = `aq-pending-title-${row.id}`;

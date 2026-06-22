@@ -623,6 +623,12 @@ export default function TentDetail() {
                 ? "No active plants in this tent."
                 : "No plants in this tent yet."}
             </p>
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="tent-detail-plants-empty-one-tent-loop-copy"
+            >
+              Add or open a plant to continue the One-Tent Loop.
+            </p>
             <div className="flex flex-wrap gap-2">
               <AddExistingPlantDialog
                 tentId={id ?? ""}

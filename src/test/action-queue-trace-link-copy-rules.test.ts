@@ -18,6 +18,71 @@ describe("buildCopyableTraceLinkFromHighlight", () => {
     expect(buildCopyableTraceLinkFromHighlight("alerts:aq-1:approved")).toBeNull();
   });
 
+  it("rejects bare UUID-only tokens (no action-queue prefix)", () => {
+    // Raw UUIDs must never appear as highlight tokens; the prefix
+    // wrapper is required so callers can never accidentally route a
+    // user/tent/plant id into the copy link.
+    expect(
+      buildCopyableTraceLinkFromHighlight(
+        "11111111-2222-3333-4444-555555555555",
+      ),
+    ).toBeNull();
+    expect(
+      buildCopyableTraceLinkFromHighlight(
+        "11111111-2222-3333-4444-555555555555:approved",
+      ),
+    ).toBeNull();
+  });
+
+  it("rejects id segment longer than 64 chars", () => {
+    const tooLong = "a".repeat(65);
+    expect(
+      buildCopyableTraceLinkFromHighlight(`action-queue:${tooLong}:approved`),
+    ).toBeNull();
+    // 64-char id is at the boundary and remains accepted.
+    const at64 = "a".repeat(64);
+    expect(
+      buildCopyableTraceLinkFromHighlight(`action-queue:${at64}:approved`),
+    ).not.toBeNull();
+  });
+
+  it("rejects all non-approved/rejected kinds", () => {
+    for (const kind of [
+      "completed",
+      "pending",
+      "pending_approval",
+      "simulated",
+      "cancelled",
+      "executed",
+      "retried",
+      "",
+      "APPROVED",
+    ]) {
+      expect(
+        buildCopyableTraceLinkFromHighlight(`action-queue:aq-1:${kind}`),
+      ).toBeNull();
+    }
+  });
+
+  it("rejects malformed prefixes and separators", () => {
+    expect(
+      buildCopyableTraceLinkFromHighlight("action_queue:aq-1:approved"),
+    ).toBeNull();
+    expect(
+      buildCopyableTraceLinkFromHighlight("actionqueue:aq-1:approved"),
+    ).toBeNull();
+    expect(
+      buildCopyableTraceLinkFromHighlight("action-queue/aq-1/approved"),
+    ).toBeNull();
+    expect(
+      buildCopyableTraceLinkFromHighlight(" action-queue:aq-1:approved"),
+    ).toBeNull();
+    expect(
+      buildCopyableTraceLinkFromHighlight("action-queue:aq-1:approved "),
+    ).toBeNull();
+  });
+
+
   it("builds a same-origin absolute URL when origin is supplied", () => {
     const link = buildCopyableTraceLinkFromHighlight("action-queue:aq-42:approved", {
       origin: "https://verdantgrowdiary.com",
@@ -84,7 +149,27 @@ describe("buildCopyableTraceLinkFromDiaryDetails", () => {
         idempotency_key: "garbage",
       }),
     ).toBeNull();
+    // wrong kind / oversize id / bare UUID — all unsafe in the details payload
+    expect(
+      buildCopyableTraceLinkFromDiaryDetails({
+        kind: "action_queue_trace",
+        idempotency_key: "action-queue:aq-1:completed",
+      }),
+    ).toBeNull();
+    expect(
+      buildCopyableTraceLinkFromDiaryDetails({
+        kind: "action_queue_trace",
+        idempotency_key: `action-queue:${"a".repeat(65)}:approved`,
+      }),
+    ).toBeNull();
+    expect(
+      buildCopyableTraceLinkFromDiaryDetails({
+        kind: "action_queue_trace",
+        idempotency_key: "11111111-2222-3333-4444-555555555555",
+      }),
+    ).toBeNull();
   });
+
 
   it("builds a link for valid action_queue_trace details", () => {
     const link = buildCopyableTraceLinkFromDiaryDetails(

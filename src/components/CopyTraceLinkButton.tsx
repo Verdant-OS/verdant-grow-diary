@@ -9,7 +9,7 @@
  *  - Never renders raw UUIDs / internal IDs / secrets.
  *  - Calm fallback copy on failure; never crashes.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Copy } from "lucide-react";
 import {
   COPY_TRACE_LINK_LABEL,
@@ -36,6 +36,9 @@ export default function CopyTraceLinkButton({
 }: CopyTraceLinkButtonProps) {
   const [status, setStatus] = useState<CopyTraceLinkResult | "idle">("idle");
   const [busy, setBusy] = useState(false);
+  const resetTimeoutRef = useRef<number | null>(null);
+  const mountedRef = useRef(true);
+
   const buttonTestId = testIdSuffix
     ? `${COPY_TRACE_LINK_TESTID}-${testIdSuffix}`
     : COPY_TRACE_LINK_TESTID;
@@ -43,16 +46,34 @@ export default function CopyTraceLinkButton({
     ? `${COPY_TRACE_LINK_STATUS_TESTID}-${testIdSuffix}`
     : COPY_TRACE_LINK_STATUS_TESTID;
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (resetTimeoutRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(resetTimeoutRef.current);
+        resetTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (busy) return;
     setBusy(true);
     const result = await copyTraceLinkToClipboard(url, clipboard ?? undefined);
+    if (!mountedRef.current) return;
     setStatus(result);
     setBusy(false);
     if (typeof window !== "undefined") {
-      window.setTimeout(() => setStatus("idle"), 2500);
+      if (resetTimeoutRef.current !== null) {
+        window.clearTimeout(resetTimeoutRef.current);
+      }
+      resetTimeoutRef.current = window.setTimeout(() => {
+        resetTimeoutRef.current = null;
+        if (mountedRef.current) setStatus("idle");
+      }, 2500);
     }
   };
 
@@ -92,7 +113,7 @@ export default function CopyTraceLinkButton({
           data-testid={`${statusTestId}-visible`}
           className={
             status === "success"
-              ? "text-xs text-emerald-300"
+              ? "text-xs text-success"
               : "text-xs text-destructive"
           }
         >

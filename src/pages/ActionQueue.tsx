@@ -1427,9 +1427,8 @@ export default function ActionQueue() {
                 data-action-id={row.id}
                 data-focused={isFocused ? "true" : undefined}
                 data-highlighted-trace={isHighlightedTrace ? "true" : undefined}
-                aria-label={isFocused ? "Focused action" : undefined}
-                aria-labelledby={isFocused ? undefined : titleId}
-                aria-describedby={isFocused ? undefined : descId}
+                aria-labelledby={titleId}
+                aria-describedby={isFocused ? `${descId} ${descId}-focused` : descId}
                 onKeyDown={(e) => {
                   if (!isActionQueueNavigationKey(e.key)) return;
                   // Only handle when focus is on the row itself; never
@@ -1472,6 +1471,11 @@ export default function ActionQueue() {
                 <span id={descId} className="sr-only">
                   {buildActionRowAriaLabel(row)}
                 </span>
+                {isFocused && (
+                  <span id={`${descId}-focused`} className="sr-only">
+                    Focused
+                  </span>
+                )}
 
 
                 <div className="flex items-start gap-3">
@@ -1648,9 +1652,8 @@ export default function ActionQueue() {
                 data-action-id={row.id}
                 data-focused={isFocused ? "true" : undefined}
                 data-highlighted-trace={isHighlightedTrace ? "true" : undefined}
-                aria-label={isFocused ? "Focused action" : undefined}
-                aria-labelledby={isFocused ? undefined : titleId}
-                aria-describedby={isFocused ? undefined : descId}
+                aria-labelledby={titleId}
+                aria-describedby={isFocused ? `${descId} ${descId}-focused` : descId}
                 className={`rounded-lg border bg-secondary/20 p-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background ${
                   isHighlightedTrace
                     ? "border-primary/60 bg-primary/5 ring-2 ring-primary/70 ring-offset-2 ring-offset-background"
@@ -1672,6 +1675,11 @@ export default function ActionQueue() {
                 <span id={descId} className="sr-only">
                   {buildActionRowAriaLabel(row)}
                 </span>
+                {isFocused && (
+                  <span id={`${descId}-focused`} className="sr-only">
+                    Focused
+                  </span>
+                )}
 
                 <div className="flex items-center gap-3 flex-wrap">
 

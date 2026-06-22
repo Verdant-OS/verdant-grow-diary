@@ -31,6 +31,7 @@ import {
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import ActionOutcomeLearningReport from "@/components/ActionOutcomeLearningReport";
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
+import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 
 /**
  * Read-only grow detail hub. Presentational only — all data loading +
@@ -121,6 +122,16 @@ export default function GrowDetail() {
           <StartPhenoHuntButton growId={grow.id} />
         </div>
       </header>
+
+      {/* One-Tent Loop continuity card. No specific tent is "selected"
+          on the grow hub, so this intentionally renders the calm safe
+          disabled state instead of inventing a tent route. */}
+      <OneTentLoopNextStepCard
+        current="grow"
+        ids={{ growId: grow.id }}
+        testId="grow-detail-one-tent-loop-next-step-card"
+        className="mb-4"
+      />
 
       <GrowStatusCard status={status} growId={growId} />
 

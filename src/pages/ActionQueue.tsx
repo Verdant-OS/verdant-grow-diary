@@ -982,32 +982,7 @@ export default function ActionQueue() {
           )}
         </div>
         {loading ? (
-          <div
-            role="status"
-            aria-busy="true"
-            aria-live="polite"
-            aria-label="Loading pending actions"
-            className="space-y-3"
-            data-testid="action-queue-loading-skeleton"
-          >
-            <span className="sr-only">Loading pending actions…</span>
-            <Loader2 className="sr-only h-4 w-4 animate-spin" aria-hidden="true" />
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="rounded-xl border border-border/60 bg-secondary/30 p-3 flex flex-col gap-2"
-                aria-hidden="true"
-              >
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-                <Skeleton className="h-3 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-              </div>
-            ))}
-          </div>
+          <ActionQueueLoadingSkeleton count={3} />
         ) : pending.length === 0 ? (
           <div className="py-4" data-testid="action-queue-empty-pending">
             <p className="text-sm text-foreground" data-testid="action-queue-empty-pending-title">

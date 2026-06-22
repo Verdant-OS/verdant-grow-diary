@@ -1427,9 +1427,8 @@ export default function ActionQueue() {
                 data-action-id={row.id}
                 data-focused={isFocused ? "true" : undefined}
                 data-highlighted-trace={isHighlightedTrace ? "true" : undefined}
-                aria-label={isFocused ? "Focused action" : undefined}
-                aria-labelledby={isFocused ? undefined : titleId}
-                aria-describedby={isFocused ? undefined : descId}
+                aria-labelledby={titleId}
+                aria-describedby={isFocused ? `${descId} ${descId}-focused` : descId}
                 onKeyDown={(e) => {
                   if (!isActionQueueNavigationKey(e.key)) return;
                   // Only handle when focus is on the row itself; never

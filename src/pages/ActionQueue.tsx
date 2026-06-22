@@ -543,6 +543,34 @@ export default function ActionQueue() {
   return (
     <div>
       <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Action Queue" section="actions" />
+      {/*
+        One-Tent Loop landing framing. Presenter-only. Makes the /actions
+        surface read clearly as the approval-required Action Queue step.
+        No automation, no AI calls, no device control, no writes.
+      */}
+      <div
+        data-testid="one-tent-loop-action-queue-landing"
+        className="mb-4 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2"
+      >
+        <h2
+          className="text-sm font-semibold text-foreground"
+          data-testid="one-tent-loop-action-queue-landing-title"
+        >
+          Approval-required Action Queue
+        </h2>
+        <p
+          className="text-xs text-muted-foreground mt-1"
+          data-testid="one-tent-loop-action-queue-landing-subtitle"
+        >
+          Review suggested actions before taking anything into the grow room.
+        </p>
+        <p
+          className="text-[11px] text-muted-foreground mt-1"
+          data-testid="one-tent-loop-action-queue-landing-note"
+        >
+          Verdant suggests. Grower approves.
+        </p>
+      </div>
       <div className="mb-5">
         <h1 className="text-2xl font-display font-bold flex items-center gap-2">
           <ListChecks className="h-5 w-5 text-primary" />
@@ -833,6 +861,14 @@ export default function ActionQueue() {
                 data-testid="action-queue-empty-pending-help"
               >
                 {ACTION_QUEUE_EMPTY_PENDING_HELP}
+              </p>
+            )}
+            {!filtersActive && (
+              <p
+                className="text-xs text-muted-foreground mt-1"
+                data-testid="one-tent-loop-action-queue-empty"
+              >
+                No approval-required actions are pending.
               </p>
             )}
           </div>

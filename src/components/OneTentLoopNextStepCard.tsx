@@ -55,6 +55,14 @@ export default function OneTentLoopNextStepCard({
           Next step: <span className="font-medium">{nextLabel}</span>
         </div>
       )}
+      {ONE_TENT_LOOP_HELPER_COPY[current] && (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid={`${resolvedTestId}-helper`}
+        >
+          {ONE_TENT_LOOP_HELPER_COPY[current]}
+        </p>
+      )}
       {step.disabled ? (
         <p
           className="text-xs text-muted-foreground"

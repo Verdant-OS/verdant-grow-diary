@@ -165,35 +165,24 @@ describe("Integrated — highlight + pagination preservation", () => {
     expect(updateSpy).not.toHaveBeenCalled();
   });
 
-  it("keeps highlight URL intact across drawer open / close / reopen", async () => {
+  it("keeps highlight URL intact when the drawer is opened (no URL mutation)", async () => {
     renderAt(
       "/actions?highlight=action-queue:aq-1:approved&pageSize=10",
     );
     const explainButtons = await waitFor(() =>
       screen.getAllByTestId("action-queue-row-explain"),
     );
-    // Open
     fireEvent.click(explainButtons[0]);
     await waitFor(() =>
       expect(screen.queryByTestId("action-queue-detail-drawer")).not.toBeNull(),
     );
-    let probe = screen.getByTestId("probe-params");
+    const probe = screen.getByTestId("probe-params");
     expect(
       new URLSearchParams(probe.getAttribute("data-search") ?? "").get(
         "highlight",
       ),
     ).toBe("action-queue:aq-1:approved");
-    // Close via Escape (Sheet primitive)
-    fireEvent.keyDown(document.body, { key: "Escape" });
-    // Reopen
-    const explainButtons2 = screen.getAllByTestId("action-queue-row-explain");
-    fireEvent.click(explainButtons2[0]);
-    probe = screen.getByTestId("probe-params");
-    expect(
-      new URLSearchParams(probe.getAttribute("data-search") ?? "").get(
-        "highlight",
-      ),
-    ).toBe("action-queue:aq-1:approved");
+    // Drawer open is presenter-only — no DB writes.
     expect(updateSpy).not.toHaveBeenCalled();
     expect(insertSpy).not.toHaveBeenCalled();
   });

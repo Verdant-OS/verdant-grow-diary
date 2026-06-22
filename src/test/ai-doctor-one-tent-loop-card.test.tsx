@@ -55,6 +55,20 @@ describe("AI Doctor One-Tent Loop next-step card wiring", () => {
     );
     const cta = screen.getByTestId("ai-doctor-one-tent-loop-next-step-card-cta");
     expect(cta.getAttribute("href")).toBe("/alerts/a1");
+    // With a specific alertId, the CTA label stays singular ("Review alert").
+    expect(cta.textContent ?? "").toMatch(/Review alert(?!s)/);
+  });
+
+  it("fallback to /alerts uses a plural 'Review alerts' label so the operator knows no specific alert was opened", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="ai-doctor"
+        testId="ai-doctor-one-tent-loop-next-step-card"
+      />,
+    );
+    const cta = screen.getByTestId("ai-doctor-one-tent-loop-next-step-card-cta");
+    expect(cta.getAttribute("href")).toBe("/alerts");
+    expect(cta).toHaveTextContent(/Review alerts/i);
   });
 
   it("does not call fetch (no AI calls triggered by rendering)", () => {

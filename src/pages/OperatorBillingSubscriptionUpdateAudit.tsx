@@ -82,8 +82,8 @@ export default function OperatorBillingSubscriptionUpdateAudit() {
             </h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
               Sanitized, read-only view of subscription updater outcomes. Rows show status, reason,
-              candidate plan, and subscription status only. Raw provider IDs, payloads, and details
-              JSON are intentionally hidden.
+              candidate plan, and subscription status only. Raw provider identifiers, webhook bodies,
+              and internal extra fields are intentionally hidden.
             </p>
           </div>
           <div className="flex items-center gap-2">

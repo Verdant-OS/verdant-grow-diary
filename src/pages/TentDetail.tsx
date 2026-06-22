@@ -276,15 +276,25 @@ export default function TentDetail() {
         testId="tent-detail-data-source-disclosure"
       />
 
-      {/* One-Tent Loop continuity card. No plant is "selected" on this
-          page, so we intentionally render the calm safe disabled state
-          instead of inventing a plant route. */}
-      <OneTentLoopNextStepCard
-        current="tent"
-        ids={{ growId: tent.growId ?? null }}
-        testId="tent-detail-one-tent-loop-next-step-card"
-        className="mb-3"
-      />
+      {/* One-Tent Loop continuity card. Enable "Open plant" only when
+          a single safe plant target exists on this tent. With zero or
+          multiple plants, keep the calm safe disabled state — we do
+          not invent a default selection here. */}
+      {(() => {
+        const safePlantId =
+          activePlants.length === 1 ? activePlants[0]?.id ?? null : null;
+        return (
+          <OneTentLoopNextStepCard
+            current="tent"
+            ids={{
+              growId: tent.growId ?? null,
+              plantId: safePlantId,
+            }}
+            testId="tent-detail-one-tent-loop-next-step-card"
+            className="mb-3"
+          />
+        );
+      })()}
 
 
       <div className="mb-3 flex items-center gap-2 flex-wrap">
@@ -612,6 +622,12 @@ export default function TentDetail() {
               {activeCount === 0 && hasArchived
                 ? "No active plants in this tent."
                 : "No plants in this tent yet."}
+            </p>
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="tent-detail-plants-empty-one-tent-loop-copy"
+            >
+              Add or open a plant to continue the One-Tent Loop.
             </p>
             <div className="flex flex-wrap gap-2">
               <AddExistingPlantDialog

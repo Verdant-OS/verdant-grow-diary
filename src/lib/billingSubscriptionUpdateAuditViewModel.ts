@@ -40,6 +40,53 @@ export interface BillingSubscriptionUpdateAuditCounts {
   total: number;
 }
 
+/**
+ * Narrow, sanitized row shape returned by the operator audit RPC. This is
+ * the ONLY shape the parser will ever emit upstream of display mapping.
+ *
+ * The field list is closed: adding raw provider/payload fields here must
+ * be a deliberate review-gated change. Forbidden keys are also asserted at
+ * compile time (see _assertSafeOperatorRow / _assertSafeDisplayRow below)
+ * and at runtime via a static test on this file's source.
+ */
+export type BillingSubscriptionUpdateAuditOperatorRow = {
+  readonly created_at: string | null;
+  readonly result_status: BillingSubscriptionUpdateAuditStatus;
+  readonly result_reason: string | null;
+  readonly candidate_plan_id: BillingSubscriptionUpdateAuditPlanId | null;
+  readonly candidate_status: BillingSubscriptionUpdateAuditSubscriptionStatus | null;
+  readonly subscription_status: BillingSubscriptionUpdateAuditSubscriptionStatus | null;
+};
+
+export const BILLING_SUBSCRIPTION_UPDATE_AUDIT_OPERATOR_ROW_KEYS = [
+  "created_at",
+  "result_status",
+  "result_reason",
+  "candidate_plan_id",
+  "candidate_status",
+  "subscription_status",
+] as const satisfies ReadonlyArray<keyof BillingSubscriptionUpdateAuditOperatorRow>;
+
+/**
+ * Forbidden field names that must never appear on the sanitized operator
+ * row or its display row. Kept as a const tuple so it can drive both
+ * compile-time assertions and the runtime static test.
+ */
+export const BILLING_SUBSCRIPTION_UPDATE_AUDIT_FORBIDDEN_KEYS = [
+  "provider_customer_id",
+  "provider_subscription_id",
+  "provider_price_id",
+  "payload",
+  "raw_payload",
+  "details",
+  "event_id",
+  "processing_id",
+  "user_id",
+] as const;
+
+export type BillingSubscriptionUpdateAuditForbiddenKey =
+  typeof BILLING_SUBSCRIPTION_UPDATE_AUDIT_FORBIDDEN_KEYS[number];
+
 export interface BillingSubscriptionUpdateAuditRow {
   createdAt: string | null;
   resultStatus: BillingSubscriptionUpdateAuditStatus;
@@ -54,6 +101,29 @@ export interface BillingSubscriptionUpdateAuditRow {
   subscriptionStatusLabel: string;
 }
 
+/**
+ * Display row exposed to the UI. Alias of the parsed row; declared
+ * separately so future presenter-only fields can be added without
+ * weakening the operator row contract.
+ */
+export type BillingSubscriptionUpdateAuditDisplayRow = BillingSubscriptionUpdateAuditRow;
+
+/**
+ * Compile-time guard: any forbidden key appearing on the operator or
+ * display row makes this type resolve to `never`, breaking the build.
+ */
+type AssertNoForbiddenKeys<T> = Extract<
+  keyof T,
+  BillingSubscriptionUpdateAuditForbiddenKey
+> extends never
+  ? true
+  : never;
+
+const _assertSafeOperatorRow: AssertNoForbiddenKeys<BillingSubscriptionUpdateAuditOperatorRow> = true;
+const _assertSafeDisplayRow: AssertNoForbiddenKeys<BillingSubscriptionUpdateAuditDisplayRow> = true;
+void _assertSafeOperatorRow;
+void _assertSafeDisplayRow;
+
 export interface BillingSubscriptionUpdateAuditViewModel {
   ok: boolean;
   reason: string | null;
@@ -62,7 +132,7 @@ export interface BillingSubscriptionUpdateAuditViewModel {
   limit: number;
   counts: BillingSubscriptionUpdateAuditCounts;
   countsSummary: string;
-  latest: BillingSubscriptionUpdateAuditRow[];
+  latest: BillingSubscriptionUpdateAuditDisplayRow[];
 }
 
 const DEFAULT_COUNTS: BillingSubscriptionUpdateAuditCounts = {

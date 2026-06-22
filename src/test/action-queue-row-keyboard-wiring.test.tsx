@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { useRef, useState } from "react";
-import { render, fireEvent } from "@testing-library/react";
+import { render, fireEvent, act } from "@testing-library/react";
 import {
   isActionQueueNavigationKey,
   resolveActionQueueNavIntent,
@@ -111,7 +111,7 @@ describe("Action Queue row keyboard wiring (DOM-level)", () => {
   it("Enter on a focused row opens drawer for THAT row exactly once", () => {
     const { getByTestId, setDrawerRow, forbidden } = setup();
     const rowA = getByTestId("row-a");
-    rowA.focus();
+    act(() => { rowA.focus(); });
     fireEvent.keyDown(rowA, { key: "Enter" });
     expect(setDrawerRow).toHaveBeenCalledTimes(1);
     expect(setDrawerRow).toHaveBeenCalledWith(ROWS[0]);
@@ -123,7 +123,7 @@ describe("Action Queue row keyboard wiring (DOM-level)", () => {
   it("Enter on the second row opens drawer for the second row", () => {
     const { getByTestId, setDrawerRow } = setup();
     const rowB = getByTestId("row-b");
-    rowB.focus();
+    act(() => { rowB.focus(); });
     fireEvent.keyDown(rowB, { key: "Enter" });
     expect(setDrawerRow).toHaveBeenCalledTimes(1);
     expect(setDrawerRow).toHaveBeenCalledWith(ROWS[1]);
@@ -134,7 +134,7 @@ describe("Action Queue row keyboard wiring (DOM-level)", () => {
     (key) => {
       const { getByTestId, setDrawerRow, forbidden } = setup();
       const rowB = getByTestId("row-b");
-      rowB.focus();
+      act(() => { rowB.focus(); });
       fireEvent.keyDown(rowB, { key });
       expect(setDrawerRow).not.toHaveBeenCalled();
       for (const fn of Object.values(forbidden)) {
@@ -146,7 +146,7 @@ describe("Action Queue row keyboard wiring (DOM-level)", () => {
   it("non-navigation keys are ignored entirely", () => {
     const { getByTestId, setDrawerRow, forbidden } = setup();
     const rowA = getByTestId("row-a");
-    rowA.focus();
+    act(() => { rowA.focus(); });
     for (const key of [" ", "Space", "Tab", "Escape", "Delete", "a"]) {
       fireEvent.keyDown(rowA, { key });
     }

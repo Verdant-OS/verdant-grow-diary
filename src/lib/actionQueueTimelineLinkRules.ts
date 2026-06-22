@@ -60,3 +60,26 @@ export function buildActionDiaryTraceLink(
   const href = `/timeline?${TIMELINE_HIGHLIGHT_PARAM}=${encodeURIComponent(highlight)}`;
   return { href, label: TIMELINE_TRACE_LINK_LABEL, highlight, kind };
 }
+
+export const JUMP_TO_HIGHLIGHTED_TRACE_LABEL = "Jump to highlighted trace";
+export const JUMP_TO_HIGHLIGHTED_TRACE_TESTID =
+  "action-queue-jump-to-highlighted-trace";
+
+/**
+ * Build a safe "Jump to highlighted trace" link directly from the raw
+ * highlight token (e.g. parsed from /actions ?highlight=...). Returns
+ * null for malformed/unsafe tokens. Visible label never includes IDs.
+ */
+export function buildJumpToHighlightedTraceLink(
+  rawHighlight: string | null | undefined,
+): { href: string; label: string; highlight: string } | null {
+  if (typeof rawHighlight !== "string") return null;
+  const parts = rawHighlight.split(":");
+  if (parts.length !== 3) return null;
+  const [prefix, actionId, kind] = parts;
+  if (prefix !== "action-queue") return null;
+  if (!SAFE_ID_RE.test(actionId)) return null;
+  if (kind !== "approved" && kind !== "rejected") return null;
+  const href = `/timeline?${TIMELINE_HIGHLIGHT_PARAM}=${encodeURIComponent(rawHighlight)}`;
+  return { href, label: JUMP_TO_HIGHLIGHTED_TRACE_LABEL, highlight: rawHighlight };
+}

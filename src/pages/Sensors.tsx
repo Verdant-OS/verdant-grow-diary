@@ -104,6 +104,12 @@ export default function Sensors() {
         description="Environmental telemetry across tents."
         icon={<Activity className="h-5 w-5" />}
       />
+      <OneTentLoopNextStepCard
+        current="sensor-snapshot"
+        ids={{ growId: selectedGrowId ?? null, tentId }}
+        testId="sensors-one-tent-loop-next-step-card"
+        className="mb-3"
+      />
       <div className="flex flex-wrap items-center gap-1.5 mb-4">
         {tents.map((t) => (
           <button

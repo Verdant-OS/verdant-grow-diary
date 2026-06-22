@@ -160,6 +160,10 @@ const App = () => (
                   path="/operator/paddle-processing-audit"
                   element={<OperatorPaddleProcessingAudit />}
                 />
+                <Route
+                  path="/operator/billing-subscription-updates"
+                  element={<OperatorBillingSubscriptionUpdateAudit />}
+                />
                 <Route path="/operator/one-tent-proof-record" element={<OneTentProofRecord />} />
                 <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />
                 <Route path="/operator/ecowitt-bridge-debug" element={<EcowittBridgeDebug />} />

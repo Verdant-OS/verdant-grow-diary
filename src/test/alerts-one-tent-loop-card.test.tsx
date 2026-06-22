@@ -34,6 +34,20 @@ describe("Alerts One-Tent Loop next-step card wiring", () => {
     ).toHaveTextContent(/Add to Action Queue/i);
   });
 
+  it("renders the approval-required Action Queue helper copy", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="alert"
+        testId="alerts-one-tent-loop-next-step-card"
+      />,
+    );
+    expect(
+      screen.getByTestId("alerts-one-tent-loop-next-step-card-helper"),
+    ).toHaveTextContent(
+      /Review the approval-required Action Queue before taking action\./,
+    );
+  });
+
   it("routes to alerts index when no alertId is provided (safe fallback)", () => {
     renderCard(
       <OneTentLoopNextStepCard

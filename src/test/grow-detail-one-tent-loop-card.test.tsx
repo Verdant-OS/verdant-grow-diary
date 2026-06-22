@@ -44,11 +44,11 @@ describe("GrowDetail One-Tent Loop next-step card wiring", () => {
     expect(card.textContent ?? "").toMatch(/Tent/);
   });
 
-  it("shows the Open tent CTA when a growId is available", () => {
+  it("shows the Open tent CTA only when a safe tentId is available", () => {
     renderCard(
       <OneTentLoopNextStepCard
         current="grow"
-        ids={{ growId: "g1" }}
+        ids={{ growId: "g1", tentId: "t1" }}
         testId="grow-detail-one-tent-loop-next-step-card"
       />,
     );
@@ -56,9 +56,27 @@ describe("GrowDetail One-Tent Loop next-step card wiring", () => {
       "grow-detail-one-tent-loop-next-step-card-cta",
     );
     expect(cta).toHaveTextContent(/Open tent/i);
+    expect(cta.getAttribute("href")).toBe("/tents/t1");
   });
 
-  it("renders the safe disabled state when no growId is provided", () => {
+  it("renders disabled when only a growId is provided (Open tent must not self-link to /grows/{id})", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="grow"
+        ids={{ growId: "g1" }}
+        testId="grow-detail-one-tent-loop-next-step-card"
+      />,
+    );
+    expect(
+      screen.getByTestId("grow-detail-one-tent-loop-next-step-card-disabled"),
+    ).toHaveTextContent(/Next step unavailable until this record is selected\./);
+    // Regression guard: no CTA href anywhere pointing back to /grows/.
+    expect(
+      screen.queryByTestId("grow-detail-one-tent-loop-next-step-card-cta"),
+    ).toBeNull();
+  });
+
+  it("renders the safe disabled state when no ids are provided", () => {
     renderCard(
       <OneTentLoopNextStepCard
         current="grow"

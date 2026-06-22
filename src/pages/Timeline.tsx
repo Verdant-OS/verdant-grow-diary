@@ -787,13 +787,25 @@ export default function Timeline() {
                   <div className="h-px flex-1 bg-border/50" />
                 </div>
                 <ul className="space-y-3">
-                  {group.items.map((e) => (
+                  {group.items.map((e) => {
+                    const isHighlighted = diaryEntryMatchesHighlight(e, highlight);
+                    return (
                     <li
                       key={e.id}
                       id={`timeline-entry-${e.id}`}
-                      data-testid="timeline-entry"
-                      className="glass rounded-2xl overflow-hidden animate-fade-in"
+                      data-testid={
+                        isHighlighted
+                          ? TIMELINE_HIGHLIGHT_TESTID
+                          : "timeline-entry"
+                      }
+                      data-highlight={isHighlighted ? "action-queue-trace" : undefined}
+                      aria-label={isHighlighted ? TIMELINE_HIGHLIGHT_ARIA_LABEL : undefined}
+                      className={cn(
+                        "glass rounded-2xl overflow-hidden animate-fade-in",
+                        isHighlighted && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                      )}
                     >
+
                       {e.photo_url ? (
                         (() => {
                           const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
@@ -1003,7 +1015,9 @@ export default function Timeline() {
                         })()}
                       </div>
                     </li>
-                  ))}
+                  );
+                  })}
+
                 </ul>
               </section>
             ))}

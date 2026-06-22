@@ -206,7 +206,9 @@ describe("ActionQueueDetailDrawer — trace failure + retry", () => {
       />,
     );
     const banner = screen.getByTestId("action-queue-detail-drawer-trace-failure");
-    expect(banner.textContent).toContain("Status saved, but timeline trace failed.");
+    expect(banner.textContent).toContain("Status was saved, but the diary trace did not save.");
+    expect(banner.textContent).toContain("Retry only repairs the diary trace. It will not approve/reject again.");
+
     fireEvent.click(
       screen.getByTestId("action-queue-detail-drawer-retry-trace"),
     );

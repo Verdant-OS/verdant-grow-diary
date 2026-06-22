@@ -564,13 +564,18 @@ export default function ActionQueue() {
     }
   }, [focusedActionId, loading, rows.length]);
 
-  // Reset to page 1 whenever search/filters/page size change. The page
-  // value itself is excluded from the dep list on purpose so manual
-  // page navigation doesn't get clobbered.
+  // Reset to page 1 whenever search/filters/page size change. Skip the
+  // very first run so an initial ?page=N from the URL is preserved.
+  const filterResetSkipRef = useRef(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (filterResetSkipRef.current) {
+      filterResetSkipRef.current = false;
+      return;
+    }
     setPage(1);
   }, [searchQuery, statusFilter, traceExtraFilter, pageSize]);
+
 
   // Mirror state → URL via replace-history so typing doesn't spam the
   // back stack. Unrelated params (growId, focus, alert, sensorSources…)

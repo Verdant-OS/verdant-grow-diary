@@ -63,6 +63,13 @@ export interface ActionQueueDetailDrawerProps {
   traceFailed?: boolean;
   /** True while a trace-only retry is in flight. */
   retrying?: boolean;
+  /**
+   * Current /actions URLSearchParams. When provided, the "View diary
+   * trace" link adds a safe `actionsReturn` round-trip so the grower
+   * returns to their exact /actions URL state — preserving any
+   * highlight, search, status, trace, pagination, view, or growId.
+   */
+  currentActionsParams?: URLSearchParams | null;
   onApprove?: (row: ActionDrawerInput) => void;
   onReject?: (row: ActionDrawerInput) => void;
   onRetryTrace?: (row: ActionDrawerInput) => void;
@@ -245,6 +252,7 @@ function ActionQueueDetailDrawerBody({
             status: rowStatus,
             actionId: rowId,
             traceFailed,
+            currentActionsParams: props.currentActionsParams ?? null,
           });
           if (link) {
             return (

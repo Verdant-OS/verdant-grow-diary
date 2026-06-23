@@ -27,7 +27,7 @@ describe("<EcowittLiveProofPanel />", () => {
     expect(screen.getByTestId("ecowitt-live-proof-panel").dataset.tone).toBe("neutral");
     expect(screen.getByTestId("ecowitt-live-proof-accepted").textContent).toBe("0");
     expect(screen.getByTestId("ecowitt-live-proof-rejected").textContent).toBe("0");
-    expect(screen.getByText(/No EcoWitt readings observed/i)).toBeTruthy();
+    expect(screen.getAllByText(/No EcoWitt readings observed/i).length).toBeGreaterThan(0);
   });
 
   it("renders accepted/rejected with proof-window copy", () => {

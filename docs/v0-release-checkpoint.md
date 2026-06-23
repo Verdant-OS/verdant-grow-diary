@@ -310,3 +310,90 @@ Explicitly out of scope for that branch:
 - No AI calls.
 - No Action Queue writes.
 - No automation or device control.
+
+## 11. Checkpoint — Timeline Evidence Quality Pass
+
+Docs-only checkpoint following the `timeline-evidence-quality-pass`
+branch.
+
+### 11.1 Product changes landed
+
+Plant timeline Category view now ships with:
+
+- Seven fixed read-only category sections (Watering, Feeding,
+  Training, Photos, Diagnoses, Harvest results, Other diary entries).
+- Saved expand/collapse state via a namespaced+versioned
+  localStorage key (`verdant:plant-relative-timeline:category-sections:v1`).
+  Only `DiaryTimelineSectionId → boolean` is persisted.
+- Expand all / Collapse all / Reset sections controls.
+- Per-section evidence-quality indicator
+  (`present` / `missing`, with `limited` reserved for future use):
+  - "Watering evidence present in this view." / "No watering entries in this view."
+  - Same pattern for every other section.
+- Overall evidence summary line, e.g.
+  "3 of 7 sections have evidence in this view."
+
+### 11.2 Safety posture
+
+- Read-only UX only. No new writes.
+- No schema, RLS, Edge Function, RPC, auth, or Supabase query changes.
+- No Supabase mutations.
+- No AI / model / provider calls.
+- No alerts created.
+- No Action Queue writes.
+- No automation or device control.
+- No Fast Add presets.
+- No localStorage entry data, raw payloads, tokens, MACs, or bridge
+  IDs — only section ID booleans for UI expansion state.
+- Missing evidence framed as a context limitation, never as a
+  health problem; no diagnostic / aggressive / actionable wording
+  (`healthy`, `ideal`, `fix`, `urgent`, `auto`, `execute`, `control`,
+  `actuate`, `relay`, `emergency`, `critical` are all banned and
+  asserted by tests).
+
+### 11.3 Validation
+
+- Targeted evidence-quality tests
+  (`diaryTimelineEvidenceQualityRules`,
+  `DiaryTimelineCategorySections`,
+  `diaryTimelineSectionRules`,
+  `diaryTimelineSectionStateRules`):
+  **4 files / 82 tests passed**.
+- Nearby timeline guards
+  (`relative-timeline-projection`, `timeline`,
+  `plant-tent-movement-display`,
+  `plant-tent-detail-data-source-disclosure`):
+  **114 files / 1420 tests passed**.
+- TypeScript: `tsc -p tsconfig.app.json --noEmit` clean.
+
+### 11.4 Rollback
+
+- Delete `src/lib/diaryTimelineEvidenceQualityRules.ts` and
+  `src/test/diaryTimelineEvidenceQualityRules.test.ts`.
+- In `src/components/DiaryTimelineCategorySections.tsx`: remove the
+  evidence-quality import, the `evidenceSummary` `useMemo`, the
+  `data-testid="…-evidence-summary"` block, the
+  `evidence = buildDiaryTimelineEvidenceQualityForSection(section)`
+  line, the `data-evidence-status` attribute on the section wrapper,
+  and the `data-testid="…-section-evidence"` block inside the panel.
+- In `src/test/DiaryTimelineCategorySections.test.tsx`: remove the
+  appended `describe("DiaryTimelineCategorySections —
+  evidence-quality indicators", …)` block.
+
+### 11.5 Recommended next branch — `timeline-readability-pass`
+
+Read-only only. Candidates:
+
+- Sticky day headers on the existing diary/timeline feed.
+- Visible entry-count badge in the timeline section header.
+- Print-friendly timeline summary view.
+
+Explicitly out of scope for that branch:
+
+- No Quick Log write-flow expansion.
+- No new writes.
+- No schema / RLS / Edge Function / auth changes.
+- No AI calls.
+- No Action Queue writes.
+- No automation or device control.
+- No Fast Add presets.

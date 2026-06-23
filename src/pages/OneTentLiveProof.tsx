@@ -53,7 +53,7 @@ export default function OneTentLiveProof() {
   const linkedActionExists = useMemo(() => {
     for (const id of alertIds) {
       const summary = linkedCounts.get(id);
-      if (summary && summary.totalOpen > 0) return true;
+      if (summary && summary.count > 0) return true;
     }
     return false;
   }, [alertIds, linkedCounts]);

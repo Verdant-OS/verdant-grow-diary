@@ -416,7 +416,7 @@ export default function Sensors() {
             <h2 className="text-sm font-semibold">Operator diagnostics — read-only</h2>
             <p className="text-[11px] text-muted-foreground">
               Use this panel after dry-run and one webhook send. It does not start the
-              bridge or verify local MQTT by itself.
+              bridge or verify the local message broker by itself.
             </p>
           </header>
           <EcowittBridgeTroubleshootingPanel
@@ -451,17 +451,15 @@ export default function Sensors() {
               onSearchParamsChange: (next) => setSearchParams(next, { replace: true }),
             }}
             input={{
-              rows: filtered.map((r, i) => ({
-                id: (r as unknown as { id?: string }).id ?? `r-${i}`,
-                tent_id: tentId,
-                captured_at:
-                  (r as unknown as { captured_at?: string | null }).captured_at ?? r.ts ?? null,
-                ts: r.ts,
-                metric: null,
-                value: null,
-                source: (r as unknown as { source?: string | null }).source ?? null,
-                raw_payload: null,
-              })),
+              rows: mapReadingsToOperatorAuditRows(
+                filtered.map((r) => ({
+                  id: (r as unknown as { id?: string }).id,
+                  ts: r.ts,
+                  captured_at: (r as unknown as { captured_at?: string | null }).captured_at ?? null,
+                  source: (r as unknown as { source?: string | null }).source ?? null,
+                })),
+                tentId,
+              ),
             }}
           />
         </section>

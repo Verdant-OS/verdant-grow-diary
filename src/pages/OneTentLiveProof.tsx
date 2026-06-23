@@ -178,6 +178,29 @@ export default function OneTentLiveProof() {
         ))}
       </ul>
 
+      <div
+        role="note"
+        className="rounded-md border border-amber-400/40 bg-amber-50 dark:bg-amber-950/30 p-2 text-[11px] text-amber-800 dark:text-amber-200"
+        data-testid="one-tent-live-proof-demo-safety-warning"
+      >
+        {PROOF_DEMO_SAFETY_WARNING}
+      </div>
+
+      <section
+        aria-label="Recommended demo path"
+        className="rounded-md border border-border p-2 text-[11px]"
+        data-testid="one-tent-live-proof-demo-run-banner"
+      >
+        <p className="font-medium">Recommended demo path</p>
+        <ol className="list-decimal pl-5 text-muted-foreground">
+          {PROOF_DEMO_RUN_STEPS.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ol>
+      </section>
+
+
+
       <section
         className="glass rounded-2xl p-3 space-y-2"
         aria-label="Proof context selector"

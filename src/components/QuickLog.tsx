@@ -558,7 +558,10 @@ export default function QuickLog({
         const reason = result.reason ?? "save_failed";
         const message = quickLogReasonToOperatorMessage(reason);
         setSaveError(`${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`);
-        toast.error(message);
+        // Surface the (allow-listed) reason code alongside the friendly
+        // copy so the operator and tests can correlate the failure with
+        // logs without exposing tokens, endpoints, or raw payloads.
+        toast.error(`${message} [${reason}]`);
         // Safe diagnostic only — reason code is allow-listed, never tokens/payload.
         console.error("[QuickLog] RPC save error", { reason });
         return;
@@ -596,6 +599,12 @@ export default function QuickLog({
         targetId: selectedPlant.id,
         tentId: selectedPlant.tent_id ?? null,
       });
+      // Explicit, statically-grep-able invalidations for the two V0-loop
+      // memory surfaces (Recent Plant Activity + shared diary_entries
+      // reads). `applyQuickLogV2Refresh` also covers these keys; the
+      // duplicate invalidate is cheap and locks the V0 contract.
+      queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
+      queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", {
           detail: { createdAt: new Date().toISOString() },

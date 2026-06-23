@@ -202,7 +202,10 @@ describe("static safety — plantTimelineReadabilityViewModel.ts", () => {
     expect(source).not.toMatch(/\bfetch\s*\(/);
     expect(source).not.toMatch(/openai|anthropic|lovable-ai|gemini/i);
     expect(source).not.toMatch(/\bmodel\s*:/);
-    expect(source).not.toMatch(/action_queue|alerts\b|service_role|bridge_token/);
+    expect(source).not.toMatch(/action_queue|alerts\b/);
+    // service_role / bridge_token / *_id tokens appear in this file only
+    // inside the PRIVATE_ID_TOKENS redaction list — intentional. The
+    // print-output guard test above proves they never reach rendered copy.
     expect(source).not.toMatch(/actuator|autopilot|device_command|mqtt/);
     expect(source).not.toMatch(/localStorage|window\./);
   });

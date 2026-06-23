@@ -262,6 +262,7 @@ export default function Alerts() {
           growName={headerContext.growName}
           stage={headerContext.stage}
           isFallback={headerContext.isFallback}
+          hasOpenAlerts={growIdsWithOpenAlerts.includes(headerContext.growId)}
         />
       ) : (
         <div

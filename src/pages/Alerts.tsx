@@ -111,8 +111,24 @@ export default function Alerts() {
     ? stageByGrow.get(scopedGrowId) ?? null
     : null;
 
-
-
+  // Pick the most relevant grow context for the Alerts header. Prefers
+  // scoped → active → first available. Keeps the header useful even on
+  // unscoped /alerts visits without inventing data.
+  const headerContext = useMemo(
+    () =>
+      pickAlertsGrowContext({
+        scopedGrowId: scopedGrowId ?? null,
+        activeGrowId: activeGrowId ?? null,
+        grows: grows.map((g) => ({
+          id: g.id,
+          name: g.name ?? null,
+          stage: (g as { stage?: string | null }).stage ?? null,
+          updated_at: (g as { updated_at?: string | null }).updated_at ?? null,
+        })),
+      }),
+    [scopedGrowId, activeGrowId, grows],
+  );
+  const [emptyStateEditorOpen, setEmptyStateEditorOpen] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");

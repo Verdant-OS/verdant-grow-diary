@@ -11,6 +11,10 @@
  *    healthy or auto-actionable.
  *  - Operator Mode `?operator=1` is described as a URL surface gate,
  *    NOT a role or capability gate.
+ *
+ * Route sequence matches the real app navigation (sidebar) — there is
+ * no standalone "Grow" page in the user-facing nav; the operator starts
+ * from the Dashboard / Command Center.
  */
 
 export type DemoProofWalkthroughStatus =
@@ -55,32 +59,32 @@ const SAFETY_SUMMARY: readonly string[] = Object.freeze([
 
 const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
   {
-    id: "grow",
+    id: "dashboard",
     order: 1,
-    label: "Grow",
+    label: "Dashboard / Command Center",
     purpose:
-      "Start from the grow context so every event has a place in plant memory.",
+      "The Command Center is the starting point for the operator. From here, the grower moves into tent context, plant context, logs, sensors, alerts, and approval-required actions.",
     expectedEvidence:
-      "Grow is selected; grow name and stage visible in app shell.",
-    href: "/grows",
+      "Dashboard renders with grow/tent context, recent activity, and entry points into the rest of the loop.",
+    href: "/",
     safetyNote: "Read-only navigation. No writes.",
     statusKind: "ready",
   },
   {
-    id: "tent",
+    id: "tents",
     order: 2,
-    label: "Tent",
+    label: "Tents",
     purpose: "Confirm tent context before reviewing readings.",
     expectedEvidence:
-      "Tent detail shows tent name, current stage target, and assigned plants.",
+      "Tent list and tent detail show tent name, current stage target, and assigned plants.",
     href: "/tents",
     safetyNote: "Read-only navigation. No device commands.",
     statusKind: "ready",
   },
   {
-    id: "plant",
+    id: "plants",
     order: 3,
-    label: "Plant",
+    label: "Plants",
     purpose: "Review plant identity, timeline, and context readiness.",
     expectedEvidence:
       "Plant detail shows strain, stage, recent timeline entries, and context readiness flags.",
@@ -101,20 +105,20 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
     statusKind: "ready",
   },
   {
-    id: "timeline",
+    id: "logs-timeline",
     order: 5,
-    label: "Timeline",
+    label: "Logs / Timeline",
     purpose: "Review what changed and what followed.",
     expectedEvidence:
       "Timeline shows category sections, evidence-quality indicators, readability summary, and print summary.",
-    href: "/timeline",
+    href: "/logs",
     safetyNote: "Read-only view of recorded events.",
     statusKind: "ready",
   },
   {
-    id: "sensor-snapshot",
+    id: "sensor-data",
     order: 6,
-    label: "Sensor Snapshot",
+    label: "Sensor Data",
     purpose:
       "Confirm the latest sensor snapshot with explicit source label.",
     expectedEvidence:
@@ -125,35 +129,22 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
     statusKind: "ready",
   },
   {
-    id: "ecowitt-live-row-proof",
+    id: "sensor-data-operator-mode",
     order: 7,
-    label: "EcoWitt row-level live proof (Operator Mode)",
+    label: "Sensor Data Operator Mode",
     purpose:
-      "Check EcoWitt row-level live/stale/invalid/limited/no-recent proof from already-loaded readings.",
+      "Review EcoWitt row-level live/stale/invalid/limited/no-recent proof and ingest-audit counts (received, inserted, rejected, last-accepted, last-rejected) for the current tent within the current proof window.",
     expectedEvidence:
-      "Operator panel shows EcoWitt row-level proof status for the current tent within the current proof window.",
+      "Operator panel shows EcoWitt row-level proof status and ingest-audit counts. Blocked or error states show calm copy and never imply healthy.",
     href: "/sensors?operator=1",
     safetyNote:
-      "Operator Mode uses ?operator=1 as a URL surface gate; RLS still enforces access.",
-    statusKind: "operator_only",
-  },
-  {
-    id: "ecowitt-ingest-audit-proof",
-    order: 8,
-    label: "EcoWitt ingest-audit proof (Operator Mode)",
-    purpose:
-      "Review accepted, rejected, and omitted ingest counts for the current tent within the current proof window.",
-    expectedEvidence:
-      "Operator panel shows received / inserted / rejected counts, last-accepted and last-rejected timestamps. Blocked or error states show calm copy and never imply healthy.",
-    href: "/sensors?operator=1",
-    safetyNote:
-      "Narrow column allowlist; no raw payloads, owning auth ids, or bridge tokens rendered.",
+      "Operator Mode uses ?operator=1 as a URL surface gate; RLS still enforces access. Narrow column allowlist; no raw payloads, owning auth ids, or bridge tokens rendered.",
     statusKind: "operator_only",
   },
   {
     id: "ai-doctor-readiness",
-    order: 9,
-    label: "AI Doctor readiness",
+    order: 8,
+    label: "AI Grow Doctor readiness",
     purpose:
       "Review available and missing context before any AI interpretation.",
     expectedEvidence:
@@ -165,7 +156,7 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
   },
   {
     id: "alerts",
-    order: 10,
+    order: 9,
     label: "Alerts",
     purpose:
       "Confirm alerts reflect real target breaches against labeled telemetry.",
@@ -177,7 +168,7 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
   },
   {
     id: "action-queue",
-    order: 11,
+    order: 10,
     label: "Approval-required Action Queue",
     purpose:
       "Actions remain pending approval; Verdant does not execute device control.",
@@ -190,7 +181,7 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
   },
   {
     id: "one-tent-live-proof",
-    order: 12,
+    order: 11,
     label: "One-Tent Live Proof report",
     purpose:
       "View the read-only proof report tying the loop together with sanitized copy/print output.",
@@ -204,6 +195,7 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
 ]);
 
 const WHAT_THIS_PROVES: readonly string[] = Object.freeze([
+  "Plant memory. Sensor truth. Better decisions.",
   "The One-Tent Loop renders end-to-end with source-labeled evidence.",
   "EcoWitt row-level and ingest-audit proof are visible in Operator Mode within the current proof window.",
   "Quick Log preserves snapshot source and captured_at without relabeling.",

@@ -68,6 +68,7 @@ import OperatorGgsRealPayloadIngest from "./pages/OperatorGgsRealPayloadIngest";
 import OperatorPostGrowReflectionDryRun from "./pages/OperatorPostGrowReflectionDryRun";
 import CustomerModeGuide from "./pages/CustomerModeGuide";
 import { OperatorAiDoctorPhase1Page } from "./pages/OperatorAiDoctorPhase1";
+import OneTentLiveProof from "./pages/OneTentLiveProof";
 
 const queryClient = new QueryClient();
 

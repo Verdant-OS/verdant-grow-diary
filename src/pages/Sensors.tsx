@@ -100,6 +100,17 @@ export default function Sensors() {
   // tent dropdown rather than silently writing to manualTents[0].
   const defaultManualTentId = manualTents.find((t) => t.id === tentId)?.id;
 
+  // Read-only recent readings for the PPFD-vs-environment trend chart.
+  // Uses the existing tent-scoped sensor_readings hook (no new query,
+  // no writes). Bound to the same tent the manual reading form targets
+  // so PPFD + temperature/humidity/VPD lines up.
+  const { data: trendReadings = [] } = useSensorReadings(
+    defaultManualTentId,
+    60,
+  );
+
+
+
   return (
     <div>
       <PageHeader

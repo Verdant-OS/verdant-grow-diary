@@ -87,9 +87,52 @@ if (truncated) {
   console.log("(tree truncated — increase limits in the script if you need more)");
 }
 
-if (!indexHtml) {
+// ---------- Required checks ----------
+const checks = [];
+checks.push({ name: "report root exists and is directory", ok: true });
+checks.push({ name: "index.html present (recursive)", ok: Boolean(indexHtml) });
+
+// At least one non-index.html supporting file anywhere under target.
+function hasSupportFile(dir) {
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+  for (const e of entries) {
+    const full = join(dir, e.name);
+    if (e.isFile() && e.name !== "index.html") return true;
+    if (e.isDirectory() && hasSupportFile(full)) return true;
+  }
+  return false;
+}
+checks.push({
+  name: "at least one supporting file besides index.html",
+  ok: hasSupportFile(target),
+});
+
+// Optional warnings — common Playwright report dirs (do not fail).
+const optional = ["data", "assets", "trace"];
+const warnings = [];
+for (const name of optional) {
+  if (!existsSync(join(target, name))) warnings.push(`optional: ${name}/ not found`);
+}
+
+console.log("");
+console.log("Required checks:");
+for (const c of checks) console.log(`  ${c.ok ? "ok  " : "FAIL"} ${c.name}`);
+if (warnings.length > 0) {
+  console.log("");
+  console.log("Optional warnings (not failures):");
+  for (const w of warnings) console.log(`  ! ${w}`);
+}
+
+const failed = checks.filter((c) => !c.ok);
+if (failed.length > 0) {
   console.error("");
-  console.error("No index.html found. Extract the report first:");
+  console.error("Report appears incomplete. Re-download or re-extract:");
+  console.error("  bun run test:demo-proof:download-report");
   console.error("  bun run test:demo-proof:open-report ./demo-proof-playwright-report.zip");
   process.exit(1);
 }

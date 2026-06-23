@@ -250,6 +250,19 @@ describe("Action Queue safety — current posture (suggest-only by construction)
 
   it("10. no simulation/auto-execute path exists that could push commands to real devices", () => {
     // No "auto execute / autopilot" code paths in production.
+    //
+    // Scoped allow-list: the Post-Grow Reflection AI prompt body is a
+    // read-only string of GROUND-RULES that explicitly FORBIDS device
+    // control / autopilot / automated equipment execution. The forbidden
+    // words appear only inside a "Do not suggest …" instruction so the
+    // model never proposes them. It is not an execution path, has no
+    // network/RPC, and is locked by post-grow-reflection-prompt.test.ts +
+    // post-grow-reflection-static-safety.test.ts. See those suites before
+    // widening this exemption.
+    const POST_GROW_REFLECTION_PROMPT_PATH = resolve(
+      ROOT,
+      "src/lib/ai/postGrowReflectionPrompt.ts",
+    );
     for (const re of [
       /\bautopilot\b/i,
       /\bauto[-_ ]?execute\b/i,
@@ -257,7 +270,19 @@ describe("Action Queue safety — current posture (suggest-only by construction)
       /\bexecute_action\b/i,
       /\bdispatch_command\b/i,
     ]) {
-      expect(ALL_PROD_CODE).not.toMatch(re);
+      let scanText = ALL_PROD_CODE;
+      let match = scanText.match(re);
+      while (match && match.index !== undefined) {
+        const path = fileAtIndex(match.index);
+        if (path !== POST_GROW_REFLECTION_PROMPT_PATH) {
+          expect(scanText, `unexpected auto-execute token in ${path}`).not.toMatch(re);
+          break;
+        }
+        // Skip this allow-listed occurrence and keep scanning the rest.
+        const consumeTo = match.index + match[0].length;
+        scanText = scanText.slice(0, match.index) + scanText.slice(consumeTo);
+        match = scanText.match(re);
+      }
     }
   });
 

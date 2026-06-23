@@ -9,10 +9,11 @@
  * Steps that cannot be safely inferred render as
  * "Needs operator confirmation".
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import PageHeader from "@/components/PageHeader";
-import { ClipboardCheck, RefreshCw } from "lucide-react";
+import { ClipboardCheck, RefreshCw, Printer, Copy } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -23,13 +24,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import OneTentLiveProofChecklist from "@/components/OneTentLiveProofChecklist";
+import OneTentLiveProofReport from "@/components/OneTentLiveProofReport";
 import { useGrows } from "@/store/grows";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import { useOneTentLiveProofActionStatus } from "@/hooks/useOneTentLiveProofActionStatus";
 import { useOneTentLiveProofTimelineFollowup } from "@/hooks/useOneTentLiveProofTimelineFollowup";
-import { buildOneTentLiveProofViewModel } from "@/lib/oneTentLiveProofViewModel";
+import {
+  buildOneTentLiveProofViewModel,
+  buildOneTentLiveProofReport,
+} from "@/lib/oneTentLiveProofViewModel";
 
 export default function OneTentLiveProof() {
   const { grows, activeGrowId } = useGrows();

@@ -65,3 +65,17 @@
 ## Recommended tag
 
 `v0-one-tent-loop-rc1`
+
+## Demo Proof CI verification
+
+This docs-only update intentionally triggers the Demo Proof Walkthrough read-only CI workflow.
+
+Expected CI checks:
+- demo proof route guards
+- proof report redaction guards
+- targeted Demo Proof Walkthrough vitest suites
+- TypeScript
+- Playwright Demo Proof Walkthrough no-write E2E with Chromium installed
+
+Success condition:
+The workflow completes with the Playwright E2E executed in CI, not left pending due to a missing browser runtime.

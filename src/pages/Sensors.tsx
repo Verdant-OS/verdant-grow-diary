@@ -113,6 +113,13 @@ export default function Sensors() {
     60,
   );
 
+  const operatorMode = searchParams.get("operator") === "1";
+  const ecowittIngestAuditProof = useEcowittIngestAuditProofRows({
+    tentId: defaultManualTentId ?? null,
+    enabled: operatorMode && Boolean(defaultManualTentId),
+  });
+
+
 
 
   return (

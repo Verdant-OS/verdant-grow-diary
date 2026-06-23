@@ -12,6 +12,12 @@
  * no device control.
  */
 import React from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { CircleHelp, ClockAlert, ShieldAlert, ShieldCheck, TimerReset } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,45 +106,69 @@ export interface GgsSentinelFreshnessGuidanceListProps {
   metricFreshness: GgsSentinelMetricFreshness[];
 }
 
+/**
+ * Example composition (read by static-safety scanner):
+ *   <GgsSentinelFreshnessGuidanceList metricFreshness={evaluation.metricFreshness} />
+ */
+function FreshnessBadge({ freshness }: { freshness: GgsSentinelMetricFreshness }) {
+  const f = freshness;
+  const tooltipText =
+    f.freshnessStatus === "missing"
+      ? "Missing means no row was found in the freshness window."
+      : "Rows are fresh through 75% of the window, aging after 75%, and stale after 15 min.";
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={`${f.freshnessStatus} freshness details`}
+          className="rounded border px-1.5 py-0.5 text-xs"
+        >
+          <span data-testid={`ggs-freshness-badge-${f.freshnessStatus}`}>
+            {f.freshnessStatus}
+          </span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{tooltipText}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 /** Compact per-metric freshness guidance list. Reads directly from the domain model. */
 export function GgsSentinelFreshnessGuidanceList({
   metricFreshness,
 }: GgsSentinelFreshnessGuidanceListProps): React.ReactElement | null {
   if (metricFreshness.length === 0) return null;
   return (
-    <div data-testid="ggs-freshness-compact-list" className="space-y-2">
-      <p data-testid="ggs-freshness-priority-note" className="text-xs text-muted-foreground">
-        Freshness guidance explains metric timing only
-      </p>
-      <ul className="overflow-hidden rounded-md border bg-muted/20">
-        {metricFreshness.map((f) => (
-          <li
-            key={f.metric}
-            data-testid={`ggs-freshness-row-${f.freshnessStatus}`}
-            className={cn(
-              "flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-l-4 border-t px-2 py-1.5 text-xs first:border-t-0",
-              f.missing && "border-dashed border-l-transparent",
-              f.stale && "border-l-destructive",
-              !f.missing && !f.stale && "border-l-transparent",
-            )}
-          >
-            {f.stale && <span aria-label="row expired" className="sr-only" />}
-            {f.missing && <span aria-label="no row found" className="sr-only" />}
-            <span className="font-medium text-foreground">{f.ageLabel}</span>
-            <span className="text-muted-foreground">{f.nextActionLabel}</span>
-            <button
-              type="button"
-              aria-label={`${f.freshnessStatus} freshness details`}
-              className="ml-auto rounded border px-1.5 py-0.5 text-xs"
+    <TooltipProvider>
+      <div data-testid="ggs-freshness-compact-list" className="space-y-2">
+        <p data-testid="ggs-freshness-priority-note" className="text-xs text-muted-foreground">
+          Freshness guidance explains metric timing only — result-state priority still comes from the smoke-check result above.
+        </p>
+        <ul className="overflow-hidden rounded-md border bg-muted/20">
+          {metricFreshness.map((f) => (
+            <li
+              key={f.metric}
+              data-testid={`ggs-freshness-row-${f.freshnessStatus}`}
+              title={f.nextActionLabel}
+              className={cn(
+                "grid grid-cols-[minmax(6.5rem,1.15fr)_auto_auto_minmax(7.5rem,1fr)] items-center gap-x-2 border-l-4 border-t px-2 py-1.5 text-xs first:border-t-0",
+                f.missing && "border-dashed border-l-muted-foreground",
+                f.stale && "border-l-destructive",
+                !f.missing && !f.stale && "border-l-transparent",
+              )}
             >
-              <span data-testid={`ggs-freshness-badge-${f.freshnessStatus}`}>
-                {f.freshnessStatus}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
+              {f.stale && <span aria-label="row expired" className="sr-only" />}
+              {f.missing && <span aria-label="no row found" className="sr-only" />}
+              <span className="font-medium text-foreground">{f.ageLabel}</span>
+              <FreshnessBadge freshness={f} />
+              <span aria-hidden="true" className="text-muted-foreground">·</span>
+              <span className="text-muted-foreground truncate">{f.nextActionLabel}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </TooltipProvider>
   );
 }
 

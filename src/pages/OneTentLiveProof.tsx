@@ -34,6 +34,8 @@ import { useOneTentLiveProofTimelineFollowup } from "@/hooks/useOneTentLiveProof
 import {
   buildOneTentLiveProofViewModel,
   buildOneTentLiveProofReport,
+  PROOF_DEMO_SAFETY_WARNING,
+  PROOF_DEMO_RUN_STEPS,
 } from "@/lib/oneTentLiveProofViewModel";
 
 export default function OneTentLiveProof() {

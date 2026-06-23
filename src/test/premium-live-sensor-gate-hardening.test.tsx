@@ -7,8 +7,17 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
-import { resolve, join } from "node:path";
+// Scanner guardrail: extend per-file timeout to 30s and cache repo walks so
+// the recursive `src/` scan in this file does not flake under shard load
+// (default 5s test timeout can be exceeded by I/O contention alone).
+import {
+  installScannerGuardrail,
+  getCachedTsFiles,
+} from "./support/scannerGuardrailHarness";
+
+installScannerGuardrail({ file: __filename });
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   PremiumLiveSensorGate,
   PREMIUM_LIVE_SENSOR_INVALID_COPY,
@@ -174,20 +183,6 @@ describe("docs/paid-launch-entitlement-blocker.md — usage snippet", () => {
 
 // --- Static safety: no current free sensor surface was wrapped -----------
 
-function walkSrc(dir: string, out: string[] = []): string[] {
-  if (!existsSync(dir)) return out;
-  for (const name of readdirSync(dir)) {
-    const p = join(dir, name);
-    const st = statSync(p);
-    if (st.isDirectory()) {
-      if (name === "__snapshots__" || name === "node_modules") continue;
-      walkSrc(p, out);
-    } else if (/\.(ts|tsx)$/.test(name)) {
-      out.push(p);
-    }
-  }
-  return out;
-}
 
 describe("PremiumLiveSensorGate — no current free sensor surface is wrapped", () => {
   it("only the component file itself, its tests, and docs reference PremiumLiveSensorGate", () => {
@@ -198,7 +193,7 @@ describe("PremiumLiveSensorGate — no current free sensor surface is wrapped", 
       resolve(ROOT, "src/test/live-sensor-server-gate.test.ts"),
     ]);
     const offenders: string[] = [];
-    for (const f of walkSrc(resolve(ROOT, "src"))) {
+    for (const f of getCachedTsFiles(resolve(ROOT, "src"))) {
       if (allowed.has(f)) continue;
       if (/PremiumLiveSensorGate/.test(readFileSync(f, "utf8"))) {
         offenders.push(f);

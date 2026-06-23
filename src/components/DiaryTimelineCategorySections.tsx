@@ -91,6 +91,10 @@ export function DiaryTimelineCategorySections<
     () => buildDiaryTimelineSectionSummary(sections),
     [sections],
   );
+  const evidenceSummary = useMemo(
+    () => buildDiaryTimelineEvidenceQualitySummary(sections),
+    [sections],
+  );
 
   // Load saved state on mount (or fall back to defaults). Saved state
   // only overrides known section IDs; malformed storage is ignored.

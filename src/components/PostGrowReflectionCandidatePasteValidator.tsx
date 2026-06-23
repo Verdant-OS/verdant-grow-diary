@@ -105,14 +105,6 @@ function ResultPanel({ result }: { result: PostGrowReflectionCandidatePasteResul
           ))}
         </div>
         <p className="text-sm text-muted-foreground">{result.message}</p>
-        <div className="text-sm">
-          <span className="font-medium">Issue codes: </span>
-          {result.issueCodes.length > 0 ? result.issueCodes.join(", ") : "none"}
-        </div>
-        <div className="text-sm">
-          <span className="font-medium">Failure reason: </span>
-          {result.failureReason}
-        </div>
       </div>
     );
   }
@@ -240,7 +232,9 @@ export function PostGrowReflectionCandidatePasteValidator() {
           </Button>
         </div>
         <ResultPanel result={result} />
-        {result.status === "validated" && <ValidationSummaryPanel summary={summary} />}
+        {(result.status === "validated" || result.status === "envelope_rejected") && (
+          <ValidationSummaryPanel summary={summary} />
+        )}
         {result.status === "validated" && (
           <PostGrowReflectionReviewPacketCard packet={reviewPacket} />
         )}

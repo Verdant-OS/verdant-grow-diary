@@ -118,7 +118,7 @@ export default function ManualSensorReadingCard({
     // re-triggered on the next save attempt against the new values.
     if (reviewOpen) setReviewOpen(false);
     // Editing after a save dismisses the prior confirmation so it never
-    // misleads the grower about the current form state.
+    // confuses the grower about the current form state.
     if (lastSaved) setLastSaved(null);
   }
 

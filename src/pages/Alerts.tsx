@@ -20,6 +20,8 @@ import { AlertWhyContext } from "@/components/AlertWhyContext";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
 import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
 import AlertsContextHeaderForGrow from "@/components/AlertsContextHeaderForGrow";
+import GrowTargetsEditor from "@/components/GrowTargetsEditor";
+import { pickAlertsGrowContext } from "@/lib/alertFreshnessContext";
 import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
 import { deriveAlertReadingSource } from "@/lib/alertReadingSourceRules";
 import { Badge } from "@/components/ui/badge";
@@ -109,8 +111,24 @@ export default function Alerts() {
     ? stageByGrow.get(scopedGrowId) ?? null
     : null;
 
-
-
+  // Pick the most relevant grow context for the Alerts header. Prefers
+  // scoped → active → first available. Keeps the header useful even on
+  // unscoped /alerts visits without inventing data.
+  const headerContext = useMemo(
+    () =>
+      pickAlertsGrowContext({
+        scopedGrowId: scopedGrowId ?? null,
+        activeGrowId: activeGrowId ?? null,
+        grows: grows.map((g) => ({
+          id: g.id,
+          name: g.name ?? null,
+          stage: (g as { stage?: string | null }).stage ?? null,
+          updated_at: (g as { updated_at?: string | null }).updated_at ?? null,
+        })),
+      }),
+    [scopedGrowId, activeGrowId, grows],
+  );
+  const [emptyStateEditorOpen, setEmptyStateEditorOpen] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
@@ -225,13 +243,23 @@ export default function Alerts() {
         />
       )}
 
-      {scopedGrowId ? (
+      {headerContext ? (
         <AlertsContextHeaderForGrow
-          growId={scopedGrowId}
-          growName={scopedGrowName ?? null}
-          stage={headerStage}
+          growId={headerContext.growId}
+          growName={headerContext.growName}
+          stage={headerContext.stage}
+          isFallback={headerContext.isFallback}
         />
-      ) : null}
+      ) : (
+        <div
+          className="glass rounded-2xl p-3 mb-3 text-xs text-muted-foreground"
+          data-testid="alerts-context-no-grow"
+        >
+          No grow selected. Create or select a grow to view alert context.
+        </div>
+      )}
+
+
 
 
 
@@ -346,17 +374,15 @@ export default function Alerts() {
             title="No open alerts."
             description="Check targets or enter a fresh manual snapshot if you expected one."
           />
-          {scopedGrowId ? (
+          {headerContext ? (
             <div className="mt-3 flex flex-wrap gap-2 justify-center">
               <Button
                 size="sm"
                 variant="outline"
-                asChild
+                onClick={() => setEmptyStateEditorOpen(true)}
                 data-testid="alerts-empty-state-manage-targets"
               >
-                <Link to={`/grows/${encodeURIComponent(scopedGrowId)}`}>
-                  Manage Targets
-                </Link>
+                Manage Targets
               </Button>
               <Button
                 size="sm"
@@ -366,8 +392,20 @@ export default function Alerts() {
               >
                 <Link to="/sensors#manual-reading">Add Manual Snapshot</Link>
               </Button>
+              <GrowTargetsEditor
+                open={emptyStateEditorOpen}
+                onOpenChange={setEmptyStateEditorOpen}
+                growId={headerContext.growId}
+              />
             </div>
-          ) : null}
+          ) : (
+            <p
+              className="mt-3 text-center text-xs text-muted-foreground"
+              data-testid="alerts-empty-state-no-grow"
+            >
+              Select a grow to manage targets.
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-6">

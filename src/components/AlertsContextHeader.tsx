@@ -24,6 +24,10 @@ interface Props {
   /** Echoed back from buildAlertsHeaderContext args so the stale-copy
    * helper can be re-run without re-passing the whole snapshot. */
   freshnessArgs: Parameters<typeof describeLatestSnapshotForAlerts>[0];
+  /** When true, the header is showing a fallback grow context (not
+   * scoped via ?growId=). Renders a small "Showing alert context for X"
+   * note so the operator knows which grow is being used. */
+  isFallback?: boolean;
   testId?: string;
 }
 
@@ -37,6 +41,7 @@ export default function AlertsContextHeader({
   vm,
   growId,
   freshnessArgs,
+  isFallback = false,
   testId = "alerts-context-header",
 }: Props) {
   const [editorOpen, setEditorOpen] = useState(false);
@@ -82,6 +87,14 @@ export default function AlertsContextHeader({
             </span>
           ) : null}
         </p>
+        {isFallback && vm.growName ? (
+          <p
+            className="text-[11px] text-muted-foreground basis-full"
+            data-testid={`${testId}-fallback-context`}
+          >
+            Showing alert context for {vm.growName}.
+          </p>
+        ) : null}
         {growId ? (
           <Button
             size="sm"

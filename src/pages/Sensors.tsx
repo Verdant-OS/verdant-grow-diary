@@ -8,6 +8,8 @@ import PageHeader from "@/components/PageHeader";
 import SensorChart from "@/components/SensorChart";
 import GrowDataSourceBadge from "@/components/GrowDataSourceBadge";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
+import ManualSensorTrendChart from "@/components/ManualSensorTrendChart";
+import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import SensorBridgeHealthCard from "@/components/SensorBridgeHealthCard";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";

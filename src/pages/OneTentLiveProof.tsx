@@ -457,6 +457,13 @@ export default function OneTentLiveProof() {
               : "Copy proof summary"}
         </Button>
       </div>
+      <p
+        className="text-[11px] text-muted-foreground"
+        data-testid="one-tent-live-proof-redaction-notice"
+      >
+        {PROOF_REPORT_REDACTION_NOTICE.join(" ")}
+      </p>
+
 
       <OneTentLiveProofReport report={report} />
 

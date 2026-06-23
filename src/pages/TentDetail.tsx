@@ -460,6 +460,7 @@ export default function TentDetail() {
           tentId={id ?? null}
           tentName={tent?.name}
           title="Latest EcoWitt Snapshot"
+          auditHrefMode="tent-detail"
         />
       </section>
 

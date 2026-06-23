@@ -621,6 +621,27 @@ export default function PlantRelativeTimelineSection({
                 }}
               />
             </div>
+            <aside
+              data-testid="relative-timeline-print-summary"
+              aria-label="Print-friendly timeline summary"
+              className="hidden print:block mt-3 border-t border-border/60 pt-2 text-xs text-foreground"
+            >
+              <ol className="space-y-1">
+                {printSummary.lines.map((line) => (
+                  <li
+                    key={line.key}
+                    data-testid="relative-timeline-print-summary-line"
+                    data-line-key={line.key}
+                    className={cn(
+                      line.key === "title" && "font-medium",
+                      line.key === "safety" && "italic text-muted-foreground",
+                    )}
+                  >
+                    {line.label}
+                  </li>
+                ))}
+              </ol>
+            </aside>
           </div>
         )}
       </CardContent>

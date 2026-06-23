@@ -135,7 +135,7 @@ function ResultPanel({ result }: { result: PostGrowReflectionCandidatePasteResul
         </div>
         <div className="text-sm">
           <span className="font-medium">Failure reason: </span>
-          {result.failureReason}
+          <span>{result.failureReason}</span>
         </div>
         <EnvelopeMetadata result={result} />
         <p className="text-xs text-muted-foreground">{result.validationOptions.label}</p>

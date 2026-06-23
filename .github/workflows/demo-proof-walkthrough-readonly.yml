@@ -129,6 +129,23 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      # Failure-only upload: surfaces Playwright screenshots, traces, and
+      # videos produced by `trace: retain-on-failure` / `video:
+      # retain-on-failure` in playwright.config.ts. Only runs when the
+      # job failed, so successful runs never publish raw page content.
+      - name: Upload Playwright failure artifacts (screenshots / traces / videos)
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: demo-proof-playwright-failure-artifacts
+          path: |
+            test-results/**/*.png
+            test-results/**/*.webm
+            test-results/**/trace.zip
+          retention-days: 7
+          if-no-files-found: ignore
+
+
       - name: Job summary — read-only / mocked
         if: ${{ always() }}
         run: |

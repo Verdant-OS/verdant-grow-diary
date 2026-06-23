@@ -117,3 +117,137 @@ None of these may bypass the V0 contract.
 The contract test is wired as an explicit step in CI ahead of the full
 suite. A failing contract test is a stop-ship event regardless of how green
 the rest of the build looks.
+
+---
+
+## 9. Checkpoint — 2026-06-23 (post PPFD env-context + harness cleanup)
+
+Stable green baseline after the read-only PPFD/environment context chart
+landed and validation harness noise was eliminated.
+
+### 9.1 Product changes landed
+
+- **Read-only PPFD and environment context chart**
+  - `src/components/ManualSensorTrendChart.tsx` — accessible semantic
+    `<table>` presenter. No chart library, no writes, no AI calls, no
+    automation.
+  - `src/lib/manualSensorTrendChartViewModel.ts` — pure view-model.
+    Reads `sensor_readings` (`ppfd`, `temperature_c`, `humidity_pct`,
+    `vpd_kpa`), normalizes units, sorts chronologically, and flags
+    `stale` / `invalid` / `demo` sources as untrusted context (never
+    rendered as healthy).
+  - Wired into `src/pages/Sensors.tsx` beneath the manual reading card
+    via the existing `useSensorReadings(defaultManualTentId, 60)` hook.
+    No new fetch path, no new RLS surface.
+- **Manual sensor PPFD harness cleanup**
+  - `src/test/manual-sensor-ppfd-entry.test.tsx` now wraps
+    `ManualSensorReadingCard` in `<MemoryRouter>` so the in-card `<Link>`
+    has a Router ancestor. Eliminates the unhandled router `TypeError`.
+    21/21 pass, 0 unhandled errors.
+- **Validation scanner / harness cleanup**
+  - `src/test/paddle-subscription-update-harness-static.test.ts` — RPC
+    exclusion regex tightened so the intentional
+    `apply_paddle_subscription_update_with_audit` wrapper is not
+    flagged as a legacy call.
+  - `src/test/premium-live-sensor-gate-hardening.test.tsx` — adopted
+    the shared scanner guardrail harness (`installScannerGuardrail`
+    + `getCachedTsFiles`). 30s per-file timeout and cached repo walk
+    eliminate the shard-load timeout false-red. Allowlist and
+    forbidden-reference assertions unchanged.
+
+Collapsible diary/timeline category sections were not part of this
+checkpoint window — not landed in this tree.
+
+### 9.2 Safety posture
+
+- No schema changes.
+- No RLS changes.
+- No Edge Function behavior changes.
+- No AI / model-call changes.
+- No Action Queue write changes.
+- No automation or device-control changes.
+- No fake live data. `stale` / `invalid` / `demo` rows remain
+  explicitly flagged in the trend view-model.
+
+### 9.3 Validation status
+
+- `npx tsc -p tsconfig.app.json --noEmit` — clean.
+- Premium live sensor gate + server gate focused run —
+  **2 files, 43/43 pass**, 0 failures, 0 unhandled errors.
+- Manual sensor PPFD focused run — **21/21 pass**.
+- Paddle subscription update harness static — green alongside
+  `paddle-subscription-update-rpc-static` and `entitlements-rls`
+  guards.
+- Shard 4 script stabilized: now runs with
+  `NODE_OPTIONS=--max-old-space-size=6144` and
+  `--pool=forks --poolOptions.forks.singleFork=true` to eliminate
+  the mark-compact OOM and tinypool teardown noise.
+
+Known harness caveats:
+
+- `daily-check-method-context.test.tsx` remains a documented
+  parallel-load flake (see `docs/testing/known-vitest-flakes.md`).
+  Re-run in isolation before treating any timeout there as a real
+  regression.
+- jsdom `HTMLCanvasElement.getContext` warnings from axe-core in
+  `auth-axe.test.tsx` are pre-existing and non-failing.
+
+### 9.4 Files changed since the previous checkpoint
+
+**Product UI**
+
+- `src/components/ManualSensorTrendChart.tsx` (new)
+- `src/pages/Sensors.tsx` (wiring only)
+
+**Pure view-model / rules**
+
+- `src/lib/manualSensorTrendChartViewModel.ts` (new)
+
+**Tests**
+
+- `src/test/ManualSensorTrendChart.test.tsx` (new)
+- `src/test/manualSensorTrendChartViewModel.test.ts` (new)
+- `src/test/manual-sensor-ppfd-entry.test.tsx` (Router wrapper)
+- `src/test/paddle-subscription-update-harness-static.test.ts`
+  (tightened RPC exclusion regex)
+- `src/test/premium-live-sensor-gate-hardening.test.tsx`
+  (adopted scanner guardrail harness)
+
+**Harness / package scripts**
+
+- `package.json` — `test:full:shard4` script updated for heap +
+  fork pool. Shards 1–3 untouched.
+
+### 9.5 Rollback groups
+
+- **PPFD chart rollback** — delete
+  `src/components/ManualSensorTrendChart.tsx`,
+  `src/lib/manualSensorTrendChartViewModel.ts`, and the two new
+  tests; remove the chart mount + `useSensorReadings` line in
+  `src/pages/Sensors.tsx`.
+- **Scanner harness rollback** — in
+  `src/test/premium-live-sensor-gate-hardening.test.tsx`, drop the
+  `installScannerGuardrail` import + call and restore the local
+  `walkSrc` + `fs`/`path` imports; revert the paddle harness regex
+  to the previous broad exclusion; remove the `<MemoryRouter>`
+  wrapper from `manual-sensor-ppfd-entry.test.tsx`.
+- **Shard 4 package-script rollback** — restore
+  `"test:full:shard4": "vitest run --reporter=dot --shard=4/4"` in
+  `package.json`.
+
+### 9.6 Recommended next product slice
+
+Small read-only timeline polish only. Suggested candidates:
+
+- Light visual grouping or sticky day headers on the existing
+  diary/timeline feed.
+- A read-only "context" chip on PPFD timeline rows that links to
+  the new trend view.
+
+Explicitly out of scope:
+
+- No Fast Add presets.
+- No Quick Log write-flow expansion.
+- No new alerts, Action Queue writes, AI calls, automation, or
+  device control.
+

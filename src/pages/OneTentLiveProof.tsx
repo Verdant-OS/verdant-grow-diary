@@ -25,18 +25,28 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import OneTentLiveProofChecklist from "@/components/OneTentLiveProofChecklist";
 import OneTentLiveProofReport from "@/components/OneTentLiveProofReport";
+import OneTentSensorProofSection from "@/components/OneTentSensorProofSection";
 import { useGrows } from "@/store/grows";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import { useOneTentLiveProofActionStatus } from "@/hooks/useOneTentLiveProofActionStatus";
 import { useOneTentLiveProofTimelineFollowup } from "@/hooks/useOneTentLiveProofTimelineFollowup";
+import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { useEcowittIngestAuditProofRows } from "@/hooks/useEcowittIngestAuditProofRows";
 import {
   buildOneTentLiveProofViewModel,
   buildOneTentLiveProofReport,
   PROOF_DEMO_SAFETY_WARNING,
   PROOF_DEMO_RUN_STEPS,
 } from "@/lib/oneTentLiveProofViewModel";
+import { buildEcowittLiveProofViewModel } from "@/lib/ecowittLiveProofViewModel";
+import type { EcowittProofRow } from "@/lib/ecowittLiveProofRules";
+import { buildEcowittIngestAuditProof } from "@/lib/ecowittIngestAuditProofRules";
+import {
+  buildOneTentSensorProofViewModel,
+  buildOneTentSensorProofReportSection,
+} from "@/lib/oneTentSensorProofViewModel";
 
 export default function OneTentLiveProof() {
   const { grows, activeGrowId } = useGrows();
@@ -131,13 +141,61 @@ export default function OneTentLiveProof() {
     ],
   );
 
-  const report = useMemo(
-    () =>
-      buildOneTentLiveProofReport(vm, {
-        now: lastRefreshedAt ?? new Date(),
-      }),
-    [vm, lastRefreshedAt],
+  // Read-only sensor evidence: row-level EcoWitt proof from already-loaded
+  // sensor_readings + RLS-safe ingest-audit proof from sensor_ingest_audit_log.
+  // Both queries are narrow and existing — no new write surface, no schema
+  // changes, no Edge/RPC/auth changes.
+  const { data: tentSensorRows = [] } = useSensorReadings(
+    effectiveTentId || undefined,
+    60,
   );
+  const auditProofQuery = useEcowittIngestAuditProofRows({
+    tentId: effectiveTentId || null,
+    enabled: Boolean(effectiveTentId),
+  });
+  const sensorProofVM = useMemo(() => {
+    const now = lastRefreshedAt ?? new Date();
+    const liveVM = effectiveTentId
+      ? buildEcowittLiveProofViewModel(
+          tentSensorRows as unknown as readonly EcowittProofRow[],
+          { tentId: effectiveTentId, now },
+        )
+      : null;
+    const auditVM = effectiveTentId
+      ? buildEcowittIngestAuditProof(auditProofQuery.rows, {
+          status: auditProofQuery.status,
+          tentId: effectiveTentId,
+          now,
+        })
+      : null;
+    return buildOneTentSensorProofViewModel({
+      tentId: effectiveTentId || null,
+      liveProof: liveVM,
+      auditProof: auditVM,
+    });
+  }, [
+    effectiveTentId,
+    tentSensorRows,
+    auditProofQuery.status,
+    auditProofQuery.rows,
+    lastRefreshedAt,
+    refreshNonce,
+  ]);
+
+  const report = useMemo(() => {
+    const base = buildOneTentLiveProofReport(vm, {
+      now: lastRefreshedAt ?? new Date(),
+    });
+    const sensorMarkdown = buildOneTentSensorProofReportSection(sensorProofVM);
+    return {
+      ...base,
+      markdown: `${base.markdown}\n\n${sensorMarkdown}`,
+    };
+  }, [vm, lastRefreshedAt, sensorProofVM]);
+
+
+
+
 
 
 
@@ -330,6 +388,8 @@ export default function OneTentLiveProof() {
       </section>
 
       <OneTentLiveProofChecklist vm={vm} />
+
+      <OneTentSensorProofSection vm={sensorProofVM} />
 
       <div className="flex flex-wrap items-center gap-2">
         <Button

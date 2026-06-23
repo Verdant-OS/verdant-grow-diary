@@ -26,17 +26,27 @@ on:
       - "src/pages/DemoProofWalkthrough.tsx"
       - "src/lib/demoProofWalkthroughViewModel.ts"
       - "src/lib/proofReportRedactionRules.ts"
+      - "src/lib/appRouteManifest.ts"
+      - "src/App.tsx"
       - "src/test/demoProofWalkthrough-no-grows-route.test.ts"
       - "src/test/demoProofWalkthrough-route-snapshot.test.ts"
-      - "src/test/proofReportRedactionRules.test.ts"
-      - "src/test/proofReportRedactionRules-expanded.test.ts"
+      - "src/test/proofReportRedactionRules*.test.ts"
       - "src/test/DemoProofWalkthrough*.test.tsx"
       - "playwright.config.ts"
+      - "playwright.config.*"
       - ".github/workflows/demo-proof-walkthrough-readonly.yml"
       - "package.json"
       - "bun.lock"
       - "bun.lockb"
+      - "docs/one-tent-loop-rc-smoke-test.md"
+      - "docs/v0-release-checkpoint.md"
   workflow_dispatch:
+
+# Cancel older runs for the same PR or branch so only the latest commit
+# consumes a runner.
+concurrency:
+  group: demo-proof-walkthrough-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   demo-proof-readonly:

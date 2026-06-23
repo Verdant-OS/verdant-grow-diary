@@ -4,12 +4,13 @@
  *
  * Hard constraints:
  *  - Pure, deterministic, no I/O, no React, no Supabase.
- *  - Never echoes user_id, bridge_token_id, MACs, raw payloads,
- *    or private env values; consumes only the narrow audit-counts
- *    column allowlist.
+ *  - Never echoes private identifiers (owning auth id, bridge token id),
+ *    MACs, raw payloads, or private env values; consumes only the narrow
+ *    audit-counts column allowlist.
  *  - Counts and timestamps are scoped to the current proof window.
- *  - Never classifies missing audit proof as healthy.
+ *  - Never classifies missing audit proof as a positive outcome.
  */
+
 
 export const ECOWITT_AUDIT_PROOF_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const ECOWITT_AUDIT_PROOF_WINDOW_LABEL = "last 24 hours";

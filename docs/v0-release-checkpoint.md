@@ -680,3 +680,118 @@ unchanged. Neither copy implies a healthy state.
 - Delete
   `src/test/oneTentSensorProofReportSection-static-safety.test.ts`.
 - Remove this section (15) from `docs/v0-release-checkpoint.md`.
+
+---
+
+## 16. Final Demo/Proof CI hardening slice
+
+Read-only / safety / docs hardening. No product surface change.
+
+### CI guard command
+
+`npm run test:demo-proof-guards` runs the three core demo/proof guards
+together as a single PR signal:
+
+- `/grows` route guard
+  (`src/test/demoProofWalkthrough-no-grows-route.test.ts`) — fails if
+  any walkthrough or doc reintroduces the nonexistent `/grows` route.
+- Demo Proof Walkthrough route snapshot
+  (`src/test/demoProofWalkthrough-route-snapshot.test.ts`) — fails if a
+  walkthrough `href` drifts away from a real `App.tsx` route, or if
+  `?operator=1` is dropped from the operator-mode step.
+- Proof report redaction
+  (`src/test/proofReportRedactionRules.test.ts` and the expanded
+  `src/test/proofReportRedactionRules-expanded.test.ts`).
+
+### Review-only walkthrough notes (per write-capable destination)
+
+`DemoProofWalkthroughStep.reviewOnlyNote` is rendered below the safety
+note for the four write-capable destinations. Links remain plain
+navigation links — they are never disabled or wrapped in buttons.
+
+- Quick Log (`/daily-check`): "Review only—do not submit during demo."
+- AI Doctor (`/doctor`): "Review only—do not run AI during demo."
+- Alerts (`/alerts`): "Review only—do not create or change alerts during
+  demo."
+- Action Queue (`/actions`): "Review only—do not approve actions during
+  demo."
+
+Read-only destinations (Dashboard, Tents, Plants, Logs/Timeline, Sensor
+Data, Sensor Data Operator Mode, One-Tent Live Proof report) do not
+carry a review-only note.
+
+### Expanded proof report redaction
+
+`sanitizeProofReportMarkdown` now defends copy/print output against
+secrets in:
+
+- fenced code blocks
+- inline backticks
+- shell/env assignments (`export KEY=value`, `$env:KEY="value"`)
+- JSON-like (`"KEY": "value"`) and YAML-like (`KEY: value`) variants
+- URL query tokens (`?access_token=...`)
+- `Authorization:` header values (full line) and `Bearer <token>` /
+  JWT-shaped strings
+- UUIDs, ISO-second timestamps, MAC-like values, and long hex blobs
+  including occurrences inside code spans
+
+Sensitive keyword list includes `service_role`,
+`SUPABASE_SERVICE_ROLE(_KEY)`, `bridge_token(_id)`, `access_token`,
+`refresh_token`, `raw_payload`, `anon_key`, `api_key`/`apikey`,
+`passkey`, `password`, `secret`, `jwt`, `authorization`. The sanitizer
+is pure, deterministic, idempotent, and null-safe; Copy and Print
+continue to use sanitized output only.
+
+### E2E no-write contract
+
+`e2e/demo-proof-walkthrough-readonly.spec.ts`:
+
+- Loads `/internal/demo-proof-walkthrough`.
+- Asserts the page, read-only banner, and step links render.
+- Fails on any forbidden network call during load, including:
+  - any Edge Function invocation (`/functions/v1/...`)
+  - known AI provider hosts (OpenAI, Anthropic, Google Generative
+    Language, Lovable AI gateway)
+  - Supabase mutations to `grow_events`, `diary_entries`,
+    `action_queue`, `alerts`, `ai_*`
+  - RPCs matching `quicklog_save`, alert/action/AI RPC patterns
+  - any non-GET request to `/rest/v1/...` or `/rpc/...`
+    (excepting auth session refresh)
+- Does not click into write-capable destinations.
+
+**Runtime status:** E2E spec added; runtime execution pending in this
+sandbox. Missing prerequisite: Playwright Chromium binary is not
+installed at the sandbox path
+(`/chromium_headless_shell-1223/chrome-headless-shell-linux64/...`).
+Run `npx playwright install chromium` in a CI runner with browser
+download permitted, then `npx playwright test
+e2e/demo-proof-walkthrough-readonly.spec.ts` to execute.
+
+### Safety posture
+
+- No schema, RLS, Edge Function, RPC, or auth changes.
+- No new Supabase queries.
+- No writes, no AI/model calls, no alert creation, no Action Queue
+  writes, no automation, no device control.
+- Walkthrough remains read-only; sanitizer is pure.
+
+### Validation counts (this slice)
+
+- `npm run test:demo-proof-guards` — 4 files / 62 passed.
+- `npx vitest run proofReportRedactionRules DemoProofWalkthrough
+  demoProofWalkthrough --reporter=verbose` — 9 files / 90 passed.
+- `npx tsc -p tsconfig.app.json --noEmit` — clean.
+- Playwright spec — pending (see Runtime status above).
+
+### Rollback
+
+- Remove the `test:demo-proof-guards` entry from `package.json`.
+- Delete `src/test/proofReportRedactionRules-expanded.test.ts` and
+  `src/test/DemoProofWalkthrough-review-only-notes.test.tsx`.
+- Delete `e2e/demo-proof-walkthrough-readonly.spec.ts`.
+- Revert the `reviewOnlyNote` field plus the four populated values in
+  `src/lib/demoProofWalkthroughViewModel.ts` and the matching render
+  block in `src/pages/DemoProofWalkthrough.tsx`.
+- Revert the keyword/regex expansion and `AUTH_HEADER_RE` in
+  `src/lib/proofReportRedactionRules.ts`.
+- Remove this section (16) from `docs/v0-release-checkpoint.md`.

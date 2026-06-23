@@ -64,7 +64,9 @@ function wrap() {
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={["/ecowitt-ingest-audit"]}>{children}</MemoryRouter>
+    </QueryClientProvider>
   );
 }
 

@@ -110,7 +110,8 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
     : vm.emptyCopy
       ? "missing"
       : null;
-  
+  const showTrustBadge = shouldRenderTrustBadge(view.status, view.trustBadge.label);
+  const pillIsRedundant = isPillRedundantWithBadge(view.status, view.trustBadge.label);
 
   return (
     <section
@@ -136,16 +137,18 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
             </span>
           )}
 
-          <span
-            data-testid="quicklog-sensor-snapshot-pill"
-            role="status"
-            aria-label={PILL_ARIA[view.status]}
-            className={`text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 ${PILL_TONE[view.status]}`}
-          >
-            {PILL_LABEL[view.status]}
-          </span>
+          {!pillIsRedundant && (
+            <span
+              data-testid="quicklog-sensor-snapshot-pill"
+              role="status"
+              aria-label={PILL_ARIA[view.status]}
+              className={`text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 ${PILL_TONE[view.status]}`}
+            >
+              {PILL_LABEL[view.status]}
+            </span>
+          )}
 
-          <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />
+          {showTrustBadge && <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />}
 
 
         </div>

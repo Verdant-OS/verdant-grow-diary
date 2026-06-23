@@ -38,7 +38,7 @@ export default function AlertsContextHeaderForGrow({
   const tentIds = tents.map((t) => t.id);
   const sensorState = useLatestSensorSnapshot(growId, tentIds);
   const targetsState = useGrowTargets(growId);
-  const tempUnit = loadTemperatureUnitPreference();
+  const tempUnit = useTemperatureUnitPreference();
 
   const vm = useMemo(
     () =>

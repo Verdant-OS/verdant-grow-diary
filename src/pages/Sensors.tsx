@@ -507,12 +507,12 @@ export default function Sensors() {
                   : []
               }
             />
-            <p
-              className="text-[11px] text-muted-foreground"
-              data-testid="sensors-ecowitt-live-proof-audit-unavailable"
-            >
-              Accepted/rejected ingest audit counts are not shown in this view.
-            </p>
+            <EcowittIngestAuditProofPanel
+              tentId={defaultManualTentId ?? null}
+              status={ecowittIngestAuditProof.status}
+              rows={ecowittIngestAuditProof.rows}
+            />
+
             {!defaultManualTentId && (
               <p
                 className="text-[11px] text-muted-foreground"

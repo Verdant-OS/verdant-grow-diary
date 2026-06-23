@@ -6,7 +6,7 @@
  *  - Presenter only. No writes, no AI calls, no alerts, no Action Queue,
  *    no automation, no device control.
  *  - Consumes rows + status via props; never selects from Supabase.
- *  - Never renders user_id, bridge_token_id, raw payloads, or secrets.
+ *  - Never renders the owning auth id, bridge token id, raw payloads, or secrets.
  */
 import {
   buildEcowittIngestAuditProof,

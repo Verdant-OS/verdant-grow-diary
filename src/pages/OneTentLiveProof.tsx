@@ -47,6 +47,11 @@ import {
   buildOneTentSensorProofViewModel,
   buildOneTentSensorProofReportSection,
 } from "@/lib/oneTentSensorProofViewModel";
+import {
+  sanitizeProofReportMarkdown,
+  PROOF_REPORT_REDACTION_NOTICE,
+} from "@/lib/proofReportRedactionRules";
+
 
 export default function OneTentLiveProof() {
   const { grows, activeGrowId } = useGrows();
@@ -187,11 +192,13 @@ export default function OneTentLiveProof() {
       now: lastRefreshedAt ?? new Date(),
     });
     const sensorMarkdown = buildOneTentSensorProofReportSection(sensorProofVM);
+    const rawMarkdown = `${base.markdown}\n\n${sensorMarkdown}`;
     return {
       ...base,
-      markdown: `${base.markdown}\n\n${sensorMarkdown}`,
+      markdown: sanitizeProofReportMarkdown(rawMarkdown),
     };
   }, [vm, lastRefreshedAt, sensorProofVM]);
+
 
 
 

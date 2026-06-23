@@ -103,12 +103,29 @@ export default function DemoProofWalkthrough(): JSX.Element {
         description={vm.subtitle}
         icon={<ClipboardCheck className="h-5 w-5" />}
       />
+      <section
+        role="note"
+        aria-label="Read-only demo walkthrough banner"
+        className="rounded-md border border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/30 p-3 text-[11px] text-emerald-900 dark:text-emerald-200 space-y-1"
+        data-testid="demo-proof-walkthrough-readonly-banner"
+      >
+        <p className="font-semibold">Read-only demo walkthrough.</p>
+        <p>
+          Links open existing proof surfaces; this page does not submit logs,
+          call AI, create alerts, approve actions, or control devices.
+        </p>
+        <p>
+          Operator Mode uses <code>?operator=1</code> as a URL surface gate;
+          data access is still enforced by RLS.
+        </p>
+      </section>
       <p
         className="text-[11px] text-muted-foreground"
         data-testid="demo-proof-walkthrough-proof-window"
       >
         Scope: {vm.proofWindowLabel}.
       </p>
+
 
       <section
         aria-label="Safety summary"

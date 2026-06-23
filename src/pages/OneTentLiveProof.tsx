@@ -193,11 +193,25 @@ export default function OneTentLiveProof() {
     });
     const sensorMarkdown = buildOneTentSensorProofReportSection(sensorProofVM);
     const rawMarkdown = `${base.markdown}\n\n${sensorMarkdown}`;
+    const s = sanitizeProofReportMarkdown;
     return {
       ...base,
-      markdown: sanitizeProofReportMarkdown(rawMarkdown),
+      title: s(base.title),
+      generatedAtLabel: s(base.generatedAtLabel),
+      contextLines: base.contextLines.map(s),
+      safetyNotes: base.safetyNotes.map(s),
+      steps: base.steps.map((step) => ({
+        ...step,
+        label: s(step.label),
+        statusLabel: s(step.statusLabel),
+        evidenceSummary: step.evidenceSummary ? s(step.evidenceSummary) : step.evidenceSummary,
+        missingEvidence: step.missingEvidence ? s(step.missingEvidence) : step.missingEvidence,
+      })),
+      closingLine: base.closingLine ? s(base.closingLine) : base.closingLine,
+      markdown: s(rawMarkdown),
     };
   }, [vm, lastRefreshedAt, sensorProofVM]);
+
 
 
 

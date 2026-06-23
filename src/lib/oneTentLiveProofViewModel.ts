@@ -367,3 +367,8 @@ export function buildOneTentLiveProofViewModel(
 export function proofAlertDetailHref(alertId: string): string {
   return alertDetailPath(alertId);
 }
+
+/** Convenience: action-detail link helper for the Action Queue handoff. */
+export function proofActionDetailHref(actionId: string): string {
+  return actionDetailPath(actionId);
+}

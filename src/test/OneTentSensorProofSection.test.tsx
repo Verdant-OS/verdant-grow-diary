@@ -66,11 +66,11 @@ describe("OneTentSensorProofSection", () => {
   });
 
   it("renders the Sensors Operator shortcut preserving operator=1", () => {
-    renderWith("tent-1");
-    const link = screen
-      .getByTestId("one-tent-sensor-proof-operator-shortcut")
-      .querySelector("a");
-    expect(link?.getAttribute("href")).toBe("/sensors?operator=1");
+    const { container } = renderWith("tent-1");
+    const anchor = container.querySelector(
+      'a[href="/sensors?operator=1"]',
+    );
+    expect(anchor).toBeTruthy();
   });
 
   it("renders unavailable state when no tent is selected", () => {

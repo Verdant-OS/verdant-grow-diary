@@ -142,7 +142,10 @@ describe("QuickLogV2Sheet — photo attachment", () => {
     renderSheet();
     const library = screen.getByTestId("qlv2-photo-library-input") as HTMLInputElement;
     await pickFile(library, makeImage("library.jpg"));
-    fireEvent.change(screen.getByLabelText(/note/i), {
+    // Target the primary Quick Log note textarea by its exact accessible
+    // name. The maturity section legitimately exposes its own "Grower note"
+    // field, so a /note/i regex matches multiple distinct controls.
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
       target: { value: "Observation with attached photo" },
     });
     fireEvent.click(screen.getByTestId("qlv2-save"));

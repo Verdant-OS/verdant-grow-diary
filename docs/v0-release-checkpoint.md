@@ -1082,3 +1082,28 @@ readonly E2E (mocked)**.
 - No product, schema, RLS, Edge, RPC, auth, query, write, AI, alert,
   Action Queue, automation, device-control, or workflow-behavior changes.
 - No new third-party dependencies.
+
+### 18.6 Demo-Proof artifact self-test + download-review helpers
+
+Scripts/docs-only addendum. No product, runtime, or workflow behavior changed.
+
+- Added `scripts/create-synthetic-demo-proof-artifacts.mjs` (synthetic
+  helper-validation artifact set under `.artifacts/`). Synthetic artifacts
+  validate helper behavior only; they do not prove the real Demo Proof
+  Walkthrough E2E passed.
+- Extended `scripts/tree-demo-proof-playwright-report.mjs` with required
+  checks: report root is directory, `index.html` is present recursively,
+  and at least one supporting file exists besides `index.html`. Optional
+  warnings printed for common Playwright dirs (`data/`, `assets/`, `trace/`).
+- Added `scripts/extract-and-check-demo-proof-playwright-report.mjs` that
+  extracts `demo-proof-playwright-report.zip` (via existing safe
+  Node-only `extractZip`) into `.artifacts/` and runs `verify-report` +
+  `tree-report` for a single pass/fail.
+- Added `scripts/download-and-review-demo-proof-artifacts.mjs` that
+  downloads both `demo-proof-playwright-report` and
+  `demo-proof-playwright-results` for the latest (or `--run-id`) run via
+  `gh`, then runs verify -> tree -> summarize -> open, with optional
+  `--cleanup` / `--cleanup-all`.
+- Package scripts added: `test:demo-proof:create-synthetic-artifacts`,
+  `test:demo-proof:extract-check-report`, `test:demo-proof:download-review`,
+  `test:demo-proof:download-review:cleanup`.

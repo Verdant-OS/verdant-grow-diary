@@ -119,11 +119,12 @@ describe("buildManualSensorTrendChartViewModel", () => {
     });
     const ppfd = vm.series[0].points.map((p) => p.value);
     expect(ppfd).toEqual([200, 100]);
-    const allTs = vm.series.flatMap((s) =>
-      s.points.map((p) => Date.parse(p.capturedAt)),
-    );
-    const sorted = [...allTs].sort((a, b) => a - b);
-    expect(allTs).toEqual(sorted);
+    // Each metric series must be chronologically ordered oldest -> newest.
+    for (const s of vm.series) {
+      const stamps = s.points.map((p) => Date.parse(p.capturedAt));
+      const sorted = [...stamps].sort((a, b) => a - b);
+      expect(stamps).toEqual(sorted);
+    }
   });
 
   it("is null-safe for missing/invalid fields and never crashes", () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, within } from "@testing-library/react";
@@ -135,6 +135,7 @@ describe("DiaryTimelineCategorySections — static safety", () => {
     "utf8",
   );
 
+  // Forbidden in BOTH component + pure rules: writes, AI, automation.
   const forbidden = [
     /from\s+["']@\/integrations\/supabase\/client["']/,
     /\.functions\.invoke\(/,
@@ -145,7 +146,6 @@ describe("DiaryTimelineCategorySections — static safety", () => {
     /device[_-]?command|relay|actuator|auto[_-]?adjust/i,
     /service[_-]?role|SUPABASE_SERVICE_ROLE/i,
     /raw_payload/i,
-    /(?:window\.)?(?:localStorage|sessionStorage)\s*\.\s*(?:getItem|setItem|removeItem|clear)\(/,
   ];
   for (const f of forbidden) {
     it(`component contains no match for ${f}`, () => {
@@ -155,6 +155,22 @@ describe("DiaryTimelineCategorySections — static safety", () => {
       expect(RULES).not.toMatch(f);
     });
   }
+
+  // Storage usage: pure rules must never touch storage; component MAY
+  // use guarded getItem/setItem ONLY (no clear/removeItem of unrelated
+  // keys).
+  it("rules file never touches localStorage / sessionStorage at all", () => {
+    expect(RULES).not.toMatch(/localStorage|sessionStorage/);
+  });
+  it("component only uses guarded localStorage.getItem / setItem", () => {
+    expect(COMPONENT).not.toMatch(/sessionStorage/);
+    expect(COMPONENT).not.toMatch(
+      /localStorage\s*\.\s*(?:removeItem|clear)\(/,
+    );
+    // Reads + writes must go through try/catch helpers; check those exist.
+    expect(COMPONENT).toMatch(/safeReadStorage/);
+    expect(COMPONENT).toMatch(/safeWriteStorage/);
+  });
 });
 
 // Lightweight wiring sanity: the presenter renders within a Card-like
@@ -178,3 +194,158 @@ describe("DiaryTimelineCategorySections — wrapper integration shape", () => {
     expect(region).toBeInTheDocument();
   });
 });
+
+// --- Controls + saved state polish ---------------------------------------
+describe("DiaryTimelineCategorySections — controls + saved state", () => {
+  const STORAGE_KEY = "verdant:test:diary-category-sections:v1";
+
+  beforeEach(() => {
+    try {
+      window.localStorage.clear();
+    } catch {
+      /* ignore */
+    }
+  });
+
+  it("renders Expand all / Collapse all / Reset sections controls + summary", () => {
+    render(
+      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
+    );
+    expect(screen.getByRole("button", { name: /Expand all/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Collapse all/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Reset sections/i })).toBeInTheDocument();
+    const summary = screen.getByTestId(
+      "diary-timeline-category-sections-summary",
+    );
+    expect(summary.getAttribute("data-total")).toBe(String(items.length));
+    expect(summary.getAttribute("data-non-empty")).toBe("7");
+    expect(summary.textContent).toMatch(/7 entries/);
+    expect(summary.textContent).toMatch(/7 sections with entries/);
+    expect(summary.textContent).toMatch(/1 in Other diary entries/);
+  });
+
+  it("Collapse all collapses every section, Expand all re-expands every section", () => {
+    render(
+      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Collapse all/i }));
+    for (const btn of screen.getAllByTestId(
+      "diary-timeline-category-sections-section-toggle",
+    )) {
+      expect(btn.getAttribute("aria-expanded")).toBe("false");
+    }
+    fireEvent.click(screen.getByRole("button", { name: /Expand all/i }));
+    for (const btn of screen.getAllByTestId(
+      "diary-timeline-category-sections-section-toggle",
+    )) {
+      expect(btn.getAttribute("aria-expanded")).toBe("true");
+    }
+  });
+
+  it("Reset sections restores default expansion (non-empty open, empty closed)", () => {
+    render(
+      <DiaryTimelineCategorySections
+        items={[items[0]] /* only watering */}
+        renderEntry={renderEntry}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Expand all/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Reset sections/i }));
+    expect(
+      screen
+        .getByRole("button", { name: /Watering/i })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("button", { name: /Training/i })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+  });
+
+  it("persists toggles to localStorage when storageKey is provided", () => {
+    render(
+      <DiaryTimelineCategorySections
+        items={items}
+        renderEntry={renderEntry}
+        storageKey={STORAGE_KEY}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Watering/i }));
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw!);
+    expect(parsed.watering).toBe(false);
+    // Persisted blob never contains entry IDs / plant IDs / raw payload.
+    expect(raw).not.toMatch(/w1|f1|plant|tent|user|raw_payload/i);
+  });
+
+  it("reads saved state from localStorage on mount", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ watering: false, photos: false }),
+    );
+    render(
+      <DiaryTimelineCategorySections
+        items={items}
+        renderEntry={renderEntry}
+        storageKey={STORAGE_KEY}
+      />,
+    );
+    expect(
+      screen
+        .getByRole("button", { name: /Watering/i })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(
+      screen
+        .getByRole("button", { name: /Photos/i })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+    // Sections not in saved state keep defaults (Feeding has entry → open).
+    expect(
+      screen
+        .getByRole("button", { name: /Feeding/i })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+  });
+
+  it("malformed localStorage value does not crash and falls back to defaults", () => {
+    window.localStorage.setItem(STORAGE_KEY, "{not valid json");
+    expect(() =>
+      render(
+        <DiaryTimelineCategorySections
+          items={items}
+          renderEntry={renderEntry}
+          storageKey={STORAGE_KEY}
+        />,
+      ),
+    ).not.toThrow();
+    expect(
+      screen
+        .getByRole("button", { name: /Watering/i })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+  });
+
+  it("unknown saved keys are ignored", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ "totally-unknown": false, watering: false }),
+    );
+    render(
+      <DiaryTimelineCategorySections
+        items={items}
+        renderEntry={renderEntry}
+        storageKey={STORAGE_KEY}
+      />,
+    );
+    // Known key applied; unknown ignored (no crash).
+    expect(
+      screen
+        .getByRole("button", { name: /Watering/i })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+  });
+});
+

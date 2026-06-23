@@ -37,6 +37,12 @@ import {
 } from "@/lib/relativeTimelineEmptyStateRules";
 import { DiaryTimelineCategorySections } from "@/components/DiaryTimelineCategorySections";
 import { PLANT_RELATIVE_TIMELINE_SECTION_STATE_STORAGE_KEY } from "@/lib/diaryTimelineSectionStateRules";
+import { buildDiaryTimelineSections } from "@/lib/diaryTimelineSectionRules";
+import { buildDiaryTimelineEvidenceQualitySummary } from "@/lib/diaryTimelineEvidenceQualityRules";
+import {
+  buildPlantTimelinePrintSummary,
+  buildPlantTimelineReadabilitySummary,
+} from "@/lib/plantTimelineReadabilityViewModel";
 
 
 

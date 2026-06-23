@@ -373,3 +373,121 @@ describe("pickAlertsGrowContext", () => {
     expect(sel?.isFallback).toBe(true);
   });
 });
+
+describe("formatCapturedAgo", () => {
+  it("formats minute/hour/day buckets deterministically", () => {
+    expect(formatCapturedAgo(NOW - 8 * 60_000, NOW)).toBe("8 minutes ago");
+    expect(formatCapturedAgo(NOW - 1 * 60_000, NOW)).toBe("1 minute ago");
+    expect(formatCapturedAgo(NOW - 4 * 60 * 60_000, NOW)).toBe("4 hours ago");
+    expect(formatCapturedAgo(NOW - 3 * 24 * 60 * 60_000, NOW)).toBe("3 days ago");
+    expect(formatCapturedAgo(null, NOW)).toBeNull();
+  });
+});
+
+describe("buildLatestSnapshotDetail", () => {
+  const recent = new Date(NOW - 8 * 60_000).toISOString();
+  const old = new Date(NOW - 3 * 24 * 60 * 60_000).toISOString();
+
+  it("manual + fresh → eligible for persistence", () => {
+    const d = buildLatestSnapshotDetail({
+      status: "ok",
+      snapshot: snap({ source: "manual", ts: recent }),
+      now: NOW,
+    });
+    expect(d).not.toBeNull();
+    expect(d?.sourceLabel).toBe("Manual");
+    expect(d?.insideWindow).toBe(true);
+    expect(d?.canPersist).toBe(true);
+    expect(d?.detailLine).toContain("Latest snapshot: Manual");
+    expect(d?.detailLine).toContain("captured 8 minutes ago");
+    expect(d?.detailLine).toContain(FRESHNESS_WINDOW_LABEL);
+    expect(d?.detailLine).toContain("eligible for alert persistence");
+  });
+
+  it("live + fresh → eligible for persistence", () => {
+    const d = buildLatestSnapshotDetail({
+      status: "ok",
+      snapshot: snap({ source: "live", ts: recent }),
+      now: NOW,
+    });
+    expect(d?.sourceLabel).toBe("Live");
+    expect(d?.canPersist).toBe(true);
+    expect(d?.detailLine).toContain("Latest snapshot: Live");
+  });
+
+  it("manual + stale → outside window, prompts fresh manual", () => {
+    const d = buildLatestSnapshotDetail({
+      status: "ok",
+      snapshot: snap({ source: "manual", ts: old }),
+      now: NOW,
+    });
+    expect(d?.insideWindow).toBe(false);
+    expect(d?.canPersist).toBe(false);
+    expect(d?.detailLine).toContain("outside");
+    expect(d?.detailLine).toContain("Enter a fresh manual snapshot");
+  });
+
+  it.each(["csv", "diary", "sim"] as const)(
+    "%s source is context-only even when recent — never claims persistence",
+    (source) => {
+      const d = buildLatestSnapshotDetail({
+        status: "ok",
+        snapshot: snap({ source, ts: recent }),
+        now: NOW,
+      });
+      expect(d?.canPersist).toBe(false);
+      expect(d?.detailLine).toContain("context only");
+      expect(d?.detailLine).toContain("manual or live readings");
+      expect(d?.detailLine).not.toMatch(/eligible for alert persistence/);
+    },
+  );
+
+  it("returns null while loading/unavailable or when no snapshot", () => {
+    expect(
+      buildLatestSnapshotDetail({ status: "loading", snapshot: null, now: NOW }),
+    ).toBeNull();
+    expect(
+      buildLatestSnapshotDetail({ status: "ok", snapshot: null, now: NOW }),
+    ).toBeNull();
+  });
+
+  it("buildAlertsHeaderContext attaches latestDetail mirroring alertsCanPersist", () => {
+    const vm = buildAlertsHeaderContext({
+      growName: null,
+      stage: null,
+      targets: null,
+      snapshot: snap({ source: "manual", ts: recent }),
+      status: "ok",
+      now: NOW,
+    });
+    expect(vm.latestDetail?.canPersist).toBe(vm.alertsCanPersist);
+    expect(vm.latestDetail?.detailLine).toContain("Manual");
+  });
+});
+
+describe("pickAlertsGrowContext — open-alerts tiebreaker is deterministic", () => {
+  const grows = [
+    { id: "ga", name: "A", updated_at: "2026-06-22T00:00:00Z" },
+    { id: "gb", name: "B", updated_at: "2026-06-23T00:00:00Z" },
+    { id: "gc", name: "C", updated_at: "2026-06-21T00:00:00Z" },
+  ];
+  it("prefers most-recently-updated among open-alerts grows", () => {
+    const sel = pickAlertsGrowContext({
+      grows,
+      growIdsWithOpenAlerts: ["ga", "gb", "gc"],
+    });
+    expect(sel?.growId).toBe("gb");
+    expect(sel?.reason).toBe("open-alerts");
+  });
+  it("falls back to id sort when updated_at is missing", () => {
+    const bare = [
+      { id: "g2", name: null },
+      { id: "g1", name: null },
+    ];
+    const sel = pickAlertsGrowContext({
+      grows: bare,
+      growIdsWithOpenAlerts: ["g2", "g1"],
+    });
+    expect(sel?.growId).toBe("g1");
+  });
+});

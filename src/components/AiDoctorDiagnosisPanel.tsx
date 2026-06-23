@@ -186,19 +186,22 @@ export default function AiDoctorDiagnosisPanel({
     [],
   );
 
-  // Client-side PDF report download. The report is built from already-rendered
-  // evidence + recommendations — no AI/model call, no Supabase write, no edge
-  // function call, no network. We intentionally keep this path synchronous
-  // so the anchor.click() lands in the same tick as the user gesture.
-  const handleDownloadReport = useCallback(() => {
+  // PDF report download. Routed through the server-authoritative
+  // premium-export preflight (same as CSV/Package) so denial renders the
+  // paywall message instead of producing a file. The actual PDF bytes are
+  // built client-side from already-rendered evidence — no AI/model call,
+  // no Supabase write, no network beyond the entitlement preflight itself.
+  const handleDownloadReport = useCallback(async () => {
     if (!view || !reportInput) return;
-    const bytes = buildAiDoctorReportPdfBytes({
-      ...reportInput,
-      summary: reportInput.summary || view.summary,
-      recommendations: buildRecsForReport(),
+    await runGated("report", "ai_doctor_report", () => {
+      const bytes = buildAiDoctorReportPdfBytes({
+        ...reportInput,
+        summary: reportInput.summary || view.summary,
+        recommendations: buildRecsForReport(),
+      });
+      downloadAiDoctorReportPdf(bytes, "ai-doctor-report.pdf");
     });
-    downloadAiDoctorReportPdf(bytes, "ai-doctor-report.pdf");
-  }, [view, reportInput, buildRecsForReport]);
+  }, [view, reportInput, buildRecsForReport, runGated]);
 
   const handleDownloadCsv = useCallback(async () => {
     if (!view || !reportInput) return;

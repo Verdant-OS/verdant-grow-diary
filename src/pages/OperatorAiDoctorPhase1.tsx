@@ -205,7 +205,7 @@ export default function OperatorAiDoctorPhase1(
             Create a plant before reviewing AI Doctor context.
           </p>
           <Link
-            to="/plants"
+            to={plantsPath()}
             data-testid="ai-doctor-phase1-no-plants-cta"
             className="mt-2 inline-block rounded-md border border-border bg-secondary px-3 py-1 text-xs text-secondary-foreground"
           >

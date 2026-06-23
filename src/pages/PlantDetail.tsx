@@ -297,6 +297,7 @@ export default function PlantDetail() {
     return <BlockedStateView view={blockedView} onRetry={() => refetch()} />;
   }
 
+  // Renders the "Plant not found" empty state with data-source disclosure.
   if (blockedView && blockedView.kind === "not-found") {
     return (
       <div>

@@ -17,12 +17,12 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'status', 'not_found', 'reason', 'processing_row_not_found', 'processing_id', NULL, 'user_id', NULL, 'plan_id', NULL, 'subscription_status', NULL);
   END IF;
 
-  SELECT * INTO v_processing FROM public.paddle_event_processing WHERE id = p_processing_id FOR UPDATE;
+  SELECT * INTO v_processing FROM public.paddle_event_processing WHERE id = p_processing_id FOR NO KEY UPDATE;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'status', 'not_found', 'reason', 'processing_row_not_found', 'processing_id', p_processing_id, 'user_id', NULL, 'plan_id', NULL, 'subscription_status', NULL);
   END IF;
 
-  SELECT * INTO v_event FROM public.paddle_events WHERE id = v_processing.paddle_event_id FOR UPDATE;
+  SELECT * INTO v_event FROM public.paddle_events WHERE id = v_processing.paddle_event_id FOR NO KEY UPDATE;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'status', 'blocked', 'reason', 'event_missing', 'processing_id', v_processing.id, 'user_id', NULL, 'plan_id', NULL, 'subscription_status', NULL);
   END IF;
@@ -67,7 +67,7 @@ BEGIN
      AND link_status = 'linked'
      AND confidence = 'verified'
    LIMIT 1
-   FOR UPDATE;
+   FOR NO KEY UPDATE;
 
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'status', 'blocked', 'reason', 'missing_verified_customer_link', 'processing_id', v_processing.id, 'user_id', NULL, 'plan_id', v_processing.candidate_plan_id, 'subscription_status', v_processing.candidate_status);
@@ -79,13 +79,13 @@ BEGIN
      AND provider_subscription_id = v_processing.provider_subscription_id
      AND user_id <> v_link.user_id
    LIMIT 1
-   FOR UPDATE;
+   FOR NO KEY UPDATE;
 
   IF FOUND THEN
     RETURN jsonb_build_object('ok', false, 'status', 'blocked', 'reason', 'existing_provider_identifier_conflict', 'processing_id', v_processing.id, 'user_id', v_link.user_id, 'plan_id', v_processing.candidate_plan_id, 'subscription_status', v_processing.candidate_status);
   END IF;
 
-  SELECT * INTO v_existing FROM public.billing_subscriptions WHERE user_id = v_link.user_id FOR UPDATE;
+  SELECT * INTO v_existing FROM public.billing_subscriptions WHERE user_id = v_link.user_id FOR NO KEY UPDATE;
   IF FOUND THEN
     IF v_existing.plan_id = 'founder_lifetime' OR v_existing.founder_number IS NOT NULL THEN
       RETURN jsonb_build_object('ok', false, 'status', 'blocked', 'reason', 'founder_row_not_overwritten', 'processing_id', v_processing.id, 'user_id', v_link.user_id, 'plan_id', v_processing.candidate_plan_id, 'subscription_status', v_processing.candidate_status);

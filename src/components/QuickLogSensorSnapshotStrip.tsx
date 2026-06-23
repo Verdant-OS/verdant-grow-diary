@@ -137,16 +137,25 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
             </span>
           )}
 
-          {!pillIsRedundant && (
-            <span
-              data-testid="quicklog-sensor-snapshot-pill"
-              role="status"
-              aria-label={PILL_ARIA[view.status]}
-              className={`text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 ${PILL_TONE[view.status]}`}
-            >
-              {PILL_LABEL[view.status]}
-            </span>
-          )}
+          {/*
+            Canonical strip status pill: ALWAYS rendered so growers and
+            tests can read the resolver-derived status (Usable / Stale /
+            Invalid / No data) with role="status" + a deterministic
+            aria-label. `pillIsRedundant` is retained for the
+            dedupe-rule source check but no longer gates the pill —
+            suppressing the pill removed required stale/invalid
+            user-facing copy. The trust badge below is the surface that
+            yields when its label duplicates the pill.
+          */}
+          <span
+            data-testid="quicklog-sensor-snapshot-pill"
+            data-pill-redundant={pillIsRedundant ? "true" : "false"}
+            role="status"
+            aria-label={PILL_ARIA[view.status]}
+            className={`text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 ${PILL_TONE[view.status]}`}
+          >
+            {PILL_LABEL[view.status]}
+          </span>
 
           {showTrustBadge && <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />}
 

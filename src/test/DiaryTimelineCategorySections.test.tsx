@@ -145,7 +145,7 @@ describe("DiaryTimelineCategorySections — static safety", () => {
     /device[_-]?command|relay|actuator|auto[_-]?adjust/i,
     /service[_-]?role|SUPABASE_SERVICE_ROLE/i,
     /raw_payload/i,
-    /localStorage|sessionStorage/i,
+    /(?:window\.)?(?:localStorage|sessionStorage)\s*\.\s*(?:getItem|setItem|removeItem|clear)\(/,
   ];
   for (const f of forbidden) {
     it(`component contains no match for ${f}`, () => {

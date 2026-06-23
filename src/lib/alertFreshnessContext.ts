@@ -395,7 +395,12 @@ export function pickAlertsGrowContext(
   if (openAlertIds.size > 0) {
     const open = grows
       .filter((g) => openAlertIds.has(g.id))
-      .sort((a, b) => a.id.localeCompare(b.id))[0];
+      .sort((a, b) => {
+        const ta = a.updated_at ? Date.parse(a.updated_at) : NaN;
+        const tb = b.updated_at ? Date.parse(b.updated_at) : NaN;
+        if (Number.isFinite(tb) && Number.isFinite(ta) && tb !== ta) return tb - ta;
+        return a.id.localeCompare(b.id);
+      })[0];
     if (open) return toSelection(open, "open-alerts", true);
   }
 

@@ -898,26 +898,5 @@ function getSaveHelperMessage(input: {
 }
 
 function reasonToMessage(reason: string): string {
-  switch (reason) {
-    case "no_selection":
-    case "target_unresolved":
-    case "selection_not_found":
-      return "Choose a plant or tent before saving.";
-    case "invalid_volume":
-      return "Enter a watering volume greater than zero.";
-    case "humidity_out_of_range":
-      return "Humidity must be between 0 and 100.";
-    case "invalid_sensor_value":
-      return "Sensor values must be numbers.";
-    case "photo_saving_not_enabled":
-      return "Photo saving is not enabled yet.";
-    case "target_not_owned":
-    case "grow_not_owned":
-      return "You do not have access to that target.";
-    case "not_authenticated":
-      return "Sign in to log entries.";
-    case "save_failed":
-    default:
-      return "Could not save. Try again.";
-  }
+  return quickLogReasonToOperatorMessage(reason);
 }

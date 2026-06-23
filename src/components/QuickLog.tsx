@@ -554,10 +554,12 @@ export default function QuickLog({
 
       const result = await saveViaRpc(built.payload);
       if (!result.ok) {
-        const message = `Couldn't save entry: ${result.reason ?? "save_failed"}`;
-        setSaveError(`${message}. Your input is still here — retry when connection is stable.`);
+        const reason = result.reason ?? "save_failed";
+        const message = quickLogReasonToOperatorMessage(reason);
+        setSaveError(`${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`);
         toast.error(message);
-        console.error("[QuickLog] RPC save error", result);
+        // Safe diagnostic only — reason code is allow-listed, never tokens/payload.
+        console.error("[QuickLog] RPC save error", { reason });
         return;
       }
 

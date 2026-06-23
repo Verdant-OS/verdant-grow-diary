@@ -109,10 +109,10 @@ export function buildPlantTimelineReadabilitySummary(
   let filterCopy: string;
   if (isFiltered) {
     const labelPart = filterLabel.length > 0 ? `: ${filterLabel}` : "";
-    filterCopy = `Filter active${labelPart}. Showing the current view, not all time.`;
+    filterCopy = `Filter active${labelPart}. Showing the current view. Entries outside this filter may still exist.`;
     parts.push({ key: "filter-active", label: `Filter: ${filterLabel || "active"}` });
   } else {
-    filterCopy = "No filter active. Showing the current view of all logged entries.";
+    filterCopy = "No filter active. Showing the current view of logged entries.";
     parts.push({ key: "filter-cleared", label: "No filter" });
   }
 

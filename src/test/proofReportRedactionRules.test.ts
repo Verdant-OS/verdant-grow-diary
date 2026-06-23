@@ -69,8 +69,9 @@ describe("proofReportRedactionRules", () => {
 
   it("returns empty string for empty/non-string input", () => {
     expect(sanitizeProofReportMarkdown("")).toBe("");
-    // @ts-expect-error: defensive runtime check
-    expect(sanitizeProofReportMarkdown(null)).toBe("");
+    expect(
+      sanitizeProofReportMarkdown(null as unknown as string),
+    ).toBe("");
   });
 
   it("preserves benign human-readable proof prose", () => {

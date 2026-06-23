@@ -389,6 +389,8 @@ export default function OneTentLiveProof() {
 
       <OneTentLiveProofChecklist vm={vm} />
 
+      <OneTentSensorProofSection vm={sensorProofVM} />
+
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"

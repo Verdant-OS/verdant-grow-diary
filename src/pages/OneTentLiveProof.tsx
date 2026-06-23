@@ -60,6 +60,11 @@ export default function OneTentLiveProof() {
 
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const REFRESH_SECTIONS = ["snapshots", "alerts", "actions", "timeline"] as const;
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">(
+    "idle",
+  );
 
   const actionStatus = useOneTentLiveProofActionStatus(alertIds, refreshNonce);
   const timelineFollowup = useOneTentLiveProofTimelineFollowup(
@@ -69,6 +74,7 @@ export default function OneTentLiveProof() {
   );
 
   const queryClient = useQueryClient();
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     try {
@@ -77,8 +83,11 @@ export default function OneTentLiveProof() {
       reloadAlerts();
       setRefreshNonce((n) => n + 1);
     } finally {
-      // brief loading indicator; the underlying hooks debounce themselves
-      setTimeout(() => setRefreshing(false), 400);
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      refreshTimer.current = setTimeout(() => {
+        setRefreshing(false);
+        setLastRefreshedAt(new Date());
+      }, 400);
     }
   }, [queryClient, reloadAlerts]);
 

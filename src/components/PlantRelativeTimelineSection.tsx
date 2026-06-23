@@ -499,6 +499,25 @@ export default function PlantRelativeTimelineSection({
                 ))}
               </div>
             )}
+            {/* Read-only category view — groups already-visible items
+                by event category. Reuses TimelineRow so source/trust
+                labels and rendering remain consistent with the stage
+                view above. No new queries, no writes, no persistence. */}
+            <div
+              className="pt-2 border-t border-border/40"
+              data-testid="relative-timeline-category-view-wrapper"
+            >
+              <h3 className="mb-2 text-xs font-medium text-muted-foreground">
+                Category view
+              </h3>
+              <DiaryTimelineCategorySections
+                items={visibleItems}
+                ariaLabel="Plant timeline category view"
+                renderEntry={(item) => (
+                  <TimelineRow item={item} context={entryContext} />
+                )}
+              />
+            </div>
           </div>
         )}
       </CardContent>

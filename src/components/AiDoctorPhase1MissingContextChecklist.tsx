@@ -20,6 +20,7 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
 import type { AiDoctorContextPayload } from "@/lib/aiDoctorEnginePhase1Foundation";
+import { plantDetailPath } from "@/lib/routes";
 import { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } from "@/lib/aiDoctorPhase1A11yClassNames";
 
 export type AiDoctorPhase1ChecklistStatus =
@@ -95,7 +96,7 @@ export function buildAiDoctorPhase1Checklist(
   const ctx = props.context;
   const q = ctaQuery(props.ctaContext);
   const plantPath = props.ctaContext.plantId
-    ? `/plants/${encodeURIComponent(props.ctaContext.plantId)}`
+    ? plantDetailPath(props.ctaContext.plantId)
     : null;
   const addPhotoCta = plantPath
     ? { id: "add-photo", label: "Add Photo", to: `${plantPath}${q}` }

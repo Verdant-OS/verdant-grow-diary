@@ -8,6 +8,7 @@
  */
 import * as React from "react";
 import { Link } from "react-router-dom";
+import { plantDetailPath, plantsPath } from "@/lib/routes";
 
 export interface AiDoctorPhase1CtaContext {
   plantId?: string | null;
@@ -43,7 +44,7 @@ export function deriveMissingContextCtas(
   ctx: AiDoctorPhase1CtaContext,
 ): CtaSpec[] {
   const q = ctaQuery(ctx);
-  const plantPath = ctx.plantId ? `/plants/${ctx.plantId}` : "/plants";
+  const plantPath = ctx.plantId ? plantDetailPath(ctx.plantId) : plantsPath();
   const out: CtaSpec[] = [];
   const haystack = missing.join(" | ").toLowerCase();
   if (haystack.includes("photo")) {
@@ -67,7 +68,7 @@ export function deriveMissingContextCtas(
 
 function noResultCtas(ctx: AiDoctorPhase1CtaContext): CtaSpec[] {
   const q = ctaQuery(ctx);
-  const plantPath = ctx.plantId ? `/plants/${ctx.plantId}` : "/plants";
+  const plantPath = ctx.plantId ? plantDetailPath(ctx.plantId) : plantsPath();
   return [
     { id: "add-quick-log", label: "Add Quick Log", to: `${plantPath}${q}` },
     { id: "add-photo", label: "Add Photo", to: `${plantPath}${q}` },

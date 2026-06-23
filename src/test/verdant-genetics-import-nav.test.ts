@@ -1,10 +1,18 @@
 /**
- * verdant-genetics-import-nav — operator navigation discoverability.
+ * verdant-genetics-import-nav — STALE NAV GUARD (intentionally inverted).
  *
- * Static source-level checks (no Supabase, no rendering of heavy pages)
- * that the Diagnostics "Operator tools" section advertises the Genetics
- * XLSX Import route with preview-only labelling, and that the route is
- * wired in the app router.
+ * The /operator/genetics-import surface was explicitly removed (see
+ * operator-xlsx-import-routes-removed.test.ts and sidebar-no-xlsx-import.test.tsx),
+ * so the original discoverability assertions in this file are stale by design.
+ *
+ * Re-adding the genetics-import nav/route would break the "removed" guard
+ * tests above. We keep this file as an inverted guard: it now confirms the
+ * route stays absent from Diagnostics, App.tsx, and AppSidebar so accidental
+ * re-introduction is caught here too.
+ *
+ * No production code is being changed by this file — it is a tests-only
+ * reconciliation of two contradicting source-level guards. The "removed"
+ * tests are authoritative; this file follows them.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -14,32 +22,19 @@ const diagnosticsSource = readFileSync(resolve(process.cwd(), "src/pages/Diagnos
 const appSource = readFileSync(resolve(process.cwd(), "src/App.tsx"), "utf8");
 const sidebarSource = readFileSync(resolve(process.cwd(), "src/components/AppSidebar.tsx"), "utf8");
 
-describe("operator nav: Genetics XLSX Import", () => {
-  it("Diagnostics renders a card linking to /operator/genetics-import", () => {
-    expect(diagnosticsSource).toContain("Genetics XLSX Import");
-    expect(diagnosticsSource).toMatch(/to=["']\/operator\/genetics-import["']/);
-    expect(diagnosticsSource).toContain("operator-nav-genetics-import");
+describe("operator nav: Genetics XLSX Import (removed)", () => {
+  it("Diagnostics does not advertise the removed genetics-import route", () => {
+    expect(diagnosticsSource).not.toContain("/operator/genetics-import");
+    expect(diagnosticsSource).not.toContain("operator-nav-genetics-import");
   });
 
-  it("Diagnostics card carries preview-only / no-data-saved labels", () => {
-    expect(diagnosticsSource).toContain("Preview-only");
-    expect(diagnosticsSource).toContain("No data saved until confirmed");
+  it("app router does not register OperatorGeneticsImportPage", () => {
+    expect(appSource).not.toContain("OperatorGeneticsImportPage");
+    expect(appSource).not.toMatch(/path=["']\/operator\/genetics-import["']/);
   });
 
-  it("app router registers /operator/genetics-import via OperatorGeneticsImportPage", () => {
-    expect(appSource).toContain("OperatorGeneticsImportPage");
-    expect(appSource).toMatch(
-      /path=["']\/operator\/genetics-import["']\s+element=\{<OperatorGeneticsImportPage/,
-    );
-  });
-
-  it("AppSidebar exposes Genetics XLSX Import (Preview-only)", () => {
-    expect(sidebarSource).toContain("/operator/genetics-import");
-    expect(sidebarSource).toContain("Genetics XLSX Import");
-    expect(sidebarSource).toContain("Preview-only");
-  });
-
-  it("AppSidebar still includes Diagnostics-style Operator group label", () => {
-    expect(sidebarSource).toMatch(/label:\s*["']Operator["']/);
+  it("AppSidebar does not expose the removed Genetics XLSX Import entry", () => {
+    expect(sidebarSource).not.toContain("/operator/genetics-import");
+    expect(sidebarSource).not.toContain("Genetics XLSX Import");
   });
 });

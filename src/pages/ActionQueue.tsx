@@ -43,7 +43,7 @@ import {
 } from "@/lib/actionQueueEvidenceViewModel";
 import { formatLastUpdatedAgo } from "@/lib/lastUpdatedAgo";
 
-import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
+import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath, timelinePath } from "@/lib/routes";
 import ActionQueueDetailDrawer from "@/components/ActionQueueDetailDrawer";
 import ActionQueueLoadingSkeleton from "@/components/ActionQueueLoadingSkeleton";
 import ActionQueueTraceStatusAnnouncer from "@/components/ActionQueueTraceStatusAnnouncer";
@@ -1385,7 +1385,7 @@ export default function ActionQueue() {
                 </p>
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Link
-                    to="/timeline"
+                    to={timelinePath()}
                     className="text-xs text-primary hover:underline rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     data-testid="action-queue-empty-next-steps-timeline"
                   >

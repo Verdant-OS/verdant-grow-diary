@@ -416,7 +416,7 @@ export default function Sensors() {
           <header>
             <h2 className="text-sm font-semibold">Operator diagnostics — read-only</h2>
             <p className="text-[11px] text-muted-foreground">
-              Use this panel after dry-run and one webhook send. It does not start the
+              Use this panel after a dry-run and one ingest probe. It does not start the
               bridge or verify the local message broker by itself.
             </p>
           </header>

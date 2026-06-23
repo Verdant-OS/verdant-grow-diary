@@ -133,10 +133,6 @@ function ResultPanel({ result }: { result: PostGrowReflectionCandidatePasteResul
           <span className="font-medium">Issue codes: </span>
           {result.issueCodes.length > 0 ? result.issueCodes.join(", ") : "none"}
         </div>
-        <p className="text-xs text-muted-foreground">
-          <span className="font-medium">Failure reason: </span>
-          <span>{result.failureReason}</span>
-        </p>
         <EnvelopeMetadata result={result} />
         <p className="text-xs text-muted-foreground">{result.validationOptions.label}</p>
       </div>

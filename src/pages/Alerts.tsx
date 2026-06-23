@@ -114,6 +114,28 @@ export default function Alerts() {
   // Pick the most relevant grow context for the Alerts header. Prefers
   // scoped → active → first available. Keeps the header useful even on
   // unscoped /alerts visits without inventing data.
+  const [emptyStateEditorOpen, setEmptyStateEditorOpen] = useState(false);
+
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
+
+  const { status, alerts, error, reload } = useAlertsList({
+    growId: scopedGrowId ?? null,
+    status: statusFilter,
+    severity: severityFilter,
+  });
+
+  // Deterministic grow ids that currently have an open alert. Feeds the
+  // unscoped Alerts header fallback so an alerting grow is preferred over
+  // a most-recent-update tiebreaker.
+  const growIdsWithOpenAlerts = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of alerts) {
+      if (a.status === "open" && a.grow_id) set.add(a.grow_id);
+    }
+    return Array.from(set).sort();
+  }, [alerts]);
+
   const headerContext = useMemo(
     () =>
       pickAlertsGrowContext({
@@ -125,19 +147,10 @@ export default function Alerts() {
           stage: (g as { stage?: string | null }).stage ?? null,
           updated_at: (g as { updated_at?: string | null }).updated_at ?? null,
         })),
+        growIdsWithOpenAlerts,
       }),
-    [scopedGrowId, activeGrowId, grows],
+    [scopedGrowId, activeGrowId, grows, growIdsWithOpenAlerts],
   );
-  const [emptyStateEditorOpen, setEmptyStateEditorOpen] = useState(false);
-
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
-
-  const { status, alerts, error, reload } = useAlertsList({
-    growId: scopedGrowId ?? null,
-    status: statusFilter,
-    severity: severityFilter,
-  });
 
   const grouped = useMemo(() => {
     return {

@@ -56,6 +56,7 @@ import {
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
+import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
 import { buildQuickLogDraftPreview } from "@/lib/quickLogDraftPreviewViewModel";
 import { plantDetailPath } from "@/lib/routes";

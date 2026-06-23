@@ -16,7 +16,7 @@ import { useGrowTents } from "@/hooks/useGrowData";
 import { useGrowTargets } from "@/hooks/useGrowTargets";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildAlertsHeaderContext } from "@/lib/alertFreshnessContext";
-import { loadTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
   growId: string;
@@ -38,7 +38,7 @@ export default function AlertsContextHeaderForGrow({
   const tentIds = tents.map((t) => t.id);
   const sensorState = useLatestSensorSnapshot(growId, tentIds);
   const targetsState = useGrowTargets(growId);
-  const tempUnit = loadTemperatureUnitPreference();
+  const tempUnit = useTemperatureUnitPreference();
 
   const vm = useMemo(
     () =>

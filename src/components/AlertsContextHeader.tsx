@@ -132,6 +132,17 @@ export default function AlertsContextHeader({
           </span>
         </p>
       ) : null}
+      {vm.latestDetail ? (
+        <p
+          className="text-[11px] text-muted-foreground"
+          data-testid={`${testId}-latest-detail`}
+          data-source={vm.latestSource ?? ""}
+          data-inside-window={vm.latestDetail.insideWindow ? "true" : "false"}
+          data-can-persist={vm.latestDetail.canPersist ? "true" : "false"}
+        >
+          {vm.latestDetail.detailLine}
+        </p>
+      ) : null}
       {growId ? (
         <GrowTargetsEditor
           open={editorOpen}

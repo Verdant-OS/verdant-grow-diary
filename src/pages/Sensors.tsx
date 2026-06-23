@@ -42,6 +42,8 @@ import { buildSoilMoistureReadingViewModel } from "@/lib/soilMoistureReadingView
 import EcowittBridgeTroubleshootingPanel from "@/components/EcowittBridgeTroubleshootingPanel";
 import SensorIngestAuditReport from "@/components/SensorIngestAuditReport";
 import { mapReadingsToOperatorAuditRows } from "@/lib/sensorsOperatorDiagnosticsViewModel";
+import { EcowittLiveProofPanel } from "@/components/EcowittLiveProofPanel";
+import type { EcowittProofRow } from "@/lib/ecowittLiveProofRules";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },

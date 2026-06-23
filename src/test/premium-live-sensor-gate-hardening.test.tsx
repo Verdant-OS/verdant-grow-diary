@@ -183,20 +183,6 @@ describe("docs/paid-launch-entitlement-blocker.md — usage snippet", () => {
 
 // --- Static safety: no current free sensor surface was wrapped -----------
 
-function walkSrc(dir: string, out: string[] = []): string[] {
-  if (!existsSync(dir)) return out;
-  for (const name of readdirSync(dir)) {
-    const p = join(dir, name);
-    const st = statSync(p);
-    if (st.isDirectory()) {
-      if (name === "__snapshots__" || name === "node_modules") continue;
-      walkSrc(p, out);
-    } else if (/\.(ts|tsx)$/.test(name)) {
-      out.push(p);
-    }
-  }
-  return out;
-}
 
 describe("PremiumLiveSensorGate — no current free sensor surface is wrapped", () => {
   it("only the component file itself, its tests, and docs reference PremiumLiveSensorGate", () => {

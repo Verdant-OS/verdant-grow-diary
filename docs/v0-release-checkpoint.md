@@ -795,3 +795,92 @@ e2e/demo-proof-walkthrough-readonly.spec.ts` to execute.
 - Revert the keyword/regex expansion and `AUTH_HEADER_RE` in
   `src/lib/proofReportRedactionRules.ts`.
 - Remove this section (16) from `docs/v0-release-checkpoint.md`.
+
+---
+
+## 17. CI Chromium runtime + Demo Proof E2E artifacts
+
+Workflow/harness only. No product surface change.
+
+### Chromium install added to CI
+
+New workflow `.github/workflows/demo-proof-walkthrough-readonly.yml`:
+
+- Triggers on `pull_request` to `main` / `verdant-grow-diary` when the
+  walkthrough, view model, redaction rules, related tests, the
+  Playwright config, or this workflow change. Also runs via
+  `workflow_dispatch`.
+- Caches Bun packages and `~/.cache/ms-playwright`.
+- Installs Chromium with OS deps:
+  `bunx playwright install chromium --with-deps` (matches the existing
+  `auth-loading-smoke` workflow pattern).
+
+### CI commands run
+
+1. `bun run test:demo-proof-guards`
+2. `bunx vitest run proofReportRedactionRules DemoProofWalkthrough
+   demoProofWalkthrough --reporter=verbose`
+3. `bunx tsc -p tsconfig.app.json --noEmit`
+4. `bun run test:e2e:demo-proof-readonly` →
+   `playwright test e2e/demo-proof-walkthrough-readonly.spec.ts
+   --project=chromium-mocked`
+
+Steps 1–2 tee their output into `e2e/results/*.log` for artifact
+upload. Step 4 uses the existing `chromium-mocked` Playwright project
+backed by the local Vite dev server defined in `playwright.config.ts`.
+
+### Artifacts uploaded (always)
+
+- `demo-proof-guards` → `e2e/results/demo-proof-guards.log`
+- `demo-proof-vitest` → `e2e/results/demo-proof-vitest.log`
+- `demo-proof-playwright-report` → `playwright-report/`
+- `demo-proof-playwright-results` → `test-results/` (traces,
+  screenshots, videos only when Playwright config generates them on
+  failure)
+
+Retention: 14 days. `if-no-files-found: ignore` so successful runs
+without traces do not fail the upload step.
+
+### E2E no-write contract preserved
+
+`e2e/demo-proof-walkthrough-readonly.spec.ts` still fails on:
+- any Edge Function call (`/functions/v1/...`)
+- known AI provider hosts (OpenAI, Anthropic, Google Generative
+  Language, Lovable AI gateway)
+- Supabase mutations to `grow_events`, `diary_entries`,
+  `action_queue`, `alerts`, `ai_*`
+- RPCs matching `quicklog_save` / alert / action / AI patterns
+- any non-GET `/rest/v1/...` or `/rpc/...` (except auth session
+  refresh)
+
+The E2E is blocking (not marked continue-on-error).
+
+### Local reproduction
+
+```
+npx playwright install chromium
+npm run test:e2e:demo-proof-readonly
+```
+
+### Validation result
+
+- `npm run test:demo-proof-guards` — 4 files / 62 passed.
+- Targeted vitest — 9 files / 90 passed.
+- `tsc -p tsconfig.app.json --noEmit` — clean.
+- Playwright spec — runtime unavailable in sandbox (no Chromium
+  binary). Will execute on the CI runner once the workflow runs;
+  install step `bunx playwright install chromium --with-deps` is in
+  place.
+
+### Safety posture
+
+- No product code changes.
+- No schema/RLS/Edge/RPC/auth/query changes.
+- No writes, AI calls, alerts, Action Queue writes, automation, or
+  device control.
+
+### Rollback
+
+- Delete `.github/workflows/demo-proof-walkthrough-readonly.yml`.
+- Remove the `test:e2e:demo-proof-readonly` entry from `package.json`.
+- Remove this section (17) from `docs/v0-release-checkpoint.md`.

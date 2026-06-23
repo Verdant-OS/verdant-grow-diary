@@ -217,3 +217,43 @@ bunx playwright show-report demo-proof-playwright-report
 ```
 
 Use `demo-proof-playwright-results` for raw traces/videos when the HTML report points to them. The failure-only artifact will be empty/absent on green runs — that is expected.
+
+### Local helper scripts
+
+```bash
+bun run test:demo-proof:e2e            # only the read-only Playwright spec
+bun run test:demo-proof:full           # full chain; assumes Chromium installed
+bun run test:demo-proof:full:check     # full chain with Chromium precheck (prints install cmd if missing)
+bun run test:demo-proof:open-report    # open a downloaded Playwright HTML report
+```
+
+Notes:
+
+- `test:demo-proof:e2e` is an alias for `test:e2e:demo-proof-readonly`.
+- `test:demo-proof:full:check` runs `node scripts/check-demo-proof-playwright-chromium.mjs` before the E2E step. It NEVER auto-installs Chromium. On miss it prints `bunx playwright install chromium` (and `--with-deps` for Linux CI).
+- `test:demo-proof:open-report` defaults to `./demo-proof-playwright-report.zip`. Pass an explicit path to override:
+  ```bash
+  node scripts/open-demo-proof-playwright-report.mjs ./demo-proof-playwright-report.zip
+  node scripts/open-demo-proof-playwright-report.mjs ./demo-proof-playwright-report/
+  ```
+  Zips are extracted to `.artifacts/demo-proof-playwright-report/`.
+
+### Downloaded artifact file layout
+
+**`demo-proof-playwright-report`** — Playwright HTML report bundle.
+- Entry point: `index.html` (may be nested one directory deep after extraction).
+- Open with `bun run test:demo-proof:open-report` or `bunx playwright show-report <dir>`.
+
+**`demo-proof-playwright-results`** — raw results from CI's `test-results/`.
+- Expected per-test shape:
+  - `test-results/<spec-or-test-name>/trace.zip`
+  - `test-results/<spec-or-test-name>/*.webm`
+  - `test-results/<spec-or-test-name>/*.png`
+- If GitHub flattens the artifact root, search recursively:
+  ```bash
+  find . -name 'trace.zip'
+  find . -name '*.webm'
+  find . -name '*.png'
+  ```
+
+**`demo-proof-playwright-failure-artifacts`** — uploaded only on failure. Contains screenshots / videos / traces only when Playwright generated them. Absent / empty on green runs (expected).

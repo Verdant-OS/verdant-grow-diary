@@ -46,6 +46,23 @@ function formatTimestamp(iso: string | null): string {
   }
 }
 
+/**
+ * Presenter-only: clarify operator triage by distinguishing the two
+ * non-loaded states the VM already exposes — "blocked" (permission/RLS)
+ * vs "error" (network/service). Logic and statuses are unchanged.
+ */
+function detailFor(
+  vm: EcowittIngestAuditProofViewModel,
+): string {
+  if (vm.status === "blocked") {
+    return "Audit proof unavailable with current read permissions (RLS-denied).";
+  }
+  if (vm.status === "error") {
+    return "Audit proof unavailable due to a read error (network or service).";
+  }
+  return vm.detail;
+}
+
 export function EcowittIngestAuditProofPanel(
   props: EcowittIngestAuditProofPanelProps,
 ): JSX.Element {
@@ -76,8 +93,9 @@ export function EcowittIngestAuditProofPanel(
         className="mt-2 text-xs text-muted-foreground"
         data-testid="ecowitt-ingest-audit-proof-detail"
       >
-        {vm.detail}
+        {detailFor(vm)}
       </p>
+
 
       {vm.status === "loaded" ? (
         <>

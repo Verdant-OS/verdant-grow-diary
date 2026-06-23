@@ -492,3 +492,118 @@ Explicitly out of scope for that branch:
   unless explicitly approved).
 - Out of scope: writes, AI calls, alerts, Action Queue writes,
   automation, device control, raw payload exposure.
+
+---
+
+## 14. EcoWitt Ingest Audit Proof — read-only Operator Mode (completed)
+
+Read-only branch that adds ingest-audit visibility to Operator Mode,
+complementing the existing row-level live proof from
+`sensor_readings`. No schema, RLS, Edge Function, RPC, or auth changes.
+
+### 14.1 Product changes
+
+- `EcowittLiveProofPanel` remains mounted in `src/pages/Sensors.tsx`
+  inside the operator diagnostics section (gated by `?operator=1`).
+  It continues to prove row-level
+  `live_confirmed | stale | invalid | limited | no-recent` status from
+  the already-loaded `trendReadings` (`useSensorReadings`).
+- `EcowittIngestAuditProofPanel` added in the same operator diagnostics
+  section, fed by a new read-only hook
+  `useEcowittIngestAuditProofRows` that SELECTs from
+  `sensor_ingest_audit_log` with a narrow column allowlist.
+- The legacy disclaimer "Accepted/rejected ingest audit counts are not
+  shown in this view." has been removed because RLS-safe audit proof is
+  now available.
+
+### 14.2 RLS / read-access verdict
+
+- Existing policy `"Users view own ingest audit"` on
+  `public.sensor_ingest_audit_log` allows `authenticated` to
+  `SELECT` rows where `auth.uid() = user_id`. RLS-safe access
+  confirmed; no policy or schema change was required.
+- Narrow SELECT allowlist (the only columns read by the hook):
+  `source, tent_id, rows_received, rows_inserted, captured_at,
+  created_at`.
+- Private fields `user_id` and `bridge_token_id` are **not** selected
+  by the hook and **not** rendered by the panel. `raw_payload` and
+  any secrets are not part of this table; nothing of the kind is
+  surfaced.
+- Permission errors collapse to status `"blocked"` so the UI renders
+  "Audit proof unavailable with current read permissions." rather than
+  leaking PostgREST/RLS detail or implying healthy state.
+
+### 14.3 Audit proof contract
+
+Scope (all enforced in pure rules):
+
+- `source === "ecowitt"`
+- current tent only (matches `defaultManualTentId`); if missing →
+  unavailable state
+- current proof window = **last 24 hours**
+
+Counts and timestamps:
+
+- `receivedCount = Σ rows_received`
+- `insertedCount = Σ rows_inserted`
+- `rejectedCount = Σ max(0, rows_received − rows_inserted)`
+- `lastAcceptedAt = max(ts) where rows_inserted > 0`
+- `lastRejectedAt = max(ts) where rows_received > rows_inserted`
+
+Copy rules:
+
+- Always uses "current proof window" / "last 24 hours".
+- Never claims all-time, forever-live, or complete proof.
+- UI states: `loading | loaded | no_audit_rows | unavailable |
+  blocked | error`, each with calm allowlisted copy.
+
+### 14.4 Safety posture
+
+- Read-only Operator Mode diagnostics only.
+- No new schema, RLS, Edge Function, RPC, or auth changes.
+- No writes (`.insert/.update/.delete/.upsert` absent across the slice;
+  enforced by static-safety tests).
+- No AI / model calls.
+- No alerts, Action Queue writes, automation, or device control.
+- No fake live data; missing audit proof is never classified as
+  healthy.
+- No raw payload values, tokens, service role keys, bridge tokens,
+  MACs, private IDs, or environment secrets exposed.
+
+### 14.5 Validation
+
+- EcoWitt audit proof targeted suite (`ecowittIngestAuditProof`,
+  `EcowittIngestAuditProof`, `ecowittLiveProof`,
+  `SensorsEcowittLiveProofWiring`): **77 / 77 passed**.
+- Nearby sensor guards (`live-sensor-server-gate`,
+  `premium-live-sensor-gate-hardening`,
+  `manual-sensor-fahrenheit-and-refresh`,
+  `sensorMetricStateRules`, `sensorReadingNormalizationRules`):
+  **107 / 107 passed**.
+- TypeScript (`tsgo -p tsconfig.app.json --noEmit`): **clean**.
+
+### 14.6 Rollback
+
+- Remove `EcowittIngestAuditProofPanel` mount and the
+  `useEcowittIngestAuditProofRows` hook call + imports from
+  `src/pages/Sensors.tsx`.
+- (Optional) Restore the prior
+  "Accepted/rejected ingest audit counts are not shown in this view."
+  disclaimer.
+- Delete `src/lib/ecowittIngestAuditProofRules.ts`,
+  `src/hooks/useEcowittIngestAuditProofRows.ts`,
+  `src/components/EcowittIngestAuditProofPanel.tsx`.
+- Delete tests: `src/test/ecowittIngestAuditProofRules.test.ts`,
+  `src/test/EcowittIngestAuditProofPanel.test.tsx`,
+  `src/test/ecowittIngestAuditProof-static-safety.test.ts`.
+- Revert `src/test/SensorsEcowittLiveProofWiring.test.ts` to expect
+  the legacy disclaimer.
+
+### 14.7 Recommended next action
+
+- Tag this checkpoint.
+- Do **not** add more EcoWitt product surface on this branch.
+- Future branch, if needed: `ecowitt-proof-export` — read-only
+  sanitized copy / print export only. Out of scope: writes, AI,
+  alerts, Action Queue, automation, device control, raw payload
+  exposure.

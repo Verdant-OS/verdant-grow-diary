@@ -79,3 +79,50 @@ Expected CI checks:
 
 Success condition:
 The workflow completes with the Playwright E2E executed in CI, not left pending due to a missing browser runtime.
+
+This file is included in the workflow path filters for `.github/workflows/demo-proof-walkthrough-readonly.yml`.
+
+### Local prerequisites
+
+- Bun installed.
+- Repository dependencies installed: `bun install --frozen-lockfile`.
+- Playwright Chromium installed: `bunx playwright install chromium`.
+  - On Linux CI runners that need system libraries: `bunx playwright install chromium --with-deps`.
+- Local Demo Proof Walkthrough E2E command: `bun run test:e2e:demo-proof-readonly`.
+
+### Local reproduction
+
+```
+bun run test:demo-proof-guards
+bunx vitest run proofReportRedactionRules DemoProofWalkthrough demoProofWalkthrough --reporter=verbose
+bunx tsc -p tsconfig.app.json --noEmit
+bunx playwright install chromium
+bun run test:e2e:demo-proof-readonly
+```
+
+### GitHub Actions log checklist
+
+- [ ] Workflow **Demo Proof Walkthrough readonly E2E (mocked)** queues on the PR.
+- [ ] Chromium install step runs and passes.
+- [ ] `bun run test:demo-proof-guards` runs and passes.
+- [ ] Targeted vitest (`proofReportRedactionRules DemoProofWalkthrough demoProofWalkthrough`) runs and passes.
+- [ ] TypeScript (`tsc -p tsconfig.app.json --noEmit`) runs and passes.
+- [ ] Playwright E2E executes — not skipped, not pending, not browser-missing.
+- [ ] Artifacts uploaded:
+  - [ ] `demo-proof-guards`
+  - [ ] `demo-proof-vitest`
+  - [ ] `demo-proof-playwright-report`
+  - [ ] `demo-proof-playwright-results`
+  - [ ] `demo-proof-playwright-failure-artifacts` — present **only** on failure.
+
+### Rollback if the workflow does not trigger
+
+1. Confirm this PR actually changed `docs/one-tent-loop-rc-smoke-test.md`.
+2. Confirm `.github/workflows/demo-proof-walkthrough-readonly.yml` lists that exact path under `pull_request.paths`.
+3. If GitHub did not dispatch, push an empty commit:
+   ```
+   git commit --allow-empty -m "ci: retrigger demo proof workflow"
+   ```
+4. If still not triggered, revert/remove this "Demo Proof CI verification" section from `docs/one-tent-loop-rc-smoke-test.md`.
+5. No product rollback is required — this PR is docs-only.
+

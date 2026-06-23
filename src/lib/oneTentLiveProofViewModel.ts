@@ -62,15 +62,20 @@ export interface ProofSignalsInput {
   /** True when ANY open alert exists for the selected grow. Caller is
    * responsible for scoping. */
   hasMatchingOpenAlert: boolean;
-  /** True when at least one open or completed Action Queue row references
-   * any of the grow's alerts via the existing back-pointer. */
+  /** Optional id of the matching open alert. When known, enables a
+   * deep-link CTA. Not rendered as visible copy. */
+  matchingAlertId?: string | null;
+  /** True when at least one action_queue row references any of the grow's
+   * alerts via the existing back-pointer, regardless of status. */
   linkedActionExists: boolean;
+  /** Optional id of the single linked action when uniquely known. When
+   * present, enables a deep-link CTA. Not rendered as visible copy. */
+  linkedActionId?: string | null;
   /** True only when at least one linked action is in a completed
-   * terminal state. Cannot be inferred from the open-actions hook alone
-   * — pass `null` when unknown. */
+   * terminal state. `null` = unknown / not yet inferable. */
   linkedActionCompleted: boolean | null;
-  /** True when the operator has confirmed the timeline follow-up is
-   * visible. Default null = needs operator confirmation. */
+  /** True when a follow-up diary row has been inferred from existing
+   * read-only data for the completed linked action. `null` = unknown. */
   timelineFollowupConfirmed: boolean | null;
   now?: number;
 }

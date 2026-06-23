@@ -152,7 +152,7 @@ vi.mock("@/hooks/useAlertsList", () => ({
 vi.mock("@/hooks/useAlertsLinkedActionCounts", () => ({
   useAlertsLinkedActionCounts: () => new Map(),
 }));
-const actionStatusSpy = vi.fn(() => ({
+const actionStatusSpy = vi.fn((..._args: unknown[]) => ({
   linkedActionExists: true,
   linkedActionCompleted: true,
   linkedActionId: "act-7",
@@ -162,15 +162,18 @@ const actionStatusSpy = vi.fn(() => ({
 }));
 vi.mock("@/hooks/useOneTentLiveProofActionStatus", () => ({
   useOneTentLiveProofActionStatus: (ids: string[], nonce: number) =>
-    actionStatusSpy(ids as never, nonce as never) as never,
+    actionStatusSpy(ids, nonce) as never,
 }));
-const followupSpy = vi.fn(() => ({ followupConfirmed: true, loading: false }));
+const followupSpy = vi.fn((..._args: unknown[]) => ({
+  followupConfirmed: true,
+  loading: false,
+}));
 vi.mock("@/hooks/useOneTentLiveProofTimelineFollowup", () => ({
   useOneTentLiveProofTimelineFollowup: (
     g: string | null,
     a: string | null,
     n: number,
-  ) => followupSpy(g as never, a as never, n as never) as never,
+  ) => followupSpy(g, a, n) as never,
 }));
 const supabaseFromSpy = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({

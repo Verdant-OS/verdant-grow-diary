@@ -110,6 +110,7 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
     safetyNote:
       "Snapshot provenance (source, captured_at) is preserved as-is. No fake live data.",
     statusKind: "ready",
+    reviewOnlyNote: "Review only—do not submit during demo.",
   },
   {
     id: "logs-timeline",
@@ -160,6 +161,7 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
     safetyNote:
       "AI Doctor is advisory only. It does not write to Action Queue and does not control devices.",
     statusKind: "ready",
+    reviewOnlyNote: "Review only—do not run AI during demo.",
   },
   {
     id: "alerts",
@@ -172,6 +174,8 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
     href: "/alerts",
     safetyNote: "Alerts do not auto-create Action Queue items.",
     statusKind: "ready",
+    reviewOnlyNote:
+      "Review only—do not create or change alerts during demo.",
   },
   {
     id: "action-queue",
@@ -185,6 +189,8 @@ const STEPS: readonly DemoProofWalkthroughStep[] = Object.freeze([
     safetyNote:
       "No automatic execution, no device-control payloads, no auto-creation from alerts or AI.",
     statusKind: "ready",
+    reviewOnlyNote:
+      "Review only—do not approve actions during demo.",
   },
   {
     id: "one-tent-live-proof",

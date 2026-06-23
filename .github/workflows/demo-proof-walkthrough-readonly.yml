@@ -26,17 +26,27 @@ on:
       - "src/pages/DemoProofWalkthrough.tsx"
       - "src/lib/demoProofWalkthroughViewModel.ts"
       - "src/lib/proofReportRedactionRules.ts"
+      - "src/lib/appRouteManifest.ts"
+      - "src/App.tsx"
       - "src/test/demoProofWalkthrough-no-grows-route.test.ts"
       - "src/test/demoProofWalkthrough-route-snapshot.test.ts"
-      - "src/test/proofReportRedactionRules.test.ts"
-      - "src/test/proofReportRedactionRules-expanded.test.ts"
+      - "src/test/proofReportRedactionRules*.test.ts"
       - "src/test/DemoProofWalkthrough*.test.tsx"
       - "playwright.config.ts"
+      - "playwright.config.*"
       - ".github/workflows/demo-proof-walkthrough-readonly.yml"
       - "package.json"
       - "bun.lock"
       - "bun.lockb"
+      - "docs/one-tent-loop-rc-smoke-test.md"
+      - "docs/v0-release-checkpoint.md"
   workflow_dispatch:
+
+# Cancel older runs for the same PR or branch so only the latest commit
+# consumes a runner.
+concurrency:
+  group: demo-proof-walkthrough-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   demo-proof-readonly:
@@ -118,6 +128,23 @@ jobs:
           path: test-results
           retention-days: 14
           if-no-files-found: ignore
+
+      # Failure-only upload: surfaces Playwright screenshots, traces, and
+      # videos produced by `trace: retain-on-failure` / `video:
+      # retain-on-failure` in playwright.config.ts. Only runs when the
+      # job failed, so successful runs never publish raw page content.
+      - name: Upload Playwright failure artifacts (screenshots / traces / videos)
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: demo-proof-playwright-failure-artifacts
+          path: |
+            test-results/**/*.png
+            test-results/**/*.webm
+            test-results/**/trace.zip
+          retention-days: 7
+          if-no-files-found: ignore
+
 
       - name: Job summary — read-only / mocked
         if: ${{ always() }}

@@ -884,3 +884,115 @@ npm run test:e2e:demo-proof-readonly
 - Delete `.github/workflows/demo-proof-walkthrough-readonly.yml`.
 - Remove the `test:e2e:demo-proof-readonly` entry from `package.json`.
 - Remove this section (17) from `docs/v0-release-checkpoint.md`.
+
+---
+
+## 18. Demo Proof Walkthrough CI workflow polish
+
+Workflow polish only. No product / schema / RLS / Edge / RPC / auth /
+query / write / AI / alert / Action Queue / automation / device-control
+changes. E2E no-write contract unchanged.
+
+### Concurrency contract
+
+```
+concurrency:
+  group: demo-proof-walkthrough-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+```
+
+Older in-flight runs for the same PR (or branch on `workflow_dispatch`)
+are cancelled when a new commit lands.
+
+### Path filters (PR trigger)
+
+The workflow runs only when any of these paths change:
+
+- `e2e/demo-proof-walkthrough-readonly.spec.ts`
+- `src/pages/DemoProofWalkthrough.tsx`
+- `src/lib/demoProofWalkthroughViewModel.ts`
+- `src/lib/proofReportRedactionRules.ts`
+- `src/lib/appRouteManifest.ts`
+- `src/App.tsx`
+- `src/test/demoProofWalkthrough-no-grows-route.test.ts`
+- `src/test/demoProofWalkthrough-route-snapshot.test.ts`
+- `src/test/proofReportRedactionRules*.test.ts`
+- `src/test/DemoProofWalkthrough*.test.tsx`
+- `playwright.config.ts`, `playwright.config.*`
+- `.github/workflows/demo-proof-walkthrough-readonly.yml`
+- `package.json`, `bun.lock`, `bun.lockb`
+- `docs/one-tent-loop-rc-smoke-test.md`
+- `docs/v0-release-checkpoint.md`
+
+`workflow_dispatch` is preserved for manual runs.
+
+### Browser cache contract
+
+```
+- uses: actions/cache@…
+  with:
+    path: ~/.cache/ms-playwright
+    key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+    restore-keys: |
+      ${{ runner.os }}-playwright-chromium-
+```
+
+Matches the existing `auth-loading-smoke` cache pattern. Cache miss
+falls back to OS-level restore key, then to a fresh
+`bunx playwright install chromium --with-deps`. `node_modules` is not
+cached (Bun resolves from its own `~/.bun/install/cache` and the repo
+pattern does not cache `node_modules`).
+
+### Failure-only artifacts
+
+In addition to the always-on artifacts (`demo-proof-guards`,
+`demo-proof-vitest`, `demo-proof-playwright-report`,
+`demo-proof-playwright-results`), the workflow now uploads a
+failure-only artifact:
+
+- `demo-proof-playwright-failure-artifacts` — Playwright screenshots
+  (`test-results/**/*.png`), videos (`*.webm`), and traces
+  (`trace.zip`). Gated by `if: failure()`. Retention: 7 days.
+
+Successful runs never publish raw page content beyond the standard
+report/results directories.
+
+### Local reproduction commands
+
+```
+bun run test:demo-proof-guards
+bunx vitest run proofReportRedactionRules DemoProofWalkthrough demoProofWalkthrough --reporter=verbose
+bunx tsc -p tsconfig.app.json --noEmit
+bunx playwright install chromium
+bun run test:e2e:demo-proof-readonly
+```
+
+CI workflow name (GitHub Actions UI): **Demo Proof Walkthrough
+readonly E2E (mocked)**.
+
+### Artifact names (reference)
+
+| Artifact                                   | Trigger      |
+| ------------------------------------------ | ------------ |
+| `demo-proof-guards`                        | always       |
+| `demo-proof-vitest`                        | always       |
+| `demo-proof-playwright-report`             | always       |
+| `demo-proof-playwright-results`            | always       |
+| `demo-proof-playwright-failure-artifacts`  | on failure   |
+
+### Validation result
+
+- `bun run test:demo-proof-guards` — 4 files / 62 passed.
+- Targeted vitest — 9 files / 90 passed.
+- `tsc -p tsconfig.app.json --noEmit` — clean.
+- Workflow YAML parses cleanly (`yaml.safe_load` OK).
+- Playwright spec — runtime unavailable locally (no Chromium in
+  sandbox). CI install step is in place and will execute the spec on
+  the first PR matching the path filters.
+
+### Rollback
+
+- Revert the `concurrency:` block, expanded `paths:` entries, and the
+  `Upload Playwright failure artifacts` step in
+  `.github/workflows/demo-proof-walkthrough-readonly.yml`.
+- Remove section 18 from `docs/v0-release-checkpoint.md`.

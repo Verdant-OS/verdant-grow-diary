@@ -443,3 +443,64 @@ bun run test:demo-proof:review-artifacts:cleanup  # same, then conservative clea
   continues through `summarize-results` and `open-artifacts` even when no
   traces/videos/screenshots are present. Cleanup runs only with
   `--cleanup` / `--cleanup-all`.
+
+## Demo-Proof local helper self-test (synthetic artifacts)
+
+> **WARNING — synthetic artifacts validate helper behavior only.**
+> They do NOT prove the real Demo Proof Walkthrough E2E passed.
+> Use GitHub Actions artifacts (`demo-proof-playwright-report`,
+> `demo-proof-playwright-results`) for real proof. The placeholder
+> `trace.zip` is for file-discovery validation only and is not openable
+> by `playwright show-trace`.
+
+Generate a minimal synthetic report + results set, then run the local
+helpers end-to-end against it:
+
+```bash
+bun run test:demo-proof:create-synthetic-artifacts
+bun run test:demo-proof:verify-report
+bun run test:demo-proof:tree-report
+node scripts/summarize-demo-proof-playwright-results.mjs ./.artifacts/demo-proof-playwright-results
+node scripts/open-demo-proof-playwright-artifacts.mjs ./.artifacts/demo-proof-playwright-results
+```
+
+## Extract + check a downloaded report zip
+
+```bash
+# Default: ./demo-proof-playwright-report.zip
+bun run test:demo-proof:extract-check-report
+
+# Explicit zip
+node scripts/extract-and-check-demo-proof-playwright-report.mjs ./demo-proof-playwright-report.zip
+
+# Already-extracted directory
+node scripts/extract-and-check-demo-proof-playwright-report.mjs ./.artifacts/demo-proof-playwright-report
+```
+
+The script extracts the zip (using the Node-only extractor, which rejects
+unsafe paths) and runs `verify-report` + `tree-report` for a single pass/fail.
+
+## Download report + results and run review (gh)
+
+Requires `gh` installed and `gh auth status` clean.
+
+```bash
+# Latest completed run
+bun run test:demo-proof:download-review
+
+# Explicit run id
+node scripts/download-and-review-demo-proof-artifacts.mjs --run-id <run-id>
+
+# With cleanup afterward
+node scripts/download-and-review-demo-proof-artifacts.mjs --run-id <run-id> --cleanup
+```
+
+Manual equivalent (no helper):
+
+```bash
+gh run download <run-id> --name demo-proof-playwright-report --dir .artifacts/demo-proof-playwright-report
+gh run download <run-id> --name demo-proof-playwright-results --dir .artifacts/demo-proof-playwright-results
+bun run test:demo-proof:extract-check-report
+node scripts/summarize-demo-proof-playwright-results.mjs ./.artifacts/demo-proof-playwright-results
+node scripts/open-demo-proof-playwright-artifacts.mjs ./.artifacts/demo-proof-playwright-results
+```

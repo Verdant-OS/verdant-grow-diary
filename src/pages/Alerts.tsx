@@ -255,6 +255,16 @@ export default function Alerts() {
         />
       )}
 
+      {scopedGrowId ? (
+        <AlertsContextHeader
+          vm={headerVm}
+          growId={scopedGrowId}
+          freshnessArgs={headerFreshnessArgs}
+        />
+      ) : null}
+
+
+
       <div className="flex flex-wrap gap-2 mb-4">
         <Select
           value={statusFilter}

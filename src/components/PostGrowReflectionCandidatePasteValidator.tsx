@@ -232,9 +232,7 @@ export function PostGrowReflectionCandidatePasteValidator() {
           </Button>
         </div>
         <ResultPanel result={result} />
-        {(result.status === "validated" ||
-          result.status === "validation_failed" ||
-          result.status === "envelope_rejected") && (
+        {(result.status === "validated" || result.status === "envelope_rejected") && (
           <ValidationSummaryPanel summary={summary} />
         )}
         {result.status === "validated" && (

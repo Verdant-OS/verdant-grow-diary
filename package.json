@@ -19,6 +19,8 @@
     "test:demo-proof:e2e": "bun run test:e2e:demo-proof-readonly",
     "test:demo-proof:full:check": "bun run test:demo-proof-guards && bunx vitest run proofReportRedactionRules DemoProofWalkthrough demoProofWalkthrough --reporter=verbose && bunx tsc -p tsconfig.app.json --noEmit && node scripts/check-demo-proof-playwright-chromium.mjs && bun run test:e2e:demo-proof-readonly",
     "test:demo-proof:open-report": "node scripts/open-demo-proof-playwright-report.mjs",
+    "test:demo-proof:download-report": "node scripts/download-latest-demo-proof-playwright-report.mjs",
+    "test:demo-proof:summarize-results": "node scripts/summarize-demo-proof-playwright-results.mjs",
     "test:watch": "vitest",
     "prepare": "husky",
     "sb:login": "supabase login",

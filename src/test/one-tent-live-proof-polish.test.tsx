@@ -227,21 +227,19 @@ describe("OneTentLiveProof page — refresh + deep links + safety", () => {
   });
   it("step 3 deep-links to exact alert detail when known", () => {
     renderPage();
-    const link = screen
-      .getByTestId("one-tent-live-proof-step-3-cta")
-      .querySelector("a") as HTMLAnchorElement | null;
-    expect(link?.getAttribute("href")).toBe("/alerts/alert-9");
+    const el = screen.getByTestId("one-tent-live-proof-step-3-cta");
+    const href =
+      el.getAttribute("href") ?? el.querySelector("a")?.getAttribute("href");
+    expect(href).toBe("/alerts/alert-9");
   });
   it("step 4 + 5 deep-link to exact action detail when known", () => {
     renderPage();
-    const a4 = screen
-      .getByTestId("one-tent-live-proof-step-4-cta")
-      .querySelector("a") as HTMLAnchorElement | null;
-    const a5 = screen
-      .getByTestId("one-tent-live-proof-step-5-cta")
-      .querySelector("a") as HTMLAnchorElement | null;
-    expect(a4?.getAttribute("href")).toBe("/actions/act-7");
-    expect(a5?.getAttribute("href")).toBe("/actions/act-7");
+    const e4 = screen.getByTestId("one-tent-live-proof-step-4-cta");
+    const e5 = screen.getByTestId("one-tent-live-proof-step-5-cta");
+    const h4 = e4.getAttribute("href") ?? e4.querySelector("a")?.getAttribute("href");
+    const h5 = e5.getAttribute("href") ?? e5.querySelector("a")?.getAttribute("href");
+    expect(h4).toBe("/actions/act-7");
+    expect(h5).toBe("/actions/act-7");
   });
   it("does not expose internal ids in visible step labels", () => {
     renderPage();

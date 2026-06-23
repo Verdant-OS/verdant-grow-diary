@@ -153,7 +153,18 @@ export function PostGrowReflectionReviewPacketCard({ packet }: Props) {
               <Button type="button" variant="outline" size="sm" onClick={handleDownload}>
                 Download sanitized packet
               </Button>
-              {copyStatusMessage && (
+              {copyState === "unavailable" && (
+                <span
+                  className="text-xs text-muted-foreground"
+                  role="status"
+                  aria-live="polite"
+                  data-testid="copy-sanitized-review-packet-status"
+                >
+                  <span>Clipboard not available</span>
+                  <span>. Download the sanitized packet instead.</span>
+                </span>
+              )}
+              {copyState === "copied" && (
                 <span
                   className="text-xs text-muted-foreground"
                   role="status"

@@ -79,8 +79,8 @@ describe("OneTentLiveProof page", () => {
     expect(
       screen.getByTestId("one-tent-live-proof-safety-badges"),
     ).toBeInTheDocument();
-    expect(screen.getByText(/No fake live data/i)).toBeInTheDocument();
-    expect(screen.getByText(/No device control/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/No fake live data/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/No device control/i).length).toBeGreaterThan(0);
   });
 
   it("renders the proof checklist with six steps", () => {

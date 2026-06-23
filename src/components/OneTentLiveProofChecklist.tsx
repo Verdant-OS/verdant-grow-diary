@@ -55,6 +55,14 @@ function StepRow({ step }: { step: ProofStep }) {
         </span>
       </div>
       <p className="text-xs text-muted-foreground">{step.message}</p>
+      {step.missingEvidence ? (
+        <p
+          className="text-[11px] text-amber-700 dark:text-amber-300"
+          data-testid={`one-tent-live-proof-step-${step.id}-missing-evidence`}
+        >
+          {step.missingEvidence}
+        </p>
+      ) : null}
       {step.ctaHref && step.ctaLabel ? (
         <div>
           <Button

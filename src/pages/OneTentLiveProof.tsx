@@ -9,10 +9,11 @@
  * Steps that cannot be safely inferred render as
  * "Needs operator confirmation".
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import PageHeader from "@/components/PageHeader";
-import { ClipboardCheck, RefreshCw } from "lucide-react";
+import { ClipboardCheck, RefreshCw, Printer, Copy } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -23,13 +24,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import OneTentLiveProofChecklist from "@/components/OneTentLiveProofChecklist";
+import OneTentLiveProofReport from "@/components/OneTentLiveProofReport";
 import { useGrows } from "@/store/grows";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import { useOneTentLiveProofActionStatus } from "@/hooks/useOneTentLiveProofActionStatus";
 import { useOneTentLiveProofTimelineFollowup } from "@/hooks/useOneTentLiveProofTimelineFollowup";
-import { buildOneTentLiveProofViewModel } from "@/lib/oneTentLiveProofViewModel";
+import {
+  buildOneTentLiveProofViewModel,
+  buildOneTentLiveProofReport,
+} from "@/lib/oneTentLiveProofViewModel";
 
 export default function OneTentLiveProof() {
   const { grows, activeGrowId } = useGrows();
@@ -55,6 +60,11 @@ export default function OneTentLiveProof() {
 
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const REFRESH_SECTIONS = ["snapshots", "alerts", "actions", "timeline"] as const;
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">(
+    "idle",
+  );
 
   const actionStatus = useOneTentLiveProofActionStatus(alertIds, refreshNonce);
   const timelineFollowup = useOneTentLiveProofTimelineFollowup(
@@ -64,6 +74,7 @@ export default function OneTentLiveProof() {
   );
 
   const queryClient = useQueryClient();
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     try {
@@ -72,8 +83,11 @@ export default function OneTentLiveProof() {
       reloadAlerts();
       setRefreshNonce((n) => n + 1);
     } finally {
-      // brief loading indicator; the underlying hooks debounce themselves
-      setTimeout(() => setRefreshing(false), 400);
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      refreshTimer.current = setTimeout(() => {
+        setRefreshing(false);
+        setLastRefreshedAt(new Date());
+      }, 400);
     }
   }, [queryClient, reloadAlerts]);
 
@@ -114,6 +128,16 @@ export default function OneTentLiveProof() {
       timelineFollowup.followupConfirmed,
     ],
   );
+
+  const report = useMemo(
+    () =>
+      buildOneTentLiveProofReport(vm, {
+        now: lastRefreshedAt ?? new Date(),
+      }),
+    [vm, lastRefreshedAt],
+  );
+
+
 
   return (
     <div className="space-y-4">
@@ -235,13 +259,100 @@ export default function OneTentLiveProof() {
           />
           {refreshing ? "Refreshing…" : "Refresh proof status"}
         </Button>
-        <span className="text-[11px] text-muted-foreground">
-          Use after saving a snapshot, adding an alert to Action Queue,
-          completing an action, or checking Timeline.
-        </span>
+        {refreshing ? (
+          <span
+            className="text-[11px] text-muted-foreground"
+            data-testid="one-tent-live-proof-refresh-sections"
+          >
+            Refreshing: {REFRESH_SECTIONS.join(", ")}…
+          </span>
+        ) : lastRefreshedAt ? (
+          <span
+            className="text-[11px] text-muted-foreground"
+            data-testid="one-tent-live-proof-refresh-timestamp"
+          >
+            Last refreshed{" "}
+            {lastRefreshedAt.toLocaleTimeString([], {
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+          </span>
+        ) : (
+          <span className="text-[11px] text-muted-foreground">
+            Use after saving a snapshot, adding an alert to Action Queue,
+            completing an action, or checking Timeline.
+          </span>
+        )}
       </div>
 
+      <section
+        aria-label="Proof shortcuts"
+        className="flex flex-wrap gap-2"
+        data-testid="one-tent-live-proof-shortcuts"
+      >
+        {vm.shortcutLinks.map((s) => (
+          <Button
+            key={s.id}
+            asChild
+            size="sm"
+            variant="outline"
+            data-testid={`one-tent-live-proof-shortcut-${s.id}`}
+            data-exact={s.exact ? "true" : "false"}
+          >
+            <Link to={s.href}>{s.label}</Link>
+          </Button>
+        ))}
+      </section>
+
       <OneTentLiveProofChecklist vm={vm} />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            if (typeof window !== "undefined") window.print();
+          }}
+          data-testid="one-tent-live-proof-print"
+          aria-label="Print or save proof report"
+        >
+          <Printer className="h-3.5 w-3.5 mr-1.5" aria-hidden />
+          Print / Save proof report
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          data-testid="one-tent-live-proof-copy-summary"
+          aria-label="Copy proof summary"
+          onClick={async () => {
+            try {
+              const text = report.markdown;
+              if (
+                typeof navigator !== "undefined" &&
+                navigator.clipboard?.writeText
+              ) {
+                await navigator.clipboard.writeText(text);
+                setCopyStatus("copied");
+              } else {
+                setCopyStatus("error");
+              }
+            } catch {
+              setCopyStatus("error");
+            } finally {
+              setTimeout(() => setCopyStatus("idle"), 1500);
+            }
+          }}
+        >
+          <Copy className="h-3.5 w-3.5 mr-1.5" aria-hidden />
+          {copyStatus === "copied"
+            ? "Copied"
+            : copyStatus === "error"
+              ? "Copy failed"
+              : "Copy proof summary"}
+        </Button>
+      </div>
+
+      <OneTentLiveProofReport report={report} />
 
       <p
         className="text-[11px] text-muted-foreground"

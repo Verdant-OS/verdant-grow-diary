@@ -68,7 +68,8 @@ function printTree(dir, depth, prefix) {
     const isLast = i === entries.length - 1;
     const branch = isLast ? "└─ " : "├─ ";
     const full = join(dir, e.name);
-    const isIndex = e.isFile() && e.name === "index.html" && indexHtml && resolve(full) === resolve(indexHtml);
+    const isIndex =
+      e.isFile() && e.name === "index.html" && indexHtml && resolve(full) === resolve(indexHtml);
     const marker = isIndex ? "   ← index.html" : "";
     const suffix = e.isDirectory() ? "/" : "";
     console.log(`${prefix}${branch}${e.name}${suffix}${marker}`);
@@ -92,7 +93,13 @@ const checks = [];
 checks.push({ name: "report root exists and is directory", ok: true });
 checks.push({ name: "index.html present (recursive)", ok: Boolean(indexHtml) });
 
-// At least one non-index.html supporting file anywhere under target.
+// Optional warnings — common Playwright report dirs (do not fail).
+// Note: for small/single-test suites Playwright may produce a self-contained
+// index.html with no separate assets (data/, assets/, trace/) — that is a
+// valid complete report, not an incomplete one.
+const optional = ["data", "assets", "trace"];
+const warnings = [];
+
 function hasSupportFile(dir) {
   let entries;
   try {
@@ -107,14 +114,11 @@ function hasSupportFile(dir) {
   }
   return false;
 }
-checks.push({
-  name: "at least one supporting file besides index.html",
-  ok: hasSupportFile(target),
-});
-
-// Optional warnings — common Playwright report dirs (do not fail).
-const optional = ["data", "assets", "trace"];
-const warnings = [];
+if (!hasSupportFile(target)) {
+  warnings.push(
+    "no supporting files beside index.html — self-contained single-file report (normal for small suites)",
+  );
+}
 for (const name of optional) {
   if (!existsSync(join(target, name))) warnings.push(`optional: ${name}/ not found`);
 }
@@ -138,5 +142,7 @@ if (failed.length > 0) {
 }
 
 console.log("");
-console.log(`Open with: bun run test:demo-proof:open-report ${relative(process.cwd(), target) || target}`);
+console.log(
+  `Open with: bun run test:demo-proof:open-report ${relative(process.cwd(), target) || target}`,
+);
 process.exit(0);

@@ -4,13 +4,15 @@
  *
  * Hard constraints:
  *  - SELECT only. No insert/update/delete/upsert.
- *  - Narrow column allowlist: source, tent_id, rows_received,
- *    rows_inserted, captured_at, created_at. Never selects user_id,
- *    bridge_token_id, or any private/raw-payload field.
- *  - RLS-scoped to auth.uid() by existing policy
+ *  - Narrow column allowlist: source, tent identifier, rows_received,
+ *    rows_inserted, captured_at, created_at. Never selects the owning
+ *    auth identifier, bridge token identifier, or any private/raw-payload
+ *    field.
+ *  - RLS-scoped to the authenticated caller by existing policy
  *    ("Users view own ingest audit"). Permission errors collapse to
  *    "blocked" so the UI can render the unavailable copy.
  */
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {

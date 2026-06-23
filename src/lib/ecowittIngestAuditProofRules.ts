@@ -27,7 +27,7 @@ export type EcowittIngestAuditProofTone = "ok" | "warn" | "neutral";
 
 /**
  * Narrow input row shape — only the audit-counts columns are consumed.
- * Private identifiers (user_id, bridge_token_id) are intentionally NOT
+ * Private identifiers (owning auth id, bridge token id) are intentionally NOT
  * part of this shape so they cannot accidentally flow into rendering.
  */
 export interface EcowittIngestAuditProofRow {

@@ -109,6 +109,39 @@ export default function Alerts() {
     grows.map((g) => [g.id, (g as { stage?: string | null }).stage ?? null]),
   );
 
+  // Operator-context header data — only when scoped to a single grow.
+  const headerGrowId = scopedGrowId ?? null;
+  const { data: headerTents = [] } = useGrowTents(headerGrowId ?? undefined);
+  const headerTentIds = headerTents.map((t) => t.id);
+  const headerSensor = useLatestSensorSnapshot(headerGrowId, headerTentIds);
+  const headerTargets = useGrowTargets(headerGrowId);
+  const headerStage = headerGrowId ? stageByGrow.get(headerGrowId) ?? null : null;
+  const headerVm = useMemo(
+    () =>
+      buildAlertsHeaderContext({
+        growName: scopedGrowName ?? null,
+        stage: headerStage,
+        targets:
+          headerTargets.status === "ok" ? headerTargets.targets : null,
+        snapshot:
+          headerSensor.status === "ok" ? headerSensor.snapshot : null,
+        status: headerSensor.status,
+      }),
+    [
+      scopedGrowName,
+      headerStage,
+      headerTargets.status,
+      headerTargets.targets,
+      headerSensor.status,
+      headerSensor.snapshot,
+    ],
+  );
+  const headerFreshnessArgs = {
+    snapshot: headerSensor.status === "ok" ? headerSensor.snapshot : null,
+    status: headerSensor.status,
+  } as const;
+
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
 

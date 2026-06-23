@@ -201,10 +201,6 @@ const App = () => (
                   element={<AiDoctorPhase1Preview />}
                 />
                 <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
-                <Route
-                  path="/internal/demo-proof-walkthrough"
-                  element={<DemoProofWalkthrough />}
-                />
                 <Route path="/internal/sensor-truth-audit" element={<SensorTruthAudit />} />
                 <Route
                   path="/internal/ai-doctor-confidence-audit"

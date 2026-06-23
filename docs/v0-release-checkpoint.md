@@ -397,3 +397,98 @@ Explicitly out of scope for that branch:
 - No Action Queue writes.
 - No automation or device control.
 - No Fast Add presets.
+
+---
+
+## 13. EcoWitt Live Proof Gate (foundation + operator wiring)
+
+### 13.1 Product changes
+
+- `EcowittLiveProofPanel` implemented as a read-only presenter.
+- Pure rules (`src/lib/ecowittLiveProofRules.ts`) and view model
+  (`src/lib/ecowittLiveProofViewModel.ts`) implemented.
+- Panel mounted in `src/pages/Sensors.tsx` inside the existing operator
+  diagnostics section, gated by `?operator=1`.
+- Wiring uses the already-loaded `trendReadings` from
+  `useSensorReadings(defaultManualTentId, 60)` — no new Supabase query
+  was added.
+- `sensor_ingest_audit_log` is **not** queried by this surface.
+
+### 13.2 Proof contract
+
+- Classifies the currently loaded sensor rows into:
+  `live_confirmed | stale | invalid | limited | unknown | not_ecowitt`
+  (plus a calm "no recent EcoWitt readings" empty state).
+- Uses the canonical `STALE_THRESHOLD_MS` from
+  `src/lib/sensorReadingNormalizationRules.ts` (no duplicated threshold).
+- Reuses existing sensor-truth validators: `validateHumidity`,
+  `validatePh`, `validateTempC`, `validateEcWithUnit`, and the optional
+  metric bounds from `src/lib/sensorMetricStateRules.ts`.
+- Source/provider contract:
+  - canonical `source === "live"` **with** EcoWitt vendor lineage
+    (`raw_payload.vendor` / `metadata.transport_source` / etc.) →
+    eligible for live confirmation.
+  - legacy `source === "ecowitt"` → eligible for live confirmation;
+    explicitly labeled "EcoWitt bridge source (legacy)" in copy.
+  - `demo | manual | csv | stale | invalid` → never promoted to live.
+- Invalid/suspicious readings (humidity stuck at 0/100, pH out of range,
+  EC µS/mS mismatch, temp out of range, CO₂/PPFD/soil out of bounds,
+  missing or future timestamps, stuck-at-bound soil moisture across 3+
+  rows) → never promoted to live.
+
+### 13.3 UI limitations shown in the view
+
+- "Accepted/rejected ingest audit counts are not shown in this view." —
+  prevents the panel from being mistaken for a complete ingest-audit proof.
+- Global tent-mismatch proof is limited because only the current tent's
+  rows are loaded on this surface.
+- This is row-level live proof from currently loaded sensor rows, **not**
+  a complete ingest-audit proof.
+
+### 13.4 Safety posture
+
+- Read-only operator diagnostics only.
+- No schema / RLS / Edge Function / auth changes.
+- No new queries added.
+- No writes.
+- No AI / model calls.
+- No alerts.
+- No Action Queue writes.
+- No automation or device control.
+- No fake live data.
+- No raw payload values, bridge tokens, service-role keys, MACs, or
+  private IDs exposed.
+
+### 13.5 Validation
+
+- EcoWitt proof targeted suite: **6 files / 108 passed**
+  (`ecowittLiveProof`, `EcowittLiveProof`, `SensorsEcowittLiveProofWiring`,
+  `sensorMetricStateRules`, `sensorReadingNormalizationRules`).
+- TypeScript clean (`npx tsc -p tsconfig.app.json --noEmit`, exit 0).
+
+### 13.6 Rollback
+
+- Remove the EcoWitt panel wiring from `src/pages/Sensors.tsx`:
+  delete the two new imports (`EcowittLiveProofPanel`, `EcowittProofRow`)
+  and the `<div data-testid="sensors-ecowitt-live-proof-wiring">…</div>`
+  block appended after `<SensorIngestAuditReport />` in the operator
+  diagnostics section.
+- If rolling back the full feature, also delete:
+  - `src/lib/ecowittLiveProofRules.ts`
+  - `src/lib/ecowittLiveProofViewModel.ts`
+  - `src/components/EcowittLiveProofPanel.tsx`
+  - `src/test/ecowittLiveProofRules.test.ts`
+  - `src/test/ecowittLiveProofViewModel.test.ts`
+  - `src/test/EcowittLiveProofPanel.test.tsx`
+  - `src/test/ecowittLiveProof-static-safety.test.ts`
+  - `src/test/SensorsEcowittLiveProofWiring.test.ts`
+
+### 13.7 Recommended next branch
+
+`ecowitt-ingest-audit-proof`
+
+- Add RLS-safe, read-only ingest audit visibility **only if** the
+  existing data model supports it (no schema / RLS / Edge / auth changes
+  unless explicitly approved).
+- Out of scope: writes, AI calls, alerts, Action Queue writes,
+  automation, device control, raw payload exposure.

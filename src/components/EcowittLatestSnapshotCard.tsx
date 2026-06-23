@@ -23,12 +23,27 @@ import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadg
 import { buildEcowittAuditHref } from "@/lib/ecowittAuditTentSelectionRules";
 import { Link } from "react-router-dom";
 
+/**
+ * Controls whether the audit deep-link includes the tent id in the href.
+ *
+ *  - "dashboard" (default, safe): renders the bare /sensors/ecowitt-audit
+ *    path. The Dashboard/Tent Card surface MUST NOT leak raw tent UUIDs
+ *    into the DOM. The audit page handles tent selection on its own.
+ *  - "tent-detail": opt-in scoped deep-link. Only used from the Tent
+ *    Detail page, where the user is already inside a specific tent and
+ *    the URL already exposes that tent id, so embedding it in the audit
+ *    link is no additional leakage.
+ */
+export type EcowittAuditHrefMode = "dashboard" | "tent-detail";
+
 export interface EcowittLatestSnapshotCardProps
   extends UseEcowittLatestSnapshotInput {
   /** Card heading; defaults to "Latest EcoWitt Reading". */
   title?: string;
   /** Tent name to display in the card header. */
   tentName?: string | null;
+  /** Audit link scoping mode. Defaults to the safe "dashboard" mode. */
+  auditHrefMode?: EcowittAuditHrefMode;
 }
 
 function formatNumber(v: number | null | undefined, digits = 1): string {

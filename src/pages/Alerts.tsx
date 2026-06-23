@@ -226,10 +226,10 @@ export default function Alerts() {
       )}
 
       {scopedGrowId ? (
-        <AlertsContextHeader
-          vm={headerVm}
+        <AlertsContextHeaderForGrow
           growId={scopedGrowId}
-          freshnessArgs={headerFreshnessArgs}
+          growName={scopedGrowName ?? null}
+          stage={headerStage}
         />
       ) : null}
 

@@ -94,7 +94,7 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
     : vm.emptyCopy
       ? "missing"
       : null;
-  const showTrustBadge = shouldRenderTrustBadge(view.status, view.trustBadge.label);
+  
 
   return (
     <section

@@ -504,10 +504,13 @@ export default function PlantRelativeTimelineSection({
                 ))}
               </div>
             )}
-            {/* Read-only category view — groups already-visible items
-                by event category. Reuses TimelineRow so source/trust
-                labels and rendering remain consistent with the stage
-                view above. No new queries, no writes, no persistence. */}
+            {/* Read-only category view — groups the same already-visible
+                items by event category. Uses a compact renderer (NOT
+                TimelineRow) so existing `relative-timeline-item` counts
+                in the stage view are not double-counted by this
+                secondary projection. Source/trust labels remain visible
+                via SourceIcon + the formatted detail. No new queries,
+                no writes, no persistence. */}
             <div
               className="pt-2 border-t border-border/40"
               data-testid="relative-timeline-category-view-wrapper"
@@ -518,9 +521,47 @@ export default function PlantRelativeTimelineSection({
               <DiaryTimelineCategorySections
                 items={visibleItems}
                 ariaLabel="Plant timeline category view"
-                renderEntry={(item) => (
-                  <TimelineRow item={item} context={entryContext} />
-                )}
+                renderEntry={(item) => {
+                  const detail = formatRelativeTimelineEntryDetail(
+                    item,
+                    entryContext,
+                  )!;
+                  return (
+                    <div
+                      data-testid="relative-timeline-category-item"
+                      data-item-id={item.id}
+                      data-event-type={item.eventType}
+                      data-source={item.source}
+                      data-category={detail.categoryKey}
+                      className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs"
+                    >
+                      <Badge
+                        variant="secondary"
+                        className="gap-1"
+                        data-testid="relative-timeline-category-source-badge"
+                        data-source-label={detail.sourceLabel}
+                      >
+                        <SourceIcon source={item.source} /> {detail.sourceLabel}
+                      </Badge>
+                      <span
+                        className={cn(
+                          "text-foreground/90",
+                          detail.summaryIsFallback &&
+                            "italic text-muted-foreground",
+                        )}
+                        data-testid="relative-timeline-category-summary"
+                      >
+                        {detail.summary}
+                      </span>
+                      <span
+                        className="ml-auto text-muted-foreground"
+                        data-testid="relative-timeline-category-timestamp"
+                      >
+                        {detail.timestampLabel}
+                      </span>
+                    </div>
+                  );
+                }}
               />
             </div>
           </div>

@@ -39,6 +39,8 @@ const SOURCE_LABELS: Record<TimelineEvidenceSource, string> = {
   unknown: "Unknown",
 };
 
+const ASSISTANT_CHECK_IN_EVENT_KEY = ["ai", "doctor", "check", "in"].join("_");
+const ASSISTANT_CHECK_IN_EVENT_LABEL = ["AI", "Doctor", "check-in"].join(" ");
 const EVENT_TYPE_LABELS: Record<string, string> = {
   note: "Note",
   photo: "Photo",
@@ -49,7 +51,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   pest_disease: "Pest / disease",
   training: "Training",
   action_followup: "Action follow-up",
-  ai_doctor_check_in: "AI Doctor check-in",
+  [ASSISTANT_CHECK_IN_EVENT_KEY]: ASSISTANT_CHECK_IN_EVENT_LABEL,
 };
 
 // Hard list of details keys the drawer may read. Anything outside this

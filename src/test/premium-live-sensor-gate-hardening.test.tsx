@@ -207,7 +207,7 @@ describe("PremiumLiveSensorGate — no current free sensor surface is wrapped", 
       resolve(ROOT, "src/test/live-sensor-server-gate.test.ts"),
     ]);
     const offenders: string[] = [];
-    for (const f of walkSrc(resolve(ROOT, "src"))) {
+    for (const f of getCachedTsFiles(resolve(ROOT, "src"))) {
       if (allowed.has(f)) continue;
       if (/PremiumLiveSensorGate/.test(readFileSync(f, "utf8"))) {
         offenders.push(f);

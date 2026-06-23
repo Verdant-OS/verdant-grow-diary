@@ -69,6 +69,7 @@ import OperatorPostGrowReflectionDryRun from "./pages/OperatorPostGrowReflection
 import CustomerModeGuide from "./pages/CustomerModeGuide";
 import { OperatorAiDoctorPhase1Page } from "./pages/OperatorAiDoctorPhase1";
 import OneTentLiveProof from "./pages/OneTentLiveProof";
+import DemoProofWalkthrough from "./pages/DemoProofWalkthrough";
 
 const queryClient = new QueryClient();
 
@@ -200,6 +201,10 @@ const App = () => (
                   element={<AiDoctorPhase1Preview />}
                 />
                 <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
+                <Route
+                  path="/internal/demo-proof-walkthrough"
+                  element={<DemoProofWalkthrough />}
+                />
                 <Route path="/internal/sensor-truth-audit" element={<SensorTruthAudit />} />
                 <Route
                   path="/internal/ai-doctor-confidence-audit"

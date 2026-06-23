@@ -68,6 +68,7 @@ import OperatorGgsRealPayloadIngest from "./pages/OperatorGgsRealPayloadIngest";
 import OperatorPostGrowReflectionDryRun from "./pages/OperatorPostGrowReflectionDryRun";
 import CustomerModeGuide from "./pages/CustomerModeGuide";
 import { OperatorAiDoctorPhase1Page } from "./pages/OperatorAiDoctorPhase1";
+import OneTentLiveProof from "./pages/OneTentLiveProof";
 
 const queryClient = new QueryClient();
 
@@ -170,6 +171,8 @@ const App = () => (
                   element={<OperatorBillingEntitlementResolutionAudit />}
                 />
                 <Route path="/operator/one-tent-proof-record" element={<OneTentProofRecord />} />
+                <Route path="/demo/one-tent-live-proof" element={<OneTentLiveProof />} />
+                <Route path="/operator/one-tent-live-proof" element={<OneTentLiveProof />} />
                 <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />
                 <Route path="/operator/ecowitt-bridge-debug" element={<EcowittBridgeDebug />} />
                 <Route path="/operator/ecowitt-live-bringup" element={<EcowittLiveBringup />} />

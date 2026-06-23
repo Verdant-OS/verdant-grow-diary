@@ -240,6 +240,26 @@ export default function Diagnostics() {
             </Button>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="space-y-2 pb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">One-Tent Live Proof</CardTitle>
+              <Badge variant="outline">Operator</Badge>
+              <Badge variant="secondary">Guided demo</Badge>
+              <Badge variant="outline">Read-only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>
+              Guided run sheet: Manual Snapshot → Alert → Action Queue → Completed
+              Follow-up → Timeline. No fake live data, no auto-actions, no device
+              control.
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/demo/one-tent-live-proof">Open proof path</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </section>
 
       <section aria-labelledby="internal-previews-heading" className="space-y-3">

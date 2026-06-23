@@ -537,16 +537,18 @@ describe("PlantRelativeTimelineSection — render", () => {
     const { container } = render(
       <PlantRelativeTimelineSection plantId={PLANT} plantStartedAt={PLANT_STARTED} />,
     );
-    // Filter chips are allowed (read-only radios). Category-view
-    // collapse/expand toggles are also read-only and are exempted from
-    // the role=radio check; the text-content guard below still applies
-    // to them so no mutating control can sneak in.
+    // Filter chips are allowed (read-only radios). The category view's
+    // read-only controls (collapse/expand toggles, Expand all / Collapse
+    // all / Reset sections) are also non-mutating; any button inside
+    // the category-view subtree is exempted from the role=radio check.
+    // The text-content guard below still applies to every button so no
+    // mutating control can sneak in.
     const buttons = Array.from(container.querySelectorAll("button"));
     for (const b of buttons) {
-      const isCategoryToggle =
-        b.getAttribute("data-testid") ===
-        "diary-timeline-category-sections-section-toggle";
-      if (!isCategoryToggle) {
+      const isCategoryViewControl = !!b.closest(
+        '[data-testid="diary-timeline-category-sections"]',
+      );
+      if (!isCategoryViewControl) {
         expect(b.getAttribute("role")).toBe("radio");
       }
       expect(b.textContent ?? "").not.toMatch(/create|add|edit|delete|move|drag/i);

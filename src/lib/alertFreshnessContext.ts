@@ -136,6 +136,19 @@ export interface AlertsHeaderRange {
   unit: string;
 }
 
+export interface LatestSnapshotDetail {
+  /** Capitalized operator-facing source label: Manual / Live / CSV /
+   * Diary / Simulated / Unknown. Never claims persistence. */
+  sourceLabel: string;
+  /** Pure relative-time string, e.g. "8 minutes ago" or "3 days ago".
+   * Null when no usable timestamp. */
+  capturedAgoText: string | null;
+  insideWindow: boolean;
+  canPersist: boolean;
+  /** Prepared one-line operator-facing sentence — safe to render. */
+  detailLine: string;
+}
+
 export interface AlertsHeaderContextViewModel {
   growName: string | null;
   stageLabel: string | null;
@@ -151,6 +164,9 @@ export interface AlertsHeaderContextViewModel {
    * the alert pipeline uses. Presentation must never claim persistence
    * when this is false. */
   alertsCanPersist: boolean;
+  /** Prepared one-line detail for the latest snapshot. Null when there
+   * is no snapshot or status is unavailable/loading. */
+  latestDetail: LatestSnapshotDetail | null;
 }
 
 const RH_UNIT = "%";

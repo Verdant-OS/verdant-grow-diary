@@ -7,10 +7,11 @@
  *  - Pure. No I/O, no React, no Supabase, no time except via inputs.
  *  - Never echoes raw payloads, secrets, tokens, bridge ids, owning
  *    auth ids, MACs, or other internal identifiers.
- *  - Never marks missing/blocked/stale sensor proof as healthy/ideal.
- *  - Always uses "current proof window" language; never claims all-time
- *    or complete proof.
+ *  - Never marks missing/blocked/stale sensor proof as a positive outcome.
+ *  - Always uses "current proof window" language; never claims an
+ *    unbounded window or a fully-verified outcome.
  */
+
 import type { EcowittLiveProofViewModel } from "@/lib/ecowittLiveProofViewModel";
 import type { EcowittIngestAuditProofViewModel } from "@/lib/ecowittIngestAuditProofRules";
 

@@ -171,6 +171,11 @@ async function rowFor(alertId: string): Promise<HTMLElement> {
 }
 
 vi.mock("@/components/AlertsAutoPersistForGrow", () => ({ default: () => null }));
+// These unrelated panels pull in react-query via useGrowData / useLatestSensorSnapshot.
+// Stubbed here so the page renders without a QueryClientProvider — they are out of
+// scope for the linked-action badge contract under test.
+vi.mock("@/components/AlertsContextHeaderForGrow", () => ({ default: () => null }));
+vi.mock("@/components/AlertsEmptyStateSnapshotCta", () => ({ default: () => null }));
 
 describe("Alerts Index — Linked action badge", () => {
   it("renders 'Has linked action' on alert with exactly one open linked action", async () => {

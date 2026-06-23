@@ -109,6 +109,18 @@ const App = () => (
               {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
                   no operator chrome (header, Quick Log) renders. */}
               <Route path="/customer/:shareId" element={<CustomerModeGuide />} />
+
+              {/* Internal read-only walkthrough presenter. Mounted OUTSIDE
+                  AppShell so the no-write E2E guard can render it without a
+                  signed-in session. The page performs no Supabase / AI /
+                  alerts / Action Queue / device-control calls. Path remains
+                  unlinked and is hidden by URL only. */}
+              <Route
+                path="/internal/demo-proof-walkthrough"
+                element={<DemoProofWalkthrough />}
+              />
+
+
               
               
 
@@ -201,10 +213,6 @@ const App = () => (
                   element={<AiDoctorPhase1Preview />}
                 />
                 <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
-                <Route
-                  path="/internal/demo-proof-walkthrough"
-                  element={<DemoProofWalkthrough />}
-                />
                 <Route path="/internal/sensor-truth-audit" element={<SensorTruthAudit />} />
                 <Route
                   path="/internal/ai-doctor-confidence-audit"

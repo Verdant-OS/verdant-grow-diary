@@ -42,11 +42,21 @@ describe("Sensors operator diagnostics — EcoWitt Live Proof wiring", () => {
     );
   });
 
-  it("renders the audit-unavailable disclosure", () => {
-    expect(SOURCE).toContain(
+  it("mounts the EcoWitt ingest audit proof panel inside operator diagnostics", () => {
+    const operatorSectionIdx = SOURCE.indexOf(
+      'data-testid="sensors-operator-diagnostics"',
+    );
+    const auditPanelIdx = SOURCE.indexOf("<EcowittIngestAuditProofPanel");
+    expect(operatorSectionIdx).toBeGreaterThan(-1);
+    expect(auditPanelIdx).toBeGreaterThan(operatorSectionIdx);
+  });
+
+  it("no longer renders the legacy audit-unavailable disclaimer", () => {
+    expect(SOURCE).not.toContain(
       "Accepted/rejected ingest audit counts are not shown in this view.",
     );
   });
+
 
   it("renders proof-unavailable copy when no tent rows are loaded", () => {
     expect(SOURCE).toContain(

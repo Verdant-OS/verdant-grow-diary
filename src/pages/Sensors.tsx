@@ -39,6 +39,7 @@ import SensorSourceLegendCompact from "@/components/SensorSourceLegendCompact";
 import { buildSoilMoistureReadingViewModel } from "@/lib/soilMoistureReadingViewModel";
 import EcowittBridgeTroubleshootingPanel from "@/components/EcowittBridgeTroubleshootingPanel";
 import SensorIngestAuditReport from "@/components/SensorIngestAuditReport";
+import { mapReadingsToOperatorAuditRows } from "@/lib/sensorsOperatorDiagnosticsViewModel";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },

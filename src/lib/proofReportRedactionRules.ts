@@ -96,7 +96,10 @@ const SECRET_BARE_RES: ReadonlyArray<RegExp> = SECRET_KEYWORDS.map(
 export function sanitizeProofReportMarkdown(input: string): string {
   if (typeof input !== "string" || input.length === 0) return "";
   let out = input;
-  // Order matters: strip key=value pairs first so the placeholder doesn't
+  // Authorization headers first — strip whole value before any sub-pattern
+  // (e.g. `Bearer ...`) is partially consumed by other rules.
+  out = out.replace(AUTH_HEADER_RE, REDACTED_PLACEHOLDER);
+  // Order matters: strip key=value pairs next so the placeholder doesn't
   // immediately get re-stripped by the bare keyword pass.
   for (const re of SECRET_PAIR_RES) out = out.replace(re, REDACTED_PLACEHOLDER);
   out = out.replace(JWT_RE, REDACTED_PLACEHOLDER);

@@ -6,6 +6,8 @@ import {
   hasRecentManualSnapshot,
   describeLatestSnapshotForAlerts,
   buildAlertsHeaderContext,
+  buildLatestSnapshotDetail,
+  formatCapturedAgo,
   snapshotAlertsCanPersist,
   pickAlertsGrowContext,
 } from "@/lib/alertFreshnessContext";

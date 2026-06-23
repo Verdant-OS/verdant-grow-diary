@@ -203,8 +203,8 @@ function step3(args: {
   }
   const explanation =
     args.chip.tone === "eligible"
-      ? "No matching alert yet. Confirm the snapshot is inside the freshness window and a target was breached."
-      : "No matching alert yet. Confirm the manual snapshot saved, target was breached, and the snapshot is inside the freshness window.";
+      ? "Not ready: no open alert found for the selected grow. Confirm the snapshot is inside the freshness window and a target was breached."
+      : "Not ready: no open alert found for the selected grow. Confirm the manual snapshot saved, target was breached, and the snapshot is inside the freshness window.";
   return {
     id: 3,
     label: "Alert created from target breach",

@@ -468,6 +468,29 @@ export default function PlantRelativeTimelineSection({
                 );
               })}
             </div>
+            <div
+              data-testid="relative-timeline-readability-summary"
+              data-is-filtered={readabilitySummary.isFiltered ? "true" : "false"}
+              data-visible={readabilitySummary.visibleEntries}
+              data-total={readabilitySummary.totalEntries}
+              data-groups={readabilitySummary.groupCount}
+              data-evidence-sections={readabilitySummary.sectionsWithEvidence}
+              data-total-sections={readabilitySummary.totalSections}
+              className="rounded-md border border-border/40 bg-muted/10 p-2 text-xs text-muted-foreground space-y-1"
+            >
+              <p data-testid="relative-timeline-readability-line">
+                {readabilitySummary.line}
+              </p>
+              <p
+                data-testid="relative-timeline-readability-filter-copy"
+                className={cn(
+                  readabilitySummary.isFiltered &&
+                    "text-foreground/80 font-medium",
+                )}
+              >
+                {readabilitySummary.filterCopy}
+              </p>
+            </div>
             {visibleItems.length === 0 ? (
               <p
                 className="text-sm text-muted-foreground"

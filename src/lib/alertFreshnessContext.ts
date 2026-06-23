@@ -6,8 +6,10 @@
  *   - Pure: no I/O, no React, no Supabase, no time, no randomness.
  *   - Single source of truth for the alert-persistence freshness window:
  *     `STALE_THRESHOLD_MS` from `src/lib/sensorSnapshot.ts`.
- *   - Never relabels demo/stale/invalid/csv/unknown telemetry as healthy.
- *   - Never claims alerts will persist for non-persistable snapshots.
+ *   - Never relabels demo/stale/invalid/csv/diary/unknown telemetry as
+ *     healthy or persistable.
+ *   - Operator-facing copy must mirror `alertsCanPersist`. We never imply
+ *     persistence for csv/sim/diary/unavailable or stale snapshots.
  */
 import {
   STALE_THRESHOLD_MS,
@@ -16,6 +18,10 @@ import {
   type SnapshotSource,
 } from "@/lib/sensorSnapshot";
 import { METRIC_LABELS, type GrowTargets } from "@/lib/environmentTargetComparison";
+import {
+  convertCelsiusForDisplay,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 
 /** Single shared freshness window, in minutes, for operator-facing copy. */
 export const STALE_THRESHOLD_MINUTES = Math.round(STALE_THRESHOLD_MS / 60_000);
@@ -78,24 +84,45 @@ export function hasRecentManualSnapshot(
 }
 
 /**
- * Build the operator-facing stale-latest snapshot message. Returns null
- * when the freshness state has no special copy to surface (e.g. unknown /
- * still loading).
+ * Computes the exact same gate the alert persistence pipeline uses: a
+ * snapshot can persist alerts only when status is loaded, source is
+ * `live` or `manual`, and timestamp is inside the freshness window.
+ */
+export function snapshotAlertsCanPersist(
+  args: ClassifyLatestSnapshotArgs,
+): boolean {
+  if (args.status !== "ok") return false;
+  const snap = args.snapshot;
+  if (!snap || !snap.ts) return false;
+  if (snap.source !== "live" && snap.source !== "manual") return false;
+  const now = args.now ?? Date.now();
+  return !isStale(snap.ts, now);
+}
+
+/**
+ * Operator-facing description of the latest snapshot, driven by
+ * `alertsCanPersist` and the snapshot source. Never implies persistence
+ * for csv / diary / sim / unavailable / stale snapshots.
  */
 export function describeLatestSnapshotForAlerts(
   args: ClassifyLatestSnapshotArgs,
-): string | null {
-  const cls = classifyLatestSnapshotFreshness(args);
-  if (cls === "unavailable") return null;
-  if (cls === "fresh") return "Latest snapshot is fresh enough for alert evaluation.";
-  if (cls === "missing") {
-    return `No recent manual or live snapshot is saved inside the ${FRESHNESS_WINDOW_LABEL}.`;
+): string {
+  if (args.status !== "ok") return "Snapshot status unavailable.";
+  const snap = args.snapshot;
+  if (!snap || snap.source === "unavailable" || !snap.ts) {
+    return "No snapshot available. Enter a manual snapshot to check alerts.";
   }
-  // stale
-  if (hasRecentManualSnapshot(args)) {
-    return `Latest displayed snapshot is stale, but a recent manual snapshot exists inside the ${FRESHNESS_WINDOW_LABEL}.`;
+  const persistableSource =
+    snap.source === "live" || snap.source === "manual";
+  if (!persistableSource) {
+    return "Latest snapshot is for context only. Alerts persist only from fresh manual or live readings.";
   }
-  return `Latest snapshot is stale. No recent manual snapshot is saved inside the ${FRESHNESS_WINDOW_LABEL}.`;
+  const stale = isStale(snap.ts, args.now ?? Date.now());
+  const sourceWord = snap.source === "live" ? "live" : "manual";
+  if (stale) {
+    return `Latest ${sourceWord} snapshot is stale. Enter a new manual snapshot inside the ${FRESHNESS_WINDOW_LABEL}.`;
+  }
+  return `Latest ${sourceWord} snapshot is fresh and can be checked against targets.`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -126,20 +153,44 @@ export interface AlertsHeaderContextViewModel {
   alertsCanPersist: boolean;
 }
 
-const TEMP_UNIT = "°C";
 const RH_UNIT = "%";
 const VPD_UNIT = "kPa";
 
-function buildRange(
-  key: "temp" | "rh" | "vpd",
+function roundOrNull(n: number | null): number | null {
+  if (n === null || !Number.isFinite(n)) return null;
+  return Math.round(n);
+}
+
+function buildTempRange(
   targets: GrowTargets | null,
-  unit: string,
+  tempUnit: TemperatureUnitPreference,
 ): AlertsHeaderRange | null {
-  if (!targets) return null;
-  const t = targets[key];
-  if (!t) return null;
+  if (!targets || !targets.temp) return null;
+  const t = targets.temp;
   if (t.min === null && t.max === null) return null;
-  return { metricLabel: METRIC_LABELS[key], min: t.min, max: t.max, unit };
+  if (tempUnit === "fahrenheit") {
+    return {
+      metricLabel: METRIC_LABELS.temp,
+      min: roundOrNull(convertCelsiusForDisplay(t.min, "fahrenheit")),
+      max: roundOrNull(convertCelsiusForDisplay(t.max, "fahrenheit")),
+      unit: "°F",
+    };
+  }
+  return { metricLabel: METRIC_LABELS.temp, min: t.min, max: t.max, unit: "°C" };
+}
+
+function buildRhRange(targets: GrowTargets | null): AlertsHeaderRange | null {
+  if (!targets || !targets.rh) return null;
+  const t = targets.rh;
+  if (t.min === null && t.max === null) return null;
+  return { metricLabel: METRIC_LABELS.rh, min: t.min, max: t.max, unit: RH_UNIT };
+}
+
+function buildVpdRange(targets: GrowTargets | null): AlertsHeaderRange | null {
+  if (!targets || !targets.vpd) return null;
+  const t = targets.vpd;
+  if (t.min === null && t.max === null) return null;
+  return { metricLabel: METRIC_LABELS.vpd, min: t.min, max: t.max, unit: VPD_UNIT };
 }
 
 export interface BuildAlertsHeaderContextArgs {
@@ -149,6 +200,10 @@ export interface BuildAlertsHeaderContextArgs {
   snapshot: SensorSnapshot | null;
   status: "idle" | "loading" | "ok" | "unavailable";
   now?: number;
+  /** Optional override; when omitted, defaults to Celsius display so the
+   * pure helper stays free of localStorage reads. Wrappers should pass
+   * the loaded preference. */
+  tempUnit?: TemperatureUnitPreference;
 }
 
 export function buildAlertsHeaderContext(
@@ -161,16 +216,19 @@ export function buildAlertsHeaderContext(
   });
   const latestSource: SnapshotSource | null =
     args.status === "ok" && args.snapshot ? args.snapshot.source : null;
-  const alertsCanPersist =
-    latestFreshness === "fresh" &&
-    (latestSource === "live" || latestSource === "manual");
+  const alertsCanPersist = snapshotAlertsCanPersist({
+    snapshot: args.snapshot,
+    status: args.status,
+    now: args.now,
+  });
+  const tempUnit: TemperatureUnitPreference = args.tempUnit ?? "celsius";
   return {
     growName: args.growName ?? null,
     stageLabel: args.stage ? formatStageLabel(args.stage) : null,
     ranges: {
-      temp: buildRange("temp", args.targets, TEMP_UNIT),
-      rh: buildRange("rh", args.targets, RH_UNIT),
-      vpd: buildRange("vpd", args.targets, VPD_UNIT),
+      temp: buildTempRange(args.targets, tempUnit),
+      rh: buildRhRange(args.targets),
+      vpd: buildVpdRange(args.targets),
     },
     freshnessWindowLabel: FRESHNESS_WINDOW_LABEL,
     latestFreshness,
@@ -183,4 +241,100 @@ function formatStageLabel(stage: string): string {
   const s = stage.trim();
   if (!s) return "";
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Unscoped Alerts grow context selection                                      */
+/* -------------------------------------------------------------------------- */
+
+export interface AlertsGrowCandidate {
+  id: string;
+  name: string | null;
+  stage?: string | null;
+  /** Optional — used as deterministic tiebreaker for "most recently updated". */
+  updated_at?: string | null;
+}
+
+export interface PickAlertsGrowContextArgs {
+  scopedGrowId?: string | null;
+  activeGrowId?: string | null;
+  grows: AlertsGrowCandidate[];
+  /** Optional — grow ids known to have open alerts. */
+  growIdsWithOpenAlerts?: ReadonlyArray<string>;
+}
+
+export type AlertsGrowContextReason =
+  | "scoped"
+  | "active"
+  | "open-alerts"
+  | "most-recent"
+  | "first";
+
+export interface AlertsGrowContextSelection {
+  growId: string;
+  growName: string | null;
+  stage: string | null;
+  isFallback: boolean;
+  reason: AlertsGrowContextReason;
+}
+
+/**
+ * Deterministically pick the most relevant grow context for the Alerts
+ * header. Preference order:
+ *   1. scoped grow (from URL) — exact match must exist in `grows`.
+ *   2. active grow — exact match must exist in `grows`.
+ *   3. any grow with open alerts (id-sorted for determinism).
+ *   4. most recently updated grow (by updated_at; id tiebreak).
+ *   5. first grow by id.
+ * Returns null when no candidate grow exists.
+ */
+export function pickAlertsGrowContext(
+  args: PickAlertsGrowContextArgs,
+): AlertsGrowContextSelection | null {
+  const grows = args.grows ?? [];
+  if (grows.length === 0) return null;
+
+  const findById = (id: string | null | undefined) =>
+    id ? grows.find((g) => g.id === id) ?? null : null;
+
+  const scoped = findById(args.scopedGrowId);
+  if (scoped) return toSelection(scoped, "scoped", false);
+
+  const active = findById(args.activeGrowId);
+  if (active) return toSelection(active, "active", false);
+
+  const openAlertIds = new Set(args.growIdsWithOpenAlerts ?? []);
+  if (openAlertIds.size > 0) {
+    const open = grows
+      .filter((g) => openAlertIds.has(g.id))
+      .sort((a, b) => a.id.localeCompare(b.id))[0];
+    if (open) return toSelection(open, "open-alerts", true);
+  }
+
+  const withUpdates = grows
+    .filter((g) => typeof g.updated_at === "string" && g.updated_at)
+    .sort((a, b) => {
+      const ta = Date.parse(a.updated_at as string);
+      const tb = Date.parse(b.updated_at as string);
+      if (Number.isFinite(tb) && Number.isFinite(ta) && tb !== ta) return tb - ta;
+      return a.id.localeCompare(b.id);
+    });
+  if (withUpdates[0]) return toSelection(withUpdates[0], "most-recent", true);
+
+  const first = [...grows].sort((a, b) => a.id.localeCompare(b.id))[0];
+  return toSelection(first, "first", true);
+}
+
+function toSelection(
+  g: AlertsGrowCandidate,
+  reason: AlertsGrowContextReason,
+  isFallback: boolean,
+): AlertsGrowContextSelection {
+  return {
+    growId: g.id,
+    growName: g.name ?? null,
+    stage: g.stage ?? null,
+    isFallback,
+    reason,
+  };
 }

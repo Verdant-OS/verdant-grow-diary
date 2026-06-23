@@ -197,7 +197,7 @@ describe("Alerts route — empty + error + retry", () => {
     );
     expect(screen.getByText("No open alerts.")).toBeTruthy();
     expect(
-      screen.getByText(/Alerts will appear when real or manual readings breach your grow targets/i),
+      screen.getByText(/Check targets or enter a fresh manual snapshot if you expected one/i),
     ).toBeTruthy();
   });
 

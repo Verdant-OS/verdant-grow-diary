@@ -185,13 +185,17 @@ async function handle(req: Request): Promise<Response> {
   // the Idempotency-Key header (if any) into raw_payload for
   // traceability. The real dedupe guarantee is the partial unique index
   // `sensor_readings_dedupe_uidx` enforced atomically by Postgres.
-  const toInsert = normalized.rows.map((r) =>
-    buildStoredRow({
+  const toInsert = normalized.rows.map((r) => ({
+    ...buildStoredRow({
       row: r as unknown as Record<string, unknown>,
       userId: auth.userId,
       idempotencyKey,
     }),
-  );
+    // Defense-in-depth: explicitly re-stamp the server-resolved owner on
+    // every accepted row so ownership cannot be silently lost if the
+    // shared row builder ever changes shape.
+    user_id: auth.userId,
+  }));
 
   // Atomic upsert: ON CONFLICT (user_id, tent_id, source, metric, captured_at)
   // DO NOTHING. Concurrent identical POSTs cannot create duplicates.

@@ -16,7 +16,7 @@ import { useGrowTents } from "@/hooks/useGrowData";
 import { useGrowTargets } from "@/hooks/useGrowTargets";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildAlertsHeaderContext } from "@/lib/alertFreshnessContext";
-import { loadTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
   growId: string;

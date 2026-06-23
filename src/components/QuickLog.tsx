@@ -596,8 +596,6 @@ export default function QuickLog({
       setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
-      applyQuickLogV2Refresh(queryClient, {
-        targetType: "plant",
         targetId: selectedPlant.id,
         tentId: selectedPlant.tent_id ?? null,
       });
@@ -607,6 +605,8 @@ export default function QuickLog({
       // duplicate invalidate is cheap and locks the V0 contract.
       queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
       queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
+      window.dispatchEvent(
+        new CustomEvent("verdant:entry-created", {
           detail: { createdAt: new Date().toISOString() },
         }),
       );

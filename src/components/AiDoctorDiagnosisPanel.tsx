@@ -187,8 +187,8 @@ export default function AiDoctorDiagnosisPanel({
   );
 
   // Client-side PDF report download. The report is built from already-rendered
-  // evidence + recommendations — no AI/model call, no Supabase write, no
-  // functions.invoke, no network. We intentionally keep this path synchronous
+  // evidence + recommendations — no AI/model call, no Supabase write, no edge
+  // function call, no network. We intentionally keep this path synchronous
   // so the anchor.click() lands in the same tick as the user gesture.
   const handleDownloadReport = useCallback(() => {
     if (!view || !reportInput) return;

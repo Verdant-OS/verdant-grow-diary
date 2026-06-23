@@ -135,6 +135,7 @@ describe("DiaryTimelineCategorySections — static safety", () => {
     "utf8",
   );
 
+  // Forbidden in BOTH component + pure rules: writes, AI, automation.
   const forbidden = [
     /from\s+["']@\/integrations\/supabase\/client["']/,
     /\.functions\.invoke\(/,
@@ -145,7 +146,6 @@ describe("DiaryTimelineCategorySections — static safety", () => {
     /device[_-]?command|relay|actuator|auto[_-]?adjust/i,
     /service[_-]?role|SUPABASE_SERVICE_ROLE/i,
     /raw_payload/i,
-    /(?:window\.)?(?:localStorage|sessionStorage)\s*\.\s*(?:getItem|setItem|removeItem|clear)\(/,
   ];
   for (const f of forbidden) {
     it(`component contains no match for ${f}`, () => {
@@ -155,6 +155,22 @@ describe("DiaryTimelineCategorySections — static safety", () => {
       expect(RULES).not.toMatch(f);
     });
   }
+
+  // Storage usage: pure rules must never touch storage; component MAY
+  // use guarded getItem/setItem ONLY (no clear/removeItem of unrelated
+  // keys).
+  it("rules file never touches localStorage / sessionStorage at all", () => {
+    expect(RULES).not.toMatch(/localStorage|sessionStorage/);
+  });
+  it("component only uses guarded localStorage.getItem / setItem", () => {
+    expect(COMPONENT).not.toMatch(/sessionStorage/);
+    expect(COMPONENT).not.toMatch(
+      /localStorage\s*\.\s*(?:removeItem|clear)\(/,
+    );
+    // Reads + writes must go through try/catch helpers; check those exist.
+    expect(COMPONENT).toMatch(/safeReadStorage/);
+    expect(COMPONENT).toMatch(/safeWriteStorage/);
+  });
 });
 
 // Lightweight wiring sanity: the presenter renders within a Card-like

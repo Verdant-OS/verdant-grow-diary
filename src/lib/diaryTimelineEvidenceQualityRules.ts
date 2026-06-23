@@ -8,8 +8,8 @@
  *  - Read-only context indicator only. Never classifies missing evidence
  *    as a health problem; it only states what is or is not present
  *    *in the current view*.
- *  - Copy is calm and factual. Never uses "healthy", "ideal", "fix",
- *    "urgent", "auto", "execute", "control", "actuate", "relay".
+ *  - Copy is calm and factual. Never uses diagnostic, aggressive, or
+ *    actionable wording (see paired test for the banned-wording list).
  *  - Never recommends cultivation actions and never implies AI certainty.
  *
  * Status values are intentionally simple and non-diagnostic:

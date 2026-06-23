@@ -216,7 +216,12 @@ function TemperatureUnitTile() {
         ))}
       </fieldset>
       <div className="flex flex-wrap gap-2 mt-3">
-        <Button size="sm" onClick={onSave} data-testid="temperature-unit-save">
+        <Button
+          size="sm"
+          onClick={onSave}
+          data-testid="temperature-unit-save"
+          aria-label="Save temperature unit preference"
+        >
           Save
         </Button>
         <Button

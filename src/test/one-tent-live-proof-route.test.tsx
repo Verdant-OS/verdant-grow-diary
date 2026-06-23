@@ -31,6 +31,24 @@ vi.mock("@/hooks/useAlertsLinkedActionCounts", () => ({
   useAlertsLinkedActionCounts: () => new Map(),
 }));
 
+vi.mock("@/hooks/useOneTentLiveProofActionStatus", () => ({
+  useOneTentLiveProofActionStatus: () => ({
+    linkedActionExists: false,
+    linkedActionCompleted: null,
+    linkedActionId: null,
+    completedActionId: null,
+    loading: false,
+    refreshNonce: 0,
+  }),
+}));
+
+vi.mock("@/hooks/useOneTentLiveProofTimelineFollowup", () => ({
+  useOneTentLiveProofTimelineFollowup: () => ({
+    followupConfirmed: null,
+    loading: false,
+  }),
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({

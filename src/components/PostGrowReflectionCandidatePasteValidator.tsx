@@ -244,8 +244,10 @@ export function PostGrowReflectionCandidatePasteValidator() {
           </Button>
         </div>
         <ResultPanel result={result} />
-        <ValidationSummaryPanel summary={summary} />
-        <PostGrowReflectionReviewPacketCard packet={reviewPacket} />
+        {result.status === "validated" && <ValidationSummaryPanel summary={summary} />}
+        {result.status === "validated" && (
+          <PostGrowReflectionReviewPacketCard packet={reviewPacket} />
+        )}
       </CardContent>
     </Card>
   );

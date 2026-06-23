@@ -47,6 +47,11 @@ import {
   buildOneTentSensorProofViewModel,
   buildOneTentSensorProofReportSection,
 } from "@/lib/oneTentSensorProofViewModel";
+import {
+  sanitizeProofReportMarkdown,
+  PROOF_REPORT_REDACTION_NOTICE,
+} from "@/lib/proofReportRedactionRules";
+
 
 export default function OneTentLiveProof() {
   const { grows, activeGrowId } = useGrows();
@@ -187,11 +192,27 @@ export default function OneTentLiveProof() {
       now: lastRefreshedAt ?? new Date(),
     });
     const sensorMarkdown = buildOneTentSensorProofReportSection(sensorProofVM);
+    const rawMarkdown = `${base.markdown}\n\n${sensorMarkdown}`;
+    const s = sanitizeProofReportMarkdown;
     return {
       ...base,
-      markdown: `${base.markdown}\n\n${sensorMarkdown}`,
+      title: s(base.title),
+      generatedAtLabel: s(base.generatedAtLabel),
+      contextLines: base.contextLines.map(s),
+      safetyNotes: base.safetyNotes.map(s),
+      steps: base.steps.map((step) => ({
+        ...step,
+        label: s(step.label),
+        statusLabel: s(step.statusLabel),
+        evidenceSummary: step.evidenceSummary ? s(step.evidenceSummary) : step.evidenceSummary,
+        missingEvidence: step.missingEvidence ? s(step.missingEvidence) : step.missingEvidence,
+      })),
+      closingLine: base.closingLine ? s(base.closingLine) : base.closingLine,
+      markdown: s(rawMarkdown),
     };
   }, [vm, lastRefreshedAt, sensorProofVM]);
+
+
 
 
 
@@ -436,6 +457,13 @@ export default function OneTentLiveProof() {
               : "Copy proof summary"}
         </Button>
       </div>
+      <p
+        className="text-[11px] text-muted-foreground"
+        data-testid="one-tent-live-proof-redaction-notice"
+      >
+        {PROOF_REPORT_REDACTION_NOTICE.join(" ")}
+      </p>
+
 
       <OneTentLiveProofReport report={report} />
 

@@ -51,6 +51,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/grow-lineage",
   "/internal/ai-doctor-confidence-audit",
   "/internal/ai-doctor-phase1-preview",
+  "/internal/demo-proof-walkthrough",
   "/internal/one-tent-loop-proof",
   "/internal/sensor-truth-audit",
   "/leads",

@@ -119,8 +119,9 @@ describe("serializeDiaryTimelineSectionState", () => {
       harvest: false,
       other: true,
       // forced extras get stripped because they are not in the section enum
-      ...({ plantId: "plant-abc", noteText: "secret" } as Record<string, never>),
-    } as never);
+      plantId: "plant-abc",
+      noteText: "secret",
+    } as unknown as never);
     const parsed = JSON.parse(raw);
     expect(Object.keys(parsed).sort()).toEqual([
       "diagnoses",

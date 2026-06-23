@@ -251,3 +251,62 @@ Explicitly out of scope:
 - No new alerts, Action Queue writes, AI calls, automation, or
   device control.
 
+
+## 10. Checkpoint — Validation harness stabilization (scanner timeouts)
+
+Docs-only checkpoint following the harness-only slice that quieted
+the remaining sharded validation noise.
+
+### 10.1 What changed
+
+Installed the shared `installScannerGuardrail` (30s per-file
+timeout + slow-test telemetry, via
+`src/test/support/scannerGuardrailHarness.ts`) on the remaining
+filesystem-walking scanner files that were flaking on the default
+5s Vitest timeout under sharded load:
+
+- `src/test/pi-ingest-readings-contract-doc.test.ts`
+- `src/test/live-sensor-server-gate.test.ts`
+- `src/test/quicklog-e2e-harness-safety.test.ts`
+- `src/test/manual-sensor-fahrenheit-and-refresh.test.ts`
+
+No walker rewrites, no allowlist changes, no regex changes, no
+`it.skip`, no scanner assertions weakened.
+
+### 10.2 Validation
+
+- Focused scanner files: **5 files / 90 tests passed**
+  (`pi-ingest-readings-contract-doc`, `manual-sensor-fahrenheit-and-refresh`,
+  `live-sensor-server-gate`, `quicklog-e2e-harness-safety`,
+  `premium-live-sensor-gate-hardening`).
+- Scanner guardrail harness self-tests: **12/12 passed**.
+- TypeScript: `tsc -p tsconfig.app.json --noEmit` clean.
+
+### 10.3 Confirmed invariants
+
+- No product code changed.
+- Scanner assertions were not weakened (regexes, allowlists, and
+  `it` bodies unchanged).
+- Fast Add presets remain intentionally out of scope.
+- No schema, RLS, Edge Function, auth, billing, AI, Action Queue,
+  sensor ingest, or device-control surface touched.
+
+### 10.4 Rollback
+
+Revert the `installScannerGuardrail` import + call insertion in the
+four files above; behavior reverts to the prior 5s default timeout.
+
+### 10.5 Recommended next branch — `timeline-evidence-quality-pass`
+
+Read-only only. Improve missing-context indicators inside the
+existing timeline / category sections (e.g. surface "no sensor
+snapshot at log time", "photo missing", or "stage unknown" as
+inline evidence-quality chips on existing rows).
+
+Explicitly out of scope for that branch:
+
+- No new writes.
+- No schema / RLS / Edge Function / auth changes.
+- No AI calls.
+- No Action Queue writes.
+- No automation or device control.

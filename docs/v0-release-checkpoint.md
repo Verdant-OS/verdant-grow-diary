@@ -1006,3 +1006,11 @@ readonly E2E (mocked)**.
   - Playwright CI troubleshooting checklist (Chromium missing, cache miss, path filter, Vite, no-write violation),
   - GitHub Actions rerun steps (Re-run failed jobs, empty-commit fallback),
   - artifact download/open instructions for all five artifact names.
+
+### 18.2 Local helper scripts addendum
+
+- Added `test:demo-proof:e2e` alias for the read-only Playwright spec.
+- Added `test:demo-proof:full:check` — same chain as `test:demo-proof:full` but runs `scripts/check-demo-proof-playwright-chromium.mjs` before the E2E step. Precheck NEVER auto-installs; on miss it prints `bunx playwright install chromium` (`--with-deps` for Linux CI) and exits non-zero.
+- Added `test:demo-proof:open-report` → `scripts/open-demo-proof-playwright-report.mjs`. Opens a downloaded `demo-proof-playwright-report` zip or directory, extracting zips to `.artifacts/demo-proof-playwright-report/`.
+- Expanded `docs/one-tent-loop-rc-smoke-test.md` with expected file layout for `demo-proof-playwright-report`, `demo-proof-playwright-results`, and `demo-proof-playwright-failure-artifacts`.
+- No product, runtime, workflow-trigger, schema, RLS, Edge, RPC, auth, query, write, AI, alert, Action Queue, automation, or device-control behavior changed.

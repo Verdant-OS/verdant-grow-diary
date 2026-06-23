@@ -25,18 +25,28 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import OneTentLiveProofChecklist from "@/components/OneTentLiveProofChecklist";
 import OneTentLiveProofReport from "@/components/OneTentLiveProofReport";
+import OneTentSensorProofSection from "@/components/OneTentSensorProofSection";
 import { useGrows } from "@/store/grows";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import { useOneTentLiveProofActionStatus } from "@/hooks/useOneTentLiveProofActionStatus";
 import { useOneTentLiveProofTimelineFollowup } from "@/hooks/useOneTentLiveProofTimelineFollowup";
+import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { useEcowittIngestAuditProofRows } from "@/hooks/useEcowittIngestAuditProofRows";
 import {
   buildOneTentLiveProofViewModel,
   buildOneTentLiveProofReport,
   PROOF_DEMO_SAFETY_WARNING,
   PROOF_DEMO_RUN_STEPS,
 } from "@/lib/oneTentLiveProofViewModel";
+import { buildEcowittLiveProofViewModel } from "@/lib/ecowittLiveProofViewModel";
+import type { EcowittProofRow } from "@/lib/ecowittLiveProofRules";
+import { buildEcowittIngestAuditProof } from "@/lib/ecowittIngestAuditProofRules";
+import {
+  buildOneTentSensorProofViewModel,
+  buildOneTentSensorProofReportSection,
+} from "@/lib/oneTentSensorProofViewModel";
 
 export default function OneTentLiveProof() {
   const { grows, activeGrowId } = useGrows();

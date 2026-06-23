@@ -47,8 +47,14 @@ describe("TentDetail plant cards + empty state", () => {
     expect(TENT_DETAIL).toContain("<StageBadge stage={p.stage} />");
   });
 
-  it("plant cards link to Plant Detail", () => {
-    expect(TENT_DETAIL).toMatch(/to=\{plantDetailPath\(p\.id\)\}/);
+  it("plant cards link to Plant Detail via the route helper", () => {
+    // Contract update: TentDetail now passes the current tent id as a safe
+    // route-context option so PlantDetail can render the originating tent
+    // without re-querying. See tent-detail-plant-card-tent-context.test.tsx
+    // for the helper-level contract. The link must still go through
+    // plantDetailPath(p.id, …) — never a hard-coded `/plants/${id}` string —
+    // and must not surface tent ids in visible copy.
+    expect(TENT_DETAIL).toMatch(/to=\{plantDetailPath\(p\.id,\s*\{\s*tentId:\s*tent\.id\s*\}\)\}/);
   });
 
   it("empty state keeps the Add Plant CTA prominent", () => {

@@ -16,8 +16,8 @@ import {
 } from "./support/scannerGuardrailHarness";
 
 installScannerGuardrail({ file: __filename });
-import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   PremiumLiveSensorGate,
   PREMIUM_LIVE_SENSOR_INVALID_COPY,

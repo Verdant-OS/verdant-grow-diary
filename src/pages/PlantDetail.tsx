@@ -203,6 +203,7 @@ function ArchivedTimelineReadOnlyView({
       />
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 glass rounded-2xl p-5 space-y-3">
+          <PlantRecentMoveCard plantId={plant.id} />
           <PlantRecentActivityPanel plantId={plant.id} plantName={plant.name} />
           <PlantRelativeTimelineSection
             plantId={plant.id}

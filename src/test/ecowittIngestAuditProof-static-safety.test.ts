@@ -26,7 +26,7 @@ describe("EcoWitt ingest audit proof — static safety", () => {
   });
 
   it("hook selects only the safe audit-counts column allowlist", () => {
-    const selectMatch = HOOK.match(/\.select\(\s*"([^"]+)"\s*\)/);
+    const selectMatch = HOOK.match(/\.select\(\s*"([^"]+)"\s*[,\s]*\)/);
     expect(selectMatch).toBeTruthy();
     const cols = (selectMatch?.[1] ?? "")
       .split(",")

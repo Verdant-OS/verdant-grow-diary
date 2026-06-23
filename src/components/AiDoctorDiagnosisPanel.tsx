@@ -186,17 +186,19 @@ export default function AiDoctorDiagnosisPanel({
     [],
   );
 
-  const handleDownloadReport = useCallback(async () => {
+  // Client-side PDF report download. The report is built from already-rendered
+  // evidence + recommendations — no AI/model call, no Supabase write, no
+  // functions.invoke, no network. We intentionally keep this path synchronous
+  // so the anchor.click() lands in the same tick as the user gesture.
+  const handleDownloadReport = useCallback(() => {
     if (!view || !reportInput) return;
-    await runGated("report", "ai_doctor_report", () => {
-      const bytes = buildAiDoctorReportPdfBytes({
-        ...reportInput,
-        summary: reportInput.summary || view.summary,
-        recommendations: buildRecsForReport(),
-      });
-      downloadAiDoctorReportPdf(bytes, "ai-doctor-report.pdf");
+    const bytes = buildAiDoctorReportPdfBytes({
+      ...reportInput,
+      summary: reportInput.summary || view.summary,
+      recommendations: buildRecsForReport(),
     });
-  }, [view, reportInput, buildRecsForReport, runGated]);
+    downloadAiDoctorReportPdf(bytes, "ai-doctor-report.pdf");
+  }, [view, reportInput, buildRecsForReport]);
 
   const handleDownloadCsv = useCallback(async () => {
     if (!view || !reportInput) return;

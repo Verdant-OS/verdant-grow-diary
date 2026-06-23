@@ -587,11 +587,26 @@ describe("Quick Log Playwright CI surface", () => {
   // ---------- Hardened cache guardrails ----------
 
   function extractStepBlocks(wf: string): string[] {
-    const re = /^( {6}-\s*name:[\s\S]*?)(?=^ {6}-\s*name:|$)/gms;
-    const out: string[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(wf)) !== null) out.push(m[1]);
-    return out;
+    // Split on the start-of-line `      - name:` marker (6-space indented
+    // job step). The previous single-regex form used `$` in multiline mode
+    // in its lookahead, which matches every end-of-line and truncated each
+    // block to its first line — producing zero cache blocks even when the
+    // workflow contract was satisfied. Splitting + rejoining is unambiguous.
+    const marker = /^ {6}-\s*name:/m;
+    const lines = wf.split("\n");
+    const blocks: string[] = [];
+    let current: string[] = [];
+    for (const line of lines) {
+      if (/^ {6}-\s*name:/.test(line)) {
+        if (current.length > 0) blocks.push(current.join("\n"));
+        current = [line];
+      } else if (current.length > 0) {
+        current.push(line);
+      }
+    }
+    if (current.length > 0) blocks.push(current.join("\n"));
+    void marker;
+    return blocks;
   }
 
   it("every actions/cache block is gated, has runner.os + hashFiles(lock/package), and excludes forbidden paths", () => {

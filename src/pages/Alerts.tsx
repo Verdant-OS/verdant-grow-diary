@@ -374,17 +374,15 @@ export default function Alerts() {
             title="No open alerts."
             description="Check targets or enter a fresh manual snapshot if you expected one."
           />
-          {scopedGrowId ? (
+          {headerContext ? (
             <div className="mt-3 flex flex-wrap gap-2 justify-center">
               <Button
                 size="sm"
                 variant="outline"
-                asChild
+                onClick={() => setEmptyStateEditorOpen(true)}
                 data-testid="alerts-empty-state-manage-targets"
               >
-                <Link to={`/grows/${encodeURIComponent(scopedGrowId)}`}>
-                  Manage Targets
-                </Link>
+                Manage Targets
               </Button>
               <Button
                 size="sm"
@@ -394,8 +392,20 @@ export default function Alerts() {
               >
                 <Link to="/sensors#manual-reading">Add Manual Snapshot</Link>
               </Button>
+              <GrowTargetsEditor
+                open={emptyStateEditorOpen}
+                onOpenChange={setEmptyStateEditorOpen}
+                growId={headerContext.growId}
+              />
             </div>
-          ) : null}
+          ) : (
+            <p
+              className="mt-3 text-center text-xs text-muted-foreground"
+              data-testid="alerts-empty-state-no-grow"
+            >
+              Select a grow to manage targets.
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-6">

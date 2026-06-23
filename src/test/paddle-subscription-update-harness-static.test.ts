@@ -29,7 +29,10 @@ describe("Paddle subscription update runtime harness", () => {
 
   it("exercises the merged RPC without wiring app runtime", () => {
     expect(HARNESS).toContain("public.apply_paddle_subscription_update");
-    expect(WEBHOOK).not.toContain("apply_paddle_subscription_update");
+    // Forbid the legacy bare RPC name in the webhook, but allow the intentional
+    // audit-wrapped variant `apply_paddle_subscription_update_with_audit`,
+    // which is the only correct call path from the Edge Function.
+    expect(WEBHOOK).not.toMatch(/\bapply_paddle_subscription_update\b(?!_with_audit)/);
     expect(WEBHOOK).not.toContain("apply_paddle_entitlement_update");
   });
 

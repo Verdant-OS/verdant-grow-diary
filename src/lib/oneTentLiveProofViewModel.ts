@@ -275,7 +275,7 @@ function step5(args: {
       label: "Action completed",
       status: "pending",
       message:
-        "Linked action is still open. Complete it in Action Queue. Completing an action records the grower's decision.",
+        "Not ready: linked Action Queue item is not completed. Complete it in Action Queue. Completing an action records the grower's decision.",
       ctaLabel,
       ctaHref: href,
     };

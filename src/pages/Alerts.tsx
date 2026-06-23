@@ -20,6 +20,7 @@ import { AlertWhyContext } from "@/components/AlertWhyContext";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
 import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
 import AlertsContextHeaderForGrow from "@/components/AlertsContextHeaderForGrow";
+import AlertsEmptyStateSnapshotCta from "@/components/AlertsEmptyStateSnapshotCta";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import { pickAlertsGrowContext } from "@/lib/alertFreshnessContext";
 import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";

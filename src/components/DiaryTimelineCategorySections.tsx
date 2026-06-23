@@ -14,9 +14,12 @@
  *    Diagnoses, Harvest results, Other diary entries.
  *  - Sections with entries default expanded; empty sections default
  *    collapsed but the header + empty copy remain reachable.
- *  - No localStorage in this slice (saved state lands in a follow-up).
+ *  - Optional localStorage state stores ONLY known section IDs +
+ *    booleans. Never entry IDs, plant/tent/user IDs, raw payloads,
+ *    sensor values, or note text. Malformed storage is ignored and
+ *    replaced with defaults.
  */
-import { useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -24,6 +27,14 @@ import {
   type ClassifyDiaryTimelineEntryInput,
   type DiaryTimelineSectionId,
 } from "@/lib/diaryTimelineSectionRules";
+import {
+  buildDefaultDiaryTimelineSectionState,
+  buildDiaryTimelineSectionSummary,
+  mergeSavedDiaryTimelineSectionState,
+  parseDiaryTimelineSectionState,
+  serializeDiaryTimelineSectionState,
+  type DiaryTimelineSectionExpandedState,
+} from "@/lib/diaryTimelineSectionStateRules";
 
 export interface DiaryTimelineCategorySectionsProps<
   T extends ClassifyDiaryTimelineEntryInput & { id: string },
@@ -34,6 +45,32 @@ export interface DiaryTimelineCategorySectionsProps<
   ariaLabel?: string;
   /** Optional test id root, defaults to "diary-timeline-category-sections". */
   testIdPrefix?: string;
+  /**
+   * Optional localStorage key. When provided, expanded/collapsed state
+   * is persisted across reloads. Only known section IDs + booleans are
+   * ever written. When omitted, state lives only in component memory.
+   */
+  storageKey?: string;
+}
+
+function safeReadStorage(key: string | undefined): string | null {
+  if (!key) return null;
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return null;
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeWriteStorage(key: string | undefined, value: string): void {
+  if (!key) return;
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    window.localStorage.setItem(key, value);
+  } catch {
+    /* localStorage may be disabled; UI state still works in-memory. */
+  }
 }
 
 export function DiaryTimelineCategorySections<
@@ -43,21 +80,58 @@ export function DiaryTimelineCategorySections<
   renderEntry,
   ariaLabel = "Timeline category view",
   testIdPrefix = "diary-timeline-category-sections",
+  storageKey,
 }: DiaryTimelineCategorySectionsProps<T>) {
-  const sections = buildDiaryTimelineSections(items);
+  const sections = useMemo(() => buildDiaryTimelineSections(items), [items]);
+  const summary = useMemo(
+    () => buildDiaryTimelineSectionSummary(sections),
+    [sections],
+  );
 
-  // Default: expand sections with entries, collapse empty sections.
-  // Local UI-only state — no persistence in this slice.
-  const [expanded, setExpanded] = useState<
-    Record<DiaryTimelineSectionId, boolean>
-  >(() => {
-    const initial = {} as Record<DiaryTimelineSectionId, boolean>;
-    for (const section of sections) initial[section.id] = section.count > 0;
-    return initial;
-  });
+  // Load saved state on mount (or fall back to defaults). Saved state
+  // only overrides known section IDs; malformed storage is ignored.
+  const [expanded, setExpanded] = useState<DiaryTimelineSectionExpandedState>(
+    () => {
+      const saved = parseDiaryTimelineSectionState(safeReadStorage(storageKey));
+      return mergeSavedDiaryTimelineSectionState(sections, saved);
+    },
+  );
+
+  // When the set of sections changes (e.g. filter applied), keep the
+  // user's saved choices but ensure every known id has a default.
+  useEffect(() => {
+    setExpanded((prev) =>
+      mergeSavedDiaryTimelineSectionState(sections, prev),
+    );
+    // sections identity changes when items change — safe to depend on.
+  }, [sections]);
+
+  function persist(next: DiaryTimelineSectionExpandedState) {
+    if (!storageKey) return;
+    safeWriteStorage(storageKey, serializeDiaryTimelineSectionState(next));
+  }
 
   function toggle(id: DiaryTimelineSectionId) {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+    setExpanded((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      persist(next);
+      return next;
+    });
+  }
+
+  function setAll(value: boolean) {
+    setExpanded((prev) => {
+      const next = { ...prev } as Record<DiaryTimelineSectionId, boolean>;
+      for (const s of sections) next[s.id] = value;
+      persist(next);
+      return next;
+    });
+  }
+
+  function reset() {
+    const defaults = buildDefaultDiaryTimelineSectionState(sections);
+    setExpanded(defaults);
+    persist(defaults);
   }
 
   return (
@@ -66,6 +140,44 @@ export function DiaryTimelineCategorySections<
       data-testid={testIdPrefix}
       className="space-y-2"
     >
+      <div
+        className="flex flex-wrap items-center gap-2"
+        data-testid={`${testIdPrefix}-controls`}
+      >
+        <button
+          type="button"
+          onClick={() => setAll(true)}
+          data-testid={`${testIdPrefix}-expand-all`}
+          className="text-xs rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-foreground hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+        >
+          Expand all
+        </button>
+        <button
+          type="button"
+          onClick={() => setAll(false)}
+          data-testid={`${testIdPrefix}-collapse-all`}
+          className="text-xs rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-foreground hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+        >
+          Collapse all
+        </button>
+        <button
+          type="button"
+          onClick={reset}
+          data-testid={`${testIdPrefix}-reset`}
+          className="text-xs rounded-md border border-border/40 bg-transparent px-2 py-1 text-muted-foreground hover:bg-secondary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+        >
+          Reset sections
+        </button>
+        <p
+          data-testid={`${testIdPrefix}-summary`}
+          data-total={summary.totalEntries}
+          data-non-empty={summary.nonEmptySections}
+          data-other={summary.otherCount}
+          className="ml-auto text-xs text-muted-foreground"
+        >
+          {summary.parts.join(" · ")}
+        </p>
+      </div>
       {sections.map((section) => {
         const isOpen = expanded[section.id];
         const headerId = `${testIdPrefix}-${section.id}-header`;

@@ -243,13 +243,23 @@ export default function Alerts() {
         />
       )}
 
-      {scopedGrowId ? (
+      {headerContext ? (
         <AlertsContextHeaderForGrow
-          growId={scopedGrowId}
-          growName={scopedGrowName ?? null}
-          stage={headerStage}
+          growId={headerContext.growId}
+          growName={headerContext.growName}
+          stage={headerContext.stage}
+          isFallback={headerContext.isFallback}
         />
-      ) : null}
+      ) : (
+        <div
+          className="glass rounded-2xl p-3 mb-3 text-xs text-muted-foreground"
+          data-testid="alerts-context-no-grow"
+        >
+          No grow selected. Create or select a grow to view alert context.
+        </div>
+      )}
+
+
 
 
 

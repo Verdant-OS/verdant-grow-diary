@@ -133,10 +133,6 @@ function ResultPanel({ result }: { result: PostGrowReflectionCandidatePasteResul
           <span className="font-medium">Issue codes: </span>
           {result.issueCodes.length > 0 ? result.issueCodes.join(", ") : "none"}
         </div>
-        <div className="text-sm">
-          <span className="font-medium">Failure reason: </span>
-          {result.failureReason}
-        </div>
         <EnvelopeMetadata result={result} />
         <p className="text-xs text-muted-foreground">{result.validationOptions.label}</p>
       </div>
@@ -207,8 +203,8 @@ export function PostGrowReflectionCandidatePasteValidator() {
           <Badge variant="outline">No live AI call</Badge>
         </div>
         <CardDescription>
-          Paste a candidate ReflectionOutput JSON or candidate envelope and run the same local
-          validator used by the dry-run adapter boundary.
+          Operator-only local validator — runs the same envelope and reflection contract checks
+          used by the dry-run adapter boundary. Nothing is saved or sent.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -244,8 +240,10 @@ export function PostGrowReflectionCandidatePasteValidator() {
           </Button>
         </div>
         <ResultPanel result={result} />
-        <ValidationSummaryPanel summary={summary} />
-        <PostGrowReflectionReviewPacketCard packet={reviewPacket} />
+        {result.status === "validated" && <ValidationSummaryPanel summary={summary} />}
+        {result.status === "validated" && (
+          <PostGrowReflectionReviewPacketCard packet={reviewPacket} />
+        )}
       </CardContent>
     </Card>
   );

@@ -91,7 +91,13 @@ jobs:
         run: bunx tsc -p tsconfig.app.json --noEmit
 
       - name: Run Demo Proof Walkthrough readonly E2E
-        run: bun run test:e2e:demo-proof-readonly
+        run: bun run test:e2e:demo-proof-readonly:ci
+
+      - name: Write Playwright test-results run summary
+        if: ${{ always() }}
+        run: |
+          mkdir -p test-results
+          echo '{"workflow":"demo-proof-walkthrough-readonly","run_id":"${{ github.run_id }}","ref":"${{ github.ref }}","sha":"${{ github.sha }}"}' > test-results/run-summary.json
 
       - name: Upload demo-proof-guards log
         if: ${{ always() }}
@@ -144,7 +150,6 @@ jobs:
             test-results/**/trace.zip
           retention-days: 7
           if-no-files-found: ignore
-
 
       - name: Job summary — read-only / mocked
         if: ${{ always() }}

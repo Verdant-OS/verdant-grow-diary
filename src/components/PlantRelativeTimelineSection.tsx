@@ -37,6 +37,12 @@ import {
 } from "@/lib/relativeTimelineEmptyStateRules";
 import { DiaryTimelineCategorySections } from "@/components/DiaryTimelineCategorySections";
 import { PLANT_RELATIVE_TIMELINE_SECTION_STATE_STORAGE_KEY } from "@/lib/diaryTimelineSectionStateRules";
+import { buildDiaryTimelineSections } from "@/lib/diaryTimelineSectionRules";
+import { buildDiaryTimelineEvidenceQualitySummary } from "@/lib/diaryTimelineEvidenceQualityRules";
+import {
+  buildPlantTimelinePrintSummary,
+  buildPlantTimelineReadabilitySummary,
+} from "@/lib/plantTimelineReadabilityViewModel";
 
 
 
@@ -281,6 +287,32 @@ export default function PlantRelativeTimelineSection({
   });
   const visibleItems = filterRelativeTimelineItems(items, filter);
   const groups = groupRelativeTimelineByStage(visibleItems);
+  const filterDef =
+    RELATIVE_TIMELINE_FILTERS.find((f) => f.key === filter) ??
+    RELATIVE_TIMELINE_FILTERS[0];
+  const categorySections = buildDiaryTimelineSections(visibleItems);
+  const evidenceSummary = buildDiaryTimelineEvidenceQualitySummary(categorySections);
+  const readabilitySummary = buildPlantTimelineReadabilitySummary({
+    totalEntries: items.length,
+    visibleEntries: visibleItems.length,
+    filterKey: filter,
+    filterLabel: filterDef?.label ?? null,
+    groupCount: groups.length,
+    totalSections: evidenceSummary.totalSections,
+    sectionsWithEvidence: evidenceSummary.presentCount,
+  });
+  const printSummary = buildPlantTimelinePrintSummary({
+    totalEntries: items.length,
+    visibleEntries: visibleItems.length,
+    filterKey: filter,
+    filterLabel: filterDef?.label ?? null,
+    groupCount: groups.length,
+    totalSections: evidenceSummary.totalSections,
+    sectionsWithEvidence: evidenceSummary.presentCount,
+    plantName: plantName ?? null,
+    tentName: tentName ?? null,
+    growName: growName ?? null,
+  });
 
   return (
     <Card data-testid="plant-relative-timeline-section">
@@ -436,6 +468,29 @@ export default function PlantRelativeTimelineSection({
                 );
               })}
             </div>
+            <div
+              data-testid="relative-timeline-readability-summary"
+              data-is-filtered={readabilitySummary.isFiltered ? "true" : "false"}
+              data-visible={readabilitySummary.visibleEntries}
+              data-total={readabilitySummary.totalEntries}
+              data-groups={readabilitySummary.groupCount}
+              data-evidence-sections={readabilitySummary.sectionsWithEvidence}
+              data-total-sections={readabilitySummary.totalSections}
+              className="rounded-md border border-border/40 bg-muted/10 p-2 text-xs text-muted-foreground space-y-1"
+            >
+              <p data-testid="relative-timeline-readability-line">
+                {readabilitySummary.line}
+              </p>
+              <p
+                data-testid="relative-timeline-readability-filter-copy"
+                className={cn(
+                  readabilitySummary.isFiltered &&
+                    "text-foreground/80 font-medium",
+                )}
+              >
+                {readabilitySummary.filterCopy}
+              </p>
+            </div>
             {visibleItems.length === 0 ? (
               <p
                 className="text-sm text-muted-foreground"
@@ -566,6 +621,27 @@ export default function PlantRelativeTimelineSection({
                 }}
               />
             </div>
+            <aside
+              data-testid="relative-timeline-print-summary"
+              aria-label="Print-friendly timeline summary"
+              className="hidden print:block mt-3 border-t border-border/60 pt-2 text-xs text-foreground"
+            >
+              <ol className="space-y-1">
+                {printSummary.lines.map((line) => (
+                  <li
+                    key={line.key}
+                    data-testid="relative-timeline-print-summary-line"
+                    data-line-key={line.key}
+                    className={cn(
+                      line.key === "title" && "font-medium",
+                      line.key === "safety" && "italic text-muted-foreground",
+                    )}
+                  >
+                    {line.label}
+                  </li>
+                ))}
+              </ol>
+            </aside>
           </div>
         )}
       </CardContent>

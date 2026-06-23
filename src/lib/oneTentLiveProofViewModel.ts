@@ -61,6 +61,21 @@ export const PROOF_SAFETY_BADGES: ReadonlyArray<ProofSafetyBadge> = [
   { id: "no-device-control", label: "No device control" },
 ];
 
+/** Operator-facing reminder shown on the proof page. Never includes
+ *  tokens, endpoints, or secret-shaped strings. */
+export const PROOF_DEMO_SAFETY_WARNING =
+  "Demo safety: avoid opening bridge token, webhook, or integration credential screens while recording.";
+
+/** Recommended demo path checklist. Pure UI copy. */
+export const PROOF_DEMO_RUN_STEPS: ReadonlyArray<string> = [
+  "Add Manual Snapshot",
+  "Open Alerts",
+  "Add to Action Queue",
+  "Complete Action",
+  "Open Timeline",
+  "Refresh Proof Status",
+];
+
 export interface ProofContextInput {
   grow?: { id: string; name: string | null } | null;
   tent?: { id: string; name: string | null } | null;
@@ -131,45 +146,51 @@ function step1(ctx: ProofContextInput): ProofStep {
 
 function step2(chip: SourceChipViewModel, ctx: ProofContextInput): ProofStep {
   const href = sensorsPath(ctx.grow?.id ?? null) + "#manual-reading";
+  const LABEL = "Add a fresh Manual Sensor Snapshot";
+  const HELPER =
+    "Use the Manual Snapshot form, not Quick Log hardware notes, so Alerts can evaluate the reading. After saving, return here and click Refresh proof status.";
   if (chip.tone === "eligible") {
     return {
       id: 2,
-      label: "Fresh manual snapshot saved",
+      label: LABEL,
       status: "complete",
       message: `Latest snapshot is ${chip.label} (${chip.qualifier ?? "fresh"}) and eligible for alert persistence.`,
-      ctaLabel: "Open Sensors",
+      ctaLabel: "Open Manual Snapshot",
       ctaHref: href,
     };
   }
   if (chip.tone === "warning") {
     return {
       id: 2,
-      label: "Fresh manual snapshot saved",
+      label: LABEL,
       status: "stale",
       message:
-        "Latest manual/live snapshot is stale. Enter a fresh manual reading inside the alert window. Example: RH 61% with RH max target set to 55%.",
-      ctaLabel: "Add Manual Snapshot",
+        "Not ready: no fresh manual snapshot is saved inside the alert window. " +
+        HELPER,
+      ctaLabel: "Open Manual Snapshot",
       ctaHref: href,
     };
   }
   if (chip.tone === "context") {
     return {
       id: 2,
-      label: "Fresh manual snapshot saved",
+      label: LABEL,
       status: "pending",
       message:
-        "Latest snapshot is context-only (CSV/diary/simulated). Enter a real manual reading to create a persisted alert.",
-      ctaLabel: "Add Manual Snapshot",
+        "Not ready: latest snapshot is context-only (CSV/diary/simulated). " +
+        HELPER,
+      ctaLabel: "Open Manual Snapshot",
       ctaHref: href,
     };
   }
   return {
     id: 2,
-    label: "Fresh manual snapshot saved",
+    label: LABEL,
     status: "pending",
     message:
-      "Enter a real/manual reading. For the proof, use a value that safely breaches one target. Example: RH 61% with RH max target set to 55%.",
-    ctaLabel: "Add Manual Snapshot",
+      "Not ready: no fresh manual snapshot is saved inside the alert window. " +
+      HELPER,
+    ctaLabel: "Open Manual Snapshot",
     ctaHref: href,
   };
 }
@@ -197,8 +218,8 @@ function step3(args: {
   }
   const explanation =
     args.chip.tone === "eligible"
-      ? "No matching alert yet. Confirm the snapshot is inside the freshness window and a target was breached."
-      : "No matching alert yet. Confirm the manual snapshot saved, target was breached, and the snapshot is inside the freshness window.";
+      ? "Not ready: no open alert found for the selected grow. Confirm the snapshot is inside the freshness window and a target was breached."
+      : "Not ready: no open alert found for the selected grow. Confirm the manual snapshot saved, target was breached, and the snapshot is inside the freshness window.";
   return {
     id: 3,
     label: "Alert created from target breach",
@@ -235,7 +256,7 @@ function step4(args: {
     label: "Action Queue item created",
     status: "pending",
     message:
-      "Open the alert and add it to Action Queue. Action Queue items are grower-initiated and approval-required.",
+      "Not ready: alert has not been added to Action Queue. Open the alert and add it. Action Queue items are grower-initiated and approval-required.",
     ctaLabel: "Open Alerts",
     ctaHref: alertsPath(args.ctx.grow?.id ?? null),
   };
@@ -269,7 +290,7 @@ function step5(args: {
       label: "Action completed",
       status: "pending",
       message:
-        "Linked action is still open. Complete it in Action Queue. Completing an action records the grower's decision.",
+        "Not ready: linked Action Queue item is not completed. Complete it in Action Queue. Completing an action records the grower's decision.",
       ctaLabel,
       ctaHref: href,
     };

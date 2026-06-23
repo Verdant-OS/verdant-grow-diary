@@ -100,7 +100,7 @@ describe("buildOneTentLiveProofViewModel — step derivation", () => {
       hasMatchingOpenAlert: false,
     });
     expect(vm.steps[2].status).toBe("pending");
-    expect(vm.steps[2].message.toLowerCase()).toMatch(/no matching alert/);
+    expect(vm.steps[2].message.toLowerCase()).toMatch(/no open alert/);
   });
   it("linked action exists → step 4 complete", () => {
     const vm = buildOneTentLiveProofViewModel(FULL_CTX, {

@@ -7,6 +7,15 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
+// Scanner guardrail: extend per-file timeout to 30s and cache repo walks so
+// the recursive `src/` scan in this file does not flake under shard load
+// (default 5s test timeout can be exceeded by I/O contention alone).
+import {
+  installScannerGuardrail,
+  getCachedTsFiles,
+} from "./support/scannerGuardrailHarness";
+
+installScannerGuardrail({ file: __filename });
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
 import {

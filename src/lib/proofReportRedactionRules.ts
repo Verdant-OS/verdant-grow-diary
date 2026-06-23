@@ -45,6 +45,7 @@ const LONG_HEX_RE = /\b[0-9a-fA-F]{32,}\b/g;
 const SECRET_KEYWORDS: ReadonlyArray<string> = [
   "service_role",
   "SUPABASE_SERVICE_ROLE",
+  "SUPABASE_SERVICE_ROLE_KEY",
   "bridge_token_id",
   "bridge_token",
   "access_token",
@@ -54,17 +55,27 @@ const SECRET_KEYWORDS: ReadonlyArray<string> = [
   "ANON_KEY",
   "api_key",
   "API_KEY",
+  "apikey",
   "passkey",
+  "password",
+  "secret",
+  "jwt",
+  "authorization",
 ];
 
+// Matches `KEY=value`, `KEY: value`, `KEY = "value"`, `KEY:"value"`, etc.
+// Value is captured up to whitespace, quote, comma, semicolon, ampersand,
+// or backtick — covering env, JSON, YAML, URL query, and code-span forms.
 const SECRET_PAIR_RES: ReadonlyArray<RegExp> = SECRET_KEYWORDS.map(
   (k) =>
     new RegExp(
-      `\\b${k}\\b\\s*[:=]\\s*["']?[^\\s"']+["']?`,
+      `\\b${k}\\b\\s*[:=]\\s*["'\`]?[^\\s"'\`,;&]+["'\`]?`,
       "gi",
     ),
 );
 
+// Bare keyword fallback — replaces a residual reference once any
+// preceding `key=value` pairs have been stripped.
 const SECRET_BARE_RES: ReadonlyArray<RegExp> = SECRET_KEYWORDS.map(
   (k) => new RegExp(`\\b${k}\\b`, "gi"),
 );

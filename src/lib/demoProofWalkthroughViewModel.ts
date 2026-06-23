@@ -32,6 +32,13 @@ export interface DemoProofWalkthroughStep {
   readonly href: string;
   readonly safetyNote: string;
   readonly statusKind: DemoProofWalkthroughStatus;
+  /**
+   * Per-link warning shown for destinations whose UI can submit data,
+   * approve actions, create alerts, or invoke AI when interacted with.
+   * The walkthrough never disables links — operators are reminded to
+   * navigate without performing writes during a demo.
+   */
+  readonly reviewOnlyNote?: string;
 }
 
 export interface DemoProofWalkthroughViewModel {

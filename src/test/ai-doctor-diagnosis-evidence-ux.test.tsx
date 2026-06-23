@@ -1,14 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-
-// Stub the premium export gate so the panel's download handler runs without
-// hitting the entitlement check (out of scope for this presenter test).
-vi.mock("@/hooks/usePremiumExportServerGate", () => ({
-  checkPremiumExportEntitlement: vi.fn(async () => ({ ok: true })),
-  PREMIUM_EXPORT_PAYWALL_COPY: "",
-}));
-
 import AiDoctorDiagnosisPanel from "@/components/AiDoctorDiagnosisPanel";
 import {
   buildDiagnosisEvidenceAlignmentVM,

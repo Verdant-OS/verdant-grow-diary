@@ -522,6 +522,7 @@ export default function PlantRelativeTimelineSection({
               <DiaryTimelineCategorySections
                 items={visibleItems}
                 ariaLabel="Plant timeline category view"
+                storageKey={PLANT_RELATIVE_TIMELINE_SECTION_STATE_STORAGE_KEY}
                 renderEntry={(item) => {
                   const detail = formatRelativeTimelineEntryDetail(
                     item,

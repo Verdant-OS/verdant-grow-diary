@@ -390,29 +390,32 @@ export default function Alerts() {
             description="Check targets or enter a fresh manual snapshot if you expected one."
           />
           {headerContext ? (
-            <div className="mt-3 flex flex-wrap gap-2 justify-center">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setEmptyStateEditorOpen(true)}
-                data-testid="alerts-empty-state-manage-targets"
-              >
-                Manage Targets
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                asChild
-                data-testid="alerts-empty-state-add-manual-snapshot"
-              >
-                <Link to="/sensors#manual-reading">Add Manual Snapshot</Link>
-              </Button>
-              <GrowTargetsEditor
-                open={emptyStateEditorOpen}
-                onOpenChange={setEmptyStateEditorOpen}
-                growId={headerContext.growId}
-              />
-            </div>
+            <>
+              <AlertsEmptyStateSnapshotCta growId={headerContext.growId} />
+              <div className="mt-3 flex flex-wrap gap-2 justify-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEmptyStateEditorOpen(true)}
+                  data-testid="alerts-empty-state-manage-targets"
+                >
+                  Manage Targets
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  asChild
+                  data-testid="alerts-empty-state-add-manual-snapshot"
+                >
+                  <Link to="/sensors#manual-reading">Add Manual Snapshot</Link>
+                </Button>
+                <GrowTargetsEditor
+                  open={emptyStateEditorOpen}
+                  onOpenChange={setEmptyStateEditorOpen}
+                  growId={headerContext.growId}
+                />
+              </div>
+            </>
           ) : (
             <p
               className="mt-3 text-center text-xs text-muted-foreground"

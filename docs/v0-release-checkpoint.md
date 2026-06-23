@@ -1036,3 +1036,25 @@ readonly E2E (mocked)**.
 - No product, schema, RLS, Edge, RPC, auth, query, write, AI, alert,
   Action Queue, automation, device-control, or workflow-behavior changes.
 - No new third-party dependencies.
+
+### 18.4 Demo-Proof artifact verification, cleanup, and inspection
+
+- Added `scripts/verify-demo-proof-playwright-report.mjs`
+  (`bun run test:demo-proof:verify-report`) — confirms an extracted report
+  directory exists and contains `index.html`; prints resolved path and
+  suggested open commands.
+- Documented `gh` troubleshooting (auth, repo/workflow, artifact) and the
+  exact workflow-file resolution path used by the download helper.
+- Added `scripts/cleanup-demo-proof-artifacts.mjs`
+  (`bun run test:demo-proof:cleanup` and `… :cleanup:all`) — conservative
+  cleanup of `.artifacts/demo-proof-playwright-report/` (default) and, with
+  `--all`, also `.artifacts/demo-proof-playwright-results/` plus selected
+  `trace.zip` / `*.webm` / `*.png` files under `test-results/`. Refuses
+  unsafe paths and never wipes the whole `test-results/` tree.
+- Added `scripts/open-demo-proof-playwright-artifacts.mjs`
+  (`bun run test:demo-proof:open-artifacts`) — opens the first trace / video /
+  screenshot found under `test-results/` and prints
+  `bunx playwright show-trace <path>` for inspection.
+- No product, schema, RLS, Edge, RPC, auth, query, write, AI, alert,
+  Action Queue, automation, device-control, or workflow-behavior changes.
+- No new third-party dependencies.

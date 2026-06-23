@@ -317,3 +317,68 @@ node scripts/open-demo-proof-playwright-report.mjs ./demo-proof-playwright-repor
 node scripts/summarize-demo-proof-playwright-results.mjs ./test-results
 node scripts/summarize-demo-proof-playwright-results.mjs ./.artifacts/demo-proof-playwright-results
 ```
+
+## Demo-Proof artifact tooling — verify, inspect, cleanup
+
+### Local commands
+
+```bash
+bun run test:demo-proof:verify-report          # confirm index.html exists + print resolved target
+bun run test:demo-proof:download-report        # via GitHub CLI
+bun run test:demo-proof:open-report            # open extracted/zipped report
+bun run test:demo-proof:summarize-results      # count trace/video/screenshot files
+bun run test:demo-proof:open-artifacts         # open first trace/video/screenshot under test-results/
+bun run test:demo-proof:cleanup                # remove .artifacts/demo-proof-playwright-report/
+bun run test:demo-proof:cleanup:all            # also remove demo-proof results + selected test-results/ files
+```
+
+- `verify-report` walks the default `.artifacts/demo-proof-playwright-report/`
+  (or an explicit path), recursively finds `index.html`, and prints the
+  resolved entry point plus suggested open commands. Exit 0 if found.
+- `open-artifacts` selects the first `trace.zip`, `*.webm`, and `*.png`
+  beneath the default `test-results/` (or an explicit path), prints
+  `bunx playwright show-trace <path>` (and best-effort spawns it), and opens
+  the video/screenshot through the OS opener.
+- `cleanup` is conservative: by default it only removes
+  `.artifacts/demo-proof-playwright-report/`. `--all` (or
+  `test:demo-proof:cleanup:all`) also removes
+  `.artifacts/demo-proof-playwright-results/` and selected
+  `trace.zip` / `*.webm` / `*.png` files under `test-results/` (and any
+  clearly demo-proof-named top-level folder under `test-results/`). It refuses
+  unsafe paths (`/`, repo root, or anything outside the repo) and never
+  removes the entire `test-results/` tree.
+
+### `gh` troubleshooting (download helper)
+
+The download helper resolves the workflow by file path:
+`.github/workflows/demo-proof-walkthrough-readonly.yml`.
+
+```bash
+# Auth
+gh --version
+gh auth status
+gh auth login
+
+# Repo / workflow
+gh repo view --json nameWithOwner
+gh workflow list
+gh workflow view .github/workflows/demo-proof-walkthrough-readonly.yml
+gh run list --workflow .github/workflows/demo-proof-walkthrough-readonly.yml --limit 10
+
+# Artifact (manual fallback)
+gh run download <run-id> --name demo-proof-playwright-report --dir .artifacts/demo-proof-playwright-report
+```
+
+Common failure patterns:
+
+- **`gh` not installed** — install the GitHub CLI locally.
+- **`gh auth status` failed** — run `gh auth login`.
+- **Wrong repo selected** — run `gh repo view --json nameWithOwner`; confirm
+  the current git remote points to the Verdant repo.
+- **Workflow not found** — verify the file exists at
+  `.github/workflows/demo-proof-walkthrough-readonly.yml` and appears in
+  `gh workflow list`.
+- **No completed runs found** — open a PR that touches a path-filter entry,
+  or push an empty commit (`git commit --allow-empty -m "ci: retrigger demo proof workflow"`).
+- **Artifact not found** — verify the run completed and that the artifact name
+  is exactly `demo-proof-playwright-report` (case-sensitive).

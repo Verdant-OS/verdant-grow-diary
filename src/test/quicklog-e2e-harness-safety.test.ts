@@ -15,6 +15,12 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+// Scanner guardrail: 30s per-file timeout + slow-test telemetry so the
+// recursive e2e/ + src/ scans below do not flake under sharded
+// validation load.
+import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+
+installScannerGuardrail({ file: __filename });
 
 const E2E_DIR = path.resolve(__dirname, "../../e2e");
 

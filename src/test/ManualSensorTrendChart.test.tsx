@@ -73,10 +73,10 @@ describe("ManualSensorTrendChart — chart surface", () => {
       />,
     );
     const table = screen.getByTestId("manual-sensor-trend-chart-table");
-    expect(within(table).getByText(/µmol\/m²\/s/)).toBeInTheDocument();
-    expect(within(table).getByText(/°F/)).toBeInTheDocument();
-    expect(within(table).getByText(/% RH/)).toBeInTheDocument();
-    expect(within(table).getByText(/kPa/)).toBeInTheDocument();
+    expect(within(table).getAllByText(/µmol\/m²\/s/).length).toBeGreaterThan(0);
+    expect(within(table).getAllByText(/°F/).length).toBeGreaterThan(0);
+    expect(within(table).getAllByText(/% RH/).length).toBeGreaterThan(0);
+    expect(within(table).getAllByText(/kPa/).length).toBeGreaterThan(0);
     expect(within(table).getByText("412 µmol/m²/s")).toBeInTheDocument();
     expect(within(table).getByText("75.2°F")).toBeInTheDocument();
   });

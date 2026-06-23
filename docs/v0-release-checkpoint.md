@@ -996,3 +996,13 @@ readonly E2E (mocked)**.
   `Upload Playwright failure artifacts` step in
   `.github/workflows/demo-proof-walkthrough-readonly.yml`.
 - Remove section 18 from `docs/v0-release-checkpoint.md`.
+
+### 18.1 Operator recovery addendum
+
+- Added `test:demo-proof:full` package script — single fail-fast command running guards → targeted vitest → `tsc` → demo-proof read-only E2E.
+- Local prerequisite is unchanged: run `bunx playwright install chromium` once per machine. The script does NOT auto-install Chromium.
+- `docs/one-tent-loop-rc-smoke-test.md` "Demo Proof CI verification" now includes:
+  - one-liner `grep` to verify the path filter still references the doc,
+  - Playwright CI troubleshooting checklist (Chromium missing, cache miss, path filter, Vite, no-write violation),
+  - GitHub Actions rerun steps (Re-run failed jobs, empty-commit fallback),
+  - artifact download/open instructions for all five artifact names.

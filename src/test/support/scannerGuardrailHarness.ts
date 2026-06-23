@@ -236,23 +236,16 @@ export function getCachedScannerFiles(opts: {
 }
 
 /**
- * Convenience wrapper. New scanner tests should prefer:
+ * Convenience alias for vitest's `it`. New scanner tests should prefer:
  *
  *   scannerIt("does not leak X", () => { ... });
  *
- * over a bare `it(...)` so the standardised per-test timeout cannot
- * accidentally be dropped. Behaviour is identical to `it` aside from
- * carrying the harness timeout default.
+ * over a bare `it(...)` so the import declares scanner-suite intent and
+ * the standardised per-file timeout (installed via installScannerGuardrail)
+ * is centrally owned. The alias is `=== it` so callers, hooks, and modes
+ * (.skip / .only / .each) behave identically.
  */
-export const scannerIt = ((
-  name: string,
-  fn?: (...args: unknown[]) => unknown,
-  timeout?: number,
-) => {
-  return (
-    vitestIt as unknown as (n: string, f?: (...args: unknown[]) => unknown, t?: number) => unknown
-  )(name, fn, timeout ?? SCANNER_GUARDRAIL_TIMEOUT_MS);
-}) as unknown as typeof vitestIt;
+export const scannerIt = vitestIt;
 
 /**
  * Cached recursive walk for `.ts`/`.tsx` files (configurable).

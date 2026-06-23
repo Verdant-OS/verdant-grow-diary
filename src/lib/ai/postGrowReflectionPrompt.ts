@@ -82,7 +82,7 @@ ${contextJson}
 - If data is thin, missing, stale, invalid, or conflicting, lower confidence and state the gap clearly.
 - Respect autoflower vs photoperiod differences only where the supplied context supports it. For autoflowers, be extra cautious about stress and recovery recommendations.
 - Do not recommend aggressive nutrient, irrigation, training, or equipment changes from weak evidence.
-- Do not suggest device control, autopilot behavior, or automated equipment execution.
+- Do not suggest device control, hands-off equipment behavior, or unattended equipment changes.
 - Do not invent dry/cure checkpoints, quality scores, pheno differences, sensor coverage, or timestamps.
 - Output must be deterministic for the same input context.`;
 }

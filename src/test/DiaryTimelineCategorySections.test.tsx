@@ -218,9 +218,9 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
       "diary-timeline-category-sections-summary",
     );
     expect(summary.getAttribute("data-total")).toBe(String(items.length));
-    expect(summary.getAttribute("data-non-empty")).toBe("6");
+    expect(summary.getAttribute("data-non-empty")).toBe("7");
     expect(summary.textContent).toMatch(/7 entries/);
-    expect(summary.textContent).toMatch(/6 sections with entries/);
+    expect(summary.textContent).toMatch(/7 sections with entries/);
     expect(summary.textContent).toMatch(/1 in Other diary entries/);
   });
 

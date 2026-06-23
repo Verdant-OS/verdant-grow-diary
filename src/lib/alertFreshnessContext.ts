@@ -431,3 +431,147 @@ function toSelection(
     reason,
   };
 }
+
+/* -------------------------------------------------------------------------- */
+/* Source chip view-model                                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Tone categories for the latest-snapshot source chip. Only `eligible`
+ * represents a fresh manual/live snapshot the alert engine can persist
+ * from. Presenter maps these to semantic tokens. */
+export type SourceChipTone = "eligible" | "warning" | "context" | "caution";
+
+export interface SourceChipViewModel {
+  /** Operator-facing label: Manual / Live / CSV / Diary / Simulated /
+   * Unknown. Never relabels untrusted telemetry as healthy. */
+  label: string;
+  tone: SourceChipTone;
+  /** Short qualifier such as "fresh", "stale", "context only",
+   * "no snapshot". Null when not applicable. */
+  qualifier: string | null;
+  /** Mirrors the same gate used by the alert persistence pipeline. */
+  canPersist: boolean;
+}
+
+export function buildSourceChip(
+  args: ClassifyLatestSnapshotArgs,
+): SourceChipViewModel {
+  if (args.status !== "ok") {
+    return { label: "Unknown", tone: "caution", qualifier: null, canPersist: false };
+  }
+  const snap = args.snapshot;
+  if (!snap || snap.source === "unavailable" || !snap.ts) {
+    return {
+      label: "Unknown",
+      tone: "caution",
+      qualifier: "no snapshot",
+      canPersist: false,
+    };
+  }
+  const stale = isStale(snap.ts, args.now ?? Date.now());
+  const label = SOURCE_LABELS[snap.source] ?? "Unknown";
+  if (snap.source === "manual" || snap.source === "live") {
+    if (stale) {
+      return { label, tone: "warning", qualifier: "stale", canPersist: false };
+    }
+    return { label, tone: "eligible", qualifier: "fresh", canPersist: true };
+  }
+  return { label, tone: "context", qualifier: "context only", canPersist: false };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Source eligibility help copy                                                */
+/* -------------------------------------------------------------------------- */
+
+export const SOURCE_ELIGIBILITY_HELP = {
+  title: "Source rules",
+  eligible: "Eligible for persisted alerts: fresh manual or live readings.",
+  contextOnly:
+    "Context only: CSV, demo, diary, simulated, stale, invalid, unavailable, or unknown readings.",
+  summary:
+    "Alerts persist only from fresh manual or live readings. CSV, demo, diary, simulated, stale, invalid, unavailable, or unknown readings are shown for context only.",
+  why: "This prevents stale or untrusted telemetry from creating misleading alerts.",
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* Empty-state CTA                                                             */
+/* -------------------------------------------------------------------------- */
+
+export interface EmptyStateSnapshotCta {
+  message: string;
+  /** True when a "/sensors#manual-reading" action makes sense. */
+  showAddManualSnapshot: boolean;
+  /** Stable category for tests/styling. */
+  kind: "missing" | "stale" | "context-only";
+}
+
+/**
+ * Returns a CTA for the Alerts empty state ONLY when the latest snapshot
+ * is missing, stale, or context-only. Returns null when the latest
+ * snapshot is fresh and eligible for persistence (no nudge needed).
+ */
+export function emptyStateSnapshotCta(
+  args: ClassifyLatestSnapshotArgs,
+): EmptyStateSnapshotCta | null {
+  if (args.status !== "ok") return null;
+  const snap = args.snapshot;
+  if (!snap || snap.source === "unavailable" || !snap.ts) {
+    return {
+      message:
+        "No snapshot available. Enter a fresh manual snapshot to check alerts.",
+      showAddManualSnapshot: true,
+      kind: "missing",
+    };
+  }
+  const persistable = snap.source === "manual" || snap.source === "live";
+  if (!persistable) {
+    return {
+      message:
+        "Latest snapshot is context-only. Enter a fresh manual snapshot to create persisted alerts.",
+      showAddManualSnapshot: true,
+      kind: "context-only",
+    };
+  }
+  const stale = isStale(snap.ts, args.now ?? Date.now());
+  if (stale) {
+    return {
+      message: `Latest snapshot is outside the ${FRESHNESS_WINDOW_LABEL}. Enter a fresh manual snapshot to check alerts.`,
+      showAddManualSnapshot: true,
+      kind: "stale",
+    };
+  }
+  return null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Duplicate-prevention reassurance                                            */
+/* -------------------------------------------------------------------------- */
+
+export interface DuplicateReassuranceArgs {
+  /** Must mirror the persistence gate. */
+  canPersist: boolean;
+  /** True when the relevant grow already has at least one open alert. */
+  hasOpenAlerts: boolean;
+  /** Optional stronger signal: an open alert is known to match the
+   * current snapshot's source/metric/rule. */
+  hasMatchingOpenAlert?: boolean;
+}
+
+/**
+ * Reassurance copy explaining that the alert engine de-duplicates. Returns
+ * null when the snapshot cannot persist or when no open alert exists for
+ * safe inference. Never claims a duplicate was prevented unless an open
+ * alert is known to exist.
+ */
+export function duplicateReassuranceCopy(
+  args: DuplicateReassuranceArgs,
+): string | null {
+  if (!args.canPersist) return null;
+  if (args.hasMatchingOpenAlert) {
+    return "Alert already exists for this latest snapshot. No duplicate was created.";
+  }
+  if (args.hasOpenAlerts) {
+    return "Matching open alert already exists. Verdant will not create a duplicate for this condition.";
+  }
+  return null;
+}

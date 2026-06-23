@@ -20,6 +20,7 @@ import { AlertWhyContext } from "@/components/AlertWhyContext";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
 import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
 import AlertsContextHeaderForGrow from "@/components/AlertsContextHeaderForGrow";
+import AlertsEmptyStateSnapshotCta from "@/components/AlertsEmptyStateSnapshotCta";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import { pickAlertsGrowContext } from "@/lib/alertFreshnessContext";
 import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
@@ -262,6 +263,7 @@ export default function Alerts() {
           growName={headerContext.growName}
           stage={headerContext.stage}
           isFallback={headerContext.isFallback}
+          hasOpenAlerts={growIdsWithOpenAlerts.includes(headerContext.growId)}
         />
       ) : (
         <div
@@ -388,29 +390,32 @@ export default function Alerts() {
             description="Check targets or enter a fresh manual snapshot if you expected one."
           />
           {headerContext ? (
-            <div className="mt-3 flex flex-wrap gap-2 justify-center">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setEmptyStateEditorOpen(true)}
-                data-testid="alerts-empty-state-manage-targets"
-              >
-                Manage Targets
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                asChild
-                data-testid="alerts-empty-state-add-manual-snapshot"
-              >
-                <Link to="/sensors#manual-reading">Add Manual Snapshot</Link>
-              </Button>
-              <GrowTargetsEditor
-                open={emptyStateEditorOpen}
-                onOpenChange={setEmptyStateEditorOpen}
-                growId={headerContext.growId}
-              />
-            </div>
+            <>
+              <AlertsEmptyStateSnapshotCta growId={headerContext.growId} />
+              <div className="mt-3 flex flex-wrap gap-2 justify-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEmptyStateEditorOpen(true)}
+                  data-testid="alerts-empty-state-manage-targets"
+                >
+                  Manage Targets
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  asChild
+                  data-testid="alerts-empty-state-add-manual-snapshot"
+                >
+                  <Link to="/sensors#manual-reading">Add Manual Snapshot</Link>
+                </Button>
+                <GrowTargetsEditor
+                  open={emptyStateEditorOpen}
+                  onOpenChange={setEmptyStateEditorOpen}
+                  growId={headerContext.growId}
+                />
+              </div>
+            </>
           ) : (
             <p
               className="mt-3 text-center text-xs text-muted-foreground"

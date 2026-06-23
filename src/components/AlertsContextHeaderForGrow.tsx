@@ -26,6 +26,9 @@ interface Props {
    * operator can tell the header is using a fallback grow, not the one
    * in the URL. */
   isFallback?: boolean;
+  /** True when the relevant grow already has at least one open alert.
+   * Drives the duplicate-prevention reassurance banner. */
+  hasOpenAlerts?: boolean;
 }
 
 export default function AlertsContextHeaderForGrow({
@@ -33,6 +36,7 @@ export default function AlertsContextHeaderForGrow({
   growName,
   stage,
   isFallback = false,
+  hasOpenAlerts = false,
 }: Props) {
   const { data: tents = [] } = useGrowTents(growId);
   const tentIds = tents.map((t) => t.id);
@@ -72,6 +76,7 @@ export default function AlertsContextHeaderForGrow({
       growId={growId}
       freshnessArgs={freshnessArgs}
       isFallback={isFallback}
+      hasOpenAlerts={hasOpenAlerts}
     />
   );
 }

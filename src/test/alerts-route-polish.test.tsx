@@ -22,6 +22,7 @@ import {
 // ---------------------------------------------------------------------------
 vi.mock("@/components/AlertsAutoPersistForGrow", () => ({ default: () => null }));
 vi.mock("@/components/AlertsContextHeaderForGrow", () => ({ default: () => null }));
+vi.mock("@/components/AlertsEmptyStateSnapshotCta", () => ({ default: () => null }));
 vi.mock("@/components/GrowTargetsEditor", () => ({ default: () => null }));
 
 describe("alertsRouteView — pure helpers", () => {

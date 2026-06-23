@@ -9,9 +9,10 @@
  * Steps that cannot be safely inferred render as
  * "Needs operator confirmation".
  */
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import PageHeader from "@/components/PageHeader";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, RefreshCw } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -20,12 +21,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import OneTentLiveProofChecklist from "@/components/OneTentLiveProofChecklist";
 import { useGrows } from "@/store/grows";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { useAlertsList } from "@/hooks/useAlertsList";
-import { useAlertsLinkedActionCounts } from "@/hooks/useAlertsLinkedActionCounts";
+import { useOneTentLiveProofActionStatus } from "@/hooks/useOneTentLiveProofActionStatus";
+import { useOneTentLiveProofTimelineFollowup } from "@/hooks/useOneTentLiveProofTimelineFollowup";
 import { buildOneTentLiveProofViewModel } from "@/lib/oneTentLiveProofViewModel";
 
 export default function OneTentLiveProof() {
@@ -43,20 +46,38 @@ export default function OneTentLiveProof() {
     ? [effectiveTentId]
     : tents.map((t) => t.id);
   const snapshot = useLatestSensorSnapshot(effectiveGrowId, tentIds);
-  const { alerts } = useAlertsList({
+  const { alerts, reload: reloadAlerts } = useAlertsList({
     growId: effectiveGrowId || null,
     status: "open",
     severity: "all",
   });
   const alertIds = useMemo(() => alerts.map((a) => a.id), [alerts]);
-  const linkedCounts = useAlertsLinkedActionCounts(alertIds);
-  const linkedActionExists = useMemo(() => {
-    for (const id of alertIds) {
-      const summary = linkedCounts.get(id);
-      if (summary && summary.count > 0) return true;
+
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const actionStatus = useOneTentLiveProofActionStatus(alertIds, refreshNonce);
+  const timelineFollowup = useOneTentLiveProofTimelineFollowup(
+    effectiveGrowId || null,
+    actionStatus.completedActionId,
+    refreshNonce,
+  );
+
+  const queryClient = useQueryClient();
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    try {
+      queryClient.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });
+      queryClient.invalidateQueries({ queryKey: ["sensor_readings"] });
+      reloadAlerts();
+      setRefreshNonce((n) => n + 1);
+    } finally {
+      // brief loading indicator; the underlying hooks debounce themselves
+      setTimeout(() => setRefreshing(false), 400);
     }
-    return false;
-  }, [alertIds, linkedCounts]);
+  }, [queryClient, reloadAlerts]);
+
+  const matchingAlertId = alerts.length === 1 ? alerts[0].id : null;
 
   const vm = useMemo(
     () =>
@@ -73,12 +94,11 @@ export default function OneTentLiveProof() {
           snapshot: snapshot.status === "ok" ? snapshot.snapshot : null,
           snapshotStatus: snapshot.status,
           hasMatchingOpenAlert: alerts.length > 0,
-          linkedActionExists,
-          // The lightweight hook only counts open actions; we cannot
-          // safely infer "completed" without an extra query, so we leave
-          // it for operator confirmation.
-          linkedActionCompleted: null,
-          timelineFollowupConfirmed: null,
+          matchingAlertId,
+          linkedActionExists: actionStatus.linkedActionExists,
+          linkedActionId: actionStatus.linkedActionId,
+          linkedActionCompleted: actionStatus.linkedActionCompleted,
+          timelineFollowupConfirmed: timelineFollowup.followupConfirmed,
         },
       ),
     [
@@ -87,7 +107,11 @@ export default function OneTentLiveProof() {
       snapshot.status,
       snapshot.snapshot,
       alerts.length,
-      linkedActionExists,
+      matchingAlertId,
+      actionStatus.linkedActionExists,
+      actionStatus.linkedActionId,
+      actionStatus.linkedActionCompleted,
+      timelineFollowup.followupConfirmed,
     ],
   );
 
@@ -105,6 +129,13 @@ export default function OneTentLiveProof() {
         Use this guided path to prove Verdant's core operating loop with a
         real/manual tent reading. Verdant does not fake live data, auto-create
         actions, or control equipment.
+      </p>
+      <p
+        className="text-[11px] text-muted-foreground"
+        data-testid="one-tent-live-proof-readonly-note"
+      >
+        This page only reads proof status. It does not create alerts, create
+        actions, complete actions, or control equipment.
       </p>
 
       <ul
@@ -188,6 +219,27 @@ export default function OneTentLiveProof() {
           </p>
         ) : null}
       </section>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          data-testid="one-tent-live-proof-refresh"
+          aria-label="Refresh proof status"
+        >
+          <RefreshCw
+            className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`}
+            aria-hidden
+          />
+          {refreshing ? "Refreshing…" : "Refresh proof status"}
+        </Button>
+        <span className="text-[11px] text-muted-foreground">
+          Use after saving a snapshot, adding an alert to Action Queue,
+          completing an action, or checking Timeline.
+        </span>
+      </div>
 
       <OneTentLiveProofChecklist vm={vm} />
 

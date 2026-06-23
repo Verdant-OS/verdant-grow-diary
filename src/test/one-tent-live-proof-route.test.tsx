@@ -79,24 +79,21 @@ describe("OneTentLiveProof page", () => {
 
   it("links to the manual snapshot route, alerts, actions, and timeline", () => {
     renderPage();
-    const s2 = screen
-      .getByTestId("one-tent-live-proof-step-2-cta")
-      .querySelector("a");
-    const s3 = screen
-      .getByTestId("one-tent-live-proof-step-3-cta")
-      .querySelector("a");
-    const s4 = screen
-      .getByTestId("one-tent-live-proof-step-5-cta")
-      .querySelector("a");
-    const s6 = screen
-      .getByTestId("one-tent-live-proof-step-6-cta")
-      .querySelector("a");
-    expect(s2?.getAttribute("href")).toContain("/sensors");
-    expect(s2?.getAttribute("href")).toContain("#manual-reading");
-    expect(s3?.getAttribute("href")).toContain("/alerts");
-    expect(s3?.getAttribute("href")).toContain("growId=grow-1");
-    expect(s4?.getAttribute("href")).toContain("/actions");
-    expect(s6?.getAttribute("href")).toContain("/timeline");
+    const href = (id: number) => {
+      const el = screen.getByTestId(`one-tent-live-proof-step-${id}-cta`);
+      return (
+        el.getAttribute("href") ??
+        el.querySelector("a")?.getAttribute("href") ??
+        ""
+      );
+    };
+    expect(href(2)).toContain("/sensors");
+    expect(href(2)).toContain("#manual-reading");
+    expect(href(3)).toContain("/alerts");
+    expect(href(3)).toContain("growId=grow-1");
+    expect(href(4)).toContain("/alerts");
+    expect(href(5)).toContain("/actions");
+    expect(href(6)).toContain("/timeline");
   });
 
   it("shows needs-operator-confirmation for steps that cannot be safely inferred", () => {

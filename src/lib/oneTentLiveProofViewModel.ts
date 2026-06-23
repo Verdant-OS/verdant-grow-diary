@@ -131,45 +131,51 @@ function step1(ctx: ProofContextInput): ProofStep {
 
 function step2(chip: SourceChipViewModel, ctx: ProofContextInput): ProofStep {
   const href = sensorsPath(ctx.grow?.id ?? null) + "#manual-reading";
+  const LABEL = "Add a fresh Manual Sensor Snapshot";
+  const HELPER =
+    "Use the Manual Snapshot form, not Quick Log hardware notes, so Alerts can evaluate the reading. After saving, return here and click Refresh proof status.";
   if (chip.tone === "eligible") {
     return {
       id: 2,
-      label: "Fresh manual snapshot saved",
+      label: LABEL,
       status: "complete",
       message: `Latest snapshot is ${chip.label} (${chip.qualifier ?? "fresh"}) and eligible for alert persistence.`,
-      ctaLabel: "Open Sensors",
+      ctaLabel: "Open Manual Snapshot",
       ctaHref: href,
     };
   }
   if (chip.tone === "warning") {
     return {
       id: 2,
-      label: "Fresh manual snapshot saved",
+      label: LABEL,
       status: "stale",
       message:
-        "Latest manual/live snapshot is stale. Enter a fresh manual reading inside the alert window. Example: RH 61% with RH max target set to 55%.",
-      ctaLabel: "Add Manual Snapshot",
+        "Not ready: no fresh manual snapshot is saved inside the alert window. " +
+        HELPER,
+      ctaLabel: "Open Manual Snapshot",
       ctaHref: href,
     };
   }
   if (chip.tone === "context") {
     return {
       id: 2,
-      label: "Fresh manual snapshot saved",
+      label: LABEL,
       status: "pending",
       message:
-        "Latest snapshot is context-only (CSV/diary/simulated). Enter a real manual reading to create a persisted alert.",
-      ctaLabel: "Add Manual Snapshot",
+        "Not ready: latest snapshot is context-only (CSV/diary/simulated). " +
+        HELPER,
+      ctaLabel: "Open Manual Snapshot",
       ctaHref: href,
     };
   }
   return {
     id: 2,
-    label: "Fresh manual snapshot saved",
+    label: LABEL,
     status: "pending",
     message:
-      "Enter a real/manual reading. For the proof, use a value that safely breaches one target. Example: RH 61% with RH max target set to 55%.",
-    ctaLabel: "Add Manual Snapshot",
+      "Not ready: no fresh manual snapshot is saved inside the alert window. " +
+      HELPER,
+    ctaLabel: "Open Manual Snapshot",
     ctaHref: href,
   };
 }

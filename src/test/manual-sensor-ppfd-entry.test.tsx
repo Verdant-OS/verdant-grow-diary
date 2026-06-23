@@ -35,11 +35,16 @@ vi.mock("@/integrations/supabase/client", () => ({
 function renderCard() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={qc}>
-      <ManualSensorReadingCard
-        tents={[{ id: "11111111-1111-1111-1111-111111111111", name: "Tent A" }]}
-      />
-    </QueryClientProvider>,
+    // MemoryRouter wraps the card because ManualSensorReadingCard renders a
+    // react-router-dom <Link>; without a Router ancestor the test triggers an
+    // unhandled "Cannot destructure property 'basename'" from LinkWithRef.
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>
+        <ManualSensorReadingCard
+          tents={[{ id: "11111111-1111-1111-1111-111111111111", name: "Tent A" }]}
+        />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 

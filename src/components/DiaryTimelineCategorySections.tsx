@@ -249,6 +249,14 @@ export function DiaryTimelineCategorySections<
                 data-section-id={section.id}
                 className="border-t border-border/40 px-3 py-2"
               >
+                <p
+                  data-testid={`${testIdPrefix}-section-evidence`}
+                  data-section-id={section.id}
+                  data-evidence-status={evidence.status}
+                  className="mb-2 text-xs text-muted-foreground"
+                >
+                  {evidence.copy}
+                </p>
                 {section.count === 0 ? (
                   <p
                     data-testid={`${testIdPrefix}-section-empty`}

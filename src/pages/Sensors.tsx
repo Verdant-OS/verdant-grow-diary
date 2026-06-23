@@ -42,6 +42,8 @@ import { buildSoilMoistureReadingViewModel } from "@/lib/soilMoistureReadingView
 import EcowittBridgeTroubleshootingPanel from "@/components/EcowittBridgeTroubleshootingPanel";
 import SensorIngestAuditReport from "@/components/SensorIngestAuditReport";
 import { mapReadingsToOperatorAuditRows } from "@/lib/sensorsOperatorDiagnosticsViewModel";
+import { EcowittLiveProofPanel } from "@/components/EcowittLiveProofPanel";
+import type { EcowittProofRow } from "@/lib/ecowittLiveProofRules";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },
@@ -481,6 +483,36 @@ export default function Sensors() {
               ),
             }}
           />
+          <div
+            data-testid="sensors-ecowitt-live-proof-wiring"
+            className="flex flex-col gap-2"
+          >
+            <p className="text-[11px] text-muted-foreground">
+              Read-only EcoWitt proof from currently loaded sensor rows.
+            </p>
+            <EcowittLiveProofPanel
+              tentId={defaultManualTentId ?? null}
+              rows={
+                defaultManualTentId
+                  ? (trendReadings as unknown as readonly EcowittProofRow[])
+                  : []
+              }
+            />
+            <p
+              className="text-[11px] text-muted-foreground"
+              data-testid="sensors-ecowitt-live-proof-audit-unavailable"
+            >
+              Accepted/rejected ingest audit counts are not shown in this view.
+            </p>
+            {!defaultManualTentId && (
+              <p
+                className="text-[11px] text-muted-foreground"
+                data-testid="sensors-ecowitt-live-proof-unavailable"
+              >
+                Proof unavailable from currently loaded rows for this tent.
+              </p>
+            )}
+          </div>
         </section>
       )}
     </div>

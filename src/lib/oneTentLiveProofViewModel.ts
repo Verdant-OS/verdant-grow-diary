@@ -16,6 +16,7 @@ import {
   sensorsPath,
   growDetailPath,
   alertDetailPath,
+  actionDetailPath,
 } from "@/lib/routes";
 import { buildSourceChip, type SourceChipViewModel } from "@/lib/alertFreshnessContext";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";

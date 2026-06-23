@@ -199,12 +199,14 @@ export function DiaryTimelineCategorySections<
         const isOpen = expanded[section.id];
         const headerId = `${testIdPrefix}-${section.id}-header`;
         const panelId = `${testIdPrefix}-${section.id}-panel`;
+        const evidence = buildDiaryTimelineEvidenceQualityForSection(section);
         return (
           <div
             key={section.id}
             data-testid={`${testIdPrefix}-section`}
             data-section-id={section.id}
             data-count={section.count}
+            data-evidence-status={evidence.status}
             className="rounded-lg border border-border/50 bg-card/30"
           >
             <button

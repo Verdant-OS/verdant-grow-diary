@@ -11,6 +11,7 @@
  */
 import * as React from "react";
 import { Link } from "react-router-dom";
+import { plantDetailPath } from "@/lib/routes";
 import { AI_DOCTOR_PHASE1_FOCUS_VISIBLE_LINK_CLASSES } from "@/lib/aiDoctorPhase1A11yClassNames";
 
 export interface AiDoctorPhase1RecentActivityRow {
@@ -42,7 +43,7 @@ function buildDiaryHref(
   if (ctx.growId) params.set("growId", ctx.growId);
   if (ctx.tentId) params.set("tentId", ctx.tentId);
   const qs = params.toString();
-  return `/plants/${encodeURIComponent(ctx.plantId)}${qs ? `?${qs}` : ""}#diary-${encodeURIComponent(entryId)}`;
+  return `${plantDetailPath(ctx.plantId)}${qs ? `?${qs}` : ""}#diary-${encodeURIComponent(entryId)}`;
 }
 
 function previewLabel(row: AiDoctorPhase1RecentActivityRow): string {

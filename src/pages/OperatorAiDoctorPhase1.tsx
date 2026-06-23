@@ -16,6 +16,7 @@
  */
 import * as React from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { plantDetailPath, plantsPath } from "@/lib/routes";
 import {
   AiDoctorPhase1PlantPicker,
   type AiDoctorPhase1PlantOption,
@@ -93,7 +94,7 @@ export function buildPlantContextHref(input: {
   if (input.tentId) params.set("tentId", input.tentId);
   const qs = params.toString();
   const hash = input.hash ? `#${input.hash.replace(/^#/, "")}` : "";
-  return `/plants/${encodeURIComponent(input.plantId)}${qs ? `?${qs}` : ""}${hash}`;
+  return `${plantDetailPath(input.plantId)}${qs ? `?${qs}` : ""}${hash}`;
 }
 
 export default function OperatorAiDoctorPhase1(

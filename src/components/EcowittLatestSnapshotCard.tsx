@@ -266,14 +266,15 @@ export function EcowittLatestSnapshotCard(
 
       <div className="mt-2 text-xs">
         {/*
-          Intentionally pass null tentId so the rendered href is the bare
-          /sensors/ecowitt-audit route and the dashboard card never leaks a
-          raw tent UUID into the DOM. The audit page handles tent selection
-          on its own. buildEcowittAuditHref still supports tentId for other
-          callers (see ecowitt-audit-tent-selection-rules tests).
+          The audit deep-link is scoped via the `auditHrefMode` prop and
+          defaults to "dashboard", which renders the bare
+          /sensors/ecowitt-audit path so the Dashboard card never leaks a
+          raw tent UUID into the DOM. TentDetail opts into "tent-detail"
+          mode, where the user is already inside a specific tent and the
+          scoped ?tentId= deep-link is safe to surface.
         */}
         <Link
-          to={buildEcowittAuditHref(null)}
+          to={buildEcowittAuditHref(auditHrefTentId)}
           data-testid="ecowitt-audit-link"
           className="text-primary hover:underline"
         >

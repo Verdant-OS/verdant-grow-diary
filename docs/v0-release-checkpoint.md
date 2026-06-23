@@ -1058,3 +1058,27 @@ readonly E2E (mocked)**.
 - No product, schema, RLS, Edge, RPC, auth, query, write, AI, alert,
   Action Queue, automation, device-control, or workflow-behavior changes.
 - No new third-party dependencies.
+
+### 18.5 Demo-Proof artifact docs, safety checks, tree, and review helper
+
+- Added copy-paste artifact examples (verify-report, gh download, run-id
+  download, explicit opener paths, results summary) to
+  `docs/one-tent-loop-rc-smoke-test.md`.
+- Added `isSafeArtifactDeletePath` / `assertSafeArtifactDeletePath` to
+  `scripts/demo-proof-artifact-utils.mjs` (pure, exported) plus
+  `scripts/test-demo-proof-artifact-helpers.mjs`
+  (`bun run test:demo-proof:artifact-helpers`) — Node built-in `assert`,
+  zero deps. Proves `/`, repo root, and empty paths are refused while
+  `.artifacts/demo-proof-playwright-report/` and nested
+  `test-results/.../trace.zip` are allowed.
+- Added `scripts/tree-demo-proof-playwright-report.mjs`
+  (`bun run test:demo-proof:tree-report`) — bounded tree (depth 3, ≤80
+  entries) of an extracted report; highlights resolved `index.html`.
+- Added `scripts/review-demo-proof-artifacts.mjs`
+  (`bun run test:demo-proof:review-artifacts` and
+  `:review-artifacts:cleanup`) — runs verify-report → summarize-results →
+  open-artifacts, then optional cleanup with `--cleanup` /
+  `--cleanup-all`. Supports `--report <path>` / `--results <path>`.
+- No product, schema, RLS, Edge, RPC, auth, query, write, AI, alert,
+  Action Queue, automation, device-control, or workflow-behavior changes.
+- No new third-party dependencies.

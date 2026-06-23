@@ -382,3 +382,64 @@ Common failure patterns:
   or push an empty commit (`git commit --allow-empty -m "ci: retrigger demo proof workflow"`).
 - **Artifact not found** — verify the run completed and that the artifact name
   is exactly `demo-proof-playwright-report` (case-sensitive).
+
+## Demo-Proof artifact tooling — copy-paste examples
+
+### A. Verify an extracted report
+
+```bash
+bun run test:demo-proof:verify-report
+node scripts/verify-demo-proof-playwright-report.mjs ./.artifacts/demo-proof-playwright-report
+```
+
+### B. Download the latest report (requires `gh`)
+
+```bash
+gh auth status
+bun run test:demo-proof:download-report
+```
+
+### C. Download/open the report for a specific workflow run id
+
+```bash
+gh run download <run-id> --name demo-proof-playwright-report --dir .artifacts/demo-proof-playwright-report
+bun run test:demo-proof:verify-report
+bun run test:demo-proof:open-report
+```
+
+### D. Explicit opener paths
+
+```bash
+node scripts/open-demo-proof-playwright-report.mjs ./.artifacts/demo-proof-playwright-report
+node scripts/open-demo-proof-playwright-report.mjs ./demo-proof-playwright-report.zip
+```
+
+### E. Results artifact summary + inspection
+
+```bash
+gh run download <run-id> --name demo-proof-playwright-results --dir .artifacts/demo-proof-playwright-results
+node scripts/summarize-demo-proof-playwright-results.mjs ./.artifacts/demo-proof-playwright-results
+node scripts/open-demo-proof-playwright-artifacts.mjs ./.artifacts/demo-proof-playwright-results
+```
+
+### F. Tree, safety checks, and one-command review
+
+```bash
+bun run test:demo-proof:tree-report          # bounded file tree, highlights index.html
+bun run test:demo-proof:artifact-helpers     # Node-built-in smoke tests for cleanup path guards
+bun run test:demo-proof:review-artifacts     # verify-report -> summarize -> open-artifacts
+bun run test:demo-proof:review-artifacts:cleanup  # same, then conservative cleanup
+```
+
+- `tree-report` walks `.artifacts/demo-proof-playwright-report/` (or an
+  explicit path), prints a depth-limited tree, and marks the resolved
+  `index.html` with `← index.html`. Exit non-zero if `index.html` is missing.
+- `artifact-helpers` exercises `isSafeArtifactDeletePath` /
+  `assertSafeArtifactDeletePath` from `scripts/demo-proof-artifact-utils.mjs`
+  and proves `/`, the repo root, and empty paths are refused while
+  `.artifacts/demo-proof-playwright-report/` and nested `test-results/.../trace.zip`
+  are allowed.
+- `review-artifacts` aborts early if `verify-report` fails; it always
+  continues through `summarize-results` and `open-artifacts` even when no
+  traces/videos/screenshots are present. Cleanup runs only with
+  `--cleanup` / `--cleanup-all`.

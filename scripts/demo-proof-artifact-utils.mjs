@@ -32,6 +32,25 @@ export function ensureDir(dir) {
   mkdirSync(dir, { recursive: true });
 }
 
+// Pure path-safety check used by Demo-Proof cleanup tooling. Returns true if
+// `candidatePath` is safe to delete relative to `repoRoot`. Rejects empty
+// strings, root, the repo root itself, and anything outside the repo root.
+// Inputs are not resolved here so tests can pass already-resolved paths.
+export function isSafeArtifactDeletePath(candidatePath, repoRoot) {
+  if (typeof candidatePath !== "string" || candidatePath.length === 0) return false;
+  if (typeof repoRoot !== "string" || repoRoot.length === 0) return false;
+  if (candidatePath === "/" || candidatePath === "\\") return false;
+  if (candidatePath === repoRoot) return false;
+  const sepChar = repoRoot.includes("\\") && !repoRoot.includes("/") ? "\\" : "/";
+  return candidatePath.startsWith(repoRoot + sepChar);
+}
+
+export function assertSafeArtifactDeletePath(candidatePath, repoRoot) {
+  if (!isSafeArtifactDeletePath(candidatePath, repoRoot)) {
+    throw new Error(`Refusing to delete unsafe path: ${candidatePath}`);
+  }
+}
+
 export function findIndexHtml(dir) {
   const direct = join(dir, "index.html");
   if (existsSync(direct)) return direct;

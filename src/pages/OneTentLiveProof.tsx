@@ -141,13 +141,61 @@ export default function OneTentLiveProof() {
     ],
   );
 
-  const report = useMemo(
-    () =>
-      buildOneTentLiveProofReport(vm, {
-        now: lastRefreshedAt ?? new Date(),
-      }),
-    [vm, lastRefreshedAt],
+  // Read-only sensor evidence: row-level EcoWitt proof from already-loaded
+  // sensor_readings + RLS-safe ingest-audit proof from sensor_ingest_audit_log.
+  // Both queries are narrow and existing — no new write surface, no schema
+  // changes, no Edge/RPC/auth changes.
+  const { data: tentSensorRows = [] } = useSensorReadings(
+    effectiveTentId || undefined,
+    60,
   );
+  const auditProofQuery = useEcowittIngestAuditProofRows({
+    tentId: effectiveTentId || null,
+    enabled: Boolean(effectiveTentId),
+  });
+  const sensorProofVM = useMemo(() => {
+    const now = lastRefreshedAt ?? new Date();
+    const liveVM = effectiveTentId
+      ? buildEcowittLiveProofViewModel(
+          tentSensorRows as unknown as readonly EcowittProofRow[],
+          { tentId: effectiveTentId, now },
+        )
+      : null;
+    const auditVM = effectiveTentId
+      ? buildEcowittIngestAuditProof(auditProofQuery.rows, {
+          status: auditProofQuery.status,
+          tentId: effectiveTentId,
+          now,
+        })
+      : null;
+    return buildOneTentSensorProofViewModel({
+      tentId: effectiveTentId || null,
+      liveProof: liveVM,
+      auditProof: auditVM,
+    });
+  }, [
+    effectiveTentId,
+    tentSensorRows,
+    auditProofQuery.status,
+    auditProofQuery.rows,
+    lastRefreshedAt,
+    refreshNonce,
+  ]);
+
+  const report = useMemo(() => {
+    const base = buildOneTentLiveProofReport(vm, {
+      now: lastRefreshedAt ?? new Date(),
+    });
+    const sensorMarkdown = buildOneTentSensorProofReportSection(sensorProofVM);
+    return {
+      ...base,
+      markdown: `${base.markdown}\n\n${sensorMarkdown}`,
+    };
+  }, [vm, lastRefreshedAt, sensorProofVM]);
+
+
+
+
 
 
 

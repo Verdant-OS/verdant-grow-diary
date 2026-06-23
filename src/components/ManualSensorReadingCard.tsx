@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Gauge, Info, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { AlertTriangle, ArrowRight, CheckCircle2, Gauge, Info, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import {
+  buildManualSaveSuccessLine,
+  mapManualSaveErrorToUserMessage,
+} from "@/lib/manualSensorSaveConfirmation";
 import { useInsertSensorReading } from "@/hooks/useInsertSensorReading";
 import {
   buildManualReadingPayloads,
@@ -43,7 +48,15 @@ interface Props {
   tents: TentOption[];
   defaultTentId?: string;
   successMessage?: string;
+  /** When provided, the post-save next-step links Alerts filtered to this grow. */
+  growId?: string;
   onSaved?: (meta: { tentId: string; metricsSaved: number; createdAt: string }) => void;
+}
+
+interface LastSavedConfirmation {
+  line: string;
+  capturedAt: string;
+  tentId: string;
 }
 
 const EMPTY: ManualEntryInput = {
@@ -59,6 +72,7 @@ export default function ManualSensorReadingCard({
   tents,
   defaultTentId,
   successMessage,
+  growId,
   onSaved,
 }: Props) {
   const [tentId, setTentId] = useState<string>(defaultTentId ?? tents[0]?.id ?? "");
@@ -66,6 +80,7 @@ export default function ManualSensorReadingCard({
   const [devicePreset, setDevicePreset] = useState<string>("none");
   const [deviceCustom, setDeviceCustom] = useState<string>("");
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [lastSaved, setLastSaved] = useState<LastSavedConfirmation | null>(null);
   const insert = useInsertSensorReading();
 
   const devicePresets = useMemo(() => getManualSensorDeviceOptions(), []);
@@ -102,12 +117,19 @@ export default function ManualSensorReadingCard({
     // Any edit invalidates a previously-shown review prompt so it must be
     // re-triggered on the next save attempt against the new values.
     if (reviewOpen) setReviewOpen(false);
+    // Editing after a save dismisses the prior confirmation so it never
+    // confuses the grower about the current form state.
+    if (lastSaved) setLastSaved(null);
   }
 
   async function doSave() {
+    // Belt-and-suspenders: even though Save buttons are disabled while
+    // pending, guard against a second concurrent call from any path.
+    if (insert.isPending) return;
+    const capturedMetrics = validation.metrics;
     const payloads = buildManualReadingPayloads({
       tentId,
-      metrics: validation.metrics,
+      metrics: capturedMetrics,
       deviceNote,
     });
     try {
@@ -116,22 +138,27 @@ export default function ManualSensorReadingCard({
       for (const p of payloads) {
         await insert.mutateAsync(p);
       }
-      toast.success(
-        successMessage ??
-          `Saved ${payloads.length} manual reading${payloads.length === 1 ? "" : "s"}.`,
-      );
+      const createdAt = new Date().toISOString();
+      const successLine = buildManualSaveSuccessLine({ metrics: capturedMetrics });
+      toast.success(successMessage ?? successLine);
       onSaved?.({
         tentId,
         metricsSaved: payloads.length,
-        createdAt: new Date().toISOString(),
+        createdAt,
       });
+      setLastSaved({ line: successLine, capturedAt: createdAt, tentId });
       setForm(EMPTY);
       setDevicePreset("none");
       setDeviceCustom("");
       setReviewOpen(false);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Save failed.";
+      // Preserve entered values (we don't clear the form on failure) and
+      // surface a safe operator-facing error. Never echo raw internals.
+      const msg = mapManualSaveErrorToUserMessage(err);
       toast.error(msg);
+      // Developer-safe diagnostic: console only, not in UI.
+      // eslint-disable-next-line no-console
+      console.warn("[manual-sensor-save] failed");
     }
   }
 
@@ -456,6 +483,42 @@ export default function ManualSensorReadingCard({
             current-room guidance.
           </p>
         </section>
+
+        {lastSaved && (
+          <div
+            className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 space-y-2"
+            data-testid="manual-reading-saved-confirmation"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-2">
+              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <div className="space-y-1">
+                <p
+                  className="text-xs font-medium text-emerald-700 dark:text-emerald-300"
+                  data-testid="manual-reading-saved-line"
+                >
+                  {lastSaved.line}
+                </p>
+                <p
+                  className="text-[11px] text-muted-foreground"
+                  data-testid="manual-reading-saved-captured-at"
+                >
+                  Captured {new Date(lastSaved.capturedAt).toLocaleString()}. Now
+                  available for snapshot and alert evaluation.
+                </p>
+                <Link
+                  to={growId ? `/alerts?growId=${encodeURIComponent(growId)}` : "/alerts"}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:underline"
+                  data-testid="manual-reading-next-step-alerts"
+                >
+                  Next: open Alerts to check this snapshot against current targets
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
 
 
         <div className="flex items-center justify-between gap-2 pt-1">

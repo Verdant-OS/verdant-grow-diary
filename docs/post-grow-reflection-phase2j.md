@@ -46,7 +46,7 @@ Not included:
 4. Click `Validate pasted candidate`.
 5. Review either the validated preview or envelope rejection summary.
 
-The loader does not auto-validate and does not save anything. It only places local sample JSON into the textarea.
+The loader does not auto-validate and the candidate is not saved anywhere. It only places local sample JSON into the textarea.
 
 ## Safety verdict
 

@@ -82,7 +82,14 @@ function readPayloadMetadata(rawPayload: unknown): {
 export function EcowittLatestSnapshotCard(
   props: EcowittLatestSnapshotCardProps,
 ) {
-  const { title = "Latest EcoWitt Reading", tentName, ...input } = props;
+  const {
+    title = "Latest EcoWitt Reading",
+    tentName,
+    auditHrefMode = "dashboard",
+    ...input
+  } = props;
+  const auditHrefTentId =
+    auditHrefMode === "tent-detail" ? (input.tentId ?? null) : null;
   const { status, viewModel, errorMessage } = useEcowittLatestSnapshot(input);
 
   const meta = readPayloadMetadata(viewModel?.snapshot?.rawPayload ?? null);

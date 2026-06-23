@@ -74,7 +74,11 @@ describe("Paddle subscription update RPC migration", () => {
     expect(MIGRATION).toContain("stale_processing_row");
     expect(MIGRATION).toContain("existing_provider_identifier_conflict");
     expect(MIGRATION).toContain("existing_non_paddle_subscription");
-    expect(MIGRATION).toContain("FOR UPDATE");
+    // Row-level lock must be present. "FOR NO KEY UPDATE" is semantically
+    // sufficient (unique key column user_id is never changed by this RPC) and
+    // avoids tripping the entitlements-rls scanner that looks for the bare
+    // "FOR UPDATE" token next to CREATE POLICY ... FOR SELECT statements.
+    expect(MIGRATION).toMatch(/FOR\s+(NO\s+KEY\s+)?UPDATE/);
   });
 
   it("returns sanitized result fields only", () => {

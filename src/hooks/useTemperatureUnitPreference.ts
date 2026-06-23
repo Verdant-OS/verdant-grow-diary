@@ -32,7 +32,7 @@ export function useTemperatureUnitPreference(): TemperatureUnitPreference {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onStorage = (e: StorageEvent) => {
-      if (e.key && e.key !== TEMPERATURE_UNIT_STORAGE_KEY) return;
+      if (e.key && e.key !== STORAGE_KEY) return;
       setUnit(readPreference());
     };
     window.addEventListener("storage", onStorage);

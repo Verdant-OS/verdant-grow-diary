@@ -100,6 +100,7 @@ export interface ProofViewModel {
   proofComplete: boolean;
   needsOperatorConfirmation: boolean;
   sourceChip: SourceChipViewModel;
+  shortcutLinks: ProofShortcutLink[];
 }
 
 /* -------------------------------------------------------------------------- */

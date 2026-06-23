@@ -484,6 +484,42 @@ export default function ManualSensorReadingCard({
           </p>
         </section>
 
+        {lastSaved && (
+          <div
+            className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 space-y-2"
+            data-testid="manual-reading-saved-confirmation"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-2">
+              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <div className="space-y-1">
+                <p
+                  className="text-xs font-medium text-emerald-700 dark:text-emerald-300"
+                  data-testid="manual-reading-saved-line"
+                >
+                  {lastSaved.line}
+                </p>
+                <p
+                  className="text-[11px] text-muted-foreground"
+                  data-testid="manual-reading-saved-captured-at"
+                >
+                  Captured {new Date(lastSaved.capturedAt).toLocaleString()}. Now
+                  available for snapshot and alert evaluation.
+                </p>
+                <Link
+                  to={growId ? `/alerts?growId=${encodeURIComponent(growId)}` : "/alerts"}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:underline"
+                  data-testid="manual-reading-next-step-alerts"
+                >
+                  Next: open Alerts to check this snapshot against current targets
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         <div className="flex items-center justify-between gap-2 pt-1">
           <p className="text-[11px] text-muted-foreground">

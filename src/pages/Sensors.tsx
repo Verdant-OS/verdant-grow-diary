@@ -372,6 +372,11 @@ export default function Sensors() {
           <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
         )}
       </div>
+      {manualTents.length > 0 && defaultManualTentId && (
+        <div className="mt-4 max-w-xl">
+          <ManualSensorTrendChart readings={trendReadings} />
+        </div>
+      )}
       <div
         id="csv-import"
         className="mt-4 max-w-xl scroll-mt-24"

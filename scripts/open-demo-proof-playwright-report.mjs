@@ -1,18 +1,42 @@
 #!/usr/bin/env node
 // Demo-Proof local helper: open a downloaded Playwright HTML report artifact.
-// Accepts a .zip or a directory. Defaults to ./demo-proof-playwright-report.zip.
-// Unzips into .artifacts/demo-proof-playwright-report/ and opens index.html.
-import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
-import { join, resolve, basename } from "node:path";
+//
+// Accepts:
+//   - ./demo-proof-playwright-report.zip                 (default)
+//   - ./demo-proof-playwright-report/                    (extracted)
+//   - ./.artifacts/demo-proof-playwright-report/         (extracted)
+//   - explicit path argument (.zip or directory)
+//
+// Zip extraction uses a Node-built-in extractor (no system `unzip`, no deps).
+// Output dir for .zip input: .artifacts/demo-proof-playwright-report/
+import { existsSync, statSync } from "node:fs";
+import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { extractZip, findIndexHtml, openPath } from "./demo-proof-artifact-utils.mjs";
 
-const input = resolve(process.argv[2] ?? "demo-proof-playwright-report.zip");
+const CANDIDATES = [
+  "demo-proof-playwright-report.zip",
+  "demo-proof-playwright-report",
+  ".artifacts/demo-proof-playwright-report",
+];
 const OUT_DIR = resolve(".artifacts/demo-proof-playwright-report");
 
 function fail(msg, code = 1) {
   console.error(msg);
   process.exit(code);
 }
+
+function resolveInput() {
+  const arg = process.argv[2];
+  if (arg) return resolve(arg);
+  for (const c of CANDIDATES) {
+    const p = resolve(c);
+    if (existsSync(p)) return p;
+  }
+  return resolve(CANDIDATES[0]);
+}
+
+const input = resolveInput();
 
 if (!existsSync(input)) {
   fail(
@@ -22,10 +46,13 @@ if (!existsSync(input)) {
       "Usage:",
       "  node scripts/open-demo-proof-playwright-report.mjs [path-to-zip-or-dir]",
       "",
-      "Default input: ./demo-proof-playwright-report.zip",
+      "Searched defaults (in order):",
+      ...CANDIDATES.map((c) => `  - ${c}`),
+      "",
       "Download the artifact from the GitHub Actions workflow run page",
       "(artifact name: demo-proof-playwright-report) and place it in the repo root,",
-      "or pass an explicit path.",
+      "or pass an explicit path. You can also run:",
+      "  bun run test:demo-proof:download-report",
     ].join("\n"),
   );
 }
@@ -35,44 +62,29 @@ const stat = statSync(input);
 if (stat.isDirectory()) {
   reportDir = input;
 } else if (input.toLowerCase().endsWith(".zip")) {
-  mkdirSync(OUT_DIR, { recursive: true });
-  const unzip = spawnSync("unzip", ["-o", "-q", input, "-d", OUT_DIR], { stdio: "inherit" });
-  if (unzip.error || unzip.status !== 0) {
-    fail(
-      [
-        `Failed to unzip: ${input}`,
-        "Manual fallback:",
-        `  mkdir -p ${OUT_DIR}`,
-        `  unzip -o "${input}" -d ${OUT_DIR}`,
-        "Then re-run this script pointing at the extracted directory:",
-        `  node scripts/open-demo-proof-playwright-report.mjs ${OUT_DIR}`,
-      ].join("\n"),
-    );
+  const r = extractZip(input, OUT_DIR);
+  if (!r.ok) {
+    // Best-effort fallback to system unzip if the built-in extractor failed.
+    const unzip = spawnSync("unzip", ["-o", "-q", input, "-d", OUT_DIR], { stdio: "inherit" });
+    if (unzip.error || unzip.status !== 0) {
+      fail(
+        [
+          `Failed to extract: ${input}`,
+          `  built-in extractor: ${r.error?.message ?? "unknown error"}`,
+          `  system unzip fallback: ${unzip.error?.message ?? `exit ${unzip.status}`}`,
+          "",
+          "Manual fallback:",
+          `  mkdir -p ${OUT_DIR}`,
+          `  unzip -o "${input}" -d ${OUT_DIR}`,
+          "Then re-run pointing at the extracted directory:",
+          `  node scripts/open-demo-proof-playwright-report.mjs ${OUT_DIR}`,
+        ].join("\n"),
+      );
+    }
   }
   reportDir = OUT_DIR;
 } else {
   fail(`Unsupported input (expected .zip or directory): ${input}`);
-}
-
-function findIndexHtml(dir) {
-  const direct = join(dir, "index.html");
-  if (existsSync(direct)) return direct;
-  const stack = [dir];
-  while (stack.length) {
-    const cur = stack.pop();
-    let entries;
-    try {
-      entries = readdirSync(cur, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    for (const e of entries) {
-      const full = join(cur, e.name);
-      if (e.isDirectory()) stack.push(full);
-      else if (e.isFile() && e.name === "index.html") return full;
-    }
-  }
-  return null;
 }
 
 const indexHtml = findIndexHtml(reportDir);
@@ -88,15 +100,8 @@ if (!indexHtml) {
 
 console.log(`Report entry point: ${indexHtml}`);
 
-const opener =
-  process.platform === "darwin"
-    ? ["open", [indexHtml]]
-    : process.platform === "win32"
-      ? ["cmd", ["/c", "start", "", indexHtml]]
-      : ["xdg-open", [indexHtml]];
-
-const r = spawnSync(opener[0], opener[1], { stdio: "ignore" });
-if (r.error || (typeof r.status === "number" && r.status !== 0)) {
+const opened = openPath(indexHtml);
+if (!opened.ok) {
   console.log(
     [
       "Could not auto-open the report. Open this path manually:",

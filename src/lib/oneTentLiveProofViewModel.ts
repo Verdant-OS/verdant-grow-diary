@@ -321,16 +321,23 @@ export function buildOneTentLiveProofViewModel(
   const steps: ProofStep[] = [
     step1(context),
     step2(chip, context),
-    step3({ ctx: context, chip, hasMatchingOpenAlert: signals.hasMatchingOpenAlert }),
+    step3({
+      ctx: context,
+      chip,
+      hasMatchingOpenAlert: signals.hasMatchingOpenAlert,
+      matchingAlertId: signals.matchingAlertId ?? null,
+    }),
     step4({
       ctx: context,
       hasMatchingOpenAlert: signals.hasMatchingOpenAlert,
       linkedActionExists: signals.linkedActionExists,
+      linkedActionId: signals.linkedActionId ?? null,
     }),
     step5({
       ctx: context,
       linkedActionExists: signals.linkedActionExists,
       linkedActionCompleted: signals.linkedActionCompleted,
+      linkedActionId: signals.linkedActionId ?? null,
     }),
     step6({
       ctx: context,

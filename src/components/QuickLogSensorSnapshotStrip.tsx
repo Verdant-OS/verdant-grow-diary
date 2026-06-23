@@ -63,9 +63,10 @@ const PILL_ARIA: Record<QuickLogSnapshotStripStatus, string> = {
   no_data: "Sensor snapshot status: no data",
 };
 
-function shouldRenderTrustBadge(status: QuickLogSnapshotStripStatus, trustLabel: string): boolean {
-  return trustLabel.trim().toLowerCase() !== PILL_LABEL[status].toLowerCase();
-}
+// The strip's high-level status pill and the authoritative trust badge
+// are intentionally rendered side-by-side. The trust badge is the
+// canonical sensor-truth signal (Live/Stale/Invalid/Manual/Demo/CSV)
+// and must always render so growers and tests can read it directly.
 
 export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, attached = true }: Props) {
   const state = useLatestTentSensorSnapshot(tentId ?? null);
@@ -93,7 +94,7 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
     : vm.emptyCopy
       ? "missing"
       : null;
-  const showTrustBadge = shouldRenderTrustBadge(view.status, view.trustBadge.label);
+  
 
   return (
     <section
@@ -128,7 +129,7 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
             {PILL_LABEL[view.status]}
           </span>
 
-          {showTrustBadge && <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />}
+          <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />
 
 
         </div>

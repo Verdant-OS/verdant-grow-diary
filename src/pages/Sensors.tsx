@@ -44,6 +44,8 @@ import SensorIngestAuditReport from "@/components/SensorIngestAuditReport";
 import { mapReadingsToOperatorAuditRows } from "@/lib/sensorsOperatorDiagnosticsViewModel";
 import { EcowittLiveProofPanel } from "@/components/EcowittLiveProofPanel";
 import type { EcowittProofRow } from "@/lib/ecowittLiveProofRules";
+import { EcowittIngestAuditProofPanel } from "@/components/EcowittIngestAuditProofPanel";
+import { useEcowittIngestAuditProofRows } from "@/hooks/useEcowittIngestAuditProofRows";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },
@@ -110,6 +112,13 @@ export default function Sensors() {
     defaultManualTentId,
     60,
   );
+
+  const operatorMode = searchParams.get("operator") === "1";
+  const ecowittIngestAuditProof = useEcowittIngestAuditProofRows({
+    tentId: defaultManualTentId ?? null,
+    enabled: operatorMode && Boolean(defaultManualTentId),
+  });
+
 
 
 
@@ -498,12 +507,12 @@ export default function Sensors() {
                   : []
               }
             />
-            <p
-              className="text-[11px] text-muted-foreground"
-              data-testid="sensors-ecowitt-live-proof-audit-unavailable"
-            >
-              Accepted/rejected ingest audit counts are not shown in this view.
-            </p>
+            <EcowittIngestAuditProofPanel
+              tentId={defaultManualTentId ?? null}
+              status={ecowittIngestAuditProof.status}
+              rows={ecowittIngestAuditProof.rows}
+            />
+
             {!defaultManualTentId && (
               <p
                 className="text-[11px] text-muted-foreground"

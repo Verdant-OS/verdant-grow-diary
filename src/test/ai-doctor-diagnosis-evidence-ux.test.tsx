@@ -1,6 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+
+// PDF download is gated through the premium-export preflight; stub the
+// edge function client so the gate resolves `ok:true` synchronously and
+// the download path runs in the test environment.
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    functions: {
+      invoke: vi.fn(async () => ({ data: { ok: true }, error: null })),
+    },
+  },
+}));
 import AiDoctorDiagnosisPanel from "@/components/AiDoctorDiagnosisPanel";
 import {
   buildDiagnosisEvidenceAlignmentVM,
@@ -513,7 +524,7 @@ describe("AiDoctorDiagnosisPanel — download report action", () => {
     ).toBeInTheDocument();
   });
 
-  it("clicking the download button triggers a client-side download", () => {
+  it("clicking the download button triggers a client-side download", async () => {
     render(
       <AiDoctorDiagnosisPanel
         diagnosis={baseDiagnosis}
@@ -523,7 +534,9 @@ describe("AiDoctorDiagnosisPanel — download report action", () => {
     fireEvent.click(
       screen.getByTestId("ai-doctor-diagnosis-download-report"),
     );
-    expect(clickSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
     expect((URL as any).createObjectURL).toHaveBeenCalledTimes(1);
   });
 });

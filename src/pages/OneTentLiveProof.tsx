@@ -129,6 +129,16 @@ export default function OneTentLiveProof() {
     ],
   );
 
+  const report = useMemo(
+    () =>
+      buildOneTentLiveProofReport(vm, {
+        now: lastRefreshedAt ?? new Date(),
+      }),
+    [vm, lastRefreshedAt],
+  );
+
+
+
   return (
     <div className="space-y-4">
       <PageHeader

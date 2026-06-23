@@ -105,14 +105,6 @@ function ResultPanel({ result }: { result: PostGrowReflectionCandidatePasteResul
           ))}
         </div>
         <p className="text-sm text-muted-foreground">{result.message}</p>
-        <div className="text-sm">
-          <span className="font-medium">Issue codes: </span>
-          {result.issueCodes.length > 0 ? result.issueCodes.join(", ") : "none"}
-        </div>
-        <div className="text-sm">
-          <span className="font-medium">Failure reason: </span>
-          {result.failureReason}
-        </div>
       </div>
     );
   }
@@ -129,12 +121,7 @@ function ResultPanel({ result }: { result: PostGrowReflectionCandidatePasteResul
           ))}
         </div>
         <p className="text-sm text-muted-foreground">{result.message}</p>
-        <div className="text-sm">
-          <span className="font-medium">Issue codes: </span>
-          {result.issueCodes.length > 0 ? result.issueCodes.join(", ") : "none"}
-        </div>
         <EnvelopeMetadata result={result} />
-        <p className="text-xs text-muted-foreground">{result.validationOptions.label}</p>
       </div>
     );
   }

@@ -37,18 +37,26 @@ describe("DemoProofWalkthrough page", () => {
     }
   });
 
-  it("operator-mode step links preserve ?operator=1", () => {
+  it("operator-mode step link preserves ?operator=1", () => {
     renderPage();
-    const live = screen
-      .getByTestId("demo-proof-walkthrough-step-ecowitt-live-row-proof-link")
-      .getAttribute("href");
-    const audit = screen
+    const href = screen
       .getByTestId(
-        "demo-proof-walkthrough-step-ecowitt-ingest-audit-proof-link",
+        "demo-proof-walkthrough-step-sensor-data-operator-mode-link",
       )
       .getAttribute("href");
-    expect(live).toContain("?operator=1");
-    expect(audit).toContain("?operator=1");
+    expect(href).toContain("?operator=1");
+  });
+
+  it("does not link to /grows and starts at Dashboard / Command Center", () => {
+    renderPage();
+    const dashHref = screen
+      .getByTestId("demo-proof-walkthrough-step-dashboard-link")
+      .getAttribute("href");
+    expect(dashHref).toBe("/");
+    const links = screen.getAllByRole("link");
+    for (const a of links) {
+      expect(a.getAttribute("href") ?? "").not.toMatch(/^\/grows(\b|\/)/);
+    }
   });
 
   it("renders safety summary with URL surface gate copy", () => {

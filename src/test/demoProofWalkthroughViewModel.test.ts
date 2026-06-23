@@ -6,14 +6,13 @@ import {
 } from "@/lib/demoProofWalkthroughViewModel";
 
 const EXPECTED_ORDER = [
-  "grow",
-  "tent",
-  "plant",
+  "dashboard",
+  "tents",
+  "plants",
   "quick-log",
-  "timeline",
-  "sensor-snapshot",
-  "ecowitt-live-row-proof",
-  "ecowitt-ingest-audit-proof",
+  "logs-timeline",
+  "sensor-data",
+  "sensor-data-operator-mode",
   "ai-doctor-readiness",
   "alerts",
   "action-queue",
@@ -74,19 +73,30 @@ describe("demoProofWalkthroughViewModel", () => {
   });
 
   it("operator-mode steps include ?operator=1 and are marked operator_only", () => {
-    const operatorSteps = vm.steps.filter((s) =>
-      s.id.startsWith("ecowitt-"),
-    );
-    expect(operatorSteps.length).toBe(2);
+    const operatorSteps = vm.steps.filter((s) => s.href.includes("?operator=1"));
+    expect(operatorSteps.length).toBeGreaterThanOrEqual(1);
     for (const s of operatorSteps) {
-      expect(s.href).toContain("?operator=1");
       expect(s.statusKind).toBe("operator_only");
+      expect(s.safetyNote).toMatch(/URL surface gate/i);
     }
-    // At least one operator step must spell out the URL surface gate.
-    const gateMentions = operatorSteps.filter((s) =>
-      /URL surface gate/i.test(s.safetyNote),
-    );
-    expect(gateMentions.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("first step is Dashboard / Command Center, not a nonexistent Grow page", () => {
+    expect(vm.steps[0].id).toBe("dashboard");
+    expect(vm.steps[0].label).toMatch(/Dashboard \/ Command Center/i);
+    expect(vm.steps[0].href).toBe("/");
+    for (const s of vm.steps) {
+      expect(s.label).not.toBe("Grow");
+      expect(s.href).not.toBe("/grows");
+      expect(s.href.startsWith("/grows")).toBe(false);
+    }
+  });
+
+  it("Tents and Plants are steps 2 and 3 with the real app routes", () => {
+    expect(vm.steps[1].id).toBe("tents");
+    expect(vm.steps[1].href).toBe("/tents");
+    expect(vm.steps[2].id).toBe("plants");
+    expect(vm.steps[2].href).toBe("/plants");
   });
 
 

@@ -524,7 +524,7 @@ describe("AiDoctorDiagnosisPanel — download report action", () => {
     ).toBeInTheDocument();
   });
 
-  it("clicking the download button triggers a client-side download", () => {
+  it("clicking the download button triggers a client-side download", async () => {
     render(
       <AiDoctorDiagnosisPanel
         diagnosis={baseDiagnosis}
@@ -534,7 +534,9 @@ describe("AiDoctorDiagnosisPanel — download report action", () => {
     fireEvent.click(
       screen.getByTestId("ai-doctor-diagnosis-download-report"),
     );
-    expect(clickSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
     expect((URL as any).createObjectURL).toHaveBeenCalledTimes(1);
   });
 });

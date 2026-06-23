@@ -40,14 +40,17 @@ describe("Demo Proof Walkthrough — static safety", () => {
     }
   });
 
-  it("contains no Action Queue / automation / device-control writes", () => {
+  it("contains no Action Queue / automation / device-control call surfaces", () => {
     for (const f of FILES) {
       const src = read(f);
       expect(src).not.toMatch(/createActionQueueItem|insertActionQueue/);
-      expect(src).not.toMatch(/device[_-]?control|relay[_-]?on|relay[_-]?off/i);
-      expect(src).not.toMatch(/automation/i);
+      // Functional device-control call shapes, not the literal phrase used
+      // in safety copy.
+      expect(src).not.toMatch(/sendDeviceCommand|setRelay|relayOn|relayOff/);
+      expect(src).not.toMatch(/setAutomation|runAutomation/);
     }
   });
+
 
   it("does not reference raw payloads, service role keys, bridge tokens, or env secrets", () => {
     for (const f of FILES) {

@@ -128,7 +128,7 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
             {PILL_LABEL[view.status]}
           </span>
 
-          {showTrustBadge && <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />}
+          <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />
 
 
         </div>

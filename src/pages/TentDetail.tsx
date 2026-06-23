@@ -314,6 +314,18 @@ export default function TentDetail() {
         {tent.growId ? (
           <StartPhenoHuntButton growId={tent.growId} tentId={tent.id} />
         ) : null}
+        {tent.growId ? (
+          <Button
+            size="sm"
+            variant="outline"
+            asChild
+            data-testid="tent-detail-manage-targets"
+          >
+            <Link to={`/grows/${encodeURIComponent(tent.growId)}`}>
+              Manage Targets
+            </Link>
+          </Button>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">

@@ -1014,3 +1014,25 @@ readonly E2E (mocked)**.
 - Added `test:demo-proof:open-report` → `scripts/open-demo-proof-playwright-report.mjs`. Opens a downloaded `demo-proof-playwright-report` zip or directory, extracting zips to `.artifacts/demo-proof-playwright-report/`.
 - Expanded `docs/one-tent-loop-rc-smoke-test.md` with expected file layout for `demo-proof-playwright-report`, `demo-proof-playwright-results`, and `demo-proof-playwright-failure-artifacts`.
 - No product, runtime, workflow-trigger, schema, RLS, Edge, RPC, auth, query, write, AI, alert, Action Queue, automation, or device-control behavior changed.
+
+### 18.3 Demo-Proof artifact tooling polish
+
+- Documented the exact CI artifact names produced by
+  `.github/workflows/demo-proof-walkthrough-readonly.yml`:
+  `demo-proof-guards`, `demo-proof-vitest`, `demo-proof-playwright-report`,
+  `demo-proof-playwright-results`, and the failure-only
+  `demo-proof-playwright-failure-artifacts`.
+- `scripts/open-demo-proof-playwright-report.mjs` no longer depends on a
+  system `unzip` binary. A Node-built-in zip extractor
+  (`scripts/demo-proof-artifact-utils.mjs`) handles stored + deflated entries
+  and rejects unsafe paths. System `unzip` is only a best-effort fallback.
+- Added `scripts/download-latest-demo-proof-playwright-report.mjs` (package
+  script `test:demo-proof:download-report`) which uses `gh` to fetch the
+  latest `demo-proof-playwright-report` artifact and opens it via the shared
+  opener.
+- Added `scripts/summarize-demo-proof-playwright-results.mjs` (package script
+  `test:demo-proof:summarize-results`) to recursively list `trace.zip`,
+  `*.webm`, and `*.png` artifacts under a results directory.
+- No product, schema, RLS, Edge, RPC, auth, query, write, AI, alert,
+  Action Queue, automation, device-control, or workflow-behavior changes.
+- No new third-party dependencies.

@@ -257,3 +257,63 @@ Notes:
   ```
 
 **`demo-proof-playwright-failure-artifacts`** — uploaded only on failure. Contains screenshots / videos / traces only when Playwright generated them. Absent / empty on green runs (expected).
+
+## Demo-Proof artifact tooling — exact names, paths, and helpers
+
+### CI artifact names (exact)
+
+Produced by `.github/workflows/demo-proof-walkthrough-readonly.yml`:
+
+- `demo-proof-guards` — `e2e/results/demo-proof-guards.log`
+- `demo-proof-vitest` — `e2e/results/demo-proof-vitest.log`
+- `demo-proof-playwright-report` — Playwright HTML report (`playwright-report/`)
+- `demo-proof-playwright-results` — Playwright run dir (`test-results/`)
+- `demo-proof-playwright-failure-artifacts` — **failure-only** subset of `test-results/`
+  (`**/*.png`, `**/*.webm`, `**/trace.zip`)
+
+### Local script expectations
+
+`test:demo-proof:open-report` (`scripts/open-demo-proof-playwright-report.mjs`) accepts, in order:
+
+1. explicit path argument (`.zip` or directory)
+2. `./demo-proof-playwright-report.zip`
+3. `./demo-proof-playwright-report/`
+4. `./.artifacts/demo-proof-playwright-report/`
+
+Report entry point: `index.html`, searched recursively if not at the root.
+Zip extraction uses a Node-built-in extractor (no system `unzip` and no
+dependencies required); a system `unzip` fallback is attempted only if the
+built-in extractor fails.
+
+`test:demo-proof:download-report`
+(`scripts/download-latest-demo-proof-playwright-report.mjs`):
+
+- requires `gh` on PATH
+- requires `gh auth status` to succeed
+- looks up the most recent run of `.github/workflows/demo-proof-walkthrough-readonly.yml`
+- downloads artifact `demo-proof-playwright-report` into `.artifacts/demo-proof-playwright-report/`
+- opens the report through the shared opener logic
+
+`test:demo-proof:summarize-results`
+(`scripts/summarize-demo-proof-playwright-results.mjs`):
+
+- default root: `./test-results/`
+- optional explicit path, e.g.
+  `node scripts/summarize-demo-proof-playwright-results.mjs ./.artifacts/demo-proof-playwright-results`
+- recursively counts and lists `trace.zip`, `*.webm`, `*.png`
+- exit 0 even when nothing found (expected on passing runs — Playwright only
+  retains traces/videos on failure per `playwright.config.ts`)
+- exit non-zero only when the input path is missing/unreadable
+
+### Reproduction commands
+
+```bash
+bun run test:demo-proof:open-report
+bun run test:demo-proof:download-report
+bun run test:demo-proof:summarize-results
+
+# Direct usage:
+node scripts/open-demo-proof-playwright-report.mjs ./demo-proof-playwright-report.zip
+node scripts/summarize-demo-proof-playwright-results.mjs ./test-results
+node scripts/summarize-demo-proof-playwright-results.mjs ./.artifacts/demo-proof-playwright-results
+```

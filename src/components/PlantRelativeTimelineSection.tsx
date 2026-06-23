@@ -287,6 +287,32 @@ export default function PlantRelativeTimelineSection({
   });
   const visibleItems = filterRelativeTimelineItems(items, filter);
   const groups = groupRelativeTimelineByStage(visibleItems);
+  const filterDef =
+    RELATIVE_TIMELINE_FILTERS.find((f) => f.key === filter) ??
+    RELATIVE_TIMELINE_FILTERS[0];
+  const categorySections = buildDiaryTimelineSections(visibleItems);
+  const evidenceSummary = buildDiaryTimelineEvidenceQualitySummary(categorySections);
+  const readabilitySummary = buildPlantTimelineReadabilitySummary({
+    totalEntries: items.length,
+    visibleEntries: visibleItems.length,
+    filterKey: filter,
+    filterLabel: filterDef?.label ?? null,
+    groupCount: groups.length,
+    totalSections: evidenceSummary.totalSections,
+    sectionsWithEvidence: evidenceSummary.presentCount,
+  });
+  const printSummary = buildPlantTimelinePrintSummary({
+    totalEntries: items.length,
+    visibleEntries: visibleItems.length,
+    filterKey: filter,
+    filterLabel: filterDef?.label ?? null,
+    groupCount: groups.length,
+    totalSections: evidenceSummary.totalSections,
+    sectionsWithEvidence: evidenceSummary.presentCount,
+    plantName: plantName ?? null,
+    tentName: tentName ?? null,
+    growName: growName ?? null,
+  });
 
   return (
     <Card data-testid="plant-relative-timeline-section">

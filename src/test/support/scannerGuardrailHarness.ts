@@ -91,9 +91,25 @@ export function buildScannerSlowTestReportRow(input: {
   suiteLabel?: string;
   recordedAt?: string;
 }): ScannerGuardrailSlowTestReportRow {
-  const suite = (input.suiteLabel ?? input.suite ?? deriveSuiteLabel(input.file)).trim();
+  // Validate up-front so malformed rows never reach the JSONL report.
+  // Each guardrail row must carry a stable test/suite/file triple and a
+  // finite duration — otherwise downstream telemetry can't aggregate.
+  if (typeof input.test !== "string" || input.test.trim().length === 0) {
+    throw new Error("buildScannerSlowTestReportRow: empty test name");
+  }
+  const rawSuite = input.suiteLabel ?? input.suite;
+  if (rawSuite !== undefined && (typeof rawSuite !== "string" || rawSuite.trim().length === 0)) {
+    throw new Error("buildScannerSlowTestReportRow: empty suite label");
+  }
+  if (typeof input.file !== "string" || input.file.trim().length === 0) {
+    throw new Error("buildScannerSlowTestReportRow: empty file path");
+  }
+  if (typeof input.durationMs !== "number" || !Number.isFinite(input.durationMs)) {
+    throw new Error("buildScannerSlowTestReportRow: non-finite durationMs");
+  }
+  const suite = (rawSuite ?? deriveSuiteLabel(input.file)).trim();
   return {
-    test: input.test || "(unknown test)",
+    test: input.test.trim(),
     suite: suite || "scanner-guardrail",
     file: normalizeReportFilePath(input.file),
     durationMs: Math.round(input.durationMs),

@@ -1385,7 +1385,7 @@ export default function ActionQueue() {
                 </p>
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Link
-                    to="/timeline"
+                    to={timelinePath()}
                     className="text-xs text-primary hover:underline rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     data-testid="action-queue-empty-next-steps-timeline"
                   >

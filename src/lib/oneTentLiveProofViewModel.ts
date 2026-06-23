@@ -165,15 +165,20 @@ function step3(args: {
   ctx: ProofContextInput;
   chip: SourceChipViewModel;
   hasMatchingOpenAlert: boolean;
+  matchingAlertId?: string | null;
 }): ProofStep {
-  const href = alertsPath(args.ctx.grow?.id ?? null);
+  const fallback = alertsPath(args.ctx.grow?.id ?? null);
+  const href = args.matchingAlertId
+    ? alertDetailPath(args.matchingAlertId)
+    : fallback;
+  const ctaLabel = args.matchingAlertId ? "Open alert detail" : "Open Alerts";
   if (args.hasMatchingOpenAlert) {
     return {
       id: 3,
       label: "Alert created from target breach",
       status: "complete",
       message: "Matching open alert found for the selected grow.",
-      ctaLabel: "Open Alerts",
+      ctaLabel,
       ctaHref: href,
     };
   }
@@ -187,7 +192,7 @@ function step3(args: {
     status: "pending",
     message: explanation,
     ctaLabel: "Open Alerts",
-    ctaHref: href,
+    ctaHref: fallback,
   };
 }
 
@@ -195,27 +200,31 @@ function step4(args: {
   ctx: ProofContextInput;
   hasMatchingOpenAlert: boolean;
   linkedActionExists: boolean;
+  linkedActionId?: string | null;
 }): ProofStep {
-  const href = alertsPath(args.ctx.grow?.id ?? null);
+  const fallback = actionsPath(args.ctx.grow?.id ?? null);
+  const href = args.linkedActionId
+    ? actionDetailPath(args.linkedActionId)
+    : fallback;
   if (args.linkedActionExists) {
     return {
       id: 4,
-      label: "Added to Action Queue",
+      label: "Action Queue item created",
       status: "complete",
       message:
         "Action Queue item found linked to an alert. Action Queue items are grower-initiated and approval-required.",
-      ctaLabel: "Open Alerts",
+      ctaLabel: args.linkedActionId ? "Open action detail" : "Open Action Queue",
       ctaHref: href,
     };
   }
   return {
     id: 4,
-    label: "Added to Action Queue",
-    status: args.hasMatchingOpenAlert ? "pending" : "pending",
+    label: "Action Queue item created",
+    status: "pending",
     message:
       "Open the alert and add it to Action Queue. Action Queue items are grower-initiated and approval-required.",
     ctaLabel: "Open Alerts",
-    ctaHref: href,
+    ctaHref: alertsPath(args.ctx.grow?.id ?? null),
   };
 }
 
@@ -223,8 +232,13 @@ function step5(args: {
   ctx: ProofContextInput;
   linkedActionExists: boolean;
   linkedActionCompleted: boolean | null;
+  linkedActionId?: string | null;
 }): ProofStep {
-  const href = actionsPath(args.ctx.grow?.id ?? null);
+  const fallback = actionsPath(args.ctx.grow?.id ?? null);
+  const href = args.linkedActionId
+    ? actionDetailPath(args.linkedActionId)
+    : fallback;
+  const ctaLabel = args.linkedActionId ? "Open action detail" : "Open Action Queue";
   if (args.linkedActionCompleted === true) {
     return {
       id: 5,
@@ -232,7 +246,18 @@ function step5(args: {
       status: "complete",
       message:
         "Linked action completed. Completing an action records the grower's decision. Verdant does not control equipment.",
-      ctaLabel: "Open Action Queue",
+      ctaLabel,
+      ctaHref: href,
+    };
+  }
+  if (args.linkedActionExists && args.linkedActionCompleted === false) {
+    return {
+      id: 5,
+      label: "Action completed",
+      status: "pending",
+      message:
+        "Linked action is still open. Complete it in Action Queue. Completing an action records the grower's decision.",
+      ctaLabel,
       ctaHref: href,
     };
   }
@@ -243,7 +268,7 @@ function step5(args: {
       status: "needs-confirmation",
       message:
         "Needs operator confirmation. Open the Action Queue and confirm the linked action is completed. Verdant does not control equipment.",
-      ctaLabel: "Open Action Queue",
+      ctaLabel,
       ctaHref: href,
     };
   }
@@ -253,7 +278,7 @@ function step5(args: {
     status: "pending",
     message:
       "Complete the action in Action Queue. Completing an action records the grower's decision.",
-    ctaLabel: "Open Action Queue",
+    ctaLabel,
     ctaHref: href,
   };
 }

@@ -189,12 +189,14 @@ export function buildEcowittLiveProofViewModel(
   // Sort deterministically; never trust input order.
   const sorted = sortRowsByCapturedAtDesc(tentRows);
 
-  // EcoWitt-vendor rows in the proof window.
-  const ecowittRows = sorted.filter(
-    (r) =>
-      detectEcowittVendor(r) ||
-      (resolveSourceKind(r) === "legacy_ecowitt"),
-  );
+  // EcoWitt-vendor rows that are live-class candidates. Manual/demo/csv
+  // rows with stray ecowitt lineage are out of scope for this panel.
+  const ecowittRows = sorted.filter((r) => {
+    const kind = resolveSourceKind(r);
+    if (kind === "legacy_ecowitt") return true;
+    if (kind === "canonical_live") return detectEcowittVendor(r);
+    return false;
+  });
   const inWindow = ecowittRows.filter((r) => {
     const t = r.captured_at ?? r.ts ?? null;
     if (!t) return false;

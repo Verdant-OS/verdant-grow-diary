@@ -63,16 +63,22 @@ const SECRET_KEYWORDS: ReadonlyArray<string> = [
   "authorization",
 ];
 
-// Matches `KEY=value`, `KEY: value`, `KEY = "value"`, `KEY:"value"`, etc.
-// Value is captured up to whitespace, quote, comma, semicolon, ampersand,
-// or backtick — covering env, JSON, YAML, URL query, and code-span forms.
+// Matches `KEY=value`, `KEY: value`, `"KEY": "value"`, JSON, YAML, env,
+// URL query, and code-span forms. The key may be wrapped in matching
+// quotes (e.g. `"access_token"`). Value is captured up to whitespace,
+// quote, comma, semicolon, ampersand, or backtick.
 const SECRET_PAIR_RES: ReadonlyArray<RegExp> = SECRET_KEYWORDS.map(
   (k) =>
     new RegExp(
-      `\\b${k}\\b\\s*[:=]\\s*["'\`]?[^\\s"'\`,;&]+["'\`]?`,
+      `["'\`]?\\b${k}\\b["'\`]?\\s*[:=]\\s*["'\`]?[^\\s"'\`,;&]+["'\`]?`,
       "gi",
     ),
 );
+
+// Authorization header (and `Authorization` followed by any value) — the
+// entire value up to end-of-line is redacted, since `Bearer <token>` would
+// otherwise leave the token after the `:` colon-pair strip.
+const AUTH_HEADER_RE = /\bAuthorization\s*[:=]\s*[^\r\n]+/gi;
 
 // Bare keyword fallback — replaces a residual reference once any
 // preceding `key=value` pairs have been stripped.

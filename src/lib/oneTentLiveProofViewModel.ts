@@ -35,9 +35,9 @@ export interface ProofStep {
   ctaLabel?: string;
   ctaHref?: string;
   /** Short evidence summary suitable for the printable report. */
-  evidenceSummary: string;
+  evidenceSummary?: string;
   /** Operator-facing missing-evidence line, or null when complete. */
-  missingEvidence: string | null;
+  missingEvidence?: string | null;
 }
 
 export interface ProofShortcutLink {

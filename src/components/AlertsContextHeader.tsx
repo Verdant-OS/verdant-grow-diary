@@ -87,6 +87,14 @@ export default function AlertsContextHeader({
             </span>
           ) : null}
         </p>
+        {isFallback && vm.growName ? (
+          <p
+            className="text-[11px] text-muted-foreground basis-full"
+            data-testid={`${testId}-fallback-context`}
+          >
+            Showing alert context for {vm.growName}.
+          </p>
+        ) : null}
         {growId ? (
           <Button
             size="sm"

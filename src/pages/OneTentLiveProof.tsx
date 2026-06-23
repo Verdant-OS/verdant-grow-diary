@@ -249,13 +249,100 @@ export default function OneTentLiveProof() {
           />
           {refreshing ? "Refreshing…" : "Refresh proof status"}
         </Button>
-        <span className="text-[11px] text-muted-foreground">
-          Use after saving a snapshot, adding an alert to Action Queue,
-          completing an action, or checking Timeline.
-        </span>
+        {refreshing ? (
+          <span
+            className="text-[11px] text-muted-foreground"
+            data-testid="one-tent-live-proof-refresh-sections"
+          >
+            Refreshing: {REFRESH_SECTIONS.join(", ")}…
+          </span>
+        ) : lastRefreshedAt ? (
+          <span
+            className="text-[11px] text-muted-foreground"
+            data-testid="one-tent-live-proof-refresh-timestamp"
+          >
+            Last refreshed{" "}
+            {lastRefreshedAt.toLocaleTimeString([], {
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+          </span>
+        ) : (
+          <span className="text-[11px] text-muted-foreground">
+            Use after saving a snapshot, adding an alert to Action Queue,
+            completing an action, or checking Timeline.
+          </span>
+        )}
       </div>
 
+      <section
+        aria-label="Proof shortcuts"
+        className="flex flex-wrap gap-2"
+        data-testid="one-tent-live-proof-shortcuts"
+      >
+        {vm.shortcutLinks.map((s) => (
+          <Button
+            key={s.id}
+            asChild
+            size="sm"
+            variant="outline"
+            data-testid={`one-tent-live-proof-shortcut-${s.id}`}
+            data-exact={s.exact ? "true" : "false"}
+          >
+            <Link to={s.href}>{s.label}</Link>
+          </Button>
+        ))}
+      </section>
+
       <OneTentLiveProofChecklist vm={vm} />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            if (typeof window !== "undefined") window.print();
+          }}
+          data-testid="one-tent-live-proof-print"
+          aria-label="Print or save proof report"
+        >
+          <Printer className="h-3.5 w-3.5 mr-1.5" aria-hidden />
+          Print / Save proof report
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          data-testid="one-tent-live-proof-copy-summary"
+          aria-label="Copy proof summary"
+          onClick={async () => {
+            try {
+              const text = report.markdown;
+              if (
+                typeof navigator !== "undefined" &&
+                navigator.clipboard?.writeText
+              ) {
+                await navigator.clipboard.writeText(text);
+                setCopyStatus("copied");
+              } else {
+                setCopyStatus("error");
+              }
+            } catch {
+              setCopyStatus("error");
+            } finally {
+              setTimeout(() => setCopyStatus("idle"), 1500);
+            }
+          }}
+        >
+          <Copy className="h-3.5 w-3.5 mr-1.5" aria-hidden />
+          {copyStatus === "copied"
+            ? "Copied"
+            : copyStatus === "error"
+              ? "Copy failed"
+              : "Copy proof summary"}
+        </Button>
+      </div>
+
+      <OneTentLiveProofReport report={report} />
 
       <p
         className="text-[11px] text-muted-foreground"

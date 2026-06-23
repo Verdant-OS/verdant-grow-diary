@@ -8,6 +8,8 @@ import PageHeader from "@/components/PageHeader";
 import SensorChart from "@/components/SensorChart";
 import GrowDataSourceBadge from "@/components/GrowDataSourceBadge";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
+import ManualSensorTrendChart from "@/components/ManualSensorTrendChart";
+import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import SensorBridgeHealthCard from "@/components/SensorBridgeHealthCard";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
@@ -97,6 +99,17 @@ export default function Sensors() {
   // otherwise leave it undefined so the user must consciously pick from the
   // tent dropdown rather than silently writing to manualTents[0].
   const defaultManualTentId = manualTents.find((t) => t.id === tentId)?.id;
+
+  // Read-only recent readings for the PPFD-vs-environment trend chart.
+  // Uses the existing tent-scoped sensor_readings hook (no new query,
+  // no writes). Bound to the same tent the manual reading form targets
+  // so PPFD + temperature/humidity/VPD lines up.
+  const { data: trendReadings = [] } = useSensorReadings(
+    defaultManualTentId,
+    60,
+  );
+
+
 
   return (
     <div>
@@ -359,6 +372,11 @@ export default function Sensors() {
           <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
         )}
       </div>
+      {manualTents.length > 0 && defaultManualTentId && (
+        <div className="mt-4 max-w-xl">
+          <ManualSensorTrendChart readings={trendReadings} />
+        </div>
+      )}
       <div
         id="csv-import"
         className="mt-4 max-w-xl scroll-mt-24"

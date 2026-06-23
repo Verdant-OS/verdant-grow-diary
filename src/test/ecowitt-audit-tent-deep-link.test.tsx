@@ -76,9 +76,13 @@ describe("Tent Detail → EcoWitt audit link", () => {
   });
 
   it("includes the current tent id in the deep-link href", () => {
+    // Tent Detail opts into the scoped audit deep-link via
+    // `auditHrefMode="tent-detail"`. The Dashboard card stays on the safe
+    // default "dashboard" mode so no raw tent UUID is leaked in the bare
+    // dashboard surface (covered by ecowitt-dashboard-tent-card.test.tsx).
     render(
       <MemoryRouter>
-        <EcowittLatestSnapshotCard tentId={FLOWER_TENT} />
+        <EcowittLatestSnapshotCard tentId={FLOWER_TENT} auditHrefMode="tent-detail" />
       </MemoryRouter>,
     );
     const link = screen.getByTestId("ecowitt-audit-link") as HTMLAnchorElement;
@@ -90,7 +94,7 @@ describe("Tent Detail → EcoWitt audit link", () => {
   it("falls back to the bare audit path when no tent context is available", () => {
     render(
       <MemoryRouter>
-        <EcowittLatestSnapshotCard tentId={null} />
+        <EcowittLatestSnapshotCard tentId={null} auditHrefMode="tent-detail" />
       </MemoryRouter>,
     );
     const link = screen.getByTestId("ecowitt-audit-link") as HTMLAnchorElement;

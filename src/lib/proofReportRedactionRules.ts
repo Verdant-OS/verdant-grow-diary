@@ -45,6 +45,7 @@ const LONG_HEX_RE = /\b[0-9a-fA-F]{32,}\b/g;
 const SECRET_KEYWORDS: ReadonlyArray<string> = [
   "service_role",
   "SUPABASE_SERVICE_ROLE",
+  "SUPABASE_SERVICE_ROLE_KEY",
   "bridge_token_id",
   "bridge_token",
   "access_token",
@@ -54,17 +55,33 @@ const SECRET_KEYWORDS: ReadonlyArray<string> = [
   "ANON_KEY",
   "api_key",
   "API_KEY",
+  "apikey",
   "passkey",
+  "password",
+  "secret",
+  "jwt",
+  "authorization",
 ];
 
+// Matches `KEY=value`, `KEY: value`, `"KEY": "value"`, JSON, YAML, env,
+// URL query, and code-span forms. The key may be wrapped in matching
+// quotes (e.g. `"access_token"`). Value is captured up to whitespace,
+// quote, comma, semicolon, ampersand, or backtick.
 const SECRET_PAIR_RES: ReadonlyArray<RegExp> = SECRET_KEYWORDS.map(
   (k) =>
     new RegExp(
-      `\\b${k}\\b\\s*[:=]\\s*["']?[^\\s"']+["']?`,
+      `["'\`]?\\b${k}\\b["'\`]?\\s*[:=]\\s*["'\`]?[^\\s"'\`,;&]+["'\`]?`,
       "gi",
     ),
 );
 
+// Authorization header (and `Authorization` followed by any value) — the
+// entire value up to end-of-line is redacted, since `Bearer <token>` would
+// otherwise leave the token after the `:` colon-pair strip.
+const AUTH_HEADER_RE = /\bAuthorization\s*[:=]\s*[^\r\n]+/gi;
+
+// Bare keyword fallback — replaces a residual reference once any
+// preceding `key=value` pairs have been stripped.
 const SECRET_BARE_RES: ReadonlyArray<RegExp> = SECRET_KEYWORDS.map(
   (k) => new RegExp(`\\b${k}\\b`, "gi"),
 );
@@ -79,7 +96,10 @@ const SECRET_BARE_RES: ReadonlyArray<RegExp> = SECRET_KEYWORDS.map(
 export function sanitizeProofReportMarkdown(input: string): string {
   if (typeof input !== "string" || input.length === 0) return "";
   let out = input;
-  // Order matters: strip key=value pairs first so the placeholder doesn't
+  // Authorization headers first — strip whole value before any sub-pattern
+  // (e.g. `Bearer ...`) is partially consumed by other rules.
+  out = out.replace(AUTH_HEADER_RE, REDACTED_PLACEHOLDER);
+  // Order matters: strip key=value pairs next so the placeholder doesn't
   // immediately get re-stripped by the bare keyword pass.
   for (const re of SECRET_PAIR_RES) out = out.replace(re, REDACTED_PLACEHOLDER);
   out = out.replace(JWT_RE, REDACTED_PLACEHOLDER);

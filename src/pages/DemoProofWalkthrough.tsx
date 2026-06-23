@@ -77,6 +77,14 @@ function StepCard({ step }: { step: DemoProofWalkthroughStep }) {
           {step.safetyNote}
         </span>
       </p>
+      {step.reviewOnlyNote ? (
+        <p
+          className="text-[11px] font-medium text-amber-700 dark:text-amber-300"
+          data-testid={`demo-proof-walkthrough-step-${step.id}-review-only-note`}
+        >
+          {step.reviewOnlyNote}
+        </p>
+      ) : null}
       <div>
         <Link
           to={step.href}

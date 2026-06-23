@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:summarize-timeouts": "node scripts/summarize-vitest-timeouts.mjs",
+    "test:demo-proof-guards": "vitest run demoProofWalkthrough-no-grows-route demoProofWalkthrough-route-snapshot proofReportRedactionRules --reporter=verbose",
     "test:watch": "vitest",
     "prepare": "husky",
     "sb:login": "supabase login",

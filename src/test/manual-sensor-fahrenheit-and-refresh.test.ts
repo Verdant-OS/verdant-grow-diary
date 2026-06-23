@@ -9,6 +9,12 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
+// Scanner guardrail: 30s per-file timeout so dynamic-import + renderHook
+// invalidation test below does not flake under sharded validation load
+// (default 5s vitest timeout can be exceeded by I/O contention alone).
+import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+
+installScannerGuardrail({ file: __filename });
 import {
   celsiusToFahrenheit,
   fahrenheitToCelsius,

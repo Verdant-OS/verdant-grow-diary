@@ -86,7 +86,7 @@ describe("Alerts route — quick link contract", () => {
   it("empty state uses safety-pinned copy with calm helper text", () => {
     expect(ALERTS).toMatch(/No open alerts\./);
     expect(ALERTS).toMatch(
-      /Alerts will appear when real or manual readings breach your grow targets/,
+      /Check targets or enter a fresh manual snapshot if you expected one/,
     );
   });
 

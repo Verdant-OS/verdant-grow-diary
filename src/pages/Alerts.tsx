@@ -19,6 +19,7 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
 import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
+import AlertsContextHeaderForGrow from "@/components/AlertsContextHeaderForGrow";
 import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
 import { deriveAlertReadingSource } from "@/lib/alertReadingSourceRules";
 import { Badge } from "@/components/ui/badge";
@@ -103,6 +104,13 @@ export default function Alerts() {
   const stageByGrow = new Map<string, string | null>(
     grows.map((g) => [g.id, (g as { stage?: string | null }).stage ?? null]),
   );
+
+  const headerStage = scopedGrowId
+    ? stageByGrow.get(scopedGrowId) ?? null
+    : null;
+
+
+
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
@@ -217,6 +225,16 @@ export default function Alerts() {
         />
       )}
 
+      {scopedGrowId ? (
+        <AlertsContextHeaderForGrow
+          growId={scopedGrowId}
+          growName={scopedGrowName ?? null}
+          stage={headerStage}
+        />
+      ) : null}
+
+
+
       <div className="flex flex-wrap gap-2 mb-4">
         <Select
           value={statusFilter}
@@ -322,11 +340,35 @@ export default function Alerts() {
           </div>
         </div>
       ) : alerts.length === 0 ? (
-        <EmptyState
-          icon={<Bell className="h-6 w-6" />}
-          title="No open alerts."
-          description="Alerts will appear when real or manual readings breach your grow targets."
-        />
+        <div data-testid="alerts-empty-state">
+          <EmptyState
+            icon={<Bell className="h-6 w-6" />}
+            title="No open alerts."
+            description="Check targets or enter a fresh manual snapshot if you expected one."
+          />
+          {scopedGrowId ? (
+            <div className="mt-3 flex flex-wrap gap-2 justify-center">
+              <Button
+                size="sm"
+                variant="outline"
+                asChild
+                data-testid="alerts-empty-state-manage-targets"
+              >
+                <Link to={`/grows/${encodeURIComponent(scopedGrowId)}`}>
+                  Manage Targets
+                </Link>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                asChild
+                data-testid="alerts-empty-state-add-manual-snapshot"
+              >
+                <Link to="/sensors#manual-reading">Add Manual Snapshot</Link>
+              </Button>
+            </div>
+          ) : null}
+        </div>
       ) : (
         <div className="space-y-6">
           {(

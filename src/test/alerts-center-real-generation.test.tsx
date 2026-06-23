@@ -282,7 +282,7 @@ describe("Alerts page — empty state + auto-persist wiring", () => {
     );
     expect(
       screen.getByText(
-        /Alerts will appear when real or manual readings breach your grow targets\./,
+        /Check targets or enter a fresh manual snapshot if you expected one\./,
       ),
     ).toBeTruthy();
   });

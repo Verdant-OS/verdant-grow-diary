@@ -61,6 +61,21 @@ export const PROOF_SAFETY_BADGES: ReadonlyArray<ProofSafetyBadge> = [
   { id: "no-device-control", label: "No device control" },
 ];
 
+/** Operator-facing reminder shown on the proof page. Never includes
+ *  tokens, endpoints, or secret-shaped strings. */
+export const PROOF_DEMO_SAFETY_WARNING =
+  "Demo safety: avoid opening bridge token, webhook, or integration credential screens while recording.";
+
+/** Recommended demo path checklist. Pure UI copy. */
+export const PROOF_DEMO_RUN_STEPS: ReadonlyArray<string> = [
+  "Add Manual Snapshot",
+  "Open Alerts",
+  "Add to Action Queue",
+  "Complete Action",
+  "Open Timeline",
+  "Refresh Proof Status",
+];
+
 export interface ProofContextInput {
   grow?: { id: string; name: string | null } | null;
   tent?: { id: string; name: string | null } | null;

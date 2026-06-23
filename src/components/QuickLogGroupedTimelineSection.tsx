@@ -550,12 +550,12 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
               {QUICK_LOG_GROUPED_TIMELINE_AI_EVIDENCE_EMPTY_HINT_TEXT}
             </p>
             <Button asChild size="sm" variant="outline">
-              <Link
-                to={aiDoctorResultsHref}
+              <a
+                href={aiDoctorResultsHref}
                 data-testid="quick-log-grouped-timeline-ai-evidence-results-link"
               >
                 {QUICK_LOG_GROUPED_TIMELINE_AI_EVIDENCE_RESULTS_BUTTON_LABEL}
-              </Link>
+              </a>
             </Button>
           </div>
         ) : !hasAnyEntries ? (

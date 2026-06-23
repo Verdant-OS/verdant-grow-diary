@@ -12,7 +12,7 @@
  *  - No alerts, Action Queue, or device control.
  *  - No raw payloads, tokens, private IDs, MACs, or bridge IDs.
  *  - Source labels are kept visible. Stale/invalid/demo readings are
- *    flagged, never treated as healthy.
+ *    flagged, never folded into trend context.
  */
 import {
   buildManualSensorTrendChartViewModel,

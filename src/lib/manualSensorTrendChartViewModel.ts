@@ -3,7 +3,7 @@
  *
  * Compares manually-logged PPFD readings against related environment
  * context (temperature, humidity, VPD) over time. Read-only context
- * only — never an automated diagnosis, never a healthy/unhealthy
+ * only — never an automated diagnosis, never a trusted/untrusted
  * classification, never a recommendation source.
  *
  * Inputs are `sensor_readings`-shaped rows already loaded by the
@@ -14,7 +14,7 @@
  * | stale | invalid. Stale, invalid, and demo readings are explicitly
  * flagged (`omitted` with a reason) and never folded into trend
  * series — the chart surface decides whether to show them, but they
- * are never treated as healthy.
+ * are never folded into trend context.
  */
 
 export type ManualSensorTrendMetric =
@@ -103,7 +103,7 @@ const ALLOWED_SOURCES: ReadonlySet<ManualSensorTrendSource> = new Set([
   "invalid",
 ]);
 
-const HEALTHY_SOURCES: ReadonlySet<ManualSensorTrendSource> = new Set([
+const TRUSTED_SOURCES: ReadonlySet<ManualSensorTrendSource> = new Set([
   "live",
   "manual",
   "csv",
@@ -272,14 +272,14 @@ export function buildManualSensorTrendChartViewModel(
 
   const hasPpfd = series[0]?.points.length > 0;
   const hasEnvironment = series.slice(1).some((s) => s.points.length > 0);
-  const hasAnyHealthy = acceptedPoints.some((p) =>
-    HEALTHY_SOURCES.has(p.source),
+  const hasAnyTrusted = acceptedPoints.some((p) =>
+    TRUSTED_SOURCES.has(p.source),
   );
 
   let state: ManualSensorTrendState;
   let emptyMessage: string | null = null;
 
-  if (!hasAnyHealthy && flagged.length > 0) {
+  if (!hasAnyTrusted && flagged.length > 0) {
     state = "stale_invalid_only";
     emptyMessage = EMPTY_STALE_ONLY;
   } else if (!hasPpfd) {

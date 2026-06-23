@@ -63,10 +63,26 @@ const PILL_ARIA: Record<QuickLogSnapshotStripStatus, string> = {
   no_data: "Sensor snapshot status: no data",
 };
 
-// The strip's high-level status pill and the authoritative trust badge
-// are intentionally rendered side-by-side. The trust badge is the
-// canonical sensor-truth signal (Live/Stale/Invalid/Manual/Demo/CSV)
-// and must always render so growers and tests can read it directly.
+// Canonical-badge contract: the SnapshotTrustBadge is the authoritative
+// sensor-truth signal (Live/Stale/Invalid/Manual/Demo/CSV) and must
+// always render so growers (and the trust-badge tests) can read it.
+// When the secondary status pill would repeat the exact same visible
+// label as the canonical badge, we suppress the pill text instead —
+// never the badge. The dedupe comparison is case-insensitive and
+// trim-normalized but does not change user-facing copy.
+function shouldRenderTrustBadge(_status: QuickLogSnapshotStripStatus, _trustLabel: string): boolean {
+  // Always render the canonical trust badge. See isPillRedundantWithBadge
+  // for the inverse decision used to hide the duplicate pill label.
+  return true;
+}
+
+function isPillRedundantWithBadge(
+  status: QuickLogSnapshotStripStatus,
+  trustLabel: string,
+): boolean {
+  if (!trustLabel) return false;
+  return trustLabel.trim().toLowerCase() === PILL_LABEL[status].toLowerCase();
+}
 
 export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, attached = true }: Props) {
   const state = useLatestTentSensorSnapshot(tentId ?? null);
@@ -94,7 +110,8 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
     : vm.emptyCopy
       ? "missing"
       : null;
-  
+  const showTrustBadge = shouldRenderTrustBadge(view.status, view.trustBadge.label);
+  const pillIsRedundant = isPillRedundantWithBadge(view.status, view.trustBadge.label);
 
   return (
     <section
@@ -120,16 +137,18 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
             </span>
           )}
 
-          <span
-            data-testid="quicklog-sensor-snapshot-pill"
-            role="status"
-            aria-label={PILL_ARIA[view.status]}
-            className={`text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 ${PILL_TONE[view.status]}`}
-          >
-            {PILL_LABEL[view.status]}
-          </span>
+          {!pillIsRedundant && (
+            <span
+              data-testid="quicklog-sensor-snapshot-pill"
+              role="status"
+              aria-label={PILL_ARIA[view.status]}
+              className={`text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 ${PILL_TONE[view.status]}`}
+            >
+              {PILL_LABEL[view.status]}
+            </span>
+          )}
 
-          <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />
+          {showTrustBadge && <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />}
 
 
         </div>

@@ -34,6 +34,18 @@ export interface ProofStep {
   message: string;
   ctaLabel?: string;
   ctaHref?: string;
+  /** Short evidence summary suitable for the printable report. */
+  evidenceSummary: string;
+  /** Operator-facing missing-evidence line, or null when complete. */
+  missingEvidence: string | null;
+}
+
+export interface ProofShortcutLink {
+  id: "snapshot" | "alert" | "action" | "timeline";
+  label: string;
+  href: string;
+  /** True when the href points at the specific known detail route. */
+  exact: boolean;
 }
 
 export interface ProofSafetyBadge {

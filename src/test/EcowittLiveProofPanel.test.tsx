@@ -61,7 +61,7 @@ describe("<EcowittLiveProofPanel />", () => {
     );
     const panel = screen.getByTestId("ecowitt-live-proof-panel");
     expect(panel.dataset.legacyBridge).toBe("true");
-    expect(screen.getByText(/EcoWitt bridge source/i)).toBeTruthy();
+    expect(screen.getAllByText(/EcoWitt bridge source/i).length).toBeGreaterThan(0);
   });
 
   it("does not render raw payload values or secrets", () => {

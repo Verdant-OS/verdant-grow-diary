@@ -35,6 +35,10 @@ import {
   serializeDiaryTimelineSectionState,
   type DiaryTimelineSectionExpandedState,
 } from "@/lib/diaryTimelineSectionStateRules";
+import {
+  buildDiaryTimelineEvidenceQualityForSection,
+  buildDiaryTimelineEvidenceQualitySummary,
+} from "@/lib/diaryTimelineEvidenceQualityRules";
 
 export interface DiaryTimelineCategorySectionsProps<
   T extends ClassifyDiaryTimelineEntryInput & { id: string },
@@ -85,6 +89,10 @@ export function DiaryTimelineCategorySections<
   const sections = useMemo(() => buildDiaryTimelineSections(items), [items]);
   const summary = useMemo(
     () => buildDiaryTimelineSectionSummary(sections),
+    [sections],
+  );
+  const evidenceSummary = useMemo(
+    () => buildDiaryTimelineEvidenceQualitySummary(sections),
     [sections],
   );
 
@@ -178,16 +186,27 @@ export function DiaryTimelineCategorySections<
           {summary.parts.join(" · ")}
         </p>
       </div>
+      <p
+        data-testid={`${testIdPrefix}-evidence-summary`}
+        data-total-sections={evidenceSummary.totalSections}
+        data-present-count={evidenceSummary.presentCount}
+        data-missing-count={evidenceSummary.missingCount}
+        className="text-xs text-muted-foreground"
+      >
+        {evidenceSummary.copy}
+      </p>
       {sections.map((section) => {
         const isOpen = expanded[section.id];
         const headerId = `${testIdPrefix}-${section.id}-header`;
         const panelId = `${testIdPrefix}-${section.id}-panel`;
+        const evidence = buildDiaryTimelineEvidenceQualityForSection(section);
         return (
           <div
             key={section.id}
             data-testid={`${testIdPrefix}-section`}
             data-section-id={section.id}
             data-count={section.count}
+            data-evidence-status={evidence.status}
             className="rounded-lg border border-border/50 bg-card/30"
           >
             <button
@@ -230,6 +249,14 @@ export function DiaryTimelineCategorySections<
                 data-section-id={section.id}
                 className="border-t border-border/40 px-3 py-2"
               >
+                <p
+                  data-testid={`${testIdPrefix}-section-evidence`}
+                  data-section-id={section.id}
+                  data-evidence-status={evidence.status}
+                  className="mb-2 text-xs text-muted-foreground"
+                >
+                  {evidence.copy}
+                </p>
                 {section.count === 0 ? (
                   <p
                     data-testid={`${testIdPrefix}-section-empty`}

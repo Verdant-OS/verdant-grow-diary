@@ -349,3 +349,91 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
   });
 });
 
+
+describe("DiaryTimelineCategorySections — evidence-quality indicators", () => {
+  it("renders an overall evidence summary line reflecting current sections", () => {
+    render(
+      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
+    );
+    const node = screen.getByTestId(
+      "diary-timeline-category-sections-evidence-summary",
+    );
+    // All seven sections have one entry in this fixture.
+    expect(node.getAttribute("data-total-sections")).toBe("7");
+    expect(node.getAttribute("data-present-count")).toBe("7");
+    expect(node.getAttribute("data-missing-count")).toBe("0");
+    expect(node.textContent).toMatch(/in this view/);
+  });
+
+  it("evidence summary tracks the filtered view (e.g. zero items → all missing)", () => {
+    render(
+      <DiaryTimelineCategorySections items={[]} renderEntry={renderEntry} />,
+    );
+    const node = screen.getByTestId(
+      "diary-timeline-category-sections-evidence-summary",
+    );
+    expect(node.getAttribute("data-present-count")).toBe("0");
+    expect(node.getAttribute("data-missing-count")).toBe("7");
+    expect(node.textContent).toMatch(/0 of 7/);
+    expect(node.textContent).toMatch(/in this view/);
+  });
+
+  it("each present section panel renders its own evidence-quality copy", () => {
+    render(
+      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
+    );
+    const evidenceNodes = screen.getAllByTestId(
+      "diary-timeline-category-sections-section-evidence",
+    );
+    // Default: non-empty sections are expanded, empty sections collapsed.
+    // All seven have items in this fixture, so all seven render evidence.
+    expect(evidenceNodes).toHaveLength(7);
+    for (const n of evidenceNodes) {
+      expect(n.getAttribute("data-evidence-status")).toBe("present");
+      expect(n.textContent).toMatch(/in this view\.$/);
+    }
+  });
+
+  it("empty section evidence reads 'missing' when expanded, and copy uses 'in this view'", () => {
+    const onlyWatering: FakeItem[] = [
+      { id: "w1", eventType: "watering", label: "Watered 500ml" },
+    ];
+    render(
+      <DiaryTimelineCategorySections
+        items={onlyWatering}
+        renderEntry={renderEntry}
+      />,
+    );
+    // Expand the empty Photos section to read its evidence copy.
+    const photosToggle = screen.getByRole("button", { name: /Photos/i });
+    fireEvent.click(photosToggle);
+    const evidenceNodes = screen.getAllByTestId(
+      "diary-timeline-category-sections-section-evidence",
+    );
+    const photoEvidence = evidenceNodes.find(
+      (n) => n.getAttribute("data-section-id") === "photos",
+    );
+    expect(photoEvidence).toBeDefined();
+    expect(photoEvidence!.getAttribute("data-evidence-status")).toBe("missing");
+    expect(photoEvidence!.textContent).toBe(
+      "No photo entries in this view.",
+    );
+  });
+
+  it("evidence copy never uses diagnostic/aggressive/actionable wording", () => {
+    render(
+      <DiaryTimelineCategorySections items={items} renderEntry={renderEntry} />,
+    );
+    const banned =
+      /\b(healthy|ideal|fix|urgent|auto|execute|control|actuate|relay|emergency|critical)\b/i;
+    for (const n of screen.getAllByTestId(
+      "diary-timeline-category-sections-section-evidence",
+    )) {
+      expect(n.textContent ?? "").not.toMatch(banned);
+    }
+    expect(
+      screen.getByTestId("diary-timeline-category-sections-evidence-summary")
+        .textContent ?? "",
+    ).not.toMatch(banned);
+  });
+});

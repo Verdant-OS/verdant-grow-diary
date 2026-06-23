@@ -558,7 +558,10 @@ export default function QuickLog({
         const reason = result.reason ?? "save_failed";
         const message = quickLogReasonToOperatorMessage(reason);
         setSaveError(`${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`);
-        toast.error(message);
+        // Surface the (allow-listed) reason code alongside the friendly
+        // copy so the operator and tests can correlate the failure with
+        // logs without exposing tokens, endpoints, or raw payloads.
+        toast.error(`${message} [${reason}]`);
         // Safe diagnostic only — reason code is allow-listed, never tokens/payload.
         console.error("[QuickLog] RPC save error", { reason });
         return;

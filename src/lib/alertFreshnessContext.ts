@@ -250,6 +250,11 @@ export function buildAlertsHeaderContext(
     latestFreshness,
     latestSource,
     alertsCanPersist,
+    latestDetail: buildLatestSnapshotDetail({
+      snapshot: args.snapshot,
+      status: args.status,
+      now: args.now,
+    }),
   };
 }
 
@@ -257,6 +262,73 @@ function formatStageLabel(stage: string): string {
   const s = stage.trim();
   if (!s) return "";
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Latest snapshot detail                                                      */
+/* -------------------------------------------------------------------------- */
+
+const SOURCE_LABELS: Record<SnapshotSource, string> = {
+  live: "Live",
+  manual: "Manual",
+  csv: "CSV",
+  diary: "Diary",
+  sim: "Simulated",
+  unavailable: "Unknown",
+};
+
+/** Deterministic relative-time helper. Pure: no Intl.RelativeTimeFormat
+ * locale variance. Returns null for null/invalid timestamps. */
+export function formatCapturedAgo(
+  capturedAtMs: number | null,
+  now: number,
+): string | null {
+  if (capturedAtMs === null || !Number.isFinite(capturedAtMs)) return null;
+  const diffMs = now - capturedAtMs;
+  const future = diffMs < 0;
+  const abs = Math.abs(diffMs);
+  const mins = Math.round(abs / 60_000);
+  let value: number;
+  let unit: string;
+  if (mins < 1) return future ? "in <1 minute" : "<1 minute ago";
+  if (mins < 60) {
+    value = mins;
+    unit = "minute";
+  } else if (mins < 60 * 24) {
+    value = Math.round(mins / 60);
+    unit = "hour";
+  } else {
+    value = Math.round(mins / (60 * 24));
+    unit = "day";
+  }
+  const plural = value === 1 ? unit : `${unit}s`;
+  return future ? `in ${value} ${plural}` : `${value} ${plural} ago`;
+}
+
+export function buildLatestSnapshotDetail(
+  args: ClassifyLatestSnapshotArgs,
+): LatestSnapshotDetail | null {
+  if (args.status !== "ok") return null;
+  const snap = args.snapshot;
+  if (!snap || snap.source === "unavailable" || !snap.ts) return null;
+  const now = args.now ?? Date.now();
+  const ms = Date.parse(snap.ts);
+  const capturedAgoText = formatCapturedAgo(Number.isFinite(ms) ? ms : null, now);
+  const stale = isStale(snap.ts, now);
+  const insideWindow = !stale;
+  const persistableSource = snap.source === "live" || snap.source === "manual";
+  const canPersist = persistableSource && insideWindow;
+  const sourceLabel = SOURCE_LABELS[snap.source] ?? "Unknown";
+  const captured = capturedAgoText ? `captured ${capturedAgoText}` : "captured time unknown";
+  let detailLine: string;
+  if (!persistableSource) {
+    detailLine = `Latest snapshot: ${sourceLabel} · ${captured} · context only. Alerts persist only from fresh manual or live readings.`;
+  } else if (!insideWindow) {
+    detailLine = `Latest snapshot: ${sourceLabel} · ${captured} · outside ${FRESHNESS_WINDOW_LABEL}. Enter a fresh manual snapshot to persist alerts.`;
+  } else {
+    detailLine = `Latest snapshot: ${sourceLabel} · ${captured} · inside ${FRESHNESS_WINDOW_LABEL} · eligible for alert persistence.`;
+  }
+  return { sourceLabel, capturedAgoText, insideWindow, canPersist, detailLine };
 }
 
 /* -------------------------------------------------------------------------- */

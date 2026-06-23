@@ -12,9 +12,10 @@ import { useEffect, useState } from "react";
 import {
   DEFAULT_TEMPERATURE_UNIT,
   loadTemperatureUnitPreference,
-  TEMPERATURE_UNIT_STORAGE_KEY,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+
+const STORAGE_KEY = "verdant:temperatureUnit";
 
 function readPreference(): TemperatureUnitPreference {
   if (typeof window === "undefined") return DEFAULT_TEMPERATURE_UNIT;

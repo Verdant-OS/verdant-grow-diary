@@ -147,10 +147,14 @@ describe("buildEcowittIngestAuditProof", () => {
 
   it("handles malformed input safely", () => {
     const rows = [
-      // @ts-expect-error intentional bad shape
-      null,
-      // @ts-expect-error intentional bad shape
-      { source: "ecowitt", tent_id: TENT, rows_received: "x", rows_inserted: -3, created_at: "bad" },
+      null as unknown as EcowittIngestAuditProofRow,
+      {
+        source: "ecowitt",
+        tent_id: TENT,
+        rows_received: "x" as unknown as number,
+        rows_inserted: -3,
+        created_at: "bad",
+      } as EcowittIngestAuditProofRow,
       row({ rows_received: 2, rows_inserted: 1 }),
     ];
     const vm = buildEcowittIngestAuditProof(rows, {

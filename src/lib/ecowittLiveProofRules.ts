@@ -174,7 +174,7 @@ export function detectInvalidMetric(row: EcowittProofRow): string | null {
         return validateEcWithUnit(value, "mS/cm") ? "ec_unit_mismatch" : null;
       }
       if (unit === "us/cm" || unit === "µs/cm") {
-        return validateEcWithUnit(value, "uS/cm") ? "ec_unit_mismatch" : null;
+        return validateEcWithUnit(value, "µS/cm") ? "ec_unit_mismatch" : null;
       }
       // Unknown unit: heuristic — EC >= 50 strongly implies µS/cm mislabel.
       return value >= 50 ? "ec_unit_mismatch" : null;

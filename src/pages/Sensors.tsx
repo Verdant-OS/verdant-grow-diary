@@ -44,6 +44,8 @@ import SensorIngestAuditReport from "@/components/SensorIngestAuditReport";
 import { mapReadingsToOperatorAuditRows } from "@/lib/sensorsOperatorDiagnosticsViewModel";
 import { EcowittLiveProofPanel } from "@/components/EcowittLiveProofPanel";
 import type { EcowittProofRow } from "@/lib/ecowittLiveProofRules";
+import { EcowittIngestAuditProofPanel } from "@/components/EcowittIngestAuditProofPanel";
+import { useEcowittIngestAuditProofRows } from "@/hooks/useEcowittIngestAuditProofRows";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },

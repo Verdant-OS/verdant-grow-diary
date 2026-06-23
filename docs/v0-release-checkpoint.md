@@ -607,3 +607,76 @@ Copy rules:
   sanitized copy / print export only. Out of scope: writes, AI,
   alerts, Action Queue, automation, device control, raw payload
   exposure.
+
+---
+
+## 15. RC audit follow-up — operator-mode disclosure and proof-copy clarity
+
+Read-only follow-up to the One-Tent Loop Release Candidate audit. No
+schema, RLS, Edge Function, RPC, auth, AI, alerts, Action Queue,
+automation, or device-control changes.
+
+### 15.1 Operator Mode is a URL surface gate, not a role gate
+
+- `src/pages/Sensors.tsx` mounts the EcoWitt live-row proof and
+  ingest-audit proof panels behind the `?operator=1` query parameter.
+- `?operator=1` is a **URL surface gate** — it controls only whether
+  the operator diagnostics section renders. It is **not** a role check,
+  capability check, or privileged authorization gate.
+- Data access remains scoped by existing Supabase RLS:
+  `useSensorReadings` only returns rows the current user can see, and
+  `useEcowittIngestAuditProofRows` only returns rows allowed by the
+  `"Users view own ingest audit"` policy
+  (`auth.uid() = user_id`). The query string cannot widen access.
+
+### 15.2 Ingest-audit hook column allowlist (exact)
+
+`src/hooks/useEcowittIngestAuditProofRows.ts` SELECTs only these
+columns from `public.sensor_ingest_audit_log`:
+
+```
+source, tent_id, rows_received, rows_inserted, captured_at, created_at
+```
+
+Never selected and never rendered: `user_id`, `bridge_token_id`,
+`raw_payload`, and any other private identifiers or secrets.
+
+### 15.3 Audit-proof unavailable copy (presenter-only)
+
+`src/components/EcowittIngestAuditProofPanel.tsx` now distinguishes
+the two non-loaded states the view model already exposes, to help
+operator triage without changing logic or status values:
+
+- `blocked` → "Audit proof unavailable with current read permissions
+  (RLS-denied)."
+- `error` → "Audit proof unavailable due to a read error (network or
+  service)."
+
+`loaded`, `no_audit_rows`, `unavailable`, and `loading` copy is
+unchanged. Neither copy implies a healthy state.
+
+### 15.4 New static-safety guard
+
+- `src/test/oneTentSensorProofReportSection-static-safety.test.ts`
+  asserts that `buildOneTentSensorProofReportSection(...)` markdown
+  contains no UUID-shaped identifiers and no second-precision ISO
+  timestamps across loaded / blocked / error / empty / no-tent paths.
+
+### 15.5 Safety posture
+
+- Read-only follow-up. No writes, no new queries, no new product
+  surface.
+- Action Queue remains approval-required.
+- Missing / stale / blocked / invalid sensor proof is still never
+  treated as positive.
+- No raw payloads, service role keys, bridge tokens, MACs, private
+  IDs, owning auth IDs, or env secrets exposed.
+
+### 15.6 Rollback
+
+- Revert the `detailFor` helper in
+  `src/components/EcowittIngestAuditProofPanel.tsx` to render
+  `{vm.detail}` directly.
+- Delete
+  `src/test/oneTentSensorProofReportSection-static-safety.test.ts`.
+- Remove this section (15) from `docs/v0-release-checkpoint.md`.

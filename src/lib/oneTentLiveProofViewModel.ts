@@ -241,7 +241,7 @@ function step4(args: {
     label: "Action Queue item created",
     status: "pending",
     message:
-      "Open the alert and add it to Action Queue. Action Queue items are grower-initiated and approval-required.",
+      "Not ready: alert has not been added to Action Queue. Open the alert and add it. Action Queue items are grower-initiated and approval-required.",
     ctaLabel: "Open Alerts",
     ctaHref: alertsPath(args.ctx.grow?.id ?? null),
   };

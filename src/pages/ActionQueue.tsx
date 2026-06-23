@@ -43,7 +43,7 @@ import {
 } from "@/lib/actionQueueEvidenceViewModel";
 import { formatLastUpdatedAgo } from "@/lib/lastUpdatedAgo";
 
-import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath } from "@/lib/routes";
+import { actionDetailPath, actionsPath, aiDoctorSessionDetailPath, alertDetailPath, timelinePath } from "@/lib/routes";
 import ActionQueueDetailDrawer from "@/components/ActionQueueDetailDrawer";
 import ActionQueueLoadingSkeleton from "@/components/ActionQueueLoadingSkeleton";
 import ActionQueueTraceStatusAnnouncer from "@/components/ActionQueueTraceStatusAnnouncer";

@@ -186,6 +186,15 @@ export function DiaryTimelineCategorySections<
           {summary.parts.join(" · ")}
         </p>
       </div>
+      <p
+        data-testid={`${testIdPrefix}-evidence-summary`}
+        data-total-sections={evidenceSummary.totalSections}
+        data-present-count={evidenceSummary.presentCount}
+        data-missing-count={evidenceSummary.missingCount}
+        className="text-xs text-muted-foreground"
+      >
+        {evidenceSummary.copy}
+      </p>
       {sections.map((section) => {
         const isOpen = expanded[section.id];
         const headerId = `${testIdPrefix}-${section.id}-header`;

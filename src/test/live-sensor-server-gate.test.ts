@@ -21,6 +21,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
+// Scanner guardrail: 30s per-file timeout + slow-test telemetry so the
+// recursive src/ capability-gate scan below does not flake under sharded
+// validation load.
+import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+
+installScannerGuardrail({ file: __filename });
 
 const ROOT = process.cwd();
 const FN = readFileSync(

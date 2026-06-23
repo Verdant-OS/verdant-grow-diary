@@ -27,6 +27,9 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/diagnostics",
   "/imports/representative-csv",
   "/ingest-inspector",
+  "/operator/ai-doctor-phase1",
+  "/operator/billing-entitlement-resolution",
+  "/operator/billing-subscription-updates",
   "/operator/ecowitt",
   "/operator/ecowitt-bridge-status",
   "/operator/ecowitt-bridge-debug",
@@ -34,8 +37,11 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/ecowitt-tent-preview",
   "/operator/genetics-import",
   "/operator/ggs-real-payload-ingest",
+  "/operator/one-tent-live-proof",
   "/operator/one-tent-loop-smoke-test",
   "/operator/one-tent-proof-record",
+  "/operator/paddle-processing-audit",
+  "/operator/post-grow-reflection-dry-run",
   "/pi-ingest-status",
   "/sensors/csv-preview",
   "/sensors/ecowitt-audit",
@@ -60,6 +66,7 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/pricing",
   "/hardware-integrations",
   "/partners/csv-preview",
+  "/customer/:shareId",
 ];
 
 async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {

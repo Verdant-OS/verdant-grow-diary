@@ -126,3 +126,94 @@ bun run test:e2e:demo-proof-readonly
 4. If still not triggered, revert/remove this "Demo Proof CI verification" section from `docs/one-tent-loop-rc-smoke-test.md`.
 5. No product rollback is required — this PR is docs-only.
 
+
+### Path-filter verification (one-liner)
+
+```bash
+grep -n 'docs/one-tent-loop-rc-smoke-test.md' .github/workflows/demo-proof-walkthrough-readonly.yml
+```
+
+Expected output (exact, from current workflow):
+
+```
+41:      - "docs/one-tent-loop-rc-smoke-test.md"
+```
+
+If the line number shifts after future edits, only the line number changes — the trailing `- "docs/one-tent-loop-rc-smoke-test.md"` entry must remain inside `on.pull_request.paths`.
+
+### One-command local validation
+
+```bash
+bun run test:demo-proof:full
+```
+
+Runs in order, fail-fast (`&&`):
+
+1. `bun run test:demo-proof-guards`
+2. `bunx vitest run proofReportRedactionRules DemoProofWalkthrough demoProofWalkthrough --reporter=verbose`
+3. `bunx tsc -p tsconfig.app.json --noEmit`
+4. `bun run test:e2e:demo-proof-readonly`
+
+Local prerequisite (run once per machine; the script does NOT auto-install):
+
+```bash
+bunx playwright install chromium
+```
+
+### Playwright CI troubleshooting checklist
+
+- **Chromium missing**
+  - Symptom: `Executable doesn't exist` / `chromium_headless_shell` missing.
+  - Verify: the `Install Chromium` step ran in the workflow log.
+  - Fix: re-run the workflow; if it repeats, inspect `bunx playwright install chromium --with-deps` output.
+- **Browser cache miss**
+  - Symptom: install step is slower than usual but still passes.
+  - Verify: cache restore log lines for `~/.cache/ms-playwright`.
+  - Fix: not a product issue — allow the install to complete and cache repopulates.
+- **Path filter did not trigger**
+  - Verify: run the grep one-liner above.
+  - Verify: the PR actually changed a path listed under `on.pull_request.paths`.
+  - Fix: push an empty commit or edit a listed docs file (see rerun steps below).
+- **Vite / preview failed**
+  - Verify: Playwright web-server logs in the run output.
+  - Fix: adjust harness/`playwright.config.*` only — do NOT change product routes unless a route genuinely crashes.
+- **No-write E2E violation**
+  - Symptom: spec reports a forbidden Supabase/RPC request reaching the network.
+  - Treat as a product/safety blocker. Do NOT relax intercept rules. Investigate the offending call.
+
+### GitHub Actions rerun steps
+
+1. Open the PR on GitHub.
+2. Click the **Checks** tab (or the failing check inline).
+3. Open the workflow **Demo Proof Walkthrough readonly E2E (mocked)**.
+4. Click **Re-run jobs**.
+5. Prefer **Re-run failed jobs** first; fall back to **Re-run all jobs** if needed.
+6. If the workflow did not dispatch at all (path filter mismatch), push an empty commit:
+   ```bash
+   git commit --allow-empty -m "ci: retrigger demo proof workflow"
+   git push
+   ```
+7. If it still does not trigger, re-verify path filters (grep one-liner above) and branch protection / Actions workflow permissions for the repo.
+
+### Artifact download and inspection
+
+From the completed workflow run page, scroll to **Artifacts** and download:
+
+- `demo-proof-guards` — guard-script stdout/stderr.
+- `demo-proof-vitest` — targeted vitest reporter output.
+- `demo-proof-playwright-report` — Playwright HTML report bundle.
+- `demo-proof-playwright-results` — raw results (traces, videos, screenshots when produced).
+- `demo-proof-playwright-failure-artifacts` — **only present on failure**; contains `*.png`, `*.webm`, `trace.zip`.
+
+Open the HTML report locally:
+
+```bash
+unzip demo-proof-playwright-report.zip -d demo-proof-playwright-report
+open demo-proof-playwright-report/index.html   # macOS
+# or
+xdg-open demo-proof-playwright-report/index.html   # Linux
+# If the bundle requires Playwright's viewer:
+bunx playwright show-report demo-proof-playwright-report
+```
+
+Use `demo-proof-playwright-results` for raw traces/videos when the HTML report points to them. The failure-only artifact will be empty/absent on green runs — that is expected.

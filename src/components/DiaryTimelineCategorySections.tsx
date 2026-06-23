@@ -35,6 +35,10 @@ import {
   serializeDiaryTimelineSectionState,
   type DiaryTimelineSectionExpandedState,
 } from "@/lib/diaryTimelineSectionStateRules";
+import {
+  buildDiaryTimelineEvidenceQualityForSection,
+  buildDiaryTimelineEvidenceQualitySummary,
+} from "@/lib/diaryTimelineEvidenceQualityRules";
 
 export interface DiaryTimelineCategorySectionsProps<
   T extends ClassifyDiaryTimelineEntryInput & { id: string },

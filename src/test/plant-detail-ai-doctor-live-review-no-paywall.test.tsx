@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import type { ReactElement } from "react";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
+import { expectNoPaywallCta } from "@/test/helpers/paywallCtaSelectors";
 
 function render(ui: ReactElement) {
   const client = new QueryClient({

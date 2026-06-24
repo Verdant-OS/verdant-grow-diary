@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import type { ReactElement } from "react";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
+import { expectNoPaywallCta } from "@/test/helpers/paywallCtaSelectors";
 
 function render(ui: ReactElement) {
   const client = new QueryClient({
@@ -120,19 +121,7 @@ async function mountAndDeny(planId: string | null) {
 }
 
 function assertNoPaywall(container: HTMLElement) {
-  // No PaywallCta-shaped testids.
-  expect(container.querySelector('[data-testid*="paywall"]')).toBeNull();
-  // No "upsell"-tagged credit notice.
-  expect(container.querySelector('[data-kind="upsell"]')).toBeNull();
-  // No anchors pointing at /pricing.
-  const pricingLinks = Array.from(container.querySelectorAll("a")).filter(
-    (a) => (a.getAttribute("href") ?? "").includes("/pricing"),
-  );
-  expect(pricingLinks).toHaveLength(0);
-  // No upsell button copy.
-  expect(screen.queryByRole("button", { name: /see plans/i })).toBeNull();
-  expect(screen.queryByText(/see plans/i)).toBeNull();
-  expect(screen.queryByText(/upgrade/i)).toBeNull();
+  expectNoPaywallCta({ container });
 }
 
 describe("PlantDetailAiDoctorLiveReview — no paywall on credit_denied (regression)", () => {

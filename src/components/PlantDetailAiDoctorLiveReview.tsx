@@ -196,11 +196,24 @@ export default function PlantDetailAiDoctorLiveReview({
 
       {review.status === "error" ? (
         review.reason === "credit_denied" && review.credit ? (
-          <AiCreditLimitNotice
-            credit={review.credit}
-            currentPlanLabel={currentPlanLabel}
+          // Plan-neutral denial notice. AI Doctor intentionally does NOT
+          // surface a premium/paywall upsell here — the grower sees a
+          // calm "limit reached, try later" message instead. Server-side
+          // metering and denial behavior are unchanged.
+          <section
             data-testid="plant-ai-doctor-live-review-credit-denied"
-          />
+            data-kind="wait"
+            className="rounded-xl border border-border/60 bg-card/40 p-4"
+            role="status"
+            aria-live="polite"
+          >
+            <h3 className="text-base font-semibold tracking-tight">
+              You've reached an AI Doctor limit.
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This request was not charged. Existing analyses stay available — please try again later.
+            </p>
+          </section>
         ) : review.reason === "upstream_credit_exhausted" ? (
           <AiCreditServiceDegradedNotice
             surface="doctor"

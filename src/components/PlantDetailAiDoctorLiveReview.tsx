@@ -131,16 +131,10 @@ export default function PlantDetailAiDoctorLiveReview({
       ? AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY
       : AI_DOCTOR_LIVE_REVIEW_STRONG_COPY;
 
-  const currentPlanLabel =
-    entitlement.displayPlanId === "free"
-      ? "Free"
-      : entitlement.displayPlanId === "pro_monthly"
-        ? "Pro (monthly)"
-        : entitlement.displayPlanId === "pro_annual"
-          ? "Pro (annual)"
-          : entitlement.displayPlanId === "founder_lifetime"
-            ? "Founder Lifetime"
-            : undefined;
+  // currentPlanLabel intentionally unused: AI Doctor no longer surfaces a
+  // plan-specific paywall/upsell. Keep entitlement read for future neutral
+  // copy needs without referencing plan labels here.
+  void entitlement;
 
   return (
     <section

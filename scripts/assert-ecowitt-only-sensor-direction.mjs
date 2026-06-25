@@ -54,6 +54,23 @@ const ALLOWED = new Set([
   "docs/ecowitt-only-sensor-direction.md",
   "src/test/ecowitt-only-sensor-direction.test.ts",
   ".github/workflows/ecowitt-only-safety-scan.yml",
+  // Stop-ship checklist explicitly names the banned vendor as a
+  // reminder of what must NOT re-enter the codebase. Documentation
+  // of the policy is not a violation of the policy.
+  "docs/v0-sentinel-stop-ship-checklist.md",
+  // Negative-guard tests assert the loop surfaces do NOT mention
+  // banned vendor names. The term appears only inside
+  // `expect(...).not.toMatch(/...|switchbot|.../)` regexes. These
+  // tests enforce the EcoWitt-only direction; removing the term
+  // would silently weaken them.
+  "src/test/one-tent-loop-static-safety.test.ts",
+  "src/test/ai-doctor-one-tent-loop-card.test.tsx",
+  "src/test/alerts-one-tent-loop-card.test.tsx",
+  "src/test/grow-detail-one-tent-loop-card.test.tsx",
+  "src/test/plant-detail-one-tent-loop-card.test.tsx",
+  "src/test/sensors-one-tent-loop-card.test.tsx",
+  "src/test/tent-detail-one-tent-loop-card.test.tsx",
+  "src/test/timeline-one-tent-loop-card.test.tsx",
 ]);
 
 // Pattern hits SwitchBot, switchbot, switch_bot, switch-bot, "switch bot".

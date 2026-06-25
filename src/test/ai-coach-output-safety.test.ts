@@ -92,7 +92,13 @@ describe("ai-coach — output safety contract", () => {
     expect(SYSTEM).toMatch(/Do not invent sensor values/);
     // When sensor data is missing the function explicitly emits
     // "LATEST_SENSOR_SNAPSHOT: none" — not a healthy/default reading.
-    expect(CODE).toMatch(/LATEST_SENSOR_SNAPSHOT:\s*none/);
+    // (The literal lives in the sibling pure helper since the source-aware
+    // annotation slice.)
+    const HELPER = readFileSync(
+      resolve(__dirname, "../../supabase/functions/ai-coach/sensorSnapshotContext.ts"),
+      "utf8",
+    );
+    expect(CODE + HELPER).toMatch(/LATEST_SENSOR_SNAPSHOT:\s*none/);
     // EMPTY_ANALYSIS (used when there is no grow/entries) must NOT use the
     // word "healthy" anywhere — that would be a false-positive classification.
     expect(EMPTY_BLOCK.toLowerCase()).not.toContain("healthy");

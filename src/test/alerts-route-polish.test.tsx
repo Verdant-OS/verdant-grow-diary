@@ -21,6 +21,9 @@ import {
 // Pure helper tests — no React needed.
 // ---------------------------------------------------------------------------
 vi.mock("@/components/AlertsAutoPersistForGrow", () => ({ default: () => null }));
+vi.mock("@/components/AlertsContextHeaderForGrow", () => ({ default: () => null }));
+vi.mock("@/components/AlertsEmptyStateSnapshotCta", () => ({ default: () => null }));
+vi.mock("@/components/GrowTargetsEditor", () => ({ default: () => null }));
 
 describe("alertsRouteView — pure helpers", () => {
   it("formatAlertSourceLabel maps known slugs and tokenizes unknown ones", () => {
@@ -197,7 +200,7 @@ describe("Alerts route — empty + error + retry", () => {
     );
     expect(screen.getByText("No open alerts.")).toBeTruthy();
     expect(
-      screen.getByText(/Alerts will appear when real or manual readings breach your grow targets/i),
+      screen.getByText(/Check targets or enter a fresh manual snapshot if you expected one/i),
     ).toBeTruthy();
   });
 

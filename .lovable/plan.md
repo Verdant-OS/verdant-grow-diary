@@ -1,103 +1,53 @@
-## Verdant Command Center — Build Plan
 
-A modern, dark, AI-powered grow command center. Existing Supabase pages stay live; new pages use mock data behind a clean abstraction so they can swap to real data later.
+# One-Tent Loop Release Candidate Audit (Read-Only)
 
-### Navigation & shell
+## Executive verdict
+**PASS WITH WARNINGS** — Verdant can be tagged as a One-Tent Loop RC checkpoint. No P0/P1 stop-ship findings. Three small warn-level gaps remain; none break the loop or safety invariants.
 
-Single shell with two nav surfaces:
-- **Desktop (≥md):** collapsible left sidebar (icon rail when collapsed), grouped sections.
-- **Mobile (<md):** bottom tab bar with the 5 most-used items (Dashboard, Tents, Logs, Tasks, Alerts) + "More" sheet for the rest.
-- Top header: workspace switcher placeholder, global search, alerts bell with unread dot, user menu.
+## Stop-ship findings (P0/P1)
+None.
 
-Sidebar groups:
-```text
-OVERVIEW       Dashboard
-GROW           Tents · Plants · Cameras
-DATA           Sensor Data · Grow Logs
-OPERATIONS     Tasks · Alerts
-INTELLIGENCE   AI Grow Doctor · Rewards
-ACCOUNT        Settings
+- No writes detected in proof surfaces (`EcowittLiveProofPanel`, `EcowittIngestAuditProofPanel`, `OneTentSensorProofSection`, `useEcowittIngestAuditProofRows`).
+- No `service_role`, `functions.invoke`, raw payload, bridge token, MAC, or user_id rendering in operator/proof surfaces.
+- Action Queue handoff remains approval-required (verified by existing `action-queue-*` and `alert-to-action-queue` suites referenced in smoke audit).
+- EcoWitt-only scanner clean per `scripts/assert-ecowitt-only-sensor-direction.mjs` wiring in CI.
+
+## Warn-level findings
+1. **One-Tent Live Proof copy/print report** — sensor-proof section is markdown-injected; verify the final report still excludes audit row IDs / `created_at` precision below day-level if any operator pastes it externally. Currently safe (only counts + status), but worth a 1-line guard test.
+2. **Operator Mode disclosure** — `?operator=1` gate on `Sensors.tsx` is URL-only; no role check. Acceptable for an internal proof surface, but doc note in `docs/v0-release-checkpoint.md` Section 14 should call this out explicitly so it isn't mistaken for a privileged gate.
+3. **Ingest-audit "blocked" vs "error" UX** — both collapse to read-only states, but the panel copy could more clearly distinguish "RLS-denied" from "network error" for operator triage. Cosmetic only.
+
+## Confirmed safe areas (files reviewed)
+- `src/pages/OneTentLiveProof.tsx` — read-only hooks, sanitized report.
+- `src/pages/Sensors.tsx` — operator panels behind `?operator=1`, no writes.
+- `src/components/EcowittLiveProofPanel.tsx`, `EcowittIngestAuditProofPanel.tsx`, `OneTentSensorProofSection.tsx` — presenters only.
+- `src/lib/oneTentSensorProofViewModel.ts`, `ecowittLiveProofRules.ts`, `ecowittIngestAuditProofRules.ts` — pure deterministic rules.
+- `src/hooks/useEcowittIngestAuditProofRows.ts` — strict SELECT allowlist (`source, tent_id, rows_received, rows_inserted, captured_at, created_at`); excludes `user_id`, `bridge_token_id`, `raw_payload`.
+- Quick Log path: `src/lib/quick-log/createQuickLogEvent.ts` — preserves `source`/`captured_at`, never relabels stale/invalid as live, idempotent RPC.
+- Plant timeline: `DiaryTimelineCategorySections.test.tsx` and sibling timeline tests cover category/evidence/readability/print.
+- Action Queue: full `action-queue-*` suite intact (approval-required, no device control, redaction, follow-up linkage).
+- CI guardrails: `one-tent-loop-smoke-test.yml`, `ecowitt-only-safety-scan.yml`, `sensor-intelligence-safety`, `vpd-stage-normalization-ownership` all wired.
+
+## Minimal next fix plan (max 3, all small, read-only-friendly)
+1. **Docs-only**: Append a short note to `docs/v0-release-checkpoint.md` Section 14 clarifying that `?operator=1` is a URL surface gate (not a role gate) and listing the exact column allowlist actually selected by `useEcowittIngestAuditProofRows`.
+2. **Test-only**: Add a static-safety assertion that the One-Tent copy/print markdown for the sensor-proof section never contains substrings matching UUID patterns or ISO-second-precision timestamps from audit rows. ~10 lines.
+3. **Presenter-only (tiny)**: In `EcowittIngestAuditProofPanel.tsx`, split the "blocked" UI copy into `blocked (permission)` vs `error (network)` using the existing status enum — no logic change.
+
+Defer everything else. Do not start a new feature branch until RC is tagged.
+
+## Validation plan
+Targeted (fast):
+```
+bun run test:one-tent-loop-smoke
+node scripts/assert-ecowitt-only-sensor-direction.mjs
+bun run test:sensor-intelligence-safety
+npx vitest run EcowittLiveProof ecowittLiveProof EcowittIngestAuditProof ecowittIngestAuditProof OneTentSensorProof oneTentSensorProof SensorsEcowittLiveProofWiring --reporter=verbose
+npx tsc -p tsconfig.app.json --noEmit
+```
+Full regression (pre-tag):
+```
+bunx vitest run
 ```
 
-### Pages
-
-1. **Dashboard** — KPI cards (active tents, plants, open alerts, tasks due today), environment summary strip (avg temp/RH/VPD across tents), 24 h sensor sparklines, "Needs attention" list (alerts + overdue tasks), recent log feed, quick-actions.
-2. **Tents** — Grid of tent cards (name, stage, plant count, live temp/RH/VPD chip, light status, alert badge). Click → tent detail drawer with sensors, plants in tent, camera, lighting schedule.
-3. **Plants** — Filterable table/grid (by tent, strain, stage, age). Plant card shows photo, strain, stage, age, last log, health flag. Detail page with timeline, measurements, photos.
-4. **Sensor Data** — Multi-series chart (temp, RH, VPD, CO₂, soil moisture) with tent + range filters (24 h / 7 d / 30 d), threshold bands, downloadable CSV (mock).
-5. **Grow Logs** — Reuses existing Timeline UX (stage progression, filters, edit dialog) — kept on Supabase. New "Log entry" CTA reuses QuickLog.
-6. **Tasks** — Kanban (Today / Upcoming / Done) + list view toggle; recurring task templates (water, feed, defoliate, flush); per-task tent/plant link.
-7. **Cameras** — Grid of live tiles (mock stills), per-camera detail with timelapse strip and snapshot history. Placeholder for Pi bridge.
-8. **Alerts** — Severity-grouped list (critical/warning/info), source (sensor/task/AI), acknowledge & snooze, rule editor (threshold + duration).
-9. **AI Grow Doctor** — Reuses existing Coach (Lovable AI) chat, plus structured "Diagnose photo" flow with mock symptom checklist and recommendation cards.
-10. **Settings** — Profile, units (°C/°F, EC/PPM), notification prefs, integrations stub (Spider Farmer / AC Infinity / Vivosun / Pi 5 — display-only badges), danger zone.
-
-Existing Supabase pages folded in:
-- **Timeline → Grow Logs** route `/logs` (re-export of current page).
-- **Coach → AI Grow Doctor** route `/doctor`.
-- **Grows** stays as a sub-section under Tents (a tent can have an active grow).
-- **Rewards** stays accessible under Intelligence.
-
-### Mock data layer
-
-- `src/mock/` exports typed fixtures: `tents`, `plants`, `sensorReadings`, `cameras`, `tasks`, `alerts`, `aiInsights`.
-- `src/hooks/useMockData.ts` returns React-Query-style results so swapping to Supabase later is a one-file change.
-- Sensor readings generated as 7-day sine-wave + jitter for realistic charts.
-
-### Reusable components
-
-- `KpiCard`, `MetricChip` (temp/RH/VPD pill with status color), `SensorSparkline`, `EnvironmentChart` (Recharts), `StatusDot`, `SeverityBadge`, `EmptyState`, `PageHeader`, `SectionCard`, `DataTable` wrapper around shadcn Table.
-- `TentCard`, `PlantCard`, `CameraTile`, `TaskCard`, `AlertRow`, `AIInsightCard`.
-
-### Design system
-
-Dark premium aesthetic, cannabis-tech accent. All colors via HSL tokens in `index.css` and `tailwind.config.ts`:
-- Background: deep charcoal-green (`hsl(150 12% 6%)`).
-- Surface/glass: layered translucency over background.
-- Primary: vivid leaf green (`hsl(142 70% 48%)`) with glow variant.
-- Accents: amber for warnings, rose for critical, cyan for info.
-- Display font: existing `font-display`; body Inter.
-- Existing `glass`, `gradient-leaf` utilities reused.
-
-### Routing (new)
-
-```text
-/              Dashboard
-/tents         /tents/:id
-/plants        /plants/:id
-/sensors
-/logs          (existing Timeline)
-/tasks
-/cameras       /cameras/:id
-/alerts
-/doctor        (existing Coach + diagnose tab)
-/grows         (existing)
-/rewards       (existing)
-/settings
-```
-
-### Build order
-
-1. Shell: sidebar + mobile bottom nav + header, route scaffolding, design tokens refresh.
-2. Mock data layer + shared components (KpiCard, charts, badges).
-3. Dashboard.
-4. Tents (list + detail) → Plants (list + detail) — share TentContext.
-5. Sensor Data charts.
-6. Tasks (kanban + list).
-7. Alerts (list + rule editor stub).
-8. Cameras (grid + detail).
-9. Settings.
-10. AI Grow Doctor: add diagnose tab next to existing chat.
-11. Polish pass: empty states, loading skeletons, mobile spacing, keyboard nav.
-
-### Out of scope (per your earlier note)
-
-- Raspberry Pi 5 bridge, real sensor ingestion, real camera streams — all mocked behind the data layer for a clean swap later.
-
-### Technical notes
-
-- Charts: Recharts (already in deps).
-- State: React Query for mock async; existing Zustand-style stores for auth/grows/nugs untouched.
-- Mobile nav: shadcn `Sheet` for "More"; bottom bar is a fixed `nav` with safe-area padding.
-- Sidebar: shadcn `Sidebar` with `collapsible="icon"`; active route via `NavLink`.
-- No business-logic changes to existing Supabase tables.
+## Release-candidate verdict
+**Tag as One-Tent Loop RC checkpoint.** Safety invariants hold; proof surfaces are read-only and RLS-scoped; Action Queue remains approval-required; no fake-live regressions; EcoWitt-only direction preserved. Address the three warn-level items in a single follow-up slice (docs + 1 test + 1 copy split) before promoting RC → GA.

@@ -28,6 +28,7 @@ import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDiscl
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { useGrows } from "@/store/grows";
 import OnboardingChecklistCard from "@/components/OnboardingChecklistCard";
+import FirstRunChecklist from "@/components/FirstRunChecklist";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
 
@@ -35,6 +36,7 @@ import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOut
 import SafeByDesignNotice from "@/components/SafeByDesignNotice";
 import DashboardSensorHealthSummary from "@/components/DashboardSensorHealthSummary";
 import { buildDashboardSensorHealthSummary } from "@/lib/dashboardSensorHealthViewModel";
+import { sanitizeActionCopy } from "@/lib/actionQueueRowView";
 import {
   APPROVAL_QUEUE_EMPTY_COPY,
   mapRiskToSeverity,
@@ -88,17 +90,18 @@ import {
   formatValue,
   isStale,
 } from "@/lib/sensorSnapshot";
+import { buildSensorSourceDisplayLabel } from "@/lib/sensorSourceDisplayLabel";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
-import { tempFFromC, formatTempFFromC } from "@/lib/temperatureUnits";
+import { formatTemperatureDisplay } from "@/lib/temperatureUnitPreference";
 
 
 import type { SensorReadingRow } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import DailyGrowCheckStatusCard from "@/components/DailyGrowCheckStatusCard";
-import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPanel";
+
 
 import { Badge } from "@/components/ui/badge";
 import SensorSourceBadge from "@/components/SensorSourceBadge";
@@ -276,6 +279,17 @@ export default function Dashboard() {
         <OnboardingChecklistCard vm={onboardingVm} />
       </div>
 
+      <div className="my-3">
+        <FirstRunChecklist
+          growCount={grows.length}
+          tentCount={tents.length}
+          plantCount={plants.length}
+          quickLogCount={diaryRecentCount}
+          sensorSnapshotCount={rawReadings.length}
+        />
+      </div>
+
+
       {/* Dashboard intentionally has a single Quick Log entry point (QuickLogV2Fab).
           The "Log your first plant memory" CTA was a duplicate entry point and was removed.
           The same CTA remains on TentDetail where it is contextually unique. */}
@@ -292,12 +306,7 @@ export default function Dashboard() {
         }
       />
 
-      <DailyGrowCheckOnboardingCard
-        compact
-        hideWhenReady
-        tentIds={tents.map((t) => t.id)}
-        className="mb-3"
-      />
+
 
       <DailyGrowCheckStatusCard
         className="mb-6"
@@ -718,10 +727,15 @@ export default function Dashboard() {
             <div>
               <div className="flex items-center gap-2 flex-wrap mb-2">
                 <Badge variant="outline" className="text-[10px] uppercase">
-                  {formatSensorSourceLabel({
-                    source: sensorState.snapshot.source,
-                    deviceId: sensorState.snapshot.device_id ?? null,
-                  })}
+                  {sensorState.snapshot.source === "csv"
+                    ? buildSensorSourceDisplayLabel({
+                        source: "csv",
+                        csvVendor: sensorState.snapshot.csvVendor,
+                      })
+                    : formatSensorSourceLabel({
+                        source: sensorState.snapshot.source,
+                        deviceId: sensorState.snapshot.device_id ?? null,
+                      })}
                 </Badge>
                 {sensorState.snapshot.ts && (
                   <span className="text-xs text-muted-foreground">
@@ -741,12 +755,12 @@ export default function Dashboard() {
               </div>
               <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
                 {[
-                  { label: "Temperature", value: formatTempFFromC(sensorState.snapshot.temp) },
+                  { label: "Temperature", value: formatTemperatureDisplay(sensorState.snapshot.temp, { digits: 1 }) },
                   { label: "Humidity", value: formatValue(sensorState.snapshot.rh, "%") },
                   { label: "VPD", value: formatValue(sensorState.snapshot.vpd, " kPa", 2) },
                   { label: "Soil water", value: formatValue(sensorState.snapshot.soil, "%") },
                   { label: "Soil EC", value: formatValue(sensorState.snapshot.soil_ec, " mS/cm", 2) },
-                  { label: "Soil temp", value: formatTempFFromC(sensorState.snapshot.soil_temp) },
+                  { label: "Soil temp", value: formatTemperatureDisplay(sensorState.snapshot.soil_temp, { digits: 1 }) },
                   { label: "PPFD", value: formatValue(sensorState.snapshot.ppfd, " µmol", 0) },
                 ].map((m) => (
                   <div
@@ -790,6 +804,9 @@ export default function Dashboard() {
           ) : (
             <EcowittLatestSnapshotCard
               tentId={tentSelection}
+              tentName={
+                selectableTents.find((t) => t.id === tentSelection)?.name
+              }
               title="Latest EcoWitt Snapshot"
             />
           )}
@@ -903,8 +920,8 @@ export default function Dashboard() {
                 {[
                   {
                     label: "Temperature",
-                    avg: formatTempFFromC(trendsState.trends.temp.avg),
-                    range: `${formatTempFFromC(trendsState.trends.temp.min)} – ${formatTempFFromC(trendsState.trends.temp.max)}`,
+                    avg: formatTemperatureDisplay(trendsState.trends.temp.avg, { digits: 1 }),
+                    range: `${formatTemperatureDisplay(trendsState.trends.temp.min, { digits: 1 })} – ${formatTemperatureDisplay(trendsState.trends.temp.max, { digits: 1 })}`,
                   },
                   {
                     label: "Humidity",
@@ -1358,7 +1375,7 @@ export default function Dashboard() {
                           {a.risk_level} risk
                         </Badge>
                         <span className="text-xs font-medium truncate">
-                          {a.suggested_change}
+                          {sanitizeActionCopy(a.suggested_change)}
                         </span>
                         <span className="ml-auto text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(a.created_at), {
@@ -1395,7 +1412,7 @@ export default function Dashboard() {
                       </div>
                       {a.reason && (
                         <p className="text-xs mt-2 italic text-muted-foreground">
-                          {a.reason}
+                          {sanitizeActionCopy(a.reason)}
                         </p>
                       )}
                       <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -1407,7 +1424,7 @@ export default function Dashboard() {
                         >
                           <Link
                             to={actionDetailPath(a.id)}
-                            aria-label={`Review and approve: ${a.suggested_change}`}
+                            aria-label={`Review and approve: ${sanitizeActionCopy(a.suggested_change)}`}
                             title="Approval-only — no device control is executed"
                           >
                             Review &amp; Approve
@@ -1421,7 +1438,7 @@ export default function Dashboard() {
                         >
                           <Link
                             to={actionDetailPath(a.id)}
-                            aria-label={`Dismiss: ${a.suggested_change}`}
+                            aria-label={`Dismiss: ${sanitizeActionCopy(a.suggested_change)}`}
                             title="Opens the action detail to record a dismissal"
                           >
                             Dismiss

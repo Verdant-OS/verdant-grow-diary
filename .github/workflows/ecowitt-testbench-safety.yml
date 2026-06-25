@@ -1,0 +1,114 @@
+name: EcoWitt Windows Testbench safety
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - '.github/workflows/ecowitt-testbench-safety.yml'
+      - 'tools/ecowitt-testbench/**'
+      - 'src/test/ecowitt-windows-testbench-static-safety.test.ts'
+      - 'scripts/**ecowitt**'
+      - 'package.json'
+      - 'bun.lockb'
+  workflow_dispatch:
+
+jobs:
+  testbench-static-safety:
+    name: Typecheck + static safety scan for tools/ecowitt-testbench
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Prepare artifact folder
+        run: mkdir -p artifacts/ecowitt-testbench
+
+      # No secrets required: this job is safe for forked PRs.
+      - name: Typecheck
+        shell: bash
+        run: |
+          set -o pipefail
+          bun run typecheck 2>&1 | tee artifacts/ecowitt-testbench/typecheck.log
+
+      # Stop-ship: fails if a committed token/secret pattern, weakened
+      # forwarding opt-in, weakened demo source requirement, weakened
+      # Authorization ASCII validation, weakened debug-endpoint local-only
+      # access, raw-token exposure, or Supabase client / admin-role
+      # imports appear in tools/ecowitt-testbench/.
+      - name: EcoWitt Windows testbench static safety tests
+        shell: bash
+        run: |
+          set -o pipefail
+          bunx vitest run src/test/ecowitt-windows-testbench-static-safety.test.ts --reporter=dot 2>&1 | tee artifacts/ecowitt-testbench/static-safety.log
+
+      # Scoped secret scan over tools/ecowitt-testbench only. Requires no
+      # repository secrets. Allows the documented placeholder token
+      # (vbt_REPLACE_WITH_REAL_TOKEN) and the runtime-assembled _SR_MARKER
+      # used by the sanitizer. Fails on anything that looks like a real
+      # bridge token, JWT, admin-role marker, or hardcoded credential.
+      - name: Testbench-only secret scan (tools/ecowitt-testbench)
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            set -e
+            DIR=tools/ecowitt-testbench
+            fail=0
+
+            scan() {
+              local label="$1"; shift
+              local pattern="$1"; shift
+              local allow="${1:-}"
+              local hits
+              if [ -n "$allow" ]; then
+                hits=$(grep -RInE "$pattern" "$DIR" 2>/dev/null | grep -vE "$allow" || true)
+              else
+                hits=$(grep -RInE "$pattern" "$DIR" 2>/dev/null || true)
+              fi
+              if [ -n "$hits" ]; then
+                echo "::error::Secret scan ($label) found suspicious matches:"
+                echo "$hits"
+                fail=1
+              fi
+            }
+
+            scan "vbt-token" 'vbt_[A-Za-z0-9_-]{20,}' 'vbt_REPLACE_WITH_REAL_TOKEN'
+            scan "jwt"        'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'
+            scan "admin-role" 'service_role' '_SR_MARKER|service.\+.\+_.\+.\+role|"service" \+ "_" \+ "role"'
+            scan "admin-role-key-env" 'SUPABASE_SERVICE_ROLE_KEY'
+            scan "auth-bearer-hardcoded" 'Authorization:\s*Bearer\s+[A-Za-z0-9._-]{8,}' 'vbt_REPLACE_WITH_REAL_TOKEN|\$\{|\$env:|f"Bearer \{token\}"'
+            scan "secret-assign" '(password|api_key|token|secret)\s*=\s*"[A-Za-z0-9_.-]{12,}"' 'vbt_REPLACE_WITH_REAL_TOKEN'
+
+            if [ "$fail" -ne 0 ]; then
+              echo "Testbench secret scan failed."
+              exit 1
+            fi
+            echo "Testbench secret scan clean."
+          } 2>&1 | tee artifacts/ecowitt-testbench/secret-scan.log
+
+      - name: Upload safety logs
+        if: always()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        with:
+          name: ecowitt-testbench-safety-logs
+          path: artifacts/ecowitt-testbench/
+          retention-days: 14
+          if-no-files-found: warn

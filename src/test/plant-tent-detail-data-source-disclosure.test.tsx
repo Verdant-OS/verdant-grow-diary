@@ -121,6 +121,23 @@ describe("TentDetail disclosure behavior", () => {
     ).toBe("Mixed");
   });
 
+  it("does not describe saved tent records as absent sensor data", () => {
+    render(
+      <GrowDataSourceDisclosure
+        resource="tent"
+        hasAnyData
+        metas={[meta("supabase", false)]}
+        testId="tent-detail-data-source-disclosure"
+      />,
+    );
+    expect(
+      screen.getByText(
+        "Current grow data — tent saved in your Verdant workspace. Sensor readings are labeled in their own sections below.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Not live sensor readings/i)).not.toBeInTheDocument();
+  });
+
   it("never renders Live for mock-backed tent detail", () => {
     render(
       <GrowDataSourceDisclosure

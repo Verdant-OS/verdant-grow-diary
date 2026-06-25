@@ -372,9 +372,14 @@ export function normalizeAcInfinityRows(
 
 // ---------- Build inserts ----------
 
+/**
+ * Insert-row shape for the legacy AC Infinity CSV path. Keys MUST be a
+ * subset of public.sensor_readings columns — the table has no top-level
+ * `grow_id` / `plant_id`, so grow lineage travels in `raw_payload.grow_id`
+ * to avoid PostgREST PGRST204 "unknown column" failures.
+ */
 export interface CsvInsertRow {
   tent_id: string;
-  grow_id?: string | null;
   metric: SupportedMetric;
   value: number;
   captured_at: string;
@@ -385,6 +390,8 @@ export interface CsvInsertRow {
     source_app: CsvImportSourceApp;
     source_label: string;
     import_batch_id: string;
+    /** Provenance only — never used for auth / routing. */
+    grow_id?: string;
   };
 }
 
@@ -400,12 +407,13 @@ export function buildCsvInsertRows(args: BuildInsertsArgs): CsvInsertRow[] {
   if (!args.tentId?.trim()) throw new Error("tentId is required");
   const source = csvSourceTagFor(args.sourceApp);
   const label = CSV_SOURCE_LABEL[args.sourceApp];
+  const growIdProvenance =
+    args.growId && args.growId.trim() !== "" ? args.growId : undefined;
   const out: CsvInsertRow[] = [];
   for (const row of args.rows) {
     for (const r of row.readings) {
       out.push({
         tent_id: args.tentId,
-        grow_id: args.growId ?? null,
         metric: r.metric,
         value: r.value,
         captured_at: r.captured_at,
@@ -416,12 +424,14 @@ export function buildCsvInsertRows(args: BuildInsertsArgs): CsvInsertRow[] {
           source_app: args.sourceApp,
           source_label: label,
           import_batch_id: args.importBatchId,
+          ...(growIdProvenance ? { grow_id: growIdProvenance } : {}),
         },
       });
     }
   }
   return out;
 }
+
 
 export function isCsvImportSource(source: string | null | undefined): boolean {
   return !!source && source.startsWith("csv_import_");

@@ -1,5 +1,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { buildAiSensorSnapshotContext } from "./sensorSnapshotContextRules.ts";
+import { pickLatestSensorSnapshotByCapturedAt } from "./latestSensorSnapshot.ts";
 
 type Mode = "diagnose" | "next_steps";
 interface Body {
@@ -125,7 +127,7 @@ Deno.serve(async (req) => {
 
       if (plantIds.length) {
         const { data: p } = await supabase
-          .from("plants").select("id,name,strain,stage,health").in("id", plantIds);
+          .from("plants").select("id,name,strain,stage,health,medium,pot_size").in("id", plantIds);
         (p ?? []).forEach((row: Record<string, unknown>) => plantsById.set(row.id as string, row));
       }
       if (tentIds.length) {
@@ -134,10 +136,10 @@ Deno.serve(async (req) => {
         (t ?? []).forEach((row: Record<string, unknown>) => tentsById.set(row.id as string, row));
       }
 
-      for (const row of entries) {
-        const snap = (row.details as Record<string, unknown> | null)?.sensor_snapshot;
-        if (snap && typeof snap === "object") { latestSnapshot = snap as Record<string, unknown>; break; }
-      }
+      // Select the freshest snapshot by its own captured_at (not by
+      // diary entry_at order). Missing/invalid timestamps cannot
+      // outrank a valid current reading.
+      latestSnapshot = pickLatestSensorSnapshotByCapturedAt(entries);
     }
 
     const sparse = entries.length < 2;
@@ -154,10 +156,13 @@ Deno.serve(async (req) => {
     if (grow) {
       ctxLines.push(`GROW: ${grow.name} | type=${grow.grow_type} | stage=${grow.stage} | started=${grow.started_at}`);
     }
-    if (latestSnapshot) {
-      ctxLines.push(`LATEST_SENSOR_SNAPSHOT: ${JSON.stringify(latestSnapshot)}`);
-    } else {
-      ctxLines.push("LATEST_SENSOR_SNAPSHOT: none");
+    const snapshotCtx = buildAiSensorSnapshotContext(latestSnapshot);
+    ctxLines.push(snapshotCtx.annotationLine);
+    for (const note of snapshotCtx.safetyNotes) {
+      ctxLines.push(`SENSOR_SAFETY_NOTE: ${note}`);
+    }
+    for (const hint of snapshotCtx.missingInformationHints) {
+      ctxLines.push(`MISSING_INFORMATION_HINT: ${hint}`);
     }
     ctxLines.push(`ENTRY_COUNT: ${entries.length}${sparse ? " (sparse)" : ""}`);
     ctxLines.push("");
@@ -165,11 +170,16 @@ Deno.serve(async (req) => {
     for (const [i, row] of entries.entries()) {
       const plant = row.plant_id ? plantsById.get(row.plant_id) : null;
       const tent = row.tent_id ? tentsById.get(row.tent_id) : null;
+      const plantStr = plant
+        ? `plant=${plant.name}/${plant.strain ?? "?"} stage=${plant.stage} health=${plant.health}` +
+          (plant.medium ? ` medium=${plant.medium}` : "") +
+          (plant.pot_size ? ` pot_size=${plant.pot_size}` : "")
+        : null;
       const parts = [
         `#${i + 1}`,
         new Date(row.entry_at).toISOString(),
         row.stage ? `stage=${row.stage}` : null,
-        plant ? `plant=${plant.name}/${plant.strain ?? "?"} stage=${plant.stage} health=${plant.health}` : null,
+        plantStr,
         tent ? `tent=${tent.name} stage=${tent.stage} size=${tent.size ?? "?"}` : null,
         row.photo_url ? "photo=yes" : null,
         row.note ? `note="${String(row.note).slice(0, 240)}"` : null,

@@ -1,0 +1,4 @@
+.auth/
+results/
+test-results/
+playwright-report/

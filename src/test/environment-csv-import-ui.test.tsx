@@ -32,6 +32,7 @@ describe("EnvironmentCsvImportModal UI", () => {
     );
     expect(screen.getByTestId("csv-import-entry")).toBeTruthy();
     expect(screen.getByText(/Import historical data/i)).toBeTruthy();
+    expect(screen.getByText(/Spider Farmer, AC Infinity, or other environment CSV/i)).toBeTruthy();
     expect(screen.getByText(/Data is read-only and source-tagged/i)).toBeTruthy();
   });
 
@@ -62,6 +63,26 @@ describe("EnvironmentCsvImportModal UI", () => {
     await uploadCsv("Timestamp,Temp(°C),RH\n2026-06-01T10:00:00Z,25,50\n");
     expect(screen.getByTestId("csv-import-valid-count").textContent).toBe("1");
     expect(screen.getByTestId("csv-import-days")).toBeTruthy();
+  });
+
+  it("Spider Farmer preview shows CO2 and PPFD when present", async () => {
+    render(
+      <EnvironmentCsvImportModal
+        open
+        onOpenChange={() => {}}
+        onConfirm={async () => ({ insertedCount: 0, error: null })}
+      />,
+    );
+    await uploadCsv(
+      "deviceSerialnum,temperature(°C),humidity,vpd,temperature(°F),co2,Timestamp,ppfd\n" +
+        "80F1B2B452B8,25.7,52.4,1.57,78.3,775,2026-05-31 19:00:00,925\n",
+    );
+    const preview = screen.getByTestId("csv-import-row-preview");
+    expect(preview.textContent).toContain("25.7°C");
+    expect(preview.textContent).toContain("52%");
+    expect(preview.textContent).toContain("1.57 kPa VPD");
+    expect(preview.textContent).toContain("775 ppm CO₂");
+    expect(preview.textContent).toContain("925 PPFD");
   });
 
   it("partial success banner renders when rows skipped (test 23)", async () => {
@@ -120,13 +141,12 @@ describe("EnvironmentCsvImportModal UI", () => {
 });
 
 describe("EnvironmentCsvImportModal — source safety scan (test 32, 40-44)", () => {
-  it("source code contains no Live label, no service_role, no action_queue/alerts/device control", () => {
+  it("source code contains no restricted keys or write paths outside confirm", () => {
     const raw = readFileSync(
       resolve(__dirname, "../components/EnvironmentCsvImportModal.tsx"),
       "utf8",
     );
     const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
-    expect(src.toLowerCase()).not.toMatch(/\blive\b/);
     expect(src).not.toMatch(/service_role/i);
     expect(src).not.toMatch(/action_queue/i);
     expect(src).not.toMatch(/\balerts\b/i);

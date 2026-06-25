@@ -12,19 +12,38 @@
  *  - No writes, no alerts, no Action Queue, no automation, no device control.
  *  - Never renders fake/default live values. Empty input → calm empty state.
  *  - Never renders "Live VPD" or "VPD Live" — VPD label is always "Derived VPD".
+ *  - Test payloads are clearly disclosed and never labeled as live hardware data.
  */
 import {
   useEcowittLatestSnapshot,
   type UseEcowittLatestSnapshotInput,
 } from "@/hooks/useEcowittLatestSnapshot";
 import { ECOWITT_DERIVED_VPD_LABEL } from "@/lib/ecowittReadingViewModel";
+import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
+import { buildEcowittAuditHref } from "@/lib/ecowittAuditTentSelectionRules";
 import { Link } from "react-router-dom";
 
+/**
+ * Controls whether the audit deep-link includes the tent id in the href.
+ *
+ *  - "dashboard" (default, safe): renders the bare /sensors/ecowitt-audit
+ *    path. The Dashboard/Tent Card surface MUST NOT leak raw tent UUIDs
+ *    into the DOM. The audit page handles tent selection on its own.
+ *  - "tent-detail": opt-in scoped deep-link. Only used from the Tent
+ *    Detail page, where the user is already inside a specific tent and
+ *    the URL already exposes that tent id, so embedding it in the audit
+ *    link is no additional leakage.
+ */
+export type EcowittAuditHrefMode = "dashboard" | "tent-detail";
 
 export interface EcowittLatestSnapshotCardProps
   extends UseEcowittLatestSnapshotInput {
-  /** Card heading; defaults to "Latest EcoWitt reading". */
+  /** Card heading; defaults to "Latest EcoWitt Reading". */
   title?: string;
+  /** Tent name to display in the card header. */
+  tentName?: string | null;
+  /** Audit link scoping mode. Defaults to the safe "dashboard" mode. */
+  auditHrefMode?: EcowittAuditHrefMode;
 }
 
 function formatNumber(v: number | null | undefined, digits = 1): string {
@@ -43,11 +62,37 @@ function formatCapturedAt(iso: string | null): string {
   }
 }
 
+function readPayloadMetadata(rawPayload: unknown): {
+  testSender: boolean;
+  transport: string | null;
+} {
+  if (!rawPayload || typeof rawPayload !== "object") {
+    return { testSender: false, transport: null };
+  }
+  const obj = rawPayload as Record<string, unknown>;
+  return {
+    testSender: obj.test_sender === true,
+    transport:
+      typeof obj.transport === "string" && obj.transport.length > 0
+        ? obj.transport
+        : null,
+  };
+}
+
 export function EcowittLatestSnapshotCard(
   props: EcowittLatestSnapshotCardProps,
 ) {
-  const { title = "Latest EcoWitt reading", ...input } = props;
+  const {
+    title = "Latest EcoWitt Reading",
+    tentName,
+    auditHrefMode = "dashboard",
+    ...input
+  } = props;
+  const auditHrefTentId =
+    auditHrefMode === "tent-detail" ? (input.tentId ?? null) : null;
   const { status, viewModel, errorMessage } = useEcowittLatestSnapshot(input);
+
+  const meta = readPayloadMetadata(viewModel?.snapshot?.rawPayload ?? null);
 
   return (
     <section
@@ -56,16 +101,52 @@ export function EcowittLatestSnapshotCard(
       className="rounded-lg border border-border bg-card p-4 text-card-foreground"
     >
       <header className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        {viewModel?.sourceLabel ? (
-          <span
-            data-testid="ecowitt-source-badge"
-            className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground"
-          >
-            {viewModel.sourceLabel.label}
-          </span>
-        ) : null}
+        <div>
+          <h3 className="text-sm font-semibold">{title}</h3>
+          {tentName ? (
+            <p
+              data-testid="ecowitt-tent-name"
+              className="text-xs text-muted-foreground"
+            >
+              {tentName}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {meta.testSender ? (
+            <span
+              data-testid="ecowitt-test-sender-badge"
+              className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300"
+            >
+              Local Test Payload
+            </span>
+          ) : null}
+          {viewModel?.source ? (
+            <SensorSourceProvenanceBadge
+              source={viewModel.source}
+              vendor="ecowitt"
+              testId="snapshot-sensor-source-badge"
+            />
+          ) : null}
+          {viewModel?.sourceLabel ? (
+            <span
+              data-testid="ecowitt-source-badge"
+              className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground"
+            >
+              {viewModel.sourceLabel.label}
+            </span>
+          ) : null}
+        </div>
       </header>
+
+      {meta.transport ? (
+        <p
+          data-testid="ecowitt-transport"
+          className="mb-2 text-[11px] text-muted-foreground"
+        >
+          Transport: {meta.transport}
+        </p>
+      ) : null}
 
       {status === "loading" ? (
         <p
@@ -88,12 +169,11 @@ export function EcowittLatestSnapshotCard(
       ) : null}
 
       {status === "ok" && viewModel && !viewModel.hasReading ? (
-        <p
-          data-testid="ecowitt-snapshot-empty"
-          className="text-sm text-muted-foreground"
-        >
-          {viewModel.emptyStateMessage}
-        </p>
+        <div data-testid="ecowitt-snapshot-empty">
+          <p className="text-sm text-muted-foreground">
+            {viewModel.emptyStateMessage}
+          </p>
+        </div>
       ) : null}
 
       {status === "ok" && viewModel?.hasReading ? (
@@ -111,8 +191,8 @@ export function EcowittLatestSnapshotCard(
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <dt className="text-muted-foreground">Air temperature</dt>
-              <dd data-testid="ecowitt-metric-temperature_c">
-                {formatNumber(viewModel.metrics.temperature_c)} °C
+              <dd data-testid="ecowitt-metric-temp_f">
+                {formatNumber(viewModel.metrics.temp_f)} °F
               </dd>
             </div>
             <div>
@@ -141,10 +221,15 @@ export function EcowittLatestSnapshotCard(
               <dt className="text-muted-foreground">
                 {ECOWITT_DERIVED_VPD_LABEL}
               </dt>
-              <dd data-testid="ecowitt-metric-derived-vpd">
-                {viewModel.invalid || viewModel.derivedVpdKpa == null
+              <dd data-testid="ecowitt-metric-vpd_kpa">
+                {viewModel.invalid ||
+                (viewModel.metrics.vpd_kpa == null &&
+                  viewModel.derivedVpdKpa == null)
                   ? "Unavailable"
-                  : `${formatNumber(viewModel.derivedVpdKpa, 2)} kPa`}
+                  : `${formatNumber(
+                      viewModel.metrics.vpd_kpa ?? viewModel.derivedVpdKpa,
+                      2,
+                    )} kPa`}
               </dd>
             </div>
           </dl>
@@ -180,8 +265,16 @@ export function EcowittLatestSnapshotCard(
       ) : null}
 
       <div className="mt-2 text-xs">
+        {/*
+          The audit deep-link is scoped via the `auditHrefMode` prop and
+          defaults to "dashboard", which renders the bare
+          /sensors/ecowitt-audit path so the Dashboard card never leaks a
+          raw tent UUID into the DOM. TentDetail opts into "tent-detail"
+          mode, where the user is already inside a specific tent and the
+          scoped ?tentId= deep-link is safe to surface.
+        */}
         <Link
-          to="/sensors/ecowitt-audit"
+          to={buildEcowittAuditHref(auditHrefTentId)}
           data-testid="ecowitt-audit-link"
           className="text-primary hover:underline"
         >

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Gauge, Info, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { AlertTriangle, ArrowRight, CheckCircle2, Gauge, Info, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import {
+  buildManualSaveSuccessLine,
+  mapManualSaveErrorToUserMessage,
+} from "@/lib/manualSensorSaveConfirmation";
 import { useInsertSensorReading } from "@/hooks/useInsertSensorReading";
 import {
   buildManualReadingPayloads,
@@ -24,9 +29,15 @@ import {
   MAX_MANUAL_DEVICE_NOTE_LEN,
 } from "@/lib/manualSensorSourceLabel";
 import { evaluateManualSnapshotAdvisor } from "@/lib/manualSensorSnapshotAdvisorRules";
+import {
+  evaluateManualSensorSnapshotQuality,
+  type ManualSensorSnapshotInput,
+} from "@/lib/manualSensorSnapshotQualityRules";
+import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
 import DerivedVpdStatus from "@/components/DerivedVpdStatus";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
+import { isUuid } from "@/lib/isUuid";
 
 interface TentOption {
   id: string;
@@ -37,7 +48,15 @@ interface Props {
   tents: TentOption[];
   defaultTentId?: string;
   successMessage?: string;
+  /** When provided, the post-save next-step links Alerts filtered to this grow. */
+  growId?: string;
   onSaved?: (meta: { tentId: string; metricsSaved: number; createdAt: string }) => void;
+}
+
+interface LastSavedConfirmation {
+  line: string;
+  capturedAt: string;
+  tentId: string;
 }
 
 const EMPTY: ManualEntryInput = {
@@ -53,6 +72,7 @@ export default function ManualSensorReadingCard({
   tents,
   defaultTentId,
   successMessage,
+  growId,
   onSaved,
 }: Props) {
   const [tentId, setTentId] = useState<string>(defaultTentId ?? tents[0]?.id ?? "");
@@ -60,6 +80,7 @@ export default function ManualSensorReadingCard({
   const [devicePreset, setDevicePreset] = useState<string>("none");
   const [deviceCustom, setDeviceCustom] = useState<string>("");
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [lastSaved, setLastSaved] = useState<LastSavedConfirmation | null>(null);
   const insert = useInsertSensorReading();
 
   const devicePresets = useMemo(() => getManualSensorDeviceOptions(), []);
@@ -72,18 +93,43 @@ export default function ManualSensorReadingCard({
 
   const validation = useMemo(() => validateManualEntry(form), [form]);
   const advisor = useMemo(() => evaluateManualSnapshotAdvisor(form), [form]);
+  const snapshotQuality = useMemo(() => {
+    // Build a sanitized snapshot from validated metrics only. No raw_payload,
+    // no vendor metadata, no tokens, no private IDs. captured_at = now since
+    // the grower is entering a current reading right now.
+    const fields: Record<string, number> = {};
+    for (const m of validation.metrics) {
+      if (m.metric === "temperature_c") fields.temperature_c = m.value;
+      else if (m.metric === "humidity_pct") fields.humidity_pct = m.value;
+      else if (m.metric === "vpd_kpa") fields.vpd_kpa = m.value;
+      else if (m.metric === "soil_moisture_pct") fields.soil_moisture_pct = m.value;
+    }
+    const snap: ManualSensorSnapshotInput = {
+      source: "manual",
+      captured_at: new Date().toISOString(),
+      ...fields,
+    };
+    return evaluateManualSensorSnapshotQuality(snap);
+  }, [validation.metrics]);
 
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
     // Any edit invalidates a previously-shown review prompt so it must be
     // re-triggered on the next save attempt against the new values.
     if (reviewOpen) setReviewOpen(false);
+    // Editing after a save dismisses the prior confirmation so it never
+    // confuses the grower about the current form state.
+    if (lastSaved) setLastSaved(null);
   }
 
   async function doSave() {
+    // Belt-and-suspenders: even though Save buttons are disabled while
+    // pending, guard against a second concurrent call from any path.
+    if (insert.isPending) return;
+    const capturedMetrics = validation.metrics;
     const payloads = buildManualReadingPayloads({
       tentId,
-      metrics: validation.metrics,
+      metrics: capturedMetrics,
       deviceNote,
     });
     try {
@@ -92,28 +138,37 @@ export default function ManualSensorReadingCard({
       for (const p of payloads) {
         await insert.mutateAsync(p);
       }
-      toast.success(
-        successMessage ??
-          `Saved ${payloads.length} manual reading${payloads.length === 1 ? "" : "s"}.`,
-      );
+      const createdAt = new Date().toISOString();
+      const successLine = buildManualSaveSuccessLine({ metrics: capturedMetrics });
+      toast.success(successMessage ?? successLine);
       onSaved?.({
         tentId,
         metricsSaved: payloads.length,
-        createdAt: new Date().toISOString(),
+        createdAt,
       });
+      setLastSaved({ line: successLine, capturedAt: createdAt, tentId });
       setForm(EMPTY);
       setDevicePreset("none");
       setDeviceCustom("");
       setReviewOpen(false);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Save failed.";
+      // Preserve entered values (we don't clear the form on failure) and
+      // surface a safe operator-facing error. Never echo raw internals.
+      const msg = mapManualSaveErrorToUserMessage(err);
       toast.error(msg);
+      // Developer-safe diagnostic: console only, not in UI.
+      // eslint-disable-next-line no-console
+      console.warn("[manual-sensor-save] failed");
     }
   }
 
   async function onSave() {
     if (!tentId) {
       toast.error("Pick a tent first.");
+      return;
+    }
+    if (!isUuid(tentId)) {
+      toast.error("Select a real tent before saving a manual sensor reading.");
       return;
     }
     if (!validation.ok) {
@@ -411,6 +466,60 @@ export default function ManualSensorReadingCard({
             </div>
           </div>
         )}
+
+        <section
+          className="rounded-md border border-border/50 bg-muted/30 p-3 space-y-2"
+          data-testid="manual-reading-snapshot-quality"
+          aria-label="Snapshot quality"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Snapshot quality
+            </h3>
+          </div>
+          <ManualSensorSnapshotQualityBadge evaluation={snapshotQuality} />
+          <p className="text-[11px] text-muted-foreground">
+            This check helps AI Doctor decide whether the reading can support
+            current-room guidance.
+          </p>
+        </section>
+
+        {lastSaved && (
+          <div
+            className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 space-y-2"
+            data-testid="manual-reading-saved-confirmation"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-2">
+              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <div className="space-y-1">
+                <p
+                  className="text-xs font-medium text-emerald-700 dark:text-emerald-300"
+                  data-testid="manual-reading-saved-line"
+                >
+                  {lastSaved.line}
+                </p>
+                <p
+                  className="text-[11px] text-muted-foreground"
+                  data-testid="manual-reading-saved-captured-at"
+                >
+                  Captured {new Date(lastSaved.capturedAt).toLocaleString()}. Now
+                  available for snapshot and alert evaluation.
+                </p>
+                <Link
+                  to={growId ? `/alerts?growId=${encodeURIComponent(growId)}` : "/alerts"}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:underline"
+                  data-testid="manual-reading-next-step-alerts"
+                >
+                  Next: open Alerts to check this snapshot against current targets
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         <div className="flex items-center justify-between gap-2 pt-1">
           <p className="text-[11px] text-muted-foreground">

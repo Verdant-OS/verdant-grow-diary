@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
   Loader2,
@@ -9,6 +11,7 @@ import {
   ListChecks,
   Sparkles,
   Bell,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useGrowDetailData, type GrowOutcomesState } from "@/hooks/useGrowDetailData";
 import {
@@ -25,10 +28,15 @@ import {
   dashboardPath,
   logsPath,
   plantsPath,
+  postGrowLearningReportPath,
   tentsPath,
 } from "@/lib/routes";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import ActionOutcomeLearningReport from "@/components/ActionOutcomeLearningReport";
+import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
+import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
+import GrowTargetsEditor from "@/components/GrowTargetsEditor";
+
 
 /**
  * Read-only grow detail hub. Presentational only — all data loading +
@@ -37,6 +45,8 @@ import ActionOutcomeLearningReport from "@/components/ActionOutcomeLearningRepor
  */
 export default function GrowDetail() {
   const { grow, growId, loading, notFound, error, counts, recent, status, outcomes, refetch } = useGrowDetailData();
+  const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
+
 
   if (loading) {
     return (
@@ -88,6 +98,7 @@ export default function GrowDetail() {
     );
   }
 
+  const showPostGrowReport = grow.is_archived || grow.stage === "harvest" || grow.stage === "drying";
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -112,9 +123,33 @@ export default function GrowDetail() {
           <Field label="Started" value={new Date(grow.started_at).toLocaleString()} />
           <Field label="Created" value={new Date(grow.created_at).toLocaleString()} />
           <Field label="Updated" value={new Date(grow.updated_at).toLocaleString()} />
-          <Field label="Grow ID" value={grow.id} mono />
         </dl>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <StartPhenoHuntButton growId={grow.id} />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setTargetsEditorOpen(true)}
+            data-testid="grow-detail-edit-targets"
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            Edit targets
+          </Button>
+        </div>
       </header>
+
+
+      {/* One-Tent Loop continuity card. No specific tent is "selected"
+          on the grow hub, so this intentionally renders the calm safe
+          disabled state instead of inventing a tent route. */}
+      <OneTentLoopNextStepCard
+        current="grow"
+        ids={{ growId: grow.id }}
+        testId="grow-detail-one-tent-loop-next-step-card"
+        className="mb-4"
+      />
 
       <GrowStatusCard status={status} growId={growId} />
 
@@ -167,6 +202,16 @@ export default function GrowDetail() {
           count="unavailable"
           countLabel="dashboard"
         />
+        {showPostGrowReport && (
+          <HubLink
+            to={postGrowLearningReportPath(grow.id)}
+            icon={<Leaf className="h-4 w-4" />}
+            title="Post-Grow Report"
+            description="Review lessons, stability, photos, and post-harvest notes."
+            count={counts.diary}
+            countLabel="records"
+          />
+        )}
       </section>
 
       <section className="glass rounded-2xl p-4 mt-4" aria-label="Recent activity">
@@ -224,9 +269,17 @@ export default function GrowDetail() {
         report={outcomes.learning}
         status={outcomes.status}
       />
+
+      <GrowTargetsEditor
+        open={targetsEditorOpen}
+        onOpenChange={setTargetsEditorOpen}
+        growId={grow.id}
+        growName={grow.name}
+      />
     </div>
   );
 }
+
 
 function RecentOutcomesCard({ outcomes }: { outcomes: GrowOutcomesState }) {
   const { status, summary, recent } = outcomes;

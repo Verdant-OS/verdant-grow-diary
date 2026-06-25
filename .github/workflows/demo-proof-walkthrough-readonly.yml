@@ -1,0 +1,164 @@
+name: Demo Proof Walkthrough readonly E2E (mocked)
+
+# Read-only no-write E2E guard for the Demo Proof Walkthrough.
+#
+# SAFETY:
+#  - Mocked/non-destructive. The spec asserts the walkthrough triggers
+#    NO write-capable network calls on load (no Edge Functions, no AI
+#    provider hosts, no Supabase mutations, no Quick Log / diary /
+#    action / alert / grow_event writes).
+#  - No real accounts. No real secrets. No elevated DB role.
+#  - Uses the safe pull_request event only.
+#  - Walkthrough page renders against the local Vite dev server started
+#    by playwright.config.ts (mocked project). No real backend traffic.
+#
+# Artifacts uploaded on every run:
+#   - demo-proof-guards         (npm run test:demo-proof-guards log)
+#   - demo-proof-vitest         (targeted vitest log)
+#   - demo-proof-playwright-report (Playwright HTML report)
+#   - demo-proof-playwright-results (Playwright test-results/, traces)
+
+on:
+  pull_request:
+    branches: [main, verdant-grow-diary]
+    paths:
+      - "e2e/demo-proof-walkthrough-readonly.spec.ts"
+      - "src/pages/DemoProofWalkthrough.tsx"
+      - "src/lib/demoProofWalkthroughViewModel.ts"
+      - "src/lib/proofReportRedactionRules.ts"
+      - "src/lib/appRouteManifest.ts"
+      - "src/App.tsx"
+      - "src/test/demoProofWalkthrough-no-grows-route.test.ts"
+      - "src/test/demoProofWalkthrough-route-snapshot.test.ts"
+      - "src/test/proofReportRedactionRules*.test.ts"
+      - "src/test/DemoProofWalkthrough*.test.tsx"
+      - "playwright.config.ts"
+      - "playwright.config.*"
+      - ".github/workflows/demo-proof-walkthrough-readonly.yml"
+      - "package.json"
+      - "bun.lock"
+      - "bun.lockb"
+      - "docs/one-tent-loop-rc-smoke-test.md"
+      - "docs/v0-release-checkpoint.md"
+  workflow_dispatch:
+
+# Cancel older runs for the same PR or branch so only the latest commit
+# consumes a runner.
+concurrency:
+  group: demo-proof-walkthrough-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  demo-proof-readonly:
+    name: Demo Proof Walkthrough readonly E2E (mocked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Install Chromium only (with deps)
+        run: bunx playwright install chromium --with-deps
+
+      - name: Run demo-proof guard suite (logged)
+        run: |
+          mkdir -p e2e/results
+          bun run test:demo-proof-guards 2>&1 | tee e2e/results/demo-proof-guards.log
+
+      - name: Run targeted vitest (logged)
+        run: |
+          mkdir -p e2e/results
+          bunx vitest run proofReportRedactionRules DemoProofWalkthrough demoProofWalkthrough --reporter=verbose 2>&1 | tee e2e/results/demo-proof-vitest.log
+
+      - name: TypeScript check
+        run: bunx tsc -p tsconfig.app.json --noEmit
+
+      - name: Run Demo Proof Walkthrough readonly E2E
+        run: bun run test:e2e:demo-proof-readonly:ci
+
+      - name: Write Playwright test-results run summary
+        if: ${{ always() }}
+        run: |
+          mkdir -p test-results
+          echo '{"workflow":"demo-proof-walkthrough-readonly","run_id":"${{ github.run_id }}","ref":"${{ github.ref }}","sha":"${{ github.sha }}"}' > test-results/run-summary.json
+
+      - name: Upload demo-proof-guards log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: demo-proof-guards
+          path: e2e/results/demo-proof-guards.log
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload demo-proof targeted vitest log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: demo-proof-vitest
+          path: e2e/results/demo-proof-vitest.log
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload Playwright report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: demo-proof-playwright-report
+          path: playwright-report
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload Playwright test-results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: demo-proof-playwright-results
+          path: test-results
+          retention-days: 14
+          if-no-files-found: ignore
+
+      # Failure-only upload: surfaces Playwright screenshots, traces, and
+      # videos produced by `trace: retain-on-failure` / `video:
+      # retain-on-failure` in playwright.config.ts. Only runs when the
+      # job failed, so successful runs never publish raw page content.
+      - name: Upload Playwright failure artifacts (screenshots / traces / videos)
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: demo-proof-playwright-failure-artifacts
+          path: |
+            test-results/**/*.png
+            test-results/**/*.webm
+            test-results/**/trace.zip
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Job summary — read-only / mocked
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Demo Proof Walkthrough readonly E2E (mocked)";
+            echo "";
+            echo "- Mocked / non-destructive: **yes**";
+            echo "- Walkthrough triggers no Edge Function / AI / Supabase mutation calls";
+            echo "- No writes to grow_events, diary_entries, action_queue, or alerts";
+            echo "- Guards run: /grows route guard, walkthrough route snapshot, proof report redaction (+ expanded)";
+          } >> "$GITHUB_STEP_SUMMARY"

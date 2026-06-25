@@ -1,0 +1,9 @@
+{
+  "_comment": "Sanitized EcoWitt MQTT payload for local dry-run validation. NEVER add real PASSKEY, MAC, station IDs, IPs, tokens, or secrets to this file.",
+  "dateutc": "2026-06-19 12:00:00",
+  "tempf": 75.2,
+  "humidity": 55,
+  "soilmoisture1": 42,
+  "soiltemp1f": 70.5,
+  "soilmoisture2": 38
+}

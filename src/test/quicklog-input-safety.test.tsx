@@ -112,7 +112,7 @@ describe("QuickLog input safety", () => {
   it("save is gated until a plant is selected (Gate 1 fix)", () => {
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} />);
     const dialog = screen.getByRole("dialog");
-    const btn = within(dialog).getByRole("button", { name: /save entry/i }) as HTMLButtonElement;
+    const btn = within(dialog).getByRole("button", { name: /save log/i }) as HTMLButtonElement;
     // No plant chosen on mount → save is disabled, inline error visible.
     expect(btn.disabled).toBe(true);
     expect(within(dialog).getByTestId("quick-log-plant-error")).toBeTruthy();

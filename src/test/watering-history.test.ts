@@ -10,6 +10,13 @@ import { buildWateringHistory } from "@/lib/wateringHistoryRules";
 import { typedWateringWriteEnabled } from "@/lib/featureFlags";
 import { findMatches } from "./testFileSearchRules";
 
+// Standardised scanner guardrail timeout + slow-test telemetry.
+// Replaces the previous per-file vi.setConfig bump. No scanner pattern,
+// allowlist, or assertion is changed.
+import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+installScannerGuardrail({ file: __filename });
+
+
 const REPO_ROOT = process.cwd();
 
 function normalize(raw: unknown[]): NormalizedDiaryEntry[] {

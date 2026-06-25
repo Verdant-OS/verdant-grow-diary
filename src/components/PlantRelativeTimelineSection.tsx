@@ -35,6 +35,18 @@ import {
   buildRelativeTimelineEmptyState,
   type RelativeTimelineCta,
 } from "@/lib/relativeTimelineEmptyStateRules";
+import { DiaryTimelineCategorySections } from "@/components/DiaryTimelineCategorySections";
+import { PLANT_RELATIVE_TIMELINE_SECTION_STATE_STORAGE_KEY } from "@/lib/diaryTimelineSectionStateRules";
+import { buildDiaryTimelineSections } from "@/lib/diaryTimelineSectionRules";
+import { buildDiaryTimelineEvidenceQualitySummary } from "@/lib/diaryTimelineEvidenceQualityRules";
+import {
+  buildPlantTimelinePrintSummary,
+  buildPlantTimelineReadabilitySummary,
+} from "@/lib/plantTimelineReadabilityViewModel";
+
+
+
+
 
 
 
@@ -275,6 +287,32 @@ export default function PlantRelativeTimelineSection({
   });
   const visibleItems = filterRelativeTimelineItems(items, filter);
   const groups = groupRelativeTimelineByStage(visibleItems);
+  const filterDef =
+    RELATIVE_TIMELINE_FILTERS.find((f) => f.key === filter) ??
+    RELATIVE_TIMELINE_FILTERS[0];
+  const categorySections = buildDiaryTimelineSections(visibleItems);
+  const evidenceSummary = buildDiaryTimelineEvidenceQualitySummary(categorySections);
+  const readabilitySummary = buildPlantTimelineReadabilitySummary({
+    totalEntries: items.length,
+    visibleEntries: visibleItems.length,
+    filterKey: filter,
+    filterLabel: filterDef?.label ?? null,
+    groupCount: groups.length,
+    totalSections: evidenceSummary.totalSections,
+    sectionsWithEvidence: evidenceSummary.presentCount,
+  });
+  const printSummary = buildPlantTimelinePrintSummary({
+    totalEntries: items.length,
+    visibleEntries: visibleItems.length,
+    filterKey: filter,
+    filterLabel: filterDef?.label ?? null,
+    groupCount: groups.length,
+    totalSections: evidenceSummary.totalSections,
+    sectionsWithEvidence: evidenceSummary.presentCount,
+    plantName: plantName ?? null,
+    tentName: tentName ?? null,
+    growName: growName ?? null,
+  });
 
   return (
     <Card data-testid="plant-relative-timeline-section">
@@ -430,6 +468,29 @@ export default function PlantRelativeTimelineSection({
                 );
               })}
             </div>
+            <div
+              data-testid="relative-timeline-readability-summary"
+              data-is-filtered={readabilitySummary.isFiltered ? "true" : "false"}
+              data-visible={readabilitySummary.visibleEntries}
+              data-total={readabilitySummary.totalEntries}
+              data-groups={readabilitySummary.groupCount}
+              data-evidence-sections={readabilitySummary.sectionsWithEvidence}
+              data-total-sections={readabilitySummary.totalSections}
+              className="rounded-md border border-border/40 bg-muted/10 p-2 text-xs text-muted-foreground space-y-1"
+            >
+              <p data-testid="relative-timeline-readability-line">
+                {readabilitySummary.line}
+              </p>
+              <p
+                data-testid="relative-timeline-readability-filter-copy"
+                className={cn(
+                  readabilitySummary.isFiltered &&
+                    "text-foreground/80 font-medium",
+                )}
+              >
+                {readabilitySummary.filterCopy}
+              </p>
+            </div>
             {visibleItems.length === 0 ? (
               <p
                 className="text-sm text-muted-foreground"
@@ -499,6 +560,88 @@ export default function PlantRelativeTimelineSection({
                 ))}
               </div>
             )}
+            {/* Read-only category view — groups the same already-visible
+                items by event category. Uses a compact renderer (NOT
+                TimelineRow) so existing `relative-timeline-item` counts
+                in the stage view are not double-counted by this
+                secondary projection. Source/trust labels remain visible
+                via SourceIcon + the formatted detail. No new queries,
+                no writes, no persistence. */}
+            <div
+              className="pt-2 border-t border-border/40"
+              data-testid="relative-timeline-category-view-wrapper"
+            >
+              <h3 className="mb-2 text-xs font-medium text-muted-foreground">
+                Category view
+              </h3>
+              <DiaryTimelineCategorySections
+                items={visibleItems}
+                ariaLabel="Plant timeline category view"
+                storageKey={PLANT_RELATIVE_TIMELINE_SECTION_STATE_STORAGE_KEY}
+                renderEntry={(item) => {
+                  const detail = formatRelativeTimelineEntryDetail(
+                    item,
+                    entryContext,
+                  )!;
+                  return (
+                    <div
+                      data-testid="relative-timeline-category-item"
+                      data-item-id={item.id}
+                      data-event-type={item.eventType}
+                      data-source={item.source}
+                      data-category={detail.categoryKey}
+                      className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs"
+                    >
+                      <Badge
+                        variant="secondary"
+                        className="gap-1"
+                        data-testid="relative-timeline-category-source-badge"
+                        data-source-label={detail.sourceLabel}
+                      >
+                        <SourceIcon source={item.source} /> {detail.sourceLabel}
+                      </Badge>
+                      <span
+                        className={cn(
+                          "text-foreground/90",
+                          detail.summaryIsFallback &&
+                            "italic text-muted-foreground",
+                        )}
+                        data-testid="relative-timeline-category-summary"
+                      >
+                        {detail.summary}
+                      </span>
+                      <span
+                        className="ml-auto text-muted-foreground"
+                        data-testid="relative-timeline-category-timestamp"
+                      >
+                        {detail.timestampLabel}
+                      </span>
+                    </div>
+                  );
+                }}
+              />
+            </div>
+            <aside
+              data-testid="relative-timeline-print-summary"
+              aria-label="Print-friendly timeline summary"
+              className="hidden print:block mt-3 border-t border-border/60 pt-2 text-xs text-foreground"
+            >
+              <ol className="space-y-1">
+                {printSummary.lines.map((line) => (
+                  <li
+                    key={line.key}
+                    data-testid="relative-timeline-print-summary-line"
+                    data-line-key={line.key}
+                    className={cn(
+                      line.key === "title" && "font-medium",
+                      line.key === "safety" && "italic text-muted-foreground",
+                    )}
+                  >
+                    {line.label}
+                  </li>
+                ))}
+              </ol>
+            </aside>
           </div>
         )}
       </CardContent>

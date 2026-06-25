@@ -20,11 +20,19 @@
  *  - No service_role. Auth is the bridge token Bearer header for tests.
  *  - No device control. No automation. Testbench is auditable, not live.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server, Trash2, Terminal, FileJson, History, Download, Eye } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Copy, KeyRound, Send, ShieldAlert, Activity, CheckCircle2, XCircle, Server, Trash2, Terminal, FileJson, History, Download, Eye, Share2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -46,22 +54,45 @@ import {
   classifySensorIngestTestResult,
 } from "@/lib/sensorIngestTestResultRules";
 import {
+  buildCanonicalIngestPayloadValidation,
+  buildCanonicalValidationA11yLabel,
+  buildDiagnosticsBundleFilenamePreview,
+  buildDiagnosticsBundleFiles,
+  buildDiagnosticsShareModalState,
+  buildCanonicalSensorIngestUrl,
+  buildSensorIngestNetworkDiagnostics,
   buildDownloadFilename,
-  buildHistoryExport,
+  buildPowerShellCopyWarningState,
   buildPowerShellIngestTestScript,
   buildRedactedPayloadPreview,
+  buildSafeResponseInspector,
   buildSensorIngestCurl,
   buildSensorIngestHistoryItem,
   buildSensorIngestTestPayload,
+  buildSensorTestbenchValidationUiState,
   diagnosticsExportToJson,
   diagnosticsExportToText,
+  formatSafeResponseInspectorPlainText,
   historyExportToJson,
   SENSOR_INGEST_HISTORY_MAX,
+  SENSOR_DIAGNOSTICS_RUN_HISTORY_MAX,
+  buildNetworkDiagnosticsDownloadFilename,
+  buildNetworkDiagnosticsExportJson,
+  buildSensorDiagnosticsRunHistoryEntry,
+  buildSensorDiagnosticsRunHistoryFilename,
+  buildSensorIngestVerifyCommands,
+  sensorDiagnosticsRunHistoryToJson,
+  trimSensorDiagnosticsRunHistory,
+  type SensorDiagnosticsRunHistoryEntry,
   type SensorIngestHistoryItem,
 } from "@/lib/sensorDiagnosticsExportRules";
+import JSZip from "jszip";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const INGEST_URL = `${SUPABASE_URL}/functions/v1/sensor-ingest-webhook`;
+// Canonical ingest URL — single source of truth. Do not concatenate in JSX.
+const INGEST_URL =
+  buildCanonicalSensorIngestUrl(SUPABASE_URL) ??
+  `${SUPABASE_URL}/functions/v1/sensor-ingest-webhook`;
 
 
 interface Props {
@@ -148,7 +179,12 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   const [result, setResult] = useState<TestPayloadResult | null>(null);
   const [tokens, setTokens] = useState<BridgeTokenRow[]>([]);
   const [history, setHistory] = useState<SensorIngestHistoryItem[]>([]);
+  const [diagnosticsHistory, setDiagnosticsHistory] = useState<
+    SensorDiagnosticsRunHistoryEntry[]
+  >([]);
   const [lastPayload, setLastPayload] = useState<unknown>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const validationDetailsRef = useRef<HTMLDivElement | null>(null);
 
   // Reset reveal/result/history when tent changes — plaintext token must
   // never be reused across tents, and history is per-tent only.
@@ -156,6 +192,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     setReveal(null);
     setResult(null);
     setHistory([]);
+    setDiagnosticsHistory([]);
     setLastPayload(null);
   }, [tentId]);
 
@@ -229,6 +266,108 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
       networkError: result.status === 0,
     });
   }, [result]);
+
+  const responseInspector = useMemo(() => {
+    if (!result || !resultClass) return null;
+    return buildSafeResponseInspector({
+      status: result.status,
+      classification: resultClass.category,
+      body: result.body,
+    });
+  }, [result, resultClass]);
+
+  // Validate the canonical payload we *would* send (or last sent). Gates
+  // preview/copy/export buttons so we never invite operators to copy an
+  // incomplete payload.
+  const validationPayload = useMemo(() => {
+    if (lastPayload) return lastPayload;
+    if (!tentId) return null;
+    return buildSensorIngestTestPayload({
+      tentId,
+      capturedAtIso: new Date().toISOString(),
+    });
+  }, [lastPayload, tentId]);
+
+  const canonicalValidation = useMemo(
+    () => buildCanonicalIngestPayloadValidation(validationPayload),
+    [validationPayload],
+  );
+  const validationUi = useMemo(
+    () =>
+      buildSensorTestbenchValidationUiState({
+        validation: canonicalValidation,
+        hasLastTest: lastPayload !== null,
+      }),
+    [canonicalValidation, lastPayload],
+  );
+  const canonicalReady = !validationUi.actionsDisabled;
+  const canonicalDisabledHint = validationUi.disabledReason;
+  const bundleFilenamePreview = useMemo(
+    () => buildDiagnosticsBundleFilenamePreview(new Date()),
+    // Re-compute when validation flips so the displayed name refreshes when
+    // the user opens the panel afresh; the actual download still builds a
+    // new timestamp at click time.
+    [validationUi.status],
+  );
+  const inspectorPlainText = useMemo(
+    () => (responseInspector ? formatSafeResponseInspectorPlainText(responseInspector) : null),
+    [responseInspector],
+  );
+  const validationAriaLabel = useMemo(
+    () => buildCanonicalValidationA11yLabel({ status: validationUi.status }),
+    [validationUi.status],
+  );
+  const networkDiagnostics = useMemo(() => {
+    if (!result || !resultClass) return null;
+    return buildSensorIngestNetworkDiagnostics({
+      ingestUrl: INGEST_URL,
+      appOrigin:
+        typeof window !== "undefined" && window.location
+          ? window.location.origin
+          : null,
+      httpStatus: result.status,
+      classification: resultClass.category,
+      errorMessage:
+        result.body &&
+        typeof result.body === "object" &&
+        "message" in (result.body as Record<string, unknown>)
+          ? String((result.body as Record<string, unknown>).message ?? "")
+          : null,
+      requestMethod: "POST",
+      hasActiveToken: !!reveal,
+      supabaseUrl: SUPABASE_URL,
+    });
+  }, [result, resultClass, reveal]);
+
+  const shareModalState = useMemo(
+    () =>
+      buildDiagnosticsShareModalState({
+        bundleFilename: bundleFilenamePreview,
+        validationUi,
+        lastTestResult:
+          result && resultClass
+            ? { http_status: result.status, classification: resultClass.category }
+            : null,
+        inspectorPlainText,
+        networkDiagnostics,
+      }),
+    [bundleFilenamePreview, validationUi, result, resultClass, inspectorPlainText, networkDiagnostics],
+  );
+
+  const verifyCommands = useMemo(() => {
+    const canonical = buildCanonicalSensorIngestUrl(SUPABASE_URL);
+    return buildSensorIngestVerifyCommands({
+      ingestUrl: canonical,
+      appOrigin:
+        typeof window !== "undefined" && window.location
+          ? window.location.origin
+          : null,
+    });
+  }, []);
+
+
+
+
 
 
   const powershell = useMemo(
@@ -315,6 +454,33 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
       classification,
     });
     setHistory((prev) => [item, ...prev].slice(0, SENSOR_INGEST_HISTORY_MAX));
+
+    // Append a redacted diagnostics-run entry alongside the ingest history.
+    const diagForHistory = buildSensorIngestNetworkDiagnostics({
+      ingestUrl: INGEST_URL,
+      appOrigin:
+        typeof window !== "undefined" && window.location
+          ? window.location.origin
+          : null,
+      httpStatus: status,
+      classification: classification.category,
+      errorMessage:
+        body && typeof body === "object" && "message" in (body as Record<string, unknown>)
+          ? String((body as Record<string, unknown>).message ?? "")
+          : null,
+      requestMethod: "POST",
+      hasActiveToken: !!reveal,
+      supabaseUrl: SUPABASE_URL,
+    });
+    const diagEntry = buildSensorDiagnosticsRunHistoryEntry({
+      attemptedAt: capturedAt,
+      httpStatus: status,
+      classification: classification.category,
+      diagnostics: diagForHistory,
+    });
+    setDiagnosticsHistory((prev) =>
+      trimSensorDiagnosticsRunHistory([diagEntry, ...prev]),
+    );
   }
 
   async function safeCopy(text: string, label: string) {
@@ -336,10 +502,104 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     }
   }
 
+  async function copyRedactedInspector() {
+    if (!inspectorPlainText) return;
+    try {
+      if (!navigator.clipboard?.writeText) {
+        toast({
+          title: "Could not copy diagnostics summary. You can select and copy manually.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(inspectorPlainText);
+      toast({
+        title: "Copied redacted diagnostics summary.",
+        description: "Sensitive values were redacted.",
+      });
+    } catch {
+      toast({
+        title: "Could not copy diagnostics summary. You can select and copy manually.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function copyShareSummary() {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        toast({
+          title: "Could not copy diagnostics summary. You can select and copy manually.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(shareModalState.supportSummary);
+      toast({
+        title: "Copied support-ready diagnostics summary.",
+        description: "Sensitive values were redacted.",
+      });
+    } catch {
+      toast({
+        title: "Could not copy diagnostics summary. You can select and copy manually.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function focusValidationDetails() {
+    const el = validationDetailsRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.focus({ preventScroll: true });
+  }
+
 
   async function copyPowerShell() {
     await safeCopy(powershell, "PowerShell snippet");
   }
+
+
+  function downloadNetworkDiagnosticsJson() {
+    if (!networkDiagnostics) return;
+    const now = new Date();
+    const json = buildNetworkDiagnosticsExportJson({
+      generatedAt: now.toISOString(),
+      diagnostics: networkDiagnostics,
+      lastTestResult:
+        result && resultClass
+          ? { http_status: result.status, classification: resultClass.category }
+          : null,
+    });
+    downloadBlob(
+      json,
+      "application/json",
+      buildNetworkDiagnosticsDownloadFilename(now),
+    );
+    toast({
+      title: "Downloaded network diagnostics JSON",
+      description: "Sensitive values were redacted.",
+    });
+  }
+
+  function downloadDiagnosticsRunHistoryJson() {
+    if (diagnosticsHistory.length === 0) return;
+    const now = new Date();
+    const json = sensorDiagnosticsRunHistoryToJson(
+      diagnosticsHistory,
+      now.toISOString(),
+    );
+    downloadBlob(
+      json,
+      "application/json",
+      buildSensorDiagnosticsRunHistoryFilename(now),
+    );
+  }
+
+  function clearDiagnosticsHistory() {
+    setDiagnosticsHistory([]);
+  }
+
 
   function buildDiagnosticsPayload() {
     return {
@@ -398,6 +658,17 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
   }
 
   async function copyPowerShellIngest() {
+    // Warn-and-confirm only when the one-time token reveal is in memory —
+    // the script will embed the real token. If reveal is absent the
+    // snippet is already token-free and copies without prompting.
+    const warning = buildPowerShellCopyWarningState({ hasTokenReveal: !!reveal });
+    if (warning.requiresConfirmation) {
+      const confirmFn =
+        typeof window !== "undefined" && typeof window.confirm === "function"
+          ? window.confirm.bind(window)
+          : null;
+      if (!confirmFn || !confirmFn(warning.message)) return;
+    }
     const cmd = buildPowerShellIngestTestScript({
       ingestUrl: INGEST_URL,
       tentId,
@@ -407,6 +678,7 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
     });
     await safeCopy(cmd, "PowerShell ingest test");
   }
+
 
   function buildHistoryPayload() {
     return {
@@ -466,6 +738,35 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
       buildDownloadFilename("verdant-sensor-ingest-history", "json", new Date()),
     );
   }
+
+  async function downloadDiagnosticsBundle() {
+    if (typeof window === "undefined") return;
+    try {
+      const files = buildDiagnosticsBundleFiles({
+        diagnosticsJson: diagnosticsExportToJson(buildDiagnosticsPayload()),
+        diagnosticsText: diagnosticsExportToText(buildDiagnosticsPayload()),
+        historyJson: historyExportToJson(buildHistoryPayload()),
+      });
+      const zip = new JSZip();
+      for (const f of files) zip.file(f.name, f.content);
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = buildDiagnosticsBundleFilenamePreview(new Date());
+
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      toast({
+        title: "Bundle download unavailable — copy individual exports instead.",
+        variant: "destructive",
+      });
+    }
+  }
+
 
   function clearHistory() {
     setHistory([]);
@@ -541,8 +842,13 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               size="sm"
               variant="outline"
               onClick={copyCurl}
+              disabled={!canonicalReady}
               data-testid="sensors-diag-copy-curl"
-              title="Contains token if copied during reveal. Do not paste into chat, screenshots, or git."
+              title={
+                canonicalReady
+                  ? "Contains token if copied during reveal. Do not paste into chat, screenshots, or git."
+                  : canonicalDisabledHint ?? undefined
+              }
             >
               <Terminal className="size-3 mr-1" /> curl
             </Button>
@@ -550,8 +856,13 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               size="sm"
               variant="outline"
               onClick={copyPowerShellIngest}
+              disabled={!canonicalReady}
               data-testid="sensors-diag-copy-powershell-ingest"
-              title="Contains token if copied during reveal. Do not paste into chat, screenshots, or git."
+              title={
+                canonicalReady
+                  ? "Contains token if copied during reveal. Confirmation required when token is revealed."
+                  : canonicalDisabledHint ?? undefined
+              }
             >
               <Terminal className="size-3 mr-1" /> PowerShell
             </Button>
@@ -571,14 +882,36 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             >
               <Download className="size-3 mr-1" /> .txt
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={downloadDiagnosticsBundle}
+              disabled={!canonicalReady}
+              data-testid="sensors-diag-download-bundle"
+              title={
+                canonicalReady
+                  ? "Download diagnostics + history as one .zip — client-side only."
+                  : canonicalDisabledHint ?? undefined
+              }
+            >
+              <Download className="size-3 mr-1" /> bundle
+            </Button>
           </div>
         </div>
-        <p className="text-[11px] text-muted-foreground mb-2">
+
+        <p className="text-[11px] text-muted-foreground mb-1">
           Exports contain safe identity only. The curl and PowerShell buttons
           include the bridge token only while the one-time reveal is in memory
           — do not paste them into chat, screenshots, or git. Revoke any token
           that leaks.
         </p>
+        <p
+          className="text-[11px] text-muted-foreground mb-2 font-mono"
+          data-testid="sensors-diag-bundle-filename-preview"
+        >
+          bundle filename: {bundleFilenamePreview}
+        </p>
+
 
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
           <dt className="text-muted-foreground">App Supabase URL</dt>
@@ -782,6 +1115,451 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           </div>
         )}
 
+        {responseInspector && (
+          <div
+            className="mt-3 border-t border-border/40 pt-2 text-xs"
+            data-testid="sensors-testbench-response-inspector"
+            data-kind={responseInspector.kind}
+            data-status={responseInspector.http_status}
+            data-classification={responseInspector.classification}
+          >
+            <div className="font-medium mb-1 flex flex-wrap items-center gap-2">
+              <Eye className="size-3" />
+              Response inspector
+              <Badge variant="outline" className="text-[10px]">
+                HTTP {responseInspector.http_status}
+              </Badge>
+              <Badge variant="outline" className="text-[10px]">
+                {responseInspector.classification}
+              </Badge>
+              <Badge variant="outline" className="text-[10px]">
+                {responseInspector.kind}
+              </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto h-7 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={copyRedactedInspector}
+                disabled={!inspectorPlainText}
+                data-testid="sensors-testbench-response-inspector-copy"
+                aria-label="Copy redacted response inspector summary"
+                title={
+                  inspectorPlainText
+                    ? "Copy the redacted inspector output for support. Sensitive values are redacted."
+                    : "Run a test to enable inspector copy."
+                }
+              >
+                <Copy className="size-3 mr-1" /> Copy redacted
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onClick={() => setShareOpen(true)}
+                data-testid="sensors-testbench-share-open"
+                aria-label="Open share diagnostics modal"
+                title="Open a support-ready share view of these diagnostics."
+              >
+                <Share2 className="size-3 mr-1" /> Share diagnostics
+              </Button>
+            </div>
+            {responseInspector.note && (
+              <div className="text-muted-foreground mb-1">
+                {responseInspector.note}
+              </div>
+            )}
+            {responseInspector.fields.length > 0 && (
+              <ul
+                className="font-mono text-[11px] bg-muted/40 rounded p-2 space-y-0.5"
+                data-testid="sensors-testbench-response-inspector-fields"
+              >
+                {responseInspector.fields.map((f, i) => (
+                  <li
+                    key={`${f.path}-${i}`}
+                    className="flex flex-wrap gap-x-2"
+                    data-testid="sensors-testbench-response-inspector-field"
+                    data-path={f.path}
+                    data-redacted={f.redacted ? "true" : "false"}
+                  >
+                    <span className="text-muted-foreground">{f.path}</span>
+                    <span className="text-muted-foreground">({f.type})</span>
+                    <span className={f.redacted ? "text-amber-700 dark:text-amber-300" : ""}>
+                      {f.preview}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-2">
+              <a
+                href="#canonical-ingest-validation-details"
+                className="inline-flex items-center text-[11px] underline text-muted-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                data-testid="sensors-testbench-result-readiness-badge"
+                data-status={validationUi.status}
+                aria-label={validationAriaLabel}
+                onClick={(e) => {
+                  e.preventDefault();
+                  focusValidationDetails();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    focusValidationDetails();
+                  }
+                }}
+              >
+                Canonical payload:{" "}
+                <Badge
+                  variant="outline"
+                  className={
+                    validationUi.badgeTone === "ready"
+                      ? "ml-1 text-[10px] text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                      : validationUi.badgeTone === "warn"
+                        ? "ml-1 text-[10px] text-amber-700 dark:text-amber-300 border-amber-500/40"
+                        : "ml-1 text-[10px]"
+                  }
+                >
+                  {validationUi.statusLabel}
+                </Badge>
+              </a>
+            </div>
+          </div>
+        )}
+
+        {networkDiagnostics && networkDiagnostics.status !== "not_applicable" && (
+          <div
+            className="mt-3 border border-amber-500/40 bg-amber-50/40 dark:bg-amber-900/10 rounded p-2 text-xs"
+            data-testid="sensors-testbench-network-diagnostics"
+            data-status={networkDiagnostics.status}
+          >
+            <div className="font-medium mb-1 flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="text-[10px]">
+                Network diagnostics
+              </Badge>
+              <span data-testid="sensors-testbench-network-diagnostics-title">
+                {networkDiagnostics.title}
+              </span>
+            </div>
+            <p
+              className="text-muted-foreground mb-2"
+              data-testid="sensors-testbench-network-diagnostics-summary"
+            >
+              {networkDiagnostics.summary}
+            </p>
+            <div className="grid gap-1 mb-2 font-mono text-[11px]">
+              <div>
+                <span className="text-muted-foreground">resolved ingest URL:</span>{" "}
+                <span data-testid="sensors-testbench-network-diagnostics-endpoint">
+                  {networkDiagnostics.resolvedEndpoint}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">browser origin:</span>{" "}
+                <span data-testid="sensors-testbench-network-diagnostics-origin">
+                  {networkDiagnostics.appOrigin}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">expected canonical URL:</span>{" "}
+                <span data-testid="sensors-testbench-network-diagnostics-canonical">
+                  {networkDiagnostics.canonicalIngestUrl}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">canonical URL match:</span>{" "}
+                <span
+                  data-testid="sensors-testbench-network-diagnostics-canonical-match"
+                  data-match={networkDiagnostics.canonicalUrlMatch}
+                >
+                  {networkDiagnostics.canonicalUrlMatch}
+                </span>
+              </div>
+              {networkDiagnostics.canonicalMismatchExplanation && (
+                <div
+                  className="text-amber-700 dark:text-amber-300"
+                  data-testid="sensors-testbench-network-diagnostics-canonical-explanation"
+                >
+                  {networkDiagnostics.canonicalMismatchExplanation}
+                </div>
+              )}
+              <div>
+                <span className="text-muted-foreground">CORS OPTIONS headers:</span>{" "}
+                <span
+                  data-testid="sensors-testbench-network-diagnostics-cors-options"
+                  data-state={networkDiagnostics.cors.optionsHeaders}
+                >
+                  {networkDiagnostics.cors.optionsHeaders}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">CORS POST headers:</span>{" "}
+                <span
+                  data-testid="sensors-testbench-network-diagnostics-cors-post"
+                  data-state={networkDiagnostics.cors.postHeaders}
+                >
+                  {networkDiagnostics.cors.postHeaders}
+                </span>
+              </div>
+              <div
+                className="text-muted-foreground"
+                data-testid="sensors-testbench-network-diagnostics-cors-explanation"
+              >
+                {networkDiagnostics.cors.explanation}
+              </div>
+            </div>
+            {networkDiagnostics.evidence.length > 0 && (
+              <div className="mb-2">
+                <div className="text-muted-foreground mb-1">Evidence</div>
+                <ul
+                  className="list-disc pl-4 space-y-0.5"
+                  data-testid="sensors-testbench-network-diagnostics-evidence"
+                >
+                  {networkDiagnostics.evidence.map((e, i) => (
+                    <li key={i}>{e}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {networkDiagnostics.recommendedChecks.length > 0 && (
+              <div>
+                <div className="text-muted-foreground mb-1">Recommended checks</div>
+                <ul
+                  className="list-disc pl-4 space-y-0.5"
+                  data-testid="sensors-testbench-network-diagnostics-checks"
+                >
+                  {networkDiagnostics.recommendedChecks.map((c, i) => (
+                    <li key={i}>{c}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="mt-2 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={downloadNetworkDiagnosticsJson}
+                data-testid="sensors-testbench-network-diagnostics-download"
+              >
+                Download network diagnostics JSON
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* How to verify — safe curl commands. Token is always a placeholder. */}
+        {verifyCommands.available && (
+          <div
+            className="mt-3 border border-border/40 rounded p-2 text-xs"
+            data-testid="sensors-testbench-verify-commands"
+          >
+            <div className="font-medium mb-1 flex items-center gap-2">
+              <Badge variant="outline" className="text-[10px]">How to verify</Badge>
+              <span>Safe curl commands (placeholders only)</span>
+            </div>
+            <p
+              className="text-amber-700 dark:text-amber-300 mb-2"
+              data-testid="sensors-testbench-verify-commands-note"
+            >
+              {verifyCommands.note}
+            </p>
+            <div className="mb-2">
+              <div className="text-muted-foreground mb-1">OPTIONS preflight check</div>
+              <pre
+                className="bg-muted/40 rounded p-2 overflow-x-auto whitespace-pre"
+                data-testid="sensors-testbench-verify-options"
+              >
+                {verifyCommands.options}
+              </pre>
+              <div className="mt-1 flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => safeCopy(verifyCommands.options, "OPTIONS curl")}
+                  data-testid="sensors-testbench-verify-options-copy"
+                >
+                  Copy OPTIONS
+                </Button>
+              </div>
+            </div>
+            <div>
+              <div className="text-muted-foreground mb-1">POST with placeholder token</div>
+              <pre
+                className="bg-muted/40 rounded p-2 overflow-x-auto whitespace-pre"
+                data-testid="sensors-testbench-verify-post"
+              >
+                {verifyCommands.post}
+              </pre>
+              <div className="mt-1 flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => safeCopy(verifyCommands.post, "POST curl (placeholder token)")}
+                  data-testid="sensors-testbench-verify-post-copy"
+                >
+                  Copy POST
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Diagnostics run history — last 10 Send-test results (redacted). */}
+        {diagnosticsHistory.length > 0 && (
+          <div
+            className="mt-3 border border-border/40 rounded p-2 text-xs"
+            data-testid="sensors-testbench-diagnostics-history"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <div className="font-medium flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px]">Diagnostics history</Badge>
+                <span className="text-muted-foreground">
+                  Last {diagnosticsHistory.length} of {SENSOR_DIAGNOSTICS_RUN_HISTORY_MAX}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={downloadDiagnosticsRunHistoryJson}
+                  data-testid="sensors-testbench-diagnostics-history-download"
+                >
+                  Download JSON
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearDiagnosticsHistory}
+                  data-testid="sensors-testbench-diagnostics-history-clear"
+                >
+                  Clear history
+                </Button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px] font-mono">
+                <thead className="text-muted-foreground">
+                  <tr className="text-left">
+                    <th className="pr-2">time</th>
+                    <th className="pr-2">HTTP</th>
+                    <th className="pr-2">classification</th>
+                    <th className="pr-2">URL match</th>
+                    <th className="pr-2">CORS opt</th>
+                    <th className="pr-2">CORS post</th>
+                    <th>status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {diagnosticsHistory.map((e, i) => (
+                    <tr key={i} data-testid="sensors-testbench-diagnostics-history-row">
+                      <td className="pr-2">{relativeFromIso(e.attempted_at)}</td>
+                      <td className="pr-2">{e.http_status}</td>
+                      <td className="pr-2">{e.classification}</td>
+                      <td className="pr-2">{e.canonical_url_match}</td>
+                      <td className="pr-2">{e.cors_options}</td>
+                      <td className="pr-2">{e.cors_post}</td>
+                      <td>{e.diagnostics_status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+
+
+
+        {/* Canonical payload validation summary — view-model driven. */}
+        <div
+          className="mt-3 border-t border-border/40 pt-2 text-xs rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          id="canonical-ingest-validation-details"
+          ref={validationDetailsRef}
+          tabIndex={-1}
+          data-testid="sensors-testbench-canonical-validation"
+          data-ready={canonicalReady ? "true" : "false"}
+          data-status={validationUi.status}
+          aria-label={validationAriaLabel}
+        >
+          {/* Back-compat alias for legacy in-page anchor */}
+          <span id="sensors-testbench-canonical-validation" className="sr-only" />
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span className="font-medium">Canonical payload</span>
+            <Badge
+              variant="outline"
+              className={
+                validationUi.badgeTone === "ready"
+                  ? "text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                  : validationUi.badgeTone === "warn"
+                    ? "text-amber-700 dark:text-amber-300 border-amber-500/40"
+                    : ""
+              }
+              data-testid="sensors-testbench-canonical-validation-badge"
+              data-tone={validationUi.badgeTone}
+              aria-label={validationAriaLabel}
+            >
+              {validationUi.statusLabel}
+            </Badge>
+            <span className="text-muted-foreground">
+              {canonicalValidation.readingsCount} reading
+              {canonicalValidation.readingsCount === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          {validationUi.emptyStateMessage && (
+            <p
+              className="text-muted-foreground mb-2"
+              data-testid="sensors-testbench-canonical-empty"
+            >
+              {validationUi.emptyStateMessage}
+            </p>
+          )}
+
+          {/* Ordered summary: missing → invalid → optional → present. */}
+          <div className="space-y-1 text-[11px]">
+            <div data-testid="sensors-testbench-canonical-missing">
+              <span className="text-muted-foreground">missing: </span>
+              {validationUi.summary.missing.length === 0 ? (
+                <span>—</span>
+              ) : (
+                <span>
+                  {validationUi.summary.missing
+                    .map((m) => `${m.label} (${m.reason})`)
+                    .join(", ")}
+                </span>
+              )}
+            </div>
+            <div data-testid="sensors-testbench-canonical-invalid">
+              <span className="text-muted-foreground">invalid: </span>
+              {validationUi.summary.invalid.length === 0 ? (
+                <span>—</span>
+              ) : (
+                <span>
+                  {validationUi.summary.invalid
+                    .map((i) => `${i.label}: ${i.reason}`)
+                    .join("; ")}
+                </span>
+              )}
+            </div>
+            <div data-testid="sensors-testbench-canonical-optional">
+              <span className="text-muted-foreground">optional: </span>
+              <span>{validationUi.summary.optional.join(", ") || "—"}</span>
+            </div>
+            <div data-testid="sensors-testbench-canonical-present">
+              <span className="text-muted-foreground">present: </span>
+              <span>{validationUi.summary.present.join(", ") || "—"}</span>
+            </div>
+          </div>
+
+          {validationUi.disabledReason && (
+            <p
+              className="mt-1 text-amber-700 dark:text-amber-300"
+              data-testid="sensors-testbench-canonical-helper"
+            >
+              {validationUi.disabledReason}
+            </p>
+          )}
+        </div>
+
         <details
           className="mt-3 border-t border-border/40 pt-2 text-xs"
           data-testid="sensors-testbench-payload-preview"
@@ -790,7 +1568,14 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
             <Eye className="size-3" />
             Canonical ingest payload used for last test
           </summary>
-          {lastPayload ? (
+          {validationUi.status === "not_ready" ? (
+            <p
+              className="text-amber-700 dark:text-amber-300 mt-2"
+              data-testid="sensors-testbench-payload-preview-blocked"
+            >
+              {validationUi.disabledReason}
+            </p>
+          ) : lastPayload ? (
             <pre
               className="bg-muted/40 rounded p-2 mt-2 overflow-x-auto whitespace-pre-wrap break-words"
               data-testid="sensors-testbench-payload-preview-body"
@@ -802,11 +1587,14 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
               className="text-muted-foreground mt-2"
               data-testid="sensors-testbench-payload-preview-empty"
             >
-              No test payload sent yet. Mint a token and run “Send test payload”
-              to preview the exact JSON Verdant submits.
+              No test payload sent yet.{" "}
+              {validationUi.emptyStateMessage ??
+                "Mint a token and run “Send test payload” to preview the exact JSON Verdant submits."}
             </p>
           )}
         </details>
+
+
 
         {history.length > 0 && (
           <div
@@ -823,7 +1611,9 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                   size="sm"
                   variant="outline"
                   onClick={copyHistoryJson}
+                  disabled={!canonicalReady}
                   data-testid="sensors-testbench-history-copy-json"
+                  title={canonicalDisabledHint ?? undefined}
                 >
                   <FileJson className="size-3 mr-1" /> Copy JSON
                 </Button>
@@ -831,10 +1621,13 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
                   size="sm"
                   variant="outline"
                   onClick={downloadHistoryJson}
+                  disabled={!canonicalReady}
                   data-testid="sensors-testbench-history-download-json"
+                  title={canonicalDisabledHint ?? undefined}
                 >
                   <Download className="size-3 mr-1" /> Download
                 </Button>
+
                 <Button
                   size="sm"
                   variant="ghost"
@@ -893,6 +1686,116 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           </div>
         )}
       </div>
+
+      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+        <DialogContent
+          className="max-w-2xl"
+          data-testid="sensors-testbench-share-modal"
+        >
+          <DialogHeader>
+            <DialogTitle>Share diagnostics</DialogTitle>
+            <DialogDescription>
+              Support-ready summary. Sensitive values (tokens, authorization,
+              secrets, service_role) are redacted before they leave this panel.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-muted-foreground">bundle filename:</span>
+              <code
+                className="font-mono break-all"
+                data-testid="sensors-testbench-share-bundle-filename"
+              >
+                {shareModalState.bundleFilename}
+              </code>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-muted-foreground">canonical readiness:</span>
+              <Badge
+                variant="outline"
+                className={
+                  shareModalState.badgeTone === "ready"
+                    ? "text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                    : shareModalState.badgeTone === "warn"
+                      ? "text-amber-700 dark:text-amber-300 border-amber-500/40"
+                      : ""
+                }
+                aria-label={shareModalState.ariaLabel}
+                data-testid="sensors-testbench-share-readiness"
+                data-status={shareModalState.status}
+              >
+                {shareModalState.statusLabel}
+              </Badge>
+            </div>
+            <div>
+              <div className="text-muted-foreground mb-1">
+                support-ready summary
+              </div>
+              <pre
+                className="bg-muted/40 rounded p-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px]"
+                data-testid="sensors-testbench-share-summary"
+              >
+{shareModalState.supportSummary}
+              </pre>
+            </div>
+            {shareModalState.redactedInspectorText && (
+              <div>
+                <div className="text-muted-foreground mb-1">
+                  redacted response inspector
+                </div>
+                <pre
+                  className="bg-muted/40 rounded p-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px]"
+                  data-testid="sensors-testbench-share-inspector"
+                >
+{shareModalState.redactedInspectorText}
+                </pre>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyShareSummary}
+              data-testid="sensors-testbench-share-copy-summary"
+              aria-label="Copy support-ready diagnostics summary"
+            >
+              <Copy className="size-3 mr-1" /> Copy summary
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyRedactedInspector}
+              disabled={!shareModalState.redactedInspectorText}
+              data-testid="sensors-testbench-share-copy-inspector"
+              aria-label="Copy redacted response inspector"
+            >
+              <Copy className="size-3 mr-1" /> Copy inspector
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={downloadDiagnosticsBundle}
+              disabled={!shareModalState.canDownloadBundle}
+              data-testid="sensors-testbench-share-download-bundle"
+              aria-label="Download diagnostics bundle"
+            >
+              <Download className="size-3 mr-1" /> Download bundle
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShareOpen(false)}
+              data-testid="sensors-testbench-share-close"
+              aria-label="Close share diagnostics modal"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

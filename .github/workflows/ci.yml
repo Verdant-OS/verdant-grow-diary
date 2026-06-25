@@ -13,15 +13,15 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: latest
 
       - name: Cache
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
@@ -52,6 +52,59 @@ jobs:
       - name: Static safety scans (Action Queue provenance + chip)
         run: bun run test:static-safety
 
+      # Release docs safety: docs/releases/*.md must not claim unsafe
+      # behavior (live telemetry, import writes, AI behavior changes,
+      # Action Queue auto-writes, device control, schema/RLS/Edge changes,
+      # or expose secrets/tokens/raw payloads). See
+      # scripts/assert-release-docs-safety.mjs.
+      - name: Release docs safety
+        run: bun run docs:release-safety
+
+      # AI Doctor Action Queue suggestion preview must remain read-only:
+      # the preview helper + presenter must not drift into approved/queued/
+      # executed wording, Action Queue writes, functions.invoke, service_role,
+      # device-command or automation language. See
+      # scripts/assert-ai-doctor-preview-safety.mjs.
+      - name: AI Doctor preview safety
+        run: bun run ai-doctor:preview-safety
+
+      # Stop-ship: Action Queue device-control surface scanner + allow-list
+      # guard tests. Locks the narrow safety-file allow-list (e.g.
+      # `blocked_device_command_risk`, `DEVICE_COMMAND_PATTERNS`) so it can
+      # never silently broaden into real actuator/control surfaces, unsafe
+      # grower-facing equipment copy, `raw_payload` leakage, `service_role`,
+      # or Bearer/API-key exposure. Runs on every PR.
+      - name: Action Queue safety scanner + allow-list guards
+        run: bunx vitest run src/test/action-queue-safety.test.ts src/test/action-queue-safety-allow-list-guards.test.ts --reporter=dot
+
+      # Stop-ship: repo-wide filesystem/static scanner guards (source
+      # ownership, no raw payloads, no device control, no RPC misuse,
+      # route/helper leakage). Split into its own step so timeout-only
+      # failures in slow sandboxes are easy to attribute and triage with
+      # `bun run test:summarize-timeouts`. See
+      # docs/testing/static-guards.md.
+      - name: Repo-wide static guard tests (fs-walking)
+        run: bun run test:static-guards
+
+      # Stop-ship: Action Detail evidence provenance leakage guard.
+      # Renders alert- and AI-derived Action Detail panels with malicious
+      # mock extras and confirms no raw_payload, service_role, Bearer/JWT,
+      # SUPABASE_SERVICE_ROLE_KEY, PRIVATE_API_KEY, sk_live_, or mqtt/
+      # device-control strings leak into UI textContent/innerHTML.
+      # Review timeline link must remain accessible and review-only.
+      - name: Action Detail evidence leakage guard
+        run: bun run test:action-detail-leakage
+
+      # Stop-ship: Action Queue row evidence/provenance leakage guard.
+      # View-model + static scan: no raw_payload, service_role, Bearer/JWT,
+      # SUPABASE_SERVICE_ROLE_KEY, PRIVATE_API_KEY, sk_live_, mqtt/device-
+      # control strings reach row-level evidence surfaces. Approval/reject
+      # controls remain wired (review-only posture).
+      - name: Action Queue evidence leakage guard
+        run: bun run test:action-queue-evidence-leakage
+
+
+
       # Stop-ship: QuickLog v2 RPC ownership / reason-code / mixed-boundary
       # regression. See docs/quicklog-rpc-safety.md.
       - name: QuickLog v2 RPC ownership + security
@@ -70,8 +123,67 @@ jobs:
       # gated on workflow_dispatch + push-to-main only.
 
 
+      # Stop-ship: every Shelly H&T edge function declared in
+      # supabase/config.toml must have its source file in the repo.
+      - name: Shelly H&T edge function sources present
+        run: bun run check:shelly-ht-edge-sources
+
+      # Stop-ship: App route manifest must stay in sync with src/App.tsx and
+      # every Alerts quick-link target must resolve to a registered, mounted
+      # auth route. Runs on every PR to catch drift before the full suite.
+      - name: Route manifest + Alerts quick-link drift
+        run: bunx vitest run src/test/route-manifest-sync.test.ts src/test/alerts-route-quick-link-contract.test.tsx
+
+      # Stop-ship: QuickLog RPC static trust-boundary guardrails. Always runs.
+      - name: QuickLog RPC static trust-boundary
+        run: bun run test:db:quicklog-rpc-static
+
+      # AI Doctor provider usage wiring (Deno) — local/unit only.
+      # Exercises the public cost composer used by the ai-doctor-review
+      # Edge Function at the provider response boundary. NO provider API
+      # call, NO Supabase call, NO network access, NO secrets required.
+      # Safe to run on every PR (including forks).
+      - name: AI Doctor provider usage wiring (Deno)
+        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2.0.2
+        with:
+          deno-version: v1.x
+      - name: Run AI Doctor provider usage wiring tests
+        run: deno test --allow-env --allow-read supabase/functions/ai-doctor-review/providerUsageWiring.test.ts
+
+
+
+      # Optional: QuickLog RPC runtime harnesses. Only runs when staging
+      # Supabase credentials are configured as repo/org secrets. The
+      # orchestrator script also skips cleanly when env is missing, so this
+      # step is safe to leave wired even for forked PRs.
+      - name: QuickLog RPC runtime harnesses (conditional)
+        if: ${{ env.SUPABASE_URL != '' && env.SUPABASE_SERVICE_ROLE_KEY != '' && env.SUPABASE_ANON_KEY != '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: bun run test:db:quicklog-rpc-runtime
+
       - name: Full test suite
         run: bunx vitest run
+
+      # Scanner guardrail timeout sentinel — re-runs only the filesystem-
+      # scanning guardrail suites in isolation. The CI wrapper deletes stale
+      # local telemetry, runs the full scanner suite + harness self-test,
+      # validates the JSONL row contract, and fails the build if any scanner
+      # guardrail emits a slow-test row at or above 5000ms. This step does
+      # NOT replace the full suite above. See
+      # docs/testing/scanner-guardrails.md.
+      - name: Scanner guardrail timeout sentinel
+        run: bun run test:scanner-guardrails:ci
+
+      - name: Upload scanner guardrail slow-test report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: scanner-guardrail-slow-tests
+          path: test-results/scanner-guardrail-slow-tests.jsonl
+          if-no-files-found: ignore
 
       - name: Build
         run: bun run build

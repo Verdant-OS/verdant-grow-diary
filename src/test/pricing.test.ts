@@ -378,38 +378,37 @@ describe("sitemap", () => {
 
 describe("No unrelated routes were changed", () => {
   it("App.tsx routes and the manifest stay in sync (bidirectional)", async () => {
-    const { getAppRouteManifestPathsSorted, APP_ROUTES } = await import(
-      "@/lib/appRouteManifest"
+    const { diffAppRoutesAgainstManifest } = await import(
+      "./helpers/routeManifestSyncHarness"
     );
-    const appPaths = [...APP.matchAll(/path="([^"]+)"/g)]
-      .map((m) => m[1])
-      .sort();
-    const manifestPaths = getAppRouteManifestPathsSorted();
+    const { APP_ROUTES } = await import("@/lib/appRouteManifest");
 
-    // Bidirectional drift: every App route must appear in the manifest, and
-    // every manifest path must be mounted in App.tsx. Failing message names
-    // the offending side so the fix is obvious.
-    const missingFromManifest = appPaths.filter(
-      (p) => !manifestPaths.includes(p),
-    );
-    const missingFromApp = manifestPaths.filter((p) => !appPaths.includes(p));
-    expect(missingFromManifest).toEqual([]);
-    expect(missingFromApp).toEqual([]);
+    const diff = diffAppRoutesAgainstManifest(APP);
 
-    // Belt-and-braces: full set equality on top of the diff assertions above.
-    expect(appPaths).toEqual(manifestPaths);
+    expect(diff.missingFromManifest).toEqual([]);
+    expect(diff.missingFromApp).toEqual([]);
+    expect(diff.duplicateManifestPaths).toEqual([]);
 
     // Explicit guard against the original bug — `/operator/ecowitt` must be
     // present so the Cloud Canary route is always covered by drift checks.
+    const manifestPaths = APP_ROUTES.map((r) => r.path);
     expect(manifestPaths).toContain("/operator/ecowitt");
-
-    // Manifest must have no duplicate paths.
-    const seen = new Set<string>();
-    const dupes: string[] = [];
-    for (const r of APP_ROUTES) {
-      if (seen.has(r.path)) dupes.push(r.path);
-      seen.add(r.path);
-    }
-    expect(dupes).toEqual([]);
   });
 });
+
+describe("Pricing manifest snapshot (narrow)", () => {
+  it("pricing-relevant manifest entries match the expected shape", async () => {
+    const { getPricingManifestSnapshot } = await import(
+      "./helpers/routeManifestSyncHarness"
+    );
+    // Intentionally narrow: only pricing / public billing-relevant routes so
+    // unrelated route changes do not create noisy snapshot diffs here.
+    expect(getPricingManifestSnapshot()).toEqual([
+      { path: "/billing/:plan", access: "public", description: "Billing placeholder." },
+      { path: "/hardware-integrations", access: "public" },
+      { path: "/pricing", access: "public" },
+      { path: "/welcome", access: "public" },
+    ]);
+  });
+});
+

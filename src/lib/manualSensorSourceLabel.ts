@@ -10,7 +10,7 @@
  *  - Manual device notes are persisted in the existing
  *    `sensor_readings.device_id` column with a `manual:` prefix so they
  *    cannot be confused with live bridge device IDs (e.g.
- *    `shelly-ht-gen4`). The `source` column stays `manual` — the
+ *    `ecowitt-gateway`). The `source` column stays `manual` — the
  *    presence of a device note never upgrades a row to live.
  */
 

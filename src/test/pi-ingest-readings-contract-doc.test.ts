@@ -8,6 +8,13 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
+// Scanner guardrail: 30s per-file timeout + slow-test telemetry so the
+// recursive src/ + migrations walks below do not flake under sharded
+// validation load (default 5s vitest timeout can be exceeded by I/O
+// contention alone).
+import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+
+installScannerGuardrail({ file: __filename });
 
 const ROOT = resolve(__dirname, "../..");
 const DOC_PATH = resolve(ROOT, "docs/pi-ingest-readings-contract.md");

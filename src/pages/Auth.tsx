@@ -1,72 +1,432 @@
-import { useState, useEffect } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { Navigate, useNavigate, useSearchParams, Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "sonner";
 import BrandLogo from "@/components/BrandLogo";
+import {
+  AuthInlineMessage,
+  AuthPasswordField,
+  AuthTextField,
+} from "@/components/AuthFormField";
+import {
+  validateResetEmail,
+  buildResetRedirectUrl,
+  GENERIC_RESET_REQUEST_SUCCESS,
+  MIN_PASSWORD_LENGTH,
+} from "@/lib/passwordResetRules";
+import {
+  sanitizeAuthError,
+  classifyAuthError,
+  EMAIL_VERIFICATION_REQUIRED_MESSAGE,
+  RESEND_VERIFICATION_GENERIC_SUCCESS,
+  RESEND_VERIFICATION_GENERIC_FAILURE,
+} from "@/lib/authErrorRules";
+import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
+import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
+import {
+  DEFAULT_VERIFICATION_COOLDOWN_MS,
+  VERIFICATION_COOLDOWN_HINT,
+  canResendVerification,
+  formatVerificationCooldown,
+  verificationCooldownRemainingMs,
+} from "@/lib/emailVerificationRules";
+import {
+  AUTH_MODE_TABS,
+  AUTH_TAB_LIST_CLASSNAME,
+  getAuthTabTriggerClassName,
+  type AuthMode,
+} from "@/lib/authModeTabRules";
 
 export default function Auth() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
+  const [search] = useSearchParams();
+  const explicitRedirect = useMemo(() => {
+    const raw = search.get("redirectTo");
+    return raw ? sanitizeAuthRedirect(raw) : null;
+  }, [search]);
+  const redirectTo = explicitRedirect ?? "/";
+  const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => { if (user) nav("/", { replace: true }); }, [user, nav]);
+  const [signInError, setSignInError] = useState<string | null>(null);
+  const [verifyRequired, setVerifyRequired] = useState(false);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
+  const [resendLastAttemptAt, setResendLastAttemptAt] = useState<number | null>(null);
+  const [resendNowTick, setResendNowTick] = useState<number>(() => Date.now());
+  const [signUpError, setSignUpError] = useState<string | null>(null);
+  const [signUpSuccess, setSignUpSuccess] = useState<string | null>(null);
+
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [forgotSent, setForgotSent] = useState(false);
+
+  const signInEmailRef = useRef<HTMLInputElement>(null);
+  const signUpEmailRef = useRef<HTMLInputElement>(null);
+  const forgotEmailRef = useRef<HTMLInputElement>(null);
+
+  function postSignInTarget(): string {
+    if (explicitRedirect) return explicitRedirect;
+    if (!user) return "/onboarding";
+    const saved = getStartScreenChoice(user.id);
+    return saved ? routeForStartScreen(saved) : "/onboarding";
+  }
+
+  useEffect(() => {
+    if (user) nav(postSignInTarget(), { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, nav]);
+
+  // While a verification-resend cooldown is active, tick once a second so
+  // the countdown label updates and the button re-enables on its own.
+  useEffect(() => {
+    if (resendLastAttemptAt == null) return;
+    if (canResendVerification(Date.now(), resendLastAttemptAt)) return;
+    const id = window.setInterval(() => {
+      setResendNowTick(Date.now());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [resendLastAttemptAt, resendNowTick]);
+
   if (loading) return null;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={postSignInTarget()} replace />;
+
+  const resendCooldownActive = !canResendVerification(
+    resendNowTick,
+    resendLastAttemptAt,
+    DEFAULT_VERIFICATION_COOLDOWN_MS,
+  );
+  const resendCooldownRemainingMs = verificationCooldownRemainingMs(
+    resendNowTick,
+    resendLastAttemptAt,
+    DEFAULT_VERIFICATION_COOLDOWN_MS,
+  );
+  const resendDisabled = resendBusy || resendCooldownActive;
+  const resendLabel = resendBusy
+    ? "Sending verification email…"
+    : resendCooldownActive
+      ? formatVerificationCooldown(resendCooldownRemainingMs)
+      : "Resend verification email";
+
+  async function resendVerification() {
+    if (resendBusy) return;
+    if (!canResendVerification(Date.now(), resendLastAttemptAt, DEFAULT_VERIFICATION_COOLDOWN_MS)) {
+      return;
+    }
+    setResendBusy(true);
+    setResendNotice(null);
+    try {
+      const supaAny = supabase.auth as unknown as {
+        resend?: (args: { type: "signup"; email: string }) => Promise<{ error: unknown }>;
+      };
+      if (typeof supaAny.resend === "function") {
+        await supaAny.resend({ type: "signup", email });
+      }
+      setResendNotice(RESEND_VERIFICATION_GENERIC_SUCCESS);
+    } catch {
+      setResendNotice(RESEND_VERIFICATION_GENERIC_FAILURE);
+    } finally {
+      // Apply cooldown on both success and failure to discourage hammering.
+      setResendBusy(false);
+      const stamp = Date.now();
+      setResendLastAttemptAt(stamp);
+      setResendNowTick(stamp);
+    }
+  }
 
   async function signIn(e: React.FormEvent) {
-    e.preventDefault(); setBusy(true);
+    e.preventDefault();
+    if (busy) return;
+    setSignInError(null);
+    setVerifyRequired(false);
+    setResendNotice(null);
+    setBusy(true);
+    // We never log the raw Supabase error — it can leak rate-limit timing
+    // or other account-state hints. Always show the friendly copy.
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) toast.error(error.message); else nav("/", { replace: true });
+    if (error) {
+      if (classifyAuthError(error) === "emailNotConfirmed") {
+        setVerifyRequired(true);
+        return;
+      }
+      setSignInError(sanitizeAuthError("signIn", error));
+      signInEmailRef.current?.focus();
+      return;
+    }
+    nav(postSignInTarget(), { replace: true });
   }
+
   async function signUp(e: React.FormEvent) {
-    e.preventDefault(); setBusy(true);
+    e.preventDefault();
+    if (busy) return;
+    setSignUpError(null);
+    setSignUpSuccess(null);
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setSignUpError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+      return;
+    }
+    setBusy(true);
     const { error } = await supabase.auth.signUp({
-      email, password, options: { emailRedirectTo: window.location.origin },
+      email,
+      password,
+      options: { emailRedirectTo: window.location.origin },
     });
     setBusy(false);
-    if (error) toast.error(error.message); else { toast.success("Welcome to Verdant 🌱"); nav("/", { replace: true }); }
+    if (error) {
+      setSignUpError(sanitizeAuthError("signUp", error));
+      signUpEmailRef.current?.focus();
+      return;
+    }
+    setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
+    nav(postSignInTarget(), { replace: true });
+  }
+
+  async function requestReset(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setForgotError(null);
+    const v = validateResetEmail(forgotEmail);
+    if ("message" in v) {
+      setForgotError(v.message);
+      forgotEmailRef.current?.focus();
+      return;
+    }
+    setBusy(true);
+    // Best-effort send. We do NOT branch on the success/failure shape in a
+    // way that reveals account existence. Network/rate-limit errors get a
+    // generic retry copy; success path uses GENERIC_RESET_REQUEST_SUCCESS.
+    const { error } = await supabase.auth.resetPasswordForEmail(v.email, {
+      redirectTo: buildResetRedirectUrl(window.location.origin),
+    });
+    setBusy(false);
+    if (error) {
+      setForgotError(sanitizeAuthError("forgotPassword", error));
+      forgotEmailRef.current?.focus();
+      return;
+    }
+    setForgotSent(true);
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6">
-      <div className="flex items-center gap-3 mb-8">
-        <BrandLogo size="lg" />
-        <div>
-          <h1 className="text-3xl font-display font-bold">Verdant</h1>
-          <p className="text-sm text-muted-foreground">Your simple grow diary</p>
+    <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
+      <div className="w-full max-w-sm">
+        <div className="mb-4">
+          <Link
+            to="/welcome"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden /> Back to home
+          </Link>
         </div>
-      </div>
 
-      <div className="glass rounded-2xl p-6 w-full max-w-sm">
-        <Tabs defaultValue="signin">
-          <TabsList className="grid grid-cols-2 w-full mb-4">
-            <TabsTrigger value="signin">Sign in</TabsTrigger>
-            <TabsTrigger value="signup">Create account</TabsTrigger>
-          </TabsList>
+        <div className="flex items-center gap-3 mb-6">
+          <BrandLogo size="lg" />
+          <div>
+            <h1 className="text-3xl font-display font-bold">Verdant</h1>
+            <p className="text-sm text-muted-foreground">
+              Plant memory. Sensor truth. Better decisions.
+            </p>
+          </div>
+        </div>
 
-          <TabsContent value="signin">
-            <form onSubmit={signIn} className="grid gap-3">
-              <div><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
-              <div><Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
-              <Button disabled={busy} className="gradient-leaf text-primary-foreground">Sign in</Button>
-            </form>
-          </TabsContent>
-          <TabsContent value="signup">
-            <form onSubmit={signUp} className="grid gap-3">
-              <div><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
-              <div><Label>Password</Label><Input type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
-              <Button disabled={busy} className="gradient-leaf text-primary-foreground">Create account</Button>
-            </form>
-          </TabsContent>
-        </Tabs>
+        <p className="text-sm text-muted-foreground mb-4">
+          Your grow-room operating system for logs, sensor truth, cautious AI, and
+          grower-approved actions.
+        </p>
+
+        <div className="glass rounded-2xl p-6">
+          <Tabs
+            value={mode}
+            onValueChange={(v) => {
+              setMode(v as AuthMode);
+              setSignInError(null);
+              setSignUpError(null);
+              setForgotError(null);
+              setForgotSent(false);
+            }}
+          >
+            <TabsList className={AUTH_TAB_LIST_CLASSNAME}>
+              {AUTH_MODE_TABS.map((tab) => (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className={getAuthTabTriggerClassName(tab.value)}
+                >
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            <TabsContent value="signin">
+              <p className="text-xs text-muted-foreground mb-3">
+                Use the email and password you used to create your Verdant account.
+              </p>
+              <form onSubmit={signIn} noValidate className="grid gap-3" aria-label="Sign in">
+                <AuthTextField
+                  id="signin-email"
+                  label="Email"
+                  inputRef={signInEmailRef}
+                  value={email}
+                  onChange={setEmail}
+                  ariaInvalid={!!signInError}
+                  ariaDescribedBy={signInError ? "signin-error" : undefined}
+                  required
+                />
+                <AuthPasswordField
+                  id="signin-password"
+                  label="Password"
+                  value={password}
+                  onChange={setPassword}
+                  showPassword={showPassword}
+                  onToggleShowPassword={() => setShowPassword((v) => !v)}
+                  autoComplete="current-password"
+                  ariaInvalid={!!signInError}
+                  ariaDescribedBy={signInError ? "signin-error" : undefined}
+                  required
+                />
+                {signInError ? (
+                  <AuthInlineMessage id="signin-error" role="alert" tone="error">
+                    {signInError}
+                  </AuthInlineMessage>
+                ) : null}
+                {verifyRequired ? (
+                  <div className="grid gap-2 rounded-md border border-border/50 p-3 bg-secondary/30">
+                    <p role="alert" className="text-xs text-foreground">
+                      {EMAIL_VERIFICATION_REQUIRED_MESSAGE}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={resendDisabled}
+                      aria-busy={resendBusy}
+                      onClick={resendVerification}
+                    >
+                      {resendLabel}
+                    </Button>
+                    {resendCooldownActive && !resendBusy ? (
+                      <p
+                        role="status"
+                        aria-live="polite"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        {VERIFICATION_COOLDOWN_HINT}
+                      </p>
+                    ) : null}
+                    {resendNotice ? (
+                      <AuthInlineMessage>{resendNotice}</AuthInlineMessage>
+                    ) : null}
+                  </div>
+                ) : null}
+                <Button
+                  type="submit"
+                  disabled={busy}
+                  aria-busy={busy}
+                  className="gradient-leaf text-primary-foreground"
+                >
+                  {busy ? "Signing in…" : "Sign in"}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="signup">
+              <p className="text-xs text-muted-foreground mb-3">
+                New here? Create an account to start your grow diary.
+              </p>
+              <form onSubmit={signUp} noValidate className="grid gap-3" aria-label="Create account">
+                <AuthTextField
+                  id="signup-email"
+                  label="Email"
+                  inputRef={signUpEmailRef}
+                  value={email}
+                  onChange={setEmail}
+                  ariaInvalid={!!signUpError}
+                  ariaDescribedBy={signUpError ? "signup-error" : undefined}
+                  required
+                />
+                <AuthPasswordField
+                  id="signup-password"
+                  label="Password"
+                  value={password}
+                  onChange={setPassword}
+                  showPassword={showPassword}
+                  autoComplete="new-password"
+                  minLength={MIN_PASSWORD_LENGTH}
+                  hintId="signup-password-hint"
+                  hint={`Minimum ${MIN_PASSWORD_LENGTH} characters.`}
+                  required
+                />
+                {signUpError ? (
+                  <AuthInlineMessage id="signup-error" role="alert" tone="error">
+                    {signUpError}
+                  </AuthInlineMessage>
+                ) : null}
+                {signUpSuccess ? (
+                  <AuthInlineMessage>{signUpSuccess}</AuthInlineMessage>
+                ) : null}
+                <Button
+                  type="submit"
+                  disabled={busy}
+                  aria-busy={busy}
+                  className="gradient-leaf text-primary-foreground"
+                >
+                  {busy ? "Creating account…" : "Create account"}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="forgot">
+              <p className="text-xs text-muted-foreground mb-3">
+                Forgot your password? We'll email you a secure reset link.
+              </p>
+              {forgotSent ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="text-sm text-muted-foreground"
+                >
+                  {GENERIC_RESET_REQUEST_SUCCESS}
+                </div>
+              ) : (
+                <form onSubmit={requestReset} noValidate className="grid gap-3" aria-label="Forgot password">
+                  <AuthTextField
+                    id="forgot-email"
+                    label="Email"
+                    inputRef={forgotEmailRef}
+                    value={forgotEmail}
+                    onChange={(next) => {
+                      setForgotEmail(next);
+                      if (forgotError) setForgotError(null);
+                    }}
+                    ariaInvalid={!!forgotError}
+                    ariaDescribedBy={forgotError ? "forgot-email-error" : undefined}
+                  />
+                  {forgotError ? (
+                    <AuthInlineMessage id="forgot-email-error" role="alert" tone="error">
+                      {forgotError}
+                    </AuthInlineMessage>
+                  ) : null}
+                  <Button
+                    type="submit"
+                    disabled={busy}
+                    aria-busy={busy}
+                    className="gradient-leaf text-primary-foreground"
+                  >
+                    {busy ? "Sending reset link…" : "Send reset link"}
+                  </Button>
+                </form>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );

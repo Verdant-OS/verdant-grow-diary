@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 
 import EcowittIngestAudit from "@/pages/EcowittIngestAudit";
 import {
@@ -63,7 +64,9 @@ function wrap() {
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={["/ecowitt-ingest-audit"]}>{children}</MemoryRouter>
+    </QueryClientProvider>
   );
 }
 

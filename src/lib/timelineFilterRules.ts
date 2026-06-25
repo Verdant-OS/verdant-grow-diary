@@ -27,6 +27,7 @@ import {
   type TimelineFilterCategory,
 } from "@/lib/timelineEntryClassification";
 import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
+import { isHarvestEvidenceDiaryItem } from "@/lib/harvestWatchEvidenceHistoryViewModel";
 
 export type TimelineFilterKey =
   | "all"
@@ -35,7 +36,8 @@ export type TimelineFilterKey =
   | "feeding"
   | "photos"
   | "manual_sensor_snapshot"
-  | "warnings";
+  | "warnings"
+  | "harvest_evidence";
 
 export const TIMELINE_FILTER_KEYS: ReadonlyArray<TimelineFilterKey> = [
   "all",
@@ -45,6 +47,7 @@ export const TIMELINE_FILTER_KEYS: ReadonlyArray<TimelineFilterKey> = [
   "photos",
   "manual_sensor_snapshot",
   "warnings",
+  "harvest_evidence",
 ];
 
 export const TIMELINE_FILTER_LABELS: Record<TimelineFilterKey, string> = {
@@ -55,6 +58,7 @@ export const TIMELINE_FILTER_LABELS: Record<TimelineFilterKey, string> = {
   photos: "Photos",
   manual_sensor_snapshot: "Manual sensor snapshots",
   warnings: "Warnings / issues",
+  harvest_evidence: "Harvest evidence",
 };
 
 export interface TimelineDiaryItem {
@@ -81,6 +85,12 @@ export interface TimelineDiaryItem {
   plantName?: string | null;
   /** Optional stage from `details.stage` — surfaced but never invented. */
   stage?: string | null;
+  /**
+   * Optional read-only early-stage view model (germination/seedling
+   * milestone + vigor + short note) extracted from `details.early_stage`.
+   * Presenter-only — never echoed as raw payload.
+   */
+  earlyStage?: import("./earlyStageTimelineViewModel").EarlyStageTimelineViewModel | null;
 }
 
 export interface TimelineManualSnapshotItem {
@@ -157,6 +167,15 @@ export function classifyTimelineMemoryItem(
   // reminder) are not exposed as top-level chips in this slice — they
   // still appear under "all". Unknown types fell through to "notes".
   if (item.hasWarning) buckets.add("warnings");
+  if (
+    isHarvestEvidenceDiaryItem({
+      note: item.note,
+      hasPhoto: item.hasPhoto,
+      eventType: item.eventType,
+    })
+  ) {
+    buckets.add("harvest_evidence");
+  }
   return buckets;
 }
 

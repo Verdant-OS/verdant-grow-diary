@@ -16,6 +16,7 @@ export interface QuickLogV2SavePayload {
   p_humidity_pct: number | null;
   p_vpd_kpa: number | null;
   p_occurred_at: string | null;
+  p_details?: Record<string, unknown> | null;
 }
 
 export interface BuildQuickLogV2PayloadInput {
@@ -27,6 +28,7 @@ export interface BuildQuickLogV2PayloadInput {
   humidityPct: string;
   vpdKpa: string;
   occurredAt?: string | null;
+  details?: Record<string, unknown> | null;
 }
 
 export type BuildResult =
@@ -48,7 +50,10 @@ export function buildQuickLogV2SavePayload(
   if (!resolved?.ok || !resolved.targetType || !resolved.targetId) {
     return { ok: false, reason: "target_unresolved" };
   }
-  if (action === "photo") {
+  if ((action as string) === "photo") {
+    // Photo saving is intentionally not wired through the RPC payload yet.
+    // Surface the specific gate reason so the sheet can show the canonical
+    // "photo saving not enabled" copy instead of a generic invalid-action.
     return { ok: false, reason: "photo_saving_not_enabled" };
   }
   if (action !== "water" && action !== "note") {
@@ -87,6 +92,7 @@ export function buildQuickLogV2SavePayload(
       p_humidity_pct: h,
       p_vpd_kpa: v,
       p_occurred_at: input.occurredAt ?? null,
+      ...(input.details ? { p_details: input.details } : {}),
     },
   };
 }

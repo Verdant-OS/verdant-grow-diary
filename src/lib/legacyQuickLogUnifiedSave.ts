@@ -23,11 +23,20 @@
  */
 
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
+import type { buildSensorSnapshotSavePayload } from "./latestSensorSnapshotRules";
+
+/**
+ * Redacted sensor envelope produced by `buildSensorSnapshotSavePayload`.
+ * Always either `null` (no attach / not safe to attach) or the structured
+ * sensor object. Never includes raw_payload, tokens, or auth strings.
+ */
+export type SensorAttachPayload = ReturnType<typeof buildSensorSnapshotSavePayload>;
 
 export const SUPPORTED_LEGACY_EVENT_TYPES = [
   "watering",
   "observation",
   "note",
+  "environment",
 ] as const;
 export type SupportedLegacyEventType =
   (typeof SUPPORTED_LEGACY_EVENT_TYPES)[number];
@@ -59,6 +68,34 @@ export interface LegacyQuickLogFormInput {
   plantId: string | null;
   plantTentId: string | null;
   details: LegacyQuickLogDetails;
+  /**
+   * Optional redacted sensor envelope from buildSensorSnapshotSavePayload.
+   * When non-null, emitted as `p_details: { sensor: ... }` on the RPC
+   * payload. Null/undefined → `p_details` is omitted from the RPC call,
+   * preserving the existing no-details behavior.
+   */
+  sensorAttachPayload?: SensorAttachPayload;
+  /**
+   * Optional early-stage (germination/seedling) envelope. Folded into
+   * `p_details.early_stage` alongside (not replacing) the sensor envelope.
+   * No schema change required — the RPC already accepts JSONB `p_details`.
+   * Pure pass-through: this adapter does not invent or normalize values.
+   */
+  earlyStage?: Record<string, unknown> | null;
+  /**
+   * Optional Environment Check envelope. Folded into
+   * `p_details.environment_check` alongside (not replacing) the sensor
+   * and early-stage envelopes. No schema change required — the RPC
+   * already accepts JSONB `p_details`. Pure pass-through: this adapter
+   * does not invent, normalize, or convert units.
+   */
+  environmentCheck?: Record<string, unknown> | null;
+  /**
+   * Optional human-readable suffix (e.g. milestone + vigor summary)
+   * appended to the diary note so timelines that read the note column
+   * stay informative without depending on JSON details.
+   */
+  noteSuffix?: string | null;
 }
 
 export type LegacyUnifiedBuildResult =
@@ -107,7 +144,28 @@ export function buildLegacyQuickLogUnifiedPayload(
     };
   }
 
-  const note = appendLegacyDetailsToNote(input.noteWithHardware, input.details);
+  let note = appendLegacyDetailsToNote(input.noteWithHardware, input.details);
+  const suffix = trimStr(input.noteSuffix);
+  if (suffix) {
+    note = note ? `${note}\n\n${suffix}` : suffix;
+  }
+
+  // Build the `p_details` envelope when the caller passed a redacted
+  // sensor payload and/or an early-stage milestone envelope. We never
+  // invent details, never persist raw_payload, and never re-key the
+  // sensor envelope as `sensor_snapshot`.
+  const envelopeFields: Record<string, unknown> = {};
+  if (input.sensorAttachPayload != null) {
+    envelopeFields.sensor = input.sensorAttachPayload;
+  }
+  if (input.earlyStage != null) {
+    envelopeFields.early_stage = input.earlyStage;
+  }
+  if (input.environmentCheck != null) {
+    envelopeFields.environment_check = input.environmentCheck;
+  }
+  const detailsEnvelope: Record<string, unknown> | null =
+    Object.keys(envelopeFields).length > 0 ? envelopeFields : null;
 
   if (input.eventType === "watering") {
     const raw = trimStr(input.details.watering);
@@ -131,6 +189,7 @@ export function buildLegacyQuickLogUnifiedPayload(
         p_humidity_pct: null,
         p_vpd_kpa: null,
         p_occurred_at: null,
+        p_details: detailsEnvelope,
       },
     };
   }
@@ -155,6 +214,7 @@ export function buildLegacyQuickLogUnifiedPayload(
       p_humidity_pct: null,
       p_vpd_kpa: null,
       p_occurred_at: null,
+      p_details: detailsEnvelope,
     },
   };
 }

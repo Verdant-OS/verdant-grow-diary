@@ -16,6 +16,8 @@
  *    future / pen-entered snapshots benefit without a schema change.
  */
 
+import { classifyManualMetric } from "@/lib/sensorTruthRules";
+
 export type ChangeContextMetric =
   | "temperature_c"
   | "humidity_pct"
@@ -50,11 +52,25 @@ export interface ChangeContextDelta {
   direction: "up" | "down" | "flat";
 }
 
+export interface ChangeContextSuppressedDelta {
+  key: ChangeContextMetric;
+  label: string;
+  /** Short UI chip, e.g. "Invalid temp". */
+  reasonChip: string;
+  /** Which side was invalid. "both" when both are invalid. */
+  side: "current" | "previous" | "both";
+}
+
 export interface ChangeContextResult {
   /** True when the tent has no prior manual snapshot to compare against. */
   firstSnapshot: boolean;
   /** Empty when first snapshot OR when nothing comparable changed. */
   deltas: ChangeContextDelta[];
+  /**
+   * Metrics where a delta would have been shown but at least one side
+   * failed realism guards. Surfaces a chip instead of a fabricated delta.
+   */
+  suppressedDeltas: ChangeContextSuppressedDelta[];
 }
 
 const DISPLAY_ORDER: ChangeContextMetric[] = [
@@ -66,6 +82,16 @@ const DISPLAY_ORDER: ChangeContextMetric[] = [
   "soil_ec_ms_cm",
   "reservoir_ph",
 ];
+
+const METRIC_LABEL: Record<ChangeContextMetric, string> = {
+  temperature_c: "Temp",
+  humidity_pct: "RH",
+  vpd_kpa: "VPD",
+  co2_ppm: "CO₂",
+  soil_moisture_pct: "Soil",
+  soil_ec_ms_cm: "Soil EC",
+  reservoir_ph: "pH",
+};
 
 const KNOWN_METRICS: ReadonlySet<string> = new Set(DISPLAY_ORDER);
 
@@ -186,19 +212,39 @@ export function buildManualSnapshotChangeContext(input: {
   previous: ChangeContextSnapshot | null | undefined;
 }): ChangeContextResult {
   const { latest, previous } = input;
-  if (!latest) return { firstSnapshot: true, deltas: [] };
-  if (!previous) return { firstSnapshot: true, deltas: [] };
+  if (!latest) return { firstSnapshot: true, deltas: [], suppressedDeltas: [] };
+  if (!previous) return { firstSnapshot: true, deltas: [], suppressedDeltas: [] };
 
   const deltas: ChangeContextDelta[] = [];
+  const suppressedDeltas: ChangeContextSuppressedDelta[] = [];
   for (const key of DISPLAY_ORDER) {
     const a = latest.metrics[key];
     const b = previous.metrics[key];
     if (a === undefined || b === undefined) continue;
     if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+    // Per-metric truth filter: if either side is impossible, suppress the
+    // delta and emit a reason chip instead of a fabricated swing.
+    const aTruth = classifyManualMetric(key, a);
+    const bTruth = classifyManualMetric(key, b);
+    if (!aTruth.valid || !bTruth.valid) {
+      const chip = (aTruth.chip ?? bTruth.chip) as string;
+      const side: ChangeContextSuppressedDelta["side"] = !aTruth.valid && !bTruth.valid
+        ? "both"
+        : !aTruth.valid
+          ? "current"
+          : "previous";
+      suppressedDeltas.push({
+        key,
+        label: METRIC_LABEL[key],
+        reasonChip: chip,
+        side,
+      });
+      continue;
+    }
     const d = formatDelta(key, a, b);
     if (d) deltas.push(d);
   }
-  return { firstSnapshot: false, deltas };
+  return { firstSnapshot: false, deltas, suppressedDeltas };
 }
 
 /**

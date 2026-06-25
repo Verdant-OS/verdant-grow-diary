@@ -19,6 +19,13 @@ import {
   groupManualReadingsToSnapshots,
 } from "@/lib/manualSensorSnapshotChangeContextRules";
 
+// Standardised scanner guardrail timeout + slow-test telemetry.
+// Replaces the previous per-file vi.setConfig bump. No scanner pattern,
+// allowlist, or assertion is changed.
+import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+installScannerGuardrail({ file: __filename });
+
+
 const T1 = "2026-05-24T09:00:00Z";
 const T2 = "2026-05-24T15:00:00Z";
 

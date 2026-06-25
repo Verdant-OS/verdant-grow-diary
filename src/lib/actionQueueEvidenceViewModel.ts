@@ -1,0 +1,255 @@
+/**
+ * actionQueueEvidenceViewModel — single source of truth for Action Queue
+ * evidence provenance copy surfaced on rows and on the Action Detail
+ * origin panels.
+ *
+ * Hard constraints:
+ *  - Pure. No React, no Supabase, no I/O, no model calls.
+ *  - Never reads or returns raw payloads, vendor metadata, service_role,
+ *    Bearer tokens, API keys, filenames, or private/internal IDs.
+ *  - Never claims current-room support. Action Queue evidence is always
+ *    captured-moment / historical from the grower review surface.
+ *  - Unknown origin → calm "Review evidence" fallback.
+ *  - Unknown alert type → calm "Environment alert" fallback.
+ *  - Missing sanitized snapshot metrics → neutral unavailable copy only.
+ *    Quality is never inferred from free-text fields.
+ *
+ * Wires into:
+ *   - src/pages/ActionQueue.tsx     (row chip)
+ *   - src/pages/ActionDetail.tsx    (origin panels: alert + AI Doctor)
+ */
+
+import {
+  getActionQueueSourceKind,
+  type ActionQueueSource,
+} from "@/lib/actionQueueProvenanceRules";
+import {
+  ENVIRONMENT_ALERT_FALLBACK_LABEL,
+  formatEnvironmentAlertLabel,
+} from "@/lib/environmentAlertLabelRules";
+import {
+  evaluateManualSensorSnapshotQuality,
+  type ManualSensorSnapshotInput,
+  type ManualSensorSnapshotQuality,
+} from "@/lib/manualSensorSnapshotQualityRules";
+
+/**
+ * Re-export under the requested `classify*` name so callers can read the
+ * intent at the call-site. Identical signature/behavior to the underlying
+ * `evaluateManualSensorSnapshotQuality` helper.
+ */
+export const classifyManualSensorSnapshotQuality =
+  evaluateManualSensorSnapshotQuality;
+
+export const ACTION_EVIDENCE_QUALITY_UNAVAILABLE_LABEL =
+  "Evidence quality: not available from this action record";
+export const ACTION_EVIDENCE_QUALITY_UNAVAILABLE_SUMMARY =
+  "No sanitized sensor snapshot is attached to this action record.";
+export const ACTION_EVIDENCE_REVIEW_ONLY_LABEL =
+  "Status: Grower review required";
+export const ACTION_EVIDENCE_NO_AUTOMATION_NOTE =
+  "Verdant will not send equipment commands automatically.";
+export const ACTION_EVIDENCE_HISTORICAL_NOTE =
+  "Captured-moment evidence only — not current-room guidance.";
+export const ACTION_EVIDENCE_ORIGIN_FALLBACK = "Review evidence";
+
+/**
+ * Centralized empty-state copy for the Action Queue "Needs Review" list.
+ * Preserves the safety promise that nothing is auto-approved or auto-run.
+ */
+export const ACTION_QUEUE_EMPTY_PENDING_TITLE =
+  "No actions need review right now.";
+export const ACTION_QUEUE_EMPTY_PENDING_HELP =
+  "New AI Doctor or alert suggestions will appear here for grower approval.";
+
+/**
+ * Centralized missing-evidence copy for Action Detail origin panels when
+ * no sanitized snapshot is attached. Reinforces the review-only posture
+ * without implying the action is already approved or executed.
+ */
+export const ACTION_EVIDENCE_MISSING_PANEL_TITLE =
+  "Evidence details are not available from this action record.";
+export const ACTION_EVIDENCE_MISSING_PANEL_HELP =
+  "Review the diary timeline and sensor history before approving.";
+
+export const ACTION_EVIDENCE_STATUS_AVAILABLE_LABEL = "Evidence available";
+export const ACTION_EVIDENCE_STATUS_AVAILABLE_HELP =
+  "Historical snapshot quality is available for review.";
+export const ACTION_EVIDENCE_STATUS_UNAVAILABLE_LABEL = "Evidence quality unavailable";
+export const ACTION_EVIDENCE_STATUS_UNAVAILABLE_HELP =
+  "This action record does not include sanitized snapshot metrics.";
+export const ACTION_EVIDENCE_STATUS_MISSING_LABEL = "Evidence missing";
+export const ACTION_EVIDENCE_STATUS_MISSING_HELP =
+  "Review the diary timeline and sensor history before approving.";
+
+
+const SOURCE_LABEL: Readonly<Record<ActionQueueSource, string>> = {
+  environment_alert: "Environment Alert",
+  ai_coach: "AI Coach",
+  ai_doctor: "AI Doctor",
+  manual: "Manual",
+  unknown: "Unknown",
+};
+
+/**
+ * Narrow sanitized projection of an Action Queue row/detail accepted by
+ * the view-model helper. Only fields that are safe to read in a
+ * presenter-level surface — no `raw_payload`, no `target_device` ids, no
+ * back-pointer tokens.
+ */
+export interface ActionEvidenceInput {
+  readonly source?: string | null;
+  readonly action_type?: string | null;
+  /** Optional grow-room alert type slug for environment-alert sourced rows. */
+  readonly alert_type?: string | null;
+  /** Optional ISO timestamp string for when the evidence was captured. */
+  readonly captured_at?: string | number | Date | null;
+  /**
+   * Optional fully sanitized snapshot projection. Only the well-known
+   * numeric metric fields + captured_at + source. Never raw payloads.
+   */
+  readonly snapshot?: ManualSensorSnapshotInput | null;
+}
+
+export interface ActionEvidenceViewModel {
+  readonly originLabel: string;
+  readonly originKind: ActionQueueSource;
+  readonly sourceLabel: string;
+  readonly capturedAtLabel: string;
+  readonly evidenceQualityLabel: string;
+  readonly evidenceQualitySummary: string;
+  readonly reviewOnlyLabel: string;
+  readonly safetyNotes: ReadonlyArray<string>;
+  readonly hasSnapshotQuality: boolean;
+  readonly snapshotQuality: ManualSensorSnapshotQuality | null;
+  readonly rowEvidenceStatus: "available" | "missing" | "quality_unavailable";
+  readonly rowEvidenceStatusLabel: string;
+  readonly rowEvidenceStatusHelp: string;
+  readonly rowEvidenceStatusTone: "neutral" | "caution" | "ok";
+}
+
+function formatCapturedAtLabel(
+  v: ActionEvidenceInput["captured_at"],
+): string {
+  if (v == null || v === "") return "Captured: not recorded";
+  let ms: number;
+  if (v instanceof Date) ms = v.getTime();
+  else if (typeof v === "number") ms = v;
+  else ms = Date.parse(String(v));
+  if (!Number.isFinite(ms)) return "Captured: not recorded";
+  // Deterministic ISO display — never includes filenames, IDs, or vendor metadata.
+  return `Captured: ${new Date(ms).toISOString()}`;
+}
+
+function buildOriginLabel(
+  kind: ActionQueueSource,
+  alertType: string | null | undefined,
+): string {
+  switch (kind) {
+    case "environment_alert":
+      // Always go through the safe label formatter; unknown alert type
+      // collapses to the calm "Environment alert" fallback.
+      return formatEnvironmentAlertLabel(alertType ?? null);
+    case "ai_doctor":
+      return "AI Doctor review";
+    case "ai_coach":
+      return "AI Coach suggestion";
+    case "manual":
+      return "Manual entry";
+    case "unknown":
+    default:
+      return ACTION_EVIDENCE_ORIGIN_FALLBACK;
+  }
+}
+
+/**
+ * Build the centralized Action Queue evidence view-model.
+ *
+ * Pure / deterministic / null-safe. Safe to call from rows, detail
+ * panels, and aria-label builders. Same input → same output.
+ */
+export function buildActionEvidenceViewModel(
+  input: ActionEvidenceInput | null | undefined,
+  options?: { readonly nowMs?: number },
+): ActionEvidenceViewModel {
+  const safe = input && typeof input === "object" ? input : {};
+  const originKind = getActionQueueSourceKind({ source: safe.source ?? null });
+  const originLabel = buildOriginLabel(originKind, safe.alert_type);
+  const sourceLabel = SOURCE_LABEL[originKind];
+  const capturedAtLabel = formatCapturedAtLabel(safe.captured_at ?? null);
+
+  const safetyNotes: string[] = [
+    ACTION_EVIDENCE_HISTORICAL_NOTE,
+    ACTION_EVIDENCE_NO_AUTOMATION_NOTE,
+  ];
+
+  // Snapshot quality — only when sanitized metrics are explicitly attached.
+  // We never infer quality from text fields. We always evaluate in
+  // historical mode so the result can never claim current-room support.
+  let snapshotQuality: ManualSensorSnapshotQuality | null = null;
+  if (safe.snapshot && typeof safe.snapshot === "object") {
+    snapshotQuality = classifyManualSensorSnapshotQuality(safe.snapshot, {
+      mode: "historical",
+      nowMs: options?.nowMs,
+    });
+  }
+
+  const hasSnapshotQuality = snapshotQuality !== null;
+  const evidenceQualityLabel = hasSnapshotQuality
+    ? `Evidence quality: ${snapshotQuality!.summary}`
+    : ACTION_EVIDENCE_QUALITY_UNAVAILABLE_LABEL;
+  const evidenceQualitySummary = hasSnapshotQuality
+    ? snapshotQuality!.summary
+    : ACTION_EVIDENCE_QUALITY_UNAVAILABLE_SUMMARY;
+
+  // Compact row evidence status — deterministic triage for operators.
+  // Missing: input is bare / no origin relationship at all.
+  // Quality unavailable: origin exists but no sanitized snapshot metrics.
+  // Available: sanitized snapshot metrics are present and classified.
+  const hasOrigin =
+    (typeof safe.source === "string" && safe.source.trim().length > 0) ||
+    (typeof safe.action_type === "string" && safe.action_type.trim().length > 0) ||
+    (typeof safe.alert_type === "string" && safe.alert_type.trim().length > 0) ||
+    (safe.captured_at != null && safe.captured_at !== "");
+
+  let rowEvidenceStatus: ActionEvidenceViewModel["rowEvidenceStatus"];
+  let rowEvidenceStatusLabel: string;
+  let rowEvidenceStatusHelp: string;
+  let rowEvidenceStatusTone: ActionEvidenceViewModel["rowEvidenceStatusTone"];
+
+  if (hasSnapshotQuality) {
+    rowEvidenceStatus = "available";
+    rowEvidenceStatusLabel = ACTION_EVIDENCE_STATUS_AVAILABLE_LABEL;
+    rowEvidenceStatusHelp = ACTION_EVIDENCE_STATUS_AVAILABLE_HELP;
+    rowEvidenceStatusTone = "ok";
+  } else if (hasOrigin) {
+    rowEvidenceStatus = "quality_unavailable";
+    rowEvidenceStatusLabel = ACTION_EVIDENCE_STATUS_UNAVAILABLE_LABEL;
+    rowEvidenceStatusHelp = ACTION_EVIDENCE_STATUS_UNAVAILABLE_HELP;
+    rowEvidenceStatusTone = "neutral";
+  } else {
+    rowEvidenceStatus = "missing";
+    rowEvidenceStatusLabel = ACTION_EVIDENCE_STATUS_MISSING_LABEL;
+    rowEvidenceStatusHelp = ACTION_EVIDENCE_STATUS_MISSING_HELP;
+    rowEvidenceStatusTone = "caution";
+  }
+
+  return Object.freeze({
+    originLabel,
+    originKind,
+    sourceLabel,
+    capturedAtLabel,
+    evidenceQualityLabel,
+    evidenceQualitySummary,
+    reviewOnlyLabel: ACTION_EVIDENCE_REVIEW_ONLY_LABEL,
+    safetyNotes: Object.freeze([...safetyNotes]),
+    hasSnapshotQuality,
+    snapshotQuality,
+    rowEvidenceStatus,
+    rowEvidenceStatusLabel,
+    rowEvidenceStatusHelp,
+    rowEvidenceStatusTone,
+  });
+}
+
+export { ENVIRONMENT_ALERT_FALLBACK_LABEL };

@@ -13,6 +13,13 @@ import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
 
+// Standardised scanner guardrail timeout + slow-test telemetry.
+// Replaces the previous per-file vi.setConfig bump. No scanner pattern,
+// allowlist, or assertion is changed.
+import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+installScannerGuardrail({ file: __filename });
+
+
 const ROOT = resolve(__dirname, "../..");
 const MIG_DIR = resolve(ROOT, "supabase/migrations");
 

@@ -1,16 +1,16 @@
 /**
- * fastAddActionRules — pure rules for Verdant's Global Fast Add menu.
+ * fastAddActionRules — pure rules for Verdant's Quick Log menu.
  *
  * Deterministic. Presenter helpers only:
- *  - Defines the 8 Fast Add actions in stable order.
- *  - Resolves each action against the current selection context into a
+ *  - Defines the 8 Quick Log presets in stable order.
+ *  - Resolves each preset against the current selection context into a
  *    safe intent: navigate, open-quicklog (event dispatch), or
  *    needs-context (calm copy).
  *
  * Hard constraints:
  *  - No I/O. No Supabase writes. No alerts. No Action Queue writes.
  *  - No model/API calls. No device control. No automation strings.
- *  - The Diagnosis action navigates to the AI Doctor surface only;
+ *  - The Diagnosis preset navigates to the AI Doctor surface only;
  *    it must never trigger a model call by itself.
  */
 
@@ -42,12 +42,12 @@ export interface FastAddActionDef {
 }
 
 export const FAST_ADD_ACTIONS: readonly FastAddActionDef[] = [
-  { id: "diary_note", label: "Diary Note", quickLogEventType: "observation" },
+  { id: "diary_note", label: "Note", quickLogEventType: "observation" },
+  { id: "photo", label: "Photo", quickLogEventType: "photo" },
   { id: "watering", label: "Watering", quickLogEventType: "watering" },
   { id: "feeding", label: "Feeding", quickLogEventType: "feeding" },
+  { id: "environment", label: "Environment", quickLogEventType: "environment" },
   { id: "training", label: "Training", quickLogEventType: "training" },
-  { id: "photo", label: "Photo", quickLogEventType: "photo" },
-  { id: "environment", label: "Environment Check", quickLogEventType: "environment" },
   { id: "diagnosis", label: "Diagnosis", quickLogEventType: null },
   { id: "harvest", label: "Harvest", quickLogEventType: "harvest" },
 ] as const;
@@ -109,12 +109,12 @@ function hasContext(ctx: FastAddSelectionContext | null | undefined): boolean {
 }
 
 /**
- * Resolve a Fast Add action against the current selection context.
+ * Resolve a Quick Log preset against the current selection context.
  *
- * - All actions require a plant or tent to be selected.
+ * - All presets require a plant or tent to be selected.
  * - Diagnosis routes to the AI Doctor surface (scoped to the plant when
  *   available) — never triggers a model call directly.
- * - All other actions request the existing Quick Log sheet via the
+ * - All other presets request the existing Quick Log sheet via the
  *   already-wired window event. The grower still confirms + saves.
  */
 export interface ResolveFastAddOptions {
@@ -169,14 +169,14 @@ export function resolveFastAddIntent(
 }
 
 /**
- * Compute sensible default timestamps for a Fast Add action.
+ * Compute sensible default timestamps for a Quick Log preset.
  *
  * Pure helper — does NOT persist or dispatch anything. The QuickLog form
  * still owns the actual write; this only seeds initial values.
  *
  * Rules:
- *  - All logging actions set `occurred_at = now`.
- *  - Environment Check additionally sets `captured_at = now`.
+ *  - All logging presets set `occurred_at = now`.
+ *  - Environment additionally sets `captured_at = now`.
  *  - Diagnosis is navigation-only and returns {}.
  */
 export function buildFastAddTimestampDefaults(

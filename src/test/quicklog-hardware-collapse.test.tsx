@@ -170,7 +170,7 @@ describe("QuickLog Hardware readings collapse-by-default", () => {
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {
       target: { value: "Looking healthy" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /save entry/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save log/i }));
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     const payload = saveMock.mock.calls[0][0];
     expect(payload.p_action).toBe("note");

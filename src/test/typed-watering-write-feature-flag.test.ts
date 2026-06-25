@@ -9,6 +9,13 @@ import {
 import { writeWateringTypedEvent } from "@/lib/writeWateringTypedEvent";
 import { findMatches } from "./testFileSearchRules";
 
+// Standardised scanner guardrail timeout + slow-test telemetry.
+// Replaces the previous per-file vi.setConfig bump. No scanner pattern,
+// allowlist, or assertion is changed.
+import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+installScannerGuardrail({ file: __filename });
+
+
 const REPO_ROOT = process.cwd();
 
 describe("typed watering write — feature flag scaffold", () => {

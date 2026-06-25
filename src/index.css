@@ -92,6 +92,10 @@
 @layer base {
   * { @apply border-border; }
   html, body, #root { @apply min-h-screen; }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -99,6 +103,23 @@
     background-attachment: fixed;
   }
   h1, h2, h3, h4 { font-family: 'Space Grotesk', 'Inter', sans-serif; letter-spacing: -0.02em; }
+
+  @media (max-width: 640px) {
+    body {
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    input,
+    textarea,
+    select,
+    button,
+    [role="button"],
+    [role="combobox"] {
+      font-size: 16px;
+      line-height: 1.5;
+    }
+  }
 }
 
 @layer components {
@@ -123,6 +144,120 @@
 @layer utilities {
   .animate-fade-in { animation: fadeIn 0.4s var(--transition-smooth) both; }
   .animate-slide-up { animation: slideUp 0.5s var(--transition-smooth) both; }
+
+  @media (max-width: 640px) {
+    .text-\[10px\],
+    .text-xs {
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+
+    .text-sm {
+      font-size: 1rem;
+      line-height: 1.5rem;
+    }
+  }
+
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 }
+
+/* Print rules for Environment Summary Report (and any printable section). */
+@media screen {
+  .print-only { display: none !important; }
+}
+@media print {
+  .print-hidden { display: none !important; }
+  .print-only { display: block !important; }
+  body * { visibility: hidden; }
+  [data-print-section="environment-summary-report"],
+  [data-print-section="environment-summary-report"] *,
+  [data-print-section="harvest-evidence-report"],
+  [data-print-section="harvest-evidence-report"] * { visibility: visible; }
+  [data-print-section="environment-summary-report"],
+  [data-print-section="harvest-evidence-report"] {
+    position: absolute;
+    inset: 0;
+    padding: 16px;
+    background: #fff;
+    color: #000;
+  }
+}
+
+/* Environment Summary Report — improved print rules. */
+@media print {
+  @page {
+    margin: 12mm;
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+        sans-serif;
+      font-size: 10px;
+      color: #555;
+    }
+    @bottom-left {
+      content: "Verdant — Environment Summary";
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+        sans-serif;
+      font-size: 10px;
+      color: #888;
+    }
+  }
+  @page :first {
+    @bottom-right {
+      content: "Page 1 of " counter(pages);
+    }
+  }
+  [data-print-card],
+  [data-print-issue-card],
+  [data-print-drilldown-row] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  [data-print-chart] {
+    max-width: 100%;
+    width: 100%;
+    overflow: visible;
+  }
+  .print-cover-page {
+    padding: 18mm 12mm;
+    break-after: page;
+    page-break-after: always;
+  }
+  .print-cover-title {
+    font-size: clamp(22px, 4.5vw, 36px);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  .print-cover-subtitle {
+    font-size: clamp(13px, 1.8vw, 17px);
+    line-height: 1.35;
+  }
+  .print-cover-meta,
+  .print-cover-summary,
+  .print-cover-safety {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .print-cover-section {
+    margin-top: 8mm;
+  }
+  .print-page-indicator {
+    font-size: 10px;
+    color: #666;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  /* Drilldown print mode: hide the full-report-only block. */
+  [data-print-section="environment-summary-report"][data-print-mode="drilldown"]
+    [data-print-full-report-only] {
+    display: none !important;
+  }
+  /* Make printable tables/cards fit page width. */
+  [data-print-section="environment-summary-report"] table,
+  [data-print-section="environment-summary-report"] [data-print-card] {
+    max-width: 100%;
+    width: 100%;
+  }
+}
+

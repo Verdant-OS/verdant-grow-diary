@@ -61,7 +61,8 @@ export interface EcowittSnapshotViewModel {
 }
 
 
-const EMPTY_STATE_MESSAGE = "No EcoWitt readings received yet.";
+const EMPTY_STATE_MESSAGE =
+  "No EcoWitt readings yet. Send a local test payload to verify the integration.";
 
 /**
  * Demote a "live" source to "stale" when the snapshot has aged past the
@@ -152,6 +153,15 @@ export function buildEcowittSnapshotViewModel(
 
   const metrics: EcowittSnapshotViewModel["metrics"] = {};
   for (const r of chosen.snap.readings) metrics[r.metric] = r.value;
+  // Derived VPD is not a sensor reading — surface it on the metrics map
+  // separately so the presenter can read it alongside raw values without
+  // having it labeled as a live reading.
+  if (
+    typeof chosen.snap.derivedVpdKpa === "number" &&
+    Number.isFinite(chosen.snap.derivedVpdKpa)
+  ) {
+    metrics.vpd_kpa = chosen.snap.derivedVpdKpa;
+  }
 
   return {
     hasReading: true,

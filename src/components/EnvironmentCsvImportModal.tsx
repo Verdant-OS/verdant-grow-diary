@@ -31,6 +31,11 @@ import {
   type ImportState,
 } from "@/lib/environmentCsvImportViewModel";
 import { parseEnvironmentCSV, type ParsedEnvironmentRow } from "@/lib/csvParser";
+import {
+  CSV_IMPORT_DESCRIPTION,
+  CSV_IMPORT_READING_COPY,
+  formatCsvPreviewRow,
+} from "@/lib/environmentCsvPreviewCopyRules";
 
 export interface EnvironmentCsvImportModalProps {
   open: boolean;
@@ -107,10 +112,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
       <DialogContent data-testid="csv-import-modal">
         <DialogHeader>
           <DialogTitle>Import historical data</DialogTitle>
-          <DialogDescription>
-            Bring in your AC Infinity CSV and Verdant will source-tag it as
-            historical CSV context.
-          </DialogDescription>
+          <DialogDescription>{CSV_IMPORT_DESCRIPTION}</DialogDescription>
         </DialogHeader>
 
         {state.phase === "idle" ? (
@@ -134,7 +136,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
 
         {state.phase === "parsing" ? (
           <p data-testid="csv-import-parsing" className="text-sm">
-            Reading your AC Infinity export…
+            {CSV_IMPORT_READING_COPY}
           </p>
         ) : null}
 
@@ -163,7 +165,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
           <div data-testid="csv-import-preview" className="space-y-3">
             <dl className="grid grid-cols-2 gap-2 text-sm">
               <div>
-                <dt className="text-muted-foreground">Sensor readings</dt>
+                <dt className="text-muted-foreground">Sensor rows</dt>
                 <dd data-testid="csv-import-valid-count">{coverage.validRows}</dd>
               </div>
               <div>
@@ -196,11 +198,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
               className="max-h-32 space-y-1 overflow-auto text-xs text-muted-foreground"
             >
               {(state.parsed?.validRows ?? []).slice(0, 5).map((r) => (
-                <li key={r.rowNumber}>
-                  {new Date(r.captured_at).toLocaleString()} ·{" "}
-                  {r.temperature_c != null ? `${r.temperature_c.toFixed(1)}°C` : "—"} ·{" "}
-                  {r.humidity_pct != null ? `${r.humidity_pct.toFixed(0)}%` : "—"}
-                </li>
+                <li key={r.rowNumber}>{formatCsvPreviewRow(r)}</li>
               ))}
             </ul>
             <DialogFooter>

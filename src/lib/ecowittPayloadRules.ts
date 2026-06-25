@@ -31,9 +31,11 @@ export type EcowittFreshness = "fresh" | "stale" | "missing";
 
 export type EcowittNormalizedMetric =
   | "temperature_c"
+  | "temp_f"
   | "humidity_pct"
   | "soil_moisture_pct"
-  | "co2_ppm";
+  | "co2_ppm"
+  | "vpd_kpa";
 
 export interface EcowittNormalizedReading {
   metric: EcowittNormalizedMetric;
@@ -76,9 +78,11 @@ export interface NormalizeEcowittOptions extends EcoWittAdapterOptions {
 
 const ALLOWED_METRICS = new Set<EcowittNormalizedMetric>([
   "temperature_c",
+  "temp_f",
   "humidity_pct",
   "soil_moisture_pct",
   "co2_ppm",
+  "vpd_kpa",
 ]);
 
 function freshnessFromAge(
@@ -135,6 +139,12 @@ export function normalizeEcowittPayload(
     });
   }
 
+  // Emit temp_f directly from the raw payload so the presenter can show
+  // Fahrenheit without a lossy C→F→C round-trip.
+  const rawTempF = readPayloadTempF(payload);
+  if (typeof rawTempF === "number" && Number.isFinite(rawTempF)) {
+    readings.push({ metric: "temp_f", value: rawTempF, unit: "F" });
+  }
   const capturedAtRaw = adapter.input.captured_at;
   const capturedAt =
     typeof capturedAtRaw === "string" && capturedAtRaw.length > 0
@@ -146,7 +156,6 @@ export function normalizeEcowittPayload(
   const tempC = readings.find((r) => r.metric === "temperature_c")?.value;
   const rhPct = readings.find((r) => r.metric === "humidity_pct")?.value;
   const soilPct = readings.find((r) => r.metric === "soil_moisture_pct")?.value;
-  const rawTempF = readPayloadTempF(payload);
 
   const suspicion = evaluateEcowittSuspicion({
     temperatureC: typeof tempC === "number" ? tempC : null,
@@ -167,6 +176,11 @@ export function normalizeEcowittPayload(
     rhValidForVpd && tempValidForVpd && !suspicion.hasInvalid
       ? computeVpdKpa(tempC as number, rhPct as number)
       : null;
+
+  // NOTE: derived VPD is intentionally NOT appended to `readings`. Readings
+  // represent sensor-sourced values (so they inherit the live/manual/stale
+  // source label); a derived metric pushed into that list would be mislabeled
+  // as a live reading. Consumers should read `derivedVpdKpa` instead.
 
   return {
     ok: adapter.ok && readings.length > 0 && !suspicion.hasInvalid,
@@ -310,7 +324,7 @@ export interface EcowittCloudNormalizationResult {
 
 const ECOWITT_TEMP_F_RE = /^temp([1-8])f$/i;
 const ECOWITT_HUMIDITY_CH_RE = /^humidity([1-8])$/i;
-const ECOWITT_SOIL_CH_RE = /^soilmoisture([1-8])$/i;
+const ECOWITT_SOIL_CH_RE = /^soilmoisture(1[0-6]|[1-9])$/i;
 const ECOWITT_PRESSURE_KEYS = new Set([
   "baromrelin",
   "baromabsin",

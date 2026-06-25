@@ -19,7 +19,8 @@ import {
   buildPlantQuickLogPrefill,
   PLANT_QUICKLOG_PREFILL_EVENT,
 } from "@/lib/plantQuickLogPrefillRules";
-import ShellyHtSetupCard from "@/components/ShellyHtSetupCard";
+
+
 
 
 import { tentDetailPath } from "@/lib/routes";
@@ -225,7 +226,8 @@ export default function PlantTentEnvironmentPanel({ tentId, tentName, plantId, p
             </Button>
           </div>
         ) : null}
-        {enabled ? <ShellyHtSetupCard rows={rows} /> : null}
+
+
 
       </CardContent>
     </Card>

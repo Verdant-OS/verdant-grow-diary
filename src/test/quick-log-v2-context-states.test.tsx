@@ -141,3 +141,48 @@ describe("QuickLogV2Sheet — happy path still enables Save", () => {
     ).toBe(false);
   });
 });
+
+describe("QuickLogV2Sheet — photo action removed, attachment inline", () => {
+  beforeEach(() => {
+    plantsState.data = [
+      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
+    ];
+    tentsState.data = [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }];
+  });
+
+  it("no separate Photo action button exists in the action group", () => {
+    renderSheet();
+    const group = screen.getByRole("group", { name: /quick log action type/i });
+    const buttons = Array.from(group.querySelectorAll("button"));
+    const labels = buttons.map((b) => (b.textContent || "").trim().toLowerCase());
+    expect(labels).toEqual(expect.arrayContaining(["water", "feed", "note"]));
+    expect(labels).not.toContain("photo");
+  });
+
+  it("photo attachment is rendered inline for non-feed actions (default Note)", () => {
+    renderSheet();
+    expect(screen.getByTestId("qlv2-photo-attachment")).toBeTruthy();
+    expect(screen.getByTestId("qlv2-photo-camera-input")).toBeTruthy();
+    expect(screen.getByTestId("qlv2-photo-library-input")).toBeTruthy();
+  });
+
+  it("photo attachment is hidden when Feed action is selected", () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /^feed$/i }));
+    expect(screen.queryByTestId("qlv2-photo-attachment")).toBeNull();
+  });
+
+  it("no legacy photo gate (qlv2-photo-gate) is rendered — photo saving is supported", () => {
+    renderSheet();
+    expect(screen.queryByTestId("qlv2-photo-gate")).toBeNull();
+  });
+
+  it("Take Photo and Choose from Library buttons are reachable by visible name", () => {
+    renderSheet();
+    expect(screen.getByRole("button", { name: /^take photo$/i })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /^choose from library$/i }),
+    ).toBeTruthy();
+  });
+});
+

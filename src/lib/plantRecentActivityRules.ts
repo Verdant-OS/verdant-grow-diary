@@ -13,6 +13,7 @@ import {
 } from "@/lib/diaryEntryRules";
 import { isStale } from "@/lib/sensorSnapshot";
 import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
+import { shouldShowPhotoNonDiagnosticLabel } from "@/lib/photoEventNonDiagnosticLabelRules";
 
 export interface PlantRecentActivityRow {
   id: string;
@@ -41,6 +42,12 @@ export interface PlantRecentActivityRow {
   hasHardwareReadings: boolean;
   /** Trimmed lines from the hardware readings block. Display-only. */
   hardwareReadingLines: string[];
+  /**
+   * True when this row's photo (if any) should render the
+   * "Visual record · no AI analysis" label. False when entry is linked
+   * to a saved AI Doctor session/result.
+   */
+  showPhotoNonDiagnosticLabel?: boolean;
 }
 
 const NOTE_PREVIEW_MAX = 140;
@@ -81,6 +88,10 @@ function toRow(
     warnings: entry.warnings,
     hasHardwareReadings: split.hasHardwareBlock,
     hardwareReadingLines: split.hardwareLines,
+    showPhotoNonDiagnosticLabel: shouldShowPhotoNonDiagnosticLabel({
+      hasPhoto: !!entry.photoUrl,
+      details: entry.details.extras,
+    }),
   };
 }
 

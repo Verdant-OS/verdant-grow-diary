@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,15 +12,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Camera, Loader2, Sparkles, Gauge } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  Gauge,
+  Info,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
-import { useQueryClient } from "@tanstack/react-query";
-
+import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { STAGES } from "@/lib/grow";
-
-import { EC_UNITS, type EcUnit } from "@/constants/units";
+import { EC_UNITS, EC_UNIT_LABEL, type EcUnit } from "@/constants/units";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
@@ -38,24 +47,84 @@ import {
 } from "@/lib/quickLogPlantOptionRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 import EventTypeSelector from "@/components/EventTypeSelector";
-import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
-import { buildQuickLogSnapshotStrip } from "@/lib/quickLogSnapshotStripAdapter";
+import { useLatestTentSensorSnapshot } from "@/lib/sensor";
+import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import {
   buildLegacyQuickLogUnifiedPayload,
   isSupportedLegacyEventType,
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
-
-import { AlertTriangle, Info } from "lucide-react";
-import { toast } from "sonner";
+import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
+import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
+import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
+import { buildQuickLogDraftPreview } from "@/lib/quickLogDraftPreviewViewModel";
+import { plantDetailPath } from "@/lib/routes";
+import {
+  EARLY_STAGE_MILESTONES,
+  EARLY_STAGE_VIGOR_OPTIONS,
+  EARLY_STAGE_PHOTO_HINT,
+  EARLY_STAGE_NOTE_PLACEHOLDER,
+  buildEarlyStageDetails,
+  buildEarlyStageNoteSuffix,
+  evaluateEarlyStageVisibility,
+  type EarlyStageMilestone,
+  type EarlyStageVigor,
+} from "@/lib/earlyStageQuickLogRules";
+import {
+  ENVIRONMENT_CHECK_HELPER_COPY,
+  ENVIRONMENT_CHECK_SECTION_TITLE,
+  buildEnvironmentCheckDetails,
+  hasAnyEnvironmentCheckMeasurement,
+  resolvePreviewWaterTempC,
+  type EnvironmentCheckWaterTempUnit,
+} from "@/lib/environmentCheckQuickLogRules";
+import {
+  buildEcCompensationPreview,
+  EC_COMPENSATION_PREVIEW_DISCLAIMER,
+} from "@/lib/ecCompensationPreviewViewModel";
+import { buildEnvironmentCheckSensorContext } from "@/lib/environmentCheckSensorContextRules";
+import { buildSensorNormalizationPreviewViewModel } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
+import { SensorNormalizationPreviewPanel } from "@/components/SensorNormalizationPreviewPanel";
+import {
+  buildHarvestInspectionPreviewViewModel,
+  HARVEST_PHOTO_COMPARISON_ANGLES,
+  HARVEST_PHOTO_COMPARISON_LIGHTINGS,
+  type HarvestPhotoAngle,
+  type HarvestPhotoLighting,
+} from "@/lib/harvestInspectionQuickLogPreviewRules";
 
 export interface QuickLogPrefill {
   plantId?: string | null;
+  plantName?: string | null;
   growId?: string | null;
   tentId?: string | null;
   eventType?: string | null;
   suggestSnapshot?: boolean | null;
+  /**
+   * Optional starter note text. Seeded into the Quick Log note field when
+   * the user has not yet typed anything. The grower still reviews/edits
+   * and confirms the save manually.
+   */
+  note?: string | null;
+  /**
+   * Optional handoff source label (e.g. "hyperlog", "harvest-watch-inspection").
+   * Drives the draft preview header copy — never used as a write path
+   * discriminator.
+   */
+  source?: "hyperlog" | "harvest-watch-inspection" | string | null;
+  /**
+   * Optional count of locally previewed photos waiting in the upstream
+   * caller (HyperLog modal). Drives the "Photo preview only" copy.
+   * The legacy Quick Log editor never receives the files themselves.
+   */
+  photoCount?: number | null;
+  /**
+   * Optional Harvest Watch inspection preset key (e.g. "trichome_inspection",
+   * "close_flower_photo"). Drives the Harvest Watch preview panel only.
+   * Never used as a write path discriminator.
+   */
+  preset?: string | null;
 }
 
 interface Props {
@@ -64,6 +133,60 @@ interface Props {
   onCreated?: () => void;
   prefill?: QuickLogPrefill | null;
   successMessage?: string;
+}
+
+const LAST_TARGET_STORAGE_KEY = "verdant.quickLog.lastTarget.v1";
+
+type SavedTarget = {
+  id: string;
+  name: string;
+  tentName: string | null;
+  growName: string | null;
+  eventType: string;
+  savedAt: string;
+};
+
+type LastQuickLogTarget = {
+  plantId: string;
+  growId: string | null;
+  tentId: string | null;
+  savedAt: string;
+};
+
+function readLastTarget(): LastQuickLogTarget | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LAST_TARGET_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LastQuickLogTarget>;
+    if (typeof parsed.plantId !== "string" || !parsed.plantId) return null;
+    return {
+      plantId: parsed.plantId,
+      growId: typeof parsed.growId === "string" ? parsed.growId : null,
+      tentId: typeof parsed.tentId === "string" ? parsed.tentId : null,
+      savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function rememberLastTarget(target: LastQuickLogTarget) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LAST_TARGET_STORAGE_KEY, JSON.stringify(target));
+  } catch {
+    // Non-critical speed preference. Never block saving if storage is unavailable.
+  }
+}
+
+function savedVerb(eventType: string): string {
+  if (eventType === "watering") return "watering";
+  if (eventType === "feeding") return "feeding";
+  if (eventType === "observation") return "observation";
+  if (eventType === "photo") return "photo note";
+  if (eventType === "environment") return "environment check";
+  return "log";
 }
 
 export default function QuickLog({
@@ -77,19 +200,13 @@ export default function QuickLog({
   const { grows, activeGrow, activeGrowId, setActiveGrowId } = useGrows();
   const { data: plants = [] } = usePlants();
   const { data: activeTents = [] } = useTents();
-  // Snapshot attach requires a real tent anchor. We accept either an
-  // active tent (authoritative) or a plant that already references a
-  // tent_id (covers test fixtures and legacy data where useTents may not
-  // be wired). This is intentionally permissive: the strip itself still
-  // no-ops without a selectedPlant.tent_id.
-  const tentSetupRequired =
-    shouldRequireFirstTentSetup(activeTents) &&
-    !plants.some((p) => typeof p.tent_id === "string" && p.tent_id.length > 0);
   const queryClient = useQueryClient();
   const { save: saveViaRpc } = useQuickLogV2Save();
 
-  // Photo attach is disabled in the unified Quick Log slice; placeholder
-  // state retained for layout only.
+  const tentSetupRequired =
+    shouldRequireFirstTentSetup(activeTents) &&
+    !plants.some((p) => typeof p.tent_id === "string" && p.tent_id.length > 0);
+
   const [note, setNote] = useState("");
   const [stage, setStage] = useState(activeGrow?.stage || "veg");
   const [eventType, setEventType] = useState<string>("observation");
@@ -119,23 +236,31 @@ export default function QuickLog({
     lightDistance: "",
   });
   const [busy, setBusy] = useState(false);
-  // Hardware readings collapse state. Default is recomputed via a pure
-  // helper whenever the dialog opens/resets, and remains under grower
-  // control once they toggle it in-session.
   const [hardwareOpen, setHardwareOpen] = useState(false);
-  const hardwareUserTouchedRef = useRef(false);
+  const [wateringError, setWateringError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedTarget, setSavedTarget] = useState<SavedTarget | null>(null);
+  const [earlyMilestone, setEarlyMilestone] = useState<EarlyStageMilestone | null>(null);
+  const [earlyVigor, setEarlyVigor] = useState<EarlyStageVigor | null>(null);
+  const [earlyNotes, setEarlyNotes] = useState<string>("");
+  const [earlyManuallyOpen, setEarlyManuallyOpen] = useState(false);
+  const [envRoomTempF, setEnvRoomTempF] = useState<string>("");
+  const [envHumidityPct, setEnvHumidityPct] = useState<string>("");
+  const [envVpdKpa, setEnvVpdKpa] = useState<string>("");
+  const [envWaterTempValue, setEnvWaterTempValue] = useState<string>("");
+  const [envWaterTempUnit, setEnvWaterTempUnit] = useState<EnvironmentCheckWaterTempUnit>("F");
+  const [envEcMscm, setEnvEcMscm] = useState<string>("");
+  const [harvestPhotoAngle, setHarvestPhotoAngle] = useState<HarvestPhotoAngle | "">("");
+  const [harvestPhotoLighting, setHarvestPhotoLighting] = useState<HarvestPhotoLighting | "">("");
 
-  // Tracks whether the grower has manually changed the attach toggle in
-  // this session. Until they do, we may auto-default it based on whether
-  // the latest snapshot classifies as `usable` (Gate 1 trust rule).
+  const wateringInputRef = useRef<HTMLInputElement | null>(null);
+  const plantSelectTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const attachWrapperRef = useRef<HTMLLabelElement | null>(null);
+  const noteRef = useRef<HTMLTextAreaElement | null>(null);
+  const viewPlantBtnRef = useRef<HTMLAnchorElement | null>(null);
+  const hardwareUserTouchedRef = useRef(false);
   const snapshotUserTouchedRef = useRef(false);
 
-  // Apply page-context prefill when the dialog opens. Does NOT submit —
-  // grower still chooses to save the entry. NOTE: plant resolution is NOT
-  // applied directly here. It is centralized in the
-  // `pickDefaultQuickLogPlant` effect below so that out-of-scope, archived,
-  // or merged plant ids in `prefill.plantId` are ignored and an existing
-  // grower selection is never overwritten on reopen.
   useEffect(() => {
     if (!open || !prefill) return;
     if (prefill.growId && prefill.growId !== activeGrowId) {
@@ -143,6 +268,11 @@ export default function QuickLog({
     }
     if (prefill.eventType) setEventType(prefill.eventType);
     if (prefill.suggestSnapshot && prefill.tentId) setSnapshot(true);
+    // Seed a starter note only when the grower has not yet typed anything,
+    // so we never overwrite in-progress text on re-open.
+    if (typeof prefill.note === "string" && prefill.note.length > 0) {
+      setNote((prev) => (prev.trim().length === 0 ? (prefill.note ?? "") : prev));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     open,
@@ -150,66 +280,82 @@ export default function QuickLog({
     prefill?.tentId,
     prefill?.eventType,
     prefill?.suggestSnapshot,
+    prefill?.note,
   ]);
-
 
   const scopedPlants = useMemo(
     () => filterQuickLogPlantOptions(plants, activeGrowId),
     [plants, activeGrowId],
   );
+
   const selectedPlant = useMemo(
     () => scopedPlants.find((p) => p.id === plantId) ?? null,
     [plantId, scopedPlants],
   );
 
-  // Speed slice: when no plant is selected, preselect the deterministic
-  // default (single scoped candidate or valid prefill). Never overrides a
-  // grower's current selection — pickDefaultQuickLogPlant returns
-  // currentPlantId unchanged when it's valid. Re-evaluates when the dialog
-  // re-opens or scoped plants change.
+  const selectedTent = useMemo(
+    () => activeTents.find((t) => t.id === selectedPlant?.tent_id) ?? null,
+    [activeTents, selectedPlant?.tent_id],
+  );
+
   useEffect(() => {
     if (!open) return;
     if (plantId) return;
+
+    const lastTarget = readLastTarget();
+    const lastPlantId = lastTarget?.plantId ?? null;
+    const lastPlantStillValid = lastPlantId
+      ? scopedPlants.some((p) => p.id === lastPlantId)
+      : false;
+
     const next = pickDefaultQuickLogPlant(
       scopedPlants,
-      prefill?.plantId ?? null,
+      prefill?.plantId ?? (lastPlantStillValid ? lastPlantId : null),
       plantId || null,
     );
     if (next && next !== plantId) setPlantId(next);
   }, [open, plantId, scopedPlants, prefill?.plantId]);
 
-  // Drive the sensor snapshot strip + auto-attach default from the same
-  // contract-derived status the strip uses. We call the loader here so the
-  // parent can react to status transitions without duplicating any
-  // classification logic in this .tsx.
-  const sensorTentIds = selectedPlant?.tent_id ? [selectedPlant.tent_id] : [];
-  const sensorState = useLatestSensorSnapshot(activeGrowId, sensorTentIds);
+  const sensorTentId = selectedPlant?.tent_id ?? null;
+  const sensorState = useLatestTentSensorSnapshot(sensorTentId);
   const stripView = useMemo(
     () =>
-      buildQuickLogSnapshotStrip({
+      buildQuickLogStripFromTentState({
+        status: sensorState.status,
         snapshot: sensorState.snapshot,
-        loading: sensorState.status === "loading",
-        hasTent: !!selectedPlant?.tent_id,
+        hasTent: !!sensorTentId,
         attached: snapshot,
       }),
-    [sensorState.snapshot, sensorState.status, selectedPlant?.tent_id, snapshot],
+    [sensorState.status, sensorState.snapshot, sensorTentId, snapshot],
   );
 
-  // When the snapshot becomes `usable` and the grower has NOT manually
-  // toggled the attach switch in this session, default it to ON so the
-  // strip's "this log will include current sensor context" copy matches
-  // what the save payload will actually include.
   useEffect(() => {
     if (!open) return;
     if (snapshotUserTouchedRef.current) return;
     if (!selectedPlant?.tent_id) return;
-    if (stripView.status === "usable" && !snapshot) {
-      setSnapshot(true);
-    }
+    if (stripView.status === "usable" && !snapshot) setSnapshot(true);
   }, [open, stripView.status, selectedPlant?.tent_id, snapshot]);
 
-  // On open/reset, recompute the Hardware readings default from current
-  // values unless the grower already toggled it in this session.
+  useEffect(() => {
+    if (!open) return;
+    if (stripView.status !== "usable" && snapshot) setSnapshot(false);
+  }, [open, stripView.status, snapshot]);
+
+  useEffect(() => {
+    if (!open) return;
+    snapshotUserTouchedRef.current = false;
+     
+  }, [open, selectedPlant?.tent_id]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (eventType === "watering") setShowMore(true);
+  }, [open, eventType]);
+
+  useEffect(() => {
+    if (eventType !== "watering" || details.watering.trim()) setWateringError(null);
+  }, [eventType, details.watering]);
+
   useEffect(() => {
     if (!open) {
       hardwareUserTouchedRef.current = false;
@@ -219,6 +365,21 @@ export default function QuickLog({
     setHardwareOpen(computeQuickLogHardwareDefaultOpen(hardware));
   }, [open, hardware]);
 
+  function emptyDetails() {
+    return { ec: "", ecUnit: "mS/cm" as EcUnit, nutrients: "", training: "", watering: "" };
+  }
+
+  function emptyHardware(): QuickLogHardwareReadings {
+    return {
+      inputPh: "",
+      inputEc: "",
+      runoffPh: "",
+      runoffEc: "",
+      ppfdCanopy: "",
+      lightDistance: "",
+    };
+  }
+
   function reset() {
     setNote("");
     setShowMore(false);
@@ -227,23 +388,83 @@ export default function QuickLog({
     setSnapshot(false);
     snapshotUserTouchedRef.current = false;
     setRemindAt("");
-    setDetails({ ec: "", ecUnit: "mS/cm", nutrients: "", training: "", watering: "" });
-    setHardware({
-      inputPh: "",
-      inputEc: "",
-      runoffPh: "",
-      runoffEc: "",
-      ppfdCanopy: "",
-      lightDistance: "",
-    });
+    setDetails(emptyDetails());
+    setHardware(emptyHardware());
     hardwareUserTouchedRef.current = false;
     setHardwareOpen(false);
+    setWateringError(null);
+    setSaveError(null);
+    setSavedTarget(null);
+    setEarlyMilestone(null);
+    setEarlyVigor(null);
+    setEarlyNotes("");
+    setEarlyManuallyOpen(false);
+    setEnvRoomTempF("");
+    setEnvHumidityPct("");
+    setEnvVpdKpa("");
+    setEnvWaterTempValue("");
+    setEnvWaterTempUnit("F");
+    setEnvEcMscm("");
+    setHarvestPhotoAngle("");
+    setHarvestPhotoLighting("");
+  }
+
+  function resetForAnother() {
+    const keepPlantId = savedTarget?.id ?? plantId;
+    setNote("");
+    setShowMore(false);
+    setEventType("observation");
+    setSnapshot(false);
+    snapshotUserTouchedRef.current = false;
+    setRemindAt("");
+    setDetails(emptyDetails());
+    setHardware(emptyHardware());
+    hardwareUserTouchedRef.current = false;
+    setHardwareOpen(false);
+    setWateringError(null);
+    setSaveError(null);
+    setSavedTarget(null);
+    setEarlyMilestone(null);
+    setEarlyVigor(null);
+    setEarlyNotes("");
+    setEnvRoomTempF("");
+    setEnvHumidityPct("");
+    setEnvVpdKpa("");
+    setEnvWaterTempValue("");
+    setEnvWaterTempUnit("F");
+    setEnvEcMscm("");
+    setHarvestPhotoAngle("");
+    setHarvestPhotoLighting("");
+    if (keepPlantId) setPlantId(keepPlantId);
+    setTimeout(() => noteRef.current?.focus(), 0);
+  }
+
+  function focusPlant() {
+    plantSelectTriggerRef.current?.focus();
+    plantSelectTriggerRef.current?.scrollIntoView?.({ block: "center" });
+  }
+
+  function focusAttach() {
+    attachWrapperRef.current?.focus();
+    attachWrapperRef.current?.scrollIntoView?.({ block: "center" });
+  }
+
+  function focusWatering() {
+    setShowMore(true);
+    setTimeout(() => {
+      wateringInputRef.current?.focus();
+      wateringInputRef.current?.scrollIntoView?.({ block: "center" });
+    }, 0);
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setSaveError(null);
+
     if (!user || !activeGrowId) {
-      toast.error("Pick a workspace first");
+      const message = "Pick a workspace first";
+      setSaveError(message);
+      toast.error(message);
       return;
     }
     if (!isSupportedLegacyEventType(eventType)) {
@@ -251,33 +472,98 @@ export default function QuickLog({
       return;
     }
     if (!selectedPlant) {
-      toast.error("Pick a plant to save this entry");
+      const message = "Pick a plant to save this entry";
+      setSaveError(message);
+      toast.error(message);
+      focusPlant();
       return;
     }
     if (!note.trim() && eventType !== "watering") {
-      toast.error("Add a quick note");
+      const message = "Add a quick note";
+      setSaveError(message);
+      toast.error(message);
+      noteRef.current?.focus();
       return;
+    }
+    if (eventType === "watering") {
+      const raw = details.watering.trim();
+      const vol = Number(raw);
+      if (!raw || !Number.isFinite(vol) || vol <= 0) {
+        const message = "Add a watering volume (ml) to save.";
+        setShowMore(true);
+        setWateringError(message);
+        setSaveError(message);
+        focusWatering();
+        toast.error(message);
+        return;
+      }
     }
 
     setBusy(true);
     try {
       const noteWithHardware = appendHardwareReadingsToNote(note, hardware);
+      const sensorAttachPayload =
+        snapshot && sensorTentId && stripView.status === "usable"
+          ? buildSensorSnapshotSavePayload(sensorState.snapshot)
+          : null;
+      const earlyStageEnvelope = buildEarlyStageDetails({
+        milestone: earlyMilestone,
+        vigor: earlyVigor,
+        notes: earlyNotes,
+        stage,
+      });
+      const earlyStageRecord: Record<string, unknown> | null = earlyStageEnvelope
+        ? { ...earlyStageEnvelope }
+        : null;
+      const earlyStageSuffix = buildEarlyStageNoteSuffix({
+        milestone: earlyMilestone,
+        vigor: earlyVigor,
+        notes: earlyNotes,
+        stage,
+      });
+      const environmentCheckEnvelope =
+        eventType === "environment"
+          ? buildEnvironmentCheckDetails({
+              roomTempF: envRoomTempF,
+              humidityPct: envHumidityPct,
+              vpdKpa: envVpdKpa,
+              waterTempValue: envWaterTempValue,
+              waterTempUnit: envWaterTempUnit,
+              ecMscm: envEcMscm,
+              note: null,
+            })
+          : null;
+      const environmentCheckRecord: Record<string, unknown> | null = environmentCheckEnvelope
+        ? { ...environmentCheckEnvelope }
+        : null;
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
         noteWithHardware,
         plantId: selectedPlant.id,
         plantTentId: selectedPlant.tent_id ?? null,
         details,
+        sensorAttachPayload,
+        earlyStage: earlyStageRecord,
+        environmentCheck: environmentCheckRecord,
+        noteSuffix: earlyStageSuffix || null,
       });
       if (built.ok !== true) {
+        setSaveError(built.message);
         toast.error(built.message);
         return;
       }
 
       const result = await saveViaRpc(built.payload);
       if (!result.ok) {
-        toast.error(`Couldn't save entry: ${result.reason ?? "save_failed"}`);
-        console.error("[QuickLog] RPC save error", result);
+        const reason = result.reason ?? "save_failed";
+        const message = quickLogReasonToOperatorMessage(reason);
+        setSaveError(`${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`);
+        // Surface the (allow-listed) reason code alongside the friendly
+        // copy so the operator and tests can correlate the failure with
+        // logs without exposing tokens, endpoints, or raw payloads.
+        toast.error(`${message} [${reason}]`);
+        // Safe diagnostic only — reason code is allow-listed, never tokens/payload.
+        console.error("[QuickLog] RPC save error", { reason });
         return;
       }
 
@@ -285,27 +571,72 @@ export default function QuickLog({
         await supabase.from("grows").update({ stage }).eq("id", activeGrowId);
       }
 
-      toast.success(successMessage);
-      reset();
-      onOpenChange(false);
+      const plantLabel = selectedPlant.name;
+      const finalMessage =
+        successMessage && successMessage !== "Logged 🌱"
+          ? successMessage
+          : `Saved ${savedVerb(eventType)} for ${plantLabel}`;
+      toast.success(finalMessage);
+
+      rememberLastTarget({
+        plantId: selectedPlant.id,
+        growId: activeGrowId,
+        tentId: selectedPlant.tent_id ?? null,
+        savedAt: new Date().toISOString(),
+      });
+      setSavedTarget({
+        id: selectedPlant.id,
+        name: plantLabel,
+        tentName: selectedTent?.name ?? null,
+        growName: activeGrow?.name ?? null,
+        eventType,
+        savedAt: new Date().toISOString(),
+      });
       onCreated?.();
-      // Refresh both legacy and unified timeline readers so the just-saved
-      // entry appears without a hard refresh.
+      setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
+      applyQuickLogV2Refresh(queryClient, {
+        targetType: "plant",
+        targetId: selectedPlant.id,
+        tentId: selectedPlant.tent_id ?? null,
+      });
+      // Explicit, statically-grep-able invalidations for the two V0-loop
+      // memory surfaces (Recent Plant Activity + shared diary_entries
+      // reads). `applyQuickLogV2Refresh` also covers these keys; the
+      // duplicate invalidate is cheap and locks the V0 contract.
       queryClient.invalidateQueries({ queryKey: ["plant_recent_activity"] });
       queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
-      queryClient.invalidateQueries({ queryKey: ["grow_events"] });
       window.dispatchEvent(
         new CustomEvent("verdant:entry-created", {
           detail: { createdAt: new Date().toISOString() },
         }),
       );
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+      const message = err instanceof Error ? err.message : "Failed to save";
+      setSaveError(`${message}. Your input is still here — retry when connection is stable.`);
+      toast.error(message);
       console.error("[QuickLog] unexpected error", err);
     } finally {
       setBusy(false);
     }
   }
+
+  const snapshotUsable = stripView.status === "usable";
+  const attachDisabled = !selectedPlant || !snapshotUsable;
+  const showMismatch = !!(
+    prefill?.plantId &&
+    selectedPlant &&
+    selectedPlant.id !== prefill.plantId
+  );
+  const showStaleHelper = !!(
+    selectedPlant &&
+    !snapshotUsable &&
+    stripView.status !== "no_data" &&
+    !tentSetupRequired
+  );
+  const showWateringErr = !!wateringError;
+  const targetGrowName = activeGrow?.name ?? "No setup selected";
+  const targetTentName =
+    selectedTent?.name ?? (selectedPlant?.tent_id ? "Assigned tent" : "No tent assigned");
 
   return (
     <Dialog
@@ -321,123 +652,855 @@ export default function QuickLog({
             <Sparkles className="h-4 w-4 text-primary" />
             Quick Log
           </DialogTitle>
+          <p
+            data-testid="quick-log-subtitle"
+            className="text-[12px] text-muted-foreground leading-snug"
+          >
+            One target. One truth label. One save.
+          </p>
         </DialogHeader>
+
         <form onSubmit={submit} className="grid gap-4">
-          {/* Photo — disabled in unified Quick Log slice. Photo attach
-              will return when grow_events gains a photo writer path. */}
-          <div
-            data-testid="quicklog-photo-coming-soon"
-            className="relative aspect-square w-full rounded-xl border-2 border-dashed border-border/40 overflow-hidden bg-secondary/20"
-          >
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2 px-4 text-center">
-              <Camera className="h-10 w-10 opacity-50" />
-              <span className="text-sm font-medium">Photo attach — coming soon</span>
-              <span className="text-[11px] leading-snug">
-                Photo logs will return after the unified grow_events writer is expanded.
-              </span>
-            </div>
-          </div>
-
-
-          {/* Event + Stage + Current Setup — compact responsive row.
-              Mobile (<sm): 2 cols, Setup wraps onto its own line.
-              ≥sm: all three sit side-by-side. Plant keeps its own row
-              below so the validation alert/helper has full width. */}
-          <div
-            data-testid="quicklog-context-row"
-            className="grid grid-cols-2 sm:grid-cols-3 gap-2"
-          >
-            <EventTypeSelector value={eventType} onValueChange={setEventType} />
-            <div>
-              <Label className="text-xs">Stage</Label>
-              <Select value={stage} onValueChange={setStage}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STAGES.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-2 sm:col-span-1">
-              <Label className="text-xs">Current Setup</Label>
-              <Select value={activeGrowId ?? ""} onValueChange={setActiveGrowId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  {grows.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Plant — full-width row so the validation alert + helper text
-              have room to read on narrow viewports. */}
-          <div>
-            <Label className="text-xs">Plant</Label>
-            <Select
-              value={plantId || "__none"}
-              onValueChange={(v) => setPlantId(v === "__none" ? "" : v)}
-            >
-              <SelectTrigger
-                data-testid="quick-log-plant-select"
-                aria-invalid={!selectedPlant}
-                aria-describedby={!selectedPlant ? "quick-log-plant-error" : undefined}
+          {(() => {
+            const draftPreview = buildQuickLogDraftPreview({ prefill });
+            if (!draftPreview.show) return null;
+            return (
+              <div
+                data-testid="quick-log-draft-preview"
+                data-source={prefill?.source ?? "unknown"}
+                className="rounded-lg border border-primary/30 bg-primary/[0.04] p-2.5 space-y-1"
               >
-                <SelectValue placeholder="Choose a plant" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none">Choose a plant…</SelectItem>
-                {scopedPlants.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                    {p.strain ? ` · ${p.strain}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-[11px] uppercase tracking-wide text-primary/80">
+                    {draftPreview.eventTypeLabel ?? "Draft"} prefilled
+                  </p>
+                  {draftPreview.sourceLabel ? (
+                    <span
+                      data-testid="quick-log-draft-preview-source"
+                      className="text-[10px] uppercase tracking-wide text-amber-200/80 rounded-sm border border-amber-200/30 px-1.5 py-0.5"
+                    >
+                      {draftPreview.sourceLabel}
+                    </span>
+                  ) : null}
+                </div>
+                {draftPreview.noteSummary ? (
+                  <p
+                    data-testid="quick-log-draft-preview-note"
+                    className="text-[12px] text-foreground/90 leading-snug"
+                  >
+                    {draftPreview.noteSummary}
+                  </p>
+                ) : null}
+                {draftPreview.snapshotLabel ? (
+                  <p
+                    data-testid="quick-log-draft-preview-snapshot"
+                    className="text-[11px] text-muted-foreground italic"
+                  >
+                    {draftPreview.snapshotLabel}
+                  </p>
+                ) : null}
+                {draftPreview.photoLabel ? (
+                  <p
+                    data-testid="quick-log-draft-preview-photo"
+                    className="text-[11px] text-muted-foreground italic"
+                  >
+                    {draftPreview.photoLabel}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })()}
+          {(() => {
+            const hv = buildHarvestInspectionPreviewViewModel(prefill ?? null);
+            if (!hv.show) return null;
+            return (
+              <div
+                data-testid="quick-log-harvest-inspection-preview"
+                data-preset={hv.preset ?? ""}
+                className="rounded-lg border border-amber-400/30 bg-amber-400/[0.04] p-2.5 space-y-1.5"
+              >
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p
+                    className="text-[11px] uppercase tracking-wide text-amber-200/90"
+                    data-testid="quick-log-harvest-inspection-preview-label"
+                  >
+                    Harvest Watch · {hv.presetLabel}
+                  </p>
+                  <span
+                    className="text-[10px] uppercase tracking-wide text-muted-foreground rounded-sm border border-border/60 px-1.5 py-0.5"
+                    data-testid="quick-log-harvest-inspection-preview-event-type"
+                  >
+                    {hv.eventTypeLabel}
+                  </span>
+                </div>
+                <p
+                  className="text-[11px] text-amber-200/80"
+                  data-testid="quick-log-harvest-inspection-preview-caution"
+                >
+                  {hv.caution}
+                </p>
+                <p
+                  className="text-[11px] text-muted-foreground"
+                  data-testid="quick-log-harvest-inspection-preview-review"
+                >
+                  {hv.reviewCopy}
+                </p>
+                {hv.note ? (
+                  <pre
+                    data-testid="quick-log-harvest-inspection-preview-note"
+                    className="text-[12px] text-foreground/90 leading-snug whitespace-pre-wrap font-sans"
+                  >
+                    {hv.note}
+                  </pre>
+                ) : null}
+                <p
+                  className="text-[11px] text-muted-foreground italic"
+                  data-testid="quick-log-harvest-inspection-preview-grower"
+                >
+                  Grower reviews before saving.
+                </p>
+                {hv.showPhotoComparison ? (
+                  <div
+                    data-testid="quick-log-harvest-photo-comparison"
+                    className="grid gap-2 sm:grid-cols-2 pt-1"
+                  >
+                    <div className="grid gap-1">
+                      <Label
+                        htmlFor="ql-harvest-angle"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        Angle (optional)
+                      </Label>
+                      <Select
+                        value={harvestPhotoAngle}
+                        onValueChange={(v) => setHarvestPhotoAngle(v as HarvestPhotoAngle)}
+                      >
+                        <SelectTrigger
+                          id="ql-harvest-angle"
+                          data-testid="quick-log-harvest-photo-angle"
+                          className="h-8 text-xs"
+                        >
+                          <SelectValue placeholder="Select angle" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {HARVEST_PHOTO_COMPARISON_ANGLES.map((opt) => (
+                            <SelectItem
+                              key={opt.value}
+                              value={opt.value}
+                              data-testid={`quick-log-harvest-photo-angle-${opt.value}`}
+                            >
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-1">
+                      <Label
+                        htmlFor="ql-harvest-lighting"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        Lighting (optional)
+                      </Label>
+                      <Select
+                        value={harvestPhotoLighting}
+                        onValueChange={(v) => setHarvestPhotoLighting(v as HarvestPhotoLighting)}
+                      >
+                        <SelectTrigger
+                          id="ql-harvest-lighting"
+                          data-testid="quick-log-harvest-photo-lighting"
+                          className="h-8 text-xs"
+                        >
+                          <SelectValue placeholder="Select lighting" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {HARVEST_PHOTO_COMPARISON_LIGHTINGS.map((opt) => (
+                            <SelectItem
+                              key={opt.value}
+                              value={opt.value}
+                              data-testid={`quick-log-harvest-photo-lighting-${opt.value}`}
+                            >
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })()}
+          {(showMismatch || showStaleHelper || showWateringErr) && (
+            <div
+              data-testid="quick-log-review-issues"
+              role="group"
+              aria-label="Review Quick Log issues"
+              className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 space-y-1"
+            >
+              <p className="text-[11px] uppercase tracking-wide text-amber-200/80">
+                Review before saving
+              </p>
+              <ul className="flex flex-wrap gap-x-3 gap-y-1">
+                {showMismatch && (
+                  <li>
+                    <button
+                      type="button"
+                      data-testid="quick-log-review-jump-mismatch"
+                      onClick={focusPlant}
+                      className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      Check target
+                    </button>
+                  </li>
+                )}
+                {showStaleHelper && (
+                  <li>
+                    <button
+                      type="button"
+                      data-testid="quick-log-review-jump-snapshot"
+                      onClick={focusAttach}
+                      className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      Check sensor truth
+                    </button>
+                  </li>
+                )}
+                {showWateringErr && (
+                  <li>
+                    <button
+                      type="button"
+                      data-testid="quick-log-review-jump-watering"
+                      onClick={focusWatering}
+                      className="text-[12px] underline text-amber-200 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      Add Watering (ml)
+                    </button>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+
+          <section
+            data-testid="quick-log-target-card"
+            aria-label="Quick Log target"
+            className="rounded-xl border border-primary/40 bg-primary/5 p-3 space-y-3"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Logging to
+                </p>
+                <p
+                  data-testid="quick-log-target-plant"
+                  className="text-base font-semibold text-foreground"
+                >
+                  {selectedPlant?.name ?? "Choose a plant"}
+                </p>
+                <p
+                  data-testid="quick-log-target-tent"
+                  className="text-[12px] text-muted-foreground"
+                >
+                  {selectedPlant ? targetTentName : "Plant required before save"}
+                </p>
+                <p
+                  data-testid="quick-log-target-grow"
+                  className="text-[12px] text-muted-foreground"
+                >
+                  {targetGrowName}
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={focusPlant}>
+                Change
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Plant</Label>
+                <Select
+                  value={plantId || "__none"}
+                  onValueChange={(v) => {
+                    setPlantId(v === "__none" ? "" : v);
+                    setSaveError(null);
+                  }}
+                >
+                  <SelectTrigger
+                    ref={plantSelectTriggerRef}
+                    data-testid="quick-log-plant-select"
+                    aria-invalid={!selectedPlant}
+                    aria-describedby={!selectedPlant ? "quick-log-plant-error" : undefined}
+                  >
+                    <SelectValue placeholder="Choose a plant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none">Choose a plant…</SelectItem>
+                    {scopedPlants.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                        {p.strain ? ` · ${p.strain}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Current Setup</Label>
+                <Select
+                  value={activeGrowId ?? ""}
+                  onValueChange={(v) => {
+                    setActiveGrowId(v);
+                    setSaveError(null);
+                  }}
+                >
+                  <SelectTrigger data-testid="quick-log-grow-select">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {grows.map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             {!selectedPlant ? (
               <p
                 id="quick-log-plant-error"
                 role="alert"
-                className="text-[11px] text-destructive mt-1"
+                className="text-[11px] text-destructive"
                 data-testid="quick-log-plant-error"
               >
                 Choose a plant before saving this entry.
               </p>
             ) : (
-              <p
-                className="text-[11px] text-muted-foreground mt-1"
-                data-testid="quick-log-plant-helper"
-              >
+              <p className="text-[11px] text-muted-foreground" data-testid="quick-log-plant-helper">
                 {quickLogPlantHelperText(activeGrow?.name ?? null, !!activeGrowId)}
               </p>
             )}
-          </div>
+          </section>
 
+          {prefill?.plantId && selectedPlant && selectedPlant.id !== prefill.plantId && (
+            <div
+              data-testid="quick-log-plant-mismatch-banner"
+              role="status"
+              aria-live="polite"
+              tabIndex={-1}
+              className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 text-[12px] text-amber-200 flex items-start gap-2"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+              <span>
+                Logging to <strong className="font-semibold">{selectedPlant.name}</strong>
+                {prefill.plantName ? (
+                  <>
+                    , not <strong className="font-semibold">{prefill.plantName}</strong>
+                  </>
+                ) : (
+                  ", not the plant currently open"
+                )}
+                .
+              </span>
+            </div>
+          )}
 
-          <div>
-            <Label>What's happening?</Label>
+          <section
+            data-testid="quick-log-truth-section"
+            className="rounded-xl border border-border/60 bg-secondary/20 p-3 space-y-2"
+            aria-label="Quick Log sensor truth"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+                <Gauge className="h-4 w-4 text-primary" aria-hidden="true" />
+                Sensor truth
+              </span>
+              <span
+                data-testid="quick-log-truth-pill"
+                data-status={stripView.status}
+                className="rounded px-1.5 py-0.5 bg-muted/60 text-[10px] uppercase tracking-wide text-muted-foreground"
+              >
+                {stripView.status === "usable"
+                  ? "Usable"
+                  : stripView.status === "stale"
+                    ? "Stale"
+                    : stripView.status === "invalid"
+                      ? "Invalid"
+                      : "No data"}
+              </span>
+            </div>
+            <p
+              data-testid="quick-log-truth-copy"
+              className="text-[12px] text-muted-foreground leading-snug"
+            >
+              {stripView.status === "usable"
+                ? snapshot
+                  ? "Sensor context is usable and will attach to this log."
+                  : "Sensor context is usable but not attached."
+                : stripView.status === "no_data"
+                  ? "No usable sensor context. This will save as a manual log only."
+                  : "Sensor context is not usable enough to attach. This will save as a manual log only."}
+            </p>
+
+            {tentSetupRequired ? (
+              <p
+                data-testid="quick-log-snapshot-tent-required"
+                className="rounded-lg border border-border/60 bg-secondary/30 p-3 text-[12px] text-muted-foreground"
+              >
+                Sensor snapshots need a tent first.{" "}
+                <a href="/tents" className="underline text-primary">
+                  Create your first tent
+                </a>{" "}
+                to attach environment context to logs.
+              </p>
+            ) : (
+              <>
+                <label
+                  ref={attachWrapperRef}
+                  tabIndex={-1}
+                  data-testid="quick-log-snapshot-attach-section"
+                  className={`flex items-center justify-between gap-2 rounded-lg border p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${attachDisabled ? "border-border/40 opacity-60" : "border-border/60"}`}
+                >
+                  <span className="text-sm">Attach sensor snapshot</span>
+                  <Switch
+                    data-testid="quick-log-snapshot-toggle"
+                    data-snapshot-status={stripView.status}
+                    checked={snapshot && !!selectedPlant && snapshotUsable}
+                    onCheckedChange={(v) => {
+                      snapshotUserTouchedRef.current = true;
+                      setSnapshot(v);
+                    }}
+                    disabled={attachDisabled}
+                    aria-label="Attach sensor snapshot to this log"
+                    aria-describedby="quick-log-snapshot-session-helper"
+                  />
+                </label>
+                <p
+                  id="quick-log-snapshot-session-helper"
+                  data-testid="quick-log-snapshot-session-helper"
+                  className="text-[11px] text-muted-foreground"
+                >
+                  {selectedPlant && !snapshotUsable && stripView.status !== "no_data" ? (
+                    <span data-testid="quick-log-snapshot-stale-helper">
+                      {buildStaleSnapshotHelperCopy(stripView.capturedAt)}
+                    </span>
+                  ) : (
+                    "Applies to this log only. Closing Quick Log resets this choice."
+                  )}
+                </p>
+              </>
+            )}
+          </section>
+
+          {!tentSetupRequired && (
+            <QuickLogSensorSnapshotStrip
+              growId={activeGrowId}
+              tentId={selectedPlant?.tent_id ?? null}
+              attached={snapshot && !!selectedPlant}
+            />
+          )}
+
+          <section className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <EventTypeSelector
+                id="quick-log-event-type"
+                value={eventType}
+                onValueChange={setEventType}
+              />
+              <div>
+                <Label className="text-xs">Stage</Label>
+                <Select value={stage} onValueChange={setStage}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STAGES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <h3
+              data-testid="quick-log-section-observation"
+              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+            >
+              What happened?
+            </h3>
+            <div
+              data-testid="quick-log-prompt-chips"
+              role="group"
+              aria-label="Quick observation prompts"
+              className="flex flex-wrap gap-1.5"
+            >
+              {[
+                { label: "Watered", text: "Watered today." },
+                { label: "Fed", text: "Fed today." },
+                { label: "Better", text: "Better than yesterday." },
+                { label: "Same", text: "About the same as yesterday." },
+                { label: "Worse", text: "Looking worse than yesterday." },
+                { label: "Spotted issue", text: "Spotted an issue — see photo or notes." },
+                { label: "Photo only", text: "Photo only — no other changes today." },
+              ].map((chip) => (
+                <button
+                  key={chip.label}
+                  type="button"
+                  data-testid={`quick-log-chip-${chip.label.toLowerCase().replace(/\s+/g, "-")}`}
+                  aria-label={`Insert observation: ${chip.label}`}
+                  onClick={() => {
+                    setNote((prev) => (prev.trim() ? `${prev.trim()} ${chip.text}` : chip.text));
+                    setSaveError(null);
+                  }}
+                  className="rounded-full border border-border/60 bg-secondary/30 px-2.5 py-1 text-[11px] text-foreground hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+            <Label htmlFor="quicklog-note-textarea">Short note</Label>
             <Textarea
+              id="quicklog-note-textarea"
+              ref={noteRef}
+              data-testid="quicklog-note"
               value={note}
-              onChange={(e) => setNote(e.target.value)}
+              onChange={(e) => {
+                setNote(e.target.value);
+                setSaveError(null);
+              }}
               placeholder="Watered, looking healthy, slight yellowing on a fan leaf…"
               rows={3}
+              aria-label="Quick log observation note"
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="sentences"
               spellCheck={true}
             />
-          </div>
+          </section>
+
+          {(() => {
+            const visibility = evaluateEarlyStageVisibility({
+              stage,
+              plantCreatedAt:
+                (selectedPlant as { created_at?: string | null } | null)?.created_at ?? null,
+            });
+            if (visibility === "hidden" && !earlyManuallyOpen) return null;
+            const isCollapsed = visibility === "suggested" && !earlyManuallyOpen;
+            return (
+              <section
+                data-testid="quick-log-early-stage-section"
+                data-visibility={visibility}
+                aria-label="Early-stage milestone (germination/seedling)"
+                className="rounded-xl border border-border/60 bg-secondary/20 p-3 space-y-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Early stage · germination / seedling
+                  </h3>
+                  {visibility !== "visible" && (
+                    <button
+                      type="button"
+                      data-testid="quick-log-early-stage-toggle"
+                      onClick={() => setEarlyManuallyOpen((v) => !v)}
+                      className="text-[11px] underline text-muted-foreground"
+                    >
+                      {isCollapsed ? "Open" : "Hide"}
+                    </button>
+                  )}
+                </div>
+                {!isCollapsed && (
+                  <>
+                    <div
+                      data-testid="quick-log-early-stage-milestone-chips"
+                      role="radiogroup"
+                      aria-label="Early-stage milestone"
+                      className="flex flex-wrap gap-1.5"
+                    >
+                      {EARLY_STAGE_MILESTONES.map((m) => {
+                        const selected = earlyMilestone === m.value;
+                        return (
+                          <button
+                            key={m.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            data-testid={`quick-log-early-stage-milestone-${m.value}`}
+                            onClick={() => setEarlyMilestone(selected ? null : m.value)}
+                            className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                              selected
+                                ? "border-primary bg-primary/15 text-foreground"
+                                : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
+                            }`}
+                          >
+                            {m.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div
+                      data-testid="quick-log-early-stage-vigor-chips"
+                      role="radiogroup"
+                      aria-label="Plant vigor"
+                      className="flex flex-wrap gap-1.5"
+                    >
+                      {EARLY_STAGE_VIGOR_OPTIONS.map((v) => {
+                        const selected = earlyVigor === v.value;
+                        return (
+                          <button
+                            key={v.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            data-testid={`quick-log-early-stage-vigor-${v.value}`}
+                            onClick={() => setEarlyVigor(selected ? null : v.value)}
+                            className={`rounded-full border px-2.5 py-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                              selected
+                                ? "border-primary bg-primary/15 text-foreground"
+                                : "border-border/60 bg-secondary/30 text-foreground hover:bg-secondary/60"
+                            }`}
+                          >
+                            Vigor: {v.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div>
+                      <Label htmlFor="quick-log-early-stage-notes" className="text-xs">
+                        {EARLY_STAGE_NOTE_PLACEHOLDER}
+                      </Label>
+                      <Input
+                        id="quick-log-early-stage-notes"
+                        data-testid="quick-log-early-stage-notes"
+                        value={earlyNotes}
+                        onChange={(e) => setEarlyNotes(e.target.value)}
+                        placeholder="Optional — short observation"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <p
+                      data-testid="quick-log-early-stage-photo-hint"
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      {EARLY_STAGE_PHOTO_HINT}
+                    </p>
+                  </>
+                )}
+              </section>
+            );
+          })()}
+
+          {eventType === "environment" &&
+            (() => {
+              const hasMeasurement = hasAnyEnvironmentCheckMeasurement({
+                roomTempF: envRoomTempF,
+                humidityPct: envHumidityPct,
+                vpdKpa: envVpdKpa,
+                waterTempValue: envWaterTempValue,
+                waterTempUnit: envWaterTempUnit,
+                ecMscm: envEcMscm,
+              });
+              const previewTempC = resolvePreviewWaterTempC({
+                waterTempValue: envWaterTempValue,
+                waterTempUnit: envWaterTempUnit,
+              });
+              const ecPreview = buildEcCompensationPreview({
+                ec: envEcMscm,
+                ecUnit: "mS/cm",
+                waterTempC: previewTempC,
+                sourceLabel: "manual",
+              });
+              const sensorContext = buildEnvironmentCheckSensorContext({
+                tentId: sensorTentId,
+                plantId: selectedPlant?.id ?? null,
+                sourceLabel: "manual",
+                hasMeasurements: hasMeasurement,
+              });
+              const ctxTone =
+                sensorContext.status === "valid"
+                  ? "border-emerald-500/40 bg-emerald-500/10"
+                  : sensorContext.status === "blocked"
+                    ? "border-destructive/40 bg-destructive/10"
+                    : sensorContext.status === "warning"
+                      ? "border-amber-500/40 bg-amber-500/10"
+                      : "border-border/60 bg-secondary/30";
+              return (
+                <section
+                  data-testid="quick-log-environment-check-section"
+                  aria-label={ENVIRONMENT_CHECK_SECTION_TITLE}
+                  className="rounded-xl border border-border/60 bg-secondary/20 p-3 space-y-2"
+                >
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {ENVIRONMENT_CHECK_SECTION_TITLE}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs" htmlFor="quick-log-env-room-temp-f">
+                        Room temperature (°F)
+                      </Label>
+                      <Input
+                        id="quick-log-env-room-temp-f"
+                        data-testid="quick-log-env-room-temp-f"
+                        inputMode="decimal"
+                        value={envRoomTempF}
+                        onChange={(e) => setEnvRoomTempF(e.target.value)}
+                        placeholder="76"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs" htmlFor="quick-log-env-humidity">
+                        Humidity (%)
+                      </Label>
+                      <Input
+                        id="quick-log-env-humidity"
+                        data-testid="quick-log-env-humidity"
+                        inputMode="decimal"
+                        value={envHumidityPct}
+                        onChange={(e) => setEnvHumidityPct(e.target.value)}
+                        placeholder="55"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs" htmlFor="quick-log-env-vpd">
+                        VPD (kPa)
+                      </Label>
+                      <Input
+                        id="quick-log-env-vpd"
+                        data-testid="quick-log-env-vpd"
+                        inputMode="decimal"
+                        value={envVpdKpa}
+                        onChange={(e) => setEnvVpdKpa(e.target.value)}
+                        placeholder="1.1"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs" htmlFor="quick-log-env-ec">
+                        EC (mS/cm)
+                      </Label>
+                      <Input
+                        id="quick-log-env-ec"
+                        data-testid="quick-log-env-ec"
+                        inputMode="decimal"
+                        value={envEcMscm}
+                        onChange={(e) => setEnvEcMscm(e.target.value)}
+                        placeholder="1.4"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs" htmlFor="quick-log-env-water-temp">
+                        Water/root-zone temperature
+                      </Label>
+                      <Input
+                        id="quick-log-env-water-temp"
+                        data-testid="quick-log-env-water-temp"
+                        inputMode="decimal"
+                        value={envWaterTempValue}
+                        onChange={(e) => setEnvWaterTempValue(e.target.value)}
+                        placeholder={envWaterTempUnit === "F" ? "68" : "20"}
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Water temp unit</Label>
+                      <Select
+                        value={envWaterTempUnit}
+                        onValueChange={(v) =>
+                          setEnvWaterTempUnit(v as EnvironmentCheckWaterTempUnit)
+                        }
+                      >
+                        <SelectTrigger data-testid="quick-log-env-water-temp-unit">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="F">°F</SelectItem>
+                          <SelectItem value="C">°C</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {!hasMeasurement && (
+                    <p
+                      data-testid="quick-log-env-helper"
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      {ENVIRONMENT_CHECK_HELPER_COPY}
+                    </p>
+                  )}
+                  {sensorContext.status !== "not_applicable" && (
+                    <div
+                      data-testid="quick-log-env-sensor-context"
+                      data-status={sensorContext.status}
+                      data-reason={sensorContext.reasonCode}
+                      className={`rounded-lg border p-2.5 space-y-0.5 ${ctxTone}`}
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                        {sensorContext.title}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">{sensorContext.message}</p>
+                      <p
+                        data-testid="quick-log-env-sensor-context-source"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        Source: {sensorContext.sourceLabel}
+                      </p>
+                    </div>
+                  )}
+                  {ecPreview.visible && (
+                    <div
+                      data-testid="quick-log-env-ec-preview"
+                      data-tone={ecPreview.tone}
+                      className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 space-y-0.5"
+                    >
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        {ecPreview.label}
+                      </p>
+                      <p className="text-sm font-medium text-foreground">
+                        {ecPreview.valueDisplay}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {EC_COMPENSATION_PREVIEW_DISCLAIMER}
+                      </p>
+                    </div>
+                  )}
+                  {hasMeasurement &&
+                    (() => {
+                      const normPreviewVm = buildSensorNormalizationPreviewViewModel({
+                        payload: {
+                          temperature_f: envRoomTempF || undefined,
+                          humidity_pct: envHumidityPct || undefined,
+                          vpd_kpa: envVpdKpa || undefined,
+                          soil_ec_ms_cm: envEcMscm || undefined,
+                          [envWaterTempUnit === "C" ? "soil_temperature_c" : "soil_temperature_f"]:
+                            envWaterTempValue || undefined,
+                        },
+                        options: {
+                          source: "manual",
+                          sourceIdentity: "manual_entry",
+                          transport: "manual",
+                          tentId: sensorTentId,
+                          plantId: selectedPlant?.id ?? null,
+                          capturedAt: new Date().toISOString(),
+                        },
+                      });
+                      return (
+                        <div data-testid="quick-log-env-normalization-preview-slot">
+                          <SensorNormalizationPreviewPanel
+                            viewModel={normPreviewVm}
+                            variant="compact"
+                            title="Sensor normalization preview"
+                          />
+                        </div>
+                      );
+                    })()}
+                </section>
+              );
+            })()}
 
           {eventType === "reminder" && (
             <div>
@@ -450,46 +1513,12 @@ export default function QuickLog({
             </div>
           )}
 
-          {tentSetupRequired ? (
-            <p
-              data-testid="quick-log-snapshot-tent-required"
-              className="rounded-lg border border-border/60 bg-secondary/30 p-3 text-[12px] text-muted-foreground"
-            >
-              Sensor snapshots need a tent first.{" "}
-              <a href="/tents" className="underline text-primary">
-                Create your first tent
-              </a>{" "}
-              to attach environment context to logs.
-            </p>
-          ) : (
-            <>
-              <label
-                className={`flex items-center justify-between gap-2 rounded-lg border p-3 ${selectedPlant ? "border-border/60" : "border-border/40 opacity-60"}`}
-              >
-                <span className="text-sm flex items-center gap-2">
-                  <Gauge className="h-4 w-4 text-primary" />
-                  Attach sensor snapshot
-                </span>
-                <Switch
-                  checked={snapshot && !!selectedPlant}
-                  onCheckedChange={(v) => {
-                    snapshotUserTouchedRef.current = true;
-                    setSnapshot(v);
-                  }}
-                  disabled={!selectedPlant}
-                />
-              </label>
-              {snapshot && !selectedPlant && (
-                <p
-                  className="text-[11px] text-muted-foreground -mt-2"
-                  data-testid="quick-log-snapshot-plant-warning"
-                >
-                  Choose a plant before attaching plant-specific readings.
-                </p>
-              )}
-            </>
-          )}
-
+          <h3
+            data-testid="quick-log-section-optional"
+            className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            Optional details
+          </h3>
           <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 p-3">
             <span className="text-sm">Add more details</span>
             <Switch checked={showMore} onCheckedChange={setShowMore} />
@@ -497,8 +1526,6 @@ export default function QuickLog({
 
           {showMore && (
             <div className="grid grid-cols-2 gap-2">
-              {/* pH/Runoff pH have been consolidated into the Hardware
-                  readings section below to remove duplicate inputs. */}
               <div>
                 <Label className="text-xs">EC value</Label>
                 <Input
@@ -513,9 +1540,7 @@ export default function QuickLog({
                 <Label className="text-xs">EC unit</Label>
                 <Select
                   value={details.ecUnit}
-                  onValueChange={(v) =>
-                    setDetails({ ...details, ecUnit: v as EcUnit })
-                  }
+                  onValueChange={(v) => setDetails({ ...details, ecUnit: v as EcUnit })}
                 >
                   <SelectTrigger data-testid="quicklog-details-ec-unit">
                     <SelectValue />
@@ -523,19 +1548,44 @@ export default function QuickLog({
                   <SelectContent>
                     {EC_UNITS.map((u) => (
                       <SelectItem key={u} value={u}>
-                        {u}
+                        {EC_UNIT_LABEL[u]}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label className="text-xs">Watering (ml)</Label>
+                <Label className="text-xs" htmlFor="quicklog-watering-ml">
+                  Watering (ml)
+                  {eventType === "watering" ? (
+                    <span aria-hidden="true" className="text-destructive">
+                      {" "}
+                      *
+                    </span>
+                  ) : null}
+                </Label>
                 <Input
+                  id="quicklog-watering-ml"
+                  ref={wateringInputRef}
+                  data-testid="quicklog-watering-ml"
                   inputMode="decimal"
                   value={details.watering}
                   onChange={(e) => setDetails({ ...details, watering: e.target.value })}
+                  required={eventType === "watering"}
+                  aria-required={eventType === "watering"}
+                  aria-invalid={!!wateringError}
+                  aria-describedby={wateringError ? "quicklog-watering-error" : undefined}
                 />
+                {wateringError && (
+                  <p
+                    id="quicklog-watering-error"
+                    role="alert"
+                    data-testid="quicklog-watering-error"
+                    className="text-[11px] text-destructive mt-1"
+                  >
+                    {wateringError}
+                  </p>
+                )}
               </div>
               <div className="col-span-2">
                 <Label className="text-xs">Nutrients</Label>
@@ -563,9 +1613,6 @@ export default function QuickLog({
             </div>
           )}
 
-          {/* Hardware readings — manual handheld grow tools (Spider Farmer pH/EC pen,
-              PAR/PPFD meter, etc.). NOT live sensor data. Never written to
-              sensor_readings. Never generates alerts or action_queue items. */}
           <section
             data-testid="quicklog-hardware-readings"
             data-has-readings={String(hasAnyHardwareReading(hardware))}
@@ -583,7 +1630,15 @@ export default function QuickLog({
               }}
               className="flex w-full items-center justify-between gap-2 text-left"
             >
-              <span className="text-sm font-medium">Hardware readings</span>
+              <span className="text-sm font-medium">
+                Hardware readings
+                <span
+                  data-testid="quicklog-hardware-manual-subtitle"
+                  className="ml-2 text-[10px] font-normal uppercase tracking-wide text-muted-foreground"
+                >
+                  Manual readings · handheld only, not telemetry
+                </span>
+              </span>
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 {hardwareOpen ? "Optional" : "Tap to add"}
               </span>
@@ -594,8 +1649,8 @@ export default function QuickLog({
                   data-testid="quicklog-hardware-helper"
                   className="text-[11px] text-muted-foreground leading-snug"
                 >
-                  Manual handheld readings — not live sensor data. e.g. Spider Farmer pH/EC combo pen or
-                  PAR/PPFD meter. Leave blank if not measured.
+                  Manual handheld readings — not live sensor data. EC fields are EC mS/cm only. Use
+                  the optional EC value above to record other scales.
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -608,7 +1663,7 @@ export default function QuickLog({
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">Feed/Input EC (mS/cm)</Label>
+                    <Label className="text-xs">Feed/Input EC mS/cm</Label>
                     <Input
                       inputMode="decimal"
                       value={hardware.inputEc ?? ""}
@@ -626,7 +1681,7 @@ export default function QuickLog({
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">Runoff EC (mS/cm)</Label>
+                    <Label className="text-xs">Runoff EC mS/cm</Label>
                     <Input
                       inputMode="decimal"
                       value={hardware.runoffEc ?? ""}
@@ -657,15 +1712,8 @@ export default function QuickLog({
             )}
           </section>
 
-
           {(() => {
-            const preview = evaluateQuickLogPreview({
-              note,
-              eventType,
-              stage,
-              remindAt,
-              details,
-            });
+            const preview = evaluateQuickLogPreview({ note, eventType, stage, remindAt, details });
             if (preview.warnings.length === 0) return null;
             return (
               <div
@@ -697,22 +1745,88 @@ export default function QuickLog({
             );
           })()}
 
-          {!tentSetupRequired && (
-            <QuickLogSensorSnapshotStrip
-              growId={activeGrowId}
-              tentId={selectedPlant?.tent_id ?? null}
-              attached={snapshot && !!selectedPlant}
-            />
+          {saveError && (
+            <p
+              data-testid="quick-log-save-error"
+              role="alert"
+              aria-live="assertive"
+              className="rounded-lg border border-destructive/40 bg-destructive/10 p-2.5 text-[12px] text-destructive"
+            >
+              {saveError}
+            </p>
           )}
 
           <Button
             type="submit"
-            disabled={busy || !selectedPlant}
+            disabled={busy || !selectedPlant || !!savedTarget}
             data-testid="quick-log-save"
             className="gradient-leaf text-primary-foreground"
           >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save entry"}
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save log"}
           </Button>
+          <p
+            data-testid="quick-log-save-helper"
+            className="text-[11px] text-muted-foreground -mt-2"
+          >
+            Failed saves keep your input in place. You can add more detail later from the timeline.
+          </p>
+
+          {savedTarget && (
+            <div
+              data-testid="quick-log-post-save"
+              role="status"
+              aria-live="polite"
+              className="rounded-lg border border-primary/40 bg-primary/5 p-3 flex flex-col gap-2"
+            >
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5" aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Saved</p>
+                  <p className="text-[12px] text-muted-foreground">
+                    Logged {savedVerb(savedTarget.eventType)} to{" "}
+                    <strong className="text-foreground font-semibold">{savedTarget.name}</strong>
+                    {savedTarget.tentName ? <> · {savedTarget.tentName}</> : null}
+                    {savedTarget.growName ? <> · {savedTarget.growName}</> : null}
+                    {" · just now"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  ref={viewPlantBtnRef}
+                  href={plantDetailPath(savedTarget.id)}
+                  data-testid="quick-log-view-target-plant"
+                  data-target-plant-id={savedTarget.id}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  onClick={() => {
+                    if (typeof document !== "undefined") {
+                      (document.activeElement as HTMLElement | null)?.blur?.();
+                    }
+                    onOpenChange(false);
+                  }}
+                >
+                  View {savedTarget.name}
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </a>
+                <Button
+                  type="button"
+                  variant="outline"
+                  data-testid="quick-log-post-save-another"
+                  onClick={resetForAnother}
+                >
+                  Log another for {savedTarget.name}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  data-testid="quick-log-post-save-close"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
         </form>
       </DialogContent>
     </Dialog>

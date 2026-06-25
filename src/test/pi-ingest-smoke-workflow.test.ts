@@ -62,9 +62,12 @@ describe("pi-ingest smoke workflow — static guardrails", () => {
 
   it("does not hardcode any obvious secret material", () => {
     // No raw hex >= 32 chars, no inline URLs to supabase.co, no Bearer tokens.
-    expect(yml).not.toMatch(/[A-Fa-f0-9]{32,}/);
-    expect(yml).not.toMatch(/https?:\/\/[^\s${]*supabase\.co/);
-    expect(yml).not.toMatch(/Bearer\s+[A-Za-z0-9._-]+/);
+    // Pinned action SHAs (`uses: owner/action@<40-hex>`) are required by repo
+    // policy and are not secret material — strip them before scanning.
+    const scannable = yml.replace(/(uses:\s*\S+)@[0-9a-f]{40}/g, "$1");
+    expect(scannable).not.toMatch(/[A-Fa-f0-9]{32,}/);
+    expect(scannable).not.toMatch(/https?:\/\/[^\s${]*supabase\.co/);
+    expect(scannable).not.toMatch(/Bearer\s+[A-Za-z0-9._-]+/);
   });
 
   it("does not embed production-looking bridge/tent identifiers", () => {

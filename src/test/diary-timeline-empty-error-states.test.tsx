@@ -2,7 +2,7 @@
  * Diary Timeline — empty / error / fallback state audit tests.
  *
  * Adds coverage for:
- *  - Friendly no-history empty hint that points at Fast Add / Quick Log.
+ *  - Friendly no-history empty hint that points at Quick Log.
  *  - Retry button on fetch error.
  *  - Safe fallback for malformed/unknown timeline items.
  *  - Source classification — manual/csv/demo/stale/invalid/import never
@@ -47,7 +47,7 @@ function renderSection(props: Parameters<typeof TimelineMemorySection>[0]) {
 }
 
 describe("TimelineMemorySection — empty state polish", () => {
-  it("shows friendly no-history copy guiding the grower to Fast Add / Quick Log", async () => {
+  it("shows friendly no-history copy guiding the grower to Quick Log", async () => {
     setRows({});
     renderSection({ scope: "plant", plantId: "plant-1" });
     await waitFor(() =>
@@ -55,7 +55,7 @@ describe("TimelineMemorySection — empty state polish", () => {
     );
     const txt = screen.getByTestId("timeline-memory-empty").textContent ?? "";
     expect(txt.toLowerCase()).toContain("no plant history yet");
-    expect(txt.toLowerCase()).toMatch(/fast add|quick log/);
+    expect(txt.toLowerCase()).toMatch(/quick log/);
     // Must not promote anything as Live.
     expect(txt.toLowerCase()).not.toMatch(/\blive\b/);
   });

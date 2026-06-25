@@ -47,6 +47,13 @@ import {
 } from "@/lib/routes";
 import { actionMatchesAlert, buildActionQueueDraftFromAlert } from "@/lib/alertToActionQueueRules";
 import {
+  decideAddButtonState,
+  shouldBlockInsert,
+  type ActionQueueRowForDedupe,
+} from "@/lib/alertActionQueueDedupeRules";
+import { deriveAlertReadingSource } from "@/lib/alertReadingSourceRules";
+import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
+import {
   ACTION_QUEUE_SOURCE_VALUES,
   extractSourceAiDoctorSessionId,
   getActionQueueSourceLabel,
@@ -59,6 +66,7 @@ import {
   type RawOutcomeDiaryRow,
 } from "@/lib/relatedActionOutcomeRules";
 import { ACTION_OUTCOME_EVENT_TYPE } from "@/lib/actionOutcomeRules";
+
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -111,11 +119,15 @@ export default function AlertDetail() {
   const linkedActionCounts = useAlertsLinkedActionCounts(linkedActionAlertIds);
   const [eventsKey, setEventsKey] = useState(0);
   const [existingActionId, setExistingActionId] = useState<string | null>(null);
+  const [existingActionRows, setExistingActionRows] = useState<
+    ActionQueueRowForDedupe[]
+  >([]);
   const [queuing, setQueuing] = useState(false);
   const [relatedActions, setRelatedActions] = useState<RelatedActionRow[]>([]);
   const [relatedLoaded, setRelatedLoaded] = useState(false);
   const [outcomeRows, setOutcomeRows] = useState<RawOutcomeDiaryRow[]>([]);
   const [linkedAiDoctorSessionIds, setLinkedAiDoctorSessionIds] = useState<string[]>([]);
+
 
   const load = useCallback(async () => {
     if (!alertId) return;
@@ -189,6 +201,7 @@ export default function AlertDetail() {
   useEffect(() => {
     let cancelled = false;
     setExistingActionId(null);
+    setExistingActionRows([]);
     if (!alert || !alert.grow_id) return;
     (async () => {
       const { data, error: probeErr } = await supabase
@@ -200,13 +213,16 @@ export default function AlertDetail() {
         .like("reason", `%[alert:${alert.id}]%`)
         .limit(1);
       if (cancelled || probeErr) return;
-      const match = (data ?? []).find((r) => actionMatchesAlert(r as never, alert));
+      const rows = (data ?? []) as ActionQueueRowForDedupe[];
+      setExistingActionRows(rows);
+      const match = rows.find((r) => actionMatchesAlert(r as never, alert));
       if (match) setExistingActionId(match.id);
     })();
     return () => {
       cancelled = true;
     };
   }, [alert]);
+
 
   // Read-only reverse provenance: list action_queue rows derived from this alert.
   useEffect(() => {
@@ -309,8 +325,26 @@ export default function AlertDetail() {
     };
   }, [alert, relatedLoaded, relatedActions.length]);
 
+  const addButtonDecision = useMemo(
+    () => decideAddButtonState({ alert, existingRows: existingActionRows }),
+    [alert, existingActionRows],
+  );
+
   async function addAlertToActionQueue() {
-    if (!alert || !draftResult || !draftResult.ok || existingActionId) return;
+    if (!alert || !draftResult || !draftResult.ok) return;
+    // Second line of defense: shared pure guard. Blocks duplicates
+    // (including fast double-clicks while a row is being inserted) and
+    // any ineligible-state click.
+    if (
+      existingActionId ||
+      shouldBlockInsert({
+        alert,
+        existingRows: existingActionRows,
+        inFlight: queuing,
+      })
+    ) {
+      return;
+    }
     setQueuing(true);
     const { draft } = draftResult;
     // SECURITY: never send user_id from the client. DB default (auth.uid()) wins.
@@ -348,6 +382,18 @@ export default function AlertDetail() {
     }
     if (inserted?.id) {
       setExistingActionId(inserted.id);
+      // Reflect the new row in the dedupe pool so a fast follow-up click
+      // is blocked by `decideAddButtonState` before any insert.
+      setExistingActionRows((rows) => [
+        ...rows,
+        {
+          id: inserted.id as string,
+          grow_id: (inserted.grow_id as string | null) ?? draft.grow_id,
+          source: "environment_alert",
+          status: "pending_approval",
+          reason: draft.reason,
+        },
+      ]);
       const { error: auditError } = await supabase.from("action_queue_events").insert({
         action_queue_id: inserted.id,
         grow_id: inserted.grow_id ?? draft.grow_id,
@@ -367,6 +413,12 @@ export default function AlertDetail() {
     setQueuing(false);
     toast.success("Action queued for approval.");
   }
+
+  const derivedSensorSource = useMemo(
+    () => deriveAlertReadingSource(alert),
+    [alert],
+  );
+
 
   return (
     <div>
@@ -458,7 +510,14 @@ export default function AlertDetail() {
               >
                 {alert.source}
               </Badge>
+              {derivedSensorSource ? (
+                <SensorSourceProvenanceBadge
+                  source={derivedSensorSource}
+                  testId="alert-detail-sensor-source-badge"
+                />
+              ) : null}
             </div>
+
             <h2 id="alert-detail-title" className="font-display font-semibold text-base">{alert.title}</h2>
             <p className="text-sm text-muted-foreground mt-1">{alert.reason}</p>
 
@@ -621,12 +680,21 @@ export default function AlertDetail() {
                         Not enough alert context to draft a safe action.
                       </p>
                     )}
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {existingActionId ? (
+                    <div
+                      className="flex flex-wrap gap-2 mt-2"
+                      data-testid="alert-handoff-decision"
+                      data-decision-state={addButtonDecision.state}
+                      data-decision-reason={addButtonDecision.reasonCode}
+                    >
+                      {addButtonDecision.state === "already_exists" &&
+                      (existingActionId ?? addButtonDecision.existingActionId) ? (
                         <>
                           <Button asChild size="sm" variant="secondary">
                             <Link
-                              to={`/actions/${existingActionId}`}
+                              to={`/actions/${
+                                existingActionId ??
+                                addButtonDecision.existingActionId
+                              }`}
                               data-testid="alert-handoff-already-queued-link"
                             >
                               ✓ Action already queued — view details
@@ -641,7 +709,11 @@ export default function AlertDetail() {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={!canQueue || queuing}
+                          disabled={
+                            !canQueue ||
+                            queuing ||
+                            addButtonDecision.state !== "can_add"
+                          }
                           onClick={addAlertToActionQueue}
                           data-testid="alert-handoff-add-button"
                           aria-busy={queuing || undefined}
@@ -650,6 +722,7 @@ export default function AlertDetail() {
                         </Button>
                       )}
                     </div>
+
                   </div>
                 </div>
               </div>

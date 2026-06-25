@@ -16,7 +16,10 @@ import { useGrowPlants } from "@/hooks/useGrowData";
 import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { tentDetailPath, tentsPath } from "@/lib/routes";
-import { tempFFromC } from "@/lib/temperatureUnits";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+} from "@/lib/temperatureUnitPreference";
 import { formatTentLightStatus } from "@/lib/lightScheduleFormat";
 import { deriveTentHealthChip } from "@/lib/tentHealthChip";
 import {
@@ -29,6 +32,10 @@ import {
   classifyRhAgainstStage,
   environmentMetricChipStatus,
 } from "@/lib/environmentStageTargetRules";
+
+function formatTentPlantHealthCopy(copy: string): string {
+  return copy.replace(/^●\s*/, "");
+}
 
 export default function Tents() {
   // Shared URL `?growId=` resolution against RLS-loaded grows.
@@ -96,7 +103,7 @@ export default function Tents() {
                   </div>
 
                   <div className="flex flex-wrap gap-1.5">
-                    {last && <MetricChip label="T" value={(tempFFromC(last.temp) ?? 0).toFixed(1)} unit="°F" status={environmentMetricChipStatus(classifyTempAgainstStage(last.temp ?? null, { stage: t.stage }))} />}
+                    {last && <MetricChip label="T" value={(convertCelsiusForDisplay(last.temp) ?? 0).toFixed(1)} unit={getTemperatureUnitSymbol()} status={environmentMetricChipStatus(classifyTempAgainstStage(last.temp ?? null, { stage: t.stage }))} />}
                     {last && <MetricChip label="RH" value={last.rh} unit="%" status={environmentMetricChipStatus(classifyRhAgainstStage(last.rh ?? null, { stage: t.stage }))} />}
                     {last && vpdClassification && <MetricChip label="VPD" value={last.vpd} unit=" kPa" status={vpdMetricChipStatus(vpdClassification)} />}
                   </div>
@@ -119,6 +126,7 @@ export default function Tents() {
                         : health.variant === "healthy"
                           ? "text-[hsl(var(--success))]"
                           : "text-muted-foreground";
+                    const plantHealthCopy = formatTentPlantHealthCopy(health.copy);
                     return (
                       <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/40">
                         <span>{plantCount} plants</span>
@@ -130,8 +138,10 @@ export default function Tents() {
                           className={healthCls}
                           data-testid="tent-card-health-chip"
                           data-variant={health.variant}
+                          aria-label={`Plant health status: ${plantHealthCopy}. Sensor status is shown separately.`}
+                          title="Plant health only — sensor status is shown separately."
                         >
-                          {health.copy}
+                          Plant health: {plantHealthCopy}
                         </span>
                       </div>
                     );

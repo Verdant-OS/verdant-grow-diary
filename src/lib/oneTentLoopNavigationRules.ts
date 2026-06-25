@@ -1,0 +1,198 @@
+/**
+ * oneTentLoopNavigationRules — pure, deterministic helper that defines the
+ * canonical Verdant One-Tent Loop order, the safe CTA copy for each step,
+ * and the next-step resolution given selected ids.
+ *
+ * Pure module. No I/O, no React, no remote calls, no model calls.
+ * Never fabricates live readings. Never marks unknown telemetry as ok.
+ * Approval-required wording is preserved for the Action Queue step.
+ */
+
+export type OneTentLoopStep =
+  | "grow"
+  | "tent"
+  | "plant"
+  | "quick-log"
+  | "timeline"
+  | "sensor-snapshot"
+  | "ai-doctor"
+  | "alert"
+  | "action-queue";
+
+export const ONE_TENT_LOOP_ORDER: readonly OneTentLoopStep[] = [
+  "grow",
+  "tent",
+  "plant",
+  "quick-log",
+  "timeline",
+  "sensor-snapshot",
+  "ai-doctor",
+  "alert",
+  "action-queue",
+] as const;
+
+export const ONE_TENT_LOOP_CTA_LABEL: Record<OneTentLoopStep, string> = {
+  grow: "Open tent",
+  tent: "Open plant",
+  plant: "Add quick log",
+  "quick-log": "View timeline",
+  timeline: "Review sensor snapshot",
+  "sensor-snapshot": "Open AI Doctor",
+  "ai-doctor": "Review alert",
+  alert: "Add to Action Queue",
+  "action-queue": "Review approval-required action",
+};
+
+export const ONE_TENT_LOOP_STEP_LABEL: Record<OneTentLoopStep, string> = {
+  grow: "Grow",
+  tent: "Tent",
+  plant: "Plant",
+  "quick-log": "Quick Log",
+  timeline: "Timeline",
+  "sensor-snapshot": "Sensor snapshot",
+  "ai-doctor": "AI Doctor",
+  alert: "Alert",
+  "action-queue": "Action Queue",
+};
+
+/** Safe explanation shown when the next step cannot be linked yet. */
+export const ONE_TENT_LOOP_DISABLED_COPY =
+  "Next step unavailable until this record is selected.";
+
+/**
+ * Cautious helper copy describing why the next step matters. Presenter-only.
+ * Must never imply automation, device control, or guaranteed action.
+ * Action Queue wording stays approval-required. Empty string means no helper.
+ */
+export const ONE_TENT_LOOP_HELPER_COPY: Record<OneTentLoopStep, string> = {
+  grow: "",
+  tent: "",
+  plant: "",
+  "quick-log": "",
+  timeline:
+    "Open Sensor Snapshot from Timeline to cross-check telemetry and proceed.",
+  "sensor-snapshot":
+    "Open AI Doctor page to review available context and prepare for next actions.",
+  "ai-doctor":
+    "Open Alert page to review and plan approval-required actions.",
+  alert:
+    "Review the approval-required Action Queue before taking action.",
+  "action-queue": "",
+};
+
+/** Sensor source labels the loop must always preserve. */
+export const ONE_TENT_LOOP_SENSOR_SOURCES = [
+  "live",
+  "manual",
+  "csv",
+  "demo",
+  "stale",
+  "invalid",
+] as const;
+
+export interface OneTentLoopIds {
+  growId?: string | null;
+  tentId?: string | null;
+  plantId?: string | null;
+  alertId?: string | null;
+  actionId?: string | null;
+}
+
+export interface OneTentLoopNextStep {
+  current: OneTentLoopStep;
+  next: OneTentLoopStep | null;
+  ctaLabel: string;
+  /** Internal route. Never rendered as visible copy. */
+  href: string | null;
+  disabled: boolean;
+  disabledReason: string | null;
+}
+
+export function getNextLoopStep(current: OneTentLoopStep): OneTentLoopStep | null {
+  const idx = ONE_TENT_LOOP_ORDER.indexOf(current);
+  if (idx < 0) return null;
+  return ONE_TENT_LOOP_ORDER[idx + 1] ?? null;
+}
+
+/**
+ * Resolve the next safe CTA for a given loop step + available ids.
+ * Returns a disabled state with calm copy when required ids are absent.
+ * Routes are returned as internal href strings only; callers must not
+ * surface internal IDs as visible copy.
+ */
+export function resolveOneTentLoopNextStep(
+  current: OneTentLoopStep,
+  ids: OneTentLoopIds = {},
+): OneTentLoopNextStep {
+  const next = getNextLoopStep(current);
+  const base: OneTentLoopNextStep = {
+    current,
+    next,
+    ctaLabel: ONE_TENT_LOOP_CTA_LABEL[current],
+    href: null,
+    disabled: true,
+    disabledReason: ONE_TENT_LOOP_DISABLED_COPY,
+  };
+
+  const { growId, tentId, plantId, alertId, actionId } = ids;
+
+  switch (current) {
+    case "grow":
+      // CTA is "Open tent" — must route to an actual tent, never self-link
+      // back to Grow Detail. When no tentId is selected, stay disabled so
+      // the operator is not misled into thinking a tent is opened.
+      if (tentId) return enable(base, `/tents/${tentId}`);
+      return base;
+    case "tent":
+      if (plantId) return enable(base, `/plants/${plantId}`);
+      if (tentId) return enable(base, `/tents/${tentId}`);
+      return base;
+    case "plant":
+      if (plantId) return enable(base, `/plants/${plantId}`);
+      return base;
+    case "quick-log":
+      return enable(base, "/timeline");
+    case "timeline":
+      return enable(base, "/sensors");
+    case "sensor-snapshot":
+      return enable(base, "/doctor");
+    case "ai-doctor":
+      // When a specific alertId is available, deep-link to that alert.
+      // Otherwise fall back to the alerts index AND relabel the CTA so
+      // the operator knows they are reviewing alerts, not opening one.
+      if (alertId) return enable(base, `/alerts/${alertId}`);
+      return { ...enable(base, "/alerts"), ctaLabel: "Review alerts" };
+    case "alert":
+      // CTA is "Add to Action Queue" — must route to the Action Queue
+      // surface (/actions), not back to alerts. Action Queue items
+      // remain approval-required; this CTA does NOT create or approve
+      // anything automatically — it only navigates the operator there.
+      if (actionId) return enable(base, `/actions/${actionId}`);
+      return enable(base, "/actions");
+    case "action-queue":
+      if (actionId) return enable(base, `/actions/${actionId}`);
+      return enable(base, "/actions");
+    default:
+      return base;
+  }
+}
+
+function enable(base: OneTentLoopNextStep, href: string): OneTentLoopNextStep {
+  return { ...base, href, disabled: false, disabledReason: null };
+}
+
+/** Empty-state copy keyed by loop step. */
+export const ONE_TENT_LOOP_EMPTY_STATE: Record<OneTentLoopStep, string> = {
+  grow: "No grow selected yet. Create or open a grow to begin.",
+  tent: "No tent yet. Create or open a tent to continue.",
+  plant: "No plant yet. Add or open a plant in this tent.",
+  "quick-log": "No Quick Logs yet. Add a Quick Log to capture today's evidence.",
+  timeline: "No timeline entries yet. Add diary evidence to build plant memory.",
+  "sensor-snapshot":
+    "No sensor snapshot yet. Add a manual, CSV, demo, or live snapshot — source will be labeled.",
+  "ai-doctor":
+    "AI Doctor needs context. Add a recent photo, log, or sensor evidence first. Missing context will be shown.",
+  alert: "No active alert. Continue monitoring — telemetry status is shown by source.",
+  "action-queue":
+    "No pending approval-required actions. New items always require grower approval.",
+};

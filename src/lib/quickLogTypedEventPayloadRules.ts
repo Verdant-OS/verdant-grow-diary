@@ -570,7 +570,7 @@ export type TypedEventWriteReadiness = "rpc_available" | "rpc_missing";
 
 const RPC_READINESS: Record<TypedEventKind, TypedEventWriteReadiness> = {
   watering: "rpc_available",
-  feeding: "rpc_missing",
+  feeding: "rpc_available",
   photo: "rpc_missing",
   observation: "rpc_missing",
   training: "rpc_missing",

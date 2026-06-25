@@ -246,7 +246,7 @@ describe("EcowittLatestSnapshotCard — audit link and behavior", () => {
       ).toBeInTheDocument(),
     );
     expect(
-      screen.getByTestId("ecowitt-metric-derived-vpd").textContent,
+      screen.getByTestId("ecowitt-metric-vpd_kpa").textContent,
     ).toBe("Unavailable");
   });
 

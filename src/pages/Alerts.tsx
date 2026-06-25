@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from "react";
+import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { Link } from "react-router-dom";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
@@ -18,6 +19,12 @@ import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
 import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
+import AlertsContextHeaderForGrow from "@/components/AlertsContextHeaderForGrow";
+import AlertsEmptyStateSnapshotCta from "@/components/AlertsEmptyStateSnapshotCta";
+import GrowTargetsEditor from "@/components/GrowTargetsEditor";
+import { pickAlertsGrowContext } from "@/lib/alertFreshnessContext";
+import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
+import { deriveAlertReadingSource } from "@/lib/alertReadingSourceRules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -101,6 +108,15 @@ export default function Alerts() {
     grows.map((g) => [g.id, (g as { stage?: string | null }).stage ?? null]),
   );
 
+  const headerStage = scopedGrowId
+    ? stageByGrow.get(scopedGrowId) ?? null
+    : null;
+
+  // Pick the most relevant grow context for the Alerts header. Prefers
+  // scoped → active → first available. Keeps the header useful even on
+  // unscoped /alerts visits without inventing data.
+  const [emptyStateEditorOpen, setEmptyStateEditorOpen] = useState(false);
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
 
@@ -109,6 +125,33 @@ export default function Alerts() {
     status: statusFilter,
     severity: severityFilter,
   });
+
+  // Deterministic grow ids that currently have an open alert. Feeds the
+  // unscoped Alerts header fallback so an alerting grow is preferred over
+  // a most-recent-update tiebreaker.
+  const growIdsWithOpenAlerts = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of alerts) {
+      if (a.status === "open" && a.grow_id) set.add(a.grow_id);
+    }
+    return Array.from(set).sort();
+  }, [alerts]);
+
+  const headerContext = useMemo(
+    () =>
+      pickAlertsGrowContext({
+        scopedGrowId: scopedGrowId ?? null,
+        activeGrowId: activeGrowId ?? null,
+        grows: grows.map((g) => ({
+          id: g.id,
+          name: g.name ?? null,
+          stage: (g as { stage?: string | null }).stage ?? null,
+          updated_at: (g as { updated_at?: string | null }).updated_at ?? null,
+        })),
+        growIdsWithOpenAlerts,
+      }),
+    [scopedGrowId, activeGrowId, grows, growIdsWithOpenAlerts],
+  );
 
   const grouped = useMemo(() => {
     return {
@@ -192,6 +235,18 @@ export default function Alerts() {
         description="Persistent environment alerts. Read-only insights — no automation."
         icon={<Bell className="h-5 w-5" />}
       />
+      <OneTentLoopNextStepCard
+        current="alert"
+        ids={{ growId: urlGrowId ?? null }}
+        testId="alerts-one-tent-loop-next-step-card"
+        className="mb-3"
+      />
+      <p
+        className="text-[11px] text-muted-foreground mb-3"
+        data-testid="alerts-one-tent-loop-approval-note"
+      >
+        Action Queue items are approval-required.
+      </p>
       {urlGrowId && (
         <ScopedGrowBanner
           growId={urlGrowId}
@@ -201,6 +256,27 @@ export default function Alerts() {
           backHref={backHref}
         />
       )}
+
+      {headerContext ? (
+        <AlertsContextHeaderForGrow
+          growId={headerContext.growId}
+          growName={headerContext.growName}
+          stage={headerContext.stage}
+          isFallback={headerContext.isFallback}
+          hasOpenAlerts={growIdsWithOpenAlerts.includes(headerContext.growId)}
+        />
+      ) : (
+        <div
+          className="glass rounded-2xl p-3 mb-3 text-xs text-muted-foreground"
+          data-testid="alerts-context-no-grow"
+        >
+          No grow selected. Create or select a grow to view alert context.
+        </div>
+      )}
+
+
+
+
 
       <div className="flex flex-wrap gap-2 mb-4">
         <Select
@@ -307,11 +383,48 @@ export default function Alerts() {
           </div>
         </div>
       ) : alerts.length === 0 ? (
-        <EmptyState
-          icon={<Bell className="h-6 w-6" />}
-          title="No open alerts."
-          description="Alerts will appear when real or manual readings breach your grow targets."
-        />
+        <div data-testid="alerts-empty-state">
+          <EmptyState
+            icon={<Bell className="h-6 w-6" />}
+            title="No open alerts."
+            description="Check targets or enter a fresh manual snapshot if you expected one."
+          />
+          {headerContext ? (
+            <>
+              <AlertsEmptyStateSnapshotCta growId={headerContext.growId} />
+              <div className="mt-3 flex flex-wrap gap-2 justify-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEmptyStateEditorOpen(true)}
+                  data-testid="alerts-empty-state-manage-targets"
+                >
+                  Manage Targets
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  asChild
+                  data-testid="alerts-empty-state-add-manual-snapshot"
+                >
+                  <Link to="/sensors#manual-reading">Add Manual Snapshot</Link>
+                </Button>
+                <GrowTargetsEditor
+                  open={emptyStateEditorOpen}
+                  onOpenChange={setEmptyStateEditorOpen}
+                  growId={headerContext.growId}
+                />
+              </div>
+            </>
+          ) : (
+            <p
+              className="mt-3 text-center text-xs text-muted-foreground"
+              data-testid="alerts-empty-state-no-grow"
+            >
+              Select a grow to manage targets.
+            </p>
+          )}
+        </div>
       ) : (
         <div className="space-y-6">
           {(
@@ -461,6 +574,15 @@ function AlertCard({
           >
             {sourceLabel}
           </span>
+          {(() => {
+            const derived = deriveAlertReadingSource(a);
+            return derived ? (
+              <SensorSourceProvenanceBadge
+                source={derived}
+                testId="alert-row-sensor-source-badge"
+              />
+            ) : null;
+          })()}
           <time
             className="ml-auto text-[11px] text-muted-foreground"
             dateTime={seenIso}

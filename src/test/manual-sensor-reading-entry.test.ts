@@ -118,7 +118,10 @@ describe("hook + save side effects", () => {
       React.createElement(QueryClientProvider, { client }, children);
 
     const v = validateManualEntry({ airTempF: 75, humidityPct: 55 });
-    const [payload] = buildManualReadingPayloads({ tentId: "tent-1", metrics: v.metrics });
+    const [payload] = buildManualReadingPayloads({
+      tentId: "11111111-1111-4111-8111-111111111111",
+      metrics: v.metrics,
+    });
 
     const { result } = renderHook(() => useInsertSensorReading(), { wrapper });
     result.current.mutate(payload);

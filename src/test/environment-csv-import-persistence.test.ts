@@ -22,9 +22,12 @@ function row(over: Partial<ParsedEnvironmentRow> = {}): ParsedEnvironmentRow {
     temperature_c: 25,
     humidity_pct: 50,
     vpd_kpa: 1.58,
+    co2_ppm: null,
+    ppfd: null,
     raw_temperature: 77,
     raw_temp_unit: "F",
     raw_payload: { Timestamp: "2026-06-01T10:00:00Z", Temp: "77", RH: "50" },
+    vpd_source: "derived",
     source_tag: "csv",
     ...over,
   };
@@ -61,6 +64,28 @@ describe("environmentCsvImportPersistence — shape", () => {
     expect(vpd?.raw_payload.vpd_source).toBe("derived");
   });
 
+  it("CSV VPD is labeled vpd_source: csv", () => {
+    const inserts = buildSensorReadingInserts([row({ vpd_source: "csv" })], SCOPE);
+    const vpd = inserts.find((i) => i.metric === "vpd_kpa");
+    expect(vpd?.raw_payload.vpd_source).toBe("csv");
+  });
+
+  it("persists Spider Farmer CO2 and PPFD metrics", () => {
+    const inserts = buildSensorReadingInserts(
+      [row({ co2_ppm: 775, ppfd: 925 })],
+      SCOPE,
+    );
+    expect(inserts.map((i) => i.metric)).toEqual([
+      "temperature_c",
+      "humidity_pct",
+      "vpd_kpa",
+      "co2_ppm",
+      "ppfd",
+    ]);
+    expect(inserts.find((i) => i.metric === "co2_ppm")?.value).toBe(775);
+    expect(inserts.find((i) => i.metric === "ppfd")?.value).toBe(925);
+  });
+
   it("skips null metrics (no fake zeros)", () => {
     const inserts = buildSensorReadingInserts(
       [row({ temperature_c: null, vpd_kpa: null })],
@@ -85,7 +110,7 @@ describe("environmentCsvImportPersistence — runtime", () => {
     );
     const res = await persistCsvEnvironmentRows(rows, SCOPE, client, 5);
     expect(res.error).toBeNull();
-    // 7 rows × 3 metrics = 21 inserts → chunks of 5,5,5,5,1
+    // 7 rows × 3 default metrics = 21 inserts → chunks of 5,5,5,5,1
     expect(calls).toEqual([5, 5, 5, 5, 1]);
     expect(res.insertedCount).toBe(21);
   });

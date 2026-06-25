@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
@@ -6,12 +7,25 @@ import { STAGES, stageLabel } from "@/lib/grow";
 import { format, formatDistanceToNow } from "date-fns";
 import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
+import {
+  SENSOR_SOURCES_PARAM,
+  encodeSensorSourcesParam,
+  parseSensorSourcesParam,
+  sensorSourcesEqual,
+} from "@/lib/sensorSourceUrlRules";
 
 import EntryEditDialog from "@/components/EntryEditDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DiaryEntryBadges from "@/components/DiaryEntryBadges";
+import EnvironmentCheckTimelineBadge from "@/components/EnvironmentCheckTimelineBadge";
+import EnvironmentCheckSnapshotLinkButton from "@/components/EnvironmentCheckSnapshotLinkButton";
+import AiDoctorCheckInTimelineBadge from "@/components/AiDoctorCheckInTimelineBadge";
+import {
+  buildEnvironmentCheckDiaryViewModel,
+  isEnvironmentCheckKind,
+} from "@/lib/environmentCheckViewModel";
 import WateringHistoryPanel from "@/components/WateringHistoryPanel";
 import FeedingHistoryPanel from "@/components/FeedingHistoryPanel";
 import PhotoHistoryPanel from "@/components/PhotoHistoryPanel";
@@ -21,11 +35,17 @@ import {
   TrainingHistoryPanel,
   MeasurementHistoryPanel,
 } from "@/components/QuickLogHistoryPanels";
+import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
-import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
+
+import {
+  buildEnvironmentSummaryReportUrl,
+  defaultEnvironmentSummaryRange,
+} from "@/lib/environmentSummaryNavigationRules";
 import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
+import PhenoHuntTimelineSection from "@/components/PhenoHuntTimelineSection";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
 import { buildGrowDiaryTimeline } from "@/lib/growDiaryTimelineRules";
@@ -35,6 +55,67 @@ import {
   mapGrowEventsToRecentRawEntries,
   type GrowEventRowForRecent,
 } from "@/lib/growEventToDiaryRawEntry";
+import { mergeTimelineSources } from "@/lib/timelineMergeRules";
+import {
+  deriveTimelineEventTypeOptions,
+  deriveTimelinePlantOptions,
+  deriveTimelineTentOptions,
+  filterTimelineEvidenceRows,
+  isTimelineEvidenceFilterActive,
+  TIMELINE_EVIDENCE_EMPTY_DESC,
+  TIMELINE_EVIDENCE_EMPTY_TITLE,
+  TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
+} from "@/lib/timelineEvidenceFilterRules";
+import {
+  buildTimelinePhotoLightboxList,
+  findTimelinePhotoIndexById,
+  buildTimelinePhotoAltText,
+} from "@/lib/timelinePhotoLightboxRules";
+import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
+import {
+  PHOTO_NON_DIAGNOSTIC_LABEL,
+  PHOTO_NON_DIAGNOSTIC_TESTID,
+  shouldShowPhotoNonDiagnosticLabel,
+} from "@/lib/photoEventNonDiagnosticLabelRules";
+import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
+import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
+import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
+import { classifyTimelineSensorSource, type TimelineSensorSourceKind } from "@/lib/timelineSensorSourceBadgeRules";
+import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
+import { SENSOR_SOURCE_KINDS, SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
+import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
+import {
+  parseTimelineHighlightToken,
+  diaryEntryMatchesHighlight,
+  highlightIsMissingFromList,
+  detectTimelineHighlightBlockers,
+  formatTimelineHighlightBlockersLine,
+  TIMELINE_HIGHLIGHT_PARAM,
+  TIMELINE_HIGHLIGHT_TESTID,
+  TIMELINE_HIGHLIGHT_NOT_VISIBLE_COPY,
+  TIMELINE_HIGHLIGHT_NO_BLOCKERS_COPY,
+  TIMELINE_HIGHLIGHT_NOT_VISIBLE_TESTID,
+  TIMELINE_HIGHLIGHT_BLOCKERS_TESTID,
+  TIMELINE_HIGHLIGHT_CLEAR_FILTERS_TESTID,
+  TIMELINE_HIGHLIGHT_CLEAR_FILTERS_LABEL,
+  TIMELINE_HIGHLIGHT_ARIA_LABEL,
+} from "@/lib/timelineHighlightRules";
+import {
+  resolveBackToActionsHref,
+  ACTIONS_RETURN_PARAM,
+  BACK_TO_ACTIONS_LABEL,
+  BACK_TO_ACTIONS_TESTID,
+} from "@/lib/actionQueueReturnLinkRules";
+import {
+  buildViewInActionsLinkFromDiaryDetails,
+  VIEW_IN_ACTIONS_TESTID,
+} from "@/lib/actionQueueTimelineLinkRules";
+import { buildCopyableTraceLinkFromDiaryDetails } from "@/lib/actionQueueTraceLinkCopyRules";
+import CopyTraceLinkButton from "@/components/CopyTraceLinkButton";
+import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoScroll";
+
+
+
 
 
 const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
@@ -127,6 +208,53 @@ export default function Timeline() {
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [plantFilter, setPlantFilter] = useState("");
+  const [tentFilter, setTentFilter] = useState("");
+  const [eventTypeFilter, setEventTypeFilter] = useState("");
+  const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
+  const [detailEntryId, setDetailEntryId] = useState<string | null>(null);
+  // Source filter state is mirrored to/from the `?sensorSources=` URL
+  // query param so the Sensors page summary widget can link directly into
+  // a pre-filtered Timeline without introducing app-wide global state.
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Read-only diary-trace highlight from ?highlight=action-queue:<id>:<kind>.
+  // Pure parse; never alters sorting or fetches.
+  const highlight = useMemo(
+    () => parseTimelineHighlightToken(searchParams.get(TIMELINE_HIGHLIGHT_PARAM)),
+    [searchParams],
+  );
+
+  // Resolve a safe "Back to Actions" href from the optional
+  // ?actionsReturn= round-trip param. Hidden when no safe value.
+  const backToActions = useMemo(
+    () => resolveBackToActionsHref(searchParams.get(ACTIONS_RETURN_PARAM)),
+    [searchParams],
+  );
+
+
+  const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>(
+    () => parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM)),
+  );
+
+  // Pull URL → state when the param changes externally (e.g. via Link).
+  useEffect(() => {
+    const next = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
+    setSensorSourceFilter((cur) => (sensorSourcesEqual(cur, next) ? cur : next));
+  }, [searchParams]);
+
+  // Push state → URL whenever the local filter diverges from the URL.
+  useEffect(() => {
+    const fromUrl = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
+    if (sensorSourcesEqual(fromUrl, sensorSourceFilter)) return;
+    const next = new URLSearchParams(searchParams);
+    const encoded = encodeSensorSourcesParam(sensorSourceFilter);
+    if (encoded) next.set(SENSOR_SOURCES_PARAM, encoded);
+    else next.delete(SENSOR_SOURCES_PARAM);
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sensorSourceFilter]);
+
 
   async function load() {
     if (!user || !activeGrowId) {
@@ -206,22 +334,128 @@ export default function Timeline() {
     return m;
   }, [entries]);
 
+  const plantOptions = useMemo(() => deriveTimelinePlantOptions(entries), [entries]);
+  const tentOptions = useMemo(() => deriveTimelineTentOptions(entries), [entries]);
+  const eventTypeOptions = useMemo(
+    () => deriveTimelineEventTypeOptions(entries),
+    [entries],
+  );
+
+  const evidenceFilterInput = {
+    query: searchQuery,
+    plantId: plantFilter,
+    tentId: tentFilter,
+    eventType: eventTypeFilter,
+    sensorSources: sensorSourceFilter,
+  };
+  const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
+
   const filtered = useMemo(() => {
-    return entries.filter((e) => {
+    const afterStageEvent = entries.filter((e) => {
       if (stageFilter !== "all" && e.stage !== stageFilter) return false;
       if (eventFilter !== "all" && !entryKinds(e).includes(eventFilter)) return false;
       return true;
     });
-  }, [entries, stageFilter, eventFilter]);
+    return filterTimelineEvidenceRows(afterStageEvent, evidenceFilterInput);
+  }, [
+    entries,
+    stageFilter,
+    eventFilter,
+    searchQuery,
+    plantFilter,
+    tentFilter,
+    eventTypeFilter,
+    sensorSourceFilter,
+  ]);
 
-  // Merge `grow_events` (Quick Log v2 manual saves) into the raw entries
-  // passed to the Recent Quick Logs panel so just-saved entries surface at
-  // the top. `buildRecentQuickLogActivity` sorts newest-first by entry_at,
-  // so the merged stream is correctly ordered without extra logic.
-  const recentLaneRawEntries = useMemo(
-    () => [...entries, ...mapGrowEventsToRecentRawEntries(growEvents)],
-    [entries, growEvents],
+  function clearEvidenceFilters() {
+    setSearchQuery("");
+    setPlantFilter("");
+    setTentFilter("");
+    setEventTypeFilter("");
+    setSensorSourceFilter([]);
+  }
+
+  function toggleSensorSource(kind: TimelineSensorSourceKind) {
+    setSensorSourceFilter((cur) =>
+      cur.includes(kind) ? cur.filter((k) => k !== kind) : [...cur, kind],
+    );
+  }
+
+  // Lightbox navigation list derived from currently visible (filtered)
+  // entries. Pure helper, no writes. The active photo is tracked by id so
+  // filter changes that hide or reorder the active photo auto-close or
+  // re-align navigation without pointing at the wrong item.
+  const lightboxItems = useMemo(
+    () => buildTimelinePhotoLightboxList(filtered),
+    [filtered],
   );
+  const lightboxIndex = useMemo(
+    () => findTimelinePhotoIndexById(lightboxItems, lightboxPhotoId),
+    [lightboxItems, lightboxPhotoId],
+  );
+  useEffect(() => {
+    if (lightboxPhotoId !== null && lightboxIndex < 0) setLightboxPhotoId(null);
+  }, [lightboxPhotoId, lightboxIndex]);
+
+  // Auto-scroll/focus the highlighted diary trace entry once per
+  // highlight token. The hook owns the gating ref so repeated renders
+  // never steal focus.
+  useTimelineHighlightAutoScroll(highlight, filtered);
+
+  // Merge `grow_events` (Quick Log v2 manual saves) and `diary_entries`
+  // through the tested `mergeTimelineSources` helper so the Recent Quick
+  // Logs panel receives a deterministic, deduplicated, newest-first
+  // stream. The helper enforces:
+  //   - exact-duplicate dedup by (source_table, source_id)
+  //   - logical dedup when a diary row mirrors a grow_event via
+  //     `details.grow_event_id`
+  //   - stable tie-breakers (grow_events first on equal timestamps,
+  //     then source_id lexical)
+  // We then re-hydrate each merged entry back into its original loose
+  // shape so the existing RecentQuickLogActivityPanel normalizer
+  // continues to see the same fields it always has.
+  const recentLaneRawEntries = useMemo(() => {
+    const diaryInputs = entries.map((e) => {
+      const details = (e.details ?? null) as Record<string, unknown> | null;
+      const grow_event_id =
+        details && typeof details["grow_event_id"] === "string"
+          ? (details["grow_event_id"] as string)
+          : null;
+      return {
+        id: e.id,
+        entry_at: e.entry_at,
+        plant_id: e.plant_id,
+        tent_id: e.tent_id,
+        stage: e.stage,
+        note: e.note,
+        photo_url: e.photo_url,
+        details,
+        grow_event_id,
+      };
+    });
+    const merged = mergeTimelineSources({
+      diaryEntries: diaryInputs,
+      growEvents,
+    });
+    const diaryById = new Map(entries.map((e) => [e.id, e] as const));
+    const growMappedById = new Map(
+      mapGrowEventsToRecentRawEntries(growEvents).map(
+        (r) => [r.id, r] as const,
+      ),
+    );
+    const out: Array<Entry | ReturnType<typeof mapGrowEventsToRecentRawEntries>[number]> = [];
+    for (const m of merged) {
+      if (m.source_table === "diary_entries") {
+        const e = diaryById.get(m.source_id);
+        if (e) out.push(e);
+      } else {
+        const g = growMappedById.get(m.source_id);
+        if (g) out.push(g);
+      }
+    }
+    return out;
+  }, [entries, growEvents]);
 
 
   // Pure normalized timeline view-model. Drives per-entry tags/warnings and a
@@ -278,6 +512,14 @@ export default function Timeline() {
         current={isLogsRoute ? "Logs" : "Timeline"}
         section={isLogsRoute ? "logs" : "timeline"}
       />
+
+      <OneTentLoopNextStepCard
+        current="timeline"
+        ids={{ growId: activeGrowId ?? null }}
+        testId="timeline-one-tent-loop-next-step-card"
+        className="mb-3"
+      />
+      
       
       
       {activeGrow && (
@@ -318,6 +560,10 @@ export default function Timeline() {
         </div>
       )}
 
+      {urlGrowId && <PhenoHuntTimelineSection growId={urlGrowId} />}
+
+
+
       {urlGrowId && (
         <ScopedGrowBanner
           growId={urlGrowId}
@@ -327,6 +573,197 @@ export default function Timeline() {
           backHref={backHref}
         />
       )}
+
+      {/* Search + evidence filters (read-only, client-side) */}
+      <div
+        className="mb-3 space-y-2 rounded-2xl border border-border/40 bg-secondary/20 p-3"
+        data-testid="timeline-evidence-filters"
+        aria-label="Search and filter timeline entries"
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER}
+            aria-label={TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER}
+            data-testid="timeline-search-input"
+            className="flex-1 min-w-[12rem] rounded-md border border-border/50 bg-background/60 px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+          {plantOptions.length > 0 && (
+            <select
+              value={plantFilter}
+              onChange={(e) => setPlantFilter(e.target.value)}
+              aria-label="Filter by plant"
+              data-testid="timeline-plant-filter"
+              className="rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
+            >
+              <option value="">All plants</option>
+              {plantOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label} ({o.count})
+                </option>
+              ))}
+            </select>
+          )}
+          {tentOptions.length > 0 && (
+            <select
+              value={tentFilter}
+              onChange={(e) => setTentFilter(e.target.value)}
+              aria-label="Filter by tent"
+              data-testid="timeline-tent-filter"
+              className="rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
+            >
+              <option value="">All tents</option>
+              {tentOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label} ({o.count})
+                </option>
+              ))}
+            </select>
+          )}
+          {eventTypeOptions.length > 0 && (
+            <select
+              value={eventTypeFilter}
+              onChange={(e) => setEventTypeFilter(e.target.value)}
+              aria-label="Filter by log type"
+              data-testid="timeline-event-type-filter"
+              className="rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
+            >
+              <option value="">All log types</option>
+              {eventTypeOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label} ({o.count})
+                </option>
+              ))}
+            </select>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={clearEvidenceFilters}
+            disabled={!evidenceActive}
+            data-testid="timeline-clear-filters"
+            aria-label="Clear timeline filters"
+          >
+            Clear filters
+          </Button>
+        </div>
+        <div
+          className="flex flex-wrap items-center gap-1.5"
+          data-testid="timeline-sensor-source-filter"
+          aria-label="Filter timeline by sensor source"
+        >
+          <span className="text-[11px] uppercase tracking-wide text-muted-foreground mr-1">
+            Sensor source
+          </span>
+          {SENSOR_SOURCE_KINDS.map((kind) => {
+            const active = sensorSourceFilter.includes(kind);
+            return (
+              <button
+                key={kind}
+                type="button"
+                onClick={() => toggleSensorSource(kind)}
+                aria-pressed={active}
+                data-testid={`timeline-sensor-source-toggle-${kind}`}
+                className={cn(
+                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] transition",
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-secondary/50 text-foreground border-border/50 hover:bg-secondary",
+                )}
+              >
+                {SENSOR_SOURCE_SHORT_LABEL[kind]}
+              </button>
+            );
+          })}
+          <SensorSourceLegendTooltip testIdSuffix="timeline-filter" className="ml-1" />
+        </div>
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="timeline-results-count"
+          aria-live="polite"
+        >
+          Showing {filtered.length} of {entries.length}{" "}
+          {entries.length === 1 ? "entry" : "entries"}
+        </p>
+        {highlight && highlightIsMissingFromList(filtered, highlight) && (() => {
+          const blockers = detectTimelineHighlightBlockers({
+            searchQuery,
+            stageFilter,
+            eventFilter,
+            eventTypeFilter,
+            plantFilter,
+            tentFilter,
+            sensorSourceCount: sensorSourceFilter.length,
+          });
+          const blockersLine = formatTimelineHighlightBlockersLine(blockers);
+          const handleClear = () => {
+            clearEvidenceFilters();
+            setStageFilter("all");
+            setEventFilter("all");
+            // Preserve highlight (and any other) query params untouched.
+          };
+          return (
+            <div
+              className="mt-1 space-y-1"
+              role="status"
+              aria-label={TIMELINE_HIGHLIGHT_ARIA_LABEL}
+              data-testid={TIMELINE_HIGHLIGHT_NOT_VISIBLE_TESTID}
+            >
+              <p className="text-xs text-muted-foreground">
+                {TIMELINE_HIGHLIGHT_NOT_VISIBLE_COPY}
+              </p>
+              <p
+                className="text-[11px] text-muted-foreground"
+                data-testid={TIMELINE_HIGHLIGHT_BLOCKERS_TESTID}
+              >
+                {blockersLine ?? TIMELINE_HIGHLIGHT_NO_BLOCKERS_COPY}
+              </p>
+              {blockers.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleClear}
+                  data-testid={TIMELINE_HIGHLIGHT_CLEAR_FILTERS_TESTID}
+                >
+                  {TIMELINE_HIGHLIGHT_CLEAR_FILTERS_LABEL}
+                </Button>
+              )}
+              {highlight && backToActions.wasProvided && (
+                <div>
+                  <Link
+                    to={backToActions.href}
+                    className="text-xs text-primary hover:underline"
+                    data-testid={BACK_TO_ACTIONS_TESTID}
+                  >
+                    {BACK_TO_ACTIONS_LABEL}
+                  </Link>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+        {/* Always-on Back to Actions affordance when a safe return path
+            and highlight token are present, even if the entry is found
+            and visible. Keeps the round-trip discoverable. */}
+        {highlight &&
+          !highlightIsMissingFromList(filtered, highlight) &&
+          backToActions.wasProvided && (
+            <div className="mt-1">
+              <Link
+                to={backToActions.href}
+                className="text-xs text-primary hover:underline"
+                data-testid={`${BACK_TO_ACTIONS_TESTID}-visible`}
+              >
+                {BACK_TO_ACTIONS_LABEL}
+              </Link>
+            </div>
+          )}
+      </div>
+
+
 
       {/* Filters */}
       <div className="space-y-2 mb-4">
@@ -352,15 +789,26 @@ export default function Timeline() {
         </div>
       </div>
 
-      <div className="mb-4 flex items-center justify-end gap-2">
-        <EnvironmentCsvImportLauncher
-          growId={activeGrowId}
-          tentId={entries.find((e) => !!e.tent_id)?.tent_id ?? null}
-          variant="compact"
-          label="Import CSV"
-          testIdPrefix="timeline-csv-launcher"
-        />
+
+      <div className="mb-4 flex items-center justify-end gap-2 flex-wrap">
+        <Link
+          to={buildEnvironmentSummaryReportUrl(defaultEnvironmentSummaryRange())}
+          className="hidden sm:inline-flex items-center gap-1 rounded-md border border-border/50 bg-secondary/40 px-3 py-1.5 text-xs font-medium hover:bg-secondary/60"
+          data-testid="timeline-env-summary-link"
+          aria-label="Open environment summary report"
+        >
+          Environment Summary
+        </Link>
+        <Link
+          to={buildEnvironmentSummaryReportUrl(defaultEnvironmentSummaryRange())}
+          className="sm:hidden inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/40 px-2.5 py-1 text-[11px] font-medium hover:bg-secondary/60"
+          data-testid="timeline-env-summary-shortcut"
+          aria-label="Open environment summary report"
+        >
+          Summary
+        </Link>
       </div>
+
 
       <TimelineCsvContextPanel
         growId={activeGrowId}
@@ -374,6 +822,10 @@ export default function Timeline() {
           bottom so Quick Log entries are not buried. */}
       <div className="mt-4">
         <RecentQuickLogActivityPanel rawEntries={recentLaneRawEntries} limit={10} />
+      </div>
+
+      <div className="mt-4">
+        <DiaryCalendarSection rawEntries={entries} />
       </div>
 
       <div className="mt-4">
@@ -414,7 +866,11 @@ export default function Timeline() {
         : entries.length === 0 ? (
           <Empty title="No entries yet" desc="Tap the + button to log your first photo and note." />
         ) : filtered.length === 0 ? (
-          <Empty title="No matching entries" desc="Try a different stage or event filter." />
+          <Empty
+            title={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_TITLE : "No matching entries"}
+            desc={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_DESC : "Try a different stage or event filter."}
+          />
+
         ) : (
           <div className="space-y-5">
             {groupedByStage.map((group, gi) => (
@@ -427,16 +883,81 @@ export default function Timeline() {
                   <div className="h-px flex-1 bg-border/50" />
                 </div>
                 <ul className="space-y-3">
-                  {group.items.map((e) => (
-                    <li key={e.id} className="glass rounded-2xl overflow-hidden animate-fade-in">
+                  {group.items.map((e) => {
+                    const isHighlighted = diaryEntryMatchesHighlight(e, highlight);
+                    return (
+                    <li
+                      key={e.id}
+                      id={`timeline-entry-${e.id}`}
+                      data-testid={
+                        isHighlighted
+                          ? TIMELINE_HIGHLIGHT_TESTID
+                          : "timeline-entry"
+                      }
+                      data-highlight={isHighlighted ? "action-queue-trace" : undefined}
+                      aria-label={isHighlighted ? TIMELINE_HIGHLIGHT_ARIA_LABEL : undefined}
+                      tabIndex={isHighlighted ? -1 : undefined}
+                      className={cn(
+                        "glass rounded-2xl overflow-hidden animate-fade-in",
+                        isHighlighted && "ring-2 ring-primary ring-offset-2 ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                      )}
+                    >
+
                       {e.photo_url ? (
-                        <img src={e.photo_url} className="w-full aspect-[4/3] object-cover" alt="" loading="lazy" />
+                        (() => {
+                          const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
+                          const item = idx >= 0 ? lightboxItems[idx] : null;
+                          const alt = buildTimelinePhotoAltText(item);
+                          const showNonDiagnostic = shouldShowPhotoNonDiagnosticLabel({
+                            hasPhoto: true,
+                            details: e.details,
+                          });
+                          return (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => { if (idx >= 0) setLightboxPhotoId(e.id); }}
+                                aria-label={`Open photo: ${alt}`}
+                                data-testid="timeline-photo-open"
+                                className="block w-full focus:outline-none focus:ring-2 focus:ring-primary/60"
+                              >
+                                <img
+                                  src={e.photo_url}
+                                  className="w-full aspect-[4/3] object-cover"
+                                  alt={alt}
+                                  loading="lazy"
+                                />
+                              </button>
+                              {showNonDiagnostic && (
+                                <div
+                                  data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
+                                  className="px-3 py-1.5 text-[11px] text-muted-foreground bg-secondary/30 border-t border-border/30"
+                                >
+                                  {PHOTO_NON_DIAGNOSTIC_LABEL}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()
                       ) : (
                         <div className="w-full aspect-[4/3] bg-secondary/40 flex items-center justify-center text-muted-foreground">
                           <ImageIcon className="h-8 w-8" />
                         </div>
                       )}
-                      <div className="p-4">
+                      <div
+                        className="p-4 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        role="button"
+                        tabIndex={0}
+                        data-testid="timeline-entry-body"
+                        aria-label="Open entry details"
+                        onClick={() => setDetailEntryId(e.id)}
+                        onKeyDown={(ev) => {
+                          if (ev.key === "Enter" || ev.key === " ") {
+                            ev.preventDefault();
+                            setDetailEntryId(e.id);
+                          }
+                        }}
+                      >
                         {(() => {
                           const et = getEventType((e.details?.event_type as string | undefined) ?? null);
                           const Icon = et.icon;
@@ -463,14 +984,63 @@ export default function Timeline() {
                                 <span title={format(new Date(e.entry_at), "PPpp")}>{formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}</span>
                                 <button
                                   type="button"
-                                  onClick={() => setEditingId(e.id)}
+                                  onClick={(ev) => { ev.stopPropagation(); setEditingId(e.id); }}
                                   aria-label="Edit entry"
                                   className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition"
                                 >
                                   <Pencil className="h-3 w-3" />Edit
                                 </button>
+                                <DiaryEntryRemoveButton
+                                  entry={{ id: e.id, photoUrl: e.photo_url, kind: "diary" }}
+                                  viewer={{ currentUserId: user?.id ?? null }}
+                                  plantName={plantName}
+                                  plantId={e.plant_id ?? null}
+                                  tentId={e.tent_id ?? null}
+                                  showFollowUp
+                                  onRemoved={(removedId) => {
+                                    setEntries((rows) => rows.filter((r) => r.id !== removedId));
+                                  }}
+                                />
+
+
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>
+                              {(() => {
+                                const actionsReturn = backToActions.wasProvided
+                                  ? backToActions.href
+                                  : null;
+                                const viewLink = buildViewInActionsLinkFromDiaryDetails(
+                                  e.details as { kind?: unknown; idempotency_key?: unknown } | null,
+                                  { actionsReturn },
+                                );
+                                const copyLink = buildCopyableTraceLinkFromDiaryDetails(
+                                  e.details as { kind?: unknown; idempotency_key?: unknown } | null,
+                                  { actionsReturn },
+                                );
+                                if (!viewLink && !copyLink) return null;
+                                return (
+                                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                                    {viewLink && (
+                                      <Link
+                                        to={viewLink.href}
+                                        data-testid={VIEW_IN_ACTIONS_TESTID}
+                                        data-view-in-actions-highlight={viewLink.highlight}
+                                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                        onClick={(ev) => ev.stopPropagation()}
+                                      >
+                                        <ListChecks className="h-3 w-3" aria-hidden />
+                                        {viewLink.label}
+                                      </Link>
+                                    )}
+                                    {copyLink && (
+                                      <CopyTraceLinkButton
+                                        url={copyLink.url}
+                                        testIdSuffix={`timeline-${e.id}`}
+                                      />
+                                    )}
+                                  </div>
+                                );
+                              })()}
                               {remindAt && (
                                 <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-300">
                                   <Bell className="h-3 w-3" />Remind {format(new Date(remindAt), "PPp")}
@@ -485,11 +1055,20 @@ export default function Timeline() {
                                   stage: e.stage ?? null,
                                   stale: snapStale,
                                 });
+                                const rawSource = (sensor as { source?: string | null }).source ?? null;
+                                const sourceBadge = classifyTimelineSensorSource({
+                                  rawSource,
+                                  capturedAt: snapTs ?? null,
+                                  staleMs: TIMELINE_SNAPSHOT_STALE_MS,
+                                  // Quick Log sensor_snapshot is intrinsically grower-entered.
+                                  fallback: "manual",
+                                });
                                 return (
                                   <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="timeline-manual-snapshot">
                                     <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
                                       <Gauge className="h-3 w-3" />Manual snapshot
                                     </span>
+                                    <TimelineSensorSourceBadge badge={sourceBadge} />
                                     {sensor.temp != null && <SnapChip>{(sensor.temp * 9 / 5 + 32).toFixed(1)}°F</SnapChip>}
                                     {sensor.rh != null && <SnapChip>{sensor.rh}% RH</SnapChip>}
                                     {sensor.vpd != null && <SnapChip>VPD {sensor.vpd}</SnapChip>}
@@ -519,12 +1098,59 @@ export default function Timeline() {
                                 const ni = normalizedById.get(e.id);
                                 return ni ? <DiaryEntryBadges item={ni} /> : null;
                               })()}
+                              <AiDoctorCheckInTimelineBadge event={e} />
+                              {(() => {
+                                const kindValue = (e.details?.event_type as string | undefined) ?? null;
+                                if (!isEnvironmentCheckKind(kindValue)) return null;
+                                const details = (e as { details?: Record<string, unknown> }).details ?? {};
+                                const num = (k: string): number | null => {
+                                  const v = details[k];
+                                  return typeof v === "number" && Number.isFinite(v) ? v : null;
+                                };
+                                const src = typeof details.source === "string" ? details.source : "manual";
+                                const vm = buildEnvironmentCheckDiaryViewModel({
+                                  entryId: e.id,
+                                  occurredAt: String((e as { occurred_at?: string; created_at?: string }).occurred_at ?? (e as { created_at?: string }).created_at ?? ""),
+                                  kind: kindValue ?? "environment",
+                                  snapshot: {
+                                    source: src,
+                                    tempC: num("temp_c") ?? num("tempC"),
+                                    rhPercent: num("rh_percent") ?? num("humidity"),
+                                    vpdKpa: num("vpd_kpa") ?? num("vpdKpa"),
+                                  },
+                                });
+                                return (
+                                  <>
+                                    <EnvironmentCheckTimelineBadge viewModel={vm} />
+                                    <EnvironmentCheckSnapshotLinkButton
+                                      entry={{
+                                        id: e.id,
+                                        tentId: e.tent_id ?? null,
+                                        plantId: e.plant_id ?? null,
+                                        capturedAt: String(
+                                          (e as { occurred_at?: string; created_at?: string }).occurred_at ??
+                                            (e as { created_at?: string }).created_at ??
+                                            "",
+                                        ),
+                                        sensorSnapshotId:
+                                          typeof (details as { sensor_snapshot_id?: unknown }).sensor_snapshot_id === "string"
+                                            ? ((details as { sensor_snapshot_id?: string }).sensor_snapshot_id ?? null)
+                                            : null,
+                                        source: typeof src === "string" ? src : null,
+                                      }}
+                                      snapshots={[]}
+                                    />
+                                  </>
+                                );
+                              })()}
                             </>
                           );
                         })()}
                       </div>
                     </li>
-                  ))}
+                  );
+                  })}
+
                 </ul>
               </section>
             ))}
@@ -537,6 +1163,33 @@ export default function Timeline() {
         onOpenChange={(o) => { if (!o) setEditingId(null); }}
         onSaved={(patch) => setEntries((rows) => rows.map((r) => r.id === patch.id ? { ...r, ...patch } as Entry : r))}
         onDeleted={(id) => setEntries((rows) => rows.filter((r) => r.id !== id))}
+      />
+      {lightboxIndex >= 0 && lightboxItems.length > 0 && (
+        <TimelinePhotoLightbox
+          items={lightboxItems}
+          activeIndex={lightboxIndex}
+          onClose={() => setLightboxPhotoId(null)}
+          onNavigate={(i) => setLightboxPhotoId(lightboxItems[i]?.id ?? null)}
+        />
+      )}
+      <TimelineEvidenceDetailDrawer
+        open={!!detailEntryId}
+        viewModel={(() => {
+          const row = entries.find((r) => r.id === detailEntryId);
+          return row
+            ? buildTimelineEvidenceDetailViewModel({
+                id: row.id,
+                note: row.note,
+                photo_url: row.photo_url,
+                stage: row.stage,
+                entry_at: row.entry_at,
+                plant_id: row.plant_id,
+                tent_id: row.tent_id,
+                details: row.details,
+              })
+            : null;
+        })()}
+        onClose={() => setDetailEntryId(null)}
       />
     </div>
   );

@@ -117,4 +117,20 @@ describe("quickLogV2SavePayload", () => {
     if (!r.ok) throw new Error("expected ok");
     expect(r.payload.p_target_id).toBe("p2");
   });
+
+  it("passes structured details through the existing RPC payload seam", () => {
+    const details = {
+      maturity_evidence: {
+        source: "manual",
+        evidence_type: "quick_log_maturity_evidence",
+        advisory_only: true,
+        observed_at: "2026-06-17T21:00:00.000Z",
+        cloudy_pct: 60,
+      },
+    };
+    const r = buildQuickLogV2SavePayload(base({ details }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.payload.p_details).toEqual(details);
+  });
 });

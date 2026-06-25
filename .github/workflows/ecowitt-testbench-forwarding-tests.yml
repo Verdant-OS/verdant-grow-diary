@@ -1,0 +1,109 @@
+name: EcoWitt Testbench forwarding tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/ecowitt-testbench/**"
+      - "docs/ecowitt-windows-testbench.md"
+      - "src/test/ecowitt-windows-testbench-static-safety.test.ts"
+      - ".github/workflows/ecowitt-testbench-forwarding-tests.yml"
+  pull_request:
+    paths:
+      - "tools/ecowitt-testbench/**"
+      - "docs/ecowitt-windows-testbench.md"
+      - "src/test/ecowitt-windows-testbench-static-safety.test.ts"
+      - ".github/workflows/ecowitt-testbench-forwarding-tests.yml"
+  workflow_dispatch:
+
+jobs:
+  forwarding-tests:
+    name: Python forwarding + static safety + typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # No repository secrets required. Safe for forked PRs. No real
+    # forwarding occurs; Python tests mock the requests module.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Cache bun
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install JS dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install testbench Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r tools/ecowitt-testbench/requirements.txt
+
+      - name: Prepare artifact folder
+        run: mkdir -p artifacts/ecowitt-testbench-forwarding
+
+      # Test-only env. Never real. The Python tests mock outbound
+      # `requests.post`; no real network forwarding happens.
+      - name: Python — forwarding config tests
+        working-directory: tools/ecowitt-testbench
+        env:
+          VERDANT_INGEST_URL: "https://example.invalid/functions/v1/sensor-ingest-webhook"
+          VERDANT_BRIDGE_TOKEN: "test-bridge-token-not-a-real-vbt"
+          VERDANT_TENT_ID: "11111111-2222-3333-4444-555555555555"
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 -m unittest test_forwarding_config 2>&1 | tee ../../artifacts/ecowitt-testbench-forwarding/forwarding-config.log
+
+      - name: Python — source labeling tests
+        working-directory: tools/ecowitt-testbench
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 -m unittest test_source_labeling 2>&1 | tee ../../artifacts/ecowitt-testbench-forwarding/source-labeling.log
+
+      - name: Python — golden forwarding contract tests
+        working-directory: tools/ecowitt-testbench
+        env:
+          VERDANT_INGEST_URL: "https://example.invalid/functions/v1/sensor-ingest-webhook"
+          VERDANT_BRIDGE_TOKEN: "test-bridge-token-not-a-real-vbt"
+          VERDANT_TENT_ID: "11111111-2222-3333-4444-555555555555"
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 -m unittest test_forwarding_contract 2>&1 | tee ../../artifacts/ecowitt-testbench-forwarding/contract.log
+
+      - name: Vitest — testbench static safety suite
+        shell: bash
+        run: |
+          set -o pipefail
+          bunx vitest run src/test/ecowitt-windows-testbench-static-safety.test.ts --reporter=dot 2>&1 | tee artifacts/ecowitt-testbench-forwarding/static-safety.log
+
+      - name: Typecheck
+        shell: bash
+        run: |
+          set -o pipefail
+          bun run typecheck 2>&1 | tee artifacts/ecowitt-testbench-forwarding/typecheck.log
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        with:
+          name: ecowitt-testbench-forwarding-logs
+          path: artifacts/ecowitt-testbench-forwarding/
+          retention-days: 14
+          if-no-files-found: warn

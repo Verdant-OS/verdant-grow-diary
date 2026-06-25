@@ -102,8 +102,13 @@ describe("preparePiIngestReadings — happy path", () => {
       expect(r.ownerUserId).toBe(OWNER);
       expect(r.bridgeId).toBe(BRIDGE);
       expect(r.tentId).toBe(TENT);
-      expect(r.readingDrafts.length).toBe(2);
+      // Normalizer deterministically derives vpd_kpa from temperature_c +
+      // humidity_pct, so 2 input readings yield 3 normalized drafts. The
+      // derived VPD row is a real sensor-truth output, not a duplicate.
+      expect(r.readingDrafts.length).toBe(3);
       expect(r.readingDrafts.every((d) => d.source === "pi_bridge")).toBe(true);
+      // Idempotency keys are computed per original ingested reading (2),
+      // not per derived metric — keeping ingest replay safety 1:1 with input.
       expect(r.idempotencyKeys.length).toBe(2);
       expect(new Set(r.idempotencyKeys).size).toBe(2);
     }

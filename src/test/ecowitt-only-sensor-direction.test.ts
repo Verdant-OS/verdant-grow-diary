@@ -8,20 +8,18 @@
  * Pure / read-only. No I/O against Supabase. No automation.
  */
 import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
+
+// Standardised scanner guardrail timeout + slow-test telemetry.
+// Replaces the previous per-file vi.setConfig bump. No scanner pattern,
+// allowlist, or assertion is changed.
+import { getCachedScannerFiles, installScannerGuardrail } from "./support/scannerGuardrailHarness";
+installScannerGuardrail({ file: __filename });
 
 const ROOT = resolve(__dirname, "../..");
 
-const SCAN_DIRS = [
-  "src",
-  "docs",
-  "scripts",
-  "fixtures",
-  "supabase",
-  "templates",
-  ".github",
-];
+const SCAN_DIRS = ["src", "docs", "scripts", "fixtures", "supabase", "templates", ".github"];
 
 const SCAN_EXTS = new Set([
   ".ts",
@@ -46,6 +44,22 @@ const ALLOWED = new Set([
   "docs/ecowitt-only-sensor-direction.md",
   "src/test/ecowitt-only-sensor-direction.test.ts",
   ".github/workflows/ecowitt-only-safety-scan.yml",
+  // Intentional: the stop-ship checklist *defines* the safety scan and
+  // uses SwitchBot as an example of a retired brand to watch for.
+  "docs/v0-sentinel-stop-ship-checklist.md",
+  // Negative-guard tests: each line containing the term is inside a
+  // `expect(...).not.toMatch(/...|switchbot|.../)` regex that proves
+  // the surface does NOT mention the banned vendor. These tests
+  // enforce the EcoWitt-only direction; removing the term would
+  // silently weaken them.
+  "src/test/one-tent-loop-static-safety.test.ts",
+  "src/test/ai-doctor-one-tent-loop-card.test.tsx",
+  "src/test/alerts-one-tent-loop-card.test.tsx",
+  "src/test/grow-detail-one-tent-loop-card.test.tsx",
+  "src/test/plant-detail-one-tent-loop-card.test.tsx",
+  "src/test/sensors-one-tent-loop-card.test.tsx",
+  "src/test/tent-detail-one-tent-loop-card.test.tsx",
+  "src/test/timeline-one-tent-loop-card.test.tsx",
 ]);
 
 const PATTERN = /switch[\s_-]?bot/i;
@@ -77,9 +91,18 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+// Memoise the repo walk across `it`s in this file. The scanner only
+// reads files — it never mutates them — so a per-worker cache is safe.
+let cachedScanFiles: string[] | null = null;
+function getScanFiles(): string[] {
+  if (cachedScanFiles) return cachedScanFiles;
+  cachedScanFiles = SCAN_DIRS.flatMap((d) => walk(join(ROOT, d)));
+  return cachedScanFiles;
+}
+
 describe("EcoWitt-only sensor direction", () => {
   it("contains zero SwitchBot references outside the explicit allow-list", () => {
-    const files = SCAN_DIRS.flatMap((d) => walk(join(ROOT, d)));
+    const files = getScanFiles();
     const offenders: string[] = [];
     for (const f of files) {
       const rel = relative(ROOT, f).split(sep).join("/");
@@ -92,16 +115,33 @@ describe("EcoWitt-only sensor direction", () => {
 
   it("ships the static safety scanner and CI workflow", () => {
     expect(() =>
-      readFileSync(
-        resolve(ROOT, "scripts/assert-ecowitt-only-sensor-direction.mjs"),
-        "utf8",
-      ),
+      readFileSync(resolve(ROOT, "scripts/assert-ecowitt-only-sensor-direction.mjs"), "utf8"),
     ).not.toThrow();
     expect(() =>
-      readFileSync(
-        resolve(ROOT, ".github/workflows/ecowitt-only-safety-scan.yml"),
-        "utf8",
-      ),
+      readFileSync(resolve(ROOT, ".github/workflows/ecowitt-only-safety-scan.yml"), "utf8"),
     ).not.toThrow();
+  });
+
+  it("allow-list never silently exempts production code paths", () => {
+    // Only docs, scripts, CI workflows, and test files may be
+    // allow-listed. A future allow-list addition under src/lib,
+    // src/components, src/pages, src/hooks, or src/integrations
+    // would silently reintroduce a banned vendor into production
+    // code under the guise of "exempt".
+    const forbiddenPrefixes = [
+      "src/lib/",
+      "src/components/",
+      "src/pages/",
+      "src/hooks/",
+      "src/integrations/",
+      "src/constants/",
+      "src/store/",
+      "supabase/functions/",
+      "supabase/migrations/",
+    ];
+    const leaked = [...ALLOWED].filter((entry) =>
+      forbiddenPrefixes.some((prefix) => entry.startsWith(prefix)),
+    );
+    expect(leaked).toEqual([]);
   });
 });

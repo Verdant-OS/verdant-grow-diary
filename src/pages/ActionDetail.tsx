@@ -68,7 +68,22 @@ import {
   shouldWarnPendingActionHasClosedSourceAlert,
   stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
-import { buildActionButtonAriaLabel, buildStatusBadgeAriaLabel } from "@/lib/actionQueueRowView";
+import {
+  buildActionButtonAriaLabel,
+  buildStatusBadgeAriaLabel,
+  sanitizeActionCopy,
+  APPROVE_DIALOG_REASSURANCE,
+} from "@/lib/actionQueueRowView";
+import {
+  buildActionEvidenceViewModel,
+  ACTION_EVIDENCE_MISSING_PANEL_HELP,
+} from "@/lib/actionQueueEvidenceViewModel";
+import {
+  buildMissingEvidenceReviewLink,
+  ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL,
+} from "@/lib/actionQueueMissingEvidenceLink";
+
+
 
 import { emitBreedingAuditEvent, isBreedingFollowUpAction } from "@/lib/genetics/breedingAuditLog";
 
@@ -138,7 +153,8 @@ const DIALOG_META: Record<
   approve: {
     title: "Approve Action",
     description:
-      "Approved actions are recorded for future manual or controlled execution. No equipment command is sent.",
+      "Approved actions are recorded for future manual or controlled execution. No equipment command is sent. " +
+      APPROVE_DIALOG_REASSURANCE,
     label: "Approval note",
     placeholder: "Optional — why are you approving?",
     confirmLabel: "Approve",
@@ -606,8 +622,8 @@ export default function ActionDetail() {
             {getActionQueueSourceLabel(row)}
           </Badge>
         </div>
-        <h1 className="text-xl font-display font-bold">{row.suggested_change}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{stripBackPointerTokens(row.reason)}</p>
+        <h1 className="text-xl font-display font-bold">{sanitizeActionCopy(row.suggested_change)}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{sanitizeActionCopy(stripBackPointerTokens(row.reason))}</p>
         {isAiDoctorDerived(row) &&
           (() => {
             const headerSessionId = extractSourceAiDoctorSessionId(row.reason);
@@ -710,6 +726,55 @@ export default function ActionDetail() {
                     approving this action.
                   </div>
                 )}
+                {(() => {
+                  const ev = buildActionEvidenceViewModel({ source: row.source, action_type: row.action_type, captured_at: row.created_at });
+                  return (
+                    <>
+                      <p
+                        className="mt-3 text-[11px] text-muted-foreground"
+                        data-testid="action-detail-evidence-quality"
+                      >
+                        {ev.evidenceQualityLabel}
+                      </p>
+                      {!ev.hasSnapshotQuality && (
+                        <div className="flex flex-col gap-2" data-testid="action-detail-missing-evidence-group">
+                          <p
+                            className="text-[11px] text-muted-foreground"
+                            data-testid="action-detail-evidence-missing-help"
+                          >
+                            {ACTION_EVIDENCE_MISSING_PANEL_HELP}
+                          </p>
+                          {!ev.hasSnapshotQuality && (() => {
+                            const link = buildMissingEvidenceReviewLink({
+                              grow_id: row.grow_id,
+                              tent_id: row.tent_id,
+                              plant_id: row.plant_id,
+                            });
+                            if (!link) return null;
+                            return (
+                              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                                <Button asChild size="sm" variant="outline" className="w-full sm:w-auto min-h-[2.25rem] justify-center">
+                                  <Link
+                                    to={link.to}
+                                    data-testid={link.testId}
+                                    aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}
+                                  >
+                                    {link.label}
+                                  </Link>
+                                </Button>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {link.helper}
+                                </p>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
+
               </div>
             );
           })()}
@@ -744,6 +809,55 @@ export default function ActionDetail() {
                     </Link>
                   </Button>
                 )}
+                {(() => {
+                  const ev = buildActionEvidenceViewModel({ source: row.source, action_type: row.action_type, captured_at: row.created_at });
+                  return (
+                    <>
+                      <p
+                        className="mt-3 text-[11px] text-muted-foreground"
+                        data-testid="action-detail-evidence-quality"
+                      >
+                        {ev.evidenceQualityLabel}
+                      </p>
+                      {!ev.hasSnapshotQuality && (
+                        <div className="flex flex-col gap-2" data-testid="action-detail-missing-evidence-group">
+                          <p
+                            className="text-[11px] text-muted-foreground"
+                            data-testid="action-detail-evidence-missing-help"
+                          >
+                            {ACTION_EVIDENCE_MISSING_PANEL_HELP}
+                          </p>
+                          {!ev.hasSnapshotQuality && (() => {
+                            const link = buildMissingEvidenceReviewLink({
+                              grow_id: row.grow_id,
+                              tent_id: row.tent_id,
+                              plant_id: row.plant_id,
+                            });
+                            if (!link) return null;
+                            return (
+                              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                                <Button asChild size="sm" variant="outline" className="w-full sm:w-auto min-h-[2.25rem] justify-center">
+                                  <Link
+                                    to={link.to}
+                                    data-testid={link.testId}
+                                    aria-label={ACTION_EVIDENCE_REVIEW_LINK_ARIA_LABEL}
+                                  >
+                                    {link.label}
+                                  </Link>
+                                </Button>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {link.helper}
+                                </p>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
+
               </div>
             );
           })()}

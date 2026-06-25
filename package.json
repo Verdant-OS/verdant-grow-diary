@@ -58,6 +58,8 @@
     "check:sensor-source-phase3": "bun run typecheck && bun run test:sensor-source-phase3-regression",
     "docs:release-safety": "node scripts/assert-release-docs-safety.mjs",
     "ai-doctor:preview-safety": "node scripts/assert-ai-doctor-preview-safety.mjs",
+    "supabase:migrations:sync": "node scripts/sync-supabase-migrations-from-integration.mjs",
+    "supabase:migrations:verify-remote": "node scripts/verify-supabase-migrations-complete.mjs",
     "precommit:ai-doctor-preview-safety": "node scripts/precommit-ai-doctor-preview-safety.mjs",
     "test:quicklog-rpc-ownership": "vitest run src/test/quicklog-save-manual-rpc-ownership.test.ts src/test/quicklog-save-manual-rpc-reason-codes.test.ts src/test/quicklog-save-manual-rpc-mixed-boundary.test.ts src/test/quicklog-save-manual-rpc-ci-script.test.ts",
     "test:sensor-intelligence-safety": "node scripts/assert-sensor-intelligence-safety.mjs && vitest run src/test/sensor-intelligence-safety.test.ts",

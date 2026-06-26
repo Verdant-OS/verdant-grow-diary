@@ -27,6 +27,8 @@ import {
   type QuickLogMoldCheckStatus,
   type QuickLogTrimStyle,
 } from "@/constants/quickLogEventTypes";
+import type { GroveBagAirflowObservation } from "@/constants/groveBagCureFields";
+import { normalizeGroveBagAirflowObservation } from "./groveBagAirflowRules";
 
 export const CURE_TEMP_MIN_F = 32;
 export const CURE_TEMP_MAX_F = 120;

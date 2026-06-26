@@ -76,38 +76,43 @@ describe("v1.3 workbook formula snapshots — XLSX must match contract exactly",
     expect(revHeaders).toEqual(COMMERCIAL_REVIEW_HEADERS);
   });
 
-  it("CSV artifacts contain the canonical formula text verbatim", () => {
+  it("CSV artifacts contain the canonical formula text (RFC-4180 quote-escaped)", () => {
+    // CSV doubles inner quotes per RFC 4180.
+    const csvEscape = (f: string) => f.replace(/"/g, '""');
     const seedCsv = readFileSync(SEED_CSV, "utf8");
-    expect(seedCsv).toContain(viabilityFormula(2));
-    expect(seedCsv).toContain(qualityFlagFormula(2));
+    expect(seedCsv).toContain(csvEscape(viabilityFormula(2)));
+    expect(seedCsv).toContain(csvEscape(qualityFlagFormula(2)));
 
     const revCsv = readFileSync(REVIEW_CSV, "utf8");
-    expect(revCsv).toContain(reviewStatusFormula(2));
+    expect(revCsv).toContain(csvEscape(reviewStatusFormula(2)));
     expect(revCsv).not.toMatch(/"Released"/);
+    expect(revCsv).not.toMatch(/""Released""/);
   });
 
-  it("formula contracts markdown documents all four formulas verbatim", () => {
+  it("formula contracts markdown documents all four formulas (generic-row form)", () => {
+    // Contracts md uses `r` as the generic row placeholder.
+    const generic = (f: string) => f.replace(/(\d+)/g, "r");
     const md = readFileSync(CONTRACTS_MD, "utf8");
-    expect(md).toContain(viabilityFormula(2));
-    expect(md).toContain(viableSeedRatioFormula(2));
-    expect(md).toContain(qualityFlagFormula(2));
-    expect(md).toContain(reviewStatusFormula(2));
+    expect(md).toContain(generic(viabilityFormula(2)));
+    expect(md).toContain(generic(viableSeedRatioFormula(2)));
+    expect(md).toContain(generic(qualityFlagFormula(2)));
+    expect(md).toContain(generic(reviewStatusFormula(2)));
     expect(md).not.toMatch(/"Released"/);
   });
 
-  it("inline snapshot of canonical formula strings (drift detector)", () => {
+  it("canonical formula strings match the v1.3 contract exactly (drift detector)", () => {
     expect({
       viability: viabilityFormula(2),
       viableSeedRatio: viableSeedRatioFormula(2),
       qualityFlag: qualityFlagFormula(2),
       reviewStatus: reviewStatusFormula(2),
-    }).toMatchInlineSnapshot(`
-      {
-        "qualityFlag": "=IF(L2=\\"\\",\\"Missing Test\\",IF(N2<25,\\"Hold\\",IF(N2<50,\\"Needs Review\\",IF(L2<0.7,\\"Hold\\",IF(L2<0.85,\\"Needs Review\\",\\"Pass\\")))))",
-        "reviewStatus": "=IF(AB2>0,\\"Needs Review\\",IF(M2<25,\\"Hold\\",IF(L2<0.7,\\"Hold\\",IF(M2<50,\\"Needs Review\\",IF(AND(L2>=0.85,AB2=0),\\"Release Candidate\\",\\"Needs Review\\")))))",
-        "viability": "=IF(OR(N2=\\"\\",N2=0,Q2=\\"\\"),\\"\\",Q2/N2)",
-        "viableSeedRatio": "=IF(OR(J2=\\"\\",J2=0,K2=\\"\\"),\\"\\",K2/J2)",
-      }
-    `);
+    }).toEqual({
+      viability: '=IF(OR(N2="",N2=0,Q2=""),"",Q2/N2)',
+      viableSeedRatio: '=IF(OR(J2="",J2=0,K2=""),"",K2/J2)',
+      qualityFlag:
+        '=IF(L2="","Missing Test",IF(N2<25,"Hold",IF(N2<50,"Needs Review",IF(L2<0.7,"Hold",IF(L2<0.85,"Needs Review","Pass")))))',
+      reviewStatus:
+        '=IF(AB2>0,"Needs Review",IF(M2<25,"Hold",IF(L2<0.7,"Hold",IF(M2<50,"Needs Review",IF(AND(L2>=0.85,AB2=0),"Release Candidate","Needs Review")))))',
+    });
   });
 });

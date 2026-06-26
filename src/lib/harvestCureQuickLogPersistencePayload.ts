@@ -22,7 +22,7 @@
  *    snapshot's `source` label (manual / demo / stale / invalid / etc.)
  *    is preserved exactly; this module never relabels a snapshot as
  *    "live" and never treats demo/stale/invalid as good evidence.
- *  - No AI / model imports. No device-control imports.
+ *  - No AI / model imports. No hardware-actuation imports.
  */
 
 import {

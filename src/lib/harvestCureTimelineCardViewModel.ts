@@ -28,6 +28,11 @@ import {
   cureCheckCautionState,
   type CureCautionState,
 } from "./harvestCureRules";
+import type { GroveBagAirflowObservation } from "@/constants/groveBagCureFields";
+import {
+  buildGroveBagAirflowViewModel,
+  type GroveBagAirflowViewModel,
+} from "./groveBagAirflowRules";
 import {
   isHealthySensorSource,
   normalizeSensorSource,

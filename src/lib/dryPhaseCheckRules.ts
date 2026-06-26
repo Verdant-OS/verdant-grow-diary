@@ -97,8 +97,8 @@ function enumOrUndef<T extends string>(
   return (allowed as readonly string[]).includes(t) ? (t as T) : undefined;
 }
 
-interface NumOk { ok: true; value: number | undefined }
-interface NumErr { ok: false; error: DryPhaseFieldError }
+interface NumOk { ok: true; value: number | undefined; error?: undefined }
+interface NumErr { ok: false; value?: undefined; error: DryPhaseFieldError }
 type NumResult = NumOk | NumErr;
 
 function coerceNumber(v: number | string | null | undefined): NumResult {

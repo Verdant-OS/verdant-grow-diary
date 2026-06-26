@@ -2,7 +2,7 @@
  * SensorSnapshotCard — presenter-only card for a single sensor snapshot.
  *
  * Renders provenance badge, captured age, metric rows, and any suspicious
- * metric warnings. Never asserts "healthy" for invalid/stale/demo/unknown.
+ * metric warnings. Never reads healthy for invalid/stale/demo/unknown.
  */
 import { cn } from "@/lib/utils";
 import SensorSourceBadge from "@/components/sensor/SensorSourceBadge";

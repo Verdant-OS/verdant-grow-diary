@@ -1,0 +1,26 @@
+name: Stabilization PR scope gate
+
+# Runs only on PRs labeled `test-stabilization`. Fails fast if the PR
+# touches any product/schema/RLS/Edge/UI/AI/Action Queue surface — those
+# must ship in their own scoped PRs. Dev tooling only; no product behavior
+# changes are exercised here.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches: [main]
+
+jobs:
+  scope-gate:
+    name: Verify stabilization PR scope
+    if: contains(github.event.pull_request.labels.*.name, 'test-stabilization')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify stabilization PR scope
+        run: node scripts/verify-stabilization-pr-scope.mjs --base origin/${{ github.base_ref }}

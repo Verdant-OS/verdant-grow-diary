@@ -1,105 +1,84 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import SensorSnapshotCard from "@/components/SensorSnapshotCard";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import SensorSnapshotCard from "@/components/sensor/SensorSnapshotCard";
+import type { SensorSnapshot } from "@/lib/sensor/sensorSnapshotFreshnessRules";
 
-const NOW = new Date("2026-06-19T12:00:00.000Z").getTime();
-const isoMinusMs = (ms: number) => new Date(NOW - ms).toISOString();
+const NOW = Date.parse("2026-06-26T12:00:00Z");
+
+function make(overrides: Partial<SensorSnapshot> = {}): SensorSnapshot {
+  return {
+    source: "manual",
+    captured_at: "2026-06-26T11:50:00Z",
+    tent_id: "tent-1",
+    metrics: { temp_f: 75, rh: 55 },
+    ...overrides,
+  };
+}
 
 describe("SensorSnapshotCard", () => {
-  it("renders empty state when no snapshot is provided", () => {
-    render(<SensorSnapshotCard snapshot={null} />);
-    expect(
-      screen.getByTestId("sensor-snapshot-card-empty"),
-    ).toHaveTextContent(/no sensor snapshot/i);
-  });
-
-  it("renders fresh live snapshot without warning", () => {
+  it("labels demo snapshot as sample/demo, not live", () => {
     render(
       <SensorSnapshotCard
-        snapshot={{
-          source: "live",
-          capturedAt: isoMinusMs(60_000),
-          sourceDetail: "ggs_controller",
-          metrics: [
-            { key: "temp", value: 24.3, unit: "°C" },
-            { key: "rh", value: 55, unit: "%" },
-          ],
-        }}
-        resolveOptions={{ now: NOW }}
+        snapshot={make({ source: "demo" })}
+        classifyOptions={{ now: NOW }}
       />,
     );
     const card = screen.getByTestId("sensor-snapshot-card");
-    expect(card.dataset.effectiveSource).toBe("live");
-    expect(card.dataset.freshness).toBe("fresh");
-    expect(
-      screen.queryByTestId("sensor-snapshot-card-warning"),
-    ).toBeNull();
-    expect(
-      screen.getByTestId("sensor-snapshot-card-source-detail"),
-    ).toHaveTextContent("ggs_controller");
+    expect(card.getAttribute("data-source")).toBe("demo");
+    expect(card.getAttribute("data-degraded")).toBe("true");
+    expect(screen.getByTestId("sensor-snapshot-card-demo-notice").textContent)
+      .toMatch(/sample|demo/i);
   });
 
-  it("renders stale warning copy for old environment readings", () => {
+  it("shows warnings for suspicious metrics", () => {
     render(
       <SensorSnapshotCard
-        snapshot={{
-          source: "live",
-          capturedAt: isoMinusMs(60 * 60 * 1000),
-          metrics: [{ key: "temp", value: 24 }],
-        }}
-        resolveOptions={{ now: NOW }}
+        snapshot={make({ metrics: { temp_f: 25, rh: 0, ec: 1450 } })}
+        classifyOptions={{ now: NOW }}
+      />,
+    );
+    expect(
+      screen.getByTestId("sensor-snapshot-card-warning-temp_f_looks_celsius"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("sensor-snapshot-card-warning-humidity_stuck_0"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("sensor-snapshot-card-warning-ec_likely_microsiemens"),
+    ).toBeInTheDocument();
+  });
+
+  it("invalid snapshot is degraded and never says healthy", () => {
+    render(
+      <SensorSnapshotCard
+        snapshot={make({ captured_at: null })}
+        classifyOptions={{ now: NOW }}
       />,
     );
     const card = screen.getByTestId("sensor-snapshot-card");
-    expect(card.dataset.effectiveSource).toBe("stale");
-    expect(
-      screen.getByTestId("sensor-snapshot-card-warning"),
-    ).toHaveTextContent(/stale/i);
+    expect(card.getAttribute("data-freshness")).toBe("invalid");
+    expect(card.textContent?.toLowerCase()).not.toContain("healthy");
   });
 
-  it("renders invalid warning for missing captured_at", () => {
-    render(
-      <SensorSnapshotCard
-        snapshot={{ source: "live" }}
-        resolveOptions={{ now: NOW }}
-      />,
-    );
-    const card = screen.getByTestId("sensor-snapshot-card");
-    expect(card.dataset.effectiveSource).toBe("invalid");
-    expect(
-      screen.getByTestId("sensor-snapshot-card-warning"),
-    ).toHaveTextContent(/invalid|missing/i);
-  });
-
-  it("labels demo snapshots as demo and warns", () => {
-    render(
-      <SensorSnapshotCard
-        snapshot={{ source: "demo", capturedAt: isoMinusMs(0) }}
-        resolveOptions={{ now: NOW }}
-      />,
-    );
-    const card = screen.getByTestId("sensor-snapshot-card");
-    expect(card.dataset.effectiveSource).toBe("demo");
-    expect(
-      screen.getByTestId("sensor-snapshot-card-warning"),
-    ).toHaveTextContent(/demo/i);
-  });
-
-  it("never renders raw_payload or secret-like strings", () => {
-    const evilSnapshot = {
-      source: "live",
-      capturedAt: isoMinusMs(0),
-      raw_payload: { api_key: "abcd1234", secret: "shh" },
-    } as unknown as Parameters<typeof SensorSnapshotCard>[0]["snapshot"];
-    const { container } = render(
-      <SensorSnapshotCard
-        snapshot={evilSnapshot}
-        resolveOptions={{ now: NOW }}
-      />,
-    );
-    const html = container.innerHTML;
-    expect(html).not.toMatch(/raw_payload/);
-    expect(html).not.toMatch(/api_key/);
-    expect(html).not.toMatch(/abcd1234/);
+  it("source files contain no automation/device-control language", () => {
+    const files = [
+      "src/components/sensor/SensorSourceBadge.tsx",
+      "src/components/sensor/SensorSnapshotCard.tsx",
+    ];
+    const forbidden = [
+      /\bautopilot\b/i,
+      /\bauto[ _-]?execute\b/i,
+      /\bfake live\b/i,
+      /service_role/i,
+      /\bdevice[ _-]?control\b/i,
+    ];
+    for (const file of files) {
+      const content = readFileSync(resolve(process.cwd(), file), "utf8");
+      for (const pattern of forbidden) {
+        expect(content).not.toMatch(pattern);
+      }
+    }
   });
 });

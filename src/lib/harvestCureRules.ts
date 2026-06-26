@@ -27,6 +27,8 @@ import {
   type QuickLogMoldCheckStatus,
   type QuickLogTrimStyle,
 } from "@/constants/quickLogEventTypes";
+import type { GroveBagAirflowObservation } from "@/constants/groveBagCureFields";
+import { normalizeGroveBagAirflowObservation } from "./groveBagAirflowRules";
 
 export const CURE_TEMP_MIN_F = 32;
 export const CURE_TEMP_MAX_F = 120;
@@ -74,6 +76,11 @@ export interface CureCheckDetailsInput {
   mold_check?: string | null;
   burped?: string | null;
   action_taken_note?: string | null;
+  /**
+   * Optional Grove Bag airflow observation. Operator-entered context,
+   * NEVER inferred from sensors. Normalized via groveBagAirflowRules.
+   */
+  airflow_observation?: string | null;
 }
 
 export interface CureCheckDetailsValidation {
@@ -89,6 +96,8 @@ export interface CureCheckDetailsValidation {
     mold_check?: QuickLogMoldCheckStatus;
     burped?: QuickLogBurpedValue;
     action_taken_note?: string;
+    /** Only present when the operator selected a non-unknown value. */
+    airflow_observation?: GroveBagAirflowObservation;
   };
 }
 
@@ -201,6 +210,14 @@ export function validateCureCheckDetails(
     if (tempF.value < CURE_TEMP_MIN_F || tempF.value > CURE_TEMP_MAX_F) {
       errors.cure_temp_f = "invalid_range";
     } else value.cure_temp_f = tempF.value;
+  }
+
+  // Airflow is operator-entered context, not telemetry. Invalid / missing
+  // input falls back to "unknown" and is intentionally NOT persisted —
+  // only explicit observations are stored on details.
+  if (i.airflow_observation !== undefined && i.airflow_observation !== null && i.airflow_observation !== "") {
+    const airflow = normalizeGroveBagAirflowObservation(i.airflow_observation);
+    if (airflow !== "unknown") value.airflow_observation = airflow;
   }
 
   return { ok: Object.keys(errors).length === 0, errors, value };

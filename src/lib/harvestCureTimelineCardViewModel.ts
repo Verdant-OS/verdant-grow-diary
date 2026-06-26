@@ -28,6 +28,11 @@ import {
   cureCheckCautionState,
   type CureCautionState,
 } from "./harvestCureRules";
+import type { GroveBagAirflowObservation } from "@/constants/groveBagCureFields";
+import {
+  buildGroveBagAirflowViewModel,
+  type GroveBagAirflowViewModel,
+} from "./groveBagAirflowRules";
 import {
   isHealthySensorSource,
   normalizeSensorSource,
@@ -74,6 +79,12 @@ export interface CureCheckCardViewModel {
   sensor?: SensorCardViewModel;
   cautionState: CureCautionState;
   cautionCopy: string | null;
+  /**
+   * Optional Grove Bag airflow observation view-model. Present only when
+   * the operator explicitly recorded an airflow value. Operator context
+   * only — never inferred from telemetry.
+   */
+  airflow?: GroveBagAirflowViewModel;
 }
 
 export interface SensorCardViewModel {
@@ -157,6 +168,8 @@ export interface CureCheckCardInput {
     mold_check?: QuickLogMoldCheckStatus;
     burped?: QuickLogBurpedValue;
     action_taken_note?: string;
+    /** Optional Grove Bag airflow observation. */
+    airflow_observation?: GroveBagAirflowObservation | string | null;
   };
   photoUrl?: string | null;
   sensor?: TimelineSensorSnapshotInput | null;
@@ -167,6 +180,10 @@ export function buildCureCheckCardViewModel(
 ): CureCheckCardViewModel {
   const d = input.details ?? {};
   const cautionState = cureCheckCautionState(d.mold_check);
+  const hasAirflow =
+    d.airflow_observation !== undefined &&
+    d.airflow_observation !== null &&
+    d.airflow_observation !== "";
   return {
     kind: "cure_check",
     title: QUICK_LOG_HARVEST_CURE_LABELS[QUICK_LOG_CURE_CHECK_EVENT_TYPE],
@@ -183,5 +200,8 @@ export function buildCureCheckCardViewModel(
     sensor: buildSensorCardViewModel(input.sensor),
     cautionState,
     cautionCopy: cureCheckCautionCopy(cautionState),
+    airflow: hasAirflow
+      ? buildGroveBagAirflowViewModel(d.airflow_observation)
+      : undefined,
   };
 }

@@ -630,10 +630,91 @@ If/when adopted, mark them as **optional future expansion** and keep `L` /
 
 ---
 
+## Cross-sheet traceability — backlink reference
+
+This sheet is the upstream source of seed-lot provenance for the
+`Commercial_Release_Review_Traceability` workbook. The full mapping table
+lives in
+[`docs/commercial-release-review-traceability-workbook-spec.md`](./commercial-release-review-traceability-workbook-spec.md)
+under **Cross-Sheet Traceability Mapping**.
+
+Quick summary of outbound references from this sheet:
+
+| From (Seed Production)              | To (other sheet)                                                       | Required for             |
+| ----------------------------------- | ---------------------------------------------------------------------- | ------------------------ |
+| `A Seed Lot ID`                     | `Commercial_Release_Review_Traceability.C Seed Lot ID`                 | every release review row |
+| `Y Linked Commercial Checklist Row` | `Commercial_Release_Checklist.Row ID / Checklist ID`                   | Release Candidate signal |
+
+Rules:
+
+- `Seed Lot ID` (column `A`) **must be unique** in this sheet.
+- A broken or missing outbound reference must increment the downstream
+  **Missing Evidence Count**; it must never auto-approve or auto-reject a
+  release review.
+
+---
+
+## Formula Edge Cases: Expected Outputs
+
+These scenarios pin down what the workbook formulas are expected to emit
+for `Viability %`, `Viable Seed Ratio`, `Quality Flag`,
+`Review Status suggestion`, and `Missing Evidence Count`. Treat any
+deviation as a spec bug. `Human Release Decision` is **never** set by a
+formula in any scenario.
+
+| Scenario                              | Viability %                                       | Viable Seed Ratio          | Quality Flag                 | Missing Evidence Count                            | Review Status suggestion  | Notes / safety                                                                          |
+| ------------------------------------- | ------------------------------------------------- | -------------------------- | ---------------------------- | ------------------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------- |
+| A — Complete release candidate signal (Total 1200; Cleaned 1080; Sample 100; Final 94; parentage / storage / checklist complete; no unresolved concerns) | `94%`                                             | `90%`                      | `Pass`                       | `0`                                               | `Release Candidate`       | Human Release Decision remains manual — formula must not set `Released`.                |
+| B — Good germination, small sample (Sample 40; Final 38) | `95%`                                             | per other cols             | `Needs Review`               | increment for **small sample (< 50)**             | `Needs Review`            | Sample below 50 — viability % is suggestive only.                                       |
+| C — Very small sample (Sample 20; Final 20) | `100%`                                            | per other cols             | `Hold`                       | increment for **sample < 25**                     | `Hold`                    | Percentage is not trusted enough for release review; flag must be `Hold`, never `Pass`. |
+| D — Missing germination test (Sample blank; Final blank) | `blank`                                           | per other cols             | `Missing Test`               | increment for **missing germination evidence**    | `Needs Review` or `Hold`  | Must **not** show `Release Candidate`.                                                  |
+| E — Final count > sample size (Sample 100; Final 105) | `invalid` / `review` (never `105%`)               | per other cols             | `Hold` or `Needs Review`     | increment for **invalid germination counts**      | `Hold`                    | Impossible count — formula must not trust it and must not surface a numeric viability.  |
+| F — Cleaned seeds > total collected (Total 500; Cleaned 575) | unchanged (germination drives flag)               | `invalid` / `review`       | per germination test only    | increment for **conflicting seed counts**         | `Needs Review` or `Hold`  | Quality Flag still driven by germination; release status downgraded due to conflict.    |
+| G — Conflicting dates (Seed Harvest < Pollination; Dry/Cure Start < Seed Harvest) | unchanged if germ counts valid                    | unchanged                  | unchanged if germ counts valid | increment for **date conflicts**                 | `Needs Review`            | No release candidate signal until dates are corrected or waived manually with a note.   |
+| H — Retest cycle (First: Sample 100 / Final 68 / `68%`; Retest: Sample 100 / Final 88 / `88%`; Official Viability Source = `Manual Review` / `Retest`) | first `68%`, retest `88%`; official only switches when operator marks retest official | per other cols | `Pass` allowed **only** against official viability | per other rules | `Needs Review` until reviewer accepts retest | Formula must **not** silently hide the failed first test; both remain visible in notes / retest fields. |
+
+**Formula guidance reaffirmed:**
+
+- Formulas may **flag**, **suggest**, and **count missing evidence**.
+- Formulas must **never** set `Released`.
+- `Human Release Decision` remains manual.
+- Retest override requires operator approval; replacement of the official
+  viability is a recorded decision, not a formula side effect.
+
+---
+
+## Versioning and Change-Log Policy
+
+- Workbook specs use semantic versions: `v1.0`, `v1.1`, `v1.2`, `v1.3`, …
+- **Patch-level** changes may clarify wording, examples, formulas, or
+  safety copy.
+- **Minor version** changes may add new sections, columns, formulas, or
+  workbook sheets.
+- **Major version** changes require explicit review because they may
+  change the workbook operating model.
+- Every version entry must include: **version**, **date**, **summary**,
+  **files / sections changed**, **safety impact**, **rollback note**.
+
+---
+
 ## Change log
 
-- **v1.2 (this doc):** Added Examples 3–4, full per-column rules (allowed
-  values / units / null rules / formula roles), extended formula edge cases,
+- **v1.3 (this doc) — 2026-06-26:**
+  - Summary: Premium traceability alignment, explicit expected formula
+    outputs for edge cases, cross-sheet mapping backlink to the
+    Commercial Release Review workbook, and a documented versioning /
+    change-log policy.
+  - Files / sections changed: this file — added
+    *Cross-sheet traceability — backlink reference*,
+    *Formula Edge Cases: Expected Outputs*,
+    *Versioning and Change-Log Policy*, updated *Change log*.
+  - Safety impact: **None.** Docs-only. No app code, schema, RLS, RPC,
+    Edge Function, UI, entitlement logic, AI call, alert, Action Queue
+    write, or device control changes.
+  - Rollback note: revert this file to the v1.2 revision; no app
+    rollback required.
+- **v1.2:** Added Examples 3–4, full per-column rules (allowed values /
+  units / null rules / formula roles), extended formula edge cases,
   retest-cycle guidance, and optional future expansion fields. Pointed
   release decisions at the new Commercial Release Review + Traceability
   workbook spec.

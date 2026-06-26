@@ -1,0 +1,47 @@
+name: Supabase Migrations Sync Check
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "scripts/sync-supabase-migrations-from-integration.mjs"
+      - "scripts/verify-supabase-migrations-complete.mjs"
+      - ".github/workflows/supabase-migrations-sync-check.yml"
+      - "docs/contributing-supabase-migrations.md"
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-migrations-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-migrations-complete:
+    name: Verify migrations superset of integration branch
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_MIGRATIONS_INTEGRATION_BRANCH: dev
+    steps:
+      - name: Checkout PR head with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Fetch integration branch
+        run: |
+          git fetch origin "${SUPABASE_MIGRATIONS_INTEGRATION_BRANCH}" --quiet || \
+            echo "::warning::Could not fetch origin/${SUPABASE_MIGRATIONS_INTEGRATION_BRANCH}; verify script will fall back."
+
+      - name: Verify local migrations are a superset of integration
+        run: node scripts/verify-supabase-migrations-complete.mjs
+
+      - name: Remediation hint on failure
+        if: failure()
+        run: |
+          echo "::error::Supabase migration history on this PR is missing files from origin/${SUPABASE_MIGRATIONS_INTEGRATION_BRANCH}."
+          echo "Run locally: bun run supabase:migrations:sync --branch ${SUPABASE_MIGRATIONS_INTEGRATION_BRANCH}"
+          echo "Then commit the synced files. See docs/contributing-supabase-migrations.md."

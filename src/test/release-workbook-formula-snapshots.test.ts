@@ -91,7 +91,7 @@ describe("v1.3 workbook formula snapshots — XLSX must match contract exactly",
 
   it("formula contracts markdown documents all four formulas (generic-row form)", () => {
     // Contracts md uses `r` as the generic row placeholder.
-    const generic = (f: string) => f.replace(/(\d+)/g, "r");
+    const generic = (f: string) => f.replace(/([A-Z]+)\d+/g, "$1r");
     const md = readFileSync(CONTRACTS_MD, "utf8");
     expect(md).toContain(generic(viabilityFormula(2)));
     expect(md).toContain(generic(viableSeedRatioFormula(2)));

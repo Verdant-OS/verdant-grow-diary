@@ -74,8 +74,8 @@ describe("Timeline Grove Bag cure card with airflow", () => {
     });
     // Mold caution is independent.
     expect(vm.cautionState).toBe("none");
-    // Pure VM has no alert/action surface.
-    expect((vm as Record<string, unknown>).alert).toBeUndefined();
-    expect((vm as Record<string, unknown>).actionQueueItem).toBeUndefined();
+    const anyVm = vm as unknown as Record<string, unknown>;
+    expect(anyVm.alert).toBeUndefined();
+    expect(anyVm.actionQueueItem).toBeUndefined();
   });
 });

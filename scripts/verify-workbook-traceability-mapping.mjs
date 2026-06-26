@@ -108,8 +108,8 @@ function extractTraceabilityTable(text) {
 
 function checkRow(row) {
   const problems = [];
-  const fromSheet = row.from.split(".")[0].replace(/[`*_]/g, "").trim();
-  const toSheet = row.to.split(".")[0].replace(/[`*_]/g, "").trim();
+  const fromSheet = row.from.split(".")[0].replace(/[`*]/g, "").trim();
+  const toSheet = row.to.split(".")[0].replace(/[`*]/g, "").trim().replace(/^one or more of\s+/i, "");
 
   // Validate sheet membership for `from` (must be a known sheet).
   if (!KNOWN_SHEETS.has(fromSheet)) {

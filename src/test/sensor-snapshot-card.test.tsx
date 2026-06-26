@@ -69,10 +69,10 @@ describe("SensorSnapshotCard", () => {
     ];
     const forbidden = [
       /\bautopilot\b/i,
-      /\bauto[- ]?execute\b/i,
+      /\bauto[ _-]?execute\b/i,
       /\bfake live\b/i,
       /service_role/i,
-      /\bdevice[_- ]?control\b/i,
+      /\bdevice[ _-]?control\b/i,
     ];
     for (const file of files) {
       const content = readFileSync(resolve(process.cwd(), file), "utf8");

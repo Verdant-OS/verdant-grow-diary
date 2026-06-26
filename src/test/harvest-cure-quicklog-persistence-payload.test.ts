@@ -155,7 +155,7 @@ describe("harvestCureQuickLogPersistencePayload", () => {
         harvest: { wet_weight_grams: -10 },
       });
       expect(r.ok).toBe(false);
-      if (r.ok) return;
+      if (r.ok) throw new Error("expected failure");
       expect(r.reason).toBe("invalid_harvest_details");
     });
 
@@ -167,7 +167,7 @@ describe("harvestCureQuickLogPersistencePayload", () => {
         cureCheck: { cure_day: -1 },
       });
       expect(r.ok).toBe(false);
-      if (r.ok) return;
+      if (r.ok) throw new Error("expected failure");
       expect(r.reason).toBe("invalid_cure_check_details");
     });
 
@@ -202,7 +202,7 @@ describe("harvestCureQuickLogPersistencePayload", () => {
         idempotencyKey: "short",
       });
       expect(r.ok).toBe(false);
-      if (r.ok) return;
+      if (r.ok) throw new Error("expected failure");
       expect(r.reason).toBe("invalid_idempotency_key");
     });
 
@@ -219,7 +219,7 @@ describe("harvestCureQuickLogPersistencePayload", () => {
         },
       });
       expect(r.ok).toBe(false);
-      if (r.ok) return;
+      if (r.ok) throw new Error("expected failure");
       expect(r.reason).toBe("invalid_sensor_snapshot");
     });
 
@@ -230,7 +230,7 @@ describe("harvestCureQuickLogPersistencePayload", () => {
         idempotencyKey: IK,
       });
       expect(r.ok).toBe(false);
-      if (r.ok) return;
+      if (r.ok) throw new Error("expected failure");
       expect(r.reason).toBe("invalid_event_type");
     });
   });

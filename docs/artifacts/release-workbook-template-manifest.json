@@ -1,0 +1,206 @@
+{
+  "version": "v1.3",
+  "generated_at": "2026-06-26T23:08:16.023Z",
+  "files": [
+    {
+      "path": "docs/artifacts/seed-production-tracking-v1.3-template.csv",
+      "kind": "csv"
+    },
+    {
+      "path": "docs/artifacts/commercial-release-review-traceability-v1.3-template.csv",
+      "kind": "csv"
+    },
+    {
+      "path": "docs/artifacts/seed-production-tracking-v1.3-template.xlsx",
+      "kind": "xlsx",
+      "generated": true
+    },
+    {
+      "path": "docs/artifacts/commercial-release-review-traceability-v1.3-template.xlsx",
+      "kind": "xlsx",
+      "generated": true
+    },
+    {
+      "path": "docs/artifacts/release-workbook-formula-contracts.md",
+      "kind": "markdown"
+    }
+  ],
+  "sheets": {
+    "Seed_Production_Tracking": {
+      "headers": [
+        "A Seed Lot ID",
+        "B Project / Line",
+        "C Generation",
+        "D Female Parent",
+        "E Male Parent",
+        "F Pollination Date",
+        "G Isolation Method",
+        "H Seed Harvest Date",
+        "I Dry / Cure Start Date",
+        "J Total Seeds Collected",
+        "K Cleaned / Viable Seeds",
+        "L Viability % Tested",
+        "M Germination Test Date",
+        "N Sample Size Tested",
+        "O Day 5 Germ Count",
+        "P Day 7 Germ Count",
+        "Q Final Germ Count",
+        "R Final Count Day",
+        "S Storage Method",
+        "T Storage Temp",
+        "U Storage RH / Desiccant",
+        "V Production Notes",
+        "W Quality Flag",
+        "X Commercial Release Linked?",
+        "Y Linked Commercial Checklist Row",
+        "Z Verdant Diary Entry",
+        "AA Verdant Action Queue Item"
+      ],
+      "allowed_values": {
+        "Generation": [
+          "F1",
+          "F2",
+          "F3",
+          "S1",
+          "S2",
+          "BC1",
+          "BC2",
+          "BC3",
+          "Open Pollination",
+          "Unknown"
+        ],
+        "Isolation Method": [
+          "whole_tent",
+          "branch_bag",
+          "isolated_room",
+          "manual_paint",
+          "open_pollination",
+          "unknown"
+        ],
+        "Storage Method": [
+          "fridge",
+          "freezer",
+          "room_temp",
+          "cool_dark",
+          "unknown",
+          "other"
+        ],
+        "Quality Flag (output only)": [
+          "Pass",
+          "Needs Review",
+          "Hold",
+          "Missing Test"
+        ],
+        "Commercial Release Linked?": [
+          "Yes",
+          "No"
+        ]
+      },
+      "formula_contracts": {
+        "L": "=IF(OR(N{r}=\"\",N{r}=0,Q{r}=\"\"),\"\",Q{r}/N{r})",
+        "viable_seed_ratio_helper": "=IF(OR(J{r}=\"\",J{r}=0,K{r}=\"\"),\"\",K{r}/J{r})",
+        "W": "=IF(L{r}=\"\",\"Missing Test\",IF(N{r}<25,\"Hold\",IF(N{r}<50,\"Needs Review\",IF(L{r}<0.7,\"Hold\",IF(L{r}<0.85,\"Needs Review\",\"Pass\")))))"
+      }
+    },
+    "Commercial_Release_Review_Traceability": {
+      "headers": [
+        "A Release Review ID",
+        "B Candidate Line / Product Name",
+        "C Seed Lot ID",
+        "D Project / Line",
+        "E Generation",
+        "F Female Parent",
+        "G Male Parent",
+        "H Linked Seed Production Row",
+        "I Linked Commercial Release Checklist Row",
+        "J Linked Pheno Comparison Row(s)",
+        "K Linked F1 / Backcross / Stabilization Row(s)",
+        "L Germination Viability %",
+        "M Germination Sample Size",
+        "N Germination Test Date",
+        "O Storage Method",
+        "P Storage Conditions Documented?",
+        "Q Parentage Complete?",
+        "R Multi-Environment Testing Complete?",
+        "S Stress Testing Complete?",
+        "T Herm / Stability Concern?",
+        "U Terp / Chemotype Stability Evidence",
+        "V Dry / Cure Performance Evidence",
+        "W Yield / Production Evidence",
+        "X Pest / Disease Resistance Evidence",
+        "Y Hash / Extraction Evidence, if applicable",
+        "Z Test Grow Feedback, if available",
+        "AA Unresolved Concerns",
+        "AB Missing Evidence Count",
+        "AC Review Status",
+        "AD Human Release Decision",
+        "AE Reviewer",
+        "AF Review Date",
+        "AG Verdant Diary Evidence",
+        "AH Verdant Action Queue Draft",
+        "AI Notes"
+      ],
+      "allowed_values": {
+        "Storage Conditions Documented?": [
+          "Yes",
+          "No"
+        ],
+        "Parentage Complete?": [
+          "Yes",
+          "No"
+        ],
+        "Multi-Environment Testing Complete?": [
+          "Yes",
+          "No",
+          "Waived"
+        ],
+        "Stress Testing Complete?": [
+          "Yes",
+          "No",
+          "Waived"
+        ],
+        "Herm / Stability Concern?": [
+          "No",
+          "Yes",
+          "Unknown"
+        ],
+        "Review Status (formula-suggested, max Release Candidate)": [
+          "Draft",
+          "Needs Review",
+          "Hold",
+          "Release Candidate",
+          "Released (manual-only)",
+          "Rejected (manual-only)",
+          "Retest Required"
+        ],
+        "Human Release Decision (manual-only)": [
+          "Not Reviewed",
+          "Approved",
+          "Rejected",
+          "Hold for Retest",
+          "Hold for More Data"
+        ]
+      },
+      "formula_contracts": {
+        "AC_review_status_suggestion": "=IF(AB{r}>0,\"Needs Review\",IF(M{r}<25,\"Hold\",IF(L{r}<0.7,\"Hold\",IF(M{r}<50,\"Needs Review\",IF(AND(L{r}>=0.85,AB{r}=0),\"Release Candidate\",\"Needs Review\")))))",
+        "AD_human_release_decision": "manual-only",
+        "AB_missing_evidence_count": "operator-counted or documented helper formula"
+      }
+    }
+  },
+  "safety_notes": [
+    "Formulas provide review signals only. Human Release Decision is manual. No formula releases a seed lot. Action Queue text is draft-only and grower-review-only.",
+    "Review Status formula must never output 'Released' — Released is a human-only transition.",
+    "Action Queue text is draft-only; no automatic Action Queue creation."
+  ],
+  "premium_workbook": {
+    "status": "placeholder only",
+    "placeholder": "{{PREMIUM_WORKBOOK_COPY_URL}}",
+    "real_url_included": false,
+    "entitlement_required_before_serving_real_link": true
+  },
+  "xlsx_generation": {
+    "seed": "generated",
+    "review": "generated"
+  }
+}

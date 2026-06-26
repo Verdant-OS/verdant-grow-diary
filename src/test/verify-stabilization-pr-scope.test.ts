@@ -105,3 +105,85 @@ describe("classifyStabilizationPrFiles", () => {
     expect(passWithDocs.verdict).toBe("pass");
   });
 });
+
+describe("classifyStabilizationPrFiles — staged-mode file lists", () => {
+  it("allows a staged harness-only set", () => {
+    const r = classifyStabilizationPrFiles([
+      "src/test/setup.ts",
+      "vitest.config.ts",
+      "scripts/sensor-safety-check.mjs",
+    ]);
+    expect(r.verdict).toBe("pass");
+    expect(r.blocked).toEqual([]);
+  });
+
+  it("blocks a staged set that mixes harness + product page", () => {
+    const r = classifyStabilizationPrFiles([
+      "src/test/setup.ts",
+      "src/pages/PlantDetail.tsx",
+    ]);
+    expect(r.verdict).toBe("stop-ship");
+    expect(r.allowed).toEqual(["src/test/setup.ts"]);
+    expect(r.blocked).toEqual(["src/pages/PlantDetail.tsx"]);
+  });
+
+  it("blocks a staged Supabase migration even when mixed with harness", () => {
+    const r = classifyStabilizationPrFiles([
+      "src/test/setup.ts",
+      "supabase/migrations/20260626000000_test.sql",
+    ]);
+    expect(r.verdict).toBe("stop-ship");
+    expect(r.blocked).toEqual([
+      "supabase/migrations/20260626000000_test.sql",
+    ]);
+  });
+
+  it("blocks a staged harvest/cure file", () => {
+    const r = classifyStabilizationPrFiles(["src/lib/harvestCureRules.ts"]);
+    expect(r.verdict).toBe("stop-ship");
+    expect(r.blocked).toEqual(["src/lib/harvestCureRules.ts"]);
+  });
+
+  it("blocks a staged genetics file", () => {
+    const r = classifyStabilizationPrFiles(["src/lib/genetics/foo.ts"]);
+    expect(r.verdict).toBe("stop-ship");
+    expect(r.blocked).toEqual(["src/lib/genetics/foo.ts"]);
+  });
+
+  it("allows staged docs only with allowDocs: true", () => {
+    const blocked = classifyStabilizationPrFiles([
+      "docs/test-stabilization-pr-runbook.md",
+    ]);
+    expect(blocked.verdict).toBe("stop-ship");
+    const passed = classifyStabilizationPrFiles(
+      ["docs/test-stabilization-pr-runbook.md"],
+      { allowDocs: true },
+    );
+    expect(passed.verdict).toBe("pass");
+  });
+});
+
+describe("classifyStabilizationPrFiles — lockfile allowlist", () => {
+  it.each([
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "bun.lock",
+    "bun.lockb",
+  ])("allows lockfile %s on its own", (lock) => {
+    const r = classifyStabilizationPrFiles([lock]);
+    expect(r.verdict).toBe("pass");
+    expect(r.allowed).toEqual([lock]);
+  });
+
+  it("blocks overall when a product file rides along with a lockfile", () => {
+    const r = classifyStabilizationPrFiles([
+      "package-lock.json",
+      "src/lib/harvestWatchRules.ts",
+    ]);
+    expect(r.verdict).toBe("stop-ship");
+    expect(r.allowed).toEqual(["package-lock.json"]);
+    expect(r.blocked).toEqual(["src/lib/harvestWatchRules.ts"]);
+  });
+});
+

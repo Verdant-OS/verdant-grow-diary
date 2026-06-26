@@ -74,6 +74,11 @@ export interface CureCheckDetailsInput {
   mold_check?: string | null;
   burped?: string | null;
   action_taken_note?: string | null;
+  /**
+   * Optional Grove Bag airflow observation. Operator-entered context,
+   * NEVER inferred from sensors. Normalized via groveBagAirflowRules.
+   */
+  airflow_observation?: string | null;
 }
 
 export interface CureCheckDetailsValidation {
@@ -89,6 +94,8 @@ export interface CureCheckDetailsValidation {
     mold_check?: QuickLogMoldCheckStatus;
     burped?: QuickLogBurpedValue;
     action_taken_note?: string;
+    /** Only present when the operator selected a non-unknown value. */
+    airflow_observation?: GroveBagAirflowObservation;
   };
 }
 

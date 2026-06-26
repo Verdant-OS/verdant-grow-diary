@@ -67,8 +67,8 @@ export const CURE_SPACE_BUFFER_RH_MIN = 0;
 export const CURE_SPACE_BUFFER_RH_MAX = 100;
 
 /**
- * Cautious copy. Verdant never claims "guaranteed cure" or
- * "competition-grade guaranteed" outcomes from setup memory.
+ * Cautious copy. Verdant never claims certainty of cure outcomes or
+ * "competition-grade guaranteed" results from setup memory.
  */
 export const CURE_SPACE_SETUP_RECORDED_NOTE =
   "Operator-entered setup context recorded as grow memory.";

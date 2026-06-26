@@ -79,6 +79,12 @@ export interface CureCheckCardViewModel {
   sensor?: SensorCardViewModel;
   cautionState: CureCautionState;
   cautionCopy: string | null;
+  /**
+   * Optional Grove Bag airflow observation view-model. Present only when
+   * the operator explicitly recorded an airflow value. Operator context
+   * only — never inferred from telemetry.
+   */
+  airflow?: GroveBagAirflowViewModel;
 }
 
 export interface SensorCardViewModel {

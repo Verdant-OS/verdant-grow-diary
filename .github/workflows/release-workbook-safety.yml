@@ -13,6 +13,8 @@ on:
       - "src/test/assert-release-traceability-mapping.test.ts"
       - "src/test/generate-release-workbook-templates.test.ts"
       - "src/test/release-workbook-formula-snapshots.test.ts"
+      - "src/test/release-workbook-manifest.test.ts"
+      - "scripts/verify-release-workbooks.mjs"
       - ".github/workflows/release-workbook-safety.yml"
       - "package.json"
       - "bun.lockb"

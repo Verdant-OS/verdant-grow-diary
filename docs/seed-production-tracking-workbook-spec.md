@@ -440,9 +440,204 @@ any release conversation.
 
 ---
 
+## 15. Additional Worked Seed-Lot Examples
+
+### Example 3 — Full release candidate signal (Quality Flag = `Pass`)
+
+A high-quality, fully-documented lot. Demonstrates the strongest candidate
+signal the workbook can surface.
+
+| Col | Value                                                                                                                              |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| A   | `SD-P2-F1-2026-Lot03`                                                                                                              |
+| B   | `Project Nimbus`                                                                                                                   |
+| C   | `F1`                                                                                                                               |
+| D   | `Nimbus-Mom-A`                                                                                                                     |
+| E   | `Nimbus-Stud-B`                                                                                                                    |
+| F   | `2026-03-01`                                                                                                                       |
+| G   | `isolated_room`                                                                                                                    |
+| H   | `2026-04-28`                                                                                                                       |
+| I   | `2026-04-30`                                                                                                                       |
+| J   | `1200`                                                                                                                             |
+| K   | `1080`                                                                                                                             |
+| L   | `=IF(OR(N4="",N4=0,Q4=""),"",Q4/N4)` → `0.94`                                                                                      |
+| M   | `2026-05-20`                                                                                                                       |
+| N   | `100`                                                                                                                              |
+| O   | `82`                                                                                                                               |
+| P   | `91`                                                                                                                               |
+| Q   | `94`                                                                                                                               |
+| R   | `14`                                                                                                                               |
+| S   | `freezer`                                                                                                                          |
+| T   | `-18 °C`                                                                                                                           |
+| U   | `25% RH, silica`                                                                                                                   |
+| V   | `Uniform germination, vigorous taproots, no mold.`                                                                                 |
+| W   | `=IF(L4="","Missing Test",IF(N4<25,"Hold",IF(N4<50,"Needs Review",IF(L4<0.7,"Hold",IF(L4<0.85,"Needs Review","Pass")))))` → `Pass` |
+| X   | `Yes`                                                                                                                              |
+| Y   | `CRC-2026-Nimbus-Lot03`                                                                                                            |
+| Z   | `diary://nimbus/lot03/germ-test`                                                                                                   |
+| AA  | `Forward Lot03 to Commercial Release Review`                                                                                       |
+
+**Derived values:**
+
+- Viability % (`L`) → `0.94` (94%).
+- Viable Seed Ratio (`K/J`) → `0.90` (90%).
+- Quality Flag (`W`) → `Pass`.
+- Summary impact: increments `Lots Passing >=85%` and `Total Seed Lots`;
+  contributes to `Average Viability`.
+
+**Release Status (if shown in the Commercial Release Review sheet):**
+`Candidate only / Human review required`.
+
+> `Pass` means **candidate signal only**. A human release decision is still
+> required. The Commercial Release Review + Traceability workbook is where
+> that decision is recorded.
+
+### Example 4 — Data-incomplete hold (Quality Flag = `Missing Test` / `Hold`)
+
+A lot that cannot be evaluated for release because evidence is missing.
+
+| Col | Value                                                                                                                                       |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| A   | `SD-P3-Unknown-2026-Lot04`                                                                                                                  |
+| B   | `Project Cirrus`                                                                                                                            |
+| C   | `Unknown`                                                                                                                                   |
+| D   | `Cirrus-Mom-?`                                                                                                                              |
+| E   | `(open pollination, unconfirmed)`                                                                                                           |
+| F   |                                                                                                                                             |
+| G   | `open_pollination`                                                                                                                          |
+| H   | `2026-05-02`                                                                                                                                |
+| I   |                                                                                                                                             |
+| J   | `300`                                                                                                                                       |
+| K   | `210`                                                                                                                                       |
+| L   | `=IF(OR(N5="",N5=0,Q5=""),"",Q5/N5)` → `""` (blank — sample size and final count missing)                                                   |
+| M   |                                                                                                                                             |
+| N   |                                                                                                                                             |
+| O   |                                                                                                                                             |
+| P   |                                                                                                                                             |
+| Q   |                                                                                                                                             |
+| R   |                                                                                                                                             |
+| S   | `unknown`                                                                                                                                   |
+| T   |                                                                                                                                             |
+| U   |                                                                                                                                             |
+| V   | `Parentage uncertain; storage container not labeled; no germination test performed yet.`                                                    |
+| W   | `=IF(L5="","Missing Test",IF(N5<25,"Hold",IF(N5<50,"Needs Review",IF(L5<0.7,"Hold",IF(L5<0.85,"Needs Review","Pass")))))` → `Missing Test`  |
+| X   | `No`                                                                                                                                        |
+| Y   |                                                                                                                                             |
+| Z   | `diary://cirrus/lot04/intake`                                                                                                               |
+| AA  | `Complete germination test and parentage/storage review before release consideration`                                                       |
+
+**Derived values:**
+
+- Viability % (`L`) → blank (no sample size, no final germ count).
+- Viable Seed Ratio (`K/J`) → `0.70` (70%) — cleaning ratio looks acceptable
+  but says nothing about germination viability on its own.
+- Quality Flag (`W`) → `Missing Test`. If `N` is later filled in below 25,
+  the flag becomes `Hold`.
+- Summary impact: increments `Lots Missing Germination Test`; will not count
+  toward `Average Viability` until tested.
+
+> `Hold` / `Missing Test` means **not release-ready until missing evidence
+> is resolved**. The workbook is asking for more data, not rejecting the
+> lot.
+
+---
+
+## 16. Column Rules: Allowed Values, Units, Null Rules, Formula Inputs/Outputs
+
+Per-column rules for `Seed_Production_Tracking` (A–AA). This expands §12
+with explicit formula-role detail.
+
+| Col | Field                           | Allowed values                                                                                       | Units              | Null allowed?                          | Validation                                                                 | Formula role                                | Notes                                  |
+| --- | ------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------ | -------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------- | -------------------------------------- |
+| A   | Seed Lot ID                     | Text                                                                                                 | —                  | No                                     | Unique                                                                     | None                                        | Example `SD-P1-BC1-F2-2026-Lot01`      |
+| B   | Project / Line                  | Text                                                                                                 | —                  | No                                     | Non-empty                                                                  | None                                        |                                        |
+| C   | Generation                      | `F1`, `F2`, `F3`, `S1`, `S2`, `BC1`, `BC2`, `BC3`, `Open Pollination`, `Unknown`                     | —                  | No                                     | Enum                                                                       | None                                        |                                        |
+| D   | Female Parent                   | Text / Pheno ID                                                                                      | —                  | Yes for unknown / open-pollination     | Required for intentional crosses                                           | None                                        |                                        |
+| E   | Male Parent                     | Text / Male ID / pollen source                                                                       | —                  | Yes for selfed / fem / open pol.       | Required unless `Generation` ∈ {`S1`,`S2`,`Open Pollination`}              | None                                        |                                        |
+| F   | Pollination Date                | Date `YYYY-MM-DD`                                                                                    | date               | Yes for unknown / open-pollination     | Must be ≤ Seed Harvest Date when both present                              | None                                        |                                        |
+| G   | Isolation Method                | `whole_tent`, `branch_bag`, `isolated_room`, `manual_paint`, `open_pollination`, `unknown`           | —                  | No                                     | Enum                                                                       | None                                        |                                        |
+| H   | Seed Harvest Date               | Date `YYYY-MM-DD`                                                                                    | date               | Yes                                    | Must be ≥ Pollination Date when both present                               | None                                        |                                        |
+| I   | Dry / Cure Start Date           | Date `YYYY-MM-DD`                                                                                    | date               | Yes                                    | Should be ≥ Seed Harvest Date when both present                            | None                                        |                                        |
+| J   | Total Seeds Collected           | Non-negative integer                                                                                 | seeds              | Yes                                    | ≥ 0                                                                        | Input → Viable Seed Ratio                   |                                        |
+| K   | Cleaned / Viable Seeds          | Non-negative integer                                                                                 | seeds              | Yes                                    | ≤ J when J present                                                         | Input → Viable Seed Ratio                   |                                        |
+| L   | Viability % Tested              | Formula output                                                                                       | percentage (0–1)   | Blank when inputs missing              | Formula only                                                               | Output: `=IF(OR(N2="",N2=0,Q2=""),"",Q2/N2)` | Format as %                            |
+| M   | Germination Test Date           | Date `YYYY-MM-DD`                                                                                    | date               | Yes                                    | Required when `N` or `Q` are present                                       | None                                        |                                        |
+| N   | Sample Size Tested              | Non-negative integer                                                                                 | seeds              | Yes                                    | Review if `<50`; Hold if `<25` for commercial candidate                    | Input → Viability %, Quality Flag           |                                        |
+| O   | Day 5 Germ Count                | Non-negative integer                                                                                 | seeds              | Yes                                    | ≤ N                                                                        | Input (progress)                            |                                        |
+| P   | Day 7 Germ Count                | Non-negative integer                                                                                 | seeds              | Yes                                    | ≤ N; should be ≥ O when both present                                       | Input (progress)                            |                                        |
+| Q   | Final Germ Count                | Non-negative integer                                                                                 | seeds              | Yes                                    | ≤ N; should be ≥ P when both present                                       | Input → Viability %                         |                                        |
+| R   | Final Count Day                 | Integer                                                                                              | days               | Yes                                    | Preferred 10–14; Review if `<7`; Hold if final count missing               | None                                        |                                        |
+| S   | Storage Method                  | `fridge`, `freezer`, `room_temp`, `cool_dark`, `unknown`, `other`                                    | —                  | No                                     | Enum                                                                       | None                                        |                                        |
+| T   | Storage Temp                    | Numeric with unit, or text                                                                           | °C or °F           | Yes (but required for release review)  | Include unit                                                               | None                                        |                                        |
+| U   | Storage RH / Desiccant          | Text                                                                                                 | % RH + desiccant   | Yes (but required for release review)  | Free text                                                                  | None                                        |                                        |
+| V   | Production Notes                | Text                                                                                                 | —                  | Yes                                    | Manual concerns should trigger review                                      | None                                        |                                        |
+| W   | Quality Flag                    | Formula output: `Pass`, `Needs Review`, `Hold`, `Missing Test`                                       | —                  | No (formula always returns a value)    | Formula only                                                               | Output (see §11)                            |                                        |
+| X   | Commercial Release Linked?      | `Yes`, `No`                                                                                          | —                  | No                                     | `No` should trigger review before any release decision                     | None                                        |                                        |
+| Y   | Linked Commercial Checklist Row | Text / reference                                                                                     | —                  | Yes (but required for release review)  | Reference into Commercial Release Checklist                                | None                                        |                                        |
+| Z   | Verdant Diary Entry             | Link / reference                                                                                     | —                  | Yes                                    | Recommended                                                                | None                                        |                                        |
+| AA  | Verdant Action Queue Item       | Draft text only                                                                                      | —                  | Yes                                    | Grower-review-only; must not imply automatic creation                      | None                                        |                                        |
+
+---
+
+## 17. Formula Edge Cases and Retest Cycles
+
+### Edge cases (extended)
+
+| Situation                                       | Formula behavior                                                  | Operator action                                                   |
+| ----------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Missing sample size (`N` blank)                 | `L` blank; `W` = `Missing Test`                                   | Run germination test.                                             |
+| Sample size = 0                                 | `L` blank (no division by zero); `W` = `Missing Test`             | Restart germ test with a real sample.                             |
+| Missing final germ count (`Q` blank)            | `L` blank; `W` = `Missing Test`                                   | Finish counting through Final Count Day.                          |
+| Final germ count `Q > N`                        | `L > 1.0` — invalid                                               | Correct the count or sample-size entry.                           |
+| Day 7 count `P > Q`                             | Not flagged by formula                                            | Treat as data-entry error; reconcile or note.                     |
+| Cleaned seeds `K > J`                           | Viable Seed Ratio `> 1.0` — invalid                               | Correct the entry.                                                |
+| Seed Harvest Date before Pollination Date       | Not flagged by formula                                            | Correct the date or note ambiguity.                               |
+| Dry/Cure Start Date before Seed Harvest Date    | Not flagged by formula                                            | Correct the date.                                                 |
+| Final Count Day before Day 7                    | Not flagged by formula                                            | Treat as Review trigger; investigate why counting stopped early.  |
+| Sample size 25–49 with high viability           | `W` = `Needs Review` (sample size wins)                           | Consider retest with larger sample before release review.         |
+| Viability ≥ 85% with `N` < 25                   | `W` = `Hold`                                                      | Retest with `N ≥ 50` (preferred 100).                             |
+
+### Retest cycles
+
+Recording multiple germination tests:
+
+- **Default:** column `L` is the **current official viability**.
+- Retest details live in **Production Notes** (`V`) or in optional future
+  fields (see below).
+- When a retest is performed, the operator decides whether to replace `L`
+  with the retest viability or keep the first test as official.
+- **The formula must not automatically hide a bad first test.** Replacement
+  is a manual, recorded decision.
+- When the first test and retest disagree, record both and the chosen
+  Official Viability Source in notes.
+
+### Optional future expansion fields (not part of A–AA v1)
+
+These fields may be added later if retest tracking becomes common. They are
+optional and do not change the v1 sheet contract:
+
+| Field                       | Allowed values                                  | Notes                                                  |
+| --------------------------- | ----------------------------------------------- | ------------------------------------------------------ |
+| Retest Required?            | `Yes`, `No`                                     | Operator-set, not formula-set.                         |
+| Retest Date                 | Date `YYYY-MM-DD`                               |                                                        |
+| Retest Sample Size          | Non-negative integer                            | Preferred ≥ 100.                                       |
+| Retest Final Germ Count     | Non-negative integer                            | ≤ Retest Sample Size.                                  |
+| Retest Viability %          | Formula output                                  | `= Retest Final Germ Count / Retest Sample Size`.      |
+| Official Viability Source   | `First Test`, `Retest`, `Manual Review`         | Operator decision recorded explicitly.                 |
+
+If/when adopted, mark them as **optional future expansion** and keep `L` /
+`W` as the canonical fields the rest of the workbook reads.
+
+---
+
 ## Change log
 
-- **v1.1 (this doc):** Added Safety & Review Checklist, review/hold/release
-  triggers, exact formula logic with edge cases, data dictionary, two
-  example seed lots, and safety wording guidance.
+- **v1.2 (this doc):** Added Examples 3–4, full per-column rules (allowed
+  values / units / null rules / formula roles), extended formula edge cases,
+  retest-cycle guidance, and optional future expansion fields. Pointed
+  release decisions at the new Commercial Release Review + Traceability
+  workbook spec.
+- **v1.1:** Added Safety & Review Checklist, review/hold/release triggers,
+  exact formula logic with edge cases, data dictionary, two example seed
+  lots, and safety wording guidance.
 - **v1.0:** Initial Seed_Production_Tracking workbook spec.

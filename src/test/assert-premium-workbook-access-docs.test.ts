@@ -109,7 +109,7 @@ describe("assert-premium-workbook-access-docs — negative cases (must FAIL)", (
   });
 
   it("fails on literal entitlement secret assignment", () => {
-    const v = scanPremiumWorkbookDoc(wrap(`premium_workbook_secret="abc123xyz"`));
+    const v = scanPremiumWorkbookDoc(wrap(`workbook_secret="abc123xyz"`));
     expect(v.some((x: { rule: string }) => x.rule.includes("entitlement-secret-literal"))).toBe(true);
   });
 

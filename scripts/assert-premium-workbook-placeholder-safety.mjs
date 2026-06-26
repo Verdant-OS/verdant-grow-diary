@@ -117,13 +117,25 @@ export function scanText(text) {
     const line = lines[i];
     if (line.includes(ALLOW_MARKER)) continue;
 
-    // Secrets are never allowed regardless of context.
-    for (const s of SECRET_PATTERNS) {
+    // Always-violations (literal credentials).
+    for (const s of SECRET_PATTERNS_ALWAYS) {
       if (s.re.test(line) && !DENIAL.test(line)) {
         violations.push({
           line: i + 1,
           rule: `secret/${s.name}`,
-          explanation: `Entitlement / access secret must not appear in docs.`,
+          explanation: `Literal credential / secret must not appear in docs.`,
+          text: line.trim(),
+        });
+      }
+    }
+    // Premium-context-only secrets: bare-word service_role mentions only
+    // count when they sit inside premium-workbook context.
+    for (const s of SECRET_PATTERNS_PREMIUM_ONLY) {
+      if (s.re.test(line) && hasPremiumContext(lines, i) && !DENIAL.test(line)) {
+        violations.push({
+          line: i + 1,
+          rule: `secret/${s.name}`,
+          explanation: `Entitlement / access secret must not appear near premium-workbook copy.`,
           text: line.trim(),
         });
       }

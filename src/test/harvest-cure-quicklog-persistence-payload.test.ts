@@ -156,7 +156,8 @@ describe("harvestCureQuickLogPersistencePayload", () => {
       });
       expect(r.ok).toBe(false);
       if (r.ok) throw new Error("expected failure");
-      expect(r.reason).toBe("invalid_harvest_details");
+      const fail = r as Extract<typeof r, { ok: false }>;
+      expect(fail.reason).toBe("invalid_harvest_details");
     });
 
     it("rejects negative cure_day before persistence", () => {
@@ -168,7 +169,8 @@ describe("harvestCureQuickLogPersistencePayload", () => {
       });
       expect(r.ok).toBe(false);
       if (r.ok) throw new Error("expected failure");
-      expect(r.reason).toBe("invalid_cure_check_details");
+      const fail = r as Extract<typeof r, { ok: false }>;
+      expect(fail.reason).toBe("invalid_cure_check_details");
     });
 
     it("rejects RH outside 0–100 before persistence", () => {
@@ -203,7 +205,8 @@ describe("harvestCureQuickLogPersistencePayload", () => {
       });
       expect(r.ok).toBe(false);
       if (r.ok) throw new Error("expected failure");
-      expect(r.reason).toBe("invalid_idempotency_key");
+      const fail = r as Extract<typeof r, { ok: false }>;
+      expect(fail.reason).toBe("invalid_idempotency_key");
     });
 
     it("rejects invalid sensor snapshots", () => {
@@ -220,7 +223,8 @@ describe("harvestCureQuickLogPersistencePayload", () => {
       });
       expect(r.ok).toBe(false);
       if (r.ok) throw new Error("expected failure");
-      expect(r.reason).toBe("invalid_sensor_snapshot");
+      const fail = r as Extract<typeof r, { ok: false }>;
+      expect(fail.reason).toBe("invalid_sensor_snapshot");
     });
 
     it("rejects unknown event types", () => {
@@ -231,7 +235,8 @@ describe("harvestCureQuickLogPersistencePayload", () => {
       });
       expect(r.ok).toBe(false);
       if (r.ok) throw new Error("expected failure");
-      expect(r.reason).toBe("invalid_event_type");
+      const fail = r as Extract<typeof r, { ok: false }>;
+      expect(fail.reason).toBe("invalid_event_type");
     });
   });
 

@@ -19,6 +19,8 @@ export interface BreedingActionQueuePayload {
   plant_id?: string | null;
   tent_id?: string | null;
   action_type: string;
+  target_metric?: string | null;
+  target_device?: string | null;
   status: string;
   source: string;
   reason: string;

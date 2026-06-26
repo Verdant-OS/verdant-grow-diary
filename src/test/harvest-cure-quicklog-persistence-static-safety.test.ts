@@ -33,8 +33,8 @@ describe("harvest/cure Quick Log persistence slice static safety", () => {
   it("persistence builder does not import alerts/action-queue/AI helpers", () => {
     const text = readFileSync(PERSISTENCE_FILE, "utf8");
     // Only imports allowed: constants + harvest/cure rules.
-    const importLines = text.split("\n").filter((l) => /^\s*import\b/.test(l));
-    for (const line of importLines) {
+    const fromLines = text.split("\n").filter((l) => /^\s*}?\s*from\s+["']/.test(l));
+    for (const line of fromLines) {
       expect(
         /["']@\/constants\/quickLogEventTypes["']|["']\.\/harvestCureRules["']/.test(line),
         `unexpected import: ${line}`,

@@ -575,7 +575,6 @@ async function main() {
     },
     premium_workbook_placeholder: {
       placeholder: "{{PREMIUM_WORKBOOK_COPY_URL}}",
-      typo_blocked: "{{PREMIMUM_WORKBOOK_COPY_URL}}",
     },
     xlsx_generation: {
       seed: xlsxResults.seed.ok ? "generated" : `blocked: ${xlsxResults.seed.reason}`,

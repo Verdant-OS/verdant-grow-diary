@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
@@ -50,7 +50,15 @@ import {
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
-import { actionsPath, aiDoctorSessionDetailPath, alertDetailPath, growDetailPath, logsPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
+import {
+  actionsPath,
+  aiDoctorSessionDetailPath,
+  alertDetailPath,
+  growDetailPath,
+  logsPath,
+  plantDetailPath,
+  tentDetailPath,
+} from "@/lib/routes";
 import {
   extractSourceAiDoctorSessionId,
   extractSourceAlertId,
@@ -76,6 +84,8 @@ import {
 } from "@/lib/actionQueueMissingEvidenceLink";
 
 
+
+import { emitBreedingAuditEvent, isBreedingFollowUpAction } from "@/lib/genetics/breedingAuditLog";
 
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,
@@ -195,6 +205,9 @@ export default function ActionDetail() {
   const [noteDraft, setNoteDraft] = useState("");
   const [sourceAlertStatus, setSourceAlertStatus] = useState<string | null>(null);
 
+  // Tracks which actionId has already emitted breeding_suggestion_viewed to prevent double-emit on re-load.
+  const viewedBreedingRef = useRef<string | null>(null);
+
   // Outcome capture state
   const [existingOutcome, setExistingOutcome] = useState<{ status: string } | null>(null);
   const [followupEntryId, setFollowupEntryId] = useState<string | null>(null);
@@ -232,6 +245,22 @@ export default function ActionDetail() {
         return;
       }
       setRow(data as ActionRow);
+      if (
+        isBreedingFollowUpAction((data as ActionRow).action_type) &&
+        viewedBreedingRef.current !== actionId
+      ) {
+        viewedBreedingRef.current = actionId;
+        emitBreedingAuditEvent({
+          eventType: "breeding_suggestion_viewed",
+          actionId: (data as ActionRow).id,
+          plantId: (data as ActionRow).plant_id,
+          source: "breeding_v0",
+          status: (data as ActionRow).status,
+          actorId: user?.id ?? null,
+          timestamp: new Date().toISOString(),
+          requiresApproval: true,
+        });
+      }
       const { data: evs } = await supabase
         .from("action_queue_events")
         .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at")
@@ -398,13 +427,13 @@ export default function ActionDetail() {
     event_type: EventType,
     new_status: Status,
     note?: string,
-  ) {
+  ): Promise<boolean> {
     setBusy(true);
     const { error } = await supabase.from("action_queue").update(next).eq("id", current.id);
     if (error) {
       setBusy(false);
       toast.error(error.message);
-      return;
+      return false;
     }
     await logEvent(current, event_type, new_status, note);
     // Follow-up diary entry: ONLY when this transition completes the action.
@@ -418,6 +447,7 @@ export default function ActionDetail() {
     }
     setBusy(false);
     await load();
+    return true;
   }
 
   // SECURITY: never sends user_id (diary_entries.user_id now defaults to auth.uid()).
@@ -481,7 +511,33 @@ export default function ActionDetail() {
       toast.message("Simulated (no device command sent)");
     }
     const patch = buildTransitionPatch(kind);
-    await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
+    const success = await transition(row, patch, eventTypeFor(kind), nextStatusFor(kind), note);
+    if (success && isBreedingFollowUpAction(row.action_type)) {
+      const now = new Date().toISOString();
+      if (kind === "approve") {
+        emitBreedingAuditEvent({
+          eventType: "breeding_suggestion_approved",
+          actionId: row.id,
+          plantId: row.plant_id,
+          source: "breeding_v0",
+          status: "approved",
+          actorId: user?.id ?? null,
+          timestamp: now,
+          requiresApproval: true,
+        });
+      } else if (kind === "reject" || kind === "cancel") {
+        emitBreedingAuditEvent({
+          eventType: "breeding_suggestion_declined",
+          actionId: row.id,
+          plantId: row.plant_id,
+          source: "breeding_v0",
+          status: nextStatusFor(kind),
+          actorId: user?.id ?? null,
+          timestamp: now,
+          requiresApproval: true,
+        });
+      }
+    }
   }
 
   function cancelDialog() {
@@ -509,11 +565,7 @@ export default function ActionDetail() {
     return (
       <div className="max-w-xl mx-auto">
         <BackLink />
-        <div
-          role="alert"
-          aria-live="assertive"
-          className="glass rounded-2xl p-6 text-center"
-        >
+        <div role="alert" aria-live="assertive" className="glass rounded-2xl p-6 text-center">
           <h1 className="text-lg font-semibold mb-2">We couldn't load this action</h1>
           <p className="text-sm text-muted-foreground mb-4">{loadError}</p>
           <Button
@@ -555,7 +607,11 @@ export default function ActionDetail() {
 
       <header className="glass rounded-2xl p-4 mb-4">
         <div className="flex items-center gap-2 flex-wrap mb-2">
-          <Badge variant="outline" className="uppercase text-[10px]" aria-label={buildStatusBadgeAriaLabel(row.status)}>
+          <Badge
+            variant="outline"
+            className="uppercase text-[10px]"
+            aria-label={buildStatusBadgeAriaLabel(row.status)}
+          >
             {row.status}
           </Badge>
           <Badge variant="outline" className={RISK_VARIANT[row.risk_level]}>
@@ -613,8 +669,12 @@ export default function ActionDetail() {
 
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
           <IdField label="Grow" id={row.grow_id} to={growDetailPath(row.grow_id)} />
-          {row.tent_id && <IdField label="Tent" id={row.tent_id} to={tentDetailPath(row.tent_id)} />}
-          {row.plant_id && <IdField label="Plant" id={row.plant_id} to={plantDetailPath(row.plant_id)} />}
+          {row.tent_id && (
+            <IdField label="Tent" id={row.tent_id} to={tentDetailPath(row.tent_id)} />
+          )}
+          {row.plant_id && (
+            <IdField label="Plant" id={row.plant_id} to={plantDetailPath(row.plant_id)} />
+          )}
           <Field label="Created" value={new Date(row.created_at).toLocaleString()} />
           <Field label="Updated" value={new Date(row.updated_at).toLocaleString()} />
           {row.completed_at && (
@@ -662,7 +722,8 @@ export default function ActionDetail() {
                     data-testid="stale-source-alert-warning"
                     className="mt-3 rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300"
                   >
-                    The source alert is no longer open. Re-check current grow conditions before approving this action.
+                    The source alert is no longer open. Re-check current grow conditions before
+                    approving this action.
                   </div>
                 )}
                 {(() => {
@@ -733,12 +794,10 @@ export default function ActionDetail() {
                 <p className="text-sm font-medium mt-0.5">
                   Source: {getActionQueueSourceLabel(row)}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Status: Grower review required
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">Status: Grower review required</p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  This action was suggested from an AI Doctor review and
-                  requires grower approval before anything is completed.
+                  This action was suggested from an AI Doctor review and requires grower approval
+                  before anything is completed.
                 </p>
                 {sessionId && (
                   <Button asChild size="sm" variant="outline" className="mt-3">
@@ -803,76 +862,74 @@ export default function ActionDetail() {
             );
           })()}
 
-
-
-        {!isTerminalStatus(row.status) && (() => {
-          const disabledReason = busy ? "Saving — please wait" : null;
-          return (
-          <div className="flex flex-wrap gap-2 mt-4">
-            {canApprove(row.status) && (
-              <Button
-                size="sm"
-                disabled={busy}
-                onClick={() => openDialog("approve")}
-                className="gradient-leaf text-primary-foreground"
-                aria-label={buildActionButtonAriaLabel("approve", row, { disabledReason })}
-                title={disabledReason ?? undefined}
-              >
-                <Check className="h-4 w-4" /> Approve
-              </Button>
-            )}
-            {canSimulate(row.status) && (
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={busy}
-                onClick={() => openDialog("simulate")}
-                aria-label={buildActionButtonAriaLabel("simulate", row, { disabledReason })}
-                title={disabledReason ?? undefined}
-              >
-                <FlaskConical className="h-4 w-4" /> Simulate
-              </Button>
-            )}
-            {canComplete(row.status) && (
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={busy}
-                onClick={() => openDialog("complete")}
-                aria-label={buildActionButtonAriaLabel("complete", row, { disabledReason })}
-                title={disabledReason ?? undefined}
-              >
-                <CheckCircle2 className="h-4 w-4" /> Mark Complete
-              </Button>
-            )}
-            {canReject(row.status) && (
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={busy}
-                onClick={() => openDialog("reject")}
-                aria-label={buildActionButtonAriaLabel("reject", row, { disabledReason })}
-                title={disabledReason ?? undefined}
-              >
-                <X className="h-4 w-4" /> Reject
-              </Button>
-            )}
-            {canCancel(row.status) && (
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={busy}
-                onClick={() => openDialog("cancel")}
-                aria-label={buildActionButtonAriaLabel("cancel", row, { disabledReason })}
-                title={disabledReason ?? undefined}
-              >
-                <Ban className="h-4 w-4" /> Cancel
-              </Button>
-            )}
-          </div>
-          );
-        })()}
-
+        {!isTerminalStatus(row.status) &&
+          (() => {
+            const disabledReason = busy ? "Saving — please wait" : null;
+            return (
+              <div className="flex flex-wrap gap-2 mt-4">
+                {canApprove(row.status) && (
+                  <Button
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => openDialog("approve")}
+                    className="gradient-leaf text-primary-foreground"
+                    aria-label={buildActionButtonAriaLabel("approve", row, { disabledReason })}
+                    title={disabledReason ?? undefined}
+                  >
+                    <Check className="h-4 w-4" /> Approve
+                  </Button>
+                )}
+                {canSimulate(row.status) && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => openDialog("simulate")}
+                    aria-label={buildActionButtonAriaLabel("simulate", row, { disabledReason })}
+                    title={disabledReason ?? undefined}
+                  >
+                    <FlaskConical className="h-4 w-4" /> Simulate
+                  </Button>
+                )}
+                {canComplete(row.status) && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => openDialog("complete")}
+                    aria-label={buildActionButtonAriaLabel("complete", row, { disabledReason })}
+                    title={disabledReason ?? undefined}
+                  >
+                    <CheckCircle2 className="h-4 w-4" /> Mark Complete
+                  </Button>
+                )}
+                {canReject(row.status) && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => openDialog("reject")}
+                    aria-label={buildActionButtonAriaLabel("reject", row, { disabledReason })}
+                    title={disabledReason ?? undefined}
+                  >
+                    <X className="h-4 w-4" /> Reject
+                  </Button>
+                )}
+                {canCancel(row.status) && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => openDialog("cancel")}
+                    aria-label={buildActionButtonAriaLabel("cancel", row, { disabledReason })}
+                    title={disabledReason ?? undefined}
+                  >
+                    <Ban className="h-4 w-4" /> Cancel
+                  </Button>
+                )}
+              </div>
+            );
+          })()}
       </header>
 
       {row.status === "completed" && (

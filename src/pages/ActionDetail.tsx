@@ -249,7 +249,7 @@ export default function ActionDetail() {
         isBreedingFollowUpAction((data as ActionRow).action_type) &&
         viewedBreedingRef.current !== actionId
       ) {
-        viewedBreedingRef.current = actionId ?? null;
+        viewedBreedingRef.current = actionId;
         emitBreedingAuditEvent({
           eventType: "breeding_suggestion_viewed",
           actionId: (data as ActionRow).id,

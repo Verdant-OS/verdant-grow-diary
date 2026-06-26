@@ -1,0 +1,71 @@
+name: release-workbook-safety
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "scripts/assert-premium-workbook-access-docs.mjs"
+      - "scripts/assert-release-traceability-mapping.mjs"
+      - "scripts/generate-release-workbook-templates.mjs"
+      - "scripts/assert-release-docs-safety.mjs"
+      - "scripts/sensor-safety-check.mjs"
+      - "src/test/assert-premium-workbook-access-docs.test.ts"
+      - "src/test/assert-release-traceability-mapping.test.ts"
+      - "src/test/generate-release-workbook-templates.test.ts"
+      - "src/test/release-workbook-formula-snapshots.test.ts"
+      - ".github/workflows/release-workbook-safety.yml"
+      - "package.json"
+      - "bun.lockb"
+  workflow_dispatch:
+
+jobs:
+  release-workbook-safety:
+    name: Workbook safety + traceability + snapshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Premium workbook access safety (docs)
+        run: bun run docs:assert-premium-workbook-access
+
+      - name: Release traceability mapping
+        run: bun run docs:assert-release-traceability
+
+      - name: Generate workbook templates (deterministic)
+        run: bun run docs:generate-release-workbook-templates
+
+      - name: Sensor safety check
+        run: node scripts/sensor-safety-check.mjs
+
+      - name: Release docs safety
+        run: node scripts/assert-release-docs-safety.mjs
+
+      - name: Targeted vitest — workbook validators + formula snapshots
+        run: |
+          bunx vitest run \
+            src/test/assert-premium-workbook-access-docs.test.ts \
+            src/test/assert-release-traceability-mapping.test.ts \
+            src/test/generate-release-workbook-templates.test.ts \
+            src/test/release-workbook-formula-snapshots.test.ts \
+            --reporter=dot
+
+      - name: Upload generated artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-workbook-templates-v1.3
+          path: docs/artifacts/
+          if-no-files-found: error
+          retention-days: 14

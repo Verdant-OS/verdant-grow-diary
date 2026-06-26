@@ -24,7 +24,7 @@ describe("validateCureSpaceSetupDetails", () => {
     expect(
       validateCureSpaceSetupDetails({ floor_space_used_percent: -1 }).errors
         .floor_space_used_percent,
-    ).toBe("negative_not_allowed");
+    ).toBe("invalid_range");
     expect(
       validateCureSpaceSetupDetails({ floor_space_used_percent: 150 }).errors
         .floor_space_used_percent,

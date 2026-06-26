@@ -1,6 +1,6 @@
 {
   "version": "v1.3",
-  "generated_at": "2026-06-26T23:27:44.747Z",
+  "generated_at": "2026-06-26T23:28:05.656Z",
   "templates": {
     "seed_production": {
       "canonical_sheet": "Seed_Production_Tracking",
@@ -237,8 +237,7 @@
     "entitlement_required_before_serving_real_link": true
   },
   "premium_workbook_placeholder": {
-    "placeholder": "{{PREMIUM_WORKBOOK_COPY_URL}}",
-    "typo_blocked": "{{PREMIMUM_WORKBOOK_COPY_URL}}"
+    "placeholder": "{{PREMIUM_WORKBOOK_COPY_URL}}"
   },
   "xlsx_generation": {
     "seed": "generated",

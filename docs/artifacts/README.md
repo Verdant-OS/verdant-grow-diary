@@ -53,7 +53,7 @@ The `--diff` mode prints focused expected-vs-actual diagnostics with exact file 
 
 - **Hash mismatch** — `File`, `Expected SHA256`, `Actual SHA256` per drifted artifact.
 - **Formula mismatch** — `Workbook`, `Sheet`, `Cell` (e.g. `W4`, `AC3`), `Expected`, `Actual`.
-- **Blocked token** — `File`, `Pattern`, `Line` (e.g. `access_token=` at line 42).
+- **Blocked token** — `File`, `Pattern`, `Line` (e.g. a signed-URL access-token query parameter detected at line 42). <!-- premium-workbook-access-docs:allow -->
 - **Premium placeholder mismatch** — expected `{{PREMIUM_WORKBOOK_COPY_URL}}` vs the misspelled `PREMI`+`MUM` variant.
 - **Missing generated file** — flagged when an entry in the manifest is not on disk.
 

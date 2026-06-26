@@ -368,6 +368,10 @@ function toCsv(headers, rows) {
 // ============================================================
 
 async function tryGenerateXlsx({ filePath, sheetName, headers, rows, readmeNote }) {
+  // Excel caps sheet names at 31 chars; preserve the canonical name in
+  // CSV / manifest / docs and use a deterministic shortened tab name in
+  // the .xlsx workbook only.
+  const xlsxSheetName = sheetName.length > 31 ? sheetName.slice(0, 31) : sheetName;
   let XLSX;
   try {
     XLSX = (await import("xlsx")).default ?? (await import("xlsx"));

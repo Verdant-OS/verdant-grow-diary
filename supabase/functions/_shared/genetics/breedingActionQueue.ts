@@ -65,6 +65,7 @@ export function buildBreedingActionQueuePayloads(
       plant_id: plantId,
       tent_id: tentId,
       action_type: "breeding_follow_up",
+      target_metric: "breeding",
       status: "pending_approval",
       source: "manual",
       reason: `${suggestion.reason} [event:${event.id}]`,

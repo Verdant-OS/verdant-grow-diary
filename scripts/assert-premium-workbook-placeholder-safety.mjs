@@ -60,12 +60,21 @@ const REAL_URL_PATTERNS = [
 const PREMIUM_CONTEXT_RE =
   /(premium[- ]?(workbook|copy|link)|workbook copy|copy the workbook|premium subscribers|\{\{PREMIUM_WORKBOOK_COPY_URL\}\})/i;
 
-const SECRET_PATTERNS = [
-  { name: "service_role", re: /\bservice_role\b/ },
-  { name: "supabase-service-role-key", re: /SUPABASE_SERVICE_ROLE_KEY/ },
+// Two tiers of secret detection:
+//   - SECRET_PATTERNS_ALWAYS: always violations regardless of context
+//     (actual literal credentials).
+//   - SECRET_PATTERNS_PREMIUM_ONLY: violations only inside premium-workbook
+//     context — bare-word `service_role` / `SUPABASE_SERVICE_ROLE_KEY`
+//     legitimately appear in security/architecture docs as guidance.
+const SECRET_PATTERNS_ALWAYS = [
   { name: "bearer-token", re: /\bBearer\s+[A-Za-z0-9._-]{16,}/ },
+  { name: "entitlement-token-literal", re: /\b(entitlement|premium|workbook)[_-]?(token|secret|key)\s*[:=]\s*['"][^'"\s]+['"]/i },
+  { name: "service-role-literal", re: /SUPABASE_SERVICE_ROLE_KEY\s*=\s*['"]?[A-Za-z0-9._-]{20,}/i },
+];
+const SECRET_PATTERNS_PREMIUM_ONLY = [
+  { name: "service_role", re: /\bservice_role\b/ },
+  { name: "supabase-service-role-key", re: /\bSUPABASE_SERVICE_ROLE_KEY\b/ },
   { name: "private-bucket-path", re: /\b(?:s3|gs|r2):\/\/\S+/i },
-  { name: "entitlement-token-literal", re: /\b(entitlement|premium|workbook)[_-]?(token|secret|key)\s*[:=]\s*['"][^'"]+['"]/i },
 ];
 
 const DENIAL =

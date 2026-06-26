@@ -1,30 +1,61 @@
 {
   "version": "v1.3",
-  "generated_at": "2026-06-26T23:10:13.594Z",
+  "generated_at": "2026-06-26T23:24:19.615Z",
+  "templates": {
+    "seed_production": {
+      "canonical_sheet": "Seed_Production_Tracking",
+      "xlsx_tab_name": "Seed_Production_Tracking",
+      "header_count": 27
+    },
+    "commercial_release_review": {
+      "canonical_sheet": "Commercial_Release_Review_Traceability",
+      "xlsx_tab_name": "Commercial_Release_Review_Trace",
+      "header_count": 35
+    }
+  },
   "files": [
     {
+      "filename": "seed-production-tracking-v1.3-template.csv",
       "path": "docs/artifacts/seed-production-tracking-v1.3-template.csv",
-      "kind": "csv"
+      "kind": "csv",
+      "sha256": "7ca887f3477f6959ff00307cb1c4b90d5789d1ea9855b8c6b6fbd137ad9e0455"
     },
     {
+      "filename": "commercial-release-review-traceability-v1.3-template.csv",
       "path": "docs/artifacts/commercial-release-review-traceability-v1.3-template.csv",
-      "kind": "csv"
+      "kind": "csv",
+      "sha256": "7e2eb6be49c1ddcc62fbf65ee18dcd0b5866d3df6ba0702305852f6b418bcdc2"
     },
     {
+      "filename": "release-workbook-formula-contracts.md",
+      "path": "docs/artifacts/release-workbook-formula-contracts.md",
+      "kind": "markdown",
+      "sha256": "8cf8fe973c7bba11b50e8c4612e2f01c102fe8c21e5e1553a3bfdd55d9131dd3"
+    },
+    {
+      "filename": "seed-production-tracking-v1.3-template.xlsx",
       "path": "docs/artifacts/seed-production-tracking-v1.3-template.xlsx",
       "kind": "xlsx",
-      "generated": true
+      "sha256": "2043e0aaa62618f411984159b0e3378780a43f49ebfe8c28a846e09bf437c762",
+      "sheet_canonical_name": "Seed_Production_Tracking",
+      "xlsx_tab_name": "Seed_Production_Tracking"
     },
     {
+      "filename": "commercial-release-review-traceability-v1.3-template.xlsx",
       "path": "docs/artifacts/commercial-release-review-traceability-v1.3-template.xlsx",
       "kind": "xlsx",
-      "generated": true
-    },
-    {
-      "path": "docs/artifacts/release-workbook-formula-contracts.md",
-      "kind": "markdown"
+      "sha256": "3e4dd0d64d0fbd4092ba2fb8a1ddaaba25f08875bb1eb245204987cc7faee9fe",
+      "sheet_canonical_name": "Commercial_Release_Review_Traceability",
+      "xlsx_tab_name": "Commercial_Release_Review_Trace"
     }
   ],
+  "hashes": {
+    "seed-production-tracking-v1.3-template.csv": "7ca887f3477f6959ff00307cb1c4b90d5789d1ea9855b8c6b6fbd137ad9e0455",
+    "commercial-release-review-traceability-v1.3-template.csv": "7e2eb6be49c1ddcc62fbf65ee18dcd0b5866d3df6ba0702305852f6b418bcdc2",
+    "release-workbook-formula-contracts.md": "8cf8fe973c7bba11b50e8c4612e2f01c102fe8c21e5e1553a3bfdd55d9131dd3",
+    "seed-production-tracking-v1.3-template.xlsx": "2043e0aaa62618f411984159b0e3378780a43f49ebfe8c28a846e09bf437c762",
+    "commercial-release-review-traceability-v1.3-template.xlsx": "3e4dd0d64d0fbd4092ba2fb8a1ddaaba25f08875bb1eb245204987cc7faee9fe"
+  },
   "sheets": {
     "Seed_Production_Tracking": {
       "headers": [
@@ -188,6 +219,12 @@
       }
     }
   },
+  "formula_contracts": {
+    "viabilityFormula": "=IF(OR(N{r}=\"\",N{r}=0,Q{r}=\"\"),\"\",Q{r}/N{r})",
+    "viableSeedRatioFormula": "=IF(OR(J{r}=\"\",J{r}=0,K{r}=\"\"),\"\",K{r}/J{r})",
+    "qualityFlagFormula": "=IF(L{r}=\"\",\"Missing Test\",IF(N{r}<25,\"Hold\",IF(N{r}<50,\"Needs Review\",IF(L{r}<0.7,\"Hold\",IF(L{r}<0.85,\"Needs Review\",\"Pass\")))))",
+    "reviewStatusFormula": "=IF(AB{r}>0,\"Needs Review\",IF(M{r}<25,\"Hold\",IF(L{r}<0.7,\"Hold\",IF(M{r}<50,\"Needs Review\",IF(AND(L{r}>=0.85,AB{r}=0),\"Release Candidate\",\"Needs Review\")))))"
+  },
   "safety_notes": [
     "Formulas provide review signals only. Human Release Decision is manual. No formula releases a seed lot. Action Queue text is draft-only and grower-review-only.",
     "Review Status formula must never output 'Released' — Released is a human-only transition.",
@@ -199,8 +236,13 @@
     "real_url_included": false,
     "entitlement_required_before_serving_real_link": true
   },
+  "premium_workbook_placeholder": {
+    "placeholder": "{{PREMIUM_WORKBOOK_COPY_URL}}",
+    "typo_blocked": "{{PREMIMUM_WORKBOOK_COPY_URL}}"
+  },
   "xlsx_generation": {
     "seed": "generated",
-    "review": "generated"
+    "review": "generated",
+    "deterministic": true
   }
 }

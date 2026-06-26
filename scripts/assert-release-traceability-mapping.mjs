@@ -74,7 +74,7 @@ export const REQUIRED_RULES = [
   },
   {
     label: "Commercial Release Review rows reference exactly one Seed Lot ID",
-    re: /(exactly one|single|one)\s+(`)?seed lot id|reference[s]?\s+exactly one\s+seed lot id/i,
+    re: /(exactly one|single|one)[\s*`]+seed lot id|reference[s]?[\s*]+exactly one[\s*`]+seed lot id/i,
   },
   {
     label: "Multiple review rows per Seed Lot allowed only with unique Release Review ID + Review Date",

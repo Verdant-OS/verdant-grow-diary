@@ -138,9 +138,12 @@ function main() {
   }
 
   const combined = `${commercialText}\n\n---\n\n${seedText}`;
+  // Normalize whitespace so rules wrapped across markdown lines/bullets
+  // match the canonical single-line patterns.
+  const normalized = combined.replace(/\s+/g, " ");
 
   const missingMappings = checkMappings(commercialText);
-  const missingRules = check(combined, REQUIRED_RULES);
+  const missingRules = check(normalized, REQUIRED_RULES);
 
   let failures = 0;
   for (const m of missingMappings) {

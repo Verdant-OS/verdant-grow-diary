@@ -106,3 +106,75 @@ schema/RLS/RPC migrations, edge functions, genetics/breeding modules,
 Harvest Watch, harvest/cure persistence, evidence reporting, and proof
 surfaces. None of that can honestly be represented as test stabilization.
 This gate forces product work into separate, scoped PRs.
+
+---
+
+## Troubleshooting STOP-SHIP output
+
+**What `STOP-SHIP: this branch is not test-stabilization only.` means:**
+The branch (or staged changeset) includes at least one file outside the
+harness/test-stabilization allowlist. The guard is doing its job — it is
+refusing to let product, schema, RLS, Edge Function, AI, or UI changes
+ride along under a stabilization label.
+
+### Common causes
+
+- The branch was created from a Lovable working branch instead of
+  `origin/main`.
+- Product files were staged accidentally during a multi-file `git add`.
+- Supabase migrations (`supabase/migrations/**`) or Edge Functions
+  (`supabase/functions/**`) were included.
+- `docs/**` changes were included without passing `--allow-docs`.
+- A lockfile changed because dependencies were installed differently
+  (e.g. a different package manager or a non-test dependency was added).
+
+### Recovery commands
+
+```bash
+# Inspect changed files vs main.
+git diff --name-only origin/main
+
+# Inspect currently staged files.
+git diff --cached --name-only
+
+# Unstage everything.
+git reset
+
+# Restore accidentally-touched product paths from main.
+git restore --source=origin/main -- <path>
+
+# Re-stage only confirmed harness files.
+git add \
+  src/test/setup.ts \
+  vitest.config.ts \
+  scripts/verify-stabilization-pr-scope.mjs
+
+# Re-run the gates.
+bun run verify:stabilization-pr-staged
+bun run verify:stabilization-pr-scope -- --base origin/main
+```
+
+### Lockfile handling
+
+Lockfiles (`bun.lockb`, `bun.lock`, `package-lock.json`, `pnpm-lock.yaml`,
+`yarn.lock`) are allowed **only** when the stabilization change genuinely
+required a test-tooling dependency update. If no dependency change was
+intended, revert the lockfile:
+
+```bash
+git restore --source=origin/main -- bun.lockb
+```
+
+### Final rule
+
+If the blocked list includes any of:
+
+- `supabase/migrations/**`
+- `supabase/functions/**`
+- genetics / breeding files
+- Harvest Watch files
+- Harvest / Cure files
+- Harvest Evidence Report files
+
+…split those into separate, scoped PRs. They must not ship under a
+test-stabilization label.

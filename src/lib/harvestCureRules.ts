@@ -98,17 +98,17 @@ function trimOrUndef(v: string | null | undefined): string | undefined {
   return t.length > 0 ? t : undefined;
 }
 
-type CoerceResult =
-  | { ok: true; value: number | undefined }
-  | { ok: false; error: FieldError };
+interface CoerceOk { ok: true; value: number | undefined; error?: undefined }
+interface CoerceErr { ok: false; value?: undefined; error: FieldError }
+type CoerceResult = CoerceOk | CoerceErr;
 
 function coerceNumber(v: number | string | null | undefined): CoerceResult {
   if (v === null || v === undefined || v === "") {
-    return { ok: true, value: undefined } as CoerceResult;
+    return { ok: true, value: undefined };
   }
   const n = typeof v === "number" ? v : Number(v);
   if (!Number.isFinite(n)) return { ok: false, error: "invalid_number" };
-  return { ok: true, value: n } as CoerceResult;
+  return { ok: true, value: n };
 }
 
 function enumOrUndef<T extends string>(

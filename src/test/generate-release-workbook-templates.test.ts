@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import * as XLSX from "xlsx";
 import {
   SEED_PRODUCTION_HEADERS,
   COMMERCIAL_REVIEW_HEADERS,
@@ -8,6 +9,38 @@ import {
   qualityFlagFormula,
   viabilityFormula,
 } from "../../scripts/generate-release-workbook-templates.mjs";
+
+const BLOCKED_STRINGS = [
+  "PREMIMUM_WORKBOOK_COPY_URL",
+  "docs.google.com",
+  "drive.google.com",
+  "dropbox.com",
+  "notion.so",
+  "notion.site",
+  "sheets.googleapis.com",
+  "storage.googleapis.com",
+  "supabase.co/storage",
+  "access_token=",
+  "X-Amz-Signature",
+  "SUPABASE_SERVICE_ROLE_KEY",
+];
+const BLOCKED_REGEXES: RegExp[] = [
+  /\bservice_role\b/,
+  /(^|[\s"'])private\//,
+  /(^|[\s"'])premium\//,
+  /auto[- ]?release/i,
+  /automatic action queue/i,
+  /automatically creates action queue/i,
+];
+
+function assertNoBlocked(text: string, label: string) {
+  for (const bad of BLOCKED_STRINGS) {
+    expect(text.includes(bad), `${label} contains blocked string ${bad}`).toBe(false);
+  }
+  for (const rx of BLOCKED_REGEXES) {
+    expect(text, `${label} matches blocked pattern ${rx}`).not.toMatch(rx);
+  }
+}
 
 const ART = join(process.cwd(), "docs", "artifacts");
 

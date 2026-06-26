@@ -381,7 +381,7 @@ async function tryGenerateXlsx({ filePath, sheetName, headers, rows, readmeNote 
   const aoa = [headers, ...rows];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.utils.book_append_sheet(wb, ws, xlsxSheetName);
   if (readmeNote) {
     const readmeWs = XLSX.utils.aoa_to_sheet([
       ["README — Template Safety Notes"],

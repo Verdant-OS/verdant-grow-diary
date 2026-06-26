@@ -19,12 +19,22 @@
  *
  * Pure read-only over the repo. No network. No app behavior.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
+import { createHash } from "node:crypto";
 
 const ROOT = process.cwd();
 const ARTIFACT_DIR = join(ROOT, "docs", "artifacts");
 mkdirSync(ARTIFACT_DIR, { recursive: true });
+
+// Fixed epoch used for deterministic XLSX workbook props. Combined with
+// xlsx's deterministic ZIP entry layout, this makes the binary output
+// byte-identical across runs on the same code.
+export const DETERMINISTIC_EPOCH = new Date(0);
+
+function sha256OfFile(p) {
+  return createHash("sha256").update(readFileSync(p)).digest("hex");
+}
 
 // ============================================================
 // Schemas

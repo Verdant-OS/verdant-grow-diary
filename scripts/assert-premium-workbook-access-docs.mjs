@@ -86,6 +86,36 @@ export const FORBIDDEN_SECRET_PATTERNS = [
   { name: "bearer-token-literal", re: /\bBearer\s+[A-Za-z0-9._-]{16,}/ },
 ];
 
+// Premium-workbook-scoped extra checks. These only fire on docs that
+// actually reference the premium workbook (placeholder or filename),
+// so unrelated docs that discuss `service_role` as guidance stay clean.
+export const TYPO_PLACEHOLDER = "{{PREMIMUM_WORKBOOK_COPY_URL}}";
+
+export const PREMIUM_SCOPED_FORBIDDEN = [
+  { name: "typo-placeholder/PREMIMUM_WORKBOOK_COPY_URL", re: /\{\{\s*PREMIMUM_WORKBOOK_COPY_URL\s*\}\}/ },
+  { name: "bare-service_role-in-premium-context", re: /\bservice_role\b/ },
+];
+
+export function scanPremiumWorkbookDoc(text) {
+  const violations = scanText(text);
+  const inPremiumContext =
+    text.includes(PLACEHOLDER) ||
+    text.includes(TYPO_PLACEHOLDER) ||
+    /premium\s+workbook/i.test(text);
+  if (!inPremiumContext) return violations;
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.includes(ALLOW_MARKER)) continue;
+    for (const p of PREMIUM_SCOPED_FORBIDDEN) {
+      if (p.re.test(line)) {
+        violations.push({ line: i + 1, rule: `premium-scoped/${p.name}`, text: line.trim() });
+      }
+    }
+  }
+  return violations;
+}
+
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);

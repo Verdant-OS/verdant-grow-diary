@@ -391,6 +391,12 @@ async function tryGenerateXlsx({ filePath, sheetName, headers, rows, readmeNote 
   const aoa = [headers, ...rows];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
+  // Fixed workbook props → deterministic XLSX bytes.
+  wb.Props = {
+    Title: sheetName,
+    CreatedDate: DETERMINISTIC_EPOCH,
+    ModifiedDate: DETERMINISTIC_EPOCH,
+  };
   XLSX.utils.book_append_sheet(wb, ws, xlsxSheetName);
   if (readmeNote) {
     const readmeWs = XLSX.utils.aoa_to_sheet([
@@ -404,7 +410,8 @@ async function tryGenerateXlsx({ filePath, sheetName, headers, rows, readmeNote 
     ]);
     XLSX.utils.book_append_sheet(wb, readmeWs, "README");
   }
-  XLSX.writeFile(wb, filePath);
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true });
+  writeFileSync(filePath, buf);
   return { ok: true };
 }
 

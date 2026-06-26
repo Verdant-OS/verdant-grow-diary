@@ -31,30 +31,91 @@ function cell(ws: XLSX.WorkSheet, addr: string): string {
   return c.f ? `=${c.f}` : String(c.v ?? "");
 }
 
+function expectFormulaCell(
+  ws: XLSX.WorkSheet,
+  addr: string,
+  expected: string,
+  context: { file: string; sheet: string },
+) {
+  const actual = cell(ws, addr);
+  if (actual !== expected) {
+    throw new Error(
+      `Formula mismatch in ${context.file} → sheet "${context.sheet}" cell ${addr}\n` +
+        `  expected: ${expected}\n` +
+        `  actual:   ${actual}`,
+    );
+  }
+}
+
+// Full row coverage: Seed has 5 generated data rows (blank template + 4 examples)
+// → rows 2–6. Review has 4 generated data rows → rows 2–5.
+const SEED_ROWS = [2, 3, 4, 5, 6];
+const REVIEW_ROWS = [2, 3, 4, 5];
+
+const FORBIDDEN_IN_FORMULAS = [
+  /"Released"/,
+  /auto-release/i,
+  /automatic Action Queue/i,
+  /automatically creates Action Queue/i,
+];
+
 describe("v1.3 workbook formula snapshots — XLSX must match contract exactly", () => {
-  it("Seed Production: L (viability) formula matches contract for rows 2–5", () => {
+  it("Seed Production: column L (viability) formula matches contract for every generated row", () => {
     const wb = XLSX.readFile(SEED_XLSX);
-    const ws = wb.Sheets[wb.SheetNames.find((n) => n.startsWith("Seed_Production"))!];
-    for (const r of [2, 3, 4, 5]) {
-      expect(cell(ws, `L${r}`)).toBe(viabilityFormula(r));
+    const sheetName = wb.SheetNames.find((n) => n.startsWith("Seed_Production"))!;
+    const ws = wb.Sheets[sheetName];
+    for (const r of SEED_ROWS) {
+      expectFormulaCell(ws, `L${r}`, viabilityFormula(r), { file: SEED_XLSX, sheet: sheetName });
     }
   });
 
-  it("Seed Production: W (quality flag) formula matches contract for rows 2–5", () => {
+  it("Seed Production: column W (quality flag) formula matches contract for every generated row", () => {
     const wb = XLSX.readFile(SEED_XLSX);
-    const ws = wb.Sheets[wb.SheetNames.find((n) => n.startsWith("Seed_Production"))!];
-    for (const r of [2, 3, 4, 5]) {
-      expect(cell(ws, `W${r}`)).toBe(qualityFlagFormula(r));
+    const sheetName = wb.SheetNames.find((n) => n.startsWith("Seed_Production"))!;
+    const ws = wb.Sheets[sheetName];
+    for (const r of SEED_ROWS) {
+      expectFormulaCell(ws, `W${r}`, qualityFlagFormula(r), { file: SEED_XLSX, sheet: sheetName });
     }
   });
 
   it("Commercial Release Review: AC (Review Status) formula matches contract and never says Released", () => {
     const wb = XLSX.readFile(REVIEW_XLSX);
-    const ws = wb.Sheets[wb.SheetNames.find((n) => n.startsWith("Commercial_Release_Review"))!];
-    for (const r of [2, 3, 4, 5]) {
-      const f = cell(ws, `AC${r}`);
-      expect(f).toBe(reviewStatusFormula(r));
-      expect(f).not.toMatch(/"Released"/);
+    const sheetName = wb.SheetNames.find((n) => n.startsWith("Commercial_Release_Review"))!;
+    const ws = wb.Sheets[sheetName];
+    for (const r of REVIEW_ROWS) {
+      const expected = reviewStatusFormula(r);
+      expectFormulaCell(ws, `AC${r}`, expected, { file: REVIEW_XLSX, sheet: sheetName });
+      for (const rx of FORBIDDEN_IN_FORMULAS) {
+        expect(expected, `forbidden token in formula AC${r}`).not.toMatch(rx);
+      }
+    }
+  });
+
+  it("Commercial Release Review: AB (Missing Evidence Count) is operator-entered (no formula in any row)", () => {
+    const wb = XLSX.readFile(REVIEW_XLSX);
+    const sheetName = wb.SheetNames.find((n) => n.startsWith("Commercial_Release_Review"))!;
+    const ws = wb.Sheets[sheetName];
+    for (const r of REVIEW_ROWS) {
+      const c = ws[`AB${r}`];
+      // AB may be a numeric value or empty, but must never be a formula in v1.3 generated rows.
+      expect(c?.f, `AB${r} unexpectedly has a formula`).toBeFalsy();
+      const txt = String(c?.v ?? "");
+      expect(txt.startsWith("="), `AB${r} value looks like a formula`).toBe(false);
+    }
+  });
+
+  it("Commercial Release Review: human-decision columns (AD reviewer/date/queue draft) have no formulas", () => {
+    const wb = XLSX.readFile(REVIEW_XLSX);
+    const sheetName = wb.SheetNames.find((n) => n.startsWith("Commercial_Release_Review"))!;
+    const ws = wb.Sheets[sheetName];
+    for (const r of REVIEW_ROWS) {
+      for (const col of ["AD", "AE", "AF", "AG", "AH", "AI"]) {
+        const c = ws[`${col}${r}`];
+        if (!c) continue;
+        expect(c.f, `${col}${r} must not be a formula`).toBeFalsy();
+        const txt = String(c.v ?? "");
+        expect(txt.startsWith("="), `${col}${r} value looks like a formula`).toBe(false);
+      }
     }
   });
 
@@ -76,8 +137,7 @@ describe("v1.3 workbook formula snapshots — XLSX must match contract exactly",
     expect(revHeaders).toEqual(COMMERCIAL_REVIEW_HEADERS);
   });
 
-  it("CSV artifacts contain the canonical formula text (RFC-4180 quote-escaped)", () => {
-    // CSV doubles inner quotes per RFC 4180.
+  it("CSV artifacts contain the canonical formula text (RFC-4180 quote-escaped) and never 'Released' in formulas", () => {
     const csvEscape = (f: string) => f.replace(/"/g, '""');
     const seedCsv = readFileSync(SEED_CSV, "utf8");
     expect(seedCsv).toContain(csvEscape(viabilityFormula(2)));
@@ -85,12 +145,11 @@ describe("v1.3 workbook formula snapshots — XLSX must match contract exactly",
 
     const revCsv = readFileSync(REVIEW_CSV, "utf8");
     expect(revCsv).toContain(csvEscape(reviewStatusFormula(2)));
-    expect(revCsv).not.toMatch(/"Released"/);
+    // "Released" must not appear inside any formula serialization.
     expect(revCsv).not.toMatch(/""Released""/);
   });
 
   it("formula contracts markdown documents all four formulas (generic-row form)", () => {
-    // Contracts md uses `r` as the generic row placeholder.
     const generic = (f: string) => f.replace(/([A-Z]+)\d+/g, "$1r");
     const md = readFileSync(CONTRACTS_MD, "utf8");
     expect(md).toContain(generic(viabilityFormula(2)));

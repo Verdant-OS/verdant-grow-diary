@@ -13,6 +13,8 @@ on:
       - "src/test/assert-release-traceability-mapping.test.ts"
       - "src/test/generate-release-workbook-templates.test.ts"
       - "src/test/release-workbook-formula-snapshots.test.ts"
+      - "src/test/release-workbook-manifest.test.ts"
+      - "scripts/verify-release-workbooks.mjs"
       - ".github/workflows/release-workbook-safety.yml"
       - "package.json"
       - "bun.lockb"
@@ -37,31 +39,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Premium workbook access safety (docs)
-        run: bun run docs:assert-premium-workbook-access
+      - name: Verify release workbooks (aggregator)
+        run: bun run docs:verify-release-workbooks
 
-      - name: Release traceability mapping
-        run: bun run docs:assert-release-traceability
-
-      - name: Generate workbook templates (deterministic)
-        run: bun run docs:generate-release-workbook-templates
-
-      - name: Sensor safety check
-        run: node scripts/sensor-safety-check.mjs
-
-      - name: Release docs safety
-        run: node scripts/assert-release-docs-safety.mjs
-
-      - name: Targeted vitest — workbook validators + formula snapshots
-        run: |
-          bunx vitest run \
-            src/test/assert-premium-workbook-access-docs.test.ts \
-            src/test/assert-release-traceability-mapping.test.ts \
-            src/test/generate-release-workbook-templates.test.ts \
-            src/test/release-workbook-formula-snapshots.test.ts \
-            --reporter=dot
-
-      - name: Upload generated artifacts
+      - name: Upload generated artifacts (diagnostic)
         if: always()
         uses: actions/upload-artifact@v4
         with:

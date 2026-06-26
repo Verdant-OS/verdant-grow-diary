@@ -19,12 +19,22 @@
  *
  * Pure read-only over the repo. No network. No app behavior.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
+import { createHash } from "node:crypto";
 
 const ROOT = process.cwd();
 const ARTIFACT_DIR = join(ROOT, "docs", "artifacts");
 mkdirSync(ARTIFACT_DIR, { recursive: true });
+
+// Fixed epoch used for deterministic XLSX workbook props. Combined with
+// xlsx's deterministic ZIP entry layout, this makes the binary output
+// byte-identical across runs on the same code.
+export const DETERMINISTIC_EPOCH = new Date(0);
+
+function sha256OfFile(p) {
+  return createHash("sha256").update(readFileSync(p)).digest("hex");
+}
 
 // ============================================================
 // Schemas
@@ -381,6 +391,12 @@ async function tryGenerateXlsx({ filePath, sheetName, headers, rows, readmeNote 
   const aoa = [headers, ...rows];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
+  // Fixed workbook props → deterministic XLSX bytes.
+  wb.Props = {
+    Title: sheetName,
+    CreatedDate: DETERMINISTIC_EPOCH,
+    ModifiedDate: DETERMINISTIC_EPOCH,
+  };
   XLSX.utils.book_append_sheet(wb, ws, xlsxSheetName);
   if (readmeNote) {
     const readmeWs = XLSX.utils.aoa_to_sheet([
@@ -394,7 +410,8 @@ async function tryGenerateXlsx({ filePath, sheetName, headers, rows, readmeNote 
     ]);
     XLSX.utils.book_append_sheet(wb, readmeWs, "README");
   }
-  XLSX.writeFile(wb, filePath);
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true });
+  writeFileSync(filePath, buf);
   return { ok: true };
 }
 
@@ -468,17 +485,56 @@ async function main() {
   };
   const xlsxBlocked = !xlsxResults.seed.ok || !xlsxResults.review.ok;
 
+  // Compute hashes (deterministic) for every artifact actually on disk.
+  const fileSpecs = [
+    { path: seedCsvPath, kind: "csv", filename: "seed-production-tracking-v1.3-template.csv" },
+    { path: reviewCsvPath, kind: "csv", filename: "commercial-release-review-traceability-v1.3-template.csv" },
+    { path: contractsPath, kind: "markdown", filename: "release-workbook-formula-contracts.md" },
+  ];
+  if (xlsxResults.seed.ok) {
+    fileSpecs.push({
+      path: seedXlsxPath, kind: "xlsx",
+      filename: "seed-production-tracking-v1.3-template.xlsx",
+      sheet_canonical_name: SEED_PRODUCTION_SHEET,
+      xlsx_tab_name: SEED_PRODUCTION_SHEET.slice(0, 31),
+    });
+  }
+  if (xlsxResults.review.ok) {
+    fileSpecs.push({
+      path: reviewXlsxPath, kind: "xlsx",
+      filename: "commercial-release-review-traceability-v1.3-template.xlsx",
+      sheet_canonical_name: COMMERCIAL_REVIEW_SHEET,
+      xlsx_tab_name: COMMERCIAL_REVIEW_SHEET.slice(0, 31),
+    });
+  }
+  const filesWithHashes = fileSpecs.map((f) => ({
+    filename: f.filename,
+    path: relative(ROOT, f.path).replace(/\\/g, "/"),
+    kind: f.kind,
+    sha256: sha256OfFile(f.path),
+    ...(f.sheet_canonical_name ? { sheet_canonical_name: f.sheet_canonical_name } : {}),
+    ...(f.xlsx_tab_name ? { xlsx_tab_name: f.xlsx_tab_name } : {}),
+  }));
+  const hashes = Object.fromEntries(filesWithHashes.map((f) => [f.filename, f.sha256]));
+
   // Manifest (always).
   const manifest = {
     version: "v1.3",
     generated_at: new Date().toISOString(),
-    files: [
-      { path: "docs/artifacts/seed-production-tracking-v1.3-template.csv", kind: "csv" },
-      { path: "docs/artifacts/commercial-release-review-traceability-v1.3-template.csv", kind: "csv" },
-      { path: "docs/artifacts/seed-production-tracking-v1.3-template.xlsx", kind: "xlsx", generated: xlsxResults.seed.ok },
-      { path: "docs/artifacts/commercial-release-review-traceability-v1.3-template.xlsx", kind: "xlsx", generated: xlsxResults.review.ok },
-      { path: "docs/artifacts/release-workbook-formula-contracts.md", kind: "markdown" },
-    ],
+    templates: {
+      seed_production: {
+        canonical_sheet: SEED_PRODUCTION_SHEET,
+        xlsx_tab_name: SEED_PRODUCTION_SHEET.slice(0, 31),
+        header_count: SEED_PRODUCTION_HEADERS.length,
+      },
+      commercial_release_review: {
+        canonical_sheet: COMMERCIAL_REVIEW_SHEET,
+        xlsx_tab_name: COMMERCIAL_REVIEW_SHEET.slice(0, 31),
+        header_count: COMMERCIAL_REVIEW_HEADERS.length,
+      },
+    },
+    files: filesWithHashes,
+    hashes,
     sheets: {
       [SEED_PRODUCTION_SHEET]: {
         headers: SEED_PRODUCTION_HEADERS,
@@ -500,10 +556,16 @@ async function main() {
         },
       },
     },
+    formula_contracts: {
+      viabilityFormula: viabilityFormula("{r}"),
+      viableSeedRatioFormula: viableSeedRatioFormula("{r}"),
+      qualityFlagFormula: qualityFlagFormula("{r}"),
+      reviewStatusFormula: reviewStatusFormula("{r}"),
+    },
     safety_notes: [
       SAFETY_NOTE,
       "Review Status formula must never output 'Released' — Released is a human-only transition.",
-      "Action Queue text is draft-only; no automatic Action Queue creation.",
+      "Action Queue text is draft-only; items are never auto-created — every queue entry requires explicit grower approval.",
     ],
     premium_workbook: {
       status: "placeholder only",
@@ -511,12 +573,27 @@ async function main() {
       real_url_included: false,
       entitlement_required_before_serving_real_link: true,
     },
+    premium_workbook_placeholder: {
+      placeholder: "{{PREMIUM_WORKBOOK_COPY_URL}}",
+    },
     xlsx_generation: {
       seed: xlsxResults.seed.ok ? "generated" : `blocked: ${xlsxResults.seed.reason}`,
       review: xlsxResults.review.ok ? "generated" : `blocked: ${xlsxResults.review.reason}`,
+      deterministic: true,
     },
   };
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+
+  // Self-check: re-hash the XLSX files and confirm deterministic output.
+  for (const f of filesWithHashes) {
+    if (f.kind !== "xlsx") continue;
+    const again = sha256OfFile(join(ROOT, f.path));
+    if (again !== f.sha256) {
+      throw new Error(
+        `generate-release-workbook-templates: nondeterministic XLSX output for ${f.filename} (${f.sha256} vs ${again})`,
+      );
+    }
+  }
 
   console.log("generate-release-workbook-templates: wrote artifacts:");
   console.log("  -", seedCsvPath);

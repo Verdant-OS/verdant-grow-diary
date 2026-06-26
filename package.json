@@ -22,6 +22,7 @@
     "docs:assert-release-traceability": "node scripts/assert-release-traceability-mapping.mjs",
     "docs:generate-release-workbook-templates": "node scripts/generate-release-workbook-templates.mjs",
     "docs:release-workbook-safety": "bun run docs:assert-premium-workbook-access && bun run docs:assert-release-traceability && bun run docs:generate-release-workbook-templates",
+    "docs:verify-release-workbooks": "node scripts/verify-release-workbooks.mjs",
     "test:demo-proof-guards": "vitest run demoProofWalkthrough-no-grows-route demoProofWalkthrough-route-snapshot proofReportRedactionRules --reporter=verbose",
     "test:demo-proof:full": "bun run test:demo-proof-guards && bunx vitest run proofReportRedactionRules DemoProofWalkthrough demoProofWalkthrough --reporter=verbose && bunx tsc -p tsconfig.app.json --noEmit && bun run test:e2e:demo-proof-readonly",
     "test:demo-proof:e2e": "bun run test:e2e:demo-proof-readonly",

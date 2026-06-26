@@ -92,24 +92,61 @@ describe("generate-release-workbook-templates", () => {
     expect(m.premium_workbook.entitlement_required_before_serving_real_link).toBe(true);
   });
 
-  it("generated CSV artifacts do not contain real URLs, secrets, or auto-release language", () => {
+  it("generated CSV artifacts do not contain blocked URLs/secrets/private paths", () => {
     const csvFiles = [
       join(ART, "seed-production-tracking-v1.3-template.csv"),
       join(ART, "commercial-release-review-traceability-v1.3-template.csv"),
     ];
     for (const f of csvFiles) {
       if (!existsSync(f)) continue;
-      const text = readFileSync(f, "utf8");
-      expect(text).not.toMatch(/docs\.google\.com/i);
-      expect(text).not.toMatch(/drive\.google\.com/i);
-      expect(text).not.toMatch(/dropbox\.com/i);
-      expect(text).not.toMatch(/notion\.s(o|ite)/i);
-      expect(text).not.toMatch(/access_token\s*=/i);
-      expect(text).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
-      expect(text).not.toMatch(/private\/[A-Za-z0-9]/);
-      // Released is a human-only state; CSV must not contain auto-release wording.
-      expect(text).not.toMatch(/auto[- ]?release/i);
-      expect(text).not.toMatch(/automatic action queue/i);
+      assertNoBlocked(readFileSync(f, "utf8"), `CSV ${f}`);
+    }
+  });
+
+  it("generated XLSX visible strings contain no blocked URLs/secrets/private paths", () => {
+    const xlsxFiles = [
+      join(ART, "seed-production-tracking-v1.3-template.xlsx"),
+      join(ART, "commercial-release-review-traceability-v1.3-template.xlsx"),
+    ];
+    for (const f of xlsxFiles) {
+      if (!existsSync(f)) continue;
+      const wb = XLSX.readFile(f);
+      const parts: string[] = [];
+      for (const name of wb.SheetNames) {
+        const ws = wb.Sheets[name];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false }) as unknown[][];
+        for (const row of rows) {
+          for (const cell of row) parts.push(String(cell ?? ""));
+        }
+      }
+      assertNoBlocked(parts.join("\n"), `XLSX ${f}`);
+    }
+  });
+
+  it("generated manifest, contracts md, and artifacts README contain no blocked tokens", () => {
+    const targets = [
+      join(ART, "release-workbook-template-manifest.json"),
+      join(ART, "release-workbook-formula-contracts.md"),
+      join(ART, "README.md"),
+    ];
+    for (const f of targets) {
+      if (!existsSync(f)) continue;
+      assertNoBlocked(readFileSync(f, "utf8"), f);
+    }
+  });
+
+  it("typo placeholder PREMIMUM_WORKBOOK_COPY_URL must not appear in any generated artifact", () => {
+    const all = [
+      "seed-production-tracking-v1.3-template.csv",
+      "commercial-release-review-traceability-v1.3-template.csv",
+      "release-workbook-formula-contracts.md",
+      "release-workbook-template-manifest.json",
+      "README.md",
+    ];
+    for (const fn of all) {
+      const p = join(ART, fn);
+      if (!existsSync(p)) continue;
+      expect(readFileSync(p, "utf8")).not.toMatch(/PREMIMUM_WORKBOOK_COPY_URL/);
     }
   });
 });

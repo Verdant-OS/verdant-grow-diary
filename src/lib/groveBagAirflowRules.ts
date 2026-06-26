@@ -9,7 +9,7 @@
  *  - This module emits no alerts, no Action Queue items, and no device
  *    commands. Status values are presentation-only.
  *  - Invalid / missing input falls back to "unknown" → needs_review.
- *  - Copy is cautious; never claims automation, AI, or guaranteed cure.
+ *  - Copy is cautious; never claims automation, AI, or cure guarantees.
  */
 
 import {

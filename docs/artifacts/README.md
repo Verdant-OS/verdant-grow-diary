@@ -86,7 +86,7 @@ bunx vitest run \
 ## Placeholder guard
 
 - ✅ `{{PREMIUM_WORKBOOK_COPY_URL}}` is the **only** allowed placeholder.
-- ❌ `{{PREMIMUM_WORKBOOK_COPY_URL}}` (note the typo `PREMIMUM`) is invalid and is rejected by the premium-workbook-scoped scanner.
+- ❌ Any placeholder whose prefix is misspelled as `PREMI` + `MUM` (instead of `PREMIUM`) is invalid and is rejected by the premium-workbook-scoped scanner. The exact typo string is intentionally not written here so this README itself stays clean of blocked tokens.
 
 
 

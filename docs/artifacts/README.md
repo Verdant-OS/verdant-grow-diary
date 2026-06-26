@@ -101,7 +101,7 @@ The validators and snapshot tests collectively guarantee:
 - **All 7 traceability rules are documented** including: Seed Lot ID uniqueness, missing-evidence behavior, and the prohibition on auto-creating Action Queue items.
 - **Formulas match the v1.3 contract exactly** — viability, viable-seed ratio, quality flag, and review status formulas in the XLSX, CSV, and contracts markdown are snapshot-compared on every CI run.
 - **Review Status never auto-outputs `Released`.** Released and Rejected are human-only transitions driven by `AD Human Release Decision`. The snapshot test asserts the string `"Released"` never appears in the suggestion formula or its CSV serialization.
-- **Generated CSVs contain no real URLs, no `SUPABASE_SERVICE_ROLE_KEY`, no `private/…` paths, no `auto-release` wording, and no `automatic Action Queue` wording.**
+- **Generated CSVs contain no real URLs, no `SUPABASE_SERVICE_ROLE_KEY`, no `private/…` paths, no auto-release wording, and no wording that implies queue items are created without explicit grower approval.**
 
 ## What this is not
 

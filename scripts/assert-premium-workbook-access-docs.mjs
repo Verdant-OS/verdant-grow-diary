@@ -142,12 +142,15 @@ export function scanText(text) {
 }
 
 export function checkSpecRequiredCopy(text) {
+  // Normalize whitespace so blockquote line-wrapping (`> foo\n> bar`)
+  // matches the canonical single-line required-copy strings.
+  const norm = text.replace(/^\s*>\s?/gm, " ").replace(/\s+/g, " ").trim();
   const missing = [];
   if (!text.includes(PLACEHOLDER)) missing.push("placeholder");
-  if (!text.includes(REQUIRED_FALLBACK_TEXT)) missing.push("fallback-text");
-  if (!text.includes(REQUIRED_SERVER_SIDE_COPY)) missing.push("server-side-safety-copy");
+  if (!norm.includes(REQUIRED_FALLBACK_TEXT)) missing.push("fallback-text");
+  if (!norm.includes(REQUIRED_SERVER_SIDE_COPY)) missing.push("server-side-safety-copy");
   for (const re of REQUIRED_DO_DONT_FRAGMENTS) {
-    if (!re.test(text)) missing.push(`do-dont-fragment:${re}`);
+    if (!re.test(norm)) missing.push(`do-dont-fragment:${re}`);
   }
   return missing;
 }

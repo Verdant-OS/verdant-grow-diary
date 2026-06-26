@@ -22,7 +22,7 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
   const handleSubmit = async (data: {
     plantId: string;
     subType: BreedingEventType;
-    details: any;
+    details: unknown;
   }) => {
     setBusy(true);
     try {

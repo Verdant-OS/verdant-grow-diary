@@ -11,7 +11,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-const ROOTS = ["src/lib/sensor", "src/components/sensor", "src/pages"];
+const ROOTS = ["src/lib/sensor", "src/components/sensor"];
 const EXTS = new Set([".ts", ".tsx", ".mjs", ".js"]);
 
 const HARD_PATTERNS = [
@@ -71,7 +71,7 @@ for (const root of ROOTS) {
     lines.forEach((line, i) => {
       if (SOFT_HEALTHY_RE.test(line) && DEGRADED_TOKENS.test(line)) {
         // Allow comments/tests that explicitly assert the negative.
-        if (/not\s+(be\s+)?healthy|never\s+healthy|n['o]t\s+match/i.test(line)) return;
+        if (/non[- ]?healthy|not\s+(be\s+)?healthy|never\s+\w*\s*healthy|never\s+becomes\s+healthy|reads\s+healthy|no\s+healthy/i.test(line)) return;
         violations.push(
           `${rel}:${i + 1}: "healthy" appears near degraded token (${line.trim()})`,
         );

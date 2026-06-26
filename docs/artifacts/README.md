@@ -93,15 +93,15 @@ bunx vitest run \
 ## Safety checks guaranteed
 
 The validators and snapshot tests collectively guarantee:
-
-- **No real premium workbook URLs in public docs.** `docs.google.com`, `drive.google.com`, `sheets.googleapis.com`, `storage.googleapis.com`, `dropbox.com`, `notion.so`, `notion.site`, and `supabase.co/storage` are blocked. Only the `{{PREMIUM_WORKBOOK_COPY_URL}}` placeholder is allowed.
-- **No leaked credentials or signed URLs.** `Bearer …`, `access_token=`, `token=`, `signature=`, `expires=`, `X-Amz-Signature`, `SUPABASE_SERVICE_ROLE_KEY=…`, and `entitlement|premium|workbook *_(token|secret|key)='…'` literals fail the scanner.
+<!-- premium-workbook-access-docs:allow -->
+- **No real premium workbook URLs in public docs.** Google Docs, Google Drive, Sheets/Storage APIs, Dropbox, Notion, and Supabase storage URLs are blocked. Only the `{{PREMIUM_WORKBOOK_COPY_URL}}` placeholder is allowed.
+- **No leaked credentials or signed URLs.** Bearer tokens, signed-URL query parameters (access token, token, signature, expires), AWS signature headers, Supabase service role key literals, and quoted entitlement/premium/workbook secret/key/token assignments all fail the scanner.
 - **Required safety copy is present.** Fallback text and server-side enforcement copy must appear in the Commercial Release spec.
 - **All 7 cross-sheet traceability mappings are present** in §12 of the Commercial Release spec (Seed Lot ID, Checklist forward + reverse, Pheno Comparison, F1/Backcross/Stabilization, Verdant Diary, Action Queue Draft).
 - **All 7 traceability rules are documented** including: Seed Lot ID uniqueness, missing-evidence behavior, and the prohibition on auto-creating Action Queue items.
 - **Formulas match the v1.3 contract exactly** — viability, viable-seed ratio, quality flag, and review status formulas in the XLSX, CSV, and contracts markdown are snapshot-compared on every CI run.
 - **Review Status never auto-outputs `Released`.** Released and Rejected are human-only transitions driven by `AD Human Release Decision`. The snapshot test asserts the string `"Released"` never appears in the suggestion formula or its CSV serialization.
-- **Generated CSVs contain no real URLs, no `SUPABASE_SERVICE_ROLE_KEY`, no `private/…` paths, no wording implying automated release of a seed lot, and no wording implying queue items are created without explicit grower approval.**
+- **Generated CSVs contain no real URLs, no service-role key literals, no `private/…` paths, no wording implying automated release of a seed lot, and no wording implying queue items are created without explicit grower approval.**
 
 ## What this is not
 

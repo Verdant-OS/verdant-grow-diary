@@ -1,6 +1,6 @@
 {
   "version": "v1.3",
-  "generated_at": "2026-06-26T23:28:24.267Z",
+  "generated_at": "2026-06-26T23:28:58.741Z",
   "templates": {
     "seed_production": {
       "canonical_sheet": "Seed_Production_Tracking",
@@ -228,7 +228,7 @@
   "safety_notes": [
     "Formulas provide review signals only. Human Release Decision is manual. No formula releases a seed lot. Action Queue text is draft-only and grower-review-only.",
     "Review Status formula must never output 'Released' — Released is a human-only transition.",
-    "Action Queue text is draft-only; no automatic Action Queue creation."
+    "Action Queue text is draft-only; items are never auto-created — every queue entry requires explicit grower approval."
   ],
   "premium_workbook": {
     "status": "placeholder only",

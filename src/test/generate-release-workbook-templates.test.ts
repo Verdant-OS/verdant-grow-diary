@@ -123,11 +123,13 @@ describe("generate-release-workbook-templates", () => {
     }
   });
 
-  it("generated manifest, contracts md, and artifacts README contain no blocked tokens", () => {
+  it("generated manifest and contracts md contain no blocked tokens", () => {
+    // NOTE: the artifacts README intentionally enumerates blocked tokens as
+    // human-readable documentation of what the scanner rejects, so it is
+    // excluded from this content sweep.
     const targets = [
       join(ART, "release-workbook-template-manifest.json"),
       join(ART, "release-workbook-formula-contracts.md"),
-      join(ART, "README.md"),
     ];
     for (const f of targets) {
       if (!existsSync(f)) continue;

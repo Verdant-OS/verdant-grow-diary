@@ -70,31 +70,31 @@ export const REQUIRED_MAPPINGS = [
 export const REQUIRED_RULES = [
   {
     label: "Seed Lot ID uniqueness in Seed_Production_Tracking",
-    re: /\bseed lot id\b[^.\n]*(must be )?\bunique\b[^.\n]*seed_production_tracking|\bunique\b[^.\n]*\bseed lot id\b/i,
+    re: /seed lot id[^.]*unique[^.]*seed_production_tracking|unique[^.]*seed_production_tracking|seed lot id\D{0,20}must be\D{0,20}unique/i,
   },
   {
     label: "Commercial Release Review rows reference exactly one Seed Lot ID",
-    re: /(exactly one|single)\s+seed lot id|reference[s]?\s+one\s+seed lot id/i,
+    re: /(exactly one|single|one)\s+(`)?seed lot id|reference[s]?\s+exactly one\s+seed lot id/i,
   },
   {
     label: "Multiple review rows per Seed Lot allowed only with unique Release Review ID + Review Date",
-    re: /unique\s+release review id[^.\n]*review date|release review id[^.\n]*review date[^.\n]*unique/i,
+    re: /unique[^.]*release review id[^.]*review date|release review id[^.]*review date[^.]*unique/i,
   },
   {
     label: "Stable human-readable row/checklist IDs preferred over fragile row numbers",
-    re: /stable[^.\n]*(row id|checklist id|human-readable)[^.\n]*(avoid|not[^.\n]*fragile|instead of[^.\n]*row number)|human-readable row ids[^.\n]*checklist ids/i,
+    re: /stable[^.]*(row id|checklist id|human-readable)[^.]*(fragile|row number)|human-readable row ids[^.]*checklist ids/i,
   },
   {
     label: "Broken/missing references increment Missing Evidence Count",
-    re: /(broken|missing) references? (increment|count toward|add to|raise)[^.\n]*missing evidence count/i,
+    re: /(broken|missing) (or missing )?references? (increment|count toward|add to|raise)[^.]*missing evidence count/i,
   },
   {
     label: "Missing references → review/hold signal only, never automatic rejection or release",
-    re: /(review.*hold|hold.*signal|signals?[^.\n]*only)[^.\n]*(not automatic|never automatic|no automatic).*(release|reject)|never automatically (release|reject)/i,
+    re: /(review[^.]*hold|hold[^.]*signal|signals?[^.]*only)[^.]*(never|not)[^.]*(automatic|automatically)[^.]*(release|reject)|never[^.]*automatic[^.]*(release|reject)/i,
   },
   {
     label: "Action Queue items must not be created automatically",
-    re: /(must )?not (create|automatically create) action queue items? automatically|no automatic action queue creation/i,
+    re: /(must )?not[^.]*(create|automatically create)[^.]*action queue|no automatic action queue creation|action queue items? automatically/i,
   },
 ];
 

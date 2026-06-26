@@ -565,7 +565,7 @@ async function main() {
     safety_notes: [
       SAFETY_NOTE,
       "Review Status formula must never output 'Released' — Released is a human-only transition.",
-      "Action Queue text is draft-only; no automatic Action Queue creation.",
+      "Action Queue text is draft-only; items are never auto-created — every queue entry requires explicit grower approval.",
     ],
     premium_workbook: {
       status: "placeholder only",

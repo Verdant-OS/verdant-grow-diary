@@ -5,6 +5,7 @@ import type { BreedingEvent } from "../_shared/genetics/breedingTypes.ts";
 
 interface Body {
   event_id?: string;
+  breeding_event_type?: string;
 }
 
 Deno.serve(async (req) => {
@@ -31,7 +32,7 @@ Deno.serve(async (req) => {
     // 1. Fetch the event
     const { data: eventRow, error: fetchErr } = await supabase
       .from("grow_events")
-      .select("id, event_type, occurred_at, grow_id, plant_id, tent_id, details")
+      .select("id, event_type, occurred_at, grow_id, plant_id, tent_id")
       .eq("id", body.event_id)
       .maybeSingle();
 
@@ -45,11 +46,13 @@ Deno.serve(async (req) => {
     }
 
     // 2. Map row to BreedingEvent
+    // Prefer breeding_event_type from the request body (the grow_events.event_type may be
+    // stored as "observation" to satisfy the DB constraint; the true breeding subtype is
+    // passed explicitly by the client).
     const breedingEvent: BreedingEvent = {
       id: eventRow.id,
-      type: eventRow.event_type,
+      type: body.breeding_event_type ?? eventRow.event_type,
       occurred_at: eventRow.occurred_at,
-      details: eventRow.details as any,
       plant_id: eventRow.plant_id ?? undefined,
       tent_id: eventRow.tent_id ?? undefined,
     };

@@ -26,7 +26,6 @@ export interface BreedingActionQueuePayload {
   reason: string;
   risk_level: string;
   suggested_change: string;
-  due_at?: string;
 }
 
 export function buildBreedingActionQueuePayloads(
@@ -47,11 +46,7 @@ export function buildBreedingActionQueuePayloads(
   const suggestions = suggestBreedingFollowUpActions(event);
 
   return suggestions.map((suggestion) => {
-    // Compute due_at = occurred_at + due_offset_days
-    const dueAtDate = new Date(occurredDate);
-    dueAtDate.setUTCDate(dueAtDate.getUTCDate() + suggestion.due_offset_days);
-
-    // Prepare suggested_change metadata
+    // Prepare suggested_change metadata (due_offset_days is preserved here for future expiry logic)
     const suggestedChange = {
       title: suggestion.title,
       next_steps: suggestion.next_steps,
@@ -65,13 +60,12 @@ export function buildBreedingActionQueuePayloads(
       plant_id: plantId,
       tent_id: tentId,
       action_type: "breeding_follow_up",
-      target_metric: "breeding",
+      target_metric: "breeding_follow_up",
       status: "pending_approval",
       source: "manual",
       reason: `${suggestion.reason} [event:${event.id}]`,
       risk_level: suggestion.risk_level,
       suggested_change: JSON.stringify(suggestedChange),
-      due_at: dueAtDate.toISOString(),
     };
   });
 }

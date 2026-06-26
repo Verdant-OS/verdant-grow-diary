@@ -20,10 +20,10 @@ describe("breedingActionQueue payloads", () => {
       expect(p.tent_id).toBe("tent_1");
       expect(p.status).toBe("pending_approval");
       expect(p.reason).toContain("[event:ev_123]");
+      expect(p.target_metric).toBe("breeding_follow_up");
 
       const suggestedChange = JSON.parse(p.suggested_change as string);
       expect(suggestedChange.source_event_id).toBe("ev_123");
-      expect(p.due_at).toBeDefined();
     });
   });
 

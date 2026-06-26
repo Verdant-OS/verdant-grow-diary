@@ -9,7 +9,7 @@ import { useAuth } from "@/store/auth";
 
 interface Props {
   activeGrowId: string;
-  plants: any[];
+  plants: Array<{ id: string; name?: string | null; tent_id: string | null }>;
   onCreated: () => void;
   onCancel: () => void;
 }
@@ -26,6 +26,9 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
   }) => {
     setBusy(true);
     try {
+      if (!user) {
+        throw new Error("You must be signed in to log a breeding event.");
+      }
       // 1. Save to grow_events
       const selectedPlant = plants.find((p) => p.id === data.plantId);
 
@@ -33,9 +36,13 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
         grow_id: activeGrowId,
         plant_id: data.plantId,
         tent_id: selectedPlant?.tent_id ?? null,
-        event_type: data.subType,
+        // grow_events.event_type is constrained to watering|feeding|training|observation|photo|environment.
+        // Breeding subtypes (e.g. "pollination") are not valid event_type values, so we store this
+        // event as "observation". The actual breeding subtype is passed via breeding_event_type to the
+        // edge function so action queue suggestions are correctly generated.
+        event_type: "observation" as const,
         occurred_at: new Date().toISOString(),
-        user_id: user?.id ?? "",
+        user_id: user.id,
       };
 
       const { data: eventRow, error: insertError } = await supabase
@@ -54,7 +61,7 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
         const { data: fnData, error: fnError } = await supabase.functions.invoke(
           "create-breeding-suggestions",
           {
-            body: { event_id: eventRow.id },
+            body: { event_id: eventRow.id, breeding_event_type: data.subType },
           },
         );
         if (fnError) {
@@ -87,8 +94,8 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
 
       toast.success("Breeding event logged 🌱");
       onCreated();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setBusy(false);
     }

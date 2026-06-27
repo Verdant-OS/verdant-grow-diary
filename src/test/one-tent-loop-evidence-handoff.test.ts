@@ -397,4 +397,92 @@ describe("One-Tent Loop Evidence Handoff — chain invariants", () => {
       expectNoForbiddenCopy(flatStrings(result.suggestion));
     }
   });
+
+  // -------------------------------------------------------------------------
+  // Timeline Evidence Linkage v1 — originating timeline event ID flow
+  // -------------------------------------------------------------------------
+
+  it("threads originating timeline event IDs onto the suggestion", () => {
+    const reading = makeReading("manual", "2026-06-27T11:50:00.000Z");
+    const ctx = mapSensorReadingToAiDoctorContext(reading);
+    const result = createActionSuggestion({
+      alert: openAlert("temperature_c", "Temperature trending high"),
+      sensorContext: ctx,
+      now: FIXED_NOW,
+      originatingTimelineEvents: [
+        { id: "diary-001", type: "diary_note", occurred_at: "2026-06-27T11:30:00.000Z", source: "manual" },
+        { id: "manual-snap-001", type: "manual_snapshot", occurred_at: "2026-06-27T11:50:00.000Z", source: "manual" },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const ids = result.suggestion.originatingTimelineEvents.map((e) => e.id);
+    expect(ids).toEqual(["diary-001", "manual-snap-001"]);
+  });
+
+  it("dedupes repeated timeline event IDs and sorts by occurred_at then id", () => {
+    const result = createActionSuggestion({
+      alert: openAlert("humidity_pct", "Humidity above target"),
+      now: FIXED_NOW,
+      originatingTimelineEvents: [
+        { id: "b", occurred_at: "2026-06-27T11:45:00.000Z", source: "manual" },
+        { id: "a", occurred_at: "2026-06-27T11:30:00.000Z", source: "manual" },
+        { id: "b", occurred_at: "2026-06-27T11:45:00.000Z", source: "manual" },
+        { id: "c", occurred_at: null, source: "invalid" },
+        { id: "d", occurred_at: "2026-06-27T11:30:00.000Z", source: "manual" },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.suggestion.originatingTimelineEvents.map((e) => e.id)).toEqual([
+      "a",
+      "d",
+      "b",
+      "c",
+    ]);
+  });
+
+  it("missing timeline events list → empty array, no fabricated IDs", () => {
+    const result = createActionSuggestion({
+      alert: openAlert("temperature_c", "Temperature trending high"),
+      now: FIXED_NOW,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.suggestion.originatingTimelineEvents).toEqual([]);
+  });
+
+  it("unknown source label is normalized to 'unknown', never 'live'", () => {
+    const result = createActionSuggestion({
+      alert: openAlert("humidity_pct", "Humidity above target"),
+      now: FIXED_NOW,
+      originatingTimelineEvents: [
+        { id: "x", source: "ecowitt" as unknown as never },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.suggestion.originatingTimelineEvents[0].source).toBe("unknown");
+  });
+
+  it("approveSuggestion preserves originatingTimelineEvents on queued action", () => {
+    const reading = makeReading("manual", "2026-06-27T11:50:00.000Z");
+    const ctx = mapSensorReadingToAiDoctorContext(reading);
+    const created = createActionSuggestion({
+      alert: openAlert("vpd_kpa", "VPD drifting high"),
+      sensorContext: ctx,
+      now: FIXED_NOW,
+      originatingTimelineEvents: [{ id: "diary-001", source: "manual" }],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const approval = approveSuggestion(created.suggestion, "Reviewed", FIXED_NOW);
+    expect(approval.ok).toBe(true);
+    if (!approval.ok) return;
+    expect(approval.queuedAction.status).toBe("queued_non_executable");
+    expect(approval.queuedAction.originatingTimelineEvents.map((e) => e.id)).toEqual([
+      "diary-001",
+    ]);
+    expectNoForbiddenFields(approval.queuedAction);
+  });
 });

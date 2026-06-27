@@ -132,6 +132,86 @@ const EMPTY_STATE_RULES: readonly EmptyStateRule[] = [
   },
 ];
 
+type EvidenceBadgeState = "present" | "missing" | "untrusted";
+
+interface EvidenceBadgeDescriptor {
+  readonly type: string;
+  readonly state: EvidenceBadgeState;
+  readonly label: string;
+}
+
+const EVIDENCE_BADGE_TONE: Record<EvidenceBadgeState, string> = {
+  present: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  missing: "border-muted-foreground/30 bg-muted/40 text-muted-foreground",
+  untrusted: "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300",
+};
+
+/**
+ * Deterministic per-plant evidence-summary badges. Order is locked. No
+ * scoring, no ranking, no winner. Untrusted-only sensor evidence is
+ * always rendered as caution, never as present.
+ */
+function buildEvidenceBadges(
+  plant: ContextualPhenoComparisonPlant,
+): readonly EvidenceBadgeDescriptor[] {
+  const ev = plant.evidenceCounts;
+  const env = plant.environmentSummary;
+  const untrustedCount =
+    plant.sourceCounts.demo +
+    plant.sourceCounts.stale +
+    plant.sourceCounts.invalid +
+    plant.sourceCounts.unknown;
+
+  const presentOrMissing = (count: number, label: string): EvidenceBadgeDescriptor => ({
+    type: label.toLowerCase(),
+    state: count > 0 ? "present" : "missing",
+    label: count > 0 ? `${label} present` : `${label} missing`,
+  });
+
+  const badges: EvidenceBadgeDescriptor[] = [
+    presentOrMissing(ev.diary, "Logs"),
+    presentOrMissing(ev.photos, "Photos"),
+    presentOrMissing(ev.watering, "Watering"),
+    presentOrMissing(ev.feeding, "Feeding"),
+  ];
+
+  let sensorBadge: EvidenceBadgeDescriptor;
+  if (env.hasTrustedSensorContext) {
+    sensorBadge = { type: "sensors", state: "present", label: "Sensors present" };
+  } else if (ev.sensorReadings > 0) {
+    sensorBadge = { type: "sensors", state: "untrusted", label: "Sensors untrusted" };
+  } else {
+    sensorBadge = { type: "sensors", state: "missing", label: "Sensors missing" };
+  }
+  badges.push(sensorBadge);
+
+  badges.push({
+    type: "trusted-environment",
+    state: env.hasTrustedSensorContext ? "present" : "missing",
+    label: env.hasTrustedSensorContext
+      ? "Trusted environment present"
+      : "Trusted environment missing",
+  });
+
+  if (untrustedCount > 0) {
+    badges.push({
+      type: "untrusted-evidence",
+      state: "untrusted",
+      label: "Untrusted sensor evidence",
+    });
+  }
+
+  return badges;
+}
+
+function isPlantInsufficient(plant: ContextualPhenoComparisonPlant): boolean {
+  return (
+    plant.missingContext.length > 0 ||
+    plant.environmentSummary.trustWarnings.length > 0 ||
+    !plant.environmentSummary.hasTrustedSensorContext
+  );
+}
+
 
 function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
   const env = plant.environmentSummary;

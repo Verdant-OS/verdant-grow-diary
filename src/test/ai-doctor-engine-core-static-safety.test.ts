@@ -203,3 +203,66 @@ describe("aiDoctorContextCompiler — vpd uses existing vpd_kpa only", () => {
     expect(ctx.averages_7d.vpd_kpa).toBe(1.2);
   });
 });
+
+describe("ai-doctor engine core — banned phrase scan (engine + compiler only)", () => {
+  const ENGINE_ONLY_PATHS = [
+    "src/lib/aiDoctorEngine.ts",
+    "src/lib/aiDoctorContextCompiler.ts",
+  ] as const;
+
+  // Phrase list lives in the test, never in engine sources. Each entry has a
+  // regex run against comment-stripped source. Word boundaries used where
+  // false positives are otherwise likely.
+  const BANNED: ReadonlyArray<{ label: string; rx: RegExp }> = [
+    { label: "certain", rx: /\bcertain(ty|ly)?\b/i },
+    { label: "guaranteed/guarantee", rx: /\bguarantee(d|s)?\b/i },
+    { label: "definitely", rx: /\bdefinitely\b/i },
+    { label: "auto-execute / auto execute", rx: /\bauto[\s_-]?execute\b/i },
+    { label: "automatically execute/control", rx: /\bautomatically\s+(execute|control)\b/i },
+    { label: "control device", rx: /\bcontrol\s+device\b/i },
+    { label: "device command", rx: /\bdevice\s+command\b/i },
+    { label: "send command", rx: /\bsend\s+command\b/i },
+    { label: "execute command", rx: /\bexecute\s+command\b/i },
+    { label: "turn on/off equipment", rx: /\bturn\s+(on|off)\s+(the\s+)?(fan|light|pump|heater|humidifier|dehumidifier|irrigation)\b/i },
+    { label: "set fan/light/irrigation/humidifier/dehumidifier", rx: /\bset\s+(fan|light|irrigation|humidifier|dehumidifier)\b/i },
+    { label: "diagnosed/diagnose from one photo", rx: /\bdiagnos(ed|e)\s+from\s+(one\s+)?photo\b/i },
+  ];
+
+  const engineSources = ENGINE_ONLY_PATHS.map((p) => {
+    const raw = readFileSync(resolve(ROOT, p), "utf8");
+    return { path: p, raw, src: stripComments(raw) };
+  });
+
+  it.each(engineSources)(
+    "[$path] contains no banned phrases (post comment-strip)",
+    ({ path, src }) => {
+      const violations: string[] = [];
+      const lines = src.split("\n");
+      for (const { label, rx } of BANNED) {
+        lines.forEach((line, i) => {
+          if (rx.test(line)) {
+            violations.push(`${path}:${i + 1}: "${label}" → ${line.trim()}`);
+          }
+        });
+      }
+      expect(violations, violations.join("\n")).toEqual([]);
+    },
+  );
+
+  it.each(engineSources)(
+    "[$path] never describes unknown/stale/invalid/untrusted telemetry as healthy",
+    ({ path, src }) => {
+      const violations: string[] = [];
+      const degraded = /(unknown|stale|invalid|untrusted)/i;
+      const healthy = /\bhealthy\b/i;
+      src.split("\n").forEach((line, i) => {
+        if (healthy.test(line) && degraded.test(line)) {
+          // Allow lines that explicitly deny the relationship (never/not/no).
+          if (/\b(never|not|no)\b/i.test(line)) return;
+          violations.push(`${path}:${i + 1}: ${line.trim()}`);
+        }
+      });
+      expect(violations, violations.join("\n")).toEqual([]);
+    },
+  );
+});

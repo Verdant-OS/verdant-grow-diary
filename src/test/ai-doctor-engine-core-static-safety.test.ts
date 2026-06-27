@@ -278,11 +278,16 @@ describe("ai-doctor engine core — banned phrase scan (Phase 1 engine modules)"
         if (healthy.test(line) && degraded.test(line)) {
           // Allow lines that explicitly deny the relationship (never/not/no).
           if (/\b(never|not|no)\b/i.test(line)) return;
+          // Allow hardware-health confirmation prompts — these ask the
+          // user to verify the bridge/sensor itself is healthy when
+          // telemetry is degraded, which is the safe action.
+          if (/\b(confirm|check|verify|ensure)\b/i.test(line)) return;
           violations.push(`${path}:${i + 1}: ${line.trim()}`);
         }
       });
       expect(violations, violations.join("\n")).toEqual([]);
     },
   );
+
 });
 

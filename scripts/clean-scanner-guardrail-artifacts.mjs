@@ -1,9 +1,8 @@
-#!/usr/bin/env node
 /**
  * Local operator convenience: remove the scanner guardrail slow-test
  * JSONL report (if any). The CI wrapper at
  * scripts/run-scanner-guardrails-ci.mjs already deletes stale reports
- * itself before each run — this script is purely for manual cleanup
+ * itself before each run --- this script is purely for manual cleanup
  * between local invocations.
  *
  * Usage:

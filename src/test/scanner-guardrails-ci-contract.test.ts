@@ -17,7 +17,6 @@ import {
   parseCliArgs,
   SCANNER_SLOW_THRESHOLD_MS,
   MAX_VALUE_PREVIEW,
-  // @ts-ignore - .mjs without types; helpers are pure JS.
 } from "../../scripts/run-scanner-guardrails-ci.mjs";
 
 const validRow = () => ({
@@ -92,8 +91,9 @@ describe("scanner-guardrails-ci JSONL contract", () => {
   it("returns field-level failure details on invalid rows", () => {
     const res = validateScannerSlowRow({ ...validRow(), file: "/abs/x.ts", thresholdMs: 3000 });
     expect(res.ok).toBe(false);
-    const fields = (res as { failedFields: Array<{ field: string; expected: string; got: string }> })
-      .failedFields;
+    const fields = (
+      res as { failedFields: Array<{ field: string; expected: string; got: string }> }
+    ).failedFields;
     const names = fields.map((f) => f.field);
     expect(names).toContain("file");
     expect(names).toContain("thresholdMs");
@@ -109,13 +109,16 @@ describe("scanner-guardrails-ci JSONL contract", () => {
     const res = validateScannerSlowRow({ ...validRow(), file: "/abs/x.ts", thresholdMs: 3000 });
     const diff = formatRowFieldDiff(
       2,
-      (res as { failedFields: Array<{ field: string; expected: string; got: string; message: string }> })
-        .failedFields,
+      (
+        res as {
+          failedFields: Array<{ field: string; expected: string; got: string; message: string }>;
+        }
+      ).failedFields,
     );
     expect(diff).toContain("[scanner-guardrails] line 2 failed fields:");
     expect(diff).toMatch(/- file: expected repo-relative/);
     expect(diff).toMatch(/- thresholdMs: expected 5000, got 3000/);
-    // Compact — no giant payload dump.
+    // Compact --- no giant payload dump.
     for (const line of diff.split("\n")) expect(line.length).toBeLessThan(200);
   });
 
@@ -123,7 +126,7 @@ describe("scanner-guardrails-ci JSONL contract", () => {
     const huge = "x".repeat(500);
     const preview = previewValue(huge);
     expect(preview.length).toBeLessThanOrEqual(82);
-    expect(preview.endsWith("…")).toBe(true);
+    expect(preview.endsWith("---")).toBe(true);
   });
 
   it("builds a GitHub Actions ::error annotation for the first offender", () => {
@@ -208,7 +211,9 @@ describe("scanner-guardrails-ci JSONL contract", () => {
     const slow = { ...validRow(), durationMs: 5500 };
     const slow2 = { ...validRow(), durationMs: 9000 };
     const invalid = { ...validRow(), file: "/abs/x.ts" };
-    const content = [JSON.stringify(slow), JSON.stringify(slow2), JSON.stringify(invalid)].join("\n");
+    const content = [JSON.stringify(slow), JSON.stringify(slow2), JSON.stringify(invalid)].join(
+      "\n",
+    );
     const parsed = parseAndValidateScannerSlowReport(content);
     const stats = summarizeReport(parsed);
     expect(stats).toEqual({ total: 3, valid: 2, invalid: 1, slow: 2 });

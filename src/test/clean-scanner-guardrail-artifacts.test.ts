@@ -1,7 +1,7 @@
 /**
  * Runtime test for the local scanner guardrail artifact cleanup script.
  * Verifies default path, optional report-path override, absent-file,
- * and unrelated-file safety — without touching real test-results/.
+ * and unrelated-file safety --- without touching real test-results/.
  *
  * Safety: test-tooling only.
  */
@@ -12,7 +12,6 @@ import { join } from "node:path";
 import {
   cleanScannerGuardrailArtifacts,
   SCANNER_SLOW_REPORT_PATH,
-  // @ts-ignore - .mjs without types; helpers are pure JS.
 } from "../../scripts/clean-scanner-guardrail-artifacts.mjs";
 
 describe("clean-scanner-guardrail-artifacts", () => {

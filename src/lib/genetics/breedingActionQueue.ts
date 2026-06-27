@@ -36,7 +36,11 @@ export function buildBreedingActionQueuePayloads(
     return [];
   }
 
-  const suggestions = suggestBreedingFollowUpActions(event);
+  const suggestions = suggestBreedingFollowUpActions({
+    ...event,
+    event_type: event.type,
+    details: (event.details as Record<string, unknown>) ?? null,
+  });
 
   return suggestions.map((suggestion) => {
     // Compute due_at = occurred_at + due_offset_days

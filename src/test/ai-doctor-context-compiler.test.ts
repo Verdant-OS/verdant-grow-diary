@@ -231,14 +231,15 @@ describe("compilePlantContextFromRows — windows + determinism", () => {
       plant: basePlant,
       growEvents: [],
       sensorReadings: [
-        { metric: "vpd_kpa", value: "not-a-number", captured_at: iso(60_000) },
-        { metric: "vpd_kpa", value: 1.2, captured_at: "not-a-date" },
+        { metric: "vpd_kpa", value: "not-a-number", captured_at: iso(60_000), source: "ecowitt" },
+        { metric: "vpd_kpa", value: 1.2, captured_at: "not-a-date", source: "ecowitt" },
         {
           metric: "vpd_kpa",
           value: 1.2,
           captured_at: new Date(NOW.getTime() + 60_000).toISOString(),
+          source: "ecowitt",
         },
-        { metric: "vpd_kpa", value: 1.2, captured_at: iso(60_000) },
+        { metric: "vpd_kpa", value: 1.2, captured_at: iso(60_000), source: "ecowitt" },
       ],
       now: NOW,
     });
@@ -274,5 +275,89 @@ describe("compilePlantContextFromRows — plant identity passthrough", () => {
     expect(ctx.plant_name).toBeNull();
     expect(ctx.strain).toBeNull();
     expect(ctx.stage).toBeNull();
+  });
+});
+
+describe("compilePlantContextFromRows — unknown / unrecognized source safety", () => {
+  it("never folds a reading with missing source into the live bucket", () => {
+    const ctx = compilePlantContextFromRows({
+      plant: basePlant,
+      growEvents: [],
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: iso(60_000),
+          // no source field at all
+        },
+      ],
+      now: NOW,
+    });
+    const live = ctx.sensor_groups.find((g) => g.source === "live");
+    expect(live).toBeUndefined();
+    expect(ctx.hasLiveSensorReadings).toBe(false);
+    expect(ctx.missingLiveSensorReadings).toBe(true);
+    // averages_7d trusts only live+manual → must be null.
+    expect(ctx.averages_7d.temperature_c).toBeNull();
+  });
+
+  it("classifies blank/whitespace-only source as untrusted (not live)", () => {
+    const ctx = compilePlantContextFromRows({
+      plant: basePlant,
+      growEvents: [],
+      sensorReadings: [
+        { metric: "vpd_kpa", value: 1.2, captured_at: iso(60_000), source: "" },
+        { metric: "vpd_kpa", value: 1.3, captured_at: iso(60_000), source: "   " },
+      ],
+      now: NOW,
+    });
+    expect(ctx.sensor_groups.some((g) => g.source === "live")).toBe(false);
+    expect(ctx.averages_7d.vpd_kpa).toBeNull();
+  });
+
+  it("classifies an unrecognized vendor string as untrusted (not live)", () => {
+    const ctx = compilePlantContextFromRows({
+      plant: basePlant,
+      growEvents: [],
+      sensorReadings: [
+        {
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: iso(60_000),
+          source: "mystery_vendor_42",
+        },
+      ],
+      now: NOW,
+    });
+    expect(ctx.sensor_groups.some((g) => g.source === "live")).toBe(false);
+    expect(ctx.hasLiveSensorReadings).toBe(false);
+    expect(ctx.averages_7d.humidity_pct).toBeNull();
+    // The reading is still preserved honestly in a degraded bucket so it
+    // is visible as untrusted evidence rather than silently dropped.
+    expect(
+      ctx.sensor_groups.some(
+        (g) =>
+          (g.source === "invalid" || g.source === "stale" || g.source === "demo") &&
+          g.sample_count > 0,
+      ),
+    ).toBe(true);
+  });
+
+  it("explicit source 'unknown' is bucketed as untrusted, never live", () => {
+    const ctx = compilePlantContextFromRows({
+      plant: basePlant,
+      growEvents: [],
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: iso(60_000),
+          source: "unknown",
+        },
+      ],
+      now: NOW,
+    });
+    expect(ctx.sensor_groups.some((g) => g.source === "live")).toBe(false);
+    expect(ctx.averages_7d.temperature_c).toBeNull();
   });
 });

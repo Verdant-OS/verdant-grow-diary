@@ -251,20 +251,44 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 function classifySource(row: SensorReadingRowLike): SensorSourceTag {
   // Explicit state/quality flags win — invalid/stale must never read as live.
-  const stateLike = (row.state ?? row.quality ?? "").toString().toLowerCase();
+  const stateLike = (row.state ?? row.quality ?? "").toString().toLowerCase().trim();
   if (stateLike === "invalid") return "invalid";
   if (stateLike === "stale") return "stale";
   if (stateLike === "demo") return "demo";
   if (stateLike === "manual") return "manual";
   if (stateLike === "csv") return "csv";
-  const source = (row.source ?? "").toString().toLowerCase();
-  if (source === "invalid") return "invalid";
+  const rawSource = row.source;
+  // Missing / blank source must never be trusted as live telemetry.
+  if (rawSource === null || rawSource === undefined) return "invalid";
+  const source = rawSource.toString().toLowerCase().trim();
+  if (source.length === 0) return "invalid";
+  if (source === "invalid" || source === "unknown") return "invalid";
   if (source === "stale") return "stale";
   if (source === "demo" || source === "demo_fixture") return "demo";
   if (source === "manual" || source === "manual_snapshot") return "manual";
   if (source === "csv" || source === "csv_import" || source === "import")
     return "csv";
-  return "live";
+  // Known live-sensor vendor identifiers. Anything else is untrusted and
+  // is bucketed as "invalid" so unrecognized telemetry never folds into
+  // the live / healthy view of the plant.
+  const LIVE_VENDORS = new Set([
+    "live",
+    "sensor",
+    "realtime",
+    "ecowitt",
+    "ecowitt_cloud",
+    "ecowitt_local",
+    "home_assistant",
+    "homeassistant",
+    "mqtt",
+    "pi",
+    "pi_bridge",
+    "raspberry_pi",
+    "shelly",
+    "shelly_ht",
+  ]);
+  if (LIVE_VENDORS.has(source)) return "live";
+  return "invalid";
 }
 
 function toFiniteNumber(v: unknown): number | null {

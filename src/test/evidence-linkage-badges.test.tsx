@@ -4,7 +4,13 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import EvidenceLinkageBadges from "@/components/EvidenceLinkageBadges";
-import type { OriginatingTimelineEventRef } from "@/lib/originatingTimelineEventRules";
+import {
+  ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY,
+  ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY,
+  ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY,
+  normalizeOriginatingTimelineEvents,
+  type OriginatingTimelineEventRef,
+} from "@/lib/originatingTimelineEventRules";
 
 const FORBIDDEN = [
   "executed",

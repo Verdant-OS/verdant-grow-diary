@@ -59,7 +59,7 @@ describe("contextualPhenoComparisonStaticSafety — scanner", () => {
   });
 
   it("detects device-control/dosing wording", () => {
-    const src = "doseNutrients(); set fan on; device command issued;";
+    const src = "const msg = 'dose nutrients now'; set fan on; device command issued;";
     const findings = scanSource("fake.ts", src);
     expect(findings.every((f) => f.category === "device-control/dosing")).toBe(true);
     expect(findings.map((f) => f.phrase)).toEqual(

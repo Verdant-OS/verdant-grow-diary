@@ -132,6 +132,86 @@ const EMPTY_STATE_RULES: readonly EmptyStateRule[] = [
   },
 ];
 
+type EvidenceBadgeState = "present" | "missing" | "untrusted";
+
+interface EvidenceBadgeDescriptor {
+  readonly type: string;
+  readonly state: EvidenceBadgeState;
+  readonly label: string;
+}
+
+const EVIDENCE_BADGE_TONE: Record<EvidenceBadgeState, string> = {
+  present: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  missing: "border-muted-foreground/30 bg-muted/40 text-muted-foreground",
+  untrusted: "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300",
+};
+
+/**
+ * Deterministic per-plant evidence-summary badges. Order is locked. No
+ * scoring, no ranking, no winner. Untrusted-only sensor evidence is
+ * always rendered as caution, never as present.
+ */
+function buildEvidenceBadges(
+  plant: ContextualPhenoComparisonPlant,
+): readonly EvidenceBadgeDescriptor[] {
+  const ev = plant.evidenceCounts;
+  const env = plant.environmentSummary;
+  const untrustedCount =
+    plant.sourceCounts.demo +
+    plant.sourceCounts.stale +
+    plant.sourceCounts.invalid +
+    plant.sourceCounts.unknown;
+
+  const presentOrMissing = (count: number, label: string): EvidenceBadgeDescriptor => ({
+    type: label.toLowerCase(),
+    state: count > 0 ? "present" : "missing",
+    label: count > 0 ? `${label} present` : `${label} missing`,
+  });
+
+  const badges: EvidenceBadgeDescriptor[] = [
+    presentOrMissing(ev.diary, "Logs"),
+    presentOrMissing(ev.photos, "Photos"),
+    presentOrMissing(ev.watering, "Watering"),
+    presentOrMissing(ev.feeding, "Feeding"),
+  ];
+
+  let sensorBadge: EvidenceBadgeDescriptor;
+  if (env.hasTrustedSensorContext) {
+    sensorBadge = { type: "sensors", state: "present", label: "Sensors present" };
+  } else if (ev.sensorReadings > 0) {
+    sensorBadge = { type: "sensors", state: "untrusted", label: "Sensors untrusted" };
+  } else {
+    sensorBadge = { type: "sensors", state: "missing", label: "Sensors missing" };
+  }
+  badges.push(sensorBadge);
+
+  badges.push({
+    type: "trusted-environment",
+    state: env.hasTrustedSensorContext ? "present" : "missing",
+    label: env.hasTrustedSensorContext
+      ? "Trusted environment present"
+      : "Trusted environment missing",
+  });
+
+  if (untrustedCount > 0) {
+    badges.push({
+      type: "untrusted-evidence",
+      state: "untrusted",
+      label: "Untrusted sensor evidence",
+    });
+  }
+
+  return badges;
+}
+
+function isPlantInsufficient(plant: ContextualPhenoComparisonPlant): boolean {
+  return (
+    plant.missingContext.length > 0 ||
+    plant.environmentSummary.trustWarnings.length > 0 ||
+    !plant.environmentSummary.hasTrustedSensorContext
+  );
+}
+
 
 function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
   const env = plant.environmentSummary;
@@ -163,6 +243,30 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
           )}
         </div>
       </header>
+
+      <section
+        data-testid="plant-evidence-summary"
+        aria-label="Evidence summary"
+      >
+        <ul className="flex flex-wrap gap-1.5">
+          {buildEvidenceBadges(plant).map((b) => (
+            <li
+              key={b.type}
+              data-testid={`plant-evidence-badge-${b.type}`}
+              data-evidence-type={b.type}
+              data-evidence-state={b.state}
+              className={cn(
+                "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                EVIDENCE_BADGE_TONE[b.state],
+              )}
+            >
+              {b.label}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+
 
       <section data-testid="plant-evidence-counts">
         <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
@@ -322,6 +426,10 @@ export default function ContextualPhenoComparisonPanel({
   demoBannerText = "Demo comparison data — not live sensor data.",
   className,
 }: ContextualPhenoComparisonPanelProps) {
+  const allInsufficient =
+    view.ok &&
+    view.plants.length > 0 &&
+    view.plants.every(isPlantInsufficient);
   return (
     <div
       data-testid="contextual-pheno-comparison-panel"
@@ -358,6 +466,20 @@ export default function ContextualPhenoComparisonPanel({
           className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
         >
           {view.crossPlantMissingContext.join(" ")}
+        </div>
+      )}
+
+      {allInsufficient && (
+        <div
+          data-testid="contextual-pheno-comparison-all-insufficient"
+          role="note"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200 space-y-1"
+        >
+          <p data-testid="contextual-pheno-comparison-all-insufficient-headline">
+            All compared plants are missing important context.
+          </p>
+          <p>Use this view as a checklist before making a selection decision.</p>
+          <p>Verdant is not picking a phenotype here.</p>
         </div>
       )}
 

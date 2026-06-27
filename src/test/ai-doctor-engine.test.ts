@@ -318,8 +318,7 @@ describe("Phase 1 engine — deterministic ordering of action/evidence/missing l
   // Use the additive Phase 1 surface so we cover the typed result shape
   // (evidence, missing_information, possible_causes, what_not_to_do,
   // action_queue_suggestion). No external model calls.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const engine = require("../lib/aiDoctorEngine") as typeof import("../lib/aiDoctorEngine");
+
 
   const NOW = new Date("2026-06-04T12:00:00Z");
   const iso = (offsetMs: number) =>

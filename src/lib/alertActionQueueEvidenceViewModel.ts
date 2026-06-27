@@ -11,6 +11,12 @@ import {
   type AlertLike,
   type ActionQueueDraft,
 } from "@/lib/alertToActionQueueRules";
+import {
+  normalizeOriginatingTimelineEvents,
+  TIMELINE_EVIDENCE_NOT_LINKED_COPY,
+  type OriginatingTimelineEventInput,
+  type OriginatingTimelineEventRef,
+} from "@/lib/originatingTimelineEventRules";
 
 export interface AlertActionQueueEvidenceViewModel {
   eligible: boolean;
@@ -22,6 +28,10 @@ export interface AlertActionQueueEvidenceViewModel {
   blockedReason: string | null;
   duplicateKey: string | null;
   draft: ActionQueueDraft | null;
+  /** Linked timeline evidence references (dedupe + sorted). */
+  linkedTimelineEvents: readonly OriginatingTimelineEventRef[];
+  /** Safe copy shown when no timeline event is linked. */
+  unlinkedTimelineCopy: string;
 }
 
 const DEFAULT_SAFETY_ITEMS = Object.freeze([

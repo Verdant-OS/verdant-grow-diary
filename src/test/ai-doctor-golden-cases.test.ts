@@ -40,43 +40,160 @@ function stubVision(): Phase1VisionAnalysisResult {
 }
 
 /**
- * Phrases the engine MUST never emit. Covers overconfidence and any
- * device-control / automation wording.
+ * Phrases the engine MUST never emit in any non-warning output field.
+ *
+ * v1.1 — extended set: overconfidence + automation/execution + per-device
+ * (fan / light / irrigation / pump / humidifier / dehumidifier) variants
+ * plus controller / setpoint / write-back wording.
+ *
+ * `what_not_to_do` is scanned separately because it legitimately uses
+ * "do not …" warning framing that contains device nouns and verbs.
  */
 const FORBIDDEN_PHRASES: readonly string[] = [
+  // certainty / overclaiming
   "guaranteed",
+  "guarantee",
   "definitely",
   "certain diagnosis",
+  "confirmed diagnosis",
   "diagnosed from photo",
+  "diagnose from one photo",
+  "proves",
+  "never fails",
+  // automation / execution
   "auto execute",
+  "auto-execute",
+  "automatically execute",
   "automatically control",
+  "auto control",
+  "autopilot",
   "device command",
-  "turn on",
-  "turn off",
+  "send command",
+  "execute command",
+  "control device",
+  "write to controller",
+  "trigger controller",
+  "apply setpoint",
+  "change setpoint",
+  "update setpoint",
+  "write-back",
+  "write back to hardware",
+  // fan / light / irrigation / pump / humidifier / dehumidifier
+  "turn on fan",
+  "turn off fan",
+  "turn fan on",
+  "turn fan off",
   "set fan",
+  "increase fan",
+  "decrease fan",
+  "turn on light",
+  "turn off light",
+  "turn light on",
+  "turn light off",
   "set light",
+  "dim light",
+  "raise light intensity",
+  "lower light intensity",
+  "turn on irrigation",
+  "turn off irrigation",
+  "start irrigation",
+  "stop irrigation",
   "set irrigation",
+  "trigger irrigation",
+  "run pump",
+  "turn on pump",
+  "turn off pump",
+  "dose nutrients",
+  "dose nutrient",
+  "dose reservoir",
+  "set humidifier",
+  "turn on humidifier",
+  "turn off humidifier",
+  "set dehumidifier",
+  "turn on dehumidifier",
+  "turn off dehumidifier",
 ];
 
-function collectAllStrings(result: Phase1DiagnosisResult): string[] {
-  const out: string[] = [
-    result.summary,
-    result.likely_issue,
-    result.immediate_action,
-    result.twenty_four_hour_follow_up,
-    result.three_day_recovery_plan,
-    ...result.evidence,
-    ...result.missing_information,
-    ...result.possible_causes,
-    ...result.what_not_to_do,
+/**
+ * Word-boundary certainty terms forbidden in ALL fields (including
+ * `what_not_to_do`). Boundary-checked so "uncertain"/"normally" are safe.
+ */
+const FORBIDDEN_WORD_BOUNDARY: readonly RegExp[] = [
+  /\bcertain\b/i,
+  /\bcertainty\b/i,
+  /\balways\b/i,
+];
+
+interface FieldString {
+  path: string;
+  text: string;
+}
+
+function collectFieldStrings(result: Phase1DiagnosisResult): FieldString[] {
+  const out: FieldString[] = [
+    { path: "summary", text: result.summary },
+    { path: "likely_issue", text: result.likely_issue },
+    { path: "immediate_action", text: result.immediate_action },
+    {
+      path: "twenty_four_hour_follow_up",
+      text: result.twenty_four_hour_follow_up,
+    },
+    { path: "three_day_recovery_plan", text: result.three_day_recovery_plan },
+    ...result.evidence.map((t, i) => ({ path: `evidence[${i}]`, text: t })),
+    ...result.missing_information.map((t, i) => ({
+      path: `missing_information[${i}]`,
+      text: t,
+    })),
+    ...result.possible_causes.map((t, i) => ({
+      path: `possible_causes[${i}]`,
+      text: t,
+    })),
   ];
   if (result.action_queue_suggestion) {
-    out.push(result.action_queue_suggestion.reason);
-    out.push(result.action_queue_suggestion.action_type);
-    out.push(result.action_queue_suggestion.status);
+    out.push({
+      path: "action_queue_suggestion.reason",
+      text: result.action_queue_suggestion.reason,
+    });
+    out.push({
+      path: "action_queue_suggestion.action_type",
+      text: result.action_queue_suggestion.action_type,
+    });
+    out.push({
+      path: "action_queue_suggestion.status",
+      text: result.action_queue_suggestion.status,
+    });
   }
   return out;
 }
+
+/** Warning framing required for every `what_not_to_do` entry. */
+const WARNING_FRAMING = /^(do not|never|avoid|output must not)\b/i;
+
+/**
+ * Action-Queue tightening (v1.1) — forbidden tokens in the suggestion
+ * payload itself. Allowed inside `what_not_to_do` because that field
+ * is a warning surface.
+ */
+const ACTION_SUGGESTION_FORBIDDEN: readonly RegExp[] = [
+  /\bexecute\b/i,
+  /\bexecuted\b/i,
+  /\bsend\b/i,
+  /\bcontrol\b/i,
+  /\bsetpoint\b/i,
+  /\bdevice\b/i,
+  /\bcontroller\b/i,
+  /\bpump\b/i,
+  /\bfan\b/i,
+  /\blight\b/i,
+  /\birrigation\b/i,
+  /\bhumidifier\b/i,
+  /\bdehumidifier\b/i,
+];
+const ACTION_SUGGESTION_ALLOWED_STATUSES = new Set([
+  "pending_approval",
+  "suggested",
+  "pending_review",
+]);
 
 async function runCase(caseDef: GoldenCase): Promise<Phase1DiagnosisResult> {
   const ctx = compilePlantContextRowsPhase1(caseDef.input);

@@ -72,6 +72,8 @@ export function buildAlertActionQueueEvidenceViewModel(
       blockedReason: "missing_alert",
       duplicateKey: null,
       draft: null,
+      linkedTimelineEvents,
+      unlinkedTimelineCopy: TIMELINE_EVIDENCE_NOT_LINKED_COPY,
     };
   }
 

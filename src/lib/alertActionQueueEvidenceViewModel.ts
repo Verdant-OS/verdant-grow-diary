@@ -125,5 +125,8 @@ export function buildAlertActionQueueEvidenceViewModel(
     blockedReason: null,
     duplicateKey,
     draft,
+    linkedTimelineEvents,
+    unlinkedTimelineCopy:
+      linkedTimelineEvents.length === 0 ? TIMELINE_EVIDENCE_NOT_LINKED_COPY : "",
   };
 }

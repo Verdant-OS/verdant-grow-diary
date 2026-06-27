@@ -299,17 +299,23 @@ describe("AI Doctor Golden Cases v1 — missing information signals", () => {
   }
 });
 
-describe("AI Doctor Golden Cases v1 — forbidden phrases", () => {
+describe("AI Doctor Golden Cases v1.1 — forbidden phrases (non-warning fields)", () => {
   for (const c of AI_DOCTOR_GOLDEN_CASES) {
-    it(`[${c.id}] never emits unsafe / overconfident / device-control phrases`, async () => {
+    it(`[${c.id}] no unsafe / overconfident / device-control phrasing in non-warning fields`, async () => {
       const r = await runCase(c);
-      const strings = collectAllStrings(r);
-      for (const s of strings) {
-        const lower = s.toLowerCase();
+      const fields = collectFieldStrings(r);
+      for (const { path, text } of fields) {
+        const lower = text.toLowerCase();
         for (const phrase of FORBIDDEN_PHRASES) {
           expect(
             lower.includes(phrase),
-            `forbidden phrase "${phrase}" appeared in: ${s}`,
+            `[${c.id}] forbidden phrase "${phrase}" appeared at ${path}: ${text}`,
+          ).toBe(false);
+        }
+        for (const rx of FORBIDDEN_WORD_BOUNDARY) {
+          expect(
+            rx.test(text),
+            `[${c.id}] forbidden certainty term ${rx} appeared at ${path}: ${text}`,
           ).toBe(false);
         }
       }
@@ -317,25 +323,66 @@ describe("AI Doctor Golden Cases v1 — forbidden phrases", () => {
   }
 });
 
-describe("AI Doctor Golden Cases v1 — Action Queue safety", () => {
+describe("AI Doctor Golden Cases v1.1 — what_not_to_do warning framing", () => {
   for (const c of AI_DOCTOR_GOLDEN_CASES) {
-    it(`[${c.id}] action queue suggestion (if any) is advisory + pending approval`, async () => {
+    it(`[${c.id}] every what_not_to_do entry uses warning framing`, async () => {
+      const r = await runCase(c);
+      for (let i = 0; i < r.what_not_to_do.length; i += 1) {
+        const entry = r.what_not_to_do[i];
+        expect(
+          WARNING_FRAMING.test(entry),
+          `[${c.id}] what_not_to_do[${i}] missing warning framing: ${entry}`,
+        ).toBe(true);
+        for (const rx of FORBIDDEN_WORD_BOUNDARY) {
+          expect(rx.test(entry)).toBe(false);
+        }
+      }
+    });
+  }
+});
+
+describe("AI Doctor Golden Cases v1.1 — Action Queue invariants", () => {
+  for (const c of AI_DOCTOR_GOLDEN_CASES) {
+    it(`[${c.id}] action queue suggestion is null or strictly advisory + review-only`, async () => {
       const r = await runCase(c);
       const s = r.action_queue_suggestion;
       if (c.expect.requireNoActionQueueSuggestion) {
         expect(s).toBeNull();
       }
-      if (s !== null) {
-        expect(s.action_type).toBe("advisory");
-        expect(s.status).toBe("pending_approval");
-        expect(typeof s.reason).toBe("string");
-        expect(s.reason.length).toBeGreaterThan(0);
-        expect(["low", "medium", "high"]).toContain(s.risk_level);
-        // Suggestion must never include device-control phrasing.
-        const reasonLower = s.reason.toLowerCase();
-        for (const phrase of FORBIDDEN_PHRASES) {
-          expect(reasonLower.includes(phrase)).toBe(false);
-        }
+      if (s === null) return;
+
+      expect(s.action_type).toBe("advisory");
+      expect(ACTION_SUGGESTION_ALLOWED_STATUSES.has(s.status)).toBe(true);
+      expect(typeof s.reason).toBe("string");
+      expect(s.reason.length).toBeGreaterThan(0);
+      expect(["low", "medium", "high"]).toContain(s.risk_level);
+
+      // No executable command / device / setpoint / controller wording.
+      for (const rx of ACTION_SUGGESTION_FORBIDDEN) {
+        expect(
+          rx.test(s.reason),
+          `[${c.id}] action_queue_suggestion.reason contains forbidden token ${rx}: ${s.reason}`,
+        ).toBe(false);
+      }
+      const reasonLower = s.reason.toLowerCase();
+      for (const phrase of FORBIDDEN_PHRASES) {
+        expect(reasonLower.includes(phrase)).toBe(false);
+      }
+      for (const rx of FORBIDDEN_WORD_BOUNDARY) {
+        expect(rx.test(s.reason)).toBe(false);
+      }
+
+      // No hidden write/automation metadata beyond the four contract keys.
+      const allowedKeys = new Set([
+        "action_type",
+        "status",
+        "reason",
+        "risk_level",
+      ]);
+      for (const k of Object.keys(s)) {
+        expect(allowedKeys.has(k), `unexpected key on suggestion: ${k}`).toBe(
+          true,
+        );
       }
     });
   }

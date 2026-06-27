@@ -20,6 +20,10 @@ import {
   AI_DOCTOR_GOLDEN_CASES,
   type GoldenCase,
 } from "./fixtures/aiDoctorGoldenCases";
+import {
+  scanDiagnosisForUnsafePhrases,
+  formatUnsafePhraseReport,
+} from "./utils/aiDoctorOutputSafetyScanner";
 
 const RISK_RANK = { low: 0, medium: 1, high: 2 } as const;
 const BAND_RANK = { low: 0, medium: 1, high: 2 } as const;

@@ -7,7 +7,7 @@
  *
  * Hard rules (V0):
  *  - No I/O. No fetch. No Supabase calls. No AI calls. No mutations.
- *  - No ranking. No "winner" / "best pheno" selection.
+ *  - No ranking. No automatic phenotype pick. Grower decides.
  *  - Demo / stale / invalid / unknown sensor sources are never trusted.
  *  - Missing context is reported explicitly, never guessed.
  *  - Deterministic output: stable sort with explicit tie-breakers.
@@ -78,7 +78,7 @@ export interface ContextualPhenoPlantInput {
   readonly trainingCount?: number | null;
   readonly alertCount?: number | null;
   readonly sensorReadings?: readonly ContextualPhenoSensorReadingInput[] | null;
-  /** Free-text grower notes. Never used to derive winners or AI claims. */
+  /** Free-text grower notes. Never used to derive ranking or AI claims. */
   readonly comparisonNotes?: readonly string[] | null;
 }
 
@@ -128,7 +128,7 @@ export interface ContextualPhenoComparisonView {
 }
 
 export const CONTEXTUAL_PHENO_COMPARISON_CAVEAT =
-  "This comparison shows available context. It does not select a winner automatically.";
+  "This comparison shows available context only. It does not pick a phenotype for you.";
 
 const MIN_PLANTS = 2;
 const MAX_PLANTS = 4;

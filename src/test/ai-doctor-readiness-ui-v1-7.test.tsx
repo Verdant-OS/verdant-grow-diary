@@ -272,13 +272,14 @@ describe("v1.7 — deterministic section/header ordering for partial context", (
 
   for (const c of cases) {
     it(`renders deterministic headers + badges (${c.name})`, () => {
-      renderWith(c.sensors, c.grow ?? []);
+      const view1 = renderWith(c.sensors, c.grow ?? []);
       const headersA = headersInPanel();
       const badgesA = sourceBadgesInPanel();
       expect(headersA[0]).toBe("AI Doctor Context Readiness");
       // Re-render and confirm identical structural output.
-      screen.unmount();
+      view1.unmount();
       renderWith(c.sensors, c.grow ?? []);
+
       expect(headersInPanel()).toEqual(headersA);
       expect(sourceBadgesInPanel()).toEqual(badgesA);
 

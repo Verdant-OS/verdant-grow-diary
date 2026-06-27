@@ -6,6 +6,8 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  filterChangedContextualPhenoFiles,
+  formatFindingsJson,
   formatGithubAnnotation,
   formatGithubAnnotations,
   formatLocalReport,
@@ -14,6 +16,7 @@ import {
   scanSource,
   type Finding,
 } from "@/test/utils/contextualPhenoComparisonStaticSafety";
+
 
 describe("contextualPhenoComparisonStaticSafety — scanner", () => {
   it("detects write/API operations", () => {
@@ -171,3 +174,121 @@ describe("contextualPhenoComparisonStaticSafety — formatters", () => {
     expect(ann).not.toContain("line=");
   });
 });
+
+describe("contextualPhenoComparisonStaticSafety — changed-file filter", () => {
+  it("includes known contextual-pheno files from the safety list", () => {
+    const out = filterChangedContextualPhenoFiles([
+      "src/lib/contextualPhenoComparisonViewModel.ts",
+      "src/components/ContextualPhenoComparisonPanel.tsx",
+      "src/pages/ContextualPhenoComparisonDemo.tsx",
+      "src/test/fixtures/contextualPhenoComparisonFixtures.ts",
+    ]);
+    expect(out).toEqual([
+      "src/components/ContextualPhenoComparisonPanel.tsx",
+      "src/lib/contextualPhenoComparisonViewModel.ts",
+      "src/pages/ContextualPhenoComparisonDemo.tsx",
+      "src/test/fixtures/contextualPhenoComparisonFixtures.ts",
+    ]);
+  });
+
+  it("includes any file whose path matches the contextual-pheno pattern", () => {
+    const out = filterChangedContextualPhenoFiles([
+      "src/test/contextual-pheno-comparison-empty-states.test.tsx",
+      "src/lib/extra/ContextualPhenoComparisonHelper.ts",
+    ]);
+    expect(out).toContain("src/test/contextual-pheno-comparison-empty-states.test.tsx");
+    expect(out).toContain("src/lib/extra/ContextualPhenoComparisonHelper.ts");
+  });
+
+  it("ignores unrelated files", () => {
+    const out = filterChangedContextualPhenoFiles([
+      "README.md",
+      "src/pages/Tasks.tsx",
+      "src/hooks/use-plants.ts",
+    ]);
+    expect(out).toEqual([]);
+  });
+
+  it("returns empty for an empty input", () => {
+    expect(filterChangedContextualPhenoFiles([])).toEqual([]);
+  });
+
+  it("normalises backslash paths and dedupes", () => {
+    const out = filterChangedContextualPhenoFiles([
+      "src\\lib\\contextualPhenoComparisonViewModel.ts",
+      "./src/lib/contextualPhenoComparisonViewModel.ts",
+    ]);
+    expect(out).toEqual(["src/lib/contextualPhenoComparisonViewModel.ts"]);
+  });
+});
+
+describe("contextualPhenoComparisonStaticSafety — compact JSON diagnostics", () => {
+  const f1: Finding = {
+    file: "src/components/ContextualPhenoComparisonPanel.tsx",
+    line: 42,
+    category: "ranking/selection",
+    phrase: "winner",
+    excerpt: "const label = \"Winner\";",
+  };
+  const f2: Finding = {
+    file: "src/pages/ContextualPhenoComparisonDemo.tsx",
+    line: 88,
+    category: "write/API operation",
+    phrase: "functions-invoke",
+    excerpt: "await supabase.functions.invoke('x')",
+  };
+
+  it("returns '[]' when there are no findings", () => {
+    expect(formatFindingsJson([])).toBe("[]");
+  });
+
+  it("returns compact JSON for one finding with required fields only", () => {
+    const json = formatFindingsJson([f1]);
+    const parsed = JSON.parse(json);
+    expect(parsed).toHaveLength(1);
+    expect(Object.keys(parsed[0]).sort()).toEqual([
+      "category",
+      "filePath",
+      "line",
+      "phrase",
+      "sourceLineSnippet",
+    ]);
+    // no pretty-printing
+    expect(json).not.toContain("\n");
+  });
+
+  it("stable-sorts findings by filePath, line, category, phrase", () => {
+    const json = formatFindingsJson([f2, f1, f1]);
+    const parsed = JSON.parse(json);
+    expect(parsed.map((r: { filePath: string }) => r.filePath)).toEqual([
+      "src/components/ContextualPhenoComparisonPanel.tsx",
+      "src/components/ContextualPhenoComparisonPanel.tsx",
+      "src/pages/ContextualPhenoComparisonDemo.tsx",
+    ]);
+  });
+
+  it("truncates snippets to the configured max length", () => {
+    const long: Finding = { ...f1, excerpt: "y".repeat(500) };
+    const parsed = JSON.parse(formatFindingsJson([long], { maxSnippetLength: 40 }));
+    expect(parsed[0].sourceLineSnippet.length).toBeLessThanOrEqual(40);
+    expect(parsed[0].sourceLineSnippet.endsWith("…")).toBe(true);
+  });
+
+  it("sanitises newlines and control characters in snippets", () => {
+    const dirty: Finding = {
+      ...f1,
+      excerpt: "line1\nline2\rline3\t\x07ok",
+    };
+    const parsed = JSON.parse(formatFindingsJson([dirty]));
+    expect(parsed[0].sourceLineSnippet).not.toMatch(/[\n\r\t\x00-\x1f]/);
+    expect(parsed[0].sourceLineSnippet).toContain("line1 line2 line3");
+  });
+
+  it("never includes full file contents", () => {
+    const huge = "x".repeat(10_000);
+    const big: Finding = { ...f1, excerpt: huge };
+    const json = formatFindingsJson([big]);
+    expect(json.length).toBeLessThan(1_000);
+  });
+});
+

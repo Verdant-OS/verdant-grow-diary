@@ -13,6 +13,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Need full history so the changed-file diff can resolve the
+          # PR base ref locally without an extra fetch.
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -30,6 +34,20 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # v0.6: changed-file static safety scan (PR ergonomics). Computes
+      # changed files vs the PR base ref and runs the Contextual Pheno
+      # Comparison safety scanner only on the subset that matches the
+      # contextual-pheno surface. On failure prints grouped local
+      # report + GitHub annotations + compact JSON diagnostics.
+      - name: Changed-file static safety scan
+        run: |
+          BASE="origin/${{ github.base_ref }}"
+          git fetch --no-tags --depth=0 origin "${{ github.base_ref }}" || true
+          CHANGED="$(git diff --name-only "$BASE"...HEAD || git diff --name-only "$BASE" HEAD || true)"
+          echo "Changed files vs $BASE:"
+          echo "$CHANGED"
+          echo "$CHANGED" | bun scripts/assert-contextual-pheno-comparison-safety.ts --stdin
+
       # v0.5: Full Contextual Pheno Comparison v0 suite — view-model,
       # panel, demo page, a11y, layout, empty-states, evidence badges,
       # static safety (with grouped local report + GitHub annotations
@@ -39,7 +57,7 @@ jobs:
         run: bun run test:contextual-pheno-comparison-v0
 
       - name: Static safety utility unit tests
-        run: bunx vitest run src/test/contextual-pheno-comparison-static-safety-utils.test.ts
+        run: bunx vitest run src/test/contextual-pheno-comparison-static-safety-utils.test.ts src/test/contextual-pheno-comparison-static-safety-multiline.test.ts
 
       - name: Typecheck
         run: bun run typecheck

@@ -89,9 +89,15 @@ export function stripSourceComments(input: string): string {
         i += 2;
         continue;
       }
+      // Preserve newlines inside block comments so downstream line
+      // numbering stays accurate after stripping.
+      if (ch === "\n") {
+        out += "\n";
+      }
       i += 1;
       continue;
     }
+
 
     // String modes — preserve content verbatim; handle escape pass-through
     // and matching closing delimiter.

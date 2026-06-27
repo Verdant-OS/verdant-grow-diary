@@ -76,6 +76,16 @@ describe("Evidence Linkage UI Mount v1 — ActionDetail", () => {
     expect(src).toContain('data-testid="action-detail-ai-doctor-evidence-linkage"');
   });
 
+  it("passes provenance-aware fallback copy per derivation block", () => {
+    expect(src).toMatch(
+      /fallbackCopy=\{ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY\}/,
+    );
+    expect(src).toMatch(
+      /fallbackCopy=\{ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY\}/,
+    );
+    expect(src).toMatch(/from\s+"@\/lib\/originatingTimelineEventRules"/);
+  });
+
   it("each mount uses the action-queue-suggestion surface tag", () => {
     const matches = src.match(/<EvidenceLinkageBadges[\s\S]*?surface=\"action-queue-suggestion\"/g);
     expect(matches?.length ?? 0).toBeGreaterThanOrEqual(2);

@@ -23,6 +23,11 @@
 import type { ReadingSource } from "./sensorReadingNormalizationRules";
 import type { AiDoctorSensorContext } from "./aiDoctorSensorContextRules";
 import type { AlertLike, AlertSeverity, ActionRisk } from "./alertToActionQueueRules";
+import {
+  normalizeOriginatingTimelineEvents,
+  type OriginatingTimelineEventInput,
+  type OriginatingTimelineEventRef,
+} from "./originatingTimelineEventRules";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -71,6 +76,11 @@ export interface ActionSuggestion {
   status: SuggestionStatus;
   /** ISO-8601 timestamp when suggestion was created (injectable for determinism). */
   createdAt: string;
+  /**
+   * Linked timeline evidence references (IDs + safe metadata only).
+   * Deduped and deterministically sorted. Never carries raw payloads.
+   */
+  originatingTimelineEvents: OriginatingTimelineEventRef[];
 }
 
 /**
@@ -87,6 +97,8 @@ export interface ApprovedQueuedAction {
   approvedAt: string;
   /** Audit trail: approval is explicit grower action, not automation. */
   approvalNote: string;
+  /** Linked timeline evidence references (carried for traceability only). */
+  originatingTimelineEvents: OriginatingTimelineEventRef[];
 }
 
 /**
@@ -123,6 +135,11 @@ export interface HandoffInput {
   sensorContextId?: string | null;
   /** Injectable clock for deterministic output. */
   now?: string;
+  /**
+   * Optional list of originating timeline event references. IDs + safe
+   * metadata only; raw payloads are never accepted here.
+   */
+  originatingTimelineEvents?: readonly OriginatingTimelineEventInput[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -262,6 +279,9 @@ function adjustRiskForContext(
  */
 export function createActionSuggestion(input: HandoffInput): HandoffResult {
   const { alert, sensorContext, sensorContextId, now } = input;
+  const timelineEvents = normalizeOriginatingTimelineEvents(
+    input.originatingTimelineEvents,
+  );
 
   // Validate alert
   if (!alert) return { ok: false, reason: "missing_alert" };
@@ -312,6 +332,7 @@ export function createActionSuggestion(input: HandoffInput): HandoffResult {
       cautionNotes,
       status: "pending_approval",
       createdAt: now ?? new Date().toISOString(),
+      originatingTimelineEvents: timelineEvents,
     };
 
     return { ok: true, suggestion };
@@ -344,6 +365,7 @@ export function createActionSuggestion(input: HandoffInput): HandoffResult {
     cautionNotes: buildCautionNotes(sourceContext),
     status: "pending_approval",
     createdAt: now ?? new Date().toISOString(),
+    originatingTimelineEvents: timelineEvents,
   };
 
   return { ok: true, suggestion };
@@ -377,6 +399,7 @@ export function approveSuggestion(
     status: "queued_non_executable",
     approvedAt: now ?? new Date().toISOString(),
     approvalNote: approvalNote?.trim() || "Grower approved this action suggestion.",
+    originatingTimelineEvents: suggestion.originatingTimelineEvents ?? [],
   };
 
   return { ok: true, queuedAction };

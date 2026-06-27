@@ -29,6 +29,8 @@ const SCANNED_FILES = [
   "src/lib/aiDoctorSessionToActionQueueRules.ts",
   "src/lib/alertActionQueueEvidenceViewModel.ts",
   "src/lib/aiDoctorSensorContextRules.ts",
+  "src/lib/originatingTimelineEventRules.ts",
+  "src/components/EvidenceLinkageBadges.tsx",
 ];
 
 const WRITE_TOKENS = [

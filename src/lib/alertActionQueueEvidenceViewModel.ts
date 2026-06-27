@@ -54,7 +54,13 @@ function humanMetric(metric: string | null | undefined): string {
 
 export function buildAlertActionQueueEvidenceViewModel(
   alert: AlertLike | null | undefined,
+  options?: {
+    originatingTimelineEvents?: readonly OriginatingTimelineEventInput[] | null;
+  },
 ): AlertActionQueueEvidenceViewModel {
+  const linkedTimelineEvents = normalizeOriginatingTimelineEvents(
+    options?.originatingTimelineEvents,
+  );
   if (!alert) {
     return {
       eligible: false,

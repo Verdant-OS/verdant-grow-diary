@@ -1,5 +1,5 @@
 import type { BreedingEventType, BreedingEvent } from "./breedingTypes.ts";
-import { suggestBreedingFollowUpActions } from "./breedingActionAdvisor.ts";
+import { suggestBreedingFollowUpActions, type BreedingEventLike } from "./breedingActionAdvisor.ts";
 
 export const SUPPORTED_BREEDING_EVENT_TYPES: BreedingEventType[] = [
   "reversal_application",
@@ -42,7 +42,7 @@ export function buildBreedingActionQueuePayloads(
     return [];
   }
 
-  const suggestions = suggestBreedingFollowUpActions(event);
+  const suggestions = suggestBreedingFollowUpActions(event as unknown as BreedingEventLike);
 
   return suggestions.map((suggestion) => {
     // Compute due_at = occurred_at + due_offset_days

@@ -1,6 +1,6 @@
 import type { Database } from "@/integrations/supabase/types";
 import type { BreedingEventType, BreedingEvent } from "./breedingTypes";
-import { suggestBreedingFollowUpActions } from "./breedingActionAdvisor";
+import { suggestBreedingFollowUpActions, type BreedingEventLike } from "./breedingActionAdvisor";
 
 export const SUPPORTED_BREEDING_EVENT_TYPES: BreedingEventType[] = [
   "reversal_application",

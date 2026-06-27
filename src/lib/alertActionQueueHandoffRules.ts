@@ -23,6 +23,11 @@
 import type { ReadingSource } from "./sensorReadingNormalizationRules";
 import type { AiDoctorSensorContext } from "./aiDoctorSensorContextRules";
 import type { AlertLike, AlertSeverity, ActionRisk } from "./alertToActionQueueRules";
+import {
+  normalizeOriginatingTimelineEvents,
+  type OriginatingTimelineEventInput,
+  type OriginatingTimelineEventRef,
+} from "./originatingTimelineEventRules";
 
 // ---------------------------------------------------------------------------
 // Types

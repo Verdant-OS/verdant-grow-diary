@@ -102,6 +102,7 @@ import {
 } from "@/lib/actionOutcomeRules";
 
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
+import EvidenceLinkageBadges from "@/components/EvidenceLinkageBadges";
 import { useGrows } from "@/store/grows";
 
 type Status = ActionStatus;
@@ -774,7 +775,15 @@ export default function ActionDetail() {
                   );
                 })()}
 
-
+                <div
+                  className="mt-3"
+                  data-testid="action-detail-alert-evidence-linkage"
+                >
+                  <EvidenceLinkageBadges
+                    events={[]}
+                    surface="action-queue-suggestion"
+                  />
+                </div>
               </div>
             );
           })()}
@@ -857,7 +866,15 @@ export default function ActionDetail() {
                   );
                 })()}
 
-
+                <div
+                  className="mt-3"
+                  data-testid="action-detail-ai-doctor-evidence-linkage"
+                >
+                  <EvidenceLinkageBadges
+                    events={[]}
+                    surface="action-queue-suggestion"
+                  />
+                </div>
               </div>
             );
           })()}

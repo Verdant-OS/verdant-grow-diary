@@ -17,6 +17,7 @@ import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
+import EvidenceLinkageBadges from "@/components/EvidenceLinkageBadges";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
 import { useAlertsLinkedActionCounts } from "@/hooks/useAlertsLinkedActionCounts";
 
@@ -523,6 +524,12 @@ export default function AlertDetail() {
 
             <div className="mt-3">
               <AlertWhyContext alert={alert} variant="detailed" />
+            </div>
+            <div
+              className="mt-3"
+              data-testid="alert-detail-evidence-linkage"
+            >
+              <EvidenceLinkageBadges events={[]} surface="alert-review" />
             </div>
             <div className="mt-3">
               <LinkedActionCountBadge

@@ -57,6 +57,82 @@ function fmtNum(value: number | null, digits = 1, suffix = ""): string {
   return `${value.toFixed(digits)}${suffix}`;
 }
 
+interface EmptyStateRule {
+  readonly id: string;
+  readonly text: string;
+  readonly applies: (plant: ContextualPhenoComparisonPlant) => boolean;
+}
+
+/**
+ * Deterministic empty-state copy rules for the v0.3 panel. Order is locked.
+ * Copy is cautious and specific: never says "healthy", never ranks, never
+ * implies a winner, never recommends device control or dosing.
+ */
+const EMPTY_STATE_RULES: readonly EmptyStateRule[] = [
+  {
+    id: "diary",
+    text: "No recent diary evidence yet.",
+    applies: (p) => p.evidenceCounts.diary === 0,
+  },
+  {
+    id: "photos",
+    text: "No photos available for this comparison.",
+    applies: (p) => p.evidenceCounts.photos === 0,
+  },
+  {
+    id: "watering",
+    text: "No watering entries recorded.",
+    applies: (p) => p.evidenceCounts.watering === 0,
+  },
+  {
+    id: "feeding",
+    text: "No feeding entries recorded.",
+    applies: (p) => p.evidenceCounts.feeding === 0,
+  },
+  {
+    id: "sensor",
+    text: "No sensor readings recorded.",
+    applies: (p) => p.evidenceCounts.sensorReadings === 0,
+  },
+  {
+    id: "untrusted-only",
+    text: "Untrusted sensor evidence only — do not use as live context.",
+    applies: (p) =>
+      p.evidenceCounts.sensorReadings > 0 &&
+      !p.environmentSummary.hasTrustedSensorContext,
+  },
+  {
+    id: "no-trusted-context",
+    text: "No trusted sensor context available.",
+    applies: (p) => !p.environmentSummary.hasTrustedSensorContext,
+  },
+  {
+    id: "environment-summary",
+    text: "Environment summary unavailable.",
+    applies: (p) =>
+      p.environmentSummary.avgTempF === null &&
+      p.environmentSummary.avgRh === null &&
+      p.environmentSummary.avgVpd === null &&
+      p.environmentSummary.avgPpfd === null,
+  },
+  {
+    id: "stage",
+    text: "Stage unknown.",
+    applies: (p) => p.stage === null,
+  },
+  {
+    id: "strain",
+    text: "Strain / genetics unknown.",
+    applies: (p) => p.strain === null,
+  },
+  {
+    id: "status",
+    text: "Status unknown.",
+    applies: (p) => p.status === null,
+  },
+];
+
+
 function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
   const env = plant.environmentSummary;
   const sourceEntries = SENSOR_SOURCE_ORDER.filter(
@@ -189,6 +265,31 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
           </ul>
         </section>
       )}
+
+      {(() => {
+        const empties = EMPTY_STATE_RULES.filter((r) => r.applies(plant));
+        if (empties.length === 0) return null;
+        return (
+          <section data-testid="plant-empty-states" aria-label="Missing or unknown evidence">
+            <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
+              What's missing or unknown
+            </h4>
+            <ul className="list-disc list-inside text-xs text-muted-foreground space-y-0.5">
+              {empties.map((e) => (
+                <li
+                  key={e.id}
+                  data-testid={`plant-empty-state-${e.id}`}
+                  data-empty-state-id={e.id}
+                >
+                  {e.text}
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })()}
+
+
 
       {plant.comparisonNotes.length > 0 && (
         <section data-testid="plant-comparison-notes">

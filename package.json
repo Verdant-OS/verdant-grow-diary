@@ -70,6 +70,8 @@
     "check:sensor-source-phase3": "bun run typecheck && bun run test:sensor-source-phase3-regression",
     "docs:release-safety": "node scripts/assert-release-docs-safety.mjs",
     "docs:assert-automated-phenotyping-safety": "node scripts/assert-automated-phenotyping-docs-safety.mjs",
+    "docs:assert-safety": "node scripts/assert-docs-safety.mjs",
+
     "ai-doctor:preview-safety": "node scripts/assert-ai-doctor-preview-safety.mjs",
     "supabase:migrations:sync": "node scripts/sync-supabase-migrations-from-integration.mjs",
     "supabase:migrations:verify-remote": "node scripts/verify-supabase-migrations-complete.mjs",

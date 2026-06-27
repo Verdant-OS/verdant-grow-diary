@@ -97,6 +97,8 @@ export interface ApprovedQueuedAction {
   approvedAt: string;
   /** Audit trail: approval is explicit grower action, not automation. */
   approvalNote: string;
+  /** Linked timeline evidence references (carried for traceability only). */
+  originatingTimelineEvents: OriginatingTimelineEventRef[];
 }
 
 /**

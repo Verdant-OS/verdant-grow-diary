@@ -220,10 +220,12 @@ describe("AI Doctor Readiness UI — evidence section header ordering", () => {
     const headers = Array.from(panel.querySelectorAll("h2, h3")).map(
       (h) => (h.textContent ?? "").trim(),
     );
-    // No "Next evidence to add" (all evidence present), no "Limitations",
-    // no "Missing information".
+    // "Next evidence to add" still renders because the Add Sensor Snapshot
+    // quick action is always offered (it has no automatic-fulfilment route).
+    // No "Limitations" and no "Missing information" sections on strong context.
     expect(headers).toEqual([
       "AI Doctor Context Readiness",
+      "Next evidence to add",
       "Sensor source labels",
       "Current reading quality",
       "Preview AI Doctor output",

@@ -426,6 +426,10 @@ export default function ContextualPhenoComparisonPanel({
   demoBannerText = "Demo comparison data — not live sensor data.",
   className,
 }: ContextualPhenoComparisonPanelProps) {
+  const allInsufficient =
+    view.ok &&
+    view.plants.length > 0 &&
+    view.plants.every(isPlantInsufficient);
   return (
     <div
       data-testid="contextual-pheno-comparison-panel"

@@ -244,3 +244,67 @@ describe("AI Doctor 2.0 engine — static safety", () => {
     }
   });
 });
+
+describe("generateMultimodalDiagnosis — deterministic snapshot", () => {
+  const NOW = new Date("2026-06-04T12:00:00Z");
+  const iso = (offsetMs: number) =>
+    new Date(NOW.getTime() - offsetMs).toISOString();
+
+  const vision: VisionAnalysisResult = {
+    visual_summary: "deterministic stub",
+    leaf_observations: ["slight tip curl"],
+    structural_observations: [],
+    color_and_pigmentation: [],
+    pest_disease_indicators: [],
+    growth_stage_visual_cues: [],
+    image_quality_notes: [],
+    image_quality_score: 0,
+    confidence: 0.4,
+  };
+
+  function buildContext() {
+    return compilePlantContextFromRows({
+      plant: { id: "p-snap", tent_id: "t-snap", grow_id: "g-snap", stage: "veg" },
+      growEvents: [
+        { occurred_at: iso(2 * 60 * 60 * 1000), event_type: "watering", source: "manual" },
+        { occurred_at: iso(24 * 60 * 60 * 1000), event_type: "feeding", source: "manual" },
+      ],
+      sensorReadings: [
+        { metric: "temperature_c", value: 24, captured_at: iso(60 * 60 * 1000), source: "ecowitt", quality: "ok" },
+        { metric: "humidity_pct", value: 55, captured_at: iso(60 * 60 * 1000), source: "ecowitt", quality: "ok" },
+        { metric: "vpd_kpa", value: 1.1, captured_at: iso(60 * 60 * 1000), source: "ecowitt", quality: "ok" },
+      ],
+      now: NOW,
+    });
+  }
+
+  it("produces byte-for-byte identical output for identical compiled context", async () => {
+    const ctxA = buildContext();
+    const ctxB = buildContext();
+    expect(JSON.stringify(ctxA)).toBe(JSON.stringify(ctxB));
+
+    const a = await generateMultimodalDiagnosis(vision, ctxA);
+    const b = await generateMultimodalDiagnosis(vision, ctxB);
+
+    // Stable key-order serialization for comparison.
+    const stable = (v: unknown) =>
+      JSON.stringify(v, (_k, val) => {
+        if (val && typeof val === "object" && !Array.isArray(val)) {
+          const sorted: Record<string, unknown> = {};
+          for (const k of Object.keys(val as Record<string, unknown>).sort()) {
+            sorted[k] = (val as Record<string, unknown>)[k];
+          }
+          return sorted;
+        }
+        return val;
+      });
+
+    expect(stable(a)).toBe(stable(b));
+    expect(a.summary).toBe(b.summary);
+    expect(a.model_confidence_level).toBe(b.model_confidence_level);
+    expect(a.risk_level).toBe(b.risk_level);
+    expect(a.evidence).toEqual(b.evidence);
+    expect(a.missing_information).toEqual(b.missing_information);
+    expect(a.recommended_actions).toEqual(b.recommended_actions);
+  });
+});

@@ -303,8 +303,235 @@ cleaned = pcv.fill(bin_img=binary, size=200)
 
 ---
 
-## 9. Rollback notes
+## 9. Diary Entry and Photo Linking Workflow
+
+Step-by-step workflow for getting an automated phenotyping observation
+into Verdant as supporting evidence. None of these steps are automated
+in this slice — every step is manual.
+
+1. **Create or confirm Plant ID** in Verdant.
+2. **Confirm Pheno ID / Line ID** for the breeding project.
+3. **Capture standardized photo** per Section 3 (side, top, or macro).
+4. **Name the file** using the convention in Section 11.
+5. **Record Photo ID / File Name** in the workbook log.
+6. **Record `photo_date`** from the capture date, not the upload date.
+7. **Upload / link the photo** in Verdant against the plant.
+8. **Create a Diary entry** using the template in Section 10 with the
+   fields: Plant ID, Pheno ID, Project / Line, Generation, Photo ID /
+   File Name, photo_date, Stage, View Type, Tool / Method, Source Type,
+   Confidence, Human Review Status, Notes.
+9. **Add automated phenotyping output as supporting evidence only.**
+10. **Record Human Final Score only after review.** Until then leave it
+    blank.
+11. **Action Queue Draft** (if any) is recorded as grower-review-only
+    text in the diary entry. It is not an actual Action Queue item and
+    is never created automatically by this workflow.
+
+---
+
+## 10. Diary Entry Template
+
+```
+Title: [Pheno ID] Automated Phenotyping Review – [photo_date]
+
+Plant ID:
+Pheno ID:
+Project / Line:
+Generation:
+Photo ID / File Name:
+photo_date:
+Stage:
+View Type:
+Tool / Method:
+Source Type:
+Confidence:
+Automated Metric(s):
+Human Review Status:
+Human Final Score:
+Missing Evidence:
+Notes:
+Action Queue Draft / Grower-review-only:
+```
+
+---
+
+## 11. Filename Convention and Photo ID Mapping
+
+### 11.1 Convention
+
+```
+{project}_{phenoId}_{stage}_{viewType}_{YYYY-MM-DD}_{sequence}
+```
+
+Rules:
+
+- Use **hyphens inside IDs**, **underscores between fields**.
+- Date is the **capture date**, not the upload date.
+- Sequence is **two digits**: `01`, `02`, etc.
+- Photo ID may equal the filename without extension, or a Verdant photo
+  reference if one is available.
+- `photo_date` must equal the `YYYY-MM-DD` in the filename unless
+  corrected with a Note in the workbook log.
+
+### 11.2 Examples
+
+**Example 1 — Side view**
+
+`SDxBD_SDxBD-F1-04_flower-wk6_side-view_2026-06-26_01.jpg`
+
+| Field      | Value                                                       |
+| ---------- | ----------------------------------------------------------- |
+| Photo ID   | `SDxBD_SDxBD-F1-04_flower-wk6_side-view_2026-06-26_01`      |
+| photo_date | 2026-06-26                                                  |
+| Project    | SDxBD                                                       |
+| Pheno ID   | SDxBD-F1-04                                                 |
+| Stage      | flower-wk6                                                  |
+| View Type  | side-view                                                   |
+| Sequence   | 01                                                          |
+
+**Example 2 — Top canopy**
+
+`SDxBD_SDxBD-F1-04_flower-wk6_top-canopy_2026-06-26_01.jpg`
+
+| Field      | Value                                                       |
+| ---------- | ----------------------------------------------------------- |
+| Photo ID   | `SDxBD_SDxBD-F1-04_flower-wk6_top-canopy_2026-06-26_01`     |
+| photo_date | 2026-06-26                                                  |
+| Project    | SDxBD                                                       |
+| Pheno ID   | SDxBD-F1-04                                                 |
+| Stage      | flower-wk6                                                  |
+| View Type  | top-canopy                                                  |
+| Sequence   | 01                                                          |
+
+**Example 3 — Macro / trichome**
+
+`SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome_2026-06-26_01.jpg`
+
+| Field      | Value                                                        |
+| ---------- | ------------------------------------------------------------ |
+| Photo ID   | `SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome_2026-06-26_01`  |
+| photo_date | 2026-06-26                                                   |
+| Project    | SDxBD                                                        |
+| Pheno ID   | SDxBD-F1-04                                                  |
+| Stage      | flower-wk6                                                   |
+| View Type  | macro-trichome                                               |
+| Sequence   | 01                                                           |
+
+**Example 4 — Mother plant**
+
+`SourD_SD-P1-Mother-01_veg-wk12_side-view_2026-06-26_01.jpg`
+
+| Field      | Value                                                  |
+| ---------- | ------------------------------------------------------ |
+| Photo ID   | `SourD_SD-P1-Mother-01_veg-wk12_side-view_2026-06-26_01` |
+| photo_date | 2026-06-26                                             |
+| Project    | SourD                                                  |
+| Pheno ID   | SD-P1-Mother-01                                        |
+| Stage      | veg-wk12                                               |
+| View Type  | side-view                                              |
+| Sequence   | 01                                                     |
+
+**Example 5 — Retake photo**
+
+`SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome-retake_2026-06-26_02.jpg`
+
+| Field      | Value                                                                 |
+| ---------- | --------------------------------------------------------------------- |
+| Photo ID   | `SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome-retake_2026-06-26_02`    |
+| photo_date | 2026-06-26                                                            |
+| Project    | SDxBD                                                                 |
+| Pheno ID   | SDxBD-F1-04                                                           |
+| Stage      | flower-wk6                                                            |
+| View Type  | macro-trichome-retake                                                 |
+| Sequence   | 02                                                                    |
+
+---
+
+## 12. Grower Human-Review Checklist
+
+Complete this one-page checklist before recording any keeper, cull,
+harvest, or commercial-release decision.
+
+### 12.1 Required for every decision
+
+- [ ] Plant ID confirmed
+- [ ] Pheno ID confirmed
+- [ ] `photo_date` confirmed
+- [ ] Stage confirmed
+- [ ] Photo matches the standardized protocol in Section 3
+- [ ] At least one supporting photo is clear and in focus
+- [ ] Tool / Method recorded
+- [ ] Source Type recorded
+- [ ] Confidence recorded
+- [ ] Output reviewed by a human
+- [ ] Weak or low-confidence evidence marked `Needs human review` or
+      `Retake Photo`
+- [ ] Sensor and diary context reviewed where relevant
+- [ ] Decision is based on multiple evidence points, not a single photo
+- [ ] Keeper / cull / harvest / release decision is recorded manually
+- [ ] Action Queue Draft remains grower-review-only
+
+### 12.2 Decision-specific checks
+
+**Keeper**
+
+- [ ] Repeated trait evidence or diary support exists
+- [ ] No unresolved `Visible concern` outstanding
+- [ ] Grower final score recorded
+
+**Cull**
+
+- [ ] Reason documented in diary
+- [ ] Evidence reviewed by a human (no model-only cull)
+- [ ] No automatic cull from model output
+
+**Harvest**
+
+- [ ] Multiple trichome / macro / photo observations recorded if
+      relevant
+- [ ] Environmental and cure plan considered
+- [ ] No harvest call made from a single image
+
+**Commercial release**
+
+- [ ] Release workbook traceability reviewed separately (see commercial
+      release spec)
+- [ ] Workbook formulas are treated as candidate signals only
+- [ ] Human release decision recorded **outside** the automated
+      phenotyping output
+
+---
+
+## 13. Sample Filled Phenotyping Output Log
+
+The rows below are illustrative dummy values. They show how to populate
+the log safely. Human Final Score is left blank when review is pending
+or when confidence is too low to influence scoring.
+
+| Pheno ID    | Plant ID | Project / Line | Generation | Photo ID / File Name                                              | Photo Date | Stage       | View Type      | Tool / Method            | Metric Name              | Automated Value | Unit  | Confidence | Source Type   | Human Review Status              | Human Final Score | Notes                                                  | Verdant Diary Reference | Action Queue Draft                          |
+| ----------- | -------- | -------------- | ---------- | ----------------------------------------------------------------- | ---------- | ----------- | -------------- | ------------------------ | ------------------------ | --------------- | ----- | ---------- | ------------- | -------------------------------- | ----------------- | ------------------------------------------------------ | ----------------------- | ------------------------------------------- |
+| SDxBD-F1-04 | P-0142   | SDxBD          | F1         | SDxBD_SDxBD-F1-04_flower-wk6_side-view_2026-06-26_01              | 2026-06-26 | flower-wk6  | side-view      | PlantCV 4.x (manual run) | estimated_height_cm      | 82              | cm    | Medium     | derived_from_photo | Accepted as Supporting Evidence | 80                | Reference marker visible; pixels-to-cm calibrated.     | DIARY-9821              | (none)                                      |
+| SDxBD-F1-04 | P-0142   | SDxBD          | F1         | SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome_2026-06-26_01         | 2026-06-26 | flower-wk6  | macro-trichome | Roboflow trichome v0.3   | trichome_cloudy_percent  | 62              | pct   | Low        | external_tool | Needs human review               |                   | Low confidence; do not use for harvest call.           | DIARY-9822              | Grower-review-only: schedule re-check in 48h |
+| SDxBD-F1-04 | P-0142   | SDxBD          | F1         | SDxBD_SDxBD-F1-04_flower-wk6_macro-trichome-retake_2026-06-26_02  | 2026-06-26 | flower-wk6  | macro-trichome | Roboflow trichome v0.3   | visible_concern_flag     | Uncertain       | label | Low        | external_tool | Retake Photo                     |                   | Out of focus; capture replacement macro shot.          | DIARY-9823              | (none)                                      |
+| SDxBD-F1-04 | P-0142   | SDxBD          | F1         | SDxBD_SDxBD-F1-04_flower-wk6_side-view_2026-06-26_01              | 2026-06-26 | flower-wk6  | side-view      | PlantCV 4.x (manual run) | node_count_estimate      | 14              | nodes | Medium     | derived_from_photo | Accepted as Supporting Evidence | 14                | Matches manual node count from diary.                  | DIARY-9821              | (none)                                      |
+
+Rules reflected in the sample:
+
+- Human Final Score may be blank until review.
+- Low-confidence outputs do not affect the final score.
+- Action Queue Draft is optional text only; it is never an actual
+  Action Queue item and is never created automatically.
+
+---
+
+## 14. Rollback notes
 
 This protocol is a single Markdown document. To roll back, delete
 `docs/automated-phenotyping-protocol-v1.0.md`. No application behavior,
 schema, RLS, Edge Function, or runtime surface depends on it.
+
+If the static scanner (`scripts/assert-automated-phenotyping-docs-safety.mjs`)
+is also being removed, delete that script, its test
+(`src/test/assert-automated-phenotyping-docs-safety.test.ts`), and the
+`docs:assert-automated-phenotyping-safety` package script.
+

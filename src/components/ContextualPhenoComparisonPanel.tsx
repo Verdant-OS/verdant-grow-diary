@@ -244,6 +244,30 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
         </div>
       </header>
 
+      <section
+        data-testid="plant-evidence-summary"
+        aria-label="Evidence summary"
+      >
+        <ul className="flex flex-wrap gap-1.5">
+          {buildEvidenceBadges(plant).map((b) => (
+            <li
+              key={b.type}
+              data-testid={`plant-evidence-badge-${b.type}`}
+              data-evidence-type={b.type}
+              data-evidence-state={b.state}
+              className={cn(
+                "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                EVIDENCE_BADGE_TONE[b.state],
+              )}
+            >
+              {b.label}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+
+
       <section data-testid="plant-evidence-counts">
         <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
           Evidence

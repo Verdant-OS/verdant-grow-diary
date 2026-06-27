@@ -73,7 +73,6 @@
     "docs:assert-safety": "node scripts/assert-docs-safety.mjs",
     "docs:assert-safety:dry-run": "node scripts/assert-docs-safety.mjs --dry-run",
     "precommit:docs-safety": "bun run docs:assert-safety && bunx vitest run src/test/assert-automated-phenotyping-docs-safety.test.ts",
-
     "ai-doctor:preview-safety": "node scripts/assert-ai-doctor-preview-safety.mjs",
     "supabase:migrations:sync": "node scripts/sync-supabase-migrations-from-integration.mjs",
     "supabase:migrations:verify-remote": "node scripts/verify-supabase-migrations-complete.mjs",
@@ -123,7 +122,8 @@
     "verify:full:sharded": "bun run typecheck && bun run test:full:sharded",
     "test:scanner-guardrails": "vitest run src/test/scanner-guardrail-harness.test.ts src/test/scanner-guardrails-ci-contract.test.ts src/test/clean-scanner-guardrail-artifacts.test.ts src/test/shelly-ht-retirement.test.ts src/test/ecowitt-only-sensor-direction.test.ts src/test/sensor-intelligence-safety.test.ts src/test/vpd-stage-normalization-ownership.test.ts src/test/typed-watering-write-feature-flag.test.ts src/test/watering-history.test.ts src/test/feeding-history.test.ts src/test/photo-history.test.ts src/test/piIngestBridgeCredentialEncryptedStorage.test.ts src/test/piIngestBridgeSecretStrategy.test.ts src/test/piIngestServerSecretResolverContract.test.ts src/test/piIngestServerSecretResolverImplementationPlan.test.ts src/test/piIngestBridgeCredentialsSafeViewLintFix.test.ts src/test/piIngestEdgeSkeletonAudit.test.ts src/test/piIngestSecretKeyManagementContract.test.ts src/test/piIngestSecretResolutionPlan.test.ts src/test/manual-sensor-snapshot-change-context.test.tsx --reporter=dot",
     "test:scanner-guardrails:ci": "node scripts/run-scanner-guardrails-ci.mjs",
-    "test:scanner-guardrails:clean": "node scripts/clean-scanner-guardrail-artifacts.mjs"
+    "test:scanner-guardrails:clean": "node scripts/clean-scanner-guardrail-artifacts.mjs",
+    "test:ai-doctor-golden-cases": "bunx vitest run src/test/ai-doctor-golden-cases.test.ts && node scripts/sensor-safety-check.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

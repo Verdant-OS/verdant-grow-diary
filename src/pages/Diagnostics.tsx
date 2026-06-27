@@ -323,7 +323,33 @@ export default function Diagnostics() {
             </Button>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="space-y-2 pb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">Contextual Pheno Comparison (Demo)</CardTitle>
+              <Badge variant="outline">Internal</Badge>
+              <Badge variant="secondary">Static demo data</Badge>
+              <Badge variant="outline">Read-only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>
+              Side-by-side context view for 2–4 plants using labeled demo
+              fixture data. No live data, no AI, no save, no share, no
+              ranking — the grower decides.
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link
+                to="/internal/contextual-pheno-comparison-demo"
+                data-testid="diagnostics-contextual-pheno-comparison-link"
+              >
+                Open demo
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </section>
+
     </div>
   );
 }

@@ -76,6 +76,11 @@ export interface ActionSuggestion {
   status: SuggestionStatus;
   /** ISO-8601 timestamp when suggestion was created (injectable for determinism). */
   createdAt: string;
+  /**
+   * Linked timeline evidence references (IDs + safe metadata only).
+   * Deduped and deterministically sorted. Never carries raw payloads.
+   */
+  originatingTimelineEvents: OriginatingTimelineEventRef[];
 }
 
 /**

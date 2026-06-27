@@ -209,4 +209,44 @@ describe("One-Tent Loop Evidence Handoff — static safety", () => {
       `unexpected healthy-near-untrusted lines:\n${formatFindings(findings)}`,
     ).toBe(0);
   });
+
+  it("EvidenceLinkageBadges UI mount blocks contain no forbidden execute/device copy", () => {
+    const BAD = [
+      "automatically execute",
+      "auto execute",
+      "automatically control",
+      "device command",
+      "send command",
+      "execute command",
+      "set fan",
+      "set light",
+      "set irrigation",
+      "dose nutrients",
+      "apply pesticide",
+      "guaranteed",
+      "definitely",
+      "certain diagnosis",
+      "diagnosed from photo",
+    ];
+    const findings: string[] = [];
+    for (const file of MOUNT_SCANNED_FILES) {
+      const abs = join(ROOT, file);
+      expect(existsSync(abs), `${file} should exist`).toBe(true);
+      const raw = readFileSync(abs, "utf8");
+      const lines = raw.split("\n");
+      lines.forEach((line, idx) => {
+        if (!line.includes("EvidenceLinkageBadges")) return;
+        // Scan ±6 lines around each EvidenceLinkageBadges mount.
+        const start = Math.max(0, idx - 6);
+        const end = Math.min(lines.length, idx + 7);
+        const block = lines.slice(start, end).join("\n").toLowerCase();
+        for (const phrase of BAD) {
+          if (block.includes(phrase) && !block.includes(`do not ${phrase}`) && !block.includes(`never ${phrase}`)) {
+            findings.push(`${file}:${idx + 1} mount block contains "${phrase}"`);
+          }
+        }
+      });
+    }
+    expect(findings, findings.join("\n")).toEqual([]);
+  });
 });

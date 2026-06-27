@@ -361,4 +361,3 @@ describe("compilePlantContextFromRows — unknown / unrecognized source safety",
     expect(ctx.averages_7d.temperature_c).toBeNull();
   });
 });
-});

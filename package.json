@@ -9,6 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "test:contextual-pheno-comparison-v0": "bunx vitest run src/test/contextual-pheno-comparison-view-model.test.ts src/test/contextual-pheno-comparison-panel.test.tsx src/test/contextual-pheno-comparison-demo-page.test.tsx src/test/contextual-pheno-comparison-static-safety.test.ts && node scripts/sensor-safety-check.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "preview": "vite preview",

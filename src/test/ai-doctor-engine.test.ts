@@ -382,8 +382,8 @@ describe("Phase 1 engine — deterministic ordering of action/evidence/missing l
   };
 
   it("compiled context is byte-for-byte identical across two compiles of identical unsorted input", () => {
-    const ctxA = engine.compilePlantContextRowsPhase1(buildUnsortedInput());
-    const ctxB = engine.compilePlantContextRowsPhase1(buildUnsortedInput());
+    const ctxA = compilePlantContextRowsPhase1(buildUnsortedInput());
+    const ctxB = compilePlantContextRowsPhase1(buildUnsortedInput());
     expect(stableJson(ctxA)).toBe(stableJson(ctxB));
     // recentSensorReadings ordering must be stable (newest first, tie-break by metric).
     expect(ctxA.recentSensorReadings).toEqual(ctxB.recentSensorReadings);
@@ -398,11 +398,11 @@ describe("Phase 1 engine — deterministic ordering of action/evidence/missing l
   });
 
   it("Phase 1 diagnosis byte-for-byte identical across separately compiled contexts", async () => {
-    const ctxA = engine.compilePlantContextRowsPhase1(buildUnsortedInput());
-    const ctxB = engine.compilePlantContextRowsPhase1(buildUnsortedInput());
+    const ctxA = compilePlantContextRowsPhase1(buildUnsortedInput());
+    const ctxB = compilePlantContextRowsPhase1(buildUnsortedInput());
 
-    const a = await engine.generateMultimodalDiagnosisPhase1(vision, ctxA);
-    const b = await engine.generateMultimodalDiagnosisPhase1(vision, ctxB);
+    const a = await generateMultimodalDiagnosisPhase1(vision, ctxA);
+    const b = await generateMultimodalDiagnosisPhase1(vision, ctxB);
 
     expect(stableJson(a)).toBe(stableJson(b));
 
@@ -433,12 +433,12 @@ describe("Phase 1 engine — deterministic ordering of action/evidence/missing l
       sensorReadings: [...base.sensorReadings].reverse(),
       growEvents: [...base.growEvents].reverse(),
     };
-    const ctxA = engine.compilePlantContextRowsPhase1(base);
-    const ctxB = engine.compilePlantContextRowsPhase1(shuffled);
+    const ctxA = compilePlantContextRowsPhase1(base);
+    const ctxB = compilePlantContextRowsPhase1(shuffled);
     expect(stableJson(ctxA)).toBe(stableJson(ctxB));
 
-    const a = await engine.generateMultimodalDiagnosisPhase1(vision, ctxA);
-    const b = await engine.generateMultimodalDiagnosisPhase1(vision, ctxB);
+    const a = await generateMultimodalDiagnosisPhase1(vision, ctxA);
+    const b = await generateMultimodalDiagnosisPhase1(vision, ctxB);
     expect(stableJson(a)).toBe(stableJson(b));
   });
 });

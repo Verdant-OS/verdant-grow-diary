@@ -6,6 +6,8 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  filterChangedContextualPhenoFiles,
+  formatFindingsJson,
   formatGithubAnnotation,
   formatGithubAnnotations,
   formatLocalReport,
@@ -14,6 +16,7 @@ import {
   scanSource,
   type Finding,
 } from "@/test/utils/contextualPhenoComparisonStaticSafety";
+
 
 describe("contextualPhenoComparisonStaticSafety — scanner", () => {
   it("detects write/API operations", () => {

@@ -257,3 +257,63 @@ export const CONTEXTUAL_PHENO_COMPARISON_EMPTY_STATE_PLANT_INPUTS: readonly Cont
   },
 ];
 
+/**
+ * v0.4 fixture: every plant is insufficient/untrusted so the panel must
+ * render the all-insufficient banner. Deterministic, demo-labeled, no
+ * raw payloads, no ranking, no winner fields.
+ */
+export const CONTEXTUAL_PHENO_COMPARISON_ALL_INSUFFICIENT_PLANT_INPUTS: readonly ContextualPhenoPlantInput[] = [
+  {
+    plantId: "demo-insuf-sparse-a",
+    plantLabel: "Sparse-A",
+    growId: "demo-grow-insuf",
+    tentId: "demo-tent-insuf",
+    strain: null,
+    stage: null,
+    status: null,
+    diaryCount: 0,
+    photoCount: 0,
+    wateringCount: 0,
+    feedingCount: 0,
+    trainingCount: 0,
+    alertCount: 0,
+    sensorReadings: [],
+    comparisonNotes: [],
+  },
+  {
+    plantId: "demo-insuf-untrusted-b",
+    plantLabel: "Untrusted-B",
+    growId: "demo-grow-insuf",
+    tentId: "demo-tent-insuf",
+    strain: null,
+    stage: null,
+    status: null,
+    diaryCount: 1,
+    photoCount: 0,
+    wateringCount: 0,
+    feedingCount: 0,
+    trainingCount: 0,
+    alertCount: 0,
+    sensorReadings: [
+      {
+        source: "demo",
+        capturedAt: "2026-06-18T12:00:00.000Z",
+        tempF: 999,
+        rh: 100,
+        vpd: 0,
+        ppfd: 0,
+      },
+      {
+        source: "stale",
+        capturedAt: "2026-04-01T12:00:00.000Z",
+        tempF: 80,
+        rh: 50,
+        vpd: 1.4,
+        ppfd: 700,
+      },
+    ],
+    comparisonNotes: [],
+  },
+];
+
+

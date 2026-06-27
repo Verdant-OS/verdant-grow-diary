@@ -30,6 +30,13 @@ describe("Evidence Linkage UI Mount v1 — AlertDetail", () => {
     expect(src).toContain('data-testid="alert-detail-evidence-linkage"');
   });
 
+  it("passes alert-review provenance-aware fallback copy", () => {
+    expect(src).toMatch(/fallbackCopy=\{ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY\}/);
+    expect(src).toMatch(
+      /from\s+"@\/lib\/originatingTimelineEventRules"/,
+    );
+  });
+
   it("does not introduce write/control verbs in the mount", () => {
     const forbidden = [
       "functions.invoke",

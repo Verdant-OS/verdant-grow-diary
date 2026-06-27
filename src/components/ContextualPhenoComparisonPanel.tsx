@@ -266,6 +266,31 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
         </section>
       )}
 
+      {(() => {
+        const empties = EMPTY_STATE_RULES.filter((r) => r.applies(plant));
+        if (empties.length === 0) return null;
+        return (
+          <section data-testid="plant-empty-states" aria-label="Missing or unknown evidence">
+            <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
+              What's missing or unknown
+            </h4>
+            <ul className="list-disc list-inside text-xs text-muted-foreground space-y-0.5">
+              {empties.map((e) => (
+                <li
+                  key={e.id}
+                  data-testid={`plant-empty-state-${e.id}`}
+                  data-empty-state-id={e.id}
+                >
+                  {e.text}
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })()}
+
+
+
       {plant.comparisonNotes.length > 0 && (
         <section data-testid="plant-comparison-notes">
           <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">

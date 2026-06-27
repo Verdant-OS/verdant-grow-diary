@@ -878,6 +878,7 @@ export default function ActionDetail() {
                   <EvidenceLinkageBadges
                     events={[]}
                     surface="action-queue-suggestion"
+                    fallbackCopy={ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY}
                   />
                 </div>
               </div>

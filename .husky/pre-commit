@@ -1,2 +1,4 @@
 npx lint-staged
 node scripts/precommit-release-workbooks.mjs
+node scripts/assert-docs-safety.mjs
+bunx vitest run src/test/assert-automated-phenotyping-docs-safety.test.ts --reporter=dot

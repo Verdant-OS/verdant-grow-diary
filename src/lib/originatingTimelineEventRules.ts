@@ -141,3 +141,18 @@ export function originatingTimelineEventLabel(
 /** Safe fallback copy when no timeline event is linked. */
 export const TIMELINE_EVIDENCE_NOT_LINKED_COPY =
   "Timeline evidence not linked yet." as const;
+
+/**
+ * Provenance-aware fallback copy. Each variant explains which source is not
+ * linked yet. Phrasing avoids certainty, automation, and device-control
+ * language and never implies data is missing — only that the system has not
+ * linked it yet. Approval-required flow is preserved separately.
+ */
+export const ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY =
+  "Alert evidence is not linked to a timeline event yet." as const;
+
+export const ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY =
+  "Alert-derived action evidence is not linked to a timeline event yet." as const;
+
+export const ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY =
+  "AI Doctor action evidence is not linked to a timeline event yet." as const;

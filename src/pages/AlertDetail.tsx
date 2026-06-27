@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 import EvidenceLinkageBadges from "@/components/EvidenceLinkageBadges";
+import { ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY } from "@/lib/originatingTimelineEventRules";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
 import { useAlertsLinkedActionCounts } from "@/hooks/useAlertsLinkedActionCounts";
 
@@ -529,7 +530,11 @@ export default function AlertDetail() {
               className="mt-3"
               data-testid="alert-detail-evidence-linkage"
             >
-              <EvidenceLinkageBadges events={[]} surface="alert-review" />
+              <EvidenceLinkageBadges
+                events={[]}
+                surface="alert-review"
+                fallbackCopy={ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY}
+              />
             </div>
             <div className="mt-3">
               <LinkedActionCountBadge

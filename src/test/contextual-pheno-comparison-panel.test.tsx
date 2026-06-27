@@ -80,17 +80,18 @@ describe("ContextualPhenoComparisonPanel", () => {
     expect(invalid.getAttribute("data-untrusted")).toBe("true");
   });
 
-  it("renders per-plant missing context and cross-plant missing context", () => {
+  it("renders per-plant missing context for the under-documented plant", () => {
     renderPanel();
     const charlie = screen.getByTestId(
       "contextual-pheno-comparison-plant-demo-plant-charlie",
     );
     expect(within(charlie).getByTestId("plant-missing-context").textContent)
       .toMatch(/no diary entries/i);
-    const cross = screen.getByTestId(
-      "contextual-pheno-comparison-cross-missing",
-    );
-    expect(cross.textContent).toBeTruthy();
+    // Cross-plant section only renders when *every* plant misses a slot.
+    // Demo fixtures intentionally don't trigger cross-plant gaps.
+    expect(
+      screen.queryByTestId("contextual-pheno-comparison-cross-missing"),
+    ).toBeNull();
   });
 
   it("renders trusted/untrusted yes/no marker without ever calling Charlie healthy", () => {

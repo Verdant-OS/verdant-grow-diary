@@ -145,7 +145,7 @@ function PlantCard({ plant }: { plant: ContextualPhenoComparisonPlant }) {
                   )}
                   title={
                     untrusted
-                      ? `${SOURCE_LABEL[s]} — caution: untrusted source, not treated as healthy.`
+                      ? `${SOURCE_LABEL[s]} — caution: untrusted source.`
                       : `${SOURCE_LABEL[s]} source.`
                   }
                 >

@@ -191,7 +191,7 @@ export function parseFilename(name) {
 
 export function checkFilenameExamples(text) {
   const violations = [];
-  const section = extractSection(text, /Filename Convention/i);
+  const section = extractSection(text, /Filename Convention and Photo ID Mapping/i);
   if (!section) {
     violations.push({ kind: "filename-convention", message: "Section 'Filename Convention' not found." });
     return violations;

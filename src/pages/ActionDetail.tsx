@@ -866,7 +866,15 @@ export default function ActionDetail() {
                   );
                 })()}
 
-
+                <div
+                  className="mt-3"
+                  data-testid="action-detail-ai-doctor-evidence-linkage"
+                >
+                  <EvidenceLinkageBadges
+                    events={[]}
+                    surface="action-queue-suggestion"
+                  />
+                </div>
               </div>
             );
           })()}

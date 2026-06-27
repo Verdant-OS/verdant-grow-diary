@@ -525,6 +525,11 @@ export default function AlertDetail() {
             <div className="mt-3">
               <AlertWhyContext alert={alert} variant="detailed" />
             </div>
+            <div
+              className="mt-3"
+              data-testid="alert-detail-evidence-linkage"
+            >
+              <EvidenceLinkageBadges events={[]} surface="alert-review" />
             <div className="mt-3">
               <LinkedActionCountBadge
                 alertId={alert.id}

@@ -33,6 +33,14 @@ const SCANNED_FILES = [
   "src/components/EvidenceLinkageBadges.tsx",
 ];
 
+// Scope-limited subset for presenter-mount scanning. We only scan the
+// regions of large pages that touch evidence linkage to avoid flagging
+// unrelated legacy copy elsewhere in those files.
+const MOUNT_SCANNED_FILES = [
+  "src/pages/AlertDetail.tsx",
+  "src/pages/ActionDetail.tsx",
+];
+
 const WRITE_TOKENS = [
   "functions.invoke",
   ".insert(",

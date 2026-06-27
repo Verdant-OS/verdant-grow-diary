@@ -17,6 +17,7 @@ import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
+import EvidenceLinkageBadges from "@/components/EvidenceLinkageBadges";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
 import { useAlertsLinkedActionCounts } from "@/hooks/useAlertsLinkedActionCounts";
 

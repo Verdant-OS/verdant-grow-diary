@@ -231,14 +231,15 @@ describe("compilePlantContextFromRows — windows + determinism", () => {
       plant: basePlant,
       growEvents: [],
       sensorReadings: [
-        { metric: "vpd_kpa", value: "not-a-number", captured_at: iso(60_000) },
-        { metric: "vpd_kpa", value: 1.2, captured_at: "not-a-date" },
+        { metric: "vpd_kpa", value: "not-a-number", captured_at: iso(60_000), source: "ecowitt" },
+        { metric: "vpd_kpa", value: 1.2, captured_at: "not-a-date", source: "ecowitt" },
         {
           metric: "vpd_kpa",
           value: 1.2,
           captured_at: new Date(NOW.getTime() + 60_000).toISOString(),
+          source: "ecowitt",
         },
-        { metric: "vpd_kpa", value: 1.2, captured_at: iso(60_000) },
+        { metric: "vpd_kpa", value: 1.2, captured_at: iso(60_000), source: "ecowitt" },
       ],
       now: NOW,
     });

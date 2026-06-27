@@ -21,6 +21,14 @@ export interface BreedingActionQueuePayload extends ActionQueueInsert {
   due_at?: string; // Appended since the type might not have it yet
 }
 
+function toBreedingEventLike(event: BreedingEvent): BreedingEventLike {
+  return {
+    ...event,
+    event_type: event.type,
+    details: (event.details as Record<string, unknown>) || null,
+  };
+}
+
 export function buildBreedingActionQueuePayloads(
   event: BreedingEvent,
   growId: string,
@@ -36,11 +44,8 @@ export function buildBreedingActionQueuePayloads(
     return [];
   }
 
-  const suggestions = suggestBreedingFollowUpActions({
-    ...event,
-    event_type: event.type,
-    details: (event.details as Record<string, unknown>) ?? null,
-  });
+  const eventLike = toBreedingEventLike(event);
+  const suggestions = suggestBreedingFollowUpActions(eventLike);
 
   return suggestions.map((suggestion) => {
     // Compute due_at = occurred_at + due_offset_days

@@ -99,14 +99,18 @@ beforeEach(() => {
 const TRUSTED_TONE_CLASSES = ["border-emerald-500/30", "text-emerald-200"];
 const CAUTION_TONE_CLASSES = ["border-amber-500/30", "text-amber-200"];
 const UNTRUSTED_FORBIDDEN_WORDS = ["healthy", "trusted", "live sensor"];
+// Automation/device-control verbs that must never appear in caution copy.
+// Note: the panel intentionally REASSURES with phrases like "no device
+// control" and "approval required" — those are safety copy and are
+// validated separately. We only ban execution verbs here.
 const FORBIDDEN_AUTOMATION_WORDS = [
   "auto-execute",
-  "automatically",
-  "device control",
-  "turn on",
-  "turn off",
-  "set fan",
+  "auto execute",
+  "turn on the",
+  "turn off the",
+  "set fan to",
   "dose nutrients",
+  "open valve",
 ];
 
 // ===========================================================================

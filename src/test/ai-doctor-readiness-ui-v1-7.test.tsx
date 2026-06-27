@@ -216,14 +216,15 @@ describe("v1.7 — deterministic section/header ordering for partial context", (
   function renderWith(
     sensorReadings: ReadonlyArray<Record<string, unknown>>,
     growEvents: ReadonlyArray<Record<string, unknown>> = [],
-  ): void {
-    render(
+  ): ReturnType<typeof render> {
+    return render(
       <AiDoctorContextReadinessPanel
         context={buildReadinessContext({ sensorReadings, growEvents })}
         openAlertsCount={0}
       />,
     );
   }
+
 
   const cases: Array<{
     name: string;

@@ -529,7 +529,11 @@ export default function AlertDetail() {
               className="mt-3"
               data-testid="alert-detail-evidence-linkage"
             >
-              <EvidenceLinkageBadges events={[]} surface="alert-review" />
+              <EvidenceLinkageBadges
+                events={[]}
+                surface="alert-review"
+                fallbackCopy={ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY}
+              />
             </div>
             <div className="mt-3">
               <LinkedActionCountBadge

@@ -135,6 +135,11 @@ export interface HandoffInput {
   sensorContextId?: string | null;
   /** Injectable clock for deterministic output. */
   now?: string;
+  /**
+   * Optional list of originating timeline event references. IDs + safe
+   * metadata only; raw payloads are never accepted here.
+   */
+  originatingTimelineEvents?: readonly OriginatingTimelineEventInput[] | null;
 }
 
 // ---------------------------------------------------------------------------

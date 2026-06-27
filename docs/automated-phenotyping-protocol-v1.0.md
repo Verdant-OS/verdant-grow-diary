@@ -40,14 +40,26 @@ score.
 - manual final score
 - grower-review-only draft
 
-### Avoid wording
+### Avoid wording (Do not use)
 
-- "AI selected"
-- "automatically cull"
-- "auto-release"
-- "guaranteed healthy"
-- "diagnosed from photo"
-- "Action Queue item created automatically"
+The phrases below must never appear in Verdant phenotyping records or
+copy. They are documented here only so reviewers know what to reject.
+Each line is annotated with an allow marker so the docs safety scanner
+ignores its own prohibited-wording list.
+
+- "AI selected" <!-- automated-phenotyping-docs-safety:allow -->
+- "AI approved" <!-- automated-phenotyping-docs-safety:allow -->
+- "automatically cull" <!-- automated-phenotyping-docs-safety:allow -->
+- "auto-release" <!-- automated-phenotyping-docs-safety:allow -->
+- "guaranteed healthy" <!-- automated-phenotyping-docs-safety:allow -->
+- "Guaranteed harvest ready" <!-- automated-phenotyping-docs-safety:allow -->
+- "diagnosed from photo" <!-- automated-phenotyping-docs-safety:allow -->
+- "Action Queue item created automatically" <!-- automated-phenotyping-docs-safety:allow -->
+- "automatically creates Action Queue" <!-- automated-phenotyping-docs-safety:allow -->
+- "automated keeper decision" <!-- automated-phenotyping-docs-safety:allow -->
+- "automated cull decision" <!-- automated-phenotyping-docs-safety:allow -->
+- "automated release decision" <!-- automated-phenotyping-docs-safety:allow -->
+- Legacy class names: `Healthy` <!-- automated-phenotyping-docs-safety:allow -->, `Healthy_Leaf` <!-- automated-phenotyping-docs-safety:allow -->, `Stressed` <!-- automated-phenotyping-docs-safety:allow -->, `Stressed_Leaf` <!-- automated-phenotyping-docs-safety:allow -->, `Nutrient_Deficiency` <!-- automated-phenotyping-docs-safety:allow -->, `Pest_Damage` <!-- automated-phenotyping-docs-safety:allow -->, `Diseased` <!-- automated-phenotyping-docs-safety:allow -->, `Disease_Detected` <!-- automated-phenotyping-docs-safety:allow -->
 
 ---
 
@@ -55,10 +67,10 @@ score.
 
 ### 2.1 Plant condition labels (replaces certainty-heavy labels)
 
-The following Verdant-safe labels replace prior certainty-heavy class
-names such as `Healthy`, `Healthy_Leaf`, `Stressed`,
-`Nutrient_Deficiency`, and `Pest_Damage`. Those legacy class names must
-not be used in Verdant-facing records.
+The Verdant-safe labels below replace prior certainty-heavy class
+names. Legacy class names must not be used in Verdant-facing records
+(see the annotated "Avoid wording" block in Section 1 for the full
+forbidden list).
 
 | Label                  | Meaning                                                                   |
 | ---------------------- | ------------------------------------------------------------------------- |
@@ -84,9 +96,20 @@ not be used in Verdant-facing records.
 
 ### 2.4 Forbidden label families
 
-Do not introduce health/diagnosis class names such as `Healthy`,
-`Diseased`, `Nutrient_Deficiency`, `Pest_Damage`, `Stressed`, or any
-synonym that implies a clinical diagnosis from a single image.
+Do not introduce health/diagnosis class names or any synonym that
+implies a clinical diagnosis from a single image. The full forbidden
+list (with allow markers so the safety scanner does not flag this
+document's own prohibited-wording reference) is in Section 1.
+
+### 2.5 Allowed human-review status values
+
+- `No visible concern`
+- `Visible concern`
+- `Uncertain`
+- `Needs human review`
+- `Retake Photo`
+- `Accepted as Supporting Evidence`
+- `Rejected`
 
 ---
 

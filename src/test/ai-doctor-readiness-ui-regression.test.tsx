@@ -5,6 +5,7 @@
  *  - source-quality badge inline snapshots (live/manual/csv/demo/stale/invalid)
  *  - cautious labeling of untrusted sources (no "healthy" on demo/stale/invalid)
  *  - evidence/limitations rendering for sensor-missing path
+ *  - evidence section header ordering snapshot
  *  - fallback copy on missing plantId, loading, and compile-error paths
  *  - quick-action mount dispatches navigation-only CustomEvents with safe payloads
  *
@@ -17,8 +18,14 @@ import { render, screen, fireEvent } from "@testing-library/react";
 
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
 import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
-import { compileAiDoctorContextFromRows } from "@/lib/aiDoctorEngine";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import {
+  SOURCE_BADGE_CASES,
+  buildReadingForSource,
+  buildReadinessContext,
+  readinessFixtureAgo,
+  READINESS_FIXTURE_HOUR_MS,
+} from "@/test/utils/aiDoctorReadinessFixtures";
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -66,30 +73,8 @@ vi.mock("@/hooks/usePlantAssignedTentAlerts", () => ({
   }),
 }));
 
-const NOW = new Date("2026-06-10T12:00:00Z");
-const HOUR = 3600 * 1000;
-const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
-
-const plant = {
-  id: "p1",
-  name: "Plant A",
-  strain: "Northern Lights",
-  stage: "veg" as const,
-  grow_id: "g1",
-  tent_id: "t1",
-};
-
-function ctx(
-  growEvents: ReadonlyArray<Record<string, unknown>>,
-  sensorReadings: ReadonlyArray<Record<string, unknown>>,
-) {
-  return compileAiDoctorContextFromRows({
-    plant,
-    growEvents,
-    sensorReadings,
-    now: NOW,
-  });
-}
+const HOUR = READINESS_FIXTURE_HOUR_MS;
+const ago = readinessFixtureAgo;
 
 beforeEach(() => {
   recentActivityState = { data: [], isLoading: false };
@@ -104,39 +89,26 @@ beforeEach(() => {
 // untrusted sources cannot drift to "live"/trusted styling.
 // ---------------------------------------------------------------------------
 
-const SOURCE_BADGE_CASES = [
-  { source: "live", label: "Live", trustworthy: "true" },
-  { source: "manual", label: "Manual", trustworthy: "true" },
-  { source: "csv", label: "CSV / imported", trustworthy: "false" },
-  { source: "demo", label: "Demo", trustworthy: "false" },
-  { source: "stale", label: "Stale", trustworthy: "false" },
-  { source: "invalid", label: "Invalid", trustworthy: "false" },
-] as const;
-
 const UNTRUSTED_FORBIDDEN_NEAR = ["healthy"] as const;
 
 describe("AI Doctor Readiness UI — source-quality badge snapshots", () => {
   for (const cse of SOURCE_BADGE_CASES) {
-    it(`renders ${cse.source} badge with label, count, and trustworthy=${cse.trustworthy}`, () => {
-      const reading: Record<string, unknown> = {
-        metric: "temperature_c",
-        value: 24,
-        captured_at: ago(HOUR),
-        source: cse.source === "stale" || cse.source === "invalid" ? "live" : cse.source,
-      };
-      if (cse.source === "stale") reading.quality = "stale";
-      if (cse.source === "invalid") reading.quality = "invalid";
-
-      render(<AiDoctorContextReadinessPanel context={ctx([], [reading])} />);
+    it(`renders ${cse.source} badge with label, count, and isTrustworthy=${cse.isTrustworthy}`, () => {
+      const context = buildReadinessContext({
+        sensorReadings: [buildReadingForSource(cse.source)],
+      });
+      render(<AiDoctorContextReadinessPanel context={context} />);
       const badge = screen.getByTestId(
         `ai-doctor-context-readiness-panel-source-${cse.source}`,
       );
       expect(badge.getAttribute("data-source")).toBe(cse.source);
-      expect(badge.getAttribute("data-trustworthy")).toBe(cse.trustworthy);
+      expect(badge.getAttribute("data-trustworthy")).toBe(
+        cse.isTrustworthy ? "true" : "false",
+      );
       expect(badge.textContent ?? "").toContain(cse.label);
       expect(badge.textContent ?? "").toMatch(/·\s*1\b/);
 
-      if (cse.trustworthy === "false") {
+      if (!cse.isTrustworthy) {
         const text = (badge.textContent ?? "").toLowerCase();
         for (const word of UNTRUSTED_FORBIDDEN_NEAR) {
           expect(text).not.toContain(word);
@@ -146,13 +118,12 @@ describe("AI Doctor Readiness UI — source-quality badge snapshots", () => {
   }
 
   it("does not merge multiple untrusted sources into a single trusted badge", () => {
-    const context = ctx(
-      [],
-      [
-        { metric: "temperature_c", value: 24, captured_at: ago(HOUR), source: "demo" },
-        { metric: "humidity_pct", value: 55, captured_at: ago(HOUR), source: "csv" },
+    const context = buildReadinessContext({
+      sensorReadings: [
+        buildReadingForSource("demo"),
+        buildReadingForSource("csv", { metric: "humidity_pct", value: 55 }),
       ],
-    );
+    });
     render(<AiDoctorContextReadinessPanel context={context} />);
     const demo = screen.getByTestId("ai-doctor-context-readiness-panel-source-demo");
     const csv = screen.getByTestId("ai-doctor-context-readiness-panel-source-csv");
@@ -173,12 +144,7 @@ describe("AI Doctor Readiness UI — source-quality badge snapshots", () => {
 
 describe("AI Doctor Readiness UI — limitations ordering (sensor-missing path)", () => {
   it("renders limitations in deterministic order: no_sensors → no_recent_events → missing_stage", () => {
-    const context = compileAiDoctorContextFromRows({
-      plant: { ...plant, stage: null },
-      growEvents: [],
-      sensorReadings: [],
-      now: NOW,
-    });
+    const context = buildReadinessContext({ plant: { stage: null } });
     render(<AiDoctorContextReadinessPanel context={context} />);
     const list = screen.getByTestId("ai-doctor-context-readiness-panel-limitations");
     const items = Array.from(list.querySelectorAll("li")).map(
@@ -192,18 +158,9 @@ describe("AI Doctor Readiness UI — limitations ordering (sensor-missing path)"
   });
 
   it("flags stale/invalid telemetry as untrusted with caution copy (never healthy)", () => {
-    const context = ctx(
-      [],
-      [
-        {
-          metric: "temperature_c",
-          value: 24,
-          captured_at: ago(HOUR),
-          source: "live",
-          quality: "stale",
-        },
-      ],
-    );
+    const context = buildReadinessContext({
+      sensorReadings: [buildReadingForSource("stale")],
+    });
     render(<AiDoctorContextReadinessPanel context={context} />);
     const limitation = screen.getByTestId(
       "ai-doctor-context-readiness-panel-limitation-stale_or_invalid",
@@ -211,6 +168,104 @@ describe("AI Doctor Readiness UI — limitations ordering (sensor-missing path)"
     const text = (limitation.textContent ?? "").toLowerCase();
     expect(text).toContain("untrusted");
     expect(text).not.toContain("healthy");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Evidence section header ordering snapshot — locks the actual H2/H3 ordering
+// the panel renders today. The panel groups evidence by section header, not
+// by event type (diary/photo/watering/feeding are surfaced via counts +
+// quick actions + missing-information list, not as individual headers).
+// Documenting the actual intended grouping per task instructions.
+// ---------------------------------------------------------------------------
+
+describe("AI Doctor Readiness UI — evidence section header ordering", () => {
+  it("renders H2/H3 section headers in deterministic order for a missing-evidence panel", () => {
+    const context = buildReadinessContext({
+      // No events, no sensors → triggers QuickActions + Limitations +
+      // Missing information sections so we exercise the full header set.
+      plant: { stage: null },
+    });
+    render(<AiDoctorContextReadinessPanel context={context} />);
+    const panel = screen.getByTestId("ai-doctor-context-readiness-panel");
+    const headers = Array.from(panel.querySelectorAll("h2, h3")).map(
+      (h) => (h.textContent ?? "").trim(),
+    );
+    expect(headers).toEqual([
+      "AI Doctor Context Readiness",
+      "Next evidence to add",
+      "Sensor source labels",
+      "Current reading quality",
+      "Limitations",
+      "Missing information",
+      "Preview AI Doctor output",
+      "Action Queue suggestion preview",
+    ]);
+  });
+
+  it("omits QuickActions/Limitations/Missing headers on a strong-context panel", () => {
+    const context = buildReadinessContext({
+      growEvents: [
+        { occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" },
+        { occurred_at: ago(8 * HOUR), event_type: "feeding", source: "manual" },
+        { occurred_at: ago(4 * HOUR), event_type: "photo", source: "manual" },
+      ],
+      sensorReadings: [
+        buildReadingForSource("live"),
+        buildReadingForSource("live", { metric: "humidity_pct", value: 55 }),
+      ],
+    });
+    render(<AiDoctorContextReadinessPanel context={context} openAlertsCount={0} />);
+    const panel = screen.getByTestId("ai-doctor-context-readiness-panel");
+    const headers = Array.from(panel.querySelectorAll("h2, h3")).map(
+      (h) => (h.textContent ?? "").trim(),
+    );
+    // "Next evidence to add" still renders because the Add Sensor Snapshot
+    // quick action is always offered (it has no automatic-fulfilment route).
+    // No "Limitations" and no "Missing information" sections on strong context.
+    expect(headers).toEqual([
+      "AI Doctor Context Readiness",
+      "Next evidence to add",
+      "Sensor source labels",
+      "Current reading quality",
+      "Preview AI Doctor output",
+      "Action Queue suggestion preview",
+    ]);
+  });
+
+  it("counts panel surfaces Stage / Recent logs / Sensor readings (7d) / Open alerts", () => {
+    const context = buildReadinessContext({
+      growEvents: [
+        { occurred_at: ago(2 * HOUR), event_type: "watering", source: "manual" },
+      ],
+      sensorReadings: [buildReadingForSource("manual")],
+    });
+    render(
+      <AiDoctorContextReadinessPanel context={context} openAlertsCount={3} />,
+    );
+    const dl = screen.getByTestId("ai-doctor-context-readiness-panel-counts");
+    const dtLabels = Array.from(dl.querySelectorAll("dt")).map(
+      (n) => (n.textContent ?? "").trim(),
+    );
+    expect(dtLabels).toEqual([
+      "Stage",
+      "Recent logs",
+      "Sensor readings (7d)",
+      "Open alerts",
+    ]);
+    expect(
+      screen.getByTestId("ai-doctor-context-readiness-panel-count-recent-logs")
+        .textContent,
+    ).toBe("1");
+    expect(
+      screen.getByTestId(
+        "ai-doctor-context-readiness-panel-count-sensor-readings",
+      ).textContent,
+    ).toBe("1");
+    expect(
+      screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts")
+        .textContent,
+    ).toBe("3");
   });
 });
 
@@ -311,12 +366,38 @@ describe("AI Doctor Readiness UI — fallback copy", () => {
 // Quick-action safety — when the mount wires watering/feeding handlers,
 // clicking them must only dispatch the navigation-only CustomEvent with a
 // safe `{plantId, growId, tentId}` payload. No write/command semantics.
+// Disabled quick actions must dispatch nothing.
 // ---------------------------------------------------------------------------
 
+const QUICK_ACTION_DETAIL_BANNED_KEYS = [
+  "command",
+  "execute",
+  "automation",
+  "action",
+  "action_queue",
+  "insert",
+  "update",
+  "delete",
+  "upsert",
+  "device",
+  "controller",
+  "setpoint",
+  "pump",
+  "fan",
+  "light",
+  "irrigation",
+] as const;
+
 describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
-  it("dispatches verdant:open-quicklog with safe identifiers only on Add Watering", () => {
+  it("dispatches verdant:open-quicklog CustomEvent with safe identifiers only on Add Watering", () => {
     recentActivityState = { data: [], isLoading: false };
     manualLogsState = { data: [], isLoading: false };
+
+    const localStorageSetSpy = vi.spyOn(Storage.prototype, "setItem");
+    const sessionStorageSetSpy = vi.spyOn(
+      window.sessionStorage.__proto__,
+      "setItem",
+    );
 
     const events: CustomEvent[] = [];
     const handler = (e: Event) => {
@@ -341,34 +422,100 @@ describe("AI Doctor Readiness UI — quick-action safety (mount)", () => {
       fireEvent.click(button);
     } finally {
       window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+      localStorageSetSpy.mockRestore();
+      sessionStorageSetSpy.mockRestore();
     }
 
     expect(events).toHaveLength(1);
     const evt = events[0];
+    expect(evt).toBeInstanceOf(CustomEvent);
     expect(evt.type).toBe("verdant:open-quicklog");
-    expect(evt.detail).toEqual({ plantId: "p1", growId: "g1", tentId: "t1" });
 
-    // Payload must contain only safe identifiers — no command/action/write
-    // semantics smuggled in.
-    const detailKeys = Object.keys((evt.detail ?? {}) as Record<string, unknown>);
-    expect(detailKeys.sort()).toEqual(["growId", "plantId", "tentId"]);
-    const detailJson = JSON.stringify(evt.detail).toLowerCase();
-    for (const banned of [
-      "command",
-      "execute",
-      "automate",
-      "turn_on",
-      "turn_off",
-      "action_queue",
-      "insert",
-      "update",
-      "delete",
-      "upsert",
-    ]) {
+    const detail = (evt.detail ?? {}) as Record<string, unknown>;
+    const detailKeys = Object.keys(detail).sort();
+    expect(detailKeys).toEqual(["growId", "plantId", "tentId"]);
+    expect(detail).toEqual({ plantId: "p1", growId: "g1", tentId: "t1" });
+
+    // No banned write/command/device tokens anywhere in the payload keys
+    // or stringified values.
+    const detailJson = JSON.stringify(detail).toLowerCase();
+    for (const banned of QUICK_ACTION_DETAIL_BANNED_KEYS) {
+      expect(detailKeys.map((k) => k.toLowerCase())).not.toContain(banned);
       expect(detailJson).not.toContain(banned);
     }
 
-    // And no network egress
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(localStorageSetSpy).not.toHaveBeenCalled();
+    expect(sessionStorageSetSpy).not.toHaveBeenCalled();
+  });
+
+  it("Add Feeding dispatches the same navigation-only event payload shape", () => {
+    recentActivityState = { data: [], isLoading: false };
+    manualLogsState = { data: [], isLoading: false };
+
+    const events: CustomEvent[] = [];
+    const handler = (e: Event) => {
+      events.push(e as CustomEvent);
+    };
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+
+    try {
+      render(
+        <PlantDetailAiDoctorContextReadinessMount
+          plantId="p2"
+          growId="g2"
+          tentId="t2"
+          plantName="Plant B"
+          stage="veg"
+        />,
+      );
+      const button = screen.getByTestId(
+        "ai-doctor-context-readiness-panel-quick-action-add-feeding",
+      ) as HTMLButtonElement;
+      expect(button.disabled).toBe(false);
+      fireEvent.click(button);
+    } finally {
+      window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("verdant:open-quicklog");
+    expect(events[0].detail).toEqual({
+      plantId: "p2",
+      growId: "g2",
+      tentId: "t2",
+    });
+  });
+
+  it("disabled quick actions dispatch no event and trigger no network call", () => {
+    recentActivityState = { data: [], isLoading: false };
+    manualLogsState = { data: [], isLoading: false };
+
+    const events: Event[] = [];
+    const handler = (e: Event) => {
+      events.push(e);
+    };
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+
+    try {
+      render(
+        <PlantDetailAiDoctorContextReadinessMount
+          plantId="p1"
+          growId={null}
+          tentId={null}
+          plantName="Plant A"
+        />,
+      );
+      const button = screen.getByTestId(
+        "ai-doctor-context-readiness-panel-quick-action-add-watering",
+      ) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      fireEvent.click(button);
+    } finally {
+      window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
+    }
+
+    expect(events).toHaveLength(0);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 

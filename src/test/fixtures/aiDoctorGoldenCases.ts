@@ -404,6 +404,282 @@ const ORDER: ReadonlyArray<GoldenCase> = Object.freeze([
       requireNoActionQueueSuggestion: true,
     },
   },
+  // -------------------------------------------------------------------------
+  // v1.1 — differential cases (pest/disease vs nutrient vs environment)
+  // -------------------------------------------------------------------------
+  {
+    id: "differential-pest-disease-vs-environment",
+    description:
+      "Photo + diary note describing localized leaf spotting with thin sensor " +
+      "context. Engine must stay differential (possible visible concern), not " +
+      "diagnostic, and must request closer photo / underside check / environment " +
+      "context before any treatment recommendation.",
+    input: {
+      now: GOLDEN_NOW,
+      plant: {
+        id: "plant-diff-pest-1",
+        grow_id: "grow-d1",
+        tent_id: "tent-d1",
+        stage: "veg",
+      },
+      growEvents: [
+        {
+          occurred_at: hoursAgo(2),
+          event_type: "photo",
+          source: "manual",
+          note: "Photo uploaded — localized spotting on a single fan leaf edge.",
+        },
+        {
+          occurred_at: hoursAgo(5),
+          event_type: "diary_note",
+          source: "manual",
+          note: "Noticed small dark spots near leaf margin on lower canopy.",
+        },
+      ],
+      sensorReadings: [
+        {
+          metric: "humidity_pct",
+          value: 58,
+          captured_at: hoursAgo(1),
+          source: "manual",
+          quality: "ok",
+        },
+      ],
+    },
+    expect: {
+      maxConfidenceBand: "medium",
+      maxRiskLevel: "medium",
+      expectedSourceTags: ["manual"],
+      forbiddenSourceTags: ["live"],
+    },
+  },
+  {
+    id: "differential-nutrient-vs-watering-environment",
+    description:
+      "Diary note mentions yellowing / tip burn after a recent feeding event. " +
+      "Sensor context is manual / csv only, not live. Engine must keep cause " +
+      "set as a differential (nutrient strength, pH/root-zone, watering, " +
+      "environment) and must not emit a direct dosing instruction.",
+    input: {
+      now: GOLDEN_NOW,
+      plant: {
+        id: "plant-diff-nutrient-1",
+        grow_id: "grow-d2",
+        tent_id: "tent-d2",
+        stage: "veg",
+      },
+      growEvents: [
+        {
+          occurred_at: hoursAgo(10),
+          event_type: "feeding",
+          source: "manual",
+          note: "Feeding pass — mid-strength nutrient mix.",
+        },
+        {
+          occurred_at: hoursAgo(3),
+          event_type: "diary_note",
+          source: "manual",
+          note: "Yellowing on upper leaves with light tip burn observed.",
+        },
+      ],
+      sensorReadings: [
+        {
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: hoursAgo(2),
+          source: "manual",
+          quality: "ok",
+        },
+        {
+          metric: "temperature_c",
+          value: 23,
+          captured_at: daysAgo(2),
+          source: "csv",
+          quality: "ok",
+        },
+      ],
+    },
+    expect: {
+      maxConfidenceBand: "medium",
+      maxRiskLevel: "medium",
+      expectedSourceTags: ["manual", "csv"],
+      forbiddenSourceTags: ["live"],
+    },
+  },
+  {
+    id: "differential-environment-only-stress",
+    description:
+      "Live temperature/humidity/VPD outside target with a diary curl/droop " +
+      "note and no fresh photo. Engine must frame issue as environment stress " +
+      "review, surface live evidence explicitly, and any action suggestion stays " +
+      "review-only.",
+    input: {
+      now: GOLDEN_NOW,
+      plant: {
+        id: "plant-diff-env-1",
+        grow_id: "grow-d3",
+        tent_id: "tent-d3",
+        stage: "veg",
+      },
+      growEvents: [
+        {
+          occurred_at: hoursAgo(2),
+          event_type: "diary_note",
+          source: "manual",
+          note: "Slight leaf curl and droop noted mid-afternoon.",
+        },
+      ],
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 32,
+          captured_at: hoursAgo(1),
+          source: "ecowitt",
+          quality: "ok",
+        },
+        {
+          metric: "humidity_pct",
+          value: 28,
+          captured_at: hoursAgo(1),
+          source: "ecowitt",
+          quality: "ok",
+        },
+        {
+          metric: "vpd_kpa",
+          value: 1.9,
+          captured_at: hoursAgo(1),
+          source: "ecowitt",
+          quality: "ok",
+        },
+      ],
+    },
+    expect: {
+      maxConfidenceBand: "medium",
+      maxRiskLevel: "medium",
+      expectedSourceTags: ["live"],
+    },
+  },
+  // -------------------------------------------------------------------------
+  // v1.1 — contradictory source cases
+  // -------------------------------------------------------------------------
+  {
+    id: "contradictory-live-normal-manual-alarming",
+    description:
+      "Live readings within target while a manual reading from the same window " +
+      "reports high humidity. Engine must not raise confidence to High and must " +
+      "preserve live/manual source separation without silently agreeing.",
+    input: {
+      now: GOLDEN_NOW,
+      plant: {
+        id: "plant-conflict-1",
+        grow_id: "grow-c1",
+        tent_id: "tent-c1",
+        stage: "flower",
+      },
+      growEvents: [],
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: hoursAgo(1),
+          source: "ecowitt",
+          quality: "ok",
+        },
+        {
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: hoursAgo(1),
+          source: "ecowitt",
+          quality: "ok",
+        },
+        {
+          metric: "vpd_kpa",
+          value: 1.1,
+          captured_at: hoursAgo(1),
+          source: "ecowitt",
+          quality: "ok",
+        },
+        {
+          metric: "humidity_pct",
+          value: 78,
+          captured_at: hoursAgo(1),
+          source: "manual",
+          quality: "ok",
+        },
+      ],
+    },
+    expect: {
+      maxConfidenceBand: "medium",
+      maxRiskLevel: "medium",
+      expectedSourceTags: ["live", "manual"],
+    },
+  },
+  {
+    id: "contradictory-manual-normal-live-alarming",
+    description:
+      "Live readings outside target while a recent manual snapshot reports " +
+      "normal. Engine must cap confidence at Medium, keep both sources visible, " +
+      "and avoid device-control wording.",
+    input: {
+      now: GOLDEN_NOW,
+      plant: {
+        id: "plant-conflict-2",
+        grow_id: "grow-c2",
+        tent_id: "tent-c2",
+        stage: "veg",
+      },
+      growEvents: [
+        {
+          occurred_at: hoursAgo(2),
+          event_type: "diary_note",
+          source: "manual",
+          note: "Brief observation — plants look stable to the eye.",
+        },
+      ],
+      sensorReadings: [
+        {
+          metric: "temperature_c",
+          value: 33,
+          captured_at: hoursAgo(1),
+          source: "ecowitt",
+          quality: "ok",
+        },
+        {
+          metric: "humidity_pct",
+          value: 25,
+          captured_at: hoursAgo(1),
+          source: "ecowitt",
+          quality: "ok",
+        },
+        {
+          metric: "vpd_kpa",
+          value: 2.0,
+          captured_at: hoursAgo(1),
+          source: "ecowitt",
+          quality: "ok",
+        },
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: hoursAgo(1),
+          source: "manual",
+          quality: "ok",
+        },
+        {
+          metric: "humidity_pct",
+          value: 55,
+          captured_at: hoursAgo(1),
+          source: "manual",
+          quality: "ok",
+        },
+      ],
+    },
+    expect: {
+      maxConfidenceBand: "medium",
+      maxRiskLevel: "medium",
+      expectedSourceTags: ["live", "manual"],
+    },
+  },
 ] satisfies readonly GoldenCase[]);
 
 export const AI_DOCTOR_GOLDEN_CASES: readonly GoldenCase[] = ORDER;

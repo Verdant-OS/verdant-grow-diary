@@ -40,43 +40,160 @@ function stubVision(): Phase1VisionAnalysisResult {
 }
 
 /**
- * Phrases the engine MUST never emit. Covers overconfidence and any
- * device-control / automation wording.
+ * Phrases the engine MUST never emit in any non-warning output field.
+ *
+ * v1.1 — extended set: overconfidence + automation/execution + per-device
+ * (fan / light / irrigation / pump / humidifier / dehumidifier) variants
+ * plus controller / setpoint / write-back wording.
+ *
+ * `what_not_to_do` is scanned separately because it legitimately uses
+ * "do not …" warning framing that contains device nouns and verbs.
  */
 const FORBIDDEN_PHRASES: readonly string[] = [
+  // certainty / overclaiming
   "guaranteed",
+  "guarantee",
   "definitely",
   "certain diagnosis",
+  "confirmed diagnosis",
   "diagnosed from photo",
+  "diagnose from one photo",
+  "proves",
+  "never fails",
+  // automation / execution
   "auto execute",
+  "auto-execute",
+  "automatically execute",
   "automatically control",
+  "auto control",
+  "autopilot",
   "device command",
-  "turn on",
-  "turn off",
+  "send command",
+  "execute command",
+  "control device",
+  "write to controller",
+  "trigger controller",
+  "apply setpoint",
+  "change setpoint",
+  "update setpoint",
+  "write-back",
+  "write back to hardware",
+  // fan / light / irrigation / pump / humidifier / dehumidifier
+  "turn on fan",
+  "turn off fan",
+  "turn fan on",
+  "turn fan off",
   "set fan",
+  "increase fan",
+  "decrease fan",
+  "turn on light",
+  "turn off light",
+  "turn light on",
+  "turn light off",
   "set light",
+  "dim light",
+  "raise light intensity",
+  "lower light intensity",
+  "turn on irrigation",
+  "turn off irrigation",
+  "start irrigation",
+  "stop irrigation",
   "set irrigation",
+  "trigger irrigation",
+  "run pump",
+  "turn on pump",
+  "turn off pump",
+  "dose nutrients",
+  "dose nutrient",
+  "dose reservoir",
+  "set humidifier",
+  "turn on humidifier",
+  "turn off humidifier",
+  "set dehumidifier",
+  "turn on dehumidifier",
+  "turn off dehumidifier",
 ];
 
-function collectAllStrings(result: Phase1DiagnosisResult): string[] {
-  const out: string[] = [
-    result.summary,
-    result.likely_issue,
-    result.immediate_action,
-    result.twenty_four_hour_follow_up,
-    result.three_day_recovery_plan,
-    ...result.evidence,
-    ...result.missing_information,
-    ...result.possible_causes,
-    ...result.what_not_to_do,
+/**
+ * Word-boundary certainty terms forbidden in ALL fields (including
+ * `what_not_to_do`). Boundary-checked so "uncertain"/"normally" are safe.
+ */
+const FORBIDDEN_WORD_BOUNDARY: readonly RegExp[] = [
+  /\bcertain\b/i,
+  /\bcertainty\b/i,
+  /\balways\b/i,
+];
+
+interface FieldString {
+  path: string;
+  text: string;
+}
+
+function collectFieldStrings(result: Phase1DiagnosisResult): FieldString[] {
+  const out: FieldString[] = [
+    { path: "summary", text: result.summary },
+    { path: "likely_issue", text: result.likely_issue },
+    { path: "immediate_action", text: result.immediate_action },
+    {
+      path: "twenty_four_hour_follow_up",
+      text: result.twenty_four_hour_follow_up,
+    },
+    { path: "three_day_recovery_plan", text: result.three_day_recovery_plan },
+    ...result.evidence.map((t, i) => ({ path: `evidence[${i}]`, text: t })),
+    ...result.missing_information.map((t, i) => ({
+      path: `missing_information[${i}]`,
+      text: t,
+    })),
+    ...result.possible_causes.map((t, i) => ({
+      path: `possible_causes[${i}]`,
+      text: t,
+    })),
   ];
   if (result.action_queue_suggestion) {
-    out.push(result.action_queue_suggestion.reason);
-    out.push(result.action_queue_suggestion.action_type);
-    out.push(result.action_queue_suggestion.status);
+    out.push({
+      path: "action_queue_suggestion.reason",
+      text: result.action_queue_suggestion.reason,
+    });
+    out.push({
+      path: "action_queue_suggestion.action_type",
+      text: result.action_queue_suggestion.action_type,
+    });
+    out.push({
+      path: "action_queue_suggestion.status",
+      text: result.action_queue_suggestion.status,
+    });
   }
   return out;
 }
+
+/** Warning framing required for every `what_not_to_do` entry. */
+const WARNING_FRAMING = /^(do not|never|avoid|output must not)\b/i;
+
+/**
+ * Action-Queue tightening (v1.1) — forbidden tokens in the suggestion
+ * payload itself. Allowed inside `what_not_to_do` because that field
+ * is a warning surface.
+ */
+const ACTION_SUGGESTION_FORBIDDEN: readonly RegExp[] = [
+  /\bexecute\b/i,
+  /\bexecuted\b/i,
+  /\bsend\b/i,
+  /\bcontrol\b/i,
+  /\bsetpoint\b/i,
+  /\bdevice\b/i,
+  /\bcontroller\b/i,
+  /\bpump\b/i,
+  /\bfan\b/i,
+  /\blight\b/i,
+  /\birrigation\b/i,
+  /\bhumidifier\b/i,
+  /\bdehumidifier\b/i,
+];
+const ACTION_SUGGESTION_ALLOWED_STATUSES = new Set([
+  "pending_approval",
+  "suggested",
+  "pending_review",
+]);
 
 async function runCase(caseDef: GoldenCase): Promise<Phase1DiagnosisResult> {
   const ctx = compilePlantContextRowsPhase1(caseDef.input);
@@ -182,17 +299,23 @@ describe("AI Doctor Golden Cases v1 — missing information signals", () => {
   }
 });
 
-describe("AI Doctor Golden Cases v1 — forbidden phrases", () => {
+describe("AI Doctor Golden Cases v1.1 — forbidden phrases (non-warning fields)", () => {
   for (const c of AI_DOCTOR_GOLDEN_CASES) {
-    it(`[${c.id}] never emits unsafe / overconfident / device-control phrases`, async () => {
+    it(`[${c.id}] no unsafe / overconfident / device-control phrasing in non-warning fields`, async () => {
       const r = await runCase(c);
-      const strings = collectAllStrings(r);
-      for (const s of strings) {
-        const lower = s.toLowerCase();
+      const fields = collectFieldStrings(r);
+      for (const { path, text } of fields) {
+        const lower = text.toLowerCase();
         for (const phrase of FORBIDDEN_PHRASES) {
           expect(
             lower.includes(phrase),
-            `forbidden phrase "${phrase}" appeared in: ${s}`,
+            `[${c.id}] forbidden phrase "${phrase}" appeared at ${path}: ${text}`,
+          ).toBe(false);
+        }
+        for (const rx of FORBIDDEN_WORD_BOUNDARY) {
+          expect(
+            rx.test(text),
+            `[${c.id}] forbidden certainty term ${rx} appeared at ${path}: ${text}`,
           ).toBe(false);
         }
       }
@@ -200,25 +323,66 @@ describe("AI Doctor Golden Cases v1 — forbidden phrases", () => {
   }
 });
 
-describe("AI Doctor Golden Cases v1 — Action Queue safety", () => {
+describe("AI Doctor Golden Cases v1.1 — what_not_to_do warning framing", () => {
   for (const c of AI_DOCTOR_GOLDEN_CASES) {
-    it(`[${c.id}] action queue suggestion (if any) is advisory + pending approval`, async () => {
+    it(`[${c.id}] every what_not_to_do entry uses warning framing`, async () => {
+      const r = await runCase(c);
+      for (let i = 0; i < r.what_not_to_do.length; i += 1) {
+        const entry = r.what_not_to_do[i];
+        expect(
+          WARNING_FRAMING.test(entry),
+          `[${c.id}] what_not_to_do[${i}] missing warning framing: ${entry}`,
+        ).toBe(true);
+        for (const rx of FORBIDDEN_WORD_BOUNDARY) {
+          expect(rx.test(entry)).toBe(false);
+        }
+      }
+    });
+  }
+});
+
+describe("AI Doctor Golden Cases v1.1 — Action Queue invariants", () => {
+  for (const c of AI_DOCTOR_GOLDEN_CASES) {
+    it(`[${c.id}] action queue suggestion is null or strictly advisory + review-only`, async () => {
       const r = await runCase(c);
       const s = r.action_queue_suggestion;
       if (c.expect.requireNoActionQueueSuggestion) {
         expect(s).toBeNull();
       }
-      if (s !== null) {
-        expect(s.action_type).toBe("advisory");
-        expect(s.status).toBe("pending_approval");
-        expect(typeof s.reason).toBe("string");
-        expect(s.reason.length).toBeGreaterThan(0);
-        expect(["low", "medium", "high"]).toContain(s.risk_level);
-        // Suggestion must never include device-control phrasing.
-        const reasonLower = s.reason.toLowerCase();
-        for (const phrase of FORBIDDEN_PHRASES) {
-          expect(reasonLower.includes(phrase)).toBe(false);
-        }
+      if (s === null) return;
+
+      expect(s.action_type).toBe("advisory");
+      expect(ACTION_SUGGESTION_ALLOWED_STATUSES.has(s.status)).toBe(true);
+      expect(typeof s.reason).toBe("string");
+      expect(s.reason.length).toBeGreaterThan(0);
+      expect(["low", "medium", "high"]).toContain(s.risk_level);
+
+      // No executable command / device / setpoint / controller wording.
+      for (const rx of ACTION_SUGGESTION_FORBIDDEN) {
+        expect(
+          rx.test(s.reason),
+          `[${c.id}] action_queue_suggestion.reason contains forbidden token ${rx}: ${s.reason}`,
+        ).toBe(false);
+      }
+      const reasonLower = s.reason.toLowerCase();
+      for (const phrase of FORBIDDEN_PHRASES) {
+        expect(reasonLower.includes(phrase)).toBe(false);
+      }
+      for (const rx of FORBIDDEN_WORD_BOUNDARY) {
+        expect(rx.test(s.reason)).toBe(false);
+      }
+
+      // No hidden write/automation metadata beyond the four contract keys.
+      const allowedKeys = new Set([
+        "action_type",
+        "status",
+        "reason",
+        "risk_level",
+      ]);
+      for (const k of Object.keys(s)) {
+        expect(allowedKeys.has(k), `unexpected key on suggestion: ${k}`).toBe(
+          true,
+        );
       }
     });
   }
@@ -263,5 +427,18 @@ describe("AI Doctor Golden Cases v1 — deterministic serialization", () => {
     const first = await Promise.all(AI_DOCTOR_GOLDEN_CASES.map(runCase));
     const second = await Promise.all(AI_DOCTOR_GOLDEN_CASES.map(runCase));
     expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+  });
+
+  it("preserves stable ordering for every list-shaped field", async () => {
+    for (const c of AI_DOCTOR_GOLDEN_CASES) {
+      const a = await runCase(c);
+      const b = await runCase(c);
+      expect(b.evidence).toEqual(a.evidence);
+      expect(b.missing_information).toEqual(a.missing_information);
+      expect(b.possible_causes).toEqual(a.possible_causes);
+      expect(b.what_not_to_do).toEqual(a.what_not_to_do);
+      expect(b.immediate_action).toEqual(a.immediate_action);
+      expect(b.action_queue_suggestion).toEqual(a.action_queue_suggestion);
+    }
   });
 });

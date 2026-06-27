@@ -302,9 +302,11 @@ describe("generateMultimodalDiagnosis — deterministic snapshot", () => {
     expect(stable(a)).toBe(stable(b));
     expect(a.summary).toBe(b.summary);
     expect(a.model_confidence_level).toBe(b.model_confidence_level);
-    expect(a.risk_level).toBe(b.risk_level);
-    expect(a.evidence).toEqual(b.evidence);
-    expect(a.missing_information).toEqual(b.missing_information);
+    expect(a.key_observations).toEqual(b.key_observations);
+    expect(a.contributing_factors).toEqual(b.contributing_factors);
     expect(a.recommended_actions).toEqual(b.recommended_actions);
+    expect(a.what_not_to_do).toEqual(b.what_not_to_do);
+    expect(a.monitoring_priorities).toEqual(b.monitoring_priorities);
+    expect(a.questions_for_grower).toEqual(b.questions_for_grower);
   });
 });

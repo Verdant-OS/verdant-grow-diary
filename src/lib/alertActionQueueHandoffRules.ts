@@ -399,6 +399,7 @@ export function approveSuggestion(
     status: "queued_non_executable",
     approvedAt: now ?? new Date().toISOString(),
     approvalNote: approvalNote?.trim() || "Grower approved this action suggestion.",
+    originatingTimelineEvents: suggestion.originatingTimelineEvents ?? [],
   };
 
   return { ok: true, queuedAction };

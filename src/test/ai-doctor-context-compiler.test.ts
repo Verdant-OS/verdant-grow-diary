@@ -361,3 +361,98 @@ describe("compilePlantContextFromRows — unknown / unrecognized source safety",
     expect(ctx.averages_7d.temperature_c).toBeNull();
   });
 });
+
+describe("compilePlantContextFromRows — source variant table (untrusted/never-live)", () => {
+  // Every variant below must NOT be classified as `live`, must NOT fold
+  // into the trustworthy 7-day averages, and must NOT produce a live
+  // sensor group. Manual is intentionally excluded (trusted) and so are
+  // known live vendors.
+  const UNTRUSTED_VARIANTS: ReadonlyArray<{
+    label: string;
+    row: Partial<SensorReadingRowLike>;
+  }> = [
+    { label: "missing source field", row: {} },
+    { label: 'source: ""', row: { source: "" } },
+    { label: 'source: " "', row: { source: " " } },
+    { label: "source: null", row: { source: null } },
+    {
+      label: "source: undefined",
+      row: { source: undefined as unknown as string },
+    },
+    { label: 'source: "unknown"', row: { source: "unknown" } },
+    { label: 'source: "UNKNOWN"', row: { source: "UNKNOWN" } },
+    { label: 'source: "vendor_x"', row: { source: "vendor_x" } },
+    { label: 'source: "bluetooth"', row: { source: "bluetooth" } },
+    { label: 'source: "wifi"', row: { source: "wifi" } },
+    { label: 'source: "api"', row: { source: "api" } },
+    // Numeric / malformed source value coerced through .toString().
+    {
+      label: "source: 42 (non-string)",
+      row: { source: 42 as unknown as string },
+    },
+  ];
+
+  it.each(UNTRUSTED_VARIANTS)(
+    "[$label] never buckets as live, never enters trustworthy averages",
+    ({ row }) => {
+      const ctx = compilePlantContextFromRows({
+        plant: basePlant,
+        growEvents: [],
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 24,
+            captured_at: iso(60_000),
+            ...row,
+          } as SensorReadingRowLike,
+        ],
+        now: NOW,
+      });
+      const live = ctx.sensor_groups.find((g) => g.source === "live");
+      expect(live).toBeUndefined();
+      expect(ctx.hasLiveSensorReadings).toBe(false);
+      expect(ctx.missingLiveSensorReadings).toBe(true);
+      // averages_7d trusts only live+manual.
+      expect(ctx.averages_7d.temperature_c).toBeNull();
+      // source_tags must not advertise "live".
+      expect(ctx.source_tags).not.toContain("live");
+    },
+  );
+
+  // Known live-vendor allowlist sanity check — these MUST still classify
+  // as live, otherwise the safety patch regressed the trust list.
+  const LIVE_VENDORS = [
+    "live",
+    "sensor",
+    "ecowitt",
+    "ecowitt_cloud",
+    "ecowitt_local",
+    "home_assistant",
+    "homeassistant",
+    "mqtt",
+    "shelly",
+    "pi",
+  ] as const;
+
+  it.each(LIVE_VENDORS)(
+    "[live vendor: %s] still classifies as live (allowlist regression guard)",
+    (vendor) => {
+      const ctx = compilePlantContextFromRows({
+        plant: basePlant,
+        growEvents: [],
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 24,
+            captured_at: iso(60_000),
+            source: vendor,
+          },
+        ],
+        now: NOW,
+      });
+      expect(ctx.hasLiveSensorReadings).toBe(true);
+      expect(ctx.averages_7d.temperature_c).toBe(24);
+    },
+  );
+});
+

@@ -8,10 +8,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   compilePlantContextFromRows,
+  compilePlantContextRowsPhase1,
   executeVisionAnalysis,
   generateMultimodalDiagnosis,
+  generateMultimodalDiagnosisPhase1,
   type VisionAnalysisResult,
 } from "../lib/aiDoctorEngine";
+
 
 function fakeFile(): File {
   // node test env supports File via undici.
@@ -310,3 +313,133 @@ describe("generateMultimodalDiagnosis — deterministic snapshot", () => {
     expect(a.questions_for_grower).toEqual(b.questions_for_grower);
   });
 });
+
+describe("Phase 1 engine — deterministic ordering of action/evidence/missing lists", () => {
+  // Use the additive Phase 1 surface so we cover the typed result shape
+  // (evidence, missing_information, possible_causes, what_not_to_do,
+  // action_queue_suggestion). No external model calls.
+
+
+  const NOW = new Date("2026-06-04T12:00:00Z");
+  const iso = (offsetMs: number) =>
+    new Date(NOW.getTime() - offsetMs).toISOString();
+
+  // Intentionally unsorted: mixed timestamps, mixed sources, mixed metrics,
+  // mixed event types. Compiler + diagnosis must produce identical ordering.
+  function buildUnsortedInput() {
+    return {
+      plant: {
+        id: "p-ord",
+        tent_id: "t-ord",
+        grow_id: "g-ord",
+        stage: "veg",
+        strain: "NL Auto",
+        name: "Ord Plant",
+      },
+      growEvents: [
+        { occurred_at: iso(3 * 60 * 60 * 1000), event_type: "feeding", source: "manual" },
+        { occurred_at: iso(1 * 60 * 60 * 1000), event_type: "watering", source: "manual" },
+        { occurred_at: iso(5 * 60 * 60 * 1000), event_type: "training", source: "manual" },
+        { occurred_at: iso(2 * 60 * 60 * 1000), event_type: "observation", source: "manual" },
+      ],
+      sensorReadings: [
+        { metric: "humidity_pct", value: 55, captured_at: iso(2 * 60 * 60 * 1000), source: "ecowitt" },
+        { metric: "temperature_c", value: 24, captured_at: iso(60 * 60 * 1000), source: "ecowitt" },
+        { metric: "vpd_kpa", value: 1.1, captured_at: iso(3 * 60 * 60 * 1000), source: "ecowitt" },
+        { metric: "vpd_kpa", value: 0.9, captured_at: iso(60 * 60 * 1000), source: "csv" },
+        { metric: "temperature_c", value: 99, captured_at: iso(30 * 60 * 1000), source: "ecowitt", state: "stale" },
+        { metric: "humidity_pct", value: 200, captured_at: iso(45 * 60 * 1000), source: "ecowitt", state: "invalid" },
+        { metric: "co2_ppm", value: 800, captured_at: iso(4 * 60 * 60 * 1000), source: "manual" },
+      ],
+      now: NOW,
+    };
+  }
+
+  // Stable, key-sorted JSON for byte-for-byte equality (objects only;
+  // arrays preserve order — that's what we are testing).
+  const stableJson = (v: unknown) =>
+    JSON.stringify(v, (_k, val) => {
+      if (val && typeof val === "object" && !Array.isArray(val)) {
+        const sorted: Record<string, unknown> = {};
+        for (const k of Object.keys(val as Record<string, unknown>).sort()) {
+          sorted[k] = (val as Record<string, unknown>)[k];
+        }
+        return sorted;
+      }
+      return val;
+    });
+
+  const vision = {
+    visual_summary: "deterministic stub",
+    leaf_observations: [] as readonly string[],
+    structural_observations: [] as readonly string[],
+    color_and_pigmentation: [] as readonly string[],
+    pest_disease_indicators: [] as readonly string[],
+    growth_stage_visual_cues: [] as readonly string[],
+    image_quality_notes: [] as readonly string[],
+    image_quality_score: 0,
+    confidence: 0,
+  };
+
+  it("compiled context is byte-for-byte identical across two compiles of identical unsorted input", () => {
+    const ctxA = compilePlantContextRowsPhase1(buildUnsortedInput());
+    const ctxB = compilePlantContextRowsPhase1(buildUnsortedInput());
+    expect(stableJson(ctxA)).toBe(stableJson(ctxB));
+    // recentSensorReadings ordering must be stable (newest first, tie-break by metric).
+    expect(ctxA.recentSensorReadings).toEqual(ctxB.recentSensorReadings);
+    // recent_grow_events ordering must be stable (newest first).
+    expect(ctxA.recent_grow_events.map((e) => e.event_type)).toEqual(
+      ctxB.recent_grow_events.map((e) => e.event_type),
+    );
+    // sensor_groups order follows SENSOR_SOURCE_ORDER, not row insertion order.
+    expect(ctxA.sensor_groups.map((g) => g.source)).toEqual(
+      ctxB.sensor_groups.map((g) => g.source),
+    );
+  });
+
+  it("Phase 1 diagnosis byte-for-byte identical across separately compiled contexts", async () => {
+    const ctxA = compilePlantContextRowsPhase1(buildUnsortedInput());
+    const ctxB = compilePlantContextRowsPhase1(buildUnsortedInput());
+
+    const a = await generateMultimodalDiagnosisPhase1(vision, ctxA);
+    const b = await generateMultimodalDiagnosisPhase1(vision, ctxB);
+
+    expect(stableJson(a)).toBe(stableJson(b));
+
+    // Per-list deterministic ordering assertions.
+    expect(a.evidence).toEqual(b.evidence);
+    expect(a.missing_information).toEqual(b.missing_information);
+    expect(a.possible_causes).toEqual(b.possible_causes);
+    expect(a.what_not_to_do).toEqual(b.what_not_to_do);
+
+    // action_queue_suggestion is either null or a fully-determined object;
+    // when present its field ordering and content must match.
+    expect(a.action_queue_suggestion).toEqual(b.action_queue_suggestion);
+
+    // Scalar fields must also be identical (no clock / random leakage).
+    expect(a.summary).toBe(b.summary);
+    expect(a.likely_issue).toBe(b.likely_issue);
+    expect(a.confidence).toBe(b.confidence);
+    expect(a.risk_level).toBe(b.risk_level);
+    expect(a.immediate_action).toBe(b.immediate_action);
+    expect(a.twenty_four_hour_follow_up).toBe(b.twenty_four_hour_follow_up);
+    expect(a.three_day_recovery_plan).toBe(b.three_day_recovery_plan);
+  });
+
+  it("input row order does not change the diagnosis (shuffle invariance)", async () => {
+    const base = buildUnsortedInput();
+    const shuffled = {
+      ...base,
+      sensorReadings: [...base.sensorReadings].reverse(),
+      growEvents: [...base.growEvents].reverse(),
+    };
+    const ctxA = compilePlantContextRowsPhase1(base);
+    const ctxB = compilePlantContextRowsPhase1(shuffled);
+    expect(stableJson(ctxA)).toBe(stableJson(ctxB));
+
+    const a = await generateMultimodalDiagnosisPhase1(vision, ctxA);
+    const b = await generateMultimodalDiagnosisPhase1(vision, ctxB);
+    expect(stableJson(a)).toBe(stableJson(b));
+  });
+});
+

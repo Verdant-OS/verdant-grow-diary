@@ -204,10 +204,15 @@ describe("aiDoctorContextCompiler — vpd uses existing vpd_kpa only", () => {
   });
 });
 
-describe("ai-doctor engine core — banned phrase scan (engine + compiler only)", () => {
+describe("ai-doctor engine core — banned phrase scan (Phase 1 engine modules)", () => {
+  // Phase 1 modules that can emit diagnosis text, monitoring text, safety
+  // notes, questions, or action suggestions. Keep this list narrow — UI
+  // components and unrelated legacy prompt docs are intentionally excluded.
   const ENGINE_ONLY_PATHS = [
     "src/lib/aiDoctorEngine.ts",
     "src/lib/aiDoctorContextCompiler.ts",
+    "src/lib/aiDoctorSafetyRules.ts",
+    "src/lib/aiDoctorEnginePhase1Foundation.ts",
   ] as const;
 
   // Phrase list lives in the test, never in engine sources. Each entry has a
@@ -233,6 +238,20 @@ describe("ai-doctor engine core — banned phrase scan (engine + compiler only)"
     return { path: p, raw, src: stripComments(raw) };
   });
 
+  it("covers every required Phase 1 engine module", () => {
+    // Guard against accidental shrinking of the scan surface — if a new
+    // Phase 1 engine module is added it must be added here explicitly.
+    const REQUIRED = new Set<string>([
+      "src/lib/aiDoctorEngine.ts",
+      "src/lib/aiDoctorContextCompiler.ts",
+      "src/lib/aiDoctorSafetyRules.ts",
+      "src/lib/aiDoctorEnginePhase1Foundation.ts",
+    ]);
+    for (const p of REQUIRED) {
+      expect(ENGINE_ONLY_PATHS).toContain(p);
+    }
+  });
+
   it.each(engineSources)(
     "[$path] contains no banned phrases (post comment-strip)",
     ({ path, src }) => {
@@ -250,19 +269,25 @@ describe("ai-doctor engine core — banned phrase scan (engine + compiler only)"
   );
 
   it.each(engineSources)(
-    "[$path] never describes unknown/stale/invalid/untrusted telemetry as healthy",
+    "[$path] never describes unknown/stale/invalid/demo/untrusted/degraded telemetry as healthy",
     ({ path, src }) => {
       const violations: string[] = [];
-      const degraded = /(unknown|stale|invalid|untrusted)/i;
+      const degraded = /(unknown|stale|invalid|demo|untrusted|degraded)/i;
       const healthy = /\bhealthy\b/i;
       src.split("\n").forEach((line, i) => {
         if (healthy.test(line) && degraded.test(line)) {
           // Allow lines that explicitly deny the relationship (never/not/no).
           if (/\b(never|not|no)\b/i.test(line)) return;
+          // Allow hardware-health confirmation prompts — these ask the
+          // user to verify the bridge/sensor itself is healthy when
+          // telemetry is degraded, which is the safe action.
+          if (/\b(confirm|check|verify|ensure)\b/i.test(line)) return;
           violations.push(`${path}:${i + 1}: ${line.trim()}`);
         }
       });
       expect(violations, violations.join("\n")).toEqual([]);
     },
   );
+
 });
+

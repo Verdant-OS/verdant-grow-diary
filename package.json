@@ -69,6 +69,7 @@
     "test:sensor-source-phase3-regression": "vitest run src/test/sensor-source-summary-widget.test.tsx src/test/timeline-filter-lightbox-integration.test.tsx",
     "check:sensor-source-phase3": "bun run typecheck && bun run test:sensor-source-phase3-regression",
     "docs:release-safety": "node scripts/assert-release-docs-safety.mjs",
+    "docs:assert-automated-phenotyping-safety": "node scripts/assert-automated-phenotyping-docs-safety.mjs",
     "ai-doctor:preview-safety": "node scripts/assert-ai-doctor-preview-safety.mjs",
     "supabase:migrations:sync": "node scripts/sync-supabase-migrations-from-integration.mjs",
     "supabase:migrations:verify-remote": "node scripts/verify-supabase-migrations-complete.mjs",

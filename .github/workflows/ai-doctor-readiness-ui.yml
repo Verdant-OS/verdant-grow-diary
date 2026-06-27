@@ -30,9 +30,16 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # v1.6: Full AI Doctor Context Readiness UI suite — static safety,
-      # regression, v1.4/v1.5/v1.6 edge-case + a11y + interaction coverage,
-      # view-models, mounts, panel + quick actions — plus the sensor-safety
-      # static scan. Read-only. No model/API calls. No deploys.
+      # v1.6+v1.7: Full AI Doctor Context Readiness UI suite — static
+      # safety, regression, v1.4/v1.5/v1.6/v1.7 edge-case + a11y +
+      # interaction + disabled-explanation + partial-context ordering
+      # + keyboard focus coverage, view-models, mounts, panel + quick
+      # actions — plus the sensor-safety static scan. Read-only. No
+      # model/API calls. No deploys.
       - name: Run AI Doctor Readiness UI suite
         run: bun run test:ai-doctor-readiness-ui
+
+      # v1.7: Typecheck the project so readiness UI test/type drift fails
+      # the PR gate. Read-only — `tsc --noEmit`.
+      - name: Typecheck
+        run: bun run typecheck

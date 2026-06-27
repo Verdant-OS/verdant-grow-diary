@@ -469,6 +469,20 @@ export default function ContextualPhenoComparisonPanel({
         </div>
       )}
 
+      {allInsufficient && (
+        <div
+          data-testid="contextual-pheno-comparison-all-insufficient"
+          role="note"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200 space-y-1"
+        >
+          <p data-testid="contextual-pheno-comparison-all-insufficient-headline">
+            All compared plants are missing important context.
+          </p>
+          <p>Use this view as a checklist before making a selection decision.</p>
+          <p>Verdant is not picking a phenotype here.</p>
+        </div>
+      )}
+
       {view.ok && view.plants.length > 0 && (
         <div
           data-testid="contextual-pheno-comparison-plant-grid"

@@ -194,3 +194,111 @@ export function formatGithubAnnotation(f: Finding): string {
 export function formatGithubAnnotations(findings: readonly Finding[]): string {
   return findings.map(formatGithubAnnotation).join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// v0.6: changed-file scan mode + compact JSON diagnostics.
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalise a path to forward-slash, project-relative form.
+ */
+function normalizePath(p: string): string {
+  return p.replace(/\\/g, "/").replace(/^\.\//, "").trim();
+}
+
+/**
+ * Pattern matching any contextual-pheno-comparison related source or
+ * test file (runtime, fixtures, helpers, tests).
+ */
+const CONTEXTUAL_PHENO_PATH_RE =
+  /(?:^|\/)(?:contextualPhenoComparison|contextual-pheno-comparison|ContextualPhenoComparison)/;
+
+/**
+ * Filter a list of changed file paths down to those covered by the
+ * Contextual Pheno Comparison static safety surface. Deterministic,
+ * stable order, deduped.
+ */
+export function filterChangedContextualPhenoFiles(
+  changed: readonly string[],
+): string[] {
+  const allow = new Set<string>([
+    ...CONTEXTUAL_PHENO_COMPARISON_SAFETY_FILES,
+    ...CONTEXTUAL_PHENO_COMPARISON_CHANGED_FILE_EXTRA,
+  ]);
+  const out = new Set<string>();
+  for (const raw of changed) {
+    const p = normalizePath(raw);
+    if (!p) continue;
+    if (allow.has(p) || CONTEXTUAL_PHENO_PATH_RE.test(p)) {
+      out.add(p);
+    }
+  }
+  return [...out].sort();
+}
+
+/**
+ * Scan only the relevant changed files. Missing files are skipped
+ * silently (a file may have been deleted in the same PR).
+ */
+export function scanChangedFiles(changed: readonly string[]): Finding[] {
+  const relevant = filterChangedContextualPhenoFiles(changed);
+  const findings: Finding[] = [];
+  for (const p of relevant) {
+    try {
+      findings.push(...scanFile(p));
+    } catch {
+      // Deleted/renamed file in PR diff — safe to skip.
+    }
+  }
+  return findings;
+}
+
+export interface FindingsJsonOptions {
+  /** Max snippet length, default 160. */
+  readonly maxSnippetLength?: number;
+}
+
+export interface FindingJsonRow {
+  readonly filePath: string;
+  readonly line: number;
+  readonly category: SafetyCategory;
+  readonly phrase: string;
+  readonly sourceLineSnippet: string;
+}
+
+/** Strip newlines and other control characters from a snippet. */
+function sanitizeSnippet(text: string, max: number): string {
+  // Remove all C0 control chars (incl. \n, \r, \t) and DEL.
+  // eslint-disable-next-line no-control-regex
+  const cleaned = text.replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim();
+  return truncate(cleaned, max);
+}
+
+/**
+ * Compact JSON diagnostics for CI logs. Stable sort, sanitised snippets,
+ * never includes full file contents.
+ */
+export function formatFindingsJson(
+  findings: readonly Finding[],
+  options: FindingsJsonOptions = {},
+): string {
+  const max = options.maxSnippetLength ?? MAX_EXCERPT_LEN;
+  if (findings.length === 0) return "[]";
+  const rows: FindingJsonRow[] = findings
+    .map((f) => ({
+      filePath: f.file,
+      line: f.line,
+      category: f.category,
+      phrase: f.phrase,
+      sourceLineSnippet: sanitizeSnippet(f.excerpt, max),
+    }))
+    .sort((a, b) => {
+      if (a.filePath !== b.filePath) return a.filePath < b.filePath ? -1 : 1;
+      if (a.line !== b.line) return a.line - b.line;
+      if (a.category !== b.category) return a.category < b.category ? -1 : 1;
+      if (a.phrase !== b.phrase) return a.phrase < b.phrase ? -1 : 1;
+      return 0;
+    });
+  return JSON.stringify(rows);
+}
+

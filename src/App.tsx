@@ -70,6 +70,7 @@ import CustomerModeGuide from "./pages/CustomerModeGuide";
 import { OperatorAiDoctorPhase1Page } from "./pages/OperatorAiDoctorPhase1";
 import OneTentLiveProof from "./pages/OneTentLiveProof";
 import DemoProofWalkthrough from "./pages/DemoProofWalkthrough";
+import ContextualPhenoComparisonDemo from "./pages/ContextualPhenoComparisonDemo";
 
 const queryClient = new QueryClient();
 
@@ -119,6 +120,15 @@ const App = () => (
                 path="/internal/demo-proof-walkthrough"
                 element={<DemoProofWalkthrough />}
               />
+
+              {/* Internal read-only Contextual Pheno Comparison v0.1 demo.
+                  Uses labeled fixture data only — no fetch, no Supabase,
+                  no AI, no writes. Hidden by URL only. */}
+              <Route
+                path="/internal/contextual-pheno-comparison-demo"
+                element={<ContextualPhenoComparisonDemo />}
+              />
+
 
 
               

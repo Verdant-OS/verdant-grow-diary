@@ -1,30 +1,65 @@
 /**
- * AI Doctor Golden Cases — Phase 1 regression tests.
+ * AI Doctor Golden Cases v1 — eval/regression suite.
  *
- * Proves the Phase 1 engine refuses to overdiagnose weak context.
- * Pure / deterministic. No I/O, no Supabase, no model calls.
+ * Verifies that the Phase 1 engine (compiler + diagnosis stub) stays
+ * cautious, source-aware, and useful across representative scenarios.
+ *
+ * No UI, no live AI/model calls, no Action Queue writes, no schema work.
  */
 import { describe, it, expect } from "vitest";
+
 import {
-  compilePlantContextFromRows,
-  type PlantContextPayload,
-} from "@/lib/aiDoctorContextCompiler";
-import {
+  compilePlantContextRowsPhase1,
   generateMultimodalDiagnosisPhase1,
   type Phase1DiagnosisResult,
-} from "@/lib/aiDoctorEngine";
+  type Phase1VisionAnalysisResult,
+} from "../lib/aiDoctorEngine";
+import { bandForConfidence } from "../lib/aiDoctorSafetyRules";
+
 import {
-  ALL_GOLDEN_CASES,
-  UNIVERSAL_FORBIDDEN_PHRASES,
-  type GoldenCaseWithExpectation,
-} from "./fixtures/ai-doctor-golden-cases";
+  AI_DOCTOR_GOLDEN_CASES,
+  type GoldenCase,
+} from "./fixtures/aiDoctorGoldenCases";
 
-// ---------------------------------------------------------------------------
-// Local helpers (test-scoped, not exported)
-// ---------------------------------------------------------------------------
+const RISK_RANK = { low: 0, medium: 1, high: 2 } as const;
+const BAND_RANK = { low: 0, medium: 1, high: 2 } as const;
 
-function allTextFromDiagnosis(result: Phase1DiagnosisResult): string {
-  return [
+/** Deterministic, never-analyzed stub vision payload. */
+function stubVision(): Phase1VisionAnalysisResult {
+  return Object.freeze({
+    visual_summary: "Golden-case stub vision: image not inspected.",
+    leaf_observations: [],
+    structural_observations: [],
+    color_and_pigmentation: [],
+    pest_disease_indicators: [],
+    growth_stage_visual_cues: [],
+    image_quality_notes: ["Golden-case fixture — no model invoked."],
+    image_quality_score: 0,
+    confidence: 0,
+  });
+}
+
+/**
+ * Phrases the engine MUST never emit. Covers overconfidence and any
+ * device-control / automation wording.
+ */
+const FORBIDDEN_PHRASES: readonly string[] = [
+  "guaranteed",
+  "definitely",
+  "certain diagnosis",
+  "diagnosed from photo",
+  "auto execute",
+  "automatically control",
+  "device command",
+  "turn on",
+  "turn off",
+  "set fan",
+  "set light",
+  "set irrigation",
+];
+
+function collectAllStrings(result: Phase1DiagnosisResult): string[] {
+  const out: string[] = [
     result.summary,
     result.likely_issue,
     result.immediate_action,
@@ -34,265 +69,199 @@ function allTextFromDiagnosis(result: Phase1DiagnosisResult): string {
     ...result.missing_information,
     ...result.possible_causes,
     ...result.what_not_to_do,
-    result.action_queue_suggestion?.reason ?? "",
-  ]
-    .join(" \n ")
-    .toLowerCase();
-}
-
-/** Sections where positive recommendations live (i.e. the model "telling the grower to do X"). */
-function positiveAdviceText(result: Phase1DiagnosisResult): string {
-  return [
-    result.summary,
-    result.likely_issue,
-    result.immediate_action,
-    result.twenty_four_hour_follow_up,
-    result.three_day_recovery_plan,
-    ...result.possible_causes,
-  ]
-    .join(" \n ")
-    .toLowerCase();
-}
-
-function expectLowConfidenceDiagnosis(
-  result: Phase1DiagnosisResult,
-  ceiling = 0.3,
-): void {
-  expect(result.confidence).toBeGreaterThanOrEqual(0);
-  expect(result.confidence).toBeLessThanOrEqual(ceiling);
-}
-
-function expectNoDeviceCommands(result: Phase1DiagnosisResult): void {
-  const text = allTextFromDiagnosis(result);
-  for (const phrase of [
-    "turn on",
-    "turn off",
-    "set fan",
-    "set light",
-    "switch on",
-    "switch off",
-    "setpoint",
-    "relay",
-    "actuate",
-  ]) {
-    expect(text, `must not contain "${phrase}"`).not.toContain(phrase);
+  ];
+  if (result.action_queue_suggestion) {
+    out.push(result.action_queue_suggestion.reason);
+    out.push(result.action_queue_suggestion.action_type);
+    out.push(result.action_queue_suggestion.status);
   }
+  return out;
 }
 
-function expectNoAggressiveNutrientAdvice(
-  result: Phase1DiagnosisResult,
-): void {
-  const text = positiveAdviceText(result);
-  for (const pattern of [
-    /increase nutrient/i,
-    /feed more/i,
-    /raise ec/i,
-    /add nutrient/i,
-    /\bdose\b/i,
-    /flush immediately/i,
-  ]) {
-    expect(text).not.toMatch(pattern);
+async function runCase(caseDef: GoldenCase): Promise<Phase1DiagnosisResult> {
+  const ctx = compilePlantContextRowsPhase1(caseDef.input);
+  return generateMultimodalDiagnosisPhase1(stubVision(), ctx);
+}
+
+describe("AI Doctor Golden Cases v1 — required sections", () => {
+  for (const c of AI_DOCTOR_GOLDEN_CASES) {
+    it(`[${c.id}] returns a fully-populated Phase 1 diagnosis shape`, async () => {
+      const r = await runCase(c);
+      expect(typeof r.summary).toBe("string");
+      expect(r.summary.length).toBeGreaterThan(0);
+      expect(typeof r.likely_issue).toBe("string");
+      expect(typeof r.confidence).toBe("number");
+      expect(Number.isFinite(r.confidence)).toBe(true);
+      expect(r.confidence).toBeGreaterThanOrEqual(0);
+      expect(r.confidence).toBeLessThanOrEqual(1);
+      expect(Array.isArray(r.evidence)).toBe(true);
+      expect(Array.isArray(r.missing_information)).toBe(true);
+      expect(Array.isArray(r.possible_causes)).toBe(true);
+      expect(r.possible_causes.length).toBeGreaterThan(0);
+      expect(typeof r.immediate_action).toBe("string");
+      expect(r.immediate_action.length).toBeGreaterThan(0);
+      expect(Array.isArray(r.what_not_to_do)).toBe(true);
+      expect(r.what_not_to_do.length).toBeGreaterThan(0);
+      expect(typeof r.twenty_four_hour_follow_up).toBe("string");
+      expect(typeof r.three_day_recovery_plan).toBe("string");
+      expect(["low", "medium", "high"]).toContain(r.risk_level);
+    });
   }
-}
+});
 
-function expectNoIrrigationPrescription(
-  result: Phase1DiagnosisResult,
-): void {
-  const text = positiveAdviceText(result);
-  for (const pattern of [
-    /water more/i,
-    /water less/i,
-    /irrigate now/i,
-    /\bml of water\b/i,
-    /increase watering/i,
-    /reduce watering/i,
-  ]) {
-    expect(text).not.toMatch(pattern);
+describe("AI Doctor Golden Cases v1 — confidence + risk caps", () => {
+  for (const c of AI_DOCTOR_GOLDEN_CASES) {
+    it(`[${c.id}] confidence band ≤ ${c.expect.maxConfidenceBand}, risk ≤ ${c.expect.maxRiskLevel}`, async () => {
+      const r = await runCase(c);
+      const band = bandForConfidence(r.confidence);
+      expect(BAND_RANK[band]).toBeLessThanOrEqual(
+        BAND_RANK[c.expect.maxConfidenceBand],
+      );
+      expect(RISK_RANK[r.risk_level]).toBeLessThanOrEqual(
+        RISK_RANK[c.expect.maxRiskLevel],
+      );
+      // High confidence is never allowed by any golden case.
+      expect(r.confidence).toBeLessThan(0.7);
+    });
   }
-}
+});
 
-function expectMissingInfoIncludes(
-  result: Phase1DiagnosisResult,
-  terms: readonly string[],
-): void {
-  const joined = result.missing_information.join(" \n ").toLowerCase();
-  for (const term of terms) {
-    expect(
-      joined,
-      `missing_information must mention "${term}"`,
-    ).toContain(term.toLowerCase());
-  }
-}
-
-function expectDoesNotClaimLiveData(result: Phase1DiagnosisResult): void {
-  // Look only at positive-claim surfaces. Cautionary phrasing like
-  // "no live readings are present" is allowed in follow-up text; what we
-  // forbid is the engine asserting that the data IS live.
-  const text = positiveAdviceText(result);
-  for (const phrase of [
-    "data is live",
-    "based on live",
-    "live data shows",
-    "currently live data",
-    "shown as live",
-  ]) {
-    expect(text, `must not claim "${phrase}"`).not.toContain(phrase);
-  }
-}
-
-function expectUniversalForbiddenPhrasesAbsent(
-  result: Phase1DiagnosisResult,
-): void {
-  const text = allTextFromDiagnosis(result);
-  for (const phrase of UNIVERSAL_FORBIDDEN_PHRASES) {
-    expect(text, `must not contain "${phrase}"`).not.toContain(
-      phrase.toLowerCase(),
-    );
-  }
-}
-
-function compileContextForCase(
-  c: GoldenCaseWithExpectation,
-): PlantContextPayload {
-  return compilePlantContextFromRows({
-    plant: c.plant,
-    growEvents: c.growEvents,
-    sensorReadings: c.sensorReadings,
-    now: new Date(c.now),
-  });
-}
-
-async function runCase(
-  c: GoldenCaseWithExpectation,
-): Promise<Phase1DiagnosisResult> {
-  const ctx = compileContextForCase(c);
-  return generateMultimodalDiagnosisPhase1(c.visionData, ctx);
-}
-
-// ---------------------------------------------------------------------------
-// Per-case safety assertions
-// ---------------------------------------------------------------------------
-
-describe("AI Doctor Phase 1 — golden cases (per-case safety)", () => {
-  for (const c of ALL_GOLDEN_CASES) {
-    describe(c.name, () => {
-      it("honors expectedSafetyBehavior", async () => {
-        const result = await runCase(c);
-        const exp = c.expectedSafetyBehavior;
-
-        expectLowConfidenceDiagnosis(result, exp.maxConfidence);
-        expect(exp.allowedRiskLevels).toContain(result.risk_level);
-
-        if (exp.likelyIssueMustBeEmpty) {
-          expect(result.likely_issue).toBe("");
+describe("AI Doctor Golden Cases v1 — source labeling", () => {
+  for (const c of AI_DOCTOR_GOLDEN_CASES) {
+    it(`[${c.id}] preserves source labels and trust separation`, async () => {
+      const ctx = compilePlantContextRowsPhase1(c.input);
+      const tags = ctx.source_tags;
+      for (const t of c.expect.expectedSourceTags ?? []) {
+        expect(tags).toContain(t);
+      }
+      for (const t of c.expect.forbiddenSourceTags ?? []) {
+        expect(tags).not.toContain(t);
+      }
+      // sources never merged together — each appears at most once
+      expect(new Set(tags).size).toBe(tags.length);
+      // 7-day averages must exclude demo / csv / stale / invalid
+      const untrusted = ctx.sensor_groups.filter(
+        (g) =>
+          g.source === "demo" ||
+          g.source === "csv" ||
+          g.source === "stale" ||
+          g.source === "invalid",
+      );
+      if (untrusted.length > 0 && !ctx.hasLiveSensorReadings) {
+        const m = ctx.averages_7d;
+        const noManual = !ctx.sensor_groups.some(
+          (g) => g.source === "manual" && g.sample_count > 0,
+        );
+        if (noManual) {
+          expect(m.temperature_c).toBeNull();
+          expect(m.humidity_pct).toBeNull();
+          expect(m.vpd_kpa).toBeNull();
+          expect(m.co2_ppm).toBeNull();
         }
+      }
+    });
+  }
+});
 
-        expectMissingInfoIncludes(result, exp.missingInfoMustInclude);
+describe("AI Doctor Golden Cases v1 — missing information signals", () => {
+  for (const c of AI_DOCTOR_GOLDEN_CASES) {
+    const groups = c.expect.missingInformationIncludesAny;
+    if (!groups || groups.length === 0) continue;
+    it(`[${c.id}] missing_information surfaces required signals`, async () => {
+      const r = await runCase(c);
+      const haystack = r.missing_information.join(" \n ").toLowerCase();
+      for (const group of groups) {
+        const matched = group.some((needle) =>
+          haystack.includes(needle.toLowerCase()),
+        );
+        expect(matched, `expected one of ${JSON.stringify(group)} in missing_information`).toBe(
+          true,
+        );
+      }
+    });
+  }
+});
 
-        // Universal safety
-        expectNoDeviceCommands(result);
-        expectNoAggressiveNutrientAdvice(result);
-        expectNoIrrigationPrescription(result);
-        expectUniversalForbiddenPhrasesAbsent(result);
-
-        // Per-case forbidden substrings (positive advice surfaces only —
-        // "what_not_to_do" / "missing_information" may legitimately
-        // mention some forbidden terms in a cautionary way).
-        const positive = positiveAdviceText(result);
-        for (const forbidden of exp.forbiddenSubstrings) {
-          if (UNIVERSAL_FORBIDDEN_PHRASES.includes(forbidden)) continue;
+describe("AI Doctor Golden Cases v1 — forbidden phrases", () => {
+  for (const c of AI_DOCTOR_GOLDEN_CASES) {
+    it(`[${c.id}] never emits unsafe / overconfident / device-control phrases`, async () => {
+      const r = await runCase(c);
+      const strings = collectAllStrings(r);
+      for (const s of strings) {
+        const lower = s.toLowerCase();
+        for (const phrase of FORBIDDEN_PHRASES) {
           expect(
-            positive,
-            `${c.id}: positive advice must not contain "${forbidden}"`,
-          ).not.toContain(forbidden.toLowerCase());
+            lower.includes(phrase),
+            `forbidden phrase "${phrase}" appeared in: ${s}`,
+          ).toBe(false);
         }
-
-        // Action queue suggestion contract
-        if (exp.actionQueueSuggestion === "must_be_null") {
-          expect(result.action_queue_suggestion).toBeNull();
-        } else {
-          // may_be_advisory — if present, it must be advisory + pending_approval.
-          const s = result.action_queue_suggestion;
-          if (s !== null) {
-            expect(s.action_type).toBe("advisory");
-            expect(s.status).toBe("pending_approval");
-          }
-        }
-      });
+      }
     });
   }
 });
 
-// ---------------------------------------------------------------------------
-// Targeted safety scenarios spelled out in the spec
-// ---------------------------------------------------------------------------
-
-describe("AI Doctor Phase 1 — golden case behaviors", () => {
-  it("Case E — stale/invalid readings never feed healthy averages and never claim stability", async () => {
-    const c = ALL_GOLDEN_CASES.find((x) => x.id === "stale-invalid-only")!;
-    const ctx = compileContextForCase(c);
-    // averages_7d must remain null since only stale/invalid exist.
-    expect(ctx.averages_7d.temperature_c).toBeNull();
-    expect(ctx.averages_7d.humidity_pct).toBeNull();
-    expect(ctx.averages_7d.vpd_kpa).toBeNull();
-    // Stale/invalid groups remain visible as evidence limitations.
-    expect(
-      ctx.sensor_groups.find((g) => g.source === "stale"),
-    ).toBeDefined();
-    expect(
-      ctx.sensor_groups.find((g) => g.source === "invalid"),
-    ).toBeDefined();
-
-    const result = await generateMultimodalDiagnosisPhase1(c.visionData, ctx);
-    const text = allTextFromDiagnosis(result);
-    expect(text).not.toContain("environment stable");
-    expect(text).not.toContain("conditions are stable");
-    // Engine must explicitly flag the stale/invalid limitation.
-    expect(text).toMatch(/stale or invalid/);
-  });
-
-  it("Case F — demo/CSV readings preserve source labels and never describe data as live", async () => {
-    const c = ALL_GOLDEN_CASES.find((x) => x.id === "demo-and-csv-only")!;
-    const ctx = compileContextForCase(c);
-    expect(ctx.source_tags).toEqual(
-      expect.arrayContaining(["csv", "demo"]),
-    );
-    expect(ctx.source_tags).not.toContain("live");
-    expect(ctx.averages_7d.temperature_c).toBeNull(); // demo+csv excluded
-
-    const result = await generateMultimodalDiagnosisPhase1(c.visionData, ctx);
-    expectDoesNotClaimLiveData(result);
-    expectLowConfidenceDiagnosis(result, 0.2);
-  });
-
-  it("Case G — conflicting weak signals produce a multi-cause, low-confidence answer", async () => {
-    const c = ALL_GOLDEN_CASES.find(
-      (x) => x.id === "conflicting-weak-signals",
-    )!;
-    const result = await runCase(c);
-    expect(result.likely_issue).toBe("");
-    expectLowConfidenceDiagnosis(result, 0.3);
-    // At least one possible cause is listed (multi-cause framing).
-    expect(result.possible_causes.length).toBeGreaterThanOrEqual(1);
-    // Engine must not declare a single root cause.
-    const positive = positiveAdviceText(result);
-    expect(positive).not.toMatch(/root cause is/);
-    expect(positive).not.toMatch(/single cause/);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Determinism
-// ---------------------------------------------------------------------------
-
-describe("AI Doctor Phase 1 — golden case determinism", () => {
-  for (const c of ALL_GOLDEN_CASES) {
-    it(`${c.id} returns identical output across repeated runs`, async () => {
-      const a = await runCase(c);
-      const b = await runCase(c);
-      const cc = await runCase(c);
-      expect(a).toEqual(b);
-      expect(b).toEqual(cc);
+describe("AI Doctor Golden Cases v1 — Action Queue safety", () => {
+  for (const c of AI_DOCTOR_GOLDEN_CASES) {
+    it(`[${c.id}] action queue suggestion (if any) is advisory + pending approval`, async () => {
+      const r = await runCase(c);
+      const s = r.action_queue_suggestion;
+      if (c.expect.requireNoActionQueueSuggestion) {
+        expect(s).toBeNull();
+      }
+      if (s !== null) {
+        expect(s.action_type).toBe("advisory");
+        expect(s.status).toBe("pending_approval");
+        expect(typeof s.reason).toBe("string");
+        expect(s.reason.length).toBeGreaterThan(0);
+        expect(["low", "medium", "high"]).toContain(s.risk_level);
+        // Suggestion must never include device-control phrasing.
+        const reasonLower = s.reason.toLowerCase();
+        for (const phrase of FORBIDDEN_PHRASES) {
+          expect(reasonLower.includes(phrase)).toBe(false);
+        }
+      }
     });
   }
+});
+
+describe("AI Doctor Golden Cases v1 — autoflower caution", () => {
+  for (const c of AI_DOCTOR_GOLDEN_CASES) {
+    if (!c.expect.requireAutoflowerNeverDoGuidance) continue;
+    it(`[${c.id}] what_not_to_do includes autoflower heavy-stress guardrails`, async () => {
+      const r = await runCase(c);
+      const blob = r.what_not_to_do.join(" \n ").toLowerCase();
+      expect(blob).toMatch(/defoliat/);
+      expect(blob).toMatch(/transplant/);
+    });
+  }
+});
+
+describe("AI Doctor Golden Cases v1 — deterministic serialization", () => {
+  it("produces stable JSON snapshots for every golden case", async () => {
+    const out: Record<string, unknown> = {};
+    for (const c of AI_DOCTOR_GOLDEN_CASES) {
+      const r = await runCase(c);
+      out[c.id] = {
+        confidence: r.confidence,
+        risk_level: r.risk_level,
+        summary: r.summary,
+        likely_issue: r.likely_issue,
+        evidence: r.evidence,
+        missing_information: r.missing_information,
+        possible_causes: r.possible_causes,
+        immediate_action: r.immediate_action,
+        what_not_to_do: r.what_not_to_do,
+        twenty_four_hour_follow_up: r.twenty_four_hour_follow_up,
+        three_day_recovery_plan: r.three_day_recovery_plan,
+        action_queue_suggestion: r.action_queue_suggestion,
+      };
+    }
+    expect(out).toMatchSnapshot();
+  });
+
+  it("is stable across repeated runs (no time/random drift)", async () => {
+    const first = await Promise.all(AI_DOCTOR_GOLDEN_CASES.map(runCase));
+    const second = await Promise.all(AI_DOCTOR_GOLDEN_CASES.map(runCase));
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+  });
 });

@@ -260,6 +260,7 @@ describe("v0.4 panel-level all-insufficient banner", () => {
         "contextual-pheno-comparison-plant-count",
         "contextual-pheno-comparison-all-insufficient",
         "contextual-pheno-comparison-plant-grid",
+        "contextual-pheno-comparison-cross-missing",
         "contextual-pheno-comparison-source-summary",
       ]
     `);

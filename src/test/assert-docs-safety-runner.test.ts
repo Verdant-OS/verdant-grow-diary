@@ -5,7 +5,7 @@ import {
   parseArgs,
   formatReport,
   runPhenotyping,
-  // @ts-expect-error - .mjs import
+  // @ts-ignore - .mjs import without type declarations
 } from "../../scripts/assert-docs-safety.mjs";
 
 const SCRIPT = join(process.cwd(), "scripts/assert-docs-safety.mjs");

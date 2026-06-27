@@ -21,8 +21,7 @@ describe("normalizeOriginatingTimelineEvents", () => {
       { id: "  a  ", source: "manual" },
       { id: "", source: "manual" },
       { id: null, source: "manual" },
-      // @ts-expect-error missing id on purpose
-      { source: "manual" },
+      { source: "manual" } as { id?: string | null },
     ]);
     expect(out.map((e) => e.id)).toEqual(["a"]);
   });

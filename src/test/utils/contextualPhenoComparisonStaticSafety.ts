@@ -44,6 +44,16 @@ export const CONTEXTUAL_PHENO_COMPARISON_SAFETY_FILES: readonly string[] = [
   "src/test/fixtures/contextualPhenoComparisonFixtures.ts",
 ];
 
+/**
+ * Explicit allowlist of additional files the changed-file scan should
+ * cover even though they aren't in the full-suite list (e.g. the
+ * internal Diagnostics entrypoint that links to the demo page).
+ */
+export const CONTEXTUAL_PHENO_COMPARISON_CHANGED_FILE_EXTRA: readonly string[] = [
+  "src/pages/Diagnostics.tsx",
+];
+
+
 export const PHRASE_RULES: readonly PhraseRule[] = [
   // write/API operation
   { id: "functions-invoke", pattern: /functions\.invoke\b/i, category: "write/API operation", description: "Edge function invoke" },

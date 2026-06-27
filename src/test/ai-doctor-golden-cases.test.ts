@@ -428,4 +428,17 @@ describe("AI Doctor Golden Cases v1 — deterministic serialization", () => {
     const second = await Promise.all(AI_DOCTOR_GOLDEN_CASES.map(runCase));
     expect(JSON.stringify(second)).toBe(JSON.stringify(first));
   });
+
+  it("preserves stable ordering for every list-shaped field", async () => {
+    for (const c of AI_DOCTOR_GOLDEN_CASES) {
+      const a = await runCase(c);
+      const b = await runCase(c);
+      expect(b.evidence).toEqual(a.evidence);
+      expect(b.missing_information).toEqual(a.missing_information);
+      expect(b.possible_causes).toEqual(a.possible_causes);
+      expect(b.what_not_to_do).toEqual(a.what_not_to_do);
+      expect(b.immediate_action).toEqual(a.immediate_action);
+      expect(b.action_queue_suggestion).toEqual(a.action_queue_suggestion);
+    }
+  });
 });

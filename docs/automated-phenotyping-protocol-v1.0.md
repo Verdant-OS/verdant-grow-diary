@@ -268,6 +268,29 @@ cleaned = pcv.fill(bin_img=binary, size=200)
   pipeline against ground-truth photos.
 - Always set `human_review_status = pending` on import.
 
+### 6.4 Color-space appendix (optional visible trait proxy)
+
+PlantCV color-space exploration (HSV, LAB, CMYK channel splits) is an
+**optional** external workflow for surfacing visible trait proxies —
+for example, leaf greenness shifts, trichome color band ratios, or
+canopy color uniformity. It is documented here as supporting evidence
+guidance only.
+
+Rules:
+
+- Any value derived from a color-space split is **supporting evidence
+  only**. It is a visible trait proxy, not a diagnosis.
+- Record the exact channel used (e.g. `LAB:a*`, `HSV:S`, `CMYK:K`) in
+  the `Tool / Method` column alongside the PlantCV version.
+- Default `confidence = Low`. Raise to `Medium` only after the operator
+  has validated the threshold parameters against ground-truth samples
+  on the same camera and lighting setup.
+- Set `source_type = derived_from_photo`.
+- A color-space value alone never justifies a keeper, cull, harvest, or
+  release decision. It requires human review and corroborating
+  in-person observation.
+
+
 ---
 
 ## 7. Verdant integration rules

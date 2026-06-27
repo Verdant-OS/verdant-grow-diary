@@ -332,6 +332,7 @@ export function createActionSuggestion(input: HandoffInput): HandoffResult {
       cautionNotes,
       status: "pending_approval",
       createdAt: now ?? new Date().toISOString(),
+      originatingTimelineEvents: timelineEvents,
     };
 
     return { ok: true, suggestion };

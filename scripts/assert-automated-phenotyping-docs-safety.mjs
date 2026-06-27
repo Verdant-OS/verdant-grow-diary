@@ -356,6 +356,91 @@ export function runAllChecks(text) {
   };
 }
 
+/**
+ * Convert per-check violations into a single, focused failure list.
+ *
+ * @typedef {Object} DocsSafetyFailure
+ * @property {string} scanner
+ * @property {string} filePath
+ * @property {string} [section]
+ * @property {number} [line]
+ * @property {string} check
+ * @property {string} expected
+ * @property {string} actual
+ * @property {string} reason
+ *
+ * @param {string} text
+ * @param {string} filePath
+ * @returns {DocsSafetyFailure[]}
+ */
+export function toStructuredFailures(text, filePath) {
+  const out = [];
+  const { phraseViolations, diaryViolations, filenameViolations, sampleLogViolations } =
+    runAllChecks(text);
+
+  for (const v of phraseViolations) {
+    out.push({
+      scanner: "automated-phenotyping",
+      filePath,
+      line: v.line,
+      check: "banned-phrase",
+      expected: `phrase "${v.phrase}" must not appear outside an allow-marked line`,
+      actual: v.text,
+      reason: `Banned phrase "${v.phrase}" found; use safe label (e.g. No visible concern / Visible concern / Uncertain) or add the ${ALLOW_MARKER} marker on that line.`,
+    });
+  }
+  for (const v of diaryViolations) {
+    out.push({
+      scanner: "automated-phenotyping",
+      filePath,
+      section: "Diary Entry Template",
+      check: "diary-template",
+      expected: "all required diary fields present",
+      actual: v.message,
+      reason: v.message,
+    });
+  }
+  for (const v of filenameViolations) {
+    out.push({
+      scanner: "automated-phenotyping",
+      filePath,
+      section: "Filename Convention and Photo ID Mapping",
+      check: "filename-convention",
+      expected:
+        "filenames match {project}_{phenoId}_{stage}_{viewType}_{YYYY-MM-DD}_{NN}[.ext]",
+      actual: v.message,
+      reason: v.message,
+    });
+  }
+  for (const v of sampleLogViolations) {
+    let check = "sample-log";
+    let expected = "sample log row matches contract";
+    if (/must be blank/.test(v.message)) {
+      check = "low-confidence-human-final-score";
+      expected = "Human Final Score must be blank when Confidence is Low/Unknown";
+    } else if (/does not match date in filename/.test(v.message)) {
+      check = "photo-date-matches-filename";
+      expected = "Photo Date column equals the YYYY-MM-DD encoded in the filename";
+    } else if (/missing required column/.test(v.message)) {
+      check = "sample-log-required-columns";
+      expected = "all required sample-log columns present";
+    } else if (/does not match filename convention/.test(v.message)) {
+      check = "photo-filename-convention";
+      expected = "Photo ID / File Name matches filename convention";
+    }
+    out.push({
+      scanner: "automated-phenotyping",
+      filePath,
+      section: "Sample Filled Phenotyping Output Log",
+      check,
+      expected,
+      actual: v.message,
+      reason: v.message,
+    });
+  }
+  return out;
+}
+
 function main() {
   if (!existsSync(TARGET_FILE)) {
     console.error(

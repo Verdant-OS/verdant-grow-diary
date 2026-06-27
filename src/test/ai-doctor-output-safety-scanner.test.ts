@@ -8,11 +8,15 @@
  * No model calls, no schema, no Action Queue writes — pure unit tests
  * over the test utility under src/test/utils/.
  */
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, it, expect } from "vitest";
 
 import {
   scanDiagnosisForUnsafePhrases,
   formatUnsafePhraseReport,
+  formatUnsafePhraseGitHubAnnotations,
   type UnsafePhraseFinding,
 } from "./utils/aiDoctorOutputSafetyScanner";
 

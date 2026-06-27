@@ -48,8 +48,8 @@ describe("EvidenceLinkageBadges presenter", () => {
     expect(items[1]).toHaveAttribute("data-source", "stale");
     expect(items[1]).toHaveAttribute("data-trusted", "false");
     expect(within(items[0]).getByText("diary-001")).toBeInTheDocument();
-    expect(within(items[0]).getByText(/Manual/i)).toBeInTheDocument();
-    expect(within(items[1]).getByText(/Stale/i)).toBeInTheDocument();
+    expect(within(items[0]).getByTestId("evidence-linkage-badges-source")).toHaveTextContent(/Manual/i);
+    expect(within(items[1]).getByTestId("evidence-linkage-badges-source")).toHaveTextContent(/Stale/i);
     expectNoForbiddenCopy(container);
   });
 

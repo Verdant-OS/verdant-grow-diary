@@ -8,10 +8,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   compilePlantContextFromRows,
+  compilePlantContextRowsPhase1,
   executeVisionAnalysis,
   generateMultimodalDiagnosis,
+  generateMultimodalDiagnosisPhase1,
   type VisionAnalysisResult,
 } from "../lib/aiDoctorEngine";
+
 
 function fakeFile(): File {
   // node test env supports File via undici.

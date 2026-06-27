@@ -8,11 +8,15 @@
  * No model calls, no schema, no Action Queue writes — pure unit tests
  * over the test utility under src/test/utils/.
  */
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, it, expect } from "vitest";
 
 import {
   scanDiagnosisForUnsafePhrases,
   formatUnsafePhraseReport,
+  formatUnsafePhraseGitHubAnnotations,
   type UnsafePhraseFinding,
 } from "./utils/aiDoctorOutputSafetyScanner";
 
@@ -173,5 +177,108 @@ describe("aiDoctorOutputSafetyScanner — formatUnsafePhraseReport", () => {
       { path: "result.summary", phrase: "guarantee", text: "We guarantee." },
     ]);
     expect(report).toContain("Case: (uncategorized)");
+  });
+});
+
+describe("aiDoctorOutputSafetyScanner — formatUnsafePhraseGitHubAnnotations", () => {
+  const sample: UnsafePhraseFinding = {
+    caseId: "case-a",
+    path: "result.action_queue_suggestion.reason",
+    phrase: "set fan",
+    text: "Review and set fan speed higher.",
+  };
+
+  it("returns empty string when there are no findings", () => {
+    expect(formatUnsafePhraseGitHubAnnotations([])).toBe("");
+  });
+
+  it("emits one ::error annotation per finding with case id, path, and phrase", () => {
+    const out = formatUnsafePhraseGitHubAnnotations([sample]);
+    expect(out.startsWith("::error ")).toBe(true);
+    expect(out).toContain("case-a");
+    expect(out).toContain("result.action_queue_suggestion.reason");
+    expect(out).toContain('"set fan"');
+    expect(out).toContain("title=AI Doctor unsafe phrase");
+  });
+
+  it("omits line= when no line is provided", () => {
+    const out = formatUnsafePhraseGitHubAnnotations([sample]);
+    expect(out).not.toMatch(/,line=/);
+  });
+
+  it("includes line= when provided", () => {
+    const out = formatUnsafePhraseGitHubAnnotations([sample], { line: 42 });
+    expect(out).toContain(",line=42,");
+  });
+
+  it("uses default test file path when none is supplied", () => {
+    const out = formatUnsafePhraseGitHubAnnotations([sample]);
+    expect(out).toContain(
+      "file=src/test/ai-doctor-output-safety-scanner.test.ts",
+    );
+  });
+
+  it("sanitizes newline and `::` characters in offending text", () => {
+    const out = formatUnsafePhraseGitHubAnnotations([
+      {
+        ...sample,
+        text: "Line one\nLine two with ::error injection",
+      },
+    ]);
+    // Single annotation line only.
+    expect(out.split("\n").length).toBe(1);
+    expect(out).not.toContain("\n");
+    expect(out).not.toMatch(/::error injection/);
+  });
+
+  it("falls back to (uncategorized) when caseId is missing", () => {
+    const out = formatUnsafePhraseGitHubAnnotations([
+      { path: "result.summary", phrase: "guarantee", text: "We guarantee." },
+    ]);
+    expect(out).toContain("(uncategorized)");
+  });
+
+  it("truncates very long offending text", () => {
+    const long = "x".repeat(500);
+    const out = formatUnsafePhraseGitHubAnnotations(
+      [{ ...sample, text: long }],
+      { maxTextLength: 40 },
+    );
+    expect(out).toContain("…");
+    // Annotation line should be well below the raw text length.
+    expect(out.length).toBeLessThan(400);
+  });
+});
+
+describe("aiDoctorOutputSafetyScanner — README", () => {
+  const readmePath = resolve(
+    process.cwd(),
+    "src/test/utils/README.ai-doctor-output-safety-scanner.md",
+  );
+
+  it("exists at the documented path", () => {
+    expect(existsSync(readmePath)).toBe(true);
+  });
+
+  it("documents warning-framing exceptions and strict Action Queue mode", () => {
+    const md = readFileSync(readmePath, "utf8");
+    expect(md).toMatch(/warning[- ]?fram/i);
+    expect(md).toContain("what_not_to_do");
+    expect(md).toContain("safety_notes");
+    expect(md).toContain("action_queue_suggestion");
+    expect(md.toLowerCase()).toContain("strict");
+  });
+
+  it("states that certainty phrases are never allowed, even in warning fields", () => {
+    const md = readFileSync(readmePath, "utf8").toLowerCase();
+    expect(md).toContain("certainty");
+    expect(md).toMatch(/never allowed|never permitted/);
+  });
+
+  it("documents the scan-only and complete Phase 1 commands", () => {
+    const md = readFileSync(readmePath, "utf8");
+    expect(md).toContain("bun run test:ai-doctor-output-safety-scan");
+    expect(md).toContain("bun run test:ai-doctor-phase1");
+    expect(md).toContain("node scripts/sensor-safety-check.mjs");
   });
 });

@@ -214,3 +214,79 @@ export function formatUnsafePhraseReport(
   }
   return lines.join("\n");
 }
+
+export interface UnsafePhraseGitHubAnnotationOptions {
+  /**
+   * Test file path used as the annotation `file=` attribute when a
+   * finding has no inherent source location. Defaults to the scanner
+   * self-test file, which is stable across runs.
+   */
+  file?: string;
+  /**
+   * Optional line number. Omitted from the annotation when not
+   * provided — GitHub accepts `::error file=...::message` without a
+   * line.
+   */
+  line?: number;
+  /** Annotation title. Defaults to "AI Doctor unsafe phrase". */
+  title?: string;
+  /**
+   * Maximum length of the offending text included in the annotation
+   * message. Defaults to 160 characters.
+   */
+  maxTextLength?: number;
+}
+
+/** Sanitize a value for inclusion in a single-line GitHub annotation. */
+function sanitizeAnnotationField(value: string): string {
+  return value
+    .replace(/\r/g, " ")
+    .replace(/\n/g, " ")
+    .replace(/::/g, ": ")
+    .trim();
+}
+
+function shortenText(text: string, max: number): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat.length <= max) return flat;
+  return flat.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
+}
+
+/**
+ * Render unsafe-phrase findings as GitHub-friendly workflow command
+ * annotations (one `::error ...::` line per finding).
+ *
+ * Returns the empty string when there are no findings. Never includes
+ * full diagnosis JSON, secrets, or env values — only the short
+ * offending text, case id, dotted path, and matched phrase.
+ */
+export function formatUnsafePhraseGitHubAnnotations(
+  findings: readonly UnsafePhraseFinding[],
+  options: UnsafePhraseGitHubAnnotationOptions = {},
+): string {
+  if (findings.length === 0) return "";
+  const file = sanitizeAnnotationField(
+    options.file ?? "src/test/ai-doctor-output-safety-scanner.test.ts",
+  );
+  const title = sanitizeAnnotationField(
+    options.title ?? "AI Doctor unsafe phrase",
+  );
+  const maxTextLength = options.maxTextLength ?? 160;
+  const lineAttr =
+    typeof options.line === "number" && Number.isFinite(options.line)
+      ? `,line=${options.line}`
+      : "";
+
+  const lines: string[] = [];
+  for (const f of findings) {
+    const caseId = sanitizeAnnotationField(f.caseId ?? "(uncategorized)");
+    const path = sanitizeAnnotationField(f.path);
+    const phrase = sanitizeAnnotationField(f.phrase);
+    const text = sanitizeAnnotationField(shortenText(f.text, maxTextLength));
+    const message = `Case ${caseId} at ${path} matched "${phrase}": ${text}`;
+    lines.push(
+      `::error file=${file}${lineAttr},title=${title}::${message}`,
+    );
+  }
+  return lines.join("\n");
+}

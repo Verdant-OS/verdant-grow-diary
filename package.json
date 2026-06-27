@@ -124,7 +124,8 @@
     "test:scanner-guardrails:ci": "node scripts/run-scanner-guardrails-ci.mjs",
     "test:scanner-guardrails:clean": "node scripts/clean-scanner-guardrail-artifacts.mjs",
     "test:ai-doctor-golden-cases": "bunx vitest run src/test/ai-doctor-golden-cases.test.ts && node scripts/sensor-safety-check.mjs",
-    "test:ai-doctor-output-safety-scan": "bunx vitest run src/test/ai-doctor-output-safety-scanner.test.ts src/test/ai-doctor-golden-cases.test.ts -t \"safety scan|scanner|unsafe|forbidden|Action Queue invariants|what_not_to_do warning framing\""
+    "test:ai-doctor-output-safety-scan": "bunx vitest run src/test/ai-doctor-output-safety-scanner.test.ts src/test/ai-doctor-golden-cases.test.ts -t \"safety scan|scanner|unsafe|forbidden|Action Queue invariants|what_not_to_do warning framing\"",
+    "test:ai-doctor-phase1": "bunx vitest run src/test/ai-doctor-engine.test.ts src/test/ai-doctor-context-compiler.test.ts src/test/ai-doctor-engine-core-static-safety.test.ts src/test/ai-doctor-output-safety-scanner.test.ts src/test/ai-doctor-golden-cases.test.ts && node scripts/sensor-safety-check.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

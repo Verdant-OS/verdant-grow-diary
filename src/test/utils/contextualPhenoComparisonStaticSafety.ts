@@ -46,12 +46,12 @@ export const CONTEXTUAL_PHENO_COMPARISON_SAFETY_FILES: readonly string[] = [
 
 /**
  * Explicit allowlist of additional files the changed-file scan should
- * cover even though they aren't in the full-suite list (e.g. the
- * internal Diagnostics entrypoint that links to the demo page).
+ * cover even though they aren't in the full-suite list. Empty by
+ * default — files that match the contextual-pheno path pattern are
+ * picked up automatically.
  */
-export const CONTEXTUAL_PHENO_COMPARISON_CHANGED_FILE_EXTRA: readonly string[] = [
-  "src/pages/Diagnostics.tsx",
-];
+export const CONTEXTUAL_PHENO_COMPARISON_CHANGED_FILE_EXTRA: readonly string[] = [];
+
 
 
 export const PHRASE_RULES: readonly PhraseRule[] = [

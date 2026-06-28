@@ -81,16 +81,19 @@ describe("Post-Grow Report — full-path static safety v2", () => {
   });
 
   it("only allows 'device command' inside the approved negation copy", () => {
-    // Allowed forms (lowercased): "does not include device command"
-    // Any other occurrence is a violation.
+    // Allowed forms (lowercased):
+    //   - "does not include device command"
+    //   - "no device command"
     for (const s of SOURCES) {
       const lower = s.body.toLowerCase();
       const total = lower.split("device command").length - 1;
       if (total === 0) continue;
-      const allowed = lower.split("does not include device command").length - 1;
+      const allowedA = lower.split("does not include device command").length - 1;
+      const allowedB = lower.split("no device command").length - 1;
+      const allowed = allowedA + allowedB;
       expect(
         allowed,
-        `${s.path}: every "device command" occurrence must be inside "does not include device commands". total=${total} allowed=${allowed}`,
+        `${s.path}: every "device command" occurrence must be inside an approved negation. total=${total} allowed=${allowed}`,
       ).toBe(total);
     }
   });

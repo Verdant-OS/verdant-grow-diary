@@ -172,8 +172,6 @@ describe("Post-Grow Print HTML Capture v2 — via real CTA click", () => {
     const lower = captured.html.toLowerCase();
     for (const term of [
       "automatically executed",
-      "auto execute",
-      "auto-execute",
       "send command",
       "set fan to",
       "set light to",
@@ -185,6 +183,10 @@ describe("Post-Grow Print HTML Capture v2 — via real CTA click", () => {
     ]) {
       expect(lower, `automation phrase leaked: ${term}`).not.toContain(term);
     }
+    // "auto execute" / "auto-execute" only allowed inside a negation
+    // ("does not auto-execute"). Any other occurrence is a violation.
+    const autoExec = /(?<!does not )(?<!not )auto[- ]?execute/g;
+    expect(lower.match(autoExec)).toBeNull();
     // "device command" allowed only inside "does not include device commands"
     const total = lower.split("device command").length - 1;
     const allowed = lower.split("does not include device command").length - 1;

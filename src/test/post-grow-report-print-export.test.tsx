@@ -104,7 +104,7 @@ describe("buildPostGrowReportPrintHtml", () => {
     expect(empty).toContain(PRINT_EMPTY_SECTION_COPY);
     expect(empty).toContain(PRINT_NO_DATA_COPY);
     // Healthy/issue claims, if present, must always be negated guardrail copy.
-    const unsafe = /\b(?<!not treated as )(?<!never )healthy\b|\ball good\b|\bno issues\b/i;
+    const unsafe = /\b(?<!not treated as )(?<!never )(?<!not )healthy\b|\ball good\b|\bno issues\b/i;
     expect(empty).not.toMatch(unsafe);
   });
 

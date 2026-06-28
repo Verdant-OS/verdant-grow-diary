@@ -12,8 +12,7 @@
 const withGrowId = (base: string, growId?: string | null): string =>
   growId ? `${base}?growId=${encodeURIComponent(growId)}` : base;
 
-export const growDetailPath = (growId: string): string =>
-  `/grows/${encodeURIComponent(growId)}`;
+export const growDetailPath = (growId: string): string => `/grows/${encodeURIComponent(growId)}`;
 
 export const logsPath = (growId?: string | null): string => withGrowId("/logs", growId);
 export const timelinePath = (growId?: string | null): string => withGrowId("/timeline", growId);
@@ -26,6 +25,9 @@ export const sensorsPath = (growId?: string | null): string => withGrowId("/sens
 
 export const postGrowLearningReportPath = (growId: string): string =>
   `/reports/post-grow/${encodeURIComponent(growId)}`;
+
+export const endOfRunGrowReportPath = (growId: string): string =>
+  `/reports/end-of-run/${encodeURIComponent(growId)}`;
 
 export const actionDetailPath = (actionId: string): string =>
   `/actions/${encodeURIComponent(actionId)}`;
@@ -45,7 +47,6 @@ export const growDetailOutcomesPath = (growId: string): string =>
  */
 export const actionQueueAlertContextPath = (alertId: string): string =>
   `/actions?alert=${encodeURIComponent(alertId)}`;
-
 
 export const alertDetailPath = (alertId: string): string =>
   `/alerts/${encodeURIComponent(alertId)}`;
@@ -82,8 +83,7 @@ export const plantDetailPath = (
   return qs ? `${base}?${qs}` : base;
 };
 
-export const tentDetailPath = (tentId: string): string =>
-  `/tents/${encodeURIComponent(tentId)}`;
+export const tentDetailPath = (tentId: string): string => `/tents/${encodeURIComponent(tentId)}`;
 
 export const aiDoctorSessionDetailPath = (sessionId: string): string =>
   `/doctor/sessions/${encodeURIComponent(sessionId)}`;

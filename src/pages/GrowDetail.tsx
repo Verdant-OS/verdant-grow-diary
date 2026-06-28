@@ -12,14 +12,10 @@ import {
   Sparkles,
   Bell,
   SlidersHorizontal,
+  FileText,
 } from "lucide-react";
 import { useGrowDetailData, type GrowOutcomesState } from "@/hooks/useGrowDetailData";
-import {
-  type CountValue,
-  type GrowStatus,
-  type StatusLevel,
-  formatCount,
-} from "@/lib/growStatus";
+import { type CountValue, type GrowStatus, type StatusLevel, formatCount } from "@/lib/growStatus";
 import {
   actionDetailPath,
   actionsPath,
@@ -29,6 +25,7 @@ import {
   logsPath,
   plantsPath,
   postGrowLearningReportPath,
+  endOfRunGrowReportPath,
   tentsPath,
 } from "@/lib/routes";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
@@ -37,16 +34,15 @@ import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 
-
 /**
  * Read-only grow detail hub. Presentational only — all data loading +
  * derivation live in @/hooks/useGrowDetailData and @/lib/growStatus.
  * No writes. No ai-coach call. No device-control surface.
  */
 export default function GrowDetail() {
-  const { grow, growId, loading, notFound, error, counts, recent, status, outcomes, refetch } = useGrowDetailData();
+  const { grow, growId, loading, notFound, error, counts, recent, status, outcomes, refetch } =
+    useGrowDetailData();
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
-
 
   if (loading) {
     return (
@@ -98,26 +94,35 @@ export default function GrowDetail() {
     );
   }
 
-  const showPostGrowReport = grow.is_archived || grow.stage === "harvest" || grow.stage === "drying";
+  const showPostGrowReport =
+    grow.is_archived || grow.stage === "harvest" || grow.stage === "drying";
 
   return (
     <div className="max-w-3xl mx-auto">
-      <GrowBreadcrumbs growId={grow.id} growName={grow.name} current={grow.name} section="grow-detail" />
+      <GrowBreadcrumbs
+        growId={grow.id}
+        growName={grow.name}
+        current={grow.name}
+        section="grow-detail"
+      />
       <BackLink />
-
 
       <header className="glass rounded-2xl p-4 mb-4">
         <div className="flex items-center gap-2 flex-wrap mb-2">
-          <Badge variant="outline" className="uppercase text-[10px]">{grow.stage}</Badge>
-          <Badge variant="outline" className="text-[10px]">{grow.grow_type}</Badge>
+          <Badge variant="outline" className="uppercase text-[10px]">
+            {grow.stage}
+          </Badge>
+          <Badge variant="outline" className="text-[10px]">
+            {grow.grow_type}
+          </Badge>
           {grow.is_archived && (
-            <Badge variant="outline" className="text-[10px]">archived</Badge>
+            <Badge variant="outline" className="text-[10px]">
+              archived
+            </Badge>
           )}
         </div>
         <h1 className="text-xl font-display font-bold">{grow.name}</h1>
-        {grow.notes && (
-          <p className="text-sm text-muted-foreground mt-1">{grow.notes}</p>
-        )}
+        {grow.notes && <p className="text-sm text-muted-foreground mt-1">{grow.notes}</p>}
 
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
           <Field label="Started" value={new Date(grow.started_at).toLocaleString()} />
@@ -139,7 +144,6 @@ export default function GrowDetail() {
           </Button>
         </div>
       </header>
-
 
       {/* One-Tent Loop continuity card. No specific tent is "selected"
           on the grow hub, so this intentionally renders the calm safe
@@ -212,6 +216,14 @@ export default function GrowDetail() {
             countLabel="records"
           />
         )}
+        <HubLink
+          to={endOfRunGrowReportPath(grow.id)}
+          icon={<FileText className="h-4 w-4" />}
+          title="End-of-Run Report (Preview)"
+          description="Read-only run summary from existing logs. Pro export coming soon."
+          count="unavailable"
+          countLabel="preview"
+        />
       </section>
 
       <section className="glass rounded-2xl p-4 mt-4" aria-label="Recent activity">
@@ -265,10 +277,7 @@ export default function GrowDetail() {
 
       <RecentOutcomesCard outcomes={outcomes} />
 
-      <ActionOutcomeLearningReport
-        report={outcomes.learning}
-        status={outcomes.status}
-      />
+      <ActionOutcomeLearningReport report={outcomes.learning} status={outcomes.status} />
 
       <GrowTargetsEditor
         open={targetsEditorOpen}
@@ -279,7 +288,6 @@ export default function GrowDetail() {
     </div>
   );
 }
-
 
 function RecentOutcomesCard({ outcomes }: { outcomes: GrowOutcomesState }) {
   const { status, summary, recent } = outcomes;
@@ -326,9 +334,7 @@ function RecentOutcomesCard({ outcomes }: { outcomes: GrowOutcomesState }) {
               {o.suggested_change && (
                 <p className="text-xs mt-1 text-foreground/80">{o.suggested_change}</p>
               )}
-              {o.note && (
-                <p className="text-xs mt-1 italic text-muted-foreground">{o.note}</p>
-              )}
+              {o.note && <p className="text-xs mt-1 italic text-muted-foreground">{o.note}</p>}
               <p className="text-[10px] mt-1 text-muted-foreground">
                 Grower-recorded · Recorded after follow-up
               </p>
@@ -376,9 +382,7 @@ function OutcomeChip({
       "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30",
   };
   return (
-    <span
-      className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${toneMap[tone]}`}
-    >
+    <span className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${toneMap[tone]}`}>
       {label}: {count}
     </span>
   );
@@ -420,15 +424,13 @@ function HubLink({
   countLabel: string;
 }) {
   return (
-    <Link
-      to={to}
-      className="glass rounded-2xl p-4 hover:bg-secondary/20 transition-colors block"
-    >
+    <Link to={to} className="glass rounded-2xl p-4 hover:bg-secondary/20 transition-colors block">
       <div className="flex items-center gap-2 mb-1 text-sm font-semibold">
         {icon}
         {title}
         <span className="ml-auto text-xs font-normal text-muted-foreground">
-          <span data-testid={`count-${countLabel.replace(/\s+/g, "-")}`}>{formatCount(count)}</span> {countLabel}
+          <span data-testid={`count-${countLabel.replace(/\s+/g, "-")}`}>{formatCount(count)}</span>{" "}
+          {countLabel}
         </span>
       </div>
       <p className="text-xs text-muted-foreground">{description}</p>
@@ -486,9 +488,7 @@ function GrowStatusCard({ status, growId }: { status: GrowStatus; growId: string
         </div>
         <div>
           <dt className="text-muted-foreground uppercase tracking-wider text-[10px]">Last diary</dt>
-          <dd>
-            {status.lastDiaryAt ? new Date(status.lastDiaryAt).toLocaleDateString() : "—"}
-          </dd>
+          <dd>{status.lastDiaryAt ? new Date(status.lastDiaryAt).toLocaleDateString() : "—"}</dd>
         </div>
       </dl>
       <div className="flex gap-3 mt-3 text-xs">

@@ -29,6 +29,7 @@ import GrowDetail from "./pages/GrowDetail";
 import PhenoHuntNew from "./pages/PhenoHuntNew";
 import Reports from "./pages/Reports";
 import PostGrowLearningReport from "./pages/PostGrowLearningReport";
+import EndOfRunGrowReportPreview from "./pages/EndOfRunGrowReportPreview";
 
 import Coach from "./pages/Coach";
 import AiDoctorSessionDetail from "./pages/AiDoctorSessionDetail";
@@ -116,10 +117,7 @@ const App = () => (
                   signed-in session. The page performs no Supabase / AI /
                   alerts / Action Queue / device-control calls. Path remains
                   unlinked and is hidden by URL only. */}
-              <Route
-                path="/internal/demo-proof-walkthrough"
-                element={<DemoProofWalkthrough />}
-              />
+              <Route path="/internal/demo-proof-walkthrough" element={<DemoProofWalkthrough />} />
 
               {/* Internal read-only Contextual Pheno Comparison v0.1 demo.
                   Uses labeled fixture data only — no fetch, no Supabase,
@@ -128,11 +126,6 @@ const App = () => (
                 path="/internal/contextual-pheno-comparison-demo"
                 element={<ContextualPhenoComparisonDemo />}
               />
-
-
-
-              
-              
 
               <Route element={<AppShell />}>
                 <Route path="/" element={<Dashboard />} />
@@ -169,6 +162,7 @@ const App = () => (
                 <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/reports/post-grow/:growId" element={<PostGrowLearningReport />} />
+                <Route path="/reports/end-of-run/:growId" element={<EndOfRunGrowReportPreview />} />
                 <Route
                   path="/diary/environment-summary"
                   element={<EnvironmentSummaryReportPage />}
@@ -177,10 +171,7 @@ const App = () => (
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />
                 <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
-                <Route
-                  path="/operator/ai-doctor-phase1"
-                  element={<OperatorAiDoctorPhase1Page />}
-                />
+                <Route path="/operator/ai-doctor-phase1" element={<OperatorAiDoctorPhase1Page />} />
                 <Route
                   path="/operator/paddle-processing-audit"
                   element={<OperatorPaddleProcessingAudit />}
@@ -203,7 +194,7 @@ const App = () => (
                   path="/operator/ecowitt-tent-preview"
                   element={<OperatorEcowittTentPreview />}
                 />
-                
+
                 <Route
                   path="/operator/one-tent-loop-smoke-test"
                   element={<OperatorOneTentLoopSmokeTest />}

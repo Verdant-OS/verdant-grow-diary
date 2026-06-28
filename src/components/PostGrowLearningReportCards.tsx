@@ -439,16 +439,28 @@ export function ExportSummaryButtons({ vm }: { vm: PostGrowLearningReportViewMod
 
 function ReportCard({
   title,
+  subtitle,
   testId,
   children,
 }: {
   title: string;
+  subtitle?: string;
   testId: string;
   children: React.ReactNode;
 }) {
   return (
     <section className="glass rounded-2xl p-4" data-testid={testId} aria-label={title}>
-      <h2 className="font-display font-semibold mb-3">{title}</h2>
+      <div className="mb-3">
+        <h2 className="font-display font-semibold">{title}</h2>
+        {subtitle ? (
+          <p
+            className="text-[11px] uppercase tracking-wide text-muted-foreground"
+            data-testid={`${testId}-subtitle`}
+          >
+            {subtitle}
+          </p>
+        ) : null}
+      </div>
       {children}
     </section>
   );

@@ -275,6 +275,43 @@ export default function Pricing() {
         </div>
       </section>
 
+      {/* Proof callouts — what Pro actually delivers today */}
+      <section
+        className="px-6 pb-2 max-w-5xl mx-auto"
+        data-testid="pricing-proof-callouts"
+      >
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
+          What Pro actually delivers today
+        </h2>
+        <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
+          Real, shipped surfaces — not promises. Pro upgrades the value of the grow history you are already building on Free.
+        </p>
+        <div className="mt-8 grid gap-6 md:grid-cols-2">
+          <ProofCallout
+            icon={<FileText className="h-5 w-5" />}
+            title="Post-Grow Learning Report"
+            body="Turn a completed run into a learning report: what changed, what was logged, which alerts appeared, what actions were reviewed, and what to repeat or avoid next run."
+          />
+          <ProofCallout
+            icon={<Printer className="h-5 w-5" />}
+            title="Print / Save PDF export"
+            body="Export your Post-Grow Learning Report through your browser print dialog and save it as PDF. No server-side PDF service. No paywalled download — your browser is the printer."
+          />
+          <ProofCallout
+            icon={<FileSpreadsheet className="h-5 w-5" />}
+            title="Sensor truth · CSV import"
+            body="CSV imports stay labeled as CSV. Manual, demo, stale, and invalid readings stay clearly labeled so Verdant does not pretend weak data is live data."
+          />
+          <ProofCallout
+            icon={<HandCoins className="h-5 w-5" />}
+            title="Approval-required actions"
+            body="Verdant can suggest next steps, but the grower decides. No blind automation. No device commands. The Action Queue stays grower-approved by design."
+          />
+        </div>
+      </section>
+
+
+
       {/* Founder Lifetime highlight band */}
       <section className="px-6 py-10 max-w-5xl mx-auto">
         <div className="rounded-2xl border border-primary/40 bg-primary/5 p-6 md:p-8 flex flex-col md:flex-row gap-6 md:items-center">

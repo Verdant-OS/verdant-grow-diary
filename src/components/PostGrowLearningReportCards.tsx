@@ -12,6 +12,11 @@ import {
   type PostGrowLearningReportViewModel,
   type PostHarvestPoint,
 } from "@/lib/postGrowLearningReportRules";
+import {
+  PRINT_HELPER_COPY,
+  PRINT_UNAVAILABLE_COPY,
+  openPostGrowReportPrintWindow,
+} from "@/lib/postGrowReportPrintRules";
 import { actionsPath } from "@/lib/routes";
 
 function display(value: number | null, digits = 1): string {

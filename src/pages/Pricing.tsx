@@ -50,6 +50,8 @@ const COMPARISON_ROWS: Row[] = [
   { label: "Cloud sync & automatic backups", free: false, pro: true, founder: true },
   { label: "Multi-tent support", free: false, pro: true, founder: true },
   { label: "Exports", free: "Limited", pro: "Advanced", founder: "Advanced" },
+  { label: "Post-Grow Learning Report (Print / Save PDF)", free: false, pro: true, founder: true },
+  { label: "CSV sensor import (source-labeled)", free: true, pro: true, founder: true },
   { label: "Sensor snapshot history", free: false, pro: true, founder: true },
   { label: "Better timeline filtering", free: false, pro: true, founder: true },
   { label: "Priority support", free: false, pro: true, founder: true },

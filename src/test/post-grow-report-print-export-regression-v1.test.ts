@@ -154,6 +154,8 @@ describe("Post-Grow print HTML — forbidden content", () => {
     const lower = empty.toLowerCase();
     expect(lower).not.toContain("no issues");
     expect(lower).not.toContain("all good");
-    expect(lower).not.toContain("healthy");
+    // Only negated healthy phrasing is allowed (source-honesty note).
+    const unsafeHealthy = /\b(?<!not )(?<!never )healthy\b/;
+    expect(lower).not.toMatch(unsafeHealthy);
   });
 });

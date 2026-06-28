@@ -122,7 +122,7 @@ describe("Post-Grow Report — full-path static safety v2", () => {
     }
   });
 
-  it("never leaks raw payloads, service-role keys, bridge tokens, or api tokens", () => {
+  it("never leaks raw payloads, service-role keys, bridge tokens, or api tokens in executable code", () => {
     const FORBIDDEN_SECRETS = [
       "raw_payload",
       "service_role",
@@ -133,11 +133,21 @@ describe("Post-Grow Report — full-path static safety v2", () => {
       "api_token",
       "bearer ",
     ];
-    for (const term of FORBIDDEN_SECRETS) {
-      expect(
-        COMBINED_LOWER.includes(term),
-        `forbidden secret token "${term}" found in post-grow code path`,
-      ).toBe(false);
+    // Strip /* ... */ block comments and // line comments so guardrail
+    // documentation ("Never accepts raw_payload, service-role keys, ...")
+    // doesn't trip the secret scan. We care about runtime code.
+    const stripComments = (s: string) =>
+      s
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+    for (const s of SOURCES) {
+      const lower = stripComments(s.body).toLowerCase();
+      for (const term of FORBIDDEN_SECRETS) {
+        expect(
+          lower.includes(term),
+          `forbidden secret token "${term}" found in executable code of ${s.path}`,
+        ).toBe(false);
+      }
     }
   });
 

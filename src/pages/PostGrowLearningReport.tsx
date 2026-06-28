@@ -129,6 +129,13 @@ export default function PostGrowLearningReport() {
             <Badge variant="outline">Yield {report.header.yieldGrams.toFixed(1)} g</Badge>
           )}
         </div>
+        <div className="mt-3">
+          <PostGrowReportHeaderHelper />
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <PostGrowReportTopSummaryPanel vm={report} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_18rem] gap-4 mb-4">

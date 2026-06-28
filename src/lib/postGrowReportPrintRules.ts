@@ -157,13 +157,13 @@ export function buildPostGrowReportPrintHtml(
     <p class="meta">Generated ${escapeHtml(generatedAt)} · ${PRINT_READ_ONLY_NOTE} · ${PRINT_DATA_SOURCE_NOTE}</p>
   </header>
 
-  <section><h2>Run summary</h2>${summary}${completeness}</section>
-  <section><h2>Plant highlights</h2>${plantHighlights}</section>
-  <section><h2>Sensor truth</h2>${sensorTable}</section>
-  <section><h2>Post-harvest performance</h2>${postHarvestFacts}${postHarvestPoints}</section>
-  <section><h2>Alerts &amp; issues</h2><p class="muted">${PRINT_EMPTY_SECTION_COPY}</p></section>
-  <section><h2>Action Queue summary</h2>${actionQueueSummary}</section>
-  <section><h2>Lessons · repeat &amp; avoid</h2>${lessons}</section>
+  <section><h2>Run summary</h2><p class="muted">${PRINT_SECTION_LABELS.whatChanged}</p>${summary}${completeness}</section>
+  <section><h2>Plant highlights</h2><p class="muted">${PRINT_SECTION_LABELS.whatWasLogged} (photos)</p>${plantHighlights}</section>
+  <section><h2>Sensor truth</h2><p class="muted">${PRINT_SECTION_LABELS.whatWasLogged} (environment)</p>${sensorTable}</section>
+  <section><h2>Post-harvest performance</h2><p class="muted">${PRINT_SECTION_LABELS.whatWasLogged} (harvest)</p>${postHarvestFacts}${postHarvestPoints}</section>
+  <section><h2>Alerts &amp; issues</h2><p class="muted">${PRINT_SECTION_LABELS.alertsReviewed}</p><p class="muted">${PRINT_EMPTY_SECTION_COPY}</p></section>
+  <section><h2>Action Queue summary</h2><p class="muted">${PRINT_SECTION_LABELS.actionsReviewed}</p>${actionQueueSummary}</section>
+  <section><h2>Lessons · repeat &amp; avoid</h2><p class="muted">${PRINT_SECTION_LABELS.repeatNextRun} · ${PRINT_SECTION_LABELS.avoidNextRun}</p>${lessons}</section>
 
   <p class="safety" data-testid="post-grow-print-safety-note">${PRINT_SAFETY_NOTE}</p>
   <p class="no-print muted">${PRINT_HELPER_COPY}</p>

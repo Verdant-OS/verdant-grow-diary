@@ -24,12 +24,25 @@ export const PRINT_UNAVAILABLE_COPY =
   "Print export is unavailable in this environment.";
 export const PRINT_READ_ONLY_NOTE = "Read-only report.";
 export const PRINT_DATA_SOURCE_NOTE =
-  "Data sources are shown as logged. Missing, stale, or unknown data is not treated as healthy.";
+  "Data sources are shown as logged. Missing data is treated as missing, not healthy.";
 export const PRINT_SAFETY_NOTE =
   "Verdant suggestions remain grower-approved. This report does not include device commands.";
 export const PRINT_EMPTY_SECTION_COPY =
   "Not enough evidence to summarize this section.";
 export const PRINT_NO_DATA_COPY = "No logged data yet.";
+
+/**
+ * Section labels mirror the on-screen Post-Grow report so the printed
+ * artifact stays scannable in the same order the grower used to review.
+ */
+export const PRINT_SECTION_LABELS = {
+  whatChanged: "What changed",
+  whatWasLogged: "What was logged",
+  alertsReviewed: "Alerts reviewed",
+  actionsReviewed: "Actions reviewed",
+  repeatNextRun: "What to repeat next run",
+  avoidNextRun: "What to avoid next run",
+} as const;
 
 function escapeHtml(value: string): string {
   return value
@@ -144,13 +157,13 @@ export function buildPostGrowReportPrintHtml(
     <p class="meta">Generated ${escapeHtml(generatedAt)} · ${PRINT_READ_ONLY_NOTE} · ${PRINT_DATA_SOURCE_NOTE}</p>
   </header>
 
-  <section><h2>Run summary</h2>${summary}${completeness}</section>
-  <section><h2>Plant highlights</h2>${plantHighlights}</section>
-  <section><h2>Sensor truth</h2>${sensorTable}</section>
-  <section><h2>Post-harvest performance</h2>${postHarvestFacts}${postHarvestPoints}</section>
-  <section><h2>Alerts &amp; issues</h2><p class="muted">${PRINT_EMPTY_SECTION_COPY}</p></section>
-  <section><h2>Action Queue summary</h2>${actionQueueSummary}</section>
-  <section><h2>Lessons · repeat &amp; avoid</h2>${lessons}</section>
+  <section><h2>Run summary</h2><p class="muted">${PRINT_SECTION_LABELS.whatChanged}</p>${summary}${completeness}</section>
+  <section><h2>Plant highlights</h2><p class="muted">${PRINT_SECTION_LABELS.whatWasLogged} (photos)</p>${plantHighlights}</section>
+  <section><h2>Sensor truth</h2><p class="muted">${PRINT_SECTION_LABELS.whatWasLogged} (environment)</p>${sensorTable}</section>
+  <section><h2>Post-harvest performance</h2><p class="muted">${PRINT_SECTION_LABELS.whatWasLogged} (harvest)</p>${postHarvestFacts}${postHarvestPoints}</section>
+  <section><h2>Alerts &amp; issues</h2><p class="muted">${PRINT_SECTION_LABELS.alertsReviewed}</p><p class="muted">${PRINT_EMPTY_SECTION_COPY}</p></section>
+  <section><h2>Action Queue summary</h2><p class="muted">${PRINT_SECTION_LABELS.actionsReviewed}</p>${actionQueueSummary}</section>
+  <section><h2>Lessons · repeat &amp; avoid</h2><p class="muted">${PRINT_SECTION_LABELS.repeatNextRun} · ${PRINT_SECTION_LABELS.avoidNextRun}</p>${lessons}</section>
 
   <p class="safety" data-testid="post-grow-print-safety-note">${PRINT_SAFETY_NOTE}</p>
   <p class="no-print muted">${PRINT_HELPER_COPY}</p>

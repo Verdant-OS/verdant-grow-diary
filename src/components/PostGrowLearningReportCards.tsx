@@ -1,3 +1,4 @@
+import type React from "react";
 import { Download, Image as ImageIcon, Info, ListChecks, Printer } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -67,7 +68,7 @@ export const REPORT_EMPTY_SUMMARY_COPY =
   "Not enough evidence to summarize this section yet.";
 export const REPORT_NO_LOGGED_DATA_COPY = "No logged data yet.";
 
-export function PostGrowReportHeaderHelper() {
+export function PostGrowReportHeaderHelper(_: PostGrowReportHeaderHelperProps = {}) {
   return (
     <p
       data-testid="post-grow-report-header-helper"
@@ -78,11 +79,18 @@ export function PostGrowReportHeaderHelper() {
   );
 }
 
+export interface PostGrowReportHeaderHelperProps {
+  /** Reserved for future presenter overrides. Intentionally empty today. */
+  readonly _reserved?: never;
+}
+
+export interface PostGrowReportTopSummaryPanelProps {
+  readonly vm: PostGrowLearningReportViewModel;
+}
+
 export function PostGrowReportTopSummaryPanel({
   vm,
-}: {
-  vm: PostGrowLearningReportViewModel;
-}) {
+}: PostGrowReportTopSummaryPanelProps) {
   const sensorReadingCount = vm.environment.reduce(
     (sum, m) => sum + (m.count ?? 0),
     0,
@@ -146,17 +154,14 @@ export function PostGrowReportTopSummaryPanel({
   );
 }
 
-function SummaryStat({
-  testId,
-  label,
-  value,
-  hint,
-}: {
-  testId: string;
-  label: string;
-  value: string;
-  hint?: string;
-}) {
+interface SummaryStatProps {
+  readonly testId: string;
+  readonly label: string;
+  readonly value: string;
+  readonly hint?: string;
+}
+
+function SummaryStat({ testId, label, value, hint }: SummaryStatProps) {
   return (
     <div
       data-testid={testId}
@@ -173,7 +178,14 @@ function SummaryStat({
   );
 }
 
-export function PostGrowReportActionSafetyNote() {
+export interface PostGrowReportActionSafetyNoteProps {
+  /** Reserved for future presenter overrides. Intentionally empty today. */
+  readonly _reserved?: never;
+}
+
+export function PostGrowReportActionSafetyNote(
+  _: PostGrowReportActionSafetyNoteProps = {},
+) {
   return (
     <p
       data-testid="post-grow-action-safety-note"
@@ -184,7 +196,11 @@ export function PostGrowReportActionSafetyNote() {
   );
 }
 
-export function DataCompletenessBadge({ vm }: { vm: PostGrowLearningReportViewModel }) {
+export interface DataCompletenessBadgeProps {
+  readonly vm: PostGrowLearningReportViewModel;
+}
+
+export function DataCompletenessBadge({ vm }: DataCompletenessBadgeProps) {
   return (
     <div className="glass rounded-2xl p-3" data-testid="post-grow-completeness-badge">
       <div className="flex items-center justify-between gap-2">
@@ -437,17 +453,14 @@ export function ExportSummaryButtons({ vm }: { vm: PostGrowLearningReportViewMod
   );
 }
 
-function ReportCard({
-  title,
-  subtitle,
-  testId,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  testId: string;
-  children: React.ReactNode;
-}) {
+interface ReportCardProps {
+  readonly title: string;
+  readonly subtitle?: React.ReactNode;
+  readonly testId: string;
+  readonly children: React.ReactNode;
+}
+
+function ReportCard({ title, subtitle, testId, children }: ReportCardProps) {
   return (
     <section className="glass rounded-2xl p-4" data-testid={testId} aria-label={title}>
       <div className="mb-3">

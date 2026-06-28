@@ -1,3 +1,4 @@
+import type React from "react";
 import { Download, Image as ImageIcon, Info, ListChecks, Printer } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";

@@ -33,19 +33,11 @@ function downloadText(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function printSummary(vm: PostGrowLearningReportViewModel) {
-  const summary = buildPostGrowReportSummaryText(vm);
-  const win = window.open("", "_blank", "noopener,noreferrer");
-  if (!win) {
-    toast.error("Unable to open print window");
-    return;
+function handlePrint(vm: PostGrowLearningReportViewModel) {
+  const result = openPostGrowReportPrintWindow(vm);
+  if (result === "unavailable") {
+    toast.error(PRINT_UNAVAILABLE_COPY);
   }
-  win.document.write(
-    `<html><head><title>Post-Grow Learning Report</title><style>body{font-family:Arial,sans-serif;padding:32px;line-height:1.5;color:#111}pre{white-space:pre-wrap}</style></head><body><pre>${summary.replace(/</g, "&lt;")}</pre></body></html>`,
-  );
-  win.document.close();
-  win.focus();
-  win.print();
 }
 
 export function DataCompletenessBadge({ vm }: { vm: PostGrowLearningReportViewModel }) {

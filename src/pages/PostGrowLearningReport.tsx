@@ -157,6 +157,10 @@ export default function PostGrowLearningReport() {
         />
         <PhotoGridCard vm={report} />
       </div>
+
+      <div className="mt-4">
+        <PostGrowReportActionSafetyNote />
+      </div>
     </div>
   );
 }

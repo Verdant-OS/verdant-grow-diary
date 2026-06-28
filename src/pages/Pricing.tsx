@@ -556,3 +556,26 @@ function TrustCard({
     </div>
   );
 }
+
+function ProofCallout({
+  icon,
+  title,
+  body,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div
+      className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-6"
+      data-testid="pricing-proof-callout"
+    >
+      <div className="h-9 w-9 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+        {icon}
+      </div>
+      <h3 className="mt-4 font-display text-base font-semibold">{title}</h3>
+      <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{body}</p>
+    </div>
+  );
+}

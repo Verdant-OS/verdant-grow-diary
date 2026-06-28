@@ -153,17 +153,14 @@ export function PostGrowReportTopSummaryPanel({
   );
 }
 
-function SummaryStat({
-  testId,
-  label,
-  value,
-  hint,
-}: {
-  testId: string;
-  label: string;
-  value: string;
-  hint?: string;
-}) {
+interface SummaryStatProps {
+  readonly testId: string;
+  readonly label: string;
+  readonly value: string;
+  readonly hint?: string;
+}
+
+function SummaryStat({ testId, label, value, hint }: SummaryStatProps) {
   return (
     <div
       data-testid={testId}
@@ -180,7 +177,14 @@ function SummaryStat({
   );
 }
 
-export function PostGrowReportActionSafetyNote() {
+export interface PostGrowReportActionSafetyNoteProps {
+  /** Reserved for future presenter overrides. Intentionally empty today. */
+  readonly _reserved?: never;
+}
+
+export function PostGrowReportActionSafetyNote(
+  _: PostGrowReportActionSafetyNoteProps = {},
+) {
   return (
     <p
       data-testid="post-grow-action-safety-note"
@@ -191,7 +195,11 @@ export function PostGrowReportActionSafetyNote() {
   );
 }
 
-export function DataCompletenessBadge({ vm }: { vm: PostGrowLearningReportViewModel }) {
+export interface DataCompletenessBadgeProps {
+  readonly vm: PostGrowLearningReportViewModel;
+}
+
+export function DataCompletenessBadge({ vm }: DataCompletenessBadgeProps) {
   return (
     <div className="glass rounded-2xl p-3" data-testid="post-grow-completeness-badge">
       <div className="flex items-center justify-between gap-2">

@@ -63,22 +63,18 @@ async function runConfirmedImport(): Promise<{
   inserted: ReadonlyArray<PersistedCsvReading>;
 }> {
   let captured: ReadonlyArray<PersistedCsvReading> = [];
-  const onConfirm = vi.fn(
-    async (rows: ReadonlyArray<Record<string, unknown>>) => {
-      // The modal hands the persistence layer rows already tagged source:"csv".
-      // We snapshot them here as the "persisted shape" replayed on reload.
-      captured = rows.map((r) => ({
-        captured_at: String(r.captured_at ?? ""),
-        tent_id: "tent-1",
-        source: "csv",
-        temperature_c:
-          typeof r.temperature_c === "number" ? r.temperature_c : null,
-        humidity_pct: typeof r.humidity_pct === "number" ? r.humidity_pct : null,
-        raw_payload: { source_app: "test-vendor" },
-      }));
-      return { insertedCount: captured.length, error: null };
-    },
-  );
+  const onConfirm = vi.fn(async (rows: ReadonlyArray<Record<string, unknown>>) => {
+    captured = rows.map((r) => ({
+      captured_at: String(r.captured_at ?? ""),
+      tent_id: "tent-1",
+      source: "csv",
+      temperature_c:
+        typeof r.temperature_c === "number" ? r.temperature_c : null,
+      humidity_pct: typeof r.humidity_pct === "number" ? r.humidity_pct : null,
+      raw_payload: { source_app: "test-vendor" },
+    }));
+    return { insertedCount: captured.length, error: null };
+  }) as unknown as React.ComponentProps<typeof EnvironmentCsvImportModal>["onConfirm"];
 
   render(
     <EnvironmentCsvImportModal

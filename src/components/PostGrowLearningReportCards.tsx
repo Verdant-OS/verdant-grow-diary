@@ -452,17 +452,14 @@ export function ExportSummaryButtons({ vm }: { vm: PostGrowLearningReportViewMod
   );
 }
 
-function ReportCard({
-  title,
-  subtitle,
-  testId,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  testId: string;
-  children: React.ReactNode;
-}) {
+interface ReportCardProps {
+  readonly title: string;
+  readonly subtitle?: React.ReactNode;
+  readonly testId: string;
+  readonly children: React.ReactNode;
+}
+
+function ReportCard({ title, subtitle, testId, children }: ReportCardProps) {
   return (
     <section className="glass rounded-2xl p-4" data-testid={testId} aria-label={title}>
       <div className="mb-3">

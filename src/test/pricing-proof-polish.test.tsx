@@ -5,7 +5,7 @@
  * do NOT appear anywhere on the Pricing page or BillingPlaceholder.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import Pricing from "@/pages/Pricing";
 import BillingPlaceholder from "@/pages/BillingPlaceholder";

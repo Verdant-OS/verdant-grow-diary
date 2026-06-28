@@ -271,7 +271,7 @@ export function EnvironmentStabilityCard({ metrics }: { metrics: MetricAggregate
 
 export function PostHarvestPerformanceCard({ vm }: { vm: PostGrowLearningReportViewModel }) {
   return (
-    <ReportCard title="Post-Harvest Performance" testId="post-grow-post-harvest">
+    <ReportCard title="Post-Harvest Performance" subtitle={`${REPORT_SECTION_LABELS.whatWasLogged} (harvest)`} testId="post-grow-post-harvest">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
         <Stat label="Final yield" value={vm.postHarvest.yieldGrams === null ? "—" : `${display(vm.postHarvest.yieldGrams)} g`} />
         <Stat label="Weight loss" value={vm.postHarvest.weightLossPct === null ? "—" : `${display(vm.postHarvest.weightLossPct)}%`} />
@@ -305,7 +305,7 @@ function PostHarvestPointRow({ point }: { point: PostHarvestPoint }) {
 
 export function ActionEffectivenessCard({ vm }: { vm: PostGrowLearningReportViewModel }) {
   return (
-    <ReportCard title="Action Effectiveness" testId="post-grow-action-effectiveness">
+    <ReportCard title="Action Effectiveness" subtitle={REPORT_SECTION_LABELS.actionsReviewed} testId="post-grow-action-effectiveness">
       <div className="grid grid-cols-2 gap-2 mb-3">
         <Stat label="Completed actions" value={String(vm.actionEffectiveness.completedActions)} />
         <Stat label="Outcome notes" value={String(vm.actionEffectiveness.outcomeNotes)} />
@@ -338,7 +338,7 @@ export function LessonsCard({
   busy: boolean;
 }) {
   return (
-    <ReportCard title="My Lessons & Notes" testId="post-grow-lessons">
+    <ReportCard title="My Lessons & Notes" subtitle={`${REPORT_SECTION_LABELS.repeatNextRun} · ${REPORT_SECTION_LABELS.avoidNextRun}`} testId="post-grow-lessons">
       <Textarea
         value={lesson}
         onChange={(e) => onLessonChange(e.target.value)}
@@ -372,7 +372,7 @@ export function LessonsCard({
 
 export function PhotoGridCard({ vm }: { vm: PostGrowLearningReportViewModel }) {
   return (
-    <ReportCard title="Photo Grid" testId="post-grow-photo-grid">
+    <ReportCard title="Photo Grid" subtitle={`${REPORT_SECTION_LABELS.whatWasLogged} (photos)`} testId="post-grow-photo-grid">
       {vm.photos.length === 0 ? (
         <p className="text-sm text-muted-foreground">No photos found for this grow.</p>
       ) : (

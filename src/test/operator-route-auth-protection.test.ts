@@ -20,8 +20,32 @@ const APP = fs.readFileSync(
 // Split the file on the AppShell element open/close so we can classify
 // each <Route path="..."/> as protected vs public.
 const shellOpen = APP.indexOf("<Route element={<AppShell />}>");
-const shellClose = APP.indexOf("</Route>", shellOpen);
 expect(shellOpen).toBeGreaterThan(-1);
+
+// Walk the JSX to find the matching </Route> for the AppShell wrapper,
+// accounting for nested <Route element={...}>...</Route> groups (e.g. the
+// RequireOperatorRole role-gate block) inside the protected layout.
+function findMatchingShellClose(src: string, openIdx: number): number {
+  let depth = 1;
+  let i = src.indexOf(">", openIdx) + 1;
+  while (i < src.length && depth > 0) {
+    const nextOpen = src.indexOf("<Route", i);
+    const nextClose = src.indexOf("</Route>", i);
+    if (nextClose === -1) return -1;
+    if (nextOpen !== -1 && nextOpen < nextClose) {
+      const tagEnd = src.indexOf(">", nextOpen);
+      const tag = src.slice(nextOpen, tagEnd + 1);
+      if (!tag.endsWith("/>")) depth += 1;
+      i = tagEnd + 1;
+    } else {
+      depth -= 1;
+      if (depth === 0) return nextClose;
+      i = nextClose + "</Route>".length;
+    }
+  }
+  return -1;
+}
+const shellClose = findMatchingShellClose(APP, shellOpen);
 expect(shellClose).toBeGreaterThan(shellOpen);
 
 const protectedBlock = APP.slice(shellOpen, shellClose);

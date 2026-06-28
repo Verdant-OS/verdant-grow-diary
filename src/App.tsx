@@ -71,6 +71,7 @@ import { OperatorAiDoctorPhase1Page } from "./pages/OperatorAiDoctorPhase1";
 import OneTentLiveProof from "./pages/OneTentLiveProof";
 import DemoProofWalkthrough from "./pages/DemoProofWalkthrough";
 import ContextualPhenoComparisonDemo from "./pages/ContextualPhenoComparisonDemo";
+import RequireOperatorRole from "./components/RequireOperatorRole";
 
 const queryClient = new QueryClient();
 

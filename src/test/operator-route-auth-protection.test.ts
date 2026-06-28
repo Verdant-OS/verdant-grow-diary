@@ -20,8 +20,45 @@ const APP = fs.readFileSync(
 // Split the file on the AppShell element open/close so we can classify
 // each <Route path="..."/> as protected vs public.
 const shellOpen = APP.indexOf("<Route element={<AppShell />}>");
-const shellClose = APP.indexOf("</Route>", shellOpen);
 expect(shellOpen).toBeGreaterThan(-1);
+
+// Walk the JSX to find the matching </Route> for the AppShell wrapper.
+// We track brace depth so `<RequireOperatorRole />` inside an `element={...}`
+// attribute is not mistaken for a self-closing tag boundary.
+function tagOpenEnd(src: string, openIdx: number): number {
+  let i = openIdx + 1;
+  let braces = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === "{") braces += 1;
+    else if (ch === "}") braces -= 1;
+    else if (ch === ">" && braces === 0) return i;
+    i += 1;
+  }
+  return -1;
+}
+function findMatchingShellClose(src: string, openIdx: number): number {
+  const startEnd = tagOpenEnd(src, openIdx);
+  let depth = 1;
+  let i = startEnd + 1;
+  while (i < src.length && depth > 0) {
+    const nextOpen = src.indexOf("<Route", i);
+    const nextClose = src.indexOf("</Route>", i);
+    if (nextClose === -1) return -1;
+    if (nextOpen !== -1 && nextOpen < nextClose) {
+      const end = tagOpenEnd(src, nextOpen);
+      if (end === -1) return -1;
+      if (src[end - 1] !== "/") depth += 1;
+      i = end + 1;
+    } else {
+      depth -= 1;
+      if (depth === 0) return nextClose;
+      i = nextClose + "</Route>".length;
+    }
+  }
+  return -1;
+}
+const shellClose = findMatchingShellClose(APP, shellOpen);
 expect(shellClose).toBeGreaterThan(shellOpen);
 
 const protectedBlock = APP.slice(shellOpen, shellClose);

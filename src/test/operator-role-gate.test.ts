@@ -20,26 +20,36 @@ const GUARD = fs.readFileSync(
   "utf8",
 );
 
+function tagOpenEnd(src: string, openIdx: number): number {
+  let i = openIdx + 1;
+  let braces = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === "{") braces += 1;
+    else if (ch === "}") braces -= 1;
+    else if (ch === ">" && braces === 0) return i;
+    i += 1;
+  }
+  return -1;
+}
 function extractOperatorBlock(): string {
   const open = APP.indexOf("<Route element={<RequireOperatorRole />}>");
   expect(open).toBeGreaterThan(-1);
-  // Find the matching </Route> at the end of that nested block. Count nested
-  // <Route ...> opens that DO NOT self-close until we hit a close that
-  // balances back to zero depth.
+  const startEnd = tagOpenEnd(APP, open);
   let depth = 1;
-  let i = APP.indexOf(">", open) + 1;
+  let i = startEnd + 1;
   while (i < APP.length && depth > 0) {
     const nextOpen = APP.indexOf("<Route", i);
     const nextClose = APP.indexOf("</Route>", i);
     if (nextClose === -1) break;
     if (nextOpen !== -1 && nextOpen < nextClose) {
-      // self-closing route (`/>`) does not change depth.
-      const tagEnd = APP.indexOf(">", nextOpen);
-      const tag = APP.slice(nextOpen, tagEnd + 1);
-      if (!tag.endsWith("/>")) depth += 1;
-      i = tagEnd + 1;
+      const end = tagOpenEnd(APP, nextOpen);
+      if (end === -1) break;
+      if (APP[end - 1] !== "/") depth += 1;
+      i = end + 1;
     } else {
       depth -= 1;
+      if (depth === 0) return APP.slice(open, nextClose);
       i = nextClose + "</Route>".length;
     }
   }

@@ -5,7 +5,7 @@
  * do NOT appear anywhere on the Pricing page or BillingPlaceholder.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import Pricing from "@/pages/Pricing";
 import BillingPlaceholder from "@/pages/BillingPlaceholder";
@@ -119,6 +119,53 @@ describe("Pricing — proof polish copy", () => {
     for (const term of FORBIDDEN) {
       expect(body, `forbidden phrase leaked: ${term}`).not.toContain(term);
     }
+  });
+
+  function openFaqAndGetText(testId: string): string {
+    const item = screen.getByTestId(testId);
+    const trigger = within(item).getByRole("button");
+    fireEvent.click(trigger);
+    return item.textContent ?? "";
+  }
+
+  it("Pricing FAQ v1.1 — renders the protected-grow-history trust answer", () => {
+    renderPricing();
+    const text = openFaqAndGetText("pricing-faq-what-paying-for");
+    expect(text).toContain("What am I really paying for?");
+    expect(text).toContain("grow memory system");
+    expect(text).toContain("protected grow history");
+    expect(text).toContain("source-labeled sensor data");
+  });
+
+  it("Pricing FAQ v1.1 — renders approval-required / no-device-command answer", () => {
+    renderPricing();
+    const text = openFaqAndGetText("pricing-faq-device-control").toLowerCase();
+    expect(text).toContain("does verdant control my grow equipment");
+    expect(text).toContain("does not send device commands");
+    expect(text).toContain("grower decides");
+  });
+
+  it("Pricing FAQ v1.1 — CSV imports FAQ does not call CSV live", () => {
+    renderPricing();
+    const text = openFaqAndGetText("pricing-faq-csv-imports").toLowerCase();
+    expect(text).toContain("csv imports stay labeled as csv");
+    expect(text).not.toMatch(/csv[^.]{0,80}\blive\b/);
+  });
+
+  it("Pricing FAQ v1.1 — Post-Grow Learning Report answer renders", () => {
+    renderPricing();
+    const text = openFaqAndGetText("pricing-faq-post-grow-report");
+    expect(text).toContain("What does the Post-Grow Learning Report do?");
+    expect(text).toContain("reviewable report");
+    expect(text.toLowerCase()).toContain("alerts");
+  });
+
+  it("Pricing FAQ v1.1 — checkout sandbox honesty FAQ renders", () => {
+    renderPricing();
+    const text = openFaqAndGetText("pricing-faq-checkout-sandbox");
+    expect(text).toContain("Is checkout live?");
+    expect(text.toLowerCase()).toContain("sandbox preview");
+    expect(text.toLowerCase()).toContain("no live charge");
   });
 });
 

@@ -98,6 +98,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/ingest-inspector", access: "operator" },
   { path: "/internal/ai-doctor-confidence-audit", access: "internal", description: "AI Doctor confidence internal static audit." },
   { path: "/internal/ai-doctor-phase1-preview", access: "internal", description: "Static Phase 1 view model preview." },
+  { path: "/internal/contextual-pheno-comparison-demo", access: "internal", description: "Read-only demo-labeled contextual pheno comparison panel." },
   { path: "/internal/demo-proof-walkthrough", access: "internal", description: "Read-only operator walkthrough of the V0 One-Tent Loop proof path." },
   { path: "/internal/one-tent-loop-proof", access: "internal", description: "One-tent loop internal proof checklist." },
   { path: "/internal/sensor-truth-audit", access: "internal", description: "Sensor truth internal static audit." },

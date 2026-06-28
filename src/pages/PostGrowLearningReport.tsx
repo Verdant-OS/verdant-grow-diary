@@ -22,6 +22,9 @@ import {
   LessonsCard,
   PhotoGridCard,
   PostGrowExecutiveSummaryCard,
+  PostGrowReportActionSafetyNote,
+  PostGrowReportHeaderHelper,
+  PostGrowReportTopSummaryPanel,
   PostHarvestPerformanceCard,
 } from "@/components/PostGrowLearningReportCards";
 import { usePostGrowLearningReportData } from "@/hooks/usePostGrowLearningReportData";

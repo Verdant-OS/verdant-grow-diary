@@ -209,22 +209,40 @@ export function DataCompletenessBadge({ vm }: { vm: PostGrowLearningReportViewMo
 }
 
 export function PostGrowExecutiveSummaryCard({ vm }: { vm: PostGrowLearningReportViewModel }) {
+  const lines = vm.executiveSummary;
   return (
-    <ReportCard title="Executive Summary" testId="post-grow-executive-summary">
-      <ul className="space-y-2 text-sm">
-        {vm.executiveSummary.map((line) => (
-          <li key={line} className="text-muted-foreground">
-            {line}
-          </li>
-        ))}
-      </ul>
+    <ReportCard
+      title="Executive Summary"
+      subtitle={REPORT_SECTION_LABELS.whatChanged}
+      testId="post-grow-executive-summary"
+    >
+      {lines.length === 0 ? (
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="post-grow-executive-summary-empty"
+        >
+          {REPORT_EMPTY_SUMMARY_COPY}
+        </p>
+      ) : (
+        <ul className="space-y-2 text-sm">
+          {lines.map((line) => (
+            <li key={line} className="text-muted-foreground">
+              {line}
+            </li>
+          ))}
+        </ul>
+      )}
     </ReportCard>
   );
 }
 
 export function EnvironmentStabilityCard({ metrics }: { metrics: MetricAggregateView[] }) {
   return (
-    <ReportCard title="Environment Stability" testId="post-grow-environment-stability">
+    <ReportCard
+      title="Environment Stability"
+      subtitle={`${REPORT_SECTION_LABELS.whatWasLogged} (environment)`}
+      testId="post-grow-environment-stability"
+    >
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {metrics.map((metric) => (
           <div key={metric.key} className="rounded-xl border border-border/50 bg-secondary/20 p-3">

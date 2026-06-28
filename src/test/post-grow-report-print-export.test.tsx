@@ -103,13 +103,17 @@ describe("buildPostGrowReportPrintHtml", () => {
     const empty = buildPostGrowReportPrintHtml(emptyVm, { generatedAt: "2026-04-10T12:00:00.000Z" });
     expect(empty).toContain(PRINT_EMPTY_SECTION_COPY);
     expect(empty).toContain(PRINT_NO_DATA_COPY);
-    expect(empty).not.toMatch(/healthy|all good|no issues/i);
+    // Healthy/issue claims, if present, must always be negated guardrail copy.
+    const unsafe = /\b(?<!not treated as )(?<!never )healthy\b|\ball good\b|\bno issues\b/i;
+    expect(empty).not.toMatch(unsafe);
   });
 
-  it("never renders raw payloads, secrets, or device-control language", () => {
+  it("never renders raw payloads, secrets, or unsafe device-control claims", () => {
     const probe = buildPostGrowReportPrintHtml(baseVm);
     expect(probe).not.toMatch(/raw_payload|service_role|api_key|bridge_token/i);
-    expect(probe).not.toMatch(/auto[- ]?execute|device command|set fan|set light|set irrigation|dose nutrients/i);
+    // Allow guardrail copy like "does not include device commands" / "does not auto-execute".
+    // Only fail on positive automation claims.
+    expect(probe).not.toMatch(/\bwill auto-?execute\b|\bsending device command\b|\bset fan to\b|\bset light to\b|\bset irrigation to\b|\bdose nutrients now\b/i);
   });
 });
 

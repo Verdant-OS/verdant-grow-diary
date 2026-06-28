@@ -184,7 +184,7 @@ export function PostGrowReportActionSafetyNote() {
   );
 }
 
-
+export function DataCompletenessBadge({ vm }: { vm: PostGrowLearningReportViewModel }) {
   return (
     <div className="glass rounded-2xl p-3" data-testid="post-grow-completeness-badge">
       <div className="flex items-center justify-between gap-2">

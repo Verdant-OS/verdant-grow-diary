@@ -12,6 +12,11 @@ import {
   type PostGrowLearningReportViewModel,
   type PostHarvestPoint,
 } from "@/lib/postGrowLearningReportRules";
+import {
+  PRINT_HELPER_COPY,
+  PRINT_UNAVAILABLE_COPY,
+  openPostGrowReportPrintWindow,
+} from "@/lib/postGrowReportPrintRules";
 import { actionsPath } from "@/lib/routes";
 
 function display(value: number | null, digits = 1): string {
@@ -28,19 +33,11 @@ function downloadText(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function printSummary(vm: PostGrowLearningReportViewModel) {
-  const summary = buildPostGrowReportSummaryText(vm);
-  const win = window.open("", "_blank", "noopener,noreferrer");
-  if (!win) {
-    toast.error("Unable to open print window");
-    return;
+function handlePrint(vm: PostGrowLearningReportViewModel) {
+  const result = openPostGrowReportPrintWindow(vm);
+  if (result === "unavailable") {
+    toast.error(PRINT_UNAVAILABLE_COPY);
   }
-  win.document.write(
-    `<html><head><title>Post-Grow Learning Report</title><style>body{font-family:Arial,sans-serif;padding:32px;line-height:1.5;color:#111}pre{white-space:pre-wrap}</style></head><body><pre>${summary.replace(/</g, "&lt;")}</pre></body></html>`,
-  );
-  win.document.close();
-  win.focus();
-  win.print();
 }
 
 export function DataCompletenessBadge({ vm }: { vm: PostGrowLearningReportViewModel }) {
@@ -234,36 +231,46 @@ export function PhotoGridCard({ vm }: { vm: PostGrowLearningReportViewModel }) {
 
 export function ExportSummaryButtons({ vm }: { vm: PostGrowLearningReportViewModel }) {
   return (
-    <div className="flex flex-wrap gap-2" data-testid="post-grow-export-actions">
-      <Button variant="outline" size="sm" onClick={() => printSummary(vm)}>
-        <Printer className="h-4 w-4 mr-1" /> Export PDF
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() =>
-          downloadText(
-            `post-grow-report-${vm.header.growId}.svg`,
-            buildPostGrowReportImageSvg(vm),
-            "image/svg+xml",
-          )
-        }
-      >
-        <ImageIcon className="h-4 w-4 mr-1" /> Export image
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() =>
-          downloadText(
-            `post-grow-report-${vm.header.growId}.txt`,
-            buildPostGrowReportSummaryText(vm),
-            "text/plain",
-          )
-        }
-      >
-        <Download className="h-4 w-4 mr-1" /> Summary text
-      </Button>
+    <div className="flex flex-col items-end gap-1" data-testid="post-grow-export-actions">
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handlePrint(vm)}
+          data-testid="post-grow-export-print"
+        >
+          <Printer className="h-4 w-4 mr-1" /> Print / Save PDF
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            downloadText(
+              `post-grow-report-${vm.header.growId}.svg`,
+              buildPostGrowReportImageSvg(vm),
+              "image/svg+xml",
+            )
+          }
+        >
+          <ImageIcon className="h-4 w-4 mr-1" /> Export image
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() =>
+            downloadText(
+              `post-grow-report-${vm.header.growId}.txt`,
+              buildPostGrowReportSummaryText(vm),
+              "text/plain",
+            )
+          }
+        >
+          <Download className="h-4 w-4 mr-1" /> Summary text
+        </Button>
+      </div>
+      <p className="text-[11px] text-muted-foreground" data-testid="post-grow-export-helper">
+        {PRINT_HELPER_COPY}
+      </p>
     </div>
   );
 }

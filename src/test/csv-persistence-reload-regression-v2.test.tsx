@@ -23,6 +23,7 @@
  * source-rule contract is the safe lower-level fence.
  */
 import { describe, it, expect, vi } from "vitest";
+import type React from "react";
 import {
   render,
   screen,

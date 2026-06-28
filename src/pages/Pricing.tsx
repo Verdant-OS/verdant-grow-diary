@@ -9,6 +9,10 @@ import {
   Cpu,
   Leaf,
   Info,
+  FileText,
+  Printer,
+  FileSpreadsheet,
+  HandCoins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
@@ -50,6 +54,8 @@ const COMPARISON_ROWS: Row[] = [
   { label: "Cloud sync & automatic backups", free: false, pro: true, founder: true },
   { label: "Multi-tent support", free: false, pro: true, founder: true },
   { label: "Exports", free: "Limited", pro: "Advanced", founder: "Advanced" },
+  { label: "Post-Grow Learning Report (Print / Save PDF)", free: false, pro: true, founder: true },
+  { label: "CSV sensor import (source-labeled)", free: true, pro: true, founder: true },
   { label: "Sensor snapshot history", free: false, pro: true, founder: true },
   { label: "Better timeline filtering", free: false, pro: true, founder: true },
   { label: "Priority support", free: false, pro: true, founder: true },
@@ -268,6 +274,43 @@ export default function Pricing() {
           ))}
         </div>
       </section>
+
+      {/* Proof callouts — what Pro actually delivers today */}
+      <section
+        className="px-6 pb-2 max-w-5xl mx-auto"
+        data-testid="pricing-proof-callouts"
+      >
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
+          What Pro actually delivers today
+        </h2>
+        <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
+          Real, shipped surfaces — not promises. Pro upgrades the value of the grow history you are already building on Free.
+        </p>
+        <div className="mt-8 grid gap-6 md:grid-cols-2">
+          <ProofCallout
+            icon={<FileText className="h-5 w-5" />}
+            title="Post-Grow Learning Report"
+            body="Turn a completed run into a learning report: what changed, what was logged, which alerts appeared, what actions were reviewed, and what to repeat or avoid next run."
+          />
+          <ProofCallout
+            icon={<Printer className="h-5 w-5" />}
+            title="Print / Save PDF export"
+            body="Export your Post-Grow Learning Report through your browser print dialog and save it as PDF. No server-side PDF service. No paywalled download — your browser is the printer."
+          />
+          <ProofCallout
+            icon={<FileSpreadsheet className="h-5 w-5" />}
+            title="Sensor truth · CSV import"
+            body="CSV imports stay labeled as CSV. Manual, demo, stale, and invalid readings stay clearly labeled so Verdant does not pretend weak data is live data."
+          />
+          <ProofCallout
+            icon={<HandCoins className="h-5 w-5" />}
+            title="Approval-required actions"
+            body="Verdant can suggest next steps, but the grower decides. No blind automation. No device commands. The Action Queue stays grower-approved by design."
+          />
+        </div>
+      </section>
+
+
 
       {/* Founder Lifetime highlight band */}
       <section className="px-6 py-10 max-w-5xl mx-auto">
@@ -509,6 +552,29 @@ function TrustCard({
         {icon}
       </div>
       <h3 className="mt-4 font-display text-lg font-semibold">{title}</h3>
+      <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function ProofCallout({
+  icon,
+  title,
+  body,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div
+      className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-6"
+      data-testid="pricing-proof-callout"
+    >
+      <div className="h-9 w-9 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+        {icon}
+      </div>
+      <h3 className="mt-4 font-display text-base font-semibold">{title}</h3>
       <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{body}</p>
     </div>
   );

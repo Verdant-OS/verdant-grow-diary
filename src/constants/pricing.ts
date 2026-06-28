@@ -42,8 +42,10 @@ export const PRICING = {
     features: [
       "Unlimited grows",
       "100 AI Doctor credits / month",
-      "Live / read-only sensor integrations when available",
-      "Full Action Queue",
+      "Multi-tent grow memory",
+      "Post-Grow Learning Report (Print / Save PDF)",
+      "Read-only sensor integrations when available",
+      "Full Action Queue (approval-required)",
       "Advanced timeline filtering",
       "Sensor snapshot history",
       "Priority support",

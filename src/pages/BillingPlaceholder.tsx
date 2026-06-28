@@ -115,6 +115,15 @@ export default function BillingPlaceholder() {
         </Link>
       </header>
 
+      <div
+        data-testid="billing-sandbox-banner"
+        className="px-6 pt-4 max-w-2xl mx-auto"
+      >
+        <div className="rounded-lg border border-primary/40 bg-primary/5 px-4 py-2 text-center text-xs text-primary">
+          Checkout is in sandbox preview. No live charge will be made from this page.
+        </div>
+      </div>
+
       <section className="px-6 py-16 max-w-2xl mx-auto text-center">
         <p className="text-xs uppercase tracking-widest text-primary font-medium">
           Checkout

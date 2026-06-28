@@ -121,53 +121,51 @@ describe("Pricing — proof polish copy", () => {
     }
   });
 
+  function openFaqAndGetText(testId: string): string {
+    const item = screen.getByTestId(testId);
+    const trigger = within(item).getByRole("button");
+    fireEvent.click(trigger);
+    return item.textContent ?? "";
+  }
+
   it("Pricing FAQ v1.1 — renders the protected-grow-history trust answer", () => {
     renderPricing();
-    expect(screen.getByTestId("pricing-faq-what-paying-for")).toBeInTheDocument();
-    const body = document.body.textContent ?? "";
-    expect(body).toContain("What am I really paying for?");
-    expect(body).toContain("grow memory system");
-    expect(body).toContain("protected grow history");
-    expect(body).toContain("source-labeled sensor data");
+    const text = openFaqAndGetText("pricing-faq-what-paying-for");
+    expect(text).toContain("What am I really paying for?");
+    expect(text).toContain("grow memory system");
+    expect(text).toContain("protected grow history");
+    expect(text).toContain("source-labeled sensor data");
   });
 
   it("Pricing FAQ v1.1 — renders approval-required / no-device-command answer", () => {
     renderPricing();
-    expect(screen.getByTestId("pricing-faq-device-control")).toBeInTheDocument();
-    const body = (document.body.textContent ?? "").toLowerCase();
-    expect(body).toContain("does verdant control my grow equipment");
-    expect(body).toContain("does not send device commands");
-    expect(body).toContain("grower decides");
+    const text = openFaqAndGetText("pricing-faq-device-control").toLowerCase();
+    expect(text).toContain("does verdant control my grow equipment");
+    expect(text).toContain("does not send device commands");
+    expect(text).toContain("grower decides");
   });
 
   it("Pricing FAQ v1.1 — CSV imports FAQ does not call CSV live", () => {
     renderPricing();
-    expect(screen.getByTestId("pricing-faq-csv-imports")).toBeInTheDocument();
-    const body = (document.body.textContent ?? "").toLowerCase();
-    expect(body).toContain("how does verdant handle csv sensor imports");
-    expect(body).toContain("csv imports stay labeled as csv");
-    // CSV must never be called live in the FAQ answer
-    const faqIdx = body.indexOf("csv imports stay labeled as csv");
-    const window = body.slice(faqIdx, faqIdx + 300);
-    expect(window).not.toMatch(/csv[^.]{0,80}\blive\b/);
+    const text = openFaqAndGetText("pricing-faq-csv-imports").toLowerCase();
+    expect(text).toContain("csv imports stay labeled as csv");
+    expect(text).not.toMatch(/csv[^.]{0,80}\blive\b/);
   });
 
   it("Pricing FAQ v1.1 — Post-Grow Learning Report answer renders", () => {
     renderPricing();
-    expect(screen.getByTestId("pricing-faq-post-grow-report")).toBeInTheDocument();
-    const body = document.body.textContent ?? "";
-    expect(body).toContain("What does the Post-Grow Learning Report do?");
-    expect(body).toContain("reviewable report");
-    expect(body.toLowerCase()).toContain("alerts");
+    const text = openFaqAndGetText("pricing-faq-post-grow-report");
+    expect(text).toContain("What does the Post-Grow Learning Report do?");
+    expect(text).toContain("reviewable report");
+    expect(text.toLowerCase()).toContain("alerts");
   });
 
   it("Pricing FAQ v1.1 — checkout sandbox honesty FAQ renders", () => {
     renderPricing();
-    expect(screen.getByTestId("pricing-faq-checkout-sandbox")).toBeInTheDocument();
-    const body = document.body.textContent ?? "";
-    expect(body).toContain("Is checkout live?");
-    expect(body.toLowerCase()).toContain("sandbox preview");
-    expect(body.toLowerCase()).toContain("no live charge");
+    const text = openFaqAndGetText("pricing-faq-checkout-sandbox");
+    expect(text).toContain("Is checkout live?");
+    expect(text.toLowerCase()).toContain("sandbox preview");
+    expect(text.toLowerCase()).toContain("no live charge");
   });
 });
 

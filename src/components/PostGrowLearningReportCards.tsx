@@ -40,7 +40,151 @@ function handlePrint(vm: PostGrowLearningReportViewModel) {
   }
 }
 
-export function DataCompletenessBadge({ vm }: { vm: PostGrowLearningReportViewModel }) {
+/* -----------------------------------------------------------------------------
+ * Post-Grow Learning Report — UI Polish v1
+ * Presenter-only. No new data, no new rules. All copy is factual & calm.
+ * --------------------------------------------------------------------------- */
+
+export const REPORT_HEADER_HELPER_COPY =
+  "Review the run before the next one: what changed, what was logged, which alerts appeared, which actions were reviewed, and what to repeat or avoid.";
+
+export const REPORT_SOURCE_HONESTY_COPY =
+  "This report uses available Verdant logs and labeled sensor data. Missing data is treated as missing, not healthy.";
+
+export const REPORT_ACTION_SAFETY_COPY =
+  "Verdant suggestions remain grower-approved. This report does not include device commands.";
+
+export const REPORT_SECTION_LABELS = {
+  whatChanged: "What changed",
+  whatWasLogged: "What was logged",
+  alertsReviewed: "Alerts reviewed",
+  actionsReviewed: "Actions reviewed",
+  repeatNextRun: "What to repeat next run",
+  avoidNextRun: "What to avoid next run",
+} as const;
+
+export const REPORT_EMPTY_SUMMARY_COPY =
+  "Not enough evidence to summarize this section yet.";
+export const REPORT_NO_LOGGED_DATA_COPY = "No logged data yet.";
+
+export function PostGrowReportHeaderHelper() {
+  return (
+    <p
+      data-testid="post-grow-report-header-helper"
+      className="text-sm text-muted-foreground"
+    >
+      {REPORT_HEADER_HELPER_COPY}
+    </p>
+  );
+}
+
+export function PostGrowReportTopSummaryPanel({
+  vm,
+}: {
+  vm: PostGrowLearningReportViewModel;
+}) {
+  const sensorReadingCount = vm.environment.reduce(
+    (sum, m) => sum + (m.count ?? 0),
+    0,
+  );
+  const statusLabel = !vm.eligible
+    ? "Draft"
+    : vm.header.archived
+      ? "Archived run"
+      : "In review";
+
+  return (
+    <section
+      className="glass rounded-2xl p-4"
+      data-testid="post-grow-top-summary-panel"
+      aria-label="Run summary"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Run summary
+          </p>
+          <h2 className="font-display text-lg font-semibold">
+            {vm.header.growName}
+          </h2>
+        </div>
+        <Badge variant="outline" data-testid="post-grow-top-summary-status">
+          {statusLabel}
+        </Badge>
+      </div>
+      <dl className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+        <SummaryStat
+          testId="post-grow-top-summary-logs"
+          label="Sensor readings"
+          value={String(sensorReadingCount)}
+        />
+        <SummaryStat
+          testId="post-grow-top-summary-photos"
+          label="Photos logged"
+          value={String(vm.photos.length)}
+        />
+        <SummaryStat
+          testId="post-grow-top-summary-actions"
+          label="Actions reviewed"
+          value={String(vm.actionEffectiveness.completedActions)}
+        />
+        <SummaryStat
+          testId="post-grow-top-summary-alerts"
+          label="Alerts reviewed"
+          value="Alert Center"
+          hint="Reviewed in the Alert Center"
+        />
+      </dl>
+      <p
+        className="mt-3 flex items-start gap-1.5 text-[11px] text-muted-foreground"
+        data-testid="post-grow-source-honesty"
+      >
+        <Info className="h-3 w-3 mt-[2px] shrink-0" aria-hidden="true" />
+        <span>{REPORT_SOURCE_HONESTY_COPY}</span>
+      </p>
+    </section>
+  );
+}
+
+function SummaryStat({
+  testId,
+  label,
+  value,
+  hint,
+}: {
+  testId: string;
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div
+      data-testid={testId}
+      className="rounded-xl border border-border/50 bg-secondary/20 p-2"
+    >
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="text-sm font-display">{value}</p>
+      {hint ? (
+        <p className="text-[10px] text-muted-foreground">{hint}</p>
+      ) : null}
+    </div>
+  );
+}
+
+export function PostGrowReportActionSafetyNote() {
+  return (
+    <p
+      data-testid="post-grow-action-safety-note"
+      className="text-[11px] text-muted-foreground"
+    >
+      {REPORT_ACTION_SAFETY_COPY}
+    </p>
+  );
+}
+
+
   return (
     <div className="glass rounded-2xl p-3" data-testid="post-grow-completeness-badge">
       <div className="flex items-center justify-between gap-2">

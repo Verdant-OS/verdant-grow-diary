@@ -473,6 +473,41 @@ export default function Pricing() {
               Yes. Pro Monthly and Pro Annual can be canceled at any time. If you cancel, your grow history stays on your account and you keep read-only access to your logs.
             </AccordionContent>
           </AccordionItem>
+
+          <AccordionItem value="what-paying-for" data-testid="pricing-faq-what-paying-for">
+            <AccordionTrigger>What am I really paying for?</AccordionTrigger>
+            <AccordionContent className="text-muted-foreground">
+              You are paying for Verdant to become your grow memory system: protected grow history, multi-tent organization, source-labeled sensor data, reports, exports, and safer decision context across runs.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="device-control" data-testid="pricing-faq-device-control">
+            <AccordionTrigger>Does Verdant control my grow equipment?</AccordionTrigger>
+            <AccordionContent className="text-muted-foreground">
+              No. Verdant does not send device commands or blindly automate your grow. It can organize evidence and suggest next steps, but the grower decides.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="csv-imports" data-testid="pricing-faq-csv-imports">
+            <AccordionTrigger>How does Verdant handle CSV sensor imports?</AccordionTrigger>
+            <AccordionContent className="text-muted-foreground">
+              CSV imports stay labeled as CSV. Verdant keeps manual, demo, stale, invalid, and CSV readings clearly labeled so weak or imported data is not mistaken for direct telemetry.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="post-grow-report" data-testid="pricing-faq-post-grow-report">
+            <AccordionTrigger>What does the Post-Grow Learning Report do?</AccordionTrigger>
+            <AccordionContent className="text-muted-foreground">
+              It turns a completed run into a reviewable report: what changed, what was logged, which alerts appeared, which actions were reviewed, and what to repeat or avoid next run.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="checkout-sandbox" data-testid="pricing-faq-checkout-sandbox">
+            <AccordionTrigger>Is checkout live?</AccordionTrigger>
+            <AccordionContent className="text-muted-foreground">
+              If you reach the billing placeholder, checkout is in sandbox preview and no live charge is made from that page.
+            </AccordionContent>
+          </AccordionItem>
         </Accordion>
       </section>
 

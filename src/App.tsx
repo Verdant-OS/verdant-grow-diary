@@ -177,47 +177,52 @@ const App = () => (
 
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/diagnostics" element={<Diagnostics />} />
-                <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
-                <Route
-                  path="/operator/ai-doctor-phase1"
-                  element={<OperatorAiDoctorPhase1Page />}
-                />
-                <Route
-                  path="/operator/paddle-processing-audit"
-                  element={<OperatorPaddleProcessingAudit />}
-                />
-                <Route
-                  path="/operator/billing-subscription-updates"
-                  element={<OperatorBillingSubscriptionUpdateAudit />}
-                />
-                <Route
-                  path="/operator/billing-entitlement-resolution"
-                  element={<OperatorBillingEntitlementResolutionAudit />}
-                />
-                <Route path="/operator/one-tent-proof-record" element={<OneTentProofRecord />} />
                 <Route path="/demo/one-tent-live-proof" element={<OneTentLiveProof />} />
-                <Route path="/operator/one-tent-live-proof" element={<OneTentLiveProof />} />
-                <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />
-                <Route path="/operator/ecowitt-bridge-debug" element={<EcowittBridgeDebug />} />
-                <Route path="/operator/ecowitt-live-bringup" element={<EcowittLiveBringup />} />
-                <Route
-                  path="/operator/ecowitt-tent-preview"
-                  element={<OperatorEcowittTentPreview />}
-                />
-                
-                <Route
-                  path="/operator/one-tent-loop-smoke-test"
-                  element={<OperatorOneTentLoopSmokeTest />}
-                />
-                <Route
-                  path="/operator/post-grow-reflection-dry-run"
-                  element={<OperatorPostGrowReflectionDryRun />}
-                />
-                <Route
-                  path="/operator/ggs-real-payload-ingest"
-                  element={<OperatorGgsRealPayloadIngest />}
-                />
+                {/* Operator-only routes. Authenticated via AppShell's useRequireAuth,
+                    then gated by server-side has_role('operator') via RequireOperatorRole.
+                    Non-operator users see a calm access-restricted state. */}
+                <Route element={<RequireOperatorRole />}>
+                  <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
+                  <Route
+                    path="/operator/ai-doctor-phase1"
+                    element={<OperatorAiDoctorPhase1Page />}
+                  />
+                  <Route
+                    path="/operator/paddle-processing-audit"
+                    element={<OperatorPaddleProcessingAudit />}
+                  />
+                  <Route
+                    path="/operator/billing-subscription-updates"
+                    element={<OperatorBillingSubscriptionUpdateAudit />}
+                  />
+                  <Route
+                    path="/operator/billing-entitlement-resolution"
+                    element={<OperatorBillingEntitlementResolutionAudit />}
+                  />
+                  <Route path="/operator/one-tent-proof-record" element={<OneTentProofRecord />} />
+                  <Route path="/operator/one-tent-live-proof" element={<OneTentLiveProof />} />
+                  <Route path="/operator/ecowitt-bridge-status" element={<EcowittBridgeStatus />} />
+                  <Route path="/operator/ecowitt-bridge-debug" element={<EcowittBridgeDebug />} />
+                  <Route path="/operator/ecowitt-live-bringup" element={<EcowittLiveBringup />} />
+                  <Route
+                    path="/operator/ecowitt-tent-preview"
+                    element={<OperatorEcowittTentPreview />}
+                  />
+                  <Route
+                    path="/operator/one-tent-loop-smoke-test"
+                    element={<OperatorOneTentLoopSmokeTest />}
+                  />
+                  <Route
+                    path="/operator/post-grow-reflection-dry-run"
+                    element={<OperatorPostGrowReflectionDryRun />}
+                  />
+                  <Route
+                    path="/operator/ggs-real-payload-ingest"
+                    element={<OperatorGgsRealPayloadIngest />}
+                  />
+                </Route>
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
+
                 <Route path="/ingest-inspector" element={<IngestInspector />} />
                 <Route
                   path="/internal/ai-doctor-phase1-preview"

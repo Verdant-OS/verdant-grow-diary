@@ -120,6 +120,44 @@ describe("Pricing — proof polish copy", () => {
       expect(body, `forbidden phrase leaked: ${term}`).not.toContain(term);
     }
   });
+
+  it("Pricing FAQ v1.1 — renders the protected-grow-history trust answer", () => {
+    renderPricing();
+    const item = screen.getByTestId("pricing-faq-what-paying-for");
+    expect(item.textContent).toContain("grow memory system");
+    expect(item.textContent).toContain("protected grow history");
+    expect(item.textContent).toContain("source-labeled sensor data");
+  });
+
+  it("Pricing FAQ v1.1 — renders approval-required / no-device-command answer", () => {
+    renderPricing();
+    const item = screen.getByTestId("pricing-faq-device-control");
+    expect(item.textContent).toContain("does not send device commands");
+    expect(item.textContent?.toLowerCase()).toContain("grower decides");
+  });
+
+  it("Pricing FAQ v1.1 — CSV imports FAQ does not call CSV live", () => {
+    renderPricing();
+    const item = screen.getByTestId("pricing-faq-csv-imports");
+    const text = (item.textContent ?? "").toLowerCase();
+    expect(text).toContain("csv");
+    expect(text).toContain("labeled");
+    expect(text).not.toMatch(/csv[^.]{0,80}\blive\b/);
+  });
+
+  it("Pricing FAQ v1.1 — Post-Grow Learning Report answer renders", () => {
+    renderPricing();
+    const item = screen.getByTestId("pricing-faq-post-grow-report");
+    expect(item.textContent).toContain("reviewable report");
+    expect(item.textContent?.toLowerCase()).toContain("alerts");
+  });
+
+  it("Pricing FAQ v1.1 — checkout sandbox honesty FAQ renders", () => {
+    renderPricing();
+    const item = screen.getByTestId("pricing-faq-checkout-sandbox");
+    expect(item.textContent).toContain("sandbox preview");
+    expect(item.textContent?.toLowerCase()).toContain("no live charge");
+  });
 });
 
 describe("BillingPlaceholder — sandbox disclosure polish", () => {

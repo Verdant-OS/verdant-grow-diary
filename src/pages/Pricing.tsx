@@ -9,6 +9,10 @@ import {
   Cpu,
   Leaf,
   Info,
+  FileText,
+  Printer,
+  FileSpreadsheet,
+  HandCoins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";

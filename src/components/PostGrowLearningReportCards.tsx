@@ -231,36 +231,46 @@ export function PhotoGridCard({ vm }: { vm: PostGrowLearningReportViewModel }) {
 
 export function ExportSummaryButtons({ vm }: { vm: PostGrowLearningReportViewModel }) {
   return (
-    <div className="flex flex-wrap gap-2" data-testid="post-grow-export-actions">
-      <Button variant="outline" size="sm" onClick={() => printSummary(vm)}>
-        <Printer className="h-4 w-4 mr-1" /> Export PDF
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() =>
-          downloadText(
-            `post-grow-report-${vm.header.growId}.svg`,
-            buildPostGrowReportImageSvg(vm),
-            "image/svg+xml",
-          )
-        }
-      >
-        <ImageIcon className="h-4 w-4 mr-1" /> Export image
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() =>
-          downloadText(
-            `post-grow-report-${vm.header.growId}.txt`,
-            buildPostGrowReportSummaryText(vm),
-            "text/plain",
-          )
-        }
-      >
-        <Download className="h-4 w-4 mr-1" /> Summary text
-      </Button>
+    <div className="flex flex-col items-end gap-1" data-testid="post-grow-export-actions">
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handlePrint(vm)}
+          data-testid="post-grow-export-print"
+        >
+          <Printer className="h-4 w-4 mr-1" /> Print / Save PDF
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            downloadText(
+              `post-grow-report-${vm.header.growId}.svg`,
+              buildPostGrowReportImageSvg(vm),
+              "image/svg+xml",
+            )
+          }
+        >
+          <ImageIcon className="h-4 w-4 mr-1" /> Export image
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() =>
+            downloadText(
+              `post-grow-report-${vm.header.growId}.txt`,
+              buildPostGrowReportSummaryText(vm),
+              "text/plain",
+            )
+          }
+        >
+          <Download className="h-4 w-4 mr-1" /> Summary text
+        </Button>
+      </div>
+      <p className="text-[11px] text-muted-foreground" data-testid="post-grow-export-helper">
+        {PRINT_HELPER_COPY}
+      </p>
     </div>
   );
 }

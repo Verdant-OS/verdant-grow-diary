@@ -67,7 +67,7 @@ export const REPORT_EMPTY_SUMMARY_COPY =
   "Not enough evidence to summarize this section yet.";
 export const REPORT_NO_LOGGED_DATA_COPY = "No logged data yet.";
 
-export function PostGrowReportHeaderHelper() {
+export function PostGrowReportHeaderHelper(_: PostGrowReportHeaderHelperProps = {}) {
   return (
     <p
       data-testid="post-grow-report-header-helper"
@@ -78,11 +78,18 @@ export function PostGrowReportHeaderHelper() {
   );
 }
 
+export interface PostGrowReportHeaderHelperProps {
+  /** Reserved for future presenter overrides. Intentionally empty today. */
+  readonly _reserved?: never;
+}
+
+export interface PostGrowReportTopSummaryPanelProps {
+  readonly vm: PostGrowLearningReportViewModel;
+}
+
 export function PostGrowReportTopSummaryPanel({
   vm,
-}: {
-  vm: PostGrowLearningReportViewModel;
-}) {
+}: PostGrowReportTopSummaryPanelProps) {
   const sensorReadingCount = vm.environment.reduce(
     (sum, m) => sum + (m.count ?? 0),
     0,

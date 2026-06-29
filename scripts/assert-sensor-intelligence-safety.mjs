@@ -139,7 +139,12 @@ export function scanContent(relPath, content) {
   if (isThisScanner) return violations;
 
   // 1. Frontend private/server-only credentials — check only non-comment code.
-  if (isFrontend && !isTestFile) {
+  // Files that declare the SAFETY-CONTRACT marker AND only mention the term
+  // as a bare keyword literal (denylist / redaction list) are exempt — they
+  // exist to PROTECT against leaks, not cause them. Real usage patterns
+  // (env reads, createClient options, KEY=value) still trip the explicit
+  // FRONTEND_PRIVATE_PATTERNS regexes above.
+  if (isFrontend && !isTestFile && !hasContractMarker) {
     for (const { name, re } of FRONTEND_PRIVATE_PATTERNS) {
       if (re.test(codeOnly)) {
         violations.push({

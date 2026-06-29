@@ -172,6 +172,12 @@ describe("Edge Function ingestion remains fail-closed", () => {
     for (const p of files) {
       if (!/\.(ts|tsx)$/.test(p)) continue;
       if (/\.test\.(ts|tsx)$/.test(p)) continue;
+      // Scoped allow-list (EXACT FILE PATH ONLY): the proof-report redaction
+      // helper lists `SUPABASE_SERVICE_ROLE_KEY` as a SECRET_KEYWORDS denylist
+      // literal so it can STRIP the token from human-readable copy/print
+      // output. It does not read or use the env value — it exists to PROTECT
+      // against leaks. See proofReportRedactionRules.ts.
+      if (/[\\/]src[\\/]lib[\\/]proofReportRedactionRules\.ts$/.test(p)) continue;
       const txt = readFileSync(p, "utf8");
       expect(
         /SUPABASE_SERVICE_ROLE_KEY/.test(txt),

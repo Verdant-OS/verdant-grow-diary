@@ -74,6 +74,10 @@ describe("Quick Log Playwright harness safety", () => {
       // Auth route-protection specs legitimately list action_queue as a
       // private table they guard against — exempt them from this check.
       if (/auth-route-protection/.test(file)) continue;
+      // Demo Proof Walkthrough read-only guard spec enumerates action_queue
+      // and functions.invoke in its FORBIDDEN list to ASSERT the walkthrough
+      // page never calls them. The spec issues no such calls itself.
+      if (/demo-proof-walkthrough-readonly/.test(file)) continue;
       expect(body, `${file} must not call action_queue`).not.toMatch(/action_queue/);
       expect(body, `${file} must not call functions.invoke`).not.toMatch(
         /functions\.invoke/,

@@ -148,10 +148,10 @@ export default function Diagnostics() {
       if (delErr)
         return {
           ok: false,
-          detail: `inserted ${inserted.id} but delete failed: ${delErr.message}`,
+          detail: `Round-trip insert succeeded but cleanup delete failed: ${delErr.message}`,
         };
 
-      return { ok: true, detail: `round-trip ok (row ${inserted.id})` };
+      return { ok: true, detail: "RLS round-trip insert/delete check passed." };
     });
 
     setRunning(false);

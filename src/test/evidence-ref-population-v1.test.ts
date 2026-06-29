@@ -165,10 +165,14 @@ describe("Evidence Ref Population v1 — AlertDetail wiring", () => {
 
 
   it("never infers refs from alert id, prose, metric, or timestamps at the insert site", () => {
-    const insertIdx = src.indexOf('.from("action_queue")');
-    const block = src.slice(insertIdx, insertIdx + 1600).toLowerCase();
+    const m = src.match(/\.from\("action_queue"\)\s*\.insert\(\{[\s\S]*?\}\)/);
+    expect(m, "alert→action_queue insert call not found").not.toBeNull();
+    const block = m![0].toLowerCase();
+    const payloadStart = block.indexOf("originating_timeline_events:");
+    expect(payloadStart).toBeGreaterThan(-1);
+    const payloadLine = block.slice(payloadStart, payloadStart + 200);
     const forbiddenInfer = [
-      "[alert:", // back-pointer must not be reused as a timeline ref
+      "[alert:",
       "raw_payload",
       "rawpayload",
       "service_role",
@@ -182,13 +186,6 @@ describe("Evidence Ref Population v1 — AlertDetail wiring", () => {
       "set irrigation",
       "dose nutrients",
     ];
-    // The back-pointer literal "[alert:" lives in alertToActionQueueRules.ts
-    // (inside `reason`), not in the originating_timeline_events column. The
-    // adapter/forward helper never reads from `reason`, so we only check the
-    // payload literal here.
-    const payloadStart = block.indexOf("originating_timeline_events:");
-    expect(payloadStart).toBeGreaterThan(-1);
-    const payloadLine = block.slice(payloadStart, payloadStart + 200);
     for (const phrase of forbiddenInfer) {
       expect(
         payloadLine.includes(phrase),
@@ -196,6 +193,7 @@ describe("Evidence Ref Population v1 — AlertDetail wiring", () => {
       ).toBe(false);
     }
   });
+
 });
 
 // ---------------------------------------------------------------------------

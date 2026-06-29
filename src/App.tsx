@@ -225,26 +225,28 @@ const App = () => (
                     path="/operator/demo-preview"
                     element={<OperatorDemoPreview />}
                   />
+                  {/* Route Guard Parity v1 — these operator/internal routes
+                      were previously only authenticated. They now require
+                      the server-side `operator` role to match their
+                      appRouteManifest access metadata. */}
+                  <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
+                  <Route path="/ingest-inspector" element={<IngestInspector />} />
+                  <Route
+                    path="/internal/ai-doctor-phase1-preview"
+                    element={<AiDoctorPhase1Preview />}
+                  />
+                  <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
+                  <Route path="/internal/sensor-truth-audit" element={<SensorTruthAudit />} />
+                  <Route
+                    path="/internal/ai-doctor-confidence-audit"
+                    element={<AiDoctorConfidenceAudit />}
+                  />
+                  {/* Leads is an internal admin/operator module, intentionally not
+                      surfaced in grower-facing navigation. Primary route is
+                      /admin/leads; /leads is retained as a back-compat alias. */}
+                  <Route path="/admin/leads" element={<Leads />} />
+                  <Route path="/leads" element={<Leads />} />
                 </Route>
-                <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
-
-                <Route path="/ingest-inspector" element={<IngestInspector />} />
-                <Route
-                  path="/internal/ai-doctor-phase1-preview"
-                  element={<AiDoctorPhase1Preview />}
-                />
-                <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
-                <Route path="/internal/sensor-truth-audit" element={<SensorTruthAudit />} />
-                <Route
-                  path="/internal/ai-doctor-confidence-audit"
-                  element={<AiDoctorConfidenceAudit />}
-                />
-                {/* Leads is an internal admin/operator module, intentionally not
-
-                    surfaced in grower-facing navigation. Primary route is
-                    /admin/leads; /leads is retained as a back-compat alias. */}
-                <Route path="/admin/leads" element={<Leads />} />
-                <Route path="/leads" element={<Leads />} />
               </Route>
 
               <Route path="*" element={<NotFound />} />

@@ -133,6 +133,24 @@ describe("ActionDetail — stale source-alert warning", () => {
     expectNormalizedTextToContain(ACTION_DETAIL, "before approving this action");
   });
 
+  it("stale-source warning element is present (testid) and co-located with the safety copy", () => {
+    // Hard fail if the warning element itself disappears from ActionDetail.
+    const TESTID = "stale-source-alert-warning";
+    const matches = ACTION_DETAIL.match(
+      new RegExp(`data-testid="${TESTID}"`, "g"),
+    );
+    expect(matches, `expected exactly one data-testid="${TESTID}"`).not.toBeNull();
+    expect(matches!.length).toBe(1);
+
+    // The required safety copy must live in the same JSX block as the testid.
+    const idx = ACTION_DETAIL.indexOf(`data-testid="${TESTID}"`);
+    expect(idx).toBeGreaterThan(-1);
+    const block = normalizeText(ACTION_DETAIL.slice(idx, idx + 800));
+    expect(block).toContain("Re-check current grow conditions");
+    expect(block).toContain("before approving this action");
+  });
+
+
 
   it("warning block is read-only (no onClick, no insert/update/delete)", () => {
     const idx = ACTION_DETAIL.indexOf(

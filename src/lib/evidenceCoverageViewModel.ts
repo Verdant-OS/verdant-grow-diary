@@ -13,7 +13,10 @@
  * {@link adaptOriginatingTimelineEventsColumn} so the panel mirrors the
  * exact rules used by EvidenceLinkageBadges.
  */
-import { adaptOriginatingTimelineEventsColumn } from "@/lib/originatingTimelineEventAdapter";
+import {
+  adaptOriginatingTimelineEventsColumn,
+  FORBIDDEN_REF_FIELDS,
+} from "@/lib/originatingTimelineEventAdapter";
 
 export interface EvidenceCoverageRowInput {
   readonly originating_timeline_events?: unknown;

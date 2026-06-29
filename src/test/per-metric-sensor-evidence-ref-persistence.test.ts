@@ -47,7 +47,7 @@ function snapshotWithRh(
 }
 
 const quality: SensorQualityResult = {
-  quality: "ok",
+  quality: "good",
   suspiciousFields: [],
 };
 

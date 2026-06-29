@@ -557,9 +557,9 @@ export default function AlertDetail() {
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs mt-4">
               <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
                 <dt className="uppercase tracking-wider text-muted-foreground">Grow</dt>
-                <dd className="font-medium">
+                <dd className="font-medium" data-testid="alert-detail-grow-label">
                   <Link to={growDetailPath(alert.grow_id)} className="text-primary hover:underline">
-                    {alert.grow_id}
+                    {formatGrowDisplayLabel(null, alert.grow_id)}
                   </Link>
                 </dd>
               </div>

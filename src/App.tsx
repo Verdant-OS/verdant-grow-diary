@@ -149,8 +149,6 @@ const App = () => (
                 <Route path="/plants" element={<Plants />} />
                 <Route path="/plants/:id" element={<PlantDetail />} />
                 <Route path="/sensors" element={<Sensors />} />
-                <Route path="/sensors/ecowitt-audit" element={<EcowittIngestAudit />} />
-                <Route path="/sensors/ingest-normalizer" element={<SensorsIngestNormalizer />} />
                 <Route path="/logs" element={<Timeline />} />
                 <Route path="/timeline" element={<Timeline />} />
                 <Route path="/tasks" element={<Tasks />} />

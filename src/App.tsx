@@ -247,6 +247,12 @@ const App = () => (
                       /admin/leads; /leads is retained as a back-compat alias. */}
                   <Route path="/admin/leads" element={<Leads />} />
                   <Route path="/leads" element={<Leads />} />
+                  {/* Sensor Debug Route Guard Cleanup v1 — operator-only
+                      sensor debug surfaces. Manifest already declares
+                      access: "operator"; now enforced server-side via
+                      RequireOperatorRole. */}
+                  <Route path="/sensors/ecowitt-audit" element={<EcowittIngestAudit />} />
+                  <Route path="/sensors/ingest-normalizer" element={<SensorsIngestNormalizer />} />
                 </Route>
               </Route>
 

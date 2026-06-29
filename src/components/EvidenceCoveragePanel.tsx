@@ -112,6 +112,24 @@ export function EvidenceCoveragePanel({
         />
       </div>
 
+      {viewModel.coverageHint && (
+        <Card
+          data-testid="evidence-coverage-hint"
+          className="border-muted bg-muted/40"
+        >
+          <CardHeader className="pb-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Evidence coverage note
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs text-muted-foreground">
+            <p data-testid="evidence-coverage-hint-copy">
+              {viewModel.coverageHint}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="space-y-2" data-testid="evidence-coverage-breakdown">
         <div className="space-y-1">
           <h3 className="text-base font-semibold">Coverage by category</h3>

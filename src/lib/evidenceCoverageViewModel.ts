@@ -50,6 +50,12 @@ export interface EvidenceCoverageViewModel {
   readonly alertsByCategory: readonly EvidenceCoverageBreakdownRow[];
   readonly actionsByCategory: readonly EvidenceCoverageBreakdownRow[];
   readonly notes: readonly string[];
+  /**
+   * Factual, read-only hint shown when fallback-only counts are meaningfully
+   * high. Never recommends actions, never implies broken/unsafe rows, never
+   * implies automatic backfill. `null` when no hint applies.
+   */
+  readonly coverageHint: string | null;
 }
 
 const EMPTY_BUCKET: EvidenceCoverageBucket = Object.freeze({
@@ -213,6 +219,26 @@ function breakdownFor(
   return out;
 }
 
+export const EVIDENCE_COVERAGE_HINT_FALLBACK_HIGH =
+  "Many fallback-only rows may be older records created before evidence refs were persisted. New sensor-backed alerts should begin linking evidence as they are created." as const;
+
+/** Threshold for considering fallback-only counts meaningfully high. */
+export const EVIDENCE_COVERAGE_FALLBACK_HINT_MIN = 5 as const;
+
+/**
+ * Deterministic hint selector. No inference about individual rows; only
+ * factual aggregate copy. Returns `null` when no hint should render.
+ */
+export function computeCoverageHint(overall: EvidenceCoverageBucket): string | null {
+  if (!overall || overall.total <= 0) return null;
+  const fallbackOnly = overall.fallbackOnly;
+  const linked = overall.linked;
+  if (fallbackOnly >= linked || fallbackOnly >= EVIDENCE_COVERAGE_FALLBACK_HINT_MIN) {
+    return EVIDENCE_COVERAGE_HINT_FALLBACK_HIGH;
+  }
+  return null;
+}
+
 export interface BuildEvidenceCoverageInput {
   readonly alerts?: readonly EvidenceCoverageRowInput[] | null;
   readonly actions?: readonly EvidenceCoverageRowInput[] | null;
@@ -233,6 +259,7 @@ export function buildEvidenceCoverageViewModel(
     alertsByCategory,
     actionsByCategory,
     notes: EVIDENCE_COVERAGE_NOTES,
+    coverageHint: computeCoverageHint(overall),
   };
 }
 
@@ -243,4 +270,5 @@ export const EMPTY_EVIDENCE_COVERAGE_VIEW_MODEL: EvidenceCoverageViewModel = Obj
   alertsByCategory: Object.freeze([]) as readonly EvidenceCoverageBreakdownRow[],
   actionsByCategory: Object.freeze([]) as readonly EvidenceCoverageBreakdownRow[],
   notes: EVIDENCE_COVERAGE_NOTES,
+  coverageHint: null,
 });

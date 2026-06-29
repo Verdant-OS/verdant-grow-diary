@@ -66,6 +66,7 @@ import EnvironmentSummaryReportPage from "./pages/EnvironmentSummaryReportPage";
 import OperatorOneTentLoopSmokeTest from "./pages/OperatorOneTentLoopSmokeTest";
 import OperatorGgsRealPayloadIngest from "./pages/OperatorGgsRealPayloadIngest";
 import OperatorPostGrowReflectionDryRun from "./pages/OperatorPostGrowReflectionDryRun";
+import OperatorDemoPreview from "./pages/OperatorDemoPreview";
 import CustomerModeGuide from "./pages/CustomerModeGuide";
 import { OperatorAiDoctorPhase1Page } from "./pages/OperatorAiDoctorPhase1";
 import OneTentLiveProof from "./pages/OneTentLiveProof";
@@ -219,6 +220,10 @@ const App = () => (
                   <Route
                     path="/operator/ggs-real-payload-ingest"
                     element={<OperatorGgsRealPayloadIngest />}
+                  />
+                  <Route
+                    path="/operator/demo-preview"
+                    element={<OperatorDemoPreview />}
                   />
                 </Route>
                 <Route path="/pi-ingest-status" element={<PiIngestStatus />} />

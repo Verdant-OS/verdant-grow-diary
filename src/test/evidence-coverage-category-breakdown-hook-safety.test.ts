@@ -5,6 +5,11 @@ const HOOK = "src/hooks/useEvidenceCoverage.ts";
 
 describe("useEvidenceCoverage — category-breakdown hook safety", () => {
   const src = readFileSync(HOOK, "utf8");
+  // Strip block comments and line comments so the safety-note JSDoc that
+  // intentionally names forbidden fields does not trip the scanner.
+  const code = src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
 
   it("selects only safe non-sensitive fields plus originating_timeline_events", () => {
     // Allowed select clauses

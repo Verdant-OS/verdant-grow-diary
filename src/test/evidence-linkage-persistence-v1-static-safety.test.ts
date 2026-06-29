@@ -94,22 +94,38 @@ describe("Evidence Linkage Persistence v1 — static safety", () => {
     }
   });
 
-  it("write paths persist refs as an explicit array (no prose inference)", () => {
+  it("write paths persist refs from a safe source (explicit [] or forwarded via adapter)", () => {
     const alertDetail = read("src/pages/AlertDetail.tsx");
     const aiHook = read(
       "src/hooks/useAddAiDoctorSessionSuggestionToActionQueue.ts",
     );
-    expect(alertDetail).toMatch(/originating_timeline_events:\s*\[\]/);
+    // AlertDetail now forwards the alert's already-sanitized persisted refs
+    // (Evidence Ref Population v1) via the shared adapter wrapper.
+    expect(alertDetail).toMatch(
+      /originating_timeline_events:\s*\n?\s*forwardAlertRefsToActionQueue\(alert\)/,
+    );
+    // AI Doctor session path has no typed refs at the write boundary; stays [].
     expect(aiHook).toMatch(/originating_timeline_events:\s*\[\]/);
-    // Defense: every assignment to the column in these writers is the empty
-    // array literal — no variable/spread/derived value.
+    // Defense: every assignment to the column in these writers is either an
+    // explicit empty array or the safe forward helper — no raw payloads,
+    // session text, or inferred values.
+    const ALLOWED = new Set([
+      "originating_timeline_events:[]",
+      "originating_timeline_events:forwardAlertRefsToActionQueue(alert)asunknownasnever",
+    ]);
     for (const src of [alertDetail, aiHook]) {
-      const assignments = src.match(/originating_timeline_events:\s*[^,\n]+/g) ?? [];
+      const assignments =
+        src.match(/originating_timeline_events:[\s\S]*?(?=,\n|\n\s*}|$)/g) ?? [];
       for (const a of assignments) {
-        expect(a.replace(/\s+/g, "")).toBe("originating_timeline_events:[]");
+        const normalized = a.replace(/\s+/g, "");
+        expect(
+          ALLOWED.has(normalized),
+          `disallowed originating_timeline_events assignment: ${normalized}`,
+        ).toBe(true);
       }
     }
   });
+
 
   it("Action Queue approval flow remains approval-required (no auto-execution language)", () => {
     const src = read("src/pages/ActionDetail.tsx").toLowerCase();

@@ -99,7 +99,7 @@ export default function Diagnostics() {
       if (!data) return { ok: false, detail: "no profile row returned" };
       return {
         ok: true,
-        detail: `level=${data.level} tier=${data.tier} nugs=${data.nugs_total}`,
+        detail: "Profile ownership check passed.",
       };
     });
 

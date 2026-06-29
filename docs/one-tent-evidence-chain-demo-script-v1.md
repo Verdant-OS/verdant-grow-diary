@@ -142,9 +142,9 @@ Before starting the demo, make sure the following exist in the demo account:
 Tone notes:
 
 - Plain language. No hype.
-- No "AI grows for you."
-- No yield guarantees.
-- No automation claims.
+- Do not claim Verdant grows the plant for the user.
+- Do not promise yield outcomes.
+- Do not claim hands-off operation. See the Do-Not-Say List below for the exact banned phrases.
 - Emphasize evidence, source labels, cautious decisions, grower approval.
 
 ---

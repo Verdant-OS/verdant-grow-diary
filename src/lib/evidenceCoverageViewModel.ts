@@ -70,22 +70,14 @@ export const EVIDENCE_COVERAGE_NOTES: readonly string[] = Object.freeze([
 
 export const UNCATEGORIZED_LABEL = "Uncategorized" as const;
 
-const FORBIDDEN_LABEL_TOKENS = [
-  "raw_payload",
-  "rawpayload",
-  "payload",
-  "service_role",
-  "bridge_token",
-  "api_token",
-  "api_key",
-  "access_token",
-  "refresh_token",
-  "jwt",
-  "secret",
-  "prompt",
-  "completion",
-  "model_output",
-];
+/**
+ * Defensive blocklist for category labels. Sourced from the adapter so the
+ * banned-field list stays in one place. If a row's category text contains any
+ * of these tokens we fall back to "Uncategorized" rather than render it.
+ */
+const FORBIDDEN_LABEL_TOKENS: readonly string[] = FORBIDDEN_REF_FIELDS.map((s) =>
+  s.toLowerCase(),
+);
 
 /** Conservative label sanitizer: short, alphanum + safe punctuation only. */
 function normalizeLabel(raw: unknown): string {

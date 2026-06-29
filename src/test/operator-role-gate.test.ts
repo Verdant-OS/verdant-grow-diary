@@ -106,6 +106,35 @@ describe("Slice A — RequireOperatorRole guard contract", () => {
   });
 });
 
+describe("Slice A — Denied state copy is calm and leak-free", () => {
+  it("uses the approved three-line copy", () => {
+    expect(GUARD).toContain(
+      "Signed in, but this account does not have operator access.",
+    );
+    expect(GUARD).toContain("Use an operator-role account for this preview.");
+    expect(GUARD).toContain("No operator data was loaded.");
+  });
+
+  it("leaks no internal identifiers or auth internals", () => {
+    const denied = GUARD;
+    // No UUID-shaped literals.
+    expect(denied).not.toMatch(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+    );
+    for (const banned of [
+      "user_roles",
+      "has_role",
+      "service_role",
+      "jwt",
+      "auth.uid",
+    ]) {
+      expect(denied.toLowerCase()).not.toContain(banned.toLowerCase());
+    }
+    // "token" appears nowhere in denied/granted copy.
+    expect(denied).not.toMatch(/\btoken\b/i);
+  });
+});
+
 describe("Slice A — Public/customer routes remain unaffected", () => {
   const PUBLIC = [
     "/auth",

@@ -208,6 +208,25 @@ export function snapshotFromReadings(
   // Summarise CSV vendor lineage (presentation hint only — never
   // upgrades the source classification).
   const csvVendor = source === "csv" ? summarizeCsvVendor(latest) : null;
+  // Per-metric provenance — use the EXACT row selected by `get(metric)`
+  // (first match in `latest`, preserving existing selection semantics).
+  // Only emit a ref when the row carries a non-empty id. Never inferred.
+  let metric_refs:
+    | Partial<Record<SensorSnapshotMetricRefKey, SensorSnapshotMetricRef>>
+    | undefined;
+  for (const key of Object.keys(METRIC_REF_KEY_TO_READING_METRIC) as SensorSnapshotMetricRefKey[]) {
+    const readingMetric = METRIC_REF_KEY_TO_READING_METRIC[key];
+    const row = latest.find((x) => x.metric === readingMetric);
+    if (!row) continue;
+    const id = typeof row.id === "string" ? row.id.trim() : "";
+    if (!id) continue;
+    if (!metric_refs) metric_refs = {};
+    metric_refs[key] = {
+      id,
+      captured_at: row.ts,
+      source: typeof row.source === "string" ? row.source : "",
+    };
+  }
   return {
     source,
     ts: latestTs,
@@ -221,6 +240,7 @@ export function snapshotFromReadings(
     ppfd: get("ppfd"),
     device_id: deviceRow?.device_id ?? null,
     csvVendor,
+    ...(metric_refs ? { metric_refs } : {}),
   };
 }
 

@@ -79,8 +79,6 @@ const PUBLIC_FIXTURE_ONLY_INTERNAL_EXCEPTIONS = new Set<string>([
  */
 const DEFERRED_OPERATOR_PARITY = new Set<string>([
   "/grow-lineage",
-  "/sensors/ecowitt-audit",
-  "/sensors/ingest-normalizer",
 ]);
 
 describe("Route Guard Parity v1 — operator/internal manifest entries are role-gated", () => {

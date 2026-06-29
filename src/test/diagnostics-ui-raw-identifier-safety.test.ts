@@ -52,6 +52,6 @@ describe("Diagnostics UI — raw identifier exposure safety", () => {
     expect(SRC).toContain("Authenticated session detected.");
     expect(SRC).toContain("Profile ownership check passed.");
     expect(SRC).toContain("RLS round-trip insert/delete check passed.");
-    expect(SRC).toContain("No operator secrets or raw payloads are shown.");
+    expect(SRC.replace(/\s+/g, " ")).toContain("No operator secrets or raw payloads are shown.");
   });
 });

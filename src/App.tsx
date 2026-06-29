@@ -224,6 +224,10 @@ const App = () => (
                     path="/operator/demo-preview"
                     element={<OperatorDemoPreview />}
                   />
+                  {/* Diagnostics Audience Split v1 — /diagnostics is an
+                      operator-only RLS / round-trip / DevOps surface; manifest
+                      already declared access: "operator". */}
+                  <Route path="/diagnostics" element={<Diagnostics />} />
                   {/* Route Guard Parity v1 — these operator/internal routes
                       were previously only authenticated. They now require
                       the server-side `operator` role to match their

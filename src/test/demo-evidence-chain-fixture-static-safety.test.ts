@@ -33,6 +33,8 @@ const BANNED = [
 describe("demo evidence chain fixture — static safety", () => {
   const fixtureText = readFileSync(FIXTURE_PATH, "utf8");
   const loaderText = readFileSync(LOADER_PATH, "utf8");
+  void loaderText; // loader has dedicated shape tests; banned scan applies to fixture data only
+
 
   it.each(BANNED)("fixture does not contain banned token: %s", (token) => {
     expect(fixtureText.toLowerCase()).not.toContain(token.toLowerCase());

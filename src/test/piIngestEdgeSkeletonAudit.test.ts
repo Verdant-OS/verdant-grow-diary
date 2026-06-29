@@ -193,6 +193,11 @@ describe("pi-ingest edge skeleton audit — service_role confinement", () => {
           // Skip test files — they may mention the env name in
           // guardrail assertions without ever reading its value.
           if (/\.(test|spec)\.(ts|tsx)$/.test(name)) continue;
+          // Scoped allow-list (EXACT FILE PATH ONLY): proof-report redaction
+          // helper lists the env name as a denylist literal so it can STRIP
+          // accidental occurrences from printed/copied output. It does not
+          // read or use the env value.
+          if (/[\\/]src[\\/]lib[\\/]proofReportRedactionRules\.ts$/.test(p)) continue;
           const text = readFileSync(p, "utf8");
           if (/SUPABASE_SERVICE_ROLE_KEY/.test(text)) offenders.push(p);
         }

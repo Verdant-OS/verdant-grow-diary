@@ -18,6 +18,25 @@ that every decision in Verdant is anchored to evidence the grower can see.
 
 ---
 
+## How to run this demo
+
+Target length: 2–3 minutes.
+
+1. 0:00–0:20 — Open Sensors and point out the source label.
+2. 0:20–0:45 — Open the environment alert created from that metric.
+3. 0:45–1:10 — Show the AlertDetail evidence badge or honest fallback.
+4. 1:10–1:35 — Add the alert to the approval-required Action Queue.
+5. 1:35–2:00 — Open ActionDetail and show that evidence follows the action.
+6. 2:00–2:30 — Open the Post-Grow Learning Report and show reviewed alerts/actions.
+7. 2:30–3:00 — Close with: "Plant memory. Sensor truth. Better decisions."
+
+If a badge is missing, say Verdant does not fake missing provenance.
+
+Do not describe Verdant as hands-off, do not imply it operates equipment on
+the grower's behalf, and do not promise specific yield outcomes.
+
+---
+
 ## 2. Setup Checklist
 
 Before starting the demo, make sure the following exist in the demo account:

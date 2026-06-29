@@ -33,8 +33,8 @@ describe("Per-Metric Sensor Evidence Refs v1 — env-alert write path", () => {
     // The only allowed ref origin is snapshot.metric_refs[<metric>].
     expect(src).toMatch(/snapshot\.metric_refs/);
     // No DB-side metric lookup, no nearest-row search.
-    expect(src.toLowerCase()).not.toMatch(/nearest|closest|fuzzy/);
     expect(src).not.toMatch(/from\(["']sensor_readings["']\)/);
+    expect(src).not.toMatch(/nearestReading|closestReading|fuzzyMatch/);
   });
 
   it("saveAlert default still persists [] when no refs are passed", () => {

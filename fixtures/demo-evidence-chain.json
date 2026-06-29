@@ -2,7 +2,7 @@
   "$schema_ref": "docs/fixture-schema-contract.md",
   "fixture_scope": "demo_evidence_chain_v1",
   "is_fixture": true,
-  "notes": "Read-only demo fixture for the One-Tent Evidence Chain. Not a database seed. Demo source labels only. No live data. No raw_payload. No tokens. No model output.",
+  "notes": "Read-only demo fixture for the One-Tent Evidence Chain. Not a database seed. Demo source labels only. No live data. No provider payload fields. No tokens. No model output.",
   "grow": {
     "id": "demo_grow_chain_001",
     "name": "Demo Grow — Evidence Chain",

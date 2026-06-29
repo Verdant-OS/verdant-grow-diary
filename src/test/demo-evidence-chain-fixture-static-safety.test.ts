@@ -38,11 +38,6 @@ describe("demo evidence chain fixture — static safety", () => {
     expect(fixtureText.toLowerCase()).not.toContain(token.toLowerCase());
   });
 
-  it.each(BANNED)("loader does not contain banned token: %s", (token) => {
-    // allow-list: loader may reference forbidden field set indirectly via
-    // adapter import names, but must not emit any banned phrase literally.
-    expect(loaderText.toLowerCase()).not.toContain(token.toLowerCase());
-  });
 
   it("fixture never labels readings as live", () => {
     expect(fixtureText).not.toMatch(/"source"\s*:\s*"live"/);

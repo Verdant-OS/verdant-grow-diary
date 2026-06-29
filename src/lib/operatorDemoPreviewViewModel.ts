@@ -47,6 +47,13 @@ export interface OperatorDemoPreviewViewModel {
   alert: OperatorDemoPreviewAlertSection;
   action: OperatorDemoPreviewActionSection;
   postGrow: OperatorDemoPreviewPostGrow;
+  /**
+   * Presenter-only map of evidence-ref id -> safe human label. Lets the
+   * Operator Demo Preview render "Sensor snapshot · Demo VPD reading" in
+   * place of raw fixture ids while leaving evidenceRefs unchanged for
+   * provenance equality tests and badge rendering.
+   */
+  evidenceDisplayLabels: Record<string, string>;
   safetyNotes: string[];
 }
 

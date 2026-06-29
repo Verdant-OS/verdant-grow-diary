@@ -220,6 +220,11 @@ export default function Diagnostics() {
         />
       </section>
 
+      <EvidenceCoveragePanel
+        viewModel={evidenceCoverage.viewModel}
+        status={evidenceCoverage.status}
+      />
+
       <section aria-labelledby="operator-tools-heading" className="space-y-3">
         <h2 id="operator-tools-heading" className="text-lg font-semibold">
           Operator tools

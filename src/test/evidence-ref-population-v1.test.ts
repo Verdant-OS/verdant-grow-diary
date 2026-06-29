@@ -156,13 +156,13 @@ describe("Evidence Ref Population v1 — AlertDetail wiring", () => {
   });
 
   it("does not regress to a literal [] originating_timeline_events on the alert→action insert", () => {
-    // Locate the action_queue.insert block and assert no `originating_timeline_events: []`
-    // literal lives inside it. (Other unrelated literals elsewhere are fine.)
-    const insertIdx = src.indexOf('.from("action_queue")');
-    expect(insertIdx).toBeGreaterThan(-1);
-    const block = src.slice(insertIdx, insertIdx + 1600);
-    expect(block).not.toMatch(/originating_timeline_events:\s*\[\]/);
+    // Locate the action_queue.insert(...) call site and assert no
+    // `originating_timeline_events: []` literal lives inside it.
+    const m = src.match(/\.from\("action_queue"\)\s*\.insert\(\{[\s\S]*?\}\)/);
+    expect(m, "alert→action_queue insert call not found").not.toBeNull();
+    expect(m![0]).not.toMatch(/originating_timeline_events:\s*\[\]/);
   });
+
 
   it("never infers refs from alert id, prose, metric, or timestamps at the insert site", () => {
     const insertIdx = src.indexOf('.from("action_queue")');

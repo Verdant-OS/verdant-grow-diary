@@ -87,8 +87,9 @@ describe("OperatorModeCallout", () => {
   it("renders CTA for operator users with link to /operator/demo-preview", () => {
     roleState.status = "granted";
     renderCallout();
-    const cta = screen.getByTestId("operator-mode-callout-cta").querySelector("a");
-    expect(cta?.getAttribute("href")).toBe("/operator/demo-preview");
+    const cta = screen.getByTestId("operator-mode-callout-cta");
+    const anchor = cta.tagName === "A" ? cta : cta.querySelector("a");
+    expect(anchor?.getAttribute("href")).toBe("/operator/demo-preview");
     expect(screen.getByText(/open the protected demo preview/i)).toBeInTheDocument();
   });
 

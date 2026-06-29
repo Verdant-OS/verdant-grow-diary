@@ -117,11 +117,22 @@ describe("ActionDetail — stale source-alert warning", () => {
 
   it("renders the stale source-alert warning with the required copy", () => {
     expect(ACTION_DETAIL).toMatch(/data-testid="stale-source-alert-warning"/);
-    expect(ACTION_DETAIL).toMatch(
-      /The source alert is no longer open\.\s+Re-check\s+current\s+grow\s+conditions\s+before\s+approving\s+this\s+action\./,
+    // Whitespace-tolerant: incidental JSX line wrapping must not break the check.
+    expect(normalizeText(ACTION_DETAIL)).toContain(
+      "The source alert is no longer open.",
     );
-
+    expectNormalizedTextToContain(
+      ACTION_DETAIL,
+      "Re-check current grow conditions before approving this action.",
+    );
   });
+
+  it("safety-meaning regression: warning instructs review before approval", () => {
+    // Locked safety phrases — independent of incidental wrapping/indent.
+    expectNormalizedTextToContain(ACTION_DETAIL, "Re-check current grow conditions");
+    expectNormalizedTextToContain(ACTION_DETAIL, "before approving this action");
+  });
+
 
   it("warning block is read-only (no onClick, no insert/update/delete)", () => {
     const idx = ACTION_DETAIL.indexOf(

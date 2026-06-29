@@ -20,7 +20,10 @@
  *     via the returned state, never silently retried into automation.
  */
 import { useEffect, useRef, useState } from "react";
-import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import type {
+  SensorSnapshot,
+  SensorSnapshotMetricRefKey,
+} from "@/lib/sensorSnapshot";
 import type { SensorQualityResult } from "@/lib/sensorQuality";
 import type { TargetComparisonResult } from "@/lib/environmentTargetComparison";
 import {
@@ -32,6 +35,7 @@ import {
   selectPersistableAlerts,
 } from "@/lib/environmentAlertPersistence";
 import { listAlerts, saveAlert, logAlertEvent } from "@/lib/alerts";
+import { buildSensorSnapshotEvidenceRefs } from "@/lib/sensorSnapshotEvidenceRefRules";
 
 export type PersistStatus =
   | "idle"

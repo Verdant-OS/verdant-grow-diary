@@ -115,9 +115,14 @@ describe("Slice A — Denied state copy is calm and leak-free", () => {
     expect(GUARD).toContain("No operator data was loaded.");
   });
 
-  it("leaks no internal identifiers or auth internals", () => {
-    const denied = GUARD;
-    // No UUID-shaped literals.
+  it("leaks no internal identifiers or auth internals in the denied JSX", () => {
+    // Extract only the denied-state JSX block (between the status check and
+    // the closing `);`), so source comments/imports above don't pollute the
+    // leak check.
+    const start = GUARD.indexOf('data-testid="require-operator-denied"');
+    expect(start).toBeGreaterThan(-1);
+    const end = GUARD.indexOf("return <Outlet", start);
+    const denied = GUARD.slice(start, end);
     expect(denied).not.toMatch(
       /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
     );
@@ -127,11 +132,10 @@ describe("Slice A — Denied state copy is calm and leak-free", () => {
       "service_role",
       "jwt",
       "auth.uid",
+      "token",
     ]) {
       expect(denied.toLowerCase()).not.toContain(banned.toLowerCase());
     }
-    // "token" appears nowhere in denied/granted copy.
-    expect(denied).not.toMatch(/\btoken\b/i);
   });
 });
 

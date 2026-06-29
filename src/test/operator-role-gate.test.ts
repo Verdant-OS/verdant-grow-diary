@@ -107,12 +107,13 @@ describe("Slice A — RequireOperatorRole guard contract", () => {
 });
 
 describe("Slice A — Denied state copy is calm and leak-free", () => {
-  it("uses the approved three-line copy", () => {
+  it("uses the approved access-restricted copy", () => {
+    expect(GUARD).toContain("This account does not have operator access.");
     expect(GUARD).toContain(
-      "Signed in, but this account does not have operator access.",
+      "Use an operator-role account or ask the project owner to grant operator access.",
     );
-    expect(GUARD).toContain("Use an operator-role account for this preview.");
     expect(GUARD).toContain("No operator data was loaded.");
+    expect(GUARD).toContain("Signed in, but email is unavailable.");
   });
 
   it("leaks no internal identifiers or auth internals in the denied JSX", () => {

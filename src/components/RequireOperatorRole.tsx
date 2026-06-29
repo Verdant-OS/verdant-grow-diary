@@ -19,9 +19,11 @@ import { Outlet } from "react-router-dom";
 import { ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHasRole } from "@/hooks/useHasRole";
+import { useAuth } from "@/store/auth";
 
 export function RequireOperatorRole() {
   const role = useHasRole("operator");
+  const { user } = useAuth();
 
   if (role.status === "loading" || role.status === "unauthenticated") {
     return (
@@ -36,6 +38,7 @@ export function RequireOperatorRole() {
   }
 
   if (role.status !== "granted") {
+    const email = typeof user?.email === "string" && user.email.length > 0 ? user.email : null;
     return (
       <div className="mx-auto max-w-2xl p-6" data-testid="require-operator-denied">
         <Card>
@@ -44,11 +47,22 @@ export function RequireOperatorRole() {
               <ShieldAlert className="h-4 w-4" /> Access restricted
             </CardTitle>
             <CardDescription>
-              Signed in, but this account does not have operator access.
+              This account does not have operator access.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>Use an operator-role account for this preview.</p>
+            {email ? (
+              <p data-testid="require-operator-denied-email">
+                Signed in as: <span className="font-medium text-foreground">{email}</span>
+              </p>
+            ) : (
+              <p data-testid="require-operator-denied-email-missing">
+                Signed in, but email is unavailable.
+              </p>
+            )}
+            <p>
+              Use an operator-role account or ask the project owner to grant operator access.
+            </p>
             <p>No operator data was loaded.</p>
           </CardContent>
         </Card>

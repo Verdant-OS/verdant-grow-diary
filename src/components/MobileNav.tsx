@@ -3,6 +3,7 @@ import { LayoutDashboard, Box, NotebookText, ListChecks, Bell, MoreHorizontal, S
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import OperatorModeLink from "@/components/OperatorModeLink";
 
 export const primary = [
   { to: "/", label: "Home", icon: LayoutDashboard, end: true },
@@ -61,6 +62,7 @@ export default function MobileNav() {
                   {m.label}
                 </NavLink>
               ))}
+              <OperatorModeLink variant="mobile" onNavigate={() => setOpen(false)} />
             </div>
           </SheetContent>
         </Sheet>

@@ -31,6 +31,7 @@ import OnboardingChecklistCard from "@/components/OnboardingChecklistCard";
 import FirstRunChecklist from "@/components/FirstRunChecklist";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
+import OperatorModeCallout from "@/components/OperatorModeCallout";
 
 import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOutcomeReviewsCard";
 import SafeByDesignNotice from "@/components/SafeByDesignNotice";
@@ -278,6 +279,11 @@ export default function Dashboard() {
       <div className="my-3">
         <OnboardingChecklistCard vm={onboardingVm} />
       </div>
+
+      <div className="my-3">
+        <OperatorModeCallout />
+      </div>
+
 
       <div className="my-3">
         <FirstRunChecklist

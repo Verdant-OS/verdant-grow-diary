@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import BrandLogo from "@/components/BrandLogo";
+import OperatorModeLink from "@/components/OperatorModeLink";
 
 interface NavItem {
   to: string;
@@ -132,6 +133,18 @@ export default function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
+        <SidebarGroup>
+          {!collapsed && (
+            <SidebarGroupLabel className="text-[10px] tracking-wider">
+              Operator
+            </SidebarGroupLabel>
+          )}
+          <SidebarGroupContent>
+            <div className="px-1">
+              <OperatorModeLink variant="sidebar" />
+            </div>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
     </Sidebar>
   );

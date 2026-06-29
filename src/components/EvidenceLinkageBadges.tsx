@@ -56,6 +56,7 @@ export default function EvidenceLinkageBadges({
   events,
   surface = "alert-review",
   fallbackCopy = TIMELINE_EVIDENCE_NOT_LINKED_COPY,
+  renderEventLabel,
   className,
   testId = "evidence-linkage-badges",
 }: EvidenceLinkageBadgesProps) {

@@ -1,0 +1,80 @@
+{
+  "$schema_ref": "docs/fixture-schema-contract.md",
+  "fixture_scope": "demo_evidence_chain_v1",
+  "is_fixture": true,
+  "notes": "Read-only demo fixture for the One-Tent Evidence Chain. Not a database seed. Demo source labels only. No live data. No provider payload fields. No tokens. No model output.",
+  "grow": {
+    "id": "demo_grow_chain_001",
+    "name": "Demo Grow — Evidence Chain",
+    "stage": "harvest",
+    "is_archived": true,
+    "is_demo": true,
+    "started_at": "2026-03-01T12:00:00Z",
+    "harvested_at": "2026-06-01T12:00:00Z"
+  },
+  "tent": {
+    "id": "demo_tent_chain_001",
+    "grow_id": "demo_grow_chain_001",
+    "name": "Tent A",
+    "is_demo": true
+  },
+  "plant": {
+    "id": "demo_plant_chain_001",
+    "tent_id": "demo_tent_chain_001",
+    "grow_id": "demo_grow_chain_001",
+    "name": "Plant A1",
+    "strain": "Demo Auto #1",
+    "is_demo": true
+  },
+  "reading": {
+    "id": "demo_reading_vpd_001",
+    "tent_id": "demo_tent_chain_001",
+    "plant_id": "demo_plant_chain_001",
+    "metric": "vpd",
+    "value": 1.62,
+    "unit": "kPa",
+    "source": "demo",
+    "captured_at": "2026-05-15T14:00:00Z",
+    "is_demo": true
+  },
+  "snapshot": {
+    "ts": "2026-05-15T14:00:00Z",
+    "source": "demo",
+    "tent_id": "demo_tent_chain_001",
+    "metric_refs": { "vpd": "demo_reading_vpd_001" },
+    "is_demo": true
+  },
+  "alert": {
+    "id": "demo_alert_vpd_001",
+    "grow_id": "demo_grow_chain_001",
+    "tent_id": "demo_tent_chain_001",
+    "plant_id": "demo_plant_chain_001",
+    "metric": "vpd",
+    "status": "reviewed",
+    "risk_level": "medium",
+    "reason": "Demo: VPD above safe band for 15 minutes.",
+    "created_at": "2026-05-15T14:05:00Z",
+    "is_demo": true,
+    "_ref_seed": {
+      "id": "demo_reading_vpd_001",
+      "source": "demo",
+      "captured_at": "2026-05-15T14:00:00Z",
+      "metric": "vpd"
+    }
+  },
+  "action_queue_item": {
+    "id": "demo_action_vpd_001",
+    "grow_id": "demo_grow_chain_001",
+    "tent_id": "demo_tent_chain_001",
+    "plant_id": "demo_plant_chain_001",
+    "source": "alert",
+    "action_type": "advisory",
+    "status": "pending_approval",
+    "risk_level": "medium",
+    "suggested_change": "Demo: review canopy temperature and humidity before next watering.",
+    "reason": "Demo: forwarded from alert demo_alert_vpd_001.",
+    "created_at": "2026-05-15T14:06:00Z",
+    "updated_at": "2026-05-15T14:06:00Z",
+    "is_demo": true
+  }
+}

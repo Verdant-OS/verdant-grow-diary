@@ -59,6 +59,7 @@ import {
   plantDetailPath,
   tentDetailPath,
 } from "@/lib/routes";
+import { formatGrowDisplayLabel } from "@/lib/growDisplayLabel";
 import {
   extractSourceAiDoctorSessionId,
   extractSourceAlertId,
@@ -676,7 +677,13 @@ export default function ActionDetail() {
         })()}
 
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          <IdField label="Grow" id={row.grow_id} to={growDetailPath(row.grow_id)} />
+          <IdField
+            label="Grow"
+            id={row.grow_id}
+            to={growDetailPath(row.grow_id)}
+            displayLabel={formatGrowDisplayLabel(growName, row.grow_id)}
+            data-testid="action-detail-grow-label"
+          />
           {row.tent_id && (
             <IdField label="Tent" id={row.tent_id} to={tentDetailPath(row.tent_id)} />
           )}
@@ -1164,17 +1171,31 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
   );
 }
 
-function IdField({ label, id, to }: { label: string; id: string; to: string | null }) {
+function IdField({
+  label,
+  id,
+  to,
+  displayLabel,
+  "data-testid": testId,
+}: {
+  label: string;
+  id: string;
+  to: string | null;
+  displayLabel?: string;
+  "data-testid"?: string;
+}) {
+  const visible = displayLabel ?? id;
+  const isPlainText = displayLabel !== undefined;
   return (
-    <div>
+    <div data-testid={testId}>
       <dt className="text-muted-foreground uppercase tracking-wider text-[10px]">{label}</dt>
-      <dd className="font-mono text-[11px] break-all">
+      <dd className={isPlainText ? "text-[11px]" : "font-mono text-[11px] break-all"}>
         {to ? (
           <Link to={to} className="text-primary hover:underline">
-            {id}
+            {visible}
           </Link>
         ) : (
-          <span>{id}</span>
+          <span>{visible}</span>
         )}
       </dd>
     </div>

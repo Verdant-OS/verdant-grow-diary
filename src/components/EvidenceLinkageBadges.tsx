@@ -8,6 +8,7 @@
  *
  * No I/O. No writes. No automation. No device-control copy.
  */
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import {
   isTrustedTimelineEventSource,
@@ -35,6 +36,13 @@ export interface EvidenceLinkageBadgesProps {
   surface?: "alert-review" | "action-queue-suggestion";
   /** Optional copy to show when nothing is linked. */
   fallbackCopy?: string;
+  /**
+   * Optional presenter-only override for the per-event label. When provided
+   * and it returns a non-null value, the human label is rendered in place of
+   * the raw `ev.id` string. The underlying `data-event-id` attribute is
+   * preserved for tests and provenance equality checks.
+   */
+  renderEventLabel?: (ev: OriginatingTimelineEventRef) => ReactNode | null;
   className?: string;
   testId?: string;
 }

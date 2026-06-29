@@ -144,3 +144,93 @@ describe("EvidenceCoveragePanel — hint render", () => {
     }
   });
 });
+
+describe("buildEvidenceCoverageViewModel — coverageHint determinism", () => {
+  // Fixed fixture refs. Valid linked rows must carry a safe ref with id + source.
+  const linkedRow = (id: string) => ({
+    originating_timeline_events: [
+      { id, kind: "diary_entry", source: "manual", occurred_at: "2026-01-01T00:00:00Z" },
+    ],
+  });
+  const fallbackRow = () => ({ originating_timeline_events: null });
+  const invalidRow = () => ({ originating_timeline_events: [{ raw_payload: "x" }] });
+
+  function shuffleFixed<T>(arr: readonly T[]): T[] {
+    // Deterministic reorder: reverse + odd/even interleave. No randomness.
+    const rev = [...arr].reverse();
+    const evens = rev.filter((_, i) => i % 2 === 0);
+    const odds = rev.filter((_, i) => i % 2 === 1);
+    return [...evens, ...odds];
+  }
+
+  it("hint-rendering case: same counts, different order → same hint (fallback >= linked)", () => {
+    const orderA = [
+      linkedRow("a-1"),
+      linkedRow("a-2"),
+      fallbackRow(),
+      fallbackRow(),
+      fallbackRow(),
+      invalidRow(),
+    ];
+    const orderB = shuffleFixed(orderA);
+    const a = buildEvidenceCoverageViewModel({ alerts: orderA, actions: [] });
+    const b = buildEvidenceCoverageViewModel({ alerts: orderB, actions: [] });
+    expect(a.overall.total).toBe(b.overall.total);
+    expect(a.overall.linked).toBe(b.overall.linked);
+    expect(a.overall.fallbackOnly).toBe(b.overall.fallbackOnly);
+    expect(a.overall.invalidRefs).toBe(b.overall.invalidRefs);
+    expect(a.coverageHint).toBe(EVIDENCE_COVERAGE_HINT_FALLBACK_HIGH);
+    expect(b.coverageHint).toBe(a.coverageHint);
+  });
+
+  it("hint-rendering case: fallbackOnly >= 5 trigger, order-independent", () => {
+    const orderA = [
+      linkedRow("b-1"),
+      linkedRow("b-2"),
+      linkedRow("b-3"),
+      linkedRow("b-4"),
+      linkedRow("b-5"),
+      linkedRow("b-6"),
+      linkedRow("b-7"),
+      fallbackRow(),
+      fallbackRow(),
+      fallbackRow(),
+      fallbackRow(),
+      fallbackRow(),
+    ];
+    const orderB = shuffleFixed(orderA);
+    // Split across alerts/actions buckets too — overall must still aggregate equal.
+    const a = buildEvidenceCoverageViewModel({
+      alerts: orderA.slice(0, 6),
+      actions: orderA.slice(6),
+    });
+    const b = buildEvidenceCoverageViewModel({
+      alerts: orderB.slice(0, 6),
+      actions: orderB.slice(6),
+    });
+    expect(a.overall).toEqual(b.overall);
+    expect(a.coverageHint).toBe(EVIDENCE_COVERAGE_HINT_FALLBACK_HIGH);
+    expect(b.coverageHint).toBe(a.coverageHint);
+  });
+
+  it("no-hint case: linked > fallbackOnly and fallbackOnly < 5, order-independent", () => {
+    const orderA = [
+      linkedRow("c-1"),
+      linkedRow("c-2"),
+      linkedRow("c-3"),
+      linkedRow("c-4"),
+      linkedRow("c-5"),
+      linkedRow("c-6"),
+      linkedRow("c-7"),
+      linkedRow("c-8"),
+      fallbackRow(),
+      fallbackRow(),
+    ];
+    const orderB = shuffleFixed(orderA);
+    const a = buildEvidenceCoverageViewModel({ alerts: orderA, actions: [] });
+    const b = buildEvidenceCoverageViewModel({ alerts: orderB, actions: [] });
+    expect(a.overall).toEqual(b.overall);
+    expect(a.coverageHint).toBeNull();
+    expect(b.coverageHint).toBeNull();
+  });
+});

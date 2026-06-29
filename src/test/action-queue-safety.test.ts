@@ -276,6 +276,19 @@ describe("Action Queue safety — current posture (suggest-only by construction)
       ROOT,
       "src/lib/ai/postGrowReflectionPrompt.ts",
     );
+    // Also allow-list (EXACT FILE PATH ONLY): postGrowReportPrintRules.ts is
+    // a pure HTML-printing helper whose copy includes the literal grower-
+    // facing reassurance "Verdant does not auto-execute." That string is a
+    // safety GUARANTEE rendered into the printed report — there is no
+    // network, RPC, automation, or device-control surface in this file.
+    const POST_GROW_REPORT_PRINT_RULES_PATH = resolve(
+      ROOT,
+      "src/lib/postGrowReportPrintRules.ts",
+    );
+    const ALLOWED_AUTO_EXECUTE_PATHS = new Set([
+      POST_GROW_REFLECTION_PROMPT_PATH,
+      POST_GROW_REPORT_PRINT_RULES_PATH,
+    ]);
     for (const re of [
       /\bautopilot\b/i,
       /\bauto[-_ ]?execute\b/i,
@@ -287,7 +300,7 @@ describe("Action Queue safety — current posture (suggest-only by construction)
       let match = scanText.match(re);
       while (match && match.index !== undefined) {
         const path = fileAtIndex(match.index);
-        if (path !== POST_GROW_REFLECTION_PROMPT_PATH) {
+        if (!ALLOWED_AUTO_EXECUTE_PATHS.has(path)) {
           expect(scanText, `unexpected auto-execute token in ${path}`).not.toMatch(re);
           break;
         }

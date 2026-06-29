@@ -34,7 +34,7 @@ describe("useEvidenceCoverage — category-breakdown hook safety", () => {
       "debug_json",
       "provider_payload",
     ]) {
-      expect(src.toLowerCase(), `banned column reference: ${banned}`).not.toContain(banned);
+      expect(code.toLowerCase(), `banned column reference: ${banned}`).not.toContain(banned);
     }
   });
 
@@ -47,7 +47,7 @@ describe("useEvidenceCoverage — category-breakdown hook safety", () => {
       /\.rpc\(/,
       /functions\.invoke\(/,
     ]) {
-      expect(pat.test(src), `forbidden pattern: ${pat}`).toBe(false);
+      expect(pat.test(code), `forbidden pattern: ${pat}`).toBe(false);
     }
   });
 });

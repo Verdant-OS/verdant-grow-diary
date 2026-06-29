@@ -48,7 +48,7 @@ export function useLatestSensorSnapshot(
         if (tentIds.length > 0) {
           const { data, error } = await supabase
             .from("sensor_readings")
-            .select("ts,metric,value,source,tent_id,created_at,raw_payload")
+            .select("id,ts,metric,value,source,tent_id,created_at,raw_payload")
             .in("tent_id", tentIds)
             .order("ts", { ascending: false })
             .order("created_at", { ascending: false })
@@ -56,6 +56,7 @@ export function useLatestSensorSnapshot(
           if (!error && data && data.length > 0) {
             const snap = snapshotFromReadings(
               data.map((r) => ({
+                id: (r as { id?: string | null }).id ?? null,
                 ts: r.ts,
                 metric: r.metric,
                 value: r.value as number | string | null,

@@ -11,6 +11,33 @@ import { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";
 
 export type SnapshotSource = "live" | "manual" | "sim" | "diary" | "csv" | "unavailable";
 
+/**
+ * Per-metric provenance ref keys for {@link SensorSnapshot.metric_refs}.
+ * Mirrors the {@link import("@/lib/environmentTargetComparison").MetricKey}
+ * union; redeclared locally to avoid a circular import. Keep both lists
+ * in sync if a new metric is added.
+ */
+export type SensorSnapshotMetricRefKey =
+  | "temp"
+  | "rh"
+  | "vpd"
+  | "soil"
+  | "soil_ec"
+  | "soil_temp"
+  | "ppfd";
+
+/**
+ * Provenance for a single metric in a snapshot. Carries ONLY the safe
+ * id + captured_at + raw source from the EXACT `sensor_readings` row
+ * already selected by {@link snapshotFromReadings} for that metric.
+ * Never carries raw_payload, never inferred, never "nearest" matched.
+ */
+export interface SensorSnapshotMetricRef {
+  id: string;
+  captured_at: string;
+  source: string;
+}
+
 export interface SensorSnapshot {
   source: SnapshotSource;
   ts: string | null;
@@ -40,6 +67,16 @@ export interface SensorSnapshot {
    * latest timestamp.
    */
   csvVendor?: import("@/lib/sensorSourceDisplayLabel").CsvVendorSummary;
+  /**
+   * Per-metric provenance for environment alert ref population. Each
+   * entry is the EXACT `sensor_readings` row selected by
+   * `snapshotFromReadings` for that metric — same id, same `ts` (as
+   * `captured_at`), same raw `source`. Only present when the underlying
+   * row carried an `id`. Diary-derived snapshots never populate this.
+   */
+  metric_refs?: Partial<
+    Record<SensorSnapshotMetricRefKey, SensorSnapshotMetricRef>
+  >;
 }
 
 export const EMPTY_SNAPSHOT: SensorSnapshot = {
@@ -94,12 +131,37 @@ export interface SensorReadingLike {
   source?: string | null;
   device_id?: string | null;
   /**
+   * Originating `sensor_readings.id`. Optional: when present and the row
+   * is selected as the contributing row for a known metric,
+   * `snapshotFromReadings` populates `SensorSnapshot.metric_refs[<key>]`
+   * for the env-alert ref population path. Never inferred.
+   */
+  id?: string | null;
+  /**
    * Upstream provenance envelope. This file NEVER reads, returns, or
    * renders its contents — it is forwarded as-is to
    * `summarizeCsvVendor`, which is the only sanctioned reader.
    */
   raw_payload?: unknown;
 }
+
+/**
+ * Map a {@link SensorSnapshotMetricRefKey} to the matching
+ * `sensor_readings.metric` value. Snapshot fields and reading metrics
+ * use different vocabularies; this table is the only mapping site.
+ */
+const METRIC_REF_KEY_TO_READING_METRIC: Record<
+  SensorSnapshotMetricRefKey,
+  string
+> = {
+  temp: "temperature_c",
+  rh: "humidity_pct",
+  vpd: "vpd_kpa",
+  soil: "soil_moisture_pct",
+  soil_ec: "soil_ec",
+  soil_temp: "soil_temp_c",
+  ppfd: "ppfd",
+};
 
 /**
  * Build a snapshot from a batch of sensor_readings rows. Picks the latest
@@ -146,6 +208,25 @@ export function snapshotFromReadings(
   // Summarise CSV vendor lineage (presentation hint only — never
   // upgrades the source classification).
   const csvVendor = source === "csv" ? summarizeCsvVendor(latest) : null;
+  // Per-metric provenance — use the EXACT row selected by `get(metric)`
+  // (first match in `latest`, preserving existing selection semantics).
+  // Only emit a ref when the row carries a non-empty id. Never inferred.
+  let metric_refs:
+    | Partial<Record<SensorSnapshotMetricRefKey, SensorSnapshotMetricRef>>
+    | undefined;
+  for (const key of Object.keys(METRIC_REF_KEY_TO_READING_METRIC) as SensorSnapshotMetricRefKey[]) {
+    const readingMetric = METRIC_REF_KEY_TO_READING_METRIC[key];
+    const row = latest.find((x) => x.metric === readingMetric);
+    if (!row) continue;
+    const id = typeof row.id === "string" ? row.id.trim() : "";
+    if (!id) continue;
+    if (!metric_refs) metric_refs = {};
+    metric_refs[key] = {
+      id,
+      captured_at: row.ts,
+      source: typeof row.source === "string" ? row.source : "",
+    };
+  }
   return {
     source,
     ts: latestTs,
@@ -159,6 +240,7 @@ export function snapshotFromReadings(
     ppfd: get("ppfd"),
     device_id: deviceRow?.device_id ?? null,
     csvVendor,
+    ...(metric_refs ? { metric_refs } : {}),
   };
 }
 

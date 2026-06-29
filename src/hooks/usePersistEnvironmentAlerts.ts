@@ -20,7 +20,10 @@
  *     via the returned state, never silently retried into automation.
  */
 import { useEffect, useRef, useState } from "react";
-import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import type {
+  SensorSnapshot,
+  SensorSnapshotMetricRefKey,
+} from "@/lib/sensorSnapshot";
 import type { SensorQualityResult } from "@/lib/sensorQuality";
 import type { TargetComparisonResult } from "@/lib/environmentTargetComparison";
 import {
@@ -32,6 +35,7 @@ import {
   selectPersistableAlerts,
 } from "@/lib/environmentAlertPersistence";
 import { listAlerts, saveAlert, logAlertEvent } from "@/lib/alerts";
+import { buildSensorSnapshotEvidenceRefs } from "@/lib/sensorSnapshotEvidenceRefRules";
 
 export type PersistStatus =
   | "idle"
@@ -193,6 +197,25 @@ export function usePersistEnvironmentAlerts(
       for (const a of toInsert) {
         const key = derivedAlertKey(a, SOURCE);
         try {
+          // Look up the metric-scoped row ref that THIS snapshot was
+          // already built from (no nearest matching, no metric-only DB
+          // lookup, no prose inference). Only metric-scoped alerts whose
+          // metric key matches a known sensor metric can resolve a ref.
+          const metricRef =
+            typeof a.metric === "string" &&
+            input.snapshot?.metric_refs
+              ? input.snapshot.metric_refs[
+                  a.metric as SensorSnapshotMetricRefKey
+                ] ?? null
+              : null;
+          const refs = metricRef
+            ? buildSensorSnapshotEvidenceRefs({
+                id: metricRef.id,
+                captured_at: metricRef.captured_at,
+                source: metricRef.source,
+                metric: a.metric,
+              })
+            : [];
           const saved = await saveAlert({
             grow_id: growId,
             severity: a.severity,
@@ -200,6 +223,7 @@ export function usePersistEnvironmentAlerts(
             reason: a.reason,
             metric: typeof a.metric === "string" ? a.metric : null,
             source: SOURCE,
+            originating_timeline_events: refs,
           });
           try {
             await logAlertEvent({

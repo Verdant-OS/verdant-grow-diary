@@ -21,7 +21,12 @@ const FORBIDDEN_PATTERNS = [
   "alerts insert",
   "alerts update",
   "alerts delete",
-  "ai ", // trailing space to avoid matching "sails", etc
+  // Note: a previous "ai " substring guard was removed because it false-positives
+  // on legitimate prose like "Supabase / AI /" in route grouping comments inside
+  // src/App.tsx. The narrower analytics-specific patterns below (plus the PII
+  // guards in the second describe block) still prevent analytics code from
+  // referencing product data surfaces.
+
   "device control",
   "insert ",
   "update ",

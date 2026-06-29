@@ -110,6 +110,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/operator/ai-doctor-phase1", access: "operator", description: "Operator AI Doctor Phase 1 results page." },
   { path: "/operator/billing-entitlement-resolution", access: "operator", description: "Operator billing entitlement resolution audit (read-only)." },
   { path: "/operator/billing-subscription-updates", access: "operator", description: "Operator billing subscription update audit (read-only)." },
+  { path: "/operator/demo-preview", access: "operator", description: "Operator-only One-Tent Evidence Chain demo preview (read-only, demo-labeled)." },
   { path: "/operator/ecowitt", access: "operator", description: "Cloud Canary preview." },
   { path: "/operator/ecowitt-bridge-debug", access: "operator", description: "EcoWitt bridge debug (read-only)." },
   { path: "/operator/ecowitt-bridge-status", access: "operator", description: "EcoWitt bridge status (read-only)." },
@@ -120,8 +121,8 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/operator/one-tent-loop-smoke-test", access: "operator", description: "Operator one-tent loop smoke test (read-only)." },
   { path: "/operator/one-tent-proof-record", access: "operator", description: "One-tent proof record export." },
   { path: "/operator/paddle-processing-audit", access: "operator", description: "Operator Paddle processing audit (read-only)." },
-  { path: "/operator/demo-preview", access: "operator", description: "Operator-only One-Tent Evidence Chain demo preview (read-only, demo-labeled)." },
   { path: "/operator/post-grow-reflection-dry-run", access: "operator", description: "Post-Grow Reflection dry-run diagnostics panel (read-only)." },
+
   
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
   { path: "/pi-ingest-status", access: "operator" },

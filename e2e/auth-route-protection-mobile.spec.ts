@@ -42,6 +42,8 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/one-tent-proof-record",
   "/operator/paddle-processing-audit",
   "/operator/post-grow-reflection-dry-run",
+  "/operator/demo-preview",
+
   "/pi-ingest-status",
   "/sensors/csv-preview",
   "/sensors/ecowitt-audit",
@@ -51,7 +53,9 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/grow-lineage",
   "/internal/ai-doctor-confidence-audit",
   "/internal/ai-doctor-phase1-preview",
+  "/internal/contextual-pheno-comparison-demo",
   "/internal/demo-proof-walkthrough",
+
   "/internal/one-tent-loop-proof",
   "/internal/sensor-truth-audit",
   "/leads",

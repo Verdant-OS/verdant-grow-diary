@@ -154,7 +154,7 @@ export default function OperatorDemoEvidenceChainPreview({
             <li>Action evidence badge visible.</li>
             <li>Approval-required state visible.</li>
             <li>Post-Grow eligibility visible.</li>
-            <li>No fake live data is shown.</li>
+            <li>No fabricated live telemetry is shown.</li>
           </ul>
           <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
             {vm.safetyNotes.map((n) => (

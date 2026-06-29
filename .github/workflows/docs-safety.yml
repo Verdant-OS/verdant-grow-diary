@@ -38,3 +38,6 @@ jobs:
 
       - name: Run automated phenotyping docs safety tests
         run: bunx vitest run src/test/assert-automated-phenotyping-docs-safety.test.ts --reporter=dot
+
+      - name: Run demo docs banned-phrase safety tests
+        run: bun run test:docs-demo-safety

@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { verifySupabaseEnv } from "@/lib/verifyEnv";
 import { Link } from "react-router-dom";
 import { DevOpsBackupEncryptionCard } from "@/components/DevOpsBackupEncryptionCard";
+import { EvidenceCoveragePanel } from "@/components/EvidenceCoveragePanel";
+import { useEvidenceCoverage } from "@/hooks/useEvidenceCoverage";
 
 type CheckStatus = "pending" | "running" | "pass" | "fail" | "skip";
 
@@ -31,6 +33,7 @@ export default function Diagnostics() {
   const { user, loading } = useAuth();
   const [checks, setChecks] = useState<CheckResult[]>(initialChecks);
   const [running, setRunning] = useState(false);
+  const evidenceCoverage = useEvidenceCoverage();
 
   const update = (i: number, patch: Partial<CheckResult>) =>
     setChecks((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
@@ -216,6 +219,11 @@ export default function Diagnostics() {
           }}
         />
       </section>
+
+      <EvidenceCoveragePanel
+        viewModel={evidenceCoverage.viewModel}
+        status={evidenceCoverage.status}
+      />
 
       <section aria-labelledby="operator-tools-heading" className="space-y-3">
         <h2 id="operator-tools-heading" className="text-lg font-semibold">

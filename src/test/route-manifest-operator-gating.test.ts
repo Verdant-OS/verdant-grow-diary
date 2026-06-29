@@ -131,6 +131,7 @@ describe("Route Guard Parity v1 — required operator-gated routes", () => {
     "/internal/one-tent-loop-proof",
     "/internal/sensor-truth-audit",
     "/internal/ai-doctor-confidence-audit",
+    "/diagnostics",
   ];
   for (const p of REQUIRED_OPERATOR_GATED) {
     it(`${p} is inside the RequireOperatorRole block`, () => {

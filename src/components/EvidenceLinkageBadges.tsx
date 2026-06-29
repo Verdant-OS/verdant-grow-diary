@@ -87,6 +87,7 @@ export default function EvidenceLinkageBadges({
           const src = (ev.source ?? "unknown") as OriginatingTimelineEventSource;
           const trusted = isTrustedTimelineEventSource(src);
           const occurredAt = formatOccurredAt(ev.occurred_at);
+          const labelOverride = renderEventLabel ? renderEventLabel(ev) : null;
           return (
             <li
               key={ev.id}
@@ -106,12 +107,21 @@ export default function EvidenceLinkageBadges({
               >
                 {originatingTimelineEventLabel(src)}
               </span>
-              {ev.type && (
+              {ev.type && !labelOverride && (
                 <span className="text-muted-foreground">{ev.type}</span>
               )}
-              <span className="font-mono text-[11px] text-muted-foreground">
-                {ev.id}
-              </span>
+              {labelOverride ? (
+                <span
+                  data-testid={`${testId}-label`}
+                  className="text-[11px] text-foreground"
+                >
+                  {labelOverride}
+                </span>
+              ) : (
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {ev.id}
+                </span>
+              )}
               {occurredAt && (
                 <span className="text-[11px] text-muted-foreground">
                   {occurredAt}

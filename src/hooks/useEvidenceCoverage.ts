@@ -5,7 +5,8 @@
  *  - Authenticated user only; RLS enforces ownership.
  *  - Read-only: no .insert/.update/.delete/.upsert/.rpc.
  *  - Selects only the columns needed to classify coverage; never selects
- *    raw_payload, tokens, prompts, completions, or any debug JSON.
+ *    sensitive payload fields, tokens, prompts, completions, or any debug
+ *    JSON.
  */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";

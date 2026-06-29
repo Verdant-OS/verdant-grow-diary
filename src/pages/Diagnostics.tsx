@@ -84,7 +84,7 @@ export default function Diagnostics() {
       if (!data.session) return { ok: false, detail: "no active session" };
       return {
         ok: true,
-        detail: `user_id=${data.session.user.id} email=${data.session.user.email ?? "n/a"}`,
+        detail: "Authenticated session detected.",
       };
     });
 

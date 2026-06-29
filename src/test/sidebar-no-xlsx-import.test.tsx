@@ -2,17 +2,23 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/AppSidebar";
 
 describe("AppSidebar — no XLSX import link", () => {
   it("renders no link mentioning XLSX, Spreadsheet, or Genetics Import", () => {
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     const { container } = render(
-      <MemoryRouter>
-        <SidebarProvider>
-          <AppSidebar />
-        </SidebarProvider>
-      </MemoryRouter>,
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <SidebarProvider>
+            <AppSidebar />
+          </SidebarProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/XLSX/i);

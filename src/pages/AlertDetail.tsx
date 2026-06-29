@@ -365,10 +365,13 @@ export default function AlertDetail() {
         risk_level: draft.risk_level,
         source: draft.source,
         status: draft.status,
-        // Evidence Linkage Persistence v1: no safe in-memory refs are
-        // available at this boundary. Persist an explicit empty array —
-        // never infer from prose, timestamps, plant/tent, or alert id.
-        originating_timeline_events: [],
+        // Evidence Ref Population v1: forward the source alert's already-
+        // sanitized, persisted refs into the derived action_queue row via the
+        // shared adapter. If the alert has no refs, an explicit empty array
+        // is persisted — never inferred from prose, timestamps, plant/tent,
+        // alert id, or metric name.
+        originating_timeline_events:
+          forwardAlertRefsToActionQueue(alert) as unknown as never,
       })
       .select("id,grow_id")
       .single();

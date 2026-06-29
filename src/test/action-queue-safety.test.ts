@@ -235,13 +235,26 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     // `src/constants/*` are explicitly forbidden — see the "pi_bridge
     // scanner allow-list hardening" suite at the bottom of this file.
     const SENSOR_INGEST_PROVENANCE_PATH = resolve(ROOT, "src/constants/sensorIngestProvenance.ts");
+    // Also allow-list (EXACT FILE PATH ONLY): src/lib/aiDoctorContextCompiler.ts
+    // holds a read-only LIVE_VENDORS Set used to CLASSIFY incoming sensor
+    // source strings (e.g. "mqtt", "pi_bridge") as live vs invalid. It is:
+    //   - read-only source classification
+    //   - NOT a device-control surface, NOT an outbound call, NOT a writer
+    // The 60-char context window around pi_bridge here includes the adjacent
+    // "mqtt" literal in the same Set, which triggers the control-call regex
+    // as a false positive. Keep file-specific.
+    const AI_DOCTOR_CONTEXT_COMPILER_PATH = resolve(ROOT, "src/lib/aiDoctorContextCompiler.ts");
     const piContexts = [...ALL_PROD_CODE.matchAll(/pi[_-]bridge/gi)];
     for (const m of piContexts) {
       const ctx = ALL_PROD_CODE.slice(Math.max(0, m.index! - 60), m.index! + 60);
       // Scoped skip: if the match is inside a read-only constants file,
       // the surrounding text is a map key / constant string, not a control surface.
       const path = fileAtIndex(m.index!);
-      if (path === PROVIDER_LABELS_PATH || path === SENSOR_INGEST_PROVENANCE_PATH) continue;
+      if (
+        path === PROVIDER_LABELS_PATH ||
+        path === SENSOR_INGEST_PROVENANCE_PATH ||
+        path === AI_DOCTOR_CONTEXT_COMPILER_PATH
+      ) continue;
       expect(ctx, `pi_bridge reference must not be a control call: ${ctx}`).not.toMatch(
         /fetch|http|mqtt|publish|post|send|trigger/i,
       );

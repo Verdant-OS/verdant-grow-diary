@@ -33,6 +33,7 @@ export default function Diagnostics() {
   const { user, loading } = useAuth();
   const [checks, setChecks] = useState<CheckResult[]>(initialChecks);
   const [running, setRunning] = useState(false);
+  const evidenceCoverage = useEvidenceCoverage();
 
   const update = (i: number, patch: Partial<CheckResult>) =>
     setChecks((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));

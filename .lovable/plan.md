@@ -1,96 +1,70 @@
-## Demo Seed Readiness v1 — Plan
+## Plan-mode findings (read-only audit)
 
-### Plan-mode findings
+**Exact role guard path**
+- Route: `src/App.tsx:225` — `/operator/demo-preview` is inside the `<Route element={<RequireOperatorRole />}>` group (lines ~184–230), nested under the authenticated `AppShell` (which already calls `useRequireAuth`).
+- Guard: `src/components/RequireOperatorRole.tsx` → `useHasRole("operator")`.
+- Hook: `src/hooks/useHasRole.ts` calls server-side RPC `supabase.rpc("has_role", { _user_id, _role })`. Roles are NEVER inferred client-side.
+- DB: `public.app_role` enum = `('operator','customer')` (migration `20260517010926…`). Roles stored in `public.user_roles`. `has_role` is a SECURITY DEFINER SQL function gated by `user_roles`.
+- No JWT claim or profile-metadata role path exists. The only way to grant operator is an `INSERT INTO public.user_roles (user_id, role) VALUES (<uid>, 'operator')` via service_role (no client policy allows that insert — verified: `user_roles` has only SELECT-own + operator-managed policies).
 
-- **No DB seed pattern exists.** `supabase/` has only `config.toml`, `functions/`, `migrations/`, `tests/`. No `seed.sql`, no `scripts/seed-*.ts`. The only "seed" tool is `scripts/verify-seed.ts` (read-only verifier).
-- **Fixture convention exists** in `fixtures/*.json` (notably `fixtures/demo-grow-one-tent.json`) with `is_fixture: true`, `is_demo: true`, `source_type: "demo_fixture"`. These are read-only JSON fixtures, not DB rows. They are not currently imported by `src/` code (rg shows zero importers).
-- **Operator demo tooling exists**: `src/pages/OperatorPostGrowReflectionDryRun.tsx`, `src/pages/OperatorOneTentLoopSmokeTest.tsx`, all under the `/operator/*` admin-gated routes (Slice A guard). Safe surface for a fixture-driven demo viewer.
-- **Evidence ref helpers ready**: `sensorSnapshotEvidenceRefRules.buildSensorSnapshotEvidenceRefs`, `originatingTimelineEventRules.normalizeOriginatingTimelineEvents`, and `originatingTimelineEventAdapter` already enforce safe ref shape. We can build refs from a fixture-id without inferring.
-- **Grow UUID rendering** in `AlertDetail.tsx` (line 562) and `ActionDetail.tsx` (line 679 via `IdField`) shows the raw UUID under the "Grow" label. Both pages already compute `growName` from the grows list — only the JSX needs a fallback chain.
-- **No automated seeding is safe** for a hosted Supabase project from client code (no service_role on client). RLS-scoped inserts would require an authenticated user session. Therefore the demo path will be **fixture-driven** (read-only) plus a **docs runbook**, not a DB-mutating seed script.
+**Why the embedded preview stayed gated**
+The session is authenticated (AppShell didn't redirect to `/auth`), but `has_role(auth.uid(), 'operator')` returned `false`. The signed-in test account simply has no row in `public.user_roles` with `role = 'operator'`. The guard is working as designed; nothing in code is wrong. This is an **account-provisioning gap**, not a code defect.
 
-### Approach
+**Existing test coverage (already strong)**
+- `src/test/operator-role-gate.test.ts`
+- `src/test/operator-route-auth-protection.test.ts`
+- `src/test/operator-route-mobile-coverage.test.ts`
+- `src/test/operator-demo-preview-page.test.tsx` (already asserts operator-only render)
+- `src/test/operator-demo-preview-static-safety.test.ts`
 
-**Part A — Raw grow UUID polish (presentational only).**
-- Edit `src/pages/AlertDetail.tsx` (~line 561) and `src/pages/ActionDetail.tsx` (~line 679) so the "Grow" field prefers `growName`, falling back to the short label `"Current grow"`. Never render the raw UUID string in the visible text. The `to=` link target keeps the UUID in the URL (acceptable — not user-facing copy).
-- Add a tiny pure helper `src/lib/growDisplayLabel.ts` with `formatGrowDisplayLabel(name, id)` returning `name ?? "Current grow"` and explicitly never returning a UUID-shaped string.
-- Tests: `src/test/grow-display-label.test.ts` covers UUID rejection, null/empty name fallback, and presence of canonical "Current grow" copy.
+No new guard tests are needed — Option B is already satisfied.
 
-**Part B — Demo Seed Readiness via fixture + operator viewer (no DB writes).**
+**Seed pattern in repo**
+No client-callable operator-seed helper exists, and we should not add one (would weaken the boundary). Operator role assignment is a one-time owner action via the backend.
 
-No new DB rows. No new migrations. No new public routes. Reuses `fixtures/demo-grow-one-tent.json` shape and the `/operator/*` admin gate.
+---
 
-1. **New fixture** `fixtures/demo-evidence-chain.json` extending the one-tent fixture with:
-   - one `sensor_reading` row (`id: "demo_reading_vpd_001"`, `source: "demo"`, `metric: "vpd"`, `value: 1.62`, `captured_at`, `tent_id`, `plant_id`).
-   - one `sensor_snapshot` shape carrying `metric_refs: { vpd: "demo_reading_vpd_001" }`.
-   - one `alert` row referencing that snapshot via `originating_timeline_events: [{ id: "demo_reading_vpd_001", type: "sensor_snapshot", source: "demo", occurred_at }]` — built through the existing `buildSensorSnapshotEvidenceRefs` helper at fixture-load time, not hand-typed.
-   - one `action_queue` row in `pending_approval` whose `originating_timeline_events` is forwarded via `forwardAlertRefsToActionQueue` from the alert row.
-   - one `harvest`/archived `grow` state with reviewed alert/action history so `PostGrowLearningReport` renders populated content.
-   - All rows carry `is_demo: true` and an `is_fixture: true` envelope.
+## Chosen approach
 
-2. **New pure loader** `src/lib/demoEvidenceChainFixture.ts`:
-   - Loads the JSON, runs ref builders through the real adapters, returns a typed view model.
-   - Strips any field outside an allow-list (`FORBIDDEN_REF_FIELDS` already enforces this).
-   - Asserts at load time: no reading is `live`, every alert/action has at least one ref id present in the readings set.
+**Option A (runbook) + Option C (gate copy polish).** No schema/RLS/Edge changes. No seed script. No bypass.
 
-3. **New operator-only viewer** `src/pages/OperatorDemoEvidenceChainPreview.tsx` mounted under the existing `/operator/*` group in `src/App.tsx`. Renders:
-   - source-labeled reading (Demo badge),
-   - alert with `EvidenceLinkageBadges`,
-   - action with `EvidenceLinkageBadges`,
-   - a clearly-labeled "Preview of populated Post-Grow Report" panel using existing `PostGrowLearningReport` presenter against the fixture grow, with the print/save affordance visible.
-   - Prominent "DEMO FIXTURE — not live data" banner.
+### File-level changes
 
-4. **Docs runbook** `docs/demo-seed-readiness-v1-runbook.md`:
-   - Where the fixture lives, how to load the operator viewer, how to run the chain end-to-end for a demo recording.
-   - Do-Not-Say list (fake-live, automation, device-control terms).
-   - Wired into `docs/README.md` and the existing `bun run test:docs-demo-safety` glob (the script already globs `docs/*demo-script*.md` — extend pattern or rename file to match).
+1. `docs/operator-demo-preview-access-runbook.md` (new) — owner-only runbook:
+   - Confirm the test account is signed in to the same Lovable Cloud project as the embedded preview (project ref check via in-app account email, not raw IDs).
+   - Confirm `app_role` enum + `user_roles` table is the source of truth.
+   - Owner-only step: assign the `operator` role by inserting one row into `public.user_roles` from the backend admin surface (no service_role values pasted, no SQL with secrets, no raw UIDs shown in public copy — refer to the account by email).
+   - Re-test path: sign out → sign in as the operator account → navigate to `/operator/demo-preview` → expect the read-only walkthrough.
+   - Explicit DO-NOT list: no public route, no `?operator=1` bypass, no service_role in client, no JWT-claim shortcut, no demo-only auth path.
 
-### Files to add/change
+2. `src/components/RequireOperatorRole.tsx` (copy polish only) — replace the current denied copy with the three approved lines:
+   - "Signed in, but this account does not have operator access."
+   - "Use an operator-role account for this preview."
+   - "No operator data was loaded."
+   - Continue to leak nothing (no uid, no role rows, no RPC error text, no table names). Existing `data-testid="require-operator-denied"` preserved.
 
-**Add**
-- `fixtures/demo-evidence-chain.json`
-- `src/lib/growDisplayLabel.ts`
-- `src/lib/demoEvidenceChainFixture.ts`
-- `src/pages/OperatorDemoEvidenceChainPreview.tsx`
-- `docs/demo-evidence-chain-demo-script-v1.md` (matches existing safety glob)
-- Tests:
-  - `src/test/grow-display-label.test.ts`
-  - `src/test/alert-detail-grow-label-uuid.test.tsx`
-  - `src/test/action-detail-grow-label-uuid.test.tsx`
-  - `src/test/demo-evidence-chain-fixture-shape.test.ts`
-  - `src/test/demo-evidence-chain-fixture-static-safety.test.ts`
-  - `src/test/operator-demo-evidence-chain-preview.test.tsx`
+3. `src/test/operator-role-gate.test.ts` (extend) — add assertions that the denied state contains the three new copy strings and does NOT contain any of: a UUID-shaped string, the substrings `user_roles`, `has_role`, `service_role`, `jwt`, `token`, `auth.uid`.
 
-**Edit (minimal)**
-- `src/pages/AlertDetail.tsx` — swap raw `{alert.grow_id}` for safe label.
-- `src/pages/ActionDetail.tsx` — pass `growName` to `IdField` (extend `IdField` to render label-first, id-as-link-target only).
-- `src/App.tsx` — add operator route.
-- `docs/README.md` — index the new demo script.
-
-**Do NOT touch**
-- Any migration, RLS, Edge function, auth config.
-- Any production hook that writes alerts/actions.
-- Any public route.
-- `src/integrations/supabase/client.ts` / generated types / `.env`.
-
-### Safety envelope
-
-- No DB writes. No service_role. No AI calls. No automation copy. No device control.
-- Demo readings labeled `demo`; the source-label tests will fail if any UI line in the new files contains "Live" for fixture data.
-- Refs built through existing adapters → no inference from prose/timestamps/metric/nearest reading.
-- Static safety scan added for the new files banning: fake live, auto execute, device command, set fan/light/irrigation, dose nutrients, guaranteed, diagnosed with certainty, raw_payload, service_role, bridge_token, api_token, access_token, refresh_token, jwt, prompt, completion, model_output.
-- Operator route stays behind `RequireOperatorRole`.
+### Not doing
+- Option B: existing tests cover it.
+- Option D: no safe existing seed pattern in repo; adding one risks weakening the boundary. Operator provisioning stays an owner-only backend action documented in the runbook.
 
 ### Validation
-
-- `bunx vitest run` on the new + adjacent files (grow-display-label, alert/action grow-label-uuid, demo fixture shape + static safety, operator preview, plus existing `evidence-linkage-*`, `sensor-snapshot-metric-refs`, `evidence-coverage-*`, `post-grow-report-*`).
-- `bun run test:docs-demo-safety`
-- `node scripts/sensor-safety-check.mjs`
+- `bunx vitest run src/test/operator-role-gate.test.ts src/test/operator-route-auth-protection.test.ts src/test/operator-demo-preview-page.test.tsx src/test/operator-demo-preview-static-safety.test.ts`
 - `bunx tsgo --noEmit`
+- `node scripts/sensor-safety-check.mjs`
+- `node scripts/assert-docs-safety.mjs` (covers new runbook)
+
+### Safety verdict
+GO. No guard weakening, no public exposure, no bypass param, no schema/RLS/Edge/auth changes, no DB writes, no AI, no automation, no device control, no secret exposure.
+
+### Browser re-test instructions (after operator role is granted to the test account)
+1. Sign out of the embedded preview.
+2. Sign in as the operator-role account.
+3. Navigate to `/operator/demo-preview`.
+4. Expect the read-only One-Tent Evidence Chain walkthrough (no mutation controls).
 
 ### Risk / rollback
+Minimal. Copy polish + new doc + extended assertions. Rollback = revert the 3 files.
 
-- Pure additive except two presentational fallbacks in AlertDetail/ActionDetail. Rollback = revert ~10 LOC + delete new files.
-- No data, schema, RLS, edge, or public-route surface changed.
-
-Approve and I'll implement Parts A + B in one slice.
+**Approve to proceed with implementation, or tell me to stop at audit-only.**

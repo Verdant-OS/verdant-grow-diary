@@ -11,12 +11,17 @@ import { resolve } from "node:path";
 import {
   shouldWarnPendingActionHasClosedSourceAlert,
 } from "@/lib/actionQueueProvenanceRules";
+import {
+  normalizeText,
+  expectNormalizedTextToContain,
+} from "./utils/normalizeText";
 
 const ROOT = resolve(__dirname, "../..");
 const ACTION_DETAIL = readFileSync(
   resolve(ROOT, "src/pages/ActionDetail.tsx"),
   "utf8",
 );
+
 
 describe("shouldWarnPendingActionHasClosedSourceAlert", () => {
   it("true: pending action + resolved source alert", () => {

@@ -178,8 +178,9 @@ export default function Diagnostics() {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Connection diagnostics</h1>
         <p className="text-sm text-muted-foreground">
-          Verifies env vars, auth session, RLS-scoped reads, and a safe insert/delete round-trip
-          against your own data.
+          Operator-only. Verifies env vars, auth session, RLS-scoped reads, and a safe
+          insert/delete round-trip against your own data. No operator secrets or raw payloads
+          are shown.
         </p>
       </header>
 

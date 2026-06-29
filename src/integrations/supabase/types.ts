@@ -22,6 +22,7 @@ export type Database = {
           created_at: string
           grow_id: string
           id: string
+          originating_timeline_events: Json
           plant_id: string | null
           reason: string
           rejected_at: string | null
@@ -42,6 +43,7 @@ export type Database = {
           created_at?: string
           grow_id: string
           id?: string
+          originating_timeline_events?: Json
           plant_id?: string | null
           reason: string
           rejected_at?: string | null
@@ -62,6 +64,7 @@ export type Database = {
           created_at?: string
           grow_id?: string
           id?: string
+          originating_timeline_events?: Json
           plant_id?: string | null
           reason?: string
           rejected_at?: string | null
@@ -366,6 +369,7 @@ export type Database = {
           id: string
           last_seen_at: string
           metric: string | null
+          originating_timeline_events: Json
           plant_id: string | null
           reason: string
           resolved_at: string | null
@@ -385,6 +389,7 @@ export type Database = {
           id?: string
           last_seen_at?: string
           metric?: string | null
+          originating_timeline_events?: Json
           plant_id?: string | null
           reason: string
           resolved_at?: string | null
@@ -404,6 +409,7 @@ export type Database = {
           id?: string
           last_seen_at?: string
           metric?: string | null
+          originating_timeline_events?: Json
           plant_id?: string | null
           reason?: string
           resolved_at?: string | null

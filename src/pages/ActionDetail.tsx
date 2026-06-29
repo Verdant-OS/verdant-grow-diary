@@ -107,6 +107,7 @@ import {
   ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY,
   ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY,
 } from "@/lib/originatingTimelineEventRules";
+import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimelineEventAdapter";
 import { useGrows } from "@/store/grows";
 
 type Status = ActionStatus;
@@ -132,6 +133,8 @@ interface ActionRow {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Safe persisted originating timeline event refs. Adapter-validated. */
+  originating_timeline_events: Json;
 }
 
 interface EventRow {
@@ -230,7 +233,7 @@ export default function ActionDetail() {
       const { data, error } = await supabase
         .from("action_queue")
         .select(
-          "id,grow_id,tent_id,plant_id,source,action_type,target_metric,target_device,suggested_change,reason,risk_level,status,approved_at,rejected_at,completed_at,created_at,updated_at",
+          "id,grow_id,tent_id,plant_id,source,action_type,target_metric,target_device,suggested_change,reason,risk_level,status,approved_at,rejected_at,completed_at,created_at,updated_at,originating_timeline_events",
         )
         .eq("id", actionId)
         .maybeSingle();
@@ -784,7 +787,7 @@ export default function ActionDetail() {
                   data-testid="action-detail-alert-evidence-linkage"
                 >
                   <EvidenceLinkageBadges
-                    events={[]}
+                    events={adaptOriginatingTimelineEventsFromRow(row)}
                     surface="action-queue-suggestion"
                     fallbackCopy={ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY}
                   />
@@ -876,7 +879,7 @@ export default function ActionDetail() {
                   data-testid="action-detail-ai-doctor-evidence-linkage"
                 >
                   <EvidenceLinkageBadges
-                    events={[]}
+                    events={adaptOriginatingTimelineEventsFromRow(row)}
                     surface="action-queue-suggestion"
                     fallbackCopy={ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY}
                   />

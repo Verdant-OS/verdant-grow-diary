@@ -19,6 +19,7 @@ import { formatDistanceToNow } from "date-fns";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 import EvidenceLinkageBadges from "@/components/EvidenceLinkageBadges";
 import { ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY } from "@/lib/originatingTimelineEventRules";
+import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimelineEventAdapter";
 import { LinkedActionCountBadge } from "@/components/LinkedActionCountBadge";
 import { useAlertsLinkedActionCounts } from "@/hooks/useAlertsLinkedActionCounts";
 
@@ -363,6 +364,10 @@ export default function AlertDetail() {
         risk_level: draft.risk_level,
         source: draft.source,
         status: draft.status,
+        // Evidence Linkage Persistence v1: no safe in-memory refs are
+        // available at this boundary. Persist an explicit empty array —
+        // never infer from prose, timestamps, plant/tent, or alert id.
+        originating_timeline_events: [],
       })
       .select("id,grow_id")
       .single();
@@ -531,7 +536,7 @@ export default function AlertDetail() {
               data-testid="alert-detail-evidence-linkage"
             >
               <EvidenceLinkageBadges
-                events={[]}
+                events={adaptOriginatingTimelineEventsFromRow(alert)}
                 surface="alert-review"
                 fallbackCopy={ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY}
               />

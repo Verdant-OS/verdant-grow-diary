@@ -14,6 +14,8 @@ import {
   buildDismissAlertPatch,
   buildReopenAlertPatch,
 } from "@/lib/alertStatusTransitionRules";
+import type { OriginatingTimelineEventInput } from "@/lib/originatingTimelineEventRules";
+import { normalizeOriginatingTimelineEvents } from "@/lib/originatingTimelineEventRules";
 
 export type AlertSeverityRow = "info" | "watch" | "warning" | "critical";
 export type AlertStatusRow = "open" | "acknowledged" | "resolved" | "dismissed";
@@ -36,6 +38,13 @@ export interface AlertRow {
   resolved_at: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * Safe originating timeline event refs (id, kind, source, occurred_at?,
+   * label?). Persisted as `jsonb` with default `[]`; never carries raw
+   * payloads, tokens, or provider data. Read via the adapter in
+   * `originatingTimelineEventAdapter.ts`.
+   */
+  originating_timeline_events: import("@/integrations/supabase/types").Json;
 }
 
 export interface SaveAlertInput {
@@ -47,6 +56,14 @@ export interface SaveAlertInput {
   source?: string;
   tent_id?: string | null;
   plant_id?: string | null;
+  /**
+   * Optional list of safe originating timeline event refs. Only IDs + safe
+   * metadata are persisted; raw payloads / tokens are rejected by the writer.
+   * Omitting (or passing []) persists an empty array — never inferred.
+   */
+  originating_timeline_events?:
+    | readonly OriginatingTimelineEventInput[]
+    | null;
 }
 
 function alertsTable() {
@@ -55,6 +72,9 @@ function alertsTable() {
 
 /** Persist a generated alert candidate. Omits user_id (DB default = auth.uid()). */
 export async function saveAlert(input: SaveAlertInput): Promise<AlertRow> {
+  const refs = normalizeOriginatingTimelineEvents(
+    input.originating_timeline_events,
+  );
   const payload = {
     grow_id: input.grow_id,
     severity: input.severity,
@@ -65,6 +85,7 @@ export async function saveAlert(input: SaveAlertInput): Promise<AlertRow> {
     tent_id: input.tent_id ?? null,
     plant_id: input.plant_id ?? null,
     status: "open" as AlertStatusRow,
+    originating_timeline_events: refs as unknown as never,
   };
   const { data, error } = await alertsTable().insert(payload).select("*").single();
   if (error) throw error;

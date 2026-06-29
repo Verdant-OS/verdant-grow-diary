@@ -239,6 +239,7 @@ export function buildEvidenceCoverageViewModel(
     alertsByCategory,
     actionsByCategory,
     notes: EVIDENCE_COVERAGE_NOTES,
+    coverageHint: computeCoverageHint(overall),
   };
 }
 
@@ -249,4 +250,5 @@ export const EMPTY_EVIDENCE_COVERAGE_VIEW_MODEL: EvidenceCoverageViewModel = Obj
   alertsByCategory: Object.freeze([]) as readonly EvidenceCoverageBreakdownRow[],
   actionsByCategory: Object.freeze([]) as readonly EvidenceCoverageBreakdownRow[],
   notes: EVIDENCE_COVERAGE_NOTES,
+  coverageHint: null,
 });

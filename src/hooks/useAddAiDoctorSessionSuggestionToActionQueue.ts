@@ -112,6 +112,11 @@ export function useAddAiDoctorSessionSuggestionToActionQueue() {
           risk_level: draft.risk_level,
           source: draft.source,
           status: draft.status,
+          // Evidence Linkage Persistence v1: AI Doctor session suggestions
+          // do not yet carry typed timeline refs at this boundary. Persist
+          // an explicit empty array — never infer from session prose, ids,
+          // timestamps, or model output.
+          originating_timeline_events: [],
         })
         .select("id,grow_id")
         .single();

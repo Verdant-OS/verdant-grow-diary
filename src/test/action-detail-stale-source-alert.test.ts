@@ -113,8 +113,9 @@ describe("ActionDetail — stale source-alert warning", () => {
   it("renders the stale source-alert warning with the required copy", () => {
     expect(ACTION_DETAIL).toMatch(/data-testid="stale-source-alert-warning"/);
     expect(ACTION_DETAIL).toMatch(
-      /The source alert is no longer open\. Re-check current grow\s+conditions before approving this action\./,
+      /The source alert is no longer open\.\s+Re-check\s+current\s+grow\s+conditions\s+before\s+approving\s+this\s+action\./,
     );
+
   });
 
   it("warning block is read-only (no onClick, no insert/update/delete)", () => {

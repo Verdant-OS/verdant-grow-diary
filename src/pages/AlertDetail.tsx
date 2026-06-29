@@ -16,6 +16,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { formatGrowDisplayLabel } from "@/lib/growDisplayLabel";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 import EvidenceLinkageBadges from "@/components/EvidenceLinkageBadges";
 import { ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY } from "@/lib/originatingTimelineEventRules";

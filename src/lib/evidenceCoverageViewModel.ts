@@ -50,6 +50,12 @@ export interface EvidenceCoverageViewModel {
   readonly alertsByCategory: readonly EvidenceCoverageBreakdownRow[];
   readonly actionsByCategory: readonly EvidenceCoverageBreakdownRow[];
   readonly notes: readonly string[];
+  /**
+   * Factual, read-only hint shown when fallback-only counts are meaningfully
+   * high. Never recommends actions, never implies broken/unsafe rows, never
+   * implies automatic backfill. `null` when no hint applies.
+   */
+  readonly coverageHint: string | null;
 }
 
 const EMPTY_BUCKET: EvidenceCoverageBucket = Object.freeze({

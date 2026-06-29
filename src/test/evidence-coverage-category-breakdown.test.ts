@@ -118,13 +118,12 @@ describe("evidenceCoverageViewModel — category breakdown", () => {
       ],
       actions: [],
     });
-    const labels = vm.alertsByCategory.map((r) => r.label).join("|");
-    expect(labels).not.toContain(uuid);
+    const labels = vm.alertsByCategory.map((r) => r.label);
+    expect(labels.join("|")).not.toContain(uuid);
+    expect(labels.join("|").toLowerCase()).not.toContain("raw_payload");
     expect(labels).toContain("vpd_low");
-    // "raw_payload" is a literal short string — allowed as a label only because
-    // adapter never sees it; safety scan focuses on rendered output. But to be
-    // extra safe we ensure label-normalize did not promote it to a payload leak.
-    expect(vm.alertsByCategory.find((r) => r.label === "raw_payload")).toBeDefined();
+    // UUID + raw_payload both fall back to Uncategorized → collapse into one row.
+    expect(labels.filter((l) => l === UNCATEGORIZED_LABEL)).toHaveLength(1);
   });
 
   it("returns empty breakdowns for empty inputs", () => {

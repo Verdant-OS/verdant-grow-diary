@@ -20,7 +20,9 @@ describe("EvidenceCoveragePanel", () => {
       actions: [{ originating_timeline_events: [validRef] }],
     });
     render(<EvidenceCoveragePanel viewModel={vm} status="ok" />);
-    expect(screen.getByText(/read-only evidence coverage/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /read-only evidence coverage/i }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("evidence-coverage-alerts-total")).toHaveTextContent("2");
     expect(screen.getByTestId("evidence-coverage-alerts-linked")).toHaveTextContent("1");
     expect(screen.getByTestId("evidence-coverage-alerts-fallback")).toHaveTextContent("1");

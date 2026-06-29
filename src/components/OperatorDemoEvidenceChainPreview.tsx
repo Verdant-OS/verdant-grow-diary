@@ -111,6 +111,7 @@ export default function OperatorDemoEvidenceChainPreview({
           <EvidenceLinkageBadges
             events={vm.action.evidenceRefs}
             surface="action-queue-suggestion"
+            renderEventLabel={(ev) => vm.evidenceDisplayLabels[ev.id] ?? null}
           />
           <p className="text-xs text-muted-foreground">
             No equipment command is sent. Grower approval is required.

@@ -676,7 +676,13 @@ export default function ActionDetail() {
         })()}
 
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          <IdField label="Grow" id={row.grow_id} to={growDetailPath(row.grow_id)} />
+          <IdField
+            label="Grow"
+            id={row.grow_id}
+            to={growDetailPath(row.grow_id)}
+            displayLabel={formatGrowDisplayLabel(growName, row.grow_id)}
+            data-testid="action-detail-grow-label"
+          />
           {row.tent_id && (
             <IdField label="Tent" id={row.tent_id} to={tentDetailPath(row.tent_id)} />
           )}

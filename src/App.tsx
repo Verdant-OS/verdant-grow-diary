@@ -177,7 +177,6 @@ const App = () => (
                 />
 
                 <Route path="/settings" element={<Settings />} />
-                <Route path="/diagnostics" element={<Diagnostics />} />
                 <Route path="/demo/one-tent-live-proof" element={<OneTentLiveProof />} />
                 {/* Operator-only routes. Authenticated via AppShell's useRequireAuth,
                     then gated by server-side has_role('operator') via RequireOperatorRole.

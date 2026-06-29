@@ -11,6 +11,33 @@ import { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";
 
 export type SnapshotSource = "live" | "manual" | "sim" | "diary" | "csv" | "unavailable";
 
+/**
+ * Per-metric provenance ref keys for {@link SensorSnapshot.metric_refs}.
+ * Mirrors the {@link import("@/lib/environmentTargetComparison").MetricKey}
+ * union; redeclared locally to avoid a circular import. Keep both lists
+ * in sync if a new metric is added.
+ */
+export type SensorSnapshotMetricRefKey =
+  | "temp"
+  | "rh"
+  | "vpd"
+  | "soil"
+  | "soil_ec"
+  | "soil_temp"
+  | "ppfd";
+
+/**
+ * Provenance for a single metric in a snapshot. Carries ONLY the safe
+ * id + captured_at + raw source from the EXACT `sensor_readings` row
+ * already selected by {@link snapshotFromReadings} for that metric.
+ * Never carries raw_payload, never inferred, never "nearest" matched.
+ */
+export interface SensorSnapshotMetricRef {
+  id: string;
+  captured_at: string;
+  source: string;
+}
+
 export interface SensorSnapshot {
   source: SnapshotSource;
   ts: string | null;
@@ -40,6 +67,16 @@ export interface SensorSnapshot {
    * latest timestamp.
    */
   csvVendor?: import("@/lib/sensorSourceDisplayLabel").CsvVendorSummary;
+  /**
+   * Per-metric provenance for environment alert ref population. Each
+   * entry is the EXACT `sensor_readings` row selected by
+   * `snapshotFromReadings` for that metric — same id, same `ts` (as
+   * `captured_at`), same raw `source`. Only present when the underlying
+   * row carried an `id`. Diary-derived snapshots never populate this.
+   */
+  metric_refs?: Partial<
+    Record<SensorSnapshotMetricRefKey, SensorSnapshotMetricRef>
+  >;
 }
 
 export const EMPTY_SNAPSHOT: SensorSnapshot = {

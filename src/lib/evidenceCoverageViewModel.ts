@@ -1,11 +1,11 @@
 /**
  * evidenceCoverageViewModel — pure, deterministic view model for the
- * Evidence Coverage Panel v1.
+ * Evidence Coverage Panel v1 + Category Breakdown v1.
  *
  * Strict safety envelope:
  *  - Pure. No I/O. No React. No Supabase. No fetch.
  *  - Read-only diagnostics. Never infers missing evidence.
- *  - Counts only. No row IDs, no raw payloads, no provider payloads,
+ *  - Counts only. No row IDs, no provider payloads,
  *    no tokens/prompts/completions, no model outputs.
  *
  * Inputs are row-like objects carrying the JSON column
@@ -13,13 +13,29 @@
  * {@link adaptOriginatingTimelineEventsColumn} so the panel mirrors the
  * exact rules used by EvidenceLinkageBadges.
  */
-import { adaptOriginatingTimelineEventsColumn } from "@/lib/originatingTimelineEventAdapter";
+import {
+  adaptOriginatingTimelineEventsColumn,
+  FORBIDDEN_REF_FIELDS,
+} from "@/lib/originatingTimelineEventAdapter";
 
 export interface EvidenceCoverageRowInput {
   readonly originating_timeline_events?: unknown;
+  /** Safe alert category label (e.g. "vpd", "temp"). */
+  readonly metric?: unknown;
+  /** Safe action category label (e.g. "adjust_vpd"). */
+  readonly action_type?: unknown;
 }
 
 export interface EvidenceCoverageBucket {
+  readonly total: number;
+  readonly linked: number;
+  readonly fallbackOnly: number;
+  readonly invalidRefs: number;
+  readonly linkedPct: number;
+}
+
+export interface EvidenceCoverageBreakdownRow {
+  readonly label: string;
   readonly total: number;
   readonly linked: number;
   readonly fallbackOnly: number;
@@ -31,6 +47,8 @@ export interface EvidenceCoverageViewModel {
   readonly alerts: EvidenceCoverageBucket;
   readonly actions: EvidenceCoverageBucket;
   readonly overall: EvidenceCoverageBucket;
+  readonly alertsByCategory: readonly EvidenceCoverageBreakdownRow[];
+  readonly actionsByCategory: readonly EvidenceCoverageBreakdownRow[];
   readonly notes: readonly string[];
 }
 
@@ -50,10 +68,38 @@ export const EVIDENCE_COVERAGE_NOTES: readonly string[] = Object.freeze([
   "This panel does not infer missing evidence.",
 ]);
 
+export const UNCATEGORIZED_LABEL = "Uncategorized" as const;
+
+/**
+ * Defensive blocklist for category labels. Sourced from the adapter so the
+ * banned-field list stays in one place. If a row's category text contains any
+ * of these tokens we fall back to "Uncategorized" rather than render it.
+ */
+const FORBIDDEN_LABEL_TOKENS: readonly string[] = FORBIDDEN_REF_FIELDS.map((s) =>
+  s.toLowerCase(),
+);
+
+/** Conservative label sanitizer: short, alphanum + safe punctuation only. */
+function normalizeLabel(raw: unknown): string {
+  if (typeof raw !== "string") return UNCATEGORIZED_LABEL;
+  const trimmed = raw.trim();
+  if (!trimmed) return UNCATEGORIZED_LABEL;
+  // Strip anything that isn't a safe label character.
+  const safe = trimmed.replace(/[^A-Za-z0-9 _.\-]/g, "").slice(0, 48);
+  if (!safe) return UNCATEGORIZED_LABEL;
+  // Reject anything resembling a UUID or long opaque id.
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(safe)) return UNCATEGORIZED_LABEL;
+  if (/^[A-Za-z0-9]{24,}$/.test(safe)) return UNCATEGORIZED_LABEL;
+  const lower = safe.toLowerCase();
+  for (const tok of FORBIDDEN_LABEL_TOKENS) {
+    if (lower.includes(tok)) return UNCATEGORIZED_LABEL;
+  }
+  return safe;
+}
+
 function hasRawRefs(raw: unknown): boolean {
   if (raw === null || raw === undefined) return false;
   if (Array.isArray(raw)) return raw.length > 0;
-  // Any non-array, non-null value is "something was persisted" but unusable.
   return true;
 }
 
@@ -67,8 +113,6 @@ function classifyRow(row: EvidenceCoverageRowInput): {
   if (safeRefs.length > 0) {
     return { linked: true, fallbackOnly: false, invalidRefs: false };
   }
-  // No safe refs: distinguish "nothing persisted" from "something persisted
-  // but the adapter rejected every entry".
   if (hasRawRefs(raw)) {
     return { linked: false, fallbackOnly: true, invalidRefs: true };
   }
@@ -77,9 +121,7 @@ function classifyRow(row: EvidenceCoverageRowInput): {
 
 function roundPct(linked: number, total: number): number {
   if (total <= 0) return 0;
-  // Deterministic rounding: half-away-from-zero on a positive ratio.
-  const pct = (linked / total) * 100;
-  return Math.round(pct);
+  return Math.round((linked / total) * 100);
 }
 
 function bucketFor(rows: readonly EvidenceCoverageRowInput[] | null | undefined): EvidenceCoverageBucket {
@@ -121,6 +163,56 @@ function combine(a: EvidenceCoverageBucket, b: EvidenceCoverageBucket): Evidence
   };
 }
 
+function breakdownFor(
+  rows: readonly EvidenceCoverageRowInput[] | null | undefined,
+  labelKey: "metric" | "action_type",
+): EvidenceCoverageBreakdownRow[] {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  const acc = new Map<
+    string,
+    { total: number; linked: number; fallbackOnly: number; invalidRefs: number }
+  >();
+  for (const row of rows) {
+    const label = normalizeLabel(
+      row && typeof row === "object" ? (row as Record<string, unknown>)[labelKey] : null,
+    );
+    const cur = acc.get(label) ?? {
+      total: 0,
+      linked: 0,
+      fallbackOnly: 0,
+      invalidRefs: 0,
+    };
+    cur.total += 1;
+    if (!row || typeof row !== "object") {
+      cur.fallbackOnly += 1;
+    } else {
+      const c = classifyRow(row);
+      if (c.linked) cur.linked += 1;
+      if (c.fallbackOnly) cur.fallbackOnly += 1;
+      if (c.invalidRefs) cur.invalidRefs += 1;
+    }
+    acc.set(label, cur);
+  }
+  const out: EvidenceCoverageBreakdownRow[] = [];
+  for (const [label, v] of acc) {
+    out.push({
+      label,
+      total: v.total,
+      linked: v.linked,
+      fallbackOnly: v.fallbackOnly,
+      invalidRefs: v.invalidRefs,
+      linkedPct: roundPct(v.linked, v.total),
+    });
+  }
+  out.sort((a, b) => {
+    if (a.fallbackOnly !== b.fallbackOnly) return b.fallbackOnly - a.fallbackOnly;
+    if (a.invalidRefs !== b.invalidRefs) return b.invalidRefs - a.invalidRefs;
+    if (a.total !== b.total) return b.total - a.total;
+    return a.label < b.label ? -1 : a.label > b.label ? 1 : 0;
+  });
+  return out;
+}
+
 export interface BuildEvidenceCoverageInput {
   readonly alerts?: readonly EvidenceCoverageRowInput[] | null;
   readonly actions?: readonly EvidenceCoverageRowInput[] | null;
@@ -132,12 +224,23 @@ export function buildEvidenceCoverageViewModel(
   const alerts = bucketFor(input?.alerts ?? null);
   const actions = bucketFor(input?.actions ?? null);
   const overall = combine(alerts, actions);
-  return { alerts, actions, overall, notes: EVIDENCE_COVERAGE_NOTES };
+  const alertsByCategory = breakdownFor(input?.alerts ?? null, "metric");
+  const actionsByCategory = breakdownFor(input?.actions ?? null, "action_type");
+  return {
+    alerts,
+    actions,
+    overall,
+    alertsByCategory,
+    actionsByCategory,
+    notes: EVIDENCE_COVERAGE_NOTES,
+  };
 }
 
 export const EMPTY_EVIDENCE_COVERAGE_VIEW_MODEL: EvidenceCoverageViewModel = Object.freeze({
   alerts: EMPTY_BUCKET,
   actions: EMPTY_BUCKET,
   overall: EMPTY_BUCKET,
+  alertsByCategory: Object.freeze([]) as readonly EvidenceCoverageBreakdownRow[],
+  actionsByCategory: Object.freeze([]) as readonly EvidenceCoverageBreakdownRow[],
   notes: EVIDENCE_COVERAGE_NOTES,
 });

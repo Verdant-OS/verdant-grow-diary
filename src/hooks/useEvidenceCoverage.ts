@@ -44,10 +44,13 @@ export function useEvidenceCoverage(): UseEvidenceCoverageState {
     (async () => {
       try {
         const [alertsResp, actionsResp] = await Promise.all([
-          supabase.from("alerts").select("id,originating_timeline_events").limit(1000),
+          supabase
+            .from("alerts")
+            .select("id,metric,originating_timeline_events")
+            .limit(1000),
           supabase
             .from("action_queue")
-            .select("id,originating_timeline_events")
+            .select("id,action_type,originating_timeline_events")
             .limit(1000),
         ]);
         if (alertsResp.error) throw alertsResp.error;
@@ -55,8 +58,14 @@ export function useEvidenceCoverage(): UseEvidenceCoverageState {
         if (cancelled) return;
         setViewModel(
           buildEvidenceCoverageViewModel({
-            alerts: (alertsResp.data ?? []) as { originating_timeline_events?: unknown }[],
-            actions: (actionsResp.data ?? []) as { originating_timeline_events?: unknown }[],
+            alerts: (alertsResp.data ?? []) as {
+              metric?: unknown;
+              originating_timeline_events?: unknown;
+            }[],
+            actions: (actionsResp.data ?? []) as {
+              action_type?: unknown;
+              originating_timeline_events?: unknown;
+            }[],
           }),
         );
         setStatus("ok");

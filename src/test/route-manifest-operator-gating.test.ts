@@ -67,16 +67,35 @@ const PUBLIC_FIXTURE_ONLY_INTERNAL_EXCEPTIONS = new Set<string>([
   "/internal/contextual-pheno-comparison-demo",
 ]);
 
+/**
+ * Deferred operator/internal manifest entries that are NOT covered by
+ * Route Guard Parity v1. They are intentionally left as-is in this slice
+ * because moving them under <RequireOperatorRole /> would change
+ * grower-facing behavior (e.g. `/diagnostics` exposes the read-only
+ * Contextual Pheno Comparison entrypoint to all authenticated users) or
+ * was not part of the audited route set. Tracked for a follow-up slice
+ * after a behavior review.
+ */
+const DEFERRED_OPERATOR_PARITY = new Set<string>([
+  "/diagnostics",
+  "/grow-lineage",
+  "/sensors/ecowitt-audit",
+  "/sensors/ingest-normalizer",
+]);
+
 describe("Route Guard Parity v1 — operator/internal manifest entries are role-gated", () => {
   const gated = APP_ROUTES.filter(
     (r) => r.access === "operator" || r.access === "internal",
   );
 
   for (const r of gated) {
-    const isException = PUBLIC_FIXTURE_ONLY_INTERNAL_EXCEPTIONS.has(r.path);
-    if (isException) {
+    if (PUBLIC_FIXTURE_ONLY_INTERNAL_EXCEPTIONS.has(r.path)) {
       it(`${r.path} is a documented public fixture-only exception`, () => {
         expect(r.access).toBe("internal");
+        expect(OPERATOR_PROTECTED_PATHS.has(r.path)).toBe(false);
+      });
+    } else if (DEFERRED_OPERATOR_PARITY.has(r.path)) {
+      it(`${r.path} is a documented deferred-parity entry (follow-up slice)`, () => {
         expect(OPERATOR_PROTECTED_PATHS.has(r.path)).toBe(false);
       });
     } else {

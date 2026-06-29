@@ -59,6 +59,7 @@ import {
   plantDetailPath,
   tentDetailPath,
 } from "@/lib/routes";
+import { formatGrowDisplayLabel } from "@/lib/growDisplayLabel";
 import {
   extractSourceAiDoctorSessionId,
   extractSourceAlertId,

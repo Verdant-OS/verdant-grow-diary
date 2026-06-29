@@ -67,6 +67,23 @@ export const EVIDENCE_COVERAGE_NOTES: readonly string[] = Object.freeze([
 
 export const UNCATEGORIZED_LABEL = "Uncategorized" as const;
 
+const FORBIDDEN_LABEL_TOKENS = [
+  "raw_payload",
+  "rawpayload",
+  "payload",
+  "service_role",
+  "bridge_token",
+  "api_token",
+  "api_key",
+  "access_token",
+  "refresh_token",
+  "jwt",
+  "secret",
+  "prompt",
+  "completion",
+  "model_output",
+];
+
 /** Conservative label sanitizer: short, alphanum + safe punctuation only. */
 function normalizeLabel(raw: unknown): string {
   if (typeof raw !== "string") return UNCATEGORIZED_LABEL;
@@ -78,6 +95,10 @@ function normalizeLabel(raw: unknown): string {
   // Reject anything resembling a UUID or long opaque id.
   if (/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(safe)) return UNCATEGORIZED_LABEL;
   if (/^[A-Za-z0-9]{24,}$/.test(safe)) return UNCATEGORIZED_LABEL;
+  const lower = safe.toLowerCase();
+  for (const tok of FORBIDDEN_LABEL_TOKENS) {
+    if (lower.includes(tok)) return UNCATEGORIZED_LABEL;
+  }
   return safe;
 }
 

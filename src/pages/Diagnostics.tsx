@@ -84,7 +84,7 @@ export default function Diagnostics() {
       if (!data.session) return { ok: false, detail: "no active session" };
       return {
         ok: true,
-        detail: `user_id=${data.session.user.id} email=${data.session.user.email ?? "n/a"}`,
+        detail: "Authenticated session detected.",
       };
     });
 
@@ -99,7 +99,7 @@ export default function Diagnostics() {
       if (!data) return { ok: false, detail: "no profile row returned" };
       return {
         ok: true,
-        detail: `level=${data.level} tier=${data.tier} nugs=${data.nugs_total}`,
+        detail: "Profile ownership check passed.",
       };
     });
 
@@ -148,10 +148,10 @@ export default function Diagnostics() {
       if (delErr)
         return {
           ok: false,
-          detail: `inserted ${inserted.id} but delete failed: ${delErr.message}`,
+          detail: `Round-trip insert succeeded but cleanup delete failed: ${delErr.message}`,
         };
 
-      return { ok: true, detail: `round-trip ok (row ${inserted.id})` };
+      return { ok: true, detail: "RLS round-trip insert/delete check passed." };
     });
 
     setRunning(false);
@@ -178,8 +178,9 @@ export default function Diagnostics() {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Connection diagnostics</h1>
         <p className="text-sm text-muted-foreground">
-          Verifies env vars, auth session, RLS-scoped reads, and a safe insert/delete round-trip
-          against your own data.
+          Operator-only. Verifies env vars, auth session, RLS-scoped reads, and a safe
+          insert/delete round-trip against your own data. No operator secrets or raw payloads
+          are shown.
         </p>
       </header>
 

@@ -71,13 +71,13 @@ const PUBLIC_FIXTURE_ONLY_INTERNAL_EXCEPTIONS = new Set<string>([
  * Deferred operator/internal manifest entries that are NOT covered by
  * Route Guard Parity v1. They are intentionally left as-is in this slice
  * because moving them under <RequireOperatorRole /> would change
- * grower-facing behavior (e.g. `/diagnostics` exposes the read-only
- * Contextual Pheno Comparison entrypoint to all authenticated users) or
- * was not part of the audited route set. Tracked for a follow-up slice
- * after a behavior review.
+ * grower-facing behavior, or was not part of the audited route set.
+ * Tracked for a follow-up slice after a behavior review.
+ *
+ * Diagnostics Audience Split v1 — `/diagnostics` removed from this list
+ * and is now mounted inside <RequireOperatorRole />.
  */
 const DEFERRED_OPERATOR_PARITY = new Set<string>([
-  "/diagnostics",
   "/grow-lineage",
   "/sensors/ecowitt-audit",
   "/sensors/ingest-normalizer",
@@ -131,6 +131,7 @@ describe("Route Guard Parity v1 — required operator-gated routes", () => {
     "/internal/one-tent-loop-proof",
     "/internal/sensor-truth-audit",
     "/internal/ai-doctor-confidence-audit",
+    "/diagnostics",
   ];
   for (const p of REQUIRED_OPERATOR_GATED) {
     it(`${p} is inside the RequireOperatorRole block`, () => {

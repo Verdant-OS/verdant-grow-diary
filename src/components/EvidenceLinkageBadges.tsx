@@ -8,6 +8,7 @@
  *
  * No I/O. No writes. No automation. No device-control copy.
  */
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import {
   isTrustedTimelineEventSource,
@@ -35,6 +36,13 @@ export interface EvidenceLinkageBadgesProps {
   surface?: "alert-review" | "action-queue-suggestion";
   /** Optional copy to show when nothing is linked. */
   fallbackCopy?: string;
+  /**
+   * Optional presenter-only override for the per-event label. When provided
+   * and it returns a non-null value, the human label is rendered in place of
+   * the raw `ev.id` string. The underlying `data-event-id` attribute is
+   * preserved for tests and provenance equality checks.
+   */
+  renderEventLabel?: (ev: OriginatingTimelineEventRef) => ReactNode | null;
   className?: string;
   testId?: string;
 }
@@ -48,6 +56,7 @@ export default function EvidenceLinkageBadges({
   events,
   surface = "alert-review",
   fallbackCopy = TIMELINE_EVIDENCE_NOT_LINKED_COPY,
+  renderEventLabel,
   className,
   testId = "evidence-linkage-badges",
 }: EvidenceLinkageBadgesProps) {
@@ -78,6 +87,7 @@ export default function EvidenceLinkageBadges({
           const src = (ev.source ?? "unknown") as OriginatingTimelineEventSource;
           const trusted = isTrustedTimelineEventSource(src);
           const occurredAt = formatOccurredAt(ev.occurred_at);
+          const labelOverride = renderEventLabel ? renderEventLabel(ev) : null;
           return (
             <li
               key={ev.id}
@@ -97,12 +107,21 @@ export default function EvidenceLinkageBadges({
               >
                 {originatingTimelineEventLabel(src)}
               </span>
-              {ev.type && (
+              {ev.type && !labelOverride && (
                 <span className="text-muted-foreground">{ev.type}</span>
               )}
-              <span className="font-mono text-[11px] text-muted-foreground">
-                {ev.id}
-              </span>
+              {labelOverride ? (
+                <span
+                  data-testid={`${testId}-label`}
+                  className="text-[11px] text-foreground"
+                >
+                  {labelOverride}
+                </span>
+              ) : (
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {ev.id}
+                </span>
+              )}
               {occurredAt && (
                 <span className="text-[11px] text-muted-foreground">
                   {occurredAt}

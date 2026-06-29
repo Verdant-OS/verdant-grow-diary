@@ -47,6 +47,13 @@ export interface OperatorDemoPreviewViewModel {
   alert: OperatorDemoPreviewAlertSection;
   action: OperatorDemoPreviewActionSection;
   postGrow: OperatorDemoPreviewPostGrow;
+  /**
+   * Presenter-only map of evidence-ref id -> safe human label. Lets the
+   * Operator Demo Preview render "Sensor snapshot · Demo VPD reading" in
+   * place of raw fixture ids while leaving evidenceRefs unchanged for
+   * provenance equality tests and badge rendering.
+   */
+  evidenceDisplayLabels: Record<string, string>;
   safetyNotes: string[];
 }
 
@@ -85,6 +92,21 @@ function actionStatusLabel(raw: string): string {
   return statusLabel(raw);
 }
 
+function buildEvidenceDisplayLabel(
+  metric: string | null | undefined,
+): string {
+  const m = (metric ?? "").trim().toLowerCase();
+  if (m === "vpd") return "Sensor snapshot · Demo VPD reading";
+  if (m === "temp" || m === "temperature") {
+    return "Sensor snapshot · Demo temperature reading";
+  }
+  if (m === "rh" || m === "humidity") {
+    return "Sensor snapshot · Demo humidity reading";
+  }
+  if (m === "co2") return "Sensor snapshot · Demo CO2 reading";
+  return "Sensor snapshot · Demo evidence ref";
+}
+
 export function buildOperatorDemoPreviewViewModel(
   fixture: DemoEvidenceChainFixture = loadDemoEvidenceChainFixture(),
 ): OperatorDemoPreviewViewModel {
@@ -95,6 +117,13 @@ export function buildOperatorDemoPreviewViewModel(
     typeof grow.harvested_at === "string" &&
     grow.harvested_at.length > 0 &&
     grow.stage === "harvest";
+
+  // Build presenter-only display labels keyed by ref id. The single seeded
+  // sensor reading id is shared by the alert and forwarded action refs.
+  const displayLabel = buildEvidenceDisplayLabel(reading.metric);
+  const evidenceDisplayLabels: Record<string, string> = {
+    [reading.id]: displayLabel,
+  };
 
   return {
     sourceLabel: "demo",
@@ -125,6 +154,7 @@ export function buildOperatorDemoPreviewViewModel(
           ? grow.harvested_at
           : null,
     },
+    evidenceDisplayLabels,
     safetyNotes: [
       "Demo data is not live telemetry.",
       "Evidence is linked through the persisted fixture ref, not inferred.",

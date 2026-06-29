@@ -120,6 +120,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/operator/one-tent-loop-smoke-test", access: "operator", description: "Operator one-tent loop smoke test (read-only)." },
   { path: "/operator/one-tent-proof-record", access: "operator", description: "One-tent proof record export." },
   { path: "/operator/paddle-processing-audit", access: "operator", description: "Operator Paddle processing audit (read-only)." },
+  { path: "/operator/demo-preview", access: "operator", description: "Operator-only One-Tent Evidence Chain demo preview (read-only, demo-labeled)." },
   { path: "/operator/post-grow-reflection-dry-run", access: "operator", description: "Post-Grow Reflection dry-run diagnostics panel (read-only)." },
   
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },

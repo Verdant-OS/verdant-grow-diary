@@ -98,7 +98,22 @@ describe("Evidence Linkage Persistence v1 — schema + wiring", () => {
 
   it("alert→action insert path persists an explicit refs array (never inferred)", () => {
     const src = read("src/pages/AlertDetail.tsx");
-    expect(src).toMatch(/originating_timeline_events:\s*\[\]/);
+    // v1 contract: refs are forwarded from the alert via the shared
+    // forwarding adapter — never inferred from prose, timestamps, plant/tent,
+    // alert id, or metric name. The adapter itself returns an explicit array
+    // (possibly empty) so the persisted column is always a sanitized array.
+    expect(src).toContain(
+      'from "@/lib/originatingTimelineEventForwardRules"',
+    );
+    expect(src).toContain("forwardAlertRefsToActionQueue");
+    expect(src).toMatch(
+      /originating_timeline_events:\s*[\s\S]{0,80}forwardAlertRefsToActionQueue\(\s*alert\s*\)/,
+    );
+    // Guard against accidental reintroduction of inference: no nearest-reading
+    // / timestamp / metric-name heuristics in the insert payload region.
+    const insertRegion =
+      src.slice(src.indexOf("originating_timeline_events:"), src.indexOf("originating_timeline_events:") + 400);
+    expect(insertRegion).not.toMatch(/nearest|inferFrom|guessFrom|approximate/i);
   });
 
   it("AI Doctor→action insert path persists an explicit refs array", () => {

@@ -1,15 +1,24 @@
 import { describe, it, expect } from "vitest";
+import type { ReactNode } from "react";
 import { render, screen, act, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import MobileNav from "@/components/MobileNav";
+
+function wrap(children: ReactNode) {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return (
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>{children}</MemoryRouter>
+    </QueryClientProvider>
+  );
+}
 
 describe("MobileNav Action Queue link", () => {
   it("renders Actions in the More sheet", async () => {
-    render(
-      <MemoryRouter>
-        <MobileNav />
-      </MemoryRouter>
-    );
+    render(wrap(<MobileNav />));
 
     // Primary tabs still render
     expect(screen.getByText("Home")).toBeInTheDocument();
@@ -42,11 +51,7 @@ describe("MobileNav Action Queue link", () => {
   });
 
   it("does not expose automation or device-control language", () => {
-    const { container } = render(
-      <MemoryRouter>
-        <MobileNav />
-      </MemoryRouter>
-    );
+    const { container } = render(wrap(<MobileNav />));
     const text = container.textContent || "";
 
     const banned = [

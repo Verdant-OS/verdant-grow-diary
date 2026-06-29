@@ -1,4 +1,6 @@
 /**
+ * SAFETY-CONTRACT: APPROVAL-REQUIRED
+ *
  * proofReportRedactionRules — pure sanitizer for human-readable proof
  * reports (copy/print surfaces).
  *

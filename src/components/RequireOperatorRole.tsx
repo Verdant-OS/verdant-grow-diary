@@ -44,12 +44,12 @@ export function RequireOperatorRole() {
               <ShieldAlert className="h-4 w-4" /> Access restricted
             </CardTitle>
             <CardDescription>
-              This area is limited to operator accounts.
+              Signed in, but this account does not have operator access.
             </CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            If you believe you should have access, contact your Verdant administrator.
-            No operator data was loaded.
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p>Use an operator-role account for this preview.</p>
+            <p>No operator data was loaded.</p>
           </CardContent>
         </Card>
       </div>

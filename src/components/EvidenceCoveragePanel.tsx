@@ -112,6 +112,29 @@ export function EvidenceCoveragePanel({
         />
       </div>
 
+      <div className="space-y-2" data-testid="evidence-coverage-breakdown">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold">Coverage by category</h3>
+          <p className="text-xs text-muted-foreground">
+            Grouped counts only. No raw evidence refs or payloads are shown.
+          </p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <BreakdownCard
+            title="Alerts by category"
+            rows={viewModel.alertsByCategory}
+            emptyLabel="No alert categories to summarize yet."
+            testId="evidence-coverage-alerts-by-category"
+          />
+          <BreakdownCard
+            title="Action Queue by category"
+            rows={viewModel.actionsByCategory}
+            emptyLabel="No action categories to summarize yet."
+            testId="evidence-coverage-actions-by-category"
+          />
+        </div>
+      </div>
+
       <ul
         className="text-xs text-muted-foreground space-y-1 list-disc pl-5"
         data-testid="evidence-coverage-notes"
@@ -121,6 +144,64 @@ export function EvidenceCoveragePanel({
         ))}
       </ul>
     </section>
+  );
+}
+
+function BreakdownCard({
+  title,
+  rows,
+  emptyLabel,
+  testId,
+}: {
+  title: string;
+  rows: readonly EvidenceCoverageBreakdownRow[];
+  emptyLabel: string;
+  testId: string;
+}) {
+  return (
+    <Card data-testid={testId}>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid={`${testId}-empty`}
+          >
+            {emptyLabel}
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Category</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Linked</TableHead>
+                <TableHead className="text-right">Fallback-only</TableHead>
+                <TableHead className="text-right">Invalid refs</TableHead>
+                <TableHead className="text-right">Linked %</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow
+                  key={row.label}
+                  data-testid={`${testId}-row-${row.label}`}
+                >
+                  <TableCell>{row.label}</TableCell>
+                  <TableCell className="text-right">{row.total}</TableCell>
+                  <TableCell className="text-right">{row.linked}</TableCell>
+                  <TableCell className="text-right">{row.fallbackOnly}</TableCell>
+                  <TableCell className="text-right">{row.invalidRefs}</TableCell>
+                  <TableCell className="text-right">{row.linkedPct}%</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

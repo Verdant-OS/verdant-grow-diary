@@ -131,12 +131,37 @@ export interface SensorReadingLike {
   source?: string | null;
   device_id?: string | null;
   /**
+   * Originating `sensor_readings.id`. Optional: when present and the row
+   * is selected as the contributing row for a known metric,
+   * `snapshotFromReadings` populates `SensorSnapshot.metric_refs[<key>]`
+   * for the env-alert ref population path. Never inferred.
+   */
+  id?: string | null;
+  /**
    * Upstream provenance envelope. This file NEVER reads, returns, or
    * renders its contents — it is forwarded as-is to
    * `summarizeCsvVendor`, which is the only sanctioned reader.
    */
   raw_payload?: unknown;
 }
+
+/**
+ * Map a {@link SensorSnapshotMetricRefKey} to the matching
+ * `sensor_readings.metric` value. Snapshot fields and reading metrics
+ * use different vocabularies; this table is the only mapping site.
+ */
+const METRIC_REF_KEY_TO_READING_METRIC: Record<
+  SensorSnapshotMetricRefKey,
+  string
+> = {
+  temp: "temperature_c",
+  rh: "humidity_pct",
+  vpd: "vpd_kpa",
+  soil: "soil_moisture_pct",
+  soil_ec: "soil_ec",
+  soil_temp: "soil_temp_c",
+  ppfd: "ppfd",
+};
 
 /**
  * Build a snapshot from a batch of sensor_readings rows. Picks the latest

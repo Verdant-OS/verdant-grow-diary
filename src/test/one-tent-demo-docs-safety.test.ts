@@ -104,17 +104,69 @@ export function scanDemoDocForSafety(text: string): DemoDocsSafetyFailure[] {
   return failures;
 }
 
-const TARGET = resolve(
-  process.cwd(),
-  "docs/one-tent-evidence-chain-demo-script-v1.md",
-);
+const DOCS_DIR = resolve(process.cwd(), "docs");
+
+/**
+ * Deterministically discover demo script docs matching `docs/*demo-script*.md`.
+ * Files only, sorted lexicographically.
+ */
+export function discoverDemoScriptDocs(): string[] {
+  const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
+  const entries = readdirSync(DOCS_DIR);
+  return entries
+    .filter((name) => /demo-script.*\.md$/i.test(name))
+    .filter((name) => {
+      try {
+        return statSync(resolve(DOCS_DIR, name)).isFile();
+      } catch {
+        return false;
+      }
+    })
+    .map((name) => resolve(DOCS_DIR, name))
+    .sort((a, b) => a.localeCompare(b));
+}
 
 describe("One-Tent demo docs safety v1", () => {
-  it("current demo script has no banned phrases outside Do-Not-Say fence", () => {
-    const text = readFileSync(TARGET, "utf8");
-    const failures = scanDemoDocForSafety(text);
-    expect(failures).toEqual([]);
+  it("discovers at least one docs/*demo-script*.md file", () => {
+    const paths = discoverDemoScriptDocs();
+    expect(paths.length).toBeGreaterThan(0);
   });
+
+  it("includes the One-Tent Evidence Chain demo script", () => {
+    const paths = discoverDemoScriptDocs();
+    expect(
+      paths.some((p) => p.endsWith("one-tent-evidence-chain-demo-script-v1.md")),
+    ).toBe(true);
+  });
+
+  it("discovered paths are sorted deterministically", () => {
+    const paths = discoverDemoScriptDocs();
+    const sorted = [...paths].sort((a, b) => a.localeCompare(b));
+    expect(paths).toEqual(sorted);
+  });
+
+  it("every discovered demo script passes the safety scan", () => {
+    const paths = discoverDemoScriptDocs();
+    expect(paths.length).toBeGreaterThan(0);
+    const aggregate: Array<{ file: string; failures: DemoDocsSafetyFailure[] }> = [];
+    for (const p of paths) {
+      const text = readFileSync(p, "utf8");
+      const failures = scanDemoDocForSafety(text);
+      if (failures.length > 0) aggregate.push({ file: p, failures });
+    }
+    expect(aggregate).toEqual([]);
+  });
+
+  it("aggregate check fails if any discovered doc has a banned phrase outside the fence", () => {
+    // Simulate the aggregate by scanning a synthetic doc set including a bad entry.
+    const docs = [
+      "# Clean\nVerdant preserves source-labeled evidence.\n",
+      "# Bad\nVerdant is fully automated.\n",
+    ];
+    const anyFailed = docs.some((text) => scanDemoDocForSafety(text).length > 0);
+    expect(anyFailed).toBe(true);
+  });
+
 
   it("flags a banned phrase that appears outside the fence", () => {
     const sample = [

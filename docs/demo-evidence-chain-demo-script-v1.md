@@ -28,19 +28,19 @@ using the read-only fixture `fixtures/demo-evidence-chain.json` and the
 
 The following terms must not appear in narration or screenshots outside this fenced list:
 
-```
-do-not-say: fake live
-do-not-say: automatically executes
-do-not-say: auto execute
-do-not-say: device command
-do-not-say: controls your grow
-do-not-say: set fan / set light / set irrigation
-do-not-say: dose nutrients
-do-not-say: guaranteed
-do-not-say: diagnosed with certainty
-do-not-say: AI grows for you
-do-not-say: fully automated
-```
+<!-- DEMO-SCRIPT-DO-NOT-SAY:BEGIN -->
+- fake live
+- automatically executes
+- auto execute
+- device command
+- controls your grow
+- set fan / set light / set irrigation
+- dose nutrients
+- guaranteed
+- diagnosed with certainty
+- AI grows for you
+- fully automated
+<!-- DEMO-SCRIPT-DO-NOT-SAY:END -->
 
 ## Failure / fallback notes
 

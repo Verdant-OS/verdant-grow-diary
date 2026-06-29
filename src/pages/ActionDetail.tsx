@@ -1170,17 +1170,31 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
   );
 }
 
-function IdField({ label, id, to }: { label: string; id: string; to: string | null }) {
+function IdField({
+  label,
+  id,
+  to,
+  displayLabel,
+  "data-testid": testId,
+}: {
+  label: string;
+  id: string;
+  to: string | null;
+  displayLabel?: string;
+  "data-testid"?: string;
+}) {
+  const visible = displayLabel ?? id;
+  const isPlainText = displayLabel !== undefined;
   return (
-    <div>
+    <div data-testid={testId}>
       <dt className="text-muted-foreground uppercase tracking-wider text-[10px]">{label}</dt>
-      <dd className="font-mono text-[11px] break-all">
+      <dd className={isPlainText ? "text-[11px]" : "font-mono text-[11px] break-all"}>
         {to ? (
           <Link to={to} className="text-primary hover:underline">
-            {id}
+            {visible}
           </Link>
         ) : (
-          <span>{id}</span>
+          <span>{visible}</span>
         )}
       </dd>
     </div>

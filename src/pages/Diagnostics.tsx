@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { verifySupabaseEnv } from "@/lib/verifyEnv";
 import { Link } from "react-router-dom";
 import { DevOpsBackupEncryptionCard } from "@/components/DevOpsBackupEncryptionCard";
+import { EvidenceCoveragePanel } from "@/components/EvidenceCoveragePanel";
+import { useEvidenceCoverage } from "@/hooks/useEvidenceCoverage";
 
 type CheckStatus = "pending" | "running" | "pass" | "fail" | "skip";
 

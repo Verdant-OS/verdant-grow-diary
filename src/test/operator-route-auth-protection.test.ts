@@ -76,6 +76,7 @@ const PUBLIC = new Set(pathsIn(publicBlock));
 const REQUIRED_PROTECTED = [
   "/operator/ecowitt",
   "/operator/one-tent-proof-record",
+  "/operator/demo-preview",
   "/diagnostics",
   "/pi-ingest-status",
   "/ingest-inspector",

@@ -446,7 +446,7 @@ export function normalizeReleaseReceiptToEvidenceReceipt(
 
 export function normalizeReleaseReceiptBlockers(
   artifact: ReleaseReceiptArtifactV1,
-): EvidenceBlocker[] {
+): ReleaseEvidenceBlocker[] {
   return artifact.blockers
     .filter((b) => b.active && b.severity === "release_blocker")
     .map((b) => ({ id: b.id, label: b.label, detail: b.summary }));

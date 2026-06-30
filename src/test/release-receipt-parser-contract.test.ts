@@ -103,7 +103,7 @@ describe("releaseReceiptParser — rejection rules", () => {
       schema_version: "release-receipt.v9",
     });
     expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.errors.join(" ")).toMatch(/schema_version/);
   });
 
@@ -144,7 +144,7 @@ describe("releaseReceiptParser — rejection rules", () => {
       counts: { passed: 1, failed: 1, skipped: 1, total: 99 },
     });
     expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.errors.join(" ")).toMatch(/total/);
   });
 
@@ -154,7 +154,7 @@ describe("releaseReceiptParser — rejection rules", () => {
       source: "manual_import",
     });
     expect(r.ok).toBe(false);
-    if (r.ok) return;
+    if (r.ok) throw new Error("expected failure");
     expect(r.errors.join(" ")).toMatch(/manual_import/);
   });
 

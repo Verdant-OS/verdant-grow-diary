@@ -1695,8 +1695,8 @@ export default function SensorsTestbenchPanel({ tentId, tentName }: Props) {
           <DialogHeader>
             <DialogTitle>Share diagnostics</DialogTitle>
             <DialogDescription>
-              Support-ready summary. Sensitive values (tokens, authorization,
-              secrets, service_role) are redacted before they leave this panel.
+              Support-ready summary. Sensitive values (tokens, authorization
+              headers, secrets, server-only keys) are redacted before they leave this panel.
             </DialogDescription>
           </DialogHeader>
 

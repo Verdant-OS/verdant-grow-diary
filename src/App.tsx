@@ -223,6 +223,10 @@ const App = () => (
                     path="/operator/demo-preview"
                     element={<OperatorDemoPreview />}
                   />
+                  <Route
+                    path="/operator/release-readiness"
+                    element={<ReleaseReadiness />}
+                  />
                   {/* Diagnostics Audience Split v1 — /diagnostics is an
                       operator-only RLS / round-trip / DevOps surface; manifest
                       already declared access: "operator". */}

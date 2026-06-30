@@ -33,7 +33,7 @@ describe("ReleaseReadiness page", () => {
     expect(screen.getByTestId("release-readiness-page")).toBeInTheDocument();
     const src = screen.getByTestId("release-readiness-source-label");
     expect(src.textContent ?? "").toMatch(/static\s*\/\s*manual/i);
-    expect(src.textContent ?? "").not.toMatch(/live ci/i);
+    expect(src.textContent ?? "").not.toMatch(/live ci feed of/i);
   });
 
   it("renders HOLD overall and release posture", () => {

@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Wrench,
   LineChart,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -88,6 +89,20 @@ const groups: { label: string; items: NavItem[] }[] = [
       // Owner-scoped reads/writes only, RLS-protected. MUST stay visible to
       // every authenticated grower — do not gate behind operator role.
       { to: "/grow-lineage", label: "Lineage Repair", icon: Wrench },
+    ],
+  },
+  {
+    label: "Release",
+    items: [
+      // Operator-only deep link to the static/manual release readiness
+      // status page. Manifest access for /operator/release-readiness is
+      // "operator"; gate it here so non-operators never see the link.
+      {
+        to: "/operator/release-readiness",
+        label: "Release Readiness",
+        icon: ClipboardList,
+        requiresOperator: true,
+      },
     ],
   },
   { label: "Account", items: [{ to: "/settings", label: "Settings", icon: Settings }] },

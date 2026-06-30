@@ -287,6 +287,11 @@ export default function Dashboard() {
       </div>
 
       <div className="my-3">
+        <ReleaseReadinessOperatorCard />
+      </div>
+
+
+      <div className="my-3">
         <LineageRepairCta />
       </div>
 

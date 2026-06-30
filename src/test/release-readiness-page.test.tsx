@@ -184,6 +184,7 @@ describe("ReleaseReadiness page", () => {
       ]) {
         expect(src).not.toContain(term);
       }
+    });
   });
 });
 

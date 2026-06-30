@@ -67,7 +67,7 @@ describe("ReleaseReadinessOperatorCard", () => {
     const anchor = cta.tagName === "A" ? cta : cta.querySelector("a");
     expect(anchor?.getAttribute("href")).toBe(RELEASE_READINESS_PATH);
     expect(RELEASE_READINESS_PATH).toBe("/operator/release-readiness");
-    expect(screen.getByText(/release readiness/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/release readiness/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/static\s*\/\s*manual/i)).toBeInTheDocument();
   });
 

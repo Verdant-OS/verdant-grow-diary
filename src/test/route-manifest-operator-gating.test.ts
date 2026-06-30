@@ -142,3 +142,19 @@ describe("Route Guard Parity v1 — required operator-gated routes", () => {
     });
   }
 });
+
+describe("Grow Lineage Manifest Reclassification v1 — /grow-lineage is grower-facing auth", () => {
+  const entry = APP_ROUTES.find((r) => r.path === "/grow-lineage");
+
+  it("is present in the manifest", () => {
+    expect(entry).toBeDefined();
+  });
+
+  it("is access: 'auth' (grower-facing authenticated), not internal/operator/public", () => {
+    expect(entry?.access).toBe("auth");
+  });
+
+  it("is NOT mounted inside <RequireOperatorRole />", () => {
+    expect(OPERATOR_PROTECTED_PATHS.has("/grow-lineage")).toBe(false);
+  });
+});

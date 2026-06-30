@@ -145,7 +145,7 @@ jobs:
           BRANCH: ${{ github.ref_name }}
           WORKFLOW: ${{ github.workflow }}
         run: |
-          node scripts/build-release-receipt-input.mjs \
+          bun scripts/build-release-receipt-input.mjs \
             --out artifacts/release-readiness/release-receipt.cross-check.json \
             --artifact-id "ci-full-suite-cross-${RUN_ID}" \
             --generated-at "$(node -e 'process.stdout.write(new Date().toISOString())')" \

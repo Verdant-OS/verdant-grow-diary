@@ -203,3 +203,42 @@ export function formatDailyCheckLoggedAt(
   }).format(d);
   return `Logged at ${formatted}`;
 }
+
+// ---------------------------------------------------------------------------
+// Timeline continuity (Quick Log → Timeline)
+// ---------------------------------------------------------------------------
+
+/**
+ * Calm post-save banner used when the grower successfully writes a Quick
+ * Log entry. Never claims plant health, completion, or certainty.
+ */
+export const DAILY_CHECK_TIMELINE_CONFIRMATION_TITLE = "Saved to Timeline";
+export const DAILY_CHECK_TIMELINE_CONFIRMATION_BODY =
+  "Your entry is now part of this plant's memory. Open the Timeline to see it in context.";
+export const DAILY_CHECK_TIMELINE_CTA_LABEL = "View on Timeline";
+
+export interface DailyCheckTimelineHrefInput {
+  growId: string | null | undefined;
+  plantId?: string | null | undefined;
+  tentId?: string | null | undefined;
+}
+
+/**
+ * Build a `/timeline` href that preserves the grow/plant/tent context the
+ * grower was working in. Pure: no I/O, no time, no randomness. Only
+ * non-empty trimmed identifiers are forwarded; nothing is invented.
+ */
+export function buildDailyCheckTimelineHref(
+  input: DailyCheckTimelineHrefInput,
+): string {
+  const params = new URLSearchParams();
+  const growId = (input.growId ?? "").toString().trim();
+  const plantId = (input.plantId ?? "").toString().trim();
+  const tentId = (input.tentId ?? "").toString().trim();
+  if (growId) params.set("growId", growId);
+  if (plantId) params.set("plantId", plantId);
+  if (tentId) params.set("tentId", tentId);
+  const qs = params.toString();
+  return qs.length > 0 ? `/timeline?${qs}` : "/timeline";
+}
+

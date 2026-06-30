@@ -211,6 +211,10 @@ export default function Timeline() {
   const [searchQuery, setSearchQuery] = useState("");
   const [plantFilter, setPlantFilter] = useState("");
   const [tentFilter, setTentFilter] = useState("");
+  // Seed plant/tent filters from URL on mount so deep links from Quick
+  // Log → /timeline?growId=&plantId=&tentId= land on the right scope.
+  // One-shot seed; later user edits remain authoritative.
+  const [didSeedScopeFilters, setDidSeedScopeFilters] = useState(false);
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   const [detailEntryId, setDetailEntryId] = useState<string | null>(null);
@@ -254,6 +258,18 @@ export default function Timeline() {
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sensorSourceFilter]);
+
+  // One-shot seed of plant/tent filters from URL params written by the
+  // Quick Log → Timeline continuity link. Never overwrites later edits.
+  useEffect(() => {
+    if (didSeedScopeFilters) return;
+    const seededPlant = searchParams.get("plantId");
+    const seededTent = searchParams.get("tentId");
+    if (seededPlant && !plantFilter) setPlantFilter(seededPlant);
+    if (seededTent && !tentFilter) setTentFilter(seededTent);
+    if (seededPlant || seededTent) setDidSeedScopeFilters(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
 
   async function load() {

@@ -303,7 +303,7 @@ describe("DailyCheck post-submit confirmation", () => {
     const panel = screen.getByTestId("daily-grow-check-post-submit");
     expect(panel).toBeInTheDocument();
     expect(screen.getByTestId("daily-grow-check-post-submit-title")).toHaveTextContent(
-      /today's check was logged/i,
+      /saved to timeline/i,
     );
   });
 

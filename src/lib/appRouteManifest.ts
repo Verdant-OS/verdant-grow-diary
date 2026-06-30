@@ -30,7 +30,7 @@
  *                  diagnostic use (e.g. `/operator/ecowitt`, `/diagnostics`,
  *                  `/sensors/ecowitt-audit`). Not exposed in normal user nav.
  *  - `internal`  — mounted inside `<RequireAuth>` for internal admin/support
- *                  flows (e.g. `/admin/leads`, `/leads`, `/grow-lineage`).
+ *                  flows (e.g. `/admin/leads`, `/leads`).
  *  - `redirect`  — a `<Navigate>` alias to another route (e.g. `/login` →
  *                  `/auth`). Carries no page of its own.
  */
@@ -89,7 +89,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },
   { path: "/features", access: "redirect", description: "→ /welcome" },
-  { path: "/grow-lineage", access: "internal" },
+  { path: "/grow-lineage", access: "auth", label: "Lineage Repair", description: "Grower-facing repair tool for reassigning tents to grows (owner-scoped, RLS-protected)." },
   { path: "/grow-room", access: "redirect", description: "→ /" },
   { path: "/grows", access: "auth" },
   { path: "/grows/:growId", access: "auth" },

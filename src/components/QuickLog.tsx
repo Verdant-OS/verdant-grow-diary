@@ -30,6 +30,11 @@ import { useGrows } from "@/store/grows";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { STAGES } from "@/lib/grow";
 import { EC_UNITS, EC_UNIT_LABEL, type EcUnit } from "@/constants/units";
+import {
+  MANUAL_SENSOR_TRUTH_TITLE,
+  MANUAL_SENSOR_TRUTH_LINES,
+  MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE,
+} from "@/constants/manualSensorTruthCopy";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";

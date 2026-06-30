@@ -259,6 +259,18 @@ export default function Timeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sensorSourceFilter]);
 
+  // One-shot seed of plant/tent filters from URL params written by the
+  // Quick Log → Timeline continuity link. Never overwrites later edits.
+  useEffect(() => {
+    if (didSeedScopeFilters) return;
+    const seededPlant = searchParams.get("plantId");
+    const seededTent = searchParams.get("tentId");
+    if (seededPlant && !plantFilter) setPlantFilter(seededPlant);
+    if (seededTent && !tentFilter) setTentFilter(seededTent);
+    if (seededPlant || seededTent) setDidSeedScopeFilters(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
 
   async function load() {
     if (!user || !activeGrowId) {

@@ -3,7 +3,7 @@
  *
  * Read-only, deterministic data + helpers for the operator-only Release
  * Readiness page. All data here is STATIC / MANUAL. No I/O, no fetch, no
- * Supabase, no GitHub API, no Date.now(), no model calls. Purely typed.
+ * backend, no GitHub API, no clock reads, no model calls. Purely typed.
  *
  * Hard rules enforced by `deriveReleaseEvidencePosture`:
  *  - Only a passing `ci_full_suite` receipt can unlock Release GO.

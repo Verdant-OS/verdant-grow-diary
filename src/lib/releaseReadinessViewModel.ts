@@ -91,7 +91,7 @@ export const RELEASE_READINESS_VIEW_MODEL: ReleaseReadinessViewModel = {
     {
       id: "full-suite-parser",
       label: "Full-suite parser receipt (PR #112)",
-      status: "PASS",
+      status: "SATISFIED",
       source: "doc-receipt",
       note: "Parser-generated full-suite receipt returned GO on PR head 4eb63ba (run 28463133281): 16/16 batches · 22,187 passed · 0 failed · 6 skipped · 0 OOMs.",
     },

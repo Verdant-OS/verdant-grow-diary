@@ -71,15 +71,15 @@ describe("ReleaseReadiness page", () => {
     expect(text).toMatch(/0 oo?ms?/i);
   });
 
-  it("renders the full-suite parser receipt as PASS (no pending copy)", () => {
+  it("renders the full-suite parser receipt as SATISFIED (no pending copy)", () => {
     renderPage();
     const row = screen.getByTestId(
       "release-readiness-check-full-suite-parser",
     );
-    expect(row.textContent ?? "").toContain("PASS");
+    expect(row.textContent ?? "").toContain("SATISFIED");
     expect(row.textContent ?? "").toContain("28463133281");
     expect(row.textContent ?? "").not.toMatch(/blocked behind ci billing/i);
-    expect(row.textContent ?? "").not.toMatch(/pr\s*#?112\s*parser-generated\s*full-suite\s*receipt\s*pending/i);
+    expect(row.textContent ?? "").not.toMatch(/pending/i);
   });
 
   it("renders Auth loading smoke WARNING and tracks it separately", () => {
@@ -187,3 +187,142 @@ describe("ReleaseReadiness page", () => {
     });
   });
 });
+
+describe("Release Readiness HOLD invariants (Gate Reliability v1)", () => {
+  it("view model has at least one active blocker until proof lands", () => {
+    expect(RELEASE_READINESS_VIEW_MODEL.blockers.length).toBeGreaterThan(0);
+  });
+
+  it("view model has at least one WARNING-labeled check until repair lands", () => {
+    const warnings = RELEASE_READINESS_VIEW_MODEL.checks.filter(
+      (c) => c.status === "WARNING",
+    );
+    expect(warnings.length).toBeGreaterThan(0);
+  });
+
+  it("HOLD invariant: overall posture must remain HOLD whenever any blocker OR WARNING exists", () => {
+    const hasBlocker = RELEASE_READINESS_VIEW_MODEL.blockers.length > 0;
+    const hasWarning = RELEASE_READINESS_VIEW_MODEL.checks.some(
+      (c) => c.status === "WARNING",
+    );
+    if (hasBlocker || hasWarning) {
+      expect(RELEASE_READINESS_VIEW_MODEL.overall.status).toBe("HOLD");
+      expect(RELEASE_READINESS_VIEW_MODEL.release.status).toBe("HOLD");
+    }
+  });
+
+  it("overall posture is never GO/READY/RELEASED while blockers or warnings exist", () => {
+    const overall = RELEASE_READINESS_VIEW_MODEL.overall.status;
+    const release = RELEASE_READINESS_VIEW_MODEL.release.status;
+    const hasBlocker = RELEASE_READINESS_VIEW_MODEL.blockers.length > 0;
+    const hasWarning = RELEASE_READINESS_VIEW_MODEL.checks.some(
+      (c) => c.status === "WARNING",
+    );
+    if (hasBlocker || hasWarning) {
+      // No "green release" labels permitted.
+      for (const status of [overall, release]) {
+        expect(status).not.toBe("PASS");
+        expect(status).not.toBe("MERGED");
+        expect(status).not.toBe("SATISFIED");
+        expect(status).not.toBe("PRESERVED");
+      }
+    }
+  });
+
+  it("every check renders with a recognized source label (static | manual | doc-receipt)", () => {
+    render(
+      <MemoryRouter>
+        <ReleaseReadiness />
+      </MemoryRouter>,
+    );
+    for (const c of RELEASE_READINESS_VIEW_MODEL.checks) {
+      const row = screen.getByTestId(`release-readiness-check-${c.id}`);
+      expect(["static", "manual", "doc-receipt"]).toContain(c.source);
+      expect(row.textContent ?? "").toMatch(
+        /static|manual|doc-receipt/i,
+      );
+    }
+  });
+
+  it("Auth loading smoke warning stays visible until repaired", () => {
+    render(
+      <MemoryRouter>
+        <ReleaseReadiness />
+      </MemoryRouter>,
+    );
+    const row = screen.getByTestId(
+      "release-readiness-check-auth-loading-smoke",
+    );
+    expect(row.textContent ?? "").toContain("WARNING");
+  });
+
+  it("Ecowitt artifact gate remains pending/blocker until main-branch artifact proof is wired", () => {
+    render(
+      <MemoryRouter>
+        <ReleaseReadiness />
+      </MemoryRouter>,
+    );
+    const row = screen.getByTestId("release-readiness-check-ecowitt-bridge-ci");
+    expect(row.textContent ?? "").toContain("PENDING");
+    expect(
+      screen.getByTestId("release-readiness-blocker-ecowitt-artifact"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("Release Readiness ↔ Evidence Receipt label parity", () => {
+  it("PR #112 row is MERGED and matches a passing ci_full_suite receipt", async () => {
+    const { RELEASE_READINESS_EVIDENCE_RECEIPTS } = await import(
+      "@/lib/releaseReadinessEvidenceReceiptViewModel"
+    );
+    const pr112Check = RELEASE_READINESS_VIEW_MODEL.checks.find(
+      (c) => c.id === "pr-112-batched-full-suite",
+    );
+    expect(pr112Check?.status).toBe("MERGED");
+    const pr112Receipt = RELEASE_READINESS_EVIDENCE_RECEIPTS.find(
+      (r) => r.id === "ci-full-suite-pr-112",
+    );
+    expect(pr112Receipt?.category).toBe("ci_full_suite");
+    expect(pr112Receipt?.status).toBe("pass");
+    expect(pr112Receipt?.canUnlockReleaseGo).toBe(true);
+  });
+
+  it("Full-suite parser row is SATISFIED", () => {
+    const row = RELEASE_READINESS_VIEW_MODEL.checks.find(
+      (c) => c.id === "full-suite-parser",
+    );
+    expect(row?.status).toBe("SATISFIED");
+  });
+
+  it("Billing blocker no longer appears among active blockers", () => {
+    const billing = RELEASE_READINESS_VIEW_MODEL.blockers.find((b) =>
+      /billing/i.test(b.id) || /billing/i.test(b.label),
+    );
+    expect(billing).toBeUndefined();
+  });
+
+  it("Old PR #112 pending / 'full-suite receipt pending' copy is not rendered", () => {
+    render(
+      <MemoryRouter>
+        <ReleaseReadiness />
+      </MemoryRouter>,
+    );
+    const page = screen.getByTestId("release-readiness-page");
+    const text = (page.textContent ?? "").toLowerCase();
+    expect(text).not.toMatch(/pr\s*#?112\s*parser-generated\s*full-suite\s*receipt\s*pending/);
+    expect(text).not.toMatch(/blocked behind ci billing/);
+  });
+
+  it("Ecowitt evidence receipt stays pending and blocks release GO until artifact proof", async () => {
+    const { RELEASE_READINESS_EVIDENCE_RECEIPTS } = await import(
+      "@/lib/releaseReadinessEvidenceReceiptViewModel"
+    );
+    const ec = RELEASE_READINESS_EVIDENCE_RECEIPTS.find(
+      (r) => r.id === "ecowitt-bridge-ci-artifact",
+    );
+    expect(ec?.status).toBe("pending");
+    expect(ec?.blocksReleaseGo).toBe(true);
+    expect(ec?.canUnlockReleaseGo).toBe(false);
+  });
+});
+

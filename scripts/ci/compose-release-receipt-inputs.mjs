@@ -13,7 +13,7 @@
  * `scripts/emit-release-receipt.mjs` in a subsequent workflow step.
  *
  * SAFETY
- *  - No network, no Supabase, no GitHub API, no fetch.
+ *  - No network, no backend calls, no GitHub API, no fetch.
  *  - Reads only env vars + writes only under artifacts/release-readiness/.
  *  - Receipt kind is hard-coded to `ci_full_suite`.
  *  - This script does NOT unlock Release GO.

@@ -153,7 +153,9 @@ describe("AppSidebar — operator user", () => {
 
   it("exposes the Operator Mode group label", () => {
     render(wrap(<AppSidebar />));
-    expect(screen.getByText("Operator Mode")).toBeInTheDocument();
+    const labels = Array.from(document.querySelectorAll('[data-sidebar="group-label"]'))
+      .map((el) => el.textContent?.trim());
+    expect(labels).toContain("Operator Mode");
   });
 });
 

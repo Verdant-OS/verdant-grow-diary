@@ -81,12 +81,16 @@ function fail(msg, code = 1) {
   process.exit(code);
 }
 
+function toCamel(k) {
+  return k.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+}
+
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i += 1) {
     const k = argv[i];
     if (!k.startsWith("--")) continue;
-    const key = k.slice(2);
+    const key = toCamel(k.slice(2));
     const next = argv[i + 1];
     if (!next || next.startsWith("--")) {
       out[key] = true;

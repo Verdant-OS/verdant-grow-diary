@@ -8,8 +8,8 @@
   "branch": "local",
   "workflow_name": "Release Receipt CI Upload (dry-run)",
   "receipt_kind": "ci_full_suite",
-  "status": "fail",
-  "summary": "Dry-run: 7 failing command(s).",
+  "status": "blocked",
+  "summary": "Dry-run: 2 commands green.",
   "commands": [
     {
       "name": "typecheck",
@@ -24,21 +24,29 @@
     {
       "name": "vitest-batched",
       "command": "node scripts/run-vitest-batches.mjs",
-      "status": "fail",
-      "passed": 1850,
-      "failed": 7,
+      "status": "pass",
+      "passed": 1872,
+      "failed": 0,
       "skipped": 14,
-      "duration_ms": 415000,
-      "summary": "7 vitest batches failing."
+      "duration_ms": 412000,
+      "summary": "All vitest batches green."
     }
   ],
   "counts": {
-    "passed": 1850,
-    "failed": 7,
+    "passed": 1872,
+    "failed": 0,
     "skipped": 14,
-    "total": 1871
+    "total": 1886
   },
-  "blockers": [],
+  "blockers": [
+    {
+      "id": "ecowitt-bridge-artifact-missing",
+      "label": "Ecowitt bridge artifact missing",
+      "severity": "release_blocker",
+      "active": true,
+      "summary": "Ecowitt bridge CI validation artifact was not uploaded for this run."
+    }
+  ],
   "metadata": {
     "runner_os": "local-dry-run"
   }

@@ -386,7 +386,7 @@ function statusToReceiptStatus(
 
 export function normalizeReleaseReceiptToEvidenceReceipt(
   artifact: ReleaseReceiptArtifactV1,
-): EvidenceReceipt {
+): ReleaseEvidenceReceipt {
   const category = kindToCategory(artifact.receipt_kind);
   const status = statusToReceiptStatus(artifact.status);
 

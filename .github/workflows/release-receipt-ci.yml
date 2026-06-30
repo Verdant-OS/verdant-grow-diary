@@ -9,7 +9,7 @@ name: Release Receipt CI Upload
 # produces a `fail` receipt and the artifact is still uploaded; CI failure
 # is preserved by a final failing step.
 #
-# This workflow does NOT call GitHub APIs, Supabase, or any UI code path.
+# This workflow does NOT call GitHub APIs, the backend, or any UI code path.
 # It does NOT unlock Release GO and does NOT change Release Readiness
 # posture.
 

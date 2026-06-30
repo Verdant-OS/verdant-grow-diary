@@ -9,9 +9,10 @@ import {
   writePersistedDiaryCalendarFilter,
   clearPersistedDiaryCalendarFilter,
 } from "@/lib/diaryCalendarFilterPersistence";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 describe("diaryCalendarFilterPersistence", () => {

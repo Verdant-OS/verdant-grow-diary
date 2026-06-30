@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Wrench,
   LineChart,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 import {

@@ -16,6 +16,7 @@ import { resolve } from "node:path";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 const rangeSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
 const orderSpy = vi.fn(() => ({ range: rangeSpy }));
@@ -61,11 +62,11 @@ function renderPage(entry = "/doctor/sessions") {
 }
 
 function seedViews(views: SavedView[]) {
-  window.localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(views));
+  setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(views));
 }
 
 function stored(): SavedView[] {
-  return parseSavedViews(window.localStorage.getItem(SAVED_VIEWS_STORAGE_KEY));
+  return parseSavedViews(getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY));
 }
 
 const VIEW_A: SavedView = {
@@ -84,7 +85,7 @@ const VIEW_B: SavedView = {
 };
 
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 describe("formatSavedViewSummary — pure", () => {
@@ -188,7 +189,7 @@ describe("AiDoctorSessionsIndex — delete confirmation dialog", () => {
     );
     fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-delete"));
     // Simulate the view vanishing from another tab / external removal.
-    window.localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews([]));
+    setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews([]));
     fireEvent.click(
       await screen.findByTestId("ai-doctor-sessions-saved-views-delete-dialog-confirm"),
     );

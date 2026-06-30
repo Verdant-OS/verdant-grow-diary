@@ -12,6 +12,7 @@ import { resolve } from "node:path";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 // supabase noop mock
 const rangeSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
@@ -76,7 +77,7 @@ function renderAt(initialEntry: string) {
 }
 
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 // ---------------- pure helpers ----------------
@@ -202,14 +203,14 @@ describe("aiDoctorSessionsSavedViewsRules — pure helpers", () => {
       },
     ];
     writeSavedViews(list);
-    expect(window.localStorage.getItem(SAVED_VIEWS_STORAGE_KEY)).toBe(
+    expect(getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY)).toBe(
       serializeSavedViews(list),
     );
     expect(readSavedViews()).toEqual(list);
   });
 
   it("readSavedViews returns [] when localStorage holds garbage", () => {
-    window.localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, "{not-json");
+    setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, "{not-json");
     expect(readSavedViews()).toEqual([]);
   });
 });
@@ -236,7 +237,7 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
     });
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-saved-views-confirm"));
     await waitFor(() => {
-      const stored = parseSavedViews(window.localStorage.getItem(SAVED_VIEWS_STORAGE_KEY));
+      const stored = parseSavedViews(getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY));
       expect(stored).toHaveLength(1);
       expect(stored[0].label).toBe("High risk");
       expect(stored[0].filters.risk).toBe("high");
@@ -251,7 +252,7 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
     });
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-saved-views-confirm"));
     await waitFor(() => {
-      const stored = parseSavedViews(window.localStorage.getItem(SAVED_VIEWS_STORAGE_KEY));
+      const stored = parseSavedViews(getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY));
       expect(stored[0].filters.hasActions).toBe("yes");
       expect(stored[0].filters.dateRange).toBe("7d");
     });
@@ -265,7 +266,7 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
     });
     fireEvent.click(screen.getByTestId("ai-doctor-sessions-saved-views-confirm"));
     await waitFor(() => {
-      const stored = parseSavedViews(window.localStorage.getItem(SAVED_VIEWS_STORAGE_KEY));
+      const stored = parseSavedViews(getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY));
       expect(stored[0].page).toBe(2); // 0-based internal index
     });
   });
@@ -281,7 +282,7 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     ];
-    window.localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(seed));
+    setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(seed));
     renderAt("/doctor/sessions?ref=email");
     const select = (await screen.findByTestId(
       "ai-doctor-sessions-saved-views-select",
@@ -305,7 +306,7 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     ];
-    window.localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(seed));
+    setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(seed));
     renderAt("/doctor/sessions");
     fireEvent.change(await screen.findByTestId("ai-doctor-sessions-saved-views-select"), {
       target: { value: "v-del" },
@@ -315,7 +316,7 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
       await screen.findByTestId("ai-doctor-sessions-saved-views-delete-dialog-confirm"),
     );
     await waitFor(() => {
-      const stored = parseSavedViews(window.localStorage.getItem(SAVED_VIEWS_STORAGE_KEY));
+      const stored = parseSavedViews(getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY));
       expect(stored).toEqual([]);
     });
   });
@@ -330,7 +331,7 @@ describe("AiDoctorSessionsIndex — saved views UI", () => {
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     ];
-    window.localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(seed));
+    setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(seed));
     renderAt("/doctor/sessions?risk=low");
     fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-open"));
     fireEvent.change(screen.getByTestId("ai-doctor-sessions-saved-views-label-input"), {

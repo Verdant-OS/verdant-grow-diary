@@ -18,6 +18,7 @@ import { resolve } from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 // --- supabase mock with capturing spies for filter chain ---
 const rangeSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
@@ -60,7 +61,7 @@ beforeEach(() => {
   notSpy.mockClear();
   gteSpy.mockClear();
   orSpy.mockClear();
-  try { window.localStorage.clear(); } catch { /* noop */ }
+  try { clearLocalStorageForTest(); } catch { /* noop */ }
 });
 
 function LocationProbe() {
@@ -291,7 +292,7 @@ describe("Needs review × saved views", () => {
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     ];
-    window.localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, JSON.stringify(seed));
+    setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, JSON.stringify(seed));
 
     renderAt("/doctor/sessions");
     await screen.findByTestId("ai-doctor-sessions-index-page");

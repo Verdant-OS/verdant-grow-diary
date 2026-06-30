@@ -14,6 +14,7 @@ import type { ReactElement } from "react";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
 import AiDoctorSessionsIndex from "@/pages/AiDoctorSessionsIndex";
+import { removeLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID,
   BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID,
@@ -117,7 +118,7 @@ beforeEach(() => {
   sessionRows = [makeRow("a"), makeRow("b"), makeRow("c")];
   reviewRows = [];
   try {
-    window.localStorage.removeItem(SAVED_VIEWS_STORAGE_KEY);
+    removeLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY);
   } catch {
     /* ignore */
   }

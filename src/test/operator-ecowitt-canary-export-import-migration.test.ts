@@ -9,6 +9,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   WORKFLOW_BACKUP_KEY,
   WORKFLOW_MIGRATION_FLAG,
@@ -58,7 +59,7 @@ const goodReport: CanaryReportInput = {
 
 beforeEach(() => {
   try {
-    localStorage.clear();
+    clearLocalStorageForTest();
   } catch {
     /* ignore */
   }
@@ -169,31 +170,31 @@ describe("workflow snapshot migration (legacy → v1)", () => {
       source: "manual-import",
       metadata: {},
     };
-    localStorage.setItem(WORKFLOW_STORAGE_KEY, JSON.stringify(v1));
+    setLocalStorageItemForTest(WORKFLOW_STORAGE_KEY, JSON.stringify(v1));
     const a = migrateLegacyWorkflowSnapshots();
     const b = migrateLegacyWorkflowSnapshots();
     expect(a.alreadyV1).toBe(true);
     expect(b.ran).toBe(false); // flag set
-    expect(JSON.parse(localStorage.getItem(WORKFLOW_STORAGE_KEY)!)).toEqual(v1);
+    expect(JSON.parse(getLocalStorageItemForTest(WORKFLOW_STORAGE_KEY)!)).toEqual(v1);
   });
 
   it("migrates legacy snapshot, backs up first, and tolerates malformed data", () => {
-    localStorage.setItem("operator.ecowitt.canary.workflow.v0", JSON.stringify({ saved_at: "old", cards: [{ key: "x" }] }));
-    localStorage.setItem("operator.ecowitt.canary.workflow", "{not json");
+    setLocalStorageItemForTest("operator.ecowitt.canary.workflow.v0", JSON.stringify({ saved_at: "old", cards: [{ key: "x" }] }));
+    setLocalStorageItemForTest("operator.ecowitt.canary.workflow", "{not json");
     const out = migrateLegacyWorkflowSnapshots();
     expect(out.ran).toBe(true);
     expect(out.backedUp).toBe(true);
-    expect(localStorage.getItem(WORKFLOW_BACKUP_KEY)).toBeTruthy();
-    expect(localStorage.getItem(WORKFLOW_MIGRATION_FLAG)).toBe("1");
-    const migrated = JSON.parse(localStorage.getItem(WORKFLOW_STORAGE_KEY)!);
+    expect(getLocalStorageItemForTest(WORKFLOW_BACKUP_KEY)).toBeTruthy();
+    expect(getLocalStorageItemForTest(WORKFLOW_MIGRATION_FLAG)).toBe("1");
+    const migrated = JSON.parse(getLocalStorageItemForTest(WORKFLOW_STORAGE_KEY)!);
     expect(migrated.schemaVersion).toBe(1);
     expect(migrated.evidence).toEqual([{ key: "x" }]);
     // Legacy key cleared
-    expect(localStorage.getItem("operator.ecowitt.canary.workflow.v0")).toBeNull();
+    expect(getLocalStorageItemForTest("operator.ecowitt.canary.workflow.v0")).toBeNull();
   });
 
   it("does not crash boot when localStorage is malformed", () => {
-    localStorage.setItem(WORKFLOW_STORAGE_KEY, "@@@not-json@@@");
+    setLocalStorageItemForTest(WORKFLOW_STORAGE_KEY, "@@@not-json@@@");
     expect(() => migrateLegacyWorkflowSnapshots()).not.toThrow();
     // loadWorkflowFromLocalStorage also handles bad data:
     expect(() => loadWorkflowFromLocalStorage()).not.toThrow();

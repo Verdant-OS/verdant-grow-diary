@@ -9,7 +9,7 @@ import {
   writePersistedDiaryCalendarFilter,
   clearPersistedDiaryCalendarFilter,
 } from "@/lib/diaryCalendarFilterPersistence";
-import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
+import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 beforeEach(() => {
   clearLocalStorageForTest();
@@ -38,7 +38,7 @@ describe("diaryCalendarFilterPersistence", () => {
   });
 
   it("read rejects a corrupted persisted value and returns null", () => {
-    window.localStorage.setItem(DIARY_CALENDAR_FILTER_STORAGE_KEY, "garbage");
+    setLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY, "garbage");
     expect(readPersistedDiaryCalendarFilter()).toBeNull();
   });
 
@@ -50,6 +50,6 @@ describe("diaryCalendarFilterPersistence", () => {
 
   it("write ignores invalid values", () => {
     writePersistedDiaryCalendarFilter("nope" as never);
-    expect(window.localStorage.getItem(DIARY_CALENDAR_FILTER_STORAGE_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY)).toBeNull();
   });
 });

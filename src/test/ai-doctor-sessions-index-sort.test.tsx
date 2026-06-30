@@ -13,6 +13,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
+import { removeLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   applyClientSideSort,
   DEFAULT_FILTERS,
@@ -212,7 +213,7 @@ function renderPage(initialPath = "/doctor/sessions") {
 beforeEach(() => {
   currentRows = [];
   try {
-    window.localStorage.removeItem(SAVED_VIEWS_STORAGE_KEY);
+    removeLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY);
   } catch {
     /* ignore */
   }

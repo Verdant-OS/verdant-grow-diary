@@ -26,6 +26,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import { resolveEntitlements } from "@/lib/entitlements";
+import { getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY,
   clearEnvironmentSummaryExportAuditEvents,
@@ -215,7 +216,7 @@ describe("Environment Summary Report — print/export browser smoke gate", () =>
       endDate: "2026-06-07",
     });
     expect(
-      typeof window.localStorage.getItem(
+      typeof getLocalStorageItemForTest(
         ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY,
       ),
     ).toBe("string");

@@ -13,6 +13,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
+import { getLocalStorageItemForTest, removeLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   addSavedView,
   BUILTIN_SAVED_VIEWS,
@@ -233,7 +234,7 @@ function renderPage(initialPath = "/doctor/sessions") {
 beforeEach(() => {
   currentRows = [];
   try {
-    window.localStorage.removeItem(SAVED_VIEWS_STORAGE_KEY);
+    removeLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY);
   } catch {
     /* ignore */
   }
@@ -332,7 +333,7 @@ describe("AiDoctorSessionsIndex — built-in saved view UI", () => {
       { target: { value: BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID } },
     );
     await screen.findByTestId("ai-doctor-sessions-index-needs-attention-badge");
-    const raw = window.localStorage.getItem(SAVED_VIEWS_STORAGE_KEY) ?? "[]";
+    const raw = getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY) ?? "[]";
     const persisted = parseSavedViews(raw);
     expect(persisted.length).toBe(0);
     expect(persisted.some((v) => isBuiltInSavedViewId(v.id))).toBe(false);
@@ -348,7 +349,7 @@ describe("AiDoctorSessionsIndex — built-in saved view UI", () => {
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     ];
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       SAVED_VIEWS_STORAGE_KEY,
       JSON.stringify(user),
     );

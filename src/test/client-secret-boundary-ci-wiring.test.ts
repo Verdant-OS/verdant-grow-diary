@@ -92,4 +92,50 @@ describe("Client Secret Boundary — CI wiring contract", () => {
       expect(GUARD).toContain(`"${root}"`);
     }
   });
+
+  // --- Proof artifact upload contract (Verdant Client Secret Boundary Proof + Docs v1) ---
+
+  function proofWindow(yml: string): string {
+    const idx = yml.indexOf("Client secret boundary proof artifact");
+    expect(idx).toBeGreaterThan(-1);
+    // Cover the compose step + the immediately-following upload step only.
+    return yml.slice(idx, idx + 1200);
+  }
+
+  it("ci.yml uploads a trusted proof artifact AFTER the guard succeeds", () => {
+    const win = proofWindow(CI_YML);
+    expect(win).toMatch(/client-secret-boundary-proof\.txt/);
+    expect(win).toMatch(/name:\s*client-secret-boundary-proof-ci/);
+    expect(win).toMatch(/actions\/upload-artifact@v4/);
+    // No `if: always()` near the proof upload — it must be gated on guard success.
+    expect(win).not.toMatch(/if:\s*always\(\)/);
+  });
+
+  it("docs-safety.yml uploads a trusted proof artifact AFTER the guard succeeds", () => {
+    const win = proofWindow(DOCS_YML);
+    expect(win).toMatch(/client-secret-boundary-proof\.txt/);
+    expect(win).toMatch(/name:\s*client-secret-boundary-proof-docs-safety/);
+    expect(win).toMatch(/actions\/upload-artifact@v4/);
+    expect(win).not.toMatch(/if:\s*always\(\)/);
+  });
+
+  it("proof artifact heredoc body never contains secrets, tokens, env dumps, or raw logs", () => {
+    const banned = [
+      /Bearer\s+\S+/i,
+      /eyJ[A-Za-z0-9_\-]{6,}\./,
+      /SUPABASE_SERVICE_ROLE_KEY\s*=\s*\S+/,
+      /\benv\b\s*\|/, // `env |` style dumps
+      /raw[_-]?payload/i,
+      /::add-mask::/,
+    ];
+    for (const yml of [CI_YML, DOCS_YML]) {
+      const win = proofWindow(yml);
+      for (const re of banned) {
+        expect(win).not.toMatch(re);
+      }
+      // Positive signal: the proof says "Secrets printed: no".
+      expect(win).toMatch(/Secrets printed:\s*no/);
+      expect(win).toMatch(/Raw logs uploaded:\s*no/);
+    }
+  });
 });

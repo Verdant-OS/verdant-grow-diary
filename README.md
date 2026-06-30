@@ -1,6 +1,10 @@
 # Verdant
 
 [![Quick Log Playwright smoke](https://github.com/Verdant-OS/verdant-grow-diary/actions/workflows/quicklog-smoke.yml/badge.svg?branch=verdant-grow-diary)](https://github.com/Verdant-OS/verdant-grow-diary/actions/workflows/quicklog-smoke.yml)
+[![CI](https://github.com/Verdant-OS/verdant-grow-diary/actions/workflows/ci.yml/badge.svg?branch=verdant-grow-diary)](https://github.com/Verdant-OS/verdant-grow-diary/actions/workflows/ci.yml)
+[![docs-safety](https://github.com/Verdant-OS/verdant-grow-diary/actions/workflows/docs-safety.yml/badge.svg?branch=verdant-grow-diary)](https://github.com/Verdant-OS/verdant-grow-diary/actions/workflows/docs-safety.yml)
+
+These workflows include the Client secret boundary guard. The badge reflects overall workflow status, not the guard alone — see [Client Secret Boundary Guard](./docs/security.md#client-secret-boundary-guard) for how to verify the guard specifically.
 
 Quick links: [Workflow](https://github.com/Verdant-OS/verdant-grow-diary/actions/workflows/quicklog-smoke.yml) · [Latest run](https://github.com/Verdant-OS/verdant-grow-diary/actions/workflows/quicklog-smoke.yml?query=branch%3Averdant-grow-diary) · Artifacts are attached to each completed run under `quicklog-smoke-artifacts` (open the run page → Artifacts).
 

@@ -71,9 +71,9 @@ describe("Quick Log Sensor Truth Context v1 — pre-save copy", () => {
   it("never describes missing/unknown data as healthy or live", () => {
     renderCard();
     const helper = screen.getByTestId("manual-reading-helper").textContent ?? "";
-    expect(helper).not.toMatch(/\bhealthy\b/i);
-    // "not live" is allowed; bare "live sensor" or "live data" is not.
-    expect(helper).not.toMatch(/(^|[^-])\blive sensor data\b(?!.*not)/i);
+    // Positive "healthy" claims are forbidden; "not healthy" is allowed.
+    expect(helper).not.toMatch(/(?:is|are|looks?|reads?)\s+healthy/i);
+    expect(helper).not.toMatch(/\blive sensor data\b(?!.*not)/i);
   });
 });
 

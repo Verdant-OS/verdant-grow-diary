@@ -255,6 +255,19 @@ export default function DailyCheck() {
 
   const loggedAtLabel = useMemo(() => formatDailyCheckLoggedAt(lastSubmittedAt), [lastSubmittedAt]);
 
+  // Timeline continuity link — preserves grow/plant/tent context so the
+  // grower lands on the same scope they just logged into. Pure derivation;
+  // never invents IDs.
+  const timelineHref = useMemo(
+    () =>
+      buildDailyCheckTimelineHref({
+        growId: growId ?? urlGrowId ?? null,
+        plantId: selectedPlant?.id ?? null,
+        tentId: selectedPlant?.tent_id ?? tentId ?? null,
+      }),
+    [growId, urlGrowId, selectedPlant?.id, selectedPlant?.tent_id, tentId],
+  );
+
   function handleSubmitSuccess(method: "note" | "sensor") {
     toast.success(
       method === "note" ? DAILY_CHECK_NOTE_SAVED_TOAST : DAILY_CHECK_SENSOR_SAVED_TOAST,

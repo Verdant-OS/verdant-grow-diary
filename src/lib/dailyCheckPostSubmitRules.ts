@@ -242,3 +242,53 @@ export function buildDailyCheckTimelineHref(
   return qs.length > 0 ? `/timeline?${qs}` : "/timeline";
 }
 
+// ---------------------------------------------------------------------------
+// "What was saved" breakdown (presenter-only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Concise list of items the grower just confirmed as saved. Derived only
+ * from confirmed success state (the `verdant:entry-created` /
+ * `verdant:sensor-reading-created` events). Never infers from drafts,
+ * never invents items, never infers plant health.
+ *
+ * Manual sensor snapshot is intentionally labeled as manual — not live —
+ * to preserve sensor truth rules.
+ */
+export const DAILY_CHECK_SAVED_BREAKDOWN_TITLE = "What was saved";
+export const DAILY_CHECK_SAVED_ITEM_NOTE_LABEL = "Plant note";
+export const DAILY_CHECK_SAVED_ITEM_MANUAL_SNAPSHOT_LABEL =
+  "Manual snapshot — saved as manual, not live sensor data";
+
+export type DailyCheckSavedItemKey = "note" | "manual-snapshot";
+
+export interface DailyCheckSavedItem {
+  key: DailyCheckSavedItemKey;
+  label: string;
+}
+
+export interface DailyCheckSavedItemsInput {
+  source: "note" | "sensor" | null | undefined;
+  submittedAt: number | null | undefined;
+}
+
+export function buildDailyCheckSavedItems(
+  input: DailyCheckSavedItemsInput,
+): DailyCheckSavedItem[] {
+  if (!input) return [];
+  const ts = input.submittedAt;
+  if (ts == null || !Number.isFinite(ts)) return [];
+  if (input.source === "note") {
+    return [{ key: "note", label: DAILY_CHECK_SAVED_ITEM_NOTE_LABEL }];
+  }
+  if (input.source === "sensor") {
+    return [
+      {
+        key: "manual-snapshot",
+        label: DAILY_CHECK_SAVED_ITEM_MANUAL_SNAPSHOT_LABEL,
+      },
+    ];
+  }
+  return [];
+}
+

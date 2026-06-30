@@ -79,10 +79,12 @@ import {
   DAILY_CHECK_SENSOR_SAVED_TOAST,
   DAILY_CHECK_SUCCESS_BODY,
   DAILY_CHECK_SUCCESS_TITLE,
+  DAILY_CHECK_SAVED_BREAKDOWN_TITLE,
   DAILY_CHECK_TIMELINE_CONFIRMATION_BODY,
   DAILY_CHECK_TIMELINE_CONFIRMATION_TITLE,
   DAILY_CHECK_TIMELINE_CTA_LABEL,
   buildDailyCheckPostSubmitActions,
+  buildDailyCheckSavedItems,
   buildDailyCheckTimelineHref,
   formatDailyCheckLoggedAt,
   parseDailyCheckEntrySource,
@@ -268,6 +270,14 @@ export default function DailyCheck() {
   );
 
   const loggedAtLabel = useMemo(() => formatDailyCheckLoggedAt(lastSubmittedAt), [lastSubmittedAt]);
+  const savedItems = useMemo(
+    () =>
+      buildDailyCheckSavedItems({
+        source: lastSubmittedSource,
+        submittedAt: lastSubmittedAt,
+      }),
+    [lastSubmittedSource, lastSubmittedAt],
+  );
 
   // Timeline continuity link — preserves grow/plant/tent context so the
   // grower lands on the same scope they just logged into. Pure derivation;
@@ -383,6 +393,26 @@ export default function DailyCheck() {
                 >
                   {loggedAtLabel}
                 </p>
+              )}
+              {savedItems.length > 0 && (
+                <div
+                  className="mt-2 rounded-md border border-emerald-500/20 bg-background/30 p-2"
+                  data-testid="daily-grow-check-post-submit-saved-items"
+                >
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                    {DAILY_CHECK_SAVED_BREAKDOWN_TITLE}
+                  </div>
+                  <ul className="text-xs text-muted-foreground space-y-0.5 list-disc list-inside">
+                    {savedItems.map((item) => (
+                      <li
+                        key={item.key}
+                        data-testid={`daily-grow-check-post-submit-saved-item-${item.key}`}
+                      >
+                        {item.label}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
               <div className="mt-2">
                 <Button

@@ -16,6 +16,11 @@ import {
   RELEASE_RECEIPT_SOURCES,
   RELEASE_RECEIPT_STATUSES,
   RELEASE_RECEIPT_UNSAFE_SUBSTRINGS,
+  type ParsedReleaseReceiptFailure,
+  type ParsedReleaseReceiptResult,
+  type ParsedReleaseReceiptSuccess,
+  type ReleaseEvidenceBlocker,
+  type ReleaseEvidenceReceipt,
   type ReleaseReceiptArtifactV1,
   type ReleaseReceiptBlocker,
   type ReleaseReceiptCommandResult,
@@ -27,29 +32,16 @@ import {
 import {
   LOCAL_TARGETED_DISCLAIMER,
   MANUAL_NOTE_DISCLAIMER,
-  type EvidenceBlocker,
-  type EvidenceReceipt,
   type ReceiptCategory,
   type ReceiptStatus,
 } from "./releaseReadinessEvidenceReceiptViewModel";
 
-export interface ParsedReleaseReceiptSuccess {
-  ok: true;
-  artifact: ReleaseReceiptArtifactV1;
-  evidenceReceipt: EvidenceReceipt;
-  blockers: EvidenceBlocker[];
-  warnings: string[];
-}
+export type {
+  ParsedReleaseReceiptFailure,
+  ParsedReleaseReceiptResult,
+  ParsedReleaseReceiptSuccess,
+};
 
-export interface ParsedReleaseReceiptFailure {
-  ok: false;
-  errors: string[];
-  warnings: string[];
-}
-
-export type ParsedReleaseReceiptResult =
-  | ParsedReleaseReceiptSuccess
-  | ParsedReleaseReceiptFailure;
 
 // --- Type guards ---------------------------------------------------------
 
@@ -394,7 +386,7 @@ function statusToReceiptStatus(
 
 export function normalizeReleaseReceiptToEvidenceReceipt(
   artifact: ReleaseReceiptArtifactV1,
-): EvidenceReceipt {
+): ReleaseEvidenceReceipt {
   const category = kindToCategory(artifact.receipt_kind);
   const status = statusToReceiptStatus(artifact.status);
 
@@ -454,7 +446,7 @@ export function normalizeReleaseReceiptToEvidenceReceipt(
 
 export function normalizeReleaseReceiptBlockers(
   artifact: ReleaseReceiptArtifactV1,
-): EvidenceBlocker[] {
+): ReleaseEvidenceBlocker[] {
   return artifact.blockers
     .filter((b) => b.active && b.severity === "release_blocker")
     .map((b) => ({ id: b.id, label: b.label, detail: b.summary }));

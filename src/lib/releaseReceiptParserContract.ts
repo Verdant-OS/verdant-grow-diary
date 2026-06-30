@@ -149,3 +149,38 @@ export const RELEASE_RECEIPT_COMMAND_STATUSES: readonly ReleaseReceiptCommandSta
 
 export const RELEASE_RECEIPT_BLOCKER_SEVERITIES: readonly ReleaseReceiptBlockerSeverity[] =
   ["release_blocker", "warning", "info"];
+
+// ---------------------------------------------------------------------------
+// Parser result union (discriminated by `ok`).
+//
+// Re-exports of viewmodel evidence types live alongside the union so the
+// parser result is fully describable from the contract layer alone.
+// Type-only imports — no runtime coupling.
+// ---------------------------------------------------------------------------
+
+import type {
+  EvidenceBlocker as _EvidenceBlocker,
+  EvidenceReceipt as _EvidenceReceipt,
+} from "./releaseReadinessEvidenceReceiptViewModel";
+
+export type ReleaseEvidenceReceipt = _EvidenceReceipt;
+export type ReleaseEvidenceBlocker = _EvidenceBlocker;
+
+export type ParsedReleaseReceiptSuccess = {
+  ok: true;
+  artifact: ReleaseReceiptArtifactV1;
+  evidenceReceipt: ReleaseEvidenceReceipt;
+  blockers: ReleaseEvidenceBlocker[];
+  warnings: string[];
+};
+
+export type ParsedReleaseReceiptFailure = {
+  ok: false;
+  errors: string[];
+  warnings: string[];
+};
+
+export type ParsedReleaseReceiptResult =
+  | ParsedReleaseReceiptSuccess
+  | ParsedReleaseReceiptFailure;
+

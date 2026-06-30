@@ -47,7 +47,7 @@ describe("releaseReceiptParser — contract acceptance", () => {
 
   it("normalizes passing CI artifact with canUnlockReleaseGo=true", () => {
     const r = parseReleaseReceiptArtifact(ciPass);
-    if (!r.ok) throw new Error("expected ok");
+    if (r.ok === false) throw new Error("expected ok");
     expect(r.evidenceReceipt.canUnlockReleaseGo).toBe(true);
     expect(r.evidenceReceipt.blocksReleaseGo).toBe(false);
     expect(r.evidenceReceipt.category).toBe("ci_full_suite");
@@ -55,7 +55,7 @@ describe("releaseReceiptParser — contract acceptance", () => {
 
   it("failing CI artifact becomes blocking evidence and cannot unlock GO", () => {
     const r = parseReleaseReceiptArtifact(ciFail);
-    if (!r.ok) throw new Error("expected ok");
+    if (r.ok === false) throw new Error("expected ok");
     expect(r.evidenceReceipt.canUnlockReleaseGo).toBe(false);
     expect(r.evidenceReceipt.blocksReleaseGo).toBe(true);
     expect(r.blockers.length).toBeGreaterThan(0);
@@ -63,7 +63,7 @@ describe("releaseReceiptParser — contract acceptance", () => {
 
   it("blocked CI artifact produces an active release blocker", () => {
     const r = parseReleaseReceiptArtifact(ciBlocked);
-    if (!r.ok) throw new Error("expected ok");
+    if (r.ok === false) throw new Error("expected ok");
     expect(r.evidenceReceipt.canUnlockReleaseGo).toBe(false);
     expect(r.evidenceReceipt.blocksReleaseGo).toBe(true);
     expect(r.blockers.map((b) => b.id)).toContain("github-actions-billing-limit");
@@ -77,7 +77,7 @@ describe("releaseReceiptParser — contract acceptance", () => {
       source: "local_parser",
     };
     const r = parseReleaseReceiptArtifact(local);
-    if (!r.ok) throw new Error("expected ok");
+    if (r.ok === false) throw new Error("expected ok");
     expect(r.evidenceReceipt.canUnlockReleaseGo).toBe(false);
     expect(r.evidenceReceipt.blocksReleaseGo).toBe(false);
   });
@@ -90,7 +90,7 @@ describe("releaseReceiptParser — contract acceptance", () => {
       source: "manual_import",
     };
     const r = parseReleaseReceiptArtifact(note);
-    if (!r.ok) throw new Error("expected ok");
+    if (r.ok === false) throw new Error("expected ok");
     expect(r.evidenceReceipt.canUnlockReleaseGo).toBe(false);
     expect(r.evidenceReceipt.blocksReleaseGo).toBe(false);
   });
@@ -103,8 +103,12 @@ describe("releaseReceiptParser — rejection rules", () => {
       schema_version: "release-receipt.v9",
     });
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected failure");
+    if (r.ok === true) {
+      throw new Error("expected failure");
+    }
     expect(r.errors.join(" ")).toMatch(/schema_version/);
+
+
   });
 
   it("rejects missing required fields", () => {
@@ -144,7 +148,7 @@ describe("releaseReceiptParser — rejection rules", () => {
       counts: { passed: 1, failed: 1, skipped: 1, total: 99 },
     });
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected failure");
+    if (r.ok === true) throw new Error("expected failure");
     expect(r.errors.join(" ")).toMatch(/total/);
   });
 
@@ -154,7 +158,7 @@ describe("releaseReceiptParser — rejection rules", () => {
       source: "manual_import",
     });
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected failure");
+    if (r.ok === true) throw new Error("expected failure");
     expect(r.errors.join(" ")).toMatch(/manual_import/);
   });
 
@@ -196,7 +200,7 @@ describe("releaseReceiptParser — rejection rules", () => {
 
   it("direct normalizers are pure functions of artifact", () => {
     const r = parseReleaseReceiptArtifact(ciBlocked);
-    if (!r.ok) throw new Error("expected ok");
+    if (r.ok === false) throw new Error("expected ok");
     expect(normalizeReleaseReceiptToEvidenceReceipt(r.artifact)).toEqual(
       r.evidenceReceipt,
     );
@@ -207,14 +211,14 @@ describe("releaseReceiptParser — rejection rules", () => {
 describe("releaseReceiptParser — posture integration", () => {
   it("parsed passing CI + no blockers → posture GO", () => {
     const r = parseReleaseReceiptArtifact(ciPass);
-    if (!r.ok) throw new Error("expected ok");
+    if (r.ok === false) throw new Error("expected ok");
     const posture = deriveReleaseEvidencePosture([r.evidenceReceipt], r.blockers);
     expect(posture.posture).toBe("GO");
   });
 
   it("parsed blocked CI keeps HOLD", () => {
     const r = parseReleaseReceiptArtifact(ciBlocked);
-    if (!r.ok) throw new Error("expected ok");
+    if (r.ok === false) throw new Error("expected ok");
     const posture = deriveReleaseEvidencePosture([r.evidenceReceipt], r.blockers);
     expect(posture.posture).toBe("HOLD");
   });

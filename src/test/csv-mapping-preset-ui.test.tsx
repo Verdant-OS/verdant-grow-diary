@@ -9,11 +9,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import RepresentativeCsvPreview from "@/pages/RepresentativeCsvPreview";
+import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 const CSV_TEXT = "Timestamp,Air_F,RH,EC\n2024-01-01 12:00:00,25,60,1.5";
 
 function seedPreset() {
-  localStorage.setItem(
+  setLocalStorageItemForTest(
     "verdant.csvPreview.mappingPreset.v1",
     JSON.stringify({
       schema_version: 1,
@@ -51,10 +52,10 @@ function seedPreset() {
 
 describe("csv mapping preset UI", () => {
   beforeEach(() => {
-    localStorage.clear();
+    clearLocalStorageForTest();
   });
   afterEach(() => {
-    localStorage.clear();
+    clearLocalStorageForTest();
     vi.restoreAllMocks();
   });
 

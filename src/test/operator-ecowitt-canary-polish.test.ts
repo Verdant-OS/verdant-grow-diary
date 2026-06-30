@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
+import { clearLocalStorageForTest, getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   buildAuditReport,
   clearAuditFromLocalStorage,
@@ -242,7 +243,7 @@ describe("redacted JSON audit export", () => {
 
 describe("localStorage save/restore/clear", () => {
   beforeEach(() => {
-    localStorage.clear();
+    clearLocalStorageForTest();
   });
 
   const verdict = computeVerdict({ preflight: goodPreflight, report: greenReport, logReviewed: true });
@@ -271,7 +272,7 @@ describe("localStorage save/restore/clear", () => {
 
   it("never stores raw pasted text", () => {
     saveAuditToLocalStorage(built);
-    const raw = localStorage.getItem("operator.ecowitt.canary.audit.v1") ?? "";
+    const raw = getLocalStorageItemForTest("operator.ecowitt.canary.audit.v1") ?? "";
     expect(raw).not.toMatch(/pasted_text/i);
     expect(raw).not.toMatch(/<paste>/i);
   });
@@ -295,7 +296,7 @@ describe("localStorage save/restore/clear", () => {
       verdict: v,
     });
     saveAuditToLocalStorage(a);
-    const raw = localStorage.getItem("operator.ecowitt.canary.audit.v1") ?? "";
+    const raw = getLocalStorageItemForTest("operator.ecowitt.canary.audit.v1") ?? "";
     expect(raw).not.toMatch(/AA:BB:CC:DD:EE:FF/);
     expect(raw).not.toMatch(/vbt_fake_token_canary/);
     expect(raw).not.toMatch(/AABBCCDDEEFF0011/);

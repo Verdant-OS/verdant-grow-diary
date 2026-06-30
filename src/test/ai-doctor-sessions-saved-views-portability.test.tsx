@@ -14,6 +14,7 @@ import { resolve } from "node:path";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 // supabase noop mock
 const rangeSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
@@ -93,7 +94,7 @@ function setClipboard(impl: ((text: string) => Promise<void>) | null) {
 }
 
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 afterEach(() => {
@@ -260,7 +261,7 @@ describe("importSavedViewsFromJson", () => {
 describe("AiDoctorSessionsIndex — export action", () => {
   it("copies exported JSON to clipboard via async API", async () => {
     setClipboard(async () => {});
-    window.localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(SEED));
+    setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(SEED));
     renderAt("/doctor/sessions");
     fireEvent.click(await screen.findByTestId("ai-doctor-sessions-saved-views-export"));
     await waitFor(() => expect(writeTextSpy).toHaveBeenCalledTimes(1));
@@ -275,7 +276,7 @@ describe("AiDoctorSessionsIndex — export action", () => {
 
   it("falls back to execCommand when clipboard API is unavailable", async () => {
     setClipboard(null);
-    window.localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(SEED));
+    setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(SEED));
     const execSpy = vi.fn(() => true);
     const originalExec = document.execCommand;
     document.execCommand = execSpy as unknown as typeof document.execCommand;
@@ -330,7 +331,7 @@ describe("AiDoctorSessionsIndex — import action", () => {
   });
 
   it("shows clear error state for invalid JSON and does not change storage", async () => {
-    window.localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(SEED));
+    setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, serializeSavedViews(SEED));
     renderAt("/doctor/sessions");
     await screen.findByTestId("ai-doctor-sessions-saved-views-import-toggle");
     openImportPanel();
@@ -343,7 +344,7 @@ describe("AiDoctorSessionsIndex — import action", () => {
       await screen.findByTestId("ai-doctor-sessions-saved-views-import-error"),
     ).toBeInTheDocument();
     // Untouched.
-    expect(window.localStorage.getItem(SAVED_VIEWS_STORAGE_KEY)).toBe(
+    expect(getLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY)).toBe(
       serializeSavedViews(SEED),
     );
   });

@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { axe } from "vitest-axe";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({
@@ -18,7 +19,7 @@ import Settings from "@/pages/Settings";
 
 beforeEach(() => {
   try {
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   } catch {
     /* ignore */
   }

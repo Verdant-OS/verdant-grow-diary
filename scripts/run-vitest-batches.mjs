@@ -7,10 +7,16 @@
  * huge `bunx vitest run`. Never skips, never hides failures, never
  * updates snapshots.
  *
- * Batching strategy is selectable via `--strategy=contiguous|round-robin`
- * (default contiguous, for backward compatibility). round-robin spreads
- * alphabetically clustered files across batches to avoid piling memory-heavy
- * suites (e.g. `ecowitt-*` jsdom tests) into a single worker.
+ * Supports:
+ *   --batches=N            total batches (default 8)
+ *   --batch=K              run only batch K (0-indexed)
+ *   --strategy=contiguous|round-robin   (default contiguous)
+ *   --chunk-size=N         inside a batch, run N files per vitest invocation
+ *                          (releases worker memory between chunks)
+ *   --isolate              pass --isolate to vitest
+ *   --pool=forks|threads|vmThreads   pass --pool to vitest
+ *   --reporter=dot|verbose
+ *   --continue-on-fail
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
@@ -19,7 +25,9 @@ import { resolve, join, relative } from "node:path";
 import {
   sortTestFiles,
   splitIntoBatches,
+  splitIntoBatchesRoundRobin,
   selectBatch,
+  splitIntoChunks,
   parseBatchArgs,
   chunkArray,
 } from "./vitest-batch-utils.mjs";
@@ -54,73 +62,49 @@ function discoverTestFiles(dir) {
   return out;
 }
 
-/** Run one Vitest invocation over `files`, forwarding isolation options. */
-function runVitest(label, files, opts) {
-  const cmd = "bunx";
+function buildVitestArgs(files, opts) {
   const args = ["vitest", "run", `--reporter=${opts.reporter}`];
   if (opts.isolate) args.push("--isolate");
   if (opts.pool) args.push(`--pool=${opts.pool}`);
   args.push(...files);
-  console.log(`  ▶ ${label}: ${files.length} files\n    $ ${cmd} ${args.join(" ")}`);
-  const res = spawnSync(cmd, args, { stdio: "inherit", cwd: ROOT });
-  const ok = res.status === 0;
-  console.log(`  ◀ ${label}: ${ok ? "PASS" : "FAIL"} (exit ${res.status})`);
-  return { ok, code: res.status };
+  return args;
 }
 
-/**
- * Run a batch, optionally splitting it into fixed-size chunks. Each chunk is a
- * fresh Vitest process, so heap is released between chunks — this is the
- * worker-isolation mechanism that prevents OOM accumulation.
- */
-function runBatch(batchNumber, files, opts) {
-  const chunks = opts.chunkSize ? chunkArray(files, opts.chunkSize) : [files];
-  emitMarker("VERDANT_BATCH_START", {
-    batch: batchNumber,
-    batches: opts.batches,
-    strategy: opts.strategy,
-    chunkSize: opts.chunkSize ?? null,
-    fileCount: files.length,
-    chunks: chunks.length,
-  });
+function runVitest(label, files, opts) {
+  const args = buildVitestArgs(files, opts);
   console.log(
-    `\n▶ Batch ${batchNumber}: ${files.length} files in ${chunks.length} chunk(s)` +
-      (opts.chunkSize ? ` (chunk-size=${opts.chunkSize})` : "") +
-      (opts.isolate ? " [isolate]" : "") +
-      (opts.pool ? ` [pool=${opts.pool}]` : ""),
+    `\n▶ ${label}: ${files.length} files\n  $ bunx ${args.join(" ")}`,
   );
-  let ok = true;
-  let batchCode = 0;
+  const res = spawnSync("bunx", args, { stdio: "inherit", cwd: ROOT });
+  const ok = res.status === 0;
+  console.log(`◀ ${label}: ${ok ? "PASS" : "FAIL"} (exit ${res.status})`);
+  return ok;
+}
+
+function runBatch(batchNumber, files, opts) {
+  if (!opts.chunkSize || files.length <= opts.chunkSize) {
+    return runVitest(`Batch ${batchNumber}`, files, opts);
+  }
+  const chunks = splitIntoChunks(files, opts.chunkSize);
+  console.log(
+    `\n▶ Batch ${batchNumber}: ${files.length} files in ${chunks.length} chunk(s) of <= ${opts.chunkSize}`,
+  );
+  let allOk = true;
   for (let c = 0; c < chunks.length; c++) {
-    const label = `Batch ${batchNumber} chunk ${c + 1}/${chunks.length}`;
-    emitMarker("VERDANT_CHUNK_START", {
-      batch: batchNumber,
-      chunk: c + 1,
-      chunks: chunks.length,
-      fileCount: chunks[c].length,
-    });
-    const { ok: chunkOk, code } = runVitest(label, chunks[c], opts);
-    emitMarker("VERDANT_CHUNK_END", {
-      batch: batchNumber,
-      chunk: c + 1,
-      status: chunkOk ? "pass" : "fail",
-      exitCode: code,
-    });
-    if (!chunkOk) {
-      ok = false;
-      batchCode = code ?? 1;
+    const ok = runVitest(
+      `Batch ${batchNumber} chunk ${c + 1}/${chunks.length}`,
+      chunks[c],
+      opts,
+    );
+    if (!ok) {
+      allOk = false;
       if (!opts.continueOnFail) break;
     }
   }
   console.log(
-    `◀ Batch ${batchNumber}: ${ok ? "PASS" : "FAIL"} (${chunks.length} chunk(s))`,
+    `◀ Batch ${batchNumber}: ${allOk ? "PASS" : "FAIL"} (all chunks)`,
   );
-  emitMarker("VERDANT_BATCH_END", {
-    batch: batchNumber,
-    status: ok ? "pass" : "fail",
-    exitCode: ok ? 0 : batchCode,
-  });
-  return ok;
+  return allOk;
 }
 
 function main() {
@@ -140,10 +124,14 @@ function main() {
 
   let groups;
   try {
-    groups =
-      opts.batch === null
-        ? splitIntoBatches(all, opts.batches, opts.strategy)
-        : [selectBatch(all, opts.batches, opts.batch, opts.strategy)];
+    if (opts.batch === null) {
+      groups =
+        opts.strategy === "round-robin"
+          ? splitIntoBatchesRoundRobin(all, opts.batches)
+          : splitIntoBatches(all, opts.batches);
+    } else {
+      groups = [selectBatch(all, opts.batches, opts.batch, opts.strategy)];
+    }
   } catch (e) {
     console.error("✗", e.message);
     process.exit(2);

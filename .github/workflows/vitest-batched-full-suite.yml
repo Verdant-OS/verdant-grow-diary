@@ -2,21 +2,14 @@ name: Vitest Batched Full Suite (optional)
 
 # Optional, manual-only batched full-suite validation. Mirrors the
 # Verdant Batched Validation Runner v1 — runs src/test in deterministic
-# batches so the full suite can complete in CI without OOM/timeout.
-# Does NOT replace the existing PR-default gates in ci.yml.
-#
-# Coverage contract: the matrix runs exactly 16 partitions (0..15) using the
-# round-robin strategy, so memory-heavy alphabetically clustered suites
-# (e.g. `ecowitt-*` jsdom tests) are spread across batches instead of piling
-# into one worker. The `batches` input is kept for visibility but MUST stay 16
-# to match the matrix — a guard step fails loudly on any mismatch so we never
-# silently leave partitions unvalidated.
+# batches with worker isolation/chunking so the full suite can complete
+# in CI without OOM/timeout. Does NOT replace PR-default gates in ci.yml.
 
 on:
   workflow_dispatch:
     inputs:
       batches:
-        description: "Total batches (must equal the 16-job matrix; keep at 16)"
+        description: "Total batches (locked to 16 for worker-isolation matrix)"
         required: false
         default: "16"
       reporter:
@@ -29,10 +22,10 @@ jobs:
     name: Batched Vitest (matrix)
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Raise Node's old-space heap above the 2 GB default so individual
-    # vitest batches do not OOM mid-run. GitHub-hosted ubuntu-latest runners
-    # ship with ~7 GB RAM, so 4096 MB is safe.
     env:
+      # Raise Node's old-space heap above the 2 GB default. Chunking +
+      # isolation below releases worker memory between chunks so this
+      # ceiling is rarely approached, but keep the safety margin.
       NODE_OPTIONS: --max-old-space-size=4096
     strategy:
       fail-fast: false
@@ -59,6 +52,13 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
+      - name: Guard — batches input must equal 16 for worker isolation matrix
+        run: |
+          if [ "${{ github.event.inputs.batches }}" != "16" ]; then
+            echo "::error::This workflow requires batches=16 (got ${{ github.event.inputs.batches }})."
+            exit 1
+          fi
+
       - name: Safety gates (typecheck + sensor + docs)
         run: |
           bun run typecheck
@@ -69,17 +69,13 @@ jobs:
       - name: Batch utils self-test
         run: node scripts/test-vitest-batch-utils.mjs
 
-      - name: Run batch ${{ matrix.batch }} of ${{ inputs.batches }}
-        # Worker isolation: each batch runs its files in fixed-size chunks
-        # (--chunk-size), one fresh Vitest process per chunk, with --isolate
-        # and the forks pool so heap is released between chunks. This prevents
-        # the per-worker jsdom heap accumulation that OOMed a batch at 4 GB.
+      - name: Run batch ${{ matrix.batch }} of 16 (round-robin, chunked, isolated)
         run: |
           node scripts/run-vitest-batches.mjs \
-            --batches=${{ inputs.batches }} \
+            --batches=16 \
             --batch=${{ matrix.batch }} \
-            --reporter=${{ inputs.reporter }} \
             --strategy=round-robin \
+            --reporter=${{ github.event.inputs.reporter }} \
             --chunk-size=1 \
             --isolate \
             --pool=forks

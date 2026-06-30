@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   readTentPlantRosterIncludeArchived,
   writeTentPlantRosterIncludeArchived,
@@ -10,7 +11,7 @@ import { resolve } from "node:path";
 describe("tentPlantRosterPreferences", () => {
   beforeEach(() => {
     try {
-      window.localStorage.clear();
+      clearLocalStorageForTest();
     } catch {
       /* no-op */
     }
@@ -38,11 +39,11 @@ describe("tentPlantRosterPreferences", () => {
 
   it("rejects corrupt/invalid values and falls back to false", () => {
     const key = tentPlantRosterIncludeArchivedKey("tent-a")!;
-    window.localStorage.setItem(key, "yes");
+    setLocalStorageItemForTest(key, "yes");
     expect(readTentPlantRosterIncludeArchived("tent-a")).toBe(false);
-    window.localStorage.setItem(key, "{}");
+    setLocalStorageItemForTest(key, "{}");
     expect(readTentPlantRosterIncludeArchived("tent-a")).toBe(false);
-    window.localStorage.setItem(key, "1");
+    setLocalStorageItemForTest(key, "1");
     expect(readTentPlantRosterIncludeArchived("tent-a")).toBe(false);
   });
 

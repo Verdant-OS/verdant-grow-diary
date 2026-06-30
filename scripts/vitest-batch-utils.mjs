@@ -91,10 +91,37 @@ export function splitIntoBatches(files, batches, strategy = "contiguous") {
 }
 
 /**
- * Return the slice for a specific 0-indexed batch.
+ * Split a sorted list into N round-robin batches.
+ * File at index i goes to batch (i % N). Spreads heavy/light files evenly.
  * @param {string[]} files - pre-sorted array
+ * @param {number} batches - integer >= 1
+ * @returns {string[][]}
+ */
+export function splitIntoBatchesRoundRobin(files, batches) {
+  if (!Array.isArray(files)) {
+    throw new TypeError("splitIntoBatchesRoundRobin: files must be an array");
+  }
+  if (!Number.isInteger(batches) || batches < 1) {
+    throw new RangeError(
+      "splitIntoBatchesRoundRobin: batches must be a positive integer",
+    );
+  }
+  if (files.length === 0) {
+    throw new RangeError("splitIntoBatchesRoundRobin: no test files to split");
+  }
+  const n = Math.min(batches, files.length);
+  const out = Array.from({ length: n }, () => []);
+  for (let i = 0; i < files.length; i++) {
+    out[i % n].push(files[i]);
+  }
+  return out;
+}
+
+/**
+ * Return the slice for a specific 0-indexed batch under the given strategy.
+ * @param {string[]} files
  * @param {number} batches
- * @param {number} batchIndex - 0-indexed
+ * @param {number} batchIndex
  * @param {"contiguous"|"round-robin"} [strategy="contiguous"]
  * @returns {string[]}
  */
@@ -102,7 +129,10 @@ export function selectBatch(files, batches, batchIndex, strategy = "contiguous")
   if (!Number.isInteger(batchIndex) || batchIndex < 0) {
     throw new RangeError("selectBatch: batchIndex must be a non-negative integer");
   }
-  const split = splitIntoBatches(files, batches, strategy);
+  const split =
+    strategy === "round-robin"
+      ? splitIntoBatchesRoundRobin(files, batches)
+      : splitIntoBatches(files, batches);
   if (batchIndex >= split.length) {
     throw new RangeError(
       `selectBatch: batchIndex ${batchIndex} out of range (have ${split.length} batches)`,
@@ -112,23 +142,23 @@ export function selectBatch(files, batches, batchIndex, strategy = "contiguous")
 }
 
 /**
- * Split an array into fixed-size chunks (last chunk may be shorter).
- * Used to run each batch's files in smaller Vitest invocations so heap is
- * released between chunks (worker isolation), avoiding OOM accumulation.
- * @param {any[]} items
- * @param {number} size - integer >= 1
- * @returns {any[][]}
+ * Split a list of files into contiguous chunks of at most `chunkSize`.
+ * Preserves order. If chunkSize >= files.length, returns one chunk.
+ * @param {string[]} files
+ * @param {number} chunkSize - positive integer
+ * @returns {string[][]}
  */
-export function chunkArray(items, size) {
-  if (!Array.isArray(items)) {
-    throw new TypeError("chunkArray: items must be an array");
+export function splitIntoChunks(files, chunkSize) {
+  if (!Array.isArray(files)) {
+    throw new TypeError("splitIntoChunks: files must be an array");
   }
-  if (!Number.isInteger(size) || size < 1) {
-    throw new RangeError("chunkArray: size must be a positive integer");
+  if (!Number.isInteger(chunkSize) || chunkSize < 1) {
+    throw new RangeError("splitIntoChunks: chunkSize must be a positive integer");
   }
+  if (files.length === 0) return [];
   const out = [];
-  for (let i = 0; i < items.length; i += size) {
-    out.push(items.slice(i, i + size));
+  for (let i = 0; i < files.length; i += chunkSize) {
+    out.push(files.slice(i, i + chunkSize));
   }
   return out;
 }
@@ -144,8 +174,6 @@ export function parseBatchArgs(argv) {
     reporter: "dot",
     continueOnFail: false,
     strategy: "contiguous",
-    // Worker-isolation options. Defaults keep prior behavior: no chunking,
-    // no explicit --isolate / --pool forwarded to Vitest.
     chunkSize: null,
     isolate: false,
     pool: null,
@@ -207,6 +235,37 @@ export function parseBatchArgs(argv) {
       case "continue-on-fail":
         out.continueOnFail = val === "true" || val === "1";
         break;
+      case "strategy": {
+        if (val !== "contiguous" && val !== "round-robin") {
+          throw new RangeError(
+            `--strategy must be "contiguous" or "round-robin" (got ${val})`,
+          );
+        }
+        out.strategy = val;
+        break;
+      }
+      case "chunk-size": {
+        const n = Number.parseInt(val, 10);
+        if (!Number.isInteger(n) || n < 1) {
+          throw new RangeError(
+            `--chunk-size must be a positive integer (got ${val})`,
+          );
+        }
+        out.chunkSize = n;
+        break;
+      }
+      case "isolate":
+        out.isolate = val === "true" || val === "1";
+        break;
+      case "pool": {
+        if (val !== "forks" && val !== "threads" && val !== "vmThreads") {
+          throw new RangeError(
+            `--pool must be "forks", "threads", or "vmThreads" (got ${val})`,
+          );
+        }
+        out.pool = val;
+        break;
+      }
       default:
         // Ignore unknown flags so Vitest forwarding can be layered later.
         break;

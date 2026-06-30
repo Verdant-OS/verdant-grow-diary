@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -51,6 +52,16 @@ jobs:
       # static-safety scans must pass on every PR.
       - name: Static safety scans (Action Queue provenance + chip)
         run: bun run test:static-safety
+
+      # Stop-ship: every test file in src/test/** must route localStorage
+      # through src/test/helpers/localStorageTestHelper.ts so jsdom
+      # environments without a built-in localStorage (e.g. Windows + Node 26)
+      # keep working via the in-memory shim installed by src/test/setup.ts.
+      # See scripts/assert-test-localstorage-helper-usage.mjs.
+      - name: Test localStorage helper enforcement
+        run: |
+          node scripts/assert-test-localstorage-helper-usage.mjs
+          node scripts/test-localstorage-helper-usage-audit.mjs
 
       # Release docs safety: docs/releases/*.md must not claim unsafe
       # behavior (live telemetry, import writes, AI behavior changes,
@@ -184,6 +195,36 @@ jobs:
           name: scanner-guardrail-slow-tests
           path: test-results/scanner-guardrail-slow-tests.jsonl
           if-no-files-found: ignore
+
+      # Ecowitt bridge status page suite runs reliably on CI/Linux but
+      # times out in low-capacity sandboxes. Run with the exact parity
+      # command, capture full verbose output + exit code as artifacts,
+      # and fail the job if the suite does not complete with exit 0.
+      # See docs/test-validation-notes.md.
+      - name: Run ecowitt bridge CI validation
+        id: ecowitt_bridge_ci
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          echo "not-run" > artifacts/ecowitt-bridge-ci-exit-code.txt
+          : > artifacts/ecowitt-bridge-ci-output.txt
+          set +e
+          NODE_OPTIONS=--max-old-space-size=4096 bunx vitest run src/test/ecowitt-bridge-status-page.test.tsx --reporter=verbose --isolate --pool=forks 2>&1 | tee artifacts/ecowitt-bridge-ci-output.txt
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "$status" > artifacts/ecowitt-bridge-ci-exit-code.txt
+          echo "Ecowitt bridge CI validation exit code: $status"
+          exit "$status"
+
+      - name: Upload ecowitt bridge CI validation artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ecowitt-bridge-ci-validation
+          path: |
+            artifacts/ecowitt-bridge-ci-output.txt
+            artifacts/ecowitt-bridge-ci-exit-code.txt
+          if-no-files-found: warn
 
       - name: Build
         run: bun run build

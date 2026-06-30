@@ -15,6 +15,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { resolveEntitlements } from "@/lib/entitlements";
+import { getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY,
   clearEnvironmentSummaryExportAuditEvents,
@@ -185,7 +186,7 @@ describe("EnvironmentSummaryReportPage — drilldown print action", () => {
     expect(events[0].issueRuleId).toBe("source.review");
     expect(events[0].source).toBe("local_only");
     expect(
-      typeof window.localStorage.getItem(
+      typeof getLocalStorageItemForTest(
         ENVIRONMENT_SUMMARY_EXPORT_AUDIT_STORAGE_KEY,
       ),
     ).toBe("string");

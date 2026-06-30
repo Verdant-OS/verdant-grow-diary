@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { DiaryTimelineCategorySections } from "@/components/DiaryTimelineCategorySections";
+import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 interface FakeItem {
   id: string;
@@ -201,7 +202,7 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
 
   beforeEach(() => {
     try {
-      window.localStorage.clear();
+      clearLocalStorageForTest();
     } catch {
       /* ignore */
     }
@@ -272,7 +273,7 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /Watering/i }));
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = getLocalStorageItemForTest(STORAGE_KEY);
     expect(raw).not.toBeNull();
     const parsed = JSON.parse(raw!);
     expect(parsed.watering).toBe(false);
@@ -281,7 +282,7 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
   });
 
   it("reads saved state from localStorage on mount", () => {
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       STORAGE_KEY,
       JSON.stringify({ watering: false, photos: false }),
     );
@@ -311,7 +312,7 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
   });
 
   it("malformed localStorage value does not crash and falls back to defaults", () => {
-    window.localStorage.setItem(STORAGE_KEY, "{not valid json");
+    setLocalStorageItemForTest(STORAGE_KEY, "{not valid json");
     expect(() =>
       render(
         <DiaryTimelineCategorySections
@@ -329,7 +330,7 @@ describe("DiaryTimelineCategorySections — controls + saved state", () => {
   });
 
   it("unknown saved keys are ignored", () => {
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       STORAGE_KEY,
       JSON.stringify({ "totally-unknown": false, watering: false }),
     );

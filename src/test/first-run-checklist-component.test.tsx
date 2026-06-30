@@ -6,6 +6,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import FirstRunChecklist from "@/components/FirstRunChecklist";
 import { FIRST_RUN_DISMISS_STORAGE_KEY } from "@/lib/firstRunChecklistViewModel";
+import { getLocalStorageItemForTest, removeLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 function renderWithRouter(ui: React.ReactElement) {
   return render(<MemoryRouter>{ui}</MemoryRouter>);
@@ -14,7 +15,7 @@ function renderWithRouter(ui: React.ReactElement) {
 beforeEach(() => {
   cleanup();
   try {
-    window.localStorage.removeItem(FIRST_RUN_DISMISS_STORAGE_KEY);
+    removeLocalStorageItemForTest(FIRST_RUN_DISMISS_STORAGE_KEY);
   } catch {
     /* ignore */
   }
@@ -57,12 +58,12 @@ describe("FirstRunChecklist component", () => {
     );
     fireEvent.click(screen.getByTestId("first-run-checklist-dismiss"));
     expect(
-      window.localStorage.getItem(FIRST_RUN_DISMISS_STORAGE_KEY),
+      getLocalStorageItemForTest(FIRST_RUN_DISMISS_STORAGE_KEY),
     ).toBe("1");
   });
 
   it("hides when dismissed with partial (non-zero-grow) setup", () => {
-    window.localStorage.setItem(FIRST_RUN_DISMISS_STORAGE_KEY, "1");
+    setLocalStorageItemForTest(FIRST_RUN_DISMISS_STORAGE_KEY, "1");
     renderWithRouter(
       <FirstRunChecklist growCount={1} tentCount={0} plantCount={0} />,
     );
@@ -71,7 +72,7 @@ describe("FirstRunChecklist component", () => {
   });
 
   it("zero-grow override: stays visible even when dismissed", () => {
-    window.localStorage.setItem(FIRST_RUN_DISMISS_STORAGE_KEY, "1");
+    setLocalStorageItemForTest(FIRST_RUN_DISMISS_STORAGE_KEY, "1");
     renderWithRouter(
       <FirstRunChecklist growCount={0} tentCount={0} plantCount={0} />,
     );
@@ -80,13 +81,13 @@ describe("FirstRunChecklist component", () => {
   });
 
   it("'Show setup checklist' restores the card", () => {
-    window.localStorage.setItem(FIRST_RUN_DISMISS_STORAGE_KEY, "1");
+    setLocalStorageItemForTest(FIRST_RUN_DISMISS_STORAGE_KEY, "1");
     renderWithRouter(
       <FirstRunChecklist growCount={1} tentCount={1} plantCount={0} />,
     );
     fireEvent.click(screen.getByTestId("first-run-checklist-restore"));
     expect(screen.getByTestId("first-run-checklist")).toBeTruthy();
-    expect(window.localStorage.getItem(FIRST_RUN_DISMISS_STORAGE_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(FIRST_RUN_DISMISS_STORAGE_KEY)).toBeNull();
   });
 
   it("renders nothing when fully activated", () => {

@@ -16,6 +16,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   addView,
   buildView,
@@ -171,7 +172,7 @@ describe("buildView", () => {
 
 describe("useLeadSavedViews — persistence", () => {
   beforeEach(() => {
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   });
 
   it("saves current search/filter/sort state to storage", () => {
@@ -185,7 +186,7 @@ describe("useLeadSavedViews — persistence", () => {
       });
     });
     expect(result.current.views.length).toBe(1);
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = getLocalStorageItemForTest(STORAGE_KEY);
     expect(raw).toBeTruthy();
     const parsed = JSON.parse(raw!);
     expect(parsed[0].search).toBe("Pulse");
@@ -203,7 +204,7 @@ describe("useLeadSavedViews — persistence", () => {
         sort: "newest",
       });
     });
-    const raw = window.localStorage.getItem(STORAGE_KEY)!;
+    const raw = getLocalStorageItemForTest(STORAGE_KEY)!;
     const parsed = JSON.parse(raw);
     const allowed = new Set([
       "id",
@@ -268,7 +269,7 @@ describe("useLeadSavedViews — persistence", () => {
   });
 
   it("handles malformed localStorage on init without throwing", () => {
-    window.localStorage.setItem(STORAGE_KEY, "not-json");
+    setLocalStorageItemForTest(STORAGE_KEY, "not-json");
     const { result } = renderHook(() => useLeadSavedViews());
     expect(result.current.views).toEqual([]);
   });

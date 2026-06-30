@@ -12,6 +12,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
+import { removeLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID,
   SAVED_VIEWS_STORAGE_KEY,
@@ -76,13 +77,13 @@ function renderPage(initialPath = "/doctor/sessions") {
 }
 
 function seedUserViews(views: SavedView[]) {
-  window.localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, JSON.stringify(views));
+  setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, JSON.stringify(views));
 }
 
 beforeEach(() => {
   currentRows = [makeRow("a")];
   try {
-    window.localStorage.removeItem(SAVED_VIEWS_STORAGE_KEY);
+    removeLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY);
   } catch {
     /* ignore */
   }

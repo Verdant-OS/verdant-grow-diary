@@ -100,6 +100,7 @@ describe("AppSidebar — non-operator authenticated grower", () => {
       "/operator/ai-doctor-phase1",
       "/operator/demo-preview",
       "/operator/ecowitt",
+      "/operator/release-readiness",
       "/diagnostics",
       "/sensors/ecowitt-audit",
       "/sensors/ingest-normalizer",
@@ -142,6 +143,12 @@ describe("AppSidebar — operator user", () => {
   it("still renders /grow-lineage (operator role does not hide grower tools)", () => {
     render(wrap(<AppSidebar />));
     expect(hrefSet().has("/grow-lineage")).toBe(true);
+  });
+
+  it("exposes the operator-only Release Readiness deep link", () => {
+    render(wrap(<AppSidebar />));
+    expect(hrefSet().has("/operator/release-readiness")).toBe(true);
+    expect(screen.getByText("Release Readiness")).toBeInTheDocument();
   });
 });
 

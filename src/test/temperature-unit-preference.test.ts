@@ -12,6 +12,7 @@
  *    paths touched here.
  */
 import { describe, it, expect, beforeEach } from "vitest";
+import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   DEFAULT_TEMPERATURE_UNIT,
   TEMPERATURE_UNIT_OPTIONS,
@@ -26,7 +27,7 @@ import {
 
 beforeEach(() => {
   try {
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   } catch {
     /* ignore */
   }
@@ -44,7 +45,7 @@ describe("temperatureUnitPreference — defaults and persistence", () => {
   });
 
   it("ignores corrupted storage values and returns the default", () => {
-    window.localStorage.setItem("verdant:temperatureUnit", "kelvin");
+    setLocalStorageItemForTest("verdant:temperatureUnit", "kelvin");
     expect(loadTemperatureUnitPreference()).toBe("fahrenheit");
   });
 

@@ -12,6 +12,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 import type { Diagnosis } from "@/lib/aiDoctorDiagnosisRules";
+import { removeLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   BUILTIN_SAVED_VIEW_NEEDS_ATTENTION_ID,
   BUILTIN_SAVED_VIEW_TOOLTIP,
@@ -79,7 +80,7 @@ function renderPage(initialPath = "/doctor/sessions") {
 beforeEach(() => {
   currentRows = [];
   try {
-    window.localStorage.removeItem(SAVED_VIEWS_STORAGE_KEY);
+    removeLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY);
   } catch {
     /* ignore */
   }
@@ -139,7 +140,7 @@ describe("AiDoctorSessionsIndex — Built-in badge + tooltip", () => {
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     ];
-    window.localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, JSON.stringify(user));
+    setLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY, JSON.stringify(user));
     currentRows = [makeRow("a")];
     renderPage();
     await screen.findByTestId("ai-doctor-sessions-index-list");

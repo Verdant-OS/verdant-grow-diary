@@ -73,6 +73,7 @@ import OneTentLiveProof from "./pages/OneTentLiveProof";
 import DemoProofWalkthrough from "./pages/DemoProofWalkthrough";
 import ContextualPhenoComparisonDemo from "./pages/ContextualPhenoComparisonDemo";
 import RequireOperatorRole from "./components/RequireOperatorRole";
+import ReleaseReadiness from "./pages/ReleaseReadiness";
 
 const queryClient = new QueryClient();
 
@@ -221,6 +222,10 @@ const App = () => (
                   <Route
                     path="/operator/demo-preview"
                     element={<OperatorDemoPreview />}
+                  />
+                  <Route
+                    path="/operator/release-readiness"
+                    element={<ReleaseReadiness />}
                   />
                   {/* Diagnostics Audience Split v1 — /diagnostics is an
                       operator-only RLS / round-trip / DevOps surface; manifest

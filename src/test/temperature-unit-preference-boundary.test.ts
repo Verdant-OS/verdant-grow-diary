@@ -15,6 +15,7 @@
  *  - Pure: no Supabase, no AI, no Action Queue, no schema, no fetch.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   formatTemperatureDisplay,
   loadTemperatureUnitPreference,
@@ -32,7 +33,7 @@ import { formatTempDualF } from "@/lib/temperatureDisplay";
 
 beforeEach(() => {
   try {
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   } catch {
     /* ignore */
   }
@@ -118,12 +119,12 @@ describe("legacy F-only helpers are insulated from preference", () => {
 describe("safety boundary", () => {
   it("storage key is the scoped Verdant enum, no PII", () => {
     saveTemperatureUnitPreference("celsius");
-    const raw = window.localStorage.getItem("verdant:temperatureUnit");
+    const raw = getLocalStorageItemForTest("verdant:temperatureUnit");
     expect(raw).toBe("celsius");
   });
 
   it("rejects invalid saved values and falls back to default", () => {
-    window.localStorage.setItem("verdant:temperatureUnit", "kelvin");
+    setLocalStorageItemForTest("verdant:temperatureUnit", "kelvin");
     expect(loadTemperatureUnitPreference()).toBe("fahrenheit");
   });
 });

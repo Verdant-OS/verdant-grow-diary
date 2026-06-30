@@ -348,13 +348,19 @@ export default function DailyCheck() {
                 className="text-sm font-semibold"
                 data-testid="daily-grow-check-post-submit-title"
               >
-                {DAILY_CHECK_SUCCESS_TITLE}
+                {DAILY_CHECK_TIMELINE_CONFIRMATION_TITLE}
               </div>
               <p
                 className="text-xs text-muted-foreground"
                 data-testid="daily-grow-check-post-submit-body"
               >
-                {DAILY_CHECK_SUCCESS_BODY}
+                {DAILY_CHECK_TIMELINE_CONFIRMATION_BODY}
+              </p>
+              <p
+                className="text-[11px] text-muted-foreground/80 mt-1"
+                data-testid="daily-grow-check-post-submit-prior-summary"
+              >
+                {DAILY_CHECK_SUCCESS_TITLE} — {DAILY_CHECK_SUCCESS_BODY}
               </p>
               {loggedAtLabel && (
                 <p
@@ -364,6 +370,20 @@ export default function DailyCheck() {
                   {loggedAtLabel}
                 </p>
               )}
+              <div className="mt-2">
+                <Button
+                  asChild
+                  size="sm"
+                  variant="default"
+                  className="h-9"
+                  data-testid="daily-grow-check-post-submit-timeline"
+                >
+                  <Link to={timelineHref} data-href={timelineHref}>
+                    {DAILY_CHECK_TIMELINE_CTA_LABEL}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
             </div>
           </div>
           {lastSubmittedSource === "sensor" && (

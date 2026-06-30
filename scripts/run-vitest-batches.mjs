@@ -21,6 +21,7 @@ import {
   splitIntoBatches,
   selectBatch,
   parseBatchArgs,
+  chunkArray,
 } from "./vitest-batch-utils.mjs";
 
 const ROOT = process.cwd();
@@ -44,15 +45,45 @@ function discoverTestFiles(dir) {
   return out;
 }
 
-function runBatch(batchNumber, files, reporter) {
+/** Run one Vitest invocation over `files`, forwarding isolation options. */
+function runVitest(label, files, opts) {
   const cmd = "bunx";
-  const args = ["vitest", "run", `--reporter=${reporter}`, ...files];
-  console.log(
-    `\n▶ Batch ${batchNumber}: ${files.length} files\n  $ ${cmd} ${args.join(" ")}`,
-  );
+  const args = ["vitest", "run", `--reporter=${opts.reporter}`];
+  if (opts.isolate) args.push("--isolate");
+  if (opts.pool) args.push(`--pool=${opts.pool}`);
+  args.push(...files);
+  console.log(`  ▶ ${label}: ${files.length} files\n    $ ${cmd} ${args.join(" ")}`);
   const res = spawnSync(cmd, args, { stdio: "inherit", cwd: ROOT });
   const ok = res.status === 0;
-  console.log(`◀ Batch ${batchNumber}: ${ok ? "PASS" : "FAIL"} (exit ${res.status})`);
+  console.log(`  ◀ ${label}: ${ok ? "PASS" : "FAIL"} (exit ${res.status})`);
+  return ok;
+}
+
+/**
+ * Run a batch, optionally splitting it into fixed-size chunks. Each chunk is a
+ * fresh Vitest process, so heap is released between chunks — this is the
+ * worker-isolation mechanism that prevents OOM accumulation.
+ */
+function runBatch(batchNumber, files, opts) {
+  const chunks = opts.chunkSize ? chunkArray(files, opts.chunkSize) : [files];
+  console.log(
+    `\n▶ Batch ${batchNumber}: ${files.length} files in ${chunks.length} chunk(s)` +
+      (opts.chunkSize ? ` (chunk-size=${opts.chunkSize})` : "") +
+      (opts.isolate ? " [isolate]" : "") +
+      (opts.pool ? ` [pool=${opts.pool}]` : ""),
+  );
+  let ok = true;
+  for (let c = 0; c < chunks.length; c++) {
+    const label = `Batch ${batchNumber} chunk ${c + 1}/${chunks.length}`;
+    const chunkOk = runVitest(label, chunks[c], opts);
+    if (!chunkOk) {
+      ok = false;
+      if (!opts.continueOnFail) break;
+    }
+  }
+  console.log(
+    `◀ Batch ${batchNumber}: ${ok ? "PASS" : "FAIL"} (${chunks.length} chunk(s))`,
+  );
   return ok;
 }
 
@@ -86,6 +117,9 @@ function main() {
     `Verdant Batched Validation Runner v1 — ${all.length} test files, ` +
       `${opts.batch === null ? opts.batches : 1} batch(es), ` +
       `strategy=${opts.strategy}, reporter=${opts.reporter}` +
+      (opts.chunkSize ? `, chunk-size=${opts.chunkSize}` : "") +
+      (opts.isolate ? ", isolate" : "") +
+      (opts.pool ? `, pool=${opts.pool}` : "") +
       (opts.batch !== null ? ` (only batch ${opts.batch})` : "") +
       (opts.continueOnFail ? " [continue-on-fail]" : ""),
   );
@@ -94,7 +128,7 @@ function main() {
   const failed = [];
   for (let i = 0; i < groups.length; i++) {
     const batchNumber = opts.batch === null ? i : opts.batch;
-    const ok = runBatch(batchNumber, groups[i], opts.reporter);
+    const ok = runBatch(batchNumber, groups[i], opts);
     if (!ok) {
       anyFail = true;
       failed.push(batchNumber);

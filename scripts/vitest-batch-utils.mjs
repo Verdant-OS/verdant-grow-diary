@@ -12,6 +12,17 @@
 export const BATCH_STRATEGIES = Object.freeze(["contiguous", "round-robin"]);
 
 /**
+ * Vitest worker pools accepted by `--pool`. Validated so a typo fails fast
+ * instead of silently falling back.
+ */
+export const VITEST_POOLS = Object.freeze([
+  "forks",
+  "threads",
+  "vmForks",
+  "vmThreads",
+]);
+
+/**
  * Deterministically sort test file paths (ascending, locale-independent).
  * @param {string[]} files
  * @returns {string[]}
@@ -101,6 +112,28 @@ export function selectBatch(files, batches, batchIndex, strategy = "contiguous")
 }
 
 /**
+ * Split an array into fixed-size chunks (last chunk may be shorter).
+ * Used to run each batch's files in smaller Vitest invocations so heap is
+ * released between chunks (worker isolation), avoiding OOM accumulation.
+ * @param {any[]} items
+ * @param {number} size - integer >= 1
+ * @returns {any[][]}
+ */
+export function chunkArray(items, size) {
+  if (!Array.isArray(items)) {
+    throw new TypeError("chunkArray: items must be an array");
+  }
+  if (!Number.isInteger(size) || size < 1) {
+    throw new RangeError("chunkArray: size must be a positive integer");
+  }
+  const out = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(items.slice(i, i + size));
+  }
+  return out;
+}
+
+/**
  * Parse simple --key=value / --flag CLI args. No side effects.
  * @param {string[]} argv
  */
@@ -111,6 +144,11 @@ export function parseBatchArgs(argv) {
     reporter: "dot",
     continueOnFail: false,
     strategy: "contiguous",
+    // Worker-isolation options. Defaults keep prior behavior: no chunking,
+    // no explicit --isolate / --pool forwarded to Vitest.
+    chunkSize: null,
+    isolate: false,
+    pool: null,
   };
   for (const raw of argv) {
     if (!raw.startsWith("--")) continue;
@@ -144,6 +182,26 @@ export function parseBatchArgs(argv) {
           );
         }
         out.strategy = val;
+        break;
+      }
+      case "chunk-size": {
+        const n = Number.parseInt(val, 10);
+        if (!Number.isInteger(n) || n < 1) {
+          throw new RangeError(`--chunk-size must be a positive integer (got ${val})`);
+        }
+        out.chunkSize = n;
+        break;
+      }
+      case "isolate":
+        out.isolate = val === "true" || val === "1";
+        break;
+      case "pool": {
+        if (!VITEST_POOLS.includes(val)) {
+          throw new RangeError(
+            `--pool must be one of: ${VITEST_POOLS.join(", ")} (got ${val})`,
+          );
+        }
+        out.pool = val;
         break;
       }
       case "continue-on-fail":

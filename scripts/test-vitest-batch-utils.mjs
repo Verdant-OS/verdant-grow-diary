@@ -6,7 +6,9 @@ import {
   splitIntoBatches,
   selectBatch,
   parseBatchArgs,
+  chunkArray,
   BATCH_STRATEGIES,
+  VITEST_POOLS,
 } from "./vitest-batch-utils.mjs";
 
 let passed = 0;
@@ -186,6 +188,53 @@ t("parseBatchArgs: rejects bad --batches", () => {
 
 t("parseBatchArgs: rejects bad --batch", () => {
   assert.throws(() => parseBatchArgs(["--batch=-1"]), RangeError);
+});
+
+// ---- Worker isolation: chunking + --chunk-size / --isolate / --pool ----
+
+t("chunkArray: splits into fixed-size chunks (last may be short)", () => {
+  assert.deepEqual(chunkArray(["a", "b", "c", "d", "e"], 2), [
+    ["a", "b"],
+    ["c", "d"],
+    ["e"],
+  ]);
+  // exact multiple
+  assert.deepEqual(chunkArray(["a", "b", "c", "d"], 2), [
+    ["a", "b"],
+    ["c", "d"],
+  ]);
+  // size larger than input → single chunk; nothing lost
+  assert.deepEqual(chunkArray(["a", "b"], 20), [["a", "b"]]);
+  assert.equal(chunkArray(["a", "b", "c", "d", "e"], 2).flat().length, 5);
+});
+
+t("chunkArray: rejects invalid size / non-array", () => {
+  assert.throws(() => chunkArray(["a"], 0), RangeError);
+  assert.throws(() => chunkArray(["a"], -1), RangeError);
+  assert.throws(() => chunkArray(["a"], 1.5), RangeError);
+  assert.throws(() => chunkArray(null, 2), TypeError);
+});
+
+t("parseBatchArgs: parses --chunk-size, --isolate, --pool (with validation)", () => {
+  const o = parseBatchArgs([
+    "--chunk-size=20",
+    "--isolate",
+    "--pool=forks",
+  ]);
+  assert.equal(o.chunkSize, 20);
+  assert.equal(o.isolate, true);
+  assert.equal(o.pool, "forks");
+  // defaults keep prior behavior
+  const d = parseBatchArgs([]);
+  assert.equal(d.chunkSize, null);
+  assert.equal(d.isolate, false);
+  assert.equal(d.pool, null);
+  // VITEST_POOLS is the validated set
+  assert.ok(VITEST_POOLS.includes("forks"));
+  // invalid values fail safely
+  assert.throws(() => parseBatchArgs(["--chunk-size=0"]), RangeError);
+  assert.throws(() => parseBatchArgs(["--chunk-size=abc"]), RangeError);
+  assert.throws(() => parseBatchArgs(["--pool=bogus"]), RangeError);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

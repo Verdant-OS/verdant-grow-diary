@@ -6,6 +6,17 @@
  * completes in memory-limited / time-limited environments without one
  * huge `bunx vitest run`. Never skips, never hides failures, never
  * updates snapshots.
+ *
+ * Supports:
+ *   --batches=N            total batches (default 8)
+ *   --batch=K              run only batch K (0-indexed)
+ *   --strategy=contiguous|round-robin   (default contiguous)
+ *   --chunk-size=N         inside a batch, run N files per vitest invocation
+ *                          (releases worker memory between chunks)
+ *   --isolate              pass --isolate to vitest
+ *   --pool=forks|threads|vmThreads   pass --pool to vitest
+ *   --reporter=dot|verbose
+ *   --continue-on-fail
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
@@ -14,7 +25,9 @@ import { resolve, join, relative } from "node:path";
 import {
   sortTestFiles,
   splitIntoBatches,
+  splitIntoBatchesRoundRobin,
   selectBatch,
+  splitIntoChunks,
   parseBatchArgs,
 } from "./vitest-batch-utils.mjs";
 
@@ -39,16 +52,49 @@ function discoverTestFiles(dir) {
   return out;
 }
 
-function runBatch(batchNumber, files, reporter) {
-  const cmd = "bunx";
-  const args = ["vitest", "run", `--reporter=${reporter}`, ...files];
+function buildVitestArgs(files, opts) {
+  const args = ["vitest", "run", `--reporter=${opts.reporter}`];
+  if (opts.isolate) args.push("--isolate");
+  if (opts.pool) args.push(`--pool=${opts.pool}`);
+  args.push(...files);
+  return args;
+}
+
+function runVitest(label, files, opts) {
+  const args = buildVitestArgs(files, opts);
   console.log(
-    `\n▶ Batch ${batchNumber}: ${files.length} files\n  $ ${cmd} ${args.join(" ")}`,
+    `\n▶ ${label}: ${files.length} files\n  $ bunx ${args.join(" ")}`,
   );
-  const res = spawnSync(cmd, args, { stdio: "inherit", cwd: ROOT });
+  const res = spawnSync("bunx", args, { stdio: "inherit", cwd: ROOT });
   const ok = res.status === 0;
-  console.log(`◀ Batch ${batchNumber}: ${ok ? "PASS" : "FAIL"} (exit ${res.status})`);
+  console.log(`◀ ${label}: ${ok ? "PASS" : "FAIL"} (exit ${res.status})`);
   return ok;
+}
+
+function runBatch(batchNumber, files, opts) {
+  if (!opts.chunkSize || files.length <= opts.chunkSize) {
+    return runVitest(`Batch ${batchNumber}`, files, opts);
+  }
+  const chunks = splitIntoChunks(files, opts.chunkSize);
+  console.log(
+    `\n▶ Batch ${batchNumber}: ${files.length} files in ${chunks.length} chunk(s) of <= ${opts.chunkSize}`,
+  );
+  let allOk = true;
+  for (let c = 0; c < chunks.length; c++) {
+    const ok = runVitest(
+      `Batch ${batchNumber} chunk ${c + 1}/${chunks.length}`,
+      chunks[c],
+      opts,
+    );
+    if (!ok) {
+      allOk = false;
+      if (!opts.continueOnFail) break;
+    }
+  }
+  console.log(
+    `◀ Batch ${batchNumber}: ${allOk ? "PASS" : "FAIL"} (all chunks)`,
+  );
+  return allOk;
 }
 
 function main() {
@@ -68,10 +114,14 @@ function main() {
 
   let groups;
   try {
-    groups =
-      opts.batch === null
-        ? splitIntoBatches(all, opts.batches)
-        : [selectBatch(all, opts.batches, opts.batch)];
+    if (opts.batch === null) {
+      groups =
+        opts.strategy === "round-robin"
+          ? splitIntoBatchesRoundRobin(all, opts.batches)
+          : splitIntoBatches(all, opts.batches);
+    } else {
+      groups = [selectBatch(all, opts.batches, opts.batch, opts.strategy)];
+    }
   } catch (e) {
     console.error("✗", e.message);
     process.exit(2);
@@ -79,7 +129,11 @@ function main() {
 
   console.log(
     `Verdant Batched Validation Runner v1 — ${all.length} test files, ` +
-      `${opts.batch === null ? opts.batches : 1} batch(es), reporter=${opts.reporter}` +
+      `${opts.batch === null ? opts.batches : 1} batch(es), ` +
+      `strategy=${opts.strategy}, reporter=${opts.reporter}` +
+      (opts.chunkSize ? `, chunk-size=${opts.chunkSize}` : "") +
+      (opts.isolate ? ", isolate" : "") +
+      (opts.pool ? `, pool=${opts.pool}` : "") +
       (opts.batch !== null ? ` (only batch ${opts.batch})` : "") +
       (opts.continueOnFail ? " [continue-on-fail]" : ""),
   );
@@ -88,7 +142,7 @@ function main() {
   const failed = [];
   for (let i = 0; i < groups.length; i++) {
     const batchNumber = opts.batch === null ? i : opts.batch;
-    const ok = runBatch(batchNumber, groups[i], opts.reporter);
+    const ok = runBatch(batchNumber, groups[i], opts);
     if (!ok) {
       anyFail = true;
       failed.push(batchNumber);

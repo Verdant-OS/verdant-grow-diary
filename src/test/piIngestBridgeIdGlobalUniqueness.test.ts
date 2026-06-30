@@ -178,6 +178,10 @@ describe("Edge Function ingestion remains fail-closed", () => {
       // output. It does not read or use the env value — it exists to PROTECT
       // against leaks. See proofReportRedactionRules.ts.
       if (/[\\/]src[\\/]lib[\\/]proofReportRedactionRules\.ts$/.test(p)) continue;
+      // Same legitimate denylist pattern: releaseReceiptParserContract.ts lists
+      // the token in RELEASE_RECEIPT_UNSAFE_SUBSTRINGS to REJECT secret-like
+      // receipt fields. It does not read or use the env value.
+      if (/[\\/]src[\\/]lib[\\/]releaseReceiptParserContract\.ts$/.test(p)) continue;
       const txt = readFileSync(p, "utf8");
       expect(
         /SUPABASE_SERVICE_ROLE_KEY/.test(txt),

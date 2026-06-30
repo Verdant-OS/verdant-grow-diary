@@ -198,6 +198,10 @@ describe("pi-ingest edge skeleton audit — service_role confinement", () => {
           // accidental occurrences from printed/copied output. It does not
           // read or use the env value.
           if (/[\\/]src[\\/]lib[\\/]proofReportRedactionRules\.ts$/.test(p)) continue;
+          // Same legitimate pattern: the release-receipt parser contract lists
+          // the env name in RELEASE_RECEIPT_UNSAFE_SUBSTRINGS so it can REJECT
+          // secret-like receipt fields. It does not read or use the env value.
+          if (/[\\/]src[\\/]lib[\\/]releaseReceiptParserContract\.ts$/.test(p)) continue;
           const text = readFileSync(p, "utf8");
           if (/SUPABASE_SERVICE_ROLE_KEY/.test(text)) offenders.push(p);
         }

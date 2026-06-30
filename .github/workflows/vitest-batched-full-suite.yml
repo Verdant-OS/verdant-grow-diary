@@ -38,6 +38,17 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Assert batches input matches the 16-job matrix
+        run: |
+          if [ "${{ inputs.batches }}" != "16" ]; then
+            echo "::error::This workflow's matrix runs exactly 16 partitions (0..15), but batches=${{ inputs.batches }}. Running would leave partitions unvalidated. Set batches=16."
+            exit 1
+          fi
+          echo "OK: batches=16 matches the 16-job matrix."
+
+      - name: Assert batched workflow safety (chunk-size=1 + invariants)
+        run: node scripts/assert-vitest-batched-workflow-safety.mjs
+
       - name: Install
         run: bun install --frozen-lockfile
 

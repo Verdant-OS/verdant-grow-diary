@@ -1159,7 +1159,10 @@ describe("ecowitt windows testbench — preflight PowerShell invocation smoke", 
     expect(r.status, out).toBe(0);
     expect(out).toMatch(/\[preflight\]/);
     expect(out.toLowerCase()).toMatch(/repo root/);
-  });
+    // pwsh cold-start on CI Linux can exceed the 5s default; the spawnSync
+    // itself caps at 30s. Give the smoke test the same budget so it isn't
+    // killed mid-invocation (assertions unchanged).
+  }, 30_000);
 
   maybeIt("invokes successfully from tools/ecowitt-testbench", () => {
     const r = runPreflight(tbDir, []);
@@ -1167,7 +1170,7 @@ describe("ecowitt windows testbench — preflight PowerShell invocation smoke", 
     assertSafeOutput(out);
     expect(r.status, out).toBe(0);
     expect(out).toMatch(/\[preflight\]/);
-  });
+  }, 30_000);
 
   maybeIt("invokes successfully by direct script path from repo root with -Diagnostics", () => {
     const r = runPreflight(repoRoot, ["-Diagnostics"]);
@@ -1176,7 +1179,7 @@ describe("ecowitt windows testbench — preflight PowerShell invocation smoke", 
     expect(r.status, out).toBe(0);
     expect(out).toMatch(/Diagnostics \(safe paths only\)/);
     expect(out.toLowerCase()).toMatch(/detected repo root/);
-  });
+  }, 30_000);
 });
 
 describe("ecowitt windows testbench — forwarding tent-context safety", () => {

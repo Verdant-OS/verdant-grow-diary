@@ -34,6 +34,15 @@ import {
 const ROOT = process.cwd();
 const TEST_ROOT = resolve(ROOT, "src/test");
 
+/**
+ * Emit a machine-readable marker for the CI log parser. Markers carry only
+ * numeric/string metadata (batch/chunk indices, counts, strategy, status,
+ * exit codes) — never file contents, secrets, env values, or payloads.
+ */
+function emitMarker(kind, obj) {
+  console.log(`${kind} ${JSON.stringify(obj)}`);
+}
+
 function discoverTestFiles(dir) {
   const out = [];
   if (!existsSync(dir)) return out;
@@ -72,28 +81,56 @@ function runVitest(label, files, opts) {
 }
 
 function runBatch(batchNumber, files, opts) {
-  if (!opts.chunkSize || files.length <= opts.chunkSize) {
-    return runVitest(`Batch ${batchNumber}`, files, opts);
+  const chunks =
+    opts.chunkSize && files.length > opts.chunkSize
+      ? splitIntoChunks(files, opts.chunkSize)
+      : [files];
+  // Machine-readable markers for the CI receipt parser (metadata only — no
+  // file contents, secrets, or payloads). The parser prefers these over the
+  // human ▶/◀ lines for reliable batch/chunk attribution.
+  emitMarker("VERDANT_BATCH_START", {
+    batch: batchNumber,
+    batches: opts.batches,
+    strategy: opts.strategy,
+    chunkSize: opts.chunkSize ?? null,
+    fileCount: files.length,
+    chunks: chunks.length,
+  });
+  if (chunks.length > 1) {
+    console.log(
+      `\n▶ Batch ${batchNumber}: ${files.length} files in ${chunks.length} chunk(s) of <= ${opts.chunkSize}`,
+    );
   }
-  const chunks = splitIntoChunks(files, opts.chunkSize);
-  console.log(
-    `\n▶ Batch ${batchNumber}: ${files.length} files in ${chunks.length} chunk(s) of <= ${opts.chunkSize}`,
-  );
   let allOk = true;
   for (let c = 0; c < chunks.length; c++) {
-    const ok = runVitest(
-      `Batch ${batchNumber} chunk ${c + 1}/${chunks.length}`,
-      chunks[c],
-      opts,
-    );
+    emitMarker("VERDANT_CHUNK_START", {
+      batch: batchNumber,
+      chunk: c + 1,
+      chunks: chunks.length,
+      fileCount: chunks[c].length,
+    });
+    const label =
+      chunks.length > 1
+        ? `Batch ${batchNumber} chunk ${c + 1}/${chunks.length}`
+        : `Batch ${batchNumber}`;
+    const ok = runVitest(label, chunks[c], opts);
+    emitMarker("VERDANT_CHUNK_END", {
+      batch: batchNumber,
+      chunk: c + 1,
+      status: ok ? "pass" : "fail",
+    });
     if (!ok) {
       allOk = false;
       if (!opts.continueOnFail) break;
     }
   }
   console.log(
-    `◀ Batch ${batchNumber}: ${allOk ? "PASS" : "FAIL"} (all chunks)`,
+    `◀ Batch ${batchNumber}: ${allOk ? "PASS" : "FAIL"} (${chunks.length} chunk(s))`,
   );
+  emitMarker("VERDANT_BATCH_END", {
+    batch: batchNumber,
+    status: allOk ? "pass" : "fail",
+  });
   return allOk;
 }
 
@@ -129,7 +166,7 @@ function main() {
 
   console.log(
     `Verdant Batched Validation Runner v1 — ${all.length} test files, ` +
-      `${opts.batch === null ? opts.batches : 1} batch(es), ` +
+      `${groups.length} batch(es) actual (requested ${opts.batches}), ` +
       `strategy=${opts.strategy}, reporter=${opts.reporter}` +
       (opts.chunkSize ? `, chunk-size=${opts.chunkSize}` : "") +
       (opts.isolate ? ", isolate" : "") +

@@ -168,6 +168,15 @@ t("parseBatchArgs: parses flags", () => {
   assert.equal(o.pool, "forks");
 });
 
+t("parseBatchArgs: parses --strategy=round-robin", () => {
+  assert.equal(parseBatchArgs(["--strategy=round-robin"]).strategy, "round-robin");
+  assert.equal(parseBatchArgs(["--strategy=contiguous"]).strategy, "contiguous");
+});
+
+t("parseBatchArgs: rejects invalid --strategy", () => {
+  assert.throws(() => parseBatchArgs(["--strategy=bogus"]), RangeError);
+});
+
 t("parseBatchArgs: rejects bad --batches", () => {
   assert.throws(() => parseBatchArgs(["--batches=0"]), RangeError);
   assert.throws(() => parseBatchArgs(["--batches=abc"]), RangeError);

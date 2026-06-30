@@ -37,17 +37,18 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   end?: boolean;
-  /**
-   * When true, this entry is gated behind server-side `has_role('operator')`
-   * and is never rendered (or even mounted into the DOM) for non-operators.
-   * Operator/internal routes that leak into the grower sidebar would point
-   * users at "Access restricted" screens; gate them here instead.
-   */
-  requiresOperator?: boolean;
 }
 
-const groups: { label: string; items: NavItem[] }[] = [
-  { label: "Overview", items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard, end: true }] },
+/**
+ * UI Simplification Slice 1 — Grower-facing groups.
+ *
+ * The One-Tent Loop spine (Today → Cultivation → Daily → Insight) is the
+ * shape of the sidebar. Advanced/Account hold lower-frequency tools.
+ * Operator/internal surfaces live in the separate `operatorGroups` block
+ * below, which is rendered ONLY when `useHasRole("operator")` is granted.
+ */
+const growerGroups: { label: string; items: NavItem[] }[] = [
+  { label: "Today", items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard, end: true }] },
   {
     label: "Cultivation",
     items: [
@@ -56,34 +57,25 @@ const groups: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
-    label: "Data",
+    label: "Daily",
     items: [
-      { to: "/sensors", label: "Sensor Data", icon: Activity },
-      { to: "/logs", label: "Logs", icon: NotebookText },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
-      { to: "/tasks", label: "Tasks", icon: ListChecks },
+      { to: "/logs", label: "Timeline", icon: NotebookText },
       { to: "/alerts", label: "Alerts", icon: Bell },
       { to: "/actions", label: "Action Queue", icon: ShieldCheck },
+      { to: "/tasks", label: "Tasks", icon: ListChecks },
     ],
   },
   {
-    label: "Intelligence",
+    label: "Insight",
     items: [
-      { to: "/doctor", label: "AI Grow Doctor", icon: Stethoscope },
-      // Operator-only deep link to the Phase 1 results page. Manifest
-      // access for /operator/ai-doctor-phase1 is "operator"; we gate it
-      // here so non-operators never see the link.
-      { to: "/operator/ai-doctor-phase1", label: "AI Doctor Results", icon: Stethoscope, requiresOperator: true },
+      { to: "/sensors", label: "Sensors", icon: Activity },
+      { to: "/doctor", label: "AI Doctor", icon: Stethoscope },
+    ],
+  },
+  {
+    label: "Advanced",
+    items: [
       { to: "/reports", label: "Grow Learning Hub", icon: LineChart },
-    ],
-  },
-  {
-    label: "Archive",
-    items: [
       { to: "/grows", label: "Harvest Archive", icon: Sprout },
       // /grow-lineage is manifest access "auth" (grower-facing repair tool).
       // Owner-scoped reads/writes only, RLS-protected. MUST stay visible to
@@ -91,21 +83,24 @@ const groups: { label: string; items: NavItem[] }[] = [
       { to: "/grow-lineage", label: "Lineage Repair", icon: Wrench },
     ],
   },
+  { label: "Account", items: [{ to: "/settings", label: "Settings", icon: Settings }] },
+];
+
+/**
+ * Operator-only groups. These are rendered ONLY when the server-side
+ * `has_role('operator')` check returns granted. While role status is
+ * loading/denied/error/unauthenticated, no operator group, label, or
+ * item is mounted — guaranteeing zero leakage of operator paths into
+ * the grower DOM.
+ */
+const operatorGroups: { label: string; items: NavItem[] }[] = [
   {
-    label: "Release",
+    label: "Operator Mode",
     items: [
-      // Operator-only deep link to the static/manual release readiness
-      // status page. Manifest access for /operator/release-readiness is
-      // "operator"; gate it here so non-operators never see the link.
-      {
-        to: "/operator/release-readiness",
-        label: "Release Readiness",
-        icon: ClipboardList,
-        requiresOperator: true,
-      },
+      { to: "/operator/release-readiness", label: "Release Readiness", icon: ClipboardList },
+      { to: "/operator/ai-doctor-phase1", label: "AI Doctor Results", icon: Stethoscope },
     ],
   },
-  { label: "Account", items: [{ to: "/settings", label: "Settings", icon: Settings }] },
 ];
 
 export default function AppSidebar() {
@@ -114,6 +109,42 @@ export default function AppSidebar() {
   const { pathname } = useLocation();
   const operatorRole = useHasRole("operator");
   const isOperator = operatorRole.status === "granted";
+
+  const renderGroup = (g: { label: string; items: NavItem[] }) => {
+    if (g.items.length === 0) return null;
+    return (
+      <SidebarGroup key={g.label}>
+        {!collapsed && (
+          <SidebarGroupLabel className="text-[10px] tracking-wider">
+            {g.label}
+          </SidebarGroupLabel>
+        )}
+        <SidebarGroupContent>
+          <SidebarMenu>
+            {g.items.map((item) => {
+              const active = item.end
+                ? pathname === item.to
+                : pathname === item.to || pathname.startsWith(item.to + "/");
+              return (
+                <SidebarMenuItem key={item.to}>
+                  <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+                    <NavLink
+                      to={item.to}
+                      end={item.end}
+                      className={cn("flex items-center gap-2.5")}
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    );
+  };
 
   return (
     <Sidebar collapsible="icon">
@@ -132,56 +163,25 @@ export default function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="gap-0">
-        {groups.map((g) => {
-          const visibleItems = g.items.filter(
-            (item) => !item.requiresOperator || isOperator,
-          );
-          if (visibleItems.length === 0) return null;
-          return (
-          <SidebarGroup key={g.label}>
-            {!collapsed && (
-              <SidebarGroupLabel className="text-[10px] tracking-wider">
-                {g.label}
-              </SidebarGroupLabel>
-            )}
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {visibleItems.map((item) => {
-                  const active = item.end
-                    ? pathname === item.to
-                    : pathname === item.to || pathname.startsWith(item.to + "/");
-                  return (
-                    <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                        <NavLink
-                          to={item.to}
-                          end={item.end}
-                          className={cn("flex items-center gap-2.5")}
-                        >
-                          <item.icon className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{item.label}</span>
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          );
-        })}
-        <SidebarGroup>
-          {!collapsed && (
-            <SidebarGroupLabel className="text-[10px] tracking-wider">
-              Operator
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <div className="px-1">
-              <OperatorModeLink variant="sidebar" />
-            </div>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {growerGroups.map(renderGroup)}
+
+        {isOperator && (
+          <>
+            {operatorGroups.map(renderGroup)}
+            <SidebarGroup>
+              {!collapsed && (
+                <SidebarGroupLabel className="text-[10px] tracking-wider">
+                  Operator
+                </SidebarGroupLabel>
+              )}
+              <SidebarGroupContent>
+                <div className="px-1">
+                  <OperatorModeLink variant="sidebar" />
+                </div>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
     </Sidebar>
   );

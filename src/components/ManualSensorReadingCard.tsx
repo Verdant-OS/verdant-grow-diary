@@ -38,6 +38,13 @@ import DerivedVpdStatus from "@/components/DerivedVpdStatus";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
 import { isUuid } from "@/lib/isUuid";
+import {
+  MANUAL_SENSOR_TRUTH_TITLE,
+  MANUAL_SENSOR_TRUTH_SOURCE_LINE,
+  MANUAL_SENSOR_TRUTH_NOT_DEVICE_CONTROL_LINE,
+  MANUAL_SENSOR_TRUTH_NOT_DIAGNOSIS_LINE,
+  MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE,
+} from "@/constants/manualSensorTruthCopy";
 
 interface TentOption {
   id: string;
@@ -210,10 +217,26 @@ export default function ManualSensorReadingCard({
           data-testid="manual-reading-helper"
         >
           <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-          <span>
-            Saved as a <strong>manual snapshot</strong>, not live sensor data. Good for handheld
-            tools and EcoWitt console/app readouts (e.g. WH45 CO₂/THP, WH31 temp/RH, WH51 soil).
-          </span>
+          <div className="space-y-1">
+            <p>
+              <strong>{MANUAL_SENSOR_TRUTH_TITLE}</strong> — {MANUAL_SENSOR_TRUTH_SOURCE_LINE}
+            </p>
+            <p data-testid="manual-reading-helper-not-device-control">
+              {MANUAL_SENSOR_TRUTH_NOT_DEVICE_CONTROL_LINE}
+            </p>
+            <p data-testid="manual-reading-helper-not-diagnosis">
+              {MANUAL_SENSOR_TRUTH_NOT_DIAGNOSIS_LINE}
+            </p>
+            {validation.metrics.length === 0 && (
+              <p data-testid="manual-reading-helper-missing-readings">
+                {MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE}
+              </p>
+            )}
+            <p className="text-[11px] opacity-80">
+              Good for handheld tools and EcoWitt console/app readouts (e.g. WH45 CO₂/THP, WH31
+              temp/RH, WH51 soil).
+            </p>
+          </div>
         </div>
 
         {tents.length > 0 && (

@@ -97,6 +97,94 @@ nonzero unless both workflows are `completed` + `success` + the guard
 markers are present in the run logs. It **never** prints raw logs,
 env, tokens, or secrets.
 
+### Download and validate the proof artifacts
+
+To independently verify the trusted proof artifacts uploaded by CI
+(without opening or pasting raw logs):
+
+```bash
+bun run check:client-secret-boundary-artifacts
+```
+
+The verifier:
+
+1. Finds the latest `success` runs of `ci.yml` and `docs-safety.yml`
+   on the branch (defaults to `verdant-grow-diary`).
+2. Downloads the two proof artifacts:
+   - `client-secret-boundary-proof-ci`
+   - `client-secret-boundary-proof-docs-safety`
+3. Validates that each proof text file contains the fixed markers:
+   - `Client secret boundary guard: PASS`
+   - `Command: bun run test:client-secret-boundary`
+   - `Scanned client roots: src/components, src/pages, src/hooks, src/lib`
+   - `Blocked executable-code terms: SUPABASE_SERVICE_ROLE_KEY, service_role`
+   - `Secrets printed: no`
+   - `Raw logs uploaded: no`
+4. Rejects any proof file that contains contamination:
+   - JWT-shaped tokens (`eyJ…`)
+   - `Bearer <token>` headers
+   - Assignments like `service_role=…` or `SUPABASE_SERVICE_ROLE_KEY=…`
+   - Bridge secret column names: `secret_ciphertext`, `secret_nonce`,
+     `secret_hash`, `token_hash`
+   - Raw GitHub Actions log fragments (ISO timestamps, `##[group]`
+     markers, `::add-mask::`, `env |` dumps)
+
+Optional flags:
+
+```bash
+bun run check:client-secret-boundary-artifacts -- \
+  --repo=Verdant-OS/verdant-grow-diary \
+  --branch=verdant-grow-diary \
+  --ci-run-id=<RUN_ID> \
+  --docs-run-id=<RUN_ID> \
+  --out-dir=artifacts/client-secret-boundary-proof-check
+```
+
+The verifier prints **only** a short sanitized per-artifact summary
+(workflow, run id, artifact name, marker/contamination counts,
+PASS/FAIL). It never prints the proof body, raw logs, env, or
+secrets. Exit code is `0` only when both artifacts are present,
+downloaded, and valid.
+
+#### Manual fallback
+
+If `gh` is not available locally, an operator can fetch the same
+artifacts by hand and inspect them with a plain text viewer:
+
+```bash
+gh run list --workflow ci.yml --branch verdant-grow-diary --limit 5
+gh run download <RUN_ID> --name client-secret-boundary-proof-ci \
+  --dir artifacts/client-secret-boundary-proof-check/ci
+gh run download <RUN_ID> --name client-secret-boundary-proof-docs-safety \
+  --dir artifacts/client-secret-boundary-proof-check/docs-safety
+```
+
+#### What a valid proof artifact contains
+
+A single short text file with the six fixed markers listed above and
+nothing else of substance. It is a **claim that the guard ran and
+passed**, not a dump of build output.
+
+#### What must never appear in a proof artifact
+
+- Secrets, tokens, JWTs, Bearer headers, bridge tokens, API keys.
+- Raw CI logs, log timestamps, `##[group]` markers, `::add-mask::`,
+  `env |` dumps.
+- Bridge token column names (`secret_ciphertext`, `secret_nonce`,
+  `secret_hash`, `token_hash`).
+- Any user, sensor, or payload data.
+
+#### Reminders
+
+- **Do not paste secrets** into chat, issues, commits, or artifact
+  bodies — even redacted-looking ones.
+- **Do not paste raw logs.** The trusted proof artifact is the
+  intended evidence surface; raw logs are not.
+- A passing artifact proves the guard ran and passed for that run.
+  It does **not** prove every future branch or change is safe — the
+  guard runs every CI/docs-safety pipeline and must stay enabled.
+
+
 ### What a failure means
 
 If the guard fails on your PR:

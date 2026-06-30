@@ -138,4 +138,20 @@ describe("Client Secret Boundary — CI wiring contract", () => {
       expect(win).toMatch(/Raw logs uploaded:\s*no/);
     }
   });
+
+  // --- Artifact verifier wiring (Verdant Client Secret Boundary Artifact Verification v1) ---
+
+  it("package.json wires the artifact verifier script", () => {
+    expect(PKG.scripts["check:client-secret-boundary-artifacts"]).toBe(
+      "node scripts/check-client-secret-boundary-artifacts.mjs",
+    );
+    expect(PKG.scripts["test:check-client-secret-boundary-artifacts"]).toBe(
+      "node scripts/test-check-client-secret-boundary-artifacts.mjs",
+    );
+  });
+
+  it("both workflows declare the trusted proof artifact names", () => {
+    expect(CI_YML).toMatch(/name:\s*client-secret-boundary-proof-ci\b/);
+    expect(DOCS_YML).toMatch(/name:\s*client-secret-boundary-proof-docs-safety\b/);
+  });
 });

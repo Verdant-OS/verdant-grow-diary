@@ -27,6 +27,15 @@ import {
 const ROOT = process.cwd();
 const TEST_ROOT = resolve(ROOT, "src/test");
 
+/**
+ * Emit a machine-readable marker for the CI log parser. Markers carry only
+ * numeric/string metadata (batch/chunk indices, counts, strategy, status,
+ * exit codes) — never file contents, secrets, env values, or payloads.
+ */
+function emitMarker(kind, obj) {
+  console.log(`${kind} ${JSON.stringify(obj)}`);
+}
+
 function discoverTestFiles(dir) {
   const out = [];
   if (!existsSync(dir)) return out;
@@ -56,7 +65,7 @@ function runVitest(label, files, opts) {
   const res = spawnSync(cmd, args, { stdio: "inherit", cwd: ROOT });
   const ok = res.status === 0;
   console.log(`  ◀ ${label}: ${ok ? "PASS" : "FAIL"} (exit ${res.status})`);
-  return ok;
+  return { ok, code: res.status };
 }
 
 /**
@@ -66,6 +75,14 @@ function runVitest(label, files, opts) {
  */
 function runBatch(batchNumber, files, opts) {
   const chunks = opts.chunkSize ? chunkArray(files, opts.chunkSize) : [files];
+  emitMarker("VERDANT_BATCH_START", {
+    batch: batchNumber,
+    batches: opts.batches,
+    strategy: opts.strategy,
+    chunkSize: opts.chunkSize ?? null,
+    fileCount: files.length,
+    chunks: chunks.length,
+  });
   console.log(
     `\n▶ Batch ${batchNumber}: ${files.length} files in ${chunks.length} chunk(s)` +
       (opts.chunkSize ? ` (chunk-size=${opts.chunkSize})` : "") +
@@ -73,17 +90,36 @@ function runBatch(batchNumber, files, opts) {
       (opts.pool ? ` [pool=${opts.pool}]` : ""),
   );
   let ok = true;
+  let batchCode = 0;
   for (let c = 0; c < chunks.length; c++) {
     const label = `Batch ${batchNumber} chunk ${c + 1}/${chunks.length}`;
-    const chunkOk = runVitest(label, chunks[c], opts);
+    emitMarker("VERDANT_CHUNK_START", {
+      batch: batchNumber,
+      chunk: c + 1,
+      chunks: chunks.length,
+      fileCount: chunks[c].length,
+    });
+    const { ok: chunkOk, code } = runVitest(label, chunks[c], opts);
+    emitMarker("VERDANT_CHUNK_END", {
+      batch: batchNumber,
+      chunk: c + 1,
+      status: chunkOk ? "pass" : "fail",
+      exitCode: code,
+    });
     if (!chunkOk) {
       ok = false;
+      batchCode = code ?? 1;
       if (!opts.continueOnFail) break;
     }
   }
   console.log(
     `◀ Batch ${batchNumber}: ${ok ? "PASS" : "FAIL"} (${chunks.length} chunk(s))`,
   );
+  emitMarker("VERDANT_BATCH_END", {
+    batch: batchNumber,
+    status: ok ? "pass" : "fail",
+    exitCode: ok ? 0 : batchCode,
+  });
   return ok;
 }
 

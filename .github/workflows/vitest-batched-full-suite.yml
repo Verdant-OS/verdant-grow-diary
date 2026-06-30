@@ -53,6 +53,9 @@ jobs:
           fi
           echo "OK: batches=16 matches the 16-job matrix."
 
+      - name: Assert batched workflow safety (chunk-size=1 + invariants)
+        run: node scripts/assert-vitest-batched-workflow-safety.mjs
+
       - name: Install
         run: bun install --frozen-lockfile
 
@@ -77,6 +80,6 @@ jobs:
             --batch=${{ matrix.batch }} \
             --reporter=${{ inputs.reporter }} \
             --strategy=round-robin \
-            --chunk-size=8 \
+            --chunk-size=1 \
             --isolate \
             --pool=forks

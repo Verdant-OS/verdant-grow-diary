@@ -108,7 +108,7 @@ import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPa
 
 import { Badge } from "@/components/ui/badge";
 import SensorSourceBadge from "@/components/SensorSourceBadge";
-import { actionDetailPath, actionsPath, alertDetailPath, alertsPath, dashboardPath, logsPath, tentDetailPath, tentsPath } from "@/lib/routes";
+import { actionDetailPath, actionsPath, alertDetailPath, alertsPath, dashboardPath, timelinePath, tentDetailPath, tentsPath } from "@/lib/routes";
 import {
   buildTentSnapshotView,
   type BuildTentSnapshotInput,
@@ -701,7 +701,7 @@ export default function Dashboard() {
             <div>
               <h2 className="font-display font-semibold">Latest Environment</h2>
               <p className="text-xs text-muted-foreground">
-                Most recent reading for this grow. Not live device control.
+                Grow-scoped detail with per-tent filter and persisted alerts. Not live device control.
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -728,7 +728,7 @@ export default function Dashboard() {
                 </Select>
               )}
               <Link
-                to={logsPath(scopedGrowId)}
+                to={timelinePath(scopedGrowId)}
                 className="text-xs text-primary hover:underline"
               >
                 Open Timeline →
@@ -875,7 +875,7 @@ export default function Dashboard() {
                       </p>
                     </div>
                     <Link
-                      to={logsPath(scopedGrowId)}
+                      to={timelinePath(scopedGrowId)}
                       className="text-xs text-primary hover:underline"
                     >
                       Inspect history →
@@ -924,7 +924,7 @@ export default function Dashboard() {
               </p>
             </div>
             <Link
-              to={logsPath(scopedGrowId)}
+              to={timelinePath(scopedGrowId)}
               className="text-xs text-primary hover:underline"
             >
               Open Timeline →
@@ -1025,7 +1025,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex items-center gap-3">
                     <Link
-                      to={logsPath(scopedGrowId)}
+                      to={timelinePath(scopedGrowId)}
                       className="text-xs text-primary hover:underline"
                     >
                       Inspect history →
@@ -1308,7 +1308,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-display font-semibold">Recent Activity</h2>
               <Link
-                to={logsPath(scopedGrowId)}
+                to={timelinePath(scopedGrowId)}
                 className="text-xs text-primary hover:underline"
               >
                 View full Timeline →

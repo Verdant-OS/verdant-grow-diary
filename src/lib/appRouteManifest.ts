@@ -82,7 +82,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/customer/:shareId", access: "public", description: "Customer Mode QR guide shell (read-only, no private grow data)." },
   { path: "/daily-check", access: "auth" },
   { path: "/demo", access: "redirect", description: "→ /welcome" },
-  { path: "/demo/one-tent-live-proof", access: "auth", description: "One-tent live proof page (legacy /demo path, mounted inside AppShell)." },
+  { path: "/demo/one-tent-live-proof", access: "operator", description: "One-tent live proof page (legacy /demo path, mounted inside AppShell). UI Simplification Slice 0 — operator-gated; proof artifact, not grower-facing." },
   { path: "/diagnostics", access: "operator" },
   { path: "/diary/environment-summary", access: "auth", description: "Environment summary report (diary)." },
   { path: "/doctor", access: "auth" },

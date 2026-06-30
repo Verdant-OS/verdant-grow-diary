@@ -30,7 +30,7 @@
  *                  diagnostic use (e.g. `/operator/ecowitt`, `/diagnostics`,
  *                  `/sensors/ecowitt-audit`). Not exposed in normal user nav.
  *  - `internal`  — mounted inside `<RequireAuth>` for internal admin/support
- *                  flows (e.g. `/admin/leads`, `/leads`, `/grow-lineage`).
+ *                  flows (e.g. `/admin/leads`, `/leads`).
  *  - `redirect`  — a `<Navigate>` alias to another route (e.g. `/login` →
  *                  `/auth`). Carries no page of its own.
  */

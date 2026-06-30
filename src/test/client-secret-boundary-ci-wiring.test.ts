@@ -103,7 +103,7 @@ describe("Client Secret Boundary — CI wiring contract", () => {
   }
 
   it("ci.yml uploads a trusted proof artifact AFTER the guard succeeds", () => {
-    const win = windowAfterGuard(CI_YML);
+    const win = proofWindow(CI_YML);
     expect(win).toMatch(/client-secret-boundary-proof\.txt/);
     expect(win).toMatch(/name:\s*client-secret-boundary-proof-ci/);
     expect(win).toMatch(/actions\/upload-artifact@v4/);
@@ -112,7 +112,7 @@ describe("Client Secret Boundary — CI wiring contract", () => {
   });
 
   it("docs-safety.yml uploads a trusted proof artifact AFTER the guard succeeds", () => {
-    const win = windowAfterGuard(DOCS_YML);
+    const win = proofWindow(DOCS_YML);
     expect(win).toMatch(/client-secret-boundary-proof\.txt/);
     expect(win).toMatch(/name:\s*client-secret-boundary-proof-docs-safety/);
     expect(win).toMatch(/actions\/upload-artifact@v4/);
@@ -129,7 +129,7 @@ describe("Client Secret Boundary — CI wiring contract", () => {
       /::add-mask::/,
     ];
     for (const yml of [CI_YML, DOCS_YML]) {
-      const win = windowAfterGuard(yml);
+      const win = proofWindow(yml);
       for (const re of banned) {
         expect(win).not.toMatch(re);
       }

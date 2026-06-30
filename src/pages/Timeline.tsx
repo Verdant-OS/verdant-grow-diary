@@ -211,6 +211,10 @@ export default function Timeline() {
   const [searchQuery, setSearchQuery] = useState("");
   const [plantFilter, setPlantFilter] = useState("");
   const [tentFilter, setTentFilter] = useState("");
+  // Seed plant/tent filters from URL on mount so deep links from Quick
+  // Log → /timeline?growId=&plantId=&tentId= land on the right scope.
+  // One-shot seed; later user edits remain authoritative.
+  const [didSeedScopeFilters, setDidSeedScopeFilters] = useState(false);
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   const [detailEntryId, setDetailEntryId] = useState<string | null>(null);

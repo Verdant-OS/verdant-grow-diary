@@ -97,6 +97,8 @@ export default function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
+  const operatorRole = useHasRole("operator");
+  const isOperator = operatorRole.status === "granted";
 
   return (
     <Sidebar collapsible="icon">
@@ -115,7 +117,12 @@ export default function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="gap-0">
-        {groups.map((g) => (
+        {groups.map((g) => {
+          const visibleItems = g.items.filter(
+            (item) => !item.requiresOperator || isOperator,
+          );
+          if (visibleItems.length === 0) return null;
+          return (
           <SidebarGroup key={g.label}>
             {!collapsed && (
               <SidebarGroupLabel className="text-[10px] tracking-wider">
@@ -124,7 +131,7 @@ export default function AppSidebar() {
             )}
             <SidebarGroupContent>
               <SidebarMenu>
-                {g.items.map((item) => {
+                {visibleItems.map((item) => {
                   const active = item.end
                     ? pathname === item.to
                     : pathname === item.to || pathname.startsWith(item.to + "/");

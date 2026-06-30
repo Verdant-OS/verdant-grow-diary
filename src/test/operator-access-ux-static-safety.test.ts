@@ -12,6 +12,7 @@ const FILES = [
   "src/components/RequireOperatorRole.tsx",
   "src/components/OperatorModeLink.tsx",
   "src/components/OperatorModeCallout.tsx",
+  "src/components/ReleaseReadinessOperatorCard.tsx",
 ];
 
 const FORBIDDEN = [

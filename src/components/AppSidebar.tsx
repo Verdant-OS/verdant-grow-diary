@@ -29,12 +29,20 @@ import {
 import { cn } from "@/lib/utils";
 import BrandLogo from "@/components/BrandLogo";
 import OperatorModeLink from "@/components/OperatorModeLink";
+import { useHasRole } from "@/hooks/useHasRole";
 
 interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
   end?: boolean;
+  /**
+   * When true, this entry is gated behind server-side `has_role('operator')`
+   * and is never rendered (or even mounted into the DOM) for non-operators.
+   * Operator/internal routes that leak into the grower sidebar would point
+   * users at "Access restricted" screens; gate them here instead.
+   */
+  requiresOperator?: boolean;
 }
 
 const groups: { label: string; items: NavItem[] }[] = [
@@ -65,7 +73,10 @@ const groups: { label: string; items: NavItem[] }[] = [
     label: "Intelligence",
     items: [
       { to: "/doctor", label: "AI Grow Doctor", icon: Stethoscope },
-      { to: "/operator/ai-doctor-phase1", label: "AI Doctor Results", icon: Stethoscope },
+      // Operator-only deep link to the Phase 1 results page. Manifest
+      // access for /operator/ai-doctor-phase1 is "operator"; we gate it
+      // here so non-operators never see the link.
+      { to: "/operator/ai-doctor-phase1", label: "AI Doctor Results", icon: Stethoscope, requiresOperator: true },
       { to: "/reports", label: "Grow Learning Hub", icon: LineChart },
     ],
   },
@@ -73,6 +84,9 @@ const groups: { label: string; items: NavItem[] }[] = [
     label: "Archive",
     items: [
       { to: "/grows", label: "Harvest Archive", icon: Sprout },
+      // /grow-lineage is manifest access "auth" (grower-facing repair tool).
+      // Owner-scoped reads/writes only, RLS-protected. MUST stay visible to
+      // every authenticated grower — do not gate behind operator role.
       { to: "/grow-lineage", label: "Lineage Repair", icon: Wrench },
     ],
   },

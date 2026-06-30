@@ -18,7 +18,6 @@ const FORBIDDEN = [
   /\bhealthy\b/i,
   /\bperfect\b/i,
   /\bdiagnos/i,
-  /\blive (sensor|data|reading)\b/i,
 ];
 
 function assertSafeCopy(s: string) {

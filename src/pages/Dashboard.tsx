@@ -262,7 +262,10 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 flex-wrap">
             <OnboardingProgressPill vm={onboardingVm} />
             <Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">
-              <Link to="/daily-check">Daily Grow Check</Link>
+              {/* Route still targets /daily-check (the underlying Quick Log
+                  surface). Label unified to "Quick Log" so the Dashboard
+                  presents a single grower-facing logging concept. */}
+              <Link to="/daily-check">Quick Log</Link>
             </Button>
             <Button asChild className="gradient-leaf text-primary-foreground"><Link to={tentsPath()}>Open tents</Link></Button>
           </div>

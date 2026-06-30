@@ -71,9 +71,11 @@ describe("Latest Environment (grow-scoped detail) — sensor truth copy", () => 
       /formatSensorSourceLabel\(\{[\s\S]{0,200}source:\s*sensorState\.snapshot\.source/,
     );
     expect(DASHBOARD).toMatch(/deviceId:\s*sensorState\.snapshot\.device_id/);
-    // No fake live/synced/connected upgrade copy.
-    expect(DASHBOARD).not.toMatch(/\bLive\s+device\b/i);
+    // No fake "synced live" / "connected live" upgrade copy.
+    // ("Not live device control" is the cautious safety phrasing and is
+    // expected to remain in the source — do not assert against it.)
     expect(DASHBOARD).not.toMatch(/\bSynced live\b/i);
+    expect(DASHBOARD).not.toMatch(/\bConnected live\b/i);
   });
 
   it("Timeline link uses the canonical /timeline route via timelinePath(scopedGrowId)", () => {
@@ -88,7 +90,7 @@ describe("Adjacent Dashboard cards keep cautious-AI safety copy", () => {
   it("Sensor Data Quality is described as a heuristic, not a diagnosis", () => {
     expect(DASHBOARD).toMatch(/Sensor Data Quality/);
     expect(DASHBOARD).toMatch(
-      /Heuristic check of the latest snapshot\. Not a plant-health diagnosis\./,
+      /Heuristic check of the latest snapshot\.\s+Not a plant-health\s+diagnosis\./,
     );
     // Surfaces suspicious fields when present.
     expect(DASHBOARD).toMatch(/Suspicious:/);

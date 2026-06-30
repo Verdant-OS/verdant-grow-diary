@@ -270,6 +270,14 @@ export default function DailyCheck() {
   );
 
   const loggedAtLabel = useMemo(() => formatDailyCheckLoggedAt(lastSubmittedAt), [lastSubmittedAt]);
+  const savedItems = useMemo(
+    () =>
+      buildDailyCheckSavedItems({
+        source: lastSubmittedSource,
+        submittedAt: lastSubmittedAt,
+      }),
+    [lastSubmittedSource, lastSubmittedAt],
+  );
 
   // Timeline continuity link — preserves grow/plant/tent context so the
   // grower lands on the same scope they just logged into. Pure derivation;

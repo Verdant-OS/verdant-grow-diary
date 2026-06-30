@@ -701,7 +701,7 @@ export default function Dashboard() {
             <div>
               <h2 className="font-display font-semibold">Latest Environment</h2>
               <p className="text-xs text-muted-foreground">
-                Most recent reading for this grow. Not live device control.
+                Grow-scoped detail with per-tent filter and persisted alerts. Not live device control.
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">

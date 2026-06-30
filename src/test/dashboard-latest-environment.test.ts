@@ -198,8 +198,9 @@ describe("Dashboard — Latest Environment card wiring", () => {
     );
   });
 
-  it("links to the timeline via logsPath (no dead links)", () => {
-    expect(DASHBOARD).toMatch(/to=\{logsPath\(scopedGrowId\)\}[\s\S]{0,200}Open Timeline/);
+  it("links to the canonical /timeline route via timelinePath (no dead links, no legacy /logs)", () => {
+    expect(DASHBOARD).toMatch(/to=\{timelinePath\(scopedGrowId\)\}[\s\S]{0,200}Open Timeline/);
+    expect(DASHBOARD).not.toMatch(/logsPath\(/);
   });
 
   it("remains read-only and free of restricted surfaces", () => {

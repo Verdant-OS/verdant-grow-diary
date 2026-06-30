@@ -28,7 +28,10 @@ export const OOM_PATTERNS = [
   /Channel closed/,
 ];
 
-const stripAnsi = (s) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/﻿/g, "");
+// `gh run view --log` may emit ANSI as real ESC (\x1b[..m) or, in some
+// environments, as literal caret notation (^[[..m). Strip both, plus BOM.
+const stripAnsi = (s) =>
+  s.replace(/(?:\x1b\[|\^\[\[)[0-9;?]*[A-Za-z]/g, "").replace(/﻿/g, "");
 
 export function detectOOM(text) {
   return OOM_PATTERNS.some((p) => p.test(text));

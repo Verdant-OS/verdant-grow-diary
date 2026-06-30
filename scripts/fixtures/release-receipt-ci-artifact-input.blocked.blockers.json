@@ -1,0 +1,9 @@
+[
+  {
+    "id": "ecowitt-bridge-artifact-missing",
+    "label": "Ecowitt bridge artifact missing",
+    "severity": "release_blocker",
+    "active": true,
+    "summary": "Ecowitt bridge CI validation artifact was not uploaded for this run."
+  }
+]

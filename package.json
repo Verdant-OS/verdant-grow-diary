@@ -56,6 +56,8 @@
     "test:vitest:batches": "node scripts/run-vitest-batches.mjs",
     "test:vitest:batch": "node scripts/run-vitest-batches.mjs",
     "test:vitest:batch-utils": "node scripts/test-vitest-batch-utils.mjs",
+    "release-receipt:build": "bun scripts/build-release-receipt-input.mjs",
+    "release-receipt:test-ci-artifact": "bun scripts/test-release-receipt-ci-artifact.mjs",
     "prepare": "husky",
     "sb:login": "supabase login",
     "sb:init": "supabase init",

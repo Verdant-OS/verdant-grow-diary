@@ -1,10 +1,16 @@
 /**
  * Release Receipt Parser Contract v1.
  *
+ * SAFETY-CONTRACT: APPROVAL-REQUIRED
+ *
  * Defines the trusted artifact shape Verdant will accept as parser-generated
  * evidence for Release Readiness. Pure types + constants only — no I/O, no
  * fetch, no Supabase, no clock reads. Consumers must validate every artifact
  * through `releaseReceiptParser` before treating it as trusted.
+ *
+ * The unsafe-substring denylist below mentions credential keywords as bare
+ * literals so the parser can reject artifacts that leak them. The keywords
+ * are denylist data, not real credential usage.
  *
  * Hard rules:
  *  - Only `schema_version === RELEASE_RECEIPT_SCHEMA_VERSION` is accepted.

@@ -349,6 +349,13 @@ export default function Dashboard() {
       {tents.length === 0 ? (
         <DashboardZeroTentEmptyState />
       ) : (
+        <>
+          <h2
+            data-testid="dashboard-section-heading-environment"
+            className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-2 mb-1 md:mt-4"
+          >
+            Environment
+          </h2>
         <section
           aria-labelledby="dashboard-environment-snapshot-heading"
           data-testid="dashboard-environment-snapshot"

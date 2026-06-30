@@ -38,7 +38,7 @@ jobs:
 
       - name: Safety gates (typecheck + sensor + docs)
         run: |
-          bunx tsgo --noEmit
+          bun run typecheck
           node scripts/sensor-safety-check.mjs
           node scripts/assert-sensor-intelligence-safety.mjs --quiet
           bun run test:docs-demo-safety

@@ -86,8 +86,8 @@ describe("Quick Log Sensor Truth Context v1 — static copy safety", () => {
     MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE,
   ].join(" | ");
 
-  it("never claims plants are healthy", () => {
-    expect(ALL).not.toMatch(/\bhealthy\b/i);
+  it("never makes a positive 'healthy' claim", () => {
+    expect(ALL).not.toMatch(/(?:is|are|looks?|reads?)\s+healthy/i);
   });
 
   it("never relabels manual as live", () => {

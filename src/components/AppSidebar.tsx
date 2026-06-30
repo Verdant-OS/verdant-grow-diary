@@ -59,7 +59,7 @@ const growerGroups: { label: string; items: NavItem[] }[] = [
   {
     label: "Daily",
     items: [
-      { to: "/logs", label: "Timeline", icon: NotebookText },
+      { to: "/timeline", label: "Timeline", icon: NotebookText },
       { to: "/alerts", label: "Alerts", icon: Bell },
       { to: "/actions", label: "Action Queue", icon: ShieldCheck },
       { to: "/tasks", label: "Tasks", icon: ListChecks },

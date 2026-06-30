@@ -286,8 +286,8 @@ export default function DailyCheck() {
         </Link>
       </Button>
       <PageHeader
-        title="Daily Grow Check"
-        description="A guided daily walkthrough — current tent, environment, manual snapshot, Quick Log, and review."
+        title="Quick Log"
+        description="Log a short observation, photo, or manual sensor snapshot for today."
         icon={<ClipboardCheck className="h-5 w-5" />}
       />
 
@@ -530,15 +530,23 @@ export default function DailyCheck() {
 
           {/* Progress */}
           {step !== "done" && (
-            <div className="glass rounded-2xl p-3 mb-4" data-testid="daily-grow-check-progress">
-              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-                <span>
-                  Step {progress.index + 1} of {progress.total}
-                </span>
-                <span className="capitalize">{step}</span>
+            <>
+              <h2
+                className="font-display font-semibold text-sm text-muted-foreground mt-2 mb-2"
+                data-testid="daily-grow-check-guided-heading"
+              >
+                Or run the guided check
+              </h2>
+              <div className="glass rounded-2xl p-3 mb-4" data-testid="daily-grow-check-progress">
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                  <span>
+                    Step {progress.index + 1} of {progress.total}
+                  </span>
+                  <span className="capitalize">{step}</span>
+                </div>
+                <Progress value={progress.percent} className="h-1.5" />
               </div>
-              <Progress value={progress.percent} className="h-1.5" />
-            </div>
+            </>
           )}
 
           {/* Step content */}

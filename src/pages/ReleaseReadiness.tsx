@@ -17,6 +17,40 @@ import {
   RELEASE_READINESS_VIEW_MODEL,
   type ReadinessStatusLabel,
 } from "@/lib/releaseReadinessViewModel";
+import {
+  RELEASE_READINESS_EVIDENCE_RECEIPTS,
+  RELEASE_READINESS_EVIDENCE_BLOCKERS,
+  deriveReleaseEvidencePosture,
+  groupEvidenceReceipts,
+  getCategoryLabel,
+  getCategoryDisclaimer,
+  RELEASE_GO_REQUIREMENT_COPY,
+  type ReceiptCategory,
+  type ReceiptStatus,
+} from "@/lib/releaseReadinessEvidenceReceiptViewModel";
+
+const RECEIPT_CATEGORY_ORDER: ReceiptCategory[] = [
+  "ci_full_suite",
+  "local_targeted",
+  "manual_operator_note",
+];
+
+function receiptStatusVariant(
+  status: ReceiptStatus,
+): "default" | "secondary" | "destructive" | "outline" {
+  switch (status) {
+    case "pass":
+      return "default";
+    case "fail":
+    case "blocked":
+      return "destructive";
+    case "pending":
+    case "unknown":
+      return "secondary";
+    default:
+      return "outline";
+  }
+}
 
 function statusVariant(
   status: ReadinessStatusLabel,

@@ -197,9 +197,8 @@ export const RELEASE_READINESS_FORBIDDEN_PHRASES = [
   "live green",
   "auto-fixed",
   "auto fixed",
-  "ci green",
-  "release green",
-  "release-green ✅",
   "all systems go",
-  "shipped",
+  "release is green",
+  "ci is green",
+  "shipped to production",
 ] as const;

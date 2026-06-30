@@ -229,5 +229,34 @@ t("buildReceipt: PARTIAL when one matrix job OOMs", () => {
   assert.deepEqual(receipt.json.aggregate.oomBatches, [1]);
 });
 
+t("buildReceipt: receipt reports failed test FILES (not 'none') and verdict NO-GO", () => {
+  const steps = [
+    { name: "Safety gates (typecheck + sensor + docs)", conclusion: "success" },
+    { name: "Batch utils self-test", conclusion: "success" },
+    { name: "Assert batches input matches the 16-job matrix", conclusion: "success" },
+  ];
+  const fileFailLog = (b) =>
+    [
+      `VERDANT_BATCH_START {"batch":${b},"batches":16,"chunks":1,"fileCount":1}`,
+      " Test Files  1 failed (1)",
+      "      Tests  no tests",
+      `VERDANT_BATCH_END {"batch":${b},"status":"fail","exitCode":1}`,
+    ].join("\n");
+  const jobs = [...Array(16).keys()].map((i) => ({
+    databaseId: 3000 + i,
+    name: `Batched Vitest (matrix) (${i})`,
+    conclusion: i === 4 ? "failure" : "success",
+    steps,
+    log: i === 4 ? fileFailLog(i) : passLog(i),
+  }));
+  const receipt = buildReceipt({ run: { conclusion: "failure" }, jobs });
+  assert.equal(receipt.verdict, "NO-GO");
+  assert.equal(receipt.json.aggregate.totalFilesFailed, 1);
+  assert.deepEqual(receipt.json.aggregate.failedBatches, [4]);
+  // The summary line must NOT contradict the verdict by saying "none".
+  assert.ok(/failed files\/tests: .*failed test file\(s\)/.test(receipt.markdown));
+  assert.ok(!/failed files\/tests: none/.test(receipt.markdown));
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

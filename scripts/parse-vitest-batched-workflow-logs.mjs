@@ -243,16 +243,22 @@ export function buildReceipt({ run, jobs }) {
   const totalFailed = matrix.reduce((a, b) => a + b.failed, 0);
   const totalSkipped = passing.reduce((a, b) => a + b.skipped, 0);
   const totalFiles = passing.reduce((a, b) => a + (b.filesValidated || 0), 0);
+  const totalFilesFailed = matrix.reduce((a, b) => a + (b.filesFailed || 0), 0);
+  // Batches with a real suite failure (failed assertion OR failed test file).
+  const failedBatches = matrix
+    .filter((b) => b.failed > 0 || b.filesFailed > 0 || b.status === "fail")
+    .map((b) => b.batch);
   const oomBatches = matrix.filter((b) => b.oom).map((b) => b.batch);
   const unvalidated = matrix.filter((b) => b.status !== "pass").map((b) => b.batch);
 
-  const md = buildMarkdown({ run, verdict, reason, gates, selfTest, matrix, agg: { totalPassed, totalFailed, totalSkipped, totalFiles, oomBatches, unvalidated } });
+  const agg = { totalPassed, totalFailed, totalFilesFailed, totalSkipped, totalFiles, failedBatches, oomBatches, unvalidated };
+  const md = buildMarkdown({ run, verdict, reason, gates, selfTest, matrix, agg });
 
   return {
     verdict,
     reason,
     markdown: md,
-    json: { run, verdict, reason, gates, selfTest, batches: matrix, aggregate: { totalPassed, totalFailed, totalSkipped, totalFiles, oomBatches, unvalidated } },
+    json: { run, verdict, reason, gates, selfTest, batches: matrix, aggregate: agg },
   };
 }
 
@@ -289,7 +295,14 @@ function buildMarkdown({ run, verdict, reason, gates, selfTest, matrix, agg }) {
   L.push(`- total failed: ${agg.totalFailed}`);
   L.push(`- total skipped: ${agg.totalSkipped}`);
   L.push(`- total files validated: ${agg.totalFiles}`);
-  L.push(`- failed files/tests: ${agg.totalFailed === 0 ? "none" : agg.totalFailed + " failed tests"}`);
+  L.push(
+    `- failed files/tests: ${
+      agg.totalFailed === 0 && agg.totalFilesFailed === 0
+        ? "none"
+        : `${agg.totalFailed} failed test(s), ${agg.totalFilesFailed} failed test file(s)` +
+          (agg.failedBatches && agg.failedBatches.length ? ` (batches: ${agg.failedBatches.join(", ")})` : "")
+    }`,
+  );
   L.push(`- unvalidated batches: ${agg.unvalidated.length ? agg.unvalidated.join(", ") : "none"}`);
   L.push(`- OOM batches: ${agg.oomBatches.length ? agg.oomBatches.join(", ") : "none"}`, "");
   L.push("## Failures or OOMs");

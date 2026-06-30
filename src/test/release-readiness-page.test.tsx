@@ -90,4 +90,65 @@ describe("ReleaseReadiness page", () => {
     expect(RELEASE_READINESS_VIEW_MODEL.overall.status).toBe("HOLD");
     expect(RELEASE_READINESS_VIEW_MODEL.release.status).toBe("HOLD");
   });
+
+  describe("Evidence Receipts section", () => {
+    it("renders the evidence section with HOLD posture", () => {
+      renderPage();
+      const section = screen.getByTestId("release-readiness-evidence");
+      expect(section).toBeInTheDocument();
+      expect(
+        screen.getByTestId("release-readiness-evidence-posture").textContent,
+      ).toBe("HOLD");
+    });
+
+    it("shows missing CI evidence message when receipt is absent", () => {
+      renderPage();
+      const missing = screen.getByTestId("release-readiness-evidence-missing");
+      expect(missing.textContent ?? "").toMatch(
+        /missing parser-generated full-suite ci receipt/i,
+      );
+    });
+
+    it("shows local targeted disclaimer that it does not unlock GO", () => {
+      renderPage();
+      const el = screen.getByTestId(
+        "release-readiness-evidence-disclaimer-local_targeted",
+      );
+      expect(el.textContent ?? "").toMatch(/does not unlock release go/i);
+    });
+
+    it("shows manual note disclaimer as context only", () => {
+      renderPage();
+      const el = screen.getByTestId(
+        "release-readiness-evidence-disclaimer-manual_operator_note",
+      );
+      expect(el.textContent ?? "").toMatch(/context only/i);
+    });
+
+    it("never shows GO posture in the evidence section without passing CI", () => {
+      renderPage();
+      expect(
+        screen.getByTestId("release-readiness-evidence-posture").textContent,
+      ).not.toBe("GO");
+    });
+
+    it("page source does not add fetch / supabase writes / github API", async () => {
+      const fs = await import("node:fs");
+      const path = await import("node:path");
+      const src = fs.readFileSync(
+        path.resolve(__dirname, "..", "pages", "ReleaseReadiness.tsx"),
+        "utf8",
+      );
+      for (const term of [
+        "fetch(",
+        "supabase",
+        "functions.invoke",
+        "api.github.com",
+        "service_role",
+        "setInterval",
+      ]) {
+        expect(src).not.toContain(term);
+      }
+    });
+  });
 });

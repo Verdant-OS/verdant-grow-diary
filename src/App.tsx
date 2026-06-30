@@ -73,6 +73,7 @@ import OneTentLiveProof from "./pages/OneTentLiveProof";
 import DemoProofWalkthrough from "./pages/DemoProofWalkthrough";
 import ContextualPhenoComparisonDemo from "./pages/ContextualPhenoComparisonDemo";
 import RequireOperatorRole from "./components/RequireOperatorRole";
+import ReleaseReadiness from "./pages/ReleaseReadiness";
 
 const queryClient = new QueryClient();
 

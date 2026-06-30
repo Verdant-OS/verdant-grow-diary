@@ -153,7 +153,8 @@ export default function AppSidebar() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-        ))}
+          );
+        })}
         <SidebarGroup>
           {!collapsed && (
             <SidebarGroupLabel className="text-[10px] tracking-wider">

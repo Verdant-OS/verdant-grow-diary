@@ -30,6 +30,11 @@ import { useGrows } from "@/store/grows";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { STAGES } from "@/lib/grow";
 import { EC_UNITS, EC_UNIT_LABEL, type EcUnit } from "@/constants/units";
+import {
+  MANUAL_SENSOR_TRUTH_TITLE,
+  MANUAL_SENSOR_TRUTH_LINES,
+  MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE,
+} from "@/constants/manualSensorTruthCopy";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
@@ -1042,6 +1047,31 @@ export default function QuickLog({
                   ? "No usable sensor context. This will save as a manual log only."
                   : "Sensor context is not usable enough to attach. This will save as a manual log only."}
             </p>
+
+            <div
+              data-testid="quick-log-snapshot-manual-truth"
+              className="rounded-lg border border-border/50 bg-background/40 p-2 text-[11px] leading-snug space-y-0.5"
+            >
+              <p className="font-medium text-foreground">
+                {MANUAL_SENSOR_TRUTH_TITLE}
+              </p>
+              <ul className="text-muted-foreground space-y-0.5">
+                {MANUAL_SENSOR_TRUTH_LINES.map((line) => (
+                  <li key={line} data-testid="quick-log-snapshot-manual-truth-line">
+                    {line}
+                  </li>
+                ))}
+                {(!snapshot || !snapshotUsable) && (
+                  <li
+                    data-testid="quick-log-snapshot-manual-truth-missing"
+                    className="text-muted-foreground"
+                  >
+                    {MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE}
+                  </li>
+                )}
+              </ul>
+            </div>
+
 
             {tentSetupRequired ? (
               <p

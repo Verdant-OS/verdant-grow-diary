@@ -15,12 +15,7 @@ export const BATCH_STRATEGIES = Object.freeze(["contiguous", "round-robin"]);
  * Vitest worker pools accepted by `--pool`. Validated so a typo fails fast
  * instead of silently falling back.
  */
-export const VITEST_POOLS = Object.freeze([
-  "forks",
-  "threads",
-  "vmForks",
-  "vmThreads",
-]);
+export const VITEST_POOLS = Object.freeze(["forks", "threads", "vmForks", "vmThreads"]);
 
 /**
  * Deterministically sort test file paths (ascending, locale-independent).
@@ -102,9 +97,7 @@ export function splitIntoBatchesRoundRobin(files, batches) {
     throw new TypeError("splitIntoBatchesRoundRobin: files must be an array");
   }
   if (!Number.isInteger(batches) || batches < 1) {
-    throw new RangeError(
-      "splitIntoBatchesRoundRobin: batches must be a positive integer",
-    );
+    throw new RangeError("splitIntoBatchesRoundRobin: batches must be a positive integer");
   }
   if (files.length === 0) {
     throw new RangeError("splitIntoBatchesRoundRobin: no test files to split");
@@ -162,6 +155,14 @@ export function splitIntoChunks(files, chunkSize) {
   }
   return out;
 }
+
+/**
+ * Back-compat alias for splitIntoChunks. Some callers/tests import `chunkArray`
+ * (the original Worker Isolation v1 name); behavior is identical — split a list
+ * into contiguous chunks of at most `chunkSize`. Restored after a merge from
+ * `verdant-grow-diary` dropped the export and broke the batch-utils self-test.
+ */
+export const chunkArray = splitIntoChunks;
 
 /**
  * Parse simple --key=value / --flag CLI args. No side effects.
@@ -225,9 +226,7 @@ export function parseBatchArgs(argv) {
         break;
       case "pool": {
         if (!VITEST_POOLS.includes(val)) {
-          throw new RangeError(
-            `--pool must be one of: ${VITEST_POOLS.join(", ")} (got ${val})`,
-          );
+          throw new RangeError(`--pool must be one of: ${VITEST_POOLS.join(", ")} (got ${val})`);
         }
         out.pool = val;
         break;
@@ -235,37 +234,6 @@ export function parseBatchArgs(argv) {
       case "continue-on-fail":
         out.continueOnFail = val === "true" || val === "1";
         break;
-      case "strategy": {
-        if (val !== "contiguous" && val !== "round-robin") {
-          throw new RangeError(
-            `--strategy must be "contiguous" or "round-robin" (got ${val})`,
-          );
-        }
-        out.strategy = val;
-        break;
-      }
-      case "chunk-size": {
-        const n = Number.parseInt(val, 10);
-        if (!Number.isInteger(n) || n < 1) {
-          throw new RangeError(
-            `--chunk-size must be a positive integer (got ${val})`,
-          );
-        }
-        out.chunkSize = n;
-        break;
-      }
-      case "isolate":
-        out.isolate = val === "true" || val === "1";
-        break;
-      case "pool": {
-        if (val !== "forks" && val !== "threads" && val !== "vmThreads") {
-          throw new RangeError(
-            `--pool must be "forks", "threads", or "vmThreads" (got ${val})`,
-          );
-        }
-        out.pool = val;
-        break;
-      }
       default:
         // Ignore unknown flags so Vitest forwarding can be layered later.
         break;

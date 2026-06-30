@@ -38,6 +38,13 @@ import DerivedVpdStatus from "@/components/DerivedVpdStatus";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
 import { isUuid } from "@/lib/isUuid";
+import {
+  MANUAL_SENSOR_TRUTH_TITLE,
+  MANUAL_SENSOR_TRUTH_SOURCE_LINE,
+  MANUAL_SENSOR_TRUTH_NOT_DEVICE_CONTROL_LINE,
+  MANUAL_SENSOR_TRUTH_NOT_DIAGNOSIS_LINE,
+  MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE,
+} from "@/constants/manualSensorTruthCopy";
 
 interface TentOption {
   id: string;

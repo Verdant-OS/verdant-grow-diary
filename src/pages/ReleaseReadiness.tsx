@@ -71,6 +71,11 @@ function statusVariant(
 
 export default function ReleaseReadiness() {
   const vm = RELEASE_READINESS_VIEW_MODEL;
+  const evidencePosture = deriveReleaseEvidencePosture(
+    RELEASE_READINESS_EVIDENCE_RECEIPTS,
+    RELEASE_READINESS_EVIDENCE_BLOCKERS,
+  );
+  const grouped = groupEvidenceReceipts(RELEASE_READINESS_EVIDENCE_RECEIPTS);
 
   return (
     <div

@@ -1,0 +1,213 @@
+name: Release Receipt CI Upload
+
+# Narrowly scoped workflow for Release Receipt CI Workflow Upload v1.
+#
+# Runs a fixed set of Verdant validation commands, structures their outcomes
+# into `command-results.json`, builds the EmitReleaseReceiptInput JSON, runs
+# the pure emitter to produce `release-receipt.v1.json`, then uploads the
+# artifact directory. If any validation command fails, the emitter still
+# produces a `fail` receipt and the artifact is still uploaded; CI failure
+# is preserved by a final failing step.
+#
+# This workflow does NOT call GitHub APIs, the backend, or any UI code path.
+# It does NOT unlock Release GO and does NOT change Release Readiness
+# posture.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  release-receipt:
+    name: Build & upload release-receipt.v1
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck (tsgo)
+        id: tc
+        continue-on-error: true
+        run: |
+          start=$(date +%s%3N)
+          set +e
+          bunx tsgo --noEmit
+          rc=$?
+          set -e
+          end=$(date +%s%3N)
+          echo "ms=$((end-start))" >> "$GITHUB_OUTPUT"
+          exit $rc
+
+      - name: Release receipt parser contract test
+        id: pc
+        continue-on-error: true
+        run: |
+          start=$(date +%s%3N)
+          set +e
+          bunx vitest run src/test/release-receipt-parser-contract.test.ts
+          rc=$?
+          set -e
+          end=$(date +%s%3N)
+          echo "ms=$((end-start))" >> "$GITHUB_OUTPUT"
+          exit $rc
+
+      - name: Release receipt emitter test
+        id: em
+        continue-on-error: true
+        run: |
+          start=$(date +%s%3N)
+          set +e
+          bunx vitest run src/test/release-receipt-emitter.test.ts
+          rc=$?
+          set -e
+          end=$(date +%s%3N)
+          echo "ms=$((end-start))" >> "$GITHUB_OUTPUT"
+          exit $rc
+
+      - name: Release receipt CI artifact self-test
+        id: ca
+        continue-on-error: true
+        run: |
+          start=$(date +%s%3N)
+          set +e
+          bun scripts/test-release-receipt-ci-artifact.mjs
+          rc=$?
+          set -e
+          end=$(date +%s%3N)
+          echo "ms=$((end-start))" >> "$GITHUB_OUTPUT"
+          exit $rc
+
+      - name: Sensor safety check
+        id: ss
+        continue-on-error: true
+        run: |
+          start=$(date +%s%3N)
+          set +e
+          node scripts/sensor-safety-check.mjs
+          rc=$?
+          set -e
+          end=$(date +%s%3N)
+          echo "ms=$((end-start))" >> "$GITHUB_OUTPUT"
+          exit $rc
+
+      - name: Docs / demo safety
+        id: ds
+        continue-on-error: true
+        run: |
+          start=$(date +%s%3N)
+          set +e
+          bun run test:docs-demo-safety
+          rc=$?
+          set -e
+          end=$(date +%s%3N)
+          echo "ms=$((end-start))" >> "$GITHUB_OUTPUT"
+          exit $rc
+
+      - name: Compose command-results.json and release-receipt-input.json
+        env:
+          TC_OUTCOME: ${{ steps.tc.outcome }}
+          TC_MS: ${{ steps.tc.outputs.ms }}
+          PC_OUTCOME: ${{ steps.pc.outcome }}
+          PC_MS: ${{ steps.pc.outputs.ms }}
+          EM_OUTCOME: ${{ steps.em.outcome }}
+          EM_MS: ${{ steps.em.outputs.ms }}
+          CA_OUTCOME: ${{ steps.ca.outcome }}
+          CA_MS: ${{ steps.ca.outputs.ms }}
+          SS_OUTCOME: ${{ steps.ss.outcome }}
+          SS_MS: ${{ steps.ss.outputs.ms }}
+          DS_OUTCOME: ${{ steps.ds.outcome }}
+          DS_MS: ${{ steps.ds.outputs.ms }}
+          RUN_ID: ${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+          WORKFLOW: ${{ github.workflow }}
+          RUNNER_OS: ${{ runner.os }}
+        run: node scripts/ci/compose-release-receipt-inputs.mjs
+
+      - name: Cross-check via build-release-receipt-input.mjs
+        env:
+          RUN_ID: ${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+          WORKFLOW: ${{ github.workflow }}
+        run: |
+          bun scripts/build-release-receipt-input.mjs \
+            --out artifacts/release-readiness/release-receipt.cross-check.json \
+            --artifact-id "ci-full-suite-cross-${RUN_ID}" \
+            --generated-at "$(node -e 'process.stdout.write(new Date().toISOString())')" \
+            --source github_actions \
+            --source-run-id "${RUN_ID}" \
+            --commit-sha "${COMMIT_SHA}" \
+            --branch "${BRANCH}" \
+            --workflow-name "${WORKFLOW}" \
+            --receipt-kind ci_full_suite \
+            --command-results artifacts/release-readiness/command-results.json
+
+      - name: Emit release-receipt.v1.json
+        id: emit
+        run: |
+          bun scripts/emit-release-receipt.mjs \
+            artifacts/release-readiness/release-receipt-input.json \
+            artifacts/release-readiness/release-receipt.v1.json
+
+      - name: Validate release-receipt.v1.json against trusted v1 contract
+        id: validate
+        run: |
+          bun scripts/validate-release-receipt-artifact.mjs \
+            artifacts/release-readiness/release-receipt.v1.json
+
+      - name: Print derived release receipt status
+        id: print_status
+        run: |
+          bun scripts/print-release-receipt-status.mjs \
+            artifacts/release-readiness/release-receipt.v1.json
+
+      - name: Upload release-receipt-v1 artifact (trusted)
+        if: success()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        with:
+          name: release-receipt-v1
+          path: artifacts/release-readiness/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload release-receipt-v1 artifact (diagnostic on failure)
+        if: failure()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        with:
+          name: release-receipt-v1-diagnostic
+          path: artifacts/release-readiness/
+          if-no-files-found: warn
+          retention-days: 14
+
+
+      - name: Preserve CI failure if any validation command failed
+        if: always()
+        run: |
+          for o in \
+            "${{ steps.tc.outcome }}" \
+            "${{ steps.pc.outcome }}" \
+            "${{ steps.em.outcome }}" \
+            "${{ steps.ca.outcome }}" \
+            "${{ steps.ss.outcome }}" \
+            "${{ steps.ds.outcome }}"; do
+            if [ "$o" != "success" ]; then
+              echo "::error::One or more validation commands did not succeed; failing CI after artifact upload."
+              exit 1
+            fi
+          done
+          echo "All validation commands passed; ci_full_suite receipt is pass."

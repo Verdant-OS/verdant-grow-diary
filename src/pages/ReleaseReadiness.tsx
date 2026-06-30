@@ -17,6 +17,40 @@ import {
   RELEASE_READINESS_VIEW_MODEL,
   type ReadinessStatusLabel,
 } from "@/lib/releaseReadinessViewModel";
+import {
+  RELEASE_READINESS_EVIDENCE_RECEIPTS,
+  RELEASE_READINESS_EVIDENCE_BLOCKERS,
+  deriveReleaseEvidencePosture,
+  groupEvidenceReceipts,
+  getCategoryLabel,
+  getCategoryDisclaimer,
+  RELEASE_GO_REQUIREMENT_COPY,
+  type ReceiptCategory,
+  type ReceiptStatus,
+} from "@/lib/releaseReadinessEvidenceReceiptViewModel";
+
+const RECEIPT_CATEGORY_ORDER: ReceiptCategory[] = [
+  "ci_full_suite",
+  "local_targeted",
+  "manual_operator_note",
+];
+
+function receiptStatusVariant(
+  status: ReceiptStatus,
+): "default" | "secondary" | "destructive" | "outline" {
+  switch (status) {
+    case "pass":
+      return "default";
+    case "fail":
+    case "blocked":
+      return "destructive";
+    case "pending":
+    case "unknown":
+      return "secondary";
+    default:
+      return "outline";
+  }
+}
 
 function statusVariant(
   status: ReadinessStatusLabel,
@@ -37,6 +71,11 @@ function statusVariant(
 
 export default function ReleaseReadiness() {
   const vm = RELEASE_READINESS_VIEW_MODEL;
+  const evidencePosture = deriveReleaseEvidencePosture(
+    RELEASE_READINESS_EVIDENCE_RECEIPTS,
+    RELEASE_READINESS_EVIDENCE_BLOCKERS,
+  );
+  const grouped = groupEvidenceReceipts(RELEASE_READINESS_EVIDENCE_RECEIPTS);
 
   return (
     <div
@@ -164,7 +203,109 @@ export default function ReleaseReadiness() {
         </CardContent>
       </Card>
 
+      <Card data-testid="release-readiness-evidence">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Evidence Receipts
+            <Badge
+              variant={
+                evidencePosture.posture === "GO" ? "default" : "destructive"
+              }
+              data-testid="release-readiness-evidence-posture"
+            >
+              {evidencePosture.posture}
+            </Badge>
+          </CardTitle>
+          <CardDescription
+            data-testid="release-readiness-evidence-reason"
+          >
+            {evidencePosture.primaryReason}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          {evidencePosture.missingEvidence.length > 0 ? (
+            <div
+              className="rounded border border-destructive/50 bg-destructive/5 p-3"
+              data-testid="release-readiness-evidence-missing"
+            >
+              <div className="font-medium">Missing evidence</div>
+              <ul className="list-disc pl-6 mt-1 text-muted-foreground">
+                {evidencePosture.missingEvidence.map((m) => (
+                  <li key={m}>{m}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <div
+            className="text-xs text-muted-foreground"
+            data-testid="release-readiness-evidence-warning"
+          >
+            {evidencePosture.operatorWarning}
+          </div>
+
+          {RECEIPT_CATEGORY_ORDER.map((category) => {
+            const items = grouped[category];
+            if (items.length === 0) return null;
+            const disclaimer = getCategoryDisclaimer(category);
+            return (
+              <section
+                key={category}
+                data-testid={`release-readiness-evidence-group-${category}`}
+                className="space-y-2"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-semibold">{getCategoryLabel(category)}</h3>
+                  {disclaimer ? (
+                    <span
+                      className="text-xs text-muted-foreground"
+                      data-testid={`release-readiness-evidence-disclaimer-${category}`}
+                    >
+                      {disclaimer}
+                    </span>
+                  ) : null}
+                </div>
+                <ul className="space-y-2">
+                  {items.map((r) => (
+                    <li
+                      key={r.id}
+                      className="border-l-2 border-muted pl-3"
+                      data-testid={`release-readiness-evidence-receipt-${r.id}`}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{r.label}</span>
+                        <Badge variant={receiptStatusVariant(r.status)}>
+                          {r.status.toUpperCase()}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] uppercase"
+                        >
+                          {r.sourceLabel}
+                        </Badge>
+                      </div>
+                      <div className="text-muted-foreground mt-1">
+                        {r.summary}
+                      </div>
+                      <pre className="mt-1 rounded bg-muted px-3 py-2 text-xs overflow-x-auto">
+                        <code>{r.commandOrSource}</code>
+                      </pre>
+                      {r.notes ? (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {r.notes}
+                        </div>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
+        </CardContent>
+      </Card>
+
       <Card data-testid="release-readiness-safety">
+
         <CardHeader>
           <CardTitle>Safety notes</CardTitle>
         </CardHeader>

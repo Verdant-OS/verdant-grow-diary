@@ -1,5 +1,5 @@
-import { describe, expect, it, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import EcowittBridgeStatus from "@/pages/EcowittBridgeStatus";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
@@ -8,19 +8,27 @@ vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: vi.fn() }),
 }));
 
-// Mock heavy, out-of-scope child components so this page test exercises only
-// EcowittBridgeStatus's own logic. These components have their own dedicated
-// tests; rendering them here (a drawer/dialog + a polling status widget) drove
-// this single test file's heap past the 4 GB CI cap (OOM). vi.mock is
-// file-scoped, so their dedicated suites are unaffected. Test-only; no product
-// behavior change. EcowittSnapshotTrustExamples is intentionally NOT mocked —
-// its rendered samples are asserted below.
+// Stub the local forwarding status widget. It auto-fetches
+// http://localhost:8787 on mount via the real `fetch` (jsdom has no
+// listener), which leaves dangling promises and DOM across the 6 render
+// cycles in this suite — observed as >4GB OOM in CI batch chunking even
+// when run alone. The stub keeps the page render path intact while
+// removing the network/effect surface that isn't under test here.
 vi.mock("@/components/EcowittLocalForwardingStatusWidget", () => ({
   default: () => null,
 }));
+
+// Stub the drawer too — it pulls in Radix Dialog + report panel and
+// remounts on every render in this suite. The page-level button +
+// `latestReport` plumbing remain covered by the import/clear tests.
 vi.mock("@/components/IngestAttemptReportDrawer", () => ({
   default: () => null,
 }));
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 function renderPage() {
   return render(
@@ -48,12 +56,6 @@ const VALID_REPORT = JSON.stringify({
 describe("EcowittBridgeStatus page", () => {
   beforeEach(() => {
     clearLocalStorageForTest();
-  });
-
-  // Unmount the rendered tree after every test so jsdom DOM + React fibers are
-  // released between cases instead of accumulating (further reduces heap).
-  afterEach(() => {
-    cleanup();
   });
 
   it("renders empty state when no attempts exist", () => {

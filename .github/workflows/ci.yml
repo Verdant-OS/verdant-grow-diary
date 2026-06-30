@@ -205,12 +205,12 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts
+          echo "not-run" > artifacts/ecowitt-bridge-ci-exit-code.txt
+          : > artifacts/ecowitt-bridge-ci-output.txt
           set +e
-          NODE_OPTIONS=--max-old-space-size=4096 bunx vitest run \
-            src/test/ecowitt-bridge-status-page.test.tsx \
-            --reporter=verbose --isolate --pool=forks 2>&1 \
-            | tee artifacts/ecowitt-bridge-ci-output.txt
+          NODE_OPTIONS=--max-old-space-size=4096 bunx vitest run src/test/ecowitt-bridge-status-page.test.tsx --reporter=verbose --isolate --pool=forks 2>&1 | tee artifacts/ecowitt-bridge-ci-output.txt
           status=${PIPESTATUS[0]}
+          set -e
           echo "$status" > artifacts/ecowitt-bridge-ci-exit-code.txt
           echo "Ecowitt bridge CI validation exit code: $status"
           exit "$status"

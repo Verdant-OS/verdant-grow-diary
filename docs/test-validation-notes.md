@@ -92,12 +92,19 @@ bun run test:docs-demo-safety
 bun run test:ecowitt-bridge:ci
 ```
 
-Equivalent expanded form (the exact parity command CI runs):
+Local artifact-capturing variant (writes `artifacts/ecowitt-bridge-ci-output.txt`
+and `artifacts/ecowitt-bridge-ci-exit-code.txt`, exits with the suite's real
+exit code):
 
 ```bash
-NODE_OPTIONS=--max-old-space-size=4096 bunx vitest run \
-  src/test/ecowitt-bridge-status-page.test.tsx \
-  --reporter=verbose --isolate --pool=forks
+bun run test:ecowitt-bridge:ci:artifact
+```
+
+Equivalent expanded form (the exact parity command CI, the package script,
+and the local artifact script all run):
+
+```bash
+NODE_OPTIONS=--max-old-space-size=4096 bunx vitest run src/test/ecowitt-bridge-status-page.test.tsx --reporter=verbose --isolate --pool=forks
 ```
 
 Rules for the ecowitt suite:
@@ -112,4 +119,44 @@ Rules for the ecowitt suite:
   `artifacts/ecowitt-bridge-ci-exit-code.txt`).
 - Do **not** claim green unless the command completes with exit code
   `0`.
+
+### Ecowitt CI artifact receipt
+
+To verify a CI/Linux/VPS green receipt for the ecowitt bridge suite:
+
+GitHub UI steps:
+
+1. Open the CI run for the relevant commit/PR.
+2. Scroll to the **Artifacts** section at the bottom of the run summary.
+3. Download the `ecowitt-bridge-ci-validation` artifact.
+4. Open both files in the downloaded archive:
+   - `ecowitt-bridge-ci-exit-code.txt`
+   - `ecowitt-bridge-ci-output.txt`
+
+Optional GitHub CLI:
+
+```bash
+gh run download <RUN_ID> --name ecowitt-bridge-ci-validation --dir artifacts/ecowitt-bridge-ci-validation
+cat artifacts/ecowitt-bridge-ci-validation/ecowitt-bridge-ci-exit-code.txt
+```
+
+Green receipt rule — **all** must be true:
+
+- `ecowitt-bridge-ci-exit-code.txt` contains exactly `0`.
+- `ecowitt-bridge-ci-output.txt` shows the ecowitt bridge suite running
+  to completion (final vitest summary line present).
+- No OOM / channel-closed lines anywhere in the output:
+  - `JavaScript heap out of memory`
+  - `FATAL ERROR: Reached heap limit`
+  - `ERR_IPC_CHANNEL_CLOSED`
+  - `Channel closed`
+
+Do **not** claim green if:
+
+- the `ecowitt-bridge-ci-validation` artifact is missing,
+- the exit-code file is missing or contains `not-run`,
+- the exit-code is anything other than `0`,
+- the output is truncated before suite completion, or
+- any of the OOM/channel-closed lines above appear.
+
 

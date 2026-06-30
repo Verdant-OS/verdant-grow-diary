@@ -286,8 +286,8 @@ export default function DailyCheck() {
         </Link>
       </Button>
       <PageHeader
-        title="Daily Grow Check"
-        description="A guided daily walkthrough — current tent, environment, manual snapshot, Quick Log, and review."
+        title="Quick Log"
+        description="Log a short observation, photo, or manual sensor snapshot for today."
         icon={<ClipboardCheck className="h-5 w-5" />}
       />
 

@@ -230,8 +230,11 @@ describe("UI Simplification Slice 1 — operator group placement", () => {
 
   it("places AI Doctor Results and Release Readiness inside the Operator Mode group", () => {
     render(wrap(<AppSidebar />));
-    const heading = screen.getByText("Operator Mode");
-    const group = heading.closest('[data-sidebar="group"]');
+    const heading = Array.from(
+      document.querySelectorAll('[data-sidebar="group-label"]'),
+    ).find((el) => el.textContent?.trim() === "Operator Mode");
+    expect(heading, "Operator Mode group label not rendered").toBeTruthy();
+    const group = heading?.closest('[data-sidebar="group"]');
     expect(group).not.toBeNull();
     const text = group?.textContent ?? "";
     expect(text).toContain("AI Doctor Results");

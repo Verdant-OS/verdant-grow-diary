@@ -122,6 +122,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/operator/one-tent-proof-record", access: "operator", description: "One-tent proof record export." },
   { path: "/operator/paddle-processing-audit", access: "operator", description: "Operator Paddle processing audit (read-only)." },
   { path: "/operator/post-grow-reflection-dry-run", access: "operator", description: "Post-Grow Reflection dry-run diagnostics panel (read-only)." },
+  { path: "/operator/release-readiness", access: "operator", description: "Read-only release readiness / validation status snapshot (static/manual, no live CI feed)." },
 
   
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },

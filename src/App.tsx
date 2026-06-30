@@ -158,6 +158,9 @@ const App = () => (
                 <Route path="/alerts" element={<Alerts />} />
                 <Route path="/alerts/:alertId" element={<AlertDetail />} />
                 <Route path="/doctor" element={<Coach />} />
+                {/* Legacy alias — canonical route is /doctor. Growers
+                    sometimes type /ai-doctor; redirect rather than 404. */}
+                <Route path="/ai-doctor" element={<Navigate to="/doctor" replace />} />
                 <Route path="/doctor/sessions" element={<AiDoctorSessionsIndex />} />
                 <Route path="/doctor/sessions/:sessionId" element={<AiDoctorSessionDetail />} />
                 <Route path="/actions" element={<ActionQueue />} />

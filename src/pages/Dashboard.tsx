@@ -294,20 +294,10 @@ export default function Dashboard() {
       </div>
 
 
-      <div className="my-3">
-        <LineageRepairCta />
-      </div>
+      {/* Lineage Repair + First-Run Checklist intentionally moved below the
+          core Quick Log + Environment loop so they don't compete visually on
+          mobile. See Today Trust + Route Polish v1. */}
 
-
-      <div className="my-3">
-        <FirstRunChecklist
-          growCount={grows.length}
-          tentCount={tents.length}
-          plantCount={plants.length}
-          quickLogCount={diaryRecentCount}
-          sensorSnapshotCount={rawReadings.length}
-        />
-      </div>
 
 
       {/* Dashboard intentionally has a single Quick Log entry point (QuickLogV2Fab).
@@ -341,7 +331,13 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
 
         <KpiCard label="Active tents" value={tents.length} icon={<Box className="h-3.5 w-3.5" />} />
-        <KpiCard label="Plants" value={plants.length} icon={<Sprout className="h-3.5 w-3.5" />} hint={`${plants.filter((p) => p.health === "healthy").length} healthy`} accent="success" />
+        <KpiCard
+          label="Plants"
+          value={plants.length}
+          icon={<Sprout className="h-3.5 w-3.5" />}
+          hint={`${plants.filter((p) => p.health === "healthy").length} marked healthy · user-assigned, not sensor-derived`}
+          accent="success"
+        />
         <KpiCard label="Open alerts" value={openAlerts} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent={openAlerts > 0 ? "destructive" : "success"} />
         <KpiCard label="Due today" value={dueToday} hint={dueToday === 0 ? "No tasks yet" : undefined} icon={<ListChecks className="h-3.5 w-3.5" />} accent={dueToday > 0 ? "warning" : "success"} />
       </div>
@@ -906,6 +902,18 @@ export default function Dashboard() {
             })()}
           </section>
         )}
+        <div className="my-3">
+          <LineageRepairCta />
+        </div>
+        <div className="my-3">
+          <FirstRunChecklist
+            growCount={grows.length}
+            tentCount={tents.length}
+            plantCount={plants.length}
+            quickLogCount={diaryRecentCount}
+            sensorSnapshotCount={rawReadings.length}
+          />
+        </div>
         <h2
           data-testid="dashboard-section-heading-advanced"
           className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-6 mb-1"

@@ -75,6 +75,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/actions", access: "auth" },
   { path: "/actions/:actionId", access: "auth" },
   { path: "/admin/leads", access: "internal" },
+  { path: "/ai-doctor", access: "redirect", description: "→ /doctor (legacy/typo alias)" },
   { path: "/alerts", access: "auth" },
   { path: "/alerts/:alertId", access: "auth" },
   { path: "/auth", access: "public" },

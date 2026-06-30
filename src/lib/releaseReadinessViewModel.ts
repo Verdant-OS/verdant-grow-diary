@@ -7,7 +7,8 @@
  *
  * Hard rules:
  *  - never claim CI is green here; the page reflects manual/static notes
- *    until a real parser-generated full-suite receipt exists
+ *    backed by documented receipts
+ *  - never declare the product fully released / live green
  *  - no I/O, no Supabase, no fetch, no Date.now() — fully deterministic
  *  - no secrets, tokens, raw payloads, prompts, or completions
  *  - Action Queue stays approval-required; this surface never mutates it
@@ -18,7 +19,10 @@ export type ReadinessStatusLabel =
   | "HOLD"
   | "BLOCKED"
   | "PENDING"
-  | "PRESERVED";
+  | "PRESERVED"
+  | "MERGED"
+  | "SATISFIED"
+  | "WARNING";
 
 export type ReadinessSource = "static" | "manual" | "doc-receipt";
 
@@ -44,7 +48,7 @@ export interface ReadinessCommand {
 }
 
 export interface ReleaseReadinessViewModel {
-  /** Overall release posture. Stays HOLD until real CI receipt is GO. */
+  /** Overall release posture. */
   overall: { status: ReadinessStatusLabel; summary: string };
   /** Demo posture — separated from release posture on purpose. */
   demo: { status: ReadinessStatusLabel; summary: string };
@@ -62,7 +66,7 @@ export const RELEASE_READINESS_VIEW_MODEL: ReleaseReadinessViewModel = {
   overall: {
     status: "HOLD",
     summary:
-      "HOLD — pending CI billing restoration and final parser-generated receipts.",
+      "CI hardening satisfied — PR #112 merged. Overall release posture remains HOLD: verification pending until the repo-wide Auth loading smoke flake is repaired and any outstanding artifact gates are proven green on main. Parser-generated full-suite receipt for PR #112 is recorded below.",
   },
   demo: {
     status: "PASS",
@@ -72,11 +76,25 @@ export const RELEASE_READINESS_VIEW_MODEL: ReleaseReadinessViewModel = {
   release: {
     status: "HOLD",
     summary:
-      "Not release-green until the full-suite parser receipt returns GO from a real CI run.",
+      "Verification pending. PR #112 parser-generated full-suite receipt is GO, but the repo-wide Auth loading smoke remains flaky/non-required and outstanding artifact gates have not yet been proven green on main.",
   },
   sourceLabel:
     "Static / manual snapshot — not a live CI feed. Reflects documented receipts only.",
   checks: [
+    {
+      id: "pr-112-batched-full-suite",
+      label: "PR #112 batched full-suite hardening",
+      status: "MERGED",
+      source: "doc-receipt",
+      note: "Merged at 5bc657fc after parser GO on 4eb63ba: 16/16 batches, 22,187 passed, 0 failed, 0 OOMs (parser run 28463133281).",
+    },
+    {
+      id: "full-suite-parser",
+      label: "Full-suite parser receipt (PR #112)",
+      status: "PASS",
+      source: "doc-receipt",
+      note: "Parser-generated full-suite receipt returned GO on PR head 4eb63ba (run 28463133281): 16/16 batches · 22,187 passed · 0 failed · 6 skipped · 0 OOMs.",
+    },
     {
       id: "localstorage-helper",
       label: "localStorage helper enforcement",
@@ -117,34 +135,22 @@ export const RELEASE_READINESS_VIEW_MODEL: ReleaseReadinessViewModel = {
       label: "Ecowitt bridge CI artifact",
       status: "PENDING",
       source: "manual",
-      note: "Parity command + artifact upload wired; CI/Linux/VPS green receipt not yet captured.",
+      note: "Parity command + artifact upload wired; standalone CI/Linux/VPS green artifact receipt not yet proven on main.",
     },
     {
-      id: "full-suite-parser",
-      label: "Full-suite parser receipt",
-      status: "PENDING",
+      id: "auth-loading-smoke",
+      label: "Auth loading smoke",
+      status: "WARNING",
       source: "manual",
-      note: "PR #112 parser-generated full-suite receipt blocked behind CI billing.",
+      note: "Known repo-wide flaky Playwright check, red on main and not a PR #112 regression. Tracked separately; do not treat as a reliable release gate until repaired.",
     },
   ],
   blockers: [
     {
-      id: "ci-billing",
-      label: "GitHub Actions billing / spending-limit",
-      detail:
-        "Runner startup is blocked until billing or spending limit is restored. No runs can complete.",
-    },
-    {
-      id: "pr-112-receipt",
-      label: "PR #112 full-suite parser receipt",
-      detail:
-        "Merge remains HOLD until a parser-generated full-suite receipt returns GO from a real CI run.",
-    },
-    {
       id: "ecowitt-artifact",
-      label: "Ecowitt bridge CI green artifact",
+      label: "Ecowitt bridge CI green artifact (on main)",
       detail:
-        "ecowitt-bridge-ci-validation artifact must contain exit code 0 and a complete vitest summary from CI/Linux/VPS.",
+        "ecowitt-bridge-ci-validation artifact must contain exit code 0 and a complete vitest summary captured from a CI/Linux/VPS run on main before this gate is considered satisfied.",
     },
   ],
   commands: [
@@ -179,16 +185,17 @@ export const RELEASE_READINESS_VIEW_MODEL: ReleaseReadinessViewModel = {
       label: "Parse vitest batched workflow logs",
       command:
         "node scripts/parse-vitest-batched-workflow-logs.mjs --run-url=<RUN_URL>",
-      note: "Replace <RUN_URL> with a real GitHub Actions run URL once billing is restored.",
+      note: "PR #112 receipt run: 28463133281 (head 4eb63ba, merge commit 5bc657fc).",
     },
   ],
   safetyNotes: [
     "No fake live data. All status is manual/static and tied to documented receipts.",
     "Demo, manual, and static labels are preserved — nothing on this page is claimed as live CI output.",
+    "PR #112 row reflects a merge that has already occurred; this surface does not poll GitHub.",
     "Bad or unknown telemetry is never treated as healthy.",
     "AI Doctor remains cautious; this surface does not invoke models.",
     "Action Queue stays approval-required; no automation or device control.",
-    "Release stays HOLD until a real parser-generated full-suite receipt is GO.",
+    "Overall release posture stays HOLD until remaining gates are proven green on main.",
   ],
 };
 
@@ -201,4 +208,6 @@ export const RELEASE_READINESS_FORBIDDEN_PHRASES = [
   "release is green",
   "ci is green",
   "shipped to production",
+  "fully released",
+  "fully live",
 ] as const;

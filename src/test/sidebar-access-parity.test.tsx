@@ -100,6 +100,7 @@ describe("AppSidebar — non-operator authenticated grower", () => {
       "/operator/ai-doctor-phase1",
       "/operator/demo-preview",
       "/operator/ecowitt",
+      "/operator/release-readiness",
       "/diagnostics",
       "/sensors/ecowitt-audit",
       "/sensors/ingest-normalizer",

@@ -1,14 +1,14 @@
 /**
- * Verdant Release Readiness Status v1 — render + safety tests.
+ * Verdant Release Readiness Status — render + safety tests.
  *
- * Asserts:
- *  - HOLD overall status is rendered
- *  - page does not claim full CI GO / live green
- *  - blockers are visible (billing, full-suite, ecowitt)
- *  - Action Queue approval-required note is visible
- *  - static/manual source label is visible
- *  - manual commands render
- *  - no forbidden "live green" / "auto-fixed" wording
+ * Reflects post-PR-#112-merge snapshot:
+ *  - PR #112 row renders as MERGED
+ *  - Full-suite parser receipt renders as PASS with documented run details
+ *  - Auth loading smoke renders as WARNING and is visible
+ *  - Overall release posture stays HOLD (not "fully released" / "live green")
+ *  - Old PR #112 pending/billing blocker copy is gone
+ *  - Static / manual / doc-receipt labeling remains visible
+ *  - No live fetch / Supabase / GitHub API calls are introduced
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -36,24 +36,60 @@ describe("ReleaseReadiness page", () => {
     expect(src.textContent ?? "").not.toMatch(/live ci feed of/i);
   });
 
-  it("renders HOLD overall and release posture", () => {
+  it("renders HOLD overall and release posture with verification-pending reason", () => {
     renderPage();
     const exec = screen.getByTestId("release-readiness-executive");
     expect(exec.textContent ?? "").toContain("HOLD");
-    expect(exec.textContent ?? "").toMatch(/parser-generated/i);
+    expect(exec.textContent ?? "").toMatch(/verification pending/i);
   });
 
-  it("renders required blockers", () => {
+  it("renders the post-merge ecowitt-artifact blocker and drops closed blockers", () => {
     renderPage();
-    expect(
-      screen.getByTestId("release-readiness-blocker-ci-billing"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("release-readiness-blocker-pr-112-receipt"),
-    ).toBeInTheDocument();
     expect(
       screen.getByTestId("release-readiness-blocker-ecowitt-artifact"),
     ).toBeInTheDocument();
+    // Closed blockers must NOT be re-rendered.
+    expect(
+      screen.queryByTestId("release-readiness-blocker-ci-billing"),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId("release-readiness-blocker-pr-112-receipt"),
+    ).toBeNull();
+  });
+
+  it("renders PR #112 batched full-suite as MERGED with merge details", () => {
+    renderPage();
+    const row = screen.getByTestId(
+      "release-readiness-check-pr-112-batched-full-suite",
+    );
+    const text = row.textContent ?? "";
+    expect(text).toContain("MERGED");
+    expect(text).toContain("4eb63ba");
+    expect(text).toContain("5bc657fc");
+    expect(text).toMatch(/16\s*\/\s*16/);
+    expect(text).toContain("22,187");
+    expect(text).toMatch(/0 oo?ms?/i);
+  });
+
+  it("renders the full-suite parser receipt as PASS (no pending copy)", () => {
+    renderPage();
+    const row = screen.getByTestId(
+      "release-readiness-check-full-suite-parser",
+    );
+    expect(row.textContent ?? "").toContain("PASS");
+    expect(row.textContent ?? "").toContain("28463133281");
+    expect(row.textContent ?? "").not.toMatch(/blocked behind ci billing/i);
+    expect(row.textContent ?? "").not.toMatch(/pr\s*#?112\s*parser-generated\s*full-suite\s*receipt\s*pending/i);
+  });
+
+  it("renders Auth loading smoke WARNING and tracks it separately", () => {
+    renderPage();
+    const row = screen.getByTestId(
+      "release-readiness-check-auth-loading-smoke",
+    );
+    expect(row.textContent ?? "").toContain("WARNING");
+    expect(row.textContent ?? "").toMatch(/flaky/i);
+    expect(row.textContent ?? "").toMatch(/repo-wide/i);
   });
 
   it("renders Action Queue approval-required preservation check", () => {
@@ -73,26 +109,26 @@ describe("ReleaseReadiness page", () => {
     }
   });
 
-  it("never claims live CI / release-green / auto-fixed status", () => {
+  it("never claims live CI / release-green / fully-released status", () => {
     const { container } = renderPage();
     const text = (container.textContent ?? "").toLowerCase();
     for (const phrase of RELEASE_READINESS_FORBIDDEN_PHRASES) {
       expect(text).not.toContain(phrase.toLowerCase());
     }
-    // Defensive: avoid any "GO" verdict on the release line.
     const release = screen
       .getByTestId("release-readiness-executive")
       .textContent ?? "";
     expect(release).not.toMatch(/release\s*:\s*go/i);
+    expect(release).not.toMatch(/fully released/i);
   });
 
-  it("view model overall status stays HOLD until receipts land", () => {
+  it("view model overall status stays HOLD until remaining gates are proven on main", () => {
     expect(RELEASE_READINESS_VIEW_MODEL.overall.status).toBe("HOLD");
     expect(RELEASE_READINESS_VIEW_MODEL.release.status).toBe("HOLD");
   });
 
   describe("Evidence Receipts section", () => {
-    it("renders the evidence section with HOLD posture", () => {
+    it("renders the evidence section with HOLD posture (active blockers)", () => {
       renderPage();
       const section = screen.getByTestId("release-readiness-evidence");
       expect(section).toBeInTheDocument();
@@ -101,12 +137,11 @@ describe("ReleaseReadiness page", () => {
       ).toBe("HOLD");
     });
 
-    it("shows missing CI evidence message when receipt is absent", () => {
+    it("does not show missing CI evidence message now that PR #112 receipt is PASS", () => {
       renderPage();
-      const missing = screen.getByTestId("release-readiness-evidence-missing");
-      expect(missing.textContent ?? "").toMatch(
-        /missing parser-generated full-suite ci receipt/i,
-      );
+      expect(
+        screen.queryByTestId("release-readiness-evidence-missing"),
+      ).toBeNull();
     });
 
     it("shows local targeted disclaimer that it does not unlock GO", () => {
@@ -125,7 +160,7 @@ describe("ReleaseReadiness page", () => {
       expect(el.textContent ?? "").toMatch(/context only/i);
     });
 
-    it("never shows GO posture in the evidence section without passing CI", () => {
+    it("never shows GO posture while active blockers remain", () => {
       renderPage();
       expect(
         screen.getByTestId("release-readiness-evidence-posture").textContent,

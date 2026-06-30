@@ -58,11 +58,14 @@ function statusVariant(
   switch (status) {
     case "PASS":
     case "PRESERVED":
+    case "MERGED":
+    case "SATISFIED":
       return "default";
     case "HOLD":
     case "BLOCKED":
       return "destructive";
     case "PENDING":
+    case "WARNING":
       return "secondary";
     default:
       return "outline";

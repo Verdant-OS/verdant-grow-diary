@@ -247,17 +247,17 @@ export const RELEASE_READINESS_EVIDENCE_RECEIPTS: EvidenceReceipt[] = [
     id: "ci-full-suite-pr-112",
     label: "PR #112 parser-generated full-suite",
     category: "ci_full_suite",
-    status: "blocked",
+    status: "pass",
     sourceLabel: "doc-receipt",
     capturedAt: "",
     commandOrSource:
       "node scripts/parse-vitest-batched-workflow-logs.mjs --run-url=<RUN_URL>",
     summary:
-      "Full-suite parser receipt blocked behind GitHub Actions billing / spending limit.",
-    blocksReleaseGo: true,
-    canUnlockReleaseGo: false,
+      "Parser GO on PR head 4eb63ba (run 28463133281): 16/16 batches, 22,187 passed, 0 failed, 6 skipped, 0 OOMs. Merged into verdant-grow-diary at merge commit 5bc657fc.",
+    blocksReleaseGo: false,
+    canUnlockReleaseGo: true,
     notes:
-      "Required for Release GO. No receipt can be produced until CI runners are restored.",
+      "Documented full-suite receipt. Merge method: merge commit. No deploy, no DB writes, no schema/RLS/Edge/auth/grant/env changes.",
   },
   {
     id: "ecowitt-bridge-ci-artifact",
@@ -268,11 +268,11 @@ export const RELEASE_READINESS_EVIDENCE_RECEIPTS: EvidenceReceipt[] = [
     capturedAt: "",
     commandOrSource: "bun run test:ecowitt-bridge:ci",
     summary:
-      "ecowitt-bridge-ci-validation artifact (exit 0 + complete vitest summary) not yet captured from CI.",
+      "Standalone ecowitt-bridge-ci-validation artifact (exit 0 + complete vitest summary) not yet proven green on main.",
     blocksReleaseGo: true,
     canUnlockReleaseGo: false,
     notes:
-      "Sandbox-bound locally; authoritative receipt must come from CI/Linux/VPS.",
+      "Sandbox-bound locally; authoritative receipt must come from CI/Linux/VPS on main.",
   },
   {
     id: "local-targeted-localstorage-helper",
@@ -314,6 +314,21 @@ export const RELEASE_READINESS_EVIDENCE_RECEIPTS: EvidenceReceipt[] = [
     notes: LOCAL_TARGETED_DISCLAIMER,
   },
   {
+    id: "manual-note-auth-loading-smoke",
+    label: "Auth loading smoke (repo-wide flake)",
+    category: "manual_operator_note",
+    status: "pending",
+    sourceLabel: "operator-note",
+    capturedAt: "",
+    commandOrSource: "manual review",
+    summary:
+      "Auth loading smoke remains red/flaky repo-wide and non-required; explicitly overridden for PR #112 merge because it is red on main and not a PR #112 regression.",
+    blocksReleaseGo: false,
+    canUnlockReleaseGo: false,
+    notes:
+      "Tracked separately. Do not treat as a reliable release gate until repaired.",
+  },
+  {
     id: "manual-note-action-queue-preserved",
     label: "Action Queue stays approval-required",
     category: "manual_operator_note",
@@ -331,9 +346,15 @@ export const RELEASE_READINESS_EVIDENCE_RECEIPTS: EvidenceReceipt[] = [
 
 export const RELEASE_READINESS_EVIDENCE_BLOCKERS: EvidenceBlocker[] = [
   {
-    id: "ci-billing",
-    label: "GitHub Actions billing / spending-limit",
+    id: "ecowitt-artifact-on-main",
+    label: "Ecowitt bridge CI green artifact (on main)",
     detail:
-      "Runner startup blocked. No parser-generated full-suite receipt can be produced.",
+      "ecowitt-bridge-ci-validation artifact must be produced with exit 0 and a complete vitest summary from a CI/Linux/VPS run on main.",
+  },
+  {
+    id: "auth-loading-smoke-flake",
+    label: "Auth loading smoke flake repair",
+    detail:
+      "Repo-wide Auth loading smoke is red/flaky on main (non-required). Repair tracked separately before it can be treated as a reliable release gate.",
   },
 ];

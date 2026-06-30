@@ -1,11 +1,25 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, expect, it, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import EcowittBridgeStatus from "@/pages/EcowittBridgeStatus";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: vi.fn() }),
+}));
+
+// Mock heavy, out-of-scope child components so this page test exercises only
+// EcowittBridgeStatus's own logic. These components have their own dedicated
+// tests; rendering them here (a drawer/dialog + a polling status widget) drove
+// this single test file's heap past the 4 GB CI cap (OOM). vi.mock is
+// file-scoped, so their dedicated suites are unaffected. Test-only; no product
+// behavior change. EcowittSnapshotTrustExamples is intentionally NOT mocked —
+// its rendered samples are asserted below.
+vi.mock("@/components/EcowittLocalForwardingStatusWidget", () => ({
+  default: () => null,
+}));
+vi.mock("@/components/IngestAttemptReportDrawer", () => ({
+  default: () => null,
 }));
 
 function renderPage() {
@@ -34,6 +48,12 @@ const VALID_REPORT = JSON.stringify({
 describe("EcowittBridgeStatus page", () => {
   beforeEach(() => {
     clearLocalStorageForTest();
+  });
+
+  // Unmount the rendered tree after every test so jsdom DOM + React fibers are
+  // released between cases instead of accumulating (further reduces heap).
+  afterEach(() => {
+    cleanup();
   });
 
   it("renders empty state when no attempts exist", () => {

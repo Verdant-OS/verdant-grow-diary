@@ -130,9 +130,9 @@ export function emitReleaseReceiptArtifact(
   };
 
   const parsed = parseReleaseReceiptArtifact(candidate);
-  if (!parsed.ok) {
-    const fail: ParsedReleaseReceiptFailure = parsed;
-    return { ok: false, errors: fail.errors };
+  if (parsed.ok === true) {
+    return { ok: true, artifact: parsed.artifact };
   }
-  return { ok: true, artifact: parsed.artifact };
+  return { ok: false, errors: (parsed as ParsedReleaseReceiptFailure).errors };
 }
+

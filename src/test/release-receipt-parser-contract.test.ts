@@ -103,8 +103,11 @@ describe("releaseReceiptParser — rejection rules", () => {
       schema_version: "release-receipt.v9",
     });
     expect(r.ok).toBe(false);
-    if (r.ok) throw new Error("expected failure");
+    if (r.ok) {
+      throw new Error("expected failure");
+    }
     expect(r.errors.join(" ")).toMatch(/schema_version/);
+
   });
 
   it("rejects missing required fields", () => {

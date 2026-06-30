@@ -144,7 +144,9 @@
     "test:ai-doctor-readiness-ui": "bunx vitest run src/test/ai-doctor-readiness-ui-static-safety.test.ts src/test/ai-doctor-readiness-ui-regression.test.tsx src/test/ai-doctor-readiness-ui-v1-4.test.tsx src/test/ai-doctor-readiness-ui-v1-5.test.tsx src/test/ai-doctor-readiness-ui-v1-6.test.tsx src/test/ai-doctor-readiness-ui-v1-7.test.tsx src/test/ai-doctor-context-readiness-config.test.ts src/test/ai-doctor-context-readiness-evidence-derivation.test.ts src/test/ai-doctor-context-readiness-panel.test.tsx src/test/ai-doctor-context-readiness-panel-current-snapshot-quality.test.tsx src/test/ai-doctor-context-readiness-panel-quick-actions.test.tsx src/test/ai-doctor-readiness-view-model.test.ts src/test/ai-doctor-readiness-gate-view-model.test.ts src/test/plant-detail-ai-doctor-context-readiness-mount.test.tsx src/test/plant-detail-ai-doctor-context-readiness-mount-hook-order.test.tsx src/test/plant-detail-ai-doctor-readiness.test.tsx src/test/plant-detail-ai-doctor-readiness-gate.test.tsx && node scripts/sensor-safety-check.mjs",
     "test:client-secret-boundary": "node scripts/assert-client-secret-boundary.mjs",
     "test:check-client-secret-boundary-ci": "node scripts/test-check-client-secret-boundary-ci.mjs",
-    "check:client-secret-boundary-ci": "node scripts/check-client-secret-boundary-ci.mjs"
+    "check:client-secret-boundary-ci": "node scripts/check-client-secret-boundary-ci.mjs",
+    "check:client-secret-boundary-artifacts": "node scripts/check-client-secret-boundary-artifacts.mjs",
+    "test:check-client-secret-boundary-artifacts": "node scripts/test-check-client-secret-boundary-artifacts.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

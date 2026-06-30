@@ -22,6 +22,11 @@ jobs:
     name: Batched Vitest (matrix)
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Raise Node's old-space heap above the 2 GB default so individual
+    # vitest batches (notably batch 2) do not OOM mid-run. GitHub-hosted
+    # ubuntu-latest runners ship with ~7 GB RAM, so 4096 MB is safe.
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
     strategy:
       fail-fast: false
       matrix:

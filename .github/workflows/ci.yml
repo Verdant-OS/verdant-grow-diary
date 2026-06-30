@@ -52,6 +52,16 @@ jobs:
       - name: Static safety scans (Action Queue provenance + chip)
         run: bun run test:static-safety
 
+      # Stop-ship: every test file in src/test/** must route localStorage
+      # through src/test/helpers/localStorageTestHelper.ts so jsdom
+      # environments without a built-in localStorage (e.g. Windows + Node 26)
+      # keep working via the in-memory shim installed by src/test/setup.ts.
+      # See scripts/assert-test-localstorage-helper-usage.mjs.
+      - name: Test localStorage helper enforcement
+        run: |
+          node scripts/assert-test-localstorage-helper-usage.mjs
+          node scripts/test-localstorage-helper-usage-audit.mjs
+
       # Release docs safety: docs/releases/*.md must not claim unsafe
       # behavior (live telemetry, import writes, AI behavior changes,
       # Action Queue auto-writes, device control, schema/RLS/Edge changes,

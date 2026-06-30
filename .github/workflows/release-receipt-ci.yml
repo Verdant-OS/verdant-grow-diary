@@ -158,19 +158,42 @@ jobs:
             --command-results artifacts/release-readiness/command-results.json
 
       - name: Emit release-receipt.v1.json
+        id: emit
         run: |
           bun scripts/emit-release-receipt.mjs \
             artifacts/release-readiness/release-receipt-input.json \
             artifacts/release-readiness/release-receipt.v1.json
 
-      - name: Upload release-receipt-v1 artifact
-        if: always()
+      - name: Validate release-receipt.v1.json against trusted v1 contract
+        id: validate
+        run: |
+          bun scripts/validate-release-receipt-artifact.mjs \
+            artifacts/release-readiness/release-receipt.v1.json
+
+      - name: Print derived release receipt status
+        id: print_status
+        run: |
+          bun scripts/print-release-receipt-status.mjs \
+            artifacts/release-readiness/release-receipt.v1.json
+
+      - name: Upload release-receipt-v1 artifact (trusted)
+        if: success()
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
         with:
           name: release-receipt-v1
           path: artifacts/release-readiness/
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload release-receipt-v1 artifact (diagnostic on failure)
+        if: failure()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        with:
+          name: release-receipt-v1-diagnostic
+          path: artifacts/release-readiness/
+          if-no-files-found: warn
+          retention-days: 14
+
 
       - name: Preserve CI failure if any validation command failed
         if: always()

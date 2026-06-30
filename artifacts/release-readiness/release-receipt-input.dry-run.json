@@ -1,0 +1,45 @@
+{
+  "artifactId": "dry-run-ci_full_suite-local",
+  "generatedAt": "2026-06-30T00:00:00.000Z",
+  "source": "local_parser",
+  "receiptKind": "ci_full_suite",
+  "summary": "Dry-run: 2 commands green.",
+  "commands": [
+    {
+      "name": "typecheck",
+      "command": "bunx tsgo --noEmit",
+      "status": "pass",
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 12000,
+      "summary": "Typecheck clean."
+    },
+    {
+      "name": "vitest-batched",
+      "command": "node scripts/run-vitest-batches.mjs",
+      "status": "pass",
+      "passed": 1872,
+      "failed": 0,
+      "skipped": 14,
+      "duration_ms": 412000,
+      "summary": "All vitest batches green."
+    }
+  ],
+  "blockers": [
+    {
+      "id": "ecowitt-bridge-artifact-missing",
+      "label": "Ecowitt bridge artifact missing",
+      "severity": "release_blocker",
+      "active": true,
+      "summary": "Ecowitt bridge CI validation artifact was not uploaded for this run."
+    }
+  ],
+  "metadata": {
+    "runner_os": "local-dry-run"
+  },
+  "sourceRunId": null,
+  "commitSha": null,
+  "branch": "local",
+  "workflowName": "Release Receipt CI Upload (dry-run)"
+}

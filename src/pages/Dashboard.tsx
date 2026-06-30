@@ -906,8 +906,14 @@ export default function Dashboard() {
             })()}
           </section>
         )}
+        <h2
+          data-testid="dashboard-section-heading-advanced"
+          className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-6 mb-1"
+        >
+          Advanced
+        </h2>
         <section
-          className="glass rounded-2xl p-4 mt-4"
+          className="glass rounded-2xl p-4 mt-2"
           aria-label="Environment Trends"
         >
           <div className="flex items-center justify-between mb-2">

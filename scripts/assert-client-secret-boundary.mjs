@@ -55,7 +55,7 @@ function stripLiteralsAndRegex(src) {
   // Single-quoted strings
   out = out.replace(/'(?:\\.|[^'\\\n])*'/g, "''");
   // Regex literals — heuristic: after a non-identifier char.
-  out = out.replace(/([=(,;:!&|?{}\[\n])\s*\/(?:\\.|[^\/\\\n])+\/[gimsuy]*/g, "$1/_/");
+  out = out.replace(/([=(,;:!&|?{}\[\n>])\s*\/(?:\\.|[^\/\\\n])+\/[gimsuy]*/g, "$1/_/");
   return out;
 }
 

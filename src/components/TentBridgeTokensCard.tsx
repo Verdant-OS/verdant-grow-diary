@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Activity, Copy, KeyRound, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { isUuid } from "@/lib/isUuid";
 import {
   BRIDGE_TOKEN_DEFAULT_TTL_DAYS,
   BRIDGE_TOKEN_MAX_TTL_DAYS,
@@ -16,6 +17,12 @@ import {
   formatIngestCount,
   sanitizeTokenName,
 } from "@/lib/bridgeTokenRules";
+
+/** Calm, non-leaking error copy for the metadata-only token list. */
+export const BRIDGE_TOKEN_LOAD_FAILED_TITLE =
+  "Bridge token status unavailable";
+export const BRIDGE_TOKEN_LOAD_FAILED_BODY =
+  "Token secrets were not loaded.";
 
 /**
  * Tent-scoped presenter for issuing bridge tokens to headless ESP32 / Pi /

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Activity, Copy, KeyRound, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { isUuid } from "@/lib/isUuid";
 import {
   BRIDGE_TOKEN_DEFAULT_TTL_DAYS,
   BRIDGE_TOKEN_MAX_TTL_DAYS,
@@ -16,6 +17,12 @@ import {
   formatIngestCount,
   sanitizeTokenName,
 } from "@/lib/bridgeTokenRules";
+
+/** Calm, non-leaking error copy for the metadata-only token list. */
+export const BRIDGE_TOKEN_LOAD_FAILED_TITLE =
+  "Bridge token status unavailable";
+export const BRIDGE_TOKEN_LOAD_FAILED_BODY =
+  "Token secrets were not loaded.";
 
 /**
  * Tent-scoped presenter for issuing bridge tokens to headless ESP32 / Pi /
@@ -31,15 +38,32 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
   const [ttlDays, setTtlDays] = useState<number>(BRIDGE_TOKEN_DEFAULT_TTL_DAYS);
   const [reveal, setReveal] = useState<string | null>(null);
 
+  const [loadFailed, setLoadFailed] = useState(false);
+
   async function load() {
     setLoading(true);
+    setLoadFailed(false);
+    // Demo / non-UUID tent ids (e.g. fixture "t1") can't be queried against
+    // the bridge_tokens table. Treat as a calm empty state — never surface
+    // the raw Postgres "invalid input syntax for type uuid" error to growers.
+    if (!isUuid(tentId)) {
+      setTokens([]);
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
       .from("bridge_tokens")
       .select("id, name, token_prefix, expires_at, last_used_at, first_used_at, ingest_count, revoked_at, created_at")
       .eq("tent_id", tentId)
       .order("created_at", { ascending: false });
     if (error) {
-      toast({ title: "Could not load bridge tokens", description: error.message, variant: "destructive" });
+      // Do not leak DB error text (may include column/SQL detail). Calm copy only.
+      setLoadFailed(true);
+      toast({
+        title: BRIDGE_TOKEN_LOAD_FAILED_TITLE,
+        description: BRIDGE_TOKEN_LOAD_FAILED_BODY,
+        variant: "destructive",
+      });
     } else {
       setTokens((data ?? []) as BridgeTokenRow[]);
     }
@@ -152,6 +176,19 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
 
       {loading ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
+      ) : loadFailed ? (
+        <div
+          className="text-sm text-muted-foreground flex items-center gap-2"
+          data-testid="bridge-token-load-failed"
+          role="status"
+        >
+          <span>
+            {BRIDGE_TOKEN_LOAD_FAILED_TITLE}. {BRIDGE_TOKEN_LOAD_FAILED_BODY}
+          </span>
+          <Button size="sm" variant="outline" onClick={load}>
+            Retry
+          </Button>
+        </div>
       ) : tokens.length === 0 ? (
         <div className="text-sm text-muted-foreground">No bridge tokens yet.</div>
       ) : (

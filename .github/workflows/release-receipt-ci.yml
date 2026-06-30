@@ -159,7 +159,7 @@ jobs:
 
       - name: Emit release-receipt.v1.json
         run: |
-          node scripts/emit-release-receipt.mjs \
+          bun scripts/emit-release-receipt.mjs \
             artifacts/release-readiness/release-receipt-input.json \
             artifacts/release-readiness/release-receipt.v1.json
 

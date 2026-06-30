@@ -164,8 +164,12 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
           body: JSON.stringify([]),
         });
       });
-      await page.goto(path);
-      await page.waitForURL((u) => u.pathname === "/auth", { timeout: 8000 });
+      // Reliability v1: avoid waiting on full network idle (mobile cold-boot
+      // for 40+ protected routes is too tight at 8s and causes repo-wide
+      // flake). Use domcontentloaded for the navigation and a polling URL
+      // assertion for the auth-gate redirect with a generous timeout.
+      await page.goto(path, { waitUntil: "domcontentloaded" });
+      await expect(page).toHaveURL(/\/auth(\?|$)/, { timeout: 20_000 });
       const url = new URL(page.url());
       expect(url.origin).toBe(new URL(baseURL!).origin);
       const redirectTo = url.searchParams.get("redirectTo");

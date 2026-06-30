@@ -37,6 +37,23 @@ describe("Primary navigation: Tents and Plants are emphasized", () => {
     expect(SIDEBAR).toMatch(/label:\s*"Timeline"/);
   });
 
+  it("Slice 3: grower nav uses canonical labels (Reports, Timeline) — no 'Grow Learning Hub' or 'Logs'", () => {
+    // Sidebar
+    expect(SIDEBAR).not.toContain("Grow Learning Hub");
+    expect(SIDEBAR).toMatch(/label:\s*"Reports"/);
+    expect(SIDEBAR).not.toMatch(/label:\s*"Logs"/);
+    // Mobile
+    expect(MOBILE).not.toContain("Grow Learning Hub");
+    expect(MOBILE).not.toMatch(/label:\s*"Logs"/);
+  });
+
+  it("Slice 3: Timeline nav targets canonical /timeline route, not /logs", () => {
+    const sidebarTimeline = SIDEBAR.match(/\{[^}]*label:\s*"Timeline"[^}]*\}/);
+    expect(sidebarTimeline?.[0]).toMatch(/to:\s*"\/timeline"/);
+    const mobileTimeline = MOBILE.match(/\{[^}]*label:\s*"Timeline"[^}]*\}/);
+    expect(mobileTimeline?.[0]).toMatch(/to:\s*"\/timeline"/);
+  });
+
   it("AppSidebar moves 'Grows' index under Archive as 'Harvest Archive'", () => {
     expect(SIDEBAR).toContain('"Harvest Archive"');
     expect(SIDEBAR).not.toMatch(/label:\s*"Grows"/);

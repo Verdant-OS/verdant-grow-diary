@@ -54,6 +54,17 @@ describe("Primary navigation: Tents and Plants are emphasized", () => {
     expect(mobileTimeline?.[0]).toMatch(/to:\s*"\/timeline"/);
   });
 
+  it("Slice 6: Dashboard Timeline links use timelinePath (canonical /timeline), not logsPath", () => {
+    const DASHBOARD = read("src/pages/Dashboard.tsx");
+    expect(DASHBOARD).not.toMatch(/logsPath\(/);
+    expect(DASHBOARD).toMatch(/timelinePath\(scopedGrowId\)/);
+    // Import must include timelinePath, not logsPath.
+    expect(DASHBOARD).toMatch(/from\s+["']@\/lib\/routes["'][\s\S]{0,400}/);
+    const importLine = DASHBOARD.match(/import\s*\{[^}]*\}\s*from\s*["']@\/lib\/routes["']/)?.[0] ?? "";
+    expect(importLine).toContain("timelinePath");
+    expect(importLine).not.toContain("logsPath");
+  });
+
   it("AppSidebar moves 'Grows' index under Archive as 'Harvest Archive'", () => {
     expect(SIDEBAR).toContain('"Harvest Archive"');
     expect(SIDEBAR).not.toMatch(/label:\s*"Grows"/);

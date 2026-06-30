@@ -65,6 +65,6 @@ jobs:
             --batch=${{ matrix.batch }} \
             --strategy=round-robin \
             --reporter=${{ github.event.inputs.reporter }} \
-            --chunk-size=8 \
+            --chunk-size=1 \
             --isolate \
             --pool=forks

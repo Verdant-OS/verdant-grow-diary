@@ -169,11 +169,6 @@ export default function AppSidebar() {
           <>
             {operatorGroups.map(renderGroup)}
             <SidebarGroup>
-              {!collapsed && (
-                <SidebarGroupLabel className="text-[10px] tracking-wider">
-                  Operator
-                </SidebarGroupLabel>
-              )}
               <SidebarGroupContent>
                 <div className="px-1">
                   <OperatorModeLink variant="sidebar" />
@@ -186,3 +181,4 @@ export default function AppSidebar() {
     </Sidebar>
   );
 }
+

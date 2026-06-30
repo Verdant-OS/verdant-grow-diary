@@ -294,20 +294,10 @@ export default function Dashboard() {
       </div>
 
 
-      <div className="my-3">
-        <LineageRepairCta />
-      </div>
+      {/* Lineage Repair + First-Run Checklist intentionally moved below the
+          core Quick Log + Environment loop so they don't compete visually on
+          mobile. See Today Trust + Route Polish v1. */}
 
-
-      <div className="my-3">
-        <FirstRunChecklist
-          growCount={grows.length}
-          tentCount={tents.length}
-          plantCount={plants.length}
-          quickLogCount={diaryRecentCount}
-          sensorSnapshotCount={rawReadings.length}
-        />
-      </div>
 
 
       {/* Dashboard intentionally has a single Quick Log entry point (QuickLogV2Fab).

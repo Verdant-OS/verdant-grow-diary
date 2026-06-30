@@ -6,6 +6,7 @@ import {
   detectOOM,
   computeVerdict,
   buildReceipt,
+  summarizeGates,
 } from "./parse-vitest-batched-workflow-logs.mjs";
 
 let passed = 0, failed = 0;
@@ -133,6 +134,57 @@ t("computeVerdict: NO-GO when batches are missing (cannot prove all ran)", () =>
 t("computeVerdict: NO-GO when a safety gate failed", () => {
   const v = computeVerdict({ conclusion: "success", batches: mkBatches(), gates: [{ status: "failure" }] });
   assert.equal(v.verdict, "NO-GO");
+});
+
+t("computeVerdict: NO-GO when batch-utils self-test failed", () => {
+  const v = computeVerdict({ conclusion: "success", batches: mkBatches(), gates: okGates, selfTest: { status: "failure", passed: 25, failed: 1 } });
+  assert.equal(v.verdict, "NO-GO");
+});
+
+t("computeVerdict: NO-GO on a failed test FILE with zero failed assertions", () => {
+  const v = computeVerdict({
+    conclusion: "failure",
+    batches: mkBatches({ 5: { status: "fail", failed: 0, filesFailed: 1 } }),
+    gates: okGates,
+  });
+  assert.equal(v.verdict, "NO-GO");
+});
+
+t("computeVerdict: NO-GO when a matrix job log is missing", () => {
+  const v = computeVerdict({
+    conclusion: "success",
+    batches: mkBatches({ 7: { status: "incomplete", logMissing: true } }),
+    gates: okGates,
+  });
+  assert.equal(v.verdict, "NO-GO");
+});
+
+t("summarizeGates: fails closed when a gate fails on a non-first matrix leg", () => {
+  const ok = { name: "Batched Vitest (matrix) (0)", steps: [{ name: "Safety gates (typecheck + sensor + docs)", conclusion: "success" }] };
+  const bad = { name: "Batched Vitest (matrix) (1)", steps: [{ name: "Safety gates (typecheck + sensor + docs)", conclusion: "failure" }] };
+  const { gates } = summarizeGates([ok, bad]);
+  const typecheck = gates.find((g) => /typecheck/.test(g.gate));
+  assert.equal(typecheck.status, "failure");
+  // and the verdict must be NO-GO, not blessed by the first (passing) leg
+  assert.equal(computeVerdict({ conclusion: "failure", batches: mkBatches(), gates }).verdict, "NO-GO");
+});
+
+t("parseJobLog: empty log → logMissing true, status incomplete", () => {
+  const r = parseJobLog("");
+  assert.equal(r.logMissing, true);
+  assert.equal(r.status, "incomplete");
+});
+
+t("parseJobLog: failed test FILE with 0 failed assertions → status fail, filesFailed>0", () => {
+  const log = [
+    'VERDANT_BATCH_START {"batch":3,"batches":16,"chunks":1,"fileCount":1}',
+    " Test Files  1 failed (1)",
+    "      Tests  no tests",
+    'VERDANT_BATCH_END {"batch":3,"status":"fail","exitCode":1}',
+  ].join("\n");
+  const r = parseJobLog(log);
+  assert.equal(r.filesFailed, 1);
+  assert.equal(r.status, "fail");
 });
 
 t("buildReceipt: GO end-to-end across 16 passing matrix jobs", () => {

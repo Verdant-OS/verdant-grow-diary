@@ -61,7 +61,8 @@ function sumVitest(section, label) {
  * docs-demo-safety gate (which runs in an earlier step) is excluded by design.
  */
 export function parseJobLog(rawLog) {
-  const log = stripAnsi(rawLog);
+  const logMissing = !rawLog || !String(rawLog).trim();
+  const log = stripAnsi(rawLog || "");
 
   const startM = log.match(/VERDANT_BATCH_START (\{[^\n]*\})/);
   let batch = null, fileCount = null, chunksExpected = null;
@@ -92,12 +93,13 @@ export function parseJobLog(rawLog) {
   const oom = detectOOM(section);
 
   let status;
-  if (endStatus) status = endStatus === "pass" ? "pass" : (oom ? "oom" : "fail");
+  if (logMissing) status = "incomplete";
+  else if (endStatus) status = endStatus === "pass" ? "pass" : (oom ? "oom" : "fail");
   else if (oom) status = "oom";
-  else if (tests.failed > 0) status = "fail";
+  else if (tests.failed > 0 || files.failed > 0) status = "fail";
   else if (/◀ Batch \d+: PASS/.test(section)) status = "pass";
   else status = "incomplete";
-  if (status === "fail" && oom && tests.failed === 0) status = "oom";
+  if (status === "fail" && oom && tests.failed === 0 && files.failed === 0) status = "oom";
 
   const complete = chunksExpected != null ? chunksRun >= chunksExpected : status === "pass";
 
@@ -117,6 +119,7 @@ export function parseJobLog(rawLog) {
     exitCode,
     status,
     complete,
+    logMissing,
   };
 }
 
@@ -125,48 +128,82 @@ const stepConclusion = (steps, predicate) => {
   return s ? s.conclusion : null;
 };
 
-/** Derive safety-gate statuses from a matrix job's steps + log. */
-export function summarizeGates(job) {
-  const steps = job.steps || [];
-  const gatesStep = stepConclusion(steps, (n) => /Safety gates/i.test(n));
-  const selfStep = stepConclusion(steps, (n) => /Batch utils self-test/i.test(n));
-  const guardStep = stepConclusion(steps, (n) => /Assert batches input/i.test(n));
-  const wfSafety = stepConclusion(steps, (n) => /Assert batched workflow safety/i.test(n));
+/**
+ * Aggregate a step's conclusion across ALL matrix jobs: fail-closed.
+ * Returns "failure" if the step failed on ANY job, "success" only if it was
+ * present and passed on every job that has it, else null (not observed).
+ * A safety gate that fails on a non-first leg must not be blessed because the
+ * first leg happened to pass.
+ */
+const aggregateStep = (jobs, predicate) => {
+  let sawAny = false;
+  let sawFailure = false;
+  for (const j of jobs) {
+    const c = stepConclusion(j.steps, predicate);
+    if (c == null) continue;
+    sawAny = true;
+    if (c !== "success") sawFailure = true; // failure / cancelled / skipped-as-fail
+  }
+  if (!sawAny) return null;
+  return sawFailure ? "failure" : "success";
+};
+
+/** Derive safety-gate statuses aggregated across ALL matrix jobs + log. */
+export function summarizeGates(jobs) {
+  const list = Array.isArray(jobs) ? jobs : [jobs];
+  const gatesStep = aggregateStep(list, (n) => /Safety gates/i.test(n));
+  const guardStep = aggregateStep(list, (n) => /Assert batches input/i.test(n));
+  const selfStep = aggregateStep(list, (n) => /Batch utils self-test/i.test(n));
+  const wfSafety = aggregateStep(list, (n) => /Assert batched workflow safety/i.test(n));
 
   const gates = [
-    { gate: "bun run typecheck", status: gatesStep, notes: "bundled: Safety gates step" },
-    { gate: "node scripts/sensor-safety-check.mjs", status: gatesStep, notes: "bundled: Safety gates step" },
-    { gate: "node scripts/assert-sensor-intelligence-safety.mjs --quiet", status: gatesStep, notes: "bundled: Safety gates step" },
+    { gate: "bun run typecheck", status: gatesStep, notes: "bundled: Safety gates step (all legs)" },
+    { gate: "node scripts/sensor-safety-check.mjs", status: gatesStep, notes: "bundled: Safety gates step (all legs)" },
+    { gate: "node scripts/assert-sensor-intelligence-safety.mjs --quiet", status: gatesStep, notes: "bundled: Safety gates step (all legs)" },
     { gate: "bun run test:docs-demo-safety", status: gatesStep, notes: "bundled: Safety gates step (excluded from batch totals)" },
-    { gate: "batches=16 guard", status: guardStep, notes: "Assert batches input step" },
+    { gate: "batches=16 guard", status: guardStep, notes: "Assert batches input step (all legs)" },
   ];
-  if (wfSafety) gates.push({ gate: "workflow safety (chunk-size=1)", status: wfSafety, notes: "Assert batched workflow safety step" });
+  if (wfSafety) gates.push({ gate: "workflow safety (chunk-size=1)", status: wfSafety, notes: "Assert batched workflow safety step (all legs)" });
 
-  // Batch-utils self-test counts ("N passed, M failed") from the log.
-  const log = stripAnsi(job.log || "");
-  const m = log.match(/(\d+)\s+passed,\s+(\d+)\s+failed/);
-  const selfTest = {
-    status: selfStep || (m ? (Number(m[2]) === 0 ? "success" : "failure") : null),
-    passed: m ? Number(m[1]) : null,
-    failed: m ? Number(m[2]) : null,
-  };
+  // Batch-utils self-test: fail-closed across legs (counts from any leg).
+  let selfStatus = selfStep;
+  let passed = null;
+  let failed = null;
+  for (const j of list) {
+    const m = stripAnsi(j.log || "").match(/(\d+)\s+passed,\s+(\d+)\s+failed/);
+    if (m) {
+      passed = Number(m[1]);
+      failed = Number(m[2]);
+      if (failed > 0) selfStatus = "failure";
+    }
+  }
+  if (selfStatus == null && failed != null) selfStatus = failed === 0 ? "success" : "failure";
+  const selfTest = { status: selfStatus, passed, failed };
 
   return { gates, selfTest };
 }
 
-export function computeVerdict({ conclusion, batches, gates }) {
+export function computeVerdict({ conclusion, batches, gates, selfTest }) {
   const present = new Set(batches.map((b) => b.batch).filter((b) => b != null));
   const allPresent = [...Array(REQUIRED_BATCHES).keys()].every((i) => present.has(i));
-  const anyAssertionFail = batches.some((b) => b.failed > 0);
+  // Suite failure = a failed assertion OR a failed test *file* (e.g. an
+  // import/setup error reports "Test Files 1 failed" with 0 failed assertions).
+  const anySuiteFail = batches.some(
+    (b) => b.failed > 0 || b.filesFailed > 0 || b.status === "fail",
+  );
+  const anyLogMissing = batches.some((b) => b.logMissing);
   const anyOOM = batches.some((b) => b.oom);
   const anyIncomplete = batches.some((b) => b.status !== "pass");
   const gatesOk = gates.length > 0 && gates.every((g) => g.status === "success");
+  const selfOk = !selfTest || selfTest.status !== "failure";
 
-  if (!gatesOk) return { verdict: "NO-GO", reason: "one or more safety gates did not pass" };
-  if (anyAssertionFail) return { verdict: "NO-GO", reason: "at least one test assertion failed" };
+  if (!gatesOk) return { verdict: "NO-GO", reason: "one or more safety gates did not pass (any matrix leg)" };
+  if (!selfOk) return { verdict: "NO-GO", reason: "batch-utils self-test failed" };
+  if (anySuiteFail) return { verdict: "NO-GO", reason: "at least one test assertion or test file failed" };
+  if (anyLogMissing) return { verdict: "NO-GO", reason: "a matrix job log was missing/unreadable — batch could not be validated" };
   if (!allPresent) return { verdict: "NO-GO", reason: `cannot prove all ${REQUIRED_BATCHES} batches ran (missing job data)` };
   if (conclusion === "success" && !anyOOM && !anyIncomplete) return { verdict: "GO", reason: "all batches passed, no OOM, gates green" };
-  if (!anyAssertionFail && (anyOOM || anyIncomplete)) return { verdict: "PARTIAL", reason: "OOM/incomplete batch with zero assertion failures" };
+  if (!anySuiteFail && (anyOOM || anyIncomplete)) return { verdict: "PARTIAL", reason: "OOM/incomplete batch with zero suite failures" };
   return { verdict: "NO-GO", reason: "unresolved failure state" };
 }
 
@@ -196,10 +233,10 @@ export function buildReceipt({ run, jobs }) {
     .filter(Boolean)
     .sort((a, b) => a.batch - b.batch);
 
-  const gateSource = jobs.find((j) => /\(matrix\)/.test(j.name || "")) || jobs[0] || {};
-  const { gates, selfTest } = summarizeGates(gateSource);
+  const matrixJobs = jobs.filter((j) => /\(matrix\)/.test(j.name || ""));
+  const { gates, selfTest } = summarizeGates(matrixJobs.length ? matrixJobs : jobs);
 
-  const { verdict, reason } = computeVerdict({ conclusion: run.conclusion, batches: matrix, gates });
+  const { verdict, reason } = computeVerdict({ conclusion: run.conclusion, batches: matrix, gates, selfTest });
 
   const passing = matrix.filter((b) => b.status === "pass");
   const totalPassed = passing.reduce((a, b) => a + b.passed, 0);

@@ -8,9 +8,6 @@ import {
   selectBatch,
   splitIntoChunks,
   parseBatchArgs,
-  chunkArray,
-  BATCH_STRATEGIES,
-  VITEST_POOLS,
 } from "./vitest-batch-utils.mjs";
 
 let passed = 0;

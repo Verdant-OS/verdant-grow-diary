@@ -71,15 +71,15 @@ describe("ReleaseReadiness page", () => {
     expect(text).toMatch(/0 oo?ms?/i);
   });
 
-  it("renders the full-suite parser receipt as PASS (no pending copy)", () => {
+  it("renders the full-suite parser receipt as SATISFIED (no pending copy)", () => {
     renderPage();
     const row = screen.getByTestId(
       "release-readiness-check-full-suite-parser",
     );
-    expect(row.textContent ?? "").toContain("PASS");
+    expect(row.textContent ?? "").toContain("SATISFIED");
     expect(row.textContent ?? "").toContain("28463133281");
     expect(row.textContent ?? "").not.toMatch(/blocked behind ci billing/i);
-    expect(row.textContent ?? "").not.toMatch(/pr\s*#?112\s*parser-generated\s*full-suite\s*receipt\s*pending/i);
+    expect(row.textContent ?? "").not.toMatch(/pending/i);
   });
 
   it("renders Auth loading smoke WARNING and tracks it separately", () => {

@@ -400,7 +400,20 @@ export default function Dashboard() {
                   to see your environment here.
                 </p>
                 <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+                  {/* Sensors entry-point dedupe: a single primary "Go to
+                      Sensors" CTA. Manual reading + Import sensor data
+                      remain available as secondary anchors into the same
+                      Sensors page (no new routes). */}
                   <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
+                    <Link
+                      to="/sensors"
+                      data-testid="dashboard-environment-snapshot-go-to-sensors"
+                      aria-label="Go to Sensors page"
+                    >
+                      Go to Sensors
+                    </Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
                     <Link
                       to="/sensors#manual-reading"
                       data-testid="dashboard-environment-snapshot-add-manual-reading"
@@ -416,15 +429,6 @@ export default function Dashboard() {
                       aria-label="Import sensor data"
                     >
                       Import sensor data
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link
-                      to="/sensors"
-                      data-testid="dashboard-environment-snapshot-go-to-sensors"
-                      aria-label="Go to Sensors page"
-                    >
-                      Go to Sensors
                     </Link>
                   </Button>
                 </div>

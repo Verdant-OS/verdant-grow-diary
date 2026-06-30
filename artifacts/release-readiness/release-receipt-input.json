@@ -1,0 +1,77 @@
+{
+  "artifactId": "ci-full-suite-99-1782828866530",
+  "generatedAt": "2026-06-30T00:00:00.000Z",
+  "source": "github_actions",
+  "receiptKind": "ci_full_suite",
+  "summary": "Verdant CI full suite has 1 failing command(s).",
+  "commands": [
+    {
+      "name": "typecheck",
+      "command": "bunx tsgo --noEmit",
+      "status": "pass",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 1000,
+      "summary": "typecheck passed."
+    },
+    {
+      "name": "release-receipt-parser-contract",
+      "command": "bunx vitest run src/test/release-receipt-parser-contract.test.ts",
+      "status": "pass",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 500,
+      "summary": "release-receipt-parser-contract passed."
+    },
+    {
+      "name": "release-receipt-emitter",
+      "command": "bunx vitest run src/test/release-receipt-emitter.test.ts",
+      "status": "pass",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 500,
+      "summary": "release-receipt-emitter passed."
+    },
+    {
+      "name": "release-receipt-ci-artifact",
+      "command": "bun scripts/test-release-receipt-ci-artifact.mjs",
+      "status": "pass",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 500,
+      "summary": "release-receipt-ci-artifact passed."
+    },
+    {
+      "name": "sensor-safety-check",
+      "command": "node scripts/sensor-safety-check.mjs",
+      "status": "pass",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 500,
+      "summary": "sensor-safety-check passed."
+    },
+    {
+      "name": "docs-demo-safety",
+      "command": "bun run test:docs-demo-safety",
+      "status": "fail",
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "duration_ms": 2000,
+      "summary": "docs-demo-safety FAILED in CI."
+    }
+  ],
+  "blockers": [],
+  "metadata": {
+    "runner_os": "ubuntu-latest"
+  },
+  "sourceRunId": "99",
+  "commitSha": "abc",
+  "branch": "main",
+  "workflowName": "test"
+}

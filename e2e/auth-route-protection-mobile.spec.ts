@@ -42,6 +42,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/one-tent-proof-record",
   "/operator/paddle-processing-audit",
   "/operator/post-grow-reflection-dry-run",
+  "/operator/release-readiness",
   "/operator/demo-preview",
 
   "/pi-ingest-status",

@@ -33,7 +33,7 @@ export const SCAN_ROOTS = [
 export const BLOCKED_TERMS = ["SUPABASE_SERVICE_ROLE_KEY", "service_role"];
 
 /** Exact relative file paths permitted to reference blocked terms in code. */
-export const EXACT_PATH_EXCEPTIONS: ReadonlySet<string> = new Set([
+export const EXACT_PATH_EXCEPTIONS = new Set([
   // (intentionally empty — see header comment)
 ]);
 

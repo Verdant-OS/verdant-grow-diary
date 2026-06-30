@@ -77,6 +77,6 @@ jobs:
             --batch=${{ matrix.batch }} \
             --reporter=${{ inputs.reporter }} \
             --strategy=round-robin \
-            --chunk-size=20 \
+            --chunk-size=8 \
             --isolate \
             --pool=forks

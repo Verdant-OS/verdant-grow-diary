@@ -1289,7 +1289,13 @@ export default function Dashboard() {
 
           />
         )}
-        <div className="grid lg:grid-cols-2 gap-4 mt-4">
+        <h2
+          data-testid="dashboard-section-heading-recent-activity"
+          className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-6 mb-1"
+        >
+          Recent activity
+        </h2>
+        <div className="grid lg:grid-cols-2 gap-4 mt-2">
 
 
 

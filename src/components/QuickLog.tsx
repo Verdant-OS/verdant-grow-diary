@@ -1048,6 +1048,31 @@ export default function QuickLog({
                   : "Sensor context is not usable enough to attach. This will save as a manual log only."}
             </p>
 
+            <div
+              data-testid="quick-log-snapshot-manual-truth"
+              className="rounded-lg border border-border/50 bg-background/40 p-2 text-[11px] leading-snug space-y-0.5"
+            >
+              <p className="font-medium text-foreground">
+                {MANUAL_SENSOR_TRUTH_TITLE}
+              </p>
+              <ul className="text-muted-foreground space-y-0.5">
+                {MANUAL_SENSOR_TRUTH_LINES.map((line) => (
+                  <li key={line} data-testid="quick-log-snapshot-manual-truth-line">
+                    {line}
+                  </li>
+                ))}
+                {(!snapshot || !snapshotUsable) && (
+                  <li
+                    data-testid="quick-log-snapshot-manual-truth-missing"
+                    className="text-muted-foreground"
+                  >
+                    {MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE}
+                  </li>
+                )}
+              </ul>
+            </div>
+
+
             {tentSetupRequired ? (
               <p
                 data-testid="quick-log-snapshot-tent-required"

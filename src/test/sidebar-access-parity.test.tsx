@@ -144,6 +144,12 @@ describe("AppSidebar — operator user", () => {
     render(wrap(<AppSidebar />));
     expect(hrefSet().has("/grow-lineage")).toBe(true);
   });
+
+  it("exposes the operator-only Release Readiness deep link", () => {
+    render(wrap(<AppSidebar />));
+    expect(hrefSet().has("/operator/release-readiness")).toBe(true);
+    expect(screen.getByText("Release Readiness")).toBeInTheDocument();
+  });
 });
 
 describe("Mobile More sheet — manifest access parity", () => {

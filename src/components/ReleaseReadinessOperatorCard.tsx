@@ -37,7 +37,8 @@ export default function ReleaseReadinessOperatorCard() {
         </CardTitle>
         <CardDescription>
           Review current validation status, blockers, and manual proof
-          commands. Static / manual status snapshot — not a live feed.
+          commands. Static / manual snapshot — updated by hand from documented
+          receipts.
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -103,10 +103,11 @@ describe("releaseReceiptParser — rejection rules", () => {
       schema_version: "release-receipt.v9",
     });
     expect(r.ok).toBe(false);
-    if (r.ok) {
+    if (r.ok === true) {
       throw new Error("expected failure");
     }
     expect(r.errors.join(" ")).toMatch(/schema_version/);
+
 
   });
 

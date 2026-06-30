@@ -95,7 +95,21 @@ import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingC
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChangeContextRules";
 
-import { plantDetailPath, plantsPath, tentsPath } from "@/lib/routes";
+import { plantDetailPath, plantsPath, sensorsPath, tentsPath, timelinePath } from "@/lib/routes";
+import {
+  DAILY_CHECK_EMPTY_NO_TENT_TITLE,
+  DAILY_CHECK_EMPTY_NO_TENT_BODY,
+  DAILY_CHECK_EMPTY_NO_PLANT_TITLE,
+  DAILY_CHECK_EMPTY_NO_PLANT_BODY,
+  DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_TITLE,
+  DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_BODY,
+  DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_TITLE,
+  DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_BODY,
+  DAILY_CHECK_EMPTY_GO_TO_PLANTS_LABEL,
+  DAILY_CHECK_EMPTY_GO_TO_TENTS_LABEL,
+  DAILY_CHECK_EMPTY_OPEN_TIMELINE_LABEL,
+  DAILY_CHECK_EMPTY_OPEN_SENSORS_LABEL,
+} from "@/constants/dailyCheckEmptyStateCopy";
 
 function useQueryParam(name: string): string | null {
   const loc = useLocation();
@@ -457,28 +471,70 @@ export default function DailyCheck() {
       {!guard.ok && guard.reason === "no-tents" && (
         <EmptyState
           icon={<Box className="h-6 w-6" />}
-          title="Add a tent first."
-          description="Daily Grow Check needs at least one tent to attach readings to."
+          title={DAILY_CHECK_EMPTY_NO_TENT_TITLE}
+          description={DAILY_CHECK_EMPTY_NO_TENT_BODY}
           action={
-            <Button asChild>
-              <Link to={tentsPath()} data-testid="daily-grow-check-add-tent">
-                Add Tent <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Button>
+            <div
+              className="flex flex-wrap items-center gap-2 justify-center"
+              data-testid="daily-grow-check-empty-no-tents-actions"
+            >
+              <Button asChild>
+                <Link to={tentsPath()} data-testid="daily-grow-check-add-tent">
+                  Add Tent <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link
+                  to={plantsPath()}
+                  data-testid="daily-grow-check-empty-no-tents-go-plants"
+                >
+                  {DAILY_CHECK_EMPTY_GO_TO_PLANTS_LABEL}
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link
+                  to={timelinePath()}
+                  data-testid="daily-grow-check-empty-no-tents-open-timeline"
+                >
+                  {DAILY_CHECK_EMPTY_OPEN_TIMELINE_LABEL}
+                </Link>
+              </Button>
+            </div>
           }
         />
       )}
       {!guard.ok && guard.reason === "no-plants" && (
         <EmptyState
           icon={<Sprout className="h-6 w-6" />}
-          title="Add a plant first."
-          description="Daily Grow Check is plant-centered. Add a plant to begin."
+          title={DAILY_CHECK_EMPTY_NO_PLANT_TITLE}
+          description={DAILY_CHECK_EMPTY_NO_PLANT_BODY}
           action={
-            <Button asChild>
-              <Link to={plantsPath()} data-testid="daily-grow-check-add-plant">
-                Add Plant <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Button>
+            <div
+              className="flex flex-wrap items-center gap-2 justify-center"
+              data-testid="daily-grow-check-empty-no-plants-actions"
+            >
+              <Button asChild>
+                <Link to={plantsPath()} data-testid="daily-grow-check-add-plant">
+                  Add Plant <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link
+                  to={tentsPath()}
+                  data-testid="daily-grow-check-empty-no-plants-go-tents"
+                >
+                  {DAILY_CHECK_EMPTY_GO_TO_TENTS_LABEL}
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link
+                  to={sensorsPath()}
+                  data-testid="daily-grow-check-empty-no-plants-open-sensors"
+                >
+                  {DAILY_CHECK_EMPTY_OPEN_SENSORS_LABEL}
+                </Link>
+              </Button>
+            </div>
           }
         />
       )}
@@ -553,14 +609,67 @@ export default function DailyCheck() {
                 </Button>
               </div>
 
+              {!selectedPlant && plants.length > 0 && (
+                <div
+                  className="rounded-md border border-border/50 bg-muted/30 p-2 text-xs space-y-1"
+                  data-testid="daily-grow-check-choose-no-plant"
+                >
+                  <p className="font-medium">{DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_TITLE}</p>
+                  <p className="text-muted-foreground">
+                    {DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_BODY}
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Button asChild size="sm" variant="outline">
+                      <Link
+                        to={plantsPath()}
+                        data-testid="daily-grow-check-choose-no-plant-go-plants"
+                      >
+                        {DAILY_CHECK_EMPTY_GO_TO_PLANTS_LABEL}
+                      </Link>
+                    </Button>
+                    <Button asChild size="sm" variant="ghost">
+                      <Link
+                        to={timelinePath()}
+                        data-testid="daily-grow-check-choose-no-plant-open-timeline"
+                      >
+                        {DAILY_CHECK_EMPTY_OPEN_TIMELINE_LABEL}
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {selectedPlant && !selectedPlant.tent_id && (
-                <p
-                  className="text-xs text-amber-300 flex items-start gap-1"
+                <div
+                  className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs space-y-1"
                   data-testid="daily-grow-check-choose-no-tent"
                 >
-                  <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" aria-hidden="true" />
-                  <span>Sensor snapshots need a tent assignment.</span>
-                </p>
+                  <p className="flex items-start gap-1 font-medium text-amber-300">
+                    <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" aria-hidden="true" />
+                    <span>{DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_TITLE}</span>
+                  </p>
+                  <p className="text-muted-foreground">
+                    {DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_BODY}
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Button asChild size="sm" variant="outline">
+                      <Link
+                        to={plantDetailPath(selectedPlant.id)}
+                        data-testid="daily-grow-check-choose-no-tent-assign"
+                      >
+                        Assign tent
+                      </Link>
+                    </Button>
+                    <Button asChild size="sm" variant="ghost">
+                      <Link
+                        to={tentsPath()}
+                        data-testid="daily-grow-check-choose-no-tent-go-tents"
+                      >
+                        {DAILY_CHECK_EMPTY_GO_TO_TENTS_LABEL}
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
               )}
             </section>
           )}

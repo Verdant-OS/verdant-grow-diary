@@ -95,7 +95,21 @@ import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingC
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChangeContextRules";
 
-import { plantDetailPath, plantsPath, tentsPath } from "@/lib/routes";
+import { plantDetailPath, plantsPath, sensorsPath, tentsPath, timelinePath } from "@/lib/routes";
+import {
+  DAILY_CHECK_EMPTY_NO_TENT_TITLE,
+  DAILY_CHECK_EMPTY_NO_TENT_BODY,
+  DAILY_CHECK_EMPTY_NO_PLANT_TITLE,
+  DAILY_CHECK_EMPTY_NO_PLANT_BODY,
+  DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_TITLE,
+  DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_BODY,
+  DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_TITLE,
+  DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_BODY,
+  DAILY_CHECK_EMPTY_GO_TO_PLANTS_LABEL,
+  DAILY_CHECK_EMPTY_GO_TO_TENTS_LABEL,
+  DAILY_CHECK_EMPTY_OPEN_TIMELINE_LABEL,
+  DAILY_CHECK_EMPTY_OPEN_SENSORS_LABEL,
+} from "@/constants/dailyCheckEmptyStateCopy";
 
 function useQueryParam(name: string): string | null {
   const loc = useLocation();

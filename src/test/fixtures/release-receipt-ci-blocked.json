@@ -1,0 +1,33 @@
+{
+  "schema_version": "release-receipt.v1",
+  "artifact_id": "ci-full-suite-2026-06-28-blocked-001",
+  "generated_at": "2026-06-28T09:15:00.000Z",
+  "source": "github_actions",
+  "source_run_id": null,
+  "commit_sha": null,
+  "branch": "main",
+  "workflow_name": "Verdant CI — Full Suite",
+  "receipt_kind": "ci_full_suite",
+  "status": "blocked",
+  "summary": "Runner startup blocked by billing/spending-limit.",
+  "commands": [],
+  "counts": {
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "total": 0
+  },
+  "blockers": [
+    {
+      "id": "github-actions-billing-limit",
+      "label": "GitHub Actions billing / spending-limit",
+      "severity": "release_blocker",
+      "active": true,
+      "summary": "Runners cannot start until billing is restored."
+    }
+  ],
+  "metadata": {
+    "parser_version": "1.0.0",
+    "blocked_reason": "billing"
+  }
+}

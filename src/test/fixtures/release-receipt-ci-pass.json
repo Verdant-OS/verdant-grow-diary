@@ -1,0 +1,57 @@
+{
+  "schema_version": "release-receipt.v1",
+  "artifact_id": "ci-full-suite-2026-06-30-pass-001",
+  "generated_at": "2026-06-30T12:00:00.000Z",
+  "source": "github_actions",
+  "source_run_id": "9876543210",
+  "commit_sha": "abcdef0123456789abcdef0123456789abcdef01",
+  "branch": "main",
+  "workflow_name": "Verdant CI — Full Suite",
+  "receipt_kind": "ci_full_suite",
+  "status": "pass",
+  "summary": "All vitest batches green, type-check clean, ecowitt bridge CI artifact captured.",
+  "commands": [
+    {
+      "name": "vitest-batched",
+      "command": "node scripts/run-vitest-batches.mjs",
+      "status": "pass",
+      "passed": 2418,
+      "failed": 0,
+      "skipped": 7,
+      "duration_ms": 412000,
+      "summary": "All 16 batches reported pass."
+    },
+    {
+      "name": "type-check",
+      "command": "bun run type-check",
+      "status": "pass",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 38000,
+      "summary": "tsgo clean."
+    },
+    {
+      "name": "ecowitt-bridge-ci",
+      "command": "bun run test:ecowitt-bridge:ci",
+      "status": "pass",
+      "passed": 42,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": 5400,
+      "summary": "Bridge ingest validation artifact captured."
+    }
+  ],
+  "counts": {
+    "passed": 2461,
+    "failed": 0,
+    "skipped": 7,
+    "total": 2468
+  },
+  "blockers": [],
+  "metadata": {
+    "runner_os": "ubuntu-22.04",
+    "parser_version": "1.0.0",
+    "is_full_suite": true
+  }
+}

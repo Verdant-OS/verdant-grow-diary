@@ -1,0 +1,35 @@
+{
+  "schema_version": "release-receipt.v0",
+  "artifact_id": "malformed-001",
+  "generated_at": "not-a-date",
+  "source": "github_actions",
+  "source_run_id": null,
+  "commit_sha": null,
+  "branch": null,
+  "workflow_name": null,
+  "receipt_kind": "ci_full_suite",
+  "status": "winning",
+  "summary": "totally fine",
+  "commands": [
+    {
+      "name": "leaky",
+      "command": "echo $SUPABASE_SERVICE_ROLE_KEY",
+      "status": "pass",
+      "passed": -5,
+      "failed": 0,
+      "skipped": 0,
+      "duration_ms": null,
+      "summary": "do not trust"
+    }
+  ],
+  "counts": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "total": 99
+  },
+  "blockers": [],
+  "metadata": {
+    "service_role": "vbt_should_never_appear"
+  }
+}

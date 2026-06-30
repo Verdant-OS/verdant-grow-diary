@@ -198,7 +198,7 @@ describe("Operator Mode navigation — AI Doctor Results", () => {
   });
 
   it("existing AI Doctor navigation is preserved", () => {
-    expect(SIDEBAR_SRC).toMatch(/AI Grow Doctor/);
+    expect(SIDEBAR_SRC).toMatch(/"AI Doctor"/);
     expect(SIDEBAR_SRC).toMatch(/to:\s*"\/doctor"/);
   });
 });

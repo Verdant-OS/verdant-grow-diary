@@ -262,7 +262,10 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 flex-wrap">
             <OnboardingProgressPill vm={onboardingVm} />
             <Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">
-              <Link to="/daily-check">Daily Grow Check</Link>
+              {/* Route still targets /daily-check (the underlying Quick Log
+                  surface). Label unified to "Quick Log" so the Dashboard
+                  presents a single grower-facing logging concept. */}
+              <Link to="/daily-check">Quick Log</Link>
             </Button>
             <Button asChild className="gradient-leaf text-primary-foreground"><Link to={tentsPath()}>Open tents</Link></Button>
           </div>
@@ -397,7 +400,20 @@ export default function Dashboard() {
                   to see your environment here.
                 </p>
                 <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+                  {/* Sensors entry-point dedupe: a single primary "Go to
+                      Sensors" CTA. Manual reading + Import sensor data
+                      remain available as secondary anchors into the same
+                      Sensors page (no new routes). */}
                   <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
+                    <Link
+                      to="/sensors"
+                      data-testid="dashboard-environment-snapshot-go-to-sensors"
+                      aria-label="Go to Sensors page"
+                    >
+                      Go to Sensors
+                    </Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
                     <Link
                       to="/sensors#manual-reading"
                       data-testid="dashboard-environment-snapshot-add-manual-reading"
@@ -413,15 +429,6 @@ export default function Dashboard() {
                       aria-label="Import sensor data"
                     >
                       Import sensor data
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link
-                      to="/sensors"
-                      data-testid="dashboard-environment-snapshot-go-to-sensors"
-                      aria-label="Go to Sensors page"
-                    >
-                      Go to Sensors
                     </Link>
                   </Button>
                 </div>

@@ -9,16 +9,16 @@ export const primary = [
   { to: "/", label: "Home", icon: LayoutDashboard, end: true },
   { to: "/tents", label: "Tents", icon: Box },
   { to: "/plants", label: "Plants", icon: Sprout },
-  { to: "/logs", label: "Logs", icon: NotebookText },
+  { to: "/logs", label: "Timeline", icon: NotebookText },
   { to: "/alerts", label: "Alerts", icon: Bell },
 ];
 
 export const more = [
-  { to: "/daily-check", label: "Daily Grow Check", icon: ClipboardCheck },
+  { to: "/daily-check", label: "Quick Log", icon: ClipboardCheck },
   { to: "/tasks", label: "Tasks", icon: ListChecks },
-  { to: "/actions", label: "Actions", icon: ListChecks },
-  { to: "/sensors", label: "Sensor Data", icon: Activity },
-  { to: "/doctor", label: "AI Grow Doctor", icon: Stethoscope },
+  { to: "/actions", label: "Action Queue", icon: ListChecks },
+  { to: "/sensors", label: "Sensors", icon: Activity },
+  { to: "/doctor", label: "AI Doctor", icon: Stethoscope },
   { to: "/grows", label: "Harvest Archive", icon: Sprout },
   { to: "/settings", label: "Settings", icon: Settings },
 ];

@@ -36,10 +36,19 @@ describe("Dashboard · single daily grow-check surface", () => {
     expect(dashboardSrc).toMatch(/DailyGrowCheckStatusCard/);
   });
 
-  it("still exposes the Daily Grow Check page entry button", () => {
+  it("still exposes the Quick Log page entry button routing to /daily-check", () => {
+    // Slice 2 label cleanup: the PageHeader CTA was renamed
+    // "Daily Grow Check" → "Quick Log" so there is one grower-facing
+    // logging concept. Route target is unchanged.
     expect(dashboardSrc).toMatch(/dashboard-daily-grow-check-entry/);
-    expect(dashboardSrc).toMatch(/Daily Grow Check/);
+    expect(dashboardSrc).toMatch(/>Quick Log</);
     expect(dashboardSrc).toMatch(/\/daily-check/);
+    // The PageHeader actions block must not present "Daily Grow Check" as
+    // a competing primary CTA label alongside Quick Log.
+    const headerActions = dashboardSrc.match(
+      /dashboard-daily-grow-check-entry[\s\S]{0,400}<\/Button>/,
+    )?.[0] ?? "";
+    expect(headerActions).not.toMatch(/>Daily Grow Check</);
   });
 
   it("has exactly one DailyGrowCheckStatusCard render on Dashboard", () => {

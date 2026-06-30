@@ -150,7 +150,99 @@ describe("AppSidebar — operator user", () => {
     expect(hrefSet().has("/operator/release-readiness")).toBe(true);
     expect(screen.getByText("Release Readiness")).toBeInTheDocument();
   });
+
+  it("exposes the Operator Mode group label", () => {
+    render(wrap(<AppSidebar />));
+    const labels = Array.from(document.querySelectorAll('[data-sidebar="group-label"]'))
+      .map((el) => el.textContent?.trim());
+    expect(labels).toContain("Operator Mode");
+  });
 });
+
+describe("UI Simplification Slice 1 — grower-facing group structure", () => {
+  beforeEach(() => {
+    roleState.status = "denied";
+  });
+
+  for (const label of ["Today", "Cultivation", "Daily", "Insight", "Advanced", "Account"]) {
+    it(`renders the "${label}" group label for non-operators`, () => {
+      render(wrap(<AppSidebar />));
+      expect(screen.getByText(label)).toBeInTheDocument();
+    });
+  }
+
+  it("does NOT render any operator group label (no empty-group leakage)", () => {
+    render(wrap(<AppSidebar />));
+    expect(screen.queryByText("Operator Mode")).toBeNull();
+    expect(screen.queryByText("Operator")).toBeNull();
+  });
+
+  for (const status of ["loading", "denied", "error", "unauthenticated"] as const) {
+    it(`hides the Operator Mode group while role status is "${status}"`, () => {
+      roleState.status = status;
+      render(wrap(<AppSidebar />));
+      expect(screen.queryByText("Operator Mode")).toBeNull();
+      expect(screen.queryByText("Operator")).toBeNull();
+      expect(hrefSet().has("/operator/ai-doctor-phase1")).toBe(false);
+      expect(hrefSet().has("/operator/release-readiness")).toBe(false);
+    });
+  }
+
+  it("uses cleaned-up grower-facing labels (Timeline, AI Doctor, Action Queue)", () => {
+    render(wrap(<AppSidebar />));
+    expect(screen.getByText("Timeline")).toBeInTheDocument();
+    expect(screen.getByText("AI Doctor")).toBeInTheDocument();
+    expect(screen.getByText("Action Queue")).toBeInTheDocument();
+    expect(screen.getByText("Sensors")).toBeInTheDocument();
+    // Old labels should no longer appear in the grower sidebar.
+    expect(screen.queryByText("Logs")).toBeNull();
+    expect(screen.queryByText("AI Grow Doctor")).toBeNull();
+    expect(screen.queryByText("Sensor Data")).toBeNull();
+  });
+
+  it("places Lineage Repair inside the Advanced group", () => {
+    render(wrap(<AppSidebar />));
+    // The Advanced group label and the Lineage Repair link must coexist
+    // inside the same SidebarGroup container.
+    const advanced = screen.getByText("Advanced");
+    const group = advanced.closest('[data-sidebar="group"]');
+    expect(group).not.toBeNull();
+    expect(group?.textContent ?? "").toContain("Lineage Repair");
+    expect(group?.textContent ?? "").toContain("Harvest Archive");
+  });
+
+  it("does NOT place AI Doctor Results or Release Readiness in any grower group", () => {
+    render(wrap(<AppSidebar />));
+    for (const label of ["Today", "Cultivation", "Daily", "Insight", "Advanced", "Account"]) {
+      const heading = screen.getByText(label);
+      const group = heading.closest('[data-sidebar="group"]');
+      const text = group?.textContent ?? "";
+      expect(text).not.toContain("AI Doctor Results");
+      expect(text).not.toContain("Release Readiness");
+    }
+  });
+});
+
+describe("UI Simplification Slice 1 — operator group placement", () => {
+  beforeEach(() => {
+    roleState.status = "granted";
+  });
+
+  it("places AI Doctor Results and Release Readiness inside the Operator Mode group", () => {
+    render(wrap(<AppSidebar />));
+    const heading = Array.from(
+      document.querySelectorAll('[data-sidebar="group-label"]'),
+    ).find((el) => el.textContent?.trim() === "Operator Mode");
+    expect(heading, "Operator Mode group label not rendered").toBeTruthy();
+    const group = heading?.closest('[data-sidebar="group"]');
+    expect(group).not.toBeNull();
+    const text = group?.textContent ?? "";
+    expect(text).toContain("AI Doctor Results");
+    expect(text).toContain("Release Readiness");
+  });
+});
+
+
 
 describe("Mobile More sheet — manifest access parity", () => {
   it("primary tabs and More entries only point at manifest 'auth' paths", async () => {

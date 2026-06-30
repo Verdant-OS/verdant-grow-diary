@@ -176,11 +176,15 @@ const App = () => (
                 />
 
                 <Route path="/settings" element={<Settings />} />
-                <Route path="/demo/one-tent-live-proof" element={<OneTentLiveProof />} />
                 {/* Operator-only routes. Authenticated via AppShell's useRequireAuth,
                     then gated by server-side has_role('operator') via RequireOperatorRole.
                     Non-operator users see a calm access-restricted state. */}
                 <Route element={<RequireOperatorRole />}>
+                  {/* UI Simplification Slice 0 — /demo/one-tent-live-proof is a
+                      proof artifact, not a grower-facing page. Operator role
+                      required; /operator/one-tent-live-proof remains the
+                      canonical operator entry. */}
+                  <Route path="/demo/one-tent-live-proof" element={<OneTentLiveProof />} />
                   <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
                   <Route
                     path="/operator/ai-doctor-phase1"

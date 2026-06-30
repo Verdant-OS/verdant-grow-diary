@@ -19,6 +19,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { removeLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   render,
   screen,
@@ -231,7 +232,7 @@ beforeEach(() => {
   insertCalls.length = 0;
   Object.values(forbidden).forEach((fn) => fn.mockClear());
   try {
-    window.localStorage.removeItem(SAVED_VIEWS_STORAGE_KEY);
+    removeLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY);
   } catch {
     /* ignore */
   }

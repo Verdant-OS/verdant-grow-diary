@@ -9,6 +9,7 @@
  *  - the storage key matches the documented scoped key
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { clearLocalStorageForTest, getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   ONBOARDING_CHECKLIST_DISMISSED_KEY,
   dismissOnboardingChecklist,
@@ -18,7 +19,7 @@ import {
 
 beforeEach(() => {
   try {
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   } catch {
     /* ignore */
   }
@@ -43,7 +44,7 @@ describe("localOnboardingPreferences", () => {
     dismissOnboardingChecklist();
     expect(isOnboardingChecklistDismissed()).toBe(true);
     expect(
-      window.localStorage.getItem(ONBOARDING_CHECKLIST_DISMISSED_KEY),
+      getLocalStorageItemForTest(ONBOARDING_CHECKLIST_DISMISSED_KEY),
     ).toBe("1");
   });
 

@@ -15,6 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { removeLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   render,
   screen,
@@ -242,7 +243,7 @@ beforeEach(() => {
   nextInsertError = { message: RLS_ERROR_MESSAGE };
   Object.values(forbidden).forEach((fn) => fn.mockClear());
   try {
-    window.localStorage.removeItem(SAVED_VIEWS_STORAGE_KEY);
+    removeLocalStorageItemForTest(SAVED_VIEWS_STORAGE_KEY);
   } catch {
     /* ignore */
   }

@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import Settings from "@/pages/Settings";
 import { loadTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 // Minimal auth mock so the Settings page renders without a real session.
 vi.mock("@/store/auth", () => ({
@@ -23,7 +24,7 @@ vi.mock("@/store/auth", () => ({
 
 beforeEach(() => {
   try {
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   } catch {
     /* ignore */
   }

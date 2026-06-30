@@ -13,6 +13,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 import {
   applySavedCsvMappingPreset,
@@ -48,10 +49,10 @@ function buildTestConfig() {
 
 describe("csv mapping preset storage — localStorage only", () => {
   beforeEach(() => {
-    localStorage.clear();
+    clearLocalStorageForTest();
   });
   afterEach(() => {
-    localStorage.clear();
+    clearLocalStorageForTest();
     vi.restoreAllMocks();
   });
 
@@ -63,7 +64,7 @@ describe("csv mapping preset storage — localStorage only", () => {
       }) as never);
     const config = buildTestConfig();
     expect(saveCsvMappingPreset(config)).toBe(true);
-    const raw = localStorage.getItem(CSV_MAPPING_PRESET_STORAGE_KEY)!;
+    const raw = getLocalStorageItemForTest(CSV_MAPPING_PRESET_STORAGE_KEY)!;
     expect(raw).toContain("mapping_config");
     expect(raw).toContain("Timestamp");
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -82,7 +83,7 @@ describe("csv mapping preset storage — localStorage only", () => {
   it("saved preset excludes row data and raw CSV row data", () => {
     const config = buildTestConfig();
     saveCsvMappingPreset(config);
-    const raw = localStorage.getItem(CSV_MAPPING_PRESET_STORAGE_KEY)!;
+    const raw = getLocalStorageItemForTest(CSV_MAPPING_PRESET_STORAGE_KEY)!;
     expect(raw).not.toContain("rowIndex");
     expect(raw).not.toContain("parsedValue");
     expect(raw).not.toContain("raw_payload");
@@ -92,7 +93,7 @@ describe("csv mapping preset storage — localStorage only", () => {
   it("saved preset excludes user IDs, internal IDs, tokens, secrets, Supabase IDs", () => {
     const config = buildTestConfig();
     saveCsvMappingPreset(config);
-    const raw = localStorage.getItem(CSV_MAPPING_PRESET_STORAGE_KEY)!;
+    const raw = getLocalStorageItemForTest(CSV_MAPPING_PRESET_STORAGE_KEY)!;
     expect(raw).not.toMatch(/\buser_id\b/);
     expect(raw).not.toMatch(/\bgrow_id\b/);
     expect(raw).not.toMatch(/\bplant_id\b/);
@@ -182,10 +183,10 @@ describe("csv mapping preset storage — localStorage only", () => {
   it("unsupported schema_version blocks apply", () => {
     const config = buildTestConfig();
     saveCsvMappingPreset(config);
-    const raw = localStorage.getItem(CSV_MAPPING_PRESET_STORAGE_KEY)!;
+    const raw = getLocalStorageItemForTest(CSV_MAPPING_PRESET_STORAGE_KEY)!;
     const tampered = JSON.parse(raw);
     tampered.schema_version = 999;
-    localStorage.setItem(
+    setLocalStorageItemForTest(
       CSV_MAPPING_PRESET_STORAGE_KEY,
       JSON.stringify(tampered),
     );
@@ -203,7 +204,7 @@ describe("csv mapping preset storage — localStorage only", () => {
   });
 
   it("malformed saved JSON is handled safely", () => {
-    localStorage.setItem(CSV_MAPPING_PRESET_STORAGE_KEY, "not-json{");
+    setLocalStorageItemForTest(CSV_MAPPING_PRESET_STORAGE_KEY, "not-json{");
     const loaded = loadCsvMappingPreset();
     expect(loaded).toBeNull();
     const result = applySavedCsvMappingPreset(["Timestamp"]);
@@ -213,10 +214,10 @@ describe("csv mapping preset storage — localStorage only", () => {
   it("blocked preset apply preserves current mapping", () => {
     const config = buildTestConfig();
     saveCsvMappingPreset(config);
-    const raw = localStorage.getItem(CSV_MAPPING_PRESET_STORAGE_KEY)!;
+    const raw = getLocalStorageItemForTest(CSV_MAPPING_PRESET_STORAGE_KEY)!;
     const tampered = JSON.parse(raw);
     tampered.schema_version = 999;
-    localStorage.setItem(
+    setLocalStorageItemForTest(
       CSV_MAPPING_PRESET_STORAGE_KEY,
       JSON.stringify(tampered),
     );
@@ -234,9 +235,9 @@ describe("csv mapping preset storage — localStorage only", () => {
 
   it("clear preset removes localStorage entry", () => {
     saveCsvMappingPreset(buildTestConfig());
-    expect(localStorage.getItem(CSV_MAPPING_PRESET_STORAGE_KEY)).not.toBeNull();
+    expect(getLocalStorageItemForTest(CSV_MAPPING_PRESET_STORAGE_KEY)).not.toBeNull();
     clearCsvMappingPreset();
-    expect(localStorage.getItem(CSV_MAPPING_PRESET_STORAGE_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(CSV_MAPPING_PRESET_STORAGE_KEY)).toBeNull();
     expect(loadCsvMappingPreset()).toBeNull();
   });
 

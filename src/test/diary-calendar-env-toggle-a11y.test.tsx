@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 import DiaryCalendarSection, {
   ENVIRONMENT_CHECK_SHOW_DETAILS_LABEL,
   ENVIRONMENT_CHECK_HIDE_DETAILS_LABEL,
@@ -13,7 +14,7 @@ import DiaryCalendarSection, {
 } from "@/components/DiaryCalendarSection";
 
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 const NOW = new Date("2026-06-18T12:00:00Z");

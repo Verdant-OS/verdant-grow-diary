@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   readTentPlantTabsSelectedPlantId,
   writeTentPlantTabsSelectedPlantId,
@@ -10,7 +11,7 @@ import {
 describe("tentPlantTabsPreferences", () => {
   beforeEach(() => {
     try {
-      window.localStorage.clear();
+      clearLocalStorageForTest();
     } catch {
       /* no-op */
     }
@@ -38,11 +39,11 @@ describe("tentPlantTabsPreferences", () => {
 
   it("rejects corrupt/empty values and falls back to null", () => {
     const key = tentPlantTabsSelectedKey("tent-a")!;
-    window.localStorage.setItem(key, "");
+    setLocalStorageItemForTest(key, "");
     expect(readTentPlantTabsSelectedPlantId("tent-a")).toBeNull();
-    window.localStorage.setItem(key, "   ");
+    setLocalStorageItemForTest(key, "   ");
     expect(readTentPlantTabsSelectedPlantId("tent-a")).toBeNull();
-    window.localStorage.setItem(key, "x".repeat(500));
+    setLocalStorageItemForTest(key, "x".repeat(500));
     expect(readTentPlantTabsSelectedPlantId("tent-a")).toBeNull();
   });
 

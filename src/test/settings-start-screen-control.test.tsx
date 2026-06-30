@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { clearLocalStorageForTest, getLocalStorageItemForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({
@@ -20,7 +21,7 @@ import {
 
 beforeEach(() => {
   try {
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   } catch {
     /* ignore */
   }
@@ -55,7 +56,7 @@ describe("Settings start-screen control", () => {
     renderSettings();
     fireEvent.click(screen.getByTestId("start-screen-option-onboarding"));
     fireEvent.click(screen.getByTestId("start-screen-save"));
-    expect(window.localStorage.getItem("verdant:startScreen:user-settings-1")).toBe("onboarding");
+    expect(getLocalStorageItemForTest("verdant:startScreen:user-settings-1")).toBe("onboarding");
     expect(getStartScreenChoice("user-settings-1")).toBe("onboarding");
     expect(screen.getByTestId("start-screen-saved")).toHaveAttribute("role", "status");
   });
@@ -68,10 +69,10 @@ describe("Settings start-screen control", () => {
   });
 
   it("reset button clears preference and re-selects diary-first", () => {
-    window.localStorage.setItem("verdant:startScreen:user-settings-1", "timeline");
+    setLocalStorageItemForTest("verdant:startScreen:user-settings-1", "timeline");
     renderSettings();
     fireEvent.click(screen.getByTestId("start-screen-reset"));
-    expect(window.localStorage.getItem("verdant:startScreen:user-settings-1")).toBeNull();
+    expect(getLocalStorageItemForTest("verdant:startScreen:user-settings-1")).toBeNull();
     const quick = screen.getByTestId("start-screen-option-quickLog") as HTMLInputElement;
     expect(quick.checked).toBe(true);
   });
@@ -80,7 +81,7 @@ describe("Settings start-screen control", () => {
     renderSettings();
     fireEvent.click(screen.getByTestId("start-screen-option-timeline"));
     fireEvent.click(screen.getByTestId("start-screen-save"));
-    const v = window.localStorage.getItem("verdant:startScreen:user-settings-1") ?? "";
+    const v = getLocalStorageItemForTest("verdant:startScreen:user-settings-1") ?? "";
     expect(v).not.toMatch(/token|session|password|hash|@/i);
     expect(v).toBe("timeline");
   });

@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { clearLocalStorageForTest, getLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 
 const navMock = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -50,7 +51,7 @@ describe("Onboarding page", () => {
   it("selecting another option and pressing Continue navigates and persists", () => {
     navMock.mockClear();
     try {
-      window.localStorage.clear();
+      clearLocalStorageForTest();
     } catch {
       /* ignore */
     }
@@ -62,13 +63,13 @@ describe("Onboarding page", () => {
     expect((timeline as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
     expect(navMock).toHaveBeenCalledWith("/timeline", { replace: true });
-    expect(window.localStorage.getItem("verdant:startScreen:user-1")).toBe("timeline");
+    expect(getLocalStorageItemForTest("verdant:startScreen:user-1")).toBe("timeline");
   });
 
   it("Skip for now routes to the diary-first Quick Log route and does NOT persist", () => {
     navMock.mockClear();
     try {
-      window.localStorage.clear();
+      clearLocalStorageForTest();
     } catch {
       /* ignore */
     }
@@ -76,7 +77,7 @@ describe("Onboarding page", () => {
     fireEvent.click(screen.getByRole("button", { name: /skip for now/i }));
     // Quick Log resolves to "/" (the dashboard host of Quick Log).
     expect(navMock).toHaveBeenCalledWith("/", { replace: true });
-    expect(window.localStorage.getItem("verdant:startScreen:user-1")).toBeNull();
+    expect(getLocalStorageItemForTest("verdant:startScreen:user-1")).toBeNull();
   });
 
   it("shows a Change later link pointing to /settings", () => {

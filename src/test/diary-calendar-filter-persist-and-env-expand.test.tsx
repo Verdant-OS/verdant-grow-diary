@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
+import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   DIARY_CALENDAR_FILTER_STORAGE_KEY,
   readPersistedDiaryCalendarFilter,
@@ -41,7 +42,7 @@ const MIXED = [
 ];
 
 beforeEach(() => {
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 describe("DiaryCalendarSection — persisted filter", () => {
@@ -66,7 +67,7 @@ describe("DiaryCalendarSection — persisted filter", () => {
   });
 
   it("rejects an invalid persisted filter and falls back to 'all'", () => {
-    window.localStorage.setItem(DIARY_CALENDAR_FILTER_STORAGE_KEY, "garbage");
+    setLocalStorageItemForTest(DIARY_CALENDAR_FILTER_STORAGE_KEY, "garbage");
     render(<DiaryCalendarSection rawEntries={MIXED} />);
     expect(
       screen.getByTestId("diary-calendar-filter-all"),

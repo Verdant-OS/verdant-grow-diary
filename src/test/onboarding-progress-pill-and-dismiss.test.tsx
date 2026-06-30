@@ -22,6 +22,7 @@ import { MemoryRouter } from "react-router-dom";
 
 import OnboardingChecklistCard from "@/components/OnboardingChecklistCard";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 import {
   buildOnboardingChecklistViewModel,
   type OnboardingChecklistInput,
@@ -49,7 +50,7 @@ function renderPair(input: OnboardingChecklistInput) {
 beforeEach(() => {
   resetOnboardingChecklistDismiss();
   try {
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   } catch {
     /* ignore */
   }

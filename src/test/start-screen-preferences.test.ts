@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { clearLocalStorageForTest, setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import {
   DEFAULT_START_SCREEN,
   START_SCREEN_OPTIONS,
@@ -10,7 +11,7 @@ import {
 
 beforeEach(() => {
   try {
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   } catch {
     /* ignore */
   }
@@ -47,7 +48,7 @@ describe("startScreenPreferences", () => {
   });
 
   it("ignores tampered stored values", () => {
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       "verdant:startScreen:user-1",
       JSON.stringify({ access_token: "leak" }),
     );

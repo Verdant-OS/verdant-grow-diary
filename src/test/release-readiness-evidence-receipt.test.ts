@@ -156,13 +156,17 @@ describe("deriveReleaseEvidencePosture", () => {
     expect(grouped.manual_operator_note.length).toBeGreaterThan(0);
   });
 
-  it("seeded receipts + blockers yield HOLD with missing CI evidence", () => {
+  it("seeded receipts + blockers yield HOLD via active blockers, with passing CI receipt", () => {
     const p = deriveReleaseEvidencePosture(
       RELEASE_READINESS_EVIDENCE_RECEIPTS,
       RELEASE_READINESS_EVIDENCE_BLOCKERS,
     );
     expect(p.posture).toBe("HOLD");
-    expect(p.missingEvidence).toContain(RELEASE_GO_REQUIREMENT_COPY);
+    expect(p.missingEvidence).toHaveLength(0);
+    expect(p.primaryReason.toLowerCase()).toMatch(/active blocker|blocking/);
+    // PR #112 parser receipt is now a passing supporting receipt.
+    expect(p.supportingReceipts.some((r) => r.id === "ci-full-suite-pr-112"))
+      .toBe(true);
   });
 
   it("disclaimers are exposed for non-CI categories", () => {

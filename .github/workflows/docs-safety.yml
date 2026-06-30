@@ -41,3 +41,8 @@ jobs:
 
       - name: Run demo docs banned-phrase safety tests
         run: bun run test:docs-demo-safety
+
+      # Stop-ship: no client-side service_role / SUPABASE_SERVICE_ROLE_KEY
+      # references in executable code. See scripts/assert-client-secret-boundary.mjs.
+      - name: Client secret boundary guard
+        run: bun run test:client-secret-boundary

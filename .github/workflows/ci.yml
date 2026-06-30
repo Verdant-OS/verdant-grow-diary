@@ -53,6 +53,14 @@ jobs:
       - name: Static safety scans (Action Queue provenance + chip)
         run: bun run test:static-safety
 
+      # Stop-ship: client-side product code must never reference
+      # service_role or SUPABASE_SERVICE_ROLE_KEY in executable code.
+      # The guard strips comments, string literals, template literals,
+      # and regex literals before scanning, so intentional denylist
+      # strings are not flagged. See scripts/assert-client-secret-boundary.mjs.
+      - name: Client secret boundary guard
+        run: bun run test:client-secret-boundary
+
       # Stop-ship: every test file in src/test/** must route localStorage
       # through src/test/helpers/localStorageTestHelper.ts so jsdom
       # environments without a built-in localStorage (e.g. Windows + Node 26)

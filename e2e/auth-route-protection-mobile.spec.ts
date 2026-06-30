@@ -222,7 +222,7 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
           body: JSON.stringify([]),
         });
       });
-      await page.goto(path);
+      await page.goto(path, { waitUntil: "domcontentloaded" });
       await page.waitForTimeout(1200);
       const origin = new URL(page.url()).origin;
       expect(origin).toBe(new URL(baseURL!).origin);

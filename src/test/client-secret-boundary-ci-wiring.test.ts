@@ -95,9 +95,11 @@ describe("Client Secret Boundary — CI wiring contract", () => {
 
   // --- Proof artifact upload contract (Verdant Client Secret Boundary Proof + Docs v1) ---
 
-  function windowAfterGuard(yml: string): string {
-    const idx = yml.indexOf("test:client-secret-boundary");
-    return yml.slice(idx, idx + 2000);
+  function proofWindow(yml: string): string {
+    const idx = yml.indexOf("Client secret boundary proof artifact");
+    expect(idx).toBeGreaterThan(-1);
+    // Cover the compose step + the immediately-following upload step only.
+    return yml.slice(idx, idx + 1200);
   }
 
   it("ci.yml uploads a trusted proof artifact AFTER the guard succeeds", () => {

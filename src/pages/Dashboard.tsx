@@ -246,7 +246,7 @@ export default function Dashboard() {
   const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
 
   return (
-    <div>
+    <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
       <QuickLogV2Fab />
       <GrowBreadcrumbs
         growId={urlGrowId}

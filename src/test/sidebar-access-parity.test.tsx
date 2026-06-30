@@ -79,7 +79,7 @@ describe("AppSidebar — non-operator authenticated grower", () => {
       "/tents",
       "/plants",
       "/sensors",
-      "/logs",
+      "/timeline",
       "/tasks",
       "/alerts",
       "/actions",

@@ -150,8 +150,9 @@ const App = () => (
                 <Route path="/plants" element={<Plants />} />
                 <Route path="/plants/:id" element={<PlantDetail />} />
                 <Route path="/sensors" element={<Sensors />} />
-                <Route path="/logs" element={<Timeline />} />
                 <Route path="/timeline" element={<Timeline />} />
+                {/* Legacy alias — canonical route is /timeline. */}
+                <Route path="/logs" element={<Navigate to="/timeline" replace />} />
                 <Route path="/tasks" element={<Tasks />} />
                 {/* /cameras route removed — out of current V0 scope. */}
                 <Route path="/alerts" element={<Alerts />} />

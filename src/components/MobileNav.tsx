@@ -9,7 +9,7 @@ export const primary = [
   { to: "/", label: "Home", icon: LayoutDashboard, end: true },
   { to: "/tents", label: "Tents", icon: Box },
   { to: "/plants", label: "Plants", icon: Sprout },
-  { to: "/logs", label: "Timeline", icon: NotebookText },
+  { to: "/timeline", label: "Timeline", icon: NotebookText },
   { to: "/alerts", label: "Alerts", icon: Bell },
 ];
 

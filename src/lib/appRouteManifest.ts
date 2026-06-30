@@ -105,7 +105,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/leads", access: "internal" },
 
   { path: "/login", access: "redirect", description: "→ /auth" },
-  { path: "/logs", access: "auth" },
+  { path: "/logs", access: "redirect", description: "→ /timeline (legacy alias)" },
   { path: "/onboarding", access: "auth", description: "Post-sign-in start-screen choice (diary-first default)." },
   { path: "/operator/ai-doctor-phase1", access: "operator", description: "Operator AI Doctor Phase 1 results page." },
   { path: "/operator/billing-entitlement-resolution", access: "operator", description: "Operator billing entitlement resolution audit (read-only)." },

@@ -32,6 +32,7 @@ import FirstRunChecklist from "@/components/FirstRunChecklist";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
 import OperatorModeCallout from "@/components/OperatorModeCallout";
+import LineageRepairCta from "@/components/LineageRepairCta";
 
 import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOutcomeReviewsCard";
 import SafeByDesignNotice from "@/components/SafeByDesignNotice";
@@ -282,6 +283,10 @@ export default function Dashboard() {
 
       <div className="my-3">
         <OperatorModeCallout />
+      </div>
+
+      <div className="my-3">
+        <LineageRepairCta />
       </div>
 
 

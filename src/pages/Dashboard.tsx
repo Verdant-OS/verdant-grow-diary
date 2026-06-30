@@ -902,6 +902,18 @@ export default function Dashboard() {
             })()}
           </section>
         )}
+        <div className="my-3">
+          <LineageRepairCta />
+        </div>
+        <div className="my-3">
+          <FirstRunChecklist
+            growCount={grows.length}
+            tentCount={tents.length}
+            plantCount={plants.length}
+            quickLogCount={diaryRecentCount}
+            sensorSnapshotCount={rawReadings.length}
+          />
+        </div>
         <h2
           data-testid="dashboard-section-heading-advanced"
           className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-6 mb-1"

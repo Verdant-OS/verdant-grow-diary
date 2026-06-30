@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import type { ReactNode } from "react";
-import { render, screen, act, waitFor } from "@testing-library/react";
+import { render, screen, act, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import MobileNav from "@/components/MobileNav";
+import MobileNav, { moreGroups, more } from "@/components/MobileNav";
 
 function wrap(children: ReactNode) {
   const qc = new QueryClient({
@@ -16,58 +16,116 @@ function wrap(children: ReactNode) {
   );
 }
 
-describe("MobileNav Action Queue link", () => {
-  it("renders Action Queue in the More sheet", async () => {
+describe("MobileNav primary tabs", () => {
+  it("renders the canonical primary tabs", () => {
     render(wrap(<MobileNav />));
-
-    // Primary tabs still render with cleaned-up labels
     expect(screen.getByText("Home")).toBeInTheDocument();
     expect(screen.getByText("Tents")).toBeInTheDocument();
     expect(screen.getByText("Plants")).toBeInTheDocument();
     expect(screen.getByText("Timeline")).toBeInTheDocument();
     expect(screen.getByText("Alerts")).toBeInTheDocument();
     expect(screen.getByText("More")).toBeInTheDocument();
-
-    // Old labels must not appear anywhere in mobile nav
     expect(screen.queryByText("Logs")).toBeNull();
+  });
+});
 
-    // Open the More sheet
-    const moreBtn = screen.getByText("More");
+describe("MobileNav More sheet — Slice 4 grouping", () => {
+  it("renders groups in order: Daily → Insight → Advanced → Account with canonical labels and routes", async () => {
+    render(wrap(<MobileNav />));
+
     await act(async () => {
-      moreBtn.click();
+      screen.getByText("More").click();
     });
 
-    // Action Queue link is present and points to /actions
     await waitFor(() => {
-      const actionsLink = screen.getByText("Action Queue");
-      expect(actionsLink).toBeInTheDocument();
-      expect(actionsLink.closest("a")).toHaveAttribute("href", "/actions");
+      expect(screen.getByText("Quick Log")).toBeInTheDocument();
     });
 
-    // Canonical More labels
-    expect(screen.getByText("Quick Log")).toBeInTheDocument();
-    expect(screen.getByText("Tasks")).toBeInTheDocument();
-    expect(screen.getByText("Sensors")).toBeInTheDocument();
-    expect(screen.getByText("AI Doctor")).toBeInTheDocument();
-    expect(screen.getByText("Harvest Archive")).toBeInTheDocument();
-    expect(screen.getByText("Settings")).toBeInTheDocument();
+    // Group order
+    const groupHeadings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(groupHeadings).toEqual(["Daily", "Insight", "Advanced", "Account"]);
 
-    // Old labels gone from More sheet
-    expect(screen.queryByText("Daily Grow Check")).toBeNull();
-    expect(screen.queryByText("Sensor Data")).toBeNull();
-    expect(screen.queryByText("AI Grow Doctor")).toBeNull();
-    expect(screen.queryByText("Actions")).toBeNull();
+    // Each group contains the expected labels + route targets
+    const expectations: Record<string, Array<[string, string]>> = {
+      Daily: [
+        ["Quick Log", "/daily-check"],
+        ["Action Queue", "/actions"],
+        ["Tasks", "/tasks"],
+      ],
+      Insight: [
+        ["Sensors", "/sensors"],
+        ["AI Doctor", "/doctor"],
+      ],
+      Advanced: [
+        ["Reports", "/reports"],
+        ["Harvest Archive", "/grows"],
+      ],
+      Account: [["Settings", "/settings"]],
+    };
 
-    // Operator-only routes do not appear in normal mobile nav
-    expect(screen.queryByText("Release Readiness")).toBeNull();
-    expect(screen.queryByText("AI Doctor Results")).toBeNull();
+    for (const [heading, items] of Object.entries(expectations)) {
+      const section = screen.getByTestId(`mobile-more-group-${heading.toLowerCase()}`);
+      for (const [label, href] of items) {
+        const link = within(section).getByText(label).closest("a");
+        expect(link).toHaveAttribute("href", href);
+      }
+    }
   });
 
+  it("does not expose old labels in the More sheet", async () => {
+    render(wrap(<MobileNav />));
+    await act(async () => {
+      screen.getByText("More").click();
+    });
+    await waitFor(() => expect(screen.getByText("Quick Log")).toBeInTheDocument());
+
+    for (const banned of [
+      "Logs",
+      "Daily Grow Check",
+      "Sensor Data",
+      "AI Grow Doctor",
+      "Actions",
+      "Grow Learning Hub",
+    ]) {
+      expect(screen.queryByText(banned)).toBeNull();
+    }
+  });
+
+  it("does not expose operator/internal/demo/release/proof/diagnostic routes in normal mobile nav", () => {
+    const banned = ["/operator/", "/internal/", "/demo/", "/release", "/proof", "/diagnostic"];
+    for (const item of more) {
+      for (const prefix of banned) {
+        expect(item.to.startsWith(prefix)).toBe(false);
+      }
+    }
+    for (const banned of [
+      "Release Readiness",
+      "Demo Preview",
+      "AI Doctor Results",
+      "Diagnostics",
+    ]) {
+      // operator-mode link is role-gated and renders nothing here; these labels must not leak.
+      const { container } = render(wrap(<MobileNav />));
+      expect(container.textContent || "").not.toContain(banned);
+    }
+  });
+
+  it("uses /timeline (not /logs) for Timeline", () => {
+    const timelineHrefs = more.map((m) => m.to).filter((t) => t === "/logs");
+    expect(timelineHrefs.length).toBe(0);
+  });
+
+  it("flat `more` export matches the grouped source of truth", () => {
+    const flatFromGroups = moreGroups.flatMap((g) => g.items.map((i) => i.to));
+    expect(more.map((m) => m.to)).toEqual(flatFromGroups);
+  });
+});
+
+describe("MobileNav safety language", () => {
   it("does not expose automation or device-control language", () => {
     const { container } = render(wrap(<MobileNav />));
-    const text = container.textContent || "";
-
-    const banned = [
+    const text = (container.textContent || "").toLowerCase();
+    for (const phrase of [
       "auto-execute",
       "auto-run",
       "blind automation",
@@ -75,9 +133,8 @@ describe("MobileNav Action Queue link", () => {
       "execute action",
       "run now",
       "one-click run",
-    ];
-    for (const phrase of banned) {
-      expect(text.toLowerCase()).not.toContain(phrase.toLowerCase());
+    ]) {
+      expect(text).not.toContain(phrase);
     }
   });
 });

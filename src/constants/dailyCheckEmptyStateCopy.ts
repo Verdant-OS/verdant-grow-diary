@@ -22,7 +22,7 @@ export const DAILY_CHECK_EMPTY_NO_PLANT_BODY =
 export const DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_TITLE =
   "Pick a plant to log against." as const;
 export const DAILY_CHECK_EMPTY_NO_SELECTED_PLANT_BODY =
-  "Choose a plant above. Missing plant context stays unknown — Quick Log will not assume the plant is healthy." as const;
+  "Choose a plant above. Missing plant context stays unknown — Quick Log will not infer plant health." as const;
 
 export const DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_TITLE =
   "Assign a tent to this plant." as const;

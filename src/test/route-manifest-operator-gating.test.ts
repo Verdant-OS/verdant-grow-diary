@@ -76,10 +76,15 @@ const PUBLIC_FIXTURE_ONLY_INTERNAL_EXCEPTIONS = new Set<string>([
  *
  * Diagnostics Audience Split v1 — `/diagnostics` removed from this list
  * and is now mounted inside <RequireOperatorRole />.
+ *
+ * Grow Lineage Manifest Reclassification v1 — `/grow-lineage` removed
+ * from this list and reclassified as `access: "auth"` in the manifest.
+ * It is a grower-facing repair tool (Archive → Lineage Repair) that
+ * reads owner-scoped tents/grows and only mutates the signed-in
+ * grower's own `tents.grow_id` under existing RLS. Moving it under
+ * <RequireOperatorRole /> would incorrectly hide grower UI.
  */
-const DEFERRED_OPERATOR_PARITY = new Set<string>([
-  "/grow-lineage",
-]);
+const DEFERRED_OPERATOR_PARITY = new Set<string>([]);
 
 describe("Route Guard Parity v1 — operator/internal manifest entries are role-gated", () => {
   const gated = APP_ROUTES.filter(

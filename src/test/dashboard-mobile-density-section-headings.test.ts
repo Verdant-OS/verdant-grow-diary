@@ -20,7 +20,7 @@ const DASHBOARD = readFileSync(
 describe("Dashboard · mobile density section headings", () => {
   it("wraps Dashboard root in mobile-friendly vertical spacing", () => {
     expect(DASHBOARD).toMatch(
-      /data-testid="dashboard-root"[^>]*className="[^"]*space-y-4[^"]*md:space-y-6/,
+      /<div\s+className="space-y-4 md:space-y-6"\s+data-testid="dashboard-root"/,
     );
   });
 

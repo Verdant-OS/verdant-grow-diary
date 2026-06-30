@@ -2,6 +2,16 @@
 // No I/O, no side effects, no test skipping. Deterministic.
 
 /**
+ * Supported batching strategies.
+ * - "contiguous": even-ish adjacent slices of the sorted file list (default,
+ *   backward compatible).
+ * - "round-robin": deal files across batches by index modulo N, so
+ *   alphabetically clustered files (e.g. the heavy `ecowitt-*` jsdom suite)
+ *   are spread across batches instead of piling into one slice.
+ */
+export const BATCH_STRATEGIES = Object.freeze(["contiguous", "round-robin"]);
+
+/**
  * Deterministically sort test file paths (ascending, locale-independent).
  * @param {string[]} files
  * @returns {string[]}
@@ -14,13 +24,23 @@ export function sortTestFiles(files) {
 }
 
 /**
- * Split a sorted list into N contiguous, even-ish batches.
- * Earlier batches get the extra item when not evenly divisible.
+ * Split a sorted list into N even-ish batches using the given strategy.
+ *
+ * - "contiguous" (default): adjacent slices; earlier batches get the extra
+ *   item when not evenly divisible. Preserves the original behavior.
+ * - "round-robin": file index `i` goes to batch `i % n`. Each batch stays
+ *   internally ascending because the pre-sorted list is dealt in order.
+ *
+ * In both strategies the batch count is clamped to the file count so no
+ * empty batches are produced (an empty batch would make Vitest error with
+ * "no test files found").
+ *
  * @param {string[]} files - pre-sorted array
  * @param {number} batches - integer >= 1
+ * @param {"contiguous"|"round-robin"} [strategy="contiguous"]
  * @returns {string[][]}
  */
-export function splitIntoBatches(files, batches) {
+export function splitIntoBatches(files, batches, strategy = "contiguous") {
   if (!Array.isArray(files)) {
     throw new TypeError("splitIntoBatches: files must be an array");
   }
@@ -30,7 +50,23 @@ export function splitIntoBatches(files, batches) {
   if (files.length === 0) {
     throw new RangeError("splitIntoBatches: no test files to split");
   }
+  if (!BATCH_STRATEGIES.includes(strategy)) {
+    throw new RangeError(
+      `splitIntoBatches: unknown strategy "${strategy}" ` +
+        `(expected one of: ${BATCH_STRATEGIES.join(", ")})`,
+    );
+  }
   const n = Math.min(batches, files.length);
+
+  if (strategy === "round-robin") {
+    const out = Array.from({ length: n }, () => []);
+    for (let i = 0; i < files.length; i++) {
+      out[i % n].push(files[i]);
+    }
+    return out;
+  }
+
+  // contiguous (default)
   const base = Math.floor(files.length / n);
   const remainder = files.length % n;
   const out = [];
@@ -48,13 +84,14 @@ export function splitIntoBatches(files, batches) {
  * @param {string[]} files - pre-sorted array
  * @param {number} batches
  * @param {number} batchIndex - 0-indexed
+ * @param {"contiguous"|"round-robin"} [strategy="contiguous"]
  * @returns {string[]}
  */
-export function selectBatch(files, batches, batchIndex) {
+export function selectBatch(files, batches, batchIndex, strategy = "contiguous") {
   if (!Number.isInteger(batchIndex) || batchIndex < 0) {
     throw new RangeError("selectBatch: batchIndex must be a non-negative integer");
   }
-  const split = splitIntoBatches(files, batches);
+  const split = splitIntoBatches(files, batches, strategy);
   if (batchIndex >= split.length) {
     throw new RangeError(
       `selectBatch: batchIndex ${batchIndex} out of range (have ${split.length} batches)`,
@@ -73,6 +110,7 @@ export function parseBatchArgs(argv) {
     batch: null,
     reporter: "dot",
     continueOnFail: false,
+    strategy: "contiguous",
   };
   for (const raw of argv) {
     if (!raw.startsWith("--")) continue;
@@ -99,6 +137,15 @@ export function parseBatchArgs(argv) {
       case "reporter":
         out.reporter = val;
         break;
+      case "strategy": {
+        if (!BATCH_STRATEGIES.includes(val)) {
+          throw new RangeError(
+            `--strategy must be one of: ${BATCH_STRATEGIES.join(", ")} (got ${val})`,
+          );
+        }
+        out.strategy = val;
+        break;
+      }
       case "continue-on-fail":
         out.continueOnFail = val === "true" || val === "1";
         break;

@@ -6,6 +6,7 @@ import {
   splitIntoBatches,
   selectBatch,
   parseBatchArgs,
+  BATCH_STRATEGIES,
 } from "./vitest-batch-utils.mjs";
 
 let passed = 0;
@@ -63,11 +64,83 @@ t("splitIntoBatches: empty file list throws clearly", () => {
   assert.throws(() => splitIntoBatches([], 4), /no test files/i);
 });
 
-t("selectBatch: picks correct slice", () => {
+// ---- Strategy: explicit "contiguous" stays backward compatible ----
+
+t("splitIntoBatches: explicit contiguous == default (backward compatible)", () => {
+  const files = ["a", "b", "c", "d", "e"];
+  assert.deepEqual(
+    splitIntoBatches(files, 3, "contiguous"),
+    splitIntoBatches(files, 3),
+  );
+});
+
+t("BATCH_STRATEGIES: exposes the supported strategies", () => {
+  assert.deepEqual([...BATCH_STRATEGIES], ["contiguous", "round-robin"]);
+});
+
+// ---- Strategy: round-robin ----
+
+t("splitIntoBatches: round-robin distributes by index modulo N", () => {
+  // a(0)->0, b(1)->1, c(2)->0, d(3)->1, e(4)->0
+  const r = splitIntoBatches(["a", "b", "c", "d", "e"], 2, "round-robin");
+  assert.deepEqual(r, [["a", "c", "e"], ["b", "d"]]);
+  // total preserved, nothing dropped or duplicated
+  assert.equal(r.flat().length, 5);
+});
+
+t("splitIntoBatches: round-robin spreads adjacent sorted files across batches", () => {
+  // Simulates the clustered `ecowitt-*` case: adjacent sorted names must NOT
+  // land in the same batch.
+  const files = [
+    "ecowitt-a.test.tsx",
+    "ecowitt-b.test.tsx",
+    "ecowitt-c.test.tsx",
+    "ecowitt-d.test.tsx",
+  ];
+  const r = splitIntoBatches(files, 4, "round-robin");
+  assert.deepEqual(r, [
+    ["ecowitt-a.test.tsx"],
+    ["ecowitt-b.test.tsx"],
+    ["ecowitt-c.test.tsx"],
+    ["ecowitt-d.test.tsx"],
+  ]);
+  // Adjacent files end up in different batches (the whole point).
+  const batchOf = (name) => r.findIndex((b) => b.includes(name));
+  assert.notEqual(batchOf("ecowitt-a.test.tsx"), batchOf("ecowitt-b.test.tsx"));
+});
+
+t("splitIntoBatches: round-robin is deterministic across calls", () => {
+  const files = ["a", "b", "c", "d", "e", "f", "g"];
+  const r1 = splitIntoBatches(files, 3, "round-robin");
+  const r2 = splitIntoBatches(files, 3, "round-robin");
+  assert.deepEqual(r1, r2);
+  // Each batch internally ascending (dealt from a sorted list in order).
+  for (const b of r1) {
+    assert.deepEqual(b, [...b].sort((a, z) => (a < z ? -1 : a > z ? 1 : 0)));
+  }
+});
+
+t("splitIntoBatches: round-robin clamps when more batches than files", () => {
+  const r = splitIntoBatches(["a", "b"], 8, "round-robin");
+  assert.deepEqual(r, [["a"], ["b"]]);
+});
+
+t("splitIntoBatches: unknown strategy fails safely (RangeError)", () => {
+  assert.throws(() => splitIntoBatches(["a", "b"], 2, "bogus"), RangeError);
+});
+
+t("selectBatch: picks correct slice (contiguous)", () => {
   const files = ["a", "b", "c", "d", "e"];
   assert.deepEqual(selectBatch(files, 3, 0), ["a", "b"]);
   assert.deepEqual(selectBatch(files, 3, 1), ["c", "d"]);
   assert.deepEqual(selectBatch(files, 3, 2), ["e"]);
+});
+
+t("selectBatch: --batch=I --batches=N --strategy=round-robin selects intended batch", () => {
+  const files = ["a", "b", "c", "d", "e"];
+  // round-robin with N=2: batch 0 = a,c,e ; batch 1 = b,d
+  assert.deepEqual(selectBatch(files, 2, 0, "round-robin"), ["a", "c", "e"]);
+  assert.deepEqual(selectBatch(files, 2, 1, "round-robin"), ["b", "d"]);
 });
 
 t("selectBatch: out-of-range throws", () => {
@@ -81,6 +154,7 @@ t("parseBatchArgs: defaults", () => {
   assert.equal(o.batch, null);
   assert.equal(o.reporter, "dot");
   assert.equal(o.continueOnFail, false);
+  assert.equal(o.strategy, "contiguous");
 });
 
 t("parseBatchArgs: parses flags", () => {
@@ -94,6 +168,15 @@ t("parseBatchArgs: parses flags", () => {
   assert.equal(o.batch, 2);
   assert.equal(o.reporter, "verbose");
   assert.equal(o.continueOnFail, true);
+});
+
+t("parseBatchArgs: parses --strategy=round-robin", () => {
+  assert.equal(parseBatchArgs(["--strategy=round-robin"]).strategy, "round-robin");
+  assert.equal(parseBatchArgs(["--strategy=contiguous"]).strategy, "contiguous");
+});
+
+t("parseBatchArgs: rejects invalid --strategy", () => {
+  assert.throws(() => parseBatchArgs(["--strategy=bogus"]), RangeError);
 });
 
 t("parseBatchArgs: rejects bad --batches", () => {

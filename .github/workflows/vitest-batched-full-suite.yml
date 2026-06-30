@@ -4,14 +4,21 @@ name: Vitest Batched Full Suite (optional)
 # Verdant Batched Validation Runner v1 — runs src/test in deterministic
 # batches so the full suite can complete in CI without OOM/timeout.
 # Does NOT replace the existing PR-default gates in ci.yml.
+#
+# Coverage contract: the matrix runs exactly 16 partitions (0..15) using the
+# round-robin strategy, so memory-heavy alphabetically clustered suites
+# (e.g. `ecowitt-*` jsdom tests) are spread across batches instead of piling
+# into one worker. The `batches` input is kept for visibility but MUST stay 16
+# to match the matrix — a guard step fails loudly on any mismatch so we never
+# silently leave partitions unvalidated.
 
 on:
   workflow_dispatch:
     inputs:
       batches:
-        description: "Total batches"
+        description: "Total batches (must equal the 16-job matrix; keep at 16)"
         required: false
-        default: "8"
+        default: "16"
       reporter:
         description: "Vitest reporter (dot|verbose)"
         required: false
@@ -23,20 +30,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     # Raise Node's old-space heap above the 2 GB default so individual
-    # vitest batches (notably batch 2) do not OOM mid-run. GitHub-hosted
-    # ubuntu-latest runners ship with ~7 GB RAM, so 4096 MB is safe.
+    # vitest batches do not OOM mid-run. GitHub-hosted ubuntu-latest runners
+    # ship with ~7 GB RAM, so 4096 MB is safe.
     env:
       NODE_OPTIONS: --max-old-space-size=4096
     strategy:
       fail-fast: false
       matrix:
-        batch: [0, 1, 2, 3, 4, 5, 6, 7]
+        batch: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: latest
+
+      - name: Assert batches input matches the 16-job matrix
+        run: |
+          if [ "${{ inputs.batches }}" != "16" ]; then
+            echo "::error::This workflow's matrix runs exactly 16 partitions (0..15), but batches=${{ inputs.batches }}. Running would leave partitions unvalidated. Set batches=16."
+            exit 1
+          fi
+          echo "OK: batches=16 matches the 16-job matrix."
 
       - name: Install
         run: bun install --frozen-lockfile
@@ -51,9 +66,10 @@ jobs:
       - name: Batch utils self-test
         run: node scripts/test-vitest-batch-utils.mjs
 
-      - name: Run batch ${{ matrix.batch }} of ${{ github.event.inputs.batches }}
+      - name: Run batch ${{ matrix.batch }} of ${{ inputs.batches }}
         run: |
           node scripts/run-vitest-batches.mjs \
-            --batches=${{ github.event.inputs.batches }} \
+            --batches=${{ inputs.batches }} \
             --batch=${{ matrix.batch }} \
-            --reporter=${{ github.event.inputs.reporter }}
+            --reporter=${{ inputs.reporter }} \
+            --strategy=round-robin

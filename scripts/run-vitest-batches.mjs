@@ -6,6 +6,11 @@
  * completes in memory-limited / time-limited environments without one
  * huge `bunx vitest run`. Never skips, never hides failures, never
  * updates snapshots.
+ *
+ * Batching strategy is selectable via `--strategy=contiguous|round-robin`
+ * (default contiguous, for backward compatibility). round-robin spreads
+ * alphabetically clustered files across batches to avoid piling memory-heavy
+ * suites (e.g. `ecowitt-*` jsdom tests) into a single worker.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
@@ -70,8 +75,8 @@ function main() {
   try {
     groups =
       opts.batch === null
-        ? splitIntoBatches(all, opts.batches)
-        : [selectBatch(all, opts.batches, opts.batch)];
+        ? splitIntoBatches(all, opts.batches, opts.strategy)
+        : [selectBatch(all, opts.batches, opts.batch, opts.strategy)];
   } catch (e) {
     console.error("✗", e.message);
     process.exit(2);
@@ -79,7 +84,8 @@ function main() {
 
   console.log(
     `Verdant Batched Validation Runner v1 — ${all.length} test files, ` +
-      `${opts.batch === null ? opts.batches : 1} batch(es), reporter=${opts.reporter}` +
+      `${opts.batch === null ? opts.batches : 1} batch(es), ` +
+      `strategy=${opts.strategy}, reporter=${opts.reporter}` +
       (opts.batch !== null ? ` (only batch ${opts.batch})` : "") +
       (opts.continueOnFail ? " [continue-on-fail]" : ""),
   );

@@ -619,6 +619,12 @@ export default function Dashboard() {
 
 
 
+      <h2
+        data-testid="dashboard-section-heading-needs-attention"
+        className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-4 mb-1"
+      >
+        Needs attention
+      </h2>
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between mb-3">

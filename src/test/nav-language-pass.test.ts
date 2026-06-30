@@ -32,9 +32,9 @@ describe("Primary navigation: Tents and Plants are emphasized", () => {
     expect(plantsIdx).toBeGreaterThan(tentsIdx);
   });
 
-  it("AppSidebar renames 'Grow Logs' to 'Logs'", () => {
+  it("AppSidebar renames 'Grow Logs' to 'Timeline' (Slice 1+ cleanup)", () => {
     expect(SIDEBAR).not.toContain('"Grow Logs"');
-    expect(SIDEBAR).toMatch(/label:\s*"Logs"/);
+    expect(SIDEBAR).toMatch(/label:\s*"Timeline"/);
   });
 
   it("AppSidebar moves 'Grows' index under Archive as 'Harvest Archive'", () => {

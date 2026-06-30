@@ -42,3 +42,74 @@ node scripts/test-localstorage-helper-usage-audit.mjs
 
 Wired in `.github/workflows/ci.yml` as "Test localStorage helper
 enforcement", and exposed as `bun run test:localstorage-helper-enforcement`.
+
+## One-click validation commands
+
+Use these exact commands when validating the localStorage / sensor /
+ecowitt safety surface. Each block is copy-paste ready and matches what
+CI runs.
+
+### 1. localStorage helper enforcement
+
+```bash
+bun run test:localstorage-helper-enforcement
+```
+
+Equivalent expanded form:
+
+```bash
+node scripts/assert-test-localstorage-helper-usage.mjs
+node scripts/test-localstorage-helper-usage-audit.mjs
+```
+
+### 2. Broader migrated localStorage subset (CI parity)
+
+```bash
+NODE_OPTIONS=--max-old-space-size=4096 bunx vitest run \
+  src/test/local-storage-helper-setup-order.test.ts \
+  src/test/diary-calendar-filter-persistence.test.ts \
+  src/test/csv-mapping-preset-storage.test.ts \
+  src/test/temperature-unit-preference.test.ts \
+  src/test/leads-saved-views.test.ts \
+  src/test/onboarding-keyboard.test.tsx \
+  src/test/ai-doctor-sessions-saved-views.test.tsx \
+  --reporter=verbose \
+  --isolate \
+  --pool=forks
+```
+
+### 3. Sensor safety checks
+
+```bash
+node scripts/sensor-safety-check.mjs
+node scripts/assert-sensor-intelligence-safety.mjs --quiet
+bun run test:docs-demo-safety
+```
+
+### 4. Ecowitt bridge CI/Linux validation
+
+```bash
+bun run test:ecowitt-bridge:ci
+```
+
+Equivalent expanded form (the exact parity command CI runs):
+
+```bash
+NODE_OPTIONS=--max-old-space-size=4096 bunx vitest run \
+  src/test/ecowitt-bridge-status-page.test.tsx \
+  --reporter=verbose --isolate --pool=forks
+```
+
+Rules for the ecowitt suite:
+
+- Sandbox timeout is **not** automatically a test failure — sandbox
+  capacity is the documented cause.
+- CI/Linux/VPS is the authoritative environment for this suite.
+- A valid result **must** include the exit code and full verbose
+  output. CI captures both as artifacts in the
+  `ecowitt-bridge-ci-validation` upload (see
+  `artifacts/ecowitt-bridge-ci-output.txt` and
+  `artifacts/ecowitt-bridge-ci-exit-code.txt`).
+- Do **not** claim green unless the command completes with exit code
+  `0`.
+

@@ -46,3 +46,27 @@ jobs:
       # references in executable code. See scripts/assert-client-secret-boundary.mjs.
       - name: Client secret boundary guard
         run: bun run test:client-secret-boundary
+
+      # Non-secret proof artifact. Generated only AFTER the guard step
+      # succeeds (no `if: always()`) so the upload is trusted-proof, not
+      # a debugging dump. Contains a short fixed summary — no logs,
+      # secrets, env, or payloads.
+      - name: Client secret boundary proof artifact (compose)
+        run: |
+          mkdir -p artifacts/client-secret-boundary
+          cat > artifacts/client-secret-boundary/client-secret-boundary-proof.txt <<'EOF'
+          Client secret boundary guard: PASS
+          Workflow: docs-safety.yml
+          Command: bun run test:client-secret-boundary
+          Scanned client roots: src/components, src/pages, src/hooks, src/lib
+          Blocked executable-code terms: SUPABASE_SERVICE_ROLE_KEY, service_role
+          Secrets printed: no
+          Raw logs uploaded: no
+          EOF
+      - name: Upload client secret boundary proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-secret-boundary-proof-docs-safety
+          path: artifacts/client-secret-boundary/client-secret-boundary-proof.txt
+          if-no-files-found: error
+          retention-days: 14

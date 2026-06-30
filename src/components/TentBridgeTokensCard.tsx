@@ -176,6 +176,19 @@ export default function TentBridgeTokensCard({ tentId }: { tentId: string }) {
 
       {loading ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
+      ) : loadFailed ? (
+        <div
+          className="text-sm text-muted-foreground flex items-center gap-2"
+          data-testid="bridge-token-load-failed"
+          role="status"
+        >
+          <span>
+            {BRIDGE_TOKEN_LOAD_FAILED_TITLE}. {BRIDGE_TOKEN_LOAD_FAILED_BODY}
+          </span>
+          <Button size="sm" variant="outline" onClick={load}>
+            Retry
+          </Button>
+        </div>
       ) : tokens.length === 0 ? (
         <div className="text-sm text-muted-foreground">No bridge tokens yet.</div>
       ) : (

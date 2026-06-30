@@ -246,7 +246,7 @@ export default function Dashboard() {
   const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
 
   return (
-    <div>
+    <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
       <QuickLogV2Fab />
       <GrowBreadcrumbs
         growId={urlGrowId}
@@ -349,6 +349,13 @@ export default function Dashboard() {
       {tents.length === 0 ? (
         <DashboardZeroTentEmptyState />
       ) : (
+        <>
+          <h2
+            data-testid="dashboard-section-heading-environment"
+            className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-2 mb-1 md:mt-4"
+          >
+            Environment
+          </h2>
         <section
           aria-labelledby="dashboard-environment-snapshot-heading"
           data-testid="dashboard-environment-snapshot"
@@ -607,10 +614,17 @@ export default function Dashboard() {
           );
         })()}
         </section>
+        </>
       )}
 
 
 
+      <h2
+        data-testid="dashboard-section-heading-needs-attention"
+        className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-4 mb-1"
+      >
+        Needs attention
+      </h2>
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between mb-3">
@@ -892,8 +906,14 @@ export default function Dashboard() {
             })()}
           </section>
         )}
+        <h2
+          data-testid="dashboard-section-heading-advanced"
+          className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-6 mb-1"
+        >
+          Advanced
+        </h2>
         <section
-          className="glass rounded-2xl p-4 mt-4"
+          className="glass rounded-2xl p-4 mt-2"
           aria-label="Environment Trends"
         >
           <div className="flex items-center justify-between mb-2">
@@ -1269,7 +1289,13 @@ export default function Dashboard() {
 
           />
         )}
-        <div className="grid lg:grid-cols-2 gap-4 mt-4">
+        <h2
+          data-testid="dashboard-section-heading-recent-activity"
+          className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-6 mb-1"
+        >
+          Recent activity
+        </h2>
+        <div className="grid lg:grid-cols-2 gap-4 mt-2">
 
 
 

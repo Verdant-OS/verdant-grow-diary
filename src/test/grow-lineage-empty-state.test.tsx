@@ -9,8 +9,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
+const MOCK_USER = { id: "user-1" };
 vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "user-1" }, loading: false }),
+  useAuth: () => ({ user: MOCK_USER, loading: false }),
 }));
 
 vi.mock("@/integrations/supabase/client", () => {

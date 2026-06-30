@@ -21,9 +21,8 @@ function wrap() {
 describe("LineageRepairCta", () => {
   it("renders a link to /grow-lineage", () => {
     wrap();
-    const link = screen.getByTestId("lineage-repair-cta-link").querySelector("a");
-    expect(link).not.toBeNull();
-    expect(link!.getAttribute("href")).toBe("/grow-lineage");
+    const link = screen.getByRole("link", { name: /open lineage repair/i });
+    expect(link.getAttribute("href")).toBe("/grow-lineage");
   });
 
   it("uses grower-facing copy and does not mention operator/admin/automation", () => {

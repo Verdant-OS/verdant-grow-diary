@@ -387,9 +387,17 @@ export function rankOneTentLoopGaps(
     }
   }
 
-  // Optional plant-context gap.
+  // Optional plant-context gap. When present, it supersedes any generic
+  // "plant needs_review" gap so plant context never outranks Quick Log.
   const ctx = plantContextGap(rows);
-  if (ctx) gaps.push(ctx);
+  if (ctx) {
+    for (let i = gaps.length - 1; i >= 0; i -= 1) {
+      if (gaps[i].step_key === "plant" && gaps[i].status === "needs_review") {
+        gaps.splice(i, 1);
+      }
+    }
+    gaps.push(ctx);
+  }
 
   // Deterministic sort: priority asc, then step order asc, then title asc.
   gaps.sort((a, b) => {

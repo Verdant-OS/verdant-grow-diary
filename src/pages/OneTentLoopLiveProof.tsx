@@ -112,6 +112,113 @@ function StatusBadge({ status }: { status: LoopStepStatus }) {
   );
 }
 
+const PROVENANCE_LABEL: Record<EvidenceProvenance, string> = {
+  direct: "Direct evidence",
+  inferred: "Inferred",
+  missing: "Missing",
+  stale: "Stale",
+  invalid: "Invalid",
+  demo_only: "Demo only",
+};
+
+function ProvenanceBadge({ provenance }: { provenance: EvidenceProvenance }) {
+  // Never green: match statusToneClass conservatism.
+  const tone =
+    provenance === "invalid"
+      ? "bg-destructive/10 text-destructive border-destructive/40"
+      : "bg-muted text-muted-foreground border-border";
+  return (
+    <span
+      data-testid={`loop-live-proof-provenance-${provenance}`}
+      className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${tone}`}
+    >
+      {PROVENANCE_LABEL[provenance]}
+    </span>
+  );
+}
+
+function SourceBadge({ source, testId }: { source: string; testId: string }) {
+  return (
+    <span
+      data-testid={testId}
+      className="inline-block rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground"
+    >
+      Source: {source}
+    </span>
+  );
+}
+
+function EvidenceRefList({
+  refs,
+  testId,
+}: {
+  refs: readonly EvidenceRef[] | undefined;
+  testId: string;
+}) {
+  if (!refs || refs.length === 0) return null;
+  return (
+    <ul data-testid={testId} className="space-y-1 text-xs text-muted-foreground">
+      {refs.map((r, i) => (
+        <li
+          key={`${testId}-${i}`}
+          data-testid={`${testId}-item-${i}`}
+          className="flex flex-wrap items-center gap-2"
+        >
+          <span className="text-foreground">{r.label}</span>
+          {r.timestamp ? <span>at {r.timestamp}</span> : null}
+          {r.source ? (
+            <SourceBadge source={r.source} testId={`${testId}-item-${i}-source`} />
+          ) : null}
+          <span
+            data-testid={`${testId}-item-${i}-kind`}
+            className="inline-block rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide"
+          >
+            {r.kind}
+          </span>
+          {r.deep_link ? (
+            <Link
+              data-testid={`${testId}-item-${i}-link`}
+              to={r.deep_link}
+              className="underline text-foreground"
+            >
+              Open
+            </Link>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function DrilldownPanel({
+  drilldown,
+  testId,
+}: {
+  drilldown: MissingEvidenceDrilldown | undefined;
+  testId: string;
+}) {
+  if (!drilldown) return null;
+  return (
+    <div
+      data-testid={testId}
+      className="space-y-1 rounded-md border border-border bg-muted/40 p-3 text-xs"
+    >
+      <p>
+        <span className="font-medium text-foreground">What is missing: </span>
+        <span data-testid={`${testId}-what`}>{drilldown.what_is_missing}</span>
+      </p>
+      <p>
+        <span className="font-medium text-foreground">Why it matters: </span>
+        <span data-testid={`${testId}-why`}>{drilldown.why_it_matters}</span>
+      </p>
+      <p>
+        <span className="font-medium text-foreground">Where to record it: </span>
+        <span data-testid={`${testId}-where`}>{drilldown.where_to_record}</span>
+      </p>
+    </div>
+  );
+}
+
 function BulletList({
   items,
   emptyMessage,
@@ -148,21 +255,29 @@ function StepCard({ step }: { step: LoopStepRow }) {
     <section
       data-testid={`loop-live-proof-step-${step.id}`}
       data-status={step.status}
+      data-provenance={step.provenance ?? "unknown"}
       className="space-y-2 rounded-md border border-border bg-card p-4"
     >
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-foreground">{step.label}</h3>
-        <StatusBadge status={step.status} />
+        <div className="flex flex-wrap items-center gap-2">
+          {step.provenance ? <ProvenanceBadge provenance={step.provenance} /> : null}
+          <StatusBadge status={step.status} />
+        </div>
       </header>
 
       {step.source ? (
-        <p
-          data-testid={`loop-live-proof-step-${step.id}-source`}
-          className="text-xs text-muted-foreground"
-        >
-          Source: {step.source}
-        </p>
+        <SourceBadge
+          source={step.source}
+          testId={`loop-live-proof-step-${step.id}-source`}
+        />
       ) : null}
+
+      <p className="text-xs font-medium text-muted-foreground">Evidence references</p>
+      <EvidenceRefList
+        refs={step.evidence_refs}
+        testId={`loop-live-proof-step-${step.id}-refs`}
+      />
 
       <p className="text-xs font-medium text-muted-foreground">Evidence</p>
       <BulletList
@@ -178,6 +293,11 @@ function StepCard({ step }: { step: LoopStepRow }) {
         items={step.missing_info}
         emptyMessage="No missing information."
         testId={`loop-live-proof-step-${step.id}-missing`}
+      />
+
+      <DrilldownPanel
+        drilldown={step.drilldown}
+        testId={`loop-live-proof-step-${step.id}-drilldown`}
       />
 
       <p

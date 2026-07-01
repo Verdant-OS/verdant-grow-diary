@@ -549,6 +549,8 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         </p>
       </header>
 
+      <TopGapPanel gap={view.top_gap} />
+
       <section
         data-testid="one-tent-loop-live-proof-steps"
         className="space-y-4"

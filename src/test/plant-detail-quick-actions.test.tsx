@@ -539,6 +539,7 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
       "plant-detail-quick-action-upload-photo",
       "plant-detail-quick-action-ask-doctor",
       "plant-detail-quick-action-view-timeline",
+      "plant-detail-quick-action-harvest",
     ];
     for (const id of ids) {
       const el = screen.getByTestId(id);

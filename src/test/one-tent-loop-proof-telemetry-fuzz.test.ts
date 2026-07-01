@@ -158,10 +158,9 @@ const MISSING_FIELDS: FuzzCase[] = [
   { name: "missing source (captured_at only)", input: { captured_at: FRESH_ISO } },
   { name: "missing captured_at (live)", input: { source: "live" } },
   { name: "missing captured_at (manual)", input: { source: "manual" } },
-  {
-    name: "missing confidence (live fresh — allowed but never fabricated)",
-    input: { source: "live", captured_at: FRESH_ISO },
-  },
+  // Note: `missing confidence on a fresh live snapshot` is intentionally
+  // NOT in the never-clean table — confidence is optional and its
+  // absence must not fabricate untrusted-ness. See helper self-checks.
   {
     name: "extra unknown fields around missing source",
     input: { foo: "bar", baz: 1, captured_at: FRESH_ISO },

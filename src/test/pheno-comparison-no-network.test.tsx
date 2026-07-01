@@ -82,17 +82,18 @@ function installNetworkTraps(): { calls: Call[]; restore: () => void } {
     calls,
     restore() {
       globalThis.fetch = originalFetch;
-      // @ts-expect-error test-time restore
-      globalThis.XMLHttpRequest = OriginalXHR;
-      // @ts-expect-error test-time restore
-      globalThis.WebSocket = OriginalWS;
-      // @ts-expect-error test-time restore
-      globalThis.EventSource = OriginalES;
+      (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest =
+        OriginalXHR;
+      (globalThis as unknown as { WebSocket: unknown }).WebSocket = OriginalWS;
+      (globalThis as unknown as { EventSource: unknown }).EventSource =
+        OriginalES;
       if (originalBeacon) {
-        // @ts-expect-error test-time restore
-        navigator.sendBeacon = originalBeacon;
+        (navigator as unknown as {
+          sendBeacon: (u: string | URL) => boolean;
+        }).sendBeacon = originalBeacon;
       }
     },
+
   };
 }
 

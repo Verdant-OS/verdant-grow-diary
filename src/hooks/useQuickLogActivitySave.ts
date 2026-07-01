@@ -41,7 +41,7 @@ export interface QuickLogActivitySaveInput {
 
 export type QuickLogActivitySaveReason =
   | "ok"
-  | "harvest_disabled"
+  | "harvest_backend_unavailable"
   | "activity_disabled"
   | "unsupported_activity"
   | "missing_idempotency_key"

@@ -498,17 +498,22 @@ export function evaluateSensorSnapshot(
   ];
   if (typeof s.confidence === "number") ev.push(`Confidence: ${s.confidence.toFixed(2)}`);
   if (s.metric) ev.push(`Metric: ${s.metric}`);
-  if (s.source === "stale" || stale) {
+  if (s.source === "stale" || stale || (isLive && mins === null)) {
     return {
       id: "sensor-snapshot",
       label: "Sensor Snapshot",
       status: "stale",
       evidence: ev,
-      missing_info: ["Reading is stale; excluded from healthy status."],
+      missing_info: [
+        isLive && mins === null
+          ? "Live reading has no verifiable captured_at; excluded from healthy status."
+          : "Reading is stale; excluded from healthy status.",
+      ],
       safety_note: "Stale readings are never shown as healthy.",
       source: s.source,
     };
   }
+
   if (isManualish) {
     return {
       id: "sensor-snapshot",

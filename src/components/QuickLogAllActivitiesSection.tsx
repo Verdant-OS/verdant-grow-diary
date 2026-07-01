@@ -26,6 +26,7 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import QuickLogActivityPicker from "@/components/QuickLogActivityPicker";
@@ -33,9 +34,12 @@ import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
   QUICK_LOG_HARVEST_DISABLED_REASON,
+  QUICK_LOG_WEIGHT_UNITS,
   type QuickLogActivityDefinition,
   type QuickLogActivityId,
+  type QuickLogWeightUnit,
 } from "@/constants/quickLogActivityTypes";
+import { buildHarvestDetailsPayload } from "@/lib/harvestDetailsRules";
 import {
   buildDailyCheckSavedItems,
   type DailyCheckSavedItem,

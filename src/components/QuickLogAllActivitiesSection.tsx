@@ -76,7 +76,7 @@ function toSavedSource(
     case "manual_sensor_snapshot":
       return "sensor";
     case "harvest":
-      return null;
+      return "harvest";
     default:
       return null;
   }

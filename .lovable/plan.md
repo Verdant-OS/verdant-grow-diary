@@ -1,70 +1,48 @@
-## Plan-mode findings (read-only audit)
+# Verdant Quick Log Activity Types v1a — end-to-end wiring plan
 
-**Exact role guard path**
-- Route: `src/App.tsx:225` — `/operator/demo-preview` is inside the `<Route element={<RequireOperatorRole />}>` group (lines ~184–230), nested under the authenticated `AppShell` (which already calls `useRequireAuth`).
-- Guard: `src/components/RequireOperatorRole.tsx` → `useHasRole("operator")`.
-- Hook: `src/hooks/useHasRole.ts` calls server-side RPC `supabase.rpc("has_role", { _user_id, _role })`. Roles are NEVER inferred client-side.
-- DB: `public.app_role` enum = `('operator','customer')` (migration `20260517010926…`). Roles stored in `public.user_roles`. `has_role` is a SECURITY DEFINER SQL function gated by `user_roles`.
-- No JWT claim or profile-metadata role path exists. The only way to grant operator is an `INSERT INTO public.user_roles (user_id, role) VALUES (<uid>, 'operator')` via service_role (no client policy allows that insert — verified: `user_roles` has only SELECT-own + operator-managed policies).
+The shared foundation (constants, rules, saved-items breakdown, timeline label resolver, and their tests) already shipped in a prior slice. What's outstanding is the UI wiring, the actual save routing per activity in `QuickLog.tsx` / `DailyCheck.tsx` / the Plant page fast-actions, and the additional test coverage. Doing all of that atomically in one turn against `QuickLog.tsx` (1864 lines) and `DailyCheck.tsx` (1126 lines) would violate the "small additive slice" rule and put the Quick Log path — Gate 1 — at real regression risk.
 
-**Why the embedded preview stayed gated**
-The session is authenticated (AppShell didn't redirect to `/auth`), but `has_role(auth.uid(), 'operator')` returned `false`. The signed-in test account simply has no row in `public.user_roles` with `role = 'operator'`. The guard is working as designed; nothing in code is wrong. This is an **account-provisioning gap**, not a code defect.
+I want to split this into three tightly-scoped sub-slices, each independently reviewable, testable, and revertable. All three keep the same hard fences: no schema/RLS/Edge/auth/grant changes, no Harvest save path, no fake observation mapping for Harvest, no recommendation/diagnosis copy, no sensor-truth weakening, no Action Queue changes.
 
-**Existing test coverage (already strong)**
-- `src/test/operator-role-gate.test.ts`
-- `src/test/operator-route-auth-protection.test.ts`
-- `src/test/operator-route-mobile-coverage.test.ts`
-- `src/test/operator-demo-preview-page.test.tsx` (already asserts operator-only render)
-- `src/test/operator-demo-preview-static-safety.test.ts`
+## Sub-slice v1a.1 — Activity picker unification (UI-only, no save changes)
 
-No new guard tests are needed — Option B is already satisfied.
+Goal: every entry-point uses `QUICK_LOG_ACTIVITY_DEFINITIONS` as its label/description/safety-note/disabled source.
 
-**Seed pattern in repo**
-No client-callable operator-seed helper exists, and we should not add one (would weaken the boundary). Operator role assignment is a one-time owner action via the backend.
+Files:
+- `src/components/QuickLog.tsx` — replace the local activity/type array with a presenter driven by `QUICK_LOG_ACTIVITY_LIST`. Existing save handlers stay in place; only the picker grid + safety copy source changes. Harvest renders disabled with `disabledReason`.
+- `src/pages/DailyCheck.tsx` — same treatment for its fast-action grid.
+- `src/components/PlantDetailQuickActions.tsx` (or the plant fast-action menu it drives) — reuse the shared list where it currently duplicates labels.
+- Tests: extend `src/components/QuickLog.test.tsx` and add `src/test/quick-log-activity-picker.test.tsx` to assert every supported activity label is present, Harvest shows the disabled reason, and no duplicate taxonomy leaks.
 
----
+Fences: no save-path edits, no dispatch changes, no timeline changes. Zero risk to persistence.
 
-## Chosen approach
+## Sub-slice v1a.2 — Save routing wiring
 
-**Option A (runbook) + Option C (gate copy polish).** No schema/RLS/Edge changes. No seed script. No bypass.
+Goal: each supported activity persists through the correct existing RPC using `planQuickLogPersistence`.
 
-### File-level changes
+- Route Note/Watering → `quicklog_save_manual` with `p_action=note|water`.
+- Route Feeding/Training/Photo/Environment check/Issue/Defoliation → `createQuickLogEvent` (already wraps `quicklog_save_event`).
+- Defoliation submits `event_type=training` with `details.subtype="defoliation"` via the existing `p_details` field on `createQuickLogEvent` (no new field, no schema change).
+- Issue/observation submits `event_type=observation` with `details.subtype="issue"`.
+- Manual sensor snapshot continues to use the existing manual sensor path (already working from prior slice).
+- Harvest: submit is blocked at the presenter (button disabled + guard in submit handler that returns early with the shared disabled copy). No RPC call, no `verdant:entry-created` dispatch.
+- `verdant:entry-created` fires only on RPC success. Failed save shows an error state; no Saved-to-Timeline banner.
 
-1. `docs/operator-demo-preview-access-runbook.md` (new) — owner-only runbook:
-   - Confirm the test account is signed in to the same Lovable Cloud project as the embedded preview (project ref check via in-app account email, not raw IDs).
-   - Confirm `app_role` enum + `user_roles` table is the source of truth.
-   - Owner-only step: assign the `operator` role by inserting one row into `public.user_roles` from the backend admin surface (no service_role values pasted, no SQL with secrets, no raw UIDs shown in public copy — refer to the account by email).
-   - Re-test path: sign out → sign in as the operator account → navigate to `/operator/demo-preview` → expect the read-only walkthrough.
-   - Explicit DO-NOT list: no public route, no `?operator=1` bypass, no service_role in client, no JWT-claim shortcut, no demo-only auth path.
+Tests: `src/test/quick-log-activity-save-routing.test.ts` — mocks `supabase.rpc` and asserts the exact RPC name + payload per activity, plus zero-call assertions for Harvest and for unsupported ids.
 
-2. `src/components/RequireOperatorRole.tsx` (copy polish only) — replace the current denied copy with the three approved lines:
-   - "Signed in, but this account does not have operator access."
-   - "Use an operator-role account for this preview."
-   - "No operator data was loaded."
-   - Continue to leak nothing (no uid, no role rows, no RPC error text, no table names). Existing `data-testid="require-operator-denied"` preserved.
+## Sub-slice v1a.3 — Post-save + Timeline consistency + full test sweep
 
-3. `src/test/operator-role-gate.test.ts` (extend) — add assertions that the denied state contains the three new copy strings and does NOT contain any of: a UUID-shaped string, the substrings `user_roles`, `has_role`, `service_role`, `jwt`, `token`, `auth.uid`.
+- Confirm `buildDailyCheckSavedItems` already emits the right saved-breakdown labels for the new activities (from prior slice) and add any missing wiring in `DailyCheck.tsx` post-submit rendering.
+- Confirm Timeline card rendering calls `resolveQuickLogEventTimelineLabel` so Defoliation renders only with the subtype fence and generic training stays Training.
+- Add: `src/test/quick-log-activity-timeline-labels.test.ts`, extend `quick-log-post-save-saved-items.test.ts` with defoliation/issue/environment cases, add a Harvest-exclusion test asserting Harvest never appears in saved breakdown or Timeline.
+- Run the full validation battery listed in the task (targeted vitest files + `sensor-safety-check.mjs` + `assert-sensor-intelligence-safety.mjs` + `test:docs-demo-safety` + `test:client-secret-boundary` + `tsgo --noEmit`) and report exact counts.
 
-### Not doing
-- Option B: existing tests cover it.
-- Option D: no safe existing seed pattern in repo; adding one risks weakening the boundary. Operator provisioning stays an owner-only backend action documented in the runbook.
+## What stays out of scope (v1b blockers)
 
-### Validation
-- `bunx vitest run src/test/operator-role-gate.test.ts src/test/operator-route-auth-protection.test.ts src/test/operator-demo-preview-page.test.tsx src/test/operator-demo-preview-static-safety.test.ts`
-- `bunx tsgo --noEmit`
-- `node scripts/sensor-safety-check.mjs`
-- `node scripts/assert-docs-safety.mjs` (covers new runbook)
+- Real Harvest logging (DB validator + RPC allow-list + optional harvest schema).
+- Any change to `validate_grow_event`, `quicklog_save_event`, or `quicklog_save_manual`.
+- Any Action Queue, alerts, AI Doctor, or device-control behavior.
 
-### Safety verdict
-GO. No guard weakening, no public exposure, no bypass param, no schema/RLS/Edge/auth changes, no DB writes, no AI, no automation, no device control, no secret exposure.
+## Ask
 
-### Browser re-test instructions (after operator role is granted to the test account)
-1. Sign out of the embedded preview.
-2. Sign in as the operator-role account.
-3. Navigate to `/operator/demo-preview`.
-4. Expect the read-only One-Tent Evidence Chain walkthrough (no mutation controls).
-
-### Risk / rollback
-Minimal. Copy polish + new doc + extended assertions. Rollback = revert the 3 files.
-
-**Approve to proceed with implementation, or tell me to stop at audit-only.**
+Approve this three-slice split and I'll start with v1a.1 immediately in the next turn. If you'd rather I collapse it into one mega-turn against `QuickLog.tsx` + `DailyCheck.tsx` I can, but I'd flag that as higher regression risk to Gate 1 and want that acknowledged before proceeding.

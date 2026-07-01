@@ -72,6 +72,10 @@ jobs:
       - name: Playwright — /one-tent-loop-proof never-healthy
         run: bun run test:e2e:one-tent-loop-proof-never-healthy:ci
 
+      - name: Render sanitized proof artifact (on failure)
+        if: failure()
+        run: bun run artifact:one-tent-loop-proof-never-healthy || true
+
       - name: Upload Playwright report
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -90,6 +94,15 @@ jobs:
             test-results/**/*.png
             test-results/**/*.webm
             test-results/**/trace.zip
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload sanitized proof artifact (on failure)
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: one-tent-loop-proof-never-healthy-sanitized-proof
+          path: artifacts/one-tent-loop-proof/never-healthy-proof-report.txt
           retention-days: 7
           if-no-files-found: ignore
 

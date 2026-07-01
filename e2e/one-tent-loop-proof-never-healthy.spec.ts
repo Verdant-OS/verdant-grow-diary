@@ -134,6 +134,46 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
         writeControlCount,
         "Proof presenter must render zero write controls",
       ).toBe(0);
+
+      // Exact deterministic label assertions for the safe rendered
+      // states. Any step card that renders one of these statuses MUST
+      // expose the matching data-status attribute and MUST NOT be
+      // labelled as passed/direct. Each check is soft-guarded on
+      // whether the state is present in the current app snapshot; we
+      // don't fabricate telemetry from the browser, so only assert
+      // when the DOM shows the state.
+      const SAFE_STATES = ["stale", "invalid", "demo_only", "missing", "needs_review"] as const;
+      for (const state of SAFE_STATES) {
+        const cards = page.locator(`[data-testid^="loop-live-proof-step-"][data-status="${state}"]`);
+        const count = await cards.count();
+        for (let i = 0; i < count; i++) {
+          const card = cards.nth(i);
+          // Must not simultaneously advertise "passed" / "direct".
+          await expect(card).toHaveAttribute("data-status", state);
+          const provenance = await card.getAttribute("data-provenance");
+          expect(
+            provenance === "direct" && state !== "passed",
+            `A ${state} step must not have provenance=direct`,
+          ).toBe(false);
+          const cardText = (await card.innerText()).toLowerCase();
+          // Card copy must not include unsafe healthy wording.
+          expect(
+            hasUnsafeHealthyClaim(cardText),
+            `Card for ${state} contained unsafe wording:\n${cardText.slice(0, 400)}`,
+          ).toBe(false);
+        }
+      }
+
+      // If a copyable text report block is present, assert the same
+      // wording rules apply to its plaintext.
+      const report = page.getByTestId("loop-live-proof-text-report");
+      if ((await report.count()) > 0) {
+        const reportText = (await report.innerText()).toLowerCase();
+        expect(
+          hasUnsafeHealthyClaim(reportText),
+          `Text report contained unsafe wording:\n${reportText.slice(0, 800)}`,
+        ).toBe(false);
+      }
     } else {
       // Route-level render was blocked by auth — documented and expected.
       // Vitest fuzz + presenter tests cover the rendered-proof invariants.

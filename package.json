@@ -127,6 +127,7 @@
     "test:db:quicklog-rpc-static": "vitest run src/test/quicklog-save-event-rpc-trust-boundary.test.ts src/test/quicklog-save-manual-rpc-trust-boundary.test.ts src/test/quicklog-save-manual-rpc-ownership.test.ts src/test/quicklog-save-manual-rpc-reason-codes.test.ts src/test/quicklog-save-manual-rpc-mixed-boundary.test.ts src/test/quicklog-rpc-harness-static-safety.test.ts",
     "test:db:quicklog-rpc-runtime": "bun run scripts/run-quicklog-rpc-rls-harnesses.ts",
     "test:db:quicklog-rpc": "bun run test:db:quicklog-rpc-static && bun run test:db:quicklog-rpc-runtime",
+    "test:quicklog-typed-payloads": "bun run scripts/run-quicklog-typed-payloads-harness.ts",
     "test:genetics-import": "vitest run src/test/verdant-genetics* src/test/operator-genetics-import* --reporter=verbose",
     "verify:genetics-import": "bun run typecheck && vitest run src/test/verdant-genetics* src/test/operator-genetics-import* --reporter=verbose",
     "test:full:shard1": "vitest run --reporter=dot --shard=1/4",

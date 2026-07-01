@@ -425,6 +425,15 @@ export function evaluateTimeline(
   };
 }
 
+export const ALLOWED_SENSOR_SOURCES: readonly SensorSourceLabel[] = [
+  "live",
+  "manual",
+  "csv",
+  "demo",
+  "stale",
+  "invalid",
+];
+
 export function evaluateSensorSnapshot(
   s: SensorSnapshotEvidence | null,
   now_ms: number,
@@ -437,6 +446,21 @@ export function evaluateSensorSnapshot(
       evidence: [],
       missing_info: ["No sensor snapshot available."],
       safety_note: "Missing telemetry is never shown as healthy.",
+      deep_link: "/sensors",
+    };
+  }
+  if (!ALLOWED_SENSOR_SOURCES.includes(s.source as SensorSourceLabel)) {
+    return {
+      id: "sensor-snapshot",
+      label: "Sensor Snapshot",
+      status: "invalid",
+      evidence: [
+        `Source: unrecognized`,
+        s.captured_at ? `Captured: ${s.captured_at}` : "Captured: unknown",
+      ],
+      missing_info: ["Sensor source is unrecognized; excluded from healthy status."],
+      safety_note: "Unknown telemetry is never shown as healthy.",
+      source: "invalid",
       deep_link: "/sensors",
     };
   }
@@ -462,6 +486,7 @@ export function evaluateSensorSnapshot(
       source: "demo",
     };
   }
+
   const mins = minutesSince(s.captured_at, now_ms);
   const isLive = s.source === "live";
   const isManualish = s.source === "manual" || s.source === "csv";

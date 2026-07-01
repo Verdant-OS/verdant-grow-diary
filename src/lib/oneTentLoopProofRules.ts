@@ -456,10 +456,48 @@ export function evaluateSensorSnapshot(
       status: "invalid",
       evidence: [
         `Source: unrecognized`,
-        s.captured_at ? `Captured: ${s.captured_at}` : "Captured: unknown",
+        typeof s.captured_at === "string" && s.captured_at.length > 0
+          ? `Captured: ${s.captured_at}`
+          : "Captured: unknown",
       ],
       missing_info: ["Sensor source is unrecognized; excluded from healthy status."],
       safety_note: "Unknown telemetry is never shown as healthy.",
+      source: "invalid",
+      deep_link: "/sensors",
+    };
+  }
+  // Shape-guard the ancillary fields: confidence must be a finite number
+  // in [0,1] when present, metric must be a string when present. Bad
+  // shapes flip the row to `invalid` — untrusted telemetry is never
+  // shown as healthy just because `source` happens to be recognized.
+  const confidenceInput = (s as { confidence?: unknown }).confidence;
+  const confidenceInvalid =
+    confidenceInput !== undefined &&
+    confidenceInput !== null &&
+    (typeof confidenceInput !== "number" ||
+      !Number.isFinite(confidenceInput) ||
+      confidenceInput < 0 ||
+      confidenceInput > 1);
+  const metricInput = (s as { metric?: unknown }).metric;
+  const metricInvalid =
+    metricInput !== undefined && metricInput !== null && typeof metricInput !== "string";
+  if (confidenceInvalid || metricInvalid) {
+    return {
+      id: "sensor-snapshot",
+      label: "Sensor Snapshot",
+      status: "invalid",
+      evidence: [
+        `Source: ${s.source}`,
+        typeof s.captured_at === "string" && s.captured_at.length > 0
+          ? `Captured: ${s.captured_at}`
+          : "Captured: unknown",
+      ],
+      missing_info: [
+        confidenceInvalid
+          ? "Confidence is malformed; excluded from healthy status."
+          : "Metric label is malformed; excluded from healthy status.",
+      ],
+      safety_note: "Malformed telemetry is never shown as healthy.",
       source: "invalid",
       deep_link: "/sensors",
     };

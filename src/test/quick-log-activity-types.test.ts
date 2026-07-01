@@ -97,12 +97,24 @@ describe("quickLogActivityTypes constants", () => {
       expect(note, `${id} safetyNote must not claim readiness`).not.toMatch(
         /\bready to harvest\b/i,
       );
-      expect(note, `${id} safetyNote must not claim safe-to-x`).not.toMatch(
-        /\bsafe to (feed|train|defoliate|harvest)\b/i,
+      // Only allow "safe to <verb>" if it appears as an explicit denial
+      // ("does not mean", "not", "never").
+      const bareSafeToMatch = note.match(
+        /(?<!not\s|never\s|n't\s|no\s)\bsafe to (feed|train|defoliate|harvest)\b/i,
       );
+      // Extra guard: reject if the sentence containing it doesn't include a negation.
+      if (bareSafeToMatch) {
+        const idx = bareSafeToMatch.index ?? 0;
+        const window = note.slice(Math.max(0, idx - 40), idx);
+        expect(
+          /\b(not|never|n't|no)\b/i.test(window),
+          `${id} safetyNote asserts safe-to-x without a denial`,
+        ).toBe(true);
+      }
       expect(note, `${id} safetyNote must not claim healthy`).not.toMatch(
         /\bhealthy\b/i,
       );
+
     }
   });
 

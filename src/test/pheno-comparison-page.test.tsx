@@ -76,8 +76,8 @@ describe("PhenoComparison page", () => {
       within(bravo).getByTestId("pheno-candidate-demo-cand-bravo-no-photo"),
     ).toBeInTheDocument();
 
-    // Bravo has a stale reading — stale label visible.
-    expect(within(bravo).getByText(/Stale/i)).toBeInTheDocument();
+    // Bravo has a stale reading — stale label + stale-reading flag visible.
+    expect(within(bravo).getAllByText(/Stale/i).length).toBeGreaterThan(0);
 
     // Charlie has an invalid reading + no diary/photos.
     const charlie = screen.getByTestId("pheno-candidate-demo-cand-charlie");
@@ -101,15 +101,18 @@ describe("PhenoComparison page", () => {
     expect(within(bravo).getByText("CSV")).toBeInTheDocument();
   });
 
-  it("does not use action queue / device control / automation language", () => {
+  it("has no write controls (no buttons, no forms) and no execute-command language", () => {
     const { container } = renderAt("/pheno-comparison");
     const text = container.textContent ?? "";
-    expect(text).not.toMatch(/action queue/i);
-    expect(text).not.toMatch(/device control/i);
-    expect(text).not.toMatch(/automation/i);
+    // Denials are fine ("No automation, no device control" caveat is expected);
+    // what must not appear are affirmative write CTAs.
+    expect(text).not.toMatch(/add to action queue/i);
+    expect(text).not.toMatch(/run action/i);
     expect(text).not.toMatch(/execute .* command/i);
-    // No save / submit / import call-to-action buttons on this surface.
+    expect(text).not.toMatch(/send to device/i);
+    // No save / submit / import interactive controls on this surface.
     expect(container.querySelector("button")).toBeNull();
     expect(container.querySelector("form")).toBeNull();
+    expect(container.querySelector("input")).toBeNull();
   });
 });

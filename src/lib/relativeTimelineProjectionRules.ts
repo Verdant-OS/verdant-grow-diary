@@ -24,6 +24,7 @@ import {
   classifyTimelineEntry,
   type TimelineFilterCategory,
 } from "@/lib/timelineEntryClassification";
+import { readPersistedHarvestDetails } from "@/lib/harvestDetailsRules";
 
 export type RelativeTimelineItemSource = "note" | "photo" | "sensor";
 

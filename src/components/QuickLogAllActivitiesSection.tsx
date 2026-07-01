@@ -26,6 +26,7 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import QuickLogActivityPicker from "@/components/QuickLogActivityPicker";
@@ -33,9 +34,12 @@ import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
   QUICK_LOG_HARVEST_DISABLED_REASON,
+  QUICK_LOG_WEIGHT_UNITS,
   type QuickLogActivityDefinition,
   type QuickLogActivityId,
+  type QuickLogWeightUnit,
 } from "@/constants/quickLogActivityTypes";
+import { buildHarvestDetailsPayload } from "@/lib/harvestDetailsRules";
 import {
   buildDailyCheckSavedItems,
   type DailyCheckSavedItem,
@@ -107,6 +111,9 @@ export default function QuickLogAllActivitiesSection({
     null,
   );
   const [note, setNote] = useState("");
+  const [harvestWet, setHarvestWet] = useState("");
+  const [harvestDry, setHarvestDry] = useState("");
+  const [harvestUnit, setHarvestUnit] = useState<QuickLogWeightUnit>("g");
   const [saved, setSaved] = useState<SavedRecord[]>([]);
   const [errorReason, setErrorReason] = useState<string | null>(null);
   const [errorForActivity, setErrorForActivity] =
@@ -132,6 +139,9 @@ export default function QuickLogAllActivitiesSection({
     setErrorForActivity(null);
     setSelected(a);
     setNote("");
+    setHarvestWet("");
+    setHarvestDry("");
+    setHarvestUnit("g");
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -163,6 +173,18 @@ export default function QuickLogAllActivitiesSection({
       return;
     }
 
+    // Harvest optional weight details — sanitized in the shared rules
+    // module. Empty / invalid / negative values are dropped, never sent.
+    const extraDetails: Record<string, unknown> = {};
+    if (selected.id === "harvest") {
+      const harvestPayload = buildHarvestDetailsPayload({
+        wetWeight: harvestWet,
+        dryWeight: harvestDry,
+        weightUnit: harvestUnit,
+      });
+      if (harvestPayload) extraDetails.harvest = harvestPayload;
+    }
+
     const idempotencyKey = newIdempotencyKey(selected.id);
     const result = await save({
       activityId: selected.id,
@@ -171,6 +193,8 @@ export default function QuickLogAllActivitiesSection({
       plantId: plantId ?? null,
       note: note.trim().length > 0 ? note.trim() : null,
       idempotencyKey,
+      extraDetails:
+        Object.keys(extraDetails).length > 0 ? extraDetails : null,
     });
 
     if (!result.ok) {
@@ -203,10 +227,25 @@ export default function QuickLogAllActivitiesSection({
       }
     }
     setNote("");
+    setHarvestWet("");
+    setHarvestDry("");
+    setHarvestUnit("g");
     setSelected(null);
     setErrorReason(null);
     setErrorForActivity(null);
-  }, [selected, growId, tentId, plantId, note, requiresNote, save, canPersistManualSensor]);
+  }, [
+    selected,
+    growId,
+    tentId,
+    plantId,
+    note,
+    requiresNote,
+    save,
+    canPersistManualSensor,
+    harvestWet,
+    harvestDry,
+    harvestUnit,
+  ]);
 
   const noContext = !growId;
 
@@ -263,6 +302,89 @@ export default function QuickLogAllActivitiesSection({
               Use the Manual Sensor Snapshot card on this page to record a
               reading. Manual snapshots stay labeled manual, not live.
             </p>
+          ) : selected.id === "harvest" ? (
+            <div
+              className="space-y-2"
+              data-testid={`${testIdPrefix}-harvest-fields`}
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor={`${testIdPrefix}-harvest-wet`}
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    Wet weight (optional)
+                  </Label>
+                  <Input
+                    id={`${testIdPrefix}-harvest-wet`}
+                    data-testid={`${testIdPrefix}-harvest-wet`}
+                    value={harvestWet}
+                    onChange={(e) => setHarvestWet(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="e.g. 120"
+                    min={0}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label
+                    htmlFor={`${testIdPrefix}-harvest-dry`}
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    Dry weight (optional)
+                  </Label>
+                  <Input
+                    id={`${testIdPrefix}-harvest-dry`}
+                    data-testid={`${testIdPrefix}-harvest-dry`}
+                    value={harvestDry}
+                    onChange={(e) => setHarvestDry(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="e.g. 22"
+                    min={0}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label
+                    htmlFor={`${testIdPrefix}-harvest-unit`}
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    Weight unit
+                  </Label>
+                  <select
+                    id={`${testIdPrefix}-harvest-unit`}
+                    data-testid={`${testIdPrefix}-harvest-unit`}
+                    value={harvestUnit}
+                    onChange={(e) =>
+                      setHarvestUnit(e.target.value as QuickLogWeightUnit)
+                    }
+                    className="w-full text-sm h-9 rounded-md border border-input bg-background px-2"
+                  >
+                    {QUICK_LOG_WEIGHT_UNITS.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label
+                  htmlFor={`${testIdPrefix}-note`}
+                  className="text-[11px] text-muted-foreground"
+                >
+                  Note (optional)
+                </Label>
+                <Textarea
+                  id={`${testIdPrefix}-note`}
+                  data-testid={`${testIdPrefix}-note`}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Removed main cola, lower branches…"
+                  className="min-h-[64px] text-sm"
+                />
+              </div>
+            </div>
           ) : requiresNote ? (
             <div className="space-y-1">
               <Label

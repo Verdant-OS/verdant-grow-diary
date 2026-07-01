@@ -36,6 +36,26 @@ export const QUICK_LOG_ACTIVITY_IDS = [
 export type QuickLogActivityId = (typeof QUICK_LOG_ACTIVITY_IDS)[number];
 
 /**
+ * Optional Harvest detail payload persisted under
+ * `grow_events.details.harvest`. All fields are optional — a Harvest
+ * log with only a note is valid. Values stay as strings so the exact
+ * grower-entered precision is preserved and no unit is ever invented.
+ */
+export type QuickLogWeightUnit = "g" | "oz" | "lb" | "kg";
+export const QUICK_LOG_WEIGHT_UNITS: readonly QuickLogWeightUnit[] = [
+  "g",
+  "oz",
+  "lb",
+  "kg",
+] as const;
+
+export interface QuickLogHarvestDetails {
+  wetWeight?: string;
+  dryWeight?: string;
+  weightUnit?: QuickLogWeightUnit;
+}
+
+/**
  * Save route kind — describes which existing safe persistence path an
  * activity uses. `none` means the activity has no save path in this
  * slice (Harvest until v1b).

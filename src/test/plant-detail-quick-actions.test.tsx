@@ -69,7 +69,7 @@ const FORBIDDEN = [
 ];
 
 describe("buildPlantDetailQuickActions · ordering and completeness", () => {
-  it("returns the 5 expected kinds in deterministic order", () => {
+  it("returns the 6 expected kinds in deterministic order", () => {
     const kinds = buildPlantDetailQuickActions({ plantId: "p1" }).map(
       (e) => e.kind,
     );
@@ -79,6 +79,7 @@ describe("buildPlantDetailQuickActions · ordering and completeness", () => {
       "upload_photo",
       "ask_doctor",
       "view_timeline",
+      "harvest",
     ]);
   });
 
@@ -92,6 +93,7 @@ describe("buildPlantDetailQuickActions · ordering and completeness", () => {
       "Upload Photo",
       "Ask Doctor",
       "View Timeline",
+      "Harvest",
     ]);
   });
 
@@ -105,6 +107,7 @@ describe("buildPlantDetailQuickActions · ordering and completeness", () => {
       "Attach a plant photo to visual history.",
       "Review this plant with existing context.",
       "Jump to this plant's history.",
+      "Record a harvest event.",
     ]);
   });
 });
@@ -193,7 +196,7 @@ describe("buildPlantDetailQuickActions · payloads and routes", () => {
 });
 
 describe("PlantDetailQuickActions · render", () => {
-  it("renders all five quick actions with accessible labels", () => {
+  it("renders all six quick actions with accessible labels", () => {
     render(
       <PlantDetailQuickActions
         plantId="p1"
@@ -219,6 +222,9 @@ describe("PlantDetailQuickActions · render", () => {
       screen.getByTestId("plant-detail-quick-action-view-timeline"),
     ).toBeInTheDocument();
     expect(
+      screen.getByTestId("plant-detail-quick-action-harvest"),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("navigation", { name: /plant quick actions/i }),
     ).toBeInTheDocument();
   });
@@ -239,6 +245,7 @@ describe("PlantDetailQuickActions · render", () => {
       { testId: "plant-detail-quick-action-upload-photo", text: /visual history/i },
       { testId: "plant-detail-quick-action-ask-doctor", text: /existing context/i },
       { testId: "plant-detail-quick-action-view-timeline", text: /history/i },
+      { testId: "plant-detail-quick-action-harvest", text: /harvest/i },
     ];
     for (const { testId, text } of expected) {
       const el = screen.getByTestId(`${testId}-description`);
@@ -492,6 +499,7 @@ describe("PlantDetailQuickActions · render", () => {
       "plant-detail-quick-action-upload-photo",
       "plant-detail-quick-action-ask-doctor",
       "plant-detail-quick-action-view-timeline",
+      "plant-detail-quick-action-harvest",
     ];
     for (const id of ids) {
       const el = screen.getByTestId(id);
@@ -507,7 +515,7 @@ describe("PlantDetailQuickActions · render", () => {
     const wrappers = container.querySelectorAll(
       '[data-testid="plant-detail-quick-actions"] > div',
     );
-    expect(wrappers.length).toBe(5);
+    expect(wrappers.length).toBe(6);
     for (const w of wrappers) {
       expect(w.className).toMatch(/min-w-0/);
     }
@@ -531,6 +539,7 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
       "plant-detail-quick-action-upload-photo",
       "plant-detail-quick-action-ask-doctor",
       "plant-detail-quick-action-view-timeline",
+      "plant-detail-quick-action-harvest",
     ];
     for (const id of ids) {
       const el = screen.getByTestId(id);
@@ -555,6 +564,7 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
       "Upload Photo",
       "Ask Doctor",
       "View Timeline",
+      "Harvest",
     ];
     for (const name of expected) {
       const matches = [
@@ -617,6 +627,7 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
       "plant-detail-quick-action-upload-photo",
       "plant-detail-quick-action-ask-doctor",
       "plant-detail-quick-action-view-timeline",
+      "plant-detail-quick-action-harvest",
     ];
     for (const id of disabledIds) {
       const el = screen.getByTestId(id) as HTMLButtonElement;
@@ -672,6 +683,7 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
       "plant-detail-quick-action-upload-photo",
       "plant-detail-quick-action-ask-doctor",
       "plant-detail-quick-action-view-timeline",
+      "plant-detail-quick-action-harvest",
     ];
     for (const id of ids) {
       const el = screen.getByTestId(id);
@@ -693,6 +705,7 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
       "plant-detail-quick-action-upload-photo",
       "plant-detail-quick-action-ask-doctor",
       "plant-detail-quick-action-view-timeline",
+      "plant-detail-quick-action-harvest",
     ];
     for (const id of ids) {
       const el = screen.getByTestId(id);
@@ -711,6 +724,7 @@ describe("PlantDetailQuickActions · hardened a11y coverage", () => {
     "plant-detail-quick-action-upload-photo",
     "plant-detail-quick-action-ask-doctor",
     "plant-detail-quick-action-view-timeline",
+    "plant-detail-quick-action-harvest",
   ] as const;
 
   const EXPECTED_NAMES: Record<(typeof ALL_IDS)[number], string> = {
@@ -719,6 +733,7 @@ describe("PlantDetailQuickActions · hardened a11y coverage", () => {
     "plant-detail-quick-action-upload-photo": "Upload Photo",
     "plant-detail-quick-action-ask-doctor": "Ask Doctor",
     "plant-detail-quick-action-view-timeline": "View Timeline",
+    "plant-detail-quick-action-harvest": "Harvest",
   };
 
   function describedByOf(el: HTMLElement): string[] {
@@ -785,6 +800,7 @@ describe("PlantDetailQuickActions · hardened a11y coverage", () => {
       "plant-detail-quick-action-upload-photo",
       "plant-detail-quick-action-ask-doctor",
       "plant-detail-quick-action-view-timeline",
+      "plant-detail-quick-action-harvest",
     ] as const;
     for (const id of disabledIds) {
       const el = screen.getByTestId(id);
@@ -822,6 +838,7 @@ describe("PlantDetailQuickActions · hardened a11y coverage", () => {
       "plant-detail-quick-action-upload-photo",
       "plant-detail-quick-action-ask-doctor",
       "plant-detail-quick-action-view-timeline",
+      "plant-detail-quick-action-harvest",
     ]) {
       const el = screen.getByTestId(id) as HTMLButtonElement;
       expect(el).toBeDisabled();

@@ -13,6 +13,7 @@ import {
   ListOrdered,
   MessageSquare,
   NotebookPen,
+  Scissors,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ const ICON: Record<PlantDetailQuickActionKind, typeof NotebookPen> = {
   upload_photo: Camera,
   ask_doctor: MessageSquare,
   view_timeline: ListOrdered,
+  harvest: Scissors,
 };
 
 const FOCUS_CLASSES =

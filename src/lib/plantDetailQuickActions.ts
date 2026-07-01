@@ -14,13 +14,15 @@
  * removed). Callers must pass what they already have.
  */
 import { sensorsPath } from "@/lib/routes";
+import { QUICK_LOG_ACTIVITY_DEFINITIONS } from "@/constants/quickLogActivityTypes";
 
 export type PlantDetailQuickActionKind =
   | "quicklog"
   | "manual_sensor_snapshot"
   | "upload_photo"
   | "ask_doctor"
-  | "view_timeline";
+  | "view_timeline"
+  | "harvest";
 
 /** Payload dispatched on the `verdant:open-quicklog` event. */
 export interface PlantDetailQuickLogEventPayload {
@@ -93,6 +95,14 @@ const LABELS: Record<
   view_timeline: {
     label: "View Timeline",
     description: "Jump to this plant's history.",
+  },
+  // Harvest label/description come from the shared activity taxonomy so
+  // no local production activity copy can drift. Preselection into the
+  // shared Quick Log flow is a follow-up — this entry links into the
+  // existing open-quicklog event with plant/tent/grow context preserved.
+  harvest: {
+    label: QUICK_LOG_ACTIVITY_DEFINITIONS.harvest.label,
+    description: QUICK_LOG_ACTIVITY_DEFINITIONS.harvest.description,
   },
 };
 
@@ -182,6 +192,20 @@ export function buildPlantDetailQuickActions(
       disabledReason: hasTimelineSection
         ? undefined
         : "Timeline section is not available yet.",
+    },
+    {
+      // Harvest is fully backed by quicklog_save_event now; this entry
+      // point opens the shared Quick Log flow with plant/tent/grow
+      // context. Activity preselection inside the dialog is a follow-up.
+      kind: "harvest",
+      ...LABELS.harvest,
+      event: "open-quicklog",
+      eventPayload: quickLogPayload,
+      testId: "plant-detail-quick-action-harvest",
+      disabled: !plantId,
+      disabledReason: plantId
+        ? undefined
+        : "Plant context is not loaded yet.",
     },
   ];
 }

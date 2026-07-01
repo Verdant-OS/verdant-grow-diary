@@ -24,6 +24,7 @@ import {
   classifyTimelineEntry,
   type TimelineFilterCategory,
 } from "@/lib/timelineEntryClassification";
+import { readPersistedHarvestDetails } from "@/lib/harvestDetailsRules";
 
 export type RelativeTimelineItemSource = "note" | "photo" | "sensor";
 
@@ -43,6 +44,10 @@ export interface RelativeTimelineItem {
   stagePreset: RelativeStagePreset | null;
   plantId: string | null;
   tentId: string | null;
+  /** Full note text (untruncated). Null when empty. */
+  note?: string | null;
+  /** Structured harvest details if the entry is a harvest. Null otherwise. */
+  harvest?: import("@/constants/quickLogActivityTypes").QuickLogHarvestDetails | null;
 }
 
 export interface BuildRelativeTimelineInput {
@@ -158,6 +163,18 @@ export function buildRelativeTimelineProjection(
     // current stage. Never invent a stage if neither resolves.
     const itemPreset =
       resolveStagePreset(entry.stage) ?? stagePreset;
+    const trimmedNote =
+      typeof entry.note === "string" && entry.note.trim().length > 0
+        ? entry.note.trim()
+        : null;
+    const harvest =
+      entry.eventType === "harvest"
+        ? readPersistedHarvestDetails(
+            entry.details?.extras?.harvest ??
+              (entry.details as { harvest?: unknown } | undefined)?.harvest ??
+              null,
+          )
+        : null;
     return {
       id: entry.id,
       eventType: entry.eventType,
@@ -170,6 +187,8 @@ export function buildRelativeTimelineProjection(
       stagePreset: itemPreset,
       plantId: entry.plantId,
       tentId: entry.tentId,
+      note: trimmedNote,
+      harvest,
     };
   });
 

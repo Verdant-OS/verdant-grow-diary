@@ -29,6 +29,7 @@ import {
   buildOneTentLoopLiveProofTextReport,
   type LiveProofView,
 } from "@/lib/oneTentLoopLiveProofViewModel";
+import type { OneTentLoopGap } from "@/lib/oneTentLoopGapResolver";
 import type {
   ActionQueueEvidence,
   AiDoctorEvidence,
@@ -247,6 +248,99 @@ function BulletList({
         <li key={`${testId}-${i}`}>{item}</li>
       ))}
     </ul>
+  );
+}
+
+function TopGapPanel({ gap }: { gap: OneTentLoopGap }) {
+  const isResolved = gap.step_key === "none";
+  return (
+    <section
+      data-testid="one-tent-loop-live-proof-top-gap"
+      data-step-key={gap.step_key}
+      data-status={gap.status}
+      data-evidence-kind={gap.evidence_kind}
+      data-real-data-gap={gap.is_real_data_gap ? "yes" : "no"}
+      className="space-y-3 rounded-md border border-border bg-card p-4"
+      aria-label="Top real-data gap"
+    >
+      <header className="space-y-1">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Top real-data gap
+        </p>
+        <h2
+          data-testid="one-tent-loop-live-proof-top-gap-title"
+          className="text-base font-semibold text-foreground"
+        >
+          {gap.title}
+        </h2>
+        <p
+          data-testid="one-tent-loop-live-proof-top-gap-status"
+          className="text-xs text-muted-foreground"
+        >
+          Status: {gap.status} · Evidence kind: {gap.evidence_kind}
+          {gap.source_label ? ` · Source: ${gap.source_label}` : ""}
+          {Number.isFinite(gap.priority) ? ` · Priority: ${gap.priority}` : ""}
+        </p>
+      </header>
+
+      <div className="space-y-1 text-sm text-foreground">
+        <p>
+          <span className="font-medium">Why it matters: </span>
+          <span data-testid="one-tent-loop-live-proof-top-gap-why">
+            {gap.why_it_matters}
+          </span>
+        </p>
+        <p>
+          <span className="font-medium">Where to resolve: </span>
+          <span data-testid="one-tent-loop-live-proof-top-gap-where">
+            {gap.where_to_resolve}
+          </span>
+        </p>
+        <p>
+          <span className="font-medium">Suggested next observation: </span>
+          <span data-testid="one-tent-loop-live-proof-top-gap-next">
+            {gap.suggested_next_observation}
+          </span>
+        </p>
+      </div>
+
+      {isResolved ? null : (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground">
+            Blocked / weakened downstream
+          </p>
+          {gap.blocked_downstream_steps.length === 0 ? (
+            <p
+              data-testid="one-tent-loop-live-proof-top-gap-downstream-empty"
+              className="text-sm text-muted-foreground"
+            >
+              None recorded.
+            </p>
+          ) : (
+            <ul
+              data-testid="one-tent-loop-live-proof-top-gap-downstream"
+              className="list-disc space-y-1 pl-5 text-sm text-foreground"
+            >
+              {gap.blocked_downstream_steps.map((s) => (
+                <li
+                  key={s}
+                  data-testid={`one-tent-loop-live-proof-top-gap-downstream-${s}`}
+                >
+                  {s}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      <p
+        data-testid="one-tent-loop-live-proof-top-gap-safety"
+        className="text-xs text-muted-foreground"
+      >
+        Safety note: {gap.safety_note}
+      </p>
+    </section>
   );
 }
 
@@ -548,6 +642,8 @@ export default function OneTentLoopLiveProof(): JSX.Element {
           Demo only: {view.counts.demo_only}
         </p>
       </header>
+
+      <TopGapPanel gap={view.top_gap} />
 
       <section
         data-testid="one-tent-loop-live-proof-steps"

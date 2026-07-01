@@ -17,6 +17,11 @@ import {
   type LoopStepRow,
   type LoopStepStatus,
 } from "./oneTentLoopProofRules";
+import {
+  buildOneTentLoopTopGapTextBlock,
+  resolveTopOneTentLoopGap,
+  type OneTentLoopGap,
+} from "./oneTentLoopGapResolver";
 
 export const LIVE_PROOF_BANNER =
   "Read-only proof view. This page checks whether the One-Tent Loop has evidence. It does not create logs, alerts, actions, AI results, or device commands.";
@@ -46,6 +51,7 @@ export interface LiveProofView {
   step_ids: readonly string[];
   counts: LiveProofStatusCounts;
   generated_at: string;
+  top_gap: OneTentLoopGap;
 }
 
 function countStatuses(rows: readonly LoopStepRow[]): LiveProofStatusCounts {
@@ -80,6 +86,7 @@ export function buildOneTentLoopLiveProofView(
   now?: string | Date | number,
 ): LiveProofView {
   const steps = evaluateLoop(evidence);
+  const top_gap = resolveTopOneTentLoopGap(steps);
   return {
     title: "One-Tent Loop — Live Proof",
     banner: LIVE_PROOF_BANNER,
@@ -88,6 +95,7 @@ export function buildOneTentLoopLiveProofView(
     step_ids: LOOP_STEP_IDS,
     counts: countStatuses(steps),
     generated_at: normalizeGeneratedAt(now),
+    top_gap,
   };
 }
 
@@ -108,6 +116,8 @@ export function buildOneTentLoopLiveProofTextReport(view: LiveProofView): string
   lines.push(
     `Overall status — passed: ${c.passed}, needs review: ${c.needs_review}, missing: ${c.missing}, blocked: ${c.blocked}, stale: ${c.stale}, invalid: ${c.invalid}, demo only: ${c.demo_only}.`,
   );
+  lines.push("");
+  lines.push(buildOneTentLoopTopGapTextBlock(view.top_gap));
   lines.push("");
   for (const s of view.steps) {
     lines.push(`- ${s.label} [${s.status}]`);

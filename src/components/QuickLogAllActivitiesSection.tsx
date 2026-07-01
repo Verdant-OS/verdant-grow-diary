@@ -39,7 +39,10 @@ import {
   type QuickLogActivityId,
   type QuickLogWeightUnit,
 } from "@/constants/quickLogActivityTypes";
-import { buildHarvestDetailsPayload } from "@/lib/harvestDetailsRules";
+import {
+  buildHarvestDetailsPayload,
+  validateHarvestWeightInput,
+} from "@/lib/harvestDetailsRules";
 import {
   buildDailyCheckSavedItems,
   type DailyCheckSavedItem,

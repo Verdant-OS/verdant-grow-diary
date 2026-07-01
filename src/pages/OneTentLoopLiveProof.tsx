@@ -370,7 +370,7 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         approval_required: true,
         has_device_command: false,
         reason: aqRow.reason ?? null,
-        risk_level: aqRow.risk_level ?? null,
+        risk_level: (aqRow as { riskLevel?: string | null }).riskLevel ?? null,
         linked_alert_id: null,
       }
     : null;

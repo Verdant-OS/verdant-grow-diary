@@ -44,16 +44,26 @@ describe("buildDailyCheckSavedItems (v1a activity source extension)", () => {
     expect(item.label).toBe(DAILY_CHECK_SAVED_ITEM_MANUAL_SNAPSHOT_LABEL);
   });
 
-  it("returns [] for unrecognized sources (harvest, empty, unknown)", () => {
+  it("recognizes harvest (v1b) and returns 'Harvest' saved-item label", () => {
+    const items = buildDailyCheckSavedItems({
+      source: "harvest",
+      submittedAt: TS,
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0].key).toBe("harvest");
+    expect(items[0].label).toBe("Harvest");
+  });
+
+  it("returns [] for empty/unknown sources", () => {
     expect(
       buildDailyCheckSavedItems({
-        source: "harvest" as unknown as DailyCheckSavedSource,
+        source: "" as unknown as DailyCheckSavedSource,
         submittedAt: TS,
       }),
     ).toEqual([]);
     expect(
       buildDailyCheckSavedItems({
-        source: "" as unknown as DailyCheckSavedSource,
+        source: "totally_bogus" as unknown as DailyCheckSavedSource,
         submittedAt: TS,
       }),
     ).toEqual([]);
@@ -79,6 +89,7 @@ describe("buildDailyCheckSavedItems (v1a activity source extension)", () => {
       "training",
       "defoliation",
       "issue_observation",
+      "harvest",
     ];
     for (const s of sources) {
       const [item] = buildDailyCheckSavedItems({

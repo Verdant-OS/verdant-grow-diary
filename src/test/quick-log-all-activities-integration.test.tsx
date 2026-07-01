@@ -82,15 +82,18 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
     }
   });
 
-  it("renders Harvest visibly disabled with backend-update copy", () => {
+  it("renders Harvest as enabled (v1b) with no disabled-reason element", () => {
     mountSection();
     const btn = screen.getByTestId("quick-log-all-activities-picker-harvest");
-    expect(btn).toBeDisabled();
+    expect(btn).not.toBeDisabled();
     expect(
-      screen.getByTestId(
+      screen.queryByTestId(
         "quick-log-all-activities-picker-harvest-disabled-reason",
       ),
-    ).toHaveTextContent(QUICK_LOG_HARVEST_DISABLED_REASON);
+    ).toBeNull();
+    // Legacy disabled reason constant is still exported and remains distinct
+    // from the live Harvest safety copy.
+    expect(QUICK_LOG_HARVEST_DISABLED_REASON).toMatch(/backend update/i);
   });
 });
 
@@ -204,22 +207,62 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
   });
 });
 
-describe("QuickLogAllActivitiesSection — Harvest exclusion", () => {
-  it("Harvest cannot open a form and never calls any RPC", () => {
+describe("QuickLogAllActivitiesSection — Harvest v1b", () => {
+  it("Harvest saves via quicklog_save_event event_type=harvest and appears in saved breakdown", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-h" },
+      error: null,
+    });
     const l = listenForEntryCreated();
     mountSection();
-    fireEvent.click(screen.getByTestId("quick-log-all-activities-picker-harvest"));
-    expect(screen.queryByTestId("quick-log-all-activities-form")).toBeNull();
-    expect(rpcMock).not.toHaveBeenCalled();
-    expect(l.events.length).toBe(0);
+    await saveWithNote("harvest", "wet trim 210g");
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [rpcName, args] = rpcMock.mock.calls[0];
+    expect(rpcName).toBe("quicklog_save_event");
+    expect(args.p_event_type).toBe("harvest");
+    // Harvest must not be faked as observation or other type.
+    expect(args.p_event_type).not.toBe("observation");
+    await waitFor(() => expect(l.events.length).toBe(1));
+    const items = await screen.findAllByTestId(
+      "quick-log-all-activities-saved-item",
+    );
+    expect(items[0]).toHaveAttribute("data-saved-activity-id", "harvest");
+    expect(items[0]).toHaveTextContent(/harvest/i);
     l.dispose();
   });
 
-  it("no supported activity ever emits event_type='harvest'", async () => {
-    // Sweep every enabled event-route activity and assert the payload.
+  it("failed Harvest RPC does not dispatch and shows no saved item", async () => {
+    rpcMock.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
+    const l = listenForEntryCreated();
+    mountSection();
+    await saveWithNote("harvest", "x");
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    expect(l.events.length).toBe(0);
+    expect(
+      screen.queryByTestId("quick-log-all-activities-saved"),
+    ).toBeNull();
+    l.dispose();
+  });
+
+  it("unsaved Harvest draft does not appear in saved breakdown", () => {
+    mountSection();
+    fireEvent.click(
+      screen.getByTestId("quick-log-all-activities-picker-harvest"),
+    );
+    // Cancel without saving.
+    const cancel = screen.queryByTestId("quick-log-all-activities-cancel");
+    if (cancel) fireEvent.click(cancel);
+    expect(
+      screen.queryByTestId("quick-log-all-activities-saved"),
+    ).toBeNull();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("no NON-harvest supported activity emits event_type='harvest'", async () => {
     for (const def of Object.values(QUICK_LOG_ACTIVITY_DEFINITIONS)) {
       if (!def.enabled) continue;
       if (def.saveRoute !== "event") continue;
+      if (def.id === "harvest") continue;
       rpcMock.mockReset();
       rpcMock.mockResolvedValueOnce({
         data: { ok: true, grow_event_id: `id-${def.id}` },

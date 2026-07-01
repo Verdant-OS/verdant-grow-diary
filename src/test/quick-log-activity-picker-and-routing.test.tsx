@@ -11,6 +11,7 @@ import QuickLogActivityPicker from "@/components/QuickLogActivityPicker";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
   QUICK_LOG_HARVEST_DISABLED_REASON,
+  QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
 } from "@/constants/quickLogActivityTypes";
 import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 
@@ -35,16 +36,21 @@ describe("QuickLogActivityPicker", () => {
     }
   });
 
-  it("renders Harvest disabled with backend-update copy", () => {
+  it("renders Harvest as enabled (v1b) with safety copy denying readiness/yield", () => {
     render(<QuickLogActivityPicker onSelect={vi.fn()} />);
     const harvest = screen.getByTestId("quick-log-activity-harvest");
-    expect(harvest).toBeDisabled();
+    expect(harvest).not.toBeDisabled();
     expect(
-      screen.getByTestId("quick-log-activity-harvest-disabled-reason"),
-    ).toHaveTextContent(QUICK_LOG_HARVEST_DISABLED_REASON);
+      screen.queryByTestId("quick-log-activity-harvest-disabled-reason"),
+    ).toBeNull();
+    expect(
+      screen.getByTestId("quick-log-activity-harvest-safety"),
+    ).toHaveTextContent(/does not claim harvest readiness or final yield/i);
+    // Legacy disabled reason is still exported for stale callers.
+    expect(QUICK_LOG_HARVEST_DISABLED_REASON).toMatch(/backend update/i);
   });
 
-  it("calls onSelect for enabled activities but never for Harvest", () => {
+  it("calls onSelect for enabled activities including Harvest (v1b)", () => {
     const onSelect = vi.fn();
     render(<QuickLogActivityPicker onSelect={onSelect} />);
     fireEvent.click(screen.getByTestId("quick-log-activity-feeding"));
@@ -52,7 +58,8 @@ describe("QuickLogActivityPicker", () => {
     expect(onSelect.mock.calls[0][0].id).toBe("feeding");
 
     fireEvent.click(screen.getByTestId("quick-log-activity-harvest"));
-    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect.mock.calls[1][0].id).toBe("harvest");
   });
 
   it("uses safety copy from shared definitions (no diagnosis/recommendation)", () => {
@@ -116,6 +123,7 @@ describe("useQuickLogActivitySave — routing", () => {
     ["photo", "photo"],
     ["environment_check", "environment"],
     ["issue_observation", "observation"],
+    ["harvest", "harvest"],
   ] as const)(
     "routes %s through quicklog_save_event with event_type=%s",
     async (activityId, eventType) => {
@@ -156,22 +164,77 @@ describe("useQuickLogActivitySave — routing", () => {
     expect(payload.p_details).toEqual({ subtype: "defoliation" });
   });
 
-  it("Harvest never calls any RPC and returns disabled reason", async () => {
+  it("Harvest saves via quicklog_save_event with event_type='harvest' and dispatches on success", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "h1" },
+      error: null,
+    });
+    const listener = vi.fn();
+    window.addEventListener("verdant:entry-created", listener);
     const { result } = renderHook(() => useQuickLogActivitySave());
     let res!: Awaited<ReturnType<typeof result.current.save>>;
     await act(async () => {
       res = await result.current.save({
         activityId: "harvest",
         growId: "g1",
+        idempotencyKey: "idem-key-12345",
+      });
+    });
+    expect(res.ok).toBe(true);
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    const [name, payload] = rpcMock.mock.calls[0];
+    expect(name).toBe("quicklog_save_event");
+    expect(payload.p_event_type).toBe("harvest");
+    // Never fake-saved as observation or other type.
+    expect(payload.p_event_type).not.toBe("observation");
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("verdant:entry-created", listener);
+  });
+
+  it("Harvest never routes through quicklog_save_manual", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "h2" },
+      error: null,
+    });
+    const { result } = renderHook(() => useQuickLogActivitySave());
+    await act(async () => {
+      await result.current.save({
+        activityId: "harvest",
+        growId: "g1",
+        idempotencyKey: "idem-key-12345",
+      });
+    });
+    const [name] = rpcMock.mock.calls[0];
+    expect(name).toBe("quicklog_save_event");
+    expect(name).not.toBe("quicklog_save_manual");
+  });
+
+  it("stale-backend fallback: harvest surfaces harvest_backend_unavailable when RPC rejects", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: false, reason: "invalid_event_type" },
+      error: null,
+    });
+    const listener = vi.fn();
+    window.addEventListener("verdant:entry-created", listener);
+    const { result } = renderHook(() => useQuickLogActivitySave());
+    let res!: Awaited<ReturnType<typeof result.current.save>>;
+    await act(async () => {
+      res = await result.current.save({
+        activityId: "harvest",
+        growId: "g1",
+        idempotencyKey: "idem-key-12345",
       });
     });
     expect(res.ok).toBe(false);
-    expect(res.reason).toBe("harvest_disabled");
-    expect(res.disabledReason).toBe(QUICK_LOG_HARVEST_DISABLED_REASON);
-    expect(rpcMock).not.toHaveBeenCalled();
+    expect(res.reason).toBe("harvest_backend_unavailable");
+    expect(res.disabledReason).toBe(
+      QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
+    );
+    expect(listener).not.toHaveBeenCalled();
+    window.removeEventListener("verdant:entry-created", listener);
   });
 
-  it("never writes event_type='harvest' for any activity", async () => {
+  it("no NON-harvest activity ever writes event_type='harvest'", async () => {
     rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "x" }, error: null });
     const { result } = renderHook(() => useQuickLogActivitySave());
     for (const id of [

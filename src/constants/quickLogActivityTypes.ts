@@ -58,7 +58,8 @@ export type QuickLogEventTypeValue =
   | "training"
   | "observation"
   | "photo"
-  | "environment";
+  | "environment"
+  | "harvest";
 
 export interface QuickLogActivityDefinition {
   id: QuickLogActivityId;
@@ -86,6 +87,13 @@ export interface QuickLogActivityDefinition {
 
 export const QUICK_LOG_HARVEST_DISABLED_REASON =
   "Harvest logging requires a backend update before it can be saved safely.";
+
+/**
+ * Shown when the client is on v1b but the RPC still rejects harvest
+ * (out-of-date backend). Distinct from the v1a disabled-reason above.
+ */
+export const QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON =
+  "Harvest logging is not enabled on this backend yet.";
 
 export const QUICK_LOG_ACTIVITY_DEFINITIONS: Readonly<
   Record<QuickLogActivityId, QuickLogActivityDefinition>
@@ -197,12 +205,13 @@ export const QUICK_LOG_ACTIVITY_DEFINITIONS: Readonly<
     id: "harvest",
     label: "Harvest",
     description: "Record a harvest event.",
-    safetyNote: QUICK_LOG_HARVEST_DISABLED_REASON,
-    saveRoute: "none",
+    safetyNote:
+      "Record harvest activity. This does not claim harvest readiness or final yield.",
+    saveRoute: "event",
+    eventType: "harvest",
     timelineLabel: "Harvest",
     savedBreakdownLabel: "Harvest",
-    enabled: false,
-    disabledReason: QUICK_LOG_HARVEST_DISABLED_REASON,
+    enabled: true,
   },
 });
 

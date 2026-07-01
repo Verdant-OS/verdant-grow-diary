@@ -10,7 +10,6 @@
 
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
-  QUICK_LOG_HARVEST_DISABLED_REASON,
   type QuickLogActivityDefinition,
   type QuickLogActivityId,
   type QuickLogEventTypeValue,
@@ -113,9 +112,14 @@ export function resolveQuickLogEventTimelineLabel(input: {
       return QUICK_LOG_ACTIVITY_DEFINITIONS.environment_check.timelineLabel;
     case "observation":
       return QUICK_LOG_ACTIVITY_DEFINITIONS.issue_observation.timelineLabel;
+    case "harvest":
+      return QUICK_LOG_ACTIVITY_DEFINITIONS.harvest.timelineLabel;
     default:
       return "";
   }
 }
 
-export { QUICK_LOG_HARVEST_DISABLED_REASON };
+export {
+  QUICK_LOG_HARVEST_DISABLED_REASON,
+} from "@/constants/quickLogActivityTypes";
+export { QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON } from "@/constants/quickLogActivityTypes";

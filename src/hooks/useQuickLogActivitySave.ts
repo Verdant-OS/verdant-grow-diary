@@ -17,7 +17,7 @@ import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
-  QUICK_LOG_HARVEST_DISABLED_REASON,
+  QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
   type QuickLogActivityId,
 } from "@/constants/quickLogActivityTypes";
 import { planQuickLogPersistence } from "@/lib/quickLogActivityRules";
@@ -41,7 +41,7 @@ export interface QuickLogActivitySaveInput {
 
 export type QuickLogActivitySaveReason =
   | "ok"
-  | "harvest_disabled"
+  | "harvest_backend_unavailable"
   | "activity_disabled"
   | "unsupported_activity"
   | "missing_idempotency_key"
@@ -82,14 +82,10 @@ export function useQuickLogActivitySave() {
         setError("unsupported_activity");
         return { ok: false, reason: "unsupported_activity" };
       }
-      if (input.activityId === "harvest") {
-        setError("harvest_disabled");
-        return {
-          ok: false,
-          reason: "harvest_disabled",
-          disabledReason: QUICK_LOG_HARVEST_DISABLED_REASON,
-        };
-      }
+      // Note: 'harvest' is now enabled (v1b backend accepts event_type=harvest).
+      // Fall-through to the standard event route below. If the backend is
+      // stale (validator rejects harvest), we surface a distinct
+      // 'harvest_backend_unavailable' reason from the RPC response mapping.
       if (!def.enabled) {
         setError("activity_disabled");
         return {
@@ -171,6 +167,19 @@ export function useQuickLogActivitySave() {
           }
           const r = (data ?? {}) as EventRpcResponse;
           if (!r.ok || !r.grow_event_id) {
+            // Stale backend fence: v1b client but validator/allow-list
+            // does not accept harvest yet. Never fake-save as observation.
+            if (
+              input.activityId === "harvest" &&
+              r.reason === "invalid_event_type"
+            ) {
+              setError("harvest_backend_unavailable");
+              return {
+                ok: false,
+                reason: "harvest_backend_unavailable",
+                disabledReason: QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
+              };
+            }
             setError("save_failed");
             return { ok: false, reason: "save_failed" };
           }

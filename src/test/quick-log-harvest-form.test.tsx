@@ -62,12 +62,16 @@ describe("Harvest Quick Log form", () => {
     expect(screen.getByTestId("quick-log-all-activities-note")).toBeInTheDocument();
   });
 
-  it("safety copy does not claim readiness or final yield", async () => {
+  it("safety copy explicitly denies readiness / final-yield claims", async () => {
     mount();
     selectHarvest();
     const form = await screen.findByTestId("quick-log-all-activities-form");
     const text = (form.textContent ?? "").toLowerCase();
-    expect(text).not.toMatch(/final yield|ready to harvest|harvest ready/);
+    // The safety line must be present verbatim and must include the
+    // "does not claim" denial for both readiness and final yield.
+    expect(text).toContain("does not claim harvest readiness or final yield");
+    // No affirmative readiness/success verbs.
+    expect(text).not.toMatch(/ready to harvest|harvest ready|success/);
   });
 
   it("saves Harvest with sanitized p_details.harvest and dispatches on success", async () => {

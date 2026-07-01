@@ -29,6 +29,7 @@ import {
   buildOneTentLoopLiveProofTextReport,
   type LiveProofView,
 } from "@/lib/oneTentLoopLiveProofViewModel";
+import type { OneTentLoopGap } from "@/lib/oneTentLoopGapResolver";
 import type {
   ActionQueueEvidence,
   AiDoctorEvidence,

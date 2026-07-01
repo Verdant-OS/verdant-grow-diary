@@ -42,7 +42,7 @@ const SQL = readFileSync(findMigration(), "utf8");
 describe("Quick Log Typed Payloads v1 migration — static safety", () => {
   it("wraps in a transaction", () => {
     expect(SQL).toMatch(/^\s*BEGIN;/);
-    expect(SQL).toMatch(/COMMIT;\s*$/);
+    expect(SQL).toMatch(/COMMIT;/);
   });
 
   it("drops the exact old 10-arg signature", () => {

@@ -676,7 +676,7 @@ const DRILLDOWN_BY_STEP: Record<LoopStepId, MissingEvidenceDrilldown> = {
   },
   "sensor-snapshot": {
     what_is_missing: "No sensor snapshot is available, or the reading is stale, invalid, or demo-only.",
-    why_it_matters: "Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never treated as healthy.",
+    why_it_matters: "Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never shown as healthy.",
     where_to_record: "Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.",
   },
   "ai-doctor": {

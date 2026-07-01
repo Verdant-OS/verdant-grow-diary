@@ -645,6 +645,204 @@ export function evaluateFollowUp(f: FollowUpEvidence | null): LoopStepRow {
 }
 
 // ---------------------------------------------------------------------------
+// Drilldown copy + evidence-ref enrichment (pure, additive)
+// ---------------------------------------------------------------------------
+
+const DRILLDOWN_BY_STEP: Record<LoopStepId, MissingEvidenceDrilldown> = {
+  grow: {
+    what_is_missing: "No active grow is selected.",
+    why_it_matters: "Every downstream loop step is scoped to a grow. Without one, tent, plant, Quick Log, and sensor context cannot be evaluated.",
+    where_to_record: "Create or select a grow on the Grows page.",
+  },
+  tent: {
+    what_is_missing: "No tent is linked to the active grow, or its environment target is not set.",
+    why_it_matters: "Tent context anchors sensor readings and alerts. Environment targets are never inferred from sensor data.",
+    where_to_record: "Add or open a tent on the Tents page and set its environment targets.",
+  },
+  plant: {
+    what_is_missing: "Plant is missing, or its stage / medium / pot size is unknown.",
+    why_it_matters: "AI Doctor and cautious guidance need plant context. Verdant never guesses these values.",
+    where_to_record: "Open the plant on the Plants page and complete its stage, medium, and pot size.",
+  },
+  "quick-log": {
+    what_is_missing: "No Quick Log entry (note, photo, or action context) exists for this plant yet.",
+    why_it_matters: "Quick Log is the atomic 30-second capture that turns today's observation into plant memory.",
+    where_to_record: "Open Daily Check and save a Quick Log entry for the plant.",
+  },
+  timeline: {
+    what_is_missing: "Timeline has no visible events for this scope, or the latest Quick Log is not linked directly.",
+    why_it_matters: "Timeline continuity is how the grower confirms a saved log became plant memory.",
+    where_to_record: "Open the Timeline page filtered by this plant or tent.",
+  },
+  "sensor-snapshot": {
+    what_is_missing: "No sensor snapshot is available, or the reading is stale, invalid, or demo-only.",
+    why_it_matters: "Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never treated as healthy.",
+    where_to_record: "Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.",
+  },
+  "ai-doctor": {
+    what_is_missing: "No AI Doctor session is recorded, or the session is missing plant / medium / photo / sensor context.",
+    why_it_matters: "AI Doctor stays cautious when context is weak — weak context produces low-confidence advice.",
+    where_to_record: "Open AI Doctor from the plant page after adding the missing context items.",
+  },
+  alert: {
+    what_is_missing: "No persisted alert exists for this scope.",
+    why_it_matters: "Alerts are how sensor truth escalates to a grower-visible signal. This page never auto-creates them.",
+    where_to_record: "Open the Alerts page to review any persisted alerts.",
+  },
+  "action-queue": {
+    what_is_missing: "No approval-required Action Queue item exists, or a row was flagged as unsafe (device command / not approval-required).",
+    why_it_matters: "Action Queue must remain approval-required. Verdant may suggest, but the grower decides. No device commands.",
+    where_to_record: "Open the Action Queue page to review suggested actions.",
+  },
+  "follow-up": {
+    what_is_missing: "No follow-up or outcome has been recorded after the loop's suggested action.",
+    why_it_matters: "The loop closes only when the grower records what happened next — that is how plant memory improves future advice.",
+    where_to_record: "Save a follow-up diary entry from Daily Check or the plant page.",
+  },
+};
+
+/**
+ * Map a status to the step's overall provenance label. Never returns "direct"
+ * for a step that carries no supporting evidence.
+ */
+function provenanceForStatus(status: LoopStepStatus): EvidenceProvenance {
+  switch (status) {
+    case "passed":
+      return "direct";
+    case "needs_review":
+      return "inferred";
+    case "missing":
+      return "missing";
+    case "blocked":
+      return "missing";
+    case "stale":
+      return "stale";
+    case "invalid":
+      return "invalid";
+    case "demo_only":
+      return "demo_only";
+  }
+}
+
+function evidenceRefForStep(
+  step: LoopStepRow,
+  input: LoopEvidence,
+): EvidenceRef | null {
+  switch (step.id) {
+    case "grow":
+      if (!input.grow) return null;
+      return {
+        label: `Grow: ${input.grow.name ?? "(unnamed)"}`,
+        source: "grow",
+        deep_link: `/grows/${input.grow.id}`,
+        kind: "direct",
+      };
+    case "tent":
+      if (!input.tent) return null;
+      return {
+        label: `Tent: ${input.tent.name ?? "(unnamed)"}`,
+        source: "tent",
+        deep_link: `/tents/${input.tent.id}`,
+        kind: input.tent.has_environment_target ? "direct" : "inferred",
+      };
+    case "plant":
+      if (!input.plant) return null;
+      return {
+        label: `Plant: ${input.plant.name ?? "(unnamed)"}`,
+        source: "plant",
+        deep_link: `/plants/${input.plant.id}`,
+        kind: step.status === "passed" ? "direct" : "inferred",
+      };
+    case "quick-log":
+      if (!input.latest_quick_log) return null;
+      return {
+        label: `Latest Quick Log entry${input.latest_quick_log.entry_type ? ` (${input.latest_quick_log.entry_type})` : ""}`,
+        timestamp: input.latest_quick_log.entry_at ?? undefined,
+        source: "diary",
+        deep_link: "/timeline",
+        kind: "direct",
+      };
+    case "timeline":
+      if (!input.timeline || input.timeline.event_count <= 0) return null;
+      return {
+        label: `Timeline events for this scope: ${input.timeline.event_count}`,
+        source: "diary",
+        deep_link: "/timeline",
+        kind: input.timeline.linked_directly ? "direct" : "inferred",
+      };
+    case "sensor-snapshot":
+      if (!input.latest_sensor_snapshot?.source) return null;
+      return {
+        label: `Sensor snapshot (${input.latest_sensor_snapshot.metric ?? "reading"})`,
+        timestamp: input.latest_sensor_snapshot.captured_at ?? undefined,
+        source: input.latest_sensor_snapshot.source,
+        deep_link: "/sensors",
+        kind: input.latest_sensor_snapshot.source === "live" ? "direct" : "inferred",
+      };
+    case "ai-doctor":
+      if (!input.latest_ai_doctor?.session_id) return null;
+      return {
+        label: "Latest AI Doctor session",
+        timestamp: input.latest_ai_doctor.created_at ?? undefined,
+        source: "ai-doctor",
+        deep_link: "/doctor",
+        kind: step.status === "passed" ? "direct" : "inferred",
+      };
+    case "alert":
+      if (!input.latest_alert) return null;
+      return {
+        label: `Latest alert${input.latest_alert.metric ? `: ${input.latest_alert.metric}` : ""}`,
+        timestamp: input.latest_alert.created_at ?? undefined,
+        source: "alert",
+        deep_link: "/alerts",
+        kind: "direct",
+      };
+    case "action-queue":
+      if (!input.latest_action_queue) return null;
+      return {
+        label: "Latest Action Queue item (approval required)",
+        source: "action-queue",
+        deep_link: "/action-queue",
+        kind: step.status === "passed" ? "direct" : "inferred",
+      };
+    case "follow-up":
+      if (!input.latest_follow_up) return null;
+      return {
+        label: `Follow-up (${input.latest_follow_up.kind})`,
+        timestamp: input.latest_follow_up.entry_at ?? undefined,
+        source: "diary",
+        kind: "direct",
+      };
+  }
+}
+
+/**
+ * Enrich a bare LoopStepRow with provenance, structured refs, and
+ * missing-evidence drilldown. Pure; never invents data.
+ */
+export function enrichLoopStepRow(
+  step: LoopStepRow,
+  input: LoopEvidence,
+): LoopStepRow {
+  const provenance = provenanceForStatus(step.status);
+  const ref = evidenceRefForStep(step, input);
+  const evidence_refs = ref ? [ref] : [];
+  const showDrilldown =
+    step.status === "missing" ||
+    step.status === "blocked" ||
+    step.status === "needs_review" ||
+    step.status === "stale" ||
+    step.status === "invalid" ||
+    step.status === "demo_only";
+  return {
+    ...step,
+    provenance,
+    evidence_refs,
+    drilldown: showDrilldown ? DRILLDOWN_BY_STEP[step.id] : undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Compose full loop
 // ---------------------------------------------------------------------------
 
@@ -663,5 +861,6 @@ export function evaluateLoop(input: LoopEvidence): LoopStepRow[] {
   const alert = evaluateAlert(input.latest_alert);
   const aq = evaluateActionQueue(input.latest_action_queue);
   const followUp = evaluateFollowUp(input.latest_follow_up);
-  return [grow, tent, plant, quickLog, timeline, sensor, ai, alert, aq, followUp];
+  const rows = [grow, tent, plant, quickLog, timeline, sensor, ai, alert, aq, followUp];
+  return rows.map((r) => enrichLoopStepRow(r, input));
 }

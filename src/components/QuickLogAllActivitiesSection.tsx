@@ -187,17 +187,40 @@ export default function QuickLogAllActivitiesSection({
       setErrorForActivity(selected.id);
       return;
     }
+    // Harvest inline validation fence — never persist negative or
+    // malformed weights, even if the shared sanitizer would drop them.
+    if (selected.id === "harvest" && harvestWeightsInvalid) {
+      setErrorReason(
+        harvestWetValidation.error ??
+          harvestDryValidation.error ??
+          "Fix harvest weight fields before saving.",
+      );
+      setErrorForActivity(selected.id);
+      return;
+    }
 
     // Harvest optional weight details — sanitized in the shared rules
     // module. Empty / invalid / negative values are dropped, never sent.
     const extraDetails: Record<string, unknown> = {};
+    let harvestDetailsForBreakdown: {
+      wetWeight?: string | null;
+      dryWeight?: string | null;
+      weightUnit?: string | null;
+    } | null = null;
     if (selected.id === "harvest") {
       const harvestPayload = buildHarvestDetailsPayload({
         wetWeight: harvestWet,
         dryWeight: harvestDry,
         weightUnit: harvestUnit,
       });
-      if (harvestPayload) extraDetails.harvest = harvestPayload;
+      if (harvestPayload) {
+        extraDetails.harvest = harvestPayload;
+        harvestDetailsForBreakdown = {
+          wetWeight: harvestPayload.wetWeight ?? null,
+          dryWeight: harvestPayload.dryWeight ?? null,
+          weightUnit: harvestPayload.weightUnit ?? null,
+        };
+      }
     }
 
     const idempotencyKey = newIdempotencyKey(selected.id);
@@ -229,6 +252,8 @@ export default function QuickLogAllActivitiesSection({
       const items = buildDailyCheckSavedItems({
         source,
         submittedAt: Date.now(),
+        harvestDetails:
+          source === "harvest" ? harvestDetailsForBreakdown : null,
       });
       if (items.length > 0) {
         setSaved((prev) => [

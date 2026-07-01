@@ -11,9 +11,9 @@ import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
-import { useSensorReadings } from "@/hooks/useMockData";
-import { useGrowPlants } from "@/hooks/useGrowData";
+import { useGrowPlants, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
+
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { tentDetailPath, tentsPath } from "@/lib/routes";
 import {

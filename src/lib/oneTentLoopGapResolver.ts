@@ -162,15 +162,15 @@ const STATUS_SAFETY: Record<LoopStepStatus, string> = {
   passed:
     "Read-only view. Verified from current evidence; nothing new was recorded.",
   needs_review:
-    "Read-only view. Do not treat this step as healthy — it is only partially evidenced.",
+    "Read-only view. Not healthy — this step is only partially evidenced.",
   missing:
-    "Read-only view. Missing evidence is not the same as healthy. Nothing will be created or automated by viewing this page.",
+    "Read-only view. Missing evidence is not proof of plant condition. Nothing will be created or automated by viewing this page.",
   blocked:
     "Read-only view. A safety fence has fired. Do not bypass it; investigate the underlying record.",
   stale:
     "Read-only view. Stale telemetry must never be shown as current sensor truth.",
   invalid:
-    "Read-only view. Invalid telemetry must never be treated as healthy or accurate.",
+    "Read-only view. Invalid telemetry is never healthy and never accurate.",
   demo_only:
     "Read-only view. Demo-only data is not proof of the real One-Tent Loop.",
 };
@@ -350,7 +350,7 @@ function plantContextGap(rows: readonly LoopStepRow[]): OneTentLoopGap | null {
     suggested_next_observation:
       "Look for stage, medium, and pot size fields populated on the Plant details page.",
     safety_note:
-      "Read-only view. Missing plant context is not the same as healthy plant context.",
+      "Read-only view. Missing plant context is not proof of plant condition.",
     evidence_kind: "inferred",
     blocked_downstream_steps: ["ai-doctor", "follow-up"],
     is_real_data_gap: true,

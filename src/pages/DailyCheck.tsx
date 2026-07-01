@@ -39,6 +39,7 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import QuickLog from "@/components/QuickLog";
+import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";

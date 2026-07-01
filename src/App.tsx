@@ -59,6 +59,7 @@ import IngestInspector from "./pages/IngestInspector";
 import NotFound from "./pages/NotFound";
 import AiDoctorPhase1Preview from "./pages/AiDoctorPhase1Preview";
 import OneTentLoopProof from "./pages/OneTentLoopProof";
+import OneTentLoopLiveProof from "./pages/OneTentLoopLiveProof";
 import SensorTruthAudit from "./pages/SensorTruthAudit";
 import AiDoctorConfidenceAudit from "./pages/AiDoctorConfidenceAudit";
 import EcowittLiveBringup from "./pages/EcowittLiveBringup";
@@ -261,6 +262,7 @@ const App = () => (
                     element={<AiDoctorPhase1Preview />}
                   />
                   <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
+                  <Route path="/one-tent-loop-proof" element={<OneTentLoopLiveProof />} />
                   <Route path="/internal/sensor-truth-audit" element={<SensorTruthAudit />} />
                   <Route
                     path="/internal/ai-doctor-confidence-audit"

@@ -66,17 +66,17 @@ function installNetworkTraps(): { calls: Call[]; restore: () => void } {
       throw new Error("EventSource forbidden on /pheno-comparison");
     }
   }
-  // @ts-expect-error test-time override
-  globalThis.EventSource = TrapES;
+  (globalThis as unknown as { EventSource: unknown }).EventSource = TrapES;
 
   const originalBeacon = navigator.sendBeacon?.bind(navigator);
   if (typeof navigator.sendBeacon === "function") {
-    // @ts-expect-error test-time override
-    navigator.sendBeacon = (url: string | URL) => {
+    (navigator as unknown as { sendBeacon: (u: string | URL) => boolean })
+      .sendBeacon = (url: string | URL) => {
       calls.push({ api: "beacon", arg: String(url) });
       throw new Error("sendBeacon forbidden on /pheno-comparison");
     };
   }
+
 
   return {
     calls,

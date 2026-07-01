@@ -47,6 +47,12 @@ jobs:
       - name: Vitest — Contextual Pheno Comparison v0
         run: bun run test:contextual-pheno-comparison-v0
 
+      # Contextual Pheno Comparison viewport a11y (375px + 768px).
+      - name: Vitest — Contextual Pheno Comparison a11y viewports
+        run: |
+          bunx vitest run \
+            src/test/contextual-pheno-comparison-a11y-viewports.test.tsx
+
       # Route manifest sync — ensures /pheno-comparison + /pheno-hunts/:id/compare
       # stay wired.
       - name: Vitest — route manifest sync
@@ -57,6 +63,26 @@ jobs:
 
       - name: Typecheck
         run: bun run typecheck
+
+      # Narrow lint step.
+      #
+      # WHY NARROW: repo-wide `bun run lint` currently reports 90 pre-existing
+      # ESLint errors across unrelated files (spider-farmer, verdant-genetics,
+      # bucket-owner-policies, etc.). Fixing those is out of scope for the
+      # pheno comparison hardening slice. This step lints the exact pheno /
+      # contextual pheno source + presenter-owned test files this workflow
+      # protects, and MUST stay green on every PR.
+      - name: Lint — Pheno / Contextual Pheno owned files
+        run: |
+          bunx eslint \
+            src/pages/PhenoComparison.tsx \
+            src/components/ContextualPhenoComparisonPanel.tsx \
+            src/lib/phenoComparisonRules.ts \
+            src/lib/contextualPhenoComparisonViewModel.ts \
+            src/test/pheno-comparison-a11y.test.tsx \
+            src/test/pheno-comparison-visual-style-invariant.test.tsx \
+            src/test/contextual-pheno-comparison-a11y-viewports.test.tsx \
+            src/test/contextual-pheno-comparison-panel-a11y.test.tsx
 
       # Playwright — Pheno Comparison specs only. Route is mounted outside
       # AppShell (fixture-only), so no auth secrets are required and the
@@ -70,4 +96,6 @@ jobs:
             --project=chromium-mocked \
             e2e/pheno-comparison-responsive.spec.ts \
             e2e/pheno-comparison-reload.spec.ts \
-            e2e/pheno-hunts-compare-deep-link.spec.ts
+            e2e/pheno-comparison-visual-style.spec.ts \
+            e2e/pheno-hunts-compare-deep-link.spec.ts \
+            e2e/pheno-hunts-compare-invalid-id.spec.ts

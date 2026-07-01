@@ -46,7 +46,6 @@ vi.mock("@/integrations/supabase/client", () => ({
   ),
 }));
 
-// eslint-disable-next-line import/first
 import PhenoComparison from "@/pages/PhenoComparison";
 
 const UNTRUSTED_SOURCES = new Set(["demo", "stale", "invalid"]);

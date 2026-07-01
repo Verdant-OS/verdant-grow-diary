@@ -324,3 +324,164 @@ describe("QuickLogAllActivitiesSection — safety copy", () => {
     expect(txt).not.toMatch(/guaranteed/);
   });
 });
+
+describe("QuickLogAllActivitiesSection — Harvest v1b.next hardening", () => {
+  it("stale backend (invalid_event_type) shows backend-unavailable copy, no dispatch, no saved item, no Timeline write, no observation fallback", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: false, reason: "invalid_event_type" },
+      error: null,
+    });
+    const l = listenForEntryCreated();
+    mountSection();
+    fireEvent.click(
+      screen.getByTestId("quick-log-all-activities-picker-harvest"),
+    );
+    await screen.findByTestId("quick-log-all-activities-harvest-fields");
+    fireEvent.change(
+      screen.getByTestId("quick-log-all-activities-harvest-wet"),
+      { target: { value: "120" } },
+    );
+    fireEvent.change(
+      screen.getByTestId("quick-log-all-activities-note"),
+      { target: { value: "cola down" } },
+    );
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    // Exactly one RPC — no observation-fallback second call.
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    const [, args] = rpcMock.mock.calls[0];
+    expect(args.p_event_type).toBe("harvest");
+
+    const err = await screen.findByTestId("quick-log-all-activities-error");
+    expect(err.textContent?.toLowerCase()).toContain(
+      "not enabled on this backend yet",
+    );
+    expect(l.events.length).toBe(0);
+    expect(screen.queryByTestId("quick-log-all-activities-saved")).toBeNull();
+    l.dispose();
+  });
+
+  it("saved breakdown shows concise harvest wet/dry/unit details after success", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-hd" },
+      error: null,
+    });
+    mountSection();
+    fireEvent.click(
+      screen.getByTestId("quick-log-all-activities-picker-harvest"),
+    );
+    await screen.findByTestId("quick-log-all-activities-harvest-fields");
+    fireEvent.change(
+      screen.getByTestId("quick-log-all-activities-harvest-wet"),
+      { target: { value: "120" } },
+    );
+    fireEvent.change(
+      screen.getByTestId("quick-log-all-activities-harvest-dry"),
+      { target: { value: "32" } },
+    );
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    const items = await screen.findAllByTestId(
+      "quick-log-all-activities-saved-item",
+    );
+    const txt = items[0].textContent ?? "";
+    expect(txt).toMatch(/harvest/i);
+    expect(txt).toMatch(/wet\s*120\s*g/i);
+    expect(txt).toMatch(/dry\s*32\s*g/i);
+    expect(txt.toLowerCase()).not.toContain("yield");
+  });
+
+  it("saved breakdown hides missing dry/wet and stays plain Harvest with no weights", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-hd2" },
+      error: null,
+    });
+    mountSection();
+    fireEvent.click(
+      screen.getByTestId("quick-log-all-activities-picker-harvest"),
+    );
+    await screen.findByTestId("quick-log-all-activities-harvest-fields");
+    fireEvent.change(
+      screen.getByTestId("quick-log-all-activities-harvest-wet"),
+      { target: { value: "50" } },
+    );
+    // dry left empty
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    const items = await screen.findAllByTestId(
+      "quick-log-all-activities-saved-item",
+    );
+    const txt = items[0].textContent ?? "";
+    expect(txt).toMatch(/wet\s*50\s*g/i);
+    expect(txt.toLowerCase()).not.toMatch(/\bdry\b/);
+  });
+
+  it("negative wet weight shows inline validation and blocks the save", async () => {
+    mountSection();
+    fireEvent.click(
+      screen.getByTestId("quick-log-all-activities-picker-harvest"),
+    );
+    await screen.findByTestId("quick-log-all-activities-harvest-fields");
+    fireEvent.change(
+      screen.getByTestId("quick-log-all-activities-harvest-wet"),
+      { target: { value: "-3" } },
+    );
+    const err = await screen.findByTestId(
+      "quick-log-all-activities-harvest-wet-error",
+    );
+    expect(err.textContent).toMatch(/cannot be negative/i);
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("negative dry weight shows inline validation and blocks the save", async () => {
+    mountSection();
+    fireEvent.click(
+      screen.getByTestId("quick-log-all-activities-picker-harvest"),
+    );
+    await screen.findByTestId("quick-log-all-activities-harvest-fields");
+    fireEvent.change(
+      screen.getByTestId("quick-log-all-activities-harvest-dry"),
+      { target: { value: "-1.5" } },
+    );
+    const err = await screen.findByTestId(
+      "quick-log-all-activities-harvest-dry-error",
+    );
+    expect(err.textContent).toMatch(/cannot be negative/i);
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("valid decimals save correctly and appear in saved breakdown", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-dec" },
+      error: null,
+    });
+    mountSection();
+    fireEvent.click(
+      screen.getByTestId("quick-log-all-activities-picker-harvest"),
+    );
+    await screen.findByTestId("quick-log-all-activities-harvest-fields");
+    fireEvent.change(
+      screen.getByTestId("quick-log-all-activities-harvest-wet"),
+      { target: { value: "12.5" } },
+    );
+    fireEvent.change(
+      screen.getByTestId("quick-log-all-activities-harvest-dry"),
+      { target: { value: "3.25" } },
+    );
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [, args] = rpcMock.mock.calls[0];
+    expect(args.p_details).toEqual({
+      harvest: { wetWeight: "12.5", dryWeight: "3.25", weightUnit: "g" },
+    });
+    const items = await screen.findAllByTestId(
+      "quick-log-all-activities-saved-item",
+    );
+    expect(items[0].textContent).toMatch(/12\.5/);
+    expect(items[0].textContent).toMatch(/3\.25/);
+  });
+});

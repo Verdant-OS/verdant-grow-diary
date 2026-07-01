@@ -724,6 +724,7 @@ describe("PlantDetailQuickActions · hardened a11y coverage", () => {
     "plant-detail-quick-action-upload-photo",
     "plant-detail-quick-action-ask-doctor",
     "plant-detail-quick-action-view-timeline",
+    "plant-detail-quick-action-harvest",
   ] as const;
 
   const EXPECTED_NAMES: Record<(typeof ALL_IDS)[number], string> = {
@@ -732,6 +733,7 @@ describe("PlantDetailQuickActions · hardened a11y coverage", () => {
     "plant-detail-quick-action-upload-photo": "Upload Photo",
     "plant-detail-quick-action-ask-doctor": "Ask Doctor",
     "plant-detail-quick-action-view-timeline": "View Timeline",
+    "plant-detail-quick-action-harvest": "Harvest",
   };
 
   function describedByOf(el: HTMLElement): string[] {

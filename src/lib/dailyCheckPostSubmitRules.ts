@@ -345,11 +345,6 @@ export function buildDailyCheckSavedItems(
   if (!entry) return [];
   let label = entry.label;
   if (source === "harvest" && input.harvestDetails) {
-    // Lazy require to avoid a circular import — harvest rules import
-    // nothing from this module.
-    const { formatHarvestSavedBreakdownDetail } =
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      require("@/lib/harvestDetailsRules") as typeof import("@/lib/harvestDetailsRules");
     const suffix = formatHarvestSavedBreakdownDetail(input.harvestDetails);
     if (suffix) label = `${entry.label} — ${suffix}`;
   }

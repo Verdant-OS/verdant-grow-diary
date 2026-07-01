@@ -86,6 +86,7 @@ export function buildOneTentLoopLiveProofView(
   now?: string | Date | number,
 ): LiveProofView {
   const steps = evaluateLoop(evidence);
+  const top_gap = resolveTopOneTentLoopGap(steps);
   return {
     title: "One-Tent Loop — Live Proof",
     banner: LIVE_PROOF_BANNER,
@@ -94,6 +95,7 @@ export function buildOneTentLoopLiveProofView(
     step_ids: LOOP_STEP_IDS,
     counts: countStatuses(steps),
     generated_at: normalizeGeneratedAt(now),
+    top_gap,
   };
 }
 

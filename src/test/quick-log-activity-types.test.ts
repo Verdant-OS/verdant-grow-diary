@@ -207,8 +207,11 @@ describe("planQuickLogPersistence", () => {
     });
   });
 
-  it("Harvest has no persistence plan and cannot be fake-saved", () => {
-    expect(planQuickLogPersistence("harvest")).toBeNull();
+  it("Harvest persists via quicklog_save_event with event_type=harvest (v1b)", () => {
+    const plan = planQuickLogPersistence("harvest");
+    expect(plan?.saveRoute).toBe("event");
+    expect(plan?.eventType).toBe("harvest");
+    expect(plan?.detailsSubtype).toBeUndefined();
   });
 
   it("never plans an event_type outside the DB validator allow-list", () => {

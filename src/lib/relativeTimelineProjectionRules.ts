@@ -43,6 +43,10 @@ export interface RelativeTimelineItem {
   stagePreset: RelativeStagePreset | null;
   plantId: string | null;
   tentId: string | null;
+  /** Full note text (untruncated). Null when empty. */
+  note?: string | null;
+  /** Structured harvest details if the entry is a harvest. Null otherwise. */
+  harvest?: import("@/constants/quickLogActivityTypes").QuickLogHarvestDetails | null;
 }
 
 export interface BuildRelativeTimelineInput {

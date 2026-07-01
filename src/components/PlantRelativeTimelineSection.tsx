@@ -152,6 +152,28 @@ function TimelineRow({
   context: RelativeTimelineEntryContext;
 }) {
   const detail = formatRelativeTimelineEntryDetail(item, context)!;
+  if (item.eventType === "harvest") {
+    return (
+      <HarvestTimelineCard
+        entryId={item.id}
+        timestampLabel={detail.timestampLabel}
+        timestampIsFallback={detail.timestampIsFallback}
+        note={item.note ?? null}
+        harvest={item.harvest ?? null}
+        plantContextLabel={detail.plantContextLabel}
+        tentContextLabel={detail.tentContextLabel}
+        growContextLabel={detail.growContextLabel}
+        stageLabel={item.stagePreset?.label ?? null}
+        stageColorToken={item.stagePreset?.colorToken ?? null}
+        plantDayLabel={
+          item.plantDay !== null ? `Plant day ${item.plantDay}` : null
+        }
+        stageDayLabel={
+          item.stageDay !== null ? `Stage day ${item.stageDay}` : null
+        }
+      />
+    );
+  }
   return (
     <li
       className="rounded-lg border bg-card/40 p-3 text-sm focus-within:ring-2 focus-within:ring-ring"

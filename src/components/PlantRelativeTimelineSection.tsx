@@ -36,6 +36,7 @@ import {
   type RelativeTimelineCta,
 } from "@/lib/relativeTimelineEmptyStateRules";
 import { DiaryTimelineCategorySections } from "@/components/DiaryTimelineCategorySections";
+import HarvestTimelineCard from "@/components/HarvestTimelineCard";
 import { PLANT_RELATIVE_TIMELINE_SECTION_STATE_STORAGE_KEY } from "@/lib/diaryTimelineSectionStateRules";
 import { buildDiaryTimelineSections } from "@/lib/diaryTimelineSectionRules";
 import { buildDiaryTimelineEvidenceQualitySummary } from "@/lib/diaryTimelineEvidenceQualityRules";

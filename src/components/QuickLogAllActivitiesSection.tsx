@@ -141,8 +141,8 @@ export default function QuickLogAllActivitiesSection({
       setErrorForActivity(selected.id);
       return;
     }
-    // Harvest fence — must never reach RPC.
-    if (selected.id === "harvest" || !selected.enabled) {
+    // Disabled activities must never reach RPC.
+    if (!selected.enabled) {
       setErrorReason(
         selected.disabledReason ?? QUICK_LOG_HARVEST_DISABLED_REASON,
       );

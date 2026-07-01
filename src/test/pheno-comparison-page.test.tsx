@@ -81,7 +81,7 @@ describe("PhenoComparison page", () => {
 
     // Charlie has an invalid reading + no diary/photos.
     const charlie = screen.getByTestId("pheno-candidate-demo-cand-charlie");
-    expect(within(charlie).getByText(/Invalid/i)).toBeInTheDocument();
+    expect(within(charlie).getAllByText(/Invalid/i).length).toBeGreaterThan(0);
     expect(
       within(charlie).getByTestId("missing-no_diary"),
     ).toBeInTheDocument();

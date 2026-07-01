@@ -126,6 +126,8 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/operator/release-readiness", access: "operator", description: "Read-only release readiness / validation status snapshot (static/manual, no live CI feed)." },
 
   
+  { path: "/pheno-comparison", access: "public", description: "Read-only Pheno Comparison preview surface (demo-labeled fixtures, no writes)." },
+  { path: "/pheno-hunts/:id/compare", access: "public", description: "Read-only Pheno Comparison preview surface, per-hunt route alias (demo-labeled fixtures, no writes)." },
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
   { path: "/pi-ingest-status", access: "operator" },
   { path: "/plants", access: "auth" },

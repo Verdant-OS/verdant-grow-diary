@@ -489,7 +489,7 @@ export function evaluateSensorSnapshot(
   // typed interface already forbids extras, so this only fires when a
   // caller bypasses types with `as never` / `as unknown`.
   if (s && typeof s === "object") {
-    const keys = Object.keys(s as Record<string, unknown>);
+    const keys = Object.keys(s as unknown as Record<string, unknown>);
     const unknownKeys = keys.filter((k) => !ALLOWED_SENSOR_KEYS.has(k));
     if (unknownKeys.length > 0) {
       return {

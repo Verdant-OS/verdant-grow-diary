@@ -261,10 +261,9 @@ export const DAILY_CHECK_SAVED_ITEM_MANUAL_SNAPSHOT_LABEL =
   "Manual snapshot — saved as manual, not live sensor data";
 
 /**
- * Recognized saved-source keys. Extended in v1a to include the full
- * set of supported activities. `harvest` is intentionally NOT included:
- * Harvest cannot be persisted in v1a, so it must never appear in the
- * saved breakdown.
+ * Recognized saved-source keys. v1b adds `harvest` — Harvest is a real
+ * backend event (event_type='harvest') and appears in the saved
+ * breakdown only after a confirmed RPC success.
  */
 export type DailyCheckSavedItemKey =
   | "note"
@@ -275,7 +274,8 @@ export type DailyCheckSavedItemKey =
   | "environment_check"
   | "training"
   | "defoliation"
-  | "issue_observation";
+  | "issue_observation"
+  | "harvest";
 
 export type DailyCheckSavedSource =
   | "note"
@@ -286,7 +286,8 @@ export type DailyCheckSavedSource =
   | "environment_check"
   | "training"
   | "defoliation"
-  | "issue_observation";
+  | "issue_observation"
+  | "harvest";
 
 export interface DailyCheckSavedItem {
   key: DailyCheckSavedItemKey;
@@ -314,6 +315,7 @@ const SAVED_LABELS: Record<DailyCheckSavedSource, { key: DailyCheckSavedItemKey;
     key: "issue_observation",
     label: "Issue / observation",
   },
+  harvest: { key: "harvest", label: "Harvest" },
 };
 
 export function buildDailyCheckSavedItems(

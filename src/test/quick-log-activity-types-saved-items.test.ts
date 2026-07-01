@@ -89,6 +89,7 @@ describe("buildDailyCheckSavedItems (v1a activity source extension)", () => {
       "training",
       "defoliation",
       "issue_observation",
+      "harvest",
     ];
     for (const s of sources) {
       const [item] = buildDailyCheckSavedItems({

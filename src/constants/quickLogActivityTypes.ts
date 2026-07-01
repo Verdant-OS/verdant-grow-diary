@@ -58,7 +58,8 @@ export type QuickLogEventTypeValue =
   | "training"
   | "observation"
   | "photo"
-  | "environment";
+  | "environment"
+  | "harvest";
 
 export interface QuickLogActivityDefinition {
   id: QuickLogActivityId;

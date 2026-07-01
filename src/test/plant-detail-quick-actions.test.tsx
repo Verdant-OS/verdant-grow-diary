@@ -196,7 +196,7 @@ describe("buildPlantDetailQuickActions · payloads and routes", () => {
 });
 
 describe("PlantDetailQuickActions · render", () => {
-  it("renders all five quick actions with accessible labels", () => {
+  it("renders all six quick actions with accessible labels", () => {
     render(
       <PlantDetailQuickActions
         plantId="p1"
@@ -222,6 +222,9 @@ describe("PlantDetailQuickActions · render", () => {
       screen.getByTestId("plant-detail-quick-action-view-timeline"),
     ).toBeInTheDocument();
     expect(
+      screen.getByTestId("plant-detail-quick-action-harvest"),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("navigation", { name: /plant quick actions/i }),
     ).toBeInTheDocument();
   });
@@ -242,6 +245,7 @@ describe("PlantDetailQuickActions · render", () => {
       { testId: "plant-detail-quick-action-upload-photo", text: /visual history/i },
       { testId: "plant-detail-quick-action-ask-doctor", text: /existing context/i },
       { testId: "plant-detail-quick-action-view-timeline", text: /history/i },
+      { testId: "plant-detail-quick-action-harvest", text: /harvest/i },
     ];
     for (const { testId, text } of expected) {
       const el = screen.getByTestId(`${testId}-description`);

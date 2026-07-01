@@ -27,6 +27,7 @@ import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
 import GrowDetail from "./pages/GrowDetail";
 import PhenoHuntNew from "./pages/PhenoHuntNew";
+import PhenoComparison from "./pages/PhenoComparison";
 import Reports from "./pages/Reports";
 import PostGrowLearningReport from "./pages/PostGrowLearningReport";
 
@@ -85,10 +86,19 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AnalyticsShell />
-        <AuthProvider>
-          <GrowsProvider>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
+        <Routes>
+          {/* Read-only Pheno Comparison preview — mounted OUTSIDE AuthProvider
+              and GrowsProvider (and AppShell) so visiting it triggers no
+              grows/Supabase read and renders no write chrome. Fixture-only,
+              read-only, with no way to create or save entries. */}
+          <Route path="/pheno-comparison" element={<PhenoComparison />} />
+          <Route
+            path="*"
+            element={
+              <AuthProvider>
+                <GrowsProvider>
+                  <Routes>
+                    <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               {/* Deprecated auth entry points — redirect to canonical /auth to
                   prevent funnel leaks from old bookmarks, emails, ads, and
@@ -119,6 +129,7 @@ const App = () => (
                 path="/internal/demo-proof-walkthrough"
                 element={<DemoProofWalkthrough />}
               />
+
 
 
               
@@ -227,9 +238,12 @@ const App = () => (
               </Route>
 
               <Route path="*" element={<NotFound />} />
-            </Routes>
-          </GrowsProvider>
-        </AuthProvider>
+                  </Routes>
+                </GrowsProvider>
+              </AuthProvider>
+            }
+          />
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

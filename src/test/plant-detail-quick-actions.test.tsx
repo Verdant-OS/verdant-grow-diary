@@ -564,6 +564,7 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
       "Upload Photo",
       "Ask Doctor",
       "View Timeline",
+      "Harvest",
     ];
     for (const name of expected) {
       const matches = [

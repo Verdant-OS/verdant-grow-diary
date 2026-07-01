@@ -10,7 +10,6 @@
 
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
-  QUICK_LOG_HARVEST_DISABLED_REASON,
   type QuickLogActivityDefinition,
   type QuickLogActivityId,
   type QuickLogEventTypeValue,

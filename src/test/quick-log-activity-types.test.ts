@@ -36,6 +36,8 @@ const V1A_ENABLED: QuickLogActivityId[] = [
   "defoliation",
   "issue_observation",
   "manual_sensor_snapshot",
+  // v1b: Harvest is enabled via quicklog_save_event.
+  "harvest",
 ];
 
 const ALLOWED_EVENT_TYPES = new Set<QuickLogEventTypeValue>([
@@ -45,6 +47,7 @@ const ALLOWED_EVENT_TYPES = new Set<QuickLogEventTypeValue>([
   "observation",
   "photo",
   "environment",
+  "harvest",
 ]);
 
 const FORBIDDEN = [

@@ -67,10 +67,8 @@ function assertSafe(s: string) {
 }
 
 describe("quickLogActivityTypes constants", () => {
-  it("registers exactly the v1a activity ids + harvest", () => {
-    expect(new Set(QUICK_LOG_ACTIVITY_IDS)).toEqual(
-      new Set([...V1A_ENABLED, "harvest"]),
-    );
+  it("registers exactly the v1b activity ids (harvest now enabled)", () => {
+    expect(new Set(QUICK_LOG_ACTIVITY_IDS)).toEqual(new Set(V1A_ENABLED));
   });
 
   it.each(V1A_ENABLED)("%s is enabled and has no disabled reason", (id) => {
@@ -78,11 +76,13 @@ describe("quickLogActivityTypes constants", () => {
     expect(getQuickLogDisabledReason(id)).toBeNull();
   });
 
-  it("Harvest is disabled with the exact backend-update reason", () => {
-    expect(isQuickLogActivityEnabled("harvest")).toBe(false);
-    expect(getQuickLogDisabledReason("harvest")).toBe(
-      QUICK_LOG_HARVEST_DISABLED_REASON,
-    );
+  it("Harvest safety copy denies readiness/yield claims", () => {
+    const note = QUICK_LOG_ACTIVITY_DEFINITIONS.harvest.safetyNote.toLowerCase();
+    expect(note).toMatch(/does not claim/);
+    expect(note).toMatch(/readiness|yield/);
+    // Legacy disabled-reason constant is still exported for out-of-date
+    // callers, but must NOT be used as Harvest's live safety copy.
+    expect(note).not.toBe(QUICK_LOG_HARVEST_DISABLED_REASON.toLowerCase());
     expect(QUICK_LOG_HARVEST_DISABLED_REASON).toMatch(/backend update/i);
   });
 

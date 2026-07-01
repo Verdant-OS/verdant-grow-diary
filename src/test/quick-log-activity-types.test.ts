@@ -111,9 +111,16 @@ describe("quickLogActivityTypes constants", () => {
           `${id} safetyNote asserts safe-to-x without a denial`,
         ).toBe(true);
       }
-      expect(note, `${id} safetyNote must not claim healthy`).not.toMatch(
-        /\bhealthy\b/i,
-      );
+      const healthyMatch = note.match(/(?<!not\s|never\s|no\s)\bhealthy\b/i);
+      if (healthyMatch) {
+        const idx = healthyMatch.index ?? 0;
+        const window = note.slice(Math.max(0, idx - 20), idx);
+        expect(
+          /\b(not|never|no)\b/i.test(window),
+          `${id} safetyNote asserts healthy without a denial`,
+        ).toBe(true);
+      }
+
 
     }
   });

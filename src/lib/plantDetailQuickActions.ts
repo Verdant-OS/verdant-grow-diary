@@ -193,5 +193,19 @@ export function buildPlantDetailQuickActions(
         ? undefined
         : "Timeline section is not available yet.",
     },
+    {
+      // Harvest is fully backed by quicklog_save_event now; this entry
+      // point opens the shared Quick Log flow with plant/tent/grow
+      // context. Activity preselection inside the dialog is a follow-up.
+      kind: "harvest",
+      ...LABELS.harvest,
+      event: "open-quicklog",
+      eventPayload: quickLogPayload,
+      testId: "plant-detail-quick-action-harvest",
+      disabled: !plantId,
+      disabledReason: plantId
+        ? undefined
+        : "Plant context is not loaded yet.",
+    },
   ];
 }

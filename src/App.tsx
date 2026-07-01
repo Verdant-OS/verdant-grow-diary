@@ -72,6 +72,7 @@ import { OperatorAiDoctorPhase1Page } from "./pages/OperatorAiDoctorPhase1";
 import OneTentLiveProof from "./pages/OneTentLiveProof";
 import DemoProofWalkthrough from "./pages/DemoProofWalkthrough";
 import ContextualPhenoComparisonDemo from "./pages/ContextualPhenoComparisonDemo";
+import PhenoComparison from "./pages/PhenoComparison";
 import RequireOperatorRole from "./components/RequireOperatorRole";
 import ReleaseReadiness from "./pages/ReleaseReadiness";
 
@@ -131,6 +132,16 @@ const App = () => (
                 path="/internal/contextual-pheno-comparison-demo"
                 element={<ContextualPhenoComparisonDemo />}
               />
+
+              {/* Read-only Pheno Comparison preview surface. Fixture-only,
+                  no fetch/Supabase/AI/writes. Mounted outside AppShell so
+                  the read-only surface renders without operator chrome. */}
+              <Route path="/pheno-comparison" element={<PhenoComparison />} />
+              <Route
+                path="/pheno-hunts/:id/compare"
+                element={<PhenoComparison />}
+              />
+
 
 
 

@@ -81,13 +81,21 @@ describe("useGrowPlants", () => {
 });
 
 describe("useGrowSensorReadings", () => {
-  it("filters mock by tentId on fallback", async () => {
+  it("returns empty (no mock fallback) when repo fails — Sensor Truth P0", async () => {
     vi.mocked(repo.fetchSensorReadings).mockRejectedValue(new Error("x"));
     const { result } = renderHook(() => useGrowSensorReadings("t2"), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.length).toBeGreaterThan(0);
-    expect(result.current.data?.every((r) => r.tentId === "t2")).toBe(true);
+    expect(result.current.data).toEqual([]);
   });
+
+  it("returns empty (no mock fallback) when repo returns []", async () => {
+    vi.mocked(repo.fetchSensorReadings).mockResolvedValue([]);
+    const { result } = renderHook(() => useGrowSensorReadings(), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual([]);
+  });
+
+
 
   it("returns live data when repo returns non-empty", async () => {
     const live = [

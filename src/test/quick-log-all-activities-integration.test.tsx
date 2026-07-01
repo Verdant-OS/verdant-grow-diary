@@ -82,15 +82,18 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
     }
   });
 
-  it("renders Harvest visibly disabled with backend-update copy", () => {
+  it("renders Harvest as enabled (v1b) with no disabled-reason element", () => {
     mountSection();
     const btn = screen.getByTestId("quick-log-all-activities-picker-harvest");
-    expect(btn).toBeDisabled();
+    expect(btn).not.toBeDisabled();
     expect(
-      screen.getByTestId(
+      screen.queryByTestId(
         "quick-log-all-activities-picker-harvest-disabled-reason",
       ),
-    ).toHaveTextContent(QUICK_LOG_HARVEST_DISABLED_REASON);
+    ).toBeNull();
+    // Legacy disabled reason constant is still exported and remains distinct
+    // from the live Harvest safety copy.
+    expect(QUICK_LOG_HARVEST_DISABLED_REASON).toMatch(/backend update/i);
   });
 });
 

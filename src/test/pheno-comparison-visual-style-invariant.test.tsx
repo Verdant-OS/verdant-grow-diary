@@ -173,7 +173,7 @@ function renderWith(cands: readonly PhenoCandidateInput[]) {
 }
 
 describe("PhenoComparison visual-style never-healthy invariant", () => {
-  for (const label of ["stale", "invalid", "demo", "unknown", "incomplete"] as const) {
+  for (const label of ["stale", "invalid", "demo", "unknown"] as const) {
     it(`does not paint ${label} evidence with success visual styling`, () => {
       const matrix = makeUntrustedMatrix();
       const { container } = renderWith(matrix);
@@ -207,6 +207,37 @@ describe("PhenoComparison visual-style never-healthy invariant", () => {
       }
     });
   }
+
+  it("does not paint incomplete-metric flags with success styling (trusted source, missing metrics)", () => {
+    // Incomplete candidate uses a trusted source ("live") — the source badge
+    // legitimately renders in the source tone. But the missing-flag list
+    // and each individual `missing_*` marker must never carry success
+    // styling or affirmative healthy language.
+    const matrix = makeUntrustedMatrix();
+    const { container } = renderWith(matrix);
+    try {
+      const region = container.querySelector<HTMLElement>(
+        `[data-testid='pheno-candidate-vs-incomplete']`,
+      )!;
+      const missingNodes = region.querySelectorAll<HTMLElement>(
+        "[data-testid^='snapshot-'][data-testid*='-missing-']",
+      );
+      expect(missingNodes.length).toBeGreaterThan(0);
+      for (const el of missingNodes) {
+        expect(el.outerHTML).not.toMatch(FORBIDDEN_CLASS_RE);
+        expect(el.outerHTML).not.toMatch(FORBIDDEN_BADGE_RE);
+        for (const [attr, val] of FORBIDDEN_STATUS_ATTRS) {
+          expect(el.querySelector(`[${attr}="${val}"]`)).toBeNull();
+        }
+        const text = el.textContent ?? "";
+        expect(containsHealthyStatusLanguage(text)).toBe(false);
+      }
+    } finally {
+      candidateHolder.current = [];
+      cleanup();
+    }
+  });
+
 
   it("no untrusted snapshot subtree carries a success tone anywhere on the page", () => {
     const { container } = renderWith(makeUntrustedMatrix());

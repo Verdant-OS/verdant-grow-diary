@@ -456,10 +456,65 @@ export function evaluateSensorSnapshot(
       status: "invalid",
       evidence: [
         `Source: unrecognized`,
-        s.captured_at ? `Captured: ${s.captured_at}` : "Captured: unknown",
+        typeof s.captured_at === "string" && s.captured_at.length > 0
+          ? `Captured: ${s.captured_at}`
+          : "Captured: unknown",
       ],
       missing_info: ["Sensor source is unrecognized; excluded from healthy status."],
       safety_note: "Unknown telemetry is never shown as healthy.",
+      source: "invalid",
+      deep_link: "/sensors",
+    };
+  }
+  // Shape-guard captured_at: if present it must be a string. Non-string
+  // values (numbers, booleans, objects, arrays) are untrusted — Date.parse
+  // coercion (e.g. `Date.parse(12345)` → year 12345) must not be allowed
+  // to synthesize a "fresh" timestamp.
+  const capInput = (s as { captured_at?: unknown }).captured_at;
+  if (capInput !== undefined && capInput !== null && typeof capInput !== "string") {
+    return {
+      id: "sensor-snapshot",
+      label: "Sensor Snapshot",
+      status: "invalid",
+      evidence: [`Source: ${s.source}`, "Captured: unknown"],
+      missing_info: ["captured_at is malformed; excluded from healthy status."],
+      safety_note: "Malformed telemetry is never shown as healthy.",
+      source: "invalid",
+      deep_link: "/sensors",
+    };
+  }
+  // Shape-guard the ancillary fields: confidence must be a finite number
+  // in [0,1] when present, metric must be a string when present. Bad
+  // shapes flip the row to `invalid` — untrusted telemetry is never
+  // shown as healthy just because `source` happens to be recognized.
+  const confidenceInput = (s as { confidence?: unknown }).confidence;
+  const confidenceInvalid =
+    confidenceInput !== undefined &&
+    confidenceInput !== null &&
+    (typeof confidenceInput !== "number" ||
+      !Number.isFinite(confidenceInput) ||
+      confidenceInput < 0 ||
+      confidenceInput > 1);
+  const metricInput = (s as { metric?: unknown }).metric;
+  const metricInvalid =
+    metricInput !== undefined && metricInput !== null && typeof metricInput !== "string";
+  if (confidenceInvalid || metricInvalid) {
+    return {
+      id: "sensor-snapshot",
+      label: "Sensor Snapshot",
+      status: "invalid",
+      evidence: [
+        `Source: ${s.source}`,
+        typeof s.captured_at === "string" && s.captured_at.length > 0
+          ? `Captured: ${s.captured_at}`
+          : "Captured: unknown",
+      ],
+      missing_info: [
+        confidenceInvalid
+          ? "Confidence is malformed; excluded from healthy status."
+          : "Metric label is malformed; excluded from healthy status.",
+      ],
+      safety_note: "Malformed telemetry is never shown as healthy.",
       source: "invalid",
       deep_link: "/sensors",
     };
@@ -800,15 +855,32 @@ function evidenceRefForStep(
         deep_link: "/timeline",
         kind: input.timeline.linked_directly ? "direct" : "inferred",
       };
-    case "sensor-snapshot":
+    case "sensor-snapshot": {
       if (!input.latest_sensor_snapshot?.source) return null;
+      // Prefer the sanitized step.source (which the evaluator forces to a
+      // safe label like "invalid" for unrecognized inputs) over the raw
+      // caller-supplied string. This prevents untrusted source strings
+      // (e.g. "verified", "ok", "healthy") from being echoed into the
+      // evidence-ref, drilldown, or copyable text report.
+      const rawSource = input.latest_sensor_snapshot.source;
+      const safeSource: string =
+        step.source ??
+        (ALLOWED_SENSOR_SOURCES.includes(rawSource as SensorSourceLabel)
+          ? (rawSource as string)
+          : "invalid");
+      const metricRaw = input.latest_sensor_snapshot.metric;
+      const safeMetric = typeof metricRaw === "string" ? metricRaw : "reading";
       return {
-        label: `Sensor snapshot (${input.latest_sensor_snapshot.metric ?? "reading"})`,
-        timestamp: input.latest_sensor_snapshot.captured_at ?? undefined,
-        source: input.latest_sensor_snapshot.source,
+        label: `Sensor snapshot (${safeMetric})`,
+        timestamp:
+          typeof input.latest_sensor_snapshot.captured_at === "string"
+            ? input.latest_sensor_snapshot.captured_at
+            : undefined,
+        source: safeSource,
         deep_link: "/sensors",
-        kind: input.latest_sensor_snapshot.source === "live" ? "direct" : "inferred",
+        kind: safeSource === "live" && step.status === "passed" ? "direct" : "inferred",
       };
+    }
     case "ai-doctor":
       if (!input.latest_ai_doctor?.session_id) return null;
       return {

@@ -117,6 +117,8 @@ export function buildOneTentLoopLiveProofTextReport(view: LiveProofView): string
     `Overall status — passed: ${c.passed}, needs review: ${c.needs_review}, missing: ${c.missing}, blocked: ${c.blocked}, stale: ${c.stale}, invalid: ${c.invalid}, demo only: ${c.demo_only}.`,
   );
   lines.push("");
+  lines.push(buildOneTentLoopTopGapTextBlock(view.top_gap));
+  lines.push("");
   for (const s of view.steps) {
     lines.push(`- ${s.label} [${s.status}]`);
     if (s.provenance) lines.push(`    provenance: ${s.provenance}`);

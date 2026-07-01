@@ -167,6 +167,19 @@ export function useQuickLogActivitySave() {
           }
           const r = (data ?? {}) as EventRpcResponse;
           if (!r.ok || !r.grow_event_id) {
+            // Stale backend fence: v1b client but validator/allow-list
+            // does not accept harvest yet. Never fake-save as observation.
+            if (
+              input.activityId === "harvest" &&
+              r.reason === "invalid_event_type"
+            ) {
+              setError("harvest_backend_unavailable");
+              return {
+                ok: false,
+                reason: "harvest_backend_unavailable",
+                disabledReason: QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
+              };
+            }
             setError("save_failed");
             return { ok: false, reason: "save_failed" };
           }

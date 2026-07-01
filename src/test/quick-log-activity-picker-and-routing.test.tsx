@@ -36,16 +36,21 @@ describe("QuickLogActivityPicker", () => {
     }
   });
 
-  it("renders Harvest disabled with backend-update copy", () => {
+  it("renders Harvest as enabled (v1b) with safety copy denying readiness/yield", () => {
     render(<QuickLogActivityPicker onSelect={vi.fn()} />);
     const harvest = screen.getByTestId("quick-log-activity-harvest");
-    expect(harvest).toBeDisabled();
+    expect(harvest).not.toBeDisabled();
     expect(
-      screen.getByTestId("quick-log-activity-harvest-disabled-reason"),
-    ).toHaveTextContent(QUICK_LOG_HARVEST_DISABLED_REASON);
+      screen.queryByTestId("quick-log-activity-harvest-disabled-reason"),
+    ).toBeNull();
+    expect(
+      screen.getByTestId("quick-log-activity-harvest-safety"),
+    ).toHaveTextContent(/does not claim harvest readiness or final yield/i);
+    // Legacy disabled reason is still exported for stale callers.
+    expect(QUICK_LOG_HARVEST_DISABLED_REASON).toMatch(/backend update/i);
   });
 
-  it("calls onSelect for enabled activities but never for Harvest", () => {
+  it("calls onSelect for enabled activities including Harvest (v1b)", () => {
     const onSelect = vi.fn();
     render(<QuickLogActivityPicker onSelect={onSelect} />);
     fireEvent.click(screen.getByTestId("quick-log-activity-feeding"));
@@ -53,7 +58,8 @@ describe("QuickLogActivityPicker", () => {
     expect(onSelect.mock.calls[0][0].id).toBe("feeding");
 
     fireEvent.click(screen.getByTestId("quick-log-activity-harvest"));
-    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect.mock.calls[1][0].id).toBe("harvest");
   });
 
   it("uses safety copy from shared definitions (no diagnosis/recommendation)", () => {

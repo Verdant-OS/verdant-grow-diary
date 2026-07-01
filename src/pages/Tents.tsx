@@ -42,7 +42,7 @@ export default function Tents() {
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
   const { data: tents = [], isLoading } = useGrowTents(urlGrowId ?? undefined);
-  const { data: readings = [] } = useSensorReadings();
+  const { data: readings = [] } = useGrowSensorReadings();
   // AUD-001 fix: use real plants (Supabase, RLS-scoped) instead of mock
   // so plant counts match the assigned-tent reality. Mock plants reference
   // mock tent ids ("t1"..) which never match real tent UUIDs.

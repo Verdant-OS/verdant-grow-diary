@@ -85,9 +85,12 @@ describe("buildOneTentLoopLiveProofView", () => {
     for (const id of LOOP_STEP_IDS) {
       expect(text.includes(id.replace("-", " ")) || text.includes(id)).toBe(true);
     }
-    for (const forbidden of ["healthy", "all good", "no issues detected", "success", "verified"]) {
+    for (const forbidden of ["all good", "no issues detected", "success", "verified"]) {
       expect(text).not.toContain(forbidden);
     }
+    // "healthy" only allowed inside honest negations
+    const positive = text.replace(/never shown as healthy/g, "").replace(/excluded from healthy/g, "").replace(/not healthy/g, "");
+    expect(positive).not.toMatch(/\bhealthy\b/);
   });
 
   it("is deterministic for the same input + now", () => {

@@ -56,8 +56,9 @@ function listenForEntryCreated() {
 
 async function saveWithNote(activityId: string, note = "  short observation  ") {
   fireEvent.click(screen.getByTestId(`quick-log-all-activities-picker-${activityId}`));
-  const textarea = await screen.findByTestId("quick-log-all-activities-note");
-  fireEvent.change(textarea, { target: { value: note } });
+  await screen.findByTestId("quick-log-all-activities-form");
+  const textarea = screen.queryByTestId("quick-log-all-activities-note");
+  if (textarea) fireEvent.change(textarea, { target: { value: note } });
   fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
 }
 

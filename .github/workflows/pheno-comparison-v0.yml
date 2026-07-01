@@ -1,0 +1,113 @@
+name: Pheno Comparison v0
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  pheno-comparison-v0:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Selection-grade Pheno Comparison Vitest specs — read-only surface,
+      # no secrets required.
+      - name: Vitest — Pheno Comparison
+        run: |
+          bunx vitest run \
+            src/test/pheno-comparison-view-model.test.ts \
+            src/test/pheno-comparison-route.test.tsx \
+            src/test/pheno-comparison-static-safety.test.ts \
+            src/test/pheno-comparison-display-safety.test.tsx \
+            src/test/pheno-selection-rules.test.ts \
+            src/test/pheno-comparison-a11y-viewports.test.tsx
+
+      # Route manifest sync — ensures /pheno-comparison stays wired
+      # (App.tsx <-> appRouteManifest).
+      - name: Vitest — route manifest sync
+        run: |
+          bunx vitest run \
+            src/test/app-route-manifest.test.ts \
+            src/test/route-manifest-sync.test.ts \
+            src/test/pricing.test.ts
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      # Narrow lint step.
+      #
+      # WHY NARROW: repo-wide `bun run lint` currently reports pre-existing
+      # ESLint errors across unrelated files (see docs/eslint-cleanup-plan.md).
+      # Fixing those is out of scope for the pheno comparison slice. This step
+      # lints the exact pheno source + presenter-owned test/spec files this
+      # workflow protects, and MUST stay green on every PR.
+      - name: Lint — Pheno owned files
+        run: |
+          bunx eslint \
+            src/pages/PhenoComparison.tsx \
+            src/lib/phenoComparisonRules.ts \
+            src/lib/phenoComparisonViewModel.ts \
+            src/lib/phenoSelectionRules.ts \
+            src/lib/phenoComparisonFixtures.ts \
+            src/test/pheno-comparison-view-model.test.ts \
+            src/test/pheno-comparison-route.test.tsx \
+            src/test/pheno-comparison-static-safety.test.ts \
+            src/test/pheno-comparison-display-safety.test.tsx \
+            src/test/pheno-selection-rules.test.ts \
+            src/test/pheno-comparison-a11y-viewports.test.tsx \
+            e2e/pheno-comparison-visual-style.spec.ts \
+            e2e/pheno-comparison-readonly.spec.ts
+
+      # Playwright — Pheno Comparison specs only. Route is mounted outside
+      # AppShell + providers (fixture-only), so no auth secrets are required and
+      # the mocked project (chromium-mocked) is used to skip storageState setup.
+      - name: Install Playwright browsers (Chromium only)
+        run: bunx playwright install --with-deps chromium
+
+      - name: Playwright — Pheno Comparison
+        run: |
+          bunx playwright test \
+            --project=chromium-mocked \
+            --reporter=list,html \
+            e2e/pheno-comparison-readonly.spec.ts \
+            e2e/pheno-comparison-visual-style.spec.ts
+
+      # On failure, upload Playwright debugging artifacts for triage:
+      # HTML report, traces/videos/screenshots (test-results/), and the
+      # visual-style review screenshots. Config uses trace/video/screenshot
+      # = *-on-failure, so nothing is captured on green runs.
+      #
+      # SAFETY: uploads ONLY report/results/review-screenshot paths. It never
+      # uploads e2e/ wholesale (which can hold e2e/.auth/user.json), nor .env,
+      # tokens, or any storageState auth artifacts.
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pheno-playwright-artifacts
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            playwright-report/
+            test-results/
+            e2e/screenshots/

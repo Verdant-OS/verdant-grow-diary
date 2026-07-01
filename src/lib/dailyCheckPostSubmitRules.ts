@@ -12,6 +12,8 @@
  * enforced by tests — see
  * src/test/daily-check-post-submit.test.tsx.
  */
+import { formatHarvestSavedBreakdownDetail } from "@/lib/harvestDetailsRules";
+
 
 export const DAILY_CHECK_SUCCESS_TITLE = "Today's check was logged";
 export const DAILY_CHECK_SUCCESS_BODY =

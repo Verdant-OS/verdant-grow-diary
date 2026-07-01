@@ -205,12 +205,13 @@ export const QUICK_LOG_ACTIVITY_DEFINITIONS: Readonly<
     id: "harvest",
     label: "Harvest",
     description: "Record a harvest event.",
-    safetyNote: QUICK_LOG_HARVEST_DISABLED_REASON,
-    saveRoute: "none",
+    safetyNote:
+      "Record harvest activity. This does not claim harvest readiness or final yield.",
+    saveRoute: "event",
+    eventType: "harvest",
     timelineLabel: "Harvest",
     savedBreakdownLabel: "Harvest",
-    enabled: false,
-    disabledReason: QUICK_LOG_HARVEST_DISABLED_REASON,
+    enabled: true,
   },
 });
 

@@ -10,6 +10,9 @@ import {
   buildHarvestDetailsPayload,
   readPersistedHarvestDetails,
   formatHarvestWeightForDisplay,
+  validateHarvestWeightInput,
+  formatHarvestSavedBreakdownDetail,
+  HARVEST_WEIGHT_NEGATIVE_ERROR,
 } from "@/lib/harvestDetailsRules";
 
 describe("sanitizeHarvestWeightInput", () => {
@@ -113,5 +116,81 @@ describe("formatHarvestWeightForDisplay", () => {
   it("never contains yield/readiness copy", () => {
     const out = formatHarvestWeightForDisplay("120", "g") ?? "";
     expect(out.toLowerCase()).not.toMatch(/yield|ready|potency|quality/);
+  });
+});
+
+describe("validateHarvestWeightInput", () => {
+  it("empty/null/whitespace are valid (weights are optional)", () => {
+    expect(validateHarvestWeightInput(null).ok).toBe(true);
+    expect(validateHarvestWeightInput(undefined).ok).toBe(true);
+    expect(validateHarvestWeightInput("").ok).toBe(true);
+    expect(validateHarvestWeightInput("   ").ok).toBe(true);
+  });
+  it("non-negative decimals are valid", () => {
+    expect(validateHarvestWeightInput("0").ok).toBe(true);
+    expect(validateHarvestWeightInput("12").ok).toBe(true);
+    expect(validateHarvestWeightInput("12.5").ok).toBe(true);
+  });
+  it("negative values return the negative-error message", () => {
+    const r = validateHarvestWeightInput("-3");
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe(HARVEST_WEIGHT_NEGATIVE_ERROR);
+  });
+  it("non-numeric text is rejected with a clear message", () => {
+    const r = validateHarvestWeightInput("abc");
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/enter a number/i);
+  });
+});
+
+describe("formatHarvestSavedBreakdownDetail", () => {
+  it("returns null when no valid weight is entered", () => {
+    expect(formatHarvestSavedBreakdownDetail(null)).toBeNull();
+    expect(
+      formatHarvestSavedBreakdownDetail({ wetWeight: "", dryWeight: "" }),
+    ).toBeNull();
+    expect(
+      formatHarvestSavedBreakdownDetail({
+        wetWeight: "-1",
+        dryWeight: "abc",
+        weightUnit: "g",
+      }),
+    ).toBeNull();
+  });
+  it("hides missing wet or dry values", () => {
+    expect(
+      formatHarvestSavedBreakdownDetail({
+        wetWeight: "120",
+        weightUnit: "g",
+      }),
+    ).toBe("wet 120 g");
+    expect(
+      formatHarvestSavedBreakdownDetail({
+        dryWeight: "32",
+        weightUnit: "g",
+      }),
+    ).toBe("dry 32 g");
+  });
+  it("shows both wet and dry with unit", () => {
+    expect(
+      formatHarvestSavedBreakdownDetail({
+        wetWeight: "120",
+        dryWeight: "32",
+        weightUnit: "g",
+      }),
+    ).toBe("wet 120 g, dry 32 g");
+  });
+  it("omits unit when unit missing", () => {
+    expect(
+      formatHarvestSavedBreakdownDetail({ wetWeight: "120" }),
+    ).toBe("wet 120");
+  });
+  it("never contains the word yield", () => {
+    const out = formatHarvestSavedBreakdownDetail({
+      wetWeight: "120",
+      dryWeight: "32",
+      weightUnit: "g",
+    });
+    expect((out ?? "").toLowerCase()).not.toContain("yield");
   });
 });

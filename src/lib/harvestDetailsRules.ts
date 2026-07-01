@@ -123,3 +123,64 @@ export function formatHarvestWeightForDisplay(
   if (!unit) return safe;
   return `${safe} ${unit}`;
 }
+
+// ---------------------------------------------------------------------------
+// Inline validation (presenter feedback only)
+// ---------------------------------------------------------------------------
+
+export const HARVEST_WEIGHT_NEGATIVE_ERROR = "Weight cannot be negative.";
+export const HARVEST_WEIGHT_INVALID_ERROR =
+  "Enter a number like 12 or 12.5.";
+
+export interface HarvestWeightValidation {
+  ok: boolean;
+  error: string | null;
+}
+
+/**
+ * Validate a raw harvest weight input for inline UI feedback.
+ *
+ *  - Empty / null / whitespace → valid (weights are optional).
+ *  - Negative numbers → rejected with a friendly error.
+ *  - Non-numeric text → rejected with a friendly error.
+ *  - Non-negative decimals → valid.
+ *
+ * This is presentation-only. Persistence still runs through
+ * `sanitizeHarvestWeightInput`, which independently drops any unsafe
+ * value — so invalid inputs are never written even if a caller ignores
+ * this validator.
+ */
+export function validateHarvestWeightInput(
+  raw: string | null | undefined,
+): HarvestWeightValidation {
+  if (raw == null) return { ok: true, error: null };
+  const t = String(raw).trim();
+  if (t.length === 0) return { ok: true, error: null };
+  if (/^-/.test(t)) {
+    return { ok: false, error: HARVEST_WEIGHT_NEGATIVE_ERROR };
+  }
+  if (!/^\d+(\.\d+)?$/.test(t)) {
+    return { ok: false, error: HARVEST_WEIGHT_INVALID_ERROR };
+  }
+  return { ok: true, error: null };
+}
+
+/**
+ * Format a concise saved-breakdown detail suffix for a Harvest item, e.g.
+ * "wet 120 g, dry 32 g". Returns null when no valid weight was entered.
+ * Unit is only included when at least one valid weight exists. Never
+ * infers a missing weight from the other one. Never claims yield.
+ */
+export function formatHarvestSavedBreakdownDetail(
+  input: BuildHarvestDetailsInput | null | undefined,
+): string | null {
+  if (!input) return null;
+  const wet = sanitizeHarvestWeightInput(input.wetWeight ?? null);
+  const dry = sanitizeHarvestWeightInput(input.dryWeight ?? null);
+  if (wet === null && dry === null) return null;
+  const unit = sanitizeHarvestWeightUnit(input.weightUnit ?? null);
+  const parts: string[] = [];
+  if (wet !== null) parts.push(unit ? `wet ${wet} ${unit}` : `wet ${wet}`);
+  if (dry !== null) parts.push(unit ? `dry ${dry} ${unit}` : `dry ${dry}`);
+  return parts.join(", ");
+}

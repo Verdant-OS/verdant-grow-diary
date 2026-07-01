@@ -39,7 +39,10 @@ import {
   type QuickLogActivityId,
   type QuickLogWeightUnit,
 } from "@/constants/quickLogActivityTypes";
-import { buildHarvestDetailsPayload } from "@/lib/harvestDetailsRules";
+import {
+  buildHarvestDetailsPayload,
+  validateHarvestWeightInput,
+} from "@/lib/harvestDetailsRules";
 import {
   buildDailyCheckSavedItems,
   type DailyCheckSavedItem,
@@ -122,6 +125,18 @@ export default function QuickLogAllActivitiesSection({
 
   const canPersistManualSensor = false; // Deferred to ManualSensorReadingCard.
 
+  const harvestWetValidation = useMemo(
+    () => validateHarvestWeightInput(harvestWet),
+    [harvestWet],
+  );
+  const harvestDryValidation = useMemo(
+    () => validateHarvestWeightInput(harvestDry),
+    [harvestDry],
+  );
+  const harvestWeightsInvalid =
+    !harvestWetValidation.ok || !harvestDryValidation.ok;
+
+
   const requiresNote = useMemo(() => {
     if (!selected) return false;
     return (
@@ -172,17 +187,40 @@ export default function QuickLogAllActivitiesSection({
       setErrorForActivity(selected.id);
       return;
     }
+    // Harvest inline validation fence — never persist negative or
+    // malformed weights, even if the shared sanitizer would drop them.
+    if (selected.id === "harvest" && harvestWeightsInvalid) {
+      setErrorReason(
+        harvestWetValidation.error ??
+          harvestDryValidation.error ??
+          "Fix harvest weight fields before saving.",
+      );
+      setErrorForActivity(selected.id);
+      return;
+    }
 
     // Harvest optional weight details — sanitized in the shared rules
     // module. Empty / invalid / negative values are dropped, never sent.
     const extraDetails: Record<string, unknown> = {};
+    let harvestDetailsForBreakdown: {
+      wetWeight?: string | null;
+      dryWeight?: string | null;
+      weightUnit?: string | null;
+    } | null = null;
     if (selected.id === "harvest") {
       const harvestPayload = buildHarvestDetailsPayload({
         wetWeight: harvestWet,
         dryWeight: harvestDry,
         weightUnit: harvestUnit,
       });
-      if (harvestPayload) extraDetails.harvest = harvestPayload;
+      if (harvestPayload) {
+        extraDetails.harvest = harvestPayload;
+        harvestDetailsForBreakdown = {
+          wetWeight: harvestPayload.wetWeight ?? null,
+          dryWeight: harvestPayload.dryWeight ?? null,
+          weightUnit: harvestPayload.weightUnit ?? null,
+        };
+      }
     }
 
     const idempotencyKey = newIdempotencyKey(selected.id);
@@ -214,6 +252,8 @@ export default function QuickLogAllActivitiesSection({
       const items = buildDailyCheckSavedItems({
         source,
         submittedAt: Date.now(),
+        harvestDetails:
+          source === "harvest" ? harvestDetailsForBreakdown : null,
       });
       if (items.length > 0) {
         setSaved((prev) => [
@@ -245,6 +285,9 @@ export default function QuickLogAllActivitiesSection({
     harvestWet,
     harvestDry,
     harvestUnit,
+    harvestWeightsInvalid,
+    harvestWetValidation,
+    harvestDryValidation,
   ]);
 
   const noContext = !growId;
@@ -323,8 +366,18 @@ export default function QuickLogAllActivitiesSection({
                     inputMode="decimal"
                     placeholder="e.g. 120"
                     min={0}
+                    aria-invalid={!harvestWetValidation.ok}
                     className="text-sm"
                   />
+                  {harvestWetValidation.error && (
+                    <p
+                      role="alert"
+                      className="text-[11px] text-destructive"
+                      data-testid={`${testIdPrefix}-harvest-wet-error`}
+                    >
+                      {harvestWetValidation.error}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label
@@ -341,8 +394,18 @@ export default function QuickLogAllActivitiesSection({
                     inputMode="decimal"
                     placeholder="e.g. 22"
                     min={0}
+                    aria-invalid={!harvestDryValidation.ok}
                     className="text-sm"
                   />
+                  {harvestDryValidation.error && (
+                    <p
+                      role="alert"
+                      className="text-[11px] text-destructive"
+                      data-testid={`${testIdPrefix}-harvest-dry-error`}
+                    >
+                      {harvestDryValidation.error}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label
@@ -417,7 +480,8 @@ export default function QuickLogAllActivitiesSection({
                 saving ||
                 noContext ||
                 selected.id === "manual_sensor_snapshot" ||
-                (requiresNote && note.trim().length === 0)
+                (requiresNote && note.trim().length === 0) ||
+                (selected.id === "harvest" && harvestWeightsInvalid)
               }
               data-testid={`${testIdPrefix}-save`}
             >

@@ -70,4 +70,50 @@ describe("buildDailyCheckSavedItems", () => {
     expect(DAILY_CHECK_SAVED_BREAKDOWN_TITLE).toBe("What was saved");
     assertSafeCopy(DAILY_CHECK_SAVED_BREAKDOWN_TITLE);
   });
+
+  it("Harvest with wet/dry/unit adds a concise detail suffix (no yield claim)", () => {
+    const items = buildDailyCheckSavedItems({
+      source: "harvest",
+      submittedAt: 1_700_000_000_000,
+      harvestDetails: {
+        wetWeight: "120",
+        dryWeight: "32",
+        weightUnit: "g",
+      },
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0].key).toBe("harvest");
+    expect(items[0].label).toBe("Harvest — wet 120 g, dry 32 g");
+    expect(items[0].label.toLowerCase()).not.toContain("yield");
+    assertSafeCopy(items[0].label);
+  });
+
+  it("Harvest hides missing weight fields in the saved breakdown", () => {
+    const items = buildDailyCheckSavedItems({
+      source: "harvest",
+      submittedAt: 1_700_000_000_000,
+      harvestDetails: { wetWeight: "50", weightUnit: "g" },
+    });
+    expect(items[0].label).toBe("Harvest — wet 50 g");
+    expect(items[0].label.toLowerCase()).not.toMatch(/\bdry\b/);
+  });
+
+  it("Harvest with no valid weights stays plain 'Harvest'", () => {
+    const items = buildDailyCheckSavedItems({
+      source: "harvest",
+      submittedAt: 1_700_000_000_000,
+      harvestDetails: { wetWeight: "-1", dryWeight: "abc", weightUnit: "g" },
+    });
+    expect(items[0].label).toBe("Harvest");
+  });
+
+  it("failed/unsaved harvest drafts (no submittedAt) never appear in breakdown", () => {
+    expect(
+      buildDailyCheckSavedItems({
+        source: "harvest",
+        submittedAt: null,
+        harvestDetails: { wetWeight: "120", weightUnit: "g" },
+      }),
+    ).toEqual([]);
+  });
 });

@@ -1,0 +1,105 @@
+name: One-Tent Loop Proof never-healthy E2E (mocked)
+
+# Browser-level never-healthy regression for /one-tent-loop-proof.
+#
+# SAFETY:
+#  - Runs in the `chromium-mocked` Playwright project. No auth bypass,
+#    no credentials, no service_role, no real accounts.
+#  - Spec asserts no write-capable network calls and no unsafe healthy
+#    wording (healthy / OK / success / verified / all good / no issues
+#    detected) leak into the rendered document on that route.
+#  - Route is grower-facing and gated by auth; unauthenticated loads
+#    redirect to /auth. The spec still validates the safety invariants
+#    along the redirect path.
+#  - Route-level rendered-proof invariants with malformed fixture
+#    telemetry are additionally proven at the Vitest layer in the
+#    one-tent-loop-proof rules + telemetry fuzz suites.
+
+on:
+  pull_request:
+    branches: [main, verdant-grow-diary]
+    paths:
+      - "e2e/one-tent-loop-proof-never-healthy.spec.ts"
+      - "src/pages/OneTentLoopLiveProof.tsx"
+      - "src/lib/oneTentLoopProofRules.ts"
+      - "src/lib/oneTentLoopLiveProofViewModel.ts"
+      - "src/test/one-tent-loop-proof-*.test.ts"
+      - "src/test/one-tent-loop-proof-*.test.tsx"
+      - "src/test/one-tent-loop-live-proof-*.test.tsx"
+      - "playwright.config.ts"
+      - ".github/workflows/one-tent-loop-proof-never-healthy.yml"
+      - "package.json"
+      - "bun.lock"
+      - "bun.lockb"
+  workflow_dispatch:
+
+concurrency:
+  group: one-tent-loop-proof-never-healthy-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  one-tent-loop-proof-never-healthy:
+    name: One-Tent Loop Proof never-healthy E2E (mocked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Install Chromium only (with deps)
+        run: bunx playwright install chromium --with-deps
+
+      - name: Vitest — rules + deterministic telemetry fuzz
+        run: bun run test:one-tent-loop-proof-never-healthy
+
+      - name: Playwright — /one-tent-loop-proof never-healthy
+        run: bun run test:e2e:one-tent-loop-proof-never-healthy:ci
+
+      - name: Upload Playwright report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: one-tent-loop-proof-never-healthy-report
+          path: playwright-report
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: one-tent-loop-proof-never-healthy-failure-artifacts
+          path: |
+            test-results/**/*.png
+            test-results/**/*.webm
+            test-results/**/trace.zip
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Job summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### One-Tent Loop Proof never-healthy E2E (mocked)";
+            echo "";
+            echo "- Mocked / non-destructive: **yes**";
+            echo "- Rules + fuzz Vitest gate: ran";
+            echo "- Browser never-healthy assertion on /one-tent-loop-proof: ran";
+          } >> "$GITHUB_STEP_SUMMARY"

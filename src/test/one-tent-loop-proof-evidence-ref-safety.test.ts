@@ -75,7 +75,6 @@ const HOSTILE_WORDS = [
 ] as const;
 
 
-const HOSTILE_STATUS_LIKE = ["healthy", "verified", "success", "ok"] as const;
 
 const ALLOWED_SOURCE_BADGES = new Set([
   "invalid",

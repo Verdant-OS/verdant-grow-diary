@@ -180,10 +180,28 @@ function assertNoHostileLeak(input: unknown, label: string): void {
       `${label}: hostile string "${hostile}" leaked into user-facing text`,
     ).toBe(false);
   }
+  const scrubbed = stripAllowedNegations(all);
+  for (const re of HOSTILE_WORDS) {
+    expect(
+      re.test(scrubbed),
+      `${label}: hostile word ${re} leaked into user-facing text`,
+    ).toBe(false);
+  }
 }
 
 describe("evidenceRefForStep — hostile source string sanitization", () => {
-  for (const source of HOSTILE_STRINGS) {
+  const HOSTILE_SOURCES = [
+    "healthy",
+    "ok",
+    "success",
+    "verified",
+    "live<script>",
+    "service_role",
+    "bridge_token",
+    "eyJhbGci",
+    "sk_live_",
+  ];
+  for (const source of HOSTILE_SOURCES) {
     it(`hostile source "${source}" never leaks into any proof surface`, () => {
       assertNoHostileLeak(
         { source, captured_at: FRESH_ISO },
@@ -192,6 +210,7 @@ describe("evidenceRefForStep — hostile source string sanitization", () => {
     });
   }
 
+  const HOSTILE_STATUS_LIKE = ["healthy", "verified", "success", "ok"] as const;
   for (const bogus of HOSTILE_STATUS_LIKE) {
     it(`hostile status-like field "${bogus}" cannot flip a bad snapshot to passed`, () => {
       // Attempt to smuggle a `status: "healthy"` field through the
@@ -216,6 +235,10 @@ describe("evidenceRefForStep — hostile source string sanitization", () => {
         report.includes(hostile.toLowerCase()),
         `hostile string "${hostile}" leaked into text report`,
       ).toBe(false);
+    }
+    const scrubbed = stripAllowedNegations(report);
+    for (const re of HOSTILE_WORDS) {
+      expect(re.test(scrubbed), `hostile word ${re} in text report`).toBe(false);
     }
   });
 

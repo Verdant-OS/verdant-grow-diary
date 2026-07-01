@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
+import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import { STAGES } from "@/lib/grow";
 import { EC_UNITS, EC_UNIT_LABEL, type EcUnit } from "@/constants/units";
 import {

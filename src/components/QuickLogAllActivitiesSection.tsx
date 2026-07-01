@@ -366,8 +366,18 @@ export default function QuickLogAllActivitiesSection({
                     inputMode="decimal"
                     placeholder="e.g. 120"
                     min={0}
+                    aria-invalid={!harvestWetValidation.ok}
                     className="text-sm"
                   />
+                  {harvestWetValidation.error && (
+                    <p
+                      role="alert"
+                      className="text-[11px] text-destructive"
+                      data-testid={`${testIdPrefix}-harvest-wet-error`}
+                    >
+                      {harvestWetValidation.error}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label

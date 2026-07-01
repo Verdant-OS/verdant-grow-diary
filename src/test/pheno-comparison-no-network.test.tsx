@@ -45,8 +45,8 @@ function installNetworkTraps(): { calls: Call[]; restore: () => void } {
       throw new Error("XHR forbidden on /pheno-comparison");
     }
   }
-  // @ts-expect-error test-time override
-  globalThis.XMLHttpRequest = TrapXHR;
+  (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest =
+    TrapXHR;
 
   const OriginalWS = globalThis.WebSocket;
   class TrapWS {
@@ -55,8 +55,8 @@ function installNetworkTraps(): { calls: Call[]; restore: () => void } {
       throw new Error("WebSocket forbidden on /pheno-comparison");
     }
   }
-  // @ts-expect-error test-time override
-  globalThis.WebSocket = TrapWS;
+  (globalThis as unknown as { WebSocket: unknown }).WebSocket = TrapWS;
+
 
   const OriginalES = (globalThis as unknown as { EventSource?: unknown })
     .EventSource;

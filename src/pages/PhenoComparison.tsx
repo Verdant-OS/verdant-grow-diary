@@ -43,13 +43,15 @@ function fmtMetric(v: number | null, unit?: string): string {
 }
 
 function CandidateColumn({ c }: { c: PhenoCandidateView }) {
+  const headingId = `pheno-candidate-${c.candidateId}-heading`;
   return (
     <section
       data-testid={`pheno-candidate-${c.candidateId}`}
+      aria-labelledby={headingId}
       className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4"
     >
       <header className="space-y-1">
-        <h2 className="text-lg font-semibold">{c.candidateLabel}</h2>
+        <h2 id={headingId} className="text-lg font-semibold">{c.candidateLabel}</h2>
         <p className="text-xs text-muted-foreground">
           {[c.growLabel, c.tentLabel, c.plantLabel]
             .filter(Boolean)
@@ -63,8 +65,11 @@ function CandidateColumn({ c }: { c: PhenoCandidateView }) {
       {c.missing.length > 0 && (
         <ul
           data-testid={`pheno-candidate-${c.candidateId}-missing`}
+          role="status"
+          aria-label={`Missing context for ${c.candidateLabel}`}
           className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-300"
         >
+
           {c.missing.map((m) => (
             <li key={m.code} data-testid={`missing-${m.code}`}>
               ⚠ {m.message}

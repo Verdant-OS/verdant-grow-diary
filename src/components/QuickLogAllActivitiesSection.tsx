@@ -480,7 +480,8 @@ export default function QuickLogAllActivitiesSection({
                 saving ||
                 noContext ||
                 selected.id === "manual_sensor_snapshot" ||
-                (requiresNote && note.trim().length === 0)
+                (requiresNote && note.trim().length === 0) ||
+                (selected.id === "harvest" && harvestWeightsInvalid)
               }
               data-testid={`${testIdPrefix}-save`}
             >

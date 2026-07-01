@@ -162,6 +162,18 @@ export function buildRelativeTimelineProjection(
     // current stage. Never invent a stage if neither resolves.
     const itemPreset =
       resolveStagePreset(entry.stage) ?? stagePreset;
+    const trimmedNote =
+      typeof entry.note === "string" && entry.note.trim().length > 0
+        ? entry.note.trim()
+        : null;
+    const harvest =
+      entry.eventType === "harvest"
+        ? readPersistedHarvestDetails(
+            entry.details?.extras?.harvest ??
+              (entry.details as { harvest?: unknown } | undefined)?.harvest ??
+              null,
+          )
+        : null;
     return {
       id: entry.id,
       eventType: entry.eventType,
@@ -174,6 +186,8 @@ export function buildRelativeTimelineProjection(
       stagePreset: itemPreset,
       plantId: entry.plantId,
       tentId: entry.tentId,
+      note: trimmedNote,
+      harvest,
     };
   });
 

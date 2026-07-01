@@ -139,6 +139,9 @@ export default function QuickLogAllActivitiesSection({
     setErrorForActivity(null);
     setSelected(a);
     setNote("");
+    setHarvestWet("");
+    setHarvestDry("");
+    setHarvestUnit("g");
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -170,6 +173,18 @@ export default function QuickLogAllActivitiesSection({
       return;
     }
 
+    // Harvest optional weight details — sanitized in the shared rules
+    // module. Empty / invalid / negative values are dropped, never sent.
+    const extraDetails: Record<string, unknown> = {};
+    if (selected.id === "harvest") {
+      const harvestPayload = buildHarvestDetailsPayload({
+        wetWeight: harvestWet,
+        dryWeight: harvestDry,
+        weightUnit: harvestUnit,
+      });
+      if (harvestPayload) extraDetails.harvest = harvestPayload;
+    }
+
     const idempotencyKey = newIdempotencyKey(selected.id);
     const result = await save({
       activityId: selected.id,
@@ -178,6 +193,8 @@ export default function QuickLogAllActivitiesSection({
       plantId: plantId ?? null,
       note: note.trim().length > 0 ? note.trim() : null,
       idempotencyKey,
+      extraDetails:
+        Object.keys(extraDetails).length > 0 ? extraDetails : null,
     });
 
     if (!result.ok) {
@@ -210,10 +227,25 @@ export default function QuickLogAllActivitiesSection({
       }
     }
     setNote("");
+    setHarvestWet("");
+    setHarvestDry("");
+    setHarvestUnit("g");
     setSelected(null);
     setErrorReason(null);
     setErrorForActivity(null);
-  }, [selected, growId, tentId, plantId, note, requiresNote, save, canPersistManualSensor]);
+  }, [
+    selected,
+    growId,
+    tentId,
+    plantId,
+    note,
+    requiresNote,
+    save,
+    canPersistManualSensor,
+    harvestWet,
+    harvestDry,
+    harvestUnit,
+  ]);
 
   const noContext = !growId;
 

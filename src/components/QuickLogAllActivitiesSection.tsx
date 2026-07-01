@@ -285,6 +285,9 @@ export default function QuickLogAllActivitiesSection({
     harvestWet,
     harvestDry,
     harvestUnit,
+    harvestWeightsInvalid,
+    harvestWetValidation,
+    harvestDryValidation,
   ]);
 
   const noContext = !growId;

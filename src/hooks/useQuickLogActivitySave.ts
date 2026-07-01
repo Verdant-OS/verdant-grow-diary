@@ -82,14 +82,10 @@ export function useQuickLogActivitySave() {
         setError("unsupported_activity");
         return { ok: false, reason: "unsupported_activity" };
       }
-      if (input.activityId === "harvest") {
-        setError("harvest_disabled");
-        return {
-          ok: false,
-          reason: "harvest_disabled",
-          disabledReason: QUICK_LOG_HARVEST_DISABLED_REASON,
-        };
-      }
+      // Note: 'harvest' is now enabled (v1b backend accepts event_type=harvest).
+      // Fall-through to the standard event route below. If the backend is
+      // stale (validator rejects harvest), we surface a distinct
+      // 'harvest_backend_unavailable' reason from the RPC response mapping.
       if (!def.enabled) {
         setError("activity_disabled");
         return {

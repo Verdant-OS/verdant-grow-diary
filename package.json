@@ -114,6 +114,8 @@
     "dev:ecowitt-checklist": "bun run scripts/dev/print-ecowitt-pc-checklist.ts",
     "e2e:install": "playwright install chromium",
     "e2e:install:ci": "playwright install --with-deps chromium",
+    "test:pheno-playwright": "playwright test --project=chromium-mocked e2e/pheno-comparison-responsive.spec.ts e2e/pheno-comparison-reload.spec.ts e2e/pheno-comparison-visual-style.spec.ts e2e/pheno-hunts-compare-deep-link.spec.ts e2e/pheno-hunts-compare-invalid-id.spec.ts",
+    "test:pheno-playwright:headed": "playwright test --project=chromium-mocked --headed e2e/pheno-comparison-responsive.spec.ts e2e/pheno-comparison-reload.spec.ts e2e/pheno-comparison-visual-style.spec.ts e2e/pheno-hunts-compare-deep-link.spec.ts e2e/pheno-hunts-compare-invalid-id.spec.ts",
     "e2e:setup": "playwright test --project=setup",
     "e2e:verify-fixture": "playwright test e2e/fixture-safety.spec.ts --project=chromium-authed",
     "e2e:bootstrap-fixture": "playwright test e2e/fixture-bootstrap.spec.ts --project=chromium-authed",

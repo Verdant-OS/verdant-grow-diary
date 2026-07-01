@@ -178,13 +178,13 @@ describe("sensor-ingest-webhook E2E insert contract — EcoWitt", () => {
     // inside raw_payload.metadata.raw_payload, we only check security-
     // critical leaks here:
     expect(json).not.toContain(FAKE_BRIDGE_TOKEN);
-    expect(json).not.toMatch(/vbt_[A-Za-z0-9_\-]{6,}/);
+    expect(json).not.toMatch(/vbt_[A-Za-z0-9_-]{6,}/);
     expect(json).not.toMatch(/Authorization/);
     expect(json).not.toMatch(/Bearer\s+\S+/i);
     expect(json).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
     expect(json).not.toMatch(/service_role/);
     // No JWT-shaped strings.
-    expect(json).not.toMatch(/eyJ[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}/);
+    expect(json).not.toMatch(/eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/);
   });
 
   it("idempotency_key is folded into raw_payload (not into top-level columns)", () => {

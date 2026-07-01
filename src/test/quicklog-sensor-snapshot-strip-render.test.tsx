@@ -12,6 +12,8 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 import {
   EMPTY_SENSOR_SNAPSHOT,
@@ -230,9 +232,8 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
 
   it("does not import the legacy dashboard hook", () => {
     // Static guard: the strip must not pull from the grow+tents[] hook.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const src = require("node:fs").readFileSync(
-      require("node:path").resolve(__dirname, "../../src/components/QuickLogSensorSnapshotStrip.tsx"),
+    const src = readFileSync(
+      resolve(__dirname, "../../src/components/QuickLogSensorSnapshotStrip.tsx"),
       "utf8",
     );
     expect(src).not.toMatch(/@\/hooks\/useLatestSensorSnapshot/);

@@ -54,7 +54,7 @@ describe("Spider Farmer GGS Backhaul ADR", () => {
     it("preserves step 1: placement + antenna + clean power + channel discipline", () => {
       const adr = readAdr();
       // Isolate the escalation ladder table to avoid matching the Decision section
-      const ladderMatch = adr.match(/## Escalation Ladder[\s\S]*?(?=## |\Z)/);
+      const ladderMatch = adr.match(/## Escalation Ladder[\s\S]*?(?=## |$)/);
       expect(ladderMatch).toBeTruthy();
       const ladder = ladderMatch![0];
 

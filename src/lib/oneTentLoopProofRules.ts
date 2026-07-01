@@ -49,6 +49,34 @@ export const LOOP_STEP_IDS = [
 
 export type LoopStepId = (typeof LOOP_STEP_IDS)[number];
 
+export type EvidenceRefKind = "direct" | "inferred";
+
+export interface EvidenceRef {
+  label: string;
+  timestamp?: string;
+  /** Provenance label (e.g. "live", "manual", "csv", "demo", "stale", "invalid", "grow", "tent", "plant", "diary", "alert", "action-queue", "ai-doctor"). */
+  source?: string;
+  deep_link?: string;
+  kind: EvidenceRefKind;
+}
+
+export type EvidenceProvenance =
+  | "direct"
+  | "inferred"
+  | "missing"
+  | "stale"
+  | "invalid"
+  | "demo_only";
+
+export interface MissingEvidenceDrilldown {
+  /** Plain, user-facing "what is missing". Never raw IDs / payloads / secrets. */
+  what_is_missing: string;
+  /** Why it matters for the One-Tent Loop. */
+  why_it_matters: string;
+  /** Where the grower/operator would normally record or review it. */
+  where_to_record: string;
+}
+
 export interface LoopStepRow {
   id: LoopStepId;
   label: string;
@@ -56,8 +84,15 @@ export interface LoopStepRow {
   evidence: string[];
   missing_info: string[];
   safety_note: string;
+  /** Sensor source label when relevant. Preserved for backward compatibility. */
   source?: string;
   deep_link?: string;
+  /** Overall provenance for the step's evidence, per the allowed vocabulary. */
+  provenance?: EvidenceProvenance;
+  /** Structured evidence references (label + timestamp + source + link). */
+  evidence_refs?: EvidenceRef[];
+  /** Drilldown copy — populated when status is missing / blocked / needs_review / stale / invalid / demo_only. */
+  drilldown?: MissingEvidenceDrilldown;
 }
 
 // ---------------------------------------------------------------------------

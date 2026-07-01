@@ -1,6 +1,7 @@
 # One-Tent Loop Proof — never-healthy artifact
 # Generated at: 2026-06-09T12:00:00.000Z
 # Read-only. No writes. No network. No secrets.
+# Mode: built-in hostile matrix
 
 ## Case: missing snapshot
 sensor.status = missing

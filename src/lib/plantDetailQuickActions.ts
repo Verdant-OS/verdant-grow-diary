@@ -14,13 +14,15 @@
  * removed). Callers must pass what they already have.
  */
 import { sensorsPath } from "@/lib/routes";
+import { QUICK_LOG_ACTIVITY_DEFINITIONS } from "@/constants/quickLogActivityTypes";
 
 export type PlantDetailQuickActionKind =
   | "quicklog"
   | "manual_sensor_snapshot"
   | "upload_photo"
   | "ask_doctor"
-  | "view_timeline";
+  | "view_timeline"
+  | "harvest";
 
 /** Payload dispatched on the `verdant:open-quicklog` event. */
 export interface PlantDetailQuickLogEventPayload {

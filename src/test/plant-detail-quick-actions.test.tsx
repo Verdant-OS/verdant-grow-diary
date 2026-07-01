@@ -499,6 +499,7 @@ describe("PlantDetailQuickActions · render", () => {
       "plant-detail-quick-action-upload-photo",
       "plant-detail-quick-action-ask-doctor",
       "plant-detail-quick-action-view-timeline",
+      "plant-detail-quick-action-harvest",
     ];
     for (const id of ids) {
       const el = screen.getByTestId(id);
@@ -514,7 +515,7 @@ describe("PlantDetailQuickActions · render", () => {
     const wrappers = container.querySelectorAll(
       '[data-testid="plant-detail-quick-actions"] > div',
     );
-    expect(wrappers.length).toBe(5);
+    expect(wrappers.length).toBe(6);
     for (const w of wrappers) {
       expect(w.className).toMatch(/min-w-0/);
     }

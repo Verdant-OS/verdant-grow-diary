@@ -800,6 +800,7 @@ describe("PlantDetailQuickActions · hardened a11y coverage", () => {
       "plant-detail-quick-action-upload-photo",
       "plant-detail-quick-action-ask-doctor",
       "plant-detail-quick-action-view-timeline",
+      "plant-detail-quick-action-harvest",
     ] as const;
     for (const id of disabledIds) {
       const el = screen.getByTestId(id);

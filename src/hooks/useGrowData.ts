@@ -226,6 +226,17 @@ export function useGrowPlant(id?: string): UseQueryResult<Plant | null> {
   });
 }
 
+/**
+ * Grower-facing sensor readings hook.
+ *
+ * Sensor Truth P0: this hook MUST NOT fall back to mock/demo readings.
+ * When Supabase returns zero rows we surface an honest empty array so
+ * grower-facing UIs render an "unavailable — no real sensor data"
+ * state instead of demo curves or fake T/RH/VPD chips. Manual and CSV
+ * readings still flow through the real `sensor_readings` table with
+ * their original `source` label — those are real data, not mock, and
+ * are unaffected.
+ */
 export function useGrowSensorReadings(tentId?: string): UseQueryResult<SensorReading[]> {
   const key = ["grow", "sensors", tentId ?? "all"] as const;
   return useQuery({
@@ -235,9 +246,10 @@ export function useGrowSensorReadings(tentId?: string): UseQueryResult<SensorRea
         "sensors",
         key,
         () => fetchSensorReadings(tentId),
-        () =>
-          tentId ? sensorReadings.filter((r) => r.tentId === tentId) : sensorReadings,
+        // Honest empty state — no mock/demo fallback for grower sensor UI.
+        () => [] as SensorReading[],
         isArrEmpty,
       ),
   });
 }
+

@@ -260,7 +260,33 @@ export const DAILY_CHECK_SAVED_ITEM_NOTE_LABEL = "Plant note";
 export const DAILY_CHECK_SAVED_ITEM_MANUAL_SNAPSHOT_LABEL =
   "Manual snapshot — saved as manual, not live sensor data";
 
-export type DailyCheckSavedItemKey = "note" | "manual-snapshot";
+/**
+ * Recognized saved-source keys. Extended in v1a to include the full
+ * set of supported activities. `harvest` is intentionally NOT included:
+ * Harvest cannot be persisted in v1a, so it must never appear in the
+ * saved breakdown.
+ */
+export type DailyCheckSavedItemKey =
+  | "note"
+  | "manual-snapshot"
+  | "photo"
+  | "watering"
+  | "feeding"
+  | "environment_check"
+  | "training"
+  | "defoliation"
+  | "issue_observation";
+
+export type DailyCheckSavedSource =
+  | "note"
+  | "sensor"
+  | "photo"
+  | "watering"
+  | "feeding"
+  | "environment_check"
+  | "training"
+  | "defoliation"
+  | "issue_observation";
 
 export interface DailyCheckSavedItem {
   key: DailyCheckSavedItemKey;
@@ -268,9 +294,27 @@ export interface DailyCheckSavedItem {
 }
 
 export interface DailyCheckSavedItemsInput {
-  source: "note" | "sensor" | null | undefined;
+  source: DailyCheckSavedSource | null | undefined;
   submittedAt: number | null | undefined;
 }
+
+const SAVED_LABELS: Record<DailyCheckSavedSource, { key: DailyCheckSavedItemKey; label: string }> = {
+  note: { key: "note", label: DAILY_CHECK_SAVED_ITEM_NOTE_LABEL },
+  sensor: {
+    key: "manual-snapshot",
+    label: DAILY_CHECK_SAVED_ITEM_MANUAL_SNAPSHOT_LABEL,
+  },
+  photo: { key: "photo", label: "Photo" },
+  watering: { key: "watering", label: "Watering" },
+  feeding: { key: "feeding", label: "Feeding" },
+  environment_check: { key: "environment_check", label: "Environment check" },
+  training: { key: "training", label: "Training" },
+  defoliation: { key: "defoliation", label: "Defoliation" },
+  issue_observation: {
+    key: "issue_observation",
+    label: "Issue / observation",
+  },
+};
 
 export function buildDailyCheckSavedItems(
   input: DailyCheckSavedItemsInput,
@@ -278,17 +322,11 @@ export function buildDailyCheckSavedItems(
   if (!input) return [];
   const ts = input.submittedAt;
   if (ts == null || !Number.isFinite(ts)) return [];
-  if (input.source === "note") {
-    return [{ key: "note", label: DAILY_CHECK_SAVED_ITEM_NOTE_LABEL }];
-  }
-  if (input.source === "sensor") {
-    return [
-      {
-        key: "manual-snapshot",
-        label: DAILY_CHECK_SAVED_ITEM_MANUAL_SNAPSHOT_LABEL,
-      },
-    ];
-  }
-  return [];
+  const source = input.source;
+  if (!source) return [];
+  const entry = SAVED_LABELS[source];
+  if (!entry) return [];
+  return [{ key: entry.key, label: entry.label }];
 }
+
 

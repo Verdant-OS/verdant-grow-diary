@@ -666,7 +666,21 @@ export default function QuickLog({
           </p>
         </DialogHeader>
 
+        {/* Shared v1a activity surface — consumes canonical
+            QUICK_LOG_ACTIVITY_DEFINITIONS. Additive to the existing
+            note/photo/watering flow below; every save routes through
+            useQuickLogActivitySave and dispatches
+            verdant:entry-created only on confirmed success. */}
+        <QuickLogAllActivitiesSection
+          growId={activeGrowId ?? null}
+          tentId={selectedPlant?.tent_id ?? null}
+          plantId={selectedPlant?.id ?? null}
+          heading="All activity types"
+          testIdPrefix="quick-log-dialog-all-activities"
+        />
+
         <form onSubmit={submit} className="grid gap-4">
+
           {(() => {
             const draftPreview = buildQuickLogDraftPreview({ prefill });
             if (!draftPreview.show) return null;

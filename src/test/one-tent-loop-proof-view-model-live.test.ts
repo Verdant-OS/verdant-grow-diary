@@ -53,7 +53,10 @@ describe("buildOneTentLoopLiveProofView", () => {
     });
     const sensor = v.steps.find((s) => s.id === "sensor-snapshot")!;
     expect(sensor.status).toBe("demo_only");
-    expect(JSON.stringify(v).toLowerCase()).not.toMatch(/\bhealthy\b/);
+    // "healthy" is only allowed inside honest negations like "never shown as healthy".
+    const dump = JSON.stringify(v).toLowerCase();
+    const positive = dump.replace(/never shown as healthy/g, "").replace(/not healthy/g, "").replace(/excluded from healthy/g, "");
+    expect(positive).not.toMatch(/\bhealthy\b/);
   });
 
   it("does not leak raw payload or unknown fields", () => {

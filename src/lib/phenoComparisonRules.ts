@@ -90,3 +90,22 @@ export const PHENO_MISSING_MESSAGES: Record<
   stale_reading: "Reading is stale — not treated as current",
   invalid_reading: "Reading is invalid — not treated as healthy",
 };
+
+/** Short legend describing each allowed source, for read-only presenter use. */
+export const PHENO_SOURCE_LEGEND: ReadonlyArray<{
+  source: PhenoComparisonSensorSource;
+  label: string;
+  description: string;
+  trusted: boolean;
+}> = [
+  { source: "live", label: "Live", description: "Live device reading.", trusted: true },
+  { source: "manual", label: "Manual", description: "Grower-entered snapshot.", trusted: true },
+  { source: "csv", label: "CSV", description: "Imported history from CSV.", trusted: true },
+  { source: "demo", label: "Demo", description: "Sample data — not real telemetry.", trusted: false },
+  { source: "stale", label: "Stale", description: "Old reading — not treated as current.", trusted: false },
+  { source: "invalid", label: "Invalid", description: "Bad or unknown reading — never treated as healthy.", trusted: false },
+];
+
+/** Read-only confidence caveat shown on the preview surface. */
+export const PHENO_COMPARISON_CONFIDENCE_CAVEAT =
+  "Comparison confidence depends on available evidence. Missing photos, missing metrics, stale or invalid readings weaken the comparison and are never treated as healthy.";

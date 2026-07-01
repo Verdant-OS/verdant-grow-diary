@@ -81,21 +81,22 @@ export default function Sensors() {
   // exists but is older than the freshness window, label it "Stale" and
   // still render the chart instead of hiding it as "Unavailable". Only the
   // truly-empty case should render the empty state.
-  // `useGrowSensorReadings` currently silently falls back to mock data
-  // (documented in docs/grow-os-architecture.md); when the slice is empty we
-  // honestly classify it as Unavailable rather than fabricating a source.
+  // Sensor Truth P0: `useGrowSensorReadings` no longer falls back to demo
+  // rows when Supabase returns empty — an empty slice honestly classifies
+  // as Unavailable. When a real row is present, we trust its persisted
+  // `source` column (`live | manual | csv | demo | stale | invalid`) and
+  // never re-label it as demo just because it exists.
   const latestSourceRaw = (latest as unknown as { source?: string | null } | null)?.source ?? null;
   const latestSource =
     typeof latestSourceRaw === "string" && latestSourceRaw.length > 0
       ? latestSourceRaw
-      : latest
-        ? "demo"
-        : null;
+      : null;
   const classification = classifyGrowDataSource(
     latest
       ? { source: latestSource, value: latest.temp, timestamp: latest.ts }
       : { source: null, value: null, timestamp: null },
   );
+
   const hasReadings = filtered.length > 0;
 
   const manualTents = realTents.map((t) => ({ id: t.id as string, name: t.name as string }));

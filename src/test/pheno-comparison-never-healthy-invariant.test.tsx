@@ -23,9 +23,22 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, within, cleanup } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import PhenoComparison from "@/pages/PhenoComparison";
-import * as fixtures from "@/lib/phenoComparisonFixtures";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
+
+const candidateHolder = vi.hoisted(
+  () =>
+    ({ current: [] as readonly PhenoCandidateInput[] }) as {
+      current: readonly PhenoCandidateInput[];
+    },
+);
+
+vi.mock("@/lib/phenoComparisonFixtures", () => ({
+  PHENO_COMPARISON_DEMO_BANNER:
+    "Demo comparison data — not live sensor data. Preview surface only.",
+  get PHENO_COMPARISON_DEMO_CANDIDATES() {
+    return candidateHolder.current;
+  },
+}));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: new Proxy(
@@ -37,6 +50,11 @@ vi.mock("@/integrations/supabase/client", () => ({
     },
   ),
 }));
+
+// Import AFTER mocks are set up.
+// eslint-disable-next-line import/first
+import PhenoComparison from "@/pages/PhenoComparison";
+
 
 const AFFIRMATIVE_HEALTHY_PATTERNS: RegExp[] = [
   /\bis healthy\b/i,

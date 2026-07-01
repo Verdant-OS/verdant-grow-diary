@@ -17,7 +17,7 @@ import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
-  QUICK_LOG_HARVEST_DISABLED_REASON,
+  QUICK_LOG_HARVEST_BACKEND_UNAVAILABLE_REASON,
   type QuickLogActivityId,
 } from "@/constants/quickLogActivityTypes";
 import { planQuickLogPersistence } from "@/lib/quickLogActivityRules";

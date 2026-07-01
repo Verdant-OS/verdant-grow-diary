@@ -69,7 +69,7 @@ const FORBIDDEN = [
 ];
 
 describe("buildPlantDetailQuickActions · ordering and completeness", () => {
-  it("returns the 5 expected kinds in deterministic order", () => {
+  it("returns the 6 expected kinds in deterministic order", () => {
     const kinds = buildPlantDetailQuickActions({ plantId: "p1" }).map(
       (e) => e.kind,
     );
@@ -79,6 +79,7 @@ describe("buildPlantDetailQuickActions · ordering and completeness", () => {
       "upload_photo",
       "ask_doctor",
       "view_timeline",
+      "harvest",
     ]);
   });
 
@@ -92,6 +93,7 @@ describe("buildPlantDetailQuickActions · ordering and completeness", () => {
       "Upload Photo",
       "Ask Doctor",
       "View Timeline",
+      "Harvest",
     ]);
   });
 
@@ -105,6 +107,7 @@ describe("buildPlantDetailQuickActions · ordering and completeness", () => {
       "Attach a plant photo to visual history.",
       "Review this plant with existing context.",
       "Jump to this plant's history.",
+      "Record a harvest event.",
     ]);
   });
 });

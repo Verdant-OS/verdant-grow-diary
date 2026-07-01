@@ -93,19 +93,40 @@ export function buildOneTentLoopLiveProofView(
 
 /**
  * Build a plain-text proof summary suitable for a copyable text block.
- * Contains only the derived rows — no raw payloads, no tokens.
+ * Contains only the derived rows — no raw payloads, no tokens, no IDs.
+ * Wording explicitly states the report is generated from current app state.
  */
 export function buildOneTentLoopLiveProofTextReport(view: LiveProofView): string {
   const lines: string[] = [];
   lines.push(view.title);
   lines.push(`Generated at: ${view.generated_at}`);
+  lines.push("Generated from current app state. Read-only. No writes performed.");
   lines.push("");
   lines.push(view.banner);
   lines.push("");
+  const c = view.counts;
+  lines.push(
+    `Overall status — passed: ${c.passed}, needs review: ${c.needs_review}, missing: ${c.missing}, blocked: ${c.blocked}, stale: ${c.stale}, invalid: ${c.invalid}, demo only: ${c.demo_only}.`,
+  );
+  lines.push("");
   for (const s of view.steps) {
     lines.push(`- ${s.label} [${s.status}]`);
+    if (s.provenance) lines.push(`    provenance: ${s.provenance}`);
+    if (s.source) lines.push(`    source: ${s.source}`);
+    for (const ref of s.evidence_refs ?? []) {
+      const parts = [ref.label];
+      if (ref.timestamp) parts.push(`at ${ref.timestamp}`);
+      if (ref.source) parts.push(`source=${ref.source}`);
+      parts.push(`kind=${ref.kind}`);
+      lines.push(`    ref: ${parts.join(" · ")}`);
+    }
     for (const e of s.evidence) lines.push(`    evidence: ${e}`);
     for (const m of s.missing_info) lines.push(`    missing: ${m}`);
+    if (s.drilldown) {
+      lines.push(`    drilldown — what: ${s.drilldown.what_is_missing}`);
+      lines.push(`    drilldown — why: ${s.drilldown.why_it_matters}`);
+      lines.push(`    drilldown — where: ${s.drilldown.where_to_record}`);
+    }
     lines.push(`    safety: ${s.safety_note}`);
   }
   lines.push("");

@@ -125,6 +125,18 @@ export default function QuickLogAllActivitiesSection({
 
   const canPersistManualSensor = false; // Deferred to ManualSensorReadingCard.
 
+  const harvestWetValidation = useMemo(
+    () => validateHarvestWeightInput(harvestWet),
+    [harvestWet],
+  );
+  const harvestDryValidation = useMemo(
+    () => validateHarvestWeightInput(harvestDry),
+    [harvestDry],
+  );
+  const harvestWeightsInvalid =
+    !harvestWetValidation.ok || !harvestDryValidation.ok;
+
+
   const requiresNote = useMemo(() => {
     if (!selected) return false;
     return (

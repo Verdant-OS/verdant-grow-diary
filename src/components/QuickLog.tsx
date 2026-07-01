@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
+import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import { STAGES } from "@/lib/grow";
 import { EC_UNITS, EC_UNIT_LABEL, type EcUnit } from "@/constants/units";
 import {
@@ -665,7 +666,21 @@ export default function QuickLog({
           </p>
         </DialogHeader>
 
+        {/* Shared v1a activity surface — consumes canonical
+            QUICK_LOG_ACTIVITY_DEFINITIONS. Additive to the existing
+            note/photo/watering flow below; every save routes through
+            useQuickLogActivitySave and dispatches
+            verdant:entry-created only on confirmed success. */}
+        <QuickLogAllActivitiesSection
+          growId={activeGrowId ?? null}
+          tentId={selectedPlant?.tent_id ?? null}
+          plantId={selectedPlant?.id ?? null}
+          heading="All activity types"
+          testIdPrefix="quick-log-dialog-all-activities"
+        />
+
         <form onSubmit={submit} className="grid gap-4">
+
           {(() => {
             const draftPreview = buildQuickLogDraftPreview({ prefill });
             if (!draftPreview.show) return null;

@@ -39,6 +39,7 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import QuickLog from "@/components/QuickLog";
+import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
@@ -354,6 +355,21 @@ export default function DailyCheck() {
           <span>{plantResolution.message}</span>
         </div>
       )}
+
+      {/* Shared Quick Log activity surface — consumes the canonical
+          QUICK_LOG_ACTIVITY_DEFINITIONS via QuickLogActivityPicker and
+          routes saves through useQuickLogActivitySave. Harvest renders
+          disabled with backend-update copy and never persists. */}
+      <div className="mb-4">
+        <QuickLogAllActivitiesSection
+          growId={growId}
+          tentId={tentId}
+          plantId={selectedPlant?.id ?? null}
+          testIdPrefix="daily-check-all-activities"
+        />
+      </div>
+
+
 
       {/* Post-submit confirmation. Only renders after QuickLog dispatches
           `verdant:entry-created`, which only fires after a successful insert. */}

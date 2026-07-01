@@ -92,7 +92,7 @@ describe("Harvest Quick Log form", () => {
     );
     fireEvent.change(
       screen.getByTestId("quick-log-all-activities-harvest-dry"),
-      { target: { value: "-5" } }, // dropped
+      { target: { value: "" } }, // empty — dropped by sanitizer
     );
     fireEvent.change(
       screen.getByTestId("quick-log-all-activities-harvest-unit"),

@@ -111,6 +111,9 @@ export default function QuickLogAllActivitiesSection({
     null,
   );
   const [note, setNote] = useState("");
+  const [harvestWet, setHarvestWet] = useState("");
+  const [harvestDry, setHarvestDry] = useState("");
+  const [harvestUnit, setHarvestUnit] = useState<QuickLogWeightUnit>("g");
   const [saved, setSaved] = useState<SavedRecord[]>([]);
   const [errorReason, setErrorReason] = useState<string | null>(null);
   const [errorForActivity, setErrorForActivity] =

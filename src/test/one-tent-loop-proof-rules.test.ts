@@ -11,9 +11,13 @@ import {
   evaluateSensorSnapshot,
   evaluateActionQueue,
   evaluateAiDoctor,
+  enrichLoopStepRow,
   LOOP_STEP_IDS,
   type LoopEvidence,
+  type LoopStepRow,
+  type SensorSourceLabel,
 } from "@/lib/oneTentLoopProofRules";
+
 
 const NOW = Date.parse("2026-06-09T12:00:00.000Z");
 

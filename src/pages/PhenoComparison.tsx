@@ -43,13 +43,15 @@ function fmtMetric(v: number | null, unit?: string): string {
 }
 
 function CandidateColumn({ c }: { c: PhenoCandidateView }) {
+  const headingId = `pheno-candidate-${c.candidateId}-heading`;
   return (
     <section
       data-testid={`pheno-candidate-${c.candidateId}`}
+      aria-labelledby={headingId}
       className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4"
     >
       <header className="space-y-1">
-        <h2 className="text-lg font-semibold">{c.candidateLabel}</h2>
+        <h2 id={headingId} className="text-lg font-semibold">{c.candidateLabel}</h2>
         <p className="text-xs text-muted-foreground">
           {[c.growLabel, c.tentLabel, c.plantLabel]
             .filter(Boolean)
@@ -63,8 +65,11 @@ function CandidateColumn({ c }: { c: PhenoCandidateView }) {
       {c.missing.length > 0 && (
         <ul
           data-testid={`pheno-candidate-${c.candidateId}-missing`}
+          role="status"
+          aria-label={`Missing context for ${c.candidateLabel}`}
           className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-300"
         >
+
           {c.missing.map((m) => (
             <li key={m.code} data-testid={`missing-${m.code}`}>
               ⚠ {m.message}
@@ -120,6 +125,8 @@ function CandidateColumn({ c }: { c: PhenoCandidateView }) {
         {c.photos.length === 0 ? (
           <p
             data-testid={`pheno-candidate-${c.candidateId}-no-photo`}
+            role="status"
+            aria-label={`No photo attached for ${c.candidateLabel}`}
             className="text-xs text-amber-800 dark:text-amber-300"
           >
             No photo attached.
@@ -144,10 +151,13 @@ function CandidateColumn({ c }: { c: PhenoCandidateView }) {
         {c.sensorSnapshots.length === 0 ? (
           <p
             data-testid={`pheno-candidate-${c.candidateId}-no-sensor`}
+            role="status"
+            aria-label={`No sensor snapshot for ${c.candidateLabel}`}
             className="text-xs text-amber-800 dark:text-amber-300"
           >
             No sensor snapshot.
           </p>
+
         ) : (
           <ul className="space-y-2">
             {c.sensorSnapshots.map((s) => (
@@ -208,13 +218,16 @@ export default function PhenoComparison() {
   return (
     <main
       data-testid="pheno-comparison-page"
+      aria-labelledby="pheno-comparison-heading"
       className="container mx-auto max-w-6xl px-4 py-6 space-y-4"
     >
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold">Pheno Comparison</h1>
+          <h1 id="pheno-comparison-heading" className="text-2xl font-semibold">Pheno Comparison</h1>
           <span
             data-testid="pheno-comparison-read-only-badge"
+            role="status"
+            aria-label="Read-only preview"
             className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
           >
             Read-only preview
@@ -222,6 +235,8 @@ export default function PhenoComparison() {
         </div>
         <p
           data-testid="pheno-comparison-demo-banner"
+          role="status"
+          aria-label="Demo data disclaimer"
           className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
         >
           {PHENO_COMPARISON_DEMO_BANNER}
@@ -232,7 +247,14 @@ export default function PhenoComparison() {
         >
           {PHENO_COMPARISON_CONFIDENCE_CAVEAT}
         </p>
-        <p className="text-xs text-muted-foreground">{view.caveat}</p>
+        <p
+          data-testid="pheno-comparison-comparability-verdict"
+          role="status"
+          aria-label="Comparability verdict"
+          className="text-xs text-muted-foreground"
+        >
+          {view.caveat}
+        </p>
 
         <ul
           data-testid="pheno-comparison-source-legend"
@@ -243,6 +265,7 @@ export default function PhenoComparison() {
             <li
               key={item.source}
               data-testid={`legend-${item.source}`}
+              aria-label={`${item.label} source: ${item.description}`}
               className="flex items-center gap-1.5 rounded border border-border bg-background/60 px-2 py-1"
             >
               <span
@@ -261,6 +284,7 @@ export default function PhenoComparison() {
       {!view.ok ? (
         <p
           data-testid="pheno-comparison-error"
+          role="alert"
           className="text-sm text-muted-foreground"
         >
           Select at least two candidates to compare.
@@ -268,8 +292,11 @@ export default function PhenoComparison() {
       ) : (
         <div
           data-testid="pheno-comparison-grid"
+          role="region"
+          aria-label="Pheno candidate comparison grid"
           className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
         >
+
           {view.candidates.map((c) => (
             <CandidateColumn key={c.candidateId} c={c} />
           ))}

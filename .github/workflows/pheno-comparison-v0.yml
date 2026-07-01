@@ -1,0 +1,73 @@
+name: Pheno Comparison v0
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  pheno-comparison-v0:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Pheno Comparison Vitest specs — read-only surface, no secrets required.
+      - name: Vitest — Pheno Comparison
+        run: |
+          bunx vitest run \
+            src/test/pheno-comparison-hardening.test.tsx \
+            src/test/pheno-comparison-never-healthy-invariant.test.tsx \
+            src/test/pheno-comparison-no-network.test.tsx \
+            src/test/pheno-comparison-page.test.tsx \
+            src/test/pheno-comparison-static-safety.test.ts \
+            src/test/pheno-comparison-view-model.test.ts \
+            src/test/pheno-comparison-a11y.test.tsx \
+            src/test/pheno-comparison-visual-style-invariant.test.tsx
+
+      # Contextual Pheno Comparison v0 suite — reuses existing script.
+      - name: Vitest — Contextual Pheno Comparison v0
+        run: bun run test:contextual-pheno-comparison-v0
+
+      # Route manifest sync — ensures /pheno-comparison + /pheno-hunts/:id/compare
+      # stay wired.
+      - name: Vitest — route manifest sync
+        run: |
+          bunx vitest run \
+            $(git ls-files 'src/test/**/*route*manifest*' 'src/test/**/route-manifest*' 2>/dev/null || true) \
+            --passWithNoTests
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      # Playwright — Pheno Comparison specs only. Route is mounted outside
+      # AppShell (fixture-only), so no auth secrets are required and the
+      # mocked project (chromium-mocked) is used to skip storageState setup.
+      - name: Install Playwright browsers (Chromium only)
+        run: bunx playwright install --with-deps chromium
+
+      - name: Playwright — Pheno Comparison
+        run: |
+          bunx playwright test \
+            --project=chromium-mocked \
+            e2e/pheno-comparison-responsive.spec.ts \
+            e2e/pheno-comparison-reload.spec.ts \
+            e2e/pheno-hunts-compare-deep-link.spec.ts

@@ -270,10 +270,13 @@ describe("resolveQuickLogEventTimelineLabel", () => {
     ).toBe("Observation");
   });
 
-  it("returns empty string for unknown event_type (never invents a label)", () => {
+  it("labels harvest event_type as Harvest", () => {
     expect(resolveQuickLogEventTimelineLabel({ eventType: "harvest" })).toBe(
-      "",
+      "Harvest",
     );
+  });
+
+  it("returns empty string for unknown/absent event_type", () => {
     expect(resolveQuickLogEventTimelineLabel({ eventType: null })).toBe("");
     expect(resolveQuickLogEventTimelineLabel({ eventType: undefined })).toBe(
       "",

@@ -800,15 +800,32 @@ function evidenceRefForStep(
         deep_link: "/timeline",
         kind: input.timeline.linked_directly ? "direct" : "inferred",
       };
-    case "sensor-snapshot":
+    case "sensor-snapshot": {
       if (!input.latest_sensor_snapshot?.source) return null;
+      // Prefer the sanitized step.source (which the evaluator forces to a
+      // safe label like "invalid" for unrecognized inputs) over the raw
+      // caller-supplied string. This prevents untrusted source strings
+      // (e.g. "verified", "ok", "healthy") from being echoed into the
+      // evidence-ref, drilldown, or copyable text report.
+      const rawSource = input.latest_sensor_snapshot.source;
+      const safeSource: string =
+        step.source ??
+        (ALLOWED_SENSOR_SOURCES.includes(rawSource as SensorSourceLabel)
+          ? (rawSource as string)
+          : "invalid");
+      const metricRaw = input.latest_sensor_snapshot.metric;
+      const safeMetric = typeof metricRaw === "string" ? metricRaw : "reading";
       return {
-        label: `Sensor snapshot (${input.latest_sensor_snapshot.metric ?? "reading"})`,
-        timestamp: input.latest_sensor_snapshot.captured_at ?? undefined,
-        source: input.latest_sensor_snapshot.source,
+        label: `Sensor snapshot (${safeMetric})`,
+        timestamp:
+          typeof input.latest_sensor_snapshot.captured_at === "string"
+            ? input.latest_sensor_snapshot.captured_at
+            : undefined,
+        source: safeSource,
         deep_link: "/sensors",
-        kind: input.latest_sensor_snapshot.source === "live" ? "direct" : "inferred",
+        kind: safeSource === "live" && step.status === "passed" ? "direct" : "inferred",
       };
+    }
     case "ai-doctor":
       if (!input.latest_ai_doctor?.session_id) return null;
       return {

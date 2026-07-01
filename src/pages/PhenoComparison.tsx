@@ -19,6 +19,10 @@ import {
   PHENO_COMPARISON_DEMO_BANNER,
   PHENO_COMPARISON_DEMO_CANDIDATES,
 } from "@/lib/phenoComparisonFixtures";
+import {
+  PHENO_SOURCE_LEGEND,
+  PHENO_COMPARISON_CONFIDENCE_CAVEAT,
+} from "@/lib/phenoComparisonRules";
 
 function toneClass(view: PhenoSensorSnapshotView): string {
   if (view.source === "live")
@@ -222,7 +226,36 @@ export default function PhenoComparison() {
         >
           {PHENO_COMPARISON_DEMO_BANNER}
         </p>
+        <p
+          data-testid="pheno-comparison-confidence-caveat"
+          className="text-xs text-muted-foreground"
+        >
+          {PHENO_COMPARISON_CONFIDENCE_CAVEAT}
+        </p>
         <p className="text-xs text-muted-foreground">{view.caveat}</p>
+
+        <ul
+          data-testid="pheno-comparison-source-legend"
+          aria-label="Sensor source legend"
+          className="flex flex-wrap gap-2 rounded-md border border-border bg-muted/30 p-2 text-[11px]"
+        >
+          {PHENO_SOURCE_LEGEND.map((item) => (
+            <li
+              key={item.source}
+              data-testid={`legend-${item.source}`}
+              className="flex items-center gap-1.5 rounded border border-border bg-background/60 px-2 py-1"
+            >
+              <span
+                className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${toneClass(
+                  { source: item.source } as PhenoSensorSnapshotView,
+                )}`}
+              >
+                {item.label}
+              </span>
+              <span className="text-muted-foreground">{item.description}</span>
+            </li>
+          ))}
+        </ul>
       </header>
 
       {!view.ok ? (

@@ -96,6 +96,14 @@ const LABELS: Record<
     label: "View Timeline",
     description: "Jump to this plant's history.",
   },
+  // Harvest label/description come from the shared activity taxonomy so
+  // no local production activity copy can drift. Preselection into the
+  // shared Quick Log flow is a follow-up — this entry links into the
+  // existing open-quicklog event with plant/tent/grow context preserved.
+  harvest: {
+    label: QUICK_LOG_ACTIVITY_DEFINITIONS.harvest.label,
+    description: QUICK_LOG_ACTIVITY_DEFINITIONS.harvest.description,
+  },
 };
 
 /** Deterministic Plant Detail quick-action list. */

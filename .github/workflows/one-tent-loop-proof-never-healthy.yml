@@ -72,33 +72,50 @@ jobs:
       - name: Playwright — /one-tent-loop-proof never-healthy
         run: bun run test:e2e:one-tent-loop-proof-never-healthy:ci
 
-      - name: Render sanitized proof artifact (on failure)
-        if: failure()
-        run: bun run artifact:one-tent-loop-proof-never-healthy || true
+      - name: Render sanitized proof artifact (always, with fallback)
+        if: ${{ always() }}
+        run: |
+          set +e
+          bun run artifact:one-tent-loop-proof-never-healthy
+          status=$?
+          if [ $status -ne 0 ]; then
+            echo "[ci] artifact script exited $status; writing fallback marker"
+            mkdir -p artifacts/one-tent-loop-proof
+            {
+              echo "# One-Tent Loop Proof — never-healthy artifact (CI FALLBACK)"
+              echo "# Generated at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "# Artifact script exited with status ${status}."
+              echo "# No secrets, tokens, service_role keys, bridge tokens,"
+              echo "# raw payloads, or private env values are included."
+            } > artifacts/one-tent-loop-proof/never-healthy-proof-report.txt
+          fi
+          exit 0
 
-      - name: Upload Playwright report
+      - name: Upload Playwright HTML report
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: one-tent-loop-proof-never-healthy-report
           path: playwright-report
-          retention-days: 14
+          retention-days: 7
           if-no-files-found: ignore
 
-      - name: Upload Playwright failure artifacts
-        if: failure()
+      - name: Upload Playwright test-results (traces / screenshots / videos)
+        if: ${{ failure() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: one-tent-loop-proof-never-healthy-failure-artifacts
           path: |
             test-results/**/*.png
             test-results/**/*.webm
+            test-results/**/*.zip
             test-results/**/trace.zip
+            test-results/**/*.log
           retention-days: 7
           if-no-files-found: ignore
 
-      - name: Upload sanitized proof artifact (on failure)
-        if: failure()
+      - name: Upload sanitized proof artifact
+        if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: one-tent-loop-proof-never-healthy-sanitized-proof

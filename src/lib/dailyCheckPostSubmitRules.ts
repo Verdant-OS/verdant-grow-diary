@@ -294,9 +294,22 @@ export interface DailyCheckSavedItem {
   label: string;
 }
 
+export interface DailyCheckSavedHarvestDetailsInput {
+  wetWeight?: string | null;
+  dryWeight?: string | null;
+  weightUnit?: string | null;
+}
+
 export interface DailyCheckSavedItemsInput {
   source: DailyCheckSavedSource | null | undefined;
   submittedAt: number | null | undefined;
+  /**
+   * Optional grower-entered harvest details. Only applied when
+   * source === "harvest". Missing / invalid values are silently hidden;
+   * we never invent numbers, never infer dry from wet, never call this
+   * yield.
+   */
+  harvestDetails?: DailyCheckSavedHarvestDetailsInput | null;
 }
 
 const SAVED_LABELS: Record<DailyCheckSavedSource, { key: DailyCheckSavedItemKey; label: string }> = {
@@ -328,7 +341,17 @@ export function buildDailyCheckSavedItems(
   if (!source) return [];
   const entry = SAVED_LABELS[source];
   if (!entry) return [];
-  return [{ key: entry.key, label: entry.label }];
+  let label = entry.label;
+  if (source === "harvest" && input.harvestDetails) {
+    // Lazy require to avoid a circular import — harvest rules import
+    // nothing from this module.
+    const { formatHarvestSavedBreakdownDetail } =
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("@/lib/harvestDetailsRules") as typeof import("@/lib/harvestDetailsRules");
+    const suffix = formatHarvestSavedBreakdownDetail(input.harvestDetails);
+    if (suffix) label = `${entry.label} — ${suffix}`;
+  }
+  return [{ key: entry.key, label }];
 }
 
 

@@ -125,6 +125,8 @@ function CandidateColumn({ c }: { c: PhenoCandidateView }) {
         {c.photos.length === 0 ? (
           <p
             data-testid={`pheno-candidate-${c.candidateId}-no-photo`}
+            role="status"
+            aria-label={`No photo attached for ${c.candidateLabel}`}
             className="text-xs text-amber-800 dark:text-amber-300"
           >
             No photo attached.
@@ -149,10 +151,13 @@ function CandidateColumn({ c }: { c: PhenoCandidateView }) {
         {c.sensorSnapshots.length === 0 ? (
           <p
             data-testid={`pheno-candidate-${c.candidateId}-no-sensor`}
+            role="status"
+            aria-label={`No sensor snapshot for ${c.candidateLabel}`}
             className="text-xs text-amber-800 dark:text-amber-300"
           >
             No sensor snapshot.
           </p>
+
         ) : (
           <ul className="space-y-2">
             {c.sensorSnapshots.map((s) => (

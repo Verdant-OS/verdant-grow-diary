@@ -466,6 +466,23 @@ export function evaluateSensorSnapshot(
       deep_link: "/sensors",
     };
   }
+  // Shape-guard captured_at: if present it must be a string. Non-string
+  // values (numbers, booleans, objects, arrays) are untrusted — Date.parse
+  // coercion (e.g. `Date.parse(12345)` → year 12345) must not be allowed
+  // to synthesize a "fresh" timestamp.
+  const capInput = (s as { captured_at?: unknown }).captured_at;
+  if (capInput !== undefined && capInput !== null && typeof capInput !== "string") {
+    return {
+      id: "sensor-snapshot",
+      label: "Sensor Snapshot",
+      status: "invalid",
+      evidence: [`Source: ${s.source}`, "Captured: unknown"],
+      missing_info: ["captured_at is malformed; excluded from healthy status."],
+      safety_note: "Malformed telemetry is never shown as healthy.",
+      source: "invalid",
+      deep_link: "/sensors",
+    };
+  }
   // Shape-guard the ancillary fields: confidence must be a finite number
   // in [0,1] when present, metric must be a string when present. Bad
   // shapes flip the row to `invalid` — untrusted telemetry is never

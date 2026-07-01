@@ -209,9 +209,7 @@ const NEVER_HEALTHY_CANDIDATES: PhenoCandidateInput[] = [
 ];
 
 function renderWithCandidates(cands: readonly PhenoCandidateInput[]) {
-  const spy = vi
-    .spyOn(fixtures, "PHENO_COMPARISON_DEMO_CANDIDATES", "get")
-    .mockReturnValue(cands);
+  candidateHolder.current = cands;
   const utils = render(
     <MemoryRouter initialEntries={["/pheno-comparison"]}>
       <Routes>
@@ -219,8 +217,14 @@ function renderWithCandidates(cands: readonly PhenoCandidateInput[]) {
       </Routes>
     </MemoryRouter>,
   );
-  return { ...utils, restore: () => spy.mockRestore() };
+  return {
+    ...utils,
+    restore: () => {
+      candidateHolder.current = [];
+    },
+  };
 }
+
 
 describe("PhenoComparison never-healthy invariant — expanded combinations", () => {
   it("renders every unknown/incomplete/invalid candidate without any healthy language or success glyphs", () => {

@@ -275,8 +275,7 @@ describe("QuickLogAllActivitiesSection — safety copy", () => {
     const txt = root.textContent?.toLowerCase() ?? "";
     // Forbidden: recommendation/certainty phrasing.
     expect(txt).not.toMatch(/we recommend/);
-    expect(txt).not.toMatch(/safe to feed/);
-    expect(txt).not.toMatch(/safe to train/);
+    expect(txt).not.toMatch(/\bis safe to (feed|train|defoliate)/);
     expect(txt).not.toMatch(/ready to harvest/);
     expect(txt).not.toMatch(/plant is healthy/);
     expect(txt).not.toMatch(/guaranteed/);

@@ -1,8 +1,23 @@
 name: Pheno Comparison v0
 
 on:
+  # Path-scoped rather than base-branch-scoped: this gate must run on any PR that
+  # touches the Pheno Comparison surface, its tests/specs, or this workflow —
+  # including stacked PRs whose base is not `main`. Path filtering keeps it from
+  # firing on unrelated PRs.
   pull_request:
-    branches: [main]
+    paths:
+      - "src/pages/PhenoComparison.tsx"
+      - "src/lib/phenoComparison*"
+      - "src/lib/phenoSelectionRules.ts"
+      - "src/test/pheno-comparison-*"
+      - "e2e/pheno-comparison-*.spec.ts"
+      - "src/App.tsx"
+      - "src/lib/appRouteManifest.ts"
+      - ".github/workflows/pheno-comparison-v0.yml"
+      - "vitest.config.ts"
+      - "playwright.config.ts"
+      - "package.json"
 
 permissions:
   contents: read

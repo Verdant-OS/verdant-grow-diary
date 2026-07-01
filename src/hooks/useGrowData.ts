@@ -10,7 +10,7 @@
 // later 1:1 page migration mechanical. Query keys are namespaced under
 // ["grow", ...] to avoid clashing with the existing useMockData cache.
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { tents, plants, sensorReadings, type Tent, type Plant, type SensorReading } from "@/mock";
+import { tents, plants, type Tent, type Plant, type SensorReading } from "@/mock";
 import {
   fetchTents,
   fetchTent,

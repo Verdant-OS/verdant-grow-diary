@@ -1906,6 +1906,7 @@ export type Database = {
         Args: {
           p_details?: Json
           p_event_type: string
+          p_feed?: Json
           p_grow_id: string
           p_idempotency_key: string
           p_note?: string
@@ -1914,6 +1915,7 @@ export type Database = {
           p_plant_id?: string
           p_sensor_snapshot?: Json
           p_tent_id?: string
+          p_water?: Json
         }
         Returns: Json
       }

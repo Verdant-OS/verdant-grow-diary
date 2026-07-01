@@ -434,6 +434,21 @@ export const ALLOWED_SENSOR_SOURCES: readonly SensorSourceLabel[] = [
   "invalid",
 ];
 
+/**
+ * Whitelist of keys we understand on a sensor snapshot. Any additional
+ * top-level key (`readings`, `metrics`, `raw_payload`, `bridge_token`,
+ * `service_role`, arbitrary vendor blobs, etc.) is treated as untrusted
+ * shape and flips the row to `invalid`. Callers that need to carry
+ * ancillary data must sanitize / drop it BEFORE passing snapshot
+ * evidence into the proof rules.
+ */
+const ALLOWED_SENSOR_KEYS: ReadonlySet<string> = new Set([
+  "source",
+  "captured_at",
+  "confidence",
+  "metric",
+]);
+
 export function evaluateSensorSnapshot(
   s: SensorSnapshotEvidence | null,
   now_ms: number,
@@ -465,6 +480,36 @@ export function evaluateSensorSnapshot(
       source: "invalid",
       deep_link: "/sensors",
     };
+  }
+  // Strict-shape guard: any unknown top-level key on the snapshot is
+  // untrusted shape. This prevents nested payloads (e.g. `readings`,
+  // `metrics`, `raw_payload`, vendor blobs, or accidental
+  // `service_role`/`bridge_token` copies) from being smuggled past the
+  // schema into a snapshot the evaluator would otherwise pass. The
+  // typed interface already forbids extras, so this only fires when a
+  // caller bypasses types with `as never` / `as unknown`.
+  if (s && typeof s === "object") {
+    const keys = Object.keys(s as unknown as Record<string, unknown>);
+    const unknownKeys = keys.filter((k) => !ALLOWED_SENSOR_KEYS.has(k));
+    if (unknownKeys.length > 0) {
+      return {
+        id: "sensor-snapshot",
+        label: "Sensor Snapshot",
+        status: "invalid",
+        evidence: [
+          `Source: ${s.source}`,
+          typeof s.captured_at === "string" && s.captured_at.length > 0
+            ? `Captured: ${s.captured_at}`
+            : "Captured: unknown",
+        ],
+        missing_info: [
+          "Sensor snapshot carries unknown fields; excluded from healthy status.",
+        ],
+        safety_note: "Malformed telemetry is never shown as healthy.",
+        source: "invalid",
+        deep_link: "/sensors",
+      };
+    }
   }
   // Shape-guard captured_at: if present it must be a string. Non-string
   // values (numbers, booleans, objects, arrays) are untrusted — Date.parse

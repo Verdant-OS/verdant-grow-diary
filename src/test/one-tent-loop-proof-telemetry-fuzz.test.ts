@@ -275,11 +275,36 @@ const STALE_INVALID_DEMO: FuzzCase[] = [
   },
 ];
 
+// Nested / NaN / Infinity / hostile-string-in-nested-shape cases. All of
+// these must be rejected as invalid because the strict-shape guard
+// forbids unknown top-level keys AND the type guards force malformed
+// `metric` shapes to invalid. This proves nested raw values (whether
+// NaN/Infinity strings, hostile literals like "healthy", or arbitrary
+// vendor blobs) cannot flow into the derived proof text.
+const NESTED_AND_NUMERIC: FuzzCase[] = [
+  { name: "metric as nested object with name key", input: { source: "live", captured_at: FRESH_ISO, metric: { name: "humidity" } } },
+  { name: "metric as nested object with hostile value 'healthy'", input: { source: "live", captured_at: FRESH_ISO, metric: { value: "healthy" } } },
+  { name: "metric as array", input: { source: "live", captured_at: FRESH_ISO, metric: ["humidity"] } },
+  { name: "metrics (plural, unknown key) present", input: { source: "live", captured_at: FRESH_ISO, metrics: { vpd_kpa: { value: 1.2 } } } },
+  { name: "unknown key readings with NaN string", input: { source: "live", captured_at: FRESH_ISO, readings: { temp_f: "NaN" } } },
+  { name: "unknown key readings with Infinity string", input: { source: "live", captured_at: FRESH_ISO, readings: { humidity_pct: "Infinity" } } },
+  { name: "unknown key readings with -Infinity string", input: { source: "live", captured_at: FRESH_ISO, readings: { vpd_kpa: "-Infinity" } } },
+  { name: "unknown key readings with 'not-a-number'", input: { source: "live", captured_at: FRESH_ISO, readings: { soil_moisture_pct: "not-a-number" } } },
+  { name: "unknown key readings with nested numeric object", input: { source: "live", captured_at: FRESH_ISO, readings: { ec: { value: "1.4" } } } },
+  { name: "unknown key readings with array value", input: { source: "live", captured_at: FRESH_ISO, readings: { ph: ["6.2"] } } },
+  { name: "unknown key with nested hostile 'verified'", input: { source: "live", captured_at: FRESH_ISO, meta: { status: "verified" } } },
+  { name: "unknown key with nested hostile 'success'", input: { source: "live", captured_at: FRESH_ISO, meta: { note: "success" } } },
+  { name: "unknown key with nested hostile 'ok'", input: { source: "live", captured_at: FRESH_ISO, meta: { flag: "ok" } } },
+  { name: "unknown key raw_payload with bridge_token", input: { source: "live", captured_at: FRESH_ISO, raw_payload: { bridge_token: "REDACT-ME" } } },
+  { name: "unknown key service_role", input: { source: "live", captured_at: FRESH_ISO, service_role: "REDACT-ME" } },
+];
+
 const ALL_CASES: FuzzCase[] = [
   ...MISSING_FIELDS,
   ...BAD_TYPES,
   ...UNEXPECTED_SOURCES,
   ...STALE_INVALID_DEMO,
+  ...NESTED_AND_NUMERIC,
 ];
 
 // ---------------------------------------------------------------------------

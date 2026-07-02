@@ -19,6 +19,8 @@
  *   --no-fail-on-expired    Do not fail when allowlist entries are expired
  *   --list-expired-entries  Print expired allowlist entries and exit (no GSC calls)
  *   --now <iso>             Override "now" for deterministic tests
+ *   --previous-dir <path>   Prior artifacts dir for diffing (default: artifacts/seo/previous)
+ *   --no-diff               Skip writing suppression diff artifacts
  */
 import { mkdirSync, writeFileSync, appendFileSync, readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
@@ -33,8 +35,15 @@ import {
   simulateAllowlistForUrls,
   DEFAULT_ALLOWLIST_PATH,
 } from "./seoAllowlist.mjs";
+import {
+  readPreviousSuppressions,
+  diffSuppressions,
+  renderSuppressionDiffMarkdown,
+  renderCompactSuppressionTable,
+} from "./seoDiff.mjs";
 
 const ARTIFACT_DIR = resolve(process.cwd(), "artifacts/seo");
+const DEFAULT_PREVIOUS_DIR = resolve(process.cwd(), "artifacts/seo/previous");
 const DEFAULT_URLS = [
   "https://verdantgrowdiary.com/",
   "https://verdantgrowdiary.com/welcome",
@@ -42,6 +51,26 @@ const DEFAULT_URLS = [
   "https://verdantgrowdiary.com/hardware-integrations",
 ];
 const HARD_CAP = 50;
+
+// List of stable artifact paths that both the JSON summary and the
+// markdown summary point at. Keeping these in one place means the
+// operator always has a predictable index of what a run produced.
+const STABLE_ARTIFACTS = [
+  { key: "job_summary_md", path: "artifacts/seo/seo-job-summary.md" },
+  { key: "job_summary_json", path: "artifacts/seo/seo-job-summary.json" },
+  { key: "suppressions_json", path: "artifacts/seo/seo-allowlist-suppressions.json" },
+  { key: "suppressions_md", path: "artifacts/seo/seo-allowlist-suppressions.md" },
+  { key: "suppressions_diff_json", path: "artifacts/seo/seo-allowlist-suppressions-diff.json" },
+  { key: "suppressions_diff_md", path: "artifacts/seo/seo-allowlist-suppressions-diff.md" },
+  { key: "dry_run_json", path: "artifacts/seo/seo-allowlist-dry-run.json" },
+  { key: "dry_run_md", path: "artifacts/seo/seo-allowlist-dry-run.md" },
+  { key: "expired_json", path: "artifacts/seo/seo-allowlist-expired.json" },
+  { key: "expired_md", path: "artifacts/seo/seo-allowlist-expired.md" },
+  { key: "url_inspection_json", path: "artifacts/seo/gsc-url-inspection.json" },
+  { key: "url_inspection_md", path: "artifacts/seo/gsc-url-inspection.md" },
+  { key: "last_finding_json", path: "artifacts/seo/gsc-last-finding-verification.json" },
+  { key: "last_finding_md", path: "artifacts/seo/gsc-last-finding-verification.md" },
+];
 
 function parseArgs(argv) {
   const out = {
@@ -56,6 +85,8 @@ function parseArgs(argv) {
     failOnExpired: true,
     listExpired: false,
     now: null,
+    previousDir: DEFAULT_PREVIOUS_DIR,
+    noDiff: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -70,12 +101,15 @@ function parseArgs(argv) {
     else if (a === "--no-fail-on-expired") out.failOnExpired = false;
     else if (a === "--list-expired-entries") out.listExpired = true;
     else if (a === "--now") out.now = argv[++i];
+    else if (a === "--previous-dir") out.previousDir = resolve(argv[++i]);
+    else if (a === "--no-diff") out.noDiff = true;
   }
   return out;
 }
 
-function writeJobSummary(md) {
+function writeJobSummary(md, jsonPayload) {
   writeArtifact("seo-job-summary.md", md);
+  writeArtifact("seo-job-summary.json", JSON.stringify(jsonPayload, null, 2));
   const target = process.env.GITHUB_STEP_SUMMARY;
   if (target) {
     try {
@@ -86,7 +120,42 @@ function writeJobSummary(md) {
   }
 }
 
-function buildJobSummary({ mode, status, allowlistSource, urls, simulated, expired, suppressed, failing, notes }) {
+function buildJobSummaryData({ mode, status, allowlistSource, urls, simulated, expired, suppressed, failing, diff, notes }) {
+  const counts = simulated
+    ? {
+        never_allowlisted: simulated.filter((s) => s.classification === "never_allowlisted").length,
+        suppressed: simulated.filter((s) => s.classification === "suppressed").length,
+        expected_noindex: simulated.filter((s) => s.classification === "expected_noindex").length,
+        expired_allowlist: simulated.filter((s) => s.classification === "expired_allowlist").length,
+        no_match: simulated.filter((s) => s.classification === "no_match").length,
+      }
+    : null;
+  return {
+    generated_at: new Date().toISOString(),
+    mode,
+    status,
+    allowlist_source: allowlistSource,
+    urls_evaluated: urls?.length ?? 0,
+    simulated_classification_counts: counts,
+    live_suppressed_issue_count: typeof suppressed === "number" ? suppressed : null,
+    live_critical_issue_count: typeof failing === "number" ? failing : null,
+    expired_entries: expired ?? [],
+    suppression_diff: diff
+      ? {
+          previous_available: diff.previous_available,
+          previous_generated_at: diff.previous_generated_at,
+          added: diff.added.length,
+          removed: diff.removed.length,
+          unchanged: diff.unchanged.length,
+        }
+      : null,
+    artifacts: Object.fromEntries(STABLE_ARTIFACTS.map((a) => [a.key, a.path])),
+    notes: notes ?? [],
+  };
+}
+
+function buildJobSummary({ mode, status, allowlistSource, urls, simulated, expired, suppressed, failing, diff, notes }) {
+  const data = buildJobSummaryData({ mode, status, allowlistSource, urls, simulated, expired, suppressed, failing, diff, notes });
   const lines = [
     "## Verdant SEO Monitoring — Job Summary",
     "",
@@ -95,44 +164,46 @@ function buildJobSummary({ mode, status, allowlistSource, urls, simulated, expir
     `- **Allowlist:** ${allowlistSource ? "`" + allowlistSource + "`" : "(none)"}`,
     `- **URLs evaluated:** ${urls?.length ?? 0}`,
   ];
-  if (simulated) {
-    const counts = {
-      never: simulated.filter((s) => s.classification === "never_allowlisted").length,
-      suppressed: simulated.filter((s) => s.classification === "suppressed").length,
-      noindex: simulated.filter((s) => s.classification === "expected_noindex").length,
-      expired: simulated.filter((s) => s.classification === "expired_allowlist").length,
-      unsuppressed: simulated.filter((s) => s.classification === "no_match").length,
-    };
+  if (data.simulated_classification_counts) {
+    const c = data.simulated_classification_counts;
     lines.push(
-      `- **Allowlisted suppressions:** ${counts.suppressed}`,
-      `- **Expected-noindex suppressions:** ${counts.noindex}`,
-      `- **Never-allowlist matches:** ${counts.never}`,
-      `- **Expired matches:** ${counts.expired}`,
-      `- **Unsuppressed URLs:** ${counts.unsuppressed}`,
+      `- **Allowlisted suppressions:** ${c.suppressed}`,
+      `- **Expected-noindex suppressions:** ${c.expected_noindex}`,
+      `- **Never-allowlist matches:** ${c.never_allowlisted}`,
+      `- **Expired matches:** ${c.expired_allowlist}`,
+      `- **Unsuppressed URLs:** ${c.no_match}`,
     );
   }
   if (typeof suppressed === "number") lines.push(`- **Live suppressed issues:** ${suppressed}`);
   if (typeof failing === "number") lines.push(`- **Critical (unsuppressed) issues:** ${failing}`);
+  if (diff) {
+    lines.push(
+      "",
+      "### Suppression diff vs previous run",
+      diff.previous_available
+        ? `Previous: \`${diff.previous_generated_at ?? "unknown"}\``
+        : "_No previous run available — baseline established._",
+      `- **Added:** ${diff.added.length}`,
+      `- **Removed:** ${diff.removed.length}`,
+      `- **Unchanged:** ${diff.unchanged.length}`,
+    );
+  }
   lines.push("", "### Expired allowlist entries");
   if (!expired || expired.length === 0) lines.push("None.");
   else
     for (const e of expired)
       lines.push(`- \`${e.section}[${e.id}]\` expired on ${e.expires_on}`);
-  lines.push("", "### Artifacts");
-  lines.push(
-    "- `artifacts/seo/seo-allowlist-suppressions.json`",
-    "- `artifacts/seo/seo-allowlist-suppressions.md`",
-    "- `artifacts/seo/seo-allowlist-dry-run.json` (dry-run only)",
-    "- `artifacts/seo/seo-allowlist-dry-run.md` (dry-run only)",
-    "- `artifacts/seo/gsc-url-inspection.json` (live only)",
-    "- `artifacts/seo/gsc-url-inspection.md` (live only)",
-    "- `artifacts/seo/gsc-last-finding-verification.json` (verification step)",
-    "- `artifacts/seo/gsc-last-finding-verification.md` (verification step)",
-  );
+  lines.push("", "### Stable artifact links");
+  for (const a of STABLE_ARTIFACTS) lines.push(`- \`${a.path}\``);
   if (notes?.length) {
     lines.push("", "### Notes", ...notes.map((n) => `- ${n}`));
   }
-  return lines.join("\n") + "\n";
+  return { md: lines.join("\n") + "\n", data };
+}
+
+function emitJobSummary(args) {
+  const { md, data } = buildJobSummary(args);
+  writeJobSummary(md, data);
 }
 
 async function urlsFromSitemap(sitemapUrl) {
@@ -153,15 +224,16 @@ function writeSuppressionArtifacts({ mode, suppressed, allowlistSource, expired,
     if (!bySource.has(key)) bySource.set(key, []);
     bySource.get(key).push(s);
   }
+  const bySourceObj = Object.fromEntries(
+    [...bySource].map(([k, v]) => [k, v.map(({ code, message }) => ({ code, message }))]),
+  );
   const json = {
     mode,
     generated_at: new Date().toISOString(),
     allowlist_source: allowlistSource,
     suppressed_issue_count: suppressed.length,
     expired_entry_count: expired.length,
-    suppressed_by_source: Object.fromEntries(
-      [...bySource].map(([k, v]) => [k, v.map(({ code, message }) => ({ code, message }))]),
-    ),
+    suppressed_by_source: bySourceObj,
     expired_entries: expired,
     notes,
   };
@@ -174,6 +246,9 @@ function writeSuppressionArtifacts({ mode, suppressed, allowlistSource, expired,
     `Allowlist: ${allowlistSource ? "`" + allowlistSource + "`" : "(none)"}`,
     `Suppressed issues: ${suppressed.length}`,
     `Expired entries: ${expired.length}`,
+    "",
+    "## Compact summary",
+    renderCompactSuppressionTable(bySourceObj),
     "",
   ];
   if (notes.length) {
@@ -194,6 +269,26 @@ function writeSuppressionArtifacts({ mode, suppressed, allowlistSource, expired,
         `- \`${e.section}[${e.id}]\` expired on ${e.expires_on} — patterns: ${(e.url_patterns ?? []).join(", ")}`,
       );
   writeArtifact("seo-allowlist-suppressions.md", md.join("\n") + "\n");
+  return json;
+}
+
+function writeSuppressionDiffArtifacts({ previousDir, currentPayload }) {
+  const prevPath = previousDir ? resolve(previousDir, "seo-allowlist-suppressions.json") : null;
+  const prev = readPreviousSuppressions(prevPath);
+  const diff = diffSuppressions(prev, currentPayload);
+  const json = {
+    generated_at: new Date().toISOString(),
+    previous_source: prevPath,
+    previous_available: diff.previous_available,
+    previous_generated_at: diff.previous_generated_at,
+    current_generated_at: diff.current_generated_at,
+    added: diff.added,
+    removed: diff.removed,
+    unchanged_count: diff.unchanged.length,
+  };
+  writeArtifact("seo-allowlist-suppressions-diff.json", JSON.stringify(json, null, 2));
+  writeArtifact("seo-allowlist-suppressions-diff.md", renderSuppressionDiffMarkdown(diff));
+  return diff;
 }
 
 function writeDryRunArtifacts({ simulated, allowlistSource, expired }) {
@@ -351,8 +446,7 @@ async function main() {
         2,
       ),
     );
-    writeJobSummary(
-      buildJobSummary({
+    emitJobSummary({
         mode: "list-expired-entries",
         status: expired.length === 0 ? "PASS" : args.failOnExpired ? "FAIL" : "WARN",
         allowlistSource: allowlist._source,
@@ -360,8 +454,7 @@ async function main() {
         simulated: null,
         expired,
         notes: ["No URLs were evaluated in --list-expired-entries mode."],
-      }),
-    );
+      });
     for (const e of expired) console.log(`${e.section}[${e.id}] expired ${e.expires_on}`);
     process.exit(args.failOnExpired && expired.length > 0 ? 3 : 0);
   }
@@ -378,27 +471,29 @@ async function main() {
   if (args.dryRunAllowlist) {
     const simulated = simulateAllowlistForUrls(urls, allowlist, now);
     writeDryRunArtifacts({ simulated, allowlistSource: allowlist._source, expired });
-    writeSuppressionArtifacts({
+    const currentPayload = writeSuppressionArtifacts({
       mode: "dry-run",
       suppressed: [],
       allowlistSource: allowlist._source,
       expired,
       notes: ["Dry-run mode — no GSC API calls were made."],
     });
+    const diff = args.noDiff
+      ? null
+      : writeSuppressionDiffArtifacts({ previousDir: args.previousDir, currentPayload });
     const wouldSuppress = simulated.filter((s) => s.would_suppress_issue_types.length > 0).length;
     const willFail = args.failOnExpired && expired.length > 0;
     const status = willFail ? "FAIL" : expired.length > 0 ? "WARN" : "PASS";
-    writeJobSummary(
-      buildJobSummary({
+    emitJobSummary({
         mode: "dry-run",
         status,
         allowlistSource: allowlist._source,
         urls,
         simulated,
         expired,
+        diff,
         notes: ["Dry-run — no GSC API calls."],
-      }),
-    );
+      });
     console.log(
       `Dry-run: ${urls.length} URL(s); ${wouldSuppress} would have issues suppressed; ${expired.length} expired allowlist entr${expired.length === 1 ? "y" : "ies"}.`,
     );
@@ -421,8 +516,7 @@ async function main() {
       expired,
       notes: ["Refused to run URL inspection because the allowlist has expired entries."],
     });
-    writeJobSummary(
-      buildJobSummary({
+    emitJobSummary({
         mode: "live-blocked-expired",
         status: "FAIL",
         allowlistSource: allowlist._source,
@@ -430,8 +524,7 @@ async function main() {
         simulated: null,
         expired,
         notes: ["Live inspection blocked: allowlist has expired entries."],
-      }),
-    );
+      });
     process.exit(3);
   }
 
@@ -455,8 +548,7 @@ async function main() {
       expired,
       notes: ["GSC OAuth not configured — no live inspection performed."],
     });
-    writeJobSummary(
-      buildJobSummary({
+    emitJobSummary({
         mode: "live-skipped",
         status: "SKIPPED",
         allowlistSource: allowlist._source,
@@ -464,8 +556,7 @@ async function main() {
         simulated: null,
         expired,
         notes: ["GSC OAuth not configured — live inspection skipped. Missing env vars are logged but not shown here."],
-      }),
-    );
+      });
     console.log("GSC OAuth not configured — skipping (missing: " + creds.missing.join(", ") + ")");
     process.exit(0);
   }
@@ -510,15 +601,20 @@ async function main() {
   };
   writeArtifact("gsc-url-inspection.json", JSON.stringify(payload, null, 2));
   writeArtifact("gsc-url-inspection.md", toInspectionMarkdown(results, allowlist._source));
-  writeSuppressionArtifacts({
+  const currentSuppressionPayload = writeSuppressionArtifacts({
     mode: "live",
     suppressed,
     allowlistSource: allowlist._source,
     expired,
     notes: [],
   });
-  writeJobSummary(
-    buildJobSummary({
+  const diff = args.noDiff
+    ? null
+    : writeSuppressionDiffArtifacts({
+        previousDir: args.previousDir,
+        currentPayload: currentSuppressionPayload,
+      });
+  emitJobSummary({
       mode: "live",
       status: failing.length ? "FAIL" : expired.length > 0 ? "WARN" : "PASS",
       allowlistSource: allowlist._source,
@@ -527,9 +623,9 @@ async function main() {
       expired,
       suppressed: suppressed.length,
       failing: failing.length,
+      diff,
       notes: [],
-    }),
-  );
+    });
   console.log(
     `Inspected ${results.length} URL(s); ${failing.length} critical, ${suppressed.length} suppressed by allowlist.`,
   );

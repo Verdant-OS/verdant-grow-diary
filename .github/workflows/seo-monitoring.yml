@@ -49,11 +49,23 @@ jobs:
       - name: Prepare artifact directory
         run: mkdir -p artifacts/seo
       - name: Validate SEO allowlist config
-        run: node --test scripts/test-seo-allowlist.mjs scripts/test-seo-allowlist-config.mjs scripts/test-seo-allowlist-expiration.mjs scripts/test-seo-allowlist-diagnostics.mjs scripts/test-seo-job-summary.mjs
+        run: node --test scripts/test-seo-allowlist.mjs scripts/test-seo-allowlist-config.mjs scripts/test-seo-allowlist-expiration.mjs scripts/test-seo-allowlist-diagnostics.mjs scripts/test-seo-job-summary.mjs scripts/test-seo-suppression-diff.mjs scripts/test-seo-verify-regression-mode.mjs
+      - name: Download previous SEO artifacts (for diff)
+        id: prev
+        continue-on-error: true
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: seo-monitoring-reports
+          workflow: seo-monitoring.yml
+          workflow_conclusion: success
+          path: artifacts/seo/previous
+          if_no_artifact_found: warn
       - name: SEO allowlist — list expired entries
         run: node scripts/seo/gsc-inspect-urls.mjs --list-expired-entries --allowlist config/seo-allowlist.json
       - name: SEO allowlist dry-run (no GSC calls; fails on expired entries)
-        run: node scripts/seo/gsc-inspect-urls.mjs --dry-run-allowlist --urls "https://verdantgrowdiary.com/,https://verdantgrowdiary.com/welcome,https://verdantgrowdiary.com/pricing,https://verdantgrowdiary.com/hardware-integrations" --allowlist config/seo-allowlist.json
+        run: node scripts/seo/gsc-inspect-urls.mjs --dry-run-allowlist --urls "https://verdantgrowdiary.com/,https://verdantgrowdiary.com/welcome,https://verdantgrowdiary.com/pricing,https://verdantgrowdiary.com/hardware-integrations" --allowlist config/seo-allowlist.json --previous-dir artifacts/seo/previous
+      - name: SEO regression-only check (no GSC calls)
+        run: node scripts/seo/verify-last-gsc-finding.mjs --fail-only-previously-resolved-expired --previous artifacts/seo/previous/gsc-last-finding-verification.json
       - name: GSC OAuth configured?
         id: gsc
         run: |
@@ -66,7 +78,7 @@ jobs:
           fi
       - name: GSC URL inspection
         if: steps.gsc.outputs.configured == 'true'
-        run: node scripts/seo/gsc-inspect-urls.mjs --sitemap "$SEO_SITEMAP_URL" --max "$SEO_MAX_URLS" --allowlist config/seo-allowlist.json
+        run: node scripts/seo/gsc-inspect-urls.mjs --sitemap "$SEO_SITEMAP_URL" --max "$SEO_MAX_URLS" --allowlist config/seo-allowlist.json --previous-dir artifacts/seo/previous
       - name: Verify last GSC finding
         if: steps.gsc.outputs.configured == 'true' && (github.event.inputs.verify_last_finding != 'false')
         run: node scripts/seo/verify-last-gsc-finding.mjs
@@ -86,6 +98,7 @@ jobs:
           name: seo-monitoring-reports
           path: |
             artifacts/seo/**
+            !artifacts/seo/previous/**
             !artifacts/seo/**/*.env
             !artifacts/seo/**/*token*
             !artifacts/seo/**/*secret*

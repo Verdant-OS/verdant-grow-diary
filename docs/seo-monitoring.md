@@ -243,3 +243,54 @@ Additional operator affordances in `scripts/seo/gsc-inspect-urls.mjs`:
 "resolved" (status becomes `unresolved_expired_allowlist`) if any
 expired allowlist entry still covers an affected URL, preventing
 stale suppression from masking regressions.
+
+## v1.3 diagnostics polish
+
+### Regression-only verification mode
+
+`scripts/seo/verify-last-gsc-finding.mjs` accepts
+`--fail-only-previously-resolved-expired`. In this mode the script makes
+**no GSC API calls** — instead it compares the tracked finding's
+`affected_urls` against:
+
+1. the previous run's `gsc-last-finding-verification.json`
+   (default: `artifacts/seo/previous/gsc-last-finding-verification.json`,
+   override with `--previous <path>`), and
+2. currently expired allowlist entries covering each URL.
+
+A URL is a **regression** only if it was previously resolved AND is now
+covered by an expired allowlist entry. Exit codes:
+
+- `0` — no regression (also when no previous artifact is available)
+- `4` — one or more regressions detected
+
+The mode is safe against placeholder configs (it exits `0` with `status:
+"skipped"`).
+
+### Stable artifact links & JSON job summary
+
+`gsc-inspect-urls.mjs` now writes `artifacts/seo/seo-job-summary.json`
+alongside the Markdown summary. It contains structured status,
+classification counts, live suppression totals, expired entries, the
+suppression diff summary, and an `artifacts` map with the canonical
+paths of every report file (stable across runs).
+
+### Compact suppression table
+
+`seo-allowlist-suppressions.md` starts with a compact table that groups
+suppressed issues by allowlist entry with counts and unique issue codes,
+so reviewers see the picture without scrolling through per-issue lists.
+
+### Previous-run suppression diff
+
+When a `--previous-dir` (default `artifacts/seo/previous`) contains a
+prior `seo-allowlist-suppressions.json`, the runner now writes:
+
+- `artifacts/seo/seo-allowlist-suppressions-diff.json`
+- `artifacts/seo/seo-allowlist-suppressions-diff.md`
+
+listing suppressions **added** and **removed** since the previous run.
+The CI workflow downloads the last successful run's `seo-monitoring-reports`
+artifact into `artifacts/seo/previous/` before running dry-run and live
+inspection, so the diff surfaces automatically on every scheduled run.
+Pass `--no-diff` to disable the diff artifacts locally.

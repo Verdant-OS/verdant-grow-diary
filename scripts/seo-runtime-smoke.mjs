@@ -70,6 +70,44 @@ for (const r of ROUTES) {
   await page.close();
 }
 
+// SoftwareApplication JSON-LD (injected into index.html at build time from the
+// pricing constants). Assert it is present and the offer prices match, so the
+// structured data can never silently drift from src/constants/pricing.ts.
+{
+  const page = await browser.newPage();
+  await page.goto(BASE + "/welcome", { waitUntil: "networkidle" });
+  const blocks = await page.$$eval('script[type="application/ld+json"]', (els) =>
+    els.map((e) => e.textContent || ""),
+  );
+  const app = blocks
+    .map((t) => {
+      try {
+        return JSON.parse(t);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean)
+    .flatMap((d) => (d["@graph"] ? d["@graph"] : [d]))
+    .find((n) => n["@type"] === "SoftwareApplication");
+
+  const problems = [];
+  if (!app) problems.push("no SoftwareApplication JSON-LD found");
+  else {
+    const prices = new Set((app.offers || []).map((o) => String(o.price)));
+    for (const expected of ["0", "12", "99", "129"]) {
+      if (!prices.has(expected))
+        problems.push(`SoftwareApplication offers missing price ${expected}`);
+    }
+  }
+  const ok = problems.length === 0;
+  if (!ok) failed++;
+  console.log(`${ok ? "PASS" : "FAIL"} SoftwareApplication JSON-LD`);
+  if (app) console.log(`   offers:    ${(app.offers || []).map((o) => o.price).join(", ")}`);
+  for (const p of problems) console.log(`   ✗ ${p}`);
+  await page.close();
+}
+
 await browser.close();
-console.log(`\n${failed === 0 ? "ALL ROUTES OK" : `${failed} ROUTE(S) FAILED`}`);
+console.log(`\n${failed === 0 ? "ALL CHECKS OK" : `${failed} CHECK(S) FAILED`}`);
 process.exit(failed === 0 ? 0 : 1);

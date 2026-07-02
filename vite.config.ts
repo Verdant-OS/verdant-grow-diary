@@ -1,7 +1,65 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
+import { PRICING } from "./src/constants/pricing";
+
+const SITE_ORIGIN = "https://verdantgrowdiary.com";
+
+/**
+ * Bake a SoftwareApplication + Offer JSON-LD block into index.html at build
+ * time. Prices are read from src/constants/pricing.ts (the single source of
+ * truth) so the structured data can never drift from the pricing page. Static
+ * output means non-JS crawlers see it too — no aggregateRating is emitted
+ * because we have no real ratings to cite.
+ */
+function softwareApplicationJsonLd(): Plugin {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "@id": `${SITE_ORIGIN}/#app`,
+    name: "Verdant Grow Diary",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url: SITE_ORIGIN,
+    description:
+      "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.",
+    offers: [
+      { "@type": "Offer", name: "Free", price: String(PRICING.free.price), priceCurrency: "USD" },
+      {
+        "@type": "Offer",
+        name: "Pro (monthly)",
+        price: String(PRICING.pro.monthlyPrice),
+        priceCurrency: "USD",
+      },
+      {
+        "@type": "Offer",
+        name: "Pro (annual)",
+        price: String(PRICING.pro.annualPrice),
+        priceCurrency: "USD",
+      },
+      {
+        "@type": "Offer",
+        name: "Founder Lifetime",
+        price: String(PRICING.founder.price),
+        priceCurrency: "USD",
+      },
+    ],
+  };
+  return {
+    name: "verdant-softwareapplication-jsonld",
+    transformIndexHtml() {
+      return [
+        {
+          tag: "script",
+          attrs: { type: "application/ld+json" },
+          children: JSON.stringify(jsonLd),
+          injectTo: "head",
+        },
+      ];
+    },
+  };
+}
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -12,7 +70,11 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [
+    react(),
+    mode === "development" && componentTagger(),
+    softwareApplicationJsonLd(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

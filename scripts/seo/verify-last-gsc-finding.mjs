@@ -97,12 +97,25 @@ async function main() {
       results.push({ url, error: e.message, resolved: false });
     }
   }
-  const allResolved = results.length > 0 && results.every((r) => r.resolved);
+  // Guard: refuse to declare "resolved" if any expired allowlist entry
+  // covers one of the affected URLs — stale suppression could otherwise
+  // mask the regression the finding is meant to detect.
+  const allowlist = loadAllowlist(DEFAULT_ALLOWLIST_PATH);
+  const expiredCovering = findExpiredEntriesMatchingUrls(allowlist, urls);
+
+  const allResolved =
+    results.length > 0 && results.every((r) => r.resolved) && expiredCovering.length === 0;
+  const status = expiredCovering.length > 0
+    ? "unresolved_expired_allowlist"
+    : allResolved
+      ? "resolved"
+      : "unresolved";
   const payload = {
-    status: allResolved ? "resolved" : "unresolved",
+    status,
     finding_id: config.finding_id,
     description: config.description,
     generated_at: new Date().toISOString(),
+    expired_allowlist_entries_covering_finding: expiredCovering,
     results,
   };
   writeFileSync(
@@ -116,6 +129,15 @@ async function main() {
     `- **status:** ${payload.status}`,
     `- **description:** ${config.description}`,
     ``,
+    ...(expiredCovering.length
+      ? [
+          `⚠️ Refusing to mark resolved: ${expiredCovering.length} expired allowlist entr${expiredCovering.length === 1 ? "y" : "ies"} still cover the affected URLs.`,
+          ...expiredCovering.map(
+            (e) => `- \`${e.section}[${e.id}]\` expired on ${e.expires_on}`,
+          ),
+          ``,
+        ]
+      : []),
     ...results.map((r) => `- ${r.resolved ? "✅" : "❌"} ${r.url}`),
     ``,
   ].join("\n");

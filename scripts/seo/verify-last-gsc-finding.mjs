@@ -52,6 +52,11 @@ async function main() {
     process.exit(0);
   }
   const config = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+  const isPlaceholder =
+    !config.description ||
+    /placeholder/i.test(config.description) ||
+    !Array.isArray(config.affected_urls) ||
+    config.affected_urls.length === 0;
   const creds = loadGscCredentials();
   if (!creds.ok) {
     writeFileSync(
@@ -59,6 +64,22 @@ async function main() {
       JSON.stringify({ status: "skipped", reason: "gsc_oauth_not_configured", missing: creds.missing }, null, 2),
     );
     console.log("GSC OAuth not configured — skipping last-finding verification.");
+    process.exit(0);
+  }
+  if (isPlaceholder) {
+    writeFileSync(
+      resolve(ARTIFACT_DIR, "gsc-last-finding-verification.json"),
+      JSON.stringify(
+        {
+          status: "skipped",
+          reason: "config_is_placeholder",
+          hint: "Update config/seo-last-gsc-finding.json with a real description and affected_urls before verification.",
+        },
+        null,
+        2,
+      ),
+    );
+    console.log("Last-finding config is a placeholder — refusing to mark resolved.");
     process.exit(0);
   }
   const accessToken = await getAccessToken(creds);
@@ -69,7 +90,8 @@ async function main() {
       const raw = await inspectUrl({ accessToken, siteUrl: creds.siteUrl, inspectionUrl: url });
       const summary = summarizeInspection(url, raw);
       const checks = evaluate(summary, config.expected_resolution ?? {});
-      results.push({ url, summary, checks, resolved: checks.every((c) => c.ok) });
+      const resolved = checks.length > 0 && checks.every((c) => c.ok);
+      results.push({ url, summary, checks, resolved });
     } catch (e) {
       results.push({ url, error: e.message, resolved: false });
     }

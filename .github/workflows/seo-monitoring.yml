@@ -48,6 +48,8 @@ jobs:
         run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
       - name: Prepare artifact directory
         run: mkdir -p artifacts/seo
+      - name: Validate SEO allowlist config
+        run: node --test scripts/test-seo-allowlist.mjs scripts/test-seo-allowlist-config.mjs
       - name: GSC OAuth configured?
         id: gsc
         run: |
@@ -60,7 +62,7 @@ jobs:
           fi
       - name: GSC URL inspection
         if: steps.gsc.outputs.configured == 'true'
-        run: node scripts/seo/gsc-inspect-urls.mjs --sitemap "$SEO_SITEMAP_URL" --max "$SEO_MAX_URLS"
+        run: node scripts/seo/gsc-inspect-urls.mjs --sitemap "$SEO_SITEMAP_URL" --max "$SEO_MAX_URLS" --allowlist config/seo-allowlist.json
       - name: Verify last GSC finding
         if: steps.gsc.outputs.configured == 'true' && (github.event.inputs.verify_last_finding != 'false')
         run: node scripts/seo/verify-last-gsc-finding.mjs

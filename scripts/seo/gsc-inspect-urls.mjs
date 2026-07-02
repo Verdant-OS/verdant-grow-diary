@@ -53,6 +53,7 @@ function parseArgs(argv) {
     useAllowlist: true,
     dryRunAllowlist: false,
     failOnExpired: true,
+    listExpired: false,
     now: null,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -66,9 +67,71 @@ function parseArgs(argv) {
     else if (a === "--no-allowlist") out.useAllowlist = false;
     else if (a === "--dry-run-allowlist") out.dryRunAllowlist = true;
     else if (a === "--no-fail-on-expired") out.failOnExpired = false;
+    else if (a === "--list-expired-entries") out.listExpired = true;
     else if (a === "--now") out.now = argv[++i];
   }
   return out;
+}
+
+function writeJobSummary(md) {
+  writeArtifact("seo-job-summary.md", md);
+  const target = process.env.GITHUB_STEP_SUMMARY;
+  if (target) {
+    try {
+      appendFileSync(target, md.endsWith("\n") ? md : md + "\n");
+    } catch {
+      // step summary is best-effort; artifact file is authoritative
+    }
+  }
+}
+
+function buildJobSummary({ mode, status, allowlistSource, urls, simulated, expired, suppressed, failing, notes }) {
+  const lines = [
+    "## Verdant SEO Monitoring — Job Summary",
+    "",
+    `- **Mode:** ${mode}`,
+    `- **Status:** ${status}`,
+    `- **Allowlist:** ${allowlistSource ? "`" + allowlistSource + "`" : "(none)"}`,
+    `- **URLs evaluated:** ${urls?.length ?? 0}`,
+  ];
+  if (simulated) {
+    const counts = {
+      never: simulated.filter((s) => s.classification === "never_allowlisted").length,
+      suppressed: simulated.filter((s) => s.classification === "suppressed").length,
+      noindex: simulated.filter((s) => s.classification === "expected_noindex").length,
+      expired: simulated.filter((s) => s.classification === "expired_allowlist").length,
+      unsuppressed: simulated.filter((s) => s.classification === "no_match").length,
+    };
+    lines.push(
+      `- **Allowlisted suppressions:** ${counts.suppressed}`,
+      `- **Expected-noindex suppressions:** ${counts.noindex}`,
+      `- **Never-allowlist matches:** ${counts.never}`,
+      `- **Expired matches:** ${counts.expired}`,
+      `- **Unsuppressed URLs:** ${counts.unsuppressed}`,
+    );
+  }
+  if (typeof suppressed === "number") lines.push(`- **Live suppressed issues:** ${suppressed}`);
+  if (typeof failing === "number") lines.push(`- **Critical (unsuppressed) issues:** ${failing}`);
+  lines.push("", "### Expired allowlist entries");
+  if (!expired || expired.length === 0) lines.push("None.");
+  else
+    for (const e of expired)
+      lines.push(`- \`${e.section}[${e.id}]\` expired on ${e.expires_on}`);
+  lines.push("", "### Artifacts");
+  lines.push(
+    "- `artifacts/seo/seo-allowlist-suppressions.json`",
+    "- `artifacts/seo/seo-allowlist-suppressions.md`",
+    "- `artifacts/seo/seo-allowlist-dry-run.json` (dry-run only)",
+    "- `artifacts/seo/seo-allowlist-dry-run.md` (dry-run only)",
+    "- `artifacts/seo/gsc-url-inspection.json` (live only)",
+    "- `artifacts/seo/gsc-url-inspection.md` (live only)",
+    "- `artifacts/seo/gsc-last-finding-verification.json` (verification step)",
+    "- `artifacts/seo/gsc-last-finding-verification.md` (verification step)",
+  );
+  if (notes?.length) {
+    lines.push("", "### Notes", ...notes.map((n) => `- ${n}`));
+  }
+  return lines.join("\n") + "\n";
 }
 
 async function urlsFromSitemap(sitemapUrl) {

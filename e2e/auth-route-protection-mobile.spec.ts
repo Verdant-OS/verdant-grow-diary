@@ -68,6 +68,10 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/hardware-integrations",
   "/partners/csv-preview",
   "/customer/:shareId",
+  // Read-only Pheno Comparison preview: public, fixture-only, mounted outside
+  // AuthProvider/GrowsProvider/AppShell — must render signed-out on mobile with
+  // zero private-table fetches.
+  "/pheno-comparison",
 ];
 
 async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {

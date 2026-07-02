@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-// @ts-ignore — mjs script without types; tests verify exported behavior.
+// Untyped .mjs scanner script (resolves to `any` under noImplicitAny:false); we
+// import it to test its exported behavior at runtime.
 import { scanText, formatViolation, RULES } from "../../scripts/assert-release-docs-safety.mjs";
 
 describe("release-docs safety scanner", () => {

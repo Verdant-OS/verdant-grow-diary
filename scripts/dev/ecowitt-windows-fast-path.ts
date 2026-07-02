@@ -33,10 +33,7 @@
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve, sep } from "node:path";
-import {
-  buildDoctorReport,
-  writeLaunchers,
-} from "./ecowitt-windows-doctor";
+import { buildDoctorReport, writeLaunchers } from "./ecowitt-windows-doctor";
 import { runSmoke, type SmokeOptions, type SmokeResult } from "./ecowitt-local-bridge-smoke";
 
 export const NEXT_DRY_RUN_LINES = [
@@ -126,12 +123,24 @@ const ROLE_LITERAL = "ser" + "vice_role";
 const WEBHOOK_LITERAL = "sensor-" + "ingest-" + "webhook";
 
 const REDACTION_RULES: ReadonlyArray<{ name: string; re: RegExp; repl: string }> = [
-  { name: "jwt_like", re: /eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]+/g, repl: "***REDACTED-JWT***" },
-  { name: "bearer_token", re: /(Bearer\s+)[A-Za-z0-9._\-]+/gi, repl: "$1***REDACTED***" },
-  { name: "bridge_token_shape", re: /vbt_[A-Za-z0-9_\-]+/g, repl: "vbt_***REDACTED***" },
+  {
+    name: "jwt_like",
+    re: /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+/g,
+    repl: "***REDACTED-JWT***",
+  },
+  { name: "bearer_token", re: /(Bearer\s+)[A-Za-z0-9._-]+/gi, repl: "$1***REDACTED***" },
+  { name: "bridge_token_shape", re: /vbt_[A-Za-z0-9_-]+/g, repl: "vbt_***REDACTED***" },
   { name: "mqtt_userinfo", re: /(mqtts?:\/\/)[^@\s/]+:[^@\s/]+@/gi, repl: "$1***REDACTED***@" },
-  { name: "supabase_url", re: new RegExp("https?://[A-Za-z0-9-]+\\." + "supa" + "base\\.co[^\\s\"']*", "gi"), repl: "***REDACTED-SUPABASE-URL***" },
-  { name: "supabase_env", re: new RegExp(SB_ENV_PREFIX + "[A-Z_]+", "g"), repl: "***REDACTED-SUPABASE-ENV***" },
+  {
+    name: "supabase_url",
+    re: new RegExp("https?://[A-Za-z0-9-]+\\." + "supa" + "base\\.co[^\\s\"']*", "gi"),
+    repl: "***REDACTED-SUPABASE-URL***",
+  },
+  {
+    name: "supabase_env",
+    re: new RegExp(SB_ENV_PREFIX + "[A-Z_]+", "g"),
+    repl: "***REDACTED-SUPABASE-ENV***",
+  },
 ];
 
 const FORBIDDEN_LITERAL_RULES: ReadonlyArray<{ name: string; re: RegExp }> = [
@@ -242,9 +251,7 @@ export async function runFastPath(
     }
   };
 
-  const finalize = (
-    base: Omit<FastPathResult, "redactionAudit" | "artifacts">,
-  ): FastPathResult => {
+  const finalize = (base: Omit<FastPathResult, "redactionAudit" | "artifacts">): FastPathResult => {
     const forbidden = scanForbidden(logs);
     const audit: RedactionAudit = {
       linesScanned: auditState.linesScanned,
@@ -298,7 +305,15 @@ export async function runFastPath(
     return finalize({
       exitCode: 2,
       doctor: { status: "failed", recommendedIp: null },
-      launchers: { status: "skipped", written: [], outDir: null, created: 0, updated: 0, unchanged: 0, refused: 0 },
+      launchers: {
+        status: "skipped",
+        written: [],
+        outDir: null,
+        created: 0,
+        updated: 0,
+        unchanged: 0,
+        refused: 0,
+      },
       smoke: { status: "skipped", reason: null },
       logs,
       nextCommand: null,
@@ -328,8 +343,8 @@ export async function runFastPath(
     refused: 0,
   };
   if (opts.writeLaunchers) {
-    const write = deps.writeLaunchersFn
-      ?? (() => writeLaunchers(resolve(cwd, "tmp", "ecowitt-windows"), cwd));
+    const write =
+      deps.writeLaunchersFn ?? (() => writeLaunchers(resolve(cwd, "tmp", "ecowitt-windows"), cwd));
     try {
       const w = write();
       launchers = {
@@ -348,7 +363,15 @@ export async function runFastPath(
     } catch (e) {
       const msg = e instanceof Error ? e.message : "unknown error";
       emit(`[ecowitt-fast-path] launcher write FAILED: ${msg}`, "err");
-      launchers = { status: "failed", written: [], outDir: null, created: 0, updated: 0, unchanged: 0, refused: 0 };
+      launchers = {
+        status: "failed",
+        written: [],
+        outDir: null,
+        created: 0,
+        updated: 0,
+        unchanged: 0,
+        refused: 0,
+      };
     }
   }
 
@@ -394,8 +417,8 @@ async function main(): Promise<void> {
   const saveArtifacts = argv.includes("--save-artifacts");
 
   const captured: { logs: string[]; errs: string[] } = { logs: [], errs: [] };
-  const log = json ? (l: string) => captured.logs.push(l) : (l: string) => console.log(l); // eslint-disable-line no-console
-  const err = json ? (l: string) => captured.errs.push(l) : (l: string) => console.error(l); // eslint-disable-line no-console
+  const log = json ? (l: string) => captured.logs.push(l) : (l: string) => console.log(l);  
+  const err = json ? (l: string) => captured.errs.push(l) : (l: string) => console.error(l);  
 
   const result = await runFastPath(
     { writeLaunchers: writeLaunchersFlag, verbose, json, saveArtifacts },
@@ -431,7 +454,7 @@ async function main(): Promise<void> {
     },
   );
   if (json) {
-    // eslint-disable-next-line no-console
+     
     console.log(JSON.stringify(result, null, 2));
   }
   process.exit(result.exitCode);

@@ -31,8 +31,7 @@ export const ACTIONS_RETURN_ALLOWED_KEYS = [
   "growId",
 ] as const;
 
-export type ActionsReturnAllowedKey =
-  (typeof ACTIONS_RETURN_ALLOWED_KEYS)[number];
+export type ActionsReturnAllowedKey = (typeof ACTIONS_RETURN_ALLOWED_KEYS)[number];
 
 const ALLOWED_SET: ReadonlySet<string> = new Set(ACTIONS_RETURN_ALLOWED_KEYS);
 
@@ -43,10 +42,7 @@ export const ACTIONS_RETURN_PATH_MAX_LEN = 512;
 
 function sanitizeValue(raw: string): string {
   // eslint-disable-next-line no-control-regex -- deliberately strip C0 control chars + DEL from untrusted param values
-  return raw.replace(/[\u0000-\u001F\u007F]/g, "").slice(
-    0,
-    ACTIONS_RETURN_VALUE_MAX_LEN,
-  );
+  return raw.replace(/[\u0000-\u001F\u007F]/g, "").slice(0, ACTIONS_RETURN_VALUE_MAX_LEN);
 }
 
 /**
@@ -78,9 +74,7 @@ export function buildActionsReturnRelativePath(
  * or `/actionsfoo`). Rejects protocol URLs, schema-relative URLs,
  * javascript: payloads, and anything malformed.
  */
-export function isSafeActionsReturnPath(
-  candidate: unknown,
-): candidate is string {
+export function isSafeActionsReturnPath(candidate: unknown): candidate is string {
   if (typeof candidate !== "string") return false;
   if (candidate.length === 0) return false;
   if (candidate.length > ACTIONS_RETURN_PATH_MAX_LEN) return false;
@@ -101,9 +95,7 @@ export function isSafeActionsReturnPath(
  * Parse the raw `actionsReturn` query value. Returns the safe relative
  * path, or `null` for missing/unsafe values.
  */
-export function parseActionsReturnParam(
-  raw: string | null | undefined,
-): string | null {
+export function parseActionsReturnParam(raw: string | null | undefined): string | null {
   if (typeof raw !== "string") return null;
   // URLSearchParams.get already URL-decodes; callers may also pass an
   // already-decoded value. Re-validate either way.
@@ -127,9 +119,10 @@ export const BACK_TO_ACTIONS_FALLBACK_HREF = "/actions";
  * to hide the affordance entirely when this returns the fallback —
  * `wasProvided` makes that decision explicit.
  */
-export function resolveBackToActionsHref(
-  raw: string | null | undefined,
-): { href: string; wasProvided: boolean } {
+export function resolveBackToActionsHref(raw: string | null | undefined): {
+  href: string;
+  wasProvided: boolean;
+} {
   const parsed = parseActionsReturnParam(raw ?? null);
   if (parsed) return { href: parsed, wasProvided: true };
   return { href: BACK_TO_ACTIONS_FALLBACK_HREF, wasProvided: false };

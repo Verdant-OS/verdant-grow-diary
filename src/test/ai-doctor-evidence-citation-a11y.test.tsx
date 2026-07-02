@@ -13,18 +13,12 @@ import AiDoctorDiagnosisPanel from "@/components/AiDoctorDiagnosisPanel";
 import { AiDoctorEvidencePanel } from "@/components/AiDoctorEvidencePanel";
 import type { DiagnosisResult } from "@/lib/aiDoctorEngine";
 import type { CitationContext } from "@/lib/aiDoctorEvidenceCitationRules";
-import {
-  buildCitationDetail,
-  resolveEvidenceCitation,
-} from "@/lib/aiDoctorEvidenceCitationRules";
+import { buildCitationDetail, resolveEvidenceCitation } from "@/lib/aiDoctorEvidenceCitationRules";
 import {
   navigateToEvidenceTarget,
   AI_DOCTOR_EVIDENCE_PANEL_ROOT_ID,
 } from "@/lib/aiDoctorEvidenceNavigationRules";
-import {
-  buildAiDoctorEvidenceCsv,
-  csvEscape,
-} from "@/lib/aiDoctorEvidenceCsvExportRules";
+import { buildAiDoctorEvidenceCsv, csvEscape } from "@/lib/aiDoctorEvidenceCsvExportRules";
 import {
   buildAiDoctorReportText,
   buildPerMetricStatusTable,
@@ -47,10 +41,7 @@ function baseDiagnosis(): DiagnosisResult {
       explanation: "Mixed.",
       conflicts_detected: [],
     },
-    recommended_actions: [
-      "Re-check humidity in 24h.",
-      "Capture a soil moisture reading.",
-    ],
+    recommended_actions: ["Re-check humidity in 24h.", "Capture a soil moisture reading."],
     what_not_to_do: [],
     monitoring_priorities: [],
     questions_for_grower: [],
@@ -102,9 +93,7 @@ function baseReportInput(): Omit<AiDoctorReportInput, "recommendations"> {
         { key: "co2_ppm", statusLabel: "Not checked", value: null, derived: false },
       ],
     },
-    checklist: [
-      { key: "soil_moisture_pct", label: "Capture soil moisture", state: "needed" },
-    ],
+    checklist: [{ key: "soil_moisture_pct", label: "Capture soil moisture", state: "needed" }],
   };
 }
 
@@ -112,12 +101,7 @@ function baseReportInput(): Omit<AiDoctorReportInput, "recommendations"> {
 
 describe("Diagnosis panel — inline citation a11y + modal", () => {
   it("renders inline citation as a focusable button with aria-label and visible focus class", () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis()}
-        citationContext={baseCtx()}
-      />,
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis()} citationContext={baseCtx()} />);
     const btn = screen.getByTestId(
       "ai-doctor-diagnosis-recommended-actions-citation-0",
     ) as HTMLButtonElement;
@@ -128,15 +112,8 @@ describe("Diagnosis panel — inline citation a11y + modal", () => {
   });
 
   it("opens the citation modal on click and renders source-honest fields", () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis()}
-        citationContext={baseCtx()}
-      />,
-    );
-    const btn = screen.getByTestId(
-      "ai-doctor-diagnosis-recommended-actions-citation-0",
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis()} citationContext={baseCtx()} />);
+    const btn = screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-0");
     fireEvent.click(btn);
     const modal = screen.getByTestId("ai-doctor-diagnosis-citation-modal");
     expect(modal.getAttribute("role")).toBe("dialog");
@@ -147,55 +124,26 @@ describe("Diagnosis panel — inline citation a11y + modal", () => {
   });
 
   it("labels missing-metric citation modal as missing", () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis()}
-        citationContext={baseCtx()}
-      />,
-    );
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-1"),
-    );
-    const kind = screen.getByTestId(
-      "ai-doctor-diagnosis-citation-modal-kind",
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis()} citationContext={baseCtx()} />);
+    fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-1"));
+    const kind = screen.getByTestId("ai-doctor-diagnosis-citation-modal-kind");
     expect(kind.textContent?.toLowerCase()).toContain("missing");
   });
 
   it("Escape closes the modal", () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis()}
-        citationContext={baseCtx()}
-      />,
-    );
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-0"),
-    );
-    expect(
-      screen.queryByTestId("ai-doctor-diagnosis-citation-modal"),
-    ).toBeTruthy();
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis()} citationContext={baseCtx()} />);
+    fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-0"));
+    expect(screen.queryByTestId("ai-doctor-diagnosis-citation-modal")).toBeTruthy();
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(
-      screen.queryByTestId("ai-doctor-diagnosis-citation-modal"),
-    ).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-diagnosis-citation-modal")).toBeNull();
   });
 
   it("Close button closes modal and returns focus to triggering citation", async () => {
-    render(
-      <AiDoctorDiagnosisPanel
-        diagnosis={baseDiagnosis()}
-        citationContext={baseCtx()}
-      />,
-    );
-    const trigger = screen.getByTestId(
-      "ai-doctor-diagnosis-recommended-actions-citation-0",
-    );
+    render(<AiDoctorDiagnosisPanel diagnosis={baseDiagnosis()} citationContext={baseCtx()} />);
+    const trigger = screen.getByTestId("ai-doctor-diagnosis-recommended-actions-citation-0");
     trigger.focus();
     fireEvent.click(trigger);
-    fireEvent.click(
-      screen.getByTestId("ai-doctor-diagnosis-citation-modal-close"),
-    );
+    fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-citation-modal-close"));
     await new Promise((r) => queueMicrotask(() => r(null)));
     expect(document.activeElement).toBe(trigger);
   });
@@ -213,14 +161,13 @@ describe("Diagnosis panel — Evidence basis toggle a11y", () => {
           postureLabel: "Moderate evidence",
           postureCopy: "Moderate context available.",
           basisCopy: ["b1"],
-          guardrailWarning: null, preferredVerbs: [],
+          guardrailWarning: null,
+          preferredVerbs: [],
           moreDataReminder: null,
         }}
       />,
     );
-    const toggle = screen.getByTestId(
-      "ai-doctor-diagnosis-evidence-toggle",
-    ) as HTMLButtonElement;
+    const toggle = screen.getByTestId("ai-doctor-diagnosis-evidence-toggle") as HTMLButtonElement;
     expect(toggle.tagName).toBe("BUTTON");
     expect(toggle.getAttribute("aria-expanded")).toBeTruthy();
     expect(toggle.getAttribute("aria-controls")).toBeTruthy();
@@ -233,9 +180,7 @@ describe("Diagnosis panel — Evidence basis toggle a11y", () => {
 describe("navigateToEvidenceTarget", () => {
   it("scrolls + focuses the exact target when present", () => {
     document.body.innerHTML = `<div id="evidence-envcheck-humidity-pct">x</div>`;
-    const el = document.getElementById(
-      "evidence-envcheck-humidity-pct",
-    )! as HTMLElement;
+    const el = document.getElementById("evidence-envcheck-humidity-pct")! as HTMLElement;
     const spy = vi.fn();
     (el as any).scrollIntoView = spy;
     const r = navigateToEvidenceTarget("evidence-envcheck-humidity-pct");
@@ -293,12 +238,8 @@ describe("AiDoctorEvidencePanel — stable anchors", () => {
     };
     render(<AiDoctorEvidencePanel vm={vm} />);
     expect(document.getElementById("ai-doctor-evidence-panel")).toBeTruthy();
-    expect(
-      document.getElementById("evidence-envcheck-humidity-pct"),
-    ).toBeTruthy();
-    expect(
-      document.getElementById("evidence-missing-soil-moisture-pct"),
-    ).toBeTruthy();
+    expect(document.getElementById("evidence-envcheck-humidity-pct")).toBeTruthy();
+    expect(document.getElementById("evidence-missing-soil-moisture-pct")).toBeTruthy();
   });
 });
 
@@ -322,9 +263,7 @@ describe("buildAiDoctorEvidenceCsv", () => {
     expect(csv.contents).not.toMatch(/service_role/i);
     expect(csv.contents).not.toMatch(/user_id/i);
     expect(csv.contents).not.toMatch(/eyJ[A-Za-z0-9_-]{6,}\./);
-    expect(csv.contents).not.toMatch(
-      /00000000-0000-0000-0000-000000000000/,
-    );
+    expect(csv.contents).not.toMatch(/00000000-0000-0000-0000-000000000000/);
     expect(csv.contents).toContain("[redacted]");
   });
 
@@ -336,7 +275,8 @@ describe("buildAiDoctorEvidenceCsv", () => {
         postureLabel: "Moderate evidence",
         postureCopy: "OK.",
         basisCopy: ["humidity_pct accepted"],
-        guardrailWarning: null, preferredVerbs: [],
+        guardrailWarning: null,
+        preferredVerbs: [],
         moreDataReminder: "Capture soil moisture.",
       },
       recommendations: [

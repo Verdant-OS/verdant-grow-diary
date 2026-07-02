@@ -67,10 +67,12 @@ describe("ecowitt-windows-fast-path — static safety", () => {
 describe("redactVerboseLine", () => {
   it("redacts vbt_ tokens, JWT-like strings, and Bearer values", () => {
     expect(redactVerboseLine("token=vbt_abc123XYZ_-456")).toContain("vbt_***REDACTED***");
-    expect(
-      redactVerboseLine("auth=eyJabc12345.eyJpYXQiOj.signaturePart_xyz"),
-    ).toContain("***REDACTED-JWT***");
-    expect(redactVerboseLine("authorization: Bearer abc.def.ghi")).toContain("Bearer ***REDACTED***");
+    expect(redactVerboseLine("auth=eyJabc12345.eyJpYXQiOj.signaturePart_xyz")).toContain(
+      "***REDACTED-JWT***",
+    );
+    expect(redactVerboseLine("authorization: Bearer abc.def.ghi")).toContain(
+      "Bearer ***REDACTED***",
+    );
   });
   it("leaves benign content untouched", () => {
     expect(redactVerboseLine("recommended IP: 192.168.1.42")).toBe("recommended IP: 192.168.1.42");
@@ -104,7 +106,10 @@ describe("runFastPath — orchestration", () => {
   };
 
   it("runs doctor BEFORE smoke and returns structured result on PASS", async () => {
-    const { deps, calls, logs } = makeDeps(async () => ({ ok: true, reason: "pass — FAKE LOCAL TEST received" }));
+    const { deps, calls, logs } = makeDeps(async () => ({
+      ok: true,
+      reason: "pass — FAKE LOCAL TEST received",
+    }));
     const res = await runFastPath({}, deps);
     expect(res.exitCode).toBe(0);
     expect(res.doctor.status).toBe("ok");
@@ -123,10 +128,7 @@ describe("runFastPath — orchestration", () => {
       written: [resolve(process.cwd(), "tmp/ecowitt-windows/01-watch-mqtt.cmd")],
       outDir: resolve(process.cwd(), "tmp/ecowitt-windows"),
     }));
-    const res = await runFastPath(
-      { writeLaunchers: true },
-      { ...deps, writeLaunchersFn },
-    );
+    const res = await runFastPath({ writeLaunchers: true }, { ...deps, writeLaunchersFn });
     expect(res.exitCode).toBe(0);
     expect(writeLaunchersFn).toHaveBeenCalledTimes(1);
     expect(res.launchers.status).toBe("ok");
@@ -293,10 +295,7 @@ describe("scanForbidden", () => {
     expect(s.categories).toEqual([]);
   });
   it("detects unredacted forbidden literals", () => {
-    const s = scanForbidden([
-      "VERDANT" + "_BRIDGE_" + "TOKEN=foo",
-      "use ser" + "vice_role here",
-    ]);
+    const s = scanForbidden(["VERDANT" + "_BRIDGE_" + "TOKEN=foo", "use ser" + "vice_role here"]);
     expect(s.present).toBe(true);
     expect(s.categories.length).toBeGreaterThanOrEqual(2);
   });

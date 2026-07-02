@@ -47,7 +47,9 @@ describe("bridge-client-retry-guidance.md", () => {
   });
 
   it("does not include service_role examples", () => {
-    expect(lower).toMatch(/never paste.*service_role|do not send.*service_role|never.*service_role/);
+    expect(lower).toMatch(
+      /never paste.*service_role|do not send.*service_role|never.*service_role/,
+    );
     expect(doc).not.toMatch(/service_role\s*[:=]\s*['"]/);
   });
 

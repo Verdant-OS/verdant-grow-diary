@@ -20,10 +20,7 @@ import {
   type SensorSnapshot as StrictSensorSnapshot,
   type SensorSnapshotStatus,
 } from "@/lib/latestSensorSnapshotRules";
-import type {
-  LatestTentSensorSnapshotState,
-  LatestTentSensorSnapshotStatus,
-} from "@/lib/sensor";
+import type { LatestTentSensorSnapshotState, LatestTentSensorSnapshotStatus } from "@/lib/sensor";
 
 const NOW = new Date("2026-06-02T12:00:00Z");
 const FIVE_MIN_AGO = "2026-06-02T11:55:00Z";
@@ -35,14 +32,11 @@ vi.mock("@/lib/sensor", async (orig) => {
   const real = await orig<typeof import("@/lib/sensor")>();
   return {
     ...real,
-    useLatestTentSensorSnapshot: (...args: unknown[]) =>
-      mockUseLatestTentSensorSnapshot(...args),
+    useLatestTentSensorSnapshot: (...args: unknown[]) => mockUseLatestTentSensorSnapshot(...args),
   };
 });
 
-function fullSnapshot(
-  partial: Partial<StrictSensorSnapshot> = {},
-): StrictSensorSnapshot {
+function fullSnapshot(partial: Partial<StrictSensorSnapshot> = {}): StrictSensorSnapshot {
   // 24.3°C → 75.74°F (resolver canonicalizes to °F internally)
   const base: StrictSensorSnapshot = {
     ...EMPTY_SENSOR_SNAPSHOT,
@@ -69,15 +63,11 @@ function fullSnapshot(
   return { ...base, ...partial };
 }
 
-function stateReady(
-  snapshot: StrictSensorSnapshot,
-): LatestTentSensorSnapshotState {
+function stateReady(snapshot: StrictSensorSnapshot): LatestTentSensorSnapshotState {
   return { status: "ready", snapshot, lastUpdatedAt: NOW.getTime() };
 }
 
-function stateAs(
-  status: LatestTentSensorSnapshotStatus,
-): LatestTentSensorSnapshotState {
+function stateAs(status: LatestTentSensorSnapshotStatus): LatestTentSensorSnapshotState {
   return {
     status,
     snapshot: { ...EMPTY_SENSOR_SNAPSHOT },
@@ -106,11 +96,17 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
     expect(screen.getByText("Sensor context ready")).toBeInTheDocument();
     expect(screen.getByTestId("quicklog-sensor-snapshot-pill")).toHaveTextContent("Usable");
     expect(screen.getByText("This log will include current sensor context.")).toBeInTheDocument();
-    expect(screen.getByTestId("quicklog-sensor-snapshot-age")).toHaveTextContent("Captured 5 min ago");
+    expect(screen.getByTestId("quicklog-sensor-snapshot-age")).toHaveTextContent(
+      "Captured 5 min ago",
+    );
 
-    expect(screen.getByTestId("quicklog-sensor-snapshot-metric-temp")).toHaveTextContent("Temp 24.3°C");
+    expect(screen.getByTestId("quicklog-sensor-snapshot-metric-temp")).toHaveTextContent(
+      "Temp 24.3°C",
+    );
     expect(screen.getByTestId("quicklog-sensor-snapshot-metric-rh")).toHaveTextContent("RH 55%");
-    expect(screen.getByTestId("quicklog-sensor-snapshot-metric-vpd")).toHaveTextContent("VPD 1.12 kPa");
+    expect(screen.getByTestId("quicklog-sensor-snapshot-metric-vpd")).toHaveTextContent(
+      "VPD 1.12 kPa",
+    );
 
     expect(screen.queryByTestId("quicklog-sensor-snapshot-action")).not.toBeInTheDocument();
   });
@@ -152,8 +148,12 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
     expect(strip).toHaveAttribute("data-status", "stale");
     expect(screen.getByText("Sensor snapshot stale")).toBeInTheDocument();
     expect(screen.getByTestId("quicklog-sensor-snapshot-pill")).toHaveTextContent("Stale");
-    expect(screen.getByText("Refresh before saving for better AI Doctor context.")).toBeInTheDocument();
-    expect(screen.getByTestId("quicklog-sensor-snapshot-age")).toHaveTextContent("Captured 2 days ago");
+    expect(
+      screen.getByText("Refresh before saving for better AI Doctor context."),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("quicklog-sensor-snapshot-age")).toHaveTextContent(
+      "Captured 2 days ago",
+    );
 
     const action = screen.getByTestId("quicklog-sensor-snapshot-action");
     expect(action).toHaveAttribute("data-action-kind", "refresh");
@@ -226,7 +226,9 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
     mockUseLatestTentSensorSnapshot.mockReturnValue(stateReady(fullSnapshot()));
     render(<QuickLogSensorSnapshotStrip tentId="t1" attached={false} />);
     expect(screen.getByText("Sensor snapshot available")).toBeInTheDocument();
-    expect(screen.queryByText("This log will include current sensor context.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("This log will include current sensor context."),
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId("quicklog-sensor-snapshot-action")).not.toBeInTheDocument();
   });
 

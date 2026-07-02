@@ -109,8 +109,6 @@ jobs:
       - name: Action Queue evidence leakage guard
         run: bun run test:action-queue-evidence-leakage
 
-
-
       # Stop-ship: QuickLog v2 RPC ownership / reason-code / mixed-boundary
       # regression. See docs/quicklog-rpc-safety.md.
       - name: QuickLog v2 RPC ownership + security
@@ -127,7 +125,6 @@ jobs:
       # must not be reachable from untrusted PRs. They live in the separate
       # manual workflow .github/workflows/gamification-staging-smoke.yml,
       # gated on workflow_dispatch + push-to-main only.
-
 
       # Stop-ship: every Shelly H&T edge function declared in
       # supabase/config.toml must have its source file in the repo.
@@ -160,8 +157,6 @@ jobs:
       # found". Test-only invocation; no production source changes.
       - name: Run AI Doctor provider usage wiring tests
         run: deno test --allow-env --allow-read --unstable-sloppy-imports supabase/functions/ai-doctor-review/providerUsageWiring.test.ts
-
-
 
       # Optional: QuickLog RPC runtime harnesses. Only runs when staging
       # Supabase credentials are configured as repo/org secrets. The

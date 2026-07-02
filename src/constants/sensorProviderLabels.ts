@@ -44,9 +44,7 @@ function titleCase(token: string): string {
  * the result is length-capped so secret-looking strings never leak as
  * a UI chip.
  */
-export function deriveProviderLabel(
-  source: string | null | undefined,
-): string | null {
+export function deriveProviderLabel(source: string | null | undefined): string | null {
   if (typeof source !== "string") return null;
   const trimmed = source.trim();
   if (!trimmed) return null;
@@ -60,10 +58,7 @@ export function deriveProviderLabel(
     .replace(/\s+/g, " ")
     .trim();
   if (!safe) return null;
-  const titled = safe
-    .split(" ")
-    .map(titleCase)
-    .join(" ");
+  const titled = safe.split(" ").map(titleCase).join(" ");
   return titled.length > PROVIDER_LABEL_MAX
     ? `${titled.slice(0, PROVIDER_LABEL_MAX - 1)}…`
     : titled;

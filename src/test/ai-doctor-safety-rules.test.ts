@@ -51,7 +51,15 @@ const richContext = (
       { metric: "temperature_c", value: 24, captured_at: iso(60 * 60 * 1000), source: "live" },
       { metric: "humidity_pct", value: 55, captured_at: iso(60 * 60 * 1000), source: "live" },
       ...(overrides.stale
-        ? [{ metric: "temperature_c", value: 23, captured_at: iso(60 * 60 * 1000), source: "live", quality: "stale" }]
+        ? [
+            {
+              metric: "temperature_c",
+              value: 23,
+              captured_at: iso(60 * 60 * 1000),
+              source: "live",
+              quality: "stale",
+            },
+          ]
         : []),
       ...(overrides.demo
         ? [{ metric: "temperature_c", value: 23, captured_at: iso(60 * 60 * 1000), source: "demo" }]
@@ -127,17 +135,13 @@ describe("applyAiDoctorSafetyRules", () => {
     const r = applyAiDoctorSafetyRules(draft, minimalContext());
     expect(r.confidence).toBeLessThanOrEqual(0.5);
     expect(r.confidence_band).not.toBe("high");
-    expect(r.applied_safety_rules).toContain(
-      "cap_confidence_on_single_weak_signal",
-    );
+    expect(r.applied_safety_rules).toContain("cap_confidence_on_single_weak_signal");
   });
 
   it("adds missing_information when no recent sensor data exists", () => {
     const r = applyAiDoctorSafetyRules(baseDraft(), minimalContext());
     expect(r.missing_information.join(" ")).toMatch(/no live or manual sensor/i);
-    expect(r.applied_safety_rules).toContain(
-      "missing_information_when_no_recent_sensor_data",
-    );
+    expect(r.applied_safety_rules).toContain("missing_information_when_no_recent_sensor_data");
   });
 
   it("flags stale/invalid telemetry as a limitation and suggests recheck", () => {
@@ -156,9 +160,7 @@ describe("applyAiDoctorSafetyRules", () => {
     for (const rule of AUTOFLOWER_NEVER_DO) {
       expect(r.what_not_to_do).toContain(rule);
     }
-    expect(r.applied_safety_rules).toContain(
-      "autoflower_block_heavy_stress_recovery",
-    );
+    expect(r.applied_safety_rules).toContain("autoflower_block_heavy_stress_recovery");
   });
 
   it("always includes the never-do baseline (no nutrient/irrigation/equipment changes)", () => {
@@ -175,9 +177,7 @@ describe("applyAiDoctorSafetyRules", () => {
     const r = applyAiDoctorSafetyRules(draft, minimalContext());
     expect(r.immediate_action).not.toMatch(/turn on/i);
     expect(r.what_not_to_do.some((s) => /activate/i.test(s))).toBe(false);
-    expect(r.applied_safety_rules).toContain(
-      "stripped_device_command_from_immediate_action",
-    );
+    expect(r.applied_safety_rules).toContain("stripped_device_command_from_immediate_action");
   });
 
   it("never returns an executable action queue suggestion", () => {
@@ -215,9 +215,7 @@ describe("generateAiDoctorResult (engine surface)", () => {
 
   it("includes missing_information when sensor data is absent", () => {
     const r = generateAiDoctorResult(minimalContext());
-    expect(
-      r.missing_information.some((m) => /no live or manual sensor/i.test(m)),
-    ).toBe(true);
+    expect(r.missing_information.some((m) => /no live or manual sensor/i.test(m))).toBe(true);
   });
 
   it("does not suggest aggressive nutrient/feed changes from environment-only evidence", () => {
@@ -241,9 +239,7 @@ describe("generateAiDoctorResult (engine surface)", () => {
     const blob = [r.summary, r.immediate_action, r.follow_up_24h, r.recovery_plan_3_day]
       .join(" ")
       .toLowerCase();
-    expect(blob).not.toMatch(
-      /turn on|turn off|activate|trigger|automation|execute/,
-    );
+    expect(blob).not.toMatch(/turn on|turn off|activate|trigger|automation|execute/);
     if (r.action_queue_suggestion) {
       expect(r.action_queue_suggestion.action_type).toBe("advisory");
       expect(r.action_queue_suggestion.status).toBe("pending_approval");
@@ -258,10 +254,7 @@ describe("generateAiDoctorResult (engine surface)", () => {
 
 describe("static safety: aiDoctorSafetyRules.ts has no I/O", () => {
   it("does not import Supabase, fetch, or Action Queue writers", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../lib/aiDoctorSafetyRules.ts"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../lib/aiDoctorSafetyRules.ts"), "utf8");
     expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase/);
     expect(src).not.toMatch(/supabase\.functions\.invoke/);
     expect(src).not.toMatch(/\bfetch\s*\(/);

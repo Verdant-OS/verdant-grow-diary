@@ -76,15 +76,11 @@ const ECOWITT_FORWARDED_PAYLOAD = {
 
 function buildInsertRowsForEcoWitt() {
   const normalized = normalizeWebhookIngestPayload(
-    ECOWITT_FORWARDED_PAYLOAD as Parameters<
-      typeof normalizeWebhookIngestPayload
-    >[0],
+    ECOWITT_FORWARDED_PAYLOAD as Parameters<typeof normalizeWebhookIngestPayload>[0],
     { now: new Date("2026-06-17T05:45:00.000Z") },
   );
   if (!normalized.ok) {
-    throw new Error(
-      `normalize failed: ${normalized.errors.join(",")}`,
-    );
+    throw new Error(`normalize failed: ${normalized.errors.join(",")}`);
   }
   return normalized.rows.map((r) =>
     buildStoredRow({
@@ -125,9 +121,7 @@ describe("sensor-ingest-webhook E2E insert contract — EcoWitt", () => {
     const rows = buildInsertRowsForEcoWitt();
     for (const r of rows) {
       // sanitizeRawPayload preserves vendor when provided
-      expect((r.raw_payload as Record<string, unknown>).vendor).toBe(
-        "ecowitt_windows_testbench",
-      );
+      expect((r.raw_payload as Record<string, unknown>).vendor).toBe("ecowitt_windows_testbench");
     }
   });
 
@@ -213,8 +207,10 @@ describe("EcoWitt forwarded transport ↔ stored row agreement", () => {
   it("transport source 'ecowitt' maps to stored source 'live' with lineage", () => {
     const rows = buildInsertRowsForEcoWitt();
     expect(rows[0].source).toBe("live");
-    const meta = (rows[0].raw_payload as Record<string, unknown>)
-      .metadata as Record<string, unknown>;
+    const meta = (rows[0].raw_payload as Record<string, unknown>).metadata as Record<
+      string,
+      unknown
+    >;
     expect(meta.transport_source).toBe(ECOWITT_FORWARDED_PAYLOAD.source);
     expect(meta.verdant_source).toBe("live");
   });

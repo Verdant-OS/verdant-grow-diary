@@ -103,7 +103,9 @@ function safePage(raw: string | null): number {
 /* eslint-disable no-control-regex -- safeQuery deliberately matches C0 control chars + DEL to strip them from the query string */
 function safeQuery(raw: string | null): string {
   if (typeof raw !== "string") return "";
-  const trimmed = raw.replace(/[\u0000-\u001F\u007F]/g, "").slice(0, ACTION_QUEUE_URL_QUERY_MAX_LEN);
+  const trimmed = raw
+    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .slice(0, ACTION_QUEUE_URL_QUERY_MAX_LEN);
   return trimmed;
 }
 /* eslint-enable no-control-regex */
@@ -141,28 +143,12 @@ export function serializeActionQueueUrlState(
     else out.set(key, value);
   };
   setOrDelete(ACTION_QUEUE_URL_KEYS.q, state.q, ACTION_QUEUE_URL_DEFAULTS.q);
-  setOrDelete(
-    ACTION_QUEUE_URL_KEYS.status,
-    state.status,
-    ACTION_QUEUE_URL_DEFAULTS.status,
-  );
-  setOrDelete(
-    ACTION_QUEUE_URL_KEYS.trace,
-    state.trace,
-    ACTION_QUEUE_URL_DEFAULTS.trace,
-  );
+  setOrDelete(ACTION_QUEUE_URL_KEYS.status, state.status, ACTION_QUEUE_URL_DEFAULTS.status);
+  setOrDelete(ACTION_QUEUE_URL_KEYS.trace, state.trace, ACTION_QUEUE_URL_DEFAULTS.trace);
   const pageStr = String(state.page);
-  setOrDelete(
-    ACTION_QUEUE_URL_KEYS.page,
-    pageStr,
-    String(ACTION_QUEUE_URL_DEFAULTS.page),
-  );
+  setOrDelete(ACTION_QUEUE_URL_KEYS.page, pageStr, String(ACTION_QUEUE_URL_DEFAULTS.page));
   const sizeStr = String(state.pageSize);
-  setOrDelete(
-    ACTION_QUEUE_URL_KEYS.pageSize,
-    sizeStr,
-    String(ACTION_QUEUE_URL_DEFAULTS.pageSize),
-  );
+  setOrDelete(ACTION_QUEUE_URL_KEYS.pageSize, sizeStr, String(ACTION_QUEUE_URL_DEFAULTS.pageSize));
   return out;
 }
 

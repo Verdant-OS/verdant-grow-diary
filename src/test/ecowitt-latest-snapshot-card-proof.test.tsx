@@ -99,24 +99,12 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
     render(<EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />, {
       wrapper: wrap(),
     });
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-metric-temp_f")).toBeInTheDocument(),
-    );
-    expect(screen.getByTestId("ecowitt-metric-temp_f").textContent).toBe(
-      "78.6 °F",
-    );
-    expect(screen.getByTestId("ecowitt-metric-humidity_pct").textContent).toBe(
-      "56 %",
-    );
-    expect(screen.getByTestId("ecowitt-metric-soil_moisture_pct").textContent).toBe(
-      "45 %",
-    );
-    expect(screen.getByTestId("ecowitt-metric-co2_ppm").textContent).toBe(
-      "966 ppm",
-    );
-    expect(screen.getByTestId("ecowitt-metric-vpd_kpa").textContent).toMatch(
-      /kPa/,
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-metric-temp_f")).toBeInTheDocument());
+    expect(screen.getByTestId("ecowitt-metric-temp_f").textContent).toBe("78.6 °F");
+    expect(screen.getByTestId("ecowitt-metric-humidity_pct").textContent).toBe("56 %");
+    expect(screen.getByTestId("ecowitt-metric-soil_moisture_pct").textContent).toBe("45 %");
+    expect(screen.getByTestId("ecowitt-metric-co2_ppm").textContent).toBe("966 ppm");
+    expect(screen.getByTestId("ecowitt-metric-vpd_kpa").textContent).toMatch(/kPa/);
   });
 
   it("shows empty state when no EcoWitt data exists", async () => {
@@ -124,9 +112,7 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
     render(<EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />, {
       wrapper: wrap(),
     });
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-snapshot-empty")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-snapshot-empty")).toBeInTheDocument());
     expect(
       screen.getByText(
         "No EcoWitt readings yet. Send a local test payload to verify the integration.",
@@ -151,16 +137,10 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
       wrapper: wrap(),
     });
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ecowitt-test-sender-badge"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ecowitt-test-sender-badge")).toBeInTheDocument(),
     );
-    expect(
-      screen.getByTestId("ecowitt-test-sender-badge").textContent,
-    ).toBe("Local Test Payload");
-    expect(screen.getByTestId("ecowitt-transport").textContent).toBe(
-      "Transport: mqtt_local_test",
-    );
+    expect(screen.getByTestId("ecowitt-test-sender-badge").textContent).toBe("Local Test Payload");
+    expect(screen.getByTestId("ecowitt-transport").textContent).toBe("Transport: mqtt_local_test");
   });
 
   it("displays stale/fresh status using existing logic", async () => {
@@ -179,34 +159,19 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
       wrapper: wrap(),
     });
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ecowitt-snapshot-freshness"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ecowitt-snapshot-freshness")).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("ecowitt-snapshot-freshness").textContent).toBe(
-      "stale",
-    );
-    expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe(
-      "Stale",
-    );
+    expect(screen.getByTestId("ecowitt-snapshot-freshness").textContent).toBe("stale");
+    expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe("Stale");
   });
 
   it("shows tent name when provided", async () => {
     rowsMock = [ecowittRow({})];
-    render(
-      <EcowittLatestSnapshotCard
-        tentId={TENT_A}
-        tentName="Tent Alpha"
-        now={NOW}
-      />,
-      { wrapper: wrap() },
-    );
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-tent-name")).toBeInTheDocument(),
-    );
-    expect(screen.getByTestId("ecowitt-tent-name").textContent).toBe(
-      "Tent Alpha",
-    );
+    render(<EcowittLatestSnapshotCard tentId={TENT_A} tentName="Tent Alpha" now={NOW} />, {
+      wrapper: wrap(),
+    });
+    await waitFor(() => expect(screen.getByTestId("ecowitt-tent-name")).toBeInTheDocument());
+    expect(screen.getByTestId("ecowitt-tent-name").textContent).toBe("Tent Alpha");
   });
 });
 

@@ -44,9 +44,7 @@ describe("ecowitt-live-soil dry-run fixture", () => {
     expect(air!.metadata.transport).toBe("mqtt");
     expect(air!.tent_id).toBe(TENT);
     // Canonical Verdant view — what operators / CSVs / charts see.
-    const canonAir = out.canonicalPreviews.find(
-      (p) => p.metrics.temp_f !== undefined,
-    );
+    const canonAir = out.canonicalPreviews.find((p) => p.metrics.temp_f !== undefined);
     expect(canonAir).toBeDefined();
     expect(canonAir!.source).toBe("live");
     expect(canonAir!.provider).toBe("ecowitt");
@@ -54,9 +52,7 @@ describe("ecowitt-live-soil dry-run fixture", () => {
     // Canonical Verdant source MUST be one of the allow-listed labels —
     // never "ecowitt" / "mqtt" / vendor lineage strings.
     for (const p of out.canonicalPreviews) {
-      expect(["live", "manual", "csv", "demo", "stale", "invalid"]).toContain(
-        p.source,
-      );
+      expect(["live", "manual", "csv", "demo", "stale", "invalid"]).toContain(p.source);
       expect(p.source).not.toBe("ecowitt");
     }
   });
@@ -123,7 +119,11 @@ describe("ecowitt-live-soil dry-run fixture", () => {
   });
 
   it("dry-run never posts to the network (posted=false)", () => {
-    const out = runEcowittDryRun({ payload: loadFixture(), defaultTentId: TENT, now: fixtureNow() });
+    const out = runEcowittDryRun({
+      payload: loadFixture(),
+      defaultTentId: TENT,
+      now: fixtureNow(),
+    });
     expect(out.posted).toBe(false);
   });
 });
@@ -178,14 +178,26 @@ describe("ecowitt-live-soil fixture safety", () => {
   const json = JSON.parse(raw) as Record<string, unknown>;
 
   it("contains no forbidden secret keys", () => {
-    for (const banned of ["PASSKEY", "passkey", "MAC", "mac", "stationid", "token", "password", "apikey", "api_key"]) {
+    for (const banned of [
+      "PASSKEY",
+      "passkey",
+      "MAC",
+      "mac",
+      "stationid",
+      "token",
+      "password",
+      "apikey",
+      "api_key",
+    ]) {
       expect(json[banned]).toBeUndefined();
     }
   });
 
   it("contains no private IPs or MAC-shaped strings", () => {
     expect(raw).not.toMatch(/\b(10|192\.168|172\.(1[6-9]|2\d|3[01]))\.\d/);
-    expect(raw).not.toMatch(/\b[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}\b/i);
+    expect(raw).not.toMatch(
+      /\b[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}\b/i,
+    );
   });
 });
 

@@ -102,13 +102,9 @@ export interface PerMetricReportRow {
  * Deterministic per-metric status table. Walks the TRACKED_METRICS list in
  * fixed order so the report stays byte-identical for the same input.
  */
-export function buildPerMetricStatusTable(
-  input: AiDoctorReportInput,
-): PerMetricReportRow[] {
+export function buildPerMetricStatusTable(input: AiDoctorReportInput): PerMetricReportRow[] {
   const rows: PerMetricReportRow[] = [];
-  const envRows = input.environmentCheck.show
-    ? input.environmentCheck.metricRows
-    : [];
+  const envRows = input.environmentCheck.show ? input.environmentCheck.metricRows : [];
   for (const key of TRACKED_METRICS) {
     const m = envRows.find((r) => r.key === key) ?? null;
     if (m) {
@@ -136,8 +132,7 @@ export function buildPerMetricStatusTable(
         citationType = "env_metric_weak";
         note = "weak evidence";
       }
-      const value =
-        m.value == null || !Number.isFinite(m.value) ? "—" : String(m.value);
+      const value = m.value == null || !Number.isFinite(m.value) ? "—" : String(m.value);
       rows.push({
         metric: key,
         status,
@@ -159,8 +154,6 @@ export function buildPerMetricStatusTable(
   }
   return rows;
 }
-
-
 
 export function buildAiDoctorReportText(input: AiDoctorReportInput): string {
   const lines: string[] = [];
@@ -200,25 +193,17 @@ export function buildAiDoctorReportText(input: AiDoctorReportInput): string {
   }
 
   lines.push("Evidence used (summary):");
-  lines.push(
-    `  - Live sensor usable: ${input.evidenceSummary.liveSensorUsable ? "yes" : "no"}`,
-  );
+  lines.push(`  - Live sensor usable: ${input.evidenceSummary.liveSensorUsable ? "yes" : "no"}`);
   lines.push(
     `  - Environment Check present: ${input.evidenceSummary.envCheckPresent ? "yes (local Test/Local validation, not live)" : "no"}`,
   );
-  lines.push(
-    `  - Recent diary entry: ${input.evidenceSummary.hasRecentDiary ? "yes" : "no"}`,
-  );
-  lines.push(
-    `  - Recent photos: ${input.evidenceSummary.hasRecentPhotos ? "yes" : "no"}`,
-  );
+  lines.push(`  - Recent diary entry: ${input.evidenceSummary.hasRecentDiary ? "yes" : "no"}`);
+  lines.push(`  - Recent photos: ${input.evidenceSummary.hasRecentPhotos ? "yes" : "no"}`);
   lines.push("");
 
   if (input.environmentCheck.show) {
     lines.push("Latest EcoWitt Environment Check (local Test/Local validation):");
-    lines.push(
-      `  Captured at: ${input.environmentCheck.capturedAt ?? "unknown"}`,
-    );
+    lines.push(`  Captured at: ${input.environmentCheck.capturedAt ?? "unknown"}`);
     lines.push(`  Status: ${input.environmentCheck.statusLabel}`);
     for (const m of input.environmentCheck.metricRows) {
       const v = m.value == null || !Number.isFinite(m.value) ? "—" : String(m.value);
@@ -243,8 +228,6 @@ export function buildAiDoctorReportText(input: AiDoctorReportInput): string {
     }
     lines.push("");
   }
-
-
 
   if (input.checklist.length > 0) {
     lines.push("More data needed (checklist):");
@@ -274,12 +257,14 @@ export function buildAiDoctorReportText(input: AiDoctorReportInput): string {
 
 /** Escape a string for inclusion inside a PDF text literal. */
 function pdfEscape(s: string): string {
-  return s
-    .replace(/\\/g, "\\\\")
-    .replace(/\(/g, "\\(")
-    .replace(/\)/g, "\\)")
-    // Strip control chars and non-ASCII (Helvetica WinAnsi safe subset).
-    .replace(/[^\x20-\x7E]/g, "?");
+  return (
+    s
+      .replace(/\\/g, "\\\\")
+      .replace(/\(/g, "\\(")
+      .replace(/\)/g, "\\)")
+      // Strip control chars and non-ASCII (Helvetica WinAnsi safe subset).
+      .replace(/[^\x20-\x7E]/g, "?")
+  );
 }
 
 function wrapLine(line: string, max: number): string[] {
@@ -300,9 +285,7 @@ function wrapLine(line: string, max: number): string[] {
  * Build a minimal multi-page PDF (US Letter, Helvetica 10pt) containing the
  * text report. Returns a Uint8Array of PDF bytes — no DOM or network needed.
  */
-export function buildAiDoctorReportPdfBytes(
-  input: AiDoctorReportInput,
-): Uint8Array {
+export function buildAiDoctorReportPdfBytes(input: AiDoctorReportInput): Uint8Array {
   const text = buildAiDoctorReportText(input);
   const allLines = text.split("\n").flatMap((l) => wrapLine(l, 95));
   const linesPerPage = 60;
@@ -333,9 +316,7 @@ export function buildAiDoctorReportPdfBytes(
 
   // 2: Pages
   const kids = pageObjNums.map((n) => `${n} 0 R`).join(" ");
-  objects.push(
-    `<< /Type /Pages /Kids [${kids}] /Count ${pages.length} >>`,
-  );
+  objects.push(`<< /Type /Pages /Kids [${kids}] /Count ${pages.length} >>`);
 
   // 3: Font
   objects.push(`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>`);
@@ -347,9 +328,7 @@ export function buildAiDoctorReportPdfBytes(
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontObjNum} 0 R >> >> /Contents ${contentNum} 0 R >>`,
     );
     const stream = buildContentStream(pageLines);
-    objects.push(
-      `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
-    );
+    objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
   });
 
   // Assemble file
@@ -388,12 +367,12 @@ export function buildAiDoctorReportPdfBytes(
     const c = body.charCodeAt(i);
     if (c < 0x80) out[p++] = c;
     else if (c < 0x800) {
-      out[p++] = 0xC0 | (c >> 6);
-      out[p++] = 0x80 | (c & 0x3F);
+      out[p++] = 0xc0 | (c >> 6);
+      out[p++] = 0x80 | (c & 0x3f);
     } else {
-      out[p++] = 0xE0 | (c >> 12);
-      out[p++] = 0x80 | ((c >> 6) & 0x3F);
-      out[p++] = 0x80 | (c & 0x3F);
+      out[p++] = 0xe0 | (c >> 12);
+      out[p++] = 0x80 | ((c >> 6) & 0x3f);
+      out[p++] = 0x80 | (c & 0x3f);
     }
   }
   return out;
@@ -420,10 +399,7 @@ function buildContentStream(lines: string[]): string {
  * Trigger a client-side download of a Uint8Array as application/pdf.
  * Must be called from a user gesture. No network call.
  */
-export function downloadAiDoctorReportPdf(
-  bytes: Uint8Array,
-  filename: string,
-): void {
+export function downloadAiDoctorReportPdf(bytes: Uint8Array, filename: string): void {
   if (typeof document === "undefined" || typeof URL === "undefined") return;
   const ab = bytes.buffer.slice(
     bytes.byteOffset,

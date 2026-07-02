@@ -22,11 +22,9 @@
 
 export const REDACTED_PLACEHOLDER = "[redacted]";
 
-const UUID_RE =
-  /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/g;
+const UUID_RE = /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/g;
 
-const ISO_SECOND_RE =
-  /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})\b/g;
+const ISO_SECOND_RE = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})\b/g;
 
 const MAC_RE = /\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b/g;
 
@@ -68,11 +66,7 @@ const SECRET_KEYWORDS: ReadonlyArray<string> = [
 // quotes (e.g. `"access_token"`). Value is captured up to whitespace,
 // quote, comma, semicolon, ampersand, or backtick.
 const SECRET_PAIR_RES: ReadonlyArray<RegExp> = SECRET_KEYWORDS.map(
-  (k) =>
-    new RegExp(
-      `["'\`]?\\b${k}\\b["'\`]?\\s*[:=]\\s*["'\`]?[^\\s"'\`,;&]+["'\`]?`,
-      "gi",
-    ),
+  (k) => new RegExp(`["'\`]?\\b${k}\\b["'\`]?\\s*[:=]\\s*["'\`]?[^\\s"'\`,;&]+["'\`]?`, "gi"),
 );
 
 // Authorization header (and `Authorization` followed by any value) — the

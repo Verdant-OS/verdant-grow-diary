@@ -12,21 +12,14 @@
  */
 
 export const AUDIT_REPORT_PAGE_SIZES = [10, 25, 50] as const;
-export type AuditReportPageSize = typeof AUDIT_REPORT_PAGE_SIZES[number];
+export type AuditReportPageSize = (typeof AUDIT_REPORT_PAGE_SIZES)[number];
 export const AUDIT_REPORT_DEFAULT_PAGE_SIZE: AuditReportPageSize = 25;
 
 export const REJECTED_NOT_PERSISTED_NOTE =
   "Rejected ingest attempts are not persisted in this report." as const;
 
-export const CANONICAL_SOURCES = [
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-] as const;
-export type CanonicalSource = typeof CANONICAL_SOURCES[number];
+export const CANONICAL_SOURCES = ["live", "manual", "csv", "demo", "stale", "invalid"] as const;
+export type CanonicalSource = (typeof CANONICAL_SOURCES)[number];
 
 export interface RawSensorReadingRow {
   id?: string | null;
@@ -138,8 +131,7 @@ export interface SafeRawPayloadPreview {
 
 export const RAW_PAYLOAD_HIDDEN_COPY =
   "Raw payload hidden because it may contain sensitive values." as const;
-export const RAW_PAYLOAD_SAFE_NOTE =
-  "Redacted preview — sensitive keys removed." as const;
+export const RAW_PAYLOAD_SAFE_NOTE = "Redacted preview — sensitive keys removed." as const;
 
 export function redactPayload(value: unknown): string {
   try {
@@ -223,7 +215,11 @@ function readMetaNumber(payload: unknown, ...keys: string[]): number | null {
   return null;
 }
 
-function freshnessOf(capturedAt: string | null, now: Date, staleMs: number): "fresh" | "stale" | "unknown" {
+function freshnessOf(
+  capturedAt: string | null,
+  now: Date,
+  staleMs: number,
+): "fresh" | "stale" | "unknown" {
   if (!capturedAt) return "unknown";
   const t = Date.parse(capturedAt);
   if (!Number.isFinite(t)) return "unknown";
@@ -261,9 +257,7 @@ export function deriveSafeDeviceDisplayId(rawPayload: unknown): string | null {
     // Whitelist plain printable label chars only.
     const safe = trimmed.replace(/[^\w .-]+/g, "").trim();
     if (!safe) continue;
-    return safe.length > DEVICE_DISPLAY_MAX
-      ? `${safe.slice(0, DEVICE_DISPLAY_MAX - 1)}…`
-      : safe;
+    return safe.length > DEVICE_DISPLAY_MAX ? `${safe.slice(0, DEVICE_DISPLAY_MAX - 1)}…` : safe;
   }
   return null;
 }
@@ -306,7 +300,12 @@ function rowMatchesFilters(row: SensorIngestAuditRow, f: AuditReportFilters): bo
   return true;
 }
 
-function projectRow(r: RawSensorReadingRow, idx: number, now: Date, staleMs: number): SensorIngestAuditRow {
+function projectRow(
+  r: RawSensorReadingRow,
+  idx: number,
+  now: Date,
+  staleMs: number,
+): SensorIngestAuditRow {
   const capturedAt = r.captured_at ?? r.ts ?? null;
   const source = canonicalizeSource(r.source);
   const provider = readMetaString(r.raw_payload, "provider", "vendor");
@@ -315,9 +314,15 @@ function projectRow(r: RawSensorReadingRow, idx: number, now: Date, staleMs: num
   const vpd = readMetaNumber(r.raw_payload, "vpd_kpa");
   const soil = readMetaNumber(r.raw_payload, "soil_moisture_pct");
   const humidity = readMetaNumber(r.raw_payload, "humidity_pct", "humidity", "rh", "rh_percent");
-  const tempC = readMetaNumber(r.raw_payload, "air_temperature_c", "temperature_c", "temp_c", "tempC");
+  const tempC = readMetaNumber(
+    r.raw_payload,
+    "air_temperature_c",
+    "temperature_c",
+    "temp_c",
+    "tempC",
+  );
   const value = typeof r.value === "number" && Number.isFinite(r.value) ? r.value : null;
-  const metricSummary = r.metric && value !== null ? `${r.metric}=${value}` : r.metric ?? "—";
+  const metricSummary = r.metric && value !== null ? `${r.metric}=${value}` : (r.metric ?? "—");
   const confidence = readMetaNumber(r.raw_payload, "confidence");
 
   return {

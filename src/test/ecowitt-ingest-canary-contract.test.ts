@@ -27,9 +27,7 @@ const EDGE_SRC = readFileSync(
   "utf8",
 );
 /** Edge function source with line and block comments stripped, for code-only scans. */
-const EDGE_CODE = EDGE_SRC
-  .replace(/\/\*[\s\S]*?\*\//g, "")
-  .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+const EDGE_CODE = EDGE_SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
 const USER = "uuuuuuuu-uuuu-uuuu-uuuu-uuuuuuuuuuuu";
 const NOW = "2026-06-04T21:00:00.000Z";
@@ -110,12 +108,8 @@ describe("(2) timestamp / dateutc handling — gateway-trusted UTC with safe fal
 
   it("parseEcoWittDateUtc accepts well-formed dateutc as UTC and rejects garbage", async () => {
     const { parseEcoWittDateUtc } = await import("@/lib/ecowittRoutedRowBuilder");
-    expect(parseEcoWittDateUtc("2026-06-04 21:00:00")).toBe(
-      "2026-06-04T21:00:00.000Z",
-    );
-    expect(parseEcoWittDateUtc("2026-06-04T21:00:00")).toBe(
-      "2026-06-04T21:00:00.000Z",
-    );
+    expect(parseEcoWittDateUtc("2026-06-04 21:00:00")).toBe("2026-06-04T21:00:00.000Z");
+    expect(parseEcoWittDateUtc("2026-06-04T21:00:00")).toBe("2026-06-04T21:00:00.000Z");
     // Calendar-invalid → rejected (round-trip check).
     expect(parseEcoWittDateUtc("2026-02-30 12:00:00")).toBeNull();
     // Wrong format / garbage / missing.
@@ -150,8 +144,7 @@ describe("(2) timestamp / dateutc handling — gateway-trusted UTC with safe fal
     // Every (metric, captured_at) pair matches — so the partial unique
     // index (user_id, tent_id, source, metric, captured_at) collapses the
     // duplicate retry to a skipped insert.
-    const keyOf = (r: typeof a.rows[number]) =>
-      `${r.tent_id}|${r.metric}|${r.captured_at}`;
+    const keyOf = (r: (typeof a.rows)[number]) => `${r.tent_id}|${r.metric}|${r.captured_at}`;
     expect(a.rows.map(keyOf).sort()).toEqual(b.rows.map(keyOf).sort());
     for (const r of [...a.rows, ...b.rows]) {
       expect(r.captured_at).toBe(sharedCapturedAt);
@@ -185,17 +178,11 @@ describe("(2) timestamp / dateutc handling — gateway-trusted UTC with safe fal
     // Just past `now + 24h` is rejected.
     expect(parseEcoWittDateUtc("2026-06-06 21:00:01", now)).toBeNull();
     // Inside the window: accepted.
-    expect(parseEcoWittDateUtc("2026-06-04 21:00:00", now)).toBe(
-      "2026-06-04T21:00:00.000Z",
-    );
+    expect(parseEcoWittDateUtc("2026-06-04 21:00:00", now)).toBe("2026-06-04T21:00:00.000Z");
     // Just within +24h skew: accepted.
-    expect(parseEcoWittDateUtc("2026-06-05 21:00:00", now)).toBe(
-      "2026-06-05T21:00:00.000Z",
-    );
+    expect(parseEcoWittDateUtc("2026-06-05 21:00:00", now)).toBe("2026-06-05T21:00:00.000Z");
     // Lower-bound boundary: 2020-01-01T00:00:00Z accepted.
-    expect(parseEcoWittDateUtc("2020-01-01 00:00:00", now)).toBe(
-      "2020-01-01T00:00:00.000Z",
-    );
+    expect(parseEcoWittDateUtc("2020-01-01 00:00:00", now)).toBe("2020-01-01T00:00:00.000Z");
     // 1s before the lower bound: rejected.
     expect(parseEcoWittDateUtc("2019-12-31 23:59:59", now)).toBeNull();
   });
@@ -240,9 +227,7 @@ describe("(3) duplicate behavior — pins onConflict against dedupe unique index
   // The edge function MUST use the same columns in onConflict so a duplicate
   // POST is idempotent (skipped, never double-inserted).
   it("edge function uses ignoreDuplicates with the dedupe column set", () => {
-    expect(EDGE_SRC).toMatch(
-      /onConflict:\s*"user_id,tent_id,source,metric,captured_at"/,
-    );
+    expect(EDGE_SRC).toMatch(/onConflict:\s*"user_id,tent_id,source,metric,captured_at"/);
     expect(EDGE_SRC).toMatch(/ignoreDuplicates:\s*true/);
   });
 
@@ -303,9 +288,7 @@ describe("(4) secret + log safety — source scan of the edge function", () => {
         soilmoisture1: "40",
       },
       payloadPasskeyFingerprint: fp,
-      eligibleTents: [
-        { ...tent, passkey_fingerprint: fp as string },
-      ],
+      eligibleTents: [{ ...tent, passkey_fingerprint: fp as string }],
       capturedAt: NOW,
     });
     const serialized = JSON.stringify(rows);
@@ -324,12 +307,7 @@ describe("(4) secret + log safety — source scan of the edge function", () => {
       expect(serialized.toLowerCase()).not.toContain(k.toLowerCase());
     }
     // Known test-secret VALUES (not just field names).
-    for (const v of [
-      "AAAA-SECRET",
-      "AA:BB:CC:DD:EE:FF",
-      "fake-api-key",
-      "fake-token",
-    ]) {
+    for (const v of ["AAAA-SECRET", "AA:BB:CC:DD:EE:FF", "fake-api-key", "fake-token"]) {
       expect(serialized).not.toContain(v);
     }
   });

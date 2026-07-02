@@ -19,10 +19,7 @@ import {
   type CsvPreviewParseResult,
   type CsvPreviewReportOptions,
 } from "@/lib/csvSensorPreviewRules";
-import {
-  CSV_PREVIEW_WARNING_COPY,
-  type FlagCode,
-} from "@/lib/csvSensorPreviewWarningCopy";
+import { CSV_PREVIEW_WARNING_COPY, type FlagCode } from "@/lib/csvSensorPreviewWarningCopy";
 import { assertExportSafe } from "@/lib/exportRedactionRules";
 
 const PAGE_WIDTH = 612; // US Letter, 72dpi
@@ -47,10 +44,7 @@ const SAFE_BY_DESIGN_NOTE = [
 ];
 
 function escapePdfText(s: string): string {
-  return s
-    .replace(/\\/g, "\\\\")
-    .replace(/\(/g, "\\(")
-    .replace(/\)/g, "\\)");
+  return s.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }
 
 function wrapLine(text: string, max: number): string[] {
@@ -157,10 +151,7 @@ export function buildCsvPreviewReportPdfBytes(
   } else {
     for (const f of report.suspiciousFlags) {
       const copy = CSV_PREVIEW_WARNING_COPY[f.code as FlagCode];
-      pushBullet(
-        lines,
-        `[${f.severity.toUpperCase()}] ${f.header}: ${copy?.title ?? f.code}`,
-      );
+      pushBullet(lines, `[${f.severity.toUpperCase()}] ${f.header}: ${copy?.title ?? f.code}`);
       if (copy) {
         pushBody(lines, `  Why it matters: ${copy.whyItMatters}`);
         pushBody(lines, `  Suggested fix: ${copy.suggestedFix}`);
@@ -181,10 +172,7 @@ export function buildCsvPreviewReportPdfBytes(
   // Final-content guardrail: scan the entire assembled text body before
   // rasterizing to PDF. Catches any upstream contamination (e.g. a header
   // string that accidentally carries a MAC) at the export boundary.
-  assertExportSafe(
-    lines.map((l) => l.text).join("\n"),
-    "csv-sensor-preview-pdf",
-  );
+  assertExportSafe(lines.map((l) => l.text).join("\n"), "csv-sensor-preview-pdf");
 
   return renderPdfFromLines(lines);
 }
@@ -290,9 +278,7 @@ function renderPdfFromLines(lines: Line[]): Uint8Array {
     xref += `${objectOffsets[i].toString().padStart(10, "0")} 00000 n \n`;
   }
   push(xref);
-  push(
-    `trailer\n<< /Size ${totalObjects + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`,
-  );
+  push(`trailer\n<< /Size ${totalObjects + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`);
 
   // Concatenate.
   const total = chunks.reduce((n, c) => n + c.length, 0);

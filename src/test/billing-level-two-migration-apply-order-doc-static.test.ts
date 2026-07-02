@@ -113,11 +113,13 @@ describe("billing level two migration apply order manifest (docs/static-only)", 
       }
       if (/^\s*-\s/.test(line) && line.includes("no migration file found")) {
         const isHarness = currentGroup.includes("subscription updater harness");
-        expect(isHarness, `unexpected 'no migration file found' under group: ${currentGroup}`).toBe(true);
+        expect(isHarness, `unexpected 'no migration file found' under group: ${currentGroup}`).toBe(
+          true,
+        );
 
         // Sanity check: confirm no obvious harness migration exists in repo.
-        const harnessLike = files.filter(
-          (f) => /subscription_update.*harness|paddle.*harness/i.test(f),
+        const harnessLike = files.filter((f) =>
+          /subscription_update.*harness|paddle.*harness/i.test(f),
         );
         expect(harnessLike).toEqual([]);
       }

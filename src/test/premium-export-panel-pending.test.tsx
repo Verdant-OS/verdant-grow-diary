@@ -26,9 +26,7 @@ vi.mock("@/lib/aiDoctorReportRules", async () => {
   };
 });
 vi.mock("@/lib/aiDoctorEvidenceCsvExportRules", async () => {
-  const actual: any = await vi.importActual(
-    "@/lib/aiDoctorEvidenceCsvExportRules",
-  );
+  const actual: any = await vi.importActual("@/lib/aiDoctorEvidenceCsvExportRules");
   return {
     ...actual,
     buildAiDoctorEvidenceCsv: (...args: any[]) => buildCsvSpy(...args),
@@ -92,9 +90,7 @@ describe("premium export panel — pending UX + duplicate-click guard", () => {
         resolveGate = (v) => r(v);
       });
     render(<AiDoctorDiagnosisPanel diagnosis={diag()} reportInput={reportInput()} />);
-    const btn = screen.getByTestId(
-      "ai-doctor-diagnosis-download-report",
-    ) as HTMLButtonElement;
+    const btn = screen.getByTestId("ai-doctor-diagnosis-download-report") as HTMLButtonElement;
 
     fireEvent.click(btn);
     fireEvent.click(btn); // rapid second click while pending
@@ -120,9 +116,9 @@ describe("premium export panel — pending UX + duplicate-click guard", () => {
     render(<AiDoctorDiagnosisPanel diagnosis={diag()} reportInput={reportInput()} />);
     fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-download-csv"));
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ai-doctor-diagnosis-package-message").textContent,
-      ).toMatch(/Pro feature/),
+      expect(screen.getByTestId("ai-doctor-diagnosis-package-message").textContent).toMatch(
+        /Pro feature/,
+      ),
     );
     expect(buildCsvSpy).not.toHaveBeenCalled();
     expect(downloadCsvSpy).not.toHaveBeenCalled();

@@ -35,7 +35,7 @@ describe("Run-EcoWittCanary.ps1 — static safety", () => {
 
   it("prints a clear error if harness is missing", () => {
     expect(src).toContain(
-      "EcoWitt canary harness not found. Make sure you are using the latest Verdant repo."
+      "EcoWitt canary harness not found. Make sure you are using the latest Verdant repo.",
     );
   });
 
@@ -71,7 +71,7 @@ describe("Run-EcoWittCanary.cmd — static safety", () => {
   });
 
   it("calls Run-EcoWittCanary.ps1 via %~dp0", () => {
-    expect(src).toContain('%~dp0Run-EcoWittCanary.ps1');
+    expect(src).toContain("%~dp0Run-EcoWittCanary.ps1");
   });
 
   it("keeps the window open after completion", () => {

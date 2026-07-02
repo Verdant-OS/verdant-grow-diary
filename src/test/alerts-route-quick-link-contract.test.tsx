@@ -15,11 +15,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import {
-  alertsPath,
-  alertDetailPath,
-  actionQueueAlertContextPath,
-} from "@/lib/routes";
+import { alertsPath, alertDetailPath, actionQueueAlertContextPath } from "@/lib/routes";
 import { buildPlantQuickStatusView } from "@/lib/plantQuickStatusRules";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 import {
@@ -67,7 +63,7 @@ describe("Alerts route — quick link contract", () => {
 
   it("Alerts route is registered in App.tsx", () => {
     expect(APP).toMatch(/path="\/alerts"\s+element=\{<Alerts\s*\/>\}/);
-    expect(APP).toMatch(/import\s+Alerts\s+from\s+["']\.\/pages\/Alerts["']/);
+    expect(APP).toMatch(/import\(\s*["']\.\/pages\/Alerts["']\s*\)/);
   });
 
   it("Alerts route reads grow context from the URL (scoped grow hook)", () => {
@@ -85,9 +81,7 @@ describe("Alerts route — quick link contract", () => {
 
   it("empty state uses safety-pinned copy with calm helper text", () => {
     expect(ALERTS).toMatch(/No open alerts\./);
-    expect(ALERTS).toMatch(
-      /Check targets or enter a fresh manual snapshot if you expected one/,
-    );
+    expect(ALERTS).toMatch(/Check targets or enter a fresh manual snapshot if you expected one/);
   });
 
   it("error state surfaces calm retry guidance with a Retry control", () => {
@@ -112,7 +106,6 @@ describe("Alerts route — quick link contract", () => {
     expect(ALERTS).not.toMatch(/autopilot|auto[\s-]?execute|auto[\s-]?run/i);
   });
 
-
   it("page scaffolding does not leak token/raw_payload/provenance/service_role copy", () => {
     // Uses the shared scanner so the allow-list for <SensorSourceProvenanceBadge />
     // stays in one place (src/test/helpers/sourceLeakScanTestHelper.ts).
@@ -123,9 +116,7 @@ describe("Alerts route — quick link contract", () => {
   it("shared leak scanner allow-list stays minimal and explicit", () => {
     // Guard against silently growing the allow-list. Today the only safe
     // identifier we strip is the sensor-truth provenance badge.
-    expect([...DEFAULT_ALLOWED_LEAK_IDENTIFIERS]).toEqual([
-      "SensorSourceProvenanceBadge",
-    ]);
+    expect([...DEFAULT_ALLOWED_LEAK_IDENTIFIERS]).toEqual(["SensorSourceProvenanceBadge"]);
     // Forbidden terms must still include the four standing safety strings.
     expect(new Set(DEFAULT_FORBIDDEN_LEAK_TERMS)).toEqual(
       new Set(["service_role", "raw_payload", "bearer ", "provenance"]),
@@ -146,7 +137,9 @@ describe("Alerts route — quick link contract", () => {
       'const p = "raw_payload";',
       'const h = "Bearer abc";',
     ].join("\n");
-    const terms = scanForLeakedTerms(synthetic).map((f) => f.term).sort();
+    const terms = scanForLeakedTerms(synthetic)
+      .map((f) => f.term)
+      .sort();
     expect(terms).toEqual(["bearer ", "raw_payload", "service_role"]);
   });
 });
@@ -167,9 +160,7 @@ describe("Alerts route — quick-link targets resolve to manifest entries", () =
 
   it("every alert quick-link href reduces to a registered manifest path", () => {
     const manifestSet = new Set(APP_ROUTES.map((r) => r.path));
-    const offenders = QUICK_LINKS.filter(
-      (l) => !manifestSet.has(toManifestPattern(l.href)),
-    );
+    const offenders = QUICK_LINKS.filter((l) => !manifestSet.has(toManifestPattern(l.href)));
     expect(offenders).toEqual([]);
   });
 

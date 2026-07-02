@@ -32,7 +32,8 @@ const PRIVATE_TABLES = [
 
 describe("/hardware-integrations route", () => {
   it("is registered as a public route", () => {
-    expect(APP).toMatch(/import\s+HardwareIntegrations\s+from\s+"\.\/pages\/HardwareIntegrations"/);
+    // Page is code-split (React.lazy dynamic import) rather than eagerly imported.
+    expect(APP).toMatch(/import\(\s*["']\.\/pages\/HardwareIntegrations["']\s*\)/);
     expect(APP).toMatch(/path="\/hardware-integrations"\s+element=\{<HardwareIntegrations\s*\/>\}/);
   });
 });
@@ -87,7 +88,6 @@ describe("Hardware Integrations page copy", () => {
     }
   });
 
-
   it("includes the Hardware partner CTA", () => {
     expect(PAGE).toMatch(/Hardware partner\? Contact Verdant/);
   });
@@ -114,7 +114,9 @@ describe("Safety: no private data on public page", () => {
 
   it("does not import supabase client, hooks, or non-auth stores", () => {
     expect(PAGE).not.toMatch(/@\/integrations\/supabase\/client/);
-    expect(PAGE).not.toMatch(/@\/hooks\//);
+    // usePageSeo is a safe SEO <head> hook (no supabase/network/data); any
+    // other @/hooks import (dashboard data hooks) remains forbidden.
+    expect(PAGE).not.toMatch(/@\/hooks\/(?!usePageSeo\b)/);
     const storeImports = PAGE.match(/from\s+["']@\/store\/[^"']+["']/g) ?? [];
     for (const imp of storeImports) {
       expect(imp).toMatch(/@\/store\/auth/);

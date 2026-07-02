@@ -23,10 +23,7 @@ const DESC =
   "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.";
 
 function meta(html: string, attr: "name" | "property", key: string): string | null {
-  const re = new RegExp(
-    `<meta\\s+${attr}="${key}"\\s+content="([^"]+)"\\s*/?>`,
-    "i",
-  );
+  const re = new RegExp(`<meta\\s+${attr}="${key}"\\s+content="([^"]+)"\\s*/?>`, "i");
   return html.match(re)?.[1] ?? null;
 }
 
@@ -39,10 +36,14 @@ describe("index.html — primary SEO", () => {
     expect(meta(HTML, "name", "description")).toBe(DESC);
   });
 
-  it("canonical points at the production domain", () => {
-    expect(HTML).toMatch(
-      /<link\s+rel="canonical"\s+href="https:\/\/verdantgrowdiary\.com"/,
-    );
+  it("bakes no single root canonical (per-route self-canonicals set client-side)", () => {
+    // A single root canonical baked into every SPA route makes /welcome,
+    // /pricing, etc. declare themselves duplicates of the homepage, which
+    // de-indexes them. Per-route self-canonicals are emitted client-side by
+    // usePageSeo; non-JS crawlers fall back to the request URL (the correct
+    // self-canonical). See the index.html comment + src/hooks/usePageSeo.ts.
+    expect(HTML).not.toMatch(/<link\s+rel="canonical"/);
+    expect(HTML).toMatch(/No hardcoded canonical here on purpose/);
   });
 
   it("robots is index, follow", () => {
@@ -62,9 +63,7 @@ describe("index.html — Open Graph", () => {
     expect(meta(HTML, "property", "og:url")).toBe(PROD);
     expect(meta(HTML, "property", "og:type")).toBe("website");
     expect(meta(HTML, "property", "og:site_name")).toBe("Verdant Grow Diary");
-    expect(meta(HTML, "property", "og:image")).toMatch(
-      /\/brand\/verdant-logo\.png$/,
-    );
+    expect(meta(HTML, "property", "og:image")).toMatch(/\/brand\/verdant-logo\.png$/);
   });
 });
 
@@ -73,33 +72,46 @@ describe("index.html — Twitter card", () => {
     expect(meta(HTML, "name", "twitter:card")).toBe("summary_large_image");
     expect(meta(HTML, "name", "twitter:title")).toBe("Verdant Grow Diary");
     expect(meta(HTML, "name", "twitter:description")).toBe(DESC);
-    expect(meta(HTML, "name", "twitter:image")).toMatch(
-      /\/brand\/verdant-logo\.png$/,
-    );
+    expect(meta(HTML, "name", "twitter:image")).toMatch(/\/brand\/verdant-logo\.png$/);
+  });
+});
+
+describe("index.html — structured data", () => {
+  it("ships valid Organization + WebSite JSON-LD", () => {
+    const m = HTML.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+    expect(m).not.toBeNull();
+    const data = JSON.parse(m![1]);
+    const nodes: Array<{ "@type"?: string; url?: string }> = data["@graph"] ?? [data];
+    const types = nodes.map((n) => n["@type"]);
+    expect(types).toContain("Organization");
+    expect(types).toContain("WebSite");
+    for (const n of nodes) {
+      expect(n.url).toBe(PROD);
+    }
   });
 });
 
 describe("favicon and manifest", () => {
-  it("favicon link points at the brand logo", () => {
-    expect(HTML).toMatch(
-      /<link\s+rel="icon"[^>]+href="\/brand\/verdant-logo\.png"/,
-    );
+  it("primary favicon is the lightweight inline SVG (not the 2.38 MB brand PNG)", () => {
+    expect(HTML).toMatch(/<link\s+rel="icon"\s+type="image\/svg\+xml"\s+href="\/favicon\.svg"/);
+    const svg = resolve(root, "public/favicon.svg");
+    expect(existsSync(svg)).toBe(true);
+    // The whole point of the swap: the per-route favicon must be tiny.
+    expect(readFileSync(svg, "utf8").length).toBeLessThan(4096);
   });
 
   it("apple-touch-icon points at the brand logo", () => {
-    expect(HTML).toMatch(
-      /<link\s+rel="apple-touch-icon"[^>]+href="\/brand\/verdant-logo\.png"/,
-    );
+    expect(HTML).toMatch(/<link\s+rel="apple-touch-icon"[^>]+href="\/brand\/verdant-logo\.png"/);
   });
 
   it("links to /site.webmanifest", () => {
-    expect(HTML).toMatch(
-      /<link\s+rel="manifest"\s+href="\/site\.webmanifest"/,
-    );
+    expect(HTML).toMatch(/<link\s+rel="manifest"\s+href="\/site\.webmanifest"/);
   });
 
-  it("leaves a TODO for a simplified favicon", () => {
-    expect(HTML).toMatch(/TODO\(favicon\)/);
+  it("still tracks the remaining raster-icon design follow-up", () => {
+    // The SVG favicon is shipped; the apple-touch-icon still points at the full
+    // brand PNG and wants a purpose-built 180x180. Keep that follow-up visible.
+    expect(HTML).toMatch(/TODO\(design\)/);
   });
 
   it("legacy /favicon.ico is no longer shipped", () => {
@@ -126,8 +138,14 @@ describe("favicon and manifest", () => {
 describe("safety: SEO changes did not expose private data", () => {
   it("landing page still does not query private tables", () => {
     const privateTables = [
-      "grows", "plants", "tents", "sensor_readings",
-      "alerts", "alert_events", "action_queue", "action_queue_events",
+      "grows",
+      "plants",
+      "tents",
+      "sensor_readings",
+      "alerts",
+      "alert_events",
+      "action_queue",
+      "action_queue_events",
       "diary_entries",
     ];
     for (const t of privateTables) {

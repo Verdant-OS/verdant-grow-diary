@@ -20,23 +20,11 @@ import { resolve } from "node:path";
 
 import { alertDetailPath } from "@/lib/routes";
 
-const DETAIL_PAGE = readFileSync(
-  resolve(__dirname, "../pages/AlertDetail.tsx"),
-  "utf8",
-);
-const ALERTS_PAGE = readFileSync(
-  resolve(__dirname, "../pages/Alerts.tsx"),
-  "utf8",
-);
+const DETAIL_PAGE = readFileSync(resolve(__dirname, "../pages/AlertDetail.tsx"), "utf8");
+const ALERTS_PAGE = readFileSync(resolve(__dirname, "../pages/Alerts.tsx"), "utf8");
 const APP_TSX = readFileSync(resolve(__dirname, "../App.tsx"), "utf8");
-const ALERTS_LIB = readFileSync(
-  resolve(__dirname, "../lib/alerts.ts"),
-  "utf8",
-);
-const DASHBOARD = readFileSync(
-  resolve(__dirname, "../pages/Dashboard.tsx"),
-  "utf8",
-);
+const ALERTS_LIB = readFileSync(resolve(__dirname, "../lib/alerts.ts"), "utf8");
+const DASHBOARD = readFileSync(resolve(__dirname, "../pages/Dashboard.tsx"), "utf8");
 
 describe("alertDetailPath builder", () => {
   it("emits /alerts/:id", () => {
@@ -53,12 +41,11 @@ describe("alertDetailPath builder", () => {
 
 describe("AlertDetail route registration", () => {
   it("registers /alerts/:alertId in App.tsx", () => {
-    expect(APP_TSX).toMatch(
-      /path=["']\/alerts\/:alertId["']\s+element=\{<AlertDetail/,
-    );
+    expect(APP_TSX).toMatch(/path=["']\/alerts\/:alertId["']\s+element=\{<AlertDetail/);
   });
   it("imports the AlertDetail page", () => {
-    expect(APP_TSX).toMatch(/from\s+["']\.\/pages\/AlertDetail["']/);
+    // Route pages are code-split via React.lazy; App.tsx imports them dynamically.
+    expect(APP_TSX).toMatch(/import\(\s*["']\.\/pages\/AlertDetail["']\s*\)/);
   });
 });
 
@@ -89,9 +76,7 @@ describe("AlertDetail page composition", () => {
   });
 
   it("shows acknowledge action only for open alerts", () => {
-    expect(DETAIL_PAGE).toMatch(
-      /alert\.status\s*===\s*["']open["'][\s\S]{0,400}Acknowledge/,
-    );
+    expect(DETAIL_PAGE).toMatch(/alert\.status\s*===\s*["']open["'][\s\S]{0,400}Acknowledge/);
   });
   it("shows resolve action for open or acknowledged alerts", () => {
     expect(DETAIL_PAGE).toMatch(
@@ -177,9 +162,7 @@ describe("AlertDetail safety constraints", () => {
     // Insertion is allowed but must be user-initiated and suggest-only.
     expect(DETAIL_PAGE).toMatch(/onClick=\{addAlertToActionQueue\}/);
     expect(DETAIL_PAGE).toMatch(/status:\s*draft\.status/);
-    expect(DETAIL_PAGE).not.toMatch(
-      /useEffect\([\s\S]{0,400}action_queue[\s\S]{0,200}\.insert\(/,
-    );
+    expect(DETAIL_PAGE).not.toMatch(/useEffect\([\s\S]{0,400}action_queue[\s\S]{0,200}\.insert\(/);
   });
   it("contains no external-control or actuator strings", () => {
     expect(DETAIL_PAGE).not.toMatch(/actuator/i);

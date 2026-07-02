@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   Check,
   Minus,
@@ -66,14 +67,18 @@ const COMPARISON_ROWS: Row[] = [
 export default function Pricing() {
   const [billing, setBilling] = useState<BillingPeriod>("annual");
 
+  usePageSeo({
+    title: "Pricing — Free, Pro & Founder Lifetime | Verdant Grow Diary",
+    description:
+      "Free grow diary forever. Pro adds cloud sync, multi-tent support, sensor history and exports. Founder Lifetime is a one-time plan for early supporters.",
+    path: "/pricing",
+  });
+
   useEffect(() => {
     trackPricingEvent("pricing_page_view");
   }, []);
 
-  const proPrice =
-    billing === "annual"
-      ? `$${PRO_ANNUAL_PRICE_USD}`
-      : `$${PRO_MONTHLY_PRICE_USD}`;
+  const proPrice = billing === "annual" ? `$${PRO_ANNUAL_PRICE_USD}` : `$${PRO_MONTHLY_PRICE_USD}`;
   const proCadence = billing === "annual" ? "/ year" : "/ month";
   const proFootnote =
     billing === "annual"
@@ -87,7 +92,9 @@ export default function Pricing() {
           <BrandLogo size="md" showText />
         </Link>
         <Link to="/welcome">
-          <Button variant="outline" size="sm">Back to home</Button>
+          <Button variant="outline" size="sm">
+            Back to home
+          </Button>
         </Link>
       </header>
 
@@ -100,7 +107,9 @@ export default function Pricing() {
           Protect your grow history. Understand what changed. Make better decisions next run.
         </h1>
         <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
-          Verdant is a grow room operating system for serious growers who want more than a notebook. Track plants, logs, photos, sensor snapshots, alerts, and AI-assisted grow history in one clean timeline — without locking yourself into one hardware brand.
+          Verdant is a grow room operating system for serious growers who want more than a notebook.
+          Track plants, logs, photos, sensor snapshots, alerts, and AI-assisted grow history in one
+          clean timeline — without locking yourself into one hardware brand.
         </p>
         <p className="mt-4 text-sm md:text-base text-primary font-medium">
           Plant memory. Sensor truth. Better decisions.
@@ -122,6 +131,7 @@ export default function Pricing() {
           type="button"
           role="switch"
           aria-checked={billing === "annual"}
+          aria-label="Toggle annual billing"
           onClick={() =>
             setBilling((prev) => {
               const next = prev === "annual" ? "monthly" : "annual";
@@ -224,9 +234,7 @@ export default function Pricing() {
               <Button
                 size="lg"
                 className="w-full"
-                onClick={() =>
-                  trackPricingEvent("pricing_cta_founder_lifetime_clicked")
-                }
+                onClick={() => trackPricingEvent("pricing_cta_founder_lifetime_clicked")}
               >
                 Claim Founder Lifetime — ${PRICING.founder.price}
               </Button>
@@ -250,9 +258,7 @@ export default function Pricing() {
               </li>
             ))}
           </ul>
-          <p className="mt-4 text-xs text-muted-foreground italic">
-            {AI_CREDIT_EXPLAINER.note}
-          </p>
+          <p className="mt-4 text-xs text-muted-foreground italic">{AI_CREDIT_EXPLAINER.note}</p>
         </div>
       </section>
 
@@ -276,15 +282,13 @@ export default function Pricing() {
       </section>
 
       {/* Proof callouts — what Pro actually delivers today */}
-      <section
-        className="px-6 pb-2 max-w-5xl mx-auto"
-        data-testid="pricing-proof-callouts"
-      >
+      <section className="px-6 pb-2 max-w-5xl mx-auto" data-testid="pricing-proof-callouts">
         <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
           What Pro actually delivers today
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
-          Real, shipped surfaces — not promises. Pro upgrades the value of the grow history you are already building on Free.
+          Real, shipped surfaces — not promises. Pro upgrades the value of the grow history you are
+          already building on Free.
         </p>
         <div className="mt-8 grid gap-6 md:grid-cols-2">
           <ProofCallout
@@ -310,8 +314,6 @@ export default function Pricing() {
         </div>
       </section>
 
-
-
       {/* Founder Lifetime highlight band */}
       <section className="px-6 py-10 max-w-5xl mx-auto">
         <div className="rounded-2xl border border-primary/40 bg-primary/5 p-6 md:p-8 flex flex-col md:flex-row gap-6 md:items-center">
@@ -323,7 +325,11 @@ export default function Pricing() {
               Founder Lifetime Offer — ${FOUNDER_LIFETIME_PRICE_USD} once, full Pro forever
             </h2>
             <p className="mt-2 text-sm md:text-base text-muted-foreground">
-              Verdant is founder-built. This is a limited early-supporter offer for the first {FOUNDER_LIFETIME_LIMIT} growers who back the product early. Pay once, get full Pro access for the life of the product, and help shape what ships next. No hype, no countdown gimmicks — when the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer ends.
+              Verdant is founder-built. This is a limited early-supporter offer for the first{" "}
+              {FOUNDER_LIFETIME_LIMIT} growers who back the product early. Pay once, get full Pro
+              access for the life of the product, and help shape what ships next. No hype, no
+              countdown gimmicks — when the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer
+              ends.
             </p>
           </div>
           <Link to="/billing/founder-lifetime" className="shrink-0">
@@ -347,22 +353,19 @@ export default function Pricing() {
           Compare Free, Pro, and Founder Lifetime
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
-          Free is genuinely useful for starting a grow diary. Pro adds cloud sync, deeper history, and multi-tent support. Founder Lifetime is a limited early-supporter offer that includes full Pro access.
+          Free is genuinely useful for starting a grow diary. Pro adds cloud sync, deeper history,
+          and multi-tent support. Founder Lifetime is a limited early-supporter offer that includes
+          full Pro access.
         </p>
 
         <div className="mt-8 overflow-x-auto rounded-xl border border-border/60">
-          <table
-            className="w-full min-w-[640px] text-sm"
-            data-testid="pricing-comparison-table"
-          >
+          <table className="w-full min-w-[640px] text-sm" data-testid="pricing-comparison-table">
             <thead className="bg-secondary/40 text-muted-foreground">
               <tr>
                 <th className="text-left font-medium px-4 py-3">Feature</th>
                 <th className="text-center font-medium px-4 py-3">Free</th>
                 <th className="text-center font-medium px-4 py-3 text-primary">Pro</th>
-                <th className="text-center font-medium px-4 py-3 text-primary">
-                  Founder Lifetime
-                </th>
+                <th className="text-center font-medium px-4 py-3 text-primary">Founder Lifetime</th>
               </tr>
             </thead>
             <tbody>
@@ -414,9 +417,7 @@ export default function Pricing() {
 
       {/* FAQ */}
       <section className="px-6 py-12 max-w-3xl mx-auto">
-        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
-          Pricing FAQ
-        </h2>
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">Pricing FAQ</h2>
         <Accordion
           type="single"
           collapsible
@@ -428,84 +429,107 @@ export default function Pricing() {
           <AccordionItem value="data-ownership">
             <AccordionTrigger>Who owns the grow data I put into Verdant?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              You do. Your grow logs, photos, and sensor snapshots are yours. Verdant does not sell your data and does not share it with advertisers. Pro includes advanced exports so you can take your full grow history with you whenever you want.
+              You do. Your grow logs, photos, and sensor snapshots are yours. Verdant does not sell
+              your data and does not share it with advertisers. Pro includes advanced exports so you
+              can take your full grow history with you whenever you want.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="free-forever">
             <AccordionTrigger>Is the Free tier really free?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              Yes. Plant profiles, the basic grow diary, photo logs, manual notes, the basic timeline, and manual sensor entries are all included on Free. You can run a real grow on Free without paying.
+              Yes. Plant profiles, the basic grow diary, photo logs, manual notes, the basic
+              timeline, and manual sensor entries are all included on Free. You can run a real grow
+              on Free without paying.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="pro-what">
             <AccordionTrigger>What do I actually get with Pro?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot history, longer grow history, better timeline filtering, priority support, and early access to advanced grow reports. Pro features ship over time, only as they stabilize.
+              Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot
+              history, longer grow history, better timeline filtering, priority support, and early
+              access to advanced grow reports. Pro features ship over time, only as they stabilize.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="founder-lifetime">
             <AccordionTrigger>How does the Founder Lifetime Offer work?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              ${FOUNDER_LIFETIME_PRICE_USD} once. You get full Pro access for the life of the product. This is a limited early-supporter offer, not a separate recurring plan. Limited to the first {FOUNDER_LIFETIME_LIMIT} buyers. When the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer ends. No fake countdowns and no expiring timers beyond that real limit.
+              ${FOUNDER_LIFETIME_PRICE_USD} once. You get full Pro access for the life of the
+              product. This is a limited early-supporter offer, not a separate recurring plan.
+              Limited to the first {FOUNDER_LIFETIME_LIMIT} buyers. When the first{" "}
+              {FOUNDER_LIFETIME_LIMIT} are claimed, the offer ends. No fake countdowns and no
+              expiring timers beyond that real limit.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="hardware">
             <AccordionTrigger>Do I need specific hardware?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge. Bring the gear you already own — Verdant does not sell or require any specific gear.
+              No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or
+              connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge. Bring the gear
+              you already own — Verdant does not sell or require any specific gear.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="ai-safety">
             <AccordionTrigger>Does Verdant control my equipment or grow for me?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              No. Verdant does not control fans, lights, pumps, heaters, dehumidifiers, or any other equipment. AI-assisted insights are suggestions only, and every action in the Action Queue is grower-approved before anything happens. The grower stays in control.
+              No. Verdant does not control fans, lights, pumps, heaters, dehumidifiers, or any other
+              equipment. AI-assisted insights are suggestions only, and every action in the Action
+              Queue is grower-approved before anything happens. The grower stays in control.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="cancel">
             <AccordionTrigger>Can I cancel anytime?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              Yes. Pro Monthly and Pro Annual can be canceled at any time. If you cancel, your grow history stays on your account and you keep read-only access to your logs.
+              Yes. Pro Monthly and Pro Annual can be canceled at any time. If you cancel, your grow
+              history stays on your account and you keep read-only access to your logs.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="what-paying-for" data-testid="pricing-faq-what-paying-for">
             <AccordionTrigger>What am I really paying for?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              You are paying for Verdant to become your grow memory system: protected grow history, multi-tent organization, source-labeled sensor data, reports, exports, and safer decision context across runs.
+              You are paying for Verdant to become your grow memory system: protected grow history,
+              multi-tent organization, source-labeled sensor data, reports, exports, and safer
+              decision context across runs.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="device-control" data-testid="pricing-faq-device-control">
             <AccordionTrigger>Does Verdant control my grow equipment?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              No. Verdant does not send device commands or blindly automate your grow. It can organize evidence and suggest next steps, but the grower decides.
+              No. Verdant does not send device commands or blindly automate your grow. It can
+              organize evidence and suggest next steps, but the grower decides.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="csv-imports" data-testid="pricing-faq-csv-imports">
             <AccordionTrigger>How does Verdant handle CSV sensor imports?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              CSV imports stay labeled as CSV. Verdant keeps manual, demo, stale, invalid, and CSV readings clearly labeled so weak or imported data is not mistaken for direct telemetry.
+              CSV imports stay labeled as CSV. Verdant keeps manual, demo, stale, invalid, and CSV
+              readings clearly labeled so weak or imported data is not mistaken for direct
+              telemetry.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="post-grow-report" data-testid="pricing-faq-post-grow-report">
             <AccordionTrigger>What does the Post-Grow Learning Report do?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              It turns a completed run into a reviewable report: what changed, what was logged, which alerts appeared, which actions were reviewed, and what to repeat or avoid next run.
+              It turns a completed run into a reviewable report: what changed, what was logged,
+              which alerts appeared, which actions were reviewed, and what to repeat or avoid next
+              run.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="checkout-sandbox" data-testid="pricing-faq-checkout-sandbox">
             <AccordionTrigger>Is checkout live?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              If you reach the billing placeholder, checkout is in sandbox preview and no live charge is made from that page.
+              If you reach the billing placeholder, checkout is in sandbox preview and no live
+              charge is made from that page.
             </AccordionContent>
           </AccordionItem>
         </Accordion>
@@ -517,7 +541,8 @@ export default function Pricing() {
           Start free. Upgrade when Verdant becomes your real grow memory system.
         </h2>
         <p className="mt-3 text-muted-foreground">
-          The free tier is built to be genuinely useful. Pro is for growers who want their full grow history backed up, synced, and easy to revisit.
+          The free tier is built to be genuinely useful. Pro is for growers who want their full grow
+          history backed up, synced, and easy to revisit.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Link to="/auth">
@@ -572,15 +597,7 @@ function CellValue({ value, accent }: { value: boolean | string; accent?: boolea
   return <span className={accent ? "text-primary font-medium" : ""}>{value}</span>;
 }
 
-function TrustCard({
-  icon,
-  title,
-  body,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  body: string;
-}) {
+function TrustCard({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
   return (
     <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-6">
       <div className="h-9 w-9 rounded-lg bg-primary/15 text-primary flex items-center justify-center">

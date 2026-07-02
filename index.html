@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -9,11 +9,13 @@
     <meta name="robots" content="index, follow" />
 
     <!-- Favicon / app icons.
-         TODO(favicon): produce a simplified single-glyph (leaf + pen nib) at
-         32x32 and 16x16 — the full circular brand mark loses detail at tiny
-         sizes. Until then we ship the full logo PNG, which still renders
-         acceptably on modern high-DPI tabs. -->
-    <link rel="icon" type="image/png" href="/brand/verdant-logo.png">
+         Primary favicon is a tiny inline-simple SVG (leaf + pen nib), served
+         instead of the 2.38 MB brand PNG that was previously fetched on every
+         route. All current browsers support SVG favicons.
+         TODO(design): apple-touch-icon still points at the full logo PNG —
+         iOS ignores SVG here. Replace with a purpose-built 180x180 PNG. It is
+         only fetched by Safari when adding to the home screen, not per page. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/brand/verdant-logo.png" />
     <link rel="manifest" href="/site.webmanifest" />
 
@@ -21,51 +23,86 @@
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-B3QRSZEM9S"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
 
-      gtag('config', 'G-B3QRSZEM9S');
+      gtag("config", "G-B3QRSZEM9S");
     </script>
 
     <!-- Primary SEO -->
     <title>Verdant Grow Diary</title>
-    <meta name="description" content="Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.">
-    <link rel="canonical" href="https://verdantgrowdiary.com" />
+    <meta
+      name="description"
+      content="Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators."
+    />
+    <!-- No hardcoded canonical here on purpose. A single root canonical baked
+         into every SPA route makes /welcome, /pricing, etc. declare themselves
+         duplicates of the homepage (which de-indexes them). Per-route
+         self-canonicals are set client-side by the usePageSeo hook
+         (src/hooks/usePageSeo.ts); non-JS crawlers fall back to the request
+         URL (the correct self-canonical). A
+         build-time prerender pass (deferred) will bake per-route canonicals
+         into static HTML for non-JS consumers. -->
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
 
     <!-- Open Graph -->
-    
-    
+
     <meta property="og:url" content="https://verdantgrowdiary.com" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Verdant Grow Diary" />
-    <meta property="og:image" content="/brand/verdant-logo.png">
+    <!-- TODO(design): replace with a 1200x630 social card (<300 KB). This is
+         still the square brand logo; absolute URL so scrapers resolve it. -->
+    <meta property="og:image" content="https://verdantgrowdiary.com/brand/verdant-logo.png" />
+    <meta property="og:image:alt" content="Verdant Grow Diary" />
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
-    
-    
-    <meta name="twitter:image" content="/brand/verdant-logo.png">
 
-    <!-- Sitewide Organization JSON-LD -->
+    <meta name="twitter:image" content="https://verdantgrowdiary.com/brand/verdant-logo.png" />
+
+    <!-- Sitewide Organization + WebSite JSON-LD -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "Organization",
-        "name": "Verdant Grow Diary",
-        "url": "https://verdantgrowdiary.com",
-        "logo": "https://verdantgrowdiary.com/brand/verdant-logo.png"
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://verdantgrowdiary.com/#organization",
+            "name": "Verdant Grow Diary",
+            "url": "https://verdantgrowdiary.com",
+            "logo": "https://verdantgrowdiary.com/brand/verdant-logo.png"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://verdantgrowdiary.com/#website",
+            "name": "Verdant Grow Diary",
+            "url": "https://verdantgrowdiary.com",
+            "publisher": { "@id": "https://verdantgrowdiary.com/#organization" },
+            "description": "Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators."
+          }
+        ]
       }
     </script>
-    <meta property="og:title" content="Verdant Grow Diary">
-  <meta name="twitter:title" content="Verdant Grow Diary">
-  <meta property="og:description" content="Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.">
-  <meta name="twitter:description" content="Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators.">
-</head>
+    <meta property="og:title" content="Verdant Grow Diary" />
+    <meta name="twitter:title" content="Verdant Grow Diary" />
+    <meta
+      property="og:description"
+      content="Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators."
+    />
+    <meta
+      name="twitter:description"
+      content="Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators."
+    />
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

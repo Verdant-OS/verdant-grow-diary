@@ -21,7 +21,7 @@ const COMBINED = PAGE + "\n" + STORE;
 describe("Grows index page", () => {
   it("registers /grows route in App.tsx", () => {
     expect(APP).toMatch(/path="\/grows"\s+element=\{<Grows\s*\/>\}/);
-    expect(APP).toMatch(/import Grows from "\.\/pages\/Grows"/);
+    expect(APP).toMatch(/import\(\s*["']\.\/pages\/Grows["']\s*\)/);
   });
 
   it("queries grows via Supabase (provider + RLS)", () => {

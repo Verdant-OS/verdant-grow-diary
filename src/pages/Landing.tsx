@@ -4,6 +4,7 @@ import { useAuth } from "@/store/auth";
 import BrandLogo from "@/components/BrandLogo";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
 import LandingAuthedOnboardingBridge from "@/components/LandingAuthedOnboardingBridge";
+import { usePageSeo } from "@/hooks/usePageSeo";
 
 /**
  * Public landing page for https://verdantgrowdiary.com.
@@ -23,6 +24,13 @@ import LandingAuthedOnboardingBridge from "@/components/LandingAuthedOnboardingB
 export default function Landing() {
   const { user } = useAuth();
 
+  usePageSeo({
+    title: "Grow Diary & Grow Room Tracking App | Verdant Grow Diary",
+    description:
+      "Log every feeding, photo, and sensor reading in one plant history. Spot what changed in your grow before the same mistake repeats. Start free.",
+    path: "/welcome",
+  });
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
@@ -30,11 +38,15 @@ export default function Landing() {
         <div className="flex items-center gap-2">
           {user ? (
             <Link to="/">
-              <Button variant="outline" size="sm">Open dashboard</Button>
+              <Button variant="outline" size="sm">
+                Open dashboard
+              </Button>
             </Link>
           ) : (
             <Link to="/auth">
-              <Button variant="outline" size="sm">Sign in</Button>
+              <Button variant="outline" size="sm">
+                Sign in
+              </Button>
             </Link>
           )}
         </div>
@@ -53,22 +65,27 @@ export default function Landing() {
           <span className="block text-primary">before the next mistake repeats.</span>
         </h1>
         <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-          Verdant turns grow logs, photos, sensor snapshots, alerts, and
-          cautious AI into one clear plant history. Real grow data only —
-          no synthetic preview.
+          Verdant turns grow logs, photos, sensor snapshots, alerts, and cautious AI into one clear
+          plant history. Real grow data only — no synthetic preview.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           {user ? (
             <Link to="/">
-              <Button size="lg" className="font-semibold">Open dashboard</Button>
+              <Button size="lg" className="font-semibold">
+                Open dashboard
+              </Button>
             </Link>
           ) : (
             <Link to="/auth">
-              <Button size="lg" className="font-semibold">Create Free Account</Button>
+              <Button size="lg" className="font-semibold">
+                Create Free Account
+              </Button>
             </Link>
           )}
           <Link to="/auth">
-            <Button size="lg" variant="ghost">Sign in</Button>
+            <Button size="lg" variant="ghost">
+              Sign in
+            </Button>
           </Link>
         </div>
         <p className="mt-6 text-xs text-muted-foreground">
@@ -96,7 +113,8 @@ export default function Landing() {
               <span className="h-2 w-2 rounded-full bg-accent" /> Plant memory
             </span>
             <span className="inline-flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-muted-foreground" /> Approval-required actions
+              <span className="h-2 w-2 rounded-full bg-muted-foreground" /> Approval-required
+              actions
             </span>
           </div>
         </div>
@@ -165,9 +183,7 @@ export default function Landing() {
       {/* Safety */}
       <section className="px-6 py-14 max-w-3xl mx-auto">
         <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 md:p-8">
-          <h2 className="font-display text-2xl md:text-3xl font-semibold">
-            Built safe by default
-          </h2>
+          <h2 className="font-display text-2xl md:text-3xl font-semibold">Built safe by default</h2>
           <ul className="mt-5 space-y-3 text-sm md:text-base text-muted-foreground">
             <li>· Verdant does not control equipment by default.</li>
             <li>· AI suggestions require grower review.</li>
@@ -184,9 +200,8 @@ export default function Landing() {
           Start with your real grow
         </h2>
         <p className="mt-3 text-muted-foreground">
-          Create a free account to begin logging your tents, plants, and
-          sensor readings. Verdant tracks real grow data — there is no
-          synthetic preview mode.
+          Create a free account to begin logging your tents, plants, and sensor readings. Verdant
+          tracks real grow data — there is no synthetic preview mode.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           {user ? (
@@ -199,18 +214,26 @@ export default function Landing() {
             </Link>
           )}
           <Link to="/auth">
-            <Button size="lg" variant="outline">Sign in</Button>
+            <Button size="lg" variant="outline">
+              Sign in
+            </Button>
           </Link>
         </div>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link to="/hardware-integrations">
-            <Button size="sm" variant="ghost">Hardware integrations</Button>
+            <Button size="sm" variant="ghost">
+              Hardware integrations
+            </Button>
           </Link>
           <Link to="/pricing">
-            <Button size="sm" variant="ghost">Pricing</Button>
+            <Button size="sm" variant="ghost">
+              Pricing
+            </Button>
           </Link>
           <a href="#features">
-            <Button size="sm" variant="ghost">Learn more</Button>
+            <Button size="sm" variant="ghost">
+              Learn more
+            </Button>
           </a>
         </div>
       </section>
@@ -218,16 +241,13 @@ export default function Landing() {
       {/* Beta */}
       <section id="beta" className="px-6 py-16 max-w-3xl mx-auto">
         <div className="text-center mb-8">
-          <h2 className="font-display text-2xl md:text-3xl font-semibold">
-            Join the Verdant beta
-          </h2>
+          <h2 className="font-display text-2xl md:text-3xl font-semibold">Join the Verdant beta</h2>
           <p className="mt-3 text-muted-foreground">
             Hardware partner? Contact Verdant about read-only integrations.
           </p>
           <p className="mt-4 text-sm text-muted-foreground">
-            Verdant Grow Diary is currently in early build. Join the beta
-            list or reach out about read-only hardware integrations. Grower
-            stays in control. No blind automation.
+            Verdant Grow Diary is currently in early build. Join the beta list or reach out about
+            read-only hardware integrations. Grower stays in control. No blind automation.
           </p>
         </div>
         <LeadCaptureForm />

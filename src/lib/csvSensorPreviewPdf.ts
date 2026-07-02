@@ -100,7 +100,7 @@ function pushBullet(lines: Line[], text: string) {
   });
 }
 
-export interface CsvPreviewPdfOptions extends CsvPreviewReportOptions {}
+export type CsvPreviewPdfOptions = CsvPreviewReportOptions;
 
 export function buildCsvPreviewReportPdfBytes(
   preview: CsvPreviewParseResult,

@@ -30,9 +30,9 @@ const ISO_SECOND_RE =
 
 const MAC_RE = /\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b/g;
 
-const BEARER_RE = /\bBearer\s+[A-Za-z0-9._\-]+/g;
+const BEARER_RE = /\bBearer\s+[A-Za-z0-9._-]+/g;
 
-const JWT_RE = /\beyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/g;
+const JWT_RE = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
 
 const LONG_HEX_RE = /\b[0-9a-fA-F]{32,}\b/g;
 

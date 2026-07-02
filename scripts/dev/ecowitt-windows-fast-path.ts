@@ -126,9 +126,9 @@ const ROLE_LITERAL = "ser" + "vice_role";
 const WEBHOOK_LITERAL = "sensor-" + "ingest-" + "webhook";
 
 const REDACTION_RULES: ReadonlyArray<{ name: string; re: RegExp; repl: string }> = [
-  { name: "jwt_like", re: /eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]+/g, repl: "***REDACTED-JWT***" },
-  { name: "bearer_token", re: /(Bearer\s+)[A-Za-z0-9._\-]+/gi, repl: "$1***REDACTED***" },
-  { name: "bridge_token_shape", re: /vbt_[A-Za-z0-9_\-]+/g, repl: "vbt_***REDACTED***" },
+  { name: "jwt_like", re: /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+/g, repl: "***REDACTED-JWT***" },
+  { name: "bearer_token", re: /(Bearer\s+)[A-Za-z0-9._-]+/gi, repl: "$1***REDACTED***" },
+  { name: "bridge_token_shape", re: /vbt_[A-Za-z0-9_-]+/g, repl: "vbt_***REDACTED***" },
   { name: "mqtt_userinfo", re: /(mqtts?:\/\/)[^@\s/]+:[^@\s/]+@/gi, repl: "$1***REDACTED***@" },
   { name: "supabase_url", re: new RegExp("https?://[A-Za-z0-9-]+\\." + "supa" + "base\\.co[^\\s\"']*", "gi"), repl: "***REDACTED-SUPABASE-URL***" },
   { name: "supabase_env", re: new RegExp(SB_ENV_PREFIX + "[A-Z_]+", "g"), repl: "***REDACTED-SUPABASE-ENV***" },

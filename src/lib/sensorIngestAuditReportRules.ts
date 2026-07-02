@@ -259,7 +259,7 @@ export function deriveSafeDeviceDisplayId(rawPayload: unknown): string | null {
     if (!trimmed) continue;
     if (UNSAFE_DEVICE_PATTERNS.some((re) => re.test(trimmed))) continue;
     // Whitelist plain printable label chars only.
-    const safe = trimmed.replace(/[^\w .\-]+/g, "").trim();
+    const safe = trimmed.replace(/[^\w .-]+/g, "").trim();
     if (!safe) continue;
     return safe.length > DEVICE_DISPLAY_MAX
       ? `${safe.slice(0, DEVICE_DISPLAY_MAX - 1)}…`

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
 const TESTBENCH_DIR = join(process.cwd(), "tools", "ecowitt-testbench");
@@ -26,7 +27,7 @@ describe("ecowitt windows testbench — static safety", () => {
     // Allow the literal placeholder vbt_REPLACE_WITH_REAL_TOKEN. Reject
     // anything that looks like a real token (vbt_ + >= 20 token chars).
     for (const { path, body } of fileContents) {
-      const matches = body.match(/vbt_[A-Za-z0-9_\-]{20,}/g) || [];
+      const matches = body.match(/vbt_[A-Za-z0-9_-]{20,}/g) || [];
       for (const m of matches) {
         expect(
           m,
@@ -41,7 +42,7 @@ describe("ecowitt windows testbench — static safety", () => {
       expect(body, `service_role token in ${path}`).not.toMatch(/service_role/i);
       // Reject committed JWT-shaped tokens (header.payload.signature).
       expect(body, `JWT-shaped value in ${path}`).not.toMatch(
-        /eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}/,
+        /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
       );
     }
   });
@@ -1105,8 +1106,6 @@ describe("ecowitt windows testbench — preflight diagnostics + invocation smoke
 describe("ecowitt windows testbench — preflight PowerShell invocation smoke", () => {
   // These tests actually invoke PowerShell. Skip when no PS executable
   // is available so non-Windows CI does not fail.
-  const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
-  const { existsSync } = require("node:fs") as typeof import("node:fs");
 
   function findPwsh(): string | null {
     for (const c of ["pwsh", "powershell.exe", "powershell"]) {
@@ -1410,7 +1409,7 @@ describe("ecowitt windows testbench — retry/backoff + error report", () => {
       "utf-8",
     );
     expect(fixture).not.toMatch(/PASSKEY/i);
-    expect(fixture).not.toMatch(/vbt_[A-Za-z0-9_\-]{6,}/);
+    expect(fixture).not.toMatch(/vbt_[A-Za-z0-9_-]{6,}/);
     expect(fixture).not.toMatch(/Authorization/);
     expect(fixture).not.toMatch(/Bearer\s+/);
     expect(fixture).not.toMatch(/service_role/i);

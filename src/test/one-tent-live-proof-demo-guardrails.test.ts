@@ -92,7 +92,7 @@ describe("Demo safety warning + demo run banner", () => {
   });
   it("warning does not include token/secret/endpoint-shaped strings", () => {
     const text = PROOF_DEMO_SAFETY_WARNING;
-    expect(text).not.toMatch(/eyJ[A-Za-z0-9_\-]+/); // JWT
+    expect(text).not.toMatch(/eyJ[A-Za-z0-9_-]+/); // JWT
     expect(text).not.toMatch(/sk_[A-Za-z0-9]{8,}/);
     expect(text).not.toMatch(/service_role/i);
     expect(text).not.toMatch(/https?:\/\//);

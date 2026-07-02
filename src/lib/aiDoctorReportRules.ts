@@ -60,7 +60,7 @@ export interface AiDoctorReportInput {
 const REDACT_PATTERNS: RegExp[] = [
   /\b(service_role|bridge_token|authorization|bearer\s+[^\s]+|api[_-]?key|secret_key|jwt|user_id)\b/gi,
   // eyJ... JWT-shaped tokens
-  /eyJ[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}\.[A-Za-z0-9_\-]{6,}/g,
+  /eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/g,
   // UUID-shaped raw internal IDs in visible copy
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
 ];

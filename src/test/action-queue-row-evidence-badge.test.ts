@@ -78,7 +78,7 @@ describe("Action Queue row evidence status badge", () => {
   });
 
   it("badge uses aria-label and title for accessible help text without noisy duplication", () => {
-    expect(ACTION_QUEUE_SRC).toMatch(/aria-label=\{\`Evidence: \$\{vm\.rowEvidenceStatusLabel\}\. \$\{vm\.rowEvidenceStatusHelp\}\`\}/);
+    expect(ACTION_QUEUE_SRC).toMatch(/aria-label=\{`Evidence: \$\{vm\.rowEvidenceStatusLabel\}\. \$\{vm\.rowEvidenceStatusHelp\}`\}/);
     expect(ACTION_QUEUE_SRC).toMatch(/title=\{vm\.rowEvidenceStatusHelp\}/);
     expect(ACTION_QUEUE_SRC).toMatch(/<span className="sr-only">\{vm\.rowEvidenceStatusHelp\}<\/span>/);
   });

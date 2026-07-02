@@ -56,7 +56,7 @@ export function deriveProviderLabel(
   if (SENSOR_PROVIDER_LABELS[key]) return SENSOR_PROVIDER_LABELS[key];
   const safe = lower
     .replace(/[^a-z0-9_\- ]+/g, "")
-    .replace(/[_\-]+/g, " ")
+    .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   if (!safe) return null;

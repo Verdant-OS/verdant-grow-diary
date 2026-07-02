@@ -56,7 +56,8 @@ describe("verdant-bucket owner-scoped UPDATE/DELETE policies (migration)", () =>
   it("UPDATE policy is owner-path scoped (auth.uid() = first folder)", () => {
     const updateBlock = SQL.match(
       /CREATE\s+POLICY\s+"Users update own verdant objects"[\s\S]*?;/i,
-    )?.[0]!;
+    )?.[0];
+    expect(updateBlock).toBeTruthy();
     expect(updateBlock).toMatch(/storage\.foldername\(name\)\)\[1\]/);
     expect(updateBlock).toMatch(/auth\.uid\(\)/);
   });
@@ -64,7 +65,8 @@ describe("verdant-bucket owner-scoped UPDATE/DELETE policies (migration)", () =>
   it("DELETE policy is owner-path scoped (auth.uid() = first folder)", () => {
     const deleteBlock = SQL.match(
       /CREATE\s+POLICY\s+"Users delete own verdant objects"[\s\S]*?;/i,
-    )?.[0]!;
+    )?.[0];
+    expect(deleteBlock).toBeTruthy();
     expect(deleteBlock).toMatch(/storage\.foldername\(name\)\)\[1\]/);
     expect(deleteBlock).toMatch(/auth\.uid\(\)/);
   });

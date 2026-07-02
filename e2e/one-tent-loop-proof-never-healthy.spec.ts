@@ -209,8 +209,73 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
             if (state && weakStates.includes(state)) {
               // Must not simultaneously advertise "present".
               expect(state).not.toBe("present");
+
+              // Never render success/checkmark-style visuals for weak
+              // telemetry. We check the whole subtree's class list and
+              // any inline icon/aria hooks.
+              const classAttr = (await item.getAttribute("class")) ?? "";
+              const innerClasses =
+                (await item
+                  .locator("*")
+                  .evaluateAll((els) =>
+                    els.map((el) => (el as HTMLElement).className || "").join(" "),
+                  )) as unknown as string;
+              const allClasses = `${classAttr} ${innerClasses}`.toLowerCase();
+              const forbiddenVisuals = [
+                /\bbg-(green|emerald|lime|teal)-\d+/,
+                /\btext-(green|emerald|lime|teal)-\d+/,
+                /\bborder-(green|emerald|lime|teal)-\d+/,
+                /\bring-(green|emerald|lime|teal)-\d+/,
+                /\bbg-success\b/,
+                /\btext-success\b/,
+                /\bsuccess-tone\b/,
+                /\bcheck-mark\b/,
+                /\bcheckmark\b/,
+                /\bhealthy-tone\b/,
+              ];
+              for (const re of forbiddenVisuals) {
+                expect(
+                  re.test(allClasses),
+                  `Checklist state=${state} must not use success/checkmark visuals; matched ${re}`,
+                ).toBe(false);
+              }
+
+              // Icon/aria hooks that would imply success/checkmark.
+              const forbiddenIcons = item.locator(
+                [
+                  '[data-icon="check"]',
+                  '[data-icon="check-circle"]',
+                  '[data-icon="check-mark"]',
+                  '[data-lucide="check"]',
+                  '[data-lucide="check-circle"]',
+                  'svg[aria-label*="check" i]',
+                  'svg[aria-label*="success" i]',
+                  'svg[aria-label*="verified" i]',
+                  '[aria-label*="healthy" i]:not([aria-label*="not healthy" i]):not([aria-label*="never healthy" i])',
+                ].join(", "),
+              );
+              expect(
+                await forbiddenIcons.count(),
+                `Checklist state=${state} must not render check/success/healthy icons`,
+              ).toBe(0);
+
+              // Honest label must remain visible (do not silently hide the gap).
+              const stateBadge = item.locator(
+                `[data-testid$="-state"]`,
+              );
+              if ((await stateBadge.count()) > 0) {
+                const badgeText = (await stateBadge.first().innerText()).trim();
+                expect(
+                  badgeText.length,
+                  `Checklist state=${state} must render a visible state label`,
+                ).toBeGreaterThan(0);
+                // The badge label must not falsely read "Present" for a
+                // weak state.
+                expect(badgeText.toLowerCase()).not.toBe("present");
+              }
             }
           }
+
         }
       }
 

@@ -209,6 +209,45 @@ BuildOps Kit covering product context, data-labeling, fixture contracts, AI
 Doctor output rules, Action Queue safety, prompt scaffolds, and the QA
 regression checklist.
 
+## One-Tent Loop Proof Safety Rules
+
+The `/one-tent-loop-proof` route is a read-only diagnostic. Its rules are
+enforced by unit + fuzz + golden + Playwright tests. Any change to the
+proof surface must uphold the following:
+
+- Weak, stale, invalid, demo-only, unknown, or missing evidence must never
+  render as healthy, present, verified, success, or "OK". Downstream steps
+  blocked or weakened by weak telemetry must never render as `present`.
+- Downstream wording must be honest. Allowed phrasing includes
+  "not healthy", "not verified", and "cannot be confirmed". The following
+  unqualified phrases are forbidden anywhere on the proof surface or in
+  the sanitized text report: `healthy`, `verified`, `success`, `all good`,
+  `no issues detected`, `confirmed safe`, `validated live`.
+- The evidence checklist UI must preserve visible `weak`, `unknown`,
+  `stale`, `invalid`, `demo_only`, `missing`, and `blocked` states. Do not
+  hide or collapse a weak state into a neutral badge.
+- Sanitized text reports (top-gap block, artifact export) must never
+  expose secrets, raw payloads, bridge tokens, service role keys, API
+  keys, access tokens, or JWT-like strings. Any untrusted source label
+  must pass through `sanitizeShortLabel` before rendering.
+- Demo, manual, live, stale, and invalid source labels must remain
+  explicit in the UI and in text reports. Do not normalize them to a
+  generic "sensor" label.
+
+### Local commands
+
+- Vitest rules + fuzz + evidence-ref safety:
+  `bun run test:one-tent-loop-proof-never-healthy`
+- Golden top-gap text block (exact equality):
+  `bunx vitest run src/test/one-tent-loop-top-gap-report-golden.test.ts`
+- Playwright never-healthy spec against the mocked harness (same config
+  used in CI, no real auth, no Supabase writes, no `storageState`):
+  `bun run test:e2e:one-tent-loop-proof-never-healthy:dev`
+- Full local gate (typecheck + vitest + sanitized artifact + Playwright):
+  `bun run check:one-tent-loop-proof-never-healthy`
+
+
+
 ## Documentation
 
 - [AI Doctor Phase 1 Contract](docs/ai-doctor-phase1-contract.md) — deterministic offline pipeline, source-truth rules, confidence caps, golden cases, and view model contract

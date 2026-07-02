@@ -78,6 +78,69 @@ export default function Pricing() {
     trackPricingEvent("pricing_page_view");
   }, []);
 
+  useEffect(() => {
+    const faqEntries: Array<[string, string]> = [
+      ["Who owns the grow data I put into Verdant?", "You do. Your grow logs, photos, and sensor snapshots are yours. Verdant does not sell your data and does not share it with advertisers. Pro includes advanced exports so you can take your full grow history with you whenever you want."],
+      ["Is the Free tier really free?", "Yes. Plant profiles, the basic grow diary, photo logs, manual notes, the basic timeline, and manual sensor entries are all included on Free. You can run a real grow on Free without paying."],
+      ["What do I actually get with Pro?", "Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot history, longer grow history, better timeline filtering, priority support, and early access to advanced grow reports."],
+      ["How does the Founder Lifetime Offer work?", `$${FOUNDER_LIFETIME_PRICE_USD} once. You get full Pro access for the life of the product. This is a limited early-supporter offer, limited to the first ${FOUNDER_LIFETIME_LIMIT} buyers.`],
+      ["Do I need specific hardware?", "No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge."],
+      ["Does Verdant control my equipment or grow for me?", "No. Verdant does not control fans, lights, pumps, heaters, or other equipment. AI insights are suggestions only, and every Action Queue item is grower-approved."],
+      ["Can I cancel anytime?", "Yes. Pro Monthly and Pro Annual can be canceled at any time. Your grow history stays on your account with read-only access to your logs."],
+    ];
+    const faq = {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: faqEntries.map(([q, a]) => ({
+        "@type": "Question",
+        name: q,
+        acceptedAnswer: { "@type": "Answer", text: a },
+      })),
+    };
+    const products = {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Product",
+          name: "Verdant Pro",
+          description: "Cloud sync, multi-tent grow memory, 100 AI Doctor credits/month, advanced exports, and sensor snapshot history.",
+          brand: { "@type": "Brand", name: "Verdant Grow Diary" },
+          offers: [
+            { "@type": "Offer", price: String(PRO_MONTHLY_PRICE_USD), priceCurrency: "USD", url: "https://verdantgrowdiary.com/pricing", availability: "https://schema.org/InStock", category: "Monthly subscription" },
+            { "@type": "Offer", price: String(PRO_ANNUAL_PRICE_USD), priceCurrency: "USD", url: "https://verdantgrowdiary.com/pricing", availability: "https://schema.org/InStock", category: "Annual subscription" },
+          ],
+        },
+        {
+          "@type": "Product",
+          name: "Verdant Founder Lifetime",
+          description: `One-time purchase for lifetime Pro access. Limited to the first ${FOUNDER_LIFETIME_LIMIT} early supporters.`,
+          brand: { "@type": "Brand", name: "Verdant Grow Diary" },
+          offers: {
+            "@type": "Offer",
+            price: String(FOUNDER_LIFETIME_PRICE_USD),
+            priceCurrency: "USD",
+            url: "https://verdantgrowdiary.com/pricing",
+            availability: "https://schema.org/LimitedAvailability",
+            category: "One-time",
+          },
+        },
+      ],
+    };
+    const nodes: HTMLScriptElement[] = [];
+    for (const payload of [faq, products]) {
+      const s = document.createElement("script");
+      s.type = "application/ld+json";
+      s.setAttribute("data-page-ldjson", "pricing");
+      s.text = JSON.stringify(payload);
+      document.head.appendChild(s);
+      nodes.push(s);
+    }
+    return () => {
+      for (const n of nodes) n.remove();
+    };
+  }, []);
+
+
   const proPrice = billing === "annual" ? `$${PRO_ANNUAL_PRICE_USD}` : `$${PRO_MONTHLY_PRICE_USD}`;
   const proCadence = billing === "annual" ? "/ year" : "/ month";
   const proFootnote =

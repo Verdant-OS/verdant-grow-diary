@@ -39,6 +39,62 @@ export function loadAllowlist(path = DEFAULT_ALLOWLIST_PATH) {
   };
 }
 
+/**
+ * Return every entry (in `allowlisted_issues` and `expected_noindex`)
+ * whose `expires_on` has passed as of `now` (ISO string).
+ * Returned shape: [{ section, id, expires_on, url_patterns }].
+ */
+export function findExpiredEntries(allowlist, now = nowIso()) {
+  const today = now.slice(0, 10);
+  const out = [];
+  for (const section of ["allowlisted_issues", "expected_noindex"]) {
+    for (const e of allowlist[section] ?? []) {
+      if (e.expires_on && String(e.expires_on).slice(0, 10) < today) {
+        out.push({
+          section,
+          id: e.id ?? "(no-id)",
+          expires_on: e.expires_on,
+          url_patterns: e.url_patterns ?? [],
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Dry-run: describe what the allowlist would do for a set of URLs, without
+ * calling any external API. For each URL, list matching allowlist entries,
+ * the issue codes they would suppress, and any override flags.
+ */
+export function simulateAllowlistForUrls(urls, allowlist, now = nowIso()) {
+  const activeIssues = (allowlist.allowlisted_issues ?? []).filter((e) => isActive(e, now));
+  const activeNoindex = (allowlist.expected_noindex ?? []).filter((e) => isActive(e, now));
+  return urls.map((url) => {
+    const isNever = isNeverAllowlisted(url, allowlist);
+    const matchedIssues = isNever
+      ? []
+      : activeIssues
+          .filter((e) => matchesAny(url, e.url_patterns ?? []))
+          .map((e) => ({ id: e.id, issue_types: e.issue_types ?? [] }));
+    const matchedNoindex = isNever
+      ? []
+      : activeNoindex
+          .filter((e) => matchesAny(url, e.url_patterns ?? []))
+          .map((e) => ({ id: e.id }));
+    return {
+      url,
+      never_allowlisted: isNever,
+      would_be_expected_noindex: matchedNoindex.length > 0,
+      matched_expected_noindex_entries: matchedNoindex,
+      would_suppress_issue_types: [
+        ...new Set(matchedIssues.flatMap((m) => m.issue_types)),
+      ],
+      matched_allowlisted_issue_entries: matchedIssues,
+    };
+  });
+}
+
 /** True if the URL is listed in `never_allowlist` (exact match, case-sensitive). */
 export function isNeverAllowlisted(url, allowlist) {
   return (allowlist.never_allowlist ?? []).includes(url);

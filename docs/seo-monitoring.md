@@ -171,3 +171,54 @@ confirms every `expected_resolution` check. It emits
 
 Update `config/seo-last-gsc-finding.json` with a real description and
 one or more `affected_urls` before expecting a "resolved" verdict.
+
+## Allowlist dry-run mode
+
+Preview which URLs / issues the tracked allowlist would suppress
+**without calling the Google Search Console API**:
+
+```bash
+node scripts/seo/gsc-inspect-urls.mjs --dry-run-allowlist \
+  --urls "https://verdantgrowdiary.com/,https://verdantgrowdiary.com/auth/callback"
+```
+
+Writes:
+
+- `artifacts/seo/seo-allowlist-dry-run.json`
+- `artifacts/seo/seo-allowlist-dry-run.md`
+
+Each row shows whether the URL is `never_allowlisted`, whether it
+would be treated as expected-noindex, which issue types would be
+suppressed, and which allowlist entry IDs match. No credentials are
+loaded; no tokens are touched.
+
+## Allowlist expiration guard
+
+Every allowlist entry can carry `expires_on` (YYYY-MM-DD). The runner
+computes expired entries with `findExpiredEntries()` and, by default,
+**fails with exit code 3** in both dry-run and live modes when any
+entry has expired. This prevents stale suppressions from silently
+hiding real regressions.
+
+Flags:
+
+- `--no-fail-on-expired` — treat expired entries as informational only.
+- `--now <iso>` — override "now" (used by tests only).
+
+Expired entries always appear in
+`artifacts/seo/seo-allowlist-suppressions.{json,md}` under
+`expired_entries` for auditability.
+
+## Suppression artifacts (always uploaded)
+
+Every run — dry-run, skipped (no OAuth), or live — writes:
+
+- `artifacts/seo/seo-allowlist-suppressions.json`
+- `artifacts/seo/seo-allowlist-suppressions.md`
+
+These list every allowlist-suppressed issue grouped by the allowlist
+entry `id` that suppressed it, plus any expired entries. The workflow
+step that uploads `artifacts/seo/**` runs with `if: always()`, so
+these reports are available for every run (success or failure) without
+uploading any secrets, `.env`, `.seo/`, OAuth token JSON, refresh
+tokens, or Search Console exports.

@@ -282,6 +282,20 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
           // a check/verified aria label. Kept as a named block so the
           // unknown-state contract is inspectable in isolation.
           const UNKNOWN_EQUIVALENTS = ["unknown", "missing", "blocked"] as const;
+          // Wording that must never appear inside an unknown/equivalent
+          // checklist item — either as visible text or via aria/icon hooks.
+          const FORBIDDEN_UNKNOWN_WORDING = [
+            /\bpresent\b/i,
+            /\bsuccess\b/i,
+            /\bcheckmark\b/i,
+            /check[-\s]?mark/i,
+            /check[-\s]?circle/i,
+            /\bverified\b/i,
+            /validated live/i,
+            /confirmed safe/i,
+            /all good/i,
+            /no issues detected/i,
+          ];
           for (const uState of UNKNOWN_EQUIVALENTS) {
             const unknownItems = checklist.locator(
               `[data-testid^="one-tent-loop-live-proof-top-gap-checklist-item-"][data-state="${uState}"]`,
@@ -292,6 +306,34 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
               await expect(item).toHaveAttribute("data-state", uState);
               expect(await item.getAttribute("data-state")).not.toBe("present");
               expect(await item.getAttribute("data-status")).not.toBe("healthy");
+
+              // No forbidden wording anywhere inside the unknown item.
+              const itemText = (await item.innerText()).trim();
+              for (const re of FORBIDDEN_UNKNOWN_WORDING) {
+                expect(
+                  re.test(itemText),
+                  `Unknown-equivalent (${uState}) checklist item must not contain ${re}; got:\n${itemText.slice(0, 300)}`,
+                ).toBe(false);
+              }
+
+              // No success/check aria/icon hooks inside the unknown item.
+              const forbiddenHooks = item.locator(
+                [
+                  '[data-icon="check"]',
+                  '[data-icon="check-circle"]',
+                  '[data-lucide="check"]',
+                  '[data-lucide="check-circle"]',
+                  'svg[aria-label*="check" i]',
+                  'svg[aria-label*="success" i]',
+                  'svg[aria-label*="verified" i]',
+                  'svg[aria-label*="present" i]',
+                ].join(", "),
+              );
+              expect(
+                await forbiddenHooks.count(),
+                `Unknown-equivalent (${uState}) item must not render check/success/verified/present icon hooks`,
+              ).toBe(0);
+
               const badge = item.locator(`[data-testid$="-state"]`);
               if ((await badge.count()) > 0) {
                 const badgeText = (await badge.first().innerText()).trim();
@@ -303,6 +345,28 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
               }
             }
           }
+
+          // Broader proof-UI assertion: no checklist item whose data-state
+          // is unknown/equivalent may contain the exact visible word
+          // "Present" anywhere in its subtree. Scoped to checklist items
+          // to avoid banning legitimate uses of "present" elsewhere in
+          // the proof UI copy.
+          const allChecklistItems = checklist.locator(
+            '[data-testid^="one-tent-loop-live-proof-top-gap-checklist-item-"]',
+          );
+          const allTotal = await allChecklistItems.count();
+          for (let i = 0; i < allTotal; i += 1) {
+            const item = allChecklistItems.nth(i);
+            const state = await item.getAttribute("data-state");
+            if (state && (UNKNOWN_EQUIVALENTS as readonly string[]).includes(state)) {
+              const t = (await item.innerText()).toLowerCase();
+              expect(
+                /\bpresent\b/.test(t),
+                `Checklist item data-state=${state} must not contain "Present" text; got:\n${t.slice(0, 300)}`,
+              ).toBe(false);
+            }
+          }
+
         }
       }
 

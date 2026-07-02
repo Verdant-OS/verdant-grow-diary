@@ -222,3 +222,24 @@ step that uploads `artifacts/seo/**` runs with `if: always()`, so
 these reports are available for every run (success or failure) without
 uploading any secrets, `.env`, `.seo/`, OAuth token JSON, refresh
 tokens, or Search Console exports.
+
+## Diagnostics polish (v1.2)
+
+Additional operator affordances in `scripts/seo/gsc-inspect-urls.mjs`:
+
+- `--list-expired-entries` — no GSC calls. Prints expired allowlist
+  entries and writes `artifacts/seo/seo-allowlist-expired.{json,md}`.
+  Exits `3` when expired entries exist (unless `--no-fail-on-expired`).
+- Dry-run artifacts now include per-URL classification
+  (`never_allowlisted | suppressed | expected_noindex |
+  expired_allowlist | no_match`), matched entry ids (active and
+  expired), suppression reasons, and totals.
+- Every run writes `artifacts/seo/seo-job-summary.md` and, when
+  running under GitHub Actions, appends it to `$GITHUB_STEP_SUMMARY`.
+  The summary contains only ids, counts, and status — never env
+  values, tokens, `.env` contents, or `.seo/` payloads.
+
+`scripts/seo/verify-last-gsc-finding.mjs` also refuses to declare
+"resolved" (status becomes `unresolved_expired_allowlist`) if any
+expired allowlist entry still covers an affected URL, preventing
+stale suppression from masking regressions.

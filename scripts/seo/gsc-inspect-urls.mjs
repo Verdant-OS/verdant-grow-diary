@@ -196,12 +196,21 @@ function writeSuppressionArtifacts({ mode, suppressed, allowlistSource, expired,
 }
 
 function writeDryRunArtifacts({ simulated, allowlistSource, expired }) {
+  const totals = {
+    total: simulated.length,
+    never_allowlisted: simulated.filter((s) => s.classification === "never_allowlisted").length,
+    suppressed: simulated.filter((s) => s.classification === "suppressed").length,
+    expected_noindex: simulated.filter((s) => s.classification === "expected_noindex").length,
+    expired_allowlist: simulated.filter((s) => s.classification === "expired_allowlist").length,
+    no_match: simulated.filter((s) => s.classification === "no_match").length,
+  };
   const json = {
     mode: "dry-run",
     generated_at: new Date().toISOString(),
     allowlist_source: allowlistSource,
     inspected_count: simulated.length,
     expired_entry_count: expired.length,
+    totals,
     urls: simulated,
     expired_entries: expired,
   };
@@ -213,21 +222,45 @@ function writeDryRunArtifacts({ simulated, allowlistSource, expired }) {
     "No Google Search Console API calls were made.",
     "",
     `Allowlist: ${allowlistSource ? "`" + allowlistSource + "`" : "(none)"}`,
-    `URLs simulated: ${simulated.length}`,
-    `Expired entries: ${expired.length}`,
     "",
-    "| URL | Never-allowlisted | Would be expected-noindex | Would suppress issue types | Matching entry IDs |",
-    "| --- | --- | --- | --- | --- |",
+    "## Totals",
+    `- URLs simulated: **${totals.total}**`,
+    `- Suppressed: **${totals.suppressed}**`,
+    `- Expected-noindex: **${totals.expected_noindex}**`,
+    `- Never-allowlisted: **${totals.never_allowlisted}**`,
+    `- Expired-allowlist matches: **${totals.expired_allowlist}**`,
+    `- Unsuppressed / no-match: **${totals.no_match}**`,
+    `- Expired allowlist entries (any URL): **${expired.length}**`,
+    "",
+    "## Per-URL breakdown",
   ];
   for (const s of simulated) {
     md.push(
-      `| ${s.url} | ${s.never_allowlisted ? "yes" : "no"} | ${
-        s.would_be_expected_noindex ? "yes" : "no"
-      } | ${s.would_suppress_issue_types.join(", ") || "—"} | ${[
-        ...s.matched_allowlisted_issue_entries.map((e) => e.id),
-        ...s.matched_expected_noindex_entries.map((e) => e.id),
-      ].join(", ") || "—"} |`,
+      "",
+      `### ${s.url}`,
+      `- **Classification:** \`${s.classification}\``,
+      `- **Never-allowlisted:** ${s.never_allowlisted ? "yes" : "no"}`,
+      `- **Matched allowlisted_issues:** ${
+        s.matched_allowlisted_issue_entries.map((e) => `\`${e.id}\``).join(", ") || "—"
+      }`,
+      `- **Matched expected_noindex:** ${
+        s.matched_expected_noindex_entries.map((e) => `\`${e.id}\``).join(", ") || "—"
+      }`,
+      `- **Matched expired entries:** ${
+        s.matched_expired_entries
+          .map((e) => `\`${e.section}[${e.id}]\` (expired ${e.expires_on})`)
+          .join(", ") || "—"
+      }`,
+      `- **Would suppress issue types:** ${s.would_suppress_issue_types.join(", ") || "—"}`,
+      `- **Suppression active:** ${
+        s.matched_allowlisted_issue_entries.length > 0 && !s.never_allowlisted ? "yes" : "no"
+      }`,
+      `- **Never-allowlist overrides suppression:** ${s.never_allowlisted ? "yes" : "no"}`,
     );
+    if (s.reasons.length) {
+      md.push("- **Reasons:**");
+      for (const r of s.reasons) md.push(`  - ${r}`);
+    }
   }
   md.push("", "## Expired allowlist entries");
   if (expired.length === 0) md.push("None.");

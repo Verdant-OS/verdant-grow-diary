@@ -325,6 +325,46 @@ async function main() {
   const now = args.now ?? new Date().toISOString();
   const expired = args.useAllowlist ? findExpiredEntries(allowlist, now) : [];
 
+  // ---- LIST-EXPIRED-ENTRIES PATH: no GSC calls, no URL evaluation ----
+  if (args.listExpired) {
+    const md = [
+      "# Expired SEO Allowlist Entries",
+      "",
+      `Allowlist: ${allowlist._source ? "`" + allowlist._source + "`" : "(none)"}`,
+      `Now: ${now}`,
+      `Expired entries: ${expired.length}`,
+      "",
+    ];
+    if (expired.length === 0) md.push("None. ✅");
+    else
+      for (const e of expired)
+        md.push(
+          `- \`${e.section}[${e.id}]\` expired on **${e.expires_on}** — patterns: ${(e.url_patterns ?? []).join(", ") || "(none)"}`,
+        );
+    writeArtifact("seo-allowlist-expired.md", md.join("\n") + "\n");
+    writeArtifact(
+      "seo-allowlist-expired.json",
+      JSON.stringify(
+        { mode: "list-expired-entries", generated_at: new Date().toISOString(), now, allowlist_source: allowlist._source, expired_entries: expired },
+        null,
+        2,
+      ),
+    );
+    writeJobSummary(
+      buildJobSummary({
+        mode: "list-expired-entries",
+        status: expired.length === 0 ? "PASS" : args.failOnExpired ? "FAIL" : "WARN",
+        allowlistSource: allowlist._source,
+        urls: [],
+        simulated: null,
+        expired,
+        notes: ["No URLs were evaluated in --list-expired-entries mode."],
+      }),
+    );
+    for (const e of expired) console.log(`${e.section}[${e.id}] expired ${e.expires_on}`);
+    process.exit(args.failOnExpired && expired.length > 0 ? 3 : 0);
+  }
+
   // Determine URL set (used by dry-run and live paths).
   let urls = args.urls;
   if (!urls && args.sitemap && !args.dryRunAllowlist) {
@@ -345,10 +385,23 @@ async function main() {
       notes: ["Dry-run mode — no GSC API calls were made."],
     });
     const wouldSuppress = simulated.filter((s) => s.would_suppress_issue_types.length > 0).length;
+    const willFail = args.failOnExpired && expired.length > 0;
+    const status = willFail ? "FAIL" : expired.length > 0 ? "WARN" : "PASS";
+    writeJobSummary(
+      buildJobSummary({
+        mode: "dry-run",
+        status,
+        allowlistSource: allowlist._source,
+        urls,
+        simulated,
+        expired,
+        notes: ["Dry-run — no GSC API calls."],
+      }),
+    );
     console.log(
       `Dry-run: ${urls.length} URL(s); ${wouldSuppress} would have issues suppressed; ${expired.length} expired allowlist entr${expired.length === 1 ? "y" : "ies"}.`,
     );
-    if (args.failOnExpired && expired.length > 0) {
+    if (willFail) {
       console.error("FAIL: expired allowlist entries — refresh or remove them.");
       for (const e of expired) console.error(`  - ${e.section}[${e.id}] expired ${e.expires_on}`);
       process.exit(3);

@@ -9,7 +9,8 @@ const DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8")
 describe("Action Queue detail view", () => {
   it("registers the /actions/:actionId route in App.tsx", () => {
     expect(APP).toMatch(/path="\/actions\/:actionId"\s+element=\{<ActionDetail\s*\/>\}/);
-    expect(APP).toMatch(/import ActionDetail from "\.\/pages\/ActionDetail"/);
+    // Route pages are code-split via React.lazy; App.tsx imports them dynamically.
+    expect(APP).toMatch(/import\(\s*["']\.\/pages\/ActionDetail["']\s*\)/);
   });
 
   it("uses the useParams actionId from the URL", () => {
@@ -54,12 +55,18 @@ describe("Action Queue detail view", () => {
   });
 
   it("imports the shared transition guards (canApprove/canSimulate/canReject/canComplete/canCancel)", () => {
-    expect(DETAIL).toMatch(/import \{[\s\S]*?canApprove[\s\S]*?canSimulate[\s\S]*?canReject[\s\S]*?canComplete[\s\S]*?canCancel[\s\S]*?\} from "@\/lib\/actionQueueTransitions"/);
+    expect(DETAIL).toMatch(
+      /import \{[\s\S]*?canApprove[\s\S]*?canSimulate[\s\S]*?canReject[\s\S]*?canComplete[\s\S]*?canCancel[\s\S]*?\} from "@\/lib\/actionQueueTransitions"/,
+    );
   });
 
   it("does not allow editing audit events (no update on action_queue_events)", () => {
-    expect(DETAIL).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.update\(/);
-    expect(DETAIL).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.delete\(/);
+    expect(DETAIL).not.toMatch(
+      /\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.update\(/,
+    );
+    expect(DETAIL).not.toMatch(
+      /\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.delete\(/,
+    );
   });
 
   it("audit insert omits user_id (DB default auth.uid() wins)", () => {

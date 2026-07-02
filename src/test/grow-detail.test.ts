@@ -15,12 +15,17 @@ import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
 const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
-const PAGE = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8") + "\n" + readFileSync(resolve(ROOT, "src/hooks/useGrowDetailData.ts"), "utf8") + "\n" + readFileSync(resolve(ROOT, "src/lib/growStatus.ts"), "utf8");
+const PAGE =
+  readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8") +
+  "\n" +
+  readFileSync(resolve(ROOT, "src/hooks/useGrowDetailData.ts"), "utf8") +
+  "\n" +
+  readFileSync(resolve(ROOT, "src/lib/growStatus.ts"), "utf8");
 
 describe("GrowDetail", () => {
   it("registers /grows/:growId route in App.tsx", () => {
     expect(APP).toMatch(/path="\/grows\/:growId"\s+element=\{<GrowDetail\s*\/>\}/);
-    expect(APP).toMatch(/import GrowDetail from "\.\/pages\/GrowDetail"/);
+    expect(APP).toMatch(/import\(\s*["']\.\/pages\/GrowDetail["']\s*\)/);
   });
 
   it("uses useParams growId from URL", () => {

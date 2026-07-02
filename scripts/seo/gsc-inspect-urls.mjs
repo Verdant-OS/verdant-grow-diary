@@ -469,13 +469,16 @@ async function main() {
   if (args.dryRunAllowlist) {
     const simulated = simulateAllowlistForUrls(urls, allowlist, now);
     writeDryRunArtifacts({ simulated, allowlistSource: allowlist._source, expired });
-    writeSuppressionArtifacts({
+    const currentPayload = writeSuppressionArtifacts({
       mode: "dry-run",
       suppressed: [],
       allowlistSource: allowlist._source,
       expired,
       notes: ["Dry-run mode — no GSC API calls were made."],
     });
+    const diff = args.noDiff
+      ? null
+      : writeSuppressionDiffArtifacts({ previousDir: args.previousDir, currentPayload });
     const wouldSuppress = simulated.filter((s) => s.would_suppress_issue_types.length > 0).length;
     const willFail = args.failOnExpired && expired.length > 0;
     const status = willFail ? "FAIL" : expired.length > 0 ? "WARN" : "PASS";
@@ -486,6 +489,7 @@ async function main() {
         urls,
         simulated,
         expired,
+        diff,
         notes: ["Dry-run — no GSC API calls."],
       });
     console.log(

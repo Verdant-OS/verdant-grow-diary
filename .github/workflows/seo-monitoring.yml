@@ -50,6 +50,8 @@ jobs:
         run: mkdir -p artifacts/seo
       - name: Validate SEO allowlist config
         run: node --test scripts/test-seo-allowlist.mjs scripts/test-seo-allowlist-config.mjs scripts/test-seo-allowlist-expiration.mjs
+      - name: SEO allowlist — list expired entries
+        run: node scripts/seo/gsc-inspect-urls.mjs --list-expired-entries --allowlist config/seo-allowlist.json
       - name: SEO allowlist dry-run (no GSC calls; fails on expired entries)
         run: node scripts/seo/gsc-inspect-urls.mjs --dry-run-allowlist --urls "https://verdantgrowdiary.com/,https://verdantgrowdiary.com/welcome,https://verdantgrowdiary.com/pricing,https://verdantgrowdiary.com/hardware-integrations" --allowlist config/seo-allowlist.json
       - name: GSC OAuth configured?
@@ -68,6 +70,15 @@ jobs:
       - name: Verify last GSC finding
         if: steps.gsc.outputs.configured == 'true' && (github.event.inputs.verify_last_finding != 'false')
         run: node scripts/seo/verify-last-gsc-finding.mjs
+      - name: Append SEO job summary
+        if: always()
+        run: |
+          if [ -f artifacts/seo/seo-job-summary.md ]; then
+            cat artifacts/seo/seo-job-summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Verdant SEO Monitoring" >> "$GITHUB_STEP_SUMMARY"
+            echo "_No job summary artifact was produced._" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Upload SEO artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -76,4 +87,6 @@ jobs:
           path: |
             artifacts/seo/**
             !artifacts/seo/**/*.env
+            !artifacts/seo/**/*token*
+            !artifacts/seo/**/*secret*
           if-no-files-found: ignore

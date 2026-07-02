@@ -230,7 +230,7 @@ export default function Auth() {
         <div className="flex items-center gap-3 mb-6">
           <BrandLogo size="lg" />
           <div>
-            <h1 className="text-3xl font-display font-bold">Verdant</h1>
+            <h1 className="text-3xl font-display font-bold">Sign in to Verdant Grow Diary</h1>
             <p className="text-sm text-muted-foreground">
               Plant memory. Sensor truth. Better decisions.
             </p>

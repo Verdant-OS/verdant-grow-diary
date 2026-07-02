@@ -9,6 +9,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { loadGscCredentials, getAccessToken, inspectUrl, summarizeInspection } from "./gscClient.mjs";
+import { loadAllowlist, findExpiredEntriesMatchingUrls, DEFAULT_ALLOWLIST_PATH } from "./seoAllowlist.mjs";
 
 const CONFIG_PATH = resolve(process.cwd(), "config/seo-last-gsc-finding.json");
 const ARTIFACT_DIR = resolve(process.cwd(), "artifacts/seo");

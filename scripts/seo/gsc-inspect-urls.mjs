@@ -599,13 +599,19 @@ async function main() {
   };
   writeArtifact("gsc-url-inspection.json", JSON.stringify(payload, null, 2));
   writeArtifact("gsc-url-inspection.md", toInspectionMarkdown(results, allowlist._source));
-  writeSuppressionArtifacts({
+  const currentSuppressionPayload = writeSuppressionArtifacts({
     mode: "live",
     suppressed,
     allowlistSource: allowlist._source,
     expired,
     notes: [],
   });
+  const diff = args.noDiff
+    ? null
+    : writeSuppressionDiffArtifacts({
+        previousDir: args.previousDir,
+        currentPayload: currentSuppressionPayload,
+      });
   emitJobSummary({
       mode: "live",
       status: failing.length ? "FAIL" : expired.length > 0 ? "WARN" : "PASS",
@@ -615,6 +621,7 @@ async function main() {
       expired,
       suppressed: suppressed.length,
       failing: failing.length,
+      diff,
       notes: [],
     });
   console.log(

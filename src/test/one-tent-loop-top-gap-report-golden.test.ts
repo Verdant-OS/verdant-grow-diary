@@ -147,7 +147,7 @@ describe("buildOneTentLoopTopGapTextBlock — golden sanitized output", () => {
           label: "sensor",
           timestamp: "2026-06-01T00:00:00Z",
           source: "live",
-          kind: "stale",
+          kind: "inferred",
         },
       ];
     }, "sensor-snapshot");

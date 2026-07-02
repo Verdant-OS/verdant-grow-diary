@@ -83,6 +83,8 @@ function parseArgs(argv) {
     failOnExpired: true,
     listExpired: false,
     now: null,
+    previousDir: DEFAULT_PREVIOUS_DIR,
+    noDiff: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -97,6 +99,8 @@ function parseArgs(argv) {
     else if (a === "--no-fail-on-expired") out.failOnExpired = false;
     else if (a === "--list-expired-entries") out.listExpired = true;
     else if (a === "--now") out.now = argv[++i];
+    else if (a === "--previous-dir") out.previousDir = resolve(argv[++i]);
+    else if (a === "--no-diff") out.noDiff = true;
   }
   return out;
 }

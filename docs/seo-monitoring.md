@@ -122,3 +122,52 @@ appears; the post-deploy workflow will re-verify it every run.
 - Refresh token never committed (`.seo/` is gitignored).
 - Reports contain only URL, verdict, coverage state, robots/indexing
   state, canonical URLs, and timestamps returned by the public GSC API.
+
+## Tracked allowlist (`config/seo-allowlist.json`)
+
+The inspection runner reads a tracked allowlist so CI only fails on
+*new* critical issues. Three sections:
+
+- **`allowlisted_issues`** — suppress specific `issue_types` on URLs
+  matching `url_patterns` (glob `*`). Each entry has an `id`,
+  `description`, and optional `expires_on` (YYYY-MM-DD; expired
+  entries are ignored automatically).
+- **`expected_noindex`** — URLs allowed to be non-indexable. Treated
+  as `--expected-noindex` on a per-URL basis.
+- **`never_allowlist`** — critical public URLs (home, `/welcome`,
+  `/pricing`, `/hardware-integrations`, `/sitemap.xml`,
+  `/robots.txt`). Issues on these URLs are **never** suppressed, and
+  `validateAllowlist` refuses any allowlist pattern that would
+  capture them.
+
+Runner flags:
+
+- `--allowlist <path>` — override the default `config/seo-allowlist.json`.
+- `--no-allowlist` — disable the tracked allowlist for a run.
+
+Suppressed issues are reported in `artifacts/seo/gsc-url-inspection.{json,md}`
+under `suppressed_issue_count` / "Suppressed by allowlist", with the
+matching `id` attached for audit.
+
+### Tests
+
+```bash
+node --test scripts/test-seo-allowlist.mjs scripts/test-seo-allowlist-config.mjs
+```
+
+The workflow runs both files before invoking the inspection runner, so
+a malformed or too-broad allowlist fails CI before any GSC call.
+
+## Last-finding verification safety
+
+`scripts/seo/verify-last-gsc-finding.mjs` refuses to mark the tracked
+finding "resolved" unless authenticated URL Inspection actually
+confirms every `expected_resolution` check. It emits
+`status: "skipped"` (exit 0) when:
+
+- GSC OAuth is not configured (missing `GSC_*` secrets), or
+- `config/seo-last-gsc-finding.json` still contains the placeholder
+  description or has an empty `affected_urls` list.
+
+Update `config/seo-last-gsc-finding.json` with a real description and
+one or more `affected_urls` before expecting a "resolved" verdict.

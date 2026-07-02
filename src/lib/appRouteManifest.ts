@@ -121,6 +121,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/operator/paddle-processing-audit", access: "operator", description: "Operator Paddle processing audit (read-only)." },
   { path: "/operator/post-grow-reflection-dry-run", access: "operator", description: "Post-Grow Reflection dry-run diagnostics panel (read-only)." },
   
+  { path: "/pheno-comparison", access: "public", description: "Read-only Pheno Comparison preview (sample data, mounted outside AuthProvider/GrowsProvider/AppShell — no grows read, no write chrome)." },
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
   { path: "/pi-ingest-status", access: "operator" },
   { path: "/plants", access: "auth" },

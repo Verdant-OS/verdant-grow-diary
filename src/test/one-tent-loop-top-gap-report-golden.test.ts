@@ -475,9 +475,112 @@ describe("buildOneTentLoopTopGapTextBlock — golden sanitized output", () => {
     // absent — assert that too so any drift is caught.
     expect(text).toContain("[unknown]");
     expect(text).not.toMatch(/alert \[present\]/i);
+    assertTopGapTextLineOrderMatchesViewModel(alertOmittedRows, text);
     assertNoSecrets(text);
     assertNoUnsafeWording(text);
   });
+
+  // Additional unknown/equivalent coverage on non-alert rows. Each case
+  // asserts (a) exact sanitized output, (b) the unknown row's honest
+  // `[unknown]` bracketed state with raw-step-id fallback label, (c) no
+  // Present / success wording, (d) view-model line ordering, and (e) no
+  // secret markers.
+  it("unknown checklist state — ai-doctor row omitted → exact expected text and fences", () => {
+    const rows: LoopStepRow[] = STEP_LABELS.filter(
+      ([id]) => id !== "ai-doctor",
+    ).map(([id, label]) => mkRow(id, label, "passed", { provenance: "direct" }));
+    const sensor = rows.find((r) => r.id === "sensor-snapshot");
+    if (!sensor) throw new Error("missing sensor row");
+    sensor.status = "stale";
+    sensor.source = "live";
+    const text = goldenFor(rows);
+
+    const expected = [
+      "Top real-data gap:",
+      "- Step: sensor-snapshot",
+      "- Title: Sensor Snapshot — stale reading",
+      "- Status: stale",
+      "- Priority: 5.75",
+      "- Evidence kind: stale",
+      "- Source label: live",
+      "- Why it matters: The latest reading is too old to be trusted as current sensor truth for the loop.",
+      "- Where to resolve: Open the Sensors page for this tent and confirm a fresh, source-labeled reading.",
+      "- Suggested next observation: Look for a fresher reading with an explicit source label and captured_at timestamp.",
+      "- Safety note: Read-only view. Stale telemetry must never be shown as current sensor truth.",
+      "- Real data gap: yes",
+      "- Blocked / weakened downstream:",
+      "    - ai-doctor",
+      "    - alert",
+      "    - action-queue",
+      "    - follow-up",
+      "- Evidence checklist for this gap:",
+      "    - Grow [present] — The grow anchors every downstream loop step. Without it, no scope exists.",
+      "    - Tent [present] — The tent scopes environment targets and sensor snapshots for this grow.",
+      "    - Plant [present] — The plant scopes Quick Log entries, AI Doctor context, and follow-up.",
+      "    - Quick Log [present] — Quick Log is plant memory; the loop cannot be proven without recent entries.",
+      "    - Timeline [present] — Timeline linkage confirms Quick Log became persistent plant memory.",
+      "    - Sensor Snapshot [stale] · source=live — Sensor snapshot is the truth signal that AI Doctor and Alerts read from.",
+      "    - ai-doctor [unknown] — AI Doctor reasoning depends on real sensor and log evidence, not guesses.",
+      "    - Alert [weak] — Alerts turn sensor truth into a persisted, reviewable signal.",
+      "    - Action Queue [weak] — Action Queue items must stay approval-required. No device command.",
+    ].join("\n");
+
+    expect(text).toBe(expected);
+    expect(text).toContain("ai-doctor [unknown]");
+    expect(text).not.toMatch(/ai-doctor \[present\]/i);
+    assertTopGapTextLineOrderMatchesViewModel(rows, text);
+    assertNoSecrets(text);
+    assertNoUnsafeWording(text);
+  });
+
+  it("unknown checklist state — action-queue row omitted → exact expected text and fences", () => {
+    const rows: LoopStepRow[] = STEP_LABELS.filter(
+      ([id]) => id !== "action-queue",
+    ).map(([id, label]) => mkRow(id, label, "passed", { provenance: "direct" }));
+    const sensor = rows.find((r) => r.id === "sensor-snapshot");
+    if (!sensor) throw new Error("missing sensor row");
+    sensor.status = "stale";
+    sensor.source = "live";
+    const text = goldenFor(rows);
+
+    const expected = [
+      "Top real-data gap:",
+      "- Step: sensor-snapshot",
+      "- Title: Sensor Snapshot — stale reading",
+      "- Status: stale",
+      "- Priority: 5.75",
+      "- Evidence kind: stale",
+      "- Source label: live",
+      "- Why it matters: The latest reading is too old to be trusted as current sensor truth for the loop.",
+      "- Where to resolve: Open the Sensors page for this tent and confirm a fresh, source-labeled reading.",
+      "- Suggested next observation: Look for a fresher reading with an explicit source label and captured_at timestamp.",
+      "- Safety note: Read-only view. Stale telemetry must never be shown as current sensor truth.",
+      "- Real data gap: yes",
+      "- Blocked / weakened downstream:",
+      "    - ai-doctor",
+      "    - alert",
+      "    - action-queue",
+      "    - follow-up",
+      "- Evidence checklist for this gap:",
+      "    - Grow [present] — The grow anchors every downstream loop step. Without it, no scope exists.",
+      "    - Tent [present] — The tent scopes environment targets and sensor snapshots for this grow.",
+      "    - Plant [present] — The plant scopes Quick Log entries, AI Doctor context, and follow-up.",
+      "    - Quick Log [present] — Quick Log is plant memory; the loop cannot be proven without recent entries.",
+      "    - Timeline [present] — Timeline linkage confirms Quick Log became persistent plant memory.",
+      "    - Sensor Snapshot [stale] · source=live — Sensor snapshot is the truth signal that AI Doctor and Alerts read from.",
+      "    - AI Doctor [weak] — AI Doctor reasoning depends on real sensor and log evidence, not guesses.",
+      "    - Alert [weak] — Alerts turn sensor truth into a persisted, reviewable signal.",
+      "    - action-queue [unknown] — Action Queue items must stay approval-required. No device command.",
+    ].join("\n");
+
+    expect(text).toBe(expected);
+    expect(text).toContain("action-queue [unknown]");
+    expect(text).not.toMatch(/action-queue \[present\]/i);
+    assertTopGapTextLineOrderMatchesViewModel(rows, text);
+    assertNoSecrets(text);
+    assertNoUnsafeWording(text);
+  });
+
 
   it("resolved / no-blocking-gap → exact expected text and safety fences", () => {
     const text = goldenFor(baseRows());

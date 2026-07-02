@@ -26,15 +26,11 @@ const SQL = readFileSync(MIGRATION_PATH, "utf8");
 
 describe("verdant-bucket owner-scoped UPDATE/DELETE policies (migration)", () => {
   it("creates an UPDATE policy on storage.objects", () => {
-    expect(SQL).toMatch(
-      /CREATE\s+POLICY\s+"Users update own verdant objects"[\s\S]*FOR\s+UPDATE/i,
-    );
+    expect(SQL).toMatch(/CREATE\s+POLICY\s+"Users update own verdant objects"[\s\S]*FOR\s+UPDATE/i);
   });
 
   it("creates a DELETE policy on storage.objects", () => {
-    expect(SQL).toMatch(
-      /CREATE\s+POLICY\s+"Users delete own verdant objects"[\s\S]*FOR\s+DELETE/i,
-    );
+    expect(SQL).toMatch(/CREATE\s+POLICY\s+"Users delete own verdant objects"[\s\S]*FOR\s+DELETE/i);
   });
 
   it("UPDATE policy is scoped to bucket_id = 'verdant'", () => {
@@ -56,7 +52,8 @@ describe("verdant-bucket owner-scoped UPDATE/DELETE policies (migration)", () =>
   it("UPDATE policy is owner-path scoped (auth.uid() = first folder)", () => {
     const updateBlock = SQL.match(
       /CREATE\s+POLICY\s+"Users update own verdant objects"[\s\S]*?;/i,
-    )?.[0]!;
+    )?.[0];
+    expect(updateBlock).toBeTruthy();
     expect(updateBlock).toMatch(/storage\.foldername\(name\)\)\[1\]/);
     expect(updateBlock).toMatch(/auth\.uid\(\)/);
   });
@@ -64,16 +61,15 @@ describe("verdant-bucket owner-scoped UPDATE/DELETE policies (migration)", () =>
   it("DELETE policy is owner-path scoped (auth.uid() = first folder)", () => {
     const deleteBlock = SQL.match(
       /CREATE\s+POLICY\s+"Users delete own verdant objects"[\s\S]*?;/i,
-    )?.[0]!;
+    )?.[0];
+    expect(deleteBlock).toBeTruthy();
     expect(deleteBlock).toMatch(/storage\.foldername\(name\)\)\[1\]/);
     expect(deleteBlock).toMatch(/auth\.uid\(\)/);
   });
 
   it("policies are granted only TO authenticated (not anon, not public)", () => {
     const allPolicyBlocks =
-      SQL.match(
-        /CREATE\s+POLICY\s+"Users (?:update|delete) own verdant objects"[\s\S]*?;/gi,
-      ) ?? [];
+      SQL.match(/CREATE\s+POLICY\s+"Users (?:update|delete) own verdant objects"[\s\S]*?;/gi) ?? [];
     expect(allPolicyBlocks.length).toBe(2);
     for (const b of allPolicyBlocks) {
       expect(b).toMatch(/TO\s+authenticated\b/i);

@@ -72,7 +72,7 @@ describe("Action Queue manual refresh button behavior", () => {
   it("icon spins while refreshing", () => {
     const idx = SRC.indexOf("action-queue-refresh-button");
     const block = SRC.slice(idx, idx + 500);
-    expect(block).toMatch(/\`h-4 w-4 \$\{isRefreshing \? "animate-spin" : ""\}\`/);
+    expect(block).toMatch(/`h-4 w-4 \$\{isRefreshing \? "animate-spin" : ""\}`/);
   });
 
   it("does not gate approve/reject/complete/cancel buttons with refresh state", () => {

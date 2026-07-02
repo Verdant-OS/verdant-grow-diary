@@ -12,27 +12,25 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import type { DiagnosisResult } from "@/lib/aiDoctorEngine";
 import type { AiDoctorReportInput } from "@/lib/aiDoctorReportRules";
 
-const buildPdfSpy = vi.fn(() => new Uint8Array([1, 2, 3]));
+const buildPdfSpy = vi.fn((...args: any[]) => new Uint8Array([1, 2, 3]));
 const downloadPdfSpy = vi.fn();
-const buildCsvSpy = vi.fn(() => "a,b\n1,2");
+const buildCsvSpy = vi.fn((...args: any[]) => "a,b\n1,2");
 const downloadCsvSpy = vi.fn();
 
 vi.mock("@/lib/aiDoctorReportRules", async () => {
   const actual: any = await vi.importActual("@/lib/aiDoctorReportRules");
   return {
     ...actual,
-    buildAiDoctorReportPdfBytes: (...args: any[]) => buildPdfSpy.apply(null, args as []),
-    downloadAiDoctorReportPdf: (...args: any[]) => downloadPdfSpy.apply(null, args as []),
+    buildAiDoctorReportPdfBytes: (...args: any[]) => buildPdfSpy(...args),
+    downloadAiDoctorReportPdf: (...args: any[]) => downloadPdfSpy(...args),
   };
 });
 vi.mock("@/lib/aiDoctorEvidenceCsvExportRules", async () => {
-  const actual: any = await vi.importActual(
-    "@/lib/aiDoctorEvidenceCsvExportRules",
-  );
+  const actual: any = await vi.importActual("@/lib/aiDoctorEvidenceCsvExportRules");
   return {
     ...actual,
-    buildAiDoctorEvidenceCsv: (...args: any[]) => buildCsvSpy.apply(null, args as []),
-    downloadAiDoctorEvidenceCsv: (...args: any[]) => downloadCsvSpy.apply(null, args as []),
+    buildAiDoctorEvidenceCsv: (...args: any[]) => buildCsvSpy(...args),
+    downloadAiDoctorEvidenceCsv: (...args: any[]) => downloadCsvSpy(...args),
   };
 });
 
@@ -42,7 +40,7 @@ let invokeImpl: (...args: any[]) => unknown = async () => ({
 });
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    functions: { invoke: (...a: any[]) => invokeImpl.apply(null, a as []) },
+    functions: { invoke: (...a: any[]) => invokeImpl(...a) },
   },
 }));
 
@@ -92,9 +90,7 @@ describe("premium export panel — pending UX + duplicate-click guard", () => {
         resolveGate = (v) => r(v);
       });
     render(<AiDoctorDiagnosisPanel diagnosis={diag()} reportInput={reportInput()} />);
-    const btn = screen.getByTestId(
-      "ai-doctor-diagnosis-download-report",
-    ) as HTMLButtonElement;
+    const btn = screen.getByTestId("ai-doctor-diagnosis-download-report") as HTMLButtonElement;
 
     fireEvent.click(btn);
     fireEvent.click(btn); // rapid second click while pending
@@ -120,9 +116,9 @@ describe("premium export panel — pending UX + duplicate-click guard", () => {
     render(<AiDoctorDiagnosisPanel diagnosis={diag()} reportInput={reportInput()} />);
     fireEvent.click(screen.getByTestId("ai-doctor-diagnosis-download-csv"));
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ai-doctor-diagnosis-package-message").textContent,
-      ).toMatch(/Pro feature/),
+      expect(screen.getByTestId("ai-doctor-diagnosis-package-message").textContent).toMatch(
+        /Pro feature/,
+      ),
     );
     expect(buildCsvSpy).not.toHaveBeenCalled();
     expect(downloadCsvSpy).not.toHaveBeenCalled();

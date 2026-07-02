@@ -68,7 +68,7 @@ describe("sensor-ecowitt-home-assistant-field-mapping.md", () => {
   });
 
   it("does not embed real-looking secrets", () => {
-    expect(doc).not.toMatch(/eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}/);
+    expect(doc).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/);
     expect(doc).not.toMatch(/vbt_[A-Za-z0-9]{24,}/);
     expect(doc).not.toMatch(/service_role\s*[:=]\s*['"]/);
   });

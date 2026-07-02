@@ -31,6 +31,26 @@ export type OneTentLoopGapStatus = LoopStepStatus | "resolved";
 
 export type OneTentLoopGapEvidenceKind = EvidenceProvenance | "resolved";
 
+export type OneTentLoopGapEvidenceState =
+  | "present"
+  | "missing"
+  | "weak"
+  | "stale"
+  | "invalid"
+  | "demo_only"
+  | "unknown"
+  | "blocked";
+
+export interface OneTentLoopGapEvidenceChecklistItem {
+  kind: "loop-step";
+  step_key: LoopStepId;
+  label: string;
+  state: OneTentLoopGapEvidenceState;
+  why_it_matters: string;
+  source_label?: string;
+  provenance?: EvidenceProvenance;
+}
+
 export interface OneTentLoopGap {
   /** Step this gap is anchored to (or "none" when no blocking gap). */
   step_key: OneTentLoopGapStepKey;
@@ -59,7 +79,10 @@ export interface OneTentLoopGap {
   blocked_downstream_steps: readonly LoopStepId[];
   /** True whenever the gap represents real-data missing/weak/unsafe evidence. */
   is_real_data_gap: boolean;
+  /** Read-only per-step evidence checklist scoped to this gap. */
+  evidence_checklist: readonly OneTentLoopGapEvidenceChecklistItem[];
 }
+
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -291,6 +314,7 @@ function buildGapFromRow(row: LoopStepRow, priority: number): OneTentLoopGap {
     source_label: firstSourceLabel(row),
     blocked_downstream_steps: DOWNSTREAM_MAP[row.id],
     is_real_data_gap: isRealDataGap(row),
+    evidence_checklist: [],
   };
 }
 
@@ -319,8 +343,10 @@ function actionQueueSafetyGap(row: LoopStepRow): OneTentLoopGap | null {
     source_label: firstSourceLabel(row),
     blocked_downstream_steps: DOWNSTREAM_MAP["action-queue"],
     is_real_data_gap: true,
+    evidence_checklist: [],
   };
 }
+
 
 /**
  * Optional plant-context gap: plant row is passed but the plant lacks
@@ -354,12 +380,131 @@ function plantContextGap(rows: readonly LoopStepRow[]): OneTentLoopGap | null {
     evidence_kind: "inferred",
     blocked_downstream_steps: ["ai-doctor", "follow-up"],
     is_real_data_gap: true,
+    evidence_checklist: [],
   };
+}
+
+
+// ---------------------------------------------------------------------------
+// Evidence checklist builder
+// ---------------------------------------------------------------------------
+
+const CHECKLIST_STEP_ORDER: readonly LoopStepId[] = [
+  "grow",
+  "tent",
+  "plant",
+  "quick-log",
+  "timeline",
+  "sensor-snapshot",
+  "ai-doctor",
+  "alert",
+  "action-queue",
+];
+
+const CHECKLIST_WHY: Record<LoopStepId, string> = {
+  grow: "The grow anchors every downstream loop step. Without it, no scope exists.",
+  tent: "The tent scopes environment targets and sensor snapshots for this grow.",
+  plant: "The plant scopes Quick Log entries, AI Doctor context, and follow-up.",
+  "quick-log": "Quick Log is plant memory; the loop cannot be proven without recent entries.",
+  timeline: "Timeline linkage confirms Quick Log became persistent plant memory.",
+  "sensor-snapshot": "Sensor snapshot is the truth signal that AI Doctor and Alerts read from.",
+  "ai-doctor": "AI Doctor reasoning depends on real sensor and log evidence, not guesses.",
+  alert: "Alerts turn sensor truth into a persisted, reviewable signal.",
+  "action-queue": "Action Queue items must stay approval-required. No device command.",
+  "follow-up": "Follow-up proves the loop closed with a real observation after action.",
+};
+
+function stateFromStatus(status: LoopStepStatus): OneTentLoopGapEvidenceState {
+  switch (status) {
+    case "passed":
+      return "present";
+    case "needs_review":
+      return "weak";
+    case "missing":
+      return "missing";
+    case "blocked":
+      return "blocked";
+    case "stale":
+      return "stale";
+    case "invalid":
+      return "invalid";
+    case "demo_only":
+      return "demo_only";
+  }
+}
+
+/**
+ * Downstream weakening rule:
+ * When the top gap is caused by weak/unsafe telemetry or missing evidence,
+ * downstream checklist items must never appear as `present`. Cascade to
+ * `blocked` for hard-blocking statuses, otherwise `weak`.
+ */
+function downstreamOverride(
+  gapStatus: OneTentLoopGapStatus,
+): OneTentLoopGapEvidenceState | null {
+  switch (gapStatus) {
+    case "missing":
+    case "invalid":
+    case "blocked":
+      return "blocked";
+    case "stale":
+    case "demo_only":
+    case "needs_review":
+      return "weak";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Build a per-step evidence checklist scoped to a given gap. Never marks a
+ * downstream item as `present` when the top gap represents weak or missing
+ * telemetry. Never echoes raw IDs, payloads, or secret markers.
+ */
+export function buildOneTentLoopGapEvidenceChecklist(
+  rows: readonly LoopStepRow[],
+  gap: OneTentLoopGap,
+): OneTentLoopGapEvidenceChecklistItem[] {
+  if (gap.step_key === "none") return [];
+  const rowById = new Map<LoopStepId, LoopStepRow>();
+  for (const r of rows) rowById.set(r.id, r);
+  const downstream = new Set<LoopStepId>(gap.blocked_downstream_steps);
+  const override = downstreamOverride(gap.status);
+
+  const items: OneTentLoopGapEvidenceChecklistItem[] = [];
+  for (const stepId of CHECKLIST_STEP_ORDER) {
+    const row = rowById.get(stepId);
+    let state: OneTentLoopGapEvidenceState = row
+      ? stateFromStatus(row.status)
+      : "unknown";
+    if (
+      row &&
+      override &&
+      downstream.has(stepId) &&
+      state === "present" &&
+      stepId !== (gap.step_key as LoopStepId)
+    ) {
+      state = override;
+    }
+    const sourceLabel = row ? firstSourceLabel(row) : undefined;
+    const item: OneTentLoopGapEvidenceChecklistItem = {
+      kind: "loop-step",
+      step_key: stepId,
+      label: row?.label ?? stepId,
+      state,
+      why_it_matters: CHECKLIST_WHY[stepId],
+    };
+    if (sourceLabel) item.source_label = sourceLabel;
+    if (row?.provenance) item.provenance = row.provenance;
+    items.push(item);
+  }
+  return items;
 }
 
 // ---------------------------------------------------------------------------
 // Public entry points
 // ---------------------------------------------------------------------------
+
 
 /**
  * Rank every gap-eligible row into a stable priority-sorted list.
@@ -408,8 +553,17 @@ export function rankOneTentLoopGaps(
     return a.title.localeCompare(b.title);
   });
 
+  // Attach per-gap evidence checklist so downstream weakening reflects the
+  // gap's own status.
+  for (const g of gaps) {
+    (g as { evidence_checklist: readonly OneTentLoopGapEvidenceChecklistItem[] })
+      .evidence_checklist = buildOneTentLoopGapEvidenceChecklist(rows, g);
+  }
+
+
   return gaps;
 }
+
 
 /**
  * Resolve the single top real-data gap for the loop, or a "no blocking gap"
@@ -435,10 +589,12 @@ export function resolveTopOneTentLoopGap(
       evidence_kind: "resolved",
       blocked_downstream_steps: [],
       is_real_data_gap: false,
+      evidence_checklist: [],
     };
   }
   return ranked[0];
 }
+
 
 /**
  * Render the top gap as sanitized plain text for inclusion in the copyable
@@ -468,5 +624,17 @@ export function buildOneTentLoopTopGapTextBlock(
   } else {
     lines.push("- Blocked / weakened downstream: none");
   }
+  if (gap.evidence_checklist.length > 0) {
+    lines.push("- Evidence checklist for this gap:");
+    for (const item of gap.evidence_checklist) {
+      const src = item.source_label ? ` · source=${item.source_label}` : "";
+      lines.push(
+        `    - ${item.label} [${item.state}]${src} — ${item.why_it_matters}`,
+      );
+    }
+  } else {
+    lines.push("- Evidence checklist for this gap: none");
+  }
+
   return lines.join("\n");
 }

@@ -164,9 +164,59 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
         }
       }
 
+      // Top Gap Panel regression: when it renders, its inner text and its
+      // evidence checklist items must never surface unsafe healthy wording,
+      // and downstream/checklist items for weak telemetry must never expose
+      // a "present"/success indicator via data-state.
+      const topGap = page.getByTestId("one-tent-loop-live-proof-top-gap");
+      if ((await topGap.count()) > 0) {
+        const topGapText = (await topGap.innerText()).toLowerCase();
+        expect(
+          hasUnsafeHealthyClaim(topGapText),
+          `Top Gap Panel contained unsafe wording:\n${topGapText.slice(0, 600)}`,
+        ).toBe(false);
+
+        // The panel exposes step_key/status/evidence-kind via data-*.
+        await expect(topGap).toHaveAttribute("data-step-key", /.+/);
+        await expect(topGap).toHaveAttribute("data-status", /.+/);
+
+        const checklist = page.getByTestId(
+          "one-tent-loop-live-proof-top-gap-checklist",
+        );
+        if ((await checklist.count()) > 0) {
+          const items = checklist.locator(
+            '[data-testid^="one-tent-loop-live-proof-top-gap-checklist-item-"]',
+          );
+          const total = await items.count();
+          for (let i = 0; i < total; i += 1) {
+            const item = items.nth(i);
+            const state = await item.getAttribute("data-state");
+            // Weak-telemetry states must never render as success/green.
+            const weakStates = [
+              "missing",
+              "weak",
+              "stale",
+              "invalid",
+              "demo_only",
+              "unknown",
+              "blocked",
+            ];
+            const itemText = (await item.innerText()).toLowerCase();
+            expect(
+              hasUnsafeHealthyClaim(itemText),
+              `Checklist item state=${state} contained unsafe wording:\n${itemText.slice(0, 300)}`,
+            ).toBe(false);
+            if (state && weakStates.includes(state)) {
+              // Must not simultaneously advertise "present".
+              expect(state).not.toBe("present");
+            }
+          }
+        }
+      }
+
       // If a copyable text report block is present, assert the same
       // wording rules apply to its plaintext.
-      const report = page.getByTestId("loop-live-proof-text-report");
+      const report = page.getByTestId("one-tent-loop-live-proof-report-text");
       if ((await report.count()) > 0) {
         const reportText = (await report.innerText()).toLowerCase();
         expect(
@@ -174,6 +224,7 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
           `Text report contained unsafe wording:\n${reportText.slice(0, 800)}`,
         ).toBe(false);
       }
+
     } else {
       // Route-level render was blocked by auth — documented and expected.
       // Vitest fuzz + presenter tests cover the rendered-proof invariants.

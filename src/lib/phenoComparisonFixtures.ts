@@ -18,7 +18,12 @@
  */
 import type { PhenoComparisonInput } from "./phenoComparisonViewModel";
 
-const SAMPLE_PHOTO = "/placeholder.svg";
+// NOTE: public/placeholder.svg is the Lovable-platform scaffold wordmark
+// ("Ask Lovable to build it"), not a plant photo — rendering it as a candidate
+// photo would show vendor placeholder text on screen. No real photo asset
+// exists in this repo, so every demo candidate honestly shows the existing
+// "No photo attached for this candidate." empty state instead of a fake image.
+const SAMPLE_PHOTO = null;
 
 export const PHENO_COMPARISON_DEMO_INPUT: PhenoComparisonInput = {
   huntName: "Sample Pheno Hunt",
@@ -55,11 +60,14 @@ export const PHENO_COMPARISON_DEMO_INPUT: PhenoComparisonInput = {
         keeperImpression: "Leaning yes — resin and nose stood out",
       },
       quickLogs: [
-        { id: "c1-q1", at: "2026-06-30T09:00:00.000Z", kind: "note", note: "Trichomes mostly cloudy, some amber" },
+        {
+          id: "c1-q1",
+          at: "2026-06-30T09:00:00.000Z",
+          kind: "note",
+          note: "Trichomes mostly cloudy, some amber",
+        },
       ],
-      timelineEvents: [
-        { id: "c1-t1", at: "2026-06-30T09:05:00.000Z", kind: "photo" },
-      ],
+      timelineEvents: [{ id: "c1-t1", at: "2026-06-30T09:05:00.000Z", kind: "photo" }],
       snapshot: {
         source: "manual",
         capturedAt: "2026-07-01T10:30:00.000Z",
@@ -96,9 +104,7 @@ export const PHENO_COMPARISON_DEMO_INPUT: PhenoComparisonInput = {
       quickLogs: [
         { id: "c2-q1", at: "2026-06-29T08:45:00.000Z", kind: "feeding", note: "Bloom nutrients" },
       ],
-      timelineEvents: [
-        { id: "c2-t1", at: "2026-06-29T08:50:00.000Z", kind: "feeding" },
-      ],
+      timelineEvents: [{ id: "c2-t1", at: "2026-06-29T08:50:00.000Z", kind: "feeding" }],
       snapshot: {
         source: "csv",
         capturedAt: "2026-07-01T10:15:00.000Z",
@@ -129,9 +135,7 @@ export const PHENO_COMPARISON_DEMO_INPUT: PhenoComparisonInput = {
       quickLogs: [
         { id: "c3-q1", at: "2026-06-27T12:00:00.000Z", kind: "training", note: "LST applied" },
       ],
-      timelineEvents: [
-        { id: "c3-t1", at: "2026-06-27T12:05:00.000Z", kind: "training" },
-      ],
+      timelineEvents: [{ id: "c3-t1", at: "2026-06-27T12:05:00.000Z", kind: "training" }],
       snapshot: {
         source: "stale",
         capturedAt: "2026-06-29T06:00:00.000Z",
@@ -165,11 +169,14 @@ export const PHENO_COMPARISON_DEMO_INPUT: PhenoComparisonInput = {
         keeperImpression: "Promising, wants replication",
       },
       quickLogs: [
-        { id: "c4-q1", at: "2026-06-30T07:30:00.000Z", kind: "measurement", note: "Reservoir check" },
+        {
+          id: "c4-q1",
+          at: "2026-06-30T07:30:00.000Z",
+          kind: "measurement",
+          note: "Reservoir check",
+        },
       ],
-      timelineEvents: [
-        { id: "c4-t1", at: "2026-06-30T07:35:00.000Z", kind: "measurement" },
-      ],
+      timelineEvents: [{ id: "c4-t1", at: "2026-06-30T07:35:00.000Z", kind: "measurement" }],
       snapshot: {
         // Suspicious payload: humidity pinned at 100% → invalid (context only).
         source: "invalid",

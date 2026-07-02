@@ -232,7 +232,7 @@ export default function Landing() {
           </Link>
           <a href="#features">
             <Button size="sm" variant="ghost">
-              Learn more
+              Explore features
             </Button>
           </a>
         </div>

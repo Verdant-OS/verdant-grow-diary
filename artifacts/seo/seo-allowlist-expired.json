@@ -1,0 +1,7 @@
+{
+  "mode": "list-expired-entries",
+  "generated_at": "2026-07-02T23:34:29.113Z",
+  "now": "2026-07-02T00:00:00Z",
+  "allowlist_source": "/dev-server/config/seo-allowlist.json",
+  "expired_entries": []
+}

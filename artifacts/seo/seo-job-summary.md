@@ -1,14 +1,9 @@
 ## Verdant SEO Monitoring — Job Summary
 
-- **Mode:** dry-run
+- **Mode:** list-expired-entries
 - **Status:** PASS
 - **Allowlist:** `/dev-server/config/seo-allowlist.json`
-- **URLs evaluated:** 2
-- **Allowlisted suppressions:** 1
-- **Expected-noindex suppressions:** 0
-- **Never-allowlist matches:** 1
-- **Expired matches:** 0
-- **Unsuppressed URLs:** 0
+- **URLs evaluated:** 0
 
 ### Expired allowlist entries
 None.
@@ -24,4 +19,4 @@ None.
 - `artifacts/seo/gsc-last-finding-verification.md` (verification step)
 
 ### Notes
-- Dry-run — no GSC API calls.
+- No URLs were evaluated in --list-expired-entries mode.

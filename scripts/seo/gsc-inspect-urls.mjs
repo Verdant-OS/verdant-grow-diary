@@ -19,6 +19,8 @@
  *   --no-fail-on-expired    Do not fail when allowlist entries are expired
  *   --list-expired-entries  Print expired allowlist entries and exit (no GSC calls)
  *   --now <iso>             Override "now" for deterministic tests
+ *   --previous-dir <path>   Prior artifacts dir for diffing (default: artifacts/seo/previous)
+ *   --no-diff               Skip writing suppression diff artifacts
  */
 import { mkdirSync, writeFileSync, appendFileSync, readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";

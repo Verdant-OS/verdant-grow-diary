@@ -23,7 +23,7 @@ describe("Evidence Linkage UI Mount v1 — AlertDetail", () => {
   });
 
   it("mounts EvidenceLinkageBadges with alert-review surface", () => {
-    expect(src).toMatch(/<EvidenceLinkageBadges[\s\S]*?surface=\"alert-review\"/);
+    expect(src).toMatch(/<EvidenceLinkageBadges[\s\S]*?surface="alert-review"/);
   });
 
   it("uses the testId wrapper for the evidence linkage block", () => {
@@ -32,9 +32,7 @@ describe("Evidence Linkage UI Mount v1 — AlertDetail", () => {
 
   it("passes alert-review provenance-aware fallback copy", () => {
     expect(src).toMatch(/fallbackCopy=\{ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY\}/);
-    expect(src).toMatch(
-      /from\s+"@\/lib\/originatingTimelineEventRules"/,
-    );
+    expect(src).toMatch(/from\s+"@\/lib\/originatingTimelineEventRules"/);
   });
 
   it("does not introduce write/control verbs in the mount", () => {
@@ -54,7 +52,10 @@ describe("Evidence Linkage UI Mount v1 — AlertDetail", () => {
     const lines = src.split("\n");
     const mountIdx = lines.findIndex((l) => l.includes("alert-detail-evidence-linkage"));
     expect(mountIdx).toBeGreaterThan(-1);
-    const block = lines.slice(Math.max(0, mountIdx - 4), mountIdx + 8).join("\n").toLowerCase();
+    const block = lines
+      .slice(Math.max(0, mountIdx - 4), mountIdx + 8)
+      .join("\n")
+      .toLowerCase();
     for (const phrase of forbidden) {
       expect(block.includes(phrase), `unexpected "${phrase}" in mount block`).toBe(false);
     }
@@ -77,17 +78,13 @@ describe("Evidence Linkage UI Mount v1 — ActionDetail", () => {
   });
 
   it("passes provenance-aware fallback copy per derivation block", () => {
-    expect(src).toMatch(
-      /fallbackCopy=\{ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY\}/,
-    );
-    expect(src).toMatch(
-      /fallbackCopy=\{ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY\}/,
-    );
+    expect(src).toMatch(/fallbackCopy=\{ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY\}/);
+    expect(src).toMatch(/fallbackCopy=\{ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY\}/);
     expect(src).toMatch(/from\s+"@\/lib\/originatingTimelineEventRules"/);
   });
 
   it("each mount uses the action-queue-suggestion surface tag", () => {
-    const matches = src.match(/<EvidenceLinkageBadges[\s\S]*?surface=\"action-queue-suggestion\"/g);
+    const matches = src.match(/<EvidenceLinkageBadges[\s\S]*?surface="action-queue-suggestion"/g);
     expect(matches?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
@@ -116,7 +113,10 @@ describe("Evidence Linkage UI Mount v1 — ActionDetail", () => {
     ]) {
       const idx = lines.findIndex((l) => l.includes(marker));
       expect(idx, `marker ${marker} missing`).toBeGreaterThan(-1);
-      const block = lines.slice(Math.max(0, idx - 4), idx + 10).join("\n").toLowerCase();
+      const block = lines
+        .slice(Math.max(0, idx - 4), idx + 10)
+        .join("\n")
+        .toLowerCase();
       for (const phrase of forbidden) {
         expect(block.includes(phrase), `unexpected "${phrase}" near ${marker}`).toBe(false);
       }

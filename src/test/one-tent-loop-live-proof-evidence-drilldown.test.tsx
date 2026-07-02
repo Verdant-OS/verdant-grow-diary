@@ -270,7 +270,6 @@ vi.mock("@/hooks/usePlantAssignedTentActions", () => ({
   usePlantAssignedTentActions: () => ({ rows: [], isLoading: false, isError: false, error: null }),
 }));
 
-// eslint-disable-next-line import/first
 import OneTentLoopLiveProof from "@/pages/OneTentLoopLiveProof";
 
 function renderPage() {

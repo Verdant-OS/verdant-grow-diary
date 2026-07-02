@@ -8,7 +8,7 @@
  * Safety: docs-only, no product code, no writes, no schema.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
 export const BANNED_PHRASES = [
@@ -83,8 +83,7 @@ export function scanDemoDocForSafety(text: string): DemoDocsSafetyFailure[] {
     fenced.push([b, e]);
   }
 
-  const inFence = (lineIdx: number): boolean =>
-    fenced.some(([b, e]) => lineIdx > b && lineIdx < e);
+  const inFence = (lineIdx: number): boolean => fenced.some(([b, e]) => lineIdx > b && lineIdx < e);
 
   lines.forEach((line, idx) => {
     if (inFence(idx)) return;
@@ -111,7 +110,6 @@ const DOCS_DIR = resolve(process.cwd(), "docs");
  * Files only, sorted lexicographically.
  */
 export function discoverDemoScriptDocs(): string[] {
-  const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
   const entries = readdirSync(DOCS_DIR);
   return entries
     .filter((name) => /demo-script.*\.md$/i.test(name))
@@ -134,9 +132,7 @@ describe("One-Tent demo docs safety v1", () => {
 
   it("includes the One-Tent Evidence Chain demo script", () => {
     const paths = discoverDemoScriptDocs();
-    expect(
-      paths.some((p) => p.endsWith("one-tent-evidence-chain-demo-script-v1.md")),
-    ).toBe(true);
+    expect(paths.some((p) => p.endsWith("one-tent-evidence-chain-demo-script-v1.md"))).toBe(true);
   });
 
   it("discovered paths are sorted deterministically", () => {
@@ -167,7 +163,6 @@ describe("One-Tent demo docs safety v1", () => {
     expect(anyFailed).toBe(true);
   });
 
-
   it("flags a banned phrase that appears outside the fence", () => {
     const sample = [
       "# Sample",
@@ -178,8 +173,7 @@ describe("One-Tent demo docs safety v1", () => {
     ].join("\n");
     const failures = scanDemoDocForSafety(sample);
     expect(failures.some((f) => f.kind === "banned-outside-fence")).toBe(true);
-    expect(failures.find((f) => f.kind === "banned-outside-fence")?.phrase)
-      .toBe("fully automated");
+    expect(failures.find((f) => f.kind === "banned-outside-fence")?.phrase).toBe("fully automated");
   });
 
   it("fails when BEGIN marker exists without END marker", () => {
@@ -193,11 +187,9 @@ describe("One-Tent demo docs safety v1", () => {
   });
 
   it("fails when END marker exists without BEGIN marker", () => {
-    const sample = [
-      "# Sample",
-      '- "guaranteed yield"',
-      "<!-- DEMO-SCRIPT-DO-NOT-SAY:END -->",
-    ].join("\n");
+    const sample = ["# Sample", '- "guaranteed yield"', "<!-- DEMO-SCRIPT-DO-NOT-SAY:END -->"].join(
+      "\n",
+    );
     const failures = scanDemoDocForSafety(sample);
     expect(failures.some((f) => f.kind === "missing-begin-marker")).toBe(true);
   });

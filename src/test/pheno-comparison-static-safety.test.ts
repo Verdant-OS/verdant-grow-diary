@@ -18,12 +18,10 @@ function read(p: string): string {
   return readFileSync(resolve(process.cwd(), p), "utf8");
 }
 
-/** Strip // line comments and /* block comments *​/ so denial language in
+/** Strip // line comments and /* block comments *\/ so denial language in
  * file headers doesn't false-positive. */
 function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
 
 describe("pheno comparison static safety", () => {

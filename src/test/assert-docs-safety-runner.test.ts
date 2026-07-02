@@ -1,12 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
-import {
-  parseArgs,
-  formatReport,
-  runPhenotyping,
-  // @ts-ignore - .mjs import without type declarations
-} from "../../scripts/assert-docs-safety.mjs";
+import { parseArgs, formatReport, runPhenotyping } from "../../scripts/assert-docs-safety.mjs";
 
 const SCRIPT = join(process.cwd(), "scripts/assert-docs-safety.mjs");
 
@@ -92,7 +87,7 @@ describe("assert-docs-safety — CLI exit codes", () => {
   it("strict mode exits 0 when the repo is clean", () => {
     const r = run();
     expect(r.status).toBe(0);
-    expect((r.stdout + r.stderr)).toContain("Docs Safety Report: PASS");
+    expect(r.stdout + r.stderr).toContain("Docs Safety Report: PASS");
   });
 
   it("--dry-run always exits 0", () => {

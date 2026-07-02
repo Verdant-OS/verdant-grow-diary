@@ -19,7 +19,7 @@
  *   --no-fail-on-expired    Do not fail when allowlist entries are expired
  *   --now <iso>             Override "now" for deterministic tests
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, appendFileSync, readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { loadGscCredentials, getAccessToken, inspectUrl, summarizeInspection, classifyIssues } from "./gscClient.mjs";
 import {

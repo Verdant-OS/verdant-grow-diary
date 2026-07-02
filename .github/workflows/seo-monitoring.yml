@@ -1,0 +1,75 @@
+name: SEO Monitoring (post-deploy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployed_url:
+        description: "Deployed base URL (e.g. https://verdantgrowdiary.com)"
+        required: false
+        default: "https://verdantgrowdiary.com"
+      sitemap_url:
+        description: "Sitemap URL to pull inspection targets from"
+        required: false
+        default: "https://verdantgrowdiary.com/sitemap.xml"
+      max_urls:
+        description: "Max URLs to inspect (hard cap 50)"
+        required: false
+        default: "15"
+      verify_last_finding:
+        description: "Run last-finding verification"
+        required: false
+        default: "true"
+  # Chain after the existing CI workflow completes successfully.
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  seo-monitoring:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      GSC_CLIENT_ID: ${{ secrets.GSC_CLIENT_ID }}
+      GSC_CLIENT_SECRET: ${{ secrets.GSC_CLIENT_SECRET }}
+      GSC_REFRESH_TOKEN: ${{ secrets.GSC_REFRESH_TOKEN }}
+      GSC_SITE_URL: ${{ secrets.GSC_SITE_URL }}
+      SEO_DEPLOYED_URL: ${{ github.event.inputs.deployed_url || 'https://verdantgrowdiary.com' }}
+      SEO_SITEMAP_URL: ${{ github.event.inputs.sitemap_url || 'https://verdantgrowdiary.com/sitemap.xml' }}
+      SEO_MAX_URLS: ${{ github.event.inputs.max_urls || '15' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node_version: "20"
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      - name: Prepare artifact directory
+        run: mkdir -p artifacts/seo
+      - name: GSC OAuth configured?
+        id: gsc
+        run: |
+          if [ -n "$GSC_CLIENT_ID" ] && [ -n "$GSC_CLIENT_SECRET" ] && [ -n "$GSC_REFRESH_TOKEN" ] && [ -n "$GSC_SITE_URL" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "GSC OAuth not configured — GSC steps will be skipped."
+            echo "GSC OAuth not configured. See docs/seo-monitoring.md to authorize locally and add repo secrets." > artifacts/seo/gsc-oauth-not-configured.txt
+          fi
+      - name: GSC URL inspection
+        if: steps.gsc.outputs.configured == 'true'
+        run: node scripts/seo/gsc-inspect-urls.mjs --sitemap "$SEO_SITEMAP_URL" --max "$SEO_MAX_URLS"
+      - name: Verify last GSC finding
+        if: steps.gsc.outputs.configured == 'true' && (github.event.inputs.verify_last_finding != 'false')
+        run: node scripts/seo/verify-last-gsc-finding.mjs
+      - name: Upload SEO artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seo-monitoring-reports
+          path: |
+            artifacts/seo/**
+            !artifacts/seo/**/*.env
+          if-no-files-found: ignore

@@ -105,8 +105,9 @@ function parseArgs(argv) {
   return out;
 }
 
-function writeJobSummary(md) {
+function writeJobSummary(md, jsonPayload) {
   writeArtifact("seo-job-summary.md", md);
+  writeArtifact("seo-job-summary.json", JSON.stringify(jsonPayload, null, 2));
   const target = process.env.GITHUB_STEP_SUMMARY;
   if (target) {
     try {
@@ -117,7 +118,42 @@ function writeJobSummary(md) {
   }
 }
 
-function buildJobSummary({ mode, status, allowlistSource, urls, simulated, expired, suppressed, failing, notes }) {
+function buildJobSummaryData({ mode, status, allowlistSource, urls, simulated, expired, suppressed, failing, diff, notes }) {
+  const counts = simulated
+    ? {
+        never_allowlisted: simulated.filter((s) => s.classification === "never_allowlisted").length,
+        suppressed: simulated.filter((s) => s.classification === "suppressed").length,
+        expected_noindex: simulated.filter((s) => s.classification === "expected_noindex").length,
+        expired_allowlist: simulated.filter((s) => s.classification === "expired_allowlist").length,
+        no_match: simulated.filter((s) => s.classification === "no_match").length,
+      }
+    : null;
+  return {
+    generated_at: new Date().toISOString(),
+    mode,
+    status,
+    allowlist_source: allowlistSource,
+    urls_evaluated: urls?.length ?? 0,
+    simulated_classification_counts: counts,
+    live_suppressed_issue_count: typeof suppressed === "number" ? suppressed : null,
+    live_critical_issue_count: typeof failing === "number" ? failing : null,
+    expired_entries: expired ?? [],
+    suppression_diff: diff
+      ? {
+          previous_available: diff.previous_available,
+          previous_generated_at: diff.previous_generated_at,
+          added: diff.added.length,
+          removed: diff.removed.length,
+          unchanged: diff.unchanged.length,
+        }
+      : null,
+    artifacts: Object.fromEntries(STABLE_ARTIFACTS.map((a) => [a.key, a.path])),
+    notes: notes ?? [],
+  };
+}
+
+function buildJobSummary({ mode, status, allowlistSource, urls, simulated, expired, suppressed, failing, diff, notes }) {
+  const data = buildJobSummaryData({ mode, status, allowlistSource, urls, simulated, expired, suppressed, failing, diff, notes });
   const lines = [
     "## Verdant SEO Monitoring — Job Summary",
     "",
@@ -126,44 +162,46 @@ function buildJobSummary({ mode, status, allowlistSource, urls, simulated, expir
     `- **Allowlist:** ${allowlistSource ? "`" + allowlistSource + "`" : "(none)"}`,
     `- **URLs evaluated:** ${urls?.length ?? 0}`,
   ];
-  if (simulated) {
-    const counts = {
-      never: simulated.filter((s) => s.classification === "never_allowlisted").length,
-      suppressed: simulated.filter((s) => s.classification === "suppressed").length,
-      noindex: simulated.filter((s) => s.classification === "expected_noindex").length,
-      expired: simulated.filter((s) => s.classification === "expired_allowlist").length,
-      unsuppressed: simulated.filter((s) => s.classification === "no_match").length,
-    };
+  if (data.simulated_classification_counts) {
+    const c = data.simulated_classification_counts;
     lines.push(
-      `- **Allowlisted suppressions:** ${counts.suppressed}`,
-      `- **Expected-noindex suppressions:** ${counts.noindex}`,
-      `- **Never-allowlist matches:** ${counts.never}`,
-      `- **Expired matches:** ${counts.expired}`,
-      `- **Unsuppressed URLs:** ${counts.unsuppressed}`,
+      `- **Allowlisted suppressions:** ${c.suppressed}`,
+      `- **Expected-noindex suppressions:** ${c.expected_noindex}`,
+      `- **Never-allowlist matches:** ${c.never_allowlisted}`,
+      `- **Expired matches:** ${c.expired_allowlist}`,
+      `- **Unsuppressed URLs:** ${c.no_match}`,
     );
   }
   if (typeof suppressed === "number") lines.push(`- **Live suppressed issues:** ${suppressed}`);
   if (typeof failing === "number") lines.push(`- **Critical (unsuppressed) issues:** ${failing}`);
+  if (diff) {
+    lines.push(
+      "",
+      "### Suppression diff vs previous run",
+      diff.previous_available
+        ? `Previous: \`${diff.previous_generated_at ?? "unknown"}\``
+        : "_No previous run available — baseline established._",
+      `- **Added:** ${diff.added.length}`,
+      `- **Removed:** ${diff.removed.length}`,
+      `- **Unchanged:** ${diff.unchanged.length}`,
+    );
+  }
   lines.push("", "### Expired allowlist entries");
   if (!expired || expired.length === 0) lines.push("None.");
   else
     for (const e of expired)
       lines.push(`- \`${e.section}[${e.id}]\` expired on ${e.expires_on}`);
-  lines.push("", "### Artifacts");
-  lines.push(
-    "- `artifacts/seo/seo-allowlist-suppressions.json`",
-    "- `artifacts/seo/seo-allowlist-suppressions.md`",
-    "- `artifacts/seo/seo-allowlist-dry-run.json` (dry-run only)",
-    "- `artifacts/seo/seo-allowlist-dry-run.md` (dry-run only)",
-    "- `artifacts/seo/gsc-url-inspection.json` (live only)",
-    "- `artifacts/seo/gsc-url-inspection.md` (live only)",
-    "- `artifacts/seo/gsc-last-finding-verification.json` (verification step)",
-    "- `artifacts/seo/gsc-last-finding-verification.md` (verification step)",
-  );
+  lines.push("", "### Stable artifact links");
+  for (const a of STABLE_ARTIFACTS) lines.push(`- \`${a.path}\``);
   if (notes?.length) {
     lines.push("", "### Notes", ...notes.map((n) => `- ${n}`));
   }
-  return lines.join("\n") + "\n";
+  return { md: lines.join("\n") + "\n", data };
+}
+
+function emitJobSummary(args) {
+  const { md, data } = buildJobSummary(args);
+  writeJobSummary(md, data);
 }
 
 async function urlsFromSitemap(sitemapUrl) {

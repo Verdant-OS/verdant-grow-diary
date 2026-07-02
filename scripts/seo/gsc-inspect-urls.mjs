@@ -8,13 +8,16 @@
  * exit only on genuinely new critical issues.
  *
  * Flags:
- *   --urls a,b,c        Explicit URL list
- *   --sitemap <url>     Pull URLs from a sitemap.xml
- *   --max <n>           Max URLs to inspect (default 15, hard cap 50)
- *   --allow <a,b,c>     Ad-hoc URLs allowed to be non-indexable (skip fail)
- *   --expected-noindex  Treat every URL as expected-non-indexable
- *   --allowlist <path>  Tracked allowlist (default: config/seo-allowlist.json)
- *   --no-allowlist      Ignore the tracked allowlist entirely
+ *   --urls a,b,c            Explicit URL list
+ *   --sitemap <url>         Pull URLs from a sitemap.xml
+ *   --max <n>               Max URLs to inspect (default 15, hard cap 50)
+ *   --allow <a,b,c>         Ad-hoc URLs allowed to be non-indexable
+ *   --expected-noindex      Treat every URL as expected-non-indexable
+ *   --allowlist <path>      Tracked allowlist (default: config/seo-allowlist.json)
+ *   --no-allowlist          Ignore the tracked allowlist entirely
+ *   --dry-run-allowlist     Simulate allowlist behavior without calling GSC
+ *   --no-fail-on-expired    Do not fail when allowlist entries are expired
+ *   --now <iso>             Override "now" for deterministic tests
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -25,11 +28,18 @@ import {
   isExpectedNoindex,
   isNeverAllowlisted,
   validateAllowlist,
+  findExpiredEntries,
+  simulateAllowlistForUrls,
   DEFAULT_ALLOWLIST_PATH,
 } from "./seoAllowlist.mjs";
 
 const ARTIFACT_DIR = resolve(process.cwd(), "artifacts/seo");
-const DEFAULT_URLS = ["https://verdantgrowdiary.com/", "https://verdantgrowdiary.com/welcome", "https://verdantgrowdiary.com/pricing", "https://verdantgrowdiary.com/hardware-integrations"];
+const DEFAULT_URLS = [
+  "https://verdantgrowdiary.com/",
+  "https://verdantgrowdiary.com/welcome",
+  "https://verdantgrowdiary.com/pricing",
+  "https://verdantgrowdiary.com/hardware-integrations",
+];
 const HARD_CAP = 50;
 
 function parseArgs(argv) {
@@ -41,6 +51,9 @@ function parseArgs(argv) {
     expectedNoindex: false,
     allowlistPath: DEFAULT_ALLOWLIST_PATH,
     useAllowlist: true,
+    dryRunAllowlist: false,
+    failOnExpired: true,
+    now: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -51,6 +64,9 @@ function parseArgs(argv) {
     else if (a === "--expected-noindex") out.expectedNoindex = true;
     else if (a === "--allowlist") out.allowlistPath = resolve(argv[++i]);
     else if (a === "--no-allowlist") out.useAllowlist = false;
+    else if (a === "--dry-run-allowlist") out.dryRunAllowlist = true;
+    else if (a === "--no-fail-on-expired") out.failOnExpired = false;
+    else if (a === "--now") out.now = argv[++i];
   }
   return out;
 }
@@ -62,7 +78,105 @@ async function urlsFromSitemap(sitemapUrl) {
   return Array.from(xml.matchAll(/<loc>([^<]+)<\/loc>/g)).map((m) => m[1].trim());
 }
 
-function toMarkdown(results, allowlistSource) {
+function writeArtifact(name, content) {
+  writeFileSync(resolve(ARTIFACT_DIR, name), content);
+}
+
+function writeSuppressionArtifacts({ mode, suppressed, allowlistSource, expired, notes = [] }) {
+  const bySource = new Map();
+  for (const s of suppressed) {
+    const key = s.suppressed_by ?? "(unknown)";
+    if (!bySource.has(key)) bySource.set(key, []);
+    bySource.get(key).push(s);
+  }
+  const json = {
+    mode,
+    generated_at: new Date().toISOString(),
+    allowlist_source: allowlistSource,
+    suppressed_issue_count: suppressed.length,
+    expired_entry_count: expired.length,
+    suppressed_by_source: Object.fromEntries(
+      [...bySource].map(([k, v]) => [k, v.map(({ code, message }) => ({ code, message }))]),
+    ),
+    expired_entries: expired,
+    notes,
+  };
+  writeArtifact("seo-allowlist-suppressions.json", JSON.stringify(json, null, 2));
+
+  const md = [
+    "# SEO Allowlist Suppressions",
+    "",
+    `Mode: **${mode}**`,
+    `Allowlist: ${allowlistSource ? "`" + allowlistSource + "`" : "(none)"}`,
+    `Suppressed issues: ${suppressed.length}`,
+    `Expired entries: ${expired.length}`,
+    "",
+  ];
+  if (notes.length) {
+    md.push("## Notes", ...notes.map((n) => `- ${n}`), "");
+  }
+  md.push("## Suppressed issues by allowlist entry");
+  if (bySource.size === 0) md.push("None.");
+  else
+    for (const [source, items] of bySource) {
+      md.push("", `### ${source} (${items.length})`);
+      for (const it of items) md.push(`- \`${it.code}\` — ${it.message}`);
+    }
+  md.push("", "## Expired allowlist entries");
+  if (expired.length === 0) md.push("None.");
+  else
+    for (const e of expired)
+      md.push(
+        `- \`${e.section}[${e.id}]\` expired on ${e.expires_on} — patterns: ${(e.url_patterns ?? []).join(", ")}`,
+      );
+  writeArtifact("seo-allowlist-suppressions.md", md.join("\n") + "\n");
+}
+
+function writeDryRunArtifacts({ simulated, allowlistSource, expired }) {
+  const json = {
+    mode: "dry-run",
+    generated_at: new Date().toISOString(),
+    allowlist_source: allowlistSource,
+    inspected_count: simulated.length,
+    expired_entry_count: expired.length,
+    urls: simulated,
+    expired_entries: expired,
+  };
+  writeArtifact("seo-allowlist-dry-run.json", JSON.stringify(json, null, 2));
+
+  const md = [
+    "# SEO Allowlist Dry Run",
+    "",
+    "No Google Search Console API calls were made.",
+    "",
+    `Allowlist: ${allowlistSource ? "`" + allowlistSource + "`" : "(none)"}`,
+    `URLs simulated: ${simulated.length}`,
+    `Expired entries: ${expired.length}`,
+    "",
+    "| URL | Never-allowlisted | Would be expected-noindex | Would suppress issue types | Matching entry IDs |",
+    "| --- | --- | --- | --- | --- |",
+  ];
+  for (const s of simulated) {
+    md.push(
+      `| ${s.url} | ${s.never_allowlisted ? "yes" : "no"} | ${
+        s.would_be_expected_noindex ? "yes" : "no"
+      } | ${s.would_suppress_issue_types.join(", ") || "—"} | ${[
+        ...s.matched_allowlisted_issue_entries.map((e) => e.id),
+        ...s.matched_expected_noindex_entries.map((e) => e.id),
+      ].join(", ") || "—"} |`,
+    );
+  }
+  md.push("", "## Expired allowlist entries");
+  if (expired.length === 0) md.push("None.");
+  else
+    for (const e of expired)
+      md.push(
+        `- \`${e.section}[${e.id}]\` expired on ${e.expires_on} — patterns: ${(e.url_patterns ?? []).join(", ")}`,
+      );
+  writeArtifact("seo-allowlist-dry-run.md", md.join("\n") + "\n");
+}
+
+function toInspectionMarkdown(results, allowlistSource) {
   const lines = [
     "# GSC URL Inspection Report",
     "",
@@ -101,8 +215,63 @@ async function main() {
     if (errs.length) {
       console.error("Allowlist validation failed:");
       for (const e of errs) console.error("  - " + e);
+      writeSuppressionArtifacts({
+        mode: "invalid",
+        suppressed: [],
+        allowlistSource: allowlist._source,
+        expired: [],
+        notes: ["Allowlist structural validation failed — see stderr."],
+      });
       process.exit(2);
     }
+  }
+
+  const now = args.now ?? new Date().toISOString();
+  const expired = args.useAllowlist ? findExpiredEntries(allowlist, now) : [];
+
+  // Determine URL set (used by dry-run and live paths).
+  let urls = args.urls;
+  if (!urls && args.sitemap && !args.dryRunAllowlist) {
+    urls = await urlsFromSitemap(args.sitemap);
+  }
+  if (!urls || urls.length === 0) urls = DEFAULT_URLS;
+  urls = urls.slice(0, args.max);
+
+  // ---- DRY-RUN PATH: no GSC API calls ----
+  if (args.dryRunAllowlist) {
+    const simulated = simulateAllowlistForUrls(urls, allowlist, now);
+    writeDryRunArtifacts({ simulated, allowlistSource: allowlist._source, expired });
+    writeSuppressionArtifacts({
+      mode: "dry-run",
+      suppressed: [],
+      allowlistSource: allowlist._source,
+      expired,
+      notes: ["Dry-run mode — no GSC API calls were made."],
+    });
+    const wouldSuppress = simulated.filter((s) => s.would_suppress_issue_types.length > 0).length;
+    console.log(
+      `Dry-run: ${urls.length} URL(s); ${wouldSuppress} would have issues suppressed; ${expired.length} expired allowlist entr${expired.length === 1 ? "y" : "ies"}.`,
+    );
+    if (args.failOnExpired && expired.length > 0) {
+      console.error("FAIL: expired allowlist entries — refresh or remove them.");
+      for (const e of expired) console.error(`  - ${e.section}[${e.id}] expired ${e.expires_on}`);
+      process.exit(3);
+    }
+    process.exit(0);
+  }
+
+  // Expired allowlist entries are a hard failure in live mode too.
+  if (args.failOnExpired && expired.length > 0) {
+    console.error("FAIL: expired allowlist entries — refresh or remove them:");
+    for (const e of expired) console.error(`  - ${e.section}[${e.id}] expired ${e.expires_on}`);
+    writeSuppressionArtifacts({
+      mode: "expired",
+      suppressed: [],
+      allowlistSource: allowlist._source,
+      expired,
+      notes: ["Refused to run URL inspection because the allowlist has expired entries."],
+    });
+    process.exit(3);
   }
 
   const creds = loadGscCredentials();
@@ -113,19 +282,21 @@ async function main() {
       missing: creds.missing,
       generated_at: new Date().toISOString(),
     };
-    writeFileSync(resolve(ARTIFACT_DIR, "gsc-url-inspection.json"), JSON.stringify(skipPayload, null, 2));
-    writeFileSync(
-      resolve(ARTIFACT_DIR, "gsc-url-inspection.md"),
+    writeArtifact("gsc-url-inspection.json", JSON.stringify(skipPayload, null, 2));
+    writeArtifact(
+      "gsc-url-inspection.md",
       `# GSC URL Inspection Report\n\nSkipped: GSC OAuth is not configured.\n\nMissing: ${creds.missing.join(", ")}\n`,
     );
+    writeSuppressionArtifacts({
+      mode: "skipped-no-oauth",
+      suppressed: [],
+      allowlistSource: allowlist._source,
+      expired,
+      notes: ["GSC OAuth not configured — no live inspection performed."],
+    });
     console.log("GSC OAuth not configured — skipping (missing: " + creds.missing.join(", ") + ")");
     process.exit(0);
   }
-
-  let urls = args.urls;
-  if (!urls && args.sitemap) urls = await urlsFromSitemap(args.sitemap);
-  if (!urls || urls.length === 0) urls = DEFAULT_URLS;
-  urls = urls.slice(0, args.max);
 
   const adhocAllow = new Set(args.allow);
   const accessToken = await getAccessToken(creds);
@@ -136,7 +307,6 @@ async function main() {
       const summary = summarizeInspection(url, raw);
       const trackedNoindex = isExpectedNoindex(url, allowlist);
       const isNever = isNeverAllowlisted(url, allowlist);
-      // never_allowlist URLs ignore --expected-noindex / tracked noindex.
       const expectedIndexable = isNever
         ? true
         : !(args.expectedNoindex || adhocAllow.has(url) || trackedNoindex);
@@ -166,8 +336,15 @@ async function main() {
     allowlist_source: allowlist._source,
     results,
   };
-  writeFileSync(resolve(ARTIFACT_DIR, "gsc-url-inspection.json"), JSON.stringify(payload, null, 2));
-  writeFileSync(resolve(ARTIFACT_DIR, "gsc-url-inspection.md"), toMarkdown(results, allowlist._source));
+  writeArtifact("gsc-url-inspection.json", JSON.stringify(payload, null, 2));
+  writeArtifact("gsc-url-inspection.md", toInspectionMarkdown(results, allowlist._source));
+  writeSuppressionArtifacts({
+    mode: "live",
+    suppressed,
+    allowlistSource: allowlist._source,
+    expired,
+    notes: [],
+  });
   console.log(
     `Inspected ${results.length} URL(s); ${failing.length} critical, ${suppressed.length} suppressed by allowlist.`,
   );

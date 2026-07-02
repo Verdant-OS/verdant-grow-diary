@@ -41,6 +41,7 @@ import {
 } from "./seoDiff.mjs";
 
 const ARTIFACT_DIR = resolve(process.cwd(), "artifacts/seo");
+const DEFAULT_PREVIOUS_DIR = resolve(process.cwd(), "artifacts/seo/previous");
 const DEFAULT_URLS = [
   "https://verdantgrowdiary.com/",
   "https://verdantgrowdiary.com/welcome",
@@ -48,6 +49,26 @@ const DEFAULT_URLS = [
   "https://verdantgrowdiary.com/hardware-integrations",
 ];
 const HARD_CAP = 50;
+
+// List of stable artifact paths that both the JSON summary and the
+// markdown summary point at. Keeping these in one place means the
+// operator always has a predictable index of what a run produced.
+const STABLE_ARTIFACTS = [
+  { key: "job_summary_md", path: "artifacts/seo/seo-job-summary.md" },
+  { key: "job_summary_json", path: "artifacts/seo/seo-job-summary.json" },
+  { key: "suppressions_json", path: "artifacts/seo/seo-allowlist-suppressions.json" },
+  { key: "suppressions_md", path: "artifacts/seo/seo-allowlist-suppressions.md" },
+  { key: "suppressions_diff_json", path: "artifacts/seo/seo-allowlist-suppressions-diff.json" },
+  { key: "suppressions_diff_md", path: "artifacts/seo/seo-allowlist-suppressions-diff.md" },
+  { key: "dry_run_json", path: "artifacts/seo/seo-allowlist-dry-run.json" },
+  { key: "dry_run_md", path: "artifacts/seo/seo-allowlist-dry-run.md" },
+  { key: "expired_json", path: "artifacts/seo/seo-allowlist-expired.json" },
+  { key: "expired_md", path: "artifacts/seo/seo-allowlist-expired.md" },
+  { key: "url_inspection_json", path: "artifacts/seo/gsc-url-inspection.json" },
+  { key: "url_inspection_md", path: "artifacts/seo/gsc-url-inspection.md" },
+  { key: "last_finding_json", path: "artifacts/seo/gsc-last-finding-verification.json" },
+  { key: "last_finding_md", path: "artifacts/seo/gsc-last-finding-verification.md" },
+];
 
 function parseArgs(argv) {
   const out = {

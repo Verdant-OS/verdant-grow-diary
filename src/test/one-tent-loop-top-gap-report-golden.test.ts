@@ -415,7 +415,8 @@ describe("buildOneTentLoopTopGapTextBlock — golden sanitized output", () => {
     assertNoUnsafeWording(text);
   });
 
-
+  it("resolved / no-blocking-gap → exact expected text and safety fences", () => {
+    const text = goldenFor(baseRows());
 
     const expected = [
       "Top real-data gap:",

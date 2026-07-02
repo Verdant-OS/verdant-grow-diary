@@ -14,7 +14,7 @@
  *  - workflow uploads only the documented artifact paths via pinned SHA
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -363,7 +363,7 @@ describe("runFastPath — redaction audit + --json + --save-artifacts", () => {
 
   it("--save-artifacts writes only under tmp/ecowitt-fast-path/ and never leaks secrets", async () => {
     tmpRoot = mkdtempSync(join(tmpdir(), "ecowitt-fp-"));
-    require("node:fs").writeFileSync(join(tmpRoot, "package.json"), "{}");
+    writeFileSync(join(tmpRoot, "package.json"), "{}");
     const res = await runFastPath(
       {
         verbose: true,
@@ -400,7 +400,7 @@ describe("runFastPath — redaction audit + --json + --save-artifacts", () => {
 
   it("--json --save-artifacts still writes artifacts and emits no stdout/stderr prose", async () => {
     tmpRoot = mkdtempSync(join(tmpdir(), "ecowitt-fp-"));
-    require("node:fs").writeFileSync(join(tmpRoot, "package.json"), "{}");
+    writeFileSync(join(tmpRoot, "package.json"), "{}");
     const logs: string[] = [];
     const errs: string[] = [];
     const res = await runFastPath(
@@ -424,7 +424,7 @@ describe("runFastPath — redaction audit + --json + --save-artifacts", () => {
 
   it("refuses to save artifacts outside tmp/ecowitt-fast-path/", async () => {
     tmpRoot = mkdtempSync(join(tmpdir(), "ecowitt-fp-"));
-    require("node:fs").writeFileSync(join(tmpRoot, "package.json"), "{}");
+    writeFileSync(join(tmpRoot, "package.json"), "{}");
     const res = await runFastPath(
       {
         saveArtifacts: true,

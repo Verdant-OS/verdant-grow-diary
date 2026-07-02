@@ -100,11 +100,13 @@ function safePage(raw: string | null): number {
   return n;
 }
 
+/* eslint-disable no-control-regex -- safeQuery deliberately matches C0 control chars + DEL to strip them from the query string */
 function safeQuery(raw: string | null): string {
   if (typeof raw !== "string") return "";
   const trimmed = raw.replace(/[\u0000-\u001F\u007F]/g, "").slice(0, ACTION_QUEUE_URL_QUERY_MAX_LEN);
   return trimmed;
 }
+/* eslint-enable no-control-regex */
 
 /**
  * Parse a URLSearchParams-like instance into the deterministic

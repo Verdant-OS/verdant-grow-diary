@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Deno
-        uses: denoland/setup-deno@v1
+        uses: denoland/setup-deno@11b63cf76cfcafb4e43f97b6cad24d8e8438f62d # v1
         with:
           deno-version: v1.x
 
@@ -45,11 +45,10 @@ jobs:
 
       - name: Upload Deno test log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: sensor-ingest-webhook-deno-log
           path: deno-edge-tests.log
           # Only the test log is uploaded — never dotfiles, raw JSONL listener
           # output, or local logs.
           if-no-files-found: ignore
-

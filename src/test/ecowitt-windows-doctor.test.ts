@@ -9,7 +9,7 @@
  *  - writeLaunchers refuses paths outside tmp/ecowitt-windows/
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -213,7 +213,7 @@ describe("writeLaunchers — checksum-based summary", () => {
     const out = resolve(tmp, "tmp/ecowitt-windows");
     writeLaunchers(out, tmp);
     const target = join(out, "02-start-http-bridge.cmd");
-    require("node:fs").writeFileSync(target, "modified content\r\n", "utf8");
+    writeFileSync(target, "modified content\r\n", "utf8");
     const b = writeLaunchers(out, tmp);
     expect(b.updated).toBe(1);
     expect(b.created).toBe(0);

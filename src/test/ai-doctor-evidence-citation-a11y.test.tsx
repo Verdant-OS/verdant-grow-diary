@@ -321,7 +321,7 @@ describe("buildAiDoctorEvidenceCsv", () => {
     });
     expect(csv.contents).not.toMatch(/service_role/i);
     expect(csv.contents).not.toMatch(/user_id/i);
-    expect(csv.contents).not.toMatch(/eyJ[A-Za-z0-9_\-]{6,}\./);
+    expect(csv.contents).not.toMatch(/eyJ[A-Za-z0-9_-]{6,}\./);
     expect(csv.contents).not.toMatch(
       /00000000-0000-0000-0000-000000000000/,
     );

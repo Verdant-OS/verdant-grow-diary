@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const DOC_PATH = resolve(
@@ -96,7 +96,6 @@ describe("billing level two migration apply order manifest (docs/static-only)", 
   });
 
   it("only uses 'no migration file found' lines for groups with no repo match", () => {
-    const { readdirSync } = require("node:fs") as typeof import("node:fs");
     const migrationsDir = resolve(__dirname, "..", "..", "supabase", "migrations");
     const files = existsSync(migrationsDir) ? readdirSync(migrationsDir) : [];
 

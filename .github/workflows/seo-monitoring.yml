@@ -98,6 +98,7 @@ jobs:
           name: seo-monitoring-reports
           path: |
             artifacts/seo/**
+            !artifacts/seo/previous/**
             !artifacts/seo/**/*.env
             !artifacts/seo/**/*token*
             !artifacts/seo/**/*secret*

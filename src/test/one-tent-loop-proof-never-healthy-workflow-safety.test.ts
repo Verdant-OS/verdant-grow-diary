@@ -105,12 +105,18 @@ describe("one-tent-loop-proof-never-healthy.yml — failure artifact safeguard",
   it("never uploads .env / service_role / bridge_token / raw_payload / access_token / api_key paths", () => {
     // Extract only the artifact-upload blocks so we don't false-positive
     // on documentation comments. We scan any block that starts with
-    // `upload-artifact` up to the next step boundary.
+    // `upload-artifact` up to the next step boundary, and strip YAML
+    // comments (lines starting with `#` or trailing `# ...`) so safety
+    // notes that mention `.env`/`service_role`/etc. don't false-fail.
     const uploadBlocks = yaml.match(
       /upload-artifact[\s\S]*?(?=(?:\n\s{6}-\s|\Z))/g,
     ) ?? [];
     expect(uploadBlocks.length, "no upload-artifact steps found").toBeGreaterThan(0);
-    for (const block of uploadBlocks) {
+    for (const rawBlock of uploadBlocks) {
+      const block = rawBlock
+        .split("\n")
+        .map((l) => l.replace(/#.*$/, ""))
+        .join("\n");
       for (const re of FORBIDDEN_ARTIFACT_FRAGMENTS) {
         expect(
           re.test(block),

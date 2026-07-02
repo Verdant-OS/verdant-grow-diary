@@ -128,7 +128,7 @@
     "test:e2e:one-tent-loop-proof-never-healthy:ci": "playwright test e2e/one-tent-loop-proof-never-healthy.spec.ts --project=chromium-mocked --reporter=list,html",
     "test:e2e:one-tent-loop-proof-never-healthy:headed": "playwright test e2e/one-tent-loop-proof-never-healthy.spec.ts --project=chromium-mocked --headed",
     "test:e2e:one-tent-loop-proof-never-healthy:debug": "playwright test e2e/one-tent-loop-proof-never-healthy.spec.ts --project=chromium-mocked --ui",
-    "test:e2e:one-tent-loop-proof-never-healthy:dev": "playwright test e2e/one-tent-loop-proof-never-healthy.spec.ts --project=chromium-mocked --reporter=list",
+    "test:e2e:one-tent-loop-proof-never-healthy:dev": "playwright test e2e/one-tent-loop-proof-never-healthy.spec.ts --project=chromium-mocked --reporter=list,html --trace=retain-on-failure --screenshot=only-on-failure --video=retain-on-failure",
     "test:one-tent-loop-proof-never-healthy": "vitest run src/test/one-tent-loop-proof-rules.test.ts src/test/one-tent-loop-proof-telemetry-fuzz.test.ts src/test/one-tent-loop-proof-evidence-ref-safety.test.ts",
     "artifact:one-tent-loop-proof-never-healthy": "node scripts/write-one-tent-loop-proof-never-healthy-artifact.mjs",
     "check:one-tent-loop-proof-never-healthy": "bun run typecheck && bun run test:one-tent-loop-proof-never-healthy && bun run artifact:one-tent-loop-proof-never-healthy && bun run test:e2e:one-tent-loop-proof-never-healthy",

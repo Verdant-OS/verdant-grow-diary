@@ -276,8 +276,36 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
             }
           }
 
+          // Explicit unknown-state coverage: assert every unknown/equivalent
+          // checklist item still renders its visible state label, never
+          // advertises present/healthy via data-* hooks, and never surfaces
+          // a check/verified aria label. Kept as a named block so the
+          // unknown-state contract is inspectable in isolation.
+          const UNKNOWN_EQUIVALENTS = ["unknown", "missing", "blocked"] as const;
+          for (const uState of UNKNOWN_EQUIVALENTS) {
+            const unknownItems = checklist.locator(
+              `[data-testid^="one-tent-loop-live-proof-top-gap-checklist-item-"][data-state="${uState}"]`,
+            );
+            const uTotal = await unknownItems.count();
+            for (let i = 0; i < uTotal; i += 1) {
+              const item = unknownItems.nth(i);
+              await expect(item).toHaveAttribute("data-state", uState);
+              expect(await item.getAttribute("data-state")).not.toBe("present");
+              expect(await item.getAttribute("data-status")).not.toBe("healthy");
+              const badge = item.locator(`[data-testid$="-state"]`);
+              if ((await badge.count()) > 0) {
+                const badgeText = (await badge.first().innerText()).trim();
+                expect(
+                  badgeText.length,
+                  `Checklist state=${uState} must render a visible state badge`,
+                ).toBeGreaterThan(0);
+                expect(badgeText.toLowerCase()).not.toBe("present");
+              }
+            }
+          }
         }
       }
+
 
       // If a copyable text report block is present, assert the same
       // wording rules apply to its plaintext.

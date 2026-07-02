@@ -100,12 +100,20 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-      - name: Upload Playwright test-results (traces / screenshots / videos)
+      - name: Upload Playwright test-results (traces / screenshots / videos / logs)
         if: ${{ failure() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: one-tent-loop-proof-never-healthy-failure-artifacts
+          # Bundle every debug signal we have on failure so a regression
+          # can be inspected without re-running the browser: sanitized
+          # proof text, Playwright HTML report, traces, screenshots,
+          # videos, and logs. Secrets, .env values, service_role keys,
+          # bridge tokens, and raw payloads are never written to any of
+          # these paths by our scripts or Playwright config.
           path: |
+            artifacts/one-tent-loop-proof/never-healthy-proof-report.txt
+            playwright-report/**
             test-results/**/*.png
             test-results/**/*.webm
             test-results/**/*.zip
@@ -113,6 +121,7 @@ jobs:
             test-results/**/*.log
           retention-days: 7
           if-no-files-found: ignore
+
 
       - name: Upload sanitized proof artifact
         if: ${{ always() }}

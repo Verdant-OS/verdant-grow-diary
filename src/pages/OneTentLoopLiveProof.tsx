@@ -29,7 +29,12 @@ import {
   buildOneTentLoopLiveProofTextReport,
   type LiveProofView,
 } from "@/lib/oneTentLoopLiveProofViewModel";
-import type { OneTentLoopGap } from "@/lib/oneTentLoopGapResolver";
+import type {
+  OneTentLoopGap,
+  OneTentLoopGapEvidenceChecklistItem,
+  OneTentLoopGapEvidenceState,
+} from "@/lib/oneTentLoopGapResolver";
+
 import type {
   ActionQueueEvidence,
   AiDoctorEvidence,
@@ -340,9 +345,88 @@ function TopGapPanel({ gap }: { gap: OneTentLoopGap }) {
       >
         Safety note: {gap.safety_note}
       </p>
+
+      {isResolved || gap.evidence_checklist.length === 0 ? null : (
+        <EvidenceChecklist items={gap.evidence_checklist} />
+      )}
     </section>
   );
 }
+
+const CHECKLIST_STATE_LABEL: Record<OneTentLoopGapEvidenceState, string> = {
+  present: "Present",
+  missing: "Missing",
+  weak: "Weak",
+  stale: "Stale",
+  invalid: "Invalid",
+  demo_only: "Demo only",
+  unknown: "Unknown",
+  blocked: "Blocked",
+};
+
+function checklistStateToneClass(state: OneTentLoopGapEvidenceState): string {
+  // Never green/success for weak or worse states.
+  switch (state) {
+    case "present":
+      return "bg-muted text-foreground border-border";
+    case "invalid":
+    case "blocked":
+      return "bg-destructive/10 text-destructive border-destructive/40";
+    default:
+      return "bg-muted text-muted-foreground border-border";
+  }
+}
+
+function EvidenceChecklist({
+  items,
+}: {
+  items: readonly OneTentLoopGapEvidenceChecklistItem[];
+}) {
+  return (
+    <div
+      data-testid="one-tent-loop-live-proof-top-gap-checklist"
+      className="space-y-2"
+      aria-label="Evidence checklist for this gap"
+    >
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Evidence checklist for this gap
+      </p>
+      <ul className="space-y-2">
+        {items.map((it) => (
+          <li
+            key={it.step_key}
+            data-testid={`one-tent-loop-live-proof-top-gap-checklist-item-${it.step_key}`}
+            data-state={it.state}
+            className="space-y-1 rounded-md border border-border bg-muted/30 p-2 text-xs"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-foreground">
+                {it.label}
+              </span>
+              <span
+                data-testid={`one-tent-loop-live-proof-top-gap-checklist-item-${it.step_key}-state`}
+                className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${checklistStateToneClass(it.state)}`}
+              >
+                {CHECKLIST_STATE_LABEL[it.state]}
+              </span>
+              {it.source_label ? (
+                <SourceBadge
+                  source={it.source_label}
+                  testId={`one-tent-loop-live-proof-top-gap-checklist-item-${it.step_key}-source`}
+                />
+              ) : null}
+              {it.provenance ? (
+                <ProvenanceBadge provenance={it.provenance} />
+              ) : null}
+            </div>
+            <p className="text-muted-foreground">{it.why_it_matters}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 
 function StepCard({ step }: { step: LoopStepRow }) {
   return (

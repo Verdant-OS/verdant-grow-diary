@@ -42,6 +42,7 @@ export const ACTIONS_RETURN_VALUE_MAX_LEN = 80;
 export const ACTIONS_RETURN_PATH_MAX_LEN = 512;
 
 function sanitizeValue(raw: string): string {
+  // eslint-disable-next-line no-control-regex -- deliberately strip C0 control chars + DEL from untrusted param values
   return raw.replace(/[\u0000-\u001F\u007F]/g, "").slice(
     0,
     ACTIONS_RETURN_VALUE_MAX_LEN,
@@ -84,6 +85,7 @@ export function isSafeActionsReturnPath(
   if (candidate.length === 0) return false;
   if (candidate.length > ACTIONS_RETURN_PATH_MAX_LEN) return false;
   // Reject control chars early.
+  // eslint-disable-next-line no-control-regex -- deliberately match C0 control chars + DEL to reject them
   if (/[\u0000-\u001F\u007F]/.test(candidate)) return false;
   // Must be a relative path beginning with `/actions` followed by `?`,
   // `#`, end-of-string, or `/` boundary.

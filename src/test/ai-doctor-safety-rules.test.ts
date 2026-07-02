@@ -185,7 +185,7 @@ describe("applyAiDoctorSafetyRules", () => {
     draft.action_queue_suggestion = {
       // @ts-expect-error — intentionally test that exec values get normalized
       action_type: "execute_device_command",
-      // @ts-expect-error
+      // @ts-expect-error -- intentionally supply an executed status to prove it gets normalized
       status: "auto_executed",
       reason: "x",
       risk_level: "high",

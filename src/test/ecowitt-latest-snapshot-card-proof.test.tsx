@@ -11,6 +11,8 @@
  *
  * Read-only. No writes, no automation, no device control.
  */
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -213,8 +215,6 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
 // ---------------------------------------------------------------------------
 describe("EcowittLatestSnapshotCard — source code safety", () => {
   it("component source does not reference action_queue", () => {
-    const fs = require("node:fs");
-    const path = require("node:path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/EcowittLatestSnapshotCard.tsx"),
       "utf8",
@@ -227,8 +227,6 @@ describe("EcowittLatestSnapshotCard — source code safety", () => {
   });
 
   it("component source does not call ingest or write endpoints", () => {
-    const fs = require("node:fs");
-    const path = require("node:path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/EcowittLatestSnapshotCard.tsx"),
       "utf8",
@@ -240,8 +238,6 @@ describe("EcowittLatestSnapshotCard — source code safety", () => {
   });
 
   it("hook source does not reference action_queue or ingest writes", () => {
-    const fs = require("node:fs");
-    const path = require("node:path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../hooks/useEcowittLatestSnapshot.ts"),
       "utf8",

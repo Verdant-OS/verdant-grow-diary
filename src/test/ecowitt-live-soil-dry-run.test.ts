@@ -4,6 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { resolve } from "node:path";
 import { runEcowittDryRun } from "../../scripts/ecowitt-live-soil-dry-run";
 
@@ -208,7 +209,6 @@ describe("ecowitt-live-soil dry-run script safety", () => {
 
 describe("ecowitt-live-soil dry-run CLI canonical source labeling", () => {
   it("CLI JSON output shows canonical source='live' for accepted readings (never 'ecowitt')", () => {
-    const { execSync } = require("node:child_process") as typeof import("node:child_process");
     const TENT_UUID = "11111111-1111-1111-1111-111111111111";
     const stdout = execSync(
       `bun run scripts/ecowitt-live-soil-dry-run.ts --fixture fixtures/ecowitt-live-soil-sample.json --dry-run`,

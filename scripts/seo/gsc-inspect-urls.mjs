@@ -420,6 +420,17 @@ async function main() {
       expired,
       notes: ["Refused to run URL inspection because the allowlist has expired entries."],
     });
+    writeJobSummary(
+      buildJobSummary({
+        mode: "live-blocked-expired",
+        status: "FAIL",
+        allowlistSource: allowlist._source,
+        urls,
+        simulated: null,
+        expired,
+        notes: ["Live inspection blocked: allowlist has expired entries."],
+      }),
+    );
     process.exit(3);
   }
 
@@ -443,6 +454,17 @@ async function main() {
       expired,
       notes: ["GSC OAuth not configured — no live inspection performed."],
     });
+    writeJobSummary(
+      buildJobSummary({
+        mode: "live-skipped",
+        status: "SKIPPED",
+        allowlistSource: allowlist._source,
+        urls,
+        simulated: null,
+        expired,
+        notes: ["GSC OAuth not configured — live inspection skipped. Missing env vars are logged but not shown here."],
+      }),
+    );
     console.log("GSC OAuth not configured — skipping (missing: " + creds.missing.join(", ") + ")");
     process.exit(0);
   }
@@ -494,6 +516,19 @@ async function main() {
     expired,
     notes: [],
   });
+  writeJobSummary(
+    buildJobSummary({
+      mode: "live",
+      status: failing.length ? "FAIL" : expired.length > 0 ? "WARN" : "PASS",
+      allowlistSource: allowlist._source,
+      urls,
+      simulated: null,
+      expired,
+      suppressed: suppressed.length,
+      failing: failing.length,
+      notes: [],
+    }),
+  );
   console.log(
     `Inspected ${results.length} URL(s); ${failing.length} critical, ${suppressed.length} suppressed by allowlist.`,
   );

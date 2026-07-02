@@ -354,8 +354,68 @@ describe("buildOneTentLoopTopGapTextBlock — golden sanitized output", () => {
     assertNoUnsafeWording(text);
   });
 
-  it("resolved / no-blocking-gap → exact expected text and safety fences", () => {
-    const text = goldenFor(baseRows());
+  // The `unknown` checklist state fires when a step in CHECKLIST_STEP_ORDER
+  // has no corresponding LoopStepRow — i.e. the view model was unable to
+  // evaluate that step at all. This is distinct from "missing evidence"
+  // (rendered as [missing]) or "blocked by upstream" (rendered as
+  // [blocked]). The label falls back to the raw step id when no row is
+  // present; we assert that verbatim so the UI/text stay aligned with the
+  // view model and the honest uncertainty is preserved.
+  it("unknown checklist state (missing row) → exact expected text and safety fences", () => {
+    // Omit the alert row entirely; keep the sensor-snapshot stale so a
+    // real gap still resolves and the checklist renders. Alert must
+    // surface as `[unknown]` because there is no row to evaluate it.
+    const alertOmittedRows: LoopStepRow[] = STEP_LABELS.filter(
+      ([id]) => id !== "alert",
+    ).map(([id, label]) => mkRow(id, label, "passed", { provenance: "direct" }));
+    const sensor = alertOmittedRows.find((r) => r.id === "sensor-snapshot");
+    if (!sensor) throw new Error("missing sensor row");
+    sensor.status = "stale";
+    sensor.source = "live";
+    const text = goldenFor(alertOmittedRows);
+
+    const expected = [
+      "Top real-data gap:",
+      "- Step: sensor-snapshot",
+      "- Title: Sensor Snapshot — stale reading",
+      "- Status: stale",
+      "- Priority: 5.75",
+      "- Evidence kind: stale",
+      "- Source label: live",
+      "- Why it matters: The latest reading is too old to be trusted as current sensor truth for the loop.",
+      "- Where to resolve: Open the Sensors page for this tent and confirm a fresh, source-labeled reading.",
+      "- Suggested next observation: Look for a fresher reading with an explicit source label and captured_at timestamp.",
+      "- Safety note: Read-only view. Stale telemetry must never be shown as current sensor truth.",
+      "- Real data gap: yes",
+      "- Blocked / weakened downstream:",
+      "    - ai-doctor",
+      "    - alert",
+      "    - action-queue",
+      "    - follow-up",
+      "- Evidence checklist for this gap:",
+      "    - Grow [present] — The grow anchors every downstream loop step. Without it, no scope exists.",
+      "    - Tent [present] — The tent scopes environment targets and sensor snapshots for this grow.",
+      "    - Plant [present] — The plant scopes Quick Log entries, AI Doctor context, and follow-up.",
+      "    - Quick Log [present] — Quick Log is plant memory; the loop cannot be proven without recent entries.",
+      "    - Timeline [present] — Timeline linkage confirms Quick Log became persistent plant memory.",
+      "    - Sensor Snapshot [stale] · source=live — Sensor snapshot is the truth signal that AI Doctor and Alerts read from.",
+      "    - AI Doctor [weak] — AI Doctor reasoning depends on real sensor and log evidence, not guesses.",
+      "    - alert [unknown] — Alerts turn sensor truth into a persisted, reviewable signal.",
+      "    - Action Queue [weak] — Action Queue items must stay approval-required. No device command.",
+    ].join("\n");
+
+    expect(text).toBe(expected);
+    // Explicit unknown-state fences: the honest bracketed state must be
+    // preserved and must never be silently rewritten to a present/healthy
+    // label. The label falls back to the raw step id when the row is
+    // absent — assert that too so any drift is caught.
+    expect(text).toContain("[unknown]");
+    expect(text).not.toMatch(/alert \[present\]/i);
+    assertNoSecrets(text);
+    assertNoUnsafeWording(text);
+  });
+
+
 
     const expected = [
       "Top real-data gap:",

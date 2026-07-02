@@ -33,6 +33,12 @@ import {
   simulateAllowlistForUrls,
   DEFAULT_ALLOWLIST_PATH,
 } from "./seoAllowlist.mjs";
+import {
+  readPreviousSuppressions,
+  diffSuppressions,
+  renderSuppressionDiffMarkdown,
+  renderCompactSuppressionTable,
+} from "./seoDiff.mjs";
 
 const ARTIFACT_DIR = resolve(process.cwd(), "artifacts/seo");
 const DEFAULT_URLS = [

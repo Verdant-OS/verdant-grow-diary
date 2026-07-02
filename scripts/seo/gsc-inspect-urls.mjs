@@ -222,15 +222,16 @@ function writeSuppressionArtifacts({ mode, suppressed, allowlistSource, expired,
     if (!bySource.has(key)) bySource.set(key, []);
     bySource.get(key).push(s);
   }
+  const bySourceObj = Object.fromEntries(
+    [...bySource].map(([k, v]) => [k, v.map(({ code, message }) => ({ code, message }))]),
+  );
   const json = {
     mode,
     generated_at: new Date().toISOString(),
     allowlist_source: allowlistSource,
     suppressed_issue_count: suppressed.length,
     expired_entry_count: expired.length,
-    suppressed_by_source: Object.fromEntries(
-      [...bySource].map(([k, v]) => [k, v.map(({ code, message }) => ({ code, message }))]),
-    ),
+    suppressed_by_source: bySourceObj,
     expired_entries: expired,
     notes,
   };
@@ -243,6 +244,9 @@ function writeSuppressionArtifacts({ mode, suppressed, allowlistSource, expired,
     `Allowlist: ${allowlistSource ? "`" + allowlistSource + "`" : "(none)"}`,
     `Suppressed issues: ${suppressed.length}`,
     `Expired entries: ${expired.length}`,
+    "",
+    "## Compact summary",
+    renderCompactSuppressionTable(bySourceObj),
     "",
   ];
   if (notes.length) {
@@ -263,6 +267,26 @@ function writeSuppressionArtifacts({ mode, suppressed, allowlistSource, expired,
         `- \`${e.section}[${e.id}]\` expired on ${e.expires_on} — patterns: ${(e.url_patterns ?? []).join(", ")}`,
       );
   writeArtifact("seo-allowlist-suppressions.md", md.join("\n") + "\n");
+  return json;
+}
+
+function writeSuppressionDiffArtifacts({ previousDir, currentPayload }) {
+  const prevPath = previousDir ? resolve(previousDir, "seo-allowlist-suppressions.json") : null;
+  const prev = readPreviousSuppressions(prevPath);
+  const diff = diffSuppressions(prev, currentPayload);
+  const json = {
+    generated_at: new Date().toISOString(),
+    previous_source: prevPath,
+    previous_available: diff.previous_available,
+    previous_generated_at: diff.previous_generated_at,
+    current_generated_at: diff.current_generated_at,
+    added: diff.added,
+    removed: diff.removed,
+    unchanged_count: diff.unchanged.length,
+  };
+  writeArtifact("seo-allowlist-suppressions-diff.json", JSON.stringify(json, null, 2));
+  writeArtifact("seo-allowlist-suppressions-diff.md", renderSuppressionDiffMarkdown(diff));
+  return diff;
 }
 
 function writeDryRunArtifacts({ simulated, allowlistSource, expired }) {

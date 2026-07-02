@@ -19,6 +19,7 @@
  *   --no-fail-on-expired    Do not fail when allowlist entries are expired
  *   --list-expired-entries  Print expired allowlist entries and exit (no GSC calls)
  *   --now <iso>             Override "now" for deterministic tests
+ */
 import { mkdirSync, writeFileSync, appendFileSync, readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { loadGscCredentials, getAccessToken, inspectUrl, summarizeInspection, classifyIssues } from "./gscClient.mjs";

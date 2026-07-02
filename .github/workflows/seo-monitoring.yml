@@ -49,7 +49,7 @@ jobs:
       - name: Prepare artifact directory
         run: mkdir -p artifacts/seo
       - name: Validate SEO allowlist config
-        run: node --test scripts/test-seo-allowlist.mjs scripts/test-seo-allowlist-config.mjs scripts/test-seo-allowlist-expiration.mjs
+        run: node --test scripts/test-seo-allowlist.mjs scripts/test-seo-allowlist-config.mjs scripts/test-seo-allowlist-expiration.mjs scripts/test-seo-allowlist-diagnostics.mjs scripts/test-seo-job-summary.mjs
       - name: SEO allowlist — list expired entries
         run: node scripts/seo/gsc-inspect-urls.mjs --list-expired-entries --allowlist config/seo-allowlist.json
       - name: SEO allowlist dry-run (no GSC calls; fails on expired entries)

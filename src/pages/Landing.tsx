@@ -1,5 +1,12 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { useAuth } from "@/store/auth";
 import BrandLogo from "@/components/BrandLogo";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
@@ -11,6 +18,14 @@ import {
   VERDANT_TRUST,
   VERDANT_LOOP,
 } from "@/constants/verdantPositioningCopy";
+import {
+  VERDANT_SEO_LANDING_SECTIONS,
+  VERDANT_LANDING_FAQ,
+} from "@/constants/verdantSeoCopy";
+import {
+  buildFaqPageJsonLd,
+  safeJsonLdStringify,
+} from "@/lib/seoStructuredData";
 
 /**
  * Public landing page for https://verdantgrowdiary.com.

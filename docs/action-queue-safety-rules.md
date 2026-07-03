@@ -53,3 +53,20 @@ There is no automatic transition from suggested → approved → executed.
 
 - Use: **"read-only, no-write, no-control architecture"**.
 - Do not use: **"zero liability"**.
+
+## Forbidden language (examples only)
+
+The following phrases must never appear in public or user-facing product
+copy as promises or descriptions of Verdant's behavior:
+
+- "autopilot"
+- "fully automated grow control"
+- "AI controls your equipment"
+- "automatic device control"
+- "autonomous device control"
+- "hands-free grow control"
+- "set-and-forget automation"
+
+These terms are listed here **only as forbidden examples** — this section
+(and denylists in safety scanners/tests) is the only place they may appear.
+Verdant suggests; the grower decides and acts.

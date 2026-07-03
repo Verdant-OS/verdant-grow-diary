@@ -34,6 +34,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
+import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -87,6 +88,9 @@ export default function Pricing() {
       ["Do I need specific hardware?", "No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge."],
       ["Does Verdant control my equipment or grow for me?", "No. Verdant does not control fans, lights, pumps, heaters, or other equipment. AI insights are suggestions only, and every Action Queue item is grower-approved."],
       ["Can I cancel anytime?", "Yes. Pro Monthly and Pro Annual can be canceled at any time. Your grow history stays on your account with read-only access to your logs."],
+      ...VERDANT_PRICING_FAQ_ADDITIONS.map(
+        (entry) => [entry.question, entry.answer] as [string, string],
+      ),
     ];
     const faq = {
       "@context": "https://schema.org",
@@ -595,6 +599,19 @@ export default function Pricing() {
               charge is made from that page.
             </AccordionContent>
           </AccordionItem>
+
+          {VERDANT_PRICING_FAQ_ADDITIONS.map((entry, i) => (
+            <AccordionItem
+              key={entry.question}
+              value={`pricing-faq-grower-${i}`}
+              data-testid={`pricing-faq-grower-${i}`}
+            >
+              <AccordionTrigger>{entry.question}</AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                {entry.answer}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
         </Accordion>
       </section>
 

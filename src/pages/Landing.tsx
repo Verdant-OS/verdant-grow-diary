@@ -51,6 +51,23 @@ export default function Landing() {
     path: "/welcome",
   });
 
+  // FAQPage JSON-LD — must mirror the visible FAQ below (same source constant).
+  useEffect(() => {
+    const faq = buildFaqPageJsonLd({
+      pageUrl: "https://verdantgrowdiary.com/welcome",
+      questions: VERDANT_LANDING_FAQ,
+    });
+    const s = document.createElement("script");
+    s.type = "application/ld+json";
+    s.setAttribute("data-page-ldjson", "landing-faq");
+    s.text = safeJsonLdStringify(faq);
+    document.head.appendChild(s);
+    return () => {
+      s.remove();
+    };
+  }, []);
+
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">

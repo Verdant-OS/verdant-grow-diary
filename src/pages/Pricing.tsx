@@ -34,6 +34,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
+import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
 
 type BillingPeriod = "monthly" | "annual";
 

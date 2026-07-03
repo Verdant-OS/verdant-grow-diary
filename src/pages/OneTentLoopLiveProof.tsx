@@ -554,7 +554,11 @@ export default function OneTentLoopLiveProof(): JSX.Element {
   const tentsQ = useTents();
   const plantsQ = usePlants();
   const diaryQ = useDiaryEntries();
-  const alertsQ = useAlertsList({ growId: activeGrowId ?? undefined });
+  // Gated on a real grow scope, mirroring usePlantAssignedTentActions:
+  // without a grow (still loading, or an unauthenticated load about to
+  // redirect) this page must not fire /rest/v1/alerts at all — the
+  // never-healthy E2E spec forbids that request on this route.
+  const alertsQ = useAlertsList({ growId: activeGrowId ?? undefined }, { enabled: !!activeGrowId });
 
   // Derive scoped tent/plant.
   const grow = toGrowEvidence(activeGrow as AnyRow | null);

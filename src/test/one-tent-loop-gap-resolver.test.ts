@@ -16,7 +16,6 @@ import {
   type OneTentLoopGapEvidenceState,
 } from "@/lib/oneTentLoopGapResolver";
 
-
 const NOW_MS = Date.parse("2026-06-09T12:00:00.000Z");
 
 function baseEvidence(): LoopEvidence {
@@ -70,7 +69,7 @@ function baseEvidence(): LoopEvidence {
       id: "aq1",
       status: "pending_approval",
       approval_required: true,
-      has_device_command: false,
+      has_device_control_marker: false,
       reason: "review",
       risk_level: "low",
       linked_alert_id: null,
@@ -168,7 +167,7 @@ describe("resolveTopOneTentLoopGap", () => {
       id: "aq1",
       status: "auto_execute",
       approval_required: false,
-      has_device_command: true,
+      has_device_control_marker: true,
       reason: "should not run",
       risk_level: "high",
       linked_alert_id: null,
@@ -238,8 +237,6 @@ describe("resolveTopOneTentLoopGap", () => {
   });
 });
 
-
-
 const FORBIDDEN_DOWNSTREAM_WORDS = [
   "proven",
   "verified",
@@ -267,7 +264,6 @@ function assertNoUnsafeDownstreamWording(text: string): void {
     expect(new RegExp(w, "i").test(scrubbed)).toBe(false);
   }
 }
-
 
 interface WeakTelemetryCase {
   label: string;
@@ -477,9 +473,7 @@ describe("text-block report parity", () => {
     expect(text).toContain(`- Evidence kind: ${gap.evidence_kind}`);
     expect(text).toContain(`- Why it matters: ${gap.why_it_matters}`);
     expect(text).toContain(`- Where to resolve: ${gap.where_to_resolve}`);
-    expect(text).toContain(
-      `- Suggested next observation: ${gap.suggested_next_observation}`,
-    );
+    expect(text).toContain(`- Suggested next observation: ${gap.suggested_next_observation}`);
     expect(text).toContain(`- Safety note: ${gap.safety_note}`);
     for (const step of gap.blocked_downstream_steps) {
       expect(text).toContain(`    - ${step}`);
@@ -506,12 +500,9 @@ describe("text-block report parity", () => {
     const rows = evaluateLoop(ev);
     const gap = resolveTopOneTentLoopGap(rows);
     const text = buildOneTentLoopTopGapTextBlock(gap);
-    const sensorItem = gap.evidence_checklist.find(
-      (i) => i.step_key === "sensor-snapshot",
-    );
+    const sensorItem = gap.evidence_checklist.find((i) => i.step_key === "sensor-snapshot");
     if (sensorItem?.source_label) {
       expect(text).toContain(`source=${sensorItem.source_label}`);
     }
   });
 });
-

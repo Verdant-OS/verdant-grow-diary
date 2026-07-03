@@ -9,9 +9,9 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { VERDANT_HERO } from "@/constants/verdantPositioningCopy";
 
-const readSrc = (p: string) =>
-  readFileSync(resolve(__dirname, "..", p), "utf8");
+const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 
 const APP = readSrc("App.tsx");
 const LANDING = readSrc("pages/Landing.tsx");
@@ -28,9 +28,7 @@ describe("Demo page + route removal", () => {
     expect(APP).not.toMatch(/element=\{<Demo\s*\/>\}/);
   });
   it("/demo redirects to the public landing (no broken bookmark)", () => {
-    expect(APP).toMatch(
-      /path="\/demo"\s+element=\{<Navigate\s+to="\/welcome"\s+replace\s*\/>\}/,
-    );
+    expect(APP).toMatch(/path="\/demo"\s+element=\{<Navigate\s+to="\/welcome"\s+replace\s*\/>\}/);
   });
 });
 
@@ -44,14 +42,19 @@ describe("Landing has no demo CTAs", () => {
   it("does not render a 'Demo data' teaser badge", () => {
     expect(LANDING).not.toMatch(/Demo data/);
   });
-  it("retains real-grow CTAs (Create Free Account, Sign in)", () => {
-    expect(LANDING).toMatch(/Create Free Account/);
+  it("retains real-grow CTAs (Start Free, Sign in)", () => {
+    // Primary CTA copy is centralized in verdantPositioningCopy.ts and
+    // referenced from Landing.tsx rather than duplicated in JSX.
+    expect(LANDING).toMatch(/VERDANT_HERO/);
+    expect(VERDANT_HERO.primaryCtaLabel).toBe("Start Free");
     expect(LANDING).toMatch(/Sign in/);
   });
   it("retains the trust line", () => {
-    expect(LANDING).toMatch(/No blind automation/);
-    expect(LANDING).toMatch(/No fake live data/);
-    expect(LANDING).toMatch(/grower stays in control/i);
+    // Trust/safety copy is centralized in verdantPositioningCopy.ts.
+    expect(VERDANT_HERO.safetyLine).toMatch(/No blind automation/);
+    expect(VERDANT_HERO.safetyLine).toMatch(/No fake live data/);
+    expect(VERDANT_HERO.safetyLine).toMatch(/grower stays in control/i);
+    expect(LANDING).toMatch(/VERDANT_HERO/);
   });
 });
 

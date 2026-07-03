@@ -40,6 +40,7 @@ vi.mock("@/hooks/use-diary-entries", () => ({
 }));
 
 import LandingAuthedOnboardingBridge from "@/components/LandingAuthedOnboardingBridge";
+import { VERDANT_HERO } from "@/constants/verdantPositioningCopy";
 
 const ROOT = resolve(__dirname, "../..");
 const LANDING = readFileSync(resolve(ROOT, "src/pages/Landing.tsx"), "utf8");
@@ -71,9 +72,7 @@ describe("LandingAuthedOnboardingBridge — render", () => {
     const pill = screen.getByTestId("onboarding-progress-pill");
     expect(pill.getAttribute("data-complete-count")).toBe("0");
     expect(pill.getAttribute("data-total-count")).toBe("4");
-    expect(
-      screen.getByText(/Ready to build your real grow memory\?/i),
-    ).toBeTruthy();
+    expect(screen.getByText(/Ready to build your real grow memory\?/i)).toBeTruthy();
     const cta = screen.getByTestId("landing-authed-onboarding-bridge-cta");
     expect(cta).toHaveTextContent(/Continue setup in Dashboard/i);
     expect(cta.closest("a")?.getAttribute("href")).toBe("/");
@@ -87,8 +86,9 @@ describe("LandingAuthedOnboardingBridge — render", () => {
     const pill = screen.getByTestId("onboarding-progress-pill");
     expect(pill.getAttribute("data-complete-count")).toBe("3");
     expect(pill.getAttribute("data-activated")).toBe("false");
-    expect(screen.getByTestId("landing-authed-onboarding-bridge-cta"))
-      .toHaveTextContent(/Continue setup in Dashboard/i);
+    expect(screen.getByTestId("landing-authed-onboarding-bridge-cta")).toHaveTextContent(
+      /Continue setup in Dashboard/i,
+    );
   });
 
   it("shows Grow memory active + Open Dashboard when fully activated", () => {
@@ -119,21 +119,17 @@ describe("LandingAuthedOnboardingBridge — render", () => {
 
 describe("Landing wires the bridge for authenticated users only", () => {
   it("imports the bridge component", () => {
-    expect(LANDING).toMatch(
-      /from\s+["']@\/components\/LandingAuthedOnboardingBridge["']/,
-    );
+    expect(LANDING).toMatch(/from\s+["']@\/components\/LandingAuthedOnboardingBridge["']/);
   });
   it("renders the bridge gated on the authenticated user", () => {
-    expect(LANDING).toMatch(
-      /\{user\s*&&\s*<LandingAuthedOnboardingBridge\s*\/?>\s*\}/,
-    );
+    expect(LANDING).toMatch(/\{user\s*&&\s*<LandingAuthedOnboardingBridge\s*\/?>\s*\}/);
   });
   it("does not render the full OnboardingChecklistCard on /welcome", () => {
     expect(LANDING).not.toMatch(/OnboardingChecklistCard/);
   });
-  it("still exposes public CTAs (Create Free Account / Sign in)", () => {
+  it("still exposes public CTAs (Start Free / Sign in)", () => {
     expect(LANDING).not.toMatch(/Explore Demo/);
-    expect(LANDING).toMatch(/Create Free Account/);
+    expect(VERDANT_HERO.primaryCtaLabel).toBe("Start Free");
     expect(LANDING).toMatch(/Sign in/);
   });
 });

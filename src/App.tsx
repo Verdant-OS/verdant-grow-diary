@@ -65,6 +65,8 @@ const Landing = lazy(() => import("./pages/Landing"));
 // Demo page removed — Verdant is positioned around real grow data only.
 const HardwareIntegrations = lazy(() => import("./pages/HardwareIntegrations"));
 const Pricing = lazy(() => import("./pages/Pricing"));
+const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
+const GuidePage = lazy(() => import("./pages/GuidePage"));
 const BillingPlaceholder = lazy(() => import("./pages/BillingPlaceholder"));
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));
@@ -149,6 +151,8 @@ const App = () => (
                   <Route path="/demo" element={<Navigate to="/welcome" replace />} />
                   <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/guides" element={<GuidesIndex />} />
+                  <Route path="/guides/:slug" element={<GuidePage />} />
                   <Route path="/billing/:plan" element={<BillingPlaceholder />} />
                   {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
                       no operator chrome (header, Quick Log) renders. */}

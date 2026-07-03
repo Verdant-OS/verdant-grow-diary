@@ -17,12 +17,17 @@ import {
 } from "@/components/ui/accordion";
 import {
   findGuideBySlug,
+  VERDANT_CUSTOMER_GUIDE_PATH,
+  VERDANT_GUIDES_BREADCRUMB_ITEMS,
   VERDANT_SEO_GUIDES,
+  VERDANT_SITE_ORIGIN,
 } from "@/constants/verdantSeoContent";
 import {
+  buildBreadcrumbListJsonLd,
   buildFaqPageJsonLd,
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
+
 
 export default function GuidePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -39,19 +44,36 @@ export default function GuidePage() {
 
   useEffect(() => {
     if (!guide) return;
+    const guideUrl = `${VERDANT_SITE_ORIGIN}/guides/${guide.slug}`;
     const faq = buildFaqPageJsonLd({
-      pageUrl: `https://verdantgrowdiary.com/guides/${guide.slug}`,
+      pageUrl: guideUrl,
       questions: guide.faq,
     });
-    const s = document.createElement("script");
-    s.type = "application/ld+json";
-    s.setAttribute("data-page-ldjson", `guide-${guide.slug}-faq`);
-    s.text = safeJsonLdStringify(faq);
-    document.head.appendChild(s);
+    const crumbs = buildBreadcrumbListJsonLd({
+      items: [
+        ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
+        { name: guide.h1, url: guideUrl },
+      ],
+    });
+    const faqScript = document.createElement("script");
+    faqScript.type = "application/ld+json";
+    faqScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-faq`);
+    faqScript.text = safeJsonLdStringify(faq);
+    document.head.appendChild(faqScript);
+    const crumbScript = document.createElement("script");
+    crumbScript.type = "application/ld+json";
+    crumbScript.setAttribute(
+      "data-page-ldjson",
+      `guide-${guide.slug}-breadcrumb`,
+    );
+    crumbScript.text = safeJsonLdStringify(crumbs);
+    document.head.appendChild(crumbScript);
     return () => {
-      s.remove();
+      faqScript.remove();
+      crumbScript.remove();
     };
   }, [guide]);
+
 
   if (!guide) {
     return <Navigate to="/guides" replace />;
@@ -147,9 +169,18 @@ export default function GuidePage() {
                 to="/welcome"
                 className="underline hover:text-foreground text-muted-foreground"
               >
-                What Verdant does
+                See how Verdant works
               </Link>
             </li>
+            <li>
+              <Link
+                to={VERDANT_CUSTOMER_GUIDE_PATH}
+                className="underline hover:text-foreground text-muted-foreground"
+              >
+                Start with the Customer Guide
+              </Link>
+            </li>
+
             <li>
               <Link
                 to="/pricing"

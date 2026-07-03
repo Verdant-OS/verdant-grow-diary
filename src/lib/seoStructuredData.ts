@@ -103,6 +103,59 @@ export function buildSoftwareApplicationJsonLd({
   };
 }
 
+export interface BreadcrumbListItem {
+  readonly name: string;
+  /** Absolute production URL for this breadcrumb item. */
+  readonly url: string;
+}
+
+export interface BreadcrumbListJsonLd {
+  readonly "@context": "https://schema.org";
+  readonly "@type": "BreadcrumbList";
+  readonly itemListElement: ReadonlyArray<{
+    readonly "@type": "ListItem";
+    readonly position: number;
+    readonly name: string;
+    readonly item: string;
+  }>;
+}
+
+/**
+ * Build a schema.org BreadcrumbList JSON-LD document from an ordered list of
+ * visible breadcrumbs. Positions are 1-indexed and increment. Each item URL
+ * must be an absolute production URL — relative paths are rejected so the
+ * schema never emits ambiguous crawler hints.
+ */
+export function buildBreadcrumbListJsonLd({
+  items,
+}: {
+  items: ReadonlyArray<BreadcrumbListItem>;
+}): BreadcrumbListJsonLd {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error("buildBreadcrumbListJsonLd: items must be a non-empty array");
+  }
+  for (const it of items) {
+    if (!it.name || !it.name.trim()) {
+      throw new Error("buildBreadcrumbListJsonLd: every item must have a name");
+    }
+    if (!it.url || !/^https?:\/\//i.test(it.url)) {
+      throw new Error(
+        `buildBreadcrumbListJsonLd: item url must be absolute (got "${it.url}")`,
+      );
+    }
+  }
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((it, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: it.name,
+      item: it.url,
+    })),
+  };
+}
+
 /**
  * Stringify a JSON-LD payload for embedding in <script type="application/ld+json">.
  * Escapes the "</" sequence so a stray closing tag inside a string cannot break

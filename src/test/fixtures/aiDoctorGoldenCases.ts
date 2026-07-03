@@ -22,8 +22,7 @@ import type { CompilePlantContextFromRowsInput } from "../../lib/aiDoctorContext
 /** Fixed "now" anchor for all golden-case timestamps. */
 export const GOLDEN_NOW = new Date("2026-06-04T12:00:00Z");
 
-const minutesAgo = (m: number): string =>
-  new Date(GOLDEN_NOW.getTime() - m * 60_000).toISOString();
+const minutesAgo = (m: number): string => new Date(GOLDEN_NOW.getTime() - m * 60_000).toISOString();
 const hoursAgo = (h: number): string => minutesAgo(h * 60);
 const daysAgo = (d: number): string => hoursAgo(d * 24);
 
@@ -35,23 +34,9 @@ export interface GoldenCaseExpectations {
   /** Substrings that must appear in `missing_information`. */
   missingInformationIncludesAny?: readonly (readonly string[])[];
   /** Source tags that MUST appear in compiled context. */
-  expectedSourceTags?: readonly (
-    | "live"
-    | "manual"
-    | "csv"
-    | "demo"
-    | "stale"
-    | "invalid"
-  )[];
+  expectedSourceTags?: readonly ("live" | "manual" | "csv" | "demo" | "stale" | "invalid")[];
   /** Source tags that MUST NOT appear in compiled context. */
-  forbiddenSourceTags?: readonly (
-    | "live"
-    | "manual"
-    | "csv"
-    | "demo"
-    | "stale"
-    | "invalid"
-  )[];
+  forbiddenSourceTags?: readonly ("live" | "manual" | "csv" | "demo" | "stale" | "invalid")[];
   /** When true, `action_queue_suggestion` must be null. */
   requireNoActionQueueSuggestion?: boolean;
   /** When true, autoflower never-do guidance must be present. */
@@ -678,6 +663,145 @@ const ORDER: ReadonlyArray<GoldenCase> = Object.freeze([
       maxConfidenceBand: "medium",
       maxRiskLevel: "medium",
       expectedSourceTags: ["live", "manual"],
+    },
+  },
+  // -------------------------------------------------------------------------
+  // v1.4 — golden cases v1 required-scenario completion pass. Closes three
+  // scenario gaps explicitly called out for the "AI Doctor Golden Cases v1"
+  // pack: (1) stale telemetry combined with a leaf symptom note, (2) a
+  // feeding/nutrient context with zero pH or EC evidence of any kind, and
+  // (3) an autoflower case framed around post-stress "recovery" pressure
+  // rather than ongoing stress. No engine/rule changes — fixtures only.
+  // -------------------------------------------------------------------------
+  {
+    id: "stale-sensor-plus-leaf-symptom",
+    description:
+      "Only stale humidity/temperature telemetry is available, alongside a " +
+      "diary note describing leaf tip curl. Engine must stay Low confidence, " +
+      "flag the stale telemetry AND the lack of any trustworthy sensor " +
+      "confirmation, and must not draw a diagnosis from the stale readings.",
+    input: {
+      now: GOLDEN_NOW,
+      plant: {
+        id: "plant-stale-symptom-1",
+        grow_id: "grow-s1",
+        tent_id: "tent-s1",
+        stage: "veg",
+        strain: "Test Cultivar",
+      },
+      growEvents: [
+        {
+          occurred_at: hoursAgo(3),
+          event_type: "diary_note",
+          source: "manual",
+          note: "Leaf tips curling slightly on the upper canopy overnight.",
+        },
+      ],
+      sensorReadings: [
+        {
+          metric: "humidity_pct",
+          value: 40,
+          captured_at: hoursAgo(5),
+          source: "ecowitt",
+          quality: "stale",
+        },
+        {
+          metric: "temperature_c",
+          value: 26,
+          captured_at: hoursAgo(5),
+          source: "ecowitt",
+          quality: "stale",
+        },
+      ],
+    },
+    expect: {
+      maxConfidenceBand: "low",
+      maxRiskLevel: "medium",
+      expectedSourceTags: ["stale"],
+      forbiddenSourceTags: ["live"],
+      missingInformationIncludesAny: [["stale", "invalid"], ["sensor"]],
+    },
+  },
+  {
+    id: "missing-ph-ec-context-after-feeding",
+    description:
+      "A feeding event and a mild-yellowing diary note exist, but no pH or " +
+      "EC reading of any kind — nor any other sensor evidence — has been " +
+      "logged for this tent. Engine must stay Low confidence, explicitly " +
+      "name the missing sensor context, and must not recommend a feed/flush " +
+      "change or imply pH/EC was ever checked.",
+    input: {
+      now: GOLDEN_NOW,
+      plant: {
+        id: "plant-ph-ec-1",
+        grow_id: "grow-p1",
+        tent_id: "tent-p1",
+        stage: "veg",
+        strain: "Test Cultivar",
+        medium: "coco",
+      },
+      growEvents: [
+        {
+          occurred_at: hoursAgo(9),
+          event_type: "feeding",
+          source: "manual",
+          note: "Fed at label strength; did not check runoff pH or EC.",
+        },
+        {
+          occurred_at: hoursAgo(2),
+          event_type: "diary_note",
+          source: "manual",
+          note: "Mild yellowing on a couple of lower leaves.",
+        },
+      ],
+      sensorReadings: [],
+    },
+    expect: {
+      maxConfidenceBand: "low",
+      maxRiskLevel: "low",
+      missingInformationIncludesAny: [["sensor"]],
+      requireNoActionQueueSuggestion: true,
+    },
+  },
+  {
+    id: "autoflower-recovery-risk-after-stress",
+    description:
+      "Autoflower past a heat-stress event now showing early recovery signs; " +
+      "diary note floats a hard prune to 'speed recovery'. Because autoflowers " +
+      "cannot re-veg lost time, engine must still stay Low confidence, avoid " +
+      "any action queue suggestion, and keep the autoflower heavy-stress " +
+      "guardrails (defoliation/transplant) in what_not_to_do.",
+    input: {
+      now: GOLDEN_NOW,
+      plant: {
+        id: "plant-auto-recovery-1",
+        grow_id: "grow-a2",
+        tent_id: "tent-a2",
+        stage: "veg",
+        strain: "Fast Auto Test",
+        name: "Auto-Recovery-A",
+      },
+      growEvents: [
+        {
+          occurred_at: daysAgo(3),
+          event_type: "diary_note",
+          source: "manual",
+          note: "Heat stress event during a lights-on power flicker.",
+        },
+        {
+          occurred_at: hoursAgo(6),
+          event_type: "diary_note",
+          source: "manual",
+          note: "New growth looks slightly better today — considering a hard prune to speed recovery.",
+        },
+      ],
+      sensorReadings: [],
+    },
+    expect: {
+      maxConfidenceBand: "low",
+      maxRiskLevel: "low",
+      requireAutoflowerNeverDoGuidance: true,
+      requireNoActionQueueSuggestion: true,
     },
   },
 ] satisfies readonly GoldenCase[]);

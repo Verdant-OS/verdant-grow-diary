@@ -93,7 +93,7 @@ const FRESH: LoopEvidence = {
     id: "aq1",
     status: "pending_approval",
     approval_required: true,
-    has_device_command: false,
+    has_device_control_marker: false,
     reason: "raise humidity",
     risk_level: "low",
     linked_alert_id: "a1",
@@ -270,7 +270,6 @@ vi.mock("@/hooks/usePlantAssignedTentActions", () => ({
   usePlantAssignedTentActions: () => ({ rows: [], isLoading: false, isError: false, error: null }),
 }));
 
-// eslint-disable-next-line import/first
 import OneTentLoopLiveProof from "@/pages/OneTentLoopLiveProof";
 
 function renderPage() {

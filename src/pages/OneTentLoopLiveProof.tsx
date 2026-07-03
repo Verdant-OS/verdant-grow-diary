@@ -85,9 +85,7 @@ function statusToneClass(status: LoopStepStatus): string {
   }
 }
 
-function mapSnapshotSourceToLabel(
-  source: string | null | undefined,
-): SensorSourceLabel | null {
+function mapSnapshotSourceToLabel(source: string | null | undefined): SensorSourceLabel | null {
   switch (source) {
     case "live":
       return "live";
@@ -236,19 +234,13 @@ function BulletList({
 }) {
   if (!items || items.length === 0) {
     return (
-      <p
-        data-testid={`${testId}-empty`}
-        className="text-xs italic text-muted-foreground"
-      >
+      <p data-testid={`${testId}-empty`} className="text-xs italic text-muted-foreground">
         {emptyMessage}
       </p>
     );
   }
   return (
-    <ul
-      data-testid={testId}
-      className="list-disc space-y-1 pl-5 text-sm text-foreground"
-    >
+    <ul data-testid={testId} className="list-disc space-y-1 pl-5 text-sm text-foreground">
       {items.map((item, i) => (
         <li key={`${testId}-${i}`}>{item}</li>
       ))}
@@ -291,15 +283,11 @@ function TopGapPanel({ gap }: { gap: OneTentLoopGap }) {
       <div className="space-y-1 text-sm text-foreground">
         <p>
           <span className="font-medium">Why it matters: </span>
-          <span data-testid="one-tent-loop-live-proof-top-gap-why">
-            {gap.why_it_matters}
-          </span>
+          <span data-testid="one-tent-loop-live-proof-top-gap-why">{gap.why_it_matters}</span>
         </p>
         <p>
           <span className="font-medium">Where to resolve: </span>
-          <span data-testid="one-tent-loop-live-proof-top-gap-where">
-            {gap.where_to_resolve}
-          </span>
+          <span data-testid="one-tent-loop-live-proof-top-gap-where">{gap.where_to_resolve}</span>
         </p>
         <p>
           <span className="font-medium">Suggested next observation: </span>
@@ -311,9 +299,7 @@ function TopGapPanel({ gap }: { gap: OneTentLoopGap }) {
 
       {isResolved ? null : (
         <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground">
-            Blocked / weakened downstream
-          </p>
+          <p className="text-xs font-medium text-muted-foreground">Blocked / weakened downstream</p>
           {gap.blocked_downstream_steps.length === 0 ? (
             <p
               data-testid="one-tent-loop-live-proof-top-gap-downstream-empty"
@@ -327,10 +313,7 @@ function TopGapPanel({ gap }: { gap: OneTentLoopGap }) {
               className="list-disc space-y-1 pl-5 text-sm text-foreground"
             >
               {gap.blocked_downstream_steps.map((s) => (
-                <li
-                  key={s}
-                  data-testid={`one-tent-loop-live-proof-top-gap-downstream-${s}`}
-                >
+                <li key={s} data-testid={`one-tent-loop-live-proof-top-gap-downstream-${s}`}>
                   {s}
                 </li>
               ))}
@@ -377,11 +360,7 @@ function checklistStateToneClass(state: OneTentLoopGapEvidenceState): string {
   }
 }
 
-function EvidenceChecklist({
-  items,
-}: {
-  items: readonly OneTentLoopGapEvidenceChecklistItem[];
-}) {
+function EvidenceChecklist({ items }: { items: readonly OneTentLoopGapEvidenceChecklistItem[] }) {
   return (
     <div
       data-testid="one-tent-loop-live-proof-top-gap-checklist"
@@ -400,9 +379,7 @@ function EvidenceChecklist({
             className="space-y-1 rounded-md border border-border bg-muted/30 p-2 text-xs"
           >
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-foreground">
-                {it.label}
-              </span>
+              <span className="text-sm font-medium text-foreground">{it.label}</span>
               <span
                 data-testid={`one-tent-loop-live-proof-top-gap-checklist-item-${it.step_key}-state`}
                 className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${checklistStateToneClass(it.state)}`}
@@ -415,9 +392,7 @@ function EvidenceChecklist({
                   testId={`one-tent-loop-live-proof-top-gap-checklist-item-${it.step_key}-source`}
                 />
               ) : null}
-              {it.provenance ? (
-                <ProvenanceBadge provenance={it.provenance} />
-              ) : null}
+              {it.provenance ? <ProvenanceBadge provenance={it.provenance} /> : null}
             </div>
             <p className="text-muted-foreground">{it.why_it_matters}</p>
           </li>
@@ -426,7 +401,6 @@ function EvidenceChecklist({
     </div>
   );
 }
-
 
 function StepCard({ step }: { step: LoopStepRow }) {
   return (
@@ -445,17 +419,11 @@ function StepCard({ step }: { step: LoopStepRow }) {
       </header>
 
       {step.source ? (
-        <SourceBadge
-          source={step.source}
-          testId={`loop-live-proof-step-${step.id}-source`}
-        />
+        <SourceBadge source={step.source} testId={`loop-live-proof-step-${step.id}-source`} />
       ) : null}
 
       <p className="text-xs font-medium text-muted-foreground">Evidence references</p>
-      <EvidenceRefList
-        refs={step.evidence_refs}
-        testId={`loop-live-proof-step-${step.id}-refs`}
-      />
+      <EvidenceRefList refs={step.evidence_refs} testId={`loop-live-proof-step-${step.id}-refs`} />
 
       <p className="text-xs font-medium text-muted-foreground">Evidence</p>
       <BulletList
@@ -464,9 +432,7 @@ function StepCard({ step }: { step: LoopStepRow }) {
         testId={`loop-live-proof-step-${step.id}-evidence`}
       />
 
-      <p className="text-xs font-medium text-muted-foreground">
-        Missing information
-      </p>
+      <p className="text-xs font-medium text-muted-foreground">Missing information</p>
       <BulletList
         items={step.missing_info}
         emptyMessage="No missing information."
@@ -530,8 +496,8 @@ function toTentEvidence(t: AnyRow | null): TentEvidence | null {
   if (!t || typeof t.id !== "string") return null;
   const hasTarget = Boolean(
     (t as { target_temp_c?: unknown }).target_temp_c ||
-      (t as { target_rh?: unknown }).target_rh ||
-      (t as { target_vpd?: unknown }).target_vpd,
+    (t as { target_rh?: unknown }).target_rh ||
+    (t as { target_vpd?: unknown }).target_vpd,
   );
   return {
     id: t.id,
@@ -577,8 +543,7 @@ function toQuickLogEvidence(d: AnyRow | null): QuickLogEvidence | null {
           : null,
     has_note: typeof d.note === "string" && d.note.length > 0,
     has_photo: Array.isArray(d.photos) && d.photos.length > 0,
-    has_action_context:
-      Boolean(details.action_id) || Boolean(details.linked_action_id),
+    has_action_context: Boolean(details.action_id) || Boolean(details.linked_action_id),
     plant_id: typeof d.plant_id === "string" ? d.plant_id : null,
     tent_id: typeof d.tent_id === "string" ? d.tent_id : null,
   };
@@ -602,9 +567,8 @@ export default function OneTentLoopLiveProof(): JSX.Element {
   const plant = toPlantEvidence(scopedPlant);
 
   const diary = (diaryQ.data ?? []) as AnyRow[];
-  const scopedDiary = firstBy(
-    diary,
-    (d) => (plant ? d.plant_id === plant.id : d.tent_id === (tent?.id ?? "__none__")),
+  const scopedDiary = firstBy(diary, (d) =>
+    plant ? d.plant_id === plant.id : d.tent_id === (tent?.id ?? "__none__"),
   );
   const latest_quick_log = toQuickLogEvidence(scopedDiary);
 
@@ -617,10 +581,7 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         }
       : null;
 
-  const snapState = useLatestSensorSnapshot(
-    grow?.id ?? null,
-    tent ? [tent.id] : [],
-  );
+  const snapState = useLatestSensorSnapshot(grow?.id ?? null, tent ? [tent.id] : []);
   const snapSourceLabel = mapSnapshotSourceToLabel(snapState.snapshot.source);
   const latest_sensor_snapshot: SensorSnapshotEvidence | null = snapSourceLabel
     ? {
@@ -659,17 +620,14 @@ export default function OneTentLoopLiveProof(): JSX.Element {
       }
     : null;
 
-  const aqQ = usePlantAssignedTentActions(
-    tent?.id ?? null,
-    grow?.id ?? null,
-  );
+  const aqQ = usePlantAssignedTentActions(tent?.id ?? null, grow?.id ?? null);
   const aqRow = (aqQ.rows ?? [])[0] ?? null;
   const latest_action_queue: ActionQueueEvidence | null = aqRow
     ? {
         id: aqRow.id,
         status: aqRow.status ?? "pending_approval",
         approval_required: true,
-        has_device_command: false,
+        has_device_control_marker: false,
         reason: aqRow.reason ?? null,
         risk_level: (aqRow as { riskLevel?: string | null }).riskLevel ?? null,
         linked_alert_id: null,
@@ -697,10 +655,7 @@ export default function OneTentLoopLiveProof(): JSX.Element {
     [JSON.stringify(evidence)],
   );
 
-  const report = React.useMemo(
-    () => buildOneTentLoopLiveProofTextReport(view),
-    [view],
-  );
+  const report = React.useMemo(() => buildOneTentLoopLiveProofTextReport(view), [view]);
 
   return (
     <div
@@ -716,14 +671,10 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         >
           {view.banner}
         </p>
-        <p
-          data-testid="one-tent-loop-live-proof-counts"
-          className="text-xs text-muted-foreground"
-        >
-          Passed: {view.counts.passed} · Needs review: {view.counts.needs_review} ·
-          Missing: {view.counts.missing} · Blocked: {view.counts.blocked} ·
-          Stale: {view.counts.stale} · Invalid: {view.counts.invalid} ·
-          Demo only: {view.counts.demo_only}
+        <p data-testid="one-tent-loop-live-proof-counts" className="text-xs text-muted-foreground">
+          Passed: {view.counts.passed} · Needs review: {view.counts.needs_review} · Missing:{" "}
+          {view.counts.missing} · Blocked: {view.counts.blocked} · Stale: {view.counts.stale} ·
+          Invalid: {view.counts.invalid} · Demo only: {view.counts.demo_only}
         </p>
       </header>
 

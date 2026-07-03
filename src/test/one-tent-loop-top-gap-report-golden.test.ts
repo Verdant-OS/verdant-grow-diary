@@ -37,11 +37,7 @@ import {
   buildOneTentLoopTopGapTextBlock,
   resolveTopOneTentLoopGap,
 } from "@/lib/oneTentLoopGapResolver";
-import type {
-  LoopStepId,
-  LoopStepRow,
-  LoopStepStatus,
-} from "@/lib/oneTentLoopProofRules";
+import type { LoopStepId, LoopStepRow, LoopStepStatus } from "@/lib/oneTentLoopProofRules";
 
 const STEP_LABELS: ReadonlyArray<readonly [LoopStepId, string]> = [
   ["grow", "Grow"],
@@ -74,15 +70,10 @@ function mkRow(
 }
 
 function baseRows(): LoopStepRow[] {
-  return STEP_LABELS.map(([id, label]) =>
-    mkRow(id, label, "passed", { provenance: "direct" }),
-  );
+  return STEP_LABELS.map(([id, label]) => mkRow(id, label, "passed", { provenance: "direct" }));
 }
 
-function withStep(
-  patch: (row: LoopStepRow) => void,
-  id: LoopStepId,
-): LoopStepRow[] {
+function withStep(patch: (row: LoopStepRow) => void, id: LoopStepId): LoopStepRow[] {
   const rows = baseRows();
   const row = rows.find((r) => r.id === id);
   if (!row) throw new Error(`missing row ${id}`);
@@ -396,8 +387,8 @@ describe("buildOneTentLoopTopGapTextBlock — golden sanitized output", () => {
       "- Evidence kind: missing",
       "- Why it matters: An Action Queue item is not approval-required, or carries a device-command marker. Verdant treats this as a safety block, not proof.",
       "- Where to resolve: Open the Action Queue and confirm the item is approval-required with no device command.",
-      "- Suggested next observation: Look for the same item with approval_required=true and no device_command marker.",
-      "- Safety note: Read-only view. Do not bypass the safety fence. Verdant will not auto-execute device commands.",
+      "- Suggested next observation: Look for the same item with approval_required=true and no device-control marker.",
+      "- Safety note: Read-only view. Do not bypass the safety fence. Verdant will not run device commands automatically.",
       "- Real data gap: yes",
       "- Blocked / weakened downstream:",
       "    - follow-up",
@@ -429,9 +420,9 @@ describe("buildOneTentLoopTopGapTextBlock — golden sanitized output", () => {
     // Omit the alert row entirely; keep the sensor-snapshot stale so a
     // real gap still resolves and the checklist renders. Alert must
     // surface as `[unknown]` because there is no row to evaluate it.
-    const alertOmittedRows: LoopStepRow[] = STEP_LABELS.filter(
-      ([id]) => id !== "alert",
-    ).map(([id, label]) => mkRow(id, label, "passed", { provenance: "direct" }));
+    const alertOmittedRows: LoopStepRow[] = STEP_LABELS.filter(([id]) => id !== "alert").map(
+      ([id, label]) => mkRow(id, label, "passed", { provenance: "direct" }),
+    );
     const sensor = alertOmittedRows.find((r) => r.id === "sensor-snapshot");
     if (!sensor) throw new Error("missing sensor row");
     sensor.status = "stale";
@@ -486,9 +477,9 @@ describe("buildOneTentLoopTopGapTextBlock — golden sanitized output", () => {
   // Present / success wording, (d) view-model line ordering, and (e) no
   // secret markers.
   it("unknown checklist state — ai-doctor row omitted → exact expected text and fences", () => {
-    const rows: LoopStepRow[] = STEP_LABELS.filter(
-      ([id]) => id !== "ai-doctor",
-    ).map(([id, label]) => mkRow(id, label, "passed", { provenance: "direct" }));
+    const rows: LoopStepRow[] = STEP_LABELS.filter(([id]) => id !== "ai-doctor").map(
+      ([id, label]) => mkRow(id, label, "passed", { provenance: "direct" }),
+    );
     const sensor = rows.find((r) => r.id === "sensor-snapshot");
     if (!sensor) throw new Error("missing sensor row");
     sensor.status = "stale";
@@ -534,9 +525,9 @@ describe("buildOneTentLoopTopGapTextBlock — golden sanitized output", () => {
   });
 
   it("unknown checklist state — action-queue row omitted → exact expected text and fences", () => {
-    const rows: LoopStepRow[] = STEP_LABELS.filter(
-      ([id]) => id !== "action-queue",
-    ).map(([id, label]) => mkRow(id, label, "passed", { provenance: "direct" }));
+    const rows: LoopStepRow[] = STEP_LABELS.filter(([id]) => id !== "action-queue").map(
+      ([id, label]) => mkRow(id, label, "passed", { provenance: "direct" }),
+    );
     const sensor = rows.find((r) => r.id === "sensor-snapshot");
     if (!sensor) throw new Error("missing sensor row");
     sensor.status = "stale";
@@ -580,7 +571,6 @@ describe("buildOneTentLoopTopGapTextBlock — golden sanitized output", () => {
     assertNoSecrets(text);
     assertNoUnsafeWording(text);
   });
-
 
   it("resolved / no-blocking-gap → exact expected text and safety fences", () => {
     const text = goldenFor(baseRows());

@@ -156,6 +156,39 @@ export default function Onboarding() {
           </Button>
         </div>
 
+        <div
+          data-testid="starter-setup-block"
+          className="mt-6 rounded-lg border border-border/60 p-4"
+        >
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            Just want to try Quick Log?
+          </p>
+          <p className="mt-2 text-sm text-foreground/90">
+            {STARTER_SETUP_HELPER_COPY}
+          </p>
+          <Button
+            data-testid="starter-setup-button"
+            type="button"
+            variant="outline"
+            className="mt-3 w-full sm:w-auto"
+            disabled={starterBusy}
+            onClick={handleStarterSetup}
+          >
+            {starterBusy ? "Creating starter setup…" : STARTER_SETUP_BUTTON_LABEL}
+          </Button>
+          {starterError ? (
+            <p
+              data-testid="starter-setup-error"
+              role="alert"
+              className="mt-3 text-xs text-destructive"
+            >
+              {starterError}
+            </p>
+          ) : null}
+        </div>
+
+
+
         <p className="mt-4 text-[11px] text-muted-foreground text-center">
           You can change this later from{" "}
           <Link

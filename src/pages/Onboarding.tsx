@@ -38,6 +38,8 @@ export default function Onboarding() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const [choice, setChoice] = useState<StartScreenChoice>(DEFAULT_START_SCREEN);
+  const [starterBusy, setStarterBusy] = useState(false);
+  const [starterError, setStarterError] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -52,6 +54,31 @@ export default function Onboarding() {
   function go(c: StartScreenChoice, save: boolean) {
     if (save && user) setStartScreenChoice(user.id, c);
     nav(routeForStartScreen(c), { replace: true });
+  }
+
+  async function handleStarterSetup() {
+    if (starterBusy || !user) return;
+    setStarterError(null);
+    setStarterBusy(true);
+    try {
+      const result = await runStarterSetup(user.id, starterSetupSupabaseAdapter);
+      const prefill = buildStarterQuickLogPrefill(result);
+      // AppShell listens for this event globally and opens Quick Log with
+      // the plant/tent/grow preselected. No sensor snapshot is inserted;
+      // the grower still authors the first log manually.
+      nav("/", { replace: true });
+      window.dispatchEvent(
+        new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }),
+      );
+    } catch (err) {
+      const message =
+        err instanceof StarterSetupError
+          ? STARTER_SETUP_ERROR_COPY
+          : STARTER_SETUP_ERROR_COPY;
+      setStarterError(message);
+    } finally {
+      setStarterBusy(false);
+    }
   }
 
   return (

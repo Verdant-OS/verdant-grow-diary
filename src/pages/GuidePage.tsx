@@ -191,6 +191,29 @@ export default function GuidePage() {
             </li>
           </ul>
         </section>
+
+        <section
+          data-testid="guide-demo-cta"
+          className="mt-10 rounded-lg border border-border/60 p-6 bg-card/40"
+        >
+          <h2 className="font-display text-lg md:text-xl font-semibold">
+            See a real One-Tent Loop before signing up
+          </h2>
+          <p className="mt-2 text-sm md:text-base text-muted-foreground">
+            Walk through how Verdant connects a grow, tent, plant, Quick Log,
+            timeline, sensor snapshot, cautious AI review, and grower-approved
+            action queue.
+          </p>
+          <div className="mt-4">
+            <Link
+              to="/welcome"
+              data-testid="guide-demo-cta-link"
+              className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Explore the public demo
+            </Link>
+          </div>
+        </section>
       </article>
     </main>
   );

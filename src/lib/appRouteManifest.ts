@@ -120,6 +120,13 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Public SEO guide detail page.",
   },
   { path: "/hardware-integrations", access: "public" },
+  {
+    path: "/how-ai-doctor-works",
+    access: "public",
+    label: "How AI Doctor Works",
+    description:
+      "Public explainer: evidence-first AI Doctor 12-field output contract, missing-information transparency, and grower-approved decisions.",
+  },
 
   { path: "/ingest-inspector", access: "operator" },
   {

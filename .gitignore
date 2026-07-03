@@ -34,3 +34,7 @@ tools/ecowitt-testbench/__pycache__/
 
 # Verdant SEO monitoring — local OAuth token cache
 .seo/
+
+# Playwright transient output (uploaded as CI artifacts, never committed)
+test-results/
+playwright-report/

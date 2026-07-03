@@ -49,7 +49,7 @@ jobs:
       - name: Prepare artifact directory
         run: mkdir -p artifacts/seo
       - name: Validate SEO allowlist config
-        run: node --test scripts/test-seo-allowlist.mjs scripts/test-seo-allowlist-config.mjs scripts/test-seo-allowlist-expiration.mjs scripts/test-seo-allowlist-diagnostics.mjs scripts/test-seo-job-summary.mjs scripts/test-seo-suppression-diff.mjs scripts/test-seo-verify-regression-mode.mjs
+        run: node --test scripts/test-seo-allowlist.mjs scripts/test-seo-allowlist-config.mjs scripts/test-seo-allowlist-expiration.mjs scripts/test-seo-allowlist-diagnostics.mjs scripts/test-seo-job-summary.mjs scripts/test-seo-suppression-diff.mjs scripts/test-seo-verify-regression-mode.mjs scripts/test-seo-regression-groups.mjs scripts/test-seo-v14-diagnostics.mjs
       - name: Download previous SEO artifacts (for diff)
         id: prev
         continue-on-error: true
@@ -96,10 +96,21 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: seo-monitoring-reports
+          # Only sanitized reports are uploaded. Previous-run inputs and any
+          # credential-shaped file are excluded defensively. `.seo/` (the local
+          # OAuth token cache) is gitignored and never checked out in CI, so it
+          # can never appear under artifacts/seo/ — the excludes below are
+          # belt-and-suspenders.
           path: |
             artifacts/seo/**
             !artifacts/seo/previous/**
             !artifacts/seo/**/*.env
             !artifacts/seo/**/*token*
             !artifacts/seo/**/*secret*
+            !artifacts/seo/**/gsc-token*
+            !artifacts/seo/**/*credential*
+            !artifacts/seo/**/*client-secret*
+            !artifacts/seo/**/storageState*
+            !artifacts/seo/**/*.pem
+            !artifacts/seo/**/.seo*
           if-no-files-found: ignore

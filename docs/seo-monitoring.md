@@ -126,7 +126,7 @@ appears; the post-deploy workflow will re-verify it every run.
 ## Tracked allowlist (`config/seo-allowlist.json`)
 
 The inspection runner reads a tracked allowlist so CI only fails on
-*new* critical issues. Three sections:
+_new_ critical issues. Three sections:
 
 - **`allowlisted_issues`** — suppress specific `issue_types` on URLs
   matching `url_patterns` (glob `*`). Each entry has an `id`,
@@ -232,7 +232,7 @@ Additional operator affordances in `scripts/seo/gsc-inspect-urls.mjs`:
   Exits `3` when expired entries exist (unless `--no-fail-on-expired`).
 - Dry-run artifacts now include per-URL classification
   (`never_allowlisted | suppressed | expected_noindex |
-  expired_allowlist | no_match`), matched entry ids (active and
+expired_allowlist | no_match`), matched entry ids (active and
   expired), suppression reasons, and totals.
 - Every run writes `artifacts/seo/seo-job-summary.md` and, when
   running under GitHub Actions, appends it to `$GITHUB_STEP_SUMMARY`.
@@ -294,3 +294,111 @@ The CI workflow downloads the last successful run's `seo-monitoring-reports`
 artifact into `artifacts/seo/previous/` before running dry-run and live
 inspection, so the diff surfaces automatically on every scheduled run.
 Pass `--no-diff` to disable the diff artifacts locally.
+
+## v1.4 diagnostics polish
+
+### Reading regression-only failure groups
+
+`verify-last-gsc-finding.mjs --fail-only-previously-resolved-expired` now adds
+an `outcome_groups` object to `artifacts/seo/gsc-last-finding-verification.json`
+and a "Regression outcome groups" table to the Markdown. The legacy
+`status` / `urls[]` / `regression_count` fields and exit codes are unchanged —
+`outcome_groups` is purely additive. Every affected URL lands in exactly one of
+six stable buckets:
+
+- **`unresolved_expired_allowlist`** — the URL was resolved in the previous run
+  but is now covered only by an **expired** allowlist entry, so the suppression
+  that was masking it has lapsed. This is the one bucket that **contributes to
+  exit 4** (a real regression). The group lists the matched expired allowlist
+  ids so you can renew or remove them.
+- **`no_baseline`** — either there was no previous verification artifact at all
+  (run-level), or this specific URL was never recorded in the previous run
+  (per-URL). Exit 0 — nothing to compare against.
+- **`still_unresolved`** — the URL was in the previous baseline but was not
+  resolved then and still isn't. Exit 0 (not a _new_ regression).
+- **`resolved`** — resolved before and still resolved (no expired coverage).
+  Exit 0.
+- **`blocked`** — the run was skipped (placeholder config or OAuth not
+  configured). Exit 0.
+- **`other`** — uncategorized (should be empty in normal operation).
+
+Each group carries a `count`, up to three `example_urls`, the union of matched
+`expired_allowlist_ids` and `expected_noindex_ids`, and an `exit_code_behavior`
+string. Read the JSON/Markdown top-down: if `unresolved_expired_allowlist`
+has a non-zero count, the failure is caused by **expired allowlist coverage**;
+any other non-zero group is informational and does not fail the job.
+
+### `unresolved_expired_allowlist`
+
+Both the normal-mode top-level `status` and the regression `outcome_groups`
+use this term. It means: an allowlist entry that was suppressing an issue on an
+affected URL has passed its `expires_on` date, so the URL is no longer safely
+covered. Fix by renewing (`expires_on`) or deleting the entry in
+`config/seo-allowlist.json`, or by resolving the underlying page issue.
+
+### Reading `seo-job-summary.json`
+
+`artifacts/seo/seo-job-summary.json` mirrors every metric in
+`seo-job-summary.md`. Stable top-level keys include: `status`, `mode`,
+`urls_evaluated`, `workflow_run_url` (the GitHub run, or null locally),
+`oauth_configured`, `gsc_skipped`, `previous_baseline_found`,
+`diff_comparison_ran`, `simulated_classification_counts`,
+`expired_entries` + `expired_allowlist_ids`, `suppression_diff` (added / removed
+/ unchanged counts), `last_finding_status`, `regression_status`,
+`regression_outcome_groups`, `artifacts` (the stable relative path of every
+report file), and `notes`. The three verifier-derived fields are **best-effort
+and nullable** — they are populated only once the verifier has run in the same
+job, and are `null` otherwise (the verifier owns them and also writes its own
+artifact + Step Summary block).
+
+### Reading per-URL decision traces
+
+`artifacts/seo/seo-allowlist-suppressions.md` keeps the compact by-entry table
+and a compact per-URL table near the top, then adds a **Per-URL decision
+trace** table: for each evaluated URL it shows the final `classification`,
+matched allowlist ids, expected-noindex ids, never-allowlist match, expiration
+status, suppressed issue types, the previous-run classification (when a baseline
+exists), whether the classification `changed`, and the delta (newly-suppressed /
+newly-expired / newly-unsuppressed / ids-changed / types-changed). The current
+per-URL classifications are persisted under `url_classifications` in
+`seo-allowlist-suppressions.json`, which becomes the baseline the next run
+compares against.
+
+### Interpreting `NO_BASELINE`
+
+The per-URL suppression diff (`seo-allowlist-suppressions-diff.{json,md}`) and
+the decision trace report `NO_BASELINE` when there is **no comparable previous
+per-URL classification** — either the first run, or a previous artifact that
+predates `url_classifications`. This is **not a failure**: the run still writes
+all reports and exits normally; it simply cannot compute per-URL deltas until
+one new-code run has been recorded as the baseline.
+
+### Confirming Claude and Lovable build in the same repo
+
+Lovable and any coding agent (Claude) must edit the **same** GitHub repo and
+branch. Before editing, confirm:
+
+```bash
+git remote -v          # must be github.com/Verdant-OS/verdant-grow-diary
+git branch --show-current
+ls scripts/seo         # the SEO monitoring scripts must already exist
+ls .github/workflows   # must include seo-monitoring.yml
+```
+
+The expected SEO files are `scripts/seo/{gscClient,gsc-oauth,gsc-inspect-urls,
+verify-last-gsc-finding,seoAllowlist,seoDiff}.mjs`,
+`config/seo-{allowlist,last-gsc-finding}.json`, and
+`.github/workflows/seo-monitoring.yml`. If they are missing, **stop** — you are
+on the wrong repo or an unsynced branch. Do **not** create a new repo, a new
+app, or a separate folder, and do **not** recreate these files from scratch.
+Lovable's tip commit SHA equals the GitHub `verdant-grow-diary` tip; agents work
+on a topic branch cut from that tip and open a PR back to it.
+
+### GSC OAuth remains owner-controlled
+
+The Search Console OAuth flow is owner-controlled and never automated by an
+agent. Only the GSC-owning Google account runs `scripts/seo/gsc-oauth.mjs`
+locally; the refresh token lives in the gitignored `.seo/gsc-token.local.json`
+and (optionally) in GitHub Actions secrets. No agent requests, prints, commits,
+or uploads the client secret, refresh token, access token, or authorization
+code.

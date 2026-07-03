@@ -3,6 +3,11 @@ import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import {
+  SENSOR_SOURCE_KINDS,
+  SENSOR_SOURCE_LEGEND,
+  SENSOR_SOURCE_SHORT_LABEL,
+} from "@/constants/sensorSourceLabels";
 
 /**
  * Public hardware-neutral integration page.

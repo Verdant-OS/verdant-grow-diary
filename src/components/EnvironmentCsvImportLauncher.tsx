@@ -28,6 +28,11 @@ import {
   type InsertClient,
   type SensorReadingInsert,
 } from "@/lib/environmentCsvImportPersistence";
+import {
+  dedupeKeyOf,
+  SENSOR_READINGS_DEDUPE_SELECT_CLAUSE,
+  type ExistingKeysQueryScope,
+} from "@/lib/csv-import/sensorReadingsBatchInsert";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -48,20 +53,50 @@ const DEFAULT_LABEL = "Import historical data";
 function makeInsertClient(): InsertClient {
   return {
     async insertSensorReadings(rows: SensorReadingInsert[]) {
-      const { error } = await supabase
-        .from("sensor_readings")
-        .insert(rows as never);
+      const { error } = await supabase.from("sensor_readings").insert(rows as never);
       if (error) {
-        return { error: { message: error.message }, insertedCount: 0 };
+        return {
+          error: { message: error.message, code: error.code, details: error.details },
+          insertedCount: 0,
+        };
       }
       return { error: null, insertedCount: rows.length };
+    },
+    // Pre-insert duplicate lookup so re-imports and duplicate CSV rows are
+    // skipped instead of crashing on sensor_readings_dedupe_uidx. Selects
+    // only the presence columns the dedupe key needs — never raw_payload,
+    // user_id, value, or device_id. Fails open (empty set) on any lookup
+    // error; the insert-time 23505 catch is the safety net.
+    async fetchExistingSensorReadingKeys(scope: ExistingKeysQueryScope) {
+      try {
+        const { data, error } = await supabase
+          .from("sensor_readings")
+          .select(SENSOR_READINGS_DEDUPE_SELECT_CLAUSE)
+          .in("tent_id", scope.tentIds)
+          .in("source", scope.sources)
+          .in("metric", scope.metrics)
+          .gte("captured_at", scope.minCapturedAt)
+          .lte("captured_at", scope.maxCapturedAt);
+        if (error || !data) return new Set<string>();
+        const keys = new Set<string>();
+        for (const row of data as unknown as Array<{
+          tent_id: string;
+          source: string;
+          metric: string;
+          captured_at: string;
+        }>) {
+          const key = dedupeKeyOf(row);
+          if (key) keys.add(key);
+        }
+        return keys;
+      } catch {
+        return new Set<string>();
+      }
     },
   };
 }
 
-export function EnvironmentCsvImportLauncher(
-  props: EnvironmentCsvImportLauncherProps,
-) {
+export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncherProps) {
   const {
     growId,
     tentId,
@@ -79,7 +114,11 @@ export function EnvironmentCsvImportLauncher(
   const handleConfirm = useCallback(
     async (rows: readonly ParsedEnvironmentRow[]) => {
       if (!user?.id || !growId || !tentId) {
-        return { insertedCount: 0, error: "Missing grow or tent context." };
+        return {
+          insertedCount: 0,
+          duplicateCount: 0,
+          error: "Missing grow or tent context.",
+        };
       }
       const client = makeInsertClient();
       const res = await persistCsvEnvironmentRows(
@@ -93,10 +132,11 @@ export function EnvironmentCsvImportLauncher(
         client,
       );
       if (!res.error) {
-        toast({
-          title: "CSV history imported",
-          description: `${res.insertedCount} reading(s) added as CSV context.`,
-        });
+        const description =
+          res.duplicateCount > 0
+            ? `${res.insertedCount} reading(s) added as CSV context. Skipped ${res.duplicateCount} duplicate reading(s) already in Verdant.`
+            : `${res.insertedCount} reading(s) added as CSV context.`;
+        toast({ title: "CSV history imported", description });
         qc.invalidateQueries({ queryKey: ["sensor_readings"] });
         qc.invalidateQueries({ queryKey: ["csv-timeline-context"] });
         if (typeof window !== "undefined") {
@@ -131,11 +171,7 @@ export function EnvironmentCsvImportLauncher(
         >
           <FileUp className="h-3.5 w-3.5" /> Import CSV
         </Button>
-        <EnvironmentCsvImportModal
-          open={open}
-          onOpenChange={setOpen}
-          onConfirm={handleConfirm}
-        />
+        <EnvironmentCsvImportModal open={open} onOpenChange={setOpen} onConfirm={handleConfirm} />
       </>
     );
   }
@@ -156,18 +192,11 @@ export function EnvironmentCsvImportLauncher(
         Data is read-only and source-tagged as CSV.
       </p>
       <div className="mt-3">
-        <Button
-          onClick={() => setOpen(true)}
-          data-testid={`${testIdPrefix}-button`}
-        >
+        <Button onClick={() => setOpen(true)} data-testid={`${testIdPrefix}-button`}>
           {label}
         </Button>
       </div>
-      <EnvironmentCsvImportModal
-        open={open}
-        onOpenChange={setOpen}
-        onConfirm={handleConfirm}
-      />
+      <EnvironmentCsvImportModal open={open} onOpenChange={setOpen} onConfirm={handleConfirm} />
     </section>
   );
 }

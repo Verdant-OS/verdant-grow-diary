@@ -71,10 +71,7 @@ describe("environmentCsvImportPersistence — shape", () => {
   });
 
   it("persists Spider Farmer CO2 and PPFD metrics", () => {
-    const inserts = buildSensorReadingInserts(
-      [row({ co2_ppm: 775, ppfd: 925 })],
-      SCOPE,
-    );
+    const inserts = buildSensorReadingInserts([row({ co2_ppm: 775, ppfd: 925 })], SCOPE);
     expect(inserts.map((i) => i.metric)).toEqual([
       "temperature_c",
       "humidity_pct",
@@ -87,10 +84,7 @@ describe("environmentCsvImportPersistence — shape", () => {
   });
 
   it("skips null metrics (no fake zeros)", () => {
-    const inserts = buildSensorReadingInserts(
-      [row({ temperature_c: null, vpd_kpa: null })],
-      SCOPE,
-    );
+    const inserts = buildSensorReadingInserts([row({ temperature_c: null, vpd_kpa: null })], SCOPE);
     expect(inserts).toHaveLength(1);
     expect(inserts[0].metric).toBe("humidity_pct");
   });
@@ -105,14 +99,22 @@ describe("environmentCsvImportPersistence — runtime", () => {
         return { error: null, insertedCount: rows.length };
       }),
     };
+    // Distinct captured_at per row: rows are deduped by
+    // (tent_id, source, metric, captured_at) before insert, so identical
+    // timestamps would collapse into one reading rather than exercising
+    // chunk arithmetic across 7 genuinely distinct readings.
     const rows = Array.from({ length: 7 }, (_, i) =>
-      row({ rowNumber: i + 1 }),
+      row({
+        rowNumber: i + 1,
+        captured_at: `2026-06-01T10:0${i}:00.000Z`,
+      }),
     );
     const res = await persistCsvEnvironmentRows(rows, SCOPE, client, 5);
     expect(res.error).toBeNull();
     // 7 rows × 3 default metrics = 21 inserts → chunks of 5,5,5,5,1
     expect(calls).toEqual([5, 5, 5, 5, 1]);
     expect(res.insertedCount).toBe(21);
+    expect(res.duplicateCount).toBe(0);
   });
 
   it("does no work on empty input", async () => {

@@ -24,6 +24,15 @@ import {
   setStartScreenChoice,
   type StartScreenChoice,
 } from "@/lib/startScreenPreferences";
+import {
+  buildStarterQuickLogPrefill,
+  STARTER_SETUP_BUTTON_LABEL,
+  STARTER_SETUP_ERROR_COPY,
+  STARTER_SETUP_HELPER_COPY,
+} from "@/lib/starterSetupRules";
+import { runStarterSetup, StarterSetupError } from "@/lib/starterSetupService";
+import { starterSetupSupabaseAdapter } from "@/lib/starterSetupSupabaseAdapter";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 export default function Onboarding() {
   const { user, loading } = useAuth();

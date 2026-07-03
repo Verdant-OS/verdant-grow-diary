@@ -20,13 +20,12 @@ import {
   ENTRY_CREATED_EVENT,
   SENSOR_READING_CREATED_EVENT,
 } from "@/lib/dailyCheckRefreshRules";
+import { DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_BODY } from "@/constants/dailyCheckEmptyStateCopy";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
 const PAGE = read("src/pages/DailyCheck.tsx");
@@ -83,7 +82,12 @@ describe("DailyCheck · Choose today's check section", () => {
   });
 
   it("guards the sensor-snapshot option when the selected plant has no tent", () => {
-    expect(PAGE).toMatch(/Sensor snapshots need a tent assignment\./);
+    // The guard copy is centralized in dailyCheckEmptyStateCopy.ts; the page
+    // renders it via the constant instead of an inline literal.
+    expect(DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_BODY).toMatch(
+      /Sensor snapshots need a tent assignment\./,
+    );
+    expect(PAGE).toMatch(/DAILY_CHECK_EMPTY_PLANT_NEEDS_TENT_BODY/);
     expect(PAGE).toMatch(/data-testid="daily-grow-check-choose-no-tent"/);
     // The button must be disabled when a plant is selected without a tent —
     // never silently routes to an arbitrary tent.
@@ -161,12 +165,7 @@ describe("Dashboard + Plant Detail refresh on sensor success event", () => {
   });
 
   it("Plant Detail card invalidates diary + sensor caches on sensor success event", () => {
-    render(
-      wrap(
-        <PlantDailyGrowCheckConsistencyCard plantId="p-1" currentTentId="t-1" />,
-        qc,
-      ),
-    );
+    render(wrap(<PlantDailyGrowCheckConsistencyCard plantId="p-1" currentTentId="t-1" />, qc));
     invalidateSpy.mockClear();
     act(() => {
       window.dispatchEvent(new CustomEvent(SENSOR_READING_CREATED_EVENT));

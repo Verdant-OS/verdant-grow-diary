@@ -37,6 +37,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/ecowitt-tent-preview",
   "/operator/genetics-import",
   "/operator/ggs-real-payload-ingest",
+  "/demo/one-tent-live-proof",
   "/operator/one-tent-live-proof",
   "/operator/one-tent-loop-smoke-test",
   "/operator/one-tent-proof-record",
@@ -60,6 +61,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/internal/one-tent-loop-proof",
   "/internal/sensor-truth-audit",
   "/leads",
+  "/one-tent-loop-proof",
   // representative auth-gated surfaces
   "/",
   "/actions",
@@ -73,6 +75,8 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/hardware-integrations",
   "/partners/csv-preview",
   "/customer/:shareId",
+  "/pheno-comparison",
+  "/pheno-hunts/:id/compare",
 ];
 
 async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {

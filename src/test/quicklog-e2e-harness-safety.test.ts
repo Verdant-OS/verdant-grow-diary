@@ -30,7 +30,8 @@ function readAll(): { file: string; body: string }[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name === ".auth" || entry.name === "test-results" || entry.name === "results") continue;
+        if (entry.name === ".auth" || entry.name === "test-results" || entry.name === "results")
+          continue;
         walk(p);
         continue;
       }
@@ -56,15 +57,11 @@ describe("Quick Log Playwright harness safety", () => {
   it("contains no hardcoded credentials or service_role usage", () => {
     for (const { file, body } of files) {
       if (!/\.(ts|tsx)$/.test(file)) continue;
-      expect(body, `${file} must not reference service_role`).not.toMatch(
-        /service_role/i,
-      );
+      expect(body, `${file} must not reference service_role`).not.toMatch(/service_role/i);
       expect(body, `${file} must not hardcode passwords`).not.toMatch(
         /password\s*[:=]\s*["'][^"']+["']/i,
       );
-      expect(body, `${file} must not embed bearer tokens`).not.toMatch(
-        /eyJ[A-Za-z0-9_-]{20,}\./,
-      );
+      expect(body, `${file} must not embed bearer tokens`).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}\./);
     }
   });
 
@@ -78,13 +75,13 @@ describe("Quick Log Playwright harness safety", () => {
       // and functions.invoke in its FORBIDDEN list to ASSERT the walkthrough
       // page never calls them. The spec issues no such calls itself.
       if (/demo-proof-walkthrough-readonly/.test(file)) continue;
+      // Same class: the never-healthy proof spec's FORBIDDEN_PATH_FRAGMENTS
+      // denylist names /rest/v1/action_queue and /functions/v1/ to BLOCK any
+      // such request on /one-tent-loop-proof. The spec issues no such calls.
+      if (/one-tent-loop-proof-never-healthy/.test(file)) continue;
       expect(body, `${file} must not call action_queue`).not.toMatch(/action_queue/);
-      expect(body, `${file} must not call functions.invoke`).not.toMatch(
-        /functions\.invoke/,
-      );
-      expect(body, `${file} must not import mini-chart UI`).not.toMatch(
-        /MiniChart|mini-chart/,
-      );
+      expect(body, `${file} must not call functions.invoke`).not.toMatch(/functions\.invoke/);
+      expect(body, `${file} must not import mini-chart UI`).not.toMatch(/MiniChart|mini-chart/);
     }
   });
 

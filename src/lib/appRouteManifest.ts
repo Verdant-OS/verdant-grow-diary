@@ -108,6 +108,17 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/grow-room", access: "redirect", description: "→ /" },
   { path: "/grows", access: "auth" },
   { path: "/grows/:growId", access: "auth" },
+  {
+    path: "/guides",
+    access: "public",
+    label: "Grower Guides",
+    description: "Public SEO hub for grower-intent guides.",
+  },
+  {
+    path: "/guides/:slug",
+    access: "public",
+    description: "Public SEO guide detail page.",
+  },
   { path: "/hardware-integrations", access: "public" },
 
   { path: "/ingest-inspector", access: "operator" },

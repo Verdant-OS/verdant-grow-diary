@@ -75,3 +75,49 @@ describe("Operator route surface", () => {
     expect(entry?.access).toBe("operator");
   });
 });
+
+describe("Public SEO route surface", () => {
+  /**
+   * Regression fence: every route mounted in App.tsx that looks like a
+   * public SEO surface (grower guides, pricing, welcome, hardware
+   * integrations, customer share pages) MUST appear in the manifest and
+   * MUST be marked `public`. This catches the class of drift where a new
+   * SEO page is added to App.tsx but the manifest is not updated.
+   */
+  const PUBLIC_SEO_PATH_PATTERNS: ReadonlyArray<RegExp> = [
+    /^\/guides(\/.*)?$/,
+    /^\/welcome$/,
+    /^\/pricing$/,
+    /^\/hardware-integrations$/,
+    /^\/customer\/.+$/,
+  ];
+
+  function isPublicSeoPath(p: string): boolean {
+    return PUBLIC_SEO_PATH_PATTERNS.some((rx) => rx.test(p));
+  }
+
+  it("every mounted public SEO route exists in the manifest", () => {
+    const mounted = extractMountedAppRoutePaths();
+    const manifestSet = new Set(APP_ROUTES.map((r) => r.path));
+    const missing = mounted
+      .filter(isPublicSeoPath)
+      .filter((p) => !manifestSet.has(p));
+    expect(missing).toEqual([]);
+  });
+
+  it("every public SEO route in the manifest is access: public", () => {
+    const offenders = APP_ROUTES.filter(
+      (r) => isPublicSeoPath(r.path) && r.access !== "public",
+    ).map((r) => ({ path: r.path, access: r.access }));
+    expect(offenders).toEqual([]);
+  });
+
+  it("explicitly covers /guides and /guides/:slug as public", () => {
+    for (const path of ["/guides", "/guides/:slug"]) {
+      const entry = APP_ROUTES.find((r) => r.path === path);
+      expect(entry, `manifest entry for ${path}`).toBeDefined();
+      expect(entry?.access).toBe("public");
+    }
+  });
+});
+

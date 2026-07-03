@@ -148,4 +148,23 @@ describe("release workbook manifest", () => {
       expect(sha256File(join(ART, f)), `XLSX nondeterministic: ${f}`).toBe(hash);
     }
   });
+
+  it("regenerating with unchanged content leaves the manifest byte-identical (no timestamp/format churn)", () => {
+    const before = readFileSync(MANIFEST, "utf8");
+    execSync("node scripts/generate-release-workbook-templates.mjs", { stdio: "ignore" });
+    const after = readFileSync(MANIFEST, "utf8");
+    expect(after, "manifest churned on a no-change regeneration").toBe(before);
+  });
+
+  it("manifest on disk is prettier-formatted (generator output matches repo formatting)", async () => {
+    const raw = readFileSync(MANIFEST, "utf8");
+    const prettier = await import("prettier");
+    const config = (await prettier.resolveConfig(MANIFEST)) ?? {};
+    const formatted = await prettier.format(raw, {
+      ...config,
+      parser: "json",
+      filepath: MANIFEST,
+    });
+    expect(raw, "manifest is not prettier-clean — lint-staged would rewrite it").toBe(formatted);
+  });
 });

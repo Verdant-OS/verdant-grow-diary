@@ -177,6 +177,50 @@ export default function Landing() {
         </ol>
       </section>
 
+      {/* SEO landing sections — grower-intent keyword clusters. */}
+      <section
+        id="seo-sections"
+        aria-label="What Verdant does for growers"
+        className="px-6 py-14 max-w-5xl mx-auto space-y-10"
+      >
+        {VERDANT_SEO_LANDING_SECTIONS.map((section) => (
+          <article
+            key={section.id}
+            id={section.id}
+            className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-6"
+          >
+            <h2 className="font-display text-2xl md:text-3xl font-semibold">
+              {section.heading}
+            </h2>
+            <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed">
+              {section.body}
+            </p>
+          </article>
+        ))}
+      </section>
+
+      {/* Visible FAQ — mirrored 1:1 into FAQPage JSON-LD above. */}
+      <section
+        id="faq"
+        aria-label="Frequently asked questions about Verdant"
+        className="px-6 py-14 max-w-3xl mx-auto"
+      >
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center mb-6">
+          Grow diary & sensor FAQ
+        </h2>
+        <Accordion type="single" collapsible className="w-full">
+          {VERDANT_LANDING_FAQ.map((entry, i) => (
+            <AccordionItem key={entry.question} value={`landing-faq-${i}`}>
+              <AccordionTrigger>{entry.question}</AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                {entry.answer}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </section>
+
+
       {/* Legacy anchor tokens preserved for downstream tests/consumers.
           These are the human-facing categories the loop delivers on. */}
       <section className="sr-only" aria-hidden="true">

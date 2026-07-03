@@ -8,6 +8,8 @@ import {
   reviewStatusFormula,
   qualityFlagFormula,
   viabilityFormula,
+  manifestContentFingerprint,
+  resolveGeneratedAt,
 } from "../../scripts/generate-release-workbook-templates.mjs";
 
 const BLOCKED_STRINGS = [
@@ -150,5 +152,44 @@ describe("generate-release-workbook-templates", () => {
       if (!existsSync(p)) continue;
       expect(readFileSync(p, "utf8")).not.toMatch(/PREMIMUM_WORKBOOK_COPY_URL/);
     }
+  });
+});
+
+describe("manifest generated_at stability (anti-churn)", () => {
+  const NOW = new Date("2026-07-03T12:00:00.000Z");
+  const baseManifest = () => ({
+    version: "v1.3",
+    generated_at: "",
+    templates: { a: 1 },
+    files: [{ filename: "x.csv", sha256: "abc" }],
+  });
+
+  it("fingerprint ignores generated_at but tracks content", () => {
+    const a = { ...baseManifest(), generated_at: "2026-01-01T00:00:00.000Z" };
+    const b = { ...baseManifest(), generated_at: "2026-02-02T00:00:00.000Z" };
+    expect(manifestContentFingerprint(a)).toBe(manifestContentFingerprint(b));
+    const c = { ...baseManifest(), files: [{ filename: "x.csv", sha256: "CHANGED" }] };
+    expect(manifestContentFingerprint(a)).not.toBe(manifestContentFingerprint(c));
+  });
+
+  it("preserves the previous timestamp when content is unchanged", () => {
+    const prev = { ...baseManifest(), generated_at: "2026-01-01T00:00:00.000Z" };
+    const next = baseManifest();
+    expect(resolveGeneratedAt(next, JSON.stringify(prev), NOW)).toBe("2026-01-01T00:00:00.000Z");
+  });
+
+  it("stamps the injected now when content changed", () => {
+    const prev = { ...baseManifest(), generated_at: "2026-01-01T00:00:00.000Z" };
+    const next = {
+      ...baseManifest(),
+      files: [{ filename: "x.csv", sha256: "CHANGED" }],
+    };
+    expect(resolveGeneratedAt(next, JSON.stringify(prev), NOW)).toBe(NOW.toISOString());
+  });
+
+  it("stamps the injected now when the previous manifest is missing or unreadable", () => {
+    expect(resolveGeneratedAt(baseManifest(), null, NOW)).toBe(NOW.toISOString());
+    expect(resolveGeneratedAt(baseManifest(), "not json {", NOW)).toBe(NOW.toISOString());
+    expect(resolveGeneratedAt(baseManifest(), "", NOW)).toBe(NOW.toISOString());
   });
 });

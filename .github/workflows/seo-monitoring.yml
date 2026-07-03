@@ -53,7 +53,7 @@ jobs:
       - name: Download previous SEO artifacts (for diff)
         id: prev
         continue-on-error: true
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@bf251b5aa9c2f7eeb574a96ee720e24f801b7c11 # v6
         with:
           name: seo-monitoring-reports
           workflow: seo-monitoring.yml

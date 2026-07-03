@@ -9,7 +9,7 @@
  * Positioning rules (enforced by tests):
  *   - Verdant is plant memory, sensor truth, grower-approved decisions.
  *   - Hardware-neutral: reads gear growers already own; never controls it.
- *   - No autopilot / device-control language (see VERDANT_FORBIDDEN_PUBLIC_PHRASES).
+ *   - No forbidden autopilot-style language (see VERDANT_FORBIDDEN_PUBLIC_PHRASES).
  *   - Source labels named where relevant: live, manual, csv, demo, stale, invalid.
  */
 

@@ -95,7 +95,19 @@ describe("V0 operating loop — CI / PR guardrails", () => {
       }
       return out.join("\n");
     };
-    const w = stripIfGatedSteps(stripYamlComments(wRaw));
+    // Exact-line exemption: the client-secret-boundary proof artifact
+    // heredoc documents the terms that scanner BLOCKS ("Blocked
+    // executable-code terms: SUPABASE_SERVICE_ROLE_KEY, service_role").
+    // That line is denylist documentation required verbatim by
+    // scripts/check-client-secret-boundary-artifacts.mjs (REQUIRED_MARKERS),
+    // not an executable service_role dependency. Any other occurrence of a
+    // forbidden term in an active step still fails this scan.
+    const stripKnownDenylistDocLines = (s: string) =>
+      s
+        .split("\n")
+        .filter((l) => !/Blocked executable-code terms:/.test(l))
+        .join("\n");
+    const w = stripKnownDenylistDocLines(stripIfGatedSteps(stripYamlComments(wRaw)));
 
     it("exists at .github/workflows/ci.yml", () => {
       expect(existsSync(WORKFLOW)).toBe(true);
@@ -129,9 +141,12 @@ describe("V0 operating loop — CI / PR guardrails", () => {
       "Leads",
       "typed_watering",
       "device_command",
-    ])("does not reference forbidden surface %s in active (non-comment, non-gated) workflow steps", (term) => {
-      expect(w.toLowerCase()).not.toContain(term.toLowerCase());
-    });
+    ])(
+      "does not reference forbidden surface %s in active (non-comment, non-gated) workflow steps",
+      (term) => {
+        expect(w.toLowerCase()).not.toContain(term.toLowerCase());
+      },
+    );
   });
 
   describe("Demo doc marks the contract as stop-ship", () => {

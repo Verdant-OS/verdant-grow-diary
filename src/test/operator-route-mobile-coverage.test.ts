@@ -18,18 +18,39 @@ function extractStringArray(src: string, name: string): string[] {
 
 const protectedListed = new Set(extractStringArray(spec, "PROTECTED_MOBILE_ROUTES"));
 const publicListed = new Set(extractStringArray(spec, "PUBLIC_MOBILE_ROUTES"));
+// Fixture-only internal demo surfaces deliberately mounted OUTSIDE AppShell
+// (render signed-out by design; asserted for zero private REST hits instead
+// of an /auth redirect). Pinned below to exactly these two routes so real
+// operator/internal pages can never quietly migrate into this bucket.
+const ALLOWED_UNAUTH_FIXTURE_ROUTES = [
+  "/internal/contextual-pheno-comparison-demo",
+  "/internal/demo-proof-walkthrough",
+] as const;
+const fixtureListed = new Set(extractStringArray(spec, "UNAUTH_FIXTURE_ROUTES"));
 
 const operatorInternal = APP_ROUTES.filter(
   (r) => r.access === "operator" || r.access === "internal",
 ).map((r) => r.path);
 const publicManifest = APP_ROUTES.filter(
-  (r) => r.access === "public" && !["/auth", "/reset-password", "/billing/:plan", "*"].includes(r.path),
+  (r) =>
+    r.access === "public" && !["/auth", "/reset-password", "/billing/:plan", "*"].includes(r.path),
 ).map((r) => r.path);
 
 describe("Mobile route-protection coverage guardrail", () => {
-  it("PROTECTED_MOBILE_ROUTES contains every operator + internal route", () => {
-    const missing = operatorInternal.filter((p) => !protectedListed.has(p));
+  it("PROTECTED_MOBILE_ROUTES (plus pinned fixture list) covers every operator + internal route", () => {
+    const missing = operatorInternal.filter(
+      (p) => !protectedListed.has(p) && !fixtureListed.has(p),
+    );
     expect(missing, `Missing mobile coverage for: ${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("UNAUTH_FIXTURE_ROUTES is pinned to exactly the two fixture-only demo surfaces", () => {
+    expect([...fixtureListed].sort()).toEqual([...ALLOWED_UNAUTH_FIXTURE_ROUTES].sort());
+    // And none of them may also appear in the protected or public buckets.
+    for (const p of fixtureListed) {
+      expect(protectedListed.has(p)).toBe(false);
+      expect(publicListed.has(p)).toBe(false);
+    }
   });
 
   it("PUBLIC_MOBILE_ROUTES covers manifest public routes (excluding /auth, /reset-password, /billing/:plan, *)", () => {

@@ -12,8 +12,10 @@ const GROW_DETAIL = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf
 const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
 
 describe("Logs — grow filter (/logs?growId=…)", () => {
-  it("/logs route renders Timeline", () => {
-    expect(APP).toMatch(/path=\s*["']\/logs["']\s*element=\{<Timeline/);
+  it("/logs redirects to /timeline, which renders Timeline", () => {
+    // /logs became a legacy alias; the canonical route is /timeline.
+    expect(APP).toMatch(/path="\/logs"\s+element=\{<Navigate\s+to="\/timeline"\s+replace\s*\/>\}/);
+    expect(APP).toMatch(/path="\/timeline"\s+element=\{<Timeline\s*\/>\}/);
   });
 
   it("reads growId via shared useScopedGrow hook", () => {
@@ -31,7 +33,9 @@ describe("Logs — grow filter (/logs?growId=…)", () => {
     expect(TIMELINE).toMatch(/label=\{scopeLabel\}/);
     expect(TIMELINE).toMatch(/scopeLabel\s*=\s*isLogsRoute\s*\?\s*["']logs["']/);
     expect(TIMELINE).toMatch(/clearHref=\{clearTo\}/);
-    expect(TIMELINE).toMatch(/clearTo\s*=\s*isLogsRoute\s*\?\s*logsPath\(\)\s*:\s*timelinePath\(\)/);
+    expect(TIMELINE).toMatch(
+      /clearTo\s*=\s*isLogsRoute\s*\?\s*logsPath\(\)\s*:\s*timelinePath\(\)/,
+    );
   });
 
   it("GrowDetail links to /logs?growId=<growId> via logsPath(growId)", () => {
@@ -40,6 +44,8 @@ describe("Logs — grow filter (/logs?growId=…)", () => {
 
   it("does not introduce ai-coach, device-control, or service_role surface", () => {
     expect(TIMELINE).not.toMatch(/ai-coach|ai_coach/);
-    expect(TIMELINE).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i);
+    expect(TIMELINE).not.toMatch(
+      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
+    );
   });
 });

@@ -100,16 +100,18 @@ describe("QuickLog compact Stage + Current Setup row", () => {
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} />);
     const dialog = screen.getByRole("dialog");
     const text = dialog.textContent ?? "";
-    expect(text).not.toMatch(/\blive data\b|\blive sensor\b|guaranteed/i);
+    // Honest negations ("saved as manual, not live sensor data",
+    // "Not live device control") are REQUIRED truth labeling — strip them
+    // before scanning so only an unnegated fake-live claim fails.
+    const scrubbed = text
+      .replace(/not live sensor data/gi, "")
+      .replace(/not live device control/gi, "");
+    expect(scrubbed).not.toMatch(/\blive data\b|\blive sensor\b|guaranteed/i);
   });
 
   it("save payload (RPC) is unchanged by the layout refactor", async () => {
     renderWithClient(
-      <QuickLog
-        open
-        onOpenChange={vi.fn()}
-        prefill={{ plantId: "p1", growId: "g1" }}
-      />,
+      <QuickLog open onOpenChange={vi.fn()} prefill={{ plantId: "p1", growId: "g1" }} />,
     );
     const dialog = screen.getByRole("dialog");
     fireEvent.change(dialog.querySelector("textarea") as HTMLTextAreaElement, {

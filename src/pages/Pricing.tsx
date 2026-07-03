@@ -599,6 +599,19 @@ export default function Pricing() {
               charge is made from that page.
             </AccordionContent>
           </AccordionItem>
+
+          {VERDANT_PRICING_FAQ_ADDITIONS.map((entry, i) => (
+            <AccordionItem
+              key={entry.question}
+              value={`pricing-faq-grower-${i}`}
+              data-testid={`pricing-faq-grower-${i}`}
+            >
+              <AccordionTrigger>{entry.question}</AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                {entry.answer}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
         </Accordion>
       </section>
 

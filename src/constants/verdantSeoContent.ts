@@ -9,7 +9,7 @@
  * Positioning rules (enforced by tests):
  *   - Verdant is plant memory, sensor truth, grower-approved decisions.
  *   - Hardware-neutral: reads gear growers already own; never controls it.
- *   - No forbidden autopilot-style language (see VERDANT_FORBIDDEN_PUBLIC_PHRASES).
+ *   - No forbidden hands-off / device-control language (see VERDANT_FORBIDDEN_PUBLIC_PHRASES).
  *   - Source labels named where relevant: live, manual, csv, demo, stale, invalid.
  */
 
@@ -112,7 +112,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           "Verdant preserves the source of every reading — live, manual, csv, demo, stale, or invalid — so a snapshot you attach to a diary entry always carries its own provenance. Demo or stale values never masquerade as current tent truth.",
       },
       {
-        heading: "Grower-approved decisions, not autopilot",
+        heading: "Grower-approved decisions, never hands-off",
         body:
           "Verdant suggests; the grower decides. AI Doctor can point at likely causes and cite the evidence, but every recommended action stays in an approval-required Action Queue. Verdant cannot touch your equipment.",
       },

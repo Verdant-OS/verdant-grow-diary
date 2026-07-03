@@ -151,6 +151,8 @@ const App = () => (
                   <Route path="/demo" element={<Navigate to="/welcome" replace />} />
                   <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/guides" element={<GuidesIndex />} />
+                  <Route path="/guides/:slug" element={<GuidePage />} />
                   <Route path="/billing/:plan" element={<BillingPlaceholder />} />
                   {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
                       no operator chrome (header, Quick Log) renders. */}

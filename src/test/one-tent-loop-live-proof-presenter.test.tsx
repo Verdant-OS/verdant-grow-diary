@@ -265,6 +265,8 @@ describe("OneTentLoopLiveProof — TopGapPanel unknown/equivalent never-healthy 
 
     // Same order + same label + same state, item by item.
     for (let i = 0; i < dom.length; i += 1) {
+      expect(dom[i].label, `panel row ${i} missing label text`).not.toBe("");
+      expect(dom[i].state, `panel row ${i} missing data-state`).not.toBe("");
       expect(
         reportLines[i].includes(dom[i].label),
         `panel row ${i} label "${dom[i].label}" not at report line ${i}: "${reportLines[i]}"`,

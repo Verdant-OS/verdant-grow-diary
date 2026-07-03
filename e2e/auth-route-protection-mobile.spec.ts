@@ -25,7 +25,6 @@ const PRIVATE_TABLES = [
 const PROTECTED_MOBILE_ROUTES: string[] = [
   // operator
   "/diagnostics",
-  "/imports/representative-csv",
   "/ingest-inspector",
   "/operator/ai-doctor-phase1",
   "/operator/billing-entitlement-resolution",
@@ -35,7 +34,6 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/ecowitt-bridge-debug",
   "/operator/ecowitt-live-bringup",
   "/operator/ecowitt-tent-preview",
-  "/operator/genetics-import",
   "/operator/ggs-real-payload-ingest",
   "/demo/one-tent-live-proof",
   "/operator/one-tent-live-proof",
@@ -47,7 +45,6 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/demo-preview",
 
   "/pi-ingest-status",
-  "/sensors/csv-preview",
   "/sensors/ecowitt-audit",
   "/sensors/ingest-normalizer",
   // internal
@@ -55,9 +52,6 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/grow-lineage",
   "/internal/ai-doctor-confidence-audit",
   "/internal/ai-doctor-phase1-preview",
-  "/internal/contextual-pheno-comparison-demo",
-  "/internal/demo-proof-walkthrough",
-
   "/internal/one-tent-loop-proof",
   "/internal/sensor-truth-audit",
   "/leads",
@@ -77,6 +71,17 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/customer/:shareId",
   "/pheno-comparison",
   "/pheno-hunts/:id/compare",
+];
+
+// Internal fixture-only demo surfaces DELIBERATELY mounted OUTSIDE AppShell
+// (see App.tsx comments): they render signed-out by design so the read-only
+// E2E guards can exercise them without a session. Their safety contract is
+// not "redirects to /auth" but "renders fixture content with ZERO private
+// REST hits". Do NOT add real operator/internal pages here — the vitest
+// coverage guardrail pins this list to exactly these two routes.
+const UNAUTH_FIXTURE_ROUTES: string[] = [
+  "/internal/contextual-pheno-comparison-demo",
+  "/internal/demo-proof-walkthrough",
 ];
 
 async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {
@@ -233,6 +238,41 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
       expect(
         privateHits,
         `Private-table hits while signed out (mobile public ${path}): ${privateHits.join(", ")}`,
+      ).toHaveLength(0);
+      const body = ((await page.locator("body").textContent()) ?? "").toLowerCase();
+      expect(body).not.toContain("live reading");
+      expect(body).not.toContain("latest sensor:");
+    });
+  }
+
+  for (const path of UNAUTH_FIXTURE_ROUTES) {
+    test(`mobile fixture-only ${path} renders signed-out with zero private REST hits`, async ({
+      page,
+      baseURL,
+    }) => {
+      const privateHits: string[] = [];
+      await page.route(/\/rest\/v1\//, (route, req) => {
+        const url = req.url();
+        if (PRIVATE_TABLES.some((t) => url.includes(`/rest/v1/${t}`))) {
+          privateHits.push(url);
+        }
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([]),
+        });
+      });
+      await page.goto(path, { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(1200);
+      // Deliberately unauthenticated: the page must stay on-origin and on
+      // its own path (no crash-redirect), render fixture content only, and
+      // touch zero private tables.
+      const url = new URL(page.url());
+      expect(url.origin).toBe(new URL(baseURL!).origin);
+      expect(url.pathname).toBe(path);
+      expect(
+        privateHits,
+        `Private-table hits while signed out (mobile fixture ${path}): ${privateHits.join(", ")}`,
       ).toHaveLength(0);
       const body = ((await page.locator("body").textContent()) ?? "").toLowerCase();
       expect(body).not.toContain("live reading");

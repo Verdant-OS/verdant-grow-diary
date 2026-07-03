@@ -10,13 +10,18 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  VERDANT_CUSTOMER_GUIDE_PATH,
+  VERDANT_CUSTOMER_MODE_GROWER_FAQ,
   VERDANT_GROWER_GUIDE_FAQ,
+  VERDANT_GUIDES_BREADCRUMB_ITEMS,
   VERDANT_SEO_GUIDES,
+  VERDANT_SITE_ORIGIN,
   VERDANT_GUIDE_SLUGS,
   findGuideBySlug,
 } from "@/constants/verdantSeoContent";
 import { VERDANT_FORBIDDEN_PUBLIC_PHRASES } from "@/constants/verdantSeoCopy";
 import {
+  buildBreadcrumbListJsonLd,
   buildFaqPageJsonLd,
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
@@ -32,6 +37,8 @@ const SITEMAP = read("public/sitemap.xml");
 const ROBOTS = read("public/robots.txt");
 const LANDING = read("src/pages/Landing.tsx");
 const PRICING = read("src/pages/Pricing.tsx");
+const CUSTOMER_MODE_GUIDE = read("src/pages/CustomerModeGuide.tsx");
+
 
 const EXPECTED_SLUGS = [
   "grow-diary-app",
@@ -246,3 +253,154 @@ describe("Landing and Pricing OG/Twitter metadata", () => {
     expect(hook).toMatch(/https:\/\/verdantgrowdiary\.com/);
   });
 });
+
+describe("Guide internal links to Customer Guide route", () => {
+  it("Customer Guide path resolves to the real /customer/:shareId route", () => {
+    expect(VERDANT_CUSTOMER_GUIDE_PATH.startsWith("/customer/")).toBe(true);
+    expect(APP_TSX).toMatch(/path="\/customer\/:shareId"/);
+  });
+
+  it("GuidePage and GuidesIndex link to the Customer Guide route", () => {
+    expect(GUIDE_PAGE).toContain("VERDANT_CUSTOMER_GUIDE_PATH");
+    expect(GUIDES_INDEX).toContain("VERDANT_CUSTOMER_GUIDE_PATH");
+  });
+
+  it("guide pages do not link to protected/private app routes", () => {
+    const surface = [GUIDES_INDEX, GUIDE_PAGE].join("\n");
+    for (const priv of [
+      'to="/dashboard"',
+      'to="/diary"',
+      'to="/tents"',
+      'to="/plants"',
+      'to="/settings"',
+      'to="/action-queue"',
+      'to="/operator',
+      'to="/admin',
+      'to="/internal',
+    ]) {
+      expect(surface).not.toContain(priv);
+    }
+  });
+});
+
+describe("Guides hub metadata (/guides)", () => {
+  it("GuidesIndex title/description carry the target keyword phrases", () => {
+    expect(GUIDES_INDEX).toContain(
+      "Verdant Grower Guides | Grow Diary, VPD Tracking, and Sensor Truth",
+    );
+    expect(GUIDES_INDEX).toMatch(/source-labeled sensor data/i);
+    expect(GUIDES_INDEX).toMatch(/path:\s*"\/guides"/);
+  });
+
+  it("GuidePage passes guide.title and guide.description into usePageSeo", () => {
+    expect(GUIDE_PAGE).toContain("guide?.title");
+    expect(GUIDE_PAGE).toContain("guide?.description");
+  });
+
+  it("every guide title ends with the shared brand suffix segment", () => {
+    for (const g of VERDANT_SEO_GUIDES) {
+      expect(g.title).toMatch(/Verdant/);
+    }
+  });
+
+  it("every guide description is unique and non-empty", () => {
+    const descs = VERDANT_SEO_GUIDES.map((g) => g.description);
+    expect(new Set(descs).size).toBe(descs.length);
+    for (const d of descs) expect(d.trim().length).toBeGreaterThan(20);
+  });
+});
+
+describe("BreadcrumbList JSON-LD for guides", () => {
+  it("hub breadcrumb has Home + Grower Guides in correct positions", () => {
+    const doc = buildBreadcrumbListJsonLd({
+      items: VERDANT_GUIDES_BREADCRUMB_ITEMS,
+    });
+    expect(doc["@type"]).toBe("BreadcrumbList");
+    expect(doc.itemListElement.length).toBe(2);
+    expect(doc.itemListElement[0]).toMatchObject({
+      position: 1,
+      name: "Home",
+      item: `${VERDANT_SITE_ORIGIN}/welcome`,
+    });
+    expect(doc.itemListElement[1]).toMatchObject({
+      position: 2,
+      name: "Grower Guides",
+      item: `${VERDANT_SITE_ORIGIN}/guides`,
+    });
+    expect(() => JSON.parse(safeJsonLdStringify(doc))).not.toThrow();
+  });
+
+  it("each guide breadcrumb has Home + Grower Guides + current guide", () => {
+    for (const g of VERDANT_SEO_GUIDES) {
+      const items = [
+        ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
+        { name: g.h1, url: `${VERDANT_SITE_ORIGIN}/guides/${g.slug}` },
+      ];
+      const doc = buildBreadcrumbListJsonLd({ items });
+      expect(doc.itemListElement.length).toBe(3);
+      expect(doc.itemListElement[2]).toMatchObject({
+        position: 3,
+        name: g.h1,
+        item: `${VERDANT_SITE_ORIGIN}/guides/${g.slug}`,
+      });
+    }
+  });
+
+  it("rejects relative breadcrumb URLs", () => {
+    expect(() =>
+      buildBreadcrumbListJsonLd({
+        items: [{ name: "Home", url: "/welcome" }],
+      }),
+    ).toThrow();
+  });
+
+  it("GuidesIndex and GuidePage inject breadcrumb JSON-LD", () => {
+    expect(GUIDES_INDEX).toContain("buildBreadcrumbListJsonLd");
+    expect(GUIDES_INDEX).toContain("guides-index-breadcrumb");
+    expect(GUIDE_PAGE).toContain("buildBreadcrumbListJsonLd");
+    expect(GUIDE_PAGE).toContain("breadcrumb");
+  });
+});
+
+describe("Customer Mode grower FAQ", () => {
+  it("exposes the same 8 grower-intent questions as the /guides hub", () => {
+    expect(VERDANT_CUSTOMER_MODE_GROWER_FAQ.length).toBe(8);
+    expect(VERDANT_CUSTOMER_MODE_GROWER_FAQ).toEqual(VERDANT_GROWER_GUIDE_FAQ);
+  });
+
+  it("CustomerModeGuide renders the visible grower FAQ from shared constants", () => {
+    expect(CUSTOMER_MODE_GUIDE).toContain("VERDANT_CUSTOMER_MODE_GROWER_FAQ");
+    expect(CUSTOMER_MODE_GUIDE).toContain("customer-mode-grower-faq");
+    expect(CUSTOMER_MODE_GUIDE).toContain("buildFaqPageJsonLd");
+  });
+
+  it("all six sensor source labels appear in Customer Mode visible copy", () => {
+    const lower = CUSTOMER_MODE_GUIDE.toLowerCase();
+    for (const label of ["live", "manual", "csv", "demo", "stale", "invalid"]) {
+      expect(lower).toContain(label);
+    }
+  });
+
+  it("Customer Mode FAQ JSON-LD is derived from the visible constant", () => {
+    const doc = buildFaqPageJsonLd({
+      questions: VERDANT_CUSTOMER_MODE_GROWER_FAQ,
+    });
+    expect(doc.mainEntity.length).toBe(VERDANT_CUSTOMER_MODE_GROWER_FAQ.length);
+    for (let i = 0; i < doc.mainEntity.length; i++) {
+      expect(doc.mainEntity[i].name).toBe(
+        VERDANT_CUSTOMER_MODE_GROWER_FAQ[i].question,
+      );
+      expect(doc.mainEntity[i].acceptedAnswer.text).toBe(
+        VERDANT_CUSTOMER_MODE_GROWER_FAQ[i].answer,
+      );
+    }
+  });
+
+  it("Customer Mode contains no forbidden autopilot / device-control language", () => {
+    const lower = CUSTOMER_MODE_GUIDE.toLowerCase();
+    for (const phrase of VERDANT_FORBIDDEN_PUBLIC_PHRASES) {
+      expect(lower).not.toContain(phrase.toLowerCase());
+    }
+  });
+});
+

@@ -16,21 +16,26 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import {
+  VERDANT_CUSTOMER_GUIDE_PATH,
   VERDANT_GROWER_GUIDE_FAQ,
+  VERDANT_GUIDES_BREADCRUMB_ITEMS,
   VERDANT_SEO_GUIDES,
 } from "@/constants/verdantSeoContent";
 import {
+  buildBreadcrumbListJsonLd,
   buildFaqPageJsonLd,
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
+
 
 const PAGE_URL = "https://verdantgrowdiary.com/guides";
 
 export default function GuidesIndex() {
   usePageSeo({
-    title: "Grower Guides — Grow Diary, Sensor Truth & AI Doctor | Verdant",
+    title:
+      "Verdant Grower Guides | Grow Diary, VPD Tracking, and Sensor Truth",
     description:
-      "The Verdant grower guide: how to run a grow diary app with source-labeled sensor snapshots, VPD context, and an AI grow doctor that cites evidence and cannot touch your equipment.",
+      "Practical grower guides for using plant timelines, source-labeled sensor data, VPD context, and cautious AI to make better cultivation decisions.",
     path: "/guides",
   });
 
@@ -39,15 +44,25 @@ export default function GuidesIndex() {
       pageUrl: PAGE_URL,
       questions: VERDANT_GROWER_GUIDE_FAQ,
     });
-    const s = document.createElement("script");
-    s.type = "application/ld+json";
-    s.setAttribute("data-page-ldjson", "guides-index-faq");
-    s.text = safeJsonLdStringify(faq);
-    document.head.appendChild(s);
+    const crumbs = buildBreadcrumbListJsonLd({
+      items: VERDANT_GUIDES_BREADCRUMB_ITEMS,
+    });
+    const faqScript = document.createElement("script");
+    faqScript.type = "application/ld+json";
+    faqScript.setAttribute("data-page-ldjson", "guides-index-faq");
+    faqScript.text = safeJsonLdStringify(faq);
+    document.head.appendChild(faqScript);
+    const crumbScript = document.createElement("script");
+    crumbScript.type = "application/ld+json";
+    crumbScript.setAttribute("data-page-ldjson", "guides-index-breadcrumb");
+    crumbScript.text = safeJsonLdStringify(crumbs);
+    document.head.appendChild(crumbScript);
     return () => {
-      s.remove();
+      faqScript.remove();
+      crumbScript.remove();
     };
   }, []);
+
 
   return (
     <main
@@ -125,14 +140,22 @@ export default function GuidesIndex() {
           Ready to start? See{" "}
           <Link to="/welcome" className="underline hover:text-foreground">
             what Verdant does
-          </Link>{" "}
-          or compare{" "}
+          </Link>
+          ,{" "}
+          <Link
+            to={VERDANT_CUSTOMER_GUIDE_PATH}
+            className="underline hover:text-foreground"
+          >
+            start with the Customer Guide
+          </Link>
+          , or compare{" "}
           <Link to="/pricing" className="underline hover:text-foreground">
-            Free and Pro pricing
+            Verdant plans
           </Link>
           .
         </p>
       </section>
     </main>
+
   );
 }

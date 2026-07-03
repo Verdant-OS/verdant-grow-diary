@@ -368,3 +368,32 @@ export function findGuideBySlug(slug: string | undefined): SeoGuidePage | null {
   if (!slug) return null;
   return VERDANT_SEO_GUIDES.find((g) => g.slug === slug) ?? null;
 }
+
+/* ------------------------------------------------------------------ */
+/* Public route constants for internal linking + breadcrumbs           */
+/* ------------------------------------------------------------------ */
+
+export const VERDANT_SITE_ORIGIN = "https://verdantgrowdiary.com";
+
+/**
+ * Canonical public entry-point for the Customer Mode guide shell. The
+ * :shareId segment is opaque and rendered as placeholder copy in this
+ * shell, so a stable "guide" slug is a safe internal link target.
+ */
+export const VERDANT_CUSTOMER_GUIDE_PATH = "/customer/guide";
+
+export const VERDANT_GUIDES_BREADCRUMB_ITEMS: ReadonlyArray<{
+  name: string;
+  url: string;
+}> = [
+  { name: "Home", url: `${VERDANT_SITE_ORIGIN}/welcome` },
+  { name: "Grower Guides", url: `${VERDANT_SITE_ORIGIN}/guides` },
+];
+
+/**
+ * Customer Mode grower-intent FAQ. Reuses the same 8 grower-guide
+ * questions rendered on /guides so visible copy and FAQPage JSON-LD
+ * share a single source and cannot drift.
+ */
+export const VERDANT_CUSTOMER_MODE_GROWER_FAQ = VERDANT_GROWER_GUIDE_FAQ;
+

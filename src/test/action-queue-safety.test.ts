@@ -312,9 +312,17 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     // safety GUARANTEE rendered into the printed report — there is no
     // network, RPC, automation, or device-control surface in this file.
     const POST_GROW_REPORT_PRINT_RULES_PATH = resolve(ROOT, "src/lib/postGrowReportPrintRules.ts");
+    // Also allow-list (EXACT FILE PATH ONLY): verdantSeoCopy.ts carries the
+    // VERDANT_FORBIDDEN_PUBLIC_PHRASES denylist — "autopilot" etc. appear
+    // there ONLY as forbidden examples that the SEO safety tests assert
+    // never render on public surfaces. It is presenter copy with no
+    // network, RPC, automation, or device-control surface. Guarded by
+    // test 2d below: the tokens must stay inside the denylist array.
+    const VERDANT_SEO_COPY_PATH = resolve(ROOT, "src/constants/verdantSeoCopy.ts");
     const ALLOWED_AUTO_EXECUTE_PATHS = new Set([
       POST_GROW_REFLECTION_PROMPT_PATH,
       POST_GROW_REPORT_PRINT_RULES_PATH,
+      VERDANT_SEO_COPY_PATH,
     ]);
     for (const re of [
       /\bautopilot\b/i,
@@ -385,6 +393,45 @@ describe("Action Queue safety — current posture (suggest-only by construction)
         /block|denylist|deny[_-]?list|safety|BLOCK|risk|PATTERNS|never|forbidden/i.test(ctx),
         `device_command at ${m.index} lacks safety/block context: ${ctx}`,
       ).toBe(true);
+    }
+  });
+
+  it("2d. allow-listed SEO copy file confines auto-execute tokens to the forbidden-phrases denylist", () => {
+    const SEO_COPY_PATH = resolve(ROOT, "src/constants/verdantSeoCopy.ts");
+    const src = readFileSync(SEO_COPY_PATH, "utf8");
+
+    // The denylist MUST exist and MUST still contain the tokens — that is
+    // the entire reason for the allow-list entry (the SEO safety tests
+    // iterate it to prove public copy never renders these phrases).
+    const arrayMatch = src.match(/VERDANT_FORBIDDEN_PUBLIC_PHRASES[\s\S]*?=\s*\[([\s\S]*?)\];/);
+    expect(arrayMatch, "VERDANT_FORBIDDEN_PUBLIC_PHRASES array missing").toBeTruthy();
+    const arrayBody = arrayMatch![1];
+    expect(arrayBody).toMatch(/\bautopilot\b/i);
+
+    // Outside the denylist array, the file must contain NONE of the
+    // auto-execute tokens the production scan forbids.
+    const remainder = src.replace(arrayMatch![0], "");
+    for (const re of [
+      /\bautopilot\b/i,
+      /\bauto[-_ ]?execute\b/i,
+      /\bauto[-_ ]?apply\b/i,
+      /\bexecute_action\b/i,
+      /\bdispatch_command\b/i,
+    ]) {
+      expect(remainder, `auto-execute token outside denylist array: ${re}`).not.toMatch(re);
+    }
+
+    // Presenter copy only — no runtime danger surface may ever appear here.
+    for (const re of [
+      /\.rpc\(/i,
+      /service_role/i,
+      /\bmqtt\.connect\b/i,
+      /\bmqtt:\/\//i,
+      /supabase\s*\.\s*from\(/i,
+      /\bfetch\(/i,
+      /raw_payload/i,
+    ]) {
+      expect(src, `SEO copy file must not contain: ${re}`).not.toMatch(re);
     }
   });
 });

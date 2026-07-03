@@ -65,6 +65,8 @@ const Landing = lazy(() => import("./pages/Landing"));
 // Demo page removed — Verdant is positioned around real grow data only.
 const HardwareIntegrations = lazy(() => import("./pages/HardwareIntegrations"));
 const Pricing = lazy(() => import("./pages/Pricing"));
+const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
+const GuidePage = lazy(() => import("./pages/GuidePage"));
 const BillingPlaceholder = lazy(() => import("./pages/BillingPlaceholder"));
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));

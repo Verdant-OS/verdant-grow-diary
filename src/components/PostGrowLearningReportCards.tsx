@@ -22,6 +22,8 @@ import { exportPostGrowReportAsPdf } from "@/lib/postGrowPdfExport";
 import {
   buildProvenanceBadgeRows,
   PDF_EXPORT_UNAVAILABLE_COPY,
+  POST_GROW_SENSOR_EMPTY_STATE_COPY,
+  provenanceBadgeAriaLabel,
 } from "@/lib/postGrowReportRules";
 import { actionsPath } from "@/lib/routes";
 

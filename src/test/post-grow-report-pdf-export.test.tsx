@@ -248,6 +248,48 @@ describe("postGrowPdfExport — export orchestration", () => {
   });
 });
 
+describe("PDF sensor provenance legend", () => {
+  function htmlFor(vm: PostGrowLearningReportViewModel): string {
+    return buildPostGrowReportPdfHtml(buildPostGrowReportPdfModel(vm, { now: NOW }));
+  }
+
+  const LEGEND: Array<[string, RegExp]> = [
+    ["Live", /Connected sensor or bridge reading captured from a real source\./],
+    ["Manual", /Reading entered by the grower\./],
+    ["CSV", /Reading imported from a CSV or spreadsheet source\./],
+    ["Demo", /Sample\/demo data; not real grow-room telemetry\./],
+    ["Stale", /Old reading that should not be treated as current\./],
+    ["Invalid", /Bad, suspicious, or unusable telemetry\./],
+  ];
+
+  it("includes the legend section title", () => {
+    expect(htmlFor(baseVm())).toContain("Sensor provenance legend");
+  });
+
+  it.each(LEGEND)("includes '%s' label with its grower-facing description", (label, descRe) => {
+    const html = htmlFor(baseVm());
+    expect(html).toContain(`>${label}<`);
+    expect(html).toMatch(descRe);
+  });
+
+  it("renders the legend even when the report has no sensor rows", () => {
+    const html = htmlFor(baseVm({ environment: [] }));
+    expect(html).toContain("Sensor provenance legend");
+    for (const [label] of LEGEND) expect(html).toContain(`>${label}<`);
+  });
+
+  it("does not describe demo, stale, or invalid as live, current, or healthy", () => {
+    const html = htmlFor(baseVm()).toLowerCase();
+    const forbidden = ["demo is live", "stale is live", "invalid is live",
+      "demo is current", "stale is current", "invalid is current",
+      "demo is healthy", "stale is healthy", "invalid is healthy"];
+    for (const phrase of forbidden) expect(html).not.toContain(phrase);
+    // sanity: legend text itself never claims these are healthy.
+    expect(html).toMatch(/should not be treated as current/);
+    expect(html).toMatch(/not real grow-room telemetry/);
+  });
+});
+
 describe("ExportSummaryButtons — presenter integration", () => {
   it("renders the Export as PDF report button and invokes the helper", () => {
     const openSpy = vi.spyOn(window, "open").mockReturnValue(null);

@@ -18,6 +18,8 @@ import {
   buildPdfExportFilename,
   buildPdfExportTitle,
   PDF_EXPORT_UNAVAILABLE_COPY,
+  POST_GROW_SENSOR_PROVENANCE_LEGEND,
+  POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE,
 } from "@/lib/postGrowReportRules";
 import {
   buildPostGrowReportPdfModel,
@@ -120,6 +122,11 @@ export function buildPostGrowReportPdfHtml(model: PostGrowReportPdfModel): strin
   <section><h2>What improved · what declined</h2><p><strong>Improved:</strong> ${escapeHtml(model.improvedText)}</p><p><strong>Declined:</strong> ${escapeHtml(model.declinedText)}</p></section>
 
   <section><h2>What to repeat · what to avoid next run</h2><p><strong>Repeat:</strong> ${escapeHtml(model.repeatText)}</p><p><strong>Avoid:</strong> ${escapeHtml(model.avoidText)}</p></section>
+
+  <section data-testid="post-grow-pdf-provenance-legend"><h2>${escapeHtml(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)}</h2><table><thead><tr><th>Label</th><th>Meaning</th></tr></thead><tbody>${POST_GROW_SENSOR_PROVENANCE_LEGEND.map(
+    (row) =>
+      `<tr><th scope="row"><span class="badge ${row.healthy ? "healthy" : "flag"}">${escapeHtml(row.label)}</span></th><td>${escapeHtml(row.description)}</td></tr>`,
+  ).join("")}</tbody></table></section>
 
   <p class="muted">${escapeHtml(model.provenanceLegend)}</p>
   <p class="safety" data-testid="post-grow-pdf-safety-note">${escapeHtml(model.safetyFooter)}</p>

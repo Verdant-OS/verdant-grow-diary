@@ -112,7 +112,7 @@ export function buildPostGrowReportPdfHtml(model: PostGrowReportPdfModel): strin
 
   <section><h2>Tents &amp; plants included</h2><p>${escapeHtml(model.scopeLabel)}</p><p class="muted">${escapeHtml(model.photoCountText)}</p></section>
 
-  <section><h2>Sensor snapshot summary</h2>${envTable}<p class="muted">Source provenance:</p>${sourceBlock}</section>
+  <section><h2>Sensor snapshot summary</h2>${envTable}<p class="muted">Source provenance:</p>${sourceBlock}<p class="muted"><a class="legend-anchor" data-testid="post-grow-pdf-legend-anchor" href="#sensor-provenance-legend">Back to provenance legend</a></p></section>
 
   <section><h2>Post-harvest performance</h2>${list(model.postHarvestFacts)}</section>
 

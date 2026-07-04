@@ -78,6 +78,31 @@ export const POST_GROW_SENSOR_PROVENANCE_LEGEND: readonly PostGrowSensorProvenan
   },
 ];
 
+export const POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE =
+  "Review demo, stale, or invalid readings manually before acting on any recommendation. " +
+  "These readings are useful context, but they should not be treated as current healthy telemetry.";
+
+export function findProvenanceLegendRow(
+  kind: string,
+): PostGrowSensorProvenanceLegendRow | null {
+  const normalized = normalizeReportSensorSource(kind);
+  return POST_GROW_SENSOR_PROVENANCE_LEGEND.find((r) => r.kind === normalized) ?? null;
+}
+
+/**
+ * Build the deduplicated, canonical-order badge rows for the in-app
+ * Post-Grow report from a list of raw source labels. Empty input →
+ * empty output (caller decides not to render).
+ */
+export function buildProvenanceBadgeRows(
+  sources: ReadonlyArray<string | null | undefined>,
+): PostGrowSensorProvenanceLegendRow[] {
+  if (!Array.isArray(sources) || sources.length === 0) return [];
+  const seen = new Set<PostGrowSensorProvenanceLegendRow["kind"]>();
+  for (const s of sources) seen.add(normalizeReportSensorSource(s));
+  return POST_GROW_SENSOR_PROVENANCE_LEGEND.filter((r) => seen.has(r.kind));
+}
+
 /**
  * Redaction patterns for anything that looks like a credential or long
  * opaque token. Applied to every free-text field going into the PDF.

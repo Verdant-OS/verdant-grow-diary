@@ -19,9 +19,12 @@ import { resolve } from "node:path";
 import {
   buildPdfExportFilename,
   buildPdfExportTitle,
+  buildProvenanceBadgeRows,
   isoDateOnly,
   isReportSensorSourceHealthy,
   normalizeReportSensorSource,
+  POST_GROW_SENSOR_PROVENANCE_LEGEND,
+  POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE,
   redactSecrets,
   slugifyGrowName,
 } from "@/lib/postGrowReportRules";
@@ -31,7 +34,10 @@ import {
   exportPostGrowReportAsPdf,
 } from "@/lib/postGrowPdfExport";
 import type { PostGrowLearningReportViewModel } from "@/lib/postGrowLearningReportRules";
-import { ExportSummaryButtons } from "@/components/PostGrowLearningReportCards";
+import {
+  EnvironmentStabilityCard,
+  ExportSummaryButtons,
+} from "@/components/PostGrowLearningReportCards";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -331,5 +337,99 @@ describe("static safety — no forbidden imports in PDF export code", () => {
     for (const re of forbiddenImportRes) {
       expect(re.test(text), `${path} matched ${re}`).toBe(false);
     }
+  });
+});
+
+describe("PDF provenance review note", () => {
+  function html(): string {
+    return buildPostGrowReportPdfHtml(buildPostGrowReportPdfModel(baseVm(), { now: NOW }));
+  }
+
+  it("includes the manual-review note under the legend", () => {
+    expect(html()).toContain(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE);
+    expect(html()).toContain('data-testid="post-grow-pdf-provenance-review-note"');
+  });
+
+  it("names demo, stale, and invalid explicitly", () => {
+    const note = POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE.toLowerCase();
+    expect(note).toContain("demo");
+    expect(note).toContain("stale");
+    expect(note).toContain("invalid");
+  });
+
+  it("does not describe demo/stale/invalid as live, current, or healthy", () => {
+    const note = POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE.toLowerCase();
+    for (const bad of [
+      "demo is live", "stale is live", "invalid is live",
+      "demo is current", "stale is current", "invalid is current",
+      "demo is healthy", "stale is healthy", "invalid is healthy",
+      "safe to act",
+    ]) {
+      expect(note).not.toContain(bad);
+    }
+    // It must specifically warn against treating them as current healthy telemetry.
+    expect(note).toContain("should not be treated as current healthy telemetry");
+  });
+});
+
+describe("buildProvenanceBadgeRows — shared source-of-truth", () => {
+  it("deduplicates and preserves canonical order", () => {
+    const rows = buildProvenanceBadgeRows(["stale", "live", "live", "demo", "manual"]);
+    expect(rows.map((r) => r.kind)).toEqual(["live", "manual", "demo", "stale"]);
+  });
+
+  it("normalizes unknown/null to invalid", () => {
+    const rows = buildProvenanceBadgeRows([null, "bogus", undefined]);
+    expect(rows.map((r) => r.kind)).toEqual(["invalid"]);
+  });
+
+  it("returns [] for empty input", () => {
+    expect(buildProvenanceBadgeRows([])).toEqual([]);
+  });
+
+  it("uses the same labels/descriptions as the PDF legend", () => {
+    const rows = buildProvenanceBadgeRows(["live", "manual", "csv", "demo", "stale", "invalid"]);
+    for (const r of rows) {
+      const legendRow = POST_GROW_SENSOR_PROVENANCE_LEGEND.find((l) => l.kind === r.kind)!;
+      expect(r.label).toBe(legendRow.label);
+      expect(r.description).toBe(legendRow.description);
+      expect(r.healthy).toBe(legendRow.healthy);
+    }
+  });
+});
+
+describe("EnvironmentStabilityCard — in-app provenance badges", () => {
+  const metrics = baseVm().environment;
+
+  it("renders a badge for every canonical kind present in report data", () => {
+    render(
+      <EnvironmentStabilityCard
+        metrics={metrics}
+        sensorSourceKinds={["live", "manual", "csv", "demo", "stale", "invalid"]}
+      />,
+    );
+    const container = screen.getByTestId("post-grow-provenance-badges");
+    expect(container).toBeTruthy();
+    for (const kind of ["live", "manual", "csv", "demo", "stale", "invalid"] as const) {
+      expect(screen.getByTestId(`post-grow-provenance-badge-${kind}`)).toBeTruthy();
+    }
+    // Non-healthy badges are titled with the shared description that
+    // warns not to treat them as current.
+    expect(
+      screen.getByTestId("post-grow-provenance-badge-stale").getAttribute("title"),
+    ).toMatch(/should not be treated as current/i);
+  });
+
+  it("does not render the badge strip when no sensor sources are supplied", () => {
+    render(<EnvironmentStabilityCard metrics={metrics} />);
+    expect(screen.queryByTestId("post-grow-provenance-badges")).toBeNull();
+    // Metrics still render safely.
+    expect(screen.getByTestId("post-grow-environment-stability")).toBeTruthy();
+  });
+
+  it("renders safely with empty metrics + no sources", () => {
+    render(<EnvironmentStabilityCard metrics={[]} />);
+    expect(screen.getByTestId("post-grow-environment-stability")).toBeTruthy();
+    expect(screen.queryByTestId("post-grow-provenance-badges")).toBeNull();
   });
 });

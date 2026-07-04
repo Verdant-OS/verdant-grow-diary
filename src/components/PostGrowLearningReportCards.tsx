@@ -19,7 +19,10 @@ import {
   openPostGrowReportPrintWindow,
 } from "@/lib/postGrowReportPrintRules";
 import { exportPostGrowReportAsPdf } from "@/lib/postGrowPdfExport";
-import { PDF_EXPORT_UNAVAILABLE_COPY } from "@/lib/postGrowReportRules";
+import {
+  buildProvenanceBadgeRows,
+  PDF_EXPORT_UNAVAILABLE_COPY,
+} from "@/lib/postGrowReportRules";
 import { actionsPath } from "@/lib/routes";
 
 function display(value: number | null, digits = 1): string {
@@ -254,13 +257,39 @@ export function PostGrowExecutiveSummaryCard({ vm }: { vm: PostGrowLearningRepor
   );
 }
 
-export function EnvironmentStabilityCard({ metrics }: { metrics: MetricAggregateView[] }) {
+export function EnvironmentStabilityCard({
+  metrics,
+  sensorSourceKinds,
+}: {
+  metrics: MetricAggregateView[];
+  sensorSourceKinds?: ReadonlyArray<string | null | undefined>;
+}) {
+  const badgeRows = buildProvenanceBadgeRows(sensorSourceKinds ?? []);
   return (
     <ReportCard
       title="Environment Stability"
       subtitle={`${REPORT_SECTION_LABELS.whatWasLogged} (environment)`}
       testId="post-grow-environment-stability"
     >
+      {badgeRows.length > 0 ? (
+        <div
+          className="mb-3 flex flex-wrap gap-1"
+          data-testid="post-grow-provenance-badges"
+          aria-label="Sensor source provenance"
+        >
+          {badgeRows.map((row) => (
+            <Badge
+              key={row.kind}
+              variant={row.healthy ? "outline" : "secondary"}
+              className="text-[10px]"
+              title={row.description}
+              data-testid={`post-grow-provenance-badge-${row.kind}`}
+            >
+              {row.label}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {metrics.map((metric) => (
           <div key={metric.key} className="rounded-xl border border-border/50 bg-secondary/20 p-3">

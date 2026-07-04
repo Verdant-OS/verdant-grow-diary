@@ -20,6 +20,7 @@ import {
   PDF_EXPORT_UNAVAILABLE_COPY,
   POST_GROW_SENSOR_PROVENANCE_LEGEND,
   POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE,
+  POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE,
 } from "@/lib/postGrowReportRules";
 import {
   buildPostGrowReportPdfModel,
@@ -126,7 +127,7 @@ export function buildPostGrowReportPdfHtml(model: PostGrowReportPdfModel): strin
   <section data-testid="post-grow-pdf-provenance-legend"><h2>${escapeHtml(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)}</h2><table><thead><tr><th>Label</th><th>Meaning</th></tr></thead><tbody>${POST_GROW_SENSOR_PROVENANCE_LEGEND.map(
     (row) =>
       `<tr><th scope="row"><span class="badge ${row.healthy ? "healthy" : "flag"}">${escapeHtml(row.label)}</span></th><td>${escapeHtml(row.description)}</td></tr>`,
-  ).join("")}</tbody></table></section>
+  ).join("")}</tbody></table><p class="muted" data-testid="post-grow-pdf-provenance-review-note">${escapeHtml(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE)}</p></section>
 
   <p class="muted">${escapeHtml(model.provenanceLegend)}</p>
   <p class="safety" data-testid="post-grow-pdf-safety-note">${escapeHtml(model.safetyFooter)}</p>

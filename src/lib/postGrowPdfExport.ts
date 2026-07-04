@@ -18,9 +18,11 @@ import {
   buildPdfExportFilename,
   buildPdfExportTitle,
   PDF_EXPORT_UNAVAILABLE_COPY,
+  POST_GROW_SENSOR_EMPTY_STATE_COPY,
   POST_GROW_SENSOR_PROVENANCE_LEGEND,
   POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE,
   POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE,
+  provenanceBadgeAriaLabel,
 } from "@/lib/postGrowReportRules";
 import {
   buildPostGrowReportPdfModel,

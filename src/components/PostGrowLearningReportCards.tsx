@@ -18,6 +18,8 @@ import {
   PRINT_UNAVAILABLE_COPY,
   openPostGrowReportPrintWindow,
 } from "@/lib/postGrowReportPrintRules";
+import { exportPostGrowReportAsPdf } from "@/lib/postGrowPdfExport";
+import { PDF_EXPORT_UNAVAILABLE_COPY } from "@/lib/postGrowReportRules";
 import { actionsPath } from "@/lib/routes";
 
 function display(value: number | null, digits = 1): string {
@@ -411,6 +413,17 @@ export function ExportSummaryButtons({ vm }: { vm: PostGrowLearningReportViewMod
   return (
     <div className="flex flex-col items-end gap-1" data-testid="post-grow-export-actions">
       <div className="flex flex-wrap gap-2">
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => {
+            const result = exportPostGrowReportAsPdf(vm);
+            if (result === "unavailable") toast.error(PDF_EXPORT_UNAVAILABLE_COPY);
+          }}
+          data-testid="post-grow-export-pdf"
+        >
+          <Download className="h-4 w-4 mr-1" /> Export this grow as a PDF report
+        </Button>
         <Button
           variant="outline"
           size="sm"

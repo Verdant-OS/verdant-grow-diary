@@ -63,7 +63,7 @@ export function buildPostGrowReportPdfHtml(model: PostGrowReportPdfModel): strin
     .join("");
   const sourceBlock = sourceRows
     ? `<ul class="sources">${sourceRows}</ul>`
-    : `<p class="muted">No sensor readings available for this run.</p>`;
+    : `<p class="muted" data-testid="post-grow-pdf-sensor-empty-state">${escapeHtml(POST_GROW_SENSOR_EMPTY_STATE_COPY)}</p>`;
 
   const completenessMissing = model.completenessMissing.length
     ? `<p class="muted">Missing: ${escapeHtml(model.completenessMissing.join(", "))}</p>`

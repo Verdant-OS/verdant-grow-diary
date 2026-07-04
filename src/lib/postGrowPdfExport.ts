@@ -126,9 +126,9 @@ export function buildPostGrowReportPdfHtml(model: PostGrowReportPdfModel): strin
 
   <section><h2>What to repeat · what to avoid next run</h2><p><strong>Repeat:</strong> ${escapeHtml(model.repeatText)}</p><p><strong>Avoid:</strong> ${escapeHtml(model.avoidText)}</p></section>
 
-  <section data-testid="post-grow-pdf-provenance-legend"><h2>${escapeHtml(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)}</h2><table><thead><tr><th>Label</th><th>Meaning</th></tr></thead><tbody>${POST_GROW_SENSOR_PROVENANCE_LEGEND.map(
+  <section data-testid="post-grow-pdf-provenance-legend" aria-labelledby="post-grow-pdf-provenance-legend-heading"><h2 id="post-grow-pdf-provenance-legend-heading">${escapeHtml(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)}</h2><table aria-label="${escapeHtml(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)}"><caption class="muted">${escapeHtml(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)}</caption><thead><tr><th scope="col">Label</th><th scope="col">Meaning</th></tr></thead><tbody>${POST_GROW_SENSOR_PROVENANCE_LEGEND.map(
     (row) =>
-      `<tr><th scope="row"><span class="badge ${row.healthy ? "healthy" : "flag"}">${escapeHtml(row.label)}</span></th><td>${escapeHtml(row.description)}</td></tr>`,
+      `<tr><th scope="row"><span class="badge ${row.healthy ? "healthy" : "flag"}" aria-label="${escapeHtml(provenanceBadgeAriaLabel(row))}">${escapeHtml(row.label)}</span></th><td>${escapeHtml(row.description)}</td></tr>`,
   ).join("")}</tbody></table><p class="muted" data-testid="post-grow-pdf-provenance-review-note">${escapeHtml(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE)}</p></section>
 
   <p class="muted">${escapeHtml(model.provenanceLegend)}</p>

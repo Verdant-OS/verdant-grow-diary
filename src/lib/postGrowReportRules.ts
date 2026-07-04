@@ -82,6 +82,16 @@ export const POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE =
   "Review demo, stale, or invalid readings manually before acting on any recommendation. " +
   "These readings are useful context, but they should not be treated as current healthy telemetry.";
 
+export const POST_GROW_SENSOR_EMPTY_STATE_COPY =
+  "No sensor snapshots were available for this grow. The provenance legend is still included so future readings can be interpreted correctly.";
+
+/** Builds an accessible label for a provenance badge that includes label + meaning. */
+export function provenanceBadgeAriaLabel(
+  row: Pick<PostGrowSensorProvenanceLegendRow, "label" | "description">,
+): string {
+  return `Sensor provenance: ${row.label}. ${row.description}`;
+}
+
 export function findProvenanceLegendRow(
   kind: string,
 ): PostGrowSensorProvenanceLegendRow | null {

@@ -41,6 +41,7 @@ import {
   EnvironmentStabilityCard,
   ExportSummaryButtons,
 } from "@/components/PostGrowLearningReportCards";
+import SensorProvenanceLegend from "@/components/SensorProvenanceLegend";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 

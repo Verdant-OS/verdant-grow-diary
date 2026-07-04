@@ -41,6 +41,7 @@ import {
   EnvironmentStabilityCard,
   ExportSummaryButtons,
 } from "@/components/PostGrowLearningReportCards";
+import SensorProvenanceLegend from "@/components/SensorProvenanceLegend";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -542,3 +543,110 @@ describe("Export action — click integration (browser-level)", () => {
     openSpy.mockRestore();
   });
 });
+
+describe("SensorProvenanceLegend — in-app presenter", () => {
+  it("renders heading, all six canonical labels, and the manual-review note", () => {
+    render(<SensorProvenanceLegend />);
+    expect(
+      screen.getByTestId("post-grow-sensor-provenance-legend"),
+    ).toBeTruthy();
+    expect(screen.getByText(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)).toBeTruthy();
+    for (const row of POST_GROW_SENSOR_PROVENANCE_LEGEND) {
+      const badge = screen.getByTestId(
+        `post-grow-sensor-provenance-legend-badge-${row.kind}`,
+      );
+      expect(badge.textContent).toBe(row.label);
+      expect(badge.getAttribute("aria-label")).toBe(
+        provenanceBadgeAriaLabel(row),
+      );
+      expect(badge.getAttribute("title")).toBe(row.description);
+      expect(badge.getAttribute("tabindex")).toBe("0");
+      expect(badge.className).toMatch(/focus-visible:ring/);
+    }
+    expect(
+      screen.getByTestId("post-grow-sensor-provenance-legend-review-note")
+        .textContent,
+    ).toBe(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE);
+  });
+});
+
+describe("EnvironmentStabilityCard — What do these badges mean? control", () => {
+  it("renders a semantic button labeled 'What do these badges mean?' with collapsed aria-expanded", () => {
+    render(<EnvironmentStabilityCard metrics={[]} sensorSourceKinds={["manual"]} />);
+    const toggle = screen.getByTestId("post-grow-provenance-help-toggle");
+    expect(toggle.tagName).toBe("BUTTON");
+    expect(toggle.textContent).toMatch(/what do these badges mean\?/i);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.getAttribute("aria-controls")).toBeTruthy();
+    // Legend is not rendered until opened.
+    expect(
+      screen.queryByTestId("post-grow-sensor-provenance-legend"),
+    ).toBeNull();
+  });
+
+  it("opens the in-app legend on click and updates aria-expanded", () => {
+    render(<EnvironmentStabilityCard metrics={[]} sensorSourceKinds={["manual"]} />);
+    const toggle = screen.getByTestId("post-grow-provenance-help-toggle");
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    const legend = screen.getByTestId("post-grow-sensor-provenance-legend");
+    expect(legend).toBeTruthy();
+    // aria-controls points at the panel that contains the legend.
+    const panelId = toggle.getAttribute("aria-controls")!;
+    expect(document.getElementById(panelId)?.contains(legend)).toBe(true);
+    // All six labels present via shared source-of-truth.
+    for (const row of POST_GROW_SENSOR_PROVENANCE_LEGEND) {
+      expect(
+        screen.getByTestId(`post-grow-sensor-provenance-legend-badge-${row.kind}`),
+      ).toBeTruthy();
+    }
+    // Manual-review note visible.
+    expect(
+      screen.getByTestId("post-grow-sensor-provenance-legend-review-note")
+        .textContent,
+    ).toBe(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE);
+  });
+});
+
+describe("PDF export — no demo fallback when no sensor snapshots exist (regression)", () => {
+  it("never fabricates demo readings or sensor rows when the report has no sensor data", () => {
+    const model = buildPostGrowReportPdfModel(
+      baseVm({ environment: [] }),
+      { now: NOW /* no sensorReadingSources provided */ },
+    );
+    // No environment metric rows and no sensor source rows are fabricated.
+    expect(model.environment).toEqual([]);
+    expect(model.sensorSources).toEqual([]);
+
+    const html = buildPostGrowReportPdfHtml(model);
+
+    // Honest empty-state copy is rendered in place of any sensor rows.
+    expect(html).toContain(POST_GROW_SENSOR_EMPTY_STATE_COPY);
+    expect(html).toContain('data-testid="post-grow-pdf-sensor-empty-state"');
+
+    // Legend is still rendered so growers can interpret future readings.
+    expect(html).toContain(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE);
+    expect(html).toContain(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE);
+
+    // No sensor source list (`<ul class="sources">`) is fabricated.
+    expect(html).not.toMatch(/<ul class="sources">/);
+    // No "· N reading(s)" summary row (only produced from real source rows).
+    expect(html).not.toMatch(/·\s*\d+\s*reading/);
+    // No environment sensor <tbody> rows (env table falls back to muted <p>).
+    expect(html).toContain("No environment aggregates available.");
+    // Ensure demo is NOT presented as a sensor reading/source row anywhere.
+    // Demo may only appear inside the legend description text.
+    expect(html).not.toMatch(/badge flag[^>]*>Demo<\/span>\s*·\s*\d+/);
+    expect(html).not.toMatch(/badge healthy[^>]*>Live<\/span>\s*·\s*\d+/);
+  });
+
+  it("does not backfill missing sensor sources with a demo default", () => {
+    const model = buildPostGrowReportPdfModel(baseVm({ environment: [] }), {
+      now: NOW,
+      sensorReadingSources: [],
+    });
+    expect(model.sensorSources.some((r) => r.kind === "demo")).toBe(false);
+    expect(model.sensorSources).toEqual([]);
+  });
+});
+

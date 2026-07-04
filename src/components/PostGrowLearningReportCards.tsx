@@ -1,7 +1,9 @@
 import type React from "react";
-import { Download, Image as ImageIcon, Info, ListChecks, Printer } from "lucide-react";
+import { useCallback, useId, useRef, useState } from "react";
+import { Download, HelpCircle, Image as ImageIcon, Info, ListChecks, Printer } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import SensorProvenanceLegend from "@/components/SensorProvenanceLegend";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -269,6 +271,25 @@ export function EnvironmentStabilityCard({
   const badgeRows = buildProvenanceBadgeRows(sensorSourceKinds ?? []);
   const totalReadings = metrics.reduce((sum, m) => sum + (m.count ?? 0), 0);
   const hasSensorData = metrics.length > 0 && totalReadings > 0;
+  const [legendOpen, setLegendOpen] = useState(false);
+  const legendRef = useRef<HTMLElement | null>(null);
+  const reactId = useId();
+  const legendPanelId = `post-grow-provenance-legend-panel-${reactId}`;
+
+  const handleToggle = useCallback(() => {
+    setLegendOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        // Focus the legend heading on next tick so screen readers announce it.
+        requestAnimationFrame(() => {
+          legendRef.current?.focus();
+          legendRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        });
+      }
+      return next;
+    });
+  }, []);
+
   return (
     <ReportCard
       title="Environment Stability"
@@ -300,6 +321,24 @@ export function EnvironmentStabilityCard({
           })}
         </ul>
       ) : null}
+      <div className="mb-3">
+        <button
+          type="button"
+          onClick={handleToggle}
+          aria-expanded={legendOpen}
+          aria-controls={legendPanelId}
+          data-testid="post-grow-provenance-help-toggle"
+          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+        >
+          <HelpCircle className="h-3 w-3" aria-hidden="true" />
+          What do these badges mean?
+        </button>
+        {legendOpen ? (
+          <div id={legendPanelId} className="mt-2">
+            <SensorProvenanceLegend ref={legendRef} />
+          </div>
+        ) : null}
+      </div>
       {!hasSensorData ? (
         <p
           className="text-sm text-muted-foreground"
@@ -334,6 +373,7 @@ export function EnvironmentStabilityCard({
     </ReportCard>
   );
 }
+
 
 export function PostHarvestPerformanceCard({ vm }: { vm: PostGrowLearningReportViewModel }) {
   return (

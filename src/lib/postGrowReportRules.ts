@@ -30,6 +30,60 @@ export const PDF_PROVENANCE_LEGEND_COPY =
   "Data sources: Live = connected sensor. Manual = grower entry. CSV = imported history. " +
   "Demo = sample data. Stale = too old to treat as current. Invalid = missing/malformed.";
 
+export const POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE = "Sensor provenance legend";
+
+export interface PostGrowSensorProvenanceLegendRow {
+  kind: "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
+  label: string;
+  description: string;
+  healthy: boolean;
+}
+
+export const POST_GROW_SENSOR_PROVENANCE_LEGEND: readonly PostGrowSensorProvenanceLegendRow[] = [
+  {
+    kind: "live",
+    label: "Live",
+    description: "Connected sensor or bridge reading captured from a real source.",
+    healthy: true,
+  },
+  {
+    kind: "manual",
+    label: "Manual",
+    description: "Reading entered by the grower.",
+    healthy: true,
+  },
+  {
+    kind: "csv",
+    label: "CSV",
+    description: "Reading imported from a CSV or spreadsheet source.",
+    healthy: true,
+  },
+  {
+    kind: "demo",
+    label: "Demo",
+    description: "Sample/demo data; not real grow-room telemetry.",
+    healthy: false,
+  },
+  {
+    kind: "stale",
+    label: "Stale",
+    description: "Old reading that should not be treated as current.",
+    healthy: false,
+  },
+  {
+    kind: "invalid",
+    label: "Invalid",
+    description: "Bad, suspicious, or unusable telemetry.",
+    healthy: false,
+  },
+];
+export const PDF_EMPTY_SECTION_COPY = "Not enough evidence to summarize this section.";
+export const PDF_READ_ONLY_FOOTER =
+  "Read-only export. Verdant suggests; the grower decides. No device commands were sent.";
+export const PDF_PROVENANCE_LEGEND_COPY =
+  "Data sources: Live = connected sensor. Manual = grower entry. CSV = imported history. " +
+  "Demo = sample data. Stale = too old to treat as current. Invalid = missing/malformed.";
+
 /**
  * Redaction patterns for anything that looks like a credential or long
  * opaque token. Applied to every free-text field going into the PDF.

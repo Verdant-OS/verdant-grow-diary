@@ -19,9 +19,12 @@ import { resolve } from "node:path";
 import {
   buildPdfExportFilename,
   buildPdfExportTitle,
+  buildProvenanceBadgeRows,
   isoDateOnly,
   isReportSensorSourceHealthy,
   normalizeReportSensorSource,
+  POST_GROW_SENSOR_PROVENANCE_LEGEND,
+  POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE,
   redactSecrets,
   slugifyGrowName,
 } from "@/lib/postGrowReportRules";
@@ -31,7 +34,10 @@ import {
   exportPostGrowReportAsPdf,
 } from "@/lib/postGrowPdfExport";
 import type { PostGrowLearningReportViewModel } from "@/lib/postGrowLearningReportRules";
-import { ExportSummaryButtons } from "@/components/PostGrowLearningReportCards";
+import {
+  EnvironmentStabilityCard,
+  ExportSummaryButtons,
+} from "@/components/PostGrowLearningReportCards";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 

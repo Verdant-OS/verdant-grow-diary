@@ -430,9 +430,115 @@ describe("EnvironmentStabilityCard — in-app provenance badges", () => {
     expect(screen.getByTestId("post-grow-environment-stability")).toBeTruthy();
   });
 
-  it("renders safely with empty metrics + no sources", () => {
+  it("renders safely with empty metrics + no sources and shows empty-state copy", () => {
     render(<EnvironmentStabilityCard metrics={[]} />);
     expect(screen.getByTestId("post-grow-environment-stability")).toBeTruthy();
     expect(screen.queryByTestId("post-grow-provenance-badges")).toBeNull();
+    expect(
+      screen.getByTestId("post-grow-sensor-empty-state").textContent,
+    ).toBe(POST_GROW_SENSOR_EMPTY_STATE_COPY);
+  });
+
+  it("shows in-app empty-state copy when metrics have zero readings", () => {
+    render(
+      <EnvironmentStabilityCard
+        metrics={[
+          {
+            key: "temperature_c",
+            label: "Temperature",
+            unit: "°C",
+            count: 0,
+            avg: null,
+            min: null,
+            max: null,
+            stablePct: null,
+            sparkline: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("post-grow-sensor-empty-state").textContent).toBe(
+      POST_GROW_SENSOR_EMPTY_STATE_COPY,
+    );
+  });
+
+  it("gives each provenance badge an accessible label with its meaning and is keyboard focusable", () => {
+    render(
+      <EnvironmentStabilityCard
+        metrics={[]}
+        sensorSourceKinds={["manual", "stale"]}
+      />,
+    );
+    const manual = screen.getByTestId("post-grow-provenance-badge-manual");
+    expect(manual.getAttribute("aria-label")).toBe(
+      "Sensor provenance: Manual. Reading entered by the grower.",
+    );
+    expect(manual.getAttribute("tabindex")).toBe("0");
+    expect(manual.className).toMatch(/focus-visible:ring/);
+    const stale = screen.getByTestId("post-grow-provenance-badge-stale");
+    expect(stale.getAttribute("aria-label")).toMatch(
+      /Sensor provenance: Stale\..*should not be treated as current/i,
+    );
+  });
+});
+
+describe("PDF sensor empty-state + semantic legend", () => {
+  it("renders empty-state copy in PDF when no sensor sources exist", () => {
+    const html = buildPostGrowReportPdfHtml(
+      buildPostGrowReportPdfModel(baseVm({ environment: [] }), { now: NOW }),
+    );
+    expect(html).toContain(POST_GROW_SENSOR_EMPTY_STATE_COPY);
+    expect(html).toContain('data-testid="post-grow-pdf-sensor-empty-state"');
+    // legend still renders
+    expect(html).toContain(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE);
+    expect(html).toContain(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE);
+  });
+
+  it("uses semantic table markup for the legend (caption, scope, aria-label)", () => {
+    const html = buildPostGrowReportPdfHtml(
+      buildPostGrowReportPdfModel(baseVm(), { now: NOW }),
+    );
+    expect(html).toMatch(/<table aria-label="Sensor provenance legend">/);
+    expect(html).toMatch(/<caption[^>]*>Sensor provenance legend<\/caption>/);
+    expect(html).toMatch(/<th scope="col">Label<\/th>/);
+    expect(html).toMatch(/<th scope="row">/);
+    // Every legend badge has an aria-label with meaning.
+    for (const row of POST_GROW_SENSOR_PROVENANCE_LEGEND) {
+      expect(html).toContain(`aria-label="${provenanceBadgeAriaLabel(row)}"`);
+    }
+  });
+});
+
+describe("Export action — click integration (browser-level)", () => {
+  it("clicking Export PDF opens a print window whose HTML includes legend, all six labels, review note, and empty-state copy", () => {
+    const write = vi.fn();
+    const popup = {
+      document: { write, close: vi.fn(), title: "" } as unknown as Document,
+      focus: vi.fn(),
+      print: vi.fn(),
+    };
+    const openSpy = vi
+      .spyOn(window, "open")
+      .mockImplementation(() => popup as unknown as Window);
+
+    render(
+      <MemoryRouter>
+        <ExportSummaryButtons vm={baseVm({ environment: [] })} />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId("post-grow-export-pdf"));
+
+    expect(openSpy).toHaveBeenCalled();
+    expect(write).toHaveBeenCalledTimes(1);
+    const html = write.mock.calls[0][0] as string;
+
+    expect(html).toContain(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE);
+    for (const label of ["Live", "Manual", "CSV", "Demo", "Stale", "Invalid"]) {
+      expect(html).toContain(`>${label}<`);
+    }
+    expect(html).toContain(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE);
+    expect(html).toContain(POST_GROW_SENSOR_EMPTY_STATE_COPY);
+
+    openSpy.mockRestore();
   });
 });

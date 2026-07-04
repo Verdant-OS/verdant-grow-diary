@@ -77,12 +77,6 @@ export const POST_GROW_SENSOR_PROVENANCE_LEGEND: readonly PostGrowSensorProvenan
     healthy: false,
   },
 ];
-export const PDF_EMPTY_SECTION_COPY = "Not enough evidence to summarize this section.";
-export const PDF_READ_ONLY_FOOTER =
-  "Read-only export. Verdant suggests; the grower decides. No device commands were sent.";
-export const PDF_PROVENANCE_LEGEND_COPY =
-  "Data sources: Live = connected sensor. Manual = grower entry. CSV = imported history. " +
-  "Demo = sample data. Stale = too old to treat as current. Invalid = missing/malformed.";
 
 /**
  * Redaction patterns for anything that looks like a credential or long

@@ -56,7 +56,7 @@ const SensorProvenanceLegend = forwardRef<
         {POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE}
       </h3>
       <ul
-        className="mt-3 space-y-2 list-none p-0"
+        className="mt-3 space-y-3 list-none p-0"
         data-testid={`${testId}-rows`}
       >
         {POST_GROW_SENSOR_PROVENANCE_LEGEND.map((row) => {
@@ -64,12 +64,12 @@ const SensorProvenanceLegend = forwardRef<
           return (
             <li
               key={row.kind}
-              className="flex items-start gap-2 text-xs text-muted-foreground"
+              className="flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-start sm:gap-2"
               data-testid={`${testId}-row-${row.kind}`}
             >
               <Badge
                 variant={row.healthy ? "outline" : "secondary"}
-                className="text-[10px] shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="self-start text-[10px] shrink-0 max-w-full break-words focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 title={row.description}
                 aria-label={ariaLabel}
                 tabIndex={0}
@@ -77,7 +77,9 @@ const SensorProvenanceLegend = forwardRef<
               >
                 {row.label}
               </Badge>
-              <span>{row.description}</span>
+              <span className="min-w-0 flex-1 break-words">
+                {row.description}
+              </span>
             </li>
           );
         })}

@@ -19,7 +19,10 @@ import {
   openPostGrowReportPrintWindow,
 } from "@/lib/postGrowReportPrintRules";
 import { exportPostGrowReportAsPdf } from "@/lib/postGrowPdfExport";
-import { PDF_EXPORT_UNAVAILABLE_COPY } from "@/lib/postGrowReportRules";
+import {
+  buildProvenanceBadgeRows,
+  PDF_EXPORT_UNAVAILABLE_COPY,
+} from "@/lib/postGrowReportRules";
 import { actionsPath } from "@/lib/routes";
 
 function display(value: number | null, digits = 1): string {

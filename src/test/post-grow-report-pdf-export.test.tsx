@@ -650,3 +650,70 @@ describe("PDF export — no demo fallback when no sensor snapshots exist (regres
   });
 });
 
+describe("SensorProvenanceLegend — mobile layout polish", () => {
+  it("uses responsive stacked-on-mobile classes and no truncation on rows or labels", () => {
+    render(<SensorProvenanceLegend />);
+    const rowsContainer = screen.getByTestId(
+      "post-grow-sensor-provenance-legend-rows",
+    );
+    const rowEls = rowsContainer.querySelectorAll(
+      '[data-testid^="post-grow-sensor-provenance-legend-row-"]',
+    );
+    expect(rowEls.length).toBe(POST_GROW_SENSOR_PROVENANCE_LEGEND.length);
+    for (const el of Array.from(rowEls)) {
+      expect(el.className).not.toMatch(/\btruncate\b/);
+      expect(el.className).not.toMatch(/\bwhitespace-nowrap\b/);
+      expect(el.className).not.toMatch(/\boverflow-hidden\b/);
+      expect(el.className).toMatch(/flex-col/);
+      expect(el.className).toMatch(/sm:flex-row/);
+    }
+    for (const row of POST_GROW_SENSOR_PROVENANCE_LEGEND) {
+      const badge = screen.getByTestId(
+        `post-grow-sensor-provenance-legend-badge-${row.kind}`,
+      );
+      expect(badge.className).not.toMatch(/\btruncate\b/);
+      expect(badge.className).not.toMatch(/\bwhitespace-nowrap\b/);
+      expect(badge.textContent).toBe(row.label);
+      // Accessibility is preserved on mobile layout.
+      expect(badge.getAttribute("tabindex")).toBe("0");
+      expect(badge.className).toMatch(/focus-visible:ring/);
+    }
+    expect(
+      screen.getByTestId("post-grow-sensor-provenance-legend-review-note")
+        .textContent,
+    ).toBe(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE);
+  });
+});
+
+describe("PDF export — provenance anchor navigation", () => {
+  function html(): string {
+    return buildPostGrowReportPdfHtml(
+      buildPostGrowReportPdfModel(baseVm(), { now: NOW }),
+    );
+  }
+
+  it("gives the legend section a stable id anchor target", () => {
+    expect(html()).toContain('id="sensor-provenance-legend"');
+  });
+
+  it("renders a visible 'Back to provenance legend' anchor near Environment Stability", () => {
+    const out = html();
+    expect(out).toMatch(
+      /href="#sensor-provenance-legend"[^>]*>Back to provenance legend<\/a>/,
+    );
+    const anchorIdx = out.indexOf("Back to provenance legend");
+    const legendIdx = out.indexOf('id="sensor-provenance-legend"');
+    expect(anchorIdx).toBeGreaterThan(-1);
+    expect(legendIdx).toBeGreaterThan(anchorIdx);
+  });
+
+  it("anchor is plain HTML navigation — no inline script", () => {
+    const out = html();
+    const start = out.indexOf("post-grow-pdf-legend-anchor");
+    const snippet = out.slice(start, start + 400);
+    expect(snippet).not.toMatch(/onclick=/i);
+    expect(snippet).not.toMatch(/<script/i);
+  });
+});
+
+

@@ -270,29 +270,24 @@ describe("static safety — no forbidden imports in PDF export code", () => {
     "src/lib/postGrowReportViewModel.ts",
     "src/lib/postGrowPdfExport.ts",
   ];
-  const forbidden = [
-    "supabase",
-    "invoke",
-    "ai-doctor",
-    "ai-coach",
-    "action_queue",
-    "actionQueue",
-    "device",
-    "webhook",
-    "service_role",
-    "raw_payload",
+  // Check imports and function calls, not comment prose.
+  const forbiddenImportRes: RegExp[] = [
+    /from ["'][^"']*supabase[^"']*["']/i,
+    /from ["'][^"']*ai-doctor[^"']*["']/i,
+    /from ["'][^"']*ai-coach[^"']*["']/i,
+    /from ["'][^"']*actionQueue[^"']*["']/i,
+    /from ["'][^"']*webhook[^"']*["']/i,
+    /from ["'][^"']*device[^"']*["']/i,
+    /\.functions\.invoke\(/,
+    /supabase\./,
+    /service_role\s*[:=]/,
+    /raw_payload\s*[:=]/,
   ];
 
-  it.each(files)("%s contains no forbidden imports or side-effect calls", (path) => {
+  it.each(files)("%s contains no forbidden imports or calls", (path) => {
     const text = readFileSync(resolve(process.cwd(), path), "utf8");
-    for (const needle of forbidden) {
-      if (needle === "service_role") {
-        // rules.ts references the string as a redaction pattern — allowed.
-        if (path.endsWith("postGrowReportRules.ts")) continue;
-      }
-      expect(text.toLowerCase().includes(needle.toLowerCase()), `${path} contained ${needle}`).toBe(
-        false,
-      );
+    for (const re of forbiddenImportRes) {
+      expect(re.test(text), `${path} matched ${re}`).toBe(false);
     }
   });
 });

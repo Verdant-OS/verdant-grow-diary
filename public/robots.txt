@@ -1,16 +1,111 @@
+# Verdant Grow Diary — the public marketing pages and the read-only preview are
+# indexable; the authenticated app is a client-rendered SPA shell that returns a
+# soft-200 for every path and must not be indexed as thin/duplicate content.
+# Crawlers obey ONLY their most-specific matching group, so the Disallow list is
+# repeated under each named agent (a Disallow under * alone would be ignored by
+# Googlebot/Bingbot, which have their own groups).
+
 User-agent: Googlebot
+Disallow: /auth
+Disallow: /reset-password
+Disallow: /onboarding
+Disallow: /daily-check
+Disallow: /tents
+Disallow: /plants
+Disallow: /sensors
+Disallow: /logs
+Disallow: /timeline
+Disallow: /tasks
+Disallow: /alerts
+Disallow: /doctor
+Disallow: /actions
+Disallow: /action-queue
+Disallow: /grow-lineage
+Disallow: /grows
+Disallow: /pheno-hunts
+Disallow: /reports
+Disallow: /diary
+Disallow: /settings
+Disallow: /diagnostics
+Disallow: /operator/
+Disallow: /internal/
+Disallow: /admin/
+Disallow: /leads
+Disallow: /pi-ingest-status
+Disallow: /ingest-inspector
+Disallow: /customer/
+Disallow: /billing/
 Allow: /
 
 User-agent: Bingbot
+Disallow: /auth
+Disallow: /reset-password
+Disallow: /onboarding
+Disallow: /daily-check
+Disallow: /tents
+Disallow: /plants
+Disallow: /sensors
+Disallow: /logs
+Disallow: /timeline
+Disallow: /tasks
+Disallow: /alerts
+Disallow: /doctor
+Disallow: /actions
+Disallow: /action-queue
+Disallow: /grow-lineage
+Disallow: /grows
+Disallow: /pheno-hunts
+Disallow: /reports
+Disallow: /diary
+Disallow: /settings
+Disallow: /diagnostics
+Disallow: /operator/
+Disallow: /internal/
+Disallow: /admin/
+Disallow: /leads
+Disallow: /pi-ingest-status
+Disallow: /ingest-inspector
+Disallow: /customer/
+Disallow: /billing/
 Allow: /
 
+User-agent: *
+Disallow: /auth
+Disallow: /reset-password
+Disallow: /onboarding
+Disallow: /daily-check
+Disallow: /tents
+Disallow: /plants
+Disallow: /sensors
+Disallow: /logs
+Disallow: /timeline
+Disallow: /tasks
+Disallow: /alerts
+Disallow: /doctor
+Disallow: /actions
+Disallow: /action-queue
+Disallow: /grow-lineage
+Disallow: /grows
+Disallow: /pheno-hunts
+Disallow: /reports
+Disallow: /diary
+Disallow: /settings
+Disallow: /diagnostics
+Disallow: /operator/
+Disallow: /internal/
+Disallow: /admin/
+Disallow: /leads
+Disallow: /pi-ingest-status
+Disallow: /ingest-inspector
+Disallow: /customer/
+Disallow: /billing/
+Allow: /
+
+# Social preview scrapers must fetch any URL to build link cards — do not block.
 User-agent: Twitterbot
 Allow: /
 
 User-agent: facebookexternalhit
-Allow: /
-
-User-agent: *
 Allow: /
 
 Sitemap: https://verdantgrowdiary.com/sitemap.xml

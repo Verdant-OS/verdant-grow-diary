@@ -40,7 +40,7 @@ describe("production domain", () => {
 describe("public landing page", () => {
   it("registers /welcome as a public route outside AppShell", () => {
     expect(APP).toMatch(/path="\/welcome"\s+element=\{<Landing\s*\/>\}/);
-    expect(APP).toMatch(/import\s+Landing\s+from\s+"\.\/pages\/Landing"/);
+    expect(APP).toMatch(/import\(\s*["']\.\/pages\/Landing["']\s*\)/);
   });
 
   it("landing copy explains the product safely (Grow Diary / Grow OS)", () => {
@@ -108,7 +108,9 @@ describe("public landing page", () => {
   });
 
   it("landing page does not import dashboard data hooks", () => {
-    expect(LANDING).not.toMatch(/@\/hooks\//);
+    // usePageSeo is a safe SEO <head> hook (no supabase/network/data); any
+    // other @/hooks import (dashboard data hooks) remains forbidden.
+    expect(LANDING).not.toMatch(/@\/hooks\/(?!usePageSeo\b)/);
     // Only useAuth from the store is allowed; no other store imports.
     const storeImports = LANDING.match(/from\s+["']@\/store\/[^"']+["']/g) ?? [];
     for (const imp of storeImports) {
@@ -130,4 +132,3 @@ describe("public landing page", () => {
     expect(LANDING).not.toMatch(/\bRH\s*[:=]\s*\d/i);
   });
 });
-

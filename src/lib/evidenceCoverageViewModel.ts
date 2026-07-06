@@ -81,9 +81,7 @@ export const UNCATEGORIZED_LABEL = "Uncategorized" as const;
  * banned-field list stays in one place. If a row's category text contains any
  * of these tokens we fall back to "Uncategorized" rather than render it.
  */
-const FORBIDDEN_LABEL_TOKENS: readonly string[] = FORBIDDEN_REF_FIELDS.map((s) =>
-  s.toLowerCase(),
-);
+const FORBIDDEN_LABEL_TOKENS: readonly string[] = FORBIDDEN_REF_FIELDS.map((s) => s.toLowerCase());
 
 /** Conservative label sanitizer: short, alphanum + safe punctuation only. */
 function normalizeLabel(raw: unknown): string {
@@ -91,7 +89,7 @@ function normalizeLabel(raw: unknown): string {
   const trimmed = raw.trim();
   if (!trimmed) return UNCATEGORIZED_LABEL;
   // Strip anything that isn't a safe label character.
-  const safe = trimmed.replace(/[^A-Za-z0-9 _.\-]/g, "").slice(0, 48);
+  const safe = trimmed.replace(/[^A-Za-z0-9 _.-]/g, "").slice(0, 48);
   if (!safe) return UNCATEGORIZED_LABEL;
   // Reject anything resembling a UUID or long opaque id.
   if (/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(safe)) return UNCATEGORIZED_LABEL;
@@ -130,7 +128,9 @@ function roundPct(linked: number, total: number): number {
   return Math.round((linked / total) * 100);
 }
 
-function bucketFor(rows: readonly EvidenceCoverageRowInput[] | null | undefined): EvidenceCoverageBucket {
+function bucketFor(
+  rows: readonly EvidenceCoverageRowInput[] | null | undefined,
+): EvidenceCoverageBucket {
   if (!Array.isArray(rows) || rows.length === 0) return EMPTY_BUCKET;
   let linked = 0;
   let fallbackOnly = 0;

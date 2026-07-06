@@ -29,8 +29,9 @@ describe("Deprecated auth route redirects", () => {
 
 describe("Auth route redirects — static safety", () => {
   it("does not duplicate the Auth page component", () => {
-    // Only one import for Auth page.
-    const importMatches = APP.match(/import\s+Auth\s+from/g);
+    // Only one import for the Auth page. Pages are code-split via React.lazy,
+    // so App.tsx pulls them in with a dynamic import("./pages/Auth").
+    const importMatches = APP.match(/import\(\s*["']\.\/pages\/Auth["']\s*\)/g);
     expect(importMatches).toHaveLength(1);
   });
 

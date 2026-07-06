@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
 const TESTBENCH_DIR = join(process.cwd(), "tools", "ecowitt-testbench");
@@ -26,12 +27,11 @@ describe("ecowitt windows testbench — static safety", () => {
     // Allow the literal placeholder vbt_REPLACE_WITH_REAL_TOKEN. Reject
     // anything that looks like a real token (vbt_ + >= 20 token chars).
     for (const { path, body } of fileContents) {
-      const matches = body.match(/vbt_[A-Za-z0-9_\-]{20,}/g) || [];
+      const matches = body.match(/vbt_[A-Za-z0-9_-]{20,}/g) || [];
       for (const m of matches) {
-        expect(
-          m,
-          `Possible real bridge token committed in ${path}: ${m.slice(0, 8)}...`,
-        ).toMatch(/^vbt_REPLACE_WITH_REAL_TOKEN$/);
+        expect(m, `Possible real bridge token committed in ${path}: ${m.slice(0, 8)}...`).toMatch(
+          /^vbt_REPLACE_WITH_REAL_TOKEN$/,
+        );
       }
     }
   });
@@ -41,7 +41,7 @@ describe("ecowitt windows testbench — static safety", () => {
       expect(body, `service_role token in ${path}`).not.toMatch(/service_role/i);
       // Reject committed JWT-shaped tokens (header.payload.signature).
       expect(body, `JWT-shaped value in ${path}`).not.toMatch(
-        /eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}/,
+        /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
       );
     }
   });
@@ -52,29 +52,20 @@ describe("ecowitt windows testbench — static safety", () => {
     expect(doc).toMatch(/\.env/);
   });
 
-  it("demo payload script uses source = \"demo\"", () => {
-    const script = readFileSync(
-      join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"),
-      "utf-8",
-    );
+  it('demo payload script uses source = "demo"', () => {
+    const script = readFileSync(join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"), "utf-8");
     expect(script).toMatch(/source\s*=\s*"demo"/);
     expect(script).not.toMatch(/source\s*=\s*"live"/);
   });
 
   it("forwarding requires explicit -ForwardToVerdant opt-in", () => {
-    const script = readFileSync(
-      join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"),
-      "utf-8",
-    );
+    const script = readFileSync(join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"), "utf-8");
     expect(script).toMatch(/\[switch\]\$ForwardToVerdant/);
     expect(script).toMatch(/if\s*\(\s*\$ForwardToVerdant\s*\)/);
   });
 
   it("Authorization header validator rejects non-ASCII ellipsis", () => {
-    const script = readFileSync(
-      join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"),
-      "utf-8",
-    );
+    const script = readFileSync(join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"), "utf-8");
     // PowerShell validator iterates char codes > 127.
     expect(script).toMatch(/\[int\]\$ch\s*-gt\s*127/);
     // Python validator encodes ascii.
@@ -83,10 +74,7 @@ describe("ecowitt windows testbench — static safety", () => {
   });
 
   it("Authorization header validator rejects placeholder angle brackets", () => {
-    const script = readFileSync(
-      join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"),
-      "utf-8",
-    );
+    const script = readFileSync(join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"), "utf-8");
     expect(script).toMatch(/\[<>\]/);
     const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
     expect(py).toMatch(/"<" in value or ">" in value/);
@@ -112,10 +100,7 @@ describe("ecowitt windows testbench — static safety", () => {
   it("tokens are never printed in full — only masked previews", () => {
     const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
     expect(py).toMatch(/mask_token/);
-    const ps = readFileSync(
-      join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"),
-      "utf-8",
-    );
+    const ps = readFileSync(join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"), "utf-8");
     expect(ps).toMatch(/Get-MaskedToken/);
   });
 });
@@ -140,9 +125,7 @@ describe("ecowitt windows testbench — source labeling rules", () => {
     expect(py).toMatch(
       /def\s+resolve_source\s*\([\s\S]*?payload[\s\S]*?remote_addr[\s\S]*?\)\s*->\s*str/,
     );
-    expect(py).toMatch(
-      /resolve_source\(payload=raw,\s*remote_addr=request\.remote_addr\)/,
-    );
+    expect(py).toMatch(/resolve_source\(payload=raw,\s*remote_addr=request\.remote_addr\)/);
   });
 
   it("non-loopback gateway uploads are normalized to live", () => {
@@ -165,10 +148,7 @@ describe("ecowitt windows testbench — source labeling rules", () => {
   });
 
   it("ships a Python unit test file for resolve_source", () => {
-    const t = readFileSync(
-      join(TESTBENCH_DIR, "test_source_labeling.py"),
-      "utf-8",
-    );
+    const t = readFileSync(join(TESTBENCH_DIR, "test_source_labeling.py"), "utf-8");
     expect(t).toMatch(/test_lan_ecowitt_gateway_is_live/);
     expect(t).toMatch(/test_loopback_browser_demo_is_demo/);
     expect(t).toMatch(/test_unknown_source_label_is_invalid_not_live/);
@@ -224,9 +204,7 @@ describe("ecowitt windows testbench — /debug/raw-log-tail safety", () => {
       "password",
       "secret",
     ]) {
-      expect(py, `missing secret field name: ${name}`).toMatch(
-        new RegExp(`["']${name}["']`),
-      );
+      expect(py, `missing secret field name: ${name}`).toMatch(new RegExp(`["']${name}["']`));
     }
     // Supabase admin role marker is assembled at runtime to avoid tripping
     // the no-literal scan; assert the marker constant exists and is used.
@@ -235,16 +213,14 @@ describe("ecowitt windows testbench — /debug/raw-log-tail safety", () => {
 
   it("never returns or echoes raw VERDANT_BRIDGE_TOKEN in the debug endpoint", () => {
     // The endpoint must not read or return the token value.
-    const endpointBlock = py
-      .split("@app.get(\"/debug/raw-log-tail\")")[1]
-      ?.split("@app.get(") [0] ?? "";
+    const endpointBlock =
+      py.split('@app.get("/debug/raw-log-tail")')[1]?.split("@app.get(")[0] ?? "";
     expect(endpointBlock).not.toMatch(/VERDANT_BRIDGE_TOKEN/);
   });
 
   it("debug endpoint is read-only and does not forward to Verdant", () => {
-    const endpointBlock = py
-      .split("@app.get(\"/debug/raw-log-tail\")")[1]
-      ?.split("@app.get(") [0] ?? "";
+    const endpointBlock =
+      py.split('@app.get("/debug/raw-log-tail")')[1]?.split("@app.get(")[0] ?? "";
     expect(endpointBlock).not.toMatch(/requests\.post/);
     expect(endpointBlock).not.toMatch(/maybe_forward/);
   });
@@ -294,14 +270,15 @@ describe("ecowitt windows testbench — parse_debug_line_count safety", () => {
   });
 
   it("debug endpoints route ?lines= through parse_debug_line_count", () => {
-    const occurrences = (py.match(/parse_debug_line_count\(request\.args\.get\("lines"\)\)/g) || []).length;
+    const occurrences = (py.match(/parse_debug_line_count\(request\.args\.get\("lines"\)\)/g) || [])
+      .length;
     expect(occurrences).toBeGreaterThanOrEqual(2);
   });
 });
 
 describe("ecowitt windows testbench — /debug/status safety", () => {
   const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
-  const block = py.split('@app.get("/debug/status")')[1]?.split("@app.get(") [0] ?? "";
+  const block = py.split('@app.get("/debug/status")')[1]?.split("@app.get(")[0] ?? "";
 
   it("declares the /debug/status endpoint", () => {
     expect(py).toMatch(/@app\.get\(["']\/debug\/status["']\)/);
@@ -351,8 +328,7 @@ describe("ecowitt windows testbench — /debug/status safety", () => {
 
 describe("ecowitt windows testbench — /debug/last-events safety", () => {
   const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
-  const block =
-    py.split('@app.get("/debug/last-events")')[1]?.split("\ndef main(")[0] ?? "";
+  const block = py.split('@app.get("/debug/last-events")')[1]?.split("\ndef main(")[0] ?? "";
 
   it("declares the /debug/last-events endpoint", () => {
     expect(py).toMatch(/@app\.get\(["']\/debug\/last-events["']\)/);
@@ -414,12 +390,7 @@ describe("ecowitt windows testbench — /debug/last-events safety", () => {
 });
 
 describe("ecowitt windows testbench — CI workflow + tooling folder safety", () => {
-  const WORKFLOW_PATH = join(
-    process.cwd(),
-    ".github",
-    "workflows",
-    "ecowitt-testbench-safety.yml",
-  );
+  const WORKFLOW_PATH = join(process.cwd(), ".github", "workflows", "ecowitt-testbench-safety.yml");
   const workflow = readFileSync(WORKFLOW_PATH, "utf-8");
 
   it("runs typecheck", () => {
@@ -457,10 +428,7 @@ describe("ecowitt windows testbench — CI workflow + tooling folder safety", ()
   });
 
   it("forwarding still requires explicit -ForwardToVerdant opt-in", () => {
-    const script = readFileSync(
-      join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"),
-      "utf-8",
-    );
+    const script = readFileSync(join(TESTBENCH_DIR, "send-demo-payload-windows.ps1"), "utf-8");
     expect(script).toMatch(/\[switch\]\$ForwardToVerdant/);
     expect(script).toMatch(/if\s*\(\s*\$ForwardToVerdant\s*\)/);
   });
@@ -468,8 +436,7 @@ describe("ecowitt windows testbench — CI workflow + tooling folder safety", ()
 
 describe("ecowitt windows testbench — /debug/status extended fields", () => {
   const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
-  const block =
-    py.split('@app.get("/debug/status")')[1]?.split("@app.get(")[0] ?? "";
+  const block = py.split('@app.get("/debug/status")')[1]?.split("@app.get(")[0] ?? "";
 
   it("includes parsed_line_count, skipped_line_count, last_parse_error", () => {
     expect(block).toMatch(/parsed_line_count/);
@@ -512,9 +479,9 @@ describe("ecowitt windows testbench — /debug/status extended fields", () => {
 describe("ecowitt windows testbench — /debug/forwarding-status safety", () => {
   const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
   const block =
-    py.split('@app.get("/debug/forwarding-status")')[1]?.split("@app.get(")[0]
-    ?? py.split('@app.get("/debug/forwarding-status")')[1]?.split("\ndef main(")[0]
-    ?? "";
+    py.split('@app.get("/debug/forwarding-status")')[1]?.split("@app.get(")[0] ??
+    py.split('@app.get("/debug/forwarding-status")')[1]?.split("\ndef main(")[0] ??
+    "";
 
   it("declares the /debug/forwarding-status endpoint", () => {
     expect(py).toMatch(/@app\.get\(["']\/debug\/forwarding-status["']\)/);
@@ -590,7 +557,7 @@ describe("ecowitt windows testbench — forwarding counters", () => {
   it("increments attempt counter only in the forwarding branch (after env checks)", () => {
     expect(fn).toMatch(/FORWARD_STATS\["attempt_count"\]\s*\+=\s*1/);
     // The attempt increment must come AFTER the early-return guards.
-    const noFwdIdx = fn.indexOf('no_forwarding_configured');
+    const noFwdIdx = fn.indexOf("no_forwarding_configured");
     const attemptIdx = fn.indexOf('FORWARD_STATS["attempt_count"]');
     expect(noFwdIdx).toBeGreaterThanOrEqual(0);
     expect(attemptIdx).toBeGreaterThan(noFwdIdx);
@@ -642,12 +609,7 @@ describe("ecowitt windows testbench — troubleshooting docs", () => {
 });
 
 describe("ecowitt windows testbench — CI secret scan step", () => {
-  const WORKFLOW_PATH = join(
-    process.cwd(),
-    ".github",
-    "workflows",
-    "ecowitt-testbench-safety.yml",
-  );
+  const WORKFLOW_PATH = join(process.cwd(), ".github", "workflows", "ecowitt-testbench-safety.yml");
   const workflow = readFileSync(WORKFLOW_PATH, "utf-8");
 
   it("contains a testbench-only secret scan step", () => {
@@ -694,8 +656,10 @@ describe("ecowitt windows testbench — forwarding-status troubleshooting docs",
 
   it("forwarding-status curl examples do not include Authorization or token", () => {
     const section =
-      doc.split("### Interpreting /debug/forwarding-status")[1]?.split("\n## ")[0]
-      ?.split("\n### ")[0] ?? "";
+      doc
+        .split("### Interpreting /debug/forwarding-status")[1]
+        ?.split("\n## ")[0]
+        ?.split("\n### ")[0] ?? "";
     expect(section).not.toMatch(/Authorization:/i);
     expect(section).not.toMatch(/Bearer\s+[A-Za-z0-9._-]{8,}/);
     expect(section).not.toMatch(/vbt_[A-Za-z0-9_-]{20,}/);
@@ -756,9 +720,9 @@ describe("ecowitt windows testbench — verify-testbench-windows.ps1", () => {
 describe("ecowitt windows testbench — /debug/parse-diagnostics safety", () => {
   const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
   const block =
-    py.split('@app.get("/debug/parse-diagnostics")')[1]?.split("@app.get(")[0]
-    ?? py.split('@app.get("/debug/parse-diagnostics")')[1]?.split("\ndef main(")[0]
-    ?? "";
+    py.split('@app.get("/debug/parse-diagnostics")')[1]?.split("@app.get(")[0] ??
+    py.split('@app.get("/debug/parse-diagnostics")')[1]?.split("\ndef main(")[0] ??
+    "";
 
   it("declares the /debug/parse-diagnostics endpoint", () => {
     expect(py).toMatch(/@app\.get\(["']\/debug\/parse-diagnostics["']\)/);
@@ -793,8 +757,8 @@ describe("ecowitt windows testbench — /debug/parse-diagnostics safety", () => 
   });
 
   it("uses categorize_parse_issue helper that enumerates category names", () => {
-    const helper = py.split("def categorize_parse_issue")[1]?.split("\n@app")[0]
-      ?.split("\ndef ")[0] ?? "";
+    const helper =
+      py.split("def categorize_parse_issue")[1]?.split("\n@app")[0]?.split("\ndef ")[0] ?? "";
     expect(helper).toMatch(/json_decode_error/);
     expect(helper).toMatch(/non_object_json/);
     expect(helper).toMatch(/missing_metrics/);
@@ -804,8 +768,8 @@ describe("ecowitt windows testbench — /debug/parse-diagnostics safety", () => 
   });
 
   it("sanitizes parse errors via sanitize_debug_payload", () => {
-    const helper = py.split("def categorize_parse_issue")[1]?.split("\n@app")[0]
-      ?.split("\ndef ")[0] ?? "";
+    const helper =
+      py.split("def categorize_parse_issue")[1]?.split("\n@app")[0]?.split("\ndef ")[0] ?? "";
     expect(helper).toMatch(/sanitize_debug_payload/);
     // Must never put the raw line text into the error string.
     expect(helper).not.toMatch(/last_error\s*=\s*text/);
@@ -823,8 +787,8 @@ describe("ecowitt windows testbench — /debug/parse-diagnostics safety", () => 
   });
 
   it("malformed lines never crash — categorizer is wrapped in try/except", () => {
-    const helper = py.split("def categorize_parse_issue")[1]?.split("\n@app")[0]
-      ?.split("\ndef ")[0] ?? "";
+    const helper =
+      py.split("def categorize_parse_issue")[1]?.split("\n@app")[0]?.split("\ndef ")[0] ?? "";
     expect(helper).toMatch(/except\s+Exception/);
   });
 });
@@ -838,16 +802,16 @@ describe("ecowitt windows testbench — parse-diagnostics docs", () => {
   });
 
   it("mentions it is loopback-only and sanitized", () => {
-    const section = doc.split("### Parse diagnostics")[1]?.split("\n## ")[0]
-      ?.split("\n### ")[0] ?? "";
+    const section =
+      doc.split("### Parse diagnostics")[1]?.split("\n## ")[0]?.split("\n### ")[0] ?? "";
     expect(section).toMatch(/loopback-only/i);
     expect(section).toMatch(/sanitiz/i);
     expect(section).toMatch(/never returns raw/i);
   });
 
   it("lists multiple categories operators can expect", () => {
-    const section = doc.split("### Parse diagnostics")[1]?.split("\n## ")[0]
-      ?.split("\n### ")[0] ?? "";
+    const section =
+      doc.split("### Parse diagnostics")[1]?.split("\n## ")[0]?.split("\n### ")[0] ?? "";
     expect(section).toMatch(/json_decode_error/);
     expect(section).toMatch(/missing_metrics/);
     expect(section).toMatch(/missing_captured_at/);
@@ -861,12 +825,7 @@ describe("ecowitt windows testbench — parse-diagnostics docs", () => {
 
 describe("ecowitt windows testbench — preserved behavior", () => {
   const py = readFileSync(join(TESTBENCH_DIR, "ecowitt_listener.py"), "utf-8");
-  const WORKFLOW_PATH = join(
-    process.cwd(),
-    ".github",
-    "workflows",
-    "ecowitt-testbench-safety.yml",
-  );
+  const WORKFLOW_PATH = join(process.cwd(), ".github", "workflows", "ecowitt-testbench-safety.yml");
   const workflow = readFileSync(WORKFLOW_PATH, "utf-8");
 
   it("/debug/status still exists", () => {
@@ -907,17 +866,10 @@ describe("ecowitt windows testbench — preserved behavior", () => {
   });
 });
 
-
-
 describe("ecowitt windows testbench — preflight + wrapper + CI artifacts", () => {
   const preflightPath = join(TESTBENCH_DIR, "preflight-windows.ps1");
   const wrapperPath = join(TESTBENCH_DIR, "run-testbench-windows.ps1");
-  const WORKFLOW_PATH = join(
-    process.cwd(),
-    ".github",
-    "workflows",
-    "ecowitt-testbench-safety.yml",
-  );
+  const WORKFLOW_PATH = join(process.cwd(), ".github", "workflows", "ecowitt-testbench-safety.yml");
   const doc = readFileSync(DOC_PATH, "utf-8");
   const workflow = readFileSync(WORKFLOW_PATH, "utf-8");
 
@@ -1105,14 +1057,16 @@ describe("ecowitt windows testbench — preflight diagnostics + invocation smoke
 describe("ecowitt windows testbench — preflight PowerShell invocation smoke", () => {
   // These tests actually invoke PowerShell. Skip when no PS executable
   // is available so non-Windows CI does not fail.
-  const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
-  const { existsSync } = require("node:fs") as typeof import("node:fs");
 
   function findPwsh(): string | null {
     for (const c of ["pwsh", "powershell.exe", "powershell"]) {
-      const r = spawnSync(c, ["-NoLogo", "-NoProfile", "-Command", "$PSVersionTable.PSVersion.Major"], {
-        encoding: "utf-8",
-      });
+      const r = spawnSync(
+        c,
+        ["-NoLogo", "-NoProfile", "-Command", "$PSVersionTable.PSVersion.Major"],
+        {
+          encoding: "utf-8",
+        },
+      );
       if (r.status === 0) return c;
     }
     return null;
@@ -1159,10 +1113,7 @@ describe("ecowitt windows testbench — preflight PowerShell invocation smoke", 
     expect(r.status, out).toBe(0);
     expect(out).toMatch(/\[preflight\]/);
     expect(out.toLowerCase()).toMatch(/repo root/);
-    // pwsh cold-start on CI Linux can exceed the 5s default; the spawnSync
-    // itself caps at 30s. Give the smoke test the same budget so it isn't
-    // killed mid-invocation (assertions unchanged).
-  }, 30_000);
+  });
 
   maybeIt("invokes successfully from tools/ecowitt-testbench", () => {
     const r = runPreflight(tbDir, []);
@@ -1170,7 +1121,7 @@ describe("ecowitt windows testbench — preflight PowerShell invocation smoke", 
     assertSafeOutput(out);
     expect(r.status, out).toBe(0);
     expect(out).toMatch(/\[preflight\]/);
-  }, 30_000);
+  });
 
   maybeIt("invokes successfully by direct script path from repo root with -Diagnostics", () => {
     const r = runPreflight(repoRoot, ["-Diagnostics"]);
@@ -1179,7 +1130,7 @@ describe("ecowitt windows testbench — preflight PowerShell invocation smoke", 
     expect(r.status, out).toBe(0);
     expect(out).toMatch(/Diagnostics \(safe paths only\)/);
     expect(out.toLowerCase()).toMatch(/detected repo root/);
-  }, 30_000);
+  });
 });
 
 describe("ecowitt windows testbench — forwarding tent-context safety", () => {
@@ -1236,8 +1187,7 @@ describe("ecowitt windows testbench — forwarding response sanitization", () =>
   const listener = readFileSync(LISTENER_PATH, "utf-8");
   const doc = readFileSync(DOC_PATH, "utf-8");
   const fwdBlock =
-    listener.split('@app.get("/debug/forwarding-status")')[1]?.split("@app.get(")[0] ??
-    "";
+    listener.split('@app.get("/debug/forwarding-status")')[1]?.split("@app.get(")[0] ?? "";
 
   it("declares sanitize_forward_error_value and summarize_forward_response helpers", () => {
     expect(listener).toMatch(/def\s+sanitize_forward_error_value\(/);
@@ -1282,8 +1232,7 @@ describe("ecowitt windows testbench — forwarding response sanitization", () =>
   });
 
   it("summarize_forward_response never returns response.text without sanitization", () => {
-    const fn =
-      listener.split("def summarize_forward_response")[1]?.split("\ndef ")[0] ?? "";
+    const fn = listener.split("def summarize_forward_response")[1]?.split("\ndef ")[0] ?? "";
     expect(fn).toMatch(/sanitize_forward_error_value/);
     // Must not assign raw resp.text directly into output keys.
     expect(fn).not.toMatch(/"message"\s*:\s*text\b/);
@@ -1326,8 +1275,7 @@ describe("ecowitt windows testbench — retry/backoff + error report", () => {
   });
 
   it("retry set includes transient statuses and excludes terminal ones", () => {
-    const block =
-      listener.split("RETRYABLE_STATUSES = {")[1]?.split("}")[0] ?? "";
+    const block = listener.split("RETRYABLE_STATUSES = {")[1]?.split("}")[0] ?? "";
     for (const s of ["408", "425", "429", "500", "502", "503", "504"]) {
       expect(block).toContain(s);
     }
@@ -1375,8 +1323,7 @@ describe("ecowitt windows testbench — retry/backoff + error report", () => {
   });
 
   it("summarize_forward_response sanitizes resp.text before storing", () => {
-    const fn =
-      listener.split("def summarize_forward_response")[1]?.split("\ndef ")[0] ?? "";
+    const fn = listener.split("def summarize_forward_response")[1]?.split("\ndef ")[0] ?? "";
     // Must call sanitizer; must not pass raw text straight into message
     expect(fn).toMatch(/sanitize_forward_error_value\(text\)/);
   });
@@ -1413,25 +1360,20 @@ describe("ecowitt windows testbench — retry/backoff + error report", () => {
       "utf-8",
     );
     expect(fixture).not.toMatch(/PASSKEY/i);
-    expect(fixture).not.toMatch(/vbt_[A-Za-z0-9_\-]{6,}/);
+    expect(fixture).not.toMatch(/vbt_[A-Za-z0-9_-]{6,}/);
     expect(fixture).not.toMatch(/Authorization/);
     expect(fixture).not.toMatch(/Bearer\s+/);
     expect(fixture).not.toMatch(/service_role/i);
   });
 
   it("golden contract test file exists and asserts contract fields", () => {
-    const test = readFileSync(
-      join(TESTBENCH_DIR, "test_forwarding_contract.py"),
-      "utf-8",
-    );
+    const test = readFileSync(join(TESTBENCH_DIR, "test_forwarding_contract.py"), "utf-8");
     expect(test).toMatch(/source.*ecowitt/);
     expect(test).toMatch(/tent_id/);
     expect(test).toMatch(/verdant_source/);
     expect(test).toMatch(/PASSKEY/);
   });
 });
-
-
 
 describe("ecowitt windows testbench — forwarding tests CI workflow", () => {
   const WORKFLOW_PATH = join(
@@ -1483,12 +1425,7 @@ describe("ecowitt windows testbench — operator forwarding widget safety", () =
     "components",
     "EcowittLocalForwardingStatusWidget.tsx",
   );
-  const HELPER_PATH = join(
-    process.cwd(),
-    "src",
-    "lib",
-    "ecowittLocalForwardingStatus.ts",
-  );
+  const HELPER_PATH = join(process.cwd(), "src", "lib", "ecowittLocalForwardingStatus.ts");
   const widget = readFileSync(WIDGET_PATH, "utf-8");
   const helper = readFileSync(HELPER_PATH, "utf-8");
 

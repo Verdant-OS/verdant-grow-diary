@@ -1,0 +1,11 @@
+# Verdant Grow Diary
+
+> Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators. Verdant is plant memory, sensor truth, and grower-approved action — not a device controller.
+
+Verdant Grow Diary helps cultivators keep a structured plant memory across grows: diary entries, photos, source-labeled sensor snapshots (live, manual, CSV), cautious AI diagnostics, and an approval-required Action Queue. Hardware-neutral. Never blindly automates or controls equipment.
+
+## Pages
+
+- [Home](/welcome): Product overview — plant memory, sensor truth, cautious AI, grower-approved actions.
+- [Pricing](/pricing): Free, Pro (monthly/annual), and Founder Lifetime tiers, feature comparison, and FAQ.
+- [Hardware integrations](/hardware-integrations): Supported ways to bring sensor data in — manual entry, CSV import, webhook, MQTT, ESP32, Raspberry Pi bridge. Read-only.

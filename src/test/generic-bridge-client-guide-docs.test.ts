@@ -72,13 +72,15 @@ describe("generic-bridge-client-guide.md", () => {
   it("forbids service_role, user_id, device commands, alerts, action queue", () => {
     expect(lower).toMatch(/no\s+`?service_role`?|never.*service_role/);
     expect(lower).toMatch(/no\s+`?user_id`?\s+in the payload|no user_id/);
-    expect(lower).toMatch(/no device commands|device control is \*\*out of scope\*\*|device control.*out of scope/);
+    expect(lower).toMatch(
+      /no device commands|device control is \*\*out of scope\*\*|device control.*out of scope/,
+    );
     expect(lower).toMatch(/no alert/);
     expect(lower).toMatch(/no action queue/);
   });
 
   it("does not include real-looking secrets", () => {
-    expect(doc).not.toMatch(/eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}/);
+    expect(doc).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/);
     expect(doc).not.toMatch(/vbt_[A-Za-z0-9]{24,}/);
     expect(doc).not.toMatch(/service_role\s*[:=]\s*['"]/);
   });

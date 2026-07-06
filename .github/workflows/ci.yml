@@ -32,6 +32,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # ripgrep (rg) is required by scripts/scan-gamification-direct-inserts.mjs
+      # (the "Gamification direct-insert scan" step). It is not preinstalled on
+      # the runner, so install it before any step shells out to `rg`.
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
       - name: Lint
         run: bun run lint
 
@@ -78,7 +84,7 @@ jobs:
           Raw logs uploaded: no
           EOF
       - name: Upload client secret boundary proof
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: client-secret-boundary-proof-ci
           path: artifacts/client-secret-boundary/client-secret-boundary-proof.txt
@@ -146,8 +152,6 @@ jobs:
       - name: Action Queue evidence leakage guard
         run: bun run test:action-queue-evidence-leakage
 
-
-
       # Stop-ship: QuickLog v2 RPC ownership / reason-code / mixed-boundary
       # regression. See docs/quicklog-rpc-safety.md.
       - name: QuickLog v2 RPC ownership + security
@@ -164,7 +168,6 @@ jobs:
       # must not be reachable from untrusted PRs. They live in the separate
       # manual workflow .github/workflows/gamification-staging-smoke.yml,
       # gated on workflow_dispatch + push-to-main only.
-
 
       # Stop-ship: every Shelly H&T edge function declared in
       # supabase/config.toml must have its source file in the repo.
@@ -190,10 +193,13 @@ jobs:
         uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2.0.2
         with:
           deno-version: v1.x
+      # --unstable-sloppy-imports lets Deno resolve the extensionless relative
+      # imports used throughout src/lib/cost (Node/Vite-style; the app tsconfig
+      # sets allowImportingTsExtensions + bundler resolution). Without it Deno
+      # fails on `src/lib/cost/index.ts` -> `./costDomains` with "Module not
+      # found". Test-only invocation; no production source changes.
       - name: Run AI Doctor provider usage wiring tests
-        run: deno test --allow-env --allow-read supabase/functions/ai-doctor-review/providerUsageWiring.test.ts
-
-
+        run: deno test --allow-env --allow-read --unstable-sloppy-imports supabase/functions/ai-doctor-review/providerUsageWiring.test.ts
 
       # Optional: QuickLog RPC runtime harnesses. Only runs when staging
       # Supabase credentials are configured as repo/org secrets. The

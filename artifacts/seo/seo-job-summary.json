@@ -1,0 +1,43 @@
+{
+  "generated_at": "2026-07-02T23:49:05.536Z",
+  "mode": "dry-run",
+  "status": "PASS",
+  "allowlist_source": "/dev-server/config/seo-allowlist.json",
+  "urls_evaluated": 2,
+  "simulated_classification_counts": {
+    "never_allowlisted": 1,
+    "suppressed": 1,
+    "expected_noindex": 0,
+    "expired_allowlist": 0,
+    "no_match": 0
+  },
+  "live_suppressed_issue_count": null,
+  "live_critical_issue_count": null,
+  "expired_entries": [],
+  "suppression_diff": {
+    "previous_available": false,
+    "previous_generated_at": null,
+    "added": 0,
+    "removed": 0,
+    "unchanged": 0
+  },
+  "artifacts": {
+    "job_summary_md": "artifacts/seo/seo-job-summary.md",
+    "job_summary_json": "artifacts/seo/seo-job-summary.json",
+    "suppressions_json": "artifacts/seo/seo-allowlist-suppressions.json",
+    "suppressions_md": "artifacts/seo/seo-allowlist-suppressions.md",
+    "suppressions_diff_json": "artifacts/seo/seo-allowlist-suppressions-diff.json",
+    "suppressions_diff_md": "artifacts/seo/seo-allowlist-suppressions-diff.md",
+    "dry_run_json": "artifacts/seo/seo-allowlist-dry-run.json",
+    "dry_run_md": "artifacts/seo/seo-allowlist-dry-run.md",
+    "expired_json": "artifacts/seo/seo-allowlist-expired.json",
+    "expired_md": "artifacts/seo/seo-allowlist-expired.md",
+    "url_inspection_json": "artifacts/seo/gsc-url-inspection.json",
+    "url_inspection_md": "artifacts/seo/gsc-url-inspection.md",
+    "last_finding_json": "artifacts/seo/gsc-last-finding-verification.json",
+    "last_finding_md": "artifacts/seo/gsc-last-finding-verification.md"
+  },
+  "notes": [
+    "Dry-run — no GSC API calls."
+  ]
+}

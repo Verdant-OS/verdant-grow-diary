@@ -23,12 +23,13 @@ const SITEMAP = read("public/sitemap.xml");
 
 describe("/pricing route", () => {
   it("is registered as a public route", () => {
-    expect(APP).toMatch(/import\s+Pricing\s+from\s+"\.\/pages\/Pricing"/);
+    // Page is code-split (React.lazy dynamic import) rather than eagerly imported.
+    expect(APP).toMatch(/import\(\s*["']\.\/pages\/Pricing["']\s*\)/);
     expect(APP).toMatch(/path="\/pricing"\s+element=\{<Pricing\s*\/>\}/);
   });
 
   it("registers a /billing/:plan placeholder route", () => {
-    expect(APP).toMatch(/import\s+BillingPlaceholder\s+from\s+"\.\/pages\/BillingPlaceholder"/);
+    expect(APP).toMatch(/import\(\s*["']\.\/pages\/BillingPlaceholder["']\s*\)/);
     expect(APP).toMatch(/path="\/billing\/:plan"\s+element=\{<BillingPlaceholder\s*\/>\}/);
   });
 });
@@ -96,11 +97,7 @@ describe("Pricing page imports constants", () => {
 });
 
 describe("Free vs Pro vs Founder Lifetime comparison", () => {
-  const freeBasics = [
-    "Plant profiles & grow diary",
-    "Photo logs",
-    "Manual sensor snapshots",
-  ];
+  const freeBasics = ["Plant profiles & grow diary", "Photo logs", "Manual sensor snapshots"];
 
   it("Free tier includes the basic diary features in the comparison table", () => {
     for (const item of freeBasics) {
@@ -193,7 +190,7 @@ describe("Mobile-first pricing layout", () => {
     expect(PAGE).toMatch(/min-w-\[640px\]/);
   });
 
-  it("CTA buttons use size=\"lg\" for comfortable tap targets", () => {
+  it('CTA buttons use size="lg" for comfortable tap targets', () => {
     const ctaButtons = PAGE.match(/<Button[\s\S]*?<\/Button>/g) ?? [];
     expect(ctaButtons.length).toBeGreaterThan(0);
     const ctaText = /(Start Free|Upgrade to Pro|Claim Founder Lifetime)/;
@@ -316,7 +313,9 @@ describe("Safety: no private data on public page", () => {
 
   it("does not import supabase client or private hooks", () => {
     expect(PAGE).not.toMatch(/@\/integrations\/supabase\/client/);
-    expect(PAGE).not.toMatch(/@\/hooks\//);
+    // usePageSeo is a safe SEO <head> hook (no supabase/network/data); any
+    // other @/hooks import (dashboard data hooks) remains forbidden.
+    expect(PAGE).not.toMatch(/@\/hooks\/(?!usePageSeo\b)/);
   });
 
   it("introduces no service_role or ai-coach call", () => {
@@ -378,9 +377,7 @@ describe("sitemap", () => {
 
 describe("No unrelated routes were changed", () => {
   it("App.tsx routes and the manifest stay in sync (bidirectional)", async () => {
-    const { diffAppRoutesAgainstManifest } = await import(
-      "./helpers/routeManifestSyncHarness"
-    );
+    const { diffAppRoutesAgainstManifest } = await import("./helpers/routeManifestSyncHarness");
     const { APP_ROUTES } = await import("@/lib/appRouteManifest");
 
     const diff = diffAppRoutesAgainstManifest(APP);
@@ -398,9 +395,7 @@ describe("No unrelated routes were changed", () => {
 
 describe("Pricing manifest snapshot (narrow)", () => {
   it("pricing-relevant manifest entries match the expected shape", async () => {
-    const { getPricingManifestSnapshot } = await import(
-      "./helpers/routeManifestSyncHarness"
-    );
+    const { getPricingManifestSnapshot } = await import("./helpers/routeManifestSyncHarness");
     // Intentionally narrow: only pricing / public billing-relevant routes so
     // unrelated route changes do not create noisy snapshot diffs here.
     expect(getPricingManifestSnapshot()).toEqual([
@@ -411,4 +406,3 @@ describe("Pricing manifest snapshot (narrow)", () => {
     ]);
   });
 });
-

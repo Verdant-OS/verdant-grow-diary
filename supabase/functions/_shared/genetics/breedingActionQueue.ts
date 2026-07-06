@@ -14,6 +14,17 @@ export function isSupportedBreedingEventType(eventType: string): eventType is Br
   return SUPPORTED_BREEDING_EVENT_TYPES.includes(eventType as BreedingEventType);
 }
 
+/** Mirrors the shape src/lib/originatingTimelineEventRules.ts normalizes to. Written
+ * directly here (rather than imported) because Deno edge functions cannot resolve
+ * relative imports into src/lib/ — keep this in sync with that file's `type` field name.
+ */
+export interface BreedingOriginatingTimelineEventRef {
+  id: string;
+  type: string | null;
+  occurred_at: string | null;
+  source: string;
+}
+
 export interface BreedingActionQueuePayload {
   grow_id: string;
   plant_id?: string | null;
@@ -26,6 +37,7 @@ export interface BreedingActionQueuePayload {
   reason: string;
   risk_level: string;
   suggested_change: string;
+  originating_timeline_events: BreedingOriginatingTimelineEventRef[];
 }
 
 export function buildBreedingActionQueuePayloads(
@@ -44,6 +56,15 @@ export function buildBreedingActionQueuePayloads(
   }
 
   const suggestions = suggestBreedingFollowUpActions(event);
+
+  // Recovers the breeding subtype + original timestamp for
+  // calculateBreedingCycleStats (grow_events.event_type cannot carry the
+  // subtype). event.type/id/occurred_at are already validated above
+  // (isSupportedBreedingEventType + a real Date), so no further
+  // normalization is needed here.
+  const originatingTimelineEvents: BreedingOriginatingTimelineEventRef[] = [
+    { id: event.id, type: event.type, occurred_at: event.occurred_at, source: "manual" },
+  ];
 
   return suggestions.map((suggestion) => {
     // Prepare suggested_change metadata (due_offset_days is preserved here for future expiry logic)
@@ -66,6 +87,7 @@ export function buildBreedingActionQueuePayloads(
       reason: `${suggestion.reason} [event:${event.id}]`,
       risk_level: suggestion.risk_level,
       suggested_change: JSON.stringify(suggestedChange),
+      originating_timeline_events: originatingTimelineEvents,
     };
   });
 }

@@ -1,0 +1,937 @@
+# One-Tent Loop Proof — never-healthy artifact
+# Generated at: 2026-06-09T12:00:00.000Z
+# Read-only. No writes. No network. No secrets.
+# Mode: built-in hostile matrix
+
+## Case: missing snapshot
+sensor.status = missing
+sensor.provenance = missing
+sensor.source = unknown
+--- report ---
+One-Tent Loop — Live Proof
+Generated at: 2026-06-09T12:00:00.000Z
+Generated from current app state. Read-only. No writes performed.
+
+Read-only proof view. This page checks whether the One-Tent Loop has evidence. It does not create logs, alerts, actions, AI results, or device commands.
+
+Overall status — passed: 3, needs review: 0, missing: 6, blocked: 1, stale: 0, invalid: 0, demo only: 0.
+
+- Grow [passed]
+    provenance: direct
+    ref: Grow: G · source=grow · kind=direct
+    evidence: Grow name: G
+    evidence: Stage: veg
+    evidence: Status: active
+    safety: Ownership enforced server-side.
+- Tent [passed]
+    provenance: direct
+    ref: Tent: T · source=tent · kind=direct
+    evidence: Tent name: T
+    evidence: Environment target present.
+    safety: Tent membership cannot be self-granted from the client.
+- Plant [passed]
+    provenance: direct
+    ref: Plant: P · source=plant · kind=direct
+    evidence: Plant name: P
+    evidence: Stage: veg
+    evidence: Medium: coco
+    evidence: Pot size: 3 gal
+    safety: Missing plant context is surfaced, never guessed.
+- Quick Log [missing]
+    provenance: missing
+    missing: No Quick Log entries recorded yet.
+    drilldown — what: No Quick Log entry (note, photo, or action context) exists for this plant yet.
+    drilldown — why: Quick Log is the atomic 30-second capture that turns today's observation into plant memory.
+    drilldown — where: Open Daily Check and save a Quick Log entry for the plant.
+    safety: Verdant does not fabricate diary entries.
+- Timeline [blocked]
+    provenance: missing
+    missing: No Quick Log entry — timeline linkage cannot be proven.
+    drilldown — what: Timeline has no visible events for this scope, or the latest Quick Log is not linked directly.
+    drilldown — why: Timeline continuity is how the grower confirms a saved log became plant memory.
+    drilldown — where: Open the Timeline page filtered by this plant or tent.
+    safety: Empty timeline is not fabricated.
+- Sensor Snapshot [missing]
+    provenance: missing
+    missing: No sensor snapshot available.
+    drilldown — what: No sensor snapshot is available, or the reading is stale, invalid, or demo-only.
+    drilldown — why: Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never shown as healthy.
+    drilldown — where: Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.
+    safety: Missing telemetry is never shown as healthy.
+- AI Doctor [missing]
+    provenance: missing
+    missing: No AI Doctor session recorded yet.
+    drilldown — what: No AI Doctor session is recorded, or the session is missing plant / medium / photo / sensor context.
+    drilldown — why: AI Doctor stays cautious when context is weak — weak context produces low-confidence advice.
+    drilldown — where: Open AI Doctor from the plant page after adding the missing context items.
+    safety: Viewing this proof page does not trigger a model call.
+- Alert [missing]
+    provenance: missing
+    missing: No persisted alert found.
+    drilldown — what: No persisted alert exists for this scope.
+    drilldown — why: Alerts are how sensor truth escalates to a grower-visible signal. This page never auto-creates them.
+    drilldown — where: Open the Alerts page to review any persisted alerts.
+    safety: Alerts are not auto-created by this proof page.
+- Approval-Required Action Queue [missing]
+    provenance: missing
+    missing: No Action Queue item found for this scope.
+    drilldown — what: No approval-required Action Queue item exists, or a row was flagged as unsafe (device command / not approval-required).
+    drilldown — why: Action Queue must remain approval-required. Verdant may suggest, but the grower decides. No device commands.
+    drilldown — where: Open the Action Queue page to review suggested actions.
+    safety: Approval required. No device command. Nothing auto-created.
+- Follow-up / outcome [missing]
+    provenance: missing
+    missing: Follow-up not recorded yet.
+    drilldown — what: No follow-up or outcome has been recorded after the loop's suggested action.
+    drilldown — why: The loop closes only when the grower records what happened next — that is how plant memory improves future advice.
+    drilldown — where: Save a follow-up diary entry from Daily Check or the plant page.
+    safety: Loop closes only after grower-recorded follow-up.
+
+Safety summary:
+- Missing, stale, invalid, unknown, or demo-only data is never shown as healthy.
+- Manual snapshots are labeled Manual reading, never Live.
+- Action Queue rows remain approval-required. No device command.
+- Viewing this page does not create logs, alerts, actions, AI sessions, or device commands.
+
+## Case: empty snapshot
+sensor.status = missing
+sensor.provenance = missing
+sensor.source = unknown
+--- report ---
+One-Tent Loop — Live Proof
+Generated at: 2026-06-09T12:00:00.000Z
+Generated from current app state. Read-only. No writes performed.
+
+Read-only proof view. This page checks whether the One-Tent Loop has evidence. It does not create logs, alerts, actions, AI results, or device commands.
+
+Overall status — passed: 3, needs review: 0, missing: 6, blocked: 1, stale: 0, invalid: 0, demo only: 0.
+
+- Grow [passed]
+    provenance: direct
+    ref: Grow: G · source=grow · kind=direct
+    evidence: Grow name: G
+    evidence: Stage: veg
+    evidence: Status: active
+    safety: Ownership enforced server-side.
+- Tent [passed]
+    provenance: direct
+    ref: Tent: T · source=tent · kind=direct
+    evidence: Tent name: T
+    evidence: Environment target present.
+    safety: Tent membership cannot be self-granted from the client.
+- Plant [passed]
+    provenance: direct
+    ref: Plant: P · source=plant · kind=direct
+    evidence: Plant name: P
+    evidence: Stage: veg
+    evidence: Medium: coco
+    evidence: Pot size: 3 gal
+    safety: Missing plant context is surfaced, never guessed.
+- Quick Log [missing]
+    provenance: missing
+    missing: No Quick Log entries recorded yet.
+    drilldown — what: No Quick Log entry (note, photo, or action context) exists for this plant yet.
+    drilldown — why: Quick Log is the atomic 30-second capture that turns today's observation into plant memory.
+    drilldown — where: Open Daily Check and save a Quick Log entry for the plant.
+    safety: Verdant does not fabricate diary entries.
+- Timeline [blocked]
+    provenance: missing
+    missing: No Quick Log entry — timeline linkage cannot be proven.
+    drilldown — what: Timeline has no visible events for this scope, or the latest Quick Log is not linked directly.
+    drilldown — why: Timeline continuity is how the grower confirms a saved log became plant memory.
+    drilldown — where: Open the Timeline page filtered by this plant or tent.
+    safety: Empty timeline is not fabricated.
+- Sensor Snapshot [missing]
+    provenance: missing
+    missing: No sensor snapshot available.
+    drilldown — what: No sensor snapshot is available, or the reading is stale, invalid, or demo-only.
+    drilldown — why: Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never shown as healthy.
+    drilldown — where: Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.
+    safety: Missing telemetry is never shown as healthy.
+- AI Doctor [missing]
+    provenance: missing
+    missing: No AI Doctor session recorded yet.
+    drilldown — what: No AI Doctor session is recorded, or the session is missing plant / medium / photo / sensor context.
+    drilldown — why: AI Doctor stays cautious when context is weak — weak context produces low-confidence advice.
+    drilldown — where: Open AI Doctor from the plant page after adding the missing context items.
+    safety: Viewing this proof page does not trigger a model call.
+- Alert [missing]
+    provenance: missing
+    missing: No persisted alert found.
+    drilldown — what: No persisted alert exists for this scope.
+    drilldown — why: Alerts are how sensor truth escalates to a grower-visible signal. This page never auto-creates them.
+    drilldown — where: Open the Alerts page to review any persisted alerts.
+    safety: Alerts are not auto-created by this proof page.
+- Approval-Required Action Queue [missing]
+    provenance: missing
+    missing: No Action Queue item found for this scope.
+    drilldown — what: No approval-required Action Queue item exists, or a row was flagged as unsafe (device command / not approval-required).
+    drilldown — why: Action Queue must remain approval-required. Verdant may suggest, but the grower decides. No device commands.
+    drilldown — where: Open the Action Queue page to review suggested actions.
+    safety: Approval required. No device command. Nothing auto-created.
+- Follow-up / outcome [missing]
+    provenance: missing
+    missing: Follow-up not recorded yet.
+    drilldown — what: No follow-up or outcome has been recorded after the loop's suggested action.
+    drilldown — why: The loop closes only when the grower records what happened next — that is how plant memory improves future advice.
+    drilldown — where: Save a follow-up diary entry from Daily Check or the plant page.
+    safety: Loop closes only after grower-recorded follow-up.
+
+Safety summary:
+- Missing, stale, invalid, unknown, or demo-only data is never shown as healthy.
+- Manual snapshots are labeled Manual reading, never Live.
+- Action Queue rows remain approval-required. No device command.
+- Viewing this page does not create logs, alerts, actions, AI sessions, or device commands.
+
+## Case: unknown source label
+sensor.status = invalid
+sensor.provenance = invalid
+sensor.source = invalid
+--- report ---
+One-Tent Loop — Live Proof
+Generated at: 2026-06-09T12:00:00.000Z
+Generated from current app state. Read-only. No writes performed.
+
+Read-only proof view. This page checks whether the One-Tent Loop has evidence. It does not create logs, alerts, actions, AI results, or device commands.
+
+Overall status — passed: 3, needs review: 0, missing: 5, blocked: 1, stale: 0, invalid: 1, demo only: 0.
+
+- Grow [passed]
+    provenance: direct
+    ref: Grow: G · source=grow · kind=direct
+    evidence: Grow name: G
+    evidence: Stage: veg
+    evidence: Status: active
+    safety: Ownership enforced server-side.
+- Tent [passed]
+    provenance: direct
+    ref: Tent: T · source=tent · kind=direct
+    evidence: Tent name: T
+    evidence: Environment target present.
+    safety: Tent membership cannot be self-granted from the client.
+- Plant [passed]
+    provenance: direct
+    ref: Plant: P · source=plant · kind=direct
+    evidence: Plant name: P
+    evidence: Stage: veg
+    evidence: Medium: coco
+    evidence: Pot size: 3 gal
+    safety: Missing plant context is surfaced, never guessed.
+- Quick Log [missing]
+    provenance: missing
+    missing: No Quick Log entries recorded yet.
+    drilldown — what: No Quick Log entry (note, photo, or action context) exists for this plant yet.
+    drilldown — why: Quick Log is the atomic 30-second capture that turns today's observation into plant memory.
+    drilldown — where: Open Daily Check and save a Quick Log entry for the plant.
+    safety: Verdant does not fabricate diary entries.
+- Timeline [blocked]
+    provenance: missing
+    missing: No Quick Log entry — timeline linkage cannot be proven.
+    drilldown — what: Timeline has no visible events for this scope, or the latest Quick Log is not linked directly.
+    drilldown — why: Timeline continuity is how the grower confirms a saved log became plant memory.
+    drilldown — where: Open the Timeline page filtered by this plant or tent.
+    safety: Empty timeline is not fabricated.
+- Sensor Snapshot [invalid]
+    provenance: invalid
+    source: invalid
+    ref: Sensor snapshot (reading) · at 2026-06-09T11:58:00.000Z · source=invalid · kind=inferred
+    evidence: Source: unrecognized
+    evidence: Captured: 2026-06-09T11:58:00.000Z
+    missing: Sensor source is unrecognized; excluded from healthy status.
+    drilldown — what: No sensor snapshot is available, or the reading is stale, invalid, or demo-only.
+    drilldown — why: Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never shown as healthy.
+    drilldown — where: Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.
+    safety: Unknown telemetry is never shown as healthy.
+- AI Doctor [missing]
+    provenance: missing
+    missing: No AI Doctor session recorded yet.
+    drilldown — what: No AI Doctor session is recorded, or the session is missing plant / medium / photo / sensor context.
+    drilldown — why: AI Doctor stays cautious when context is weak — weak context produces low-confidence advice.
+    drilldown — where: Open AI Doctor from the plant page after adding the missing context items.
+    safety: Viewing this proof page does not trigger a model call.
+- Alert [missing]
+    provenance: missing
+    missing: No persisted alert found.
+    drilldown — what: No persisted alert exists for this scope.
+    drilldown — why: Alerts are how sensor truth escalates to a grower-visible signal. This page never auto-creates them.
+    drilldown — where: Open the Alerts page to review any persisted alerts.
+    safety: Alerts are not auto-created by this proof page.
+- Approval-Required Action Queue [missing]
+    provenance: missing
+    missing: No Action Queue item found for this scope.
+    drilldown — what: No approval-required Action Queue item exists, or a row was flagged as unsafe (device command / not approval-required).
+    drilldown — why: Action Queue must remain approval-required. Verdant may suggest, but the grower decides. No device commands.
+    drilldown — where: Open the Action Queue page to review suggested actions.
+    safety: Approval required. No device command. Nothing auto-created.
+- Follow-up / outcome [missing]
+    provenance: missing
+    missing: Follow-up not recorded yet.
+    drilldown — what: No follow-up or outcome has been recorded after the loop's suggested action.
+    drilldown — why: The loop closes only when the grower records what happened next — that is how plant memory improves future advice.
+    drilldown — where: Save a follow-up diary entry from Daily Check or the plant page.
+    safety: Loop closes only after grower-recorded follow-up.
+
+Safety summary:
+- Missing, stale, invalid, unknown, or demo-only data is never shown as healthy.
+- Manual snapshots are labeled Manual reading, never Live.
+- Action Queue rows remain approval-required. No device command.
+- Viewing this page does not create logs, alerts, actions, AI sessions, or device commands.
+
+## Case: hostile source (secret-role literal)
+sensor.status = invalid
+sensor.provenance = invalid
+sensor.source = invalid
+--- report ---
+One-Tent Loop — Live Proof
+Generated at: 2026-06-09T12:00:00.000Z
+Generated from current app state. Read-only. No writes performed.
+
+Read-only proof view. This page checks whether the One-Tent Loop has evidence. It does not create logs, alerts, actions, AI results, or device commands.
+
+Overall status — passed: 3, needs review: 0, missing: 5, blocked: 1, stale: 0, invalid: 1, demo only: 0.
+
+- Grow [passed]
+    provenance: direct
+    ref: Grow: G · source=grow · kind=direct
+    evidence: Grow name: G
+    evidence: Stage: veg
+    evidence: Status: active
+    safety: Ownership enforced server-side.
+- Tent [passed]
+    provenance: direct
+    ref: Tent: T · source=tent · kind=direct
+    evidence: Tent name: T
+    evidence: Environment target present.
+    safety: Tent membership cannot be self-granted from the client.
+- Plant [passed]
+    provenance: direct
+    ref: Plant: P · source=plant · kind=direct
+    evidence: Plant name: P
+    evidence: Stage: veg
+    evidence: Medium: coco
+    evidence: Pot size: 3 gal
+    safety: Missing plant context is surfaced, never guessed.
+- Quick Log [missing]
+    provenance: missing
+    missing: No Quick Log entries recorded yet.
+    drilldown — what: No Quick Log entry (note, photo, or action context) exists for this plant yet.
+    drilldown — why: Quick Log is the atomic 30-second capture that turns today's observation into plant memory.
+    drilldown — where: Open Daily Check and save a Quick Log entry for the plant.
+    safety: Verdant does not fabricate diary entries.
+- Timeline [blocked]
+    provenance: missing
+    missing: No Quick Log entry — timeline linkage cannot be proven.
+    drilldown — what: Timeline has no visible events for this scope, or the latest Quick Log is not linked directly.
+    drilldown — why: Timeline continuity is how the grower confirms a saved log became plant memory.
+    drilldown — where: Open the Timeline page filtered by this plant or tent.
+    safety: Empty timeline is not fabricated.
+- Sensor Snapshot [invalid]
+    provenance: invalid
+    source: invalid
+    ref: Sensor snapshot (reading) · at 2026-06-09T11:58:00.000Z · source=invalid · kind=inferred
+    evidence: Source: unrecognized
+    evidence: Captured: 2026-06-09T11:58:00.000Z
+    missing: Sensor source is unrecognized; excluded from healthy status.
+    drilldown — what: No sensor snapshot is available, or the reading is stale, invalid, or demo-only.
+    drilldown — why: Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never shown as healthy.
+    drilldown — where: Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.
+    safety: Unknown telemetry is never shown as healthy.
+- AI Doctor [missing]
+    provenance: missing
+    missing: No AI Doctor session recorded yet.
+    drilldown — what: No AI Doctor session is recorded, or the session is missing plant / medium / photo / sensor context.
+    drilldown — why: AI Doctor stays cautious when context is weak — weak context produces low-confidence advice.
+    drilldown — where: Open AI Doctor from the plant page after adding the missing context items.
+    safety: Viewing this proof page does not trigger a model call.
+- Alert [missing]
+    provenance: missing
+    missing: No persisted alert found.
+    drilldown — what: No persisted alert exists for this scope.
+    drilldown — why: Alerts are how sensor truth escalates to a grower-visible signal. This page never auto-creates them.
+    drilldown — where: Open the Alerts page to review any persisted alerts.
+    safety: Alerts are not auto-created by this proof page.
+- Approval-Required Action Queue [missing]
+    provenance: missing
+    missing: No Action Queue item found for this scope.
+    drilldown — what: No approval-required Action Queue item exists, or a row was flagged as unsafe (device command / not approval-required).
+    drilldown — why: Action Queue must remain approval-required. Verdant may suggest, but the grower decides. No device commands.
+    drilldown — where: Open the Action Queue page to review suggested actions.
+    safety: Approval required. No device command. Nothing auto-created.
+- Follow-up / outcome [missing]
+    provenance: missing
+    missing: Follow-up not recorded yet.
+    drilldown — what: No follow-up or outcome has been recorded after the loop's suggested action.
+    drilldown — why: The loop closes only when the grower records what happened next — that is how plant memory improves future advice.
+    drilldown — where: Save a follow-up diary entry from Daily Check or the plant page.
+    safety: Loop closes only after grower-recorded follow-up.
+
+Safety summary:
+- Missing, stale, invalid, unknown, or demo-only data is never shown as healthy.
+- Manual snapshots are labeled Manual reading, never Live.
+- Action Queue rows remain approval-required. No device command.
+- Viewing this page does not create logs, alerts, actions, AI sessions, or device commands.
+
+## Case: stale live snapshot
+sensor.status = stale
+sensor.provenance = stale
+sensor.source = live
+--- report ---
+One-Tent Loop — Live Proof
+Generated at: 2026-06-09T12:00:00.000Z
+Generated from current app state. Read-only. No writes performed.
+
+Read-only proof view. This page checks whether the One-Tent Loop has evidence. It does not create logs, alerts, actions, AI results, or device commands.
+
+Overall status — passed: 3, needs review: 0, missing: 5, blocked: 1, stale: 1, invalid: 0, demo only: 0.
+
+- Grow [passed]
+    provenance: direct
+    ref: Grow: G · source=grow · kind=direct
+    evidence: Grow name: G
+    evidence: Stage: veg
+    evidence: Status: active
+    safety: Ownership enforced server-side.
+- Tent [passed]
+    provenance: direct
+    ref: Tent: T · source=tent · kind=direct
+    evidence: Tent name: T
+    evidence: Environment target present.
+    safety: Tent membership cannot be self-granted from the client.
+- Plant [passed]
+    provenance: direct
+    ref: Plant: P · source=plant · kind=direct
+    evidence: Plant name: P
+    evidence: Stage: veg
+    evidence: Medium: coco
+    evidence: Pot size: 3 gal
+    safety: Missing plant context is surfaced, never guessed.
+- Quick Log [missing]
+    provenance: missing
+    missing: No Quick Log entries recorded yet.
+    drilldown — what: No Quick Log entry (note, photo, or action context) exists for this plant yet.
+    drilldown — why: Quick Log is the atomic 30-second capture that turns today's observation into plant memory.
+    drilldown — where: Open Daily Check and save a Quick Log entry for the plant.
+    safety: Verdant does not fabricate diary entries.
+- Timeline [blocked]
+    provenance: missing
+    missing: No Quick Log entry — timeline linkage cannot be proven.
+    drilldown — what: Timeline has no visible events for this scope, or the latest Quick Log is not linked directly.
+    drilldown — why: Timeline continuity is how the grower confirms a saved log became plant memory.
+    drilldown — where: Open the Timeline page filtered by this plant or tent.
+    safety: Empty timeline is not fabricated.
+- Sensor Snapshot [stale]
+    provenance: stale
+    source: live
+    ref: Sensor snapshot (reading) · at 2026-06-09T11:30:00.000Z · source=live · kind=inferred
+    evidence: Source: live
+    evidence: Captured: 2026-06-09T11:30:00.000Z
+    evidence: Confidence: 0.90
+    missing: Reading is stale; excluded from healthy status.
+    drilldown — what: No sensor snapshot is available, or the reading is stale, invalid, or demo-only.
+    drilldown — why: Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never shown as healthy.
+    drilldown — where: Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.
+    safety: Stale readings are never shown as healthy.
+- AI Doctor [missing]
+    provenance: missing
+    missing: No AI Doctor session recorded yet.
+    drilldown — what: No AI Doctor session is recorded, or the session is missing plant / medium / photo / sensor context.
+    drilldown — why: AI Doctor stays cautious when context is weak — weak context produces low-confidence advice.
+    drilldown — where: Open AI Doctor from the plant page after adding the missing context items.
+    safety: Viewing this proof page does not trigger a model call.
+- Alert [missing]
+    provenance: missing
+    missing: No persisted alert found.
+    drilldown — what: No persisted alert exists for this scope.
+    drilldown — why: Alerts are how sensor truth escalates to a grower-visible signal. This page never auto-creates them.
+    drilldown — where: Open the Alerts page to review any persisted alerts.
+    safety: Alerts are not auto-created by this proof page.
+- Approval-Required Action Queue [missing]
+    provenance: missing
+    missing: No Action Queue item found for this scope.
+    drilldown — what: No approval-required Action Queue item exists, or a row was flagged as unsafe (device command / not approval-required).
+    drilldown — why: Action Queue must remain approval-required. Verdant may suggest, but the grower decides. No device commands.
+    drilldown — where: Open the Action Queue page to review suggested actions.
+    safety: Approval required. No device command. Nothing auto-created.
+- Follow-up / outcome [missing]
+    provenance: missing
+    missing: Follow-up not recorded yet.
+    drilldown — what: No follow-up or outcome has been recorded after the loop's suggested action.
+    drilldown — why: The loop closes only when the grower records what happened next — that is how plant memory improves future advice.
+    drilldown — where: Save a follow-up diary entry from Daily Check or the plant page.
+    safety: Loop closes only after grower-recorded follow-up.
+
+Safety summary:
+- Missing, stale, invalid, unknown, or demo-only data is never shown as healthy.
+- Manual snapshots are labeled Manual reading, never Live.
+- Action Queue rows remain approval-required. No device command.
+- Viewing this page does not create logs, alerts, actions, AI sessions, or device commands.
+
+## Case: very old manual snapshot
+sensor.status = stale
+sensor.provenance = stale
+sensor.source = manual
+--- report ---
+One-Tent Loop — Live Proof
+Generated at: 2026-06-09T12:00:00.000Z
+Generated from current app state. Read-only. No writes performed.
+
+Read-only proof view. This page checks whether the One-Tent Loop has evidence. It does not create logs, alerts, actions, AI results, or device commands.
+
+Overall status — passed: 3, needs review: 0, missing: 5, blocked: 1, stale: 1, invalid: 0, demo only: 0.
+
+- Grow [passed]
+    provenance: direct
+    ref: Grow: G · source=grow · kind=direct
+    evidence: Grow name: G
+    evidence: Stage: veg
+    evidence: Status: active
+    safety: Ownership enforced server-side.
+- Tent [passed]
+    provenance: direct
+    ref: Tent: T · source=tent · kind=direct
+    evidence: Tent name: T
+    evidence: Environment target present.
+    safety: Tent membership cannot be self-granted from the client.
+- Plant [passed]
+    provenance: direct
+    ref: Plant: P · source=plant · kind=direct
+    evidence: Plant name: P
+    evidence: Stage: veg
+    evidence: Medium: coco
+    evidence: Pot size: 3 gal
+    safety: Missing plant context is surfaced, never guessed.
+- Quick Log [missing]
+    provenance: missing
+    missing: No Quick Log entries recorded yet.
+    drilldown — what: No Quick Log entry (note, photo, or action context) exists for this plant yet.
+    drilldown — why: Quick Log is the atomic 30-second capture that turns today's observation into plant memory.
+    drilldown — where: Open Daily Check and save a Quick Log entry for the plant.
+    safety: Verdant does not fabricate diary entries.
+- Timeline [blocked]
+    provenance: missing
+    missing: No Quick Log entry — timeline linkage cannot be proven.
+    drilldown — what: Timeline has no visible events for this scope, or the latest Quick Log is not linked directly.
+    drilldown — why: Timeline continuity is how the grower confirms a saved log became plant memory.
+    drilldown — where: Open the Timeline page filtered by this plant or tent.
+    safety: Empty timeline is not fabricated.
+- Sensor Snapshot [stale]
+    provenance: stale
+    source: manual
+    ref: Sensor snapshot (reading) · at 2026-06-01T00:00:00.000Z · source=manual · kind=inferred
+    evidence: Source: manual
+    evidence: Captured: 2026-06-01T00:00:00.000Z
+    missing: Reading is stale; excluded from healthy status.
+    drilldown — what: No sensor snapshot is available, or the reading is stale, invalid, or demo-only.
+    drilldown — why: Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never shown as healthy.
+    drilldown — where: Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.
+    safety: Stale readings are never shown as healthy.
+- AI Doctor [missing]
+    provenance: missing
+    missing: No AI Doctor session recorded yet.
+    drilldown — what: No AI Doctor session is recorded, or the session is missing plant / medium / photo / sensor context.
+    drilldown — why: AI Doctor stays cautious when context is weak — weak context produces low-confidence advice.
+    drilldown — where: Open AI Doctor from the plant page after adding the missing context items.
+    safety: Viewing this proof page does not trigger a model call.
+- Alert [missing]
+    provenance: missing
+    missing: No persisted alert found.
+    drilldown — what: No persisted alert exists for this scope.
+    drilldown — why: Alerts are how sensor truth escalates to a grower-visible signal. This page never auto-creates them.
+    drilldown — where: Open the Alerts page to review any persisted alerts.
+    safety: Alerts are not auto-created by this proof page.
+- Approval-Required Action Queue [missing]
+    provenance: missing
+    missing: No Action Queue item found for this scope.
+    drilldown — what: No approval-required Action Queue item exists, or a row was flagged as unsafe (device command / not approval-required).
+    drilldown — why: Action Queue must remain approval-required. Verdant may suggest, but the grower decides. No device commands.
+    drilldown — where: Open the Action Queue page to review suggested actions.
+    safety: Approval required. No device command. Nothing auto-created.
+- Follow-up / outcome [missing]
+    provenance: missing
+    missing: Follow-up not recorded yet.
+    drilldown — what: No follow-up or outcome has been recorded after the loop's suggested action.
+    drilldown — why: The loop closes only when the grower records what happened next — that is how plant memory improves future advice.
+    drilldown — where: Save a follow-up diary entry from Daily Check or the plant page.
+    safety: Loop closes only after grower-recorded follow-up.
+
+Safety summary:
+- Missing, stale, invalid, unknown, or demo-only data is never shown as healthy.
+- Manual snapshots are labeled Manual reading, never Live.
+- Action Queue rows remain approval-required. No device command.
+- Viewing this page does not create logs, alerts, actions, AI sessions, or device commands.
+
+## Case: demo source
+sensor.status = demo_only
+sensor.provenance = demo_only
+sensor.source = demo
+--- report ---
+One-Tent Loop — Live Proof
+Generated at: 2026-06-09T12:00:00.000Z
+Generated from current app state. Read-only. No writes performed.
+
+Read-only proof view. This page checks whether the One-Tent Loop has evidence. It does not create logs, alerts, actions, AI results, or device commands.
+
+Overall status — passed: 3, needs review: 0, missing: 5, blocked: 1, stale: 0, invalid: 0, demo only: 1.
+
+- Grow [passed]
+    provenance: direct
+    ref: Grow: G · source=grow · kind=direct
+    evidence: Grow name: G
+    evidence: Stage: veg
+    evidence: Status: active
+    safety: Ownership enforced server-side.
+- Tent [passed]
+    provenance: direct
+    ref: Tent: T · source=tent · kind=direct
+    evidence: Tent name: T
+    evidence: Environment target present.
+    safety: Tent membership cannot be self-granted from the client.
+- Plant [passed]
+    provenance: direct
+    ref: Plant: P · source=plant · kind=direct
+    evidence: Plant name: P
+    evidence: Stage: veg
+    evidence: Medium: coco
+    evidence: Pot size: 3 gal
+    safety: Missing plant context is surfaced, never guessed.
+- Quick Log [missing]
+    provenance: missing
+    missing: No Quick Log entries recorded yet.
+    drilldown — what: No Quick Log entry (note, photo, or action context) exists for this plant yet.
+    drilldown — why: Quick Log is the atomic 30-second capture that turns today's observation into plant memory.
+    drilldown — where: Open Daily Check and save a Quick Log entry for the plant.
+    safety: Verdant does not fabricate diary entries.
+- Timeline [blocked]
+    provenance: missing
+    missing: No Quick Log entry — timeline linkage cannot be proven.
+    drilldown — what: Timeline has no visible events for this scope, or the latest Quick Log is not linked directly.
+    drilldown — why: Timeline continuity is how the grower confirms a saved log became plant memory.
+    drilldown — where: Open the Timeline page filtered by this plant or tent.
+    safety: Empty timeline is not fabricated.
+- Sensor Snapshot [demo_only]
+    provenance: demo_only
+    source: demo
+    ref: Sensor snapshot (reading) · at 2026-06-09T11:58:00.000Z · source=demo · kind=inferred
+    evidence: Source: demo
+    evidence: Captured: 2026-06-09T11:58:00.000Z
+    missing: Demo data only — never shown as healthy.
+    drilldown — what: No sensor snapshot is available, or the reading is stale, invalid, or demo-only.
+    drilldown — why: Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never shown as healthy.
+    drilldown — where: Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.
+    safety: Demo readings never seed real alerts or Action Queue items.
+- AI Doctor [missing]
+    provenance: missing
+    missing: No AI Doctor session recorded yet.
+    drilldown — what: No AI Doctor session is recorded, or the session is missing plant / medium / photo / sensor context.
+    drilldown — why: AI Doctor stays cautious when context is weak — weak context produces low-confidence advice.
+    drilldown — where: Open AI Doctor from the plant page after adding the missing context items.
+    safety: Viewing this proof page does not trigger a model call.
+- Alert [missing]
+    provenance: missing
+    missing: No persisted alert found.
+    drilldown — what: No persisted alert exists for this scope.
+    drilldown — why: Alerts are how sensor truth escalates to a grower-visible signal. This page never auto-creates them.
+    drilldown — where: Open the Alerts page to review any persisted alerts.
+    safety: Alerts are not auto-created by this proof page.
+- Approval-Required Action Queue [missing]
+    provenance: missing
+    missing: No Action Queue item found for this scope.
+    drilldown — what: No approval-required Action Queue item exists, or a row was flagged as unsafe (device command / not approval-required).
+    drilldown — why: Action Queue must remain approval-required. Verdant may suggest, but the grower decides. No device commands.
+    drilldown — where: Open the Action Queue page to review suggested actions.
+    safety: Approval required. No device command. Nothing auto-created.
+- Follow-up / outcome [missing]
+    provenance: missing
+    missing: Follow-up not recorded yet.
+    drilldown — what: No follow-up or outcome has been recorded after the loop's suggested action.
+    drilldown — why: The loop closes only when the grower records what happened next — that is how plant memory improves future advice.
+    drilldown — where: Save a follow-up diary entry from Daily Check or the plant page.
+    safety: Loop closes only after grower-recorded follow-up.
+
+Safety summary:
+- Missing, stale, invalid, unknown, or demo-only data is never shown as healthy.
+- Manual snapshots are labeled Manual reading, never Live.
+- Action Queue rows remain approval-required. No device command.
+- Viewing this page does not create logs, alerts, actions, AI sessions, or device commands.
+
+## Case: invalid source
+sensor.status = invalid
+sensor.provenance = invalid
+sensor.source = invalid
+--- report ---
+One-Tent Loop — Live Proof
+Generated at: 2026-06-09T12:00:00.000Z
+Generated from current app state. Read-only. No writes performed.
+
+Read-only proof view. This page checks whether the One-Tent Loop has evidence. It does not create logs, alerts, actions, AI results, or device commands.
+
+Overall status — passed: 3, needs review: 0, missing: 5, blocked: 1, stale: 0, invalid: 1, demo only: 0.
+
+- Grow [passed]
+    provenance: direct
+    ref: Grow: G · source=grow · kind=direct
+    evidence: Grow name: G
+    evidence: Stage: veg
+    evidence: Status: active
+    safety: Ownership enforced server-side.
+- Tent [passed]
+    provenance: direct
+    ref: Tent: T · source=tent · kind=direct
+    evidence: Tent name: T
+    evidence: Environment target present.
+    safety: Tent membership cannot be self-granted from the client.
+- Plant [passed]
+    provenance: direct
+    ref: Plant: P · source=plant · kind=direct
+    evidence: Plant name: P
+    evidence: Stage: veg
+    evidence: Medium: coco
+    evidence: Pot size: 3 gal
+    safety: Missing plant context is surfaced, never guessed.
+- Quick Log [missing]
+    provenance: missing
+    missing: No Quick Log entries recorded yet.
+    drilldown — what: No Quick Log entry (note, photo, or action context) exists for this plant yet.
+    drilldown — why: Quick Log is the atomic 30-second capture that turns today's observation into plant memory.
+    drilldown — where: Open Daily Check and save a Quick Log entry for the plant.
+    safety: Verdant does not fabricate diary entries.
+- Timeline [blocked]
+    provenance: missing
+    missing: No Quick Log entry — timeline linkage cannot be proven.
+    drilldown — what: Timeline has no visible events for this scope, or the latest Quick Log is not linked directly.
+    drilldown — why: Timeline continuity is how the grower confirms a saved log became plant memory.
+    drilldown — where: Open the Timeline page filtered by this plant or tent.
+    safety: Empty timeline is not fabricated.
+- Sensor Snapshot [invalid]
+    provenance: invalid
+    source: invalid
+    ref: Sensor snapshot (reading) · at 2026-06-09T11:58:00.000Z · source=invalid · kind=inferred
+    evidence: Source: invalid
+    evidence: Captured: 2026-06-09T11:58:00.000Z
+    missing: Reading is invalid; excluded from healthy status.
+    drilldown — what: No sensor snapshot is available, or the reading is stale, invalid, or demo-only.
+    drilldown — why: Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never shown as healthy.
+    drilldown — where: Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.
+    safety: Invalid telemetry is never shown as healthy.
+- AI Doctor [missing]
+    provenance: missing
+    missing: No AI Doctor session recorded yet.
+    drilldown — what: No AI Doctor session is recorded, or the session is missing plant / medium / photo / sensor context.
+    drilldown — why: AI Doctor stays cautious when context is weak — weak context produces low-confidence advice.
+    drilldown — where: Open AI Doctor from the plant page after adding the missing context items.
+    safety: Viewing this proof page does not trigger a model call.
+- Alert [missing]
+    provenance: missing
+    missing: No persisted alert found.
+    drilldown — what: No persisted alert exists for this scope.
+    drilldown — why: Alerts are how sensor truth escalates to a grower-visible signal. This page never auto-creates them.
+    drilldown — where: Open the Alerts page to review any persisted alerts.
+    safety: Alerts are not auto-created by this proof page.
+- Approval-Required Action Queue [missing]
+    provenance: missing
+    missing: No Action Queue item found for this scope.
+    drilldown — what: No approval-required Action Queue item exists, or a row was flagged as unsafe (device command / not approval-required).
+    drilldown — why: Action Queue must remain approval-required. Verdant may suggest, but the grower decides. No device commands.
+    drilldown — where: Open the Action Queue page to review suggested actions.
+    safety: Approval required. No device command. Nothing auto-created.
+- Follow-up / outcome [missing]
+    provenance: missing
+    missing: Follow-up not recorded yet.
+    drilldown — what: No follow-up or outcome has been recorded after the loop's suggested action.
+    drilldown — why: The loop closes only when the grower records what happened next — that is how plant memory improves future advice.
+    drilldown — where: Save a follow-up diary entry from Daily Check or the plant page.
+    safety: Loop closes only after grower-recorded follow-up.
+
+Safety summary:
+- Missing, stale, invalid, unknown, or demo-only data is never shown as healthy.
+- Manual snapshots are labeled Manual reading, never Live.
+- Action Queue rows remain approval-required. No device command.
+- Viewing this page does not create logs, alerts, actions, AI sessions, or device commands.
+
+## Case: unknown top-level key (readings)
+sensor.status = invalid
+sensor.provenance = invalid
+sensor.source = invalid
+--- report ---
+One-Tent Loop — Live Proof
+Generated at: 2026-06-09T12:00:00.000Z
+Generated from current app state. Read-only. No writes performed.
+
+Read-only proof view. This page checks whether the One-Tent Loop has evidence. It does not create logs, alerts, actions, AI results, or device commands.
+
+Overall status — passed: 3, needs review: 0, missing: 5, blocked: 1, stale: 0, invalid: 1, demo only: 0.
+
+- Grow [passed]
+    provenance: direct
+    ref: Grow: G · source=grow · kind=direct
+    evidence: Grow name: G
+    evidence: Stage: veg
+    evidence: Status: active
+    safety: Ownership enforced server-side.
+- Tent [passed]
+    provenance: direct
+    ref: Tent: T · source=tent · kind=direct
+    evidence: Tent name: T
+    evidence: Environment target present.
+    safety: Tent membership cannot be self-granted from the client.
+- Plant [passed]
+    provenance: direct
+    ref: Plant: P · source=plant · kind=direct
+    evidence: Plant name: P
+    evidence: Stage: veg
+    evidence: Medium: coco
+    evidence: Pot size: 3 gal
+    safety: Missing plant context is surfaced, never guessed.
+- Quick Log [missing]
+    provenance: missing
+    missing: No Quick Log entries recorded yet.
+    drilldown — what: No Quick Log entry (note, photo, or action context) exists for this plant yet.
+    drilldown — why: Quick Log is the atomic 30-second capture that turns today's observation into plant memory.
+    drilldown — where: Open Daily Check and save a Quick Log entry for the plant.
+    safety: Verdant does not fabricate diary entries.
+- Timeline [blocked]
+    provenance: missing
+    missing: No Quick Log entry — timeline linkage cannot be proven.
+    drilldown — what: Timeline has no visible events for this scope, or the latest Quick Log is not linked directly.
+    drilldown — why: Timeline continuity is how the grower confirms a saved log became plant memory.
+    drilldown — where: Open the Timeline page filtered by this plant or tent.
+    safety: Empty timeline is not fabricated.
+- Sensor Snapshot [invalid]
+    provenance: invalid
+    source: invalid
+    ref: Sensor snapshot (reading) · at 2026-06-09T11:58:00.000Z · source=invalid · kind=inferred
+    evidence: Source: live
+    evidence: Captured: 2026-06-09T11:58:00.000Z
+    missing: Sensor snapshot carries unknown fields; excluded from healthy status.
+    drilldown — what: No sensor snapshot is available, or the reading is stale, invalid, or demo-only.
+    drilldown — why: Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never shown as healthy.
+    drilldown — where: Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.
+    safety: Malformed telemetry is never shown as healthy.
+- AI Doctor [missing]
+    provenance: missing
+    missing: No AI Doctor session recorded yet.
+    drilldown — what: No AI Doctor session is recorded, or the session is missing plant / medium / photo / sensor context.
+    drilldown — why: AI Doctor stays cautious when context is weak — weak context produces low-confidence advice.
+    drilldown — where: Open AI Doctor from the plant page after adding the missing context items.
+    safety: Viewing this proof page does not trigger a model call.
+- Alert [missing]
+    provenance: missing
+    missing: No persisted alert found.
+    drilldown — what: No persisted alert exists for this scope.
+    drilldown — why: Alerts are how sensor truth escalates to a grower-visible signal. This page never auto-creates them.
+    drilldown — where: Open the Alerts page to review any persisted alerts.
+    safety: Alerts are not auto-created by this proof page.
+- Approval-Required Action Queue [missing]
+    provenance: missing
+    missing: No Action Queue item found for this scope.
+    drilldown — what: No approval-required Action Queue item exists, or a row was flagged as unsafe (device command / not approval-required).
+    drilldown — why: Action Queue must remain approval-required. Verdant may suggest, but the grower decides. No device commands.
+    drilldown — where: Open the Action Queue page to review suggested actions.
+    safety: Approval required. No device command. Nothing auto-created.
+- Follow-up / outcome [missing]
+    provenance: missing
+    missing: Follow-up not recorded yet.
+    drilldown — what: No follow-up or outcome has been recorded after the loop's suggested action.
+    drilldown — why: The loop closes only when the grower records what happened next — that is how plant memory improves future advice.
+    drilldown — where: Save a follow-up diary entry from Daily Check or the plant page.
+    safety: Loop closes only after grower-recorded follow-up.
+
+Safety summary:
+- Missing, stale, invalid, unknown, or demo-only data is never shown as healthy.
+- Manual snapshots are labeled Manual reading, never Live.
+- Action Queue rows remain approval-required. No device command.
+- Viewing this page does not create logs, alerts, actions, AI sessions, or device commands.
+
+## Case: unknown top-level key (metrics)
+sensor.status = invalid
+sensor.provenance = invalid
+sensor.source = invalid
+--- report ---
+One-Tent Loop — Live Proof
+Generated at: 2026-06-09T12:00:00.000Z
+Generated from current app state. Read-only. No writes performed.
+
+Read-only proof view. This page checks whether the One-Tent Loop has evidence. It does not create logs, alerts, actions, AI results, or device commands.
+
+Overall status — passed: 3, needs review: 0, missing: 5, blocked: 1, stale: 0, invalid: 1, demo only: 0.
+
+- Grow [passed]
+    provenance: direct
+    ref: Grow: G · source=grow · kind=direct
+    evidence: Grow name: G
+    evidence: Stage: veg
+    evidence: Status: active
+    safety: Ownership enforced server-side.
+- Tent [passed]
+    provenance: direct
+    ref: Tent: T · source=tent · kind=direct
+    evidence: Tent name: T
+    evidence: Environment target present.
+    safety: Tent membership cannot be self-granted from the client.
+- Plant [passed]
+    provenance: direct
+    ref: Plant: P · source=plant · kind=direct
+    evidence: Plant name: P
+    evidence: Stage: veg
+    evidence: Medium: coco
+    evidence: Pot size: 3 gal
+    safety: Missing plant context is surfaced, never guessed.
+- Quick Log [missing]
+    provenance: missing
+    missing: No Quick Log entries recorded yet.
+    drilldown — what: No Quick Log entry (note, photo, or action context) exists for this plant yet.
+    drilldown — why: Quick Log is the atomic 30-second capture that turns today's observation into plant memory.
+    drilldown — where: Open Daily Check and save a Quick Log entry for the plant.
+    safety: Verdant does not fabricate diary entries.
+- Timeline [blocked]
+    provenance: missing
+    missing: No Quick Log entry — timeline linkage cannot be proven.
+    drilldown — what: Timeline has no visible events for this scope, or the latest Quick Log is not linked directly.
+    drilldown — why: Timeline continuity is how the grower confirms a saved log became plant memory.
+    drilldown — where: Open the Timeline page filtered by this plant or tent.
+    safety: Empty timeline is not fabricated.
+- Sensor Snapshot [invalid]
+    provenance: invalid
+    source: invalid
+    ref: Sensor snapshot (reading) · at 2026-06-09T11:58:00.000Z · source=invalid · kind=inferred
+    evidence: Source: live
+    evidence: Captured: 2026-06-09T11:58:00.000Z
+    missing: Sensor snapshot carries unknown fields; excluded from healthy status.
+    drilldown — what: No sensor snapshot is available, or the reading is stale, invalid, or demo-only.
+    drilldown — why: Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never shown as healthy.
+    drilldown — where: Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.
+    safety: Malformed telemetry is never shown as healthy.
+- AI Doctor [missing]
+    provenance: missing
+    missing: No AI Doctor session recorded yet.
+    drilldown — what: No AI Doctor session is recorded, or the session is missing plant / medium / photo / sensor context.
+    drilldown — why: AI Doctor stays cautious when context is weak — weak context produces low-confidence advice.
+    drilldown — where: Open AI Doctor from the plant page after adding the missing context items.
+    safety: Viewing this proof page does not trigger a model call.
+- Alert [missing]
+    provenance: missing
+    missing: No persisted alert found.
+    drilldown — what: No persisted alert exists for this scope.
+    drilldown — why: Alerts are how sensor truth escalates to a grower-visible signal. This page never auto-creates them.
+    drilldown — where: Open the Alerts page to review any persisted alerts.
+    safety: Alerts are not auto-created by this proof page.
+- Approval-Required Action Queue [missing]
+    provenance: missing
+    missing: No Action Queue item found for this scope.
+    drilldown — what: No approval-required Action Queue item exists, or a row was flagged as unsafe (device command / not approval-required).
+    drilldown — why: Action Queue must remain approval-required. Verdant may suggest, but the grower decides. No device commands.
+    drilldown — where: Open the Action Queue page to review suggested actions.
+    safety: Approval required. No device command. Nothing auto-created.
+- Follow-up / outcome [missing]
+    provenance: missing
+    missing: Follow-up not recorded yet.
+    drilldown — what: No follow-up or outcome has been recorded after the loop's suggested action.
+    drilldown — why: The loop closes only when the grower records what happened next — that is how plant memory improves future advice.
+    drilldown — where: Save a follow-up diary entry from Daily Check or the plant page.
+    safety: Loop closes only after grower-recorded follow-up.
+
+Safety summary:
+- Missing, stale, invalid, unknown, or demo-only data is never shown as healthy.
+- Manual snapshots are labeled Manual reading, never Live.
+- Action Queue rows remain approval-required. No device command.
+- Viewing this page does not create logs, alerts, actions, AI sessions, or device commands.

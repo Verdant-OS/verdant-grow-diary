@@ -39,6 +39,14 @@ jobs:
       - name: One-Tent Loop smoke audit
         run: bun run test:one-tent-loop-smoke
 
+      # Narrow safety gate — every PR runs the rules + deterministic
+      # telemetry fuzz suite for /one-tent-loop-proof. Regressions where
+      # malformed / stale / invalid / demo / unknown telemetry could be
+      # classified as passed, direct, healthy, OK, verified, or success
+      # must fail CI here.
+      - name: One-Tent Loop Proof never-healthy rules + fuzz
+        run: bun run test:one-tent-loop-proof-never-healthy
+
       - name: EcoWitt-only sensor direction scanner
         run: node scripts/assert-ecowitt-only-sensor-direction.mjs
 
@@ -47,3 +55,4 @@ jobs:
 
       - name: VPD stage mapping ownership scanner
         run: bun run test:vpd-stage-normalization-ownership
+

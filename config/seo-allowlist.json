@@ -1,0 +1,50 @@
+{
+  "allowlisted_issues": [
+    {
+      "id": "auth-routes-expected-non-indexable",
+      "description": "Authenticated app routes are intentionally not indexed.",
+      "url_patterns": [
+        "https://verdantgrowdiary.com/auth*",
+        "https://verdantgrowdiary.com/reset-password*",
+        "https://verdantgrowdiary.com/onboarding*",
+        "https://verdantgrowdiary.com/settings*",
+        "https://verdantgrowdiary.com/diagnostics*",
+        "https://verdantgrowdiary.com/operator/*",
+        "https://verdantgrowdiary.com/internal/*",
+        "https://verdantgrowdiary.com/admin/*"
+      ],
+      "issue_types": [
+        "not_indexed",
+        "noindex_detected",
+        "blocked_by_robots",
+        "verdict_not_pass"
+      ],
+      "expires_on": "2026-12-31"
+    }
+  ],
+  "expected_noindex": [
+    {
+      "id": "protected-routes-noindex",
+      "description": "Protected routes may intentionally return noindex.",
+      "url_patterns": [
+        "https://verdantgrowdiary.com/auth*",
+        "https://verdantgrowdiary.com/reset-password*",
+        "https://verdantgrowdiary.com/onboarding*",
+        "https://verdantgrowdiary.com/settings*",
+        "https://verdantgrowdiary.com/diagnostics*",
+        "https://verdantgrowdiary.com/operator/*",
+        "https://verdantgrowdiary.com/internal/*",
+        "https://verdantgrowdiary.com/admin/*"
+      ],
+      "expires_on": "2026-12-31"
+    }
+  ],
+  "never_allowlist": [
+    "https://verdantgrowdiary.com/",
+    "https://verdantgrowdiary.com/welcome",
+    "https://verdantgrowdiary.com/pricing",
+    "https://verdantgrowdiary.com/hardware-integrations",
+    "https://verdantgrowdiary.com/sitemap.xml",
+    "https://verdantgrowdiary.com/robots.txt"
+  ]
+}

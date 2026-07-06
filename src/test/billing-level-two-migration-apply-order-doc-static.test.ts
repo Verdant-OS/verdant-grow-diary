@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const DOC_PATH = resolve(
@@ -96,7 +96,6 @@ describe("billing level two migration apply order manifest (docs/static-only)", 
   });
 
   it("only uses 'no migration file found' lines for groups with no repo match", () => {
-    const { readdirSync } = require("node:fs") as typeof import("node:fs");
     const migrationsDir = resolve(__dirname, "..", "..", "supabase", "migrations");
     const files = existsSync(migrationsDir) ? readdirSync(migrationsDir) : [];
 
@@ -114,11 +113,13 @@ describe("billing level two migration apply order manifest (docs/static-only)", 
       }
       if (/^\s*-\s/.test(line) && line.includes("no migration file found")) {
         const isHarness = currentGroup.includes("subscription updater harness");
-        expect(isHarness, `unexpected 'no migration file found' under group: ${currentGroup}`).toBe(true);
+        expect(isHarness, `unexpected 'no migration file found' under group: ${currentGroup}`).toBe(
+          true,
+        );
 
         // Sanity check: confirm no obvious harness migration exists in repo.
-        const harnessLike = files.filter(
-          (f) => /subscription_update.*harness|paddle.*harness/i.test(f),
+        const harnessLike = files.filter((f) =>
+          /subscription_update.*harness|paddle.*harness/i.test(f),
         );
         expect(harnessLike).toEqual([]);
       }

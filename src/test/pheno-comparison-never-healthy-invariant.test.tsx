@@ -52,9 +52,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 // Import AFTER mocks are set up.
-// eslint-disable-next-line import/first
 import PhenoComparison from "@/pages/PhenoComparison";
-
 
 const AFFIRMATIVE_HEALTHY_PATTERNS: RegExp[] = [
   /\bis healthy\b/i,
@@ -225,12 +223,9 @@ function renderWithCandidates(cands: readonly PhenoCandidateInput[]) {
   };
 }
 
-
 describe("PhenoComparison never-healthy invariant — expanded combinations", () => {
   it("renders every unknown/incomplete/invalid candidate without any healthy language or success glyphs", () => {
-    const { container, restore } = renderWithCandidates(
-      NEVER_HEALTHY_CANDIDATES,
-    );
+    const { container, restore } = renderWithCandidates(NEVER_HEALTHY_CANDIDATES);
     try {
       const text = container.textContent ?? "";
       for (const pat of AFFIRMATIVE_HEALTHY_PATTERNS) {
@@ -241,9 +236,7 @@ describe("PhenoComparison never-healthy invariant — expanded combinations", ()
       expect(text).not.toMatch(/\bSUCCESS\b/i);
       expect(text).not.toMatch(/\bPASS(?:ED|ING)?\b/);
       for (const glyph of FORBIDDEN_SUCCESS_GLYPHS) {
-        expect(text.includes(glyph), `must not contain glyph ${glyph}`).toBe(
-          false,
-        );
+        expect(text.includes(glyph), `must not contain glyph ${glyph}`).toBe(false);
       }
     } finally {
       restore();
@@ -252,9 +245,7 @@ describe("PhenoComparison never-healthy invariant — expanded combinations", ()
   });
 
   it("never applies a green/success visual tone to demo/stale/invalid snapshots", () => {
-    const { container, restore } = renderWithCandidates(
-      NEVER_HEALTHY_CANDIDATES,
-    );
+    const { container, restore } = renderWithCandidates(NEVER_HEALTHY_CANDIDATES);
     try {
       const snapshots = container.querySelectorAll<HTMLElement>(
         "[data-testid^='snapshot-'][data-source]",
@@ -277,35 +268,20 @@ describe("PhenoComparison never-healthy invariant — expanded combinations", ()
   });
 
   it("surfaces explicit missing/invalid flags on every incomplete candidate", () => {
-    const { container, restore } = renderWithCandidates(
-      NEVER_HEALTHY_CANDIDATES,
-    );
+    const { container, restore } = renderWithCandidates(NEVER_HEALTHY_CANDIDATES);
     try {
       // Every candidate we constructed is missing SOMETHING; each must render
       // a visible missing-flag or empty-state line — never a healthy claim.
       for (const c of NEVER_HEALTHY_CANDIDATES) {
         const scope = within(
-          container.querySelector<HTMLElement>(
-            `[data-testid='pheno-candidate-${c.candidateId}']`,
-          )!,
+          container.querySelector<HTMLElement>(`[data-testid='pheno-candidate-${c.candidateId}']`)!,
         );
-        const hasMissingList = scope.queryByTestId(
-          `pheno-candidate-${c.candidateId}-missing`,
-        );
-        const hasNoPhoto = scope.queryByTestId(
-          `pheno-candidate-${c.candidateId}-no-photo`,
-        );
-        const hasNoSensor = scope.queryByTestId(
-          `pheno-candidate-${c.candidateId}-no-sensor`,
-        );
-        const hasSnapshotMissing = scope.queryAllByTestId(
-          /^snapshot-.*-missing-/,
-        );
+        const hasMissingList = scope.queryByTestId(`pheno-candidate-${c.candidateId}-missing`);
+        const hasNoPhoto = scope.queryByTestId(`pheno-candidate-${c.candidateId}-no-photo`);
+        const hasNoSensor = scope.queryByTestId(`pheno-candidate-${c.candidateId}-no-sensor`);
+        const hasSnapshotMissing = scope.queryAllByTestId(/^snapshot-.*-missing-/);
         expect(
-          hasMissingList ||
-            hasNoPhoto ||
-            hasNoSensor ||
-            hasSnapshotMissing.length > 0,
+          hasMissingList || hasNoPhoto || hasNoSensor || hasSnapshotMissing.length > 0,
           `${c.candidateId} must surface at least one missing/invalid flag`,
         ).toBeTruthy();
       }

@@ -6,6 +6,7 @@ import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BrandLogo from "@/components/BrandLogo";
+import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   AuthInlineMessage,
   AuthPasswordField,
@@ -41,6 +42,13 @@ import {
 } from "@/lib/authModeTabRules";
 
 export default function Auth() {
+  usePageSeo({
+    title: "Sign in to Verdant Grow Diary",
+    description:
+      "Sign in or create your Verdant Grow Diary account to log grows, sensor snapshots, and cautious AI coaching.",
+    path: "/auth",
+    noindex: true,
+  });
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const [search] = useSearchParams();
@@ -230,7 +238,7 @@ export default function Auth() {
         <div className="flex items-center gap-3 mb-6">
           <BrandLogo size="lg" />
           <div>
-            <h1 className="text-3xl font-display font-bold">Verdant</h1>
+            <h1 className="text-3xl font-display font-bold">Sign in to Verdant Grow Diary</h1>
             <p className="text-sm text-muted-foreground">
               Plant memory. Sensor truth. Better decisions.
             </p>

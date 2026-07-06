@@ -1,6 +1,6 @@
 {
   "version": "v1.3",
-  "generated_at": "2026-06-29T21:58:08.869Z",
+  "generated_at": "2026-07-03T09:44:29.378Z",
   "templates": {
     "seed_production": {
       "canonical_sheet": "Seed_Production_Tracking",
@@ -108,24 +108,9 @@
           "open_pollination",
           "unknown"
         ],
-        "Storage Method": [
-          "fridge",
-          "freezer",
-          "room_temp",
-          "cool_dark",
-          "unknown",
-          "other"
-        ],
-        "Quality Flag (output only)": [
-          "Pass",
-          "Needs Review",
-          "Hold",
-          "Missing Test"
-        ],
-        "Commercial Release Linked?": [
-          "Yes",
-          "No"
-        ]
+        "Storage Method": ["fridge", "freezer", "room_temp", "cool_dark", "unknown", "other"],
+        "Quality Flag (output only)": ["Pass", "Needs Review", "Hold", "Missing Test"],
+        "Commercial Release Linked?": ["Yes", "No"]
       },
       "formula_contracts": {
         "L": "=IF(OR(N{r}=\"\",N{r}=0,Q{r}=\"\"),\"\",Q{r}/N{r})",
@@ -172,29 +157,11 @@
         "AI Notes"
       ],
       "allowed_values": {
-        "Storage Conditions Documented?": [
-          "Yes",
-          "No"
-        ],
-        "Parentage Complete?": [
-          "Yes",
-          "No"
-        ],
-        "Multi-Environment Testing Complete?": [
-          "Yes",
-          "No",
-          "Waived"
-        ],
-        "Stress Testing Complete?": [
-          "Yes",
-          "No",
-          "Waived"
-        ],
-        "Herm / Stability Concern?": [
-          "No",
-          "Yes",
-          "Unknown"
-        ],
+        "Storage Conditions Documented?": ["Yes", "No"],
+        "Parentage Complete?": ["Yes", "No"],
+        "Multi-Environment Testing Complete?": ["Yes", "No", "Waived"],
+        "Stress Testing Complete?": ["Yes", "No", "Waived"],
+        "Herm / Stability Concern?": ["No", "Yes", "Unknown"],
         "Review Status (formula-suggested, max Release Candidate)": [
           "Draft",
           "Needs Review",

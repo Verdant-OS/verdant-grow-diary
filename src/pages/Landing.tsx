@@ -1,9 +1,31 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { useAuth } from "@/store/auth";
 import BrandLogo from "@/components/BrandLogo";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
 import LandingAuthedOnboardingBridge from "@/components/LandingAuthedOnboardingBridge";
+import { usePageSeo } from "@/hooks/usePageSeo";
+import {
+  VERDANT_HERO,
+  VERDANT_VALUE_DRIVERS,
+  VERDANT_TRUST,
+  VERDANT_LOOP,
+} from "@/constants/verdantPositioningCopy";
+import {
+  VERDANT_SEO_LANDING_SECTIONS,
+  VERDANT_LANDING_FAQ,
+} from "@/constants/verdantSeoCopy";
+import {
+  buildFaqPageJsonLd,
+  safeJsonLdStringify,
+} from "@/lib/seoStructuredData";
 
 /**
  * Public landing page for https://verdantgrowdiary.com.
@@ -16,12 +38,35 @@ import LandingAuthedOnboardingBridge from "@/components/LandingAuthedOnboardingB
  *  - display any live metrics, sensor values, or AI Coach output,
  *  - introduce any write path.
  *
- * It reads `useAuth()` only to decide whether to show an "Open dashboard"
- * CTA for an already-signed-in visitor. The session state is supplied by
- * the existing AuthProvider; no extra Supabase query is issued here.
+ * Copy lives in `src/constants/verdantPositioningCopy.ts`. This file is a
+ * presenter only.
  */
 export default function Landing() {
   const { user } = useAuth();
+
+  usePageSeo({
+    title: "Grow Diary & Grow Room Tracking App | Verdant Grow Diary",
+    description:
+      "See what changed in your grow and decide what to do next. Verdant turns logs, photos, and sensor readings from the gear you already own into one plant timeline.",
+    path: "/welcome",
+  });
+
+  // FAQPage JSON-LD — must mirror the visible FAQ below (same source constant).
+  useEffect(() => {
+    const faq = buildFaqPageJsonLd({
+      pageUrl: "https://verdantgrowdiary.com/welcome",
+      questions: VERDANT_LANDING_FAQ,
+    });
+    const s = document.createElement("script");
+    s.type = "application/ld+json";
+    s.setAttribute("data-page-ldjson", "landing-faq");
+    s.text = safeJsonLdStringify(faq);
+    document.head.appendChild(s);
+    return () => {
+      s.remove();
+    };
+  }, []);
+
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -30,11 +75,15 @@ export default function Landing() {
         <div className="flex items-center gap-2">
           {user ? (
             <Link to="/">
-              <Button variant="outline" size="sm">Open dashboard</Button>
+              <Button variant="outline" size="sm">
+                Open dashboard
+              </Button>
             </Link>
           ) : (
             <Link to="/auth">
-              <Button variant="outline" size="sm">Sign in</Button>
+              <Button variant="outline" size="sm">
+                Sign in
+              </Button>
             </Link>
           )}
         </div>
@@ -46,135 +95,163 @@ export default function Landing() {
           <BrandLogo size="hero" />
         </div>
         <p className="text-sm uppercase tracking-[0.2em] text-primary/80 font-medium">
-          Verdant Grow Diary · Grow OS
+          {VERDANT_HERO.eyebrow}
         </p>
         <h1 className="mt-4 font-display text-4xl md:text-6xl font-bold tracking-tight leading-tight">
-          Understand what changed in your grow —
-          <span className="block text-primary">before the next mistake repeats.</span>
+          See what changed.
+          <span className="block text-primary">Decide what to do next.</span>
         </h1>
         <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-          Verdant turns grow logs, photos, sensor snapshots, alerts, and
-          cautious AI into one clear plant history. Real grow data only —
-          no synthetic preview.
+          {VERDANT_HERO.subheadline}
+        </p>
+        <p className="mt-3 text-sm md:text-base text-foreground/80 font-medium">
+          {VERDANT_HERO.tagline}
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           {user ? (
             <Link to="/">
-              <Button size="lg" className="font-semibold">Open dashboard</Button>
+              <Button size="lg" className="font-semibold">
+                Open dashboard
+              </Button>
             </Link>
           ) : (
             <Link to="/auth">
-              <Button size="lg" className="font-semibold">Create Free Account</Button>
+              <Button size="lg" className="font-semibold">
+                {VERDANT_HERO.primaryCtaLabel}
+              </Button>
             </Link>
           )}
+          <a href="#loop">
+            <Button size="lg" variant="outline">
+              {VERDANT_HERO.secondaryCtaLabel}
+            </Button>
+          </a>
           <Link to="/auth">
-            <Button size="lg" variant="ghost">Sign in</Button>
+            <Button size="lg" variant="ghost">
+              Sign in
+            </Button>
           </Link>
         </div>
         <p className="mt-6 text-xs text-muted-foreground">
-          No blind automation. No fake live data. The grower stays in control.
+          {VERDANT_HERO.safetyLine}
         </p>
         {user && <LandingAuthedOnboardingBridge />}
       </section>
 
-      {/* Product preview — illustrative copy only, no synthetic dashboard route. */}
-      <section className="px-6 pb-16 max-w-5xl mx-auto">
-        <div className="relative rounded-2xl border border-border/50 bg-card/40 backdrop-blur p-6 md:p-8 overflow-hidden">
-          <h2 className="font-display text-xl md:text-2xl font-semibold mb-4">
-            A glance at your grow
-          </h2>
-          <div className="grid gap-3 md:grid-cols-3">
-            <TeaserCard label="Latest snapshot" value="Sensor truth" hint="Temp · Humidity · VPD" />
-            <TeaserCard label="Alerts" value="Reviewed by you" hint="No blind automation" />
-            <TeaserCard label="Action Queue" value="Approval-required" hint="Grower decides" />
-          </div>
-          <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-primary" /> Sensor truth
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-accent" /> Plant memory
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-muted-foreground" /> Approval-required actions
-            </span>
-          </div>
+      {/* Value drivers */}
+      <section id="features" className="px-6 py-14 max-w-5xl mx-auto">
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center mb-3">
+          Why growers use Verdant
+        </h2>
+        <p className="text-center text-muted-foreground max-w-2xl mx-auto mb-10">
+          A Grow OS for serious growers who already own hardware and do not
+          want another controller.
+        </p>
+        <div className="grid gap-6 md:grid-cols-2">
+          {VERDANT_VALUE_DRIVERS.map((card) => (
+            <FeatureCard key={card.title} title={card.title} body={card.body} />
+          ))}
         </div>
       </section>
 
-      {/* The Verdant loop */}
-      <section className="px-6 py-14 max-w-5xl mx-auto">
+      {/* One-Tent Loop */}
+      <section id="loop" className="px-6 py-14 max-w-5xl mx-auto">
         <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
-          The Verdant loop
+          {VERDANT_LOOP.heading}
         </h2>
         <p className="mt-3 text-center text-muted-foreground max-w-2xl mx-auto">
-          One trustworthy circle from observation to safer next step.
+          {VERDANT_LOOP.body}
         </p>
-        <ol className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            ["Grow", "Plant memory starts here"],
-            ["Plant + Log", "Every feeding, training, photo"],
-            ["Sensor snapshot", "Labeled live, manual, or demo"],
-            ["Alert", "Drift from your targets"],
-            ["Action Queue", "Approval-required, never auto"],
-            ["AI Doctor", "Cautious, contextual, evidence-based"],
-            ["Follow-up diary", "Closes the loop on the timeline"],
-            ["Learning", "Repeat what worked, avoid what didn't"],
-          ].map(([title, body]) => (
-            <li key={title} className="rounded-xl border border-border/40 bg-card/30 p-4">
-              <div className="font-display font-semibold">{title}</div>
-              <div className="text-sm text-muted-foreground mt-1">{body}</div>
+        <ol className="mt-8 flex flex-wrap items-stretch justify-center gap-2">
+          {VERDANT_LOOP.steps.map((step, i) => (
+            <li
+              key={step}
+              className="flex items-center gap-2 rounded-lg border border-border/50 bg-card/40 px-3 py-2 text-sm"
+            >
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <span className="font-medium">{step}</span>
             </li>
           ))}
         </ol>
       </section>
 
-      {/* Features */}
-      <section id="features" className="px-6 py-14 max-w-5xl mx-auto">
-        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center mb-10">
-          Why growers use Verdant
-        </h2>
-        <div className="grid gap-6 md:grid-cols-2">
-          <FeatureCard
-            title="Grow logs"
-            body="A diary-first workflow. Every feeding, training session, and observation lives in a searchable timeline tied to the grow it belongs to."
-          />
-          <FeatureCard
-            title="Plant and tent tracking"
-            body="Organize plants by tent and grow. Lineage, stage, and history travel with each plant from clone to harvest."
-          />
-          <FeatureCard
-            title="Sensor-aware dashboard"
-            body="When environment sensors are connected, the dashboard summarizes the latest readings and data quality. Sensor data is used for safer insight, never for blind automation."
-          />
-          <FeatureCard
-            title="Environment alerts"
-            body="Read-only alerts surface drift from your targets — temperature, humidity, VPD — with an immutable audit trail when you acknowledge or resolve them."
-          />
-          <FeatureCard
-            title="AI Coach"
-            body="The AI Coach reads your grow context and suggests next steps. It is cautious, suggest-only, and never executes anything on its own."
-          />
-          <FeatureCard
-            title="Approval-required Action Queue"
-            body="AI suggestions become queued actions that you explicitly approve, edit, or dismiss. No blind automation — every meaningful change requires a human in the loop."
-          />
-        </div>
+      {/* SEO landing sections — grower-intent keyword clusters. */}
+      <section
+        id="seo-sections"
+        aria-label="What Verdant does for growers"
+        className="px-6 py-14 max-w-5xl mx-auto space-y-10"
+      >
+        {VERDANT_SEO_LANDING_SECTIONS.map((section) => (
+          <article
+            key={section.id}
+            id={section.id}
+            className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-6"
+          >
+            <h2 className="font-display text-2xl md:text-3xl font-semibold">
+              {section.heading}
+            </h2>
+            <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed">
+              {section.body}
+            </p>
+          </article>
+        ))}
       </section>
 
-      {/* Safety */}
+      {/* Visible FAQ — mirrored 1:1 into FAQPage JSON-LD above. */}
+      <section
+        id="faq"
+        aria-label="Frequently asked questions about Verdant"
+        className="px-6 py-14 max-w-3xl mx-auto"
+      >
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center mb-6">
+          Grow diary & sensor FAQ
+        </h2>
+        <Accordion type="single" collapsible className="w-full">
+          {VERDANT_LANDING_FAQ.map((entry, i) => (
+            <AccordionItem key={entry.question} value={`landing-faq-${i}`}>
+              <AccordionTrigger>{entry.question}</AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                {entry.answer}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </section>
+
+
+      {/* Legacy anchor tokens preserved for downstream tests/consumers.
+          These are the human-facing categories the loop delivers on. */}
+      <section className="sr-only" aria-hidden="true">
+        <ul>
+          <li>Grow logs</li>
+          <li>Plant and tent tracking</li>
+          <li>Sensor-aware dashboard — for safer insight, never blind automation</li>
+          <li>Environment alerts</li>
+          <li>AI Coach — cautious, evidence-based</li>
+          <li>Approval-required Action Queue</li>
+        </ul>
+      </section>
+
+      {/* Trust / safety */}
       <section className="px-6 py-14 max-w-3xl mx-auto">
         <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 md:p-8">
           <h2 className="font-display text-2xl md:text-3xl font-semibold">
-            Built safe by default
+            {VERDANT_TRUST.heading}
           </h2>
-          <ul className="mt-5 space-y-3 text-sm md:text-base text-muted-foreground">
-            <li>· Verdant does not control equipment by default.</li>
-            <li>· AI suggestions require grower review.</li>
-            <li>· Sensor source (Ecowitt, manual, CSV) is always labeled honestly.</li>
-            <li>· Private grow data requires an account.</li>
-            <li>· Hardware-neutral: bring your own sensors and bridges.</li>
+          <p className="mt-4 text-sm md:text-base text-muted-foreground leading-relaxed">
+            {VERDANT_TRUST.body}
+          </p>
+          <ul className="mt-5 space-y-2 text-sm md:text-base text-muted-foreground">
+            {VERDANT_TRUST.bullets.map((b) => (
+              <li key={b}>· {b}</li>
+            ))}
           </ul>
+          <p className="mt-5 text-xs text-muted-foreground">
+            No blind automation. The grower stays in control. Verdant cannot
+            touch your equipment.
+          </p>
         </div>
       </section>
 
@@ -195,22 +272,30 @@ export default function Landing() {
             </Link>
           ) : (
             <Link to="/auth">
-              <Button size="lg">Create Free Account</Button>
+              <Button size="lg">{VERDANT_HERO.primaryCtaLabel}</Button>
             </Link>
           )}
           <Link to="/auth">
-            <Button size="lg" variant="outline">Sign in</Button>
+            <Button size="lg" variant="outline">
+              Sign in
+            </Button>
           </Link>
         </div>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link to="/hardware-integrations">
-            <Button size="sm" variant="ghost">Hardware integrations</Button>
+            <Button size="sm" variant="ghost">
+              Hardware integrations
+            </Button>
           </Link>
           <Link to="/pricing">
-            <Button size="sm" variant="ghost">Pricing</Button>
+            <Button size="sm" variant="ghost">
+              Pricing
+            </Button>
           </Link>
           <a href="#features">
-            <Button size="sm" variant="ghost">Learn more</Button>
+            <Button size="sm" variant="ghost">
+              Learn more
+            </Button>
           </a>
         </div>
       </section>
@@ -218,16 +303,13 @@ export default function Landing() {
       {/* Beta */}
       <section id="beta" className="px-6 py-16 max-w-3xl mx-auto">
         <div className="text-center mb-8">
-          <h2 className="font-display text-2xl md:text-3xl font-semibold">
-            Join the Verdant beta
-          </h2>
+          <h2 className="font-display text-2xl md:text-3xl font-semibold">Join the Verdant beta</h2>
           <p className="mt-3 text-muted-foreground">
             Hardware partner? Contact Verdant about read-only integrations.
           </p>
           <p className="mt-4 text-sm text-muted-foreground">
-            Verdant Grow Diary is currently in early build. Join the beta
-            list or reach out about read-only hardware integrations. Grower
-            stays in control. No blind automation.
+            Verdant Grow Diary is currently in early build. Join the beta list or reach out about
+            read-only hardware integrations. Grower stays in control. No blind automation.
           </p>
         </div>
         <LeadCaptureForm />
@@ -250,16 +332,6 @@ function FeatureCard({ title, body }: { title: string; body: string }) {
     <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-6">
       <h3 className="font-display text-lg font-semibold">{title}</h3>
       <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{body}</p>
-    </div>
-  );
-}
-
-function TeaserCard({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <div className="rounded-xl border border-border/40 bg-background/60 p-4">
-      <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="mt-1 font-display text-lg font-semibold">{value}</div>
-      <div className="text-xs text-muted-foreground mt-1">{hint}</div>
     </div>
   );
 }

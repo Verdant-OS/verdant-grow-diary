@@ -12,11 +12,20 @@ These rules govern how Verdant treats every sensor reading. Violating any rule i
 Every reading carries: `id`, `metric`, `value`, `unit`, `captured_at`, `state`, `source_type`, `is_fixture`, `fixture_scope`, `confidence`, `raw_payload`.
 A reading missing any of these is treated as `invalid`.
 
+Readings are additionally scoped and attributed:
+
+- `tent_id` — every reading belongs to a tent.
+- `plant_id` — carried when the reading is plant-scoped.
+- `provider` — the vendor identity (e.g. `ecowitt`) when available.
+- transport / import method (e.g. `mqtt`, webhook, CSV import) when available.
+
 ## 3. `source_type` vs `state`
 
 - `source_type` describes **where the reading came from** (e.g., `manual_snapshot`, `pi_bridge`, `home_assistant`, `demo_fixture`).
-- `state` describes **how the UI must label it** (`demo`, `manual`, `live`, `stale`, `invalid`).
+- `state` describes **how the UI must label it** (`live`, `manual`, `csv`, `demo`, `stale`, `invalid`).
 - The two are independent inputs. The mapping is computed per `data-labeling-spec.md` — never hand-set to mislead.
+- These six are the only allowed source labels. A reading that fits none of
+  them is `invalid`, never silently promoted to `live`.
 
 ## 4. Stale handling
 
@@ -35,7 +44,16 @@ A reading missing any of these is treated as `invalid`.
 
 - Demo readings live only on demo grows / fixture-backed views.
 - Demo readings are always badged "Demo".
+- Demo readings are never shown as live.
 - Demo readings never seed real alerts or real Action Queue items.
+
+## 6b. CSV / imported history
+
+- CSV/XLSX-imported readings are always labeled `csv`.
+- Imported history is **never promoted to live** — not by age, not by
+  freshness of `captured_at`, not by re-import.
+- Imported history may show trends; it is not proof of current conditions
+  and never feeds current-state KPIs or "is the plant OK?" computations.
 
 ## 7. Manual snapshot rules
 
@@ -49,3 +67,27 @@ A reading missing any of these is treated as `invalid`.
 - If telemetry is missing, stale, invalid, or unknown-source, the surface must show that explicitly.
 - The system must not classify a tent/plant as "healthy" based on absent or untrusted data.
 - "Healthy" is a positive claim and requires fresh, valid, in-range readings.
+- Old readings must never be shown as current.
+
+## 9. Derived metrics (VPD)
+
+- VPD is computed only when a valid temperature + RH pair is available.
+- When the pair is unavailable, VPD is null/missing — never a fake 0, never
+  a value derived from a stale or invalid partner reading.
+
+## 10. Soil moisture channels
+
+- Multi-channel soil moisture probes keep each channel distinct.
+- Channels are never silently merged. An intentional average is allowed only
+  when it is clearly labeled as an average.
+
+## 11. Suspicious unit flags
+
+A reading with any of the following is flagged for review (and treated as
+`invalid` where the value is physically impossible):
+
+- Celsius values that look like Fahrenheit (or vice versa).
+- µS/cm presented as mS/cm (or vice versa).
+- Humidity stuck at exactly 0 or 100.
+- Soil moisture stuck at exactly 0 or 100.
+- pH outside a realistic range.

@@ -34,12 +34,7 @@
  *  - `redirect`  — a `<Navigate>` alias to another route (e.g. `/login` →
  *                  `/auth`). Carries no page of its own.
  */
-export type AppRouteAccess =
-  | "public"
-  | "auth"
-  | "operator"
-  | "internal"
-  | "redirect";
+export type AppRouteAccess = "public" | "auth" | "operator" | "internal" | "redirect";
 
 export const APP_ROUTE_ACCESS_VALUES: ReadonlyArray<AppRouteAccess> = [
   "public",
@@ -80,54 +75,194 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/alerts/:alertId", access: "auth" },
   { path: "/auth", access: "public" },
   { path: "/billing/:plan", access: "public", description: "Billing placeholder." },
-  { path: "/customer/:shareId", access: "public", description: "Customer Mode QR guide shell (read-only, no private grow data)." },
+  {
+    path: "/customer/:shareId",
+    access: "public",
+    description: "Customer Mode QR guide shell (read-only, no private grow data).",
+  },
   { path: "/daily-check", access: "auth" },
   { path: "/demo", access: "redirect", description: "→ /welcome" },
-  { path: "/demo/one-tent-live-proof", access: "operator", description: "One-tent live proof page (legacy /demo path, mounted inside AppShell). UI Simplification Slice 0 — operator-gated; proof artifact, not grower-facing." },
+  {
+    path: "/demo/one-tent-live-proof",
+    access: "operator",
+    description:
+      "One-tent live proof page (legacy /demo path, mounted inside AppShell). UI Simplification Slice 0 — operator-gated; proof artifact, not grower-facing.",
+  },
   { path: "/diagnostics", access: "operator" },
-  { path: "/diary/environment-summary", access: "auth", description: "Environment summary report (diary)." },
+  {
+    path: "/diary/environment-summary",
+    access: "auth",
+    description: "Environment summary report (diary).",
+  },
   { path: "/doctor", access: "auth" },
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },
   { path: "/features", access: "redirect", description: "→ /welcome" },
-  { path: "/grow-lineage", access: "auth", label: "Lineage Repair", description: "Grower-facing repair tool for reassigning tents to grows (owner-scoped, RLS-protected)." },
+  {
+    path: "/grow-lineage",
+    access: "auth",
+    label: "Lineage Repair",
+    description:
+      "Grower-facing repair tool for reassigning tents to grows (owner-scoped, RLS-protected).",
+  },
   { path: "/grow-room", access: "redirect", description: "→ /" },
   { path: "/grows", access: "auth" },
   { path: "/grows/:growId", access: "auth" },
+  {
+    path: "/guides",
+    access: "public",
+    label: "Grower Guides",
+    description: "Public SEO hub for grower-intent guides.",
+  },
+  {
+    path: "/guides/:slug",
+    access: "public",
+    description: "Public SEO guide detail page.",
+  },
   { path: "/hardware-integrations", access: "public" },
-  
+  {
+    path: "/how-ai-doctor-works",
+    access: "public",
+    label: "How AI Doctor Works",
+    description:
+      "Public explainer: evidence-first AI Doctor 12-field output contract, missing-information transparency, and grower-approved decisions.",
+  },
+
   { path: "/ingest-inspector", access: "operator" },
-  { path: "/internal/ai-doctor-confidence-audit", access: "internal", description: "AI Doctor confidence internal static audit." },
-  { path: "/internal/ai-doctor-phase1-preview", access: "internal", description: "Static Phase 1 view model preview." },
-  { path: "/internal/contextual-pheno-comparison-demo", access: "internal", description: "Read-only demo-labeled contextual pheno comparison panel." },
-  { path: "/internal/demo-proof-walkthrough", access: "internal", description: "Read-only operator walkthrough of the V0 One-Tent Loop proof path." },
-  { path: "/internal/one-tent-loop-proof", access: "internal", description: "One-tent loop internal proof checklist." },
-  { path: "/internal/sensor-truth-audit", access: "internal", description: "Sensor truth internal static audit." },
+  {
+    path: "/internal/ai-doctor-confidence-audit",
+    access: "internal",
+    description: "AI Doctor confidence internal static audit.",
+  },
+  {
+    path: "/internal/ai-doctor-phase1-preview",
+    access: "internal",
+    description: "Static Phase 1 view model preview.",
+  },
+  {
+    path: "/internal/contextual-pheno-comparison-demo",
+    access: "internal",
+    description: "Read-only demo-labeled contextual pheno comparison panel.",
+  },
+  {
+    path: "/internal/demo-proof-walkthrough",
+    access: "internal",
+    description: "Read-only operator walkthrough of the V0 One-Tent Loop proof path.",
+  },
+  {
+    path: "/internal/one-tent-loop-proof",
+    access: "internal",
+    description: "One-tent loop internal proof checklist.",
+  },
+  {
+    path: "/internal/sensor-truth-audit",
+    access: "internal",
+    description: "Sensor truth internal static audit.",
+  },
   { path: "/leads", access: "internal" },
 
   { path: "/login", access: "redirect", description: "→ /auth" },
   { path: "/logs", access: "redirect", description: "→ /timeline (legacy alias)" },
-  { path: "/onboarding", access: "auth", description: "Post-sign-in start-screen choice (diary-first default)." },
-  { path: "/operator/ai-doctor-phase1", access: "operator", description: "Operator AI Doctor Phase 1 results page." },
-  { path: "/operator/billing-entitlement-resolution", access: "operator", description: "Operator billing entitlement resolution audit (read-only)." },
-  { path: "/operator/billing-subscription-updates", access: "operator", description: "Operator billing subscription update audit (read-only)." },
-  { path: "/operator/demo-preview", access: "operator", description: "Operator-only One-Tent Evidence Chain demo preview (read-only, demo-labeled)." },
+  {
+    path: "/onboarding",
+    access: "auth",
+    description: "Post-sign-in start-screen choice (diary-first default).",
+  },
+  {
+    path: "/one-tent-loop-proof",
+    access: "internal",
+    description:
+      "One-Tent Loop live proof (read-only diagnostic; no writes, no AI, no device control).",
+  },
+  {
+    path: "/operator/ai-doctor-phase1",
+    access: "operator",
+    description: "Operator AI Doctor Phase 1 results page.",
+  },
+  {
+    path: "/operator/billing-entitlement-resolution",
+    access: "operator",
+    description: "Operator billing entitlement resolution audit (read-only).",
+  },
+  {
+    path: "/operator/billing-subscription-updates",
+    access: "operator",
+    description: "Operator billing subscription update audit (read-only).",
+  },
+  {
+    path: "/operator/demo-preview",
+    access: "operator",
+    description: "Operator-only One-Tent Evidence Chain demo preview (read-only, demo-labeled).",
+  },
   { path: "/operator/ecowitt", access: "operator", description: "Cloud Canary preview." },
-  { path: "/operator/ecowitt-bridge-debug", access: "operator", description: "EcoWitt bridge debug (read-only)." },
-  { path: "/operator/ecowitt-bridge-status", access: "operator", description: "EcoWitt bridge status (read-only)." },
-  { path: "/operator/ecowitt-live-bringup", access: "operator", description: "EcoWitt live bring-up tooling (read-only)." },
-  { path: "/operator/ecowitt-tent-preview", access: "operator", description: "EcoWitt per-tent preview (read-only)." },
-  { path: "/operator/ggs-real-payload-ingest", access: "operator", description: "GGS Sentinel smoke runner verdict over real Spider Farmer GGS rows." },
-  { path: "/operator/one-tent-live-proof", access: "operator", description: "Operator one-tent live proof page." },
-  { path: "/operator/one-tent-loop-smoke-test", access: "operator", description: "Operator one-tent loop smoke test (read-only)." },
-  { path: "/operator/one-tent-proof-record", access: "operator", description: "One-tent proof record export." },
-  { path: "/operator/paddle-processing-audit", access: "operator", description: "Operator Paddle processing audit (read-only)." },
-  { path: "/operator/post-grow-reflection-dry-run", access: "operator", description: "Post-Grow Reflection dry-run diagnostics panel (read-only)." },
-  { path: "/operator/release-readiness", access: "operator", description: "Read-only release readiness / validation status snapshot (static/manual, no live CI feed)." },
+  {
+    path: "/operator/ecowitt-bridge-debug",
+    access: "operator",
+    description: "EcoWitt bridge debug (read-only).",
+  },
+  {
+    path: "/operator/ecowitt-bridge-status",
+    access: "operator",
+    description: "EcoWitt bridge status (read-only).",
+  },
+  {
+    path: "/operator/ecowitt-live-bringup",
+    access: "operator",
+    description: "EcoWitt live bring-up tooling (read-only).",
+  },
+  {
+    path: "/operator/ecowitt-tent-preview",
+    access: "operator",
+    description: "EcoWitt per-tent preview (read-only).",
+  },
+  {
+    path: "/operator/ggs-real-payload-ingest",
+    access: "operator",
+    description: "GGS Sentinel smoke runner verdict over real Spider Farmer GGS rows.",
+  },
+  {
+    path: "/operator/one-tent-live-proof",
+    access: "operator",
+    description: "Operator one-tent live proof page.",
+  },
+  {
+    path: "/operator/one-tent-loop-smoke-test",
+    access: "operator",
+    description: "Operator one-tent loop smoke test (read-only).",
+  },
+  {
+    path: "/operator/one-tent-proof-record",
+    access: "operator",
+    description: "One-tent proof record export.",
+  },
+  {
+    path: "/operator/paddle-processing-audit",
+    access: "operator",
+    description: "Operator Paddle processing audit (read-only).",
+  },
+  {
+    path: "/operator/post-grow-reflection-dry-run",
+    access: "operator",
+    description: "Post-Grow Reflection dry-run diagnostics panel (read-only).",
+  },
+  {
+    path: "/operator/release-readiness",
+    access: "operator",
+    description:
+      "Read-only release readiness / validation status snapshot (static/manual, no live CI feed).",
+  },
 
-  
-  { path: "/pheno-comparison", access: "public", description: "Read-only Pheno Comparison preview surface (demo-labeled fixtures, no writes)." },
-  { path: "/pheno-hunts/:id/compare", access: "public", description: "Read-only Pheno Comparison preview surface, per-hunt route alias (demo-labeled fixtures, no writes)." },
+  {
+    path: "/pheno-comparison",
+    access: "public",
+    description: "Read-only Pheno Comparison preview surface (demo-labeled fixtures, no writes).",
+  },
+  {
+    path: "/pheno-hunts/:id/compare",
+    access: "public",
+    description:
+      "Read-only Pheno Comparison preview surface, per-hunt route alias (demo-labeled fixtures, no writes).",
+  },
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
   { path: "/pi-ingest-status", access: "operator" },
   { path: "/plants", access: "auth" },
@@ -138,7 +273,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/reports/post-grow/:growId", access: "auth", description: "Post-grow learning report." },
   { path: "/reset-password", access: "public", description: "Password reset landing page." },
   { path: "/sensors", access: "auth" },
-  
+
   { path: "/sensors/ecowitt-audit", access: "operator" },
   { path: "/sensors/ingest-normalizer", access: "operator" },
   { path: "/settings", access: "auth" },
@@ -161,9 +296,7 @@ export function getAppRouteManifestPathsSorted(): string[] {
 }
 
 /** Filter helper — useful for future nav/access work, no React inside. */
-export function getRoutesByAccess(
-  access: AppRouteAccess,
-): ReadonlyArray<AppRouteEntry> {
+export function getRoutesByAccess(access: AppRouteAccess): ReadonlyArray<AppRouteEntry> {
   return APP_ROUTES.filter((r) => r.access === access);
 }
 
@@ -189,8 +322,6 @@ export function findDuplicateAppRoutePaths(): string[] {
 export function assertUniqueAppRouteManifestPaths(): void {
   const dupes = findDuplicateAppRoutePaths();
   if (dupes.length > 0) {
-    throw new Error(
-      `[appRouteManifest] Duplicate route path(s): ${dupes.join(", ")}`,
-    );
+    throw new Error(`[appRouteManifest] Duplicate route path(s): ${dupes.join(", ")}`);
   }
 }

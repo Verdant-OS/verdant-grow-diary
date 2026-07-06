@@ -5,7 +5,7 @@
  * fingerprint, tool names + params). Never shows tokens, secrets, OAuth
  * credentials, or private env values.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type RefObject } from "react";
 import { Copy } from "lucide-react";
 import {
   Dialog,
@@ -18,10 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  buildSafeManifestSummaryText,
-  type MCPManifestView,
-} from "@/lib/mcp/manifestView";
+import { buildSafeManifestSummaryText, type MCPManifestView } from "@/lib/mcp/manifestView";
 
 type ModalCopyState = "idle" | "copied" | "failed";
 
@@ -31,6 +28,14 @@ export type ManifestSummaryModalProps = {
   manifest: MCPManifestView;
   fingerprint: string;
   manifestUrl?: string;
+  /**
+   * Element to return keyboard focus to when the modal closes. This
+   * dialog is controlled externally (no Radix DialogTrigger), so Radix
+   * has no trigger to restore focus to on its own — without this, focus
+   * falls to <body> on close (a WCAG 2.4.3 focus-order gap). Point this
+   * at whichever button opened the modal.
+   */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 };
 
 export default function ManifestSummaryModal({
@@ -39,6 +44,7 @@ export default function ManifestSummaryModal({
   manifest,
   fingerprint,
   manifestUrl,
+  returnFocusRef,
 }: ManifestSummaryModalProps) {
   const [copyState, setCopyState] = useState<ModalCopyState>("idle");
   const summaryText = useMemo(
@@ -48,10 +54,7 @@ export default function ManifestSummaryModal({
 
   const onCopy = useCallback(async () => {
     try {
-      if (
-        typeof navigator !== "undefined" &&
-        navigator.clipboard?.writeText
-      ) {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(summaryText);
         setCopyState("copied");
         return;
@@ -73,14 +76,22 @@ export default function ManifestSummaryModal({
       <DialogContent
         className="max-w-lg"
         data-testid="manifest-summary-modal"
+        onCloseAutoFocus={(e) => {
+          // Return focus to the opening trigger when provided. Radix
+          // cannot do this for an externally-controlled dialog with no
+          // DialogTrigger, so we take over focus restoration here.
+          const target = returnFocusRef?.current;
+          if (target) {
+            e.preventDefault();
+            target.focus();
+          }
+        }}
       >
         <DialogHeader>
-          <DialogTitle data-testid="manifest-summary-title">
-            Safe MCP manifest summary
-          </DialogTitle>
+          <DialogTitle data-testid="manifest-summary-title">Safe MCP manifest summary</DialogTitle>
           <DialogDescription>
-            Public metadata only. This view does not include tokens,
-            secrets, OAuth credentials, or private environment values.
+            Public metadata only. This view does not include tokens, secrets, OAuth credentials, or
+            private environment values.
           </DialogDescription>
         </DialogHeader>
 
@@ -101,10 +112,7 @@ export default function ManifestSummaryModal({
             </div>
             <div>
               <dt className="inline text-muted-foreground">Fingerprint: </dt>
-              <dd
-                className="inline font-mono text-xs"
-                data-testid="manifest-summary-fingerprint"
-              >
+              <dd className="inline font-mono text-xs" data-testid="manifest-summary-fingerprint">
                 {fingerprint}
               </dd>
             </div>
@@ -115,17 +123,12 @@ export default function ManifestSummaryModal({
             {manifestUrl ? (
               <div>
                 <dt className="inline text-muted-foreground">Manifest: </dt>
-                <dd className="inline break-all font-mono text-xs">
-                  {manifestUrl}
-                </dd>
+                <dd className="inline break-all font-mono text-xs">{manifestUrl}</dd>
               </div>
             ) : null}
             <div>
               <dt className="inline text-muted-foreground">Tools advertised: </dt>
-              <dd
-                className="inline"
-                data-testid="manifest-summary-tool-count"
-              >
+              <dd className="inline" data-testid="manifest-summary-tool-count">
                 {manifest.tools.length}
               </dd>
             </div>
@@ -151,37 +154,25 @@ export default function ManifestSummaryModal({
                     {tool.params.map((p) => (
                       <li key={p.name} className="font-mono">
                         {p.name}: {p.type}{" "}
-                        <span
-                          className={
-                            p.required ? "text-primary" : "text-muted-foreground"
-                          }
-                        >
+                        <span className={p.required ? "text-primary" : "text-muted-foreground"}>
                           ({p.required ? "required" : "optional"})
                         </span>
                         {p.constraints ? (
-                          <span className="text-muted-foreground">
-                            {" "}
-                            [{p.constraints}]
-                          </span>
+                          <span className="text-muted-foreground"> [{p.constraints}]</span>
                         ) : null}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    No parameters.
-                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">No parameters.</p>
                 )}
               </li>
             ))}
           </ul>
 
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid="manifest-summary-safety-note"
-          >
-            This is a safe manifest summary. It does not include tokens,
-            secrets, OAuth credentials, or private environment values.
+          <p className="text-xs text-muted-foreground" data-testid="manifest-summary-safety-note">
+            This is a safe manifest summary. It does not include tokens, secrets, OAuth credentials,
+            or private environment values.
           </p>
         </div>
 

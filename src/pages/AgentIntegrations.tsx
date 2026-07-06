@@ -8,7 +8,7 @@
  *
  * Route: /settings/agent-integrations
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Copy, ExternalLink, ShieldCheck, FileText } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -21,10 +21,7 @@ import {
   buildConnectionDetailsText,
   getSupabaseOrigin,
 } from "@/lib/mcp/manifestView";
-import {
-  computeManifestHash,
-  shortenManifestHash,
-} from "@/lib/mcp/manifestHash";
+import { computeManifestHash, shortenManifestHash } from "@/lib/mcp/manifestHash";
 import {
   verifyMcpToolAccess,
   defaultBrowserHarness,
@@ -34,7 +31,6 @@ import {
   type HarnessAdapter,
   type VerifyMcpToolAccessResult,
 } from "@/lib/mcp/verifyMcpToolAccess";
-
 
 type CopyState = "idle" | "copied" | "failed";
 
@@ -110,16 +106,12 @@ export default function AgentIntegrations({
     () => (supabaseOrigin ? `${supabaseOrigin}${MCP_MANIFEST.path}` : MCP_MANIFEST.path),
     [supabaseOrigin],
   );
-  const appOrigin =
-    typeof window !== "undefined" ? window.location.origin : "";
+  const appOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const consentUrl = `${appOrigin}${MCP_MANIFEST.consentPath}`;
   const oauthStatus = deriveOAuthStatus();
 
   const manifestHash = useMemo(() => computeManifestHash(MCP_MANIFEST), []);
-  const manifestFingerprint = useMemo(
-    () => shortenManifestHash(manifestHash),
-    [manifestHash],
-  );
+  const manifestFingerprint = useMemo(() => shortenManifestHash(manifestHash), [manifestHash]);
   const toolNames = MCP_MANIFEST.tools.map((t) => t.name);
 
   const [copyState, setCopyState] = useState<CopyState>("idle");
@@ -141,8 +133,7 @@ export default function AgentIntegrations({
     }
   }, [supabaseOrigin, appOrigin]);
 
-  const [verifyResult, setVerifyResult] =
-    useState<VerifyMcpToolAccessResult | null>(null);
+  const [verifyResult, setVerifyResult] = useState<VerifyMcpToolAccessResult | null>(null);
   const [verifyBusy, setVerifyBusy] = useState(false);
   const onVerify = useCallback(async () => {
     setVerifyBusy(true);
@@ -160,8 +151,14 @@ export default function AgentIntegrations({
   const panelGuidance = getVerifyStatusGuidance(panelStatus);
 
   const [manifestModalOpen, setManifestModalOpen] = useState(false);
-
-
+  // Remembers which button opened the manifest modal so focus can return
+  // there on close (the modal is externally controlled — see the modal's
+  // returnFocusRef prop).
+  const manifestTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const openManifestModal = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    manifestTriggerRef.current = e.currentTarget;
+    setManifestModalOpen(true);
+  }, []);
 
   return (
     <div className="min-h-dvh px-4 py-6 md:px-8">
@@ -189,19 +186,15 @@ export default function AgentIntegrations({
           <div className="flex items-start gap-3">
             <ShieldCheck className="h-5 w-5 shrink-0 text-primary" aria-hidden />
             <p className="text-sm leading-relaxed">
-              Verdant agent integrations are <strong>read-only</strong> in this
-              release. Agents can list grows, recent diary entries, and latest
-              sensor snapshots for the signed-in grower only. They cannot write
-              logs, create Action Queue items, run AI Doctor, control equipment,
-              or automate grow-room devices.
+              Verdant agent integrations are <strong>read-only</strong> in this release. Agents can
+              list grows, recent diary entries, and latest sensor snapshots for the signed-in grower
+              only. They cannot write logs, create Action Queue items, run AI Doctor, control
+              equipment, or automate grow-room devices.
             </p>
           </div>
         </section>
 
-        <section
-          aria-label="Connection details"
-          className="glass rounded-2xl border p-5 space-y-4"
-        >
+        <section aria-label="Connection details" className="glass rounded-2xl border p-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Connection details</h2>
             <OAuthStatusBadge status={oauthStatus} />
@@ -210,10 +203,7 @@ export default function AgentIntegrations({
           <dl className="space-y-3 text-sm">
             <div>
               <dt className="text-muted-foreground">MCP endpoint</dt>
-              <dd
-                className="break-all font-mono text-xs"
-                data-testid="mcp-endpoint"
-              >
+              <dd className="break-all font-mono text-xs" data-testid="mcp-endpoint">
                 {endpoint}
               </dd>
             </div>
@@ -234,18 +224,14 @@ export default function AgentIntegrations({
             </div>
             <div>
               <dt className="text-muted-foreground">OAuth consent route</dt>
-              <dd
-                className="break-all font-mono text-xs"
-                data-testid="oauth-consent-url"
-              >
+              <dd className="break-all font-mono text-xs" data-testid="oauth-consent-url">
                 {consentUrl}
               </dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Server</dt>
               <dd className="text-xs">
-                {MCP_MANIFEST.serverTitle} ({MCP_MANIFEST.serverName}) v
-                {MCP_MANIFEST.version}
+                {MCP_MANIFEST.serverTitle} ({MCP_MANIFEST.serverName}) v{MCP_MANIFEST.version}
               </dd>
             </div>
             <div data-testid="manifest-identity">
@@ -263,12 +249,9 @@ export default function AgentIntegrations({
                     {manifestFingerprint}
                   </span>
                 </div>
-                <div data-testid="manifest-tool-count">
-                  Tools advertised: {toolNames.length}
-                </div>
+                <div data-testid="manifest-tool-count">Tools advertised: {toolNames.length}</div>
                 <div className="text-muted-foreground">
-                  Last-known tools:{" "}
-                  <span className="font-mono">{toolNames.join(", ")}</span>
+                  Last-known tools: <span className="font-mono">{toolNames.join(", ")}</span>
                 </div>
               </dd>
             </div>
@@ -285,7 +268,7 @@ export default function AgentIntegrations({
             </Button>
             <Button
               variant="outline"
-              onClick={() => setManifestModalOpen(true)}
+              onClick={openManifestModal}
               aria-label="View safe MCP manifest summary"
               data-testid="open-manifest-summary-modal"
             >
@@ -305,7 +288,6 @@ export default function AgentIntegrations({
                   : ""}
             </span>
           </div>
-
         </section>
 
         <section
@@ -325,9 +307,9 @@ export default function AgentIntegrations({
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            Runs a read-only <code className="font-mono">list_grows</code>{" "}
-            check against the local verification harness when available.
-            Never exposes tokens, secrets, or raw response rows.
+            Runs a read-only <code className="font-mono">list_grows</code> check against the local
+            verification harness when available. Never exposes tokens, secrets, or raw response
+            rows.
           </p>
           <div
             className="rounded-lg border p-3 text-sm space-y-1"
@@ -340,34 +322,28 @@ export default function AgentIntegrations({
               <div className="font-medium" data-testid="verify-label">
                 {panelLabel}
               </div>
-              <Badge variant="outline" className="text-[10px] uppercase" data-testid="verify-tool-checked">
+              <Badge
+                variant="outline"
+                className="text-[10px] uppercase"
+                data-testid="verify-tool-checked"
+              >
                 tool: list_grows
               </Badge>
             </div>
-            <div
-              className="text-muted-foreground"
-              data-testid="verify-description"
-            >
+            <div className="text-muted-foreground" data-testid="verify-description">
               {panelDescription}
             </div>
             {typeof verifyResult?.growCount === "number" ? (
-              <div
-                className="text-xs text-muted-foreground"
-                data-testid="verify-grow-count"
-              >
+              <div className="text-xs text-muted-foreground" data-testid="verify-grow-count">
                 {verifyResult.growCount === 0
                   ? "0 grows found (authorized empty state)."
                   : `${verifyResult.growCount} grow(s) visible to the signed-in grower.`}
               </div>
             ) : null}
-            <div
-              className="text-xs text-foreground"
-              data-testid="verify-next-step"
-            >
+            <div className="text-xs text-foreground" data-testid="verify-next-step">
               {panelGuidance}
             </div>
           </div>
-
         </section>
 
         <section
@@ -376,26 +352,16 @@ export default function AgentIntegrations({
           data-testid="connect-agent-checklist"
         >
           <h2 className="text-lg font-semibold">Connect an agent</h2>
-          <ol
-            className="list-decimal space-y-2 pl-5 text-sm"
-            data-testid="connect-agent-steps"
-          >
-            <li>
-              Open your agent app: ChatGPT, Claude, Cursor, or another
-              MCP-compatible client.
-            </li>
+          <ol className="list-decimal space-y-2 pl-5 text-sm" data-testid="connect-agent-steps">
+            <li>Open your agent app: ChatGPT, Claude, Cursor, or another MCP-compatible client.</li>
             <li>Go to Agent Integrations / MCP server settings.</li>
             <li>Add the Verdant MCP endpoint.</li>
             <li>Complete OAuth consent.</li>
             <li>Confirm available read-only tools.</li>
             <li>
-              Run a read-only test like{" "}
-              <code className="font-mono">list_grows</code>.
+              Run a read-only test like <code className="font-mono">list_grows</code>.
             </li>
-            <li>
-              Use diary entries and sensor snapshots as context, not
-              automation.
-            </li>
+            <li>Use diary entries and sensor snapshots as context, not automation.</li>
           </ol>
           <div className="flex flex-wrap gap-2 pt-2">
             <Button asChild size="sm" variant="outline">
@@ -444,7 +410,7 @@ export default function AgentIntegrations({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setManifestModalOpen(true)}
+              onClick={openManifestModal}
               aria-label="View safe MCP manifest summary"
               data-testid="checklist-open-manifest-summary-modal"
             >
@@ -453,18 +419,13 @@ export default function AgentIntegrations({
             </Button>
           </div>
 
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid="connect-agent-safety-copy"
-          >
-            Verdant agent access is read-only in this release. Agents can
-            list grows, recent diary entries, and latest sensor snapshots
-            for the signed-in grower only. They cannot write logs, create
-            Action Queue items, run AI Doctor, control equipment, or
-            automate grow-room devices.
+          <p className="text-xs text-muted-foreground" data-testid="connect-agent-safety-copy">
+            Verdant agent access is read-only in this release. Agents can list grows, recent diary
+            entries, and latest sensor snapshots for the signed-in grower only. They cannot write
+            logs, create Action Queue items, run AI Doctor, control equipment, or automate grow-room
+            devices.
           </p>
         </section>
-
 
         <section
           id="agent-tool-reference"
@@ -474,8 +435,8 @@ export default function AgentIntegrations({
         >
           <h2 className="text-lg font-semibold">Agent tool reference</h2>
           <p className="text-sm text-muted-foreground">
-            Every tool is read-only and runs under the signed-in grower's own
-            row-level security. Agents cannot see other growers' data.
+            Every tool is read-only and runs under the signed-in grower's own row-level security.
+            Agents cannot see other growers' data.
           </p>
           <ul className="space-y-4">
             {MCP_MANIFEST.tools.map((tool) => (
@@ -495,31 +456,17 @@ export default function AgentIntegrations({
                 <p className="mt-2 text-sm">{tool.description}</p>
                 {tool.params.length > 0 ? (
                   <div className="mt-3">
-                    <div className="text-xs font-medium text-muted-foreground">
-                      Parameters
-                    </div>
+                    <div className="text-xs font-medium text-muted-foreground">Parameters</div>
                     <ul className="mt-1 space-y-1 text-xs">
                       {tool.params.map((p) => (
                         <li key={p.name} className="font-mono">
                           <span>{p.name}</span>
-                          <span className="text-muted-foreground">
-                            {" "}
-                            : {p.type}
-                          </span>{" "}
-                          <span
-                            className={
-                              p.required
-                                ? "text-primary"
-                                : "text-muted-foreground"
-                            }
-                          >
+                          <span className="text-muted-foreground"> : {p.type}</span>{" "}
+                          <span className={p.required ? "text-primary" : "text-muted-foreground"}>
                             ({p.required ? "required" : "optional"})
                           </span>
                           {p.constraints ? (
-                            <span className="text-muted-foreground">
-                              {" "}
-                              [{p.constraints}]
-                            </span>
+                            <span className="text-muted-foreground"> [{p.constraints}]</span>
                           ) : null}
                           {p.description ? (
                             <div className="ml-4 font-sans text-muted-foreground">
@@ -531,9 +478,7 @@ export default function AgentIntegrations({
                     </ul>
                   </div>
                 ) : (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    No parameters.
-                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">No parameters.</p>
                 )}
               </li>
             ))}
@@ -547,6 +492,7 @@ export default function AgentIntegrations({
         manifest={MCP_MANIFEST}
         fingerprint={manifestFingerprint}
         manifestUrl={manifestUrl}
+        returnFocusRef={manifestTriggerRef}
       />
     </div>
   );

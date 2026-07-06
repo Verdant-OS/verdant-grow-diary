@@ -246,7 +246,6 @@ proof surface must uphold the following:
 - Full local gate (typecheck + vitest + sanitized artifact + Playwright):
   `bun run check:one-tent-loop-proof-never-healthy`
 
-
 ## Local MCP RLS integration test
 
 Verdant exposes three **read-only** MCP tools (`list_grows`,
@@ -256,6 +255,14 @@ enforce Supabase Row-Level Security through the signed-in grower's
 OAuth/session token, including under `limit` and `includeArchived`
 options, and that responses never leak another user's rows, `raw_payload`,
 `service_role`, JWTs, or bridge/OAuth secrets.
+
+Beyond the explicit regression cases, the suite **derives extra
+pagination/filter isolation cases from `.lovable/mcp/manifest.json`**:
+every advertised `limit`/boolean-filter param automatically generates
+cross-user cases for both users, foreign-scope-id probes, and
+unauthenticated checks. Params are never invented — a tool that
+advertises no pagination/filter params (like `get_latest_sensor_snapshot`)
+is recorded as N/A instead of failing.
 
 The suite is **local-only** and skips cleanly in CI/PRs where the
 harness is not configured. It never contacts hosted Supabase and never
@@ -268,27 +275,48 @@ requires production secrets.
 - `LOCAL_SUPABASE_ANON_KEY`
 - `LOCAL_SUPABASE_SERVICE_ROLE_KEY` — **local only**, used exclusively
   for seeding/cleanup; MCP tool execution itself always routes through
-  `supabaseForUser(ctx)` with an anon-scoped user token.
+  `supabaseForUser(ctx)` with an anon-scoped user token. Never paste a
+  hosted/production service role key here, and never commit any service
+  role key — local keys are ephemeral CLI-generated values.
 
 **Required local services**
 
 - Local Supabase running (e.g. `supabase start`) with this repo's
   migrations applied (`supabase db reset` or `supabase migration up`).
 
-**Example command**
+**Run it**
 
 ```bash
 MCP_LOCAL_RLS_HARNESS=1 \
 LOCAL_SUPABASE_URL=http://127.0.0.1:54321 \
 LOCAL_SUPABASE_ANON_KEY=<local-anon-key> \
 LOCAL_SUPABASE_SERVICE_ROLE_KEY=<local-service-role-key> \
-bunx vitest run src/test/mcp-local-rls-integration.test.ts
+bun run test:mcp:rls:local
 ```
 
-CI runs this harness against a fresh local Supabase in the
-`mcp-local-rls-integration` workflow
-(`.github/workflows/mcp-local-rls-integration.yml`).
+The `test:mcp:rls:local` package script is a thin wrapper around
+`bunx vitest run src/test/mcp-local-rls-integration.test.ts` — it contains
+no keys; you always supply local env values yourself.
 
+**CI behavior**
+
+The `mcp-local-rls-integration` workflow
+(`.github/workflows/mcp-local-rls-integration.yml`) runs the harness
+against a fresh local Supabase on the runner:
+
+1. starts local Supabase via the CLI (no `supabase link`, no remote
+   `db push`, no hosted refs, no repo secrets),
+2. masks the ephemeral local keys and waits for auth/REST readiness with
+   a bounded retry loop,
+3. applies and verifies repo migrations with `supabase db reset --local`,
+4. runs the harness, and
+5. **only when the job fails**, uploads sanitized debug artifacts from
+   `artifacts/mcp-local-rls/` (harness log, response snapshots, vitest
+   output). Artifacts are sanitized twice — at write time by the harness
+   and again by `scripts/sanitize-mcp-rls-artifacts.mjs` — so JWTs,
+   bearer tokens, service_role material, refresh/bridge/access tokens,
+   client secrets, raw headers, raw_payload, and live env values are
+   always redacted.
 
 ## Documentation
 

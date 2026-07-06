@@ -32,6 +32,10 @@ tools/ecowitt-testbench/ecowitt_raw_log.jsonl
 tools/ecowitt-testbench/__pycache__/
 .artifacts/
 
+# MCP local RLS harness debug output (uploaded as CI artifacts on failure,
+# sanitized, never committed)
+artifacts/
+
 # Verdant SEO monitoring — local OAuth token cache
 .seo/
 

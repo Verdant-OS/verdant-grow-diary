@@ -28,6 +28,14 @@ import {
   type ScoreRoundRow,
 } from "@/lib/phenoScoreRoundsService";
 import type { KeeperDecisionLogEntry } from "@/lib/phenoKeeperDecisionLogService";
+import type { SexObservationRow } from "@/lib/phenoSexObservationService";
+import {
+  PHENO_SEX_OBSERVATIONS,
+  PHENO_SEX_OBSERVATION_LABELS,
+  DEFAULT_SEX_OBSERVATION,
+  type PhenoSexObservation,
+} from "@/lib/phenoSexObservationModel";
+import { usePhenoHermCullSuggestion } from "@/hooks/usePhenoHermCullSuggestion";
 
 /** "overall" = the flat card (pheno_candidate_scores); rounds = staged cards. */
 type WorkspaceRound = "overall" | PhenoScoreRound;
@@ -60,6 +68,19 @@ interface EditorProps {
     reason: string | null,
   ) => Promise<boolean>;
   history: readonly KeeperDecisionLogEntry[];
+  sexRow: SexObservationRow | undefined;
+  onSaveSex: (plantId: string, sex: PhenoSexObservation) => Promise<boolean>;
+  growId: string | null;
+  tentId: string | null;
+  onQueueRemoval: (input: {
+    observationId: string;
+    candidateLabel: string;
+    growId: string;
+    plantId: string;
+    tentId?: string | null;
+  }) => Promise<boolean>;
+  queuing: boolean;
+  queued: boolean;
 }
 
 function CandidateEditor({
@@ -73,10 +94,18 @@ function CandidateEditor({
   onSaveRound,
   onSaveDecision,
   history,
+  sexRow,
+  onSaveSex,
+  growId,
+  tentId,
+  onQueueRemoval,
+  queuing,
+  queued,
 }: EditorProps) {
   const plantId = candidate.candidateId;
   const isRoundMode = round !== "overall";
   const [reason, setReason] = useState<string>("");
+  const [sex, setSex] = useState<PhenoSexObservation>(sexRow?.sex ?? DEFAULT_SEX_OBSERVATION);
   const [traits, setTraits] = useState<Record<string, number>>(() =>
     isRoundMode ? { ...(roundRow?.loudTraits ?? {}) } : { ...(score?.traits ?? {}) },
   );
@@ -117,8 +146,11 @@ function CandidateEditor({
       okScore = await onSaveScore(plantId, traits, note.trim() || null);
     }
     const okDecision = await onSaveDecision(plantId, decisionValue, reason.trim() || null);
-    setSaved(okScore && okDecision);
+    const okSex = await onSaveSex(plantId, sex);
+    setSaved(okScore && okDecision && okSex);
   };
+
+  const isHerm = sex === "hermaphrodite" || sexRow?.hermObserved === true;
 
   return (
     <section
@@ -240,6 +272,65 @@ function CandidateEditor({
         />
       </label>
 
+      <label className="flex items-center gap-2 text-sm">
+        <span className="font-medium">Sex</span>
+        <select
+          data-testid={`workspace-sex-${plantId}`}
+          value={sex}
+          onChange={(e) => {
+            setSaved(false);
+            setSex(e.target.value as PhenoSexObservation);
+          }}
+          className="rounded border border-border bg-background px-2 py-1"
+        >
+          {PHENO_SEX_OBSERVATIONS.map((s) => (
+            <option key={s} value={s}>
+              {PHENO_SEX_OBSERVATION_LABELS[s]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {isHerm && (
+        <div
+          data-testid={`workspace-herm-flag-${plantId}`}
+          role="alert"
+          className="space-y-2 rounded-md border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-300"
+        >
+          <p className="font-semibold">
+            ⚠ Hermaphrodite recorded — consider removing to protect the run.
+          </p>
+          <p className="opacity-90">
+            Verdant never removes a plant for you. Queue a removal for your own approval — you still
+            confirm and act.
+          </p>
+          {queued ? (
+            <span data-testid={`workspace-herm-queued-${plantId}`} className="font-medium">
+              Removal queued for approval.
+            </span>
+          ) : (
+            <button
+              type="button"
+              data-testid={`workspace-herm-queue-${plantId}`}
+              disabled={queuing || !growId}
+              onClick={() =>
+                growId &&
+                onQueueRemoval({
+                  observationId: `${plantId}-herm-${sexRow?.observedAt ?? "now"}`,
+                  candidateLabel: candidate.candidateLabel ?? plantId,
+                  growId,
+                  plantId,
+                  tentId,
+                })
+              }
+              className="rounded border border-red-500/60 px-2 py-1 font-medium disabled:opacity-50"
+            >
+              {queuing ? "Queuing…" : "Queue removal for approval"}
+            </button>
+          )}
+        </div>
+      )}
+
       {history.length > 0 && (
         <details data-testid={`workspace-decision-history-${plantId}`} className="text-xs">
           <summary className="cursor-pointer text-muted-foreground">
@@ -285,6 +376,7 @@ function CandidateEditor({
 export default function PhenoHuntWorkspace() {
   const { id } = useParams<{ id: string }>();
   const ws = usePhenoHuntWorkspace(id);
+  const herm = usePhenoHermCullSuggestion();
   const [round, setRound] = useState<WorkspaceRound>("overall");
 
   const candidates = useMemo(() => ws.candidates, [ws.candidates]);
@@ -355,6 +447,13 @@ export default function PhenoHuntWorkspace() {
               onSaveRound={ws.saveRound}
               onSaveDecision={ws.saveDecision}
               history={ws.decisionHistoryByPlant[c.candidateId] ?? []}
+              sexRow={ws.sexByPlant[c.candidateId]}
+              onSaveSex={ws.saveSex}
+              growId={ws.hunt?.growId ?? null}
+              tentId={ws.hunt?.tentId ?? null}
+              onQueueRemoval={herm.queueRemoval}
+              queuing={herm.queuing === c.candidateId}
+              queued={herm.queuedPlantIds.has(c.candidateId)}
             />
           ))}
         </div>

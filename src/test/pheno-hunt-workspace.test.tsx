@@ -13,12 +13,23 @@ vi.mock("@/hooks/usePhenoHuntWorkspace", () => ({
   usePhenoHuntWorkspace: () => hookMock(),
 }));
 
+const queueRemoval = vi.fn().mockResolvedValue(true);
+vi.mock("@/hooks/usePhenoHermCullSuggestion", () => ({
+  usePhenoHermCullSuggestion: () => ({
+    queuing: null,
+    queuedPlantIds: new Set<string>(),
+    error: null,
+    queueRemoval,
+  }),
+}));
+
 import PhenoHuntWorkspace from "@/pages/PhenoHuntWorkspace";
 
 function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
   const saveScore = state.saveScore ?? vi.fn().mockResolvedValue(true);
   const saveDecision = state.saveDecision ?? vi.fn().mockResolvedValue(true);
   const saveRound = state.saveRound ?? vi.fn().mockResolvedValue(true);
+  const saveSex = state.saveSex ?? vi.fn().mockResolvedValue(true);
   hookMock.mockReturnValue({
     status: "ok",
     hunt: { id: "h1", name: "Blue Dream Hunt", growId: "g1", tentId: "t1" },
@@ -27,11 +38,13 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     decisionsByPlant: {},
     roundsByKey: {},
     decisionHistoryByPlant: {},
+    sexByPlant: {},
     error: null,
     saving: null,
     saveScore,
     saveDecision,
     saveRound,
+    saveSex,
     ...state,
   });
   const utils = render(
@@ -133,6 +146,34 @@ describe("PhenoHuntWorkspace", () => {
   it("shows an empty state when the hunt has no candidates", () => {
     renderAt({ candidates: [] });
     expect(screen.getByTestId("pheno-workspace-empty")).toBeInTheDocument();
+  });
+
+  it("surfaces a suggest-only herm removal that queues for approval on confirm", () => {
+    queueRemoval.mockClear();
+    renderAt({
+      candidates: [{ candidateId: "p1", candidateLabel: "BD #1" }],
+      sexByPlant: {
+        p1: {
+          plantId: "p1",
+          sex: "hermaphrodite",
+          hermObserved: true,
+          note: null,
+          observedAt: "2026-03-01T00:00:00Z",
+        },
+      },
+    });
+    const flag = screen.getByTestId("workspace-herm-flag-p1");
+    expect(flag).toHaveTextContent(/consider removing/i);
+    expect(flag).toHaveTextContent(/never removes a plant for you/i);
+    fireEvent.click(screen.getByTestId("workspace-herm-queue-p1"));
+    expect(queueRemoval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        candidateLabel: "BD #1",
+        growId: "g1",
+        plantId: "p1",
+        tentId: "t1",
+      }),
+    );
   });
 
   it("switches to a staged round and saves via saveRound (with aroma + nose note)", async () => {

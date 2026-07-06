@@ -19,13 +19,13 @@ function supabaseForUser(ctx) {
   }
   return createClient(url, anon, {
     global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
-    auth: { persistSession: false, autoRefreshToken: false }
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 }
 function unauthenticated() {
   return {
     content: [{ type: "text", text: "Not authenticated." }],
-    isError: true
+    isError: true,
   };
 }
 
@@ -33,22 +33,33 @@ function unauthenticated() {
 var list_grows_default = defineTool({
   name: "list_grows",
   title: "List grows",
-  description: "List the signed-in Verdant grower's own grows (id, name, stage, grow_type, archived flag, timestamps). Read-only.",
+  description:
+    "List the signed-in Verdant grower's own grows (id, name, stage, grow_type, archived flag, timestamps). Read-only.",
   inputSchema: {
     includeArchived: z.boolean().optional().describe("Include archived grows. Defaults to false."),
-    limit: z.number().int().min(1).max(100).optional().describe("Maximum rows to return (1\u2013100). Defaults to 25.")
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe("Maximum rows to return (1–100). Defaults to 25."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ includeArchived, limit }, ctx) => {
     if (!ctx.isAuthenticated()) return unauthenticated();
     const supabase = supabaseForUser(ctx);
-    let query = supabase.from("grows").select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at").order("updated_at", { ascending: false }).limit(limit ?? 25);
+    let query = supabase
+      .from("grows")
+      .select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(limit ?? 25);
     if (!includeArchived) query = query.eq("is_archived", false);
     const { data, error } = await query;
     if (error) {
       return {
         content: [{ type: "text", text: `Error: ${error.message}` }],
-        isError: true
+        isError: true,
       };
     }
     const rows = data ?? [];
@@ -56,13 +67,16 @@ var list_grows_default = defineTool({
       content: [
         {
           type: "text",
-          text: rows.length === 0 ? "No grows found." : `Found ${rows.length} grow(s):
-${JSON.stringify(rows, null, 2)}`
-        }
+          text:
+            rows.length === 0
+              ? "No grows found."
+              : `Found ${rows.length} grow(s):
+${JSON.stringify(rows, null, 2)}`,
+        },
       ],
-      structuredContent: { grows: rows }
+      structuredContent: { grows: rows },
     };
-  }
+  },
 });
 
 // src/lib/mcp/tools/list-recent-diary-entries.ts
@@ -71,20 +85,49 @@ import { z as z2 } from "npm:zod@^4.4.3";
 var list_recent_diary_entries_default = defineTool2({
   name: "list_recent_diary_entries",
   title: "List recent diary entries",
-  description: "List recent diary entries for one of the signed-in grower's grows. Read-only.",
+  description:
+    "List recent diary entries for one of the signed-in grower's own grows. The grow must belong to the caller. Read-only.",
   inputSchema: {
     growId: z2.string().uuid().describe("Grow id to fetch diary entries for."),
-    limit: z2.number().int().min(1).max(50).optional().describe("Maximum entries to return (1\u201350). Defaults to 10.")
+    limit: z2
+      .number()
+      .int()
+      .min(1)
+      .max(50)
+      .optional()
+      .describe("Maximum entries to return (1–50). Defaults to 10."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ growId, limit }, ctx) => {
     if (!ctx.isAuthenticated()) return unauthenticated();
     const supabase = supabaseForUser(ctx);
-    const { data, error } = await supabase.from("diary_entries").select("id,grow_id,plant_id,tent_id,event_type,note,created_at").eq("grow_id", growId).order("created_at", { ascending: false }).limit(limit ?? 10);
+    const { data: grow, error: growError } = await supabase
+      .from("grows")
+      .select("id")
+      .eq("id", growId)
+      .maybeSingle();
+    if (growError) {
+      return {
+        content: [{ type: "text", text: `Error: ${growError.message}` }],
+        isError: true,
+      };
+    }
+    if (!grow) {
+      return {
+        content: [{ type: "text", text: "Grow not found for the signed-in grower." }],
+        isError: true,
+      };
+    }
+    const { data, error } = await supabase
+      .from("diary_entries")
+      .select("id,grow_id,plant_id,tent_id,stage,note,entry_at,created_at")
+      .eq("grow_id", growId)
+      .order("entry_at", { ascending: false })
+      .limit(limit ?? 10);
     if (error) {
       return {
         content: [{ type: "text", text: `Error: ${error.message}` }],
-        isError: true
+        isError: true,
       };
     }
     const rows = data ?? [];
@@ -92,55 +135,91 @@ var list_recent_diary_entries_default = defineTool2({
       content: [
         {
           type: "text",
-          text: rows.length === 0 ? "No diary entries found for that grow." : `Found ${rows.length} entry(ies):
-${JSON.stringify(rows, null, 2)}`
-        }
+          text:
+            rows.length === 0
+              ? "No diary entries found for that grow."
+              : `Found ${rows.length} entry(ies):
+${JSON.stringify(rows, null, 2)}`,
+        },
       ],
-      structuredContent: { entries: rows }
+      structuredContent: { entries: rows },
     };
-  }
+  },
 });
 
 // src/lib/mcp/tools/get-latest-sensor-snapshot.ts
 import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.20.0";
 import { z as z3 } from "npm:zod@^4.4.3";
+var SCAN_LIMIT = 50;
 var get_latest_sensor_snapshot_default = defineTool3({
   name: "get_latest_sensor_snapshot",
   title: "Get latest sensor snapshot",
-  description: "Fetch the single most recent sensor reading for one of the signed-in grower's tents. Includes temperature/humidity/vpd/co2 fields when present and always includes the `source` label (live/manual/csv/demo/stale/invalid). Never treat non-live sources as current readings. Read-only.",
+  description:
+    "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct) for one of the signed-in grower's own tents. Every reading includes its `source` label (manual/pi_bridge/sim) and `quality` label (ok/degraded/stale/invalid). Never treat readings with quality other than `ok`, or source `sim`, as current live data. Read-only.",
   inputSchema: {
-    tentId: z3.string().uuid().describe("Tent id to fetch the latest reading for.")
+    tentId: z3.string().uuid().describe("Tent id to fetch the latest readings for."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ tentId }, ctx) => {
     if (!ctx.isAuthenticated()) return unauthenticated();
     const supabase = supabaseForUser(ctx);
-    const { data, error } = await supabase.from("sensor_readings").select(
-      "id,tent_id,plant_id,source,captured_at,temperature_c,humidity_pct,vpd_kpa,co2_ppm,soil_moisture_pct,ph,ec_ms_cm,confidence"
-    ).eq("tent_id", tentId).order("captured_at", { ascending: false }).limit(1).maybeSingle();
+    const { data: tent, error: tentError } = await supabase
+      .from("tents")
+      .select("id,name")
+      .eq("id", tentId)
+      .maybeSingle();
+    if (tentError) {
+      return {
+        content: [{ type: "text", text: `Error: ${tentError.message}` }],
+        isError: true,
+      };
+    }
+    if (!tent) {
+      return {
+        content: [{ type: "text", text: "Tent not found for the signed-in grower." }],
+        isError: true,
+      };
+    }
+    const { data, error } = await supabase
+      .from("sensor_readings")
+      .select("id,tent_id,metric,value,quality,source,ts,captured_at")
+      .eq("tent_id", tentId)
+      .order("ts", { ascending: false })
+      .limit(SCAN_LIMIT);
     if (error) {
       return {
         content: [{ type: "text", text: `Error: ${error.message}` }],
-        isError: true
+        isError: true,
       };
     }
-    if (!data) {
+    const rows = data ?? [];
+    if (rows.length === 0) {
       return {
-        content: [{ type: "text", text: "No sensor snapshot found for that tent." }],
-        structuredContent: { snapshot: null }
+        content: [{ type: "text", text: "No sensor readings found for that tent." }],
+        structuredContent: { snapshot: null },
       };
     }
+    const readings = {};
+    for (const row of rows) {
+      if (!(row.metric in readings)) readings[row.metric] = row;
+    }
+    const summary = Object.values(readings)
+      .map(
+        (r) =>
+          `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, at: ${r.captured_at ?? r.ts})`,
+      )
+      .join("\n");
     return {
       content: [
         {
           type: "text",
-          text: `Latest reading (source: ${data.source}):
-${JSON.stringify(data, null, 2)}`
-        }
+          text: `Latest readings for tent "${tent.name}":
+${summary}`,
+        },
       ],
-      structuredContent: { snapshot: data }
+      structuredContent: { snapshot: { tentId, readings } },
     };
-  }
+  },
 });
 
 // src/lib/mcp/index.ts
@@ -149,16 +228,17 @@ var mcp_default = defineMcp({
   name: "verdant-grow-os-mcp",
   title: "Verdant Grow OS",
   version: "0.1.0",
-  instructions: "Read-only access to the signed-in Verdant grower's own data. Use `list_grows` to enumerate grows, `list_recent_diary_entries` for recent log entries in a grow, and `get_latest_sensor_snapshot` to read the most recent sensor reading for a tent. Sensor rows always include their `source` label (live/manual/csv/demo/stale/invalid) \u2014 never treat non-live sources as current readings. This server never writes, never approves Action Queue items, and never controls devices.",
+  instructions:
+    "Read-only access to the signed-in Verdant grower's own data. Use `list_grows` to enumerate grows, `list_recent_diary_entries` for recent log entries in a grow the caller owns, and `get_latest_sensor_snapshot` for the most recent reading per metric in a tent the caller owns. Sensor readings always include their `source` label (manual/pi_bridge/sim) and `quality` label (ok/degraded/stale/invalid) — never treat readings with quality other than `ok`, or source `sim`, as current live data. This server never writes, never approves Action Queue items, and never controls devices.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
-    acceptedAudiences: "authenticated"
+    acceptedAudiences: "authenticated",
   }),
   tools: [
     list_grows_default,
     list_recent_diary_entries_default,
-    get_latest_sensor_snapshot_default
-  ]
+    get_latest_sensor_snapshot_default,
+  ],
 });
 
 // lovable-mcp-supabase-entry.ts

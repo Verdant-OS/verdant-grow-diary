@@ -2,7 +2,14 @@
  * list_recent_diary_entries — read-only recent diary entries for a grow.
  *
  * RLS-scoped through the caller's OAuth token. Returns only presenter-
- * safe fields; never exposes raw_payload or secrets.
+ * safe fields; never exposes raw_payload, details, or secrets.
+ *
+ * Guards with an ownership check on the grow before reading entries:
+ * diary_entries carries an operator-wide SELECT policy ("Operators view
+ * all entries"), so RLS alone would let an operator-role caller read any
+ * grower's entries through this tool. grows has no operator policy, so
+ * requiring the grow to be visible to the caller keeps every account —
+ * operators included — inside this server's "own data only" contract.
  */
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
@@ -12,8 +19,8 @@ export default defineTool({
   name: "list_recent_diary_entries",
   title: "List recent diary entries",
   description:
-    "List recent diary entries for one of the signed-in grower's grows. " +
-    "Read-only.",
+    "List recent diary entries for one of the signed-in grower's own " +
+    "grows. The grow must belong to the caller. Read-only.",
   inputSchema: {
     growId: z.string().uuid().describe("Grow id to fetch diary entries for."),
     limit: z
@@ -28,11 +35,28 @@ export default defineTool({
   handler: async ({ growId, limit }, ctx) => {
     if (!ctx.isAuthenticated()) return unauthenticated();
     const supabase = supabaseForUser(ctx);
+    const { data: grow, error: growError } = await supabase
+      .from("grows")
+      .select("id")
+      .eq("id", growId)
+      .maybeSingle();
+    if (growError) {
+      return {
+        content: [{ type: "text", text: `Error: ${growError.message}` }],
+        isError: true,
+      };
+    }
+    if (!grow) {
+      return {
+        content: [{ type: "text", text: "Grow not found for the signed-in grower." }],
+        isError: true,
+      };
+    }
     const { data, error } = await supabase
       .from("diary_entries")
-      .select("id,grow_id,plant_id,tent_id,event_type,note,created_at")
+      .select("id,grow_id,plant_id,tent_id,stage,note,entry_at,created_at")
       .eq("grow_id", growId)
-      .order("created_at", { ascending: false })
+      .order("entry_at", { ascending: false })
       .limit(limit ?? 10);
     if (error) {
       return {

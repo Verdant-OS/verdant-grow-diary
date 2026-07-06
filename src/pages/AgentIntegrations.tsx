@@ -329,35 +329,45 @@ export default function AgentIntegrations({
             check against the local verification harness when available.
             Never exposes tokens, secrets, or raw response rows.
           </p>
-          {verifyResult ? (
-            <div
-              className="rounded-lg border p-3 text-sm space-y-1"
-              role="status"
-              aria-live="polite"
-              data-testid="verify-tool-access-result"
-              data-status={verifyResult.status}
-            >
+          <div
+            className="rounded-lg border p-3 text-sm space-y-1"
+            role="status"
+            aria-live="polite"
+            data-testid="verify-tool-access-result"
+            data-status={panelStatus}
+          >
+            <div className="flex flex-wrap items-center gap-2">
               <div className="font-medium" data-testid="verify-label">
-                {verifyResult.label}
+                {panelLabel}
               </div>
-              <div
-                className="text-muted-foreground"
-                data-testid="verify-description"
-              >
-                {verifyResult.description}
-              </div>
-              {typeof verifyResult.growCount === "number" ? (
-                <div
-                  className="text-xs text-muted-foreground"
-                  data-testid="verify-grow-count"
-                >
-                  {verifyResult.growCount === 0
-                    ? "0 grows found (authorized empty state)."
-                    : `${verifyResult.growCount} grow(s) visible to the signed-in grower.`}
-                </div>
-              ) : null}
+              <Badge variant="outline" className="text-[10px] uppercase" data-testid="verify-tool-checked">
+                tool: list_grows
+              </Badge>
             </div>
-          ) : null}
+            <div
+              className="text-muted-foreground"
+              data-testid="verify-description"
+            >
+              {panelDescription}
+            </div>
+            {typeof verifyResult?.growCount === "number" ? (
+              <div
+                className="text-xs text-muted-foreground"
+                data-testid="verify-grow-count"
+              >
+                {verifyResult.growCount === 0
+                  ? "0 grows found (authorized empty state)."
+                  : `${verifyResult.growCount} grow(s) visible to the signed-in grower.`}
+              </div>
+            ) : null}
+            <div
+              className="text-xs text-foreground"
+              data-testid="verify-next-step"
+            >
+              {panelGuidance}
+            </div>
+          </div>
+
         </section>
 
         <section

@@ -4,6 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
 import { PRICING } from "./src/constants/pricing";
+import { viteManualChunks } from "./src/lib/build/manualChunks";
 
 const SITE_ORIGIN = "https://verdantgrowdiary.com";
 
@@ -97,45 +98,14 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
-        // Split only *leaf* libraries that never call React.createContext() at
-        // module-eval time into their own long-term-cacheable chunks. We
-        // deliberately DO NOT hand-split the React runtime (react / react-dom /
-        // react-router / @tanstack / radix / sonner / form libs): those call
-        // React.createContext() at eval time, and forcing them into sibling
-        // manual chunks does not guarantee the react chunk initializes first —
-        // which white-screens the app with "Cannot read properties of undefined
-        // (reading 'createContext')". They stay together in `vendor` so Rollup
-        // orders them by dependency internally. The big win is still the
-        // per-route React.lazy split in App.tsx, so the public entry never pulls
-        // charts / export / heavy pages.
-        //
-        // The extra vendor-* chunks below are all React-context-free leaves
-        // (verified via a per-package diagnostic build): a data client, pure
-        // utilities, and icon components. Isolating them keeps them cached
-        // across app/react updates and shrinks the shared `vendor` chunk from
-        // ~846 kB to ~500 kB.
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return undefined;
-          if (/[\\/]node_modules[\\/](recharts|d3-|victory|internmap)/.test(id))
-            return "vendor-charts";
-          if (/[\\/]node_modules[\\/](xlsx|jszip|papaparse|file-saver)[\\/]/.test(id))
-            return "vendor-export";
-          // @supabase/* is a pure JS data client (auth / realtime / storage /
-          // postgrest) — no React, no createContext. ~200 kB, rarely changes.
-          if (/[\\/]node_modules[\\/]@supabase[\\/]/.test(id)) return "vendor-supabase";
-          // lucide-react icons render React elements but create no context at
-          // eval — safe to isolate. ~48 kB.
-          if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) return "vendor-icons";
-          // Pure, framework-agnostic utilities: schema validation + date math.
-          if (/[\\/]node_modules[\\/](zod|date-fns)[\\/]/.test(id)) return "vendor-utils";
-          // Everything else (react, react-dom, react-router, @tanstack, radix,
-          // sonner, form libs, …) goes in ONE vendor chunk. A single chunk lets
-          // Rollup order modules by dependency internally, so react initializes
-          // before anything calls React.createContext(). This is the safe
-          // alternative to sibling vendor-react/vendor-query chunks, which do
-          // not guarantee load order and white-screen on 'createContext'.
-          return "vendor";
-        },
+        // Manual chunk classification lives in a pure, unit-tested helper
+        // (src/lib/build/manualChunks.ts) so its hard invariant — keep the
+        // React-context / eval-order graph together in one `vendor` chunk;
+        // only split React-context-free leaf libraries — is guarded by a
+        // build-contract test (src/test/vite-manual-chunks-contract.test.ts)
+        // rather than a comment alone. See PR #138 for why sibling
+        // react/query/radix chunks white-screen the app on 'createContext'.
+        manualChunks: viteManualChunks,
       },
     },
   },

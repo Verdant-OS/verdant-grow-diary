@@ -39,6 +39,7 @@ const Grows = lazy(() => import("./pages/Grows"));
 const GrowDetail = lazy(() => import("./pages/GrowDetail"));
 const PhenoHuntNew = lazy(() => import("./pages/PhenoHuntNew"));
 const PhenoHuntCompare = lazy(() => import("./pages/PhenoHuntCompare"));
+const PhenoHuntWorkspace = lazy(() => import("./pages/PhenoHuntWorkspace"));
 const Reports = lazy(() => import("./pages/Reports"));
 const PostGrowLearningReport = lazy(() => import("./pages/PostGrowLearningReport"));
 
@@ -194,6 +195,10 @@ const App = () => (
                       RLS-scoped SELECT (empty/graceful without a session);
                       still read-only — no writes/AI/automation. */}
                   <Route path="/pheno-hunts/:id/compare" element={<PhenoHuntCompare />} />
+                  {/* Grower's own hunt workspace: enter trait scores + keeper
+                      decisions. RLS-scoped writes of own data; suggest-only,
+                      no AI/Action Queue/automation. */}
+                  <Route path="/pheno-hunts/:id/workspace" element={<PhenoHuntWorkspace />} />
 
                   <Route element={<AppShell />}>
                     <Route path="/" element={<Dashboard />} />

@@ -1087,6 +1087,54 @@ export type Database = {
         }
         Relationships: []
       }
+      pheno_candidate_scores: {
+        Row: {
+          created_at: string
+          hunt_id: string
+          id: string
+          note: string | null
+          plant_id: string
+          traits: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hunt_id: string
+          id?: string
+          note?: string | null
+          plant_id: string
+          traits?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hunt_id?: string
+          id?: string
+          note?: string | null
+          plant_id?: string
+          traits?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_candidate_scores_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_candidate_scores_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pheno_hunts: {
         Row: {
           created_at: string
@@ -1128,6 +1176,105 @@ export type Database = {
             columns: ["tent_id"]
             isOneToOne: false
             referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_keeper_decisions: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decision: string
+          hunt_id: string
+          id: string
+          note: string | null
+          plant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decision?: string
+          hunt_id: string
+          id?: string
+          note?: string | null
+          plant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decision?: string
+          hunt_id?: string
+          id?: string
+          note?: string | null
+          plant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_keeper_decisions_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_keeper_decisions_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_keepers: {
+        Row: {
+          created_at: string
+          hunt_id: string
+          id: string
+          keeper_name: string
+          note: string | null
+          source_plant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hunt_id: string
+          id?: string
+          keeper_name: string
+          note?: string | null
+          source_plant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hunt_id?: string
+          id?: string
+          keeper_name?: string
+          note?: string | null
+          source_plant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_keepers_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_keepers_source_plant_id_fkey"
+            columns: ["source_plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
             referencedColumns: ["id"]
           },
         ]

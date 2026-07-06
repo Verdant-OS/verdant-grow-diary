@@ -415,6 +415,7 @@ export default function AgentIntegrations({
 
 
         <section
+          id="agent-tool-reference"
           aria-label="Agent tool reference"
           className="glass rounded-2xl border p-5 space-y-4"
           data-testid="agent-tool-reference"

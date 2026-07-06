@@ -20,6 +20,16 @@ import {
   buildConnectionDetailsText,
   getSupabaseOrigin,
 } from "@/lib/mcp/manifestView";
+import {
+  computeManifestHash,
+  shortenManifestHash,
+} from "@/lib/mcp/manifestHash";
+import {
+  verifyMcpToolAccess,
+  defaultBrowserHarness,
+  type HarnessAdapter,
+  type VerifyMcpToolAccessResult,
+} from "@/lib/mcp/verifyMcpToolAccess";
 
 type CopyState = "idle" | "copied" | "failed";
 
@@ -66,7 +76,18 @@ function OAuthStatusBadge({ status }: { status: OAuthStatus }) {
   );
 }
 
-export default function AgentIntegrations() {
+export type AgentIntegrationsProps = {
+  /**
+   * Optional injectable verification harness. Defaults to a browser-safe
+   * "unavailable" adapter so we never attempt live MCP calls from the UI.
+   * Tests inject a fake adapter to exercise the four presenter states.
+   */
+  verifyHarness?: HarnessAdapter;
+};
+
+export default function AgentIntegrations({
+  verifyHarness = defaultBrowserHarness,
+}: AgentIntegrationsProps = {}) {
   usePageSeo({
     title: "Agent integrations — Verdant Grow Diary",
     description:
@@ -89,6 +110,13 @@ export default function AgentIntegrations() {
   const consentUrl = `${appOrigin}${MCP_MANIFEST.consentPath}`;
   const oauthStatus = deriveOAuthStatus();
 
+  const manifestHash = useMemo(() => computeManifestHash(MCP_MANIFEST), []);
+  const manifestFingerprint = useMemo(
+    () => shortenManifestHash(manifestHash),
+    [manifestHash],
+  );
+  const toolNames = MCP_MANIFEST.tools.map((t) => t.name);
+
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const onCopy = useCallback(async () => {
     const payload = buildConnectionDetailsText(MCP_MANIFEST, supabaseOrigin, appOrigin);
@@ -107,6 +135,20 @@ export default function AgentIntegrations() {
       setCopyState("failed");
     }
   }, [supabaseOrigin, appOrigin]);
+
+  const [verifyResult, setVerifyResult] =
+    useState<VerifyMcpToolAccessResult | null>(null);
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const onVerify = useCallback(async () => {
+    setVerifyBusy(true);
+    try {
+      const result = await verifyMcpToolAccess({ adapter: verifyHarness });
+      setVerifyResult(result);
+    } finally {
+      setVerifyBusy(false);
+    }
+  }, [verifyHarness]);
+
 
   return (
     <div className="min-h-dvh px-4 py-6 md:px-8">
@@ -193,6 +235,30 @@ export default function AgentIntegrations() {
                 {MCP_MANIFEST.version}
               </dd>
             </div>
+            <div data-testid="manifest-identity">
+              <dt className="text-muted-foreground">Manifest identity</dt>
+              <dd className="text-xs space-y-1">
+                <div>
+                  Manifest version:{" "}
+                  <span className="font-mono" data-testid="manifest-version">
+                    {MCP_MANIFEST.version}
+                  </span>
+                </div>
+                <div>
+                  Manifest fingerprint:{" "}
+                  <span className="font-mono" data-testid="manifest-fingerprint">
+                    {manifestFingerprint}
+                  </span>
+                </div>
+                <div data-testid="manifest-tool-count">
+                  Tools advertised: {toolNames.length}
+                </div>
+                <div className="text-muted-foreground">
+                  Last-known tools:{" "}
+                  <span className="font-mono">{toolNames.join(", ")}</span>
+                </div>
+              </dd>
+            </div>
           </dl>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -216,6 +282,140 @@ export default function AgentIntegrations() {
         </section>
 
         <section
+          aria-label="Verify tool access"
+          className="glass rounded-2xl border p-5 space-y-3"
+          data-testid="verify-tool-access"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Verify tool access</h2>
+            <Button
+              onClick={onVerify}
+              disabled={verifyBusy}
+              data-testid="verify-tool-access-button"
+              variant="outline"
+            >
+              {verifyBusy ? "Verifying…" : "Verify tool access"}
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Runs a read-only <code className="font-mono">list_grows</code>{" "}
+            check against the local verification harness when available.
+            Never exposes tokens, secrets, or raw response rows.
+          </p>
+          {verifyResult ? (
+            <div
+              className="rounded-lg border p-3 text-sm space-y-1"
+              role="status"
+              aria-live="polite"
+              data-testid="verify-tool-access-result"
+              data-status={verifyResult.status}
+            >
+              <div className="font-medium" data-testid="verify-label">
+                {verifyResult.label}
+              </div>
+              <div
+                className="text-muted-foreground"
+                data-testid="verify-description"
+              >
+                {verifyResult.description}
+              </div>
+              {typeof verifyResult.growCount === "number" ? (
+                <div
+                  className="text-xs text-muted-foreground"
+                  data-testid="verify-grow-count"
+                >
+                  {verifyResult.growCount === 0
+                    ? "0 grows found (authorized empty state)."
+                    : `${verifyResult.growCount} grow(s) visible to the signed-in grower.`}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+
+        <section
+          aria-label="Connect an agent"
+          className="glass rounded-2xl border p-5 space-y-3"
+          data-testid="connect-agent-checklist"
+        >
+          <h2 className="text-lg font-semibold">Connect an agent</h2>
+          <ol
+            className="list-decimal space-y-2 pl-5 text-sm"
+            data-testid="connect-agent-steps"
+          >
+            <li>
+              Open your agent app: ChatGPT, Claude, Cursor, or another
+              MCP-compatible client.
+            </li>
+            <li>Go to Agent Integrations / MCP server settings.</li>
+            <li>Add the Verdant MCP endpoint.</li>
+            <li>Complete OAuth consent.</li>
+            <li>Confirm available read-only tools.</li>
+            <li>
+              Run a read-only test like{" "}
+              <code className="font-mono">list_grows</code>.
+            </li>
+            <li>
+              Use diary entries and sensor snapshots as context, not
+              automation.
+            </li>
+          </ol>
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Button asChild size="sm" variant="outline">
+              <a
+                href={consentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="open-oauth-consent-link"
+              >
+                <ExternalLink className="mr-2 h-3 w-3" aria-hidden />
+                Open OAuth consent
+              </a>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <a
+                href={manifestUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="view-mcp-manifest-link"
+              >
+                <ExternalLink className="mr-2 h-3 w-3" aria-hidden />
+                View MCP manifest
+              </a>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <a
+                href="#agent-tool-reference"
+                data-testid="view-tool-reference-link"
+              >
+                View agent tool reference
+              </a>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onCopy}
+              data-testid="checklist-copy-connection-details"
+            >
+              <Copy className="mr-2 h-3 w-3" aria-hidden />
+              Copy connection details
+            </Button>
+          </div>
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="connect-agent-safety-copy"
+          >
+            Verdant agent access is read-only in this release. Agents can
+            list grows, recent diary entries, and latest sensor snapshots
+            for the signed-in grower only. They cannot write logs, create
+            Action Queue items, run AI Doctor, control equipment, or
+            automate grow-room devices.
+          </p>
+        </section>
+
+
+        <section
+          id="agent-tool-reference"
           aria-label="Agent tool reference"
           className="glass rounded-2xl border p-5 space-y-4"
           data-testid="agent-tool-reference"

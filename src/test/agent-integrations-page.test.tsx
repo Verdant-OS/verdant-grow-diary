@@ -141,6 +141,172 @@ describe("AgentIntegrations page", () => {
     expect(link.getAttribute("target")).toBe("_blank");
     expect(link.getAttribute("rel")).toMatch(/noopener/);
   });
+
+  it("renders manifest version, fingerprint, and tool count", () => {
+    renderAgentIntegrations();
+    expect(screen.getByTestId("manifest-version").textContent).toBe(
+      MCP_MANIFEST.version,
+    );
+    expect(screen.getByTestId("manifest-fingerprint").textContent).toMatch(
+      /^[0-9a-f]+/,
+    );
+    expect(screen.getByTestId("manifest-tool-count").textContent).toContain(
+      `Tools advertised: ${MCP_MANIFEST.tools.length}`,
+    );
+  });
+
+  it("lists exactly the three shipped MCP tools by name", () => {
+    renderAgentIntegrations();
+    const names = MCP_MANIFEST.tools.map((t) => t.name);
+    expect(names).toEqual([
+      "list_grows",
+      "list_recent_diary_entries",
+      "get_latest_sensor_snapshot",
+    ]);
+    for (const n of names) {
+      expect(screen.getByTestId(`mcp-tool-${n}`)).toBeTruthy();
+    }
+  });
+
+  it("renders the Verify tool access button + harness_unavailable by default", async () => {
+    renderAgentIntegrations();
+    const button = screen.getByTestId("verify-tool-access-button");
+    fireEvent.click(button);
+    await waitFor(() => {
+      expect(screen.getByTestId("verify-tool-access-result")).toBeTruthy();
+    });
+    expect(
+      screen.getByTestId("verify-tool-access-result").getAttribute("data-status"),
+    ).toBe("harness_unavailable");
+    expect(screen.getByTestId("verify-label").textContent).toMatch(
+      /harness unavailable/i,
+    );
+  });
+
+  it("renders authorized state when a harness adapter reports ok", async () => {
+    render(
+      <MemoryRouter initialEntries={["/settings/agent-integrations"]}>
+        <Routes>
+          <Route
+            path="/settings/agent-integrations"
+            element={
+              <AgentIntegrations
+                verifyHarness={{
+                  available: true,
+                  probe: async () => ({ ok: true, growCount: 1 }),
+                }}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId("verify-tool-access-button"));
+    await waitFor(() => {
+      expect(
+        screen
+          .getByTestId("verify-tool-access-result")
+          .getAttribute("data-status"),
+      ).toBe("authorized");
+    });
+    expect(screen.getByTestId("verify-grow-count").textContent).toContain(
+      "1 grow",
+    );
+    // Never leaks token-shaped strings into DOM.
+    const body = document.body.textContent ?? "";
+    expect(body).not.toMatch(/eyJ[A-Za-z0-9]{5,}\./);
+    expect(body).not.toMatch(/service_role/i);
+    expect(body).not.toMatch(/refresh_token/i);
+  });
+
+  it("renders unauthorized state when the probe says unauthenticated", async () => {
+    render(
+      <MemoryRouter initialEntries={["/settings/agent-integrations"]}>
+        <Routes>
+          <Route
+            path="/settings/agent-integrations"
+            element={
+              <AgentIntegrations
+                verifyHarness={{
+                  available: true,
+                  probe: async () => ({ ok: false, unauthenticated: true }),
+                }}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId("verify-tool-access-button"));
+    await waitFor(() => {
+      expect(
+        screen
+          .getByTestId("verify-tool-access-result")
+          .getAttribute("data-status"),
+      ).toBe("unauthorized");
+    });
+  });
+
+  it("renders failed state when the probe rejects, without leaking details", async () => {
+    render(
+      <MemoryRouter initialEntries={["/settings/agent-integrations"]}>
+        <Routes>
+          <Route
+            path="/settings/agent-integrations"
+            element={
+              <AgentIntegrations
+                verifyHarness={{
+                  available: true,
+                  probe: async () => {
+                    throw new Error(
+                      "Bearer eyJabc.SECRET.SIG service_role refresh_token=xyz",
+                    );
+                  },
+                }}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId("verify-tool-access-button"));
+    await waitFor(() => {
+      expect(
+        screen
+          .getByTestId("verify-tool-access-result")
+          .getAttribute("data-status"),
+      ).toBe("failed");
+    });
+    const body = document.body.textContent ?? "";
+    expect(body).not.toMatch(/eyJabc\./);
+    expect(body).not.toMatch(/service_role/i);
+    expect(body).not.toMatch(/refresh_token/i);
+  });
+
+  it("renders the connect-agent checklist with all 7 steps + OAuth consent link", () => {
+    renderAgentIntegrations();
+    const list = screen.getByTestId("connect-agent-steps");
+    expect(list.querySelectorAll("li").length).toBe(7);
+    expect(list.textContent).toMatch(/ChatGPT/);
+    expect(list.textContent).toMatch(/OAuth consent/i);
+    expect(list.textContent).toMatch(/list_grows/);
+
+    const consent = screen.getByTestId(
+      "open-oauth-consent-link",
+    ) as HTMLAnchorElement;
+    expect(consent.getAttribute("href")).toContain("/.lovable/oauth/consent");
+    expect(consent.getAttribute("rel")).toMatch(/noopener/);
+
+    const manifest = screen.getByTestId(
+      "view-mcp-manifest-link",
+    ) as HTMLAnchorElement;
+    expect(manifest.getAttribute("target")).toBe("_blank");
+    expect(manifest.getAttribute("rel")).toMatch(/noopener/);
+
+    expect(
+      screen.getByTestId("connect-agent-safety-copy").textContent,
+    ).toMatch(/read-only/i);
+  });
 });
 
 // ---------- OAuth consent route ----------

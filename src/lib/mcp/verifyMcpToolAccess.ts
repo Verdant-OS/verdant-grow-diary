@@ -110,3 +110,30 @@ export async function verifyMcpToolAccess(
  * return `available: false`. Tests inject their own adapter.
  */
 export const defaultBrowserHarness: HarnessAdapter = { available: false };
+
+/**
+ * Safe next-step guidance for the Verify-tool-access status panel.
+ * Presenter-safe copy only — no tokens, IDs, or private env values.
+ */
+export function getVerifyStatusGuidance(
+  status: VerifyStatus | "not_checked",
+): string {
+  switch (status) {
+    case "not_checked":
+      return "Run Verify tool access after connecting an agent.";
+    case "authorized":
+      return "Next: try list_recent_diary_entries or use sensor snapshots as read-only context.";
+    case "unauthorized":
+      return "Next: complete OAuth consent, then verify again.";
+    case "harness_unavailable":
+      return "Next: use a configured local harness or connect through your agent client.";
+    case "failed":
+    default:
+      return "Next: check configuration and try again.";
+  }
+}
+
+export const NOT_CHECKED_LABEL = "Not checked yet";
+export const NOT_CHECKED_DESCRIPTION =
+  "Verification has not run in this browser session.";
+

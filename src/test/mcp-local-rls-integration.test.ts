@@ -235,8 +235,7 @@ describeIfHarness("MCP local RLS integration", () => {
 
   describe("list_recent_diary_entries", () => {
     it("User A cannot read User B's diary via B's growId", async () => {
-      const res = await listDiaryTool.handler(
-        { growId: userB.growId },
+      const res = await listDiaryTool.handler({ growId: userB.growId, limit: 10 } as never,
         makeCtx(userA.accessToken),
       );
       const ids = (res.structuredContent?.entries ?? []).map((e: { id: string }) => e.id);
@@ -245,8 +244,7 @@ describeIfHarness("MCP local RLS integration", () => {
     });
 
     it("User A sees own diary entry A", async () => {
-      const res = await listDiaryTool.handler(
-        { growId: userA.growId },
+      const res = await listDiaryTool.handler({ growId: userA.growId, limit: 10 } as never,
         makeCtx(userA.accessToken),
       );
       const ids = (res.structuredContent?.entries ?? []).map((e: { id: string }) => e.id);
@@ -256,8 +254,7 @@ describeIfHarness("MCP local RLS integration", () => {
     });
 
     it("User B sees own diary entry B", async () => {
-      const res = await listDiaryTool.handler(
-        { growId: userB.growId },
+      const res = await listDiaryTool.handler({ growId: userB.growId, limit: 10 } as never,
         makeCtx(userB.accessToken),
       );
       const ids = (res.structuredContent?.entries ?? []).map((e: { id: string }) => e.id);
@@ -267,8 +264,7 @@ describeIfHarness("MCP local RLS integration", () => {
     });
 
     it("Unauthenticated caller is rejected", async () => {
-      const res = await listDiaryTool.handler(
-        { growId: userA.growId },
+      const res = await listDiaryTool.handler({ growId: userA.growId, limit: 10 } as never,
         makeCtx(null),
       );
       expect(res.isError).toBe(true);
@@ -277,8 +273,7 @@ describeIfHarness("MCP local RLS integration", () => {
 
   describe("get_latest_sensor_snapshot", () => {
     it("User A cannot read User B's tent snapshot", async () => {
-      const res = await getSnapshotTool.handler(
-        { tentId: userB.tentId },
+      const res = await getSnapshotTool.handler({ tentId: userB.tentId } as never,
         makeCtx(userA.accessToken),
       );
       const snap = res.structuredContent?.snapshot;
@@ -287,8 +282,7 @@ describeIfHarness("MCP local RLS integration", () => {
     });
 
     it("User A sees own snapshot A", async () => {
-      const res = await getSnapshotTool.handler(
-        { tentId: userA.tentId },
+      const res = await getSnapshotTool.handler({ tentId: userA.tentId } as never,
         makeCtx(userA.accessToken),
       );
       expect(res.structuredContent?.snapshot?.id).toBe(userA.snapshotId);
@@ -296,8 +290,7 @@ describeIfHarness("MCP local RLS integration", () => {
     });
 
     it("User B sees own snapshot B", async () => {
-      const res = await getSnapshotTool.handler(
-        { tentId: userB.tentId },
+      const res = await getSnapshotTool.handler({ tentId: userB.tentId } as never,
         makeCtx(userB.accessToken),
       );
       expect(res.structuredContent?.snapshot?.id).toBe(userB.snapshotId);
@@ -305,8 +298,7 @@ describeIfHarness("MCP local RLS integration", () => {
     });
 
     it("Unauthenticated caller is rejected", async () => {
-      const res = await getSnapshotTool.handler(
-        { tentId: userA.tentId },
+      const res = await getSnapshotTool.handler({ tentId: userA.tentId } as never,
         makeCtx(null),
       );
       expect(res.isError).toBe(true);

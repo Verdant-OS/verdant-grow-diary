@@ -139,13 +139,7 @@ export interface TimelineEvidence {
   linked_directly?: boolean;
 }
 
-export type SensorSourceLabel =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+export type SensorSourceLabel = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 export interface SensorSnapshotEvidence {
   source: SensorSourceLabel | null;
@@ -179,7 +173,12 @@ export interface ActionQueueEvidence {
   id: string;
   status: string | null;
   approval_required: boolean;
-  has_device_command: boolean;
+  /**
+   * True when this Action Queue row carries an unsafe device-control
+   * marker. Verdant never creates such rows — this flag exists purely to
+   * detect and block one if it were ever present, never to enable one.
+   */
+  has_device_control_marker: boolean;
   reason?: string | null;
   risk_level?: string | null;
   linked_alert_id?: string | null;
@@ -250,10 +249,7 @@ export function evaluateGrow(g: GrowEvidence | null): LoopStepRow {
   };
 }
 
-export function evaluateTent(
-  t: TentEvidence | null,
-  grow: GrowEvidence | null,
-): LoopStepRow {
+export function evaluateTent(t: TentEvidence | null, grow: GrowEvidence | null): LoopStepRow {
   if (!grow) {
     return {
       id: "tent",
@@ -293,10 +289,7 @@ export function evaluateTent(
   };
 }
 
-export function evaluatePlant(
-  p: PlantEvidence | null,
-  tent: TentEvidence | null,
-): LoopStepRow {
+export function evaluatePlant(p: PlantEvidence | null, tent: TentEvidence | null): LoopStepRow {
   if (!tent) {
     return {
       id: "plant",
@@ -369,7 +362,11 @@ export function evaluateQuickLog(
   if (q.has_note) ctx.push("note");
   if (q.has_photo) ctx.push("photo");
   if (q.has_action_context) ctx.push("action context");
-  ev.push(ctx.length > 0 ? `Includes: ${ctx.join(", ")}.` : "No note/photo/action context on latest entry.");
+  ev.push(
+    ctx.length > 0
+      ? `Includes: ${ctx.join(", ")}.`
+      : "No note/photo/action context on latest entry.",
+  );
   return {
     id: "quick-log",
     label: "Quick Log",
@@ -406,19 +403,17 @@ export function evaluateTimeline(
       deep_link: "/timeline",
     };
   }
-  const linked = tl.linked_directly === true
-    ? "direct"
-    : tl.latest_entry_id && tl.latest_entry_id === quickLog.id
+  const linked =
+    tl.linked_directly === true
       ? "direct"
-      : "inferred";
+      : tl.latest_entry_id && tl.latest_entry_id === quickLog.id
+        ? "direct"
+        : "inferred";
   return {
     id: "timeline",
     label: "Timeline",
     status: "passed",
-    evidence: [
-      `Timeline event count: ${tl.event_count}.`,
-      `Latest Quick Log linkage: ${linked}.`,
-    ],
+    evidence: [`Timeline event count: ${tl.event_count}.`, `Latest Quick Log linkage: ${linked}.`],
     missing_info: [],
     safety_note: "Source badges preserved (manual / demo / live / csv).",
     deep_link: "/timeline",
@@ -502,9 +497,7 @@ export function evaluateSensorSnapshot(
             ? `Captured: ${s.captured_at}`
             : "Captured: unknown",
         ],
-        missing_info: [
-          "Sensor snapshot carries unknown fields; excluded from healthy status.",
-        ],
+        missing_info: ["Sensor snapshot carries unknown fields; excluded from healthy status."],
         safety_note: "Malformed telemetry is never shown as healthy.",
         source: "invalid",
         deep_link: "/sensors",
@@ -569,7 +562,10 @@ export function evaluateSensorSnapshot(
       id: "sensor-snapshot",
       label: "Sensor Snapshot",
       status: "invalid",
-      evidence: [`Source: invalid`, s.captured_at ? `Captured: ${s.captured_at}` : "Captured: unknown"],
+      evidence: [
+        `Source: invalid`,
+        s.captured_at ? `Captured: ${s.captured_at}` : "Captured: unknown",
+      ],
       missing_info: ["Reading is invalid; excluded from healthy status."],
       safety_note: "Invalid telemetry is never shown as healthy.",
       source: "invalid",
@@ -580,7 +576,10 @@ export function evaluateSensorSnapshot(
       id: "sensor-snapshot",
       label: "Sensor Snapshot",
       status: "demo_only",
-      evidence: [`Source: demo`, s.captured_at ? `Captured: ${s.captured_at}` : "Captured: unknown"],
+      evidence: [
+        `Source: demo`,
+        s.captured_at ? `Captured: ${s.captured_at}` : "Captured: unknown",
+      ],
       missing_info: ["Demo data only — never shown as healthy."],
       safety_note: "Demo readings never seed real alerts or Action Queue items.",
       source: "demo",
@@ -658,7 +657,9 @@ export function evaluateAiDoctor(a: AiDoctorEvidence | null): LoopStepRow {
     [a.had_recent_sensor_snapshot, "recent sensor snapshot"],
     [a.had_alerts, "alerts"],
   ];
-  const missing = contextChecks.filter(([had]) => !had).map(([, name]) => `Missing context: ${name}.`);
+  const missing = contextChecks
+    .filter(([had]) => !had)
+    .map(([, name]) => `Missing context: ${name}.`);
   const ev: string[] = [];
   if (a.created_at) ev.push(`Session created: ${a.created_at}`);
   ev.push(`Context present: ${contextChecks.filter(([h]) => h).length}/${contextChecks.length}.`);
@@ -714,7 +715,7 @@ export function evaluateActionQueue(a: ActionQueueEvidence | null): LoopStepRow 
       deep_link: "/action-queue",
     };
   }
-  if (a.has_device_command) {
+  if (a.has_device_control_marker) {
     return {
       id: "action-queue",
       label: "Approval-Required Action Queue",
@@ -781,52 +782,69 @@ export function evaluateFollowUp(f: FollowUpEvidence | null): LoopStepRow {
 const DRILLDOWN_BY_STEP: Record<LoopStepId, MissingEvidenceDrilldown> = {
   grow: {
     what_is_missing: "No active grow is selected.",
-    why_it_matters: "Every downstream loop step is scoped to a grow. Without one, tent, plant, Quick Log, and sensor context cannot be evaluated.",
+    why_it_matters:
+      "Every downstream loop step is scoped to a grow. Without one, tent, plant, Quick Log, and sensor context cannot be evaluated.",
     where_to_record: "Create or select a grow on the Grows page.",
   },
   tent: {
     what_is_missing: "No tent is linked to the active grow, or its environment target is not set.",
-    why_it_matters: "Tent context anchors sensor readings and alerts. Environment targets are never inferred from sensor data.",
+    why_it_matters:
+      "Tent context anchors sensor readings and alerts. Environment targets are never inferred from sensor data.",
     where_to_record: "Add or open a tent on the Tents page and set its environment targets.",
   },
   plant: {
     what_is_missing: "Plant is missing, or its stage / medium / pot size is unknown.",
-    why_it_matters: "AI Doctor and cautious guidance need plant context. Verdant never guesses these values.",
-    where_to_record: "Open the plant on the Plants page and complete its stage, medium, and pot size.",
+    why_it_matters:
+      "AI Doctor and cautious guidance need plant context. Verdant never guesses these values.",
+    where_to_record:
+      "Open the plant on the Plants page and complete its stage, medium, and pot size.",
   },
   "quick-log": {
-    what_is_missing: "No Quick Log entry (note, photo, or action context) exists for this plant yet.",
-    why_it_matters: "Quick Log is the atomic 30-second capture that turns today's observation into plant memory.",
+    what_is_missing:
+      "No Quick Log entry (note, photo, or action context) exists for this plant yet.",
+    why_it_matters:
+      "Quick Log is the atomic 30-second capture that turns today's observation into plant memory.",
     where_to_record: "Open Daily Check and save a Quick Log entry for the plant.",
   },
   timeline: {
-    what_is_missing: "Timeline has no visible events for this scope, or the latest Quick Log is not linked directly.",
-    why_it_matters: "Timeline continuity is how the grower confirms a saved log became plant memory.",
+    what_is_missing:
+      "Timeline has no visible events for this scope, or the latest Quick Log is not linked directly.",
+    why_it_matters:
+      "Timeline continuity is how the grower confirms a saved log became plant memory.",
     where_to_record: "Open the Timeline page filtered by this plant or tent.",
   },
   "sensor-snapshot": {
-    what_is_missing: "No sensor snapshot is available, or the reading is stale, invalid, or demo-only.",
-    why_it_matters: "Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never shown as healthy.",
-    where_to_record: "Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.",
+    what_is_missing:
+      "No sensor snapshot is available, or the reading is stale, invalid, or demo-only.",
+    why_it_matters:
+      "Sensor truth requires source, captured_at, and freshness. Missing or untrusted telemetry is never shown as healthy.",
+    where_to_record:
+      "Open the Sensors page to review live/manual/CSV readings, or record a manual snapshot from Quick Log.",
   },
   "ai-doctor": {
-    what_is_missing: "No AI Doctor session is recorded, or the session is missing plant / medium / photo / sensor context.",
-    why_it_matters: "AI Doctor stays cautious when context is weak — weak context produces low-confidence advice.",
+    what_is_missing:
+      "No AI Doctor session is recorded, or the session is missing plant / medium / photo / sensor context.",
+    why_it_matters:
+      "AI Doctor stays cautious when context is weak — weak context produces low-confidence advice.",
     where_to_record: "Open AI Doctor from the plant page after adding the missing context items.",
   },
   alert: {
     what_is_missing: "No persisted alert exists for this scope.",
-    why_it_matters: "Alerts are how sensor truth escalates to a grower-visible signal. This page never auto-creates them.",
+    why_it_matters:
+      "Alerts are how sensor truth escalates to a grower-visible signal. This page never auto-creates them.",
     where_to_record: "Open the Alerts page to review any persisted alerts.",
   },
   "action-queue": {
-    what_is_missing: "No approval-required Action Queue item exists, or a row was flagged as unsafe (device command / not approval-required).",
-    why_it_matters: "Action Queue must remain approval-required. Verdant may suggest, but the grower decides. No device commands.",
+    what_is_missing:
+      "No approval-required Action Queue item exists, or a row was flagged as unsafe (device command / not approval-required).",
+    why_it_matters:
+      "Action Queue must remain approval-required. Verdant may suggest, but the grower decides. No device commands.",
     where_to_record: "Open the Action Queue page to review suggested actions.",
   },
   "follow-up": {
     what_is_missing: "No follow-up or outcome has been recorded after the loop's suggested action.",
-    why_it_matters: "The loop closes only when the grower records what happened next — that is how plant memory improves future advice.",
+    why_it_matters:
+      "The loop closes only when the grower records what happened next — that is how plant memory improves future advice.",
     where_to_record: "Save a follow-up diary entry from Daily Check or the plant page.",
   },
 };
@@ -854,10 +872,7 @@ function provenanceForStatus(status: LoopStepStatus): EvidenceProvenance {
   }
 }
 
-function evidenceRefForStep(
-  step: LoopStepRow,
-  input: LoopEvidence,
-): EvidenceRef | null {
+function evidenceRefForStep(step: LoopStepRow, input: LoopEvidence): EvidenceRef | null {
   switch (step.id) {
     case "grow":
       if (!input.grow) return null;
@@ -967,10 +982,7 @@ function evidenceRefForStep(
  * Enrich a bare LoopStepRow with provenance, structured refs, and
  * missing-evidence drilldown. Pure; never invents data.
  */
-export function enrichLoopStepRow(
-  step: LoopStepRow,
-  input: LoopEvidence,
-): LoopStepRow {
+export function enrichLoopStepRow(step: LoopStepRow, input: LoopEvidence): LoopStepRow {
   const provenance = provenanceForStatus(step.status);
   const ref = evidenceRefForStep(step, input);
   const evidence_refs = ref ? [ref] : [];

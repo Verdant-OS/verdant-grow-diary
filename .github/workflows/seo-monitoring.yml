@@ -1,0 +1,105 @@
+name: SEO Monitoring (post-deploy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployed_url:
+        description: "Deployed base URL (e.g. https://verdantgrowdiary.com)"
+        required: false
+        default: "https://verdantgrowdiary.com"
+      sitemap_url:
+        description: "Sitemap URL to pull inspection targets from"
+        required: false
+        default: "https://verdantgrowdiary.com/sitemap.xml"
+      max_urls:
+        description: "Max URLs to inspect (hard cap 50)"
+        required: false
+        default: "15"
+      verify_last_finding:
+        description: "Run last-finding verification"
+        required: false
+        default: "true"
+  # Chain after the existing CI workflow completes successfully.
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  seo-monitoring:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      GSC_CLIENT_ID: ${{ secrets.GSC_CLIENT_ID }}
+      GSC_CLIENT_SECRET: ${{ secrets.GSC_CLIENT_SECRET }}
+      GSC_REFRESH_TOKEN: ${{ secrets.GSC_REFRESH_TOKEN }}
+      GSC_SITE_URL: ${{ secrets.GSC_SITE_URL }}
+      SEO_DEPLOYED_URL: ${{ github.event.inputs.deployed_url || 'https://verdantgrowdiary.com' }}
+      SEO_SITEMAP_URL: ${{ github.event.inputs.sitemap_url || 'https://verdantgrowdiary.com/sitemap.xml' }}
+      SEO_MAX_URLS: ${{ github.event.inputs.max_urls || '15' }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node_version: "20"
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      - name: Prepare artifact directory
+        run: mkdir -p artifacts/seo
+      - name: Validate SEO allowlist config
+        run: node --test scripts/test-seo-allowlist.mjs scripts/test-seo-allowlist-config.mjs scripts/test-seo-allowlist-expiration.mjs scripts/test-seo-allowlist-diagnostics.mjs scripts/test-seo-job-summary.mjs scripts/test-seo-suppression-diff.mjs scripts/test-seo-verify-regression-mode.mjs
+      - name: Download previous SEO artifacts (for diff)
+        id: prev
+        continue-on-error: true
+        uses: dawidd6/action-download-artifact@bf251b5aa9c2f7eeb574a96ee720e24f801b7c11 # v6
+        with:
+          name: seo-monitoring-reports
+          workflow: seo-monitoring.yml
+          workflow_conclusion: success
+          path: artifacts/seo/previous
+          if_no_artifact_found: warn
+      - name: SEO allowlist — list expired entries
+        run: node scripts/seo/gsc-inspect-urls.mjs --list-expired-entries --allowlist config/seo-allowlist.json
+      - name: SEO allowlist dry-run (no GSC calls; fails on expired entries)
+        run: node scripts/seo/gsc-inspect-urls.mjs --dry-run-allowlist --urls "https://verdantgrowdiary.com/,https://verdantgrowdiary.com/welcome,https://verdantgrowdiary.com/pricing,https://verdantgrowdiary.com/hardware-integrations" --allowlist config/seo-allowlist.json --previous-dir artifacts/seo/previous
+      - name: SEO regression-only check (no GSC calls)
+        run: node scripts/seo/verify-last-gsc-finding.mjs --fail-only-previously-resolved-expired --previous artifacts/seo/previous/gsc-last-finding-verification.json
+      - name: GSC OAuth configured?
+        id: gsc
+        run: |
+          if [ -n "$GSC_CLIENT_ID" ] && [ -n "$GSC_CLIENT_SECRET" ] && [ -n "$GSC_REFRESH_TOKEN" ] && [ -n "$GSC_SITE_URL" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "GSC OAuth not configured — GSC steps will be skipped."
+            echo "GSC OAuth not configured. See docs/seo-monitoring.md to authorize locally and add repo secrets." > artifacts/seo/gsc-oauth-not-configured.txt
+          fi
+      - name: GSC URL inspection
+        if: steps.gsc.outputs.configured == 'true'
+        run: node scripts/seo/gsc-inspect-urls.mjs --sitemap "$SEO_SITEMAP_URL" --max "$SEO_MAX_URLS" --allowlist config/seo-allowlist.json --previous-dir artifacts/seo/previous
+      - name: Verify last GSC finding
+        if: steps.gsc.outputs.configured == 'true' && (github.event.inputs.verify_last_finding != 'false')
+        run: node scripts/seo/verify-last-gsc-finding.mjs
+      - name: Append SEO job summary
+        if: always()
+        run: |
+          if [ -f artifacts/seo/seo-job-summary.md ]; then
+            cat artifacts/seo/seo-job-summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Verdant SEO Monitoring" >> "$GITHUB_STEP_SUMMARY"
+            echo "_No job summary artifact was produced._" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload SEO artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: seo-monitoring-reports
+          path: |
+            artifacts/seo/**
+            !artifacts/seo/previous/**
+            !artifacts/seo/**/*.env
+            !artifacts/seo/**/*token*
+            !artifacts/seo/**/*secret*
+          if-no-files-found: ignore

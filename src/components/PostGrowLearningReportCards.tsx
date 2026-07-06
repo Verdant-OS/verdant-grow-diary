@@ -1,7 +1,9 @@
 import type React from "react";
-import { Download, Image as ImageIcon, Info, ListChecks, Printer } from "lucide-react";
+import { useCallback, useId, useRef, useState } from "react";
+import { Download, HelpCircle, Image as ImageIcon, Info, ListChecks, Printer } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import SensorProvenanceLegend from "@/components/SensorProvenanceLegend";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +20,13 @@ import {
   PRINT_UNAVAILABLE_COPY,
   openPostGrowReportPrintWindow,
 } from "@/lib/postGrowReportPrintRules";
+import { exportPostGrowReportAsPdf } from "@/lib/postGrowPdfExport";
+import {
+  buildProvenanceBadgeRows,
+  PDF_EXPORT_UNAVAILABLE_COPY,
+  POST_GROW_SENSOR_EMPTY_STATE_COPY,
+  provenanceBadgeAriaLabel,
+} from "@/lib/postGrowReportRules";
 import { actionsPath } from "@/lib/routes";
 
 function display(value: number | null, digits = 1): string {
@@ -252,38 +261,119 @@ export function PostGrowExecutiveSummaryCard({ vm }: { vm: PostGrowLearningRepor
   );
 }
 
-export function EnvironmentStabilityCard({ metrics }: { metrics: MetricAggregateView[] }) {
+export function EnvironmentStabilityCard({
+  metrics,
+  sensorSourceKinds,
+}: {
+  metrics: MetricAggregateView[];
+  sensorSourceKinds?: ReadonlyArray<string | null | undefined>;
+}) {
+  const badgeRows = buildProvenanceBadgeRows(sensorSourceKinds ?? []);
+  const totalReadings = metrics.reduce((sum, m) => sum + (m.count ?? 0), 0);
+  const hasSensorData = metrics.length > 0 && totalReadings > 0;
+  const [legendOpen, setLegendOpen] = useState(false);
+  const legendRef = useRef<HTMLElement | null>(null);
+  const reactId = useId();
+  const legendPanelId = `post-grow-provenance-legend-panel-${reactId}`;
+
+  const handleToggle = useCallback(() => {
+    setLegendOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        // Focus the legend heading on next tick so screen readers announce it.
+        requestAnimationFrame(() => {
+          legendRef.current?.focus();
+          legendRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        });
+      }
+      return next;
+    });
+  }, []);
+
   return (
     <ReportCard
       title="Environment Stability"
       subtitle={`${REPORT_SECTION_LABELS.whatWasLogged} (environment)`}
       testId="post-grow-environment-stability"
     >
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        {metrics.map((metric) => (
-          <div key={metric.key} className="rounded-xl border border-border/50 bg-secondary/20 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-muted-foreground">{metric.label}</span>
-              <Badge variant="outline" className="text-[10px]">
-                {metric.count} readings
-              </Badge>
-            </div>
-            <p className="mt-1 text-lg font-display">
-              {display(metric.avg, metric.key === "vpd_kpa" ? 2 : 1)} {metric.unit}
-            </p>
-            <p className="text-[11px] text-muted-foreground">
-              Range {display(metric.min, metric.key === "vpd_kpa" ? 2 : 1)}–{display(metric.max, metric.key === "vpd_kpa" ? 2 : 1)} {metric.unit}
-            </p>
-            <Sparkline points={metric.sparkline} />
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Stability window: {metric.stablePct === null ? "not enough data" : `${metric.stablePct}% in practical range`}
-            </p>
+      {badgeRows.length > 0 ? (
+        <ul
+          className="mb-3 flex flex-wrap gap-1 list-none p-0"
+          data-testid="post-grow-provenance-badges"
+          aria-label="Sensor source provenance"
+        >
+          {badgeRows.map((row) => {
+            const ariaLabel = provenanceBadgeAriaLabel(row);
+            return (
+              <li key={row.kind} className="inline-flex">
+                <Badge
+                  variant={row.healthy ? "outline" : "secondary"}
+                  className="text-[10px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  title={row.description}
+                  aria-label={ariaLabel}
+                  tabIndex={0}
+                  data-testid={`post-grow-provenance-badge-${row.kind}`}
+                >
+                  {row.label}
+                </Badge>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+      <div className="mb-3">
+        <button
+          type="button"
+          onClick={handleToggle}
+          aria-expanded={legendOpen}
+          aria-controls={legendPanelId}
+          data-testid="post-grow-provenance-help-toggle"
+          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+        >
+          <HelpCircle className="h-3 w-3" aria-hidden="true" />
+          What do these badges mean?
+        </button>
+        {legendOpen ? (
+          <div id={legendPanelId} className="mt-2">
+            <SensorProvenanceLegend ref={legendRef} />
           </div>
-        ))}
+        ) : null}
       </div>
+      {!hasSensorData ? (
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="post-grow-sensor-empty-state"
+        >
+          {POST_GROW_SENSOR_EMPTY_STATE_COPY}
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {metrics.map((metric) => (
+            <div key={metric.key} className="rounded-xl border border-border/50 bg-secondary/20 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">{metric.label}</span>
+                <Badge variant="outline" className="text-[10px]">
+                  {metric.count} readings
+                </Badge>
+              </div>
+              <p className="mt-1 text-lg font-display">
+                {display(metric.avg, metric.key === "vpd_kpa" ? 2 : 1)} {metric.unit}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Range {display(metric.min, metric.key === "vpd_kpa" ? 2 : 1)}–{display(metric.max, metric.key === "vpd_kpa" ? 2 : 1)} {metric.unit}
+              </p>
+              <Sparkline points={metric.sparkline} />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Stability window: {metric.stablePct === null ? "not enough data" : `${metric.stablePct}% in practical range`}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </ReportCard>
   );
 }
+
 
 export function PostHarvestPerformanceCard({ vm }: { vm: PostGrowLearningReportViewModel }) {
   return (
@@ -411,6 +501,17 @@ export function ExportSummaryButtons({ vm }: { vm: PostGrowLearningReportViewMod
   return (
     <div className="flex flex-col items-end gap-1" data-testid="post-grow-export-actions">
       <div className="flex flex-wrap gap-2">
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => {
+            const result = exportPostGrowReportAsPdf(vm);
+            if (result === "unavailable") toast.error(PDF_EXPORT_UNAVAILABLE_COPY);
+          }}
+          data-testid="post-grow-export-pdf"
+        >
+          <Download className="h-4 w-4 mr-1" /> Export this grow as a PDF report
+        </Button>
         <Button
           variant="outline"
           size="sm"

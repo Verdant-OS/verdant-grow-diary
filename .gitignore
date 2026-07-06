@@ -17,6 +17,7 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
+desktop.ini
 *.suo
 *.ntvs*
 *.njsproj
@@ -31,3 +32,14 @@ tools/ecowitt-testbench/.venv/
 tools/ecowitt-testbench/ecowitt_raw_log.jsonl
 tools/ecowitt-testbench/__pycache__/
 .artifacts/
+
+# MCP local RLS harness debug output (uploaded as CI artifacts on failure,
+# sanitized, never committed)
+artifacts/
+
+# Verdant SEO monitoring — local OAuth token cache
+.seo/
+
+# Playwright transient output (uploaded as CI artifacts, never committed)
+test-results/
+playwright-report/

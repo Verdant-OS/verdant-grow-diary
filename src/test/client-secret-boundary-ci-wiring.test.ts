@@ -98,7 +98,9 @@ describe("Client Secret Boundary — CI wiring contract", () => {
     const win = proofWindow(CI_YML);
     expect(win).toMatch(/client-secret-boundary-proof\.txt/);
     expect(win).toMatch(/name:\s*client-secret-boundary-proof-ci/);
-    expect(win).toMatch(/actions\/upload-artifact@v4/);
+    // Org policy requires full-SHA pinning; accept the pinned form
+    // (trailing "# v4" comment documents the version).
+    expect(win).toMatch(/actions\/upload-artifact@[a-f0-9]{40} # v4/);
     // No `if: always()` near the proof upload — it must be gated on guard success.
     expect(win).not.toMatch(/if:\s*always\(\)/);
   });
@@ -107,7 +109,9 @@ describe("Client Secret Boundary — CI wiring contract", () => {
     const win = proofWindow(DOCS_YML);
     expect(win).toMatch(/client-secret-boundary-proof\.txt/);
     expect(win).toMatch(/name:\s*client-secret-boundary-proof-docs-safety/);
-    expect(win).toMatch(/actions\/upload-artifact@v4/);
+    // Org policy requires full-SHA pinning; accept the pinned form
+    // (trailing "# v4" comment documents the version).
+    expect(win).toMatch(/actions\/upload-artifact@[a-f0-9]{40} # v4/);
     expect(win).not.toMatch(/if:\s*always\(\)/);
   });
 

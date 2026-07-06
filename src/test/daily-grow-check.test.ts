@@ -219,10 +219,7 @@ describe("DailyCheck — static safety audit", () => {
   });
 });
 
-import {
-  buildDailyGrowCheckReviewLinks,
-  formatOutcomeLabel,
-} from "@/lib/dailyGrowCheckRules";
+import { buildDailyGrowCheckReviewLinks, formatOutcomeLabel } from "@/lib/dailyGrowCheckRules";
 
 describe("buildDailyGrowCheckReviewLinks", () => {
   it("includes plant + tent + timeline when both are present", () => {
@@ -307,15 +304,18 @@ describe("Daily Grow Check entry access — multi-surface", () => {
     expect(GROW_ROOM).toMatch(/Start Check/);
   });
   it("Dashboard entry still routes to /daily-check with grower-native copy", () => {
-    expect(DASHBOARD).toMatch(/Daily Grow Check/);
-    expect(DASHBOARD).toMatch(/\/daily-check/);
+    // The visible label was renamed to the grower-native "Quick Log";
+    // the entry testid and /daily-check route are the stable contract.
+    expect(DASHBOARD).toMatch(/data-testid="dashboard-daily-grow-check-entry"/);
+    expect(DASHBOARD).toMatch(/to="\/daily-check">Quick Log</);
   });
   it("Plant Detail entry preserves ?plantId= prefill", () => {
     expect(PLANT_DETAIL).toMatch(/\/daily-check\?plantId=/);
   });
-  it("Mobile nav 'More' sheet includes Daily Grow Check", () => {
-    expect(MOBILE_NAV).toMatch(/Daily Grow Check/);
-    expect(MOBILE_NAV).toMatch(/\/daily-check/);
+  it("Mobile nav 'More' sheet includes the Daily Grow Check flow entry", () => {
+    // Label renamed to grower-native "Quick Log"; the /daily-check route
+    // in the More sheet is the stable contract.
+    expect(MOBILE_NAV).toMatch(/to:\s*"\/daily-check",\s*label:\s*"Quick Log"/);
   });
   it("does not duplicate DailyCheck flow logic outside the page/rules", () => {
     for (const surface of [GROW_ROOM, MOBILE_NAV, DASHBOARD, PLANT_DETAIL]) {
@@ -325,7 +325,15 @@ describe("Daily Grow Check entry access — multi-surface", () => {
     }
   });
   it("entry surfaces contain no forbidden integration strings", () => {
-    const FORBIDDEN = [/service_role/i, /\bmqtt\b/i, /\bhome_assistant\b/i, /\bpi_bridge\b/i, /actuator/i, /device_command/i, /autopilot/i];
+    const FORBIDDEN = [
+      /service_role/i,
+      /\bmqtt\b/i,
+      /\bhome_assistant\b/i,
+      /\bpi_bridge\b/i,
+      /actuator/i,
+      /device_command/i,
+      /autopilot/i,
+    ];
     for (const surface of [GROW_ROOM, MOBILE_NAV]) {
       for (const re of FORBIDDEN) expect(surface).not.toMatch(re);
     }

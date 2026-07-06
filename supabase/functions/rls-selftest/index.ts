@@ -44,10 +44,19 @@ Deno.serve(async (req) => {
 
     // Provision two ephemeral users
     const stamp = Date.now();
-    const mkEmail = (tag: string) => `rls-test-${tag}-${stamp}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+    const mkEmail = (tag: string) =>
+      `rls-test-${tag}-${stamp}-${Math.random().toString(36).slice(2, 8)}@example.com`;
     const password = `Pw_${crypto.randomUUID()}`;
-    const a = await admin.auth.admin.createUser({ email: mkEmail("a"), password, email_confirm: true });
-    const b = await admin.auth.admin.createUser({ email: mkEmail("b"), password, email_confirm: true });
+    const a = await admin.auth.admin.createUser({
+      email: mkEmail("a"),
+      password,
+      email_confirm: true,
+    });
+    const b = await admin.auth.admin.createUser({
+      email: mkEmail("b"),
+      password,
+      email_confirm: true,
+    });
     if (a.error || b.error || !a.data.user || !b.data.user) {
       return json({ error: "user provisioning failed", a: a.error, b: b.error }, 500);
     }
@@ -102,41 +111,62 @@ Deno.serve(async (req) => {
       const clientB = await signIn(bEmail);
 
       // --- Seed as user A ---
-      const { data: grow, error: growErr } = await clientA.from("grows").insert({
-        user_id: userA.id, name: "RLS Test Grow",
-      }).select().single();
+      const { data: grow, error: growErr } = await clientA
+        .from("grows")
+        .insert({
+          user_id: userA.id,
+          name: "RLS Test Grow",
+        })
+        .select()
+        .single();
       if (growErr || !grow) throw new Error("seed grow failed: " + growErr?.message);
 
       const photoPath = `${userA.id}/${grow.id}/${stamp}.txt`;
       await runCheck("storage: owner can upload to own folder", async () => {
-        const upA = await clientA.storage.from("diary-photos").upload(photoPath, new Blob(["secret-A"], { type: "text/plain" }));
+        const upA = await clientA.storage
+          .from("diary-photos")
+          .upload(photoPath, new Blob(["secret-A"], { type: "text/plain" }));
         return {
           passed: !upA.error,
           detail: upA.error ? upA.error.message : "uploaded successfully",
-          error: upA.error ? { message: upA.error.message, name: (upA.error as any).name } : undefined,
+          error: upA.error
+            ? { message: upA.error.message, name: (upA.error as any).name }
+            : undefined,
         };
       });
 
-      const { data: entry, error: entryErr } = await clientA.from("diary_entries").insert({
-        user_id: userA.id, grow_id: grow.id, note: "private note A", photo_url: photoPath,
-      }).select().single();
+      const { data: entry, error: entryErr } = await clientA
+        .from("diary_entries")
+        .insert({
+          user_id: userA.id,
+          grow_id: grow.id,
+          note: "private note A",
+          photo_url: photoPath,
+        })
+        .select()
+        .single();
       if (entryErr || !entry) throw new Error("seed entry failed: " + entryErr?.message);
 
       // --- Cross-user attempts as user B ---
 
       await runCheck("diary_entries: cross-user SELECT returns no rows", async () => {
-        const sel = await clientB.from("diary_entries").select("*", { count: "exact" }).eq("id", entry.id);
+        const sel = await clientB
+          .from("diary_entries")
+          .select("*", { count: "exact" })
+          .eq("id", entry.id);
         const rowCount = sel.count ?? sel.data?.length ?? 0;
         return {
           passed: rowCount === 0,
           detail: sel.error ? sel.error.message : `rows=${rowCount}`,
           rowCount,
-          error: sel.error ? {
-            message: sel.error.message,
-            code: sel.error.code,
-            details: (sel.error as any).details,
-            hint: (sel.error as any).hint,
-          } : undefined,
+          error: sel.error
+            ? {
+                message: sel.error.message,
+                code: sel.error.code,
+                details: (sel.error as any).details,
+                hint: (sel.error as any).hint,
+              }
+            : undefined,
           dataSnapshot: sel.data,
         };
       });
@@ -148,45 +178,57 @@ Deno.serve(async (req) => {
           passed: rowCount === 0,
           detail: sel.error ? sel.error.message : `rows=${rowCount}`,
           rowCount,
-          error: sel.error ? {
-            message: sel.error.message,
-            code: sel.error.code,
-            details: (sel.error as any).details,
-            hint: (sel.error as any).hint,
-          } : undefined,
+          error: sel.error
+            ? {
+                message: sel.error.message,
+                code: sel.error.code,
+                details: (sel.error as any).details,
+                hint: (sel.error as any).hint,
+              }
+            : undefined,
           dataSnapshot: sel.data,
         };
       });
 
       await runCheck("diary_entries: cross-user INSERT spoofing user_id is denied", async () => {
         const ins = await clientB.from("diary_entries").insert({
-          user_id: userA.id, grow_id: grow.id, note: "spoof",
+          user_id: userA.id,
+          grow_id: grow.id,
+          note: "spoof",
         });
         return {
           passed: !!ins.error,
           detail: ins.error ? ins.error.message : "no error returned",
-          error: ins.error ? {
-            message: ins.error.message,
-            code: ins.error.code,
-            details: (ins.error as any).details,
-            hint: (ins.error as any).hint,
-          } : undefined,
+          error: ins.error
+            ? {
+                message: ins.error.message,
+                code: ins.error.code,
+                details: (ins.error as any).details,
+                hint: (ins.error as any).hint,
+              }
+            : undefined,
         };
       });
 
       await runCheck("diary_entries: cross-user UPDATE affects 0 rows", async () => {
-        const upd = await clientB.from("diary_entries").update({ note: "hacked" }).eq("id", entry.id).select();
+        const upd = await clientB
+          .from("diary_entries")
+          .update({ note: "hacked" })
+          .eq("id", entry.id)
+          .select();
         const affectedRows = upd.data?.length ?? 0;
         return {
           passed: affectedRows === 0,
           detail: upd.error ? upd.error.message : `affected=${affectedRows}`,
           affectedRows,
-          error: upd.error ? {
-            message: upd.error.message,
-            code: upd.error.code,
-            details: (upd.error as any).details,
-            hint: (upd.error as any).hint,
-          } : undefined,
+          error: upd.error
+            ? {
+                message: upd.error.message,
+                code: upd.error.code,
+                details: (upd.error as any).details,
+                hint: (upd.error as any).hint,
+              }
+            : undefined,
           dataSnapshot: upd.data,
         };
       });
@@ -198,27 +240,35 @@ Deno.serve(async (req) => {
           passed: affectedRows === 0,
           detail: del.error ? del.error.message : `affected=${affectedRows}`,
           affectedRows,
-          error: del.error ? {
-            message: del.error.message,
-            code: del.error.code,
-            details: (del.error as any).details,
-            hint: (del.error as any).hint,
-          } : undefined,
+          error: del.error
+            ? {
+                message: del.error.message,
+                code: del.error.code,
+                details: (del.error as any).details,
+                hint: (del.error as any).hint,
+              }
+            : undefined,
           dataSnapshot: del.data,
         };
       });
 
       await runCheck("diary_entries: owner row intact after cross-user attempts", async () => {
-        const verify = await clientA.from("diary_entries").select("note").eq("id", entry.id).single();
+        const verify = await clientA
+          .from("diary_entries")
+          .select("note")
+          .eq("id", entry.id)
+          .single();
         return {
           passed: !verify.error && verify.data?.note === "private note A",
           detail: verify.error ? verify.error.message : `note=${verify.data?.note}`,
-          error: verify.error ? {
-            message: verify.error.message,
-            code: verify.error.code,
-            details: (verify.error as any).details,
-            hint: (verify.error as any).hint,
-          } : undefined,
+          error: verify.error
+            ? {
+                message: verify.error.message,
+                code: verify.error.code,
+                details: (verify.error as any).details,
+                hint: (verify.error as any).hint,
+              }
+            : undefined,
           dataSnapshot: verify.data,
         };
       });
@@ -228,7 +278,9 @@ Deno.serve(async (req) => {
         return {
           passed: !!signB.error,
           detail: signB.error ? signB.error.message : "signed url created",
-          error: signB.error ? { message: signB.error.message, name: (signB.error as any).name } : undefined,
+          error: signB.error
+            ? { message: signB.error.message, name: (signB.error as any).name }
+            : undefined,
           dataSnapshot: signB.data,
         };
       });
@@ -238,20 +290,23 @@ Deno.serve(async (req) => {
         return {
           passed: !!dlB.error,
           detail: dlB.error ? dlB.error.message : "downloaded bytes",
-          error: dlB.error ? { message: dlB.error.message, name: (dlB.error as any).name } : undefined,
+          error: dlB.error
+            ? { message: dlB.error.message, name: (dlB.error as any).name }
+            : undefined,
           dataSnapshot: dlB.data ? "<Blob>" : undefined,
         };
       });
 
       await runCheck("storage: cross-user upload into other folder is denied", async () => {
-        const upB = await clientB.storage.from("diary-photos").upload(
-          `${userA.id}/${grow.id}/intruder.txt`,
-          new Blob(["x"], { type: "text/plain" }),
-        );
+        const upB = await clientB.storage
+          .from("diary-photos")
+          .upload(`${userA.id}/${grow.id}/intruder.txt`, new Blob(["x"], { type: "text/plain" }));
         return {
           passed: !!upB.error,
           detail: upB.error ? upB.error.message : "uploaded",
-          error: upB.error ? { message: upB.error.message, name: (upB.error as any).name } : undefined,
+          error: upB.error
+            ? { message: upB.error.message, name: (upB.error as any).name }
+            : undefined,
         };
       });
 
@@ -261,7 +316,9 @@ Deno.serve(async (req) => {
         return {
           passed: rmBlocked,
           detail: rmB.error ? rmB.error.message : `removed=${rmB.data?.length ?? 0}`,
-          error: rmB.error ? { message: rmB.error.message, name: (rmB.error as any).name } : undefined,
+          error: rmB.error
+            ? { message: rmB.error.message, name: (rmB.error as any).name }
+            : undefined,
           dataSnapshot: rmB.data,
         };
       });
@@ -271,24 +328,143 @@ Deno.serve(async (req) => {
         return {
           passed: !dlA.error,
           detail: dlA.error ? dlA.error.message : "downloaded successfully",
-          error: dlA.error ? { message: dlA.error.message, name: (dlA.error as any).name } : undefined,
+          error: dlA.error
+            ? { message: dlA.error.message, name: (dlA.error as any).name }
+            : undefined,
           dataSnapshot: dlA.data ? "<Blob>" : undefined,
         };
       });
 
       // QuickLog parity: owner must be able to insert a diary_entry with photo_url = null
       await runCheck("diary_entries: owner INSERT with photo_url=null succeeds", async () => {
-        const ins = await clientA.from("diary_entries").insert({
-          user_id: userA.id, grow_id: grow.id, note: "text-only entry", photo_url: null,
-        }).select().single();
+        const ins = await clientA
+          .from("diary_entries")
+          .insert({
+            user_id: userA.id,
+            grow_id: grow.id,
+            note: "text-only entry",
+            photo_url: null,
+          })
+          .select()
+          .single();
         return {
           passed: !ins.error && !!ins.data && ins.data.photo_url === null,
-          detail: ins.error ? ins.error.message : `inserted id=${ins.data?.id} photo_url=${ins.data?.photo_url}`,
-          error: ins.error ? {
-            message: ins.error.message, code: ins.error.code,
-            details: (ins.error as any).details, hint: (ins.error as any).hint,
-          } : undefined,
+          detail: ins.error
+            ? ins.error.message
+            : `inserted id=${ins.data?.id} photo_url=${ins.data?.photo_url}`,
+          error: ins.error
+            ? {
+                message: ins.error.message,
+                code: ins.error.code,
+                details: (ins.error as any).details,
+                hint: (ins.error as any).hint,
+              }
+            : undefined,
           dataSnapshot: ins.data,
+        };
+      });
+
+      // ─────────────────────────────────────────────────────────────────────
+      // Sensor telemetry RLS: tents + sensor_readings are exposed read-only
+      // through the MCP server (get_latest_sensor_snapshot), so cross-user
+      // isolation here is an external contract, not just an app invariant.
+      // ─────────────────────────────────────────────────────────────────────
+
+      const { data: tent, error: tentErr } = await clientA
+        .from("tents")
+        .insert({
+          user_id: userA.id,
+          name: "RLS Test Tent",
+        })
+        .select()
+        .single();
+      if (tentErr || !tent) throw new Error("seed tent failed: " + tentErr?.message);
+
+      const { data: reading, error: readingErr } = await clientA
+        .from("sensor_readings")
+        .insert({
+          user_id: userA.id,
+          tent_id: tent.id,
+          metric: "temperature_c",
+          value: 23.5,
+          source: "manual",
+        })
+        .select()
+        .single();
+      if (readingErr || !reading)
+        throw new Error("seed sensor reading failed: " + readingErr?.message);
+
+      await runCheck("tents: cross-user SELECT returns no rows", async () => {
+        const sel = await clientB.from("tents").select("*", { count: "exact" }).eq("id", tent.id);
+        const rowCount = sel.count ?? sel.data?.length ?? 0;
+        return {
+          passed: rowCount === 0,
+          detail: sel.error ? sel.error.message : `rows=${rowCount}`,
+          rowCount,
+          error: sel.error ? { message: sel.error.message, code: sel.error.code } : undefined,
+          dataSnapshot: sel.data,
+        };
+      });
+
+      await runCheck("sensor_readings: cross-user SELECT returns no rows", async () => {
+        const sel = await clientB
+          .from("sensor_readings")
+          .select("*", { count: "exact" })
+          .eq("id", reading.id);
+        const rowCount = sel.count ?? sel.data?.length ?? 0;
+        return {
+          passed: rowCount === 0,
+          detail: sel.error ? sel.error.message : `rows=${rowCount}`,
+          rowCount,
+          error: sel.error ? { message: sel.error.message, code: sel.error.code } : undefined,
+          dataSnapshot: sel.data,
+        };
+      });
+
+      // Mirrors the MCP snapshot access path (filter by tent_id, not id).
+      await runCheck("sensor_readings: cross-user SELECT by tent returns no rows", async () => {
+        const sel = await clientB
+          .from("sensor_readings")
+          .select("*", { count: "exact" })
+          .eq("tent_id", tent.id);
+        const rowCount = sel.count ?? sel.data?.length ?? 0;
+        return {
+          passed: rowCount === 0,
+          detail: sel.error ? sel.error.message : `rows=${rowCount}`,
+          rowCount,
+          error: sel.error ? { message: sel.error.message, code: sel.error.code } : undefined,
+          dataSnapshot: sel.data,
+        };
+      });
+
+      await runCheck("sensor_readings: cross-user INSERT spoofing user_id is denied", async () => {
+        const ins = await clientB.from("sensor_readings").insert({
+          user_id: userA.id,
+          tent_id: tent.id,
+          metric: "humidity_pct",
+          value: 99,
+          source: "manual",
+        });
+        return {
+          passed: !!ins.error,
+          detail: ins.error ? ins.error.message : "no error returned",
+          error: ins.error ? { message: ins.error.message, code: ins.error.code } : undefined,
+        };
+      });
+
+      await runCheck("sensor_readings: owner can read own reading", async () => {
+        const sel = await clientA
+          .from("sensor_readings")
+          .select("metric,value,quality,source")
+          .eq("id", reading.id)
+          .single();
+        return {
+          passed: !sel.error && sel.data?.metric === "temperature_c",
+          detail: sel.error
+            ? sel.error.message
+            : `metric=${sel.data?.metric} value=${sel.data?.value}`,
+          error: sel.error ? { message: sel.error.message, code: sel.error.code } : undefined,
+          dataSnapshot: sel.data,
         };
       });
 
@@ -298,15 +474,26 @@ Deno.serve(async (req) => {
       // ─────────────────────────────────────────────────────────────────────
 
       // Seed harvest as user A so we have an existing reward row to attack.
-      const { data: harvestA, error: harvestErr } = await clientA.from("harvests").insert({
-        user_id: userA.id, grow_id: grow.id, grow_type: "tent", medium: "soil", yield_grams: 100,
-      }).select().single();
+      const { data: harvestA, error: harvestErr } = await clientA
+        .from("harvests")
+        .insert({
+          user_id: userA.id,
+          grow_id: grow.id,
+          grow_type: "tent",
+          medium: "soil",
+          yield_grams: 100,
+        })
+        .select()
+        .single();
       if (harvestErr || !harvestA) throw new Error("seed harvest failed: " + harvestErr?.message);
 
       // profiles are auto-created by handle_new_user trigger; just attack them.
       await runCheck("profiles: cross-user UPDATE affects 0 rows", async () => {
-        const upd = await clientB.from("profiles").update({ display_name: "pwned", nugs_total: 999999 })
-          .eq("user_id", userA.id).select();
+        const upd = await clientB
+          .from("profiles")
+          .update({ display_name: "pwned", nugs_total: 999999 })
+          .eq("user_id", userA.id)
+          .select();
         const affectedRows = upd.data?.length ?? 0;
         return {
           passed: affectedRows === 0,
@@ -319,7 +506,9 @@ Deno.serve(async (req) => {
 
       await runCheck("profiles: cross-user INSERT spoofing user_id is denied", async () => {
         const ins = await clientB.from("profiles").insert({
-          user_id: userA.id, display_name: "spoof", nugs_total: 999999,
+          user_id: userA.id,
+          display_name: "spoof",
+          nugs_total: 999999,
         });
         return {
           passed: !!ins.error,
@@ -330,7 +519,9 @@ Deno.serve(async (req) => {
 
       await runCheck("nug_events: cross-user INSERT spoofing user_id is denied", async () => {
         const ins = await clientB.from("nug_events").insert({
-          user_id: userA.id, kind: "spoof", amount: 99999,
+          user_id: userA.id,
+          kind: "spoof",
+          amount: 99999,
         });
         return {
           passed: !!ins.error,
@@ -341,7 +532,8 @@ Deno.serve(async (req) => {
 
       await runCheck("unlocks: cross-user INSERT spoofing user_id is denied", async () => {
         const ins = await clientB.from("unlocks").insert({
-          user_id: userA.id, key: "legendary_cultivator",
+          user_id: userA.id,
+          key: "legendary_cultivator",
         });
         return {
           passed: !!ins.error,
@@ -352,7 +544,8 @@ Deno.serve(async (req) => {
 
       await runCheck("user_quests: cross-user INSERT spoofing user_id is denied", async () => {
         const ins = await clientB.from("user_quests").insert({
-          user_id: userA.id, quest_key: "onboarding_profile",
+          user_id: userA.id,
+          quest_key: "onboarding_profile",
         });
         return {
           passed: !!ins.error,
@@ -363,7 +556,10 @@ Deno.serve(async (req) => {
 
       await runCheck("harvests: cross-user INSERT spoofing user_id is denied", async () => {
         const ins = await clientB.from("harvests").insert({
-          user_id: userA.id, grow_id: grow.id, grow_type: "tent", medium: "soil",
+          user_id: userA.id,
+          grow_id: grow.id,
+          grow_type: "tent",
+          medium: "soil",
         });
         return {
           passed: !!ins.error,
@@ -373,8 +569,11 @@ Deno.serve(async (req) => {
       });
 
       await runCheck("harvests: cross-user UPDATE affects 0 rows", async () => {
-        const upd = await clientB.from("harvests").update({ yield_grams: 1, notes: "hacked" })
-          .eq("id", harvestA.id).select();
+        const upd = await clientB
+          .from("harvests")
+          .update({ yield_grams: 1, notes: "hacked" })
+          .eq("id", harvestA.id)
+          .select();
         const affectedRows = upd.data?.length ?? 0;
         return {
           passed: affectedRows === 0,
@@ -386,10 +585,19 @@ Deno.serve(async (req) => {
       });
 
       await runCheck("profiles: owner row untouched after cross-user attempts", async () => {
-        const verify = await clientA.from("profiles").select("display_name,nugs_total").eq("user_id", userA.id).single();
+        const verify = await clientA
+          .from("profiles")
+          .select("display_name,nugs_total")
+          .eq("user_id", userA.id)
+          .single();
         return {
-          passed: !verify.error && verify.data?.display_name !== "pwned" && (verify.data?.nugs_total ?? 0) < 999999,
-          detail: verify.error ? verify.error.message : `name=${verify.data?.display_name} nugs=${verify.data?.nugs_total}`,
+          passed:
+            !verify.error &&
+            verify.data?.display_name !== "pwned" &&
+            (verify.data?.nugs_total ?? 0) < 999999,
+          detail: verify.error
+            ? verify.error.message
+            : `name=${verify.data?.display_name} nugs=${verify.data?.nugs_total}`,
           dataSnapshot: verify.data,
         };
       });
@@ -402,8 +610,13 @@ Deno.serve(async (req) => {
       await admin.from("profiles").delete().eq("user_id", userA.id);
       await admin.from("profiles").delete().eq("user_id", userB.id);
       await admin.from("diary_entries").delete().eq("user_id", userA.id);
+      await admin.from("sensor_readings").delete().eq("user_id", userA.id);
+      await admin.from("tents").delete().eq("user_id", userA.id);
       await admin.from("grows").delete().eq("user_id", userA.id);
-      await admin.storage.from("diary-photos").remove([`${userA.id}/`]).catch(() => {});
+      await admin.storage
+        .from("diary-photos")
+        .remove([`${userA.id}/`])
+        .catch(() => {});
       await admin.auth.admin.deleteUser(userA.id).catch(() => {});
       await admin.auth.admin.deleteUser(userB.id).catch(() => {});
     }
@@ -414,15 +627,18 @@ Deno.serve(async (req) => {
     const failed = checks.filter((c) => !c.passed);
     const totalDurationMs = Math.round(performance.now() - overallStart);
     const policyMap = buildPolicyMap(failed);
-    return json({
-      passed: failed.length === 0,
-      total: checks.length,
-      failedCount: failed.length,
-      durationMs: totalDurationMs,
-      topFixes: failed.map((c) => c.likelyFix).filter(Boolean),
-      policyMap,
-      checks,
-    }, failed.length === 0 ? 200 : 500);
+    return json(
+      {
+        passed: failed.length === 0,
+        total: checks.length,
+        failedCount: failed.length,
+        durationMs: totalDurationMs,
+        topFixes: failed.map((c) => c.likelyFix).filter(Boolean),
+        policyMap,
+        checks,
+      },
+      failed.length === 0 ? 200 : 500,
+    );
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "unknown" }, 500);
   }
@@ -438,7 +654,9 @@ function json(b: unknown, status = 200) {
 function inferLikelyFix(c: Check): LikelyFix | undefined {
   const n = c.name;
   // Table policies
-  const tableMatch = n.match(/^(diary_entries|grows):\s+(?:cross-user\s+)?(SELECT|INSERT|UPDATE|DELETE)/i);
+  const tableMatch = n.match(
+    /^(diary_entries|grows|sensor_readings|tents):\s+(?:cross-user\s+)?(SELECT|INSERT|UPDATE|DELETE)/i,
+  );
   if (tableMatch) {
     const target = tableMatch[1];
     const op = tableMatch[2].toUpperCase() as LikelyFix["operation"];
@@ -475,9 +693,10 @@ function inferLikelyFix(c: Check): LikelyFix | undefined {
       target: "storage.objects (bucket: diary-photos)",
       operation: op,
       expectedBehavior,
-      hint: expectedBehavior === "deny"
-        ? `Cross-user ${op} on diary-photos should be denied. Confirm bucket is private and the ${op} policy uses ${folderCheck}. If a public SELECT policy exists, drop it.`
-        : `Owner ${op} on own folder should succeed. Confirm a ${op} policy on storage.objects exists with ${folderCheck}.`,
+      hint:
+        expectedBehavior === "deny"
+          ? `Cross-user ${op} on diary-photos should be denied. Confirm bucket is private and the ${op} policy uses ${folderCheck}. If a public SELECT policy exists, drop it.`
+          : `Owner ${op} on own folder should succeed. Confirm a ${op} policy on storage.objects exists with ${folderCheck}.`,
     };
   }
   return undefined;
@@ -541,10 +760,14 @@ function buildPolicyMap(failed: Check[]): PolicyMapEntry[] {
 function suggestPolicyName(f: LikelyFix): string {
   if (f.resource === "table") {
     const table = f.target.replace(/^public\./, "");
-    const verb = { SELECT: "view", INSERT: "insert", UPDATE: "update", DELETE: "delete" }[f.operation];
+    const verb = { SELECT: "view", INSERT: "insert", UPDATE: "update", DELETE: "delete" }[
+      f.operation
+    ];
     return `Users ${verb} own ${table}`;
   }
-  const verb = { SELECT: "read", INSERT: "upload", UPDATE: "update", DELETE: "delete" }[f.operation];
+  const verb = { SELECT: "read", INSERT: "upload", UPDATE: "update", DELETE: "delete" }[
+    f.operation
+  ];
   return `Users ${verb} own diary-photos`;
 }
 

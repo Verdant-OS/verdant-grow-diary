@@ -24,11 +24,22 @@ import {
   setStartScreenChoice,
   type StartScreenChoice,
 } from "@/lib/startScreenPreferences";
+import {
+  buildStarterQuickLogPrefill,
+  STARTER_SETUP_BUTTON_LABEL,
+  STARTER_SETUP_ERROR_COPY,
+  STARTER_SETUP_HELPER_COPY,
+} from "@/lib/starterSetupRules";
+import { runStarterSetup, StarterSetupError } from "@/lib/starterSetupService";
+import { starterSetupSupabaseAdapter } from "@/lib/starterSetupSupabaseAdapter";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 export default function Onboarding() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const [choice, setChoice] = useState<StartScreenChoice>(DEFAULT_START_SCREEN);
+  const [starterBusy, setStarterBusy] = useState(false);
+  const [starterError, setStarterError] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -43,6 +54,31 @@ export default function Onboarding() {
   function go(c: StartScreenChoice, save: boolean) {
     if (save && user) setStartScreenChoice(user.id, c);
     nav(routeForStartScreen(c), { replace: true });
+  }
+
+  async function handleStarterSetup() {
+    if (starterBusy || !user) return;
+    setStarterError(null);
+    setStarterBusy(true);
+    try {
+      const result = await runStarterSetup(user.id, starterSetupSupabaseAdapter);
+      const prefill = buildStarterQuickLogPrefill(result);
+      // AppShell listens for this event globally and opens Quick Log with
+      // the plant/tent/grow preselected. No sensor snapshot is inserted;
+      // the grower still authors the first log manually.
+      nav("/", { replace: true });
+      window.dispatchEvent(
+        new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: prefill }),
+      );
+    } catch (err) {
+      const message =
+        err instanceof StarterSetupError
+          ? STARTER_SETUP_ERROR_COPY
+          : STARTER_SETUP_ERROR_COPY;
+      setStarterError(message);
+    } finally {
+      setStarterBusy(false);
+    }
   }
 
   return (
@@ -119,6 +155,39 @@ export default function Onboarding() {
             Continue
           </Button>
         </div>
+
+        <div
+          data-testid="starter-setup-block"
+          className="mt-6 rounded-lg border border-border/60 p-4"
+        >
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            Just want to try Quick Log?
+          </p>
+          <p className="mt-2 text-sm text-foreground/90">
+            {STARTER_SETUP_HELPER_COPY}
+          </p>
+          <Button
+            data-testid="starter-setup-button"
+            type="button"
+            variant="outline"
+            className="mt-3 w-full sm:w-auto"
+            disabled={starterBusy}
+            onClick={handleStarterSetup}
+          >
+            {starterBusy ? "Creating starter setup…" : STARTER_SETUP_BUTTON_LABEL}
+          </Button>
+          {starterError ? (
+            <p
+              data-testid="starter-setup-error"
+              role="alert"
+              className="mt-3 text-xs text-destructive"
+            >
+              {starterError}
+            </p>
+          ) : null}
+        </div>
+
+
 
         <p className="mt-4 text-[11px] text-muted-foreground text-center">
           You can change this later from{" "}

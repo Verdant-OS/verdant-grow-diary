@@ -1,0 +1,66 @@
+{
+  "mode": "dry-run",
+  "generated_at": "2026-07-02T23:49:05.535Z",
+  "allowlist_source": "/dev-server/config/seo-allowlist.json",
+  "inspected_count": 2,
+  "expired_entry_count": 0,
+  "totals": {
+    "total": 2,
+    "never_allowlisted": 1,
+    "suppressed": 1,
+    "expected_noindex": 0,
+    "expired_allowlist": 0,
+    "no_match": 0
+  },
+  "urls": [
+    {
+      "url": "https://verdantgrowdiary.com/",
+      "never_allowlisted": true,
+      "would_be_expected_noindex": false,
+      "matched_expected_noindex_entries": [],
+      "would_suppress_issue_types": [],
+      "matched_allowlisted_issue_entries": [],
+      "matched_expired_entries": [],
+      "classification": "never_allowlisted",
+      "reasons": [
+        "URL is in never_allowlist — critical, never suppressed"
+      ]
+    },
+    {
+      "url": "https://verdantgrowdiary.com/auth/callback",
+      "never_allowlisted": false,
+      "would_be_expected_noindex": true,
+      "matched_expected_noindex_entries": [
+        {
+          "id": "protected-routes-noindex",
+          "expires_on": "2026-12-31"
+        }
+      ],
+      "would_suppress_issue_types": [
+        "not_indexed",
+        "noindex_detected",
+        "blocked_by_robots",
+        "verdict_not_pass"
+      ],
+      "matched_allowlisted_issue_entries": [
+        {
+          "id": "auth-routes-expected-non-indexable",
+          "issue_types": [
+            "not_indexed",
+            "noindex_detected",
+            "blocked_by_robots",
+            "verdict_not_pass"
+          ],
+          "expires_on": "2026-12-31"
+        }
+      ],
+      "matched_expired_entries": [],
+      "classification": "suppressed",
+      "reasons": [
+        "allowlisted_issues[auth-routes-expected-non-indexable] would suppress: not_indexed, noindex_detected, blocked_by_robots, verdict_not_pass",
+        "expected_noindex[protected-routes-noindex] applies"
+      ]
+    }
+  ],
+  "expired_entries": []
+}

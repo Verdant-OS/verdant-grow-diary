@@ -17,14 +17,16 @@ import VerificationPendingBanner from "./VerificationPendingBanner";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
 
-
 export default function AppShell() {
   const { user, loading } = useAuth();
   // Protected-route boundary: re-validate session against the auth server.
   useRequireAuth("/auth");
   // Real persisted alerts (open only). RLS-scoped to the signed-in user.
   // Replaces the prior mock badge to remove the demo-vs-live mismatch.
-  const { alerts: openAlerts } = useAlertsList({ status: "open" });
+  // Gated on a resolved session: an unauthenticated load (about to redirect
+  // to /welcome) must not fire GET /rest/v1/alerts at all — the
+  // never-healthy E2E spec forbids that request along the redirect path.
+  const { alerts: openAlerts } = useAlertsList({ status: "open" }, { enabled: !loading && !!user });
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
@@ -39,8 +41,20 @@ export default function AppShell() {
     return () => window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, onOpen as EventListener);
   }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
-  if (!user) { nav("/welcome", { replace: true }); return null; }
+  // Redirect from an effect, not during render: router state must not be
+  // updated while AppShell is rendering (React update-during-render error,
+  // asserted clean by the never-healthy E2E console check).
+  useEffect(() => {
+    if (!loading && !user) nav("/welcome", { replace: true });
+  }, [loading, user, nav]);
+
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center text-muted-foreground">
+        Loading…
+      </div>
+    );
+  if (!user) return null;
 
   const unread = openAlerts.filter((a) => a.status === "open").length;
 
@@ -65,8 +79,11 @@ export default function AppShell() {
 
               <div className="ml-auto flex items-center gap-2">
                 <button className="hidden md:inline-flex items-center gap-2 px-3 h-9 rounded-lg border border-border/50 bg-secondary/30 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition">
-                  <Search className="h-4 w-4" /><span className="hidden lg:inline">Search…</span>
-                  <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">⌘K</kbd>
+                  <Search className="h-4 w-4" />
+                  <span className="hidden lg:inline">Search…</span>
+                  <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">
+                    ⌘K
+                  </kbd>
                 </button>
                 {/* Quick Log is the single grower-facing logging entry
                     point on desktop. The dropdown surfaces event-type
@@ -76,7 +93,13 @@ export default function AppShell() {
                     The previous standalone "Quick log" button has been
                     removed to eliminate duplicate add/log CTAs. */}
                 <GlobalFastAddButton className="hidden md:inline-flex" />
-                <Button variant="ghost" size="icon" onClick={() => nav("/alerts")} aria-label="Alerts" className="relative">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => nav("/alerts")}
+                  aria-label="Alerts"
+                  className="relative"
+                >
                   <Bell className="h-4 w-4" />
                   {unread > 0 && (
                     <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
@@ -90,7 +113,6 @@ export default function AppShell() {
                     </Button>
                   }
                 />
-
               </div>
             </div>
           </header>
@@ -106,7 +128,10 @@ export default function AppShell() {
 
         {/* Mobile floating + */}
         <button
-          onClick={() => { setPrefill(null); setOpenLog(true); }}
+          onClick={() => {
+            setPrefill(null);
+            setOpenLog(true);
+          }}
           aria-label="Open Quick Log"
           data-testid="mobile-quick-log-fab"
           className="md:hidden fixed z-40 bottom-20 right-4 h-14 w-14 rounded-full gradient-leaf shadow-elevated flex items-center justify-center text-primary-foreground hover:scale-105 transition active:scale-95 glow-accent"
@@ -116,7 +141,15 @@ export default function AppShell() {
 
         <MobileNav />
 
-        <QuickLog open={openLog} onOpenChange={(o) => { setOpenLog(o); if (!o) setPrefill(null); }} prefill={prefill} onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))} />
+        <QuickLog
+          open={openLog}
+          onOpenChange={(o) => {
+            setOpenLog(o);
+            if (!o) setPrefill(null);
+          }}
+          prefill={prefill}
+          onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))}
+        />
       </div>
     </SidebarProvider>
   );

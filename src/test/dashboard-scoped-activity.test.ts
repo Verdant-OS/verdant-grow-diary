@@ -18,14 +18,10 @@ import { actionDetailPath, actionsPath, logsPath } from "@/lib/routes";
 
 const ROOT = resolve(__dirname, "../..");
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
-const HOOK = readFileSync(
-  resolve(ROOT, "src/hooks/useDashboardScopedData.ts"),
-  "utf8",
-);
+const HOOK = readFileSync(resolve(ROOT, "src/hooks/useDashboardScopedData.ts"), "utf8");
 
 const AI_COACH_CALL = /["'`]ai-coach["'`]|functions\/ai-coach|ai_coach/;
-const DEVICE_SURFACE =
-  /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
+const DEVICE_SURFACE = /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
 const WRITE_PATH = /\.from\(["'][^"']+["']\)\s*\.(insert|update|delete|upsert)/;
 
 describe("useDashboardScopedData hook — read-only scoped fetches", () => {
@@ -79,10 +75,12 @@ describe("Dashboard — scoped Recent Activity & Pending Actions cards", () => {
     expect(DASHBOARD).toMatch(/\{scopedGrowId\s*\?\s*\(/);
   });
 
-  it("renders the Recent Activity card with logsPath link", () => {
+  it("renders the Recent Activity card with a grow-scoped timeline link", () => {
+    // /logs is a legacy redirect alias now — the dashboard links straight
+    // to /timeline with the same grow scoping.
     expect(DASHBOARD).toMatch(/aria-label="Recent activity"/);
     expect(DASHBOARD).toMatch(/Recent Activity/);
-    expect(DASHBOARD).toMatch(/to=\{logsPath\(scopedGrowId\)\}/);
+    expect(DASHBOARD).toMatch(/to=\{timelinePath\(scopedGrowId\)\}/);
   });
 
   it("renders the Pending Actions card with actionsPath link and per-item actionDetailPath links", () => {

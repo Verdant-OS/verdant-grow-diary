@@ -1,0 +1,13 @@
+{
+  "finding_id": "last-gsc-finding",
+  "description": "Placeholder — replace with the remaining Google Search Console issue to verify post-deploy.",
+  "affected_urls": [
+    "https://verdantgrowdiary.com/"
+  ],
+  "expected_resolution": {
+    "indexing_allowed": true,
+    "robots_allowed": true,
+    "noindex_absent": true,
+    "canonical_matches": true
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "mode": "dry-run",
+  "generated_at": "2026-07-02T23:49:05.536Z",
+  "allowlist_source": "/dev-server/config/seo-allowlist.json",
+  "suppressed_issue_count": 0,
+  "expired_entry_count": 0,
+  "suppressed_by_source": {},
+  "expired_entries": [],
+  "notes": [
+    "Dry-run mode — no GSC API calls were made."
+  ]
+}

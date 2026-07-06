@@ -209,10 +209,167 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
             if (state && weakStates.includes(state)) {
               // Must not simultaneously advertise "present".
               expect(state).not.toBe("present");
+
+              // Never render success/checkmark-style visuals for weak
+              // telemetry. We check the whole subtree's class list and
+              // any inline icon/aria hooks.
+              const classAttr = (await item.getAttribute("class")) ?? "";
+              const innerClasses =
+                (await item
+                  .locator("*")
+                  .evaluateAll((els) =>
+                    els.map((el) => (el as HTMLElement).className || "").join(" "),
+                  )) as unknown as string;
+              const allClasses = `${classAttr} ${innerClasses}`.toLowerCase();
+              const forbiddenVisuals = [
+                /\bbg-(green|emerald|lime|teal)-\d+/,
+                /\btext-(green|emerald|lime|teal)-\d+/,
+                /\bborder-(green|emerald|lime|teal)-\d+/,
+                /\bring-(green|emerald|lime|teal)-\d+/,
+                /\bbg-success\b/,
+                /\btext-success\b/,
+                /\bsuccess-tone\b/,
+                /\bcheck-mark\b/,
+                /\bcheckmark\b/,
+                /\bhealthy-tone\b/,
+              ];
+              for (const re of forbiddenVisuals) {
+                expect(
+                  re.test(allClasses),
+                  `Checklist state=${state} must not use success/checkmark visuals; matched ${re}`,
+                ).toBe(false);
+              }
+
+              // Icon/aria hooks that would imply success/checkmark.
+              const forbiddenIcons = item.locator(
+                [
+                  '[data-icon="check"]',
+                  '[data-icon="check-circle"]',
+                  '[data-icon="check-mark"]',
+                  '[data-lucide="check"]',
+                  '[data-lucide="check-circle"]',
+                  'svg[aria-label*="check" i]',
+                  'svg[aria-label*="success" i]',
+                  'svg[aria-label*="verified" i]',
+                  '[aria-label*="healthy" i]:not([aria-label*="not healthy" i]):not([aria-label*="never healthy" i])',
+                ].join(", "),
+              );
+              expect(
+                await forbiddenIcons.count(),
+                `Checklist state=${state} must not render check/success/healthy icons`,
+              ).toBe(0);
+
+              // Honest label must remain visible (do not silently hide the gap).
+              const stateBadge = item.locator(
+                `[data-testid$="-state"]`,
+              );
+              if ((await stateBadge.count()) > 0) {
+                const badgeText = (await stateBadge.first().innerText()).trim();
+                expect(
+                  badgeText.length,
+                  `Checklist state=${state} must render a visible state label`,
+                ).toBeGreaterThan(0);
+                // The badge label must not falsely read "Present" for a
+                // weak state.
+                expect(badgeText.toLowerCase()).not.toBe("present");
+              }
             }
           }
+
+          // Explicit unknown-state coverage: assert every unknown/equivalent
+          // checklist item still renders its visible state label, never
+          // advertises present/healthy via data-* hooks, and never surfaces
+          // a check/verified aria label. Kept as a named block so the
+          // unknown-state contract is inspectable in isolation.
+          const UNKNOWN_EQUIVALENTS = ["unknown", "missing", "blocked"] as const;
+          // Wording that must never appear inside an unknown/equivalent
+          // checklist item — either as visible text or via aria/icon hooks.
+          const FORBIDDEN_UNKNOWN_WORDING = [
+            /\bpresent\b/i,
+            /\bsuccess\b/i,
+            /\bcheckmark\b/i,
+            /check[-\s]?mark/i,
+            /check[-\s]?circle/i,
+            /\bverified\b/i,
+            /validated live/i,
+            /confirmed safe/i,
+            /all good/i,
+            /no issues detected/i,
+          ];
+          for (const uState of UNKNOWN_EQUIVALENTS) {
+            const unknownItems = checklist.locator(
+              `[data-testid^="one-tent-loop-live-proof-top-gap-checklist-item-"][data-state="${uState}"]`,
+            );
+            const uTotal = await unknownItems.count();
+            for (let i = 0; i < uTotal; i += 1) {
+              const item = unknownItems.nth(i);
+              await expect(item).toHaveAttribute("data-state", uState);
+              expect(await item.getAttribute("data-state")).not.toBe("present");
+              expect(await item.getAttribute("data-status")).not.toBe("healthy");
+
+              // No forbidden wording anywhere inside the unknown item.
+              const itemText = (await item.innerText()).trim();
+              for (const re of FORBIDDEN_UNKNOWN_WORDING) {
+                expect(
+                  re.test(itemText),
+                  `Unknown-equivalent (${uState}) checklist item must not contain ${re}; got:\n${itemText.slice(0, 300)}`,
+                ).toBe(false);
+              }
+
+              // No success/check aria/icon hooks inside the unknown item.
+              const forbiddenHooks = item.locator(
+                [
+                  '[data-icon="check"]',
+                  '[data-icon="check-circle"]',
+                  '[data-lucide="check"]',
+                  '[data-lucide="check-circle"]',
+                  'svg[aria-label*="check" i]',
+                  'svg[aria-label*="success" i]',
+                  'svg[aria-label*="verified" i]',
+                  'svg[aria-label*="present" i]',
+                ].join(", "),
+              );
+              expect(
+                await forbiddenHooks.count(),
+                `Unknown-equivalent (${uState}) item must not render check/success/verified/present icon hooks`,
+              ).toBe(0);
+
+              const badge = item.locator(`[data-testid$="-state"]`);
+              if ((await badge.count()) > 0) {
+                const badgeText = (await badge.first().innerText()).trim();
+                expect(
+                  badgeText.length,
+                  `Checklist state=${uState} must render a visible state badge`,
+                ).toBeGreaterThan(0);
+                expect(badgeText.toLowerCase()).not.toBe("present");
+              }
+            }
+          }
+
+          // Broader proof-UI assertion: no checklist item whose data-state
+          // is unknown/equivalent may contain the exact visible word
+          // "Present" anywhere in its subtree. Scoped to checklist items
+          // to avoid banning legitimate uses of "present" elsewhere in
+          // the proof UI copy.
+          const allChecklistItems = checklist.locator(
+            '[data-testid^="one-tent-loop-live-proof-top-gap-checklist-item-"]',
+          );
+          const allTotal = await allChecklistItems.count();
+          for (let i = 0; i < allTotal; i += 1) {
+            const item = allChecklistItems.nth(i);
+            const state = await item.getAttribute("data-state");
+            if (state && (UNKNOWN_EQUIVALENTS as readonly string[]).includes(state)) {
+              const t = (await item.innerText()).toLowerCase();
+              expect(
+                /\bpresent\b/.test(t),
+                `Checklist item data-state=${state} must not contain "Present" text; got:\n${t.slice(0, 300)}`,
+              ).toBe(false);
+            }
+          }
+
         }
       }
+
 
       // If a copyable text report block is present, assert the same
       // wording rules apply to its plaintext.

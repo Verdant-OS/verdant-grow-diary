@@ -93,7 +93,7 @@ const FRESH: LoopEvidence = {
     id: "aq1",
     status: "pending_approval",
     approval_required: true,
-    has_device_command: false,
+    has_device_control_marker: false,
     reason: "raise humidity",
     risk_level: "low",
     linked_alert_id: "a1",

@@ -48,7 +48,7 @@ const PRIVATE_TABLES = [
 
 describe("/leads route", () => {
   it("registers /leads inside AppShell", () => {
-    expect(APP).toMatch(/import\s+Leads\s+from\s+"\.\/pages\/Leads"/);
+    expect(APP).toMatch(/import\(\s*["']\.\/pages\/Leads["']\s*\)/);
     expect(APP).toMatch(/path="\/leads"\s+element=\{<Leads\s*\/>\}/);
   });
 });

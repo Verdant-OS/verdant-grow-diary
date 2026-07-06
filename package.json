@@ -15,6 +15,7 @@
     "format:check": "prettier --check .",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:mcp:rls:local": "bunx vitest run src/test/mcp-local-rls-integration.test.ts",
     "test:summarize-timeouts": "node scripts/summarize-vitest-timeouts.mjs",
     "verify:stabilization-pr-scope": "node scripts/verify-stabilization-pr-scope.mjs",
     "verify:stabilization-pr-staged": "node scripts/verify-stabilization-pr-scope.mjs --staged",

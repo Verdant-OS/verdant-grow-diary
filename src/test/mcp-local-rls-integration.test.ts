@@ -10,14 +10,29 @@
  *   Tool execution itself routes exclusively through per-user anon
  *   sessions (`supabaseForUser(ctx)`), never service_role.
  * - Cleans up seeded rows / users on completion.
+ * - On failure, writes SANITIZED debug artifacts (harness log + response
+ *   snapshots) under `artifacts/mcp-local-rls/`; CI uploads them only
+ *   when the job fails. Sanitization redacts JWTs, bearer tokens,
+ *   service_role material, refresh/bridge/access tokens, client secrets,
+ *   raw headers, raw_payload, and live env values.
+ *
+ * COVERAGE:
+ * - Explicit regression cases for `limit` and `includeArchived`.
+ * - Manifest-driven generated cases: pagination/filter params are derived
+ *   from `.lovable/mcp/manifest.json` at collection time, so new advertised
+ *   params automatically gain cross-user isolation coverage — and params
+ *   are never invented. Tools advertising no pagination/filter params are
+ *   recorded as N/A (see manifest contract tests below).
  *
  * Enable locally by exporting all of:
  *   LOCAL_SUPABASE_URL           (e.g. http://127.0.0.1:54321)
  *   LOCAL_SUPABASE_ANON_KEY
  *   LOCAL_SUPABASE_SERVICE_ROLE_KEY   (LOCAL ONLY — never a hosted key)
  *   MCP_LOCAL_RLS_HARNESS=1
+ *
+ * Convenience: `bun run test:mcp:rls:local` (env vars still required).
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { ToolContext } from "@lovable.dev/mcp-js";
 
@@ -25,6 +40,12 @@ import listGrowsTool from "@/lib/mcp/tools/list-grows";
 import listDiaryTool from "@/lib/mcp/tools/list-recent-diary-entries";
 import getSnapshotTool from "@/lib/mcp/tools/get-latest-sensor-snapshot";
 import manifest from "../../.lovable/mcp/manifest.json";
+import {
+  HarnessLog,
+  derivePaginationFilterParams,
+  generateRlsCasesFromManifest,
+  hasPaginationOrFilterAxes,
+} from "./helpers/mcpRlsHarnessOps";
 
 const HARNESS_ENABLED =
   process.env.MCP_LOCAL_RLS_HARNESS === "1" &&
@@ -72,7 +93,27 @@ describe("MCP manifest tool contract (parameter allow-list)", () => {
     expect(Object.keys(props)).toEqual(["tentId"]);
     expect(t!.inputSchema.required ?? []).toEqual(["tentId"]);
     // Snapshot tool intentionally exposes no pagination/limit/filter params —
-    // includeArchived / limit RLS coverage below is therefore N/A for it.
+    // manifest-driven pagination/filter coverage is therefore N/A for it.
+    expect(hasPaginationOrFilterAxes(t!)).toBe(false);
+  });
+
+  it("manifest-driven case generation covers every tool without inventing params", () => {
+    for (const t of manifest.mcp.tools) {
+      const advertised = new Set(Object.keys(t.inputSchema.properties ?? {}));
+      for (const c of generateRlsCasesFromManifest(t)) {
+        for (const argName of Object.keys(c.args)) {
+          expect(advertised.has(argName), `${t.name} generated unadvertised arg ${argName}`).toBe(
+            true,
+          );
+        }
+        for (const scopeName of c.scopeParams) {
+          expect(
+            advertised.has(scopeName),
+            `${t.name} generated unadvertised scope param ${scopeName}`,
+          ).toBe(true);
+        }
+      }
+    }
   });
 });
 
@@ -84,15 +125,28 @@ type SeededDiary = { id: string; note: string; growId: string };
 type SeededUser = {
   id: string;
   email: string;
+  /** Unique marker embedded in every seeded name/note for leak detection. */
+  marker: string;
   accessToken: string;
   tentId: string;
-  snapshotId: string;
-  grows: SeededGrow[];         // includes both active + archived
+  emptyTentId: string;
+  readingIds: string[];
+  grows: SeededGrow[]; // includes both active + archived
   activeGrows: SeededGrow[];
   archivedGrow: SeededGrow;
-  primaryGrow: SeededGrow;     // convenience: activeGrows[0]
-  diaries: SeededDiary[];      // multiple diary entries, all on primaryGrow
+  primaryGrow: SeededGrow; // convenience: activeGrows[0]
+  diaries: SeededDiary[]; // multiple diary entries, all on primaryGrow
 };
+
+/** Full PostgREST/GoTrue error detail for seed failures (debugging aid). */
+function fmtDbError(
+  e: { message?: string; code?: string; details?: string; hint?: string; status?: number } | null,
+): string {
+  if (!e) return "unknown error (no data returned)";
+  return `${e.message} [code=${e.code ?? "?"} status=${e.status ?? "?"} details=${
+    e.details ?? "-"
+  } hint=${e.hint ?? "-"}]`;
+}
 
 function makeCtx(token: string | null): ToolContext {
   return {
@@ -122,9 +176,9 @@ function assertNoSecretLeakage(payload: unknown) {
   }
 }
 
-const ALLOWED_SENSOR_SOURCES = new Set([
-  "live", "manual", "csv", "demo", "stale", "invalid",
-]);
+/** Real vocabularies from the live schema (long-format sensor_readings). */
+const ALLOWED_SENSOR_SOURCES = new Set(["manual", "pi_bridge", "sim"]);
+const ALLOWED_SENSOR_QUALITIES = new Set(["ok", "degraded", "stale", "invalid"]);
 
 function isIsoTimestamp(v: unknown): boolean {
   return typeof v === "string" && !Number.isNaN(Date.parse(v));
@@ -140,6 +194,14 @@ function assertMcpEnvelope(res: unknown) {
   }
 }
 
+/** No other-user marker (grow name / diary note / tent name) may appear. */
+function assertNoForeignMarker(res: unknown, other: SeededUser) {
+  const serialized = JSON.stringify(res ?? {});
+  expect(serialized, `response leaked marker of other user ${other.marker}`).not.toContain(
+    other.marker,
+  );
+}
+
 describeIfHarness("MCP local RLS integration", () => {
   const url = process.env.LOCAL_SUPABASE_URL!;
   const anon = process.env.LOCAL_SUPABASE_ANON_KEY!;
@@ -151,14 +213,57 @@ describeIfHarness("MCP local RLS integration", () => {
     SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
   };
 
+  const harnessLog = new HarnessLog();
+  const lastResponses: Record<string, unknown> = {};
+
   let admin: SupabaseClient;
   let userA: SeededUser;
   let userB: SeededUser;
 
+  const toolHandlers: Record<
+    string,
+    (args: never, ctx: ToolContext) => Promise<Record<string, unknown>>
+  > = {
+    list_grows: async (args, ctx) =>
+      (await listGrowsTool.handler(args, ctx)) as unknown as Record<string, unknown>,
+    list_recent_diary_entries: async (args, ctx) =>
+      (await listDiaryTool.handler(args, ctx)) as unknown as Record<string, unknown>,
+    get_latest_sensor_snapshot: async (args, ctx) =>
+      (await getSnapshotTool.handler(args, ctx)) as unknown as Record<string, unknown>,
+  };
+
+  async function callTool(
+    toolName: string,
+    caller: SeededUser | null,
+    args: Record<string, unknown>,
+    caseLabel: string,
+  ) {
+    const handler = toolHandlers[toolName];
+    expect(handler, `no local handler for manifest tool ${toolName}`).toBeTruthy();
+    const res = await handler(args as never, makeCtx(caller ? caller.accessToken : null));
+    const structured = (res as Record<string, unknown>).structuredContent as
+      | Record<string, unknown>
+      | undefined;
+    const rows = structured
+      ? ((structured.grows ?? structured.entries ?? null) as unknown[] | null)
+      : null;
+    harnessLog.record({
+      tool: toolName,
+      caseLabel,
+      caller: caller ? caller.marker : "(unauthenticated)",
+      args,
+      isError: !!(res as Record<string, unknown>).isError,
+      rowCount: Array.isArray(rows) ? rows.length : null,
+    });
+    lastResponses[`${toolName} ${caseLabel} as ${caller ? caller.marker : "anon"}`] = res;
+    return res as Record<string, unknown>;
+  }
+
   async function seedUser(label: string): Promise<SeededUser> {
-    const email = `mcp-rls-${label}-${Date.now()}-${Math.random()
+    const marker = `mcpr-${label}-${Date.now().toString(36)}-${Math.random()
       .toString(36)
-      .slice(2, 8)}@local.test`;
+      .slice(2, 8)}`;
+    const email = `mcp-rls-${marker}@local.test`;
     const password = `Test-${Math.random().toString(36).slice(2, 12)}-Aa1!`;
 
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
@@ -167,17 +272,17 @@ describeIfHarness("MCP local RLS integration", () => {
       email_confirm: true,
     });
     if (createErr || !created.user) {
-      throw new Error(`seedUser(${label}) createUser failed: ${createErr?.message}`);
+      throw new Error(`seedUser(${label}) createUser failed: ${fmtDbError(createErr)}`);
     }
     const userId = created.user.id;
 
     // Seed multiple active grows + one archived grow.
     const activeSpecs = [
-      { name: `Grow-${label}-active-1`, is_archived: false },
-      { name: `Grow-${label}-active-2`, is_archived: false },
-      { name: `Grow-${label}-active-3`, is_archived: false },
+      { name: `Grow-${marker}-active-1`, is_archived: false },
+      { name: `Grow-${marker}-active-2`, is_archived: false },
+      { name: `Grow-${marker}-active-3`, is_archived: false },
     ];
-    const archivedSpec = { name: `Grow-${label}-archived`, is_archived: true };
+    const archivedSpec = { name: `Grow-${marker}-archived`, is_archived: true };
     const growRows = [...activeSpecs, archivedSpec].map((g) => ({
       user_id: userId,
       stage: "veg",
@@ -188,7 +293,7 @@ describeIfHarness("MCP local RLS integration", () => {
       .from("grows")
       .insert(growRows)
       .select("id,name,is_archived");
-    if (growsErr || !growsData) throw new Error(`seed grows: ${growsErr?.message}`);
+    if (growsErr || !growsData) throw new Error(`seed grows: ${fmtDbError(growsErr)}`);
 
     const grows: SeededGrow[] = growsData.map((g) => ({
       id: g.id as string,
@@ -199,46 +304,61 @@ describeIfHarness("MCP local RLS integration", () => {
     const archivedGrow = grows.find((g) => g.archived)!;
     const primaryGrow = activeGrows[0];
 
-    const { data: tent, error: tentErr } = await admin
+    const { data: tents, error: tentErr } = await admin
       .from("tents")
-      .insert({ user_id: userId, name: `Tent-${label}` })
-      .select("id")
-      .single();
-    if (tentErr || !tent) throw new Error(`seed tent: ${tentErr?.message}`);
+      .insert([
+        { user_id: userId, name: `Tent-${marker}` },
+        { user_id: userId, name: `Tent-${marker}-empty` },
+      ])
+      .select("id,name");
+    if (tentErr || !tents || tents.length !== 2)
+      throw new Error(`seed tents: ${fmtDbError(tentErr)}`);
+    const tentId = tents.find((t) => !String(t.name).endsWith("-empty"))!.id as string;
+    const emptyTentId = tents.find((t) => String(t.name).endsWith("-empty"))!.id as string;
 
     // Seed several diary entries against the primary grow, spaced in time.
+    // Live schema: no event_type column; entry_at drives tool ordering.
     const now = Date.now();
     const diaryRows = [0, 1, 2, 3].map((i) => ({
       user_id: userId,
       grow_id: primaryGrow.id,
-      event_type: "note",
-      note: `note-${label}-${i}`,
-      created_at: new Date(now - i * 60_000).toISOString(),
+      note: `note-${marker}-${i}`,
+      entry_at: new Date(now - i * 60_000).toISOString(),
     }));
     const { data: diaryData, error: diaryErr } = await admin
       .from("diary_entries")
       .insert(diaryRows)
       .select("id,note,grow_id");
-    if (diaryErr || !diaryData) throw new Error(`seed diary: ${diaryErr?.message}`);
+    if (diaryErr || !diaryData) throw new Error(`seed diary: ${fmtDbError(diaryErr)}`);
     const diaries: SeededDiary[] = diaryData.map((d) => ({
       id: d.id as string,
       note: d.note as string,
       growId: d.grow_id as string,
     }));
 
-    const { data: snap, error: snapErr } = await admin
+    // Live schema: sensor_readings is long-format (one row per metric).
+    const { data: readings, error: readingsErr } = await admin
       .from("sensor_readings")
-      .insert({
-        user_id: userId,
-        tent_id: tent.id,
-        source: "manual",
-        captured_at: new Date().toISOString(),
-        temperature_c: 24,
-        humidity_pct: 55,
-      })
-      .select("id")
-      .single();
-    if (snapErr || !snap) throw new Error(`seed snapshot: ${snapErr?.message}`);
+      .insert([
+        {
+          user_id: userId,
+          tent_id: tentId,
+          metric: "temperature_c",
+          value: 24,
+          source: "manual",
+          ts: new Date(now - 30_000).toISOString(),
+        },
+        {
+          user_id: userId,
+          tent_id: tentId,
+          metric: "humidity_pct",
+          value: 55,
+          source: "manual",
+          ts: new Date(now - 15_000).toISOString(),
+        },
+      ])
+      .select("id");
+    if (readingsErr || !readings) throw new Error(`seed readings: ${fmtDbError(readingsErr)}`);
 
     const anonClient = createClient(url, anon, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -248,15 +368,17 @@ describeIfHarness("MCP local RLS integration", () => {
       password,
     });
     if (signInErr || !session.session) {
-      throw new Error(`seedUser(${label}) signIn failed: ${signInErr?.message}`);
+      throw new Error(`seedUser(${label}) signIn failed: ${fmtDbError(signInErr)}`);
     }
 
     return {
       id: userId,
       email,
+      marker,
       accessToken: session.session.access_token,
-      tentId: tent.id,
-      snapshotId: snap.id,
+      tentId,
+      emptyTentId,
+      readingIds: readings.map((r) => r.id as string),
       grows,
       activeGrows,
       archivedGrow,
@@ -277,7 +399,25 @@ describeIfHarness("MCP local RLS integration", () => {
     [userA, userB] = await Promise.all([seedUser("a"), seedUser("b")]);
   }, 60_000);
 
+  afterEach((ctx) => {
+    // Best-effort failure tracking for the artifact log; API differences
+    // across vitest versions must never break the suite itself.
+    try {
+      const task = (ctx as unknown as { task?: { name?: string; result?: { state?: string } } })
+        .task;
+      if (task?.result?.state === "fail") harnessLog.recordFailedTest(task.name ?? "(unknown)");
+    } catch {
+      /* ignore */
+    }
+  });
+
   afterAll(async () => {
+    // Sanitized debug artifacts. CI uploads these only when the job fails.
+    try {
+      harnessLog.flush(lastResponses);
+    } catch {
+      /* artifact plumbing must never mask the real result */
+    }
     for (const u of [userA, userB].filter(Boolean)) {
       try {
         await admin.from("sensor_readings").delete().eq("user_id", u.id);
@@ -294,11 +434,11 @@ describeIfHarness("MCP local RLS integration", () => {
     process.env.SUPABASE_ANON_KEY = priorEnv.SUPABASE_ANON_KEY;
   }, 30_000);
 
-  // ---------- list_grows ----------
+  // ---------- list_grows (explicit regression cases) ----------
 
   describe("list_grows", () => {
     async function callAs(user: SeededUser, args: Record<string, unknown>) {
-      const res = await listGrowsTool.handler(args as never, makeCtx(user.accessToken));
+      const res = await callTool("list_grows", user, args, "explicit");
       assertMcpEnvelope(res);
       assertNoSecretLeakage(res);
       return res;
@@ -311,6 +451,7 @@ describeIfHarness("MCP local RLS integration", () => {
       const ids = rows.map((g) => g.id);
       for (const g of userA.activeGrows) expect(ids).toContain(g.id);
       for (const g of userB.grows) expect(ids).not.toContain(g.id);
+      assertNoForeignMarker(res, userB);
       // Shape assertions on the first row
       const first = rows[0];
       expect(typeof first.id).toBe("string");
@@ -370,26 +511,32 @@ describeIfHarness("MCP local RLS integration", () => {
     });
 
     it("Unauthenticated caller is rejected", async () => {
-      const res = await listGrowsTool.handler(
-        { includeArchived: false, limit: 25 } as never,
-        makeCtx(null),
+      const res = await callTool(
+        "list_grows",
+        null,
+        { includeArchived: false, limit: 25 },
+        "explicit unauthenticated",
       );
       expect(res.isError).toBe(true);
     });
   });
 
-  // ---------- list_recent_diary_entries ----------
+  // ---------- list_recent_diary_entries (explicit regression cases) ----------
 
   describe("list_recent_diary_entries", () => {
     async function callAs(user: SeededUser, args: Record<string, unknown>) {
-      const res = await listDiaryTool.handler(args as never, makeCtx(user.accessToken));
+      const res = await callTool("list_recent_diary_entries", user, args, "explicit");
       assertMcpEnvelope(res);
       assertNoSecretLeakage(res);
       return res;
     }
 
-    it("User A cannot read User B's diary via B's growId (empty, no leak)", async () => {
+    it("User A cannot read User B's diary via B's growId (ownership-gated error, no leak)", async () => {
       const res = await callAs(userA, { growId: userB.primaryGrow.id, limit: 10 });
+      // The tool ownership-gates on grows (no operator policy there), so a
+      // foreign growId surfaces as an error, never as another user's rows.
+      expect(res.isError).toBe(true);
+      assertNoForeignMarker(res, userB);
       const rows = ((res.structuredContent as any)?.entries ?? []) as any[];
       const bIds = new Set(userB.diaries.map((d) => d.id));
       for (const r of rows) expect(bIds.has(r.id)).toBe(false);
@@ -401,12 +548,13 @@ describeIfHarness("MCP local RLS integration", () => {
       const ids = rows.map((r) => r.id);
       for (const d of userA.diaries) expect(ids).toContain(d.id);
       for (const d of userB.diaries) expect(ids).not.toContain(d.id);
+      assertNoForeignMarker(res, userB);
       const first = rows[0];
       expect(typeof first.id).toBe("string");
       expect(typeof first.grow_id).toBe("string");
       expect(first.grow_id).toBe(userA.primaryGrow.id);
-      expect(typeof first.event_type).toBe("string");
       expect(first.note === null || typeof first.note === "string").toBe(true);
+      expect(isIsoTimestamp(first.entry_at)).toBe(true);
       expect(isIsoTimestamp(first.created_at)).toBe(true);
     });
 
@@ -432,89 +580,205 @@ describeIfHarness("MCP local RLS integration", () => {
 
     it("limit=1 targeting another user's growId still never leaks their rows", async () => {
       const res = await callAs(userA, { growId: userB.primaryGrow.id, limit: 1 });
-      const rows = ((res.structuredContent as any)?.entries ?? []) as any[];
-      const bIds = new Set(userB.diaries.map((d) => d.id));
-      for (const r of rows) expect(bIds.has(r.id)).toBe(false);
+      expect(res.isError).toBe(true);
+      assertNoForeignMarker(res, userB);
     });
 
     it("Unauthenticated caller is rejected", async () => {
-      const res = await listDiaryTool.handler(
-        { growId: userA.primaryGrow.id, limit: 10 } as never,
-        makeCtx(null),
+      const res = await callTool(
+        "list_recent_diary_entries",
+        null,
+        { growId: userA.primaryGrow.id, limit: 10 },
+        "explicit unauthenticated",
       );
       expect(res.isError).toBe(true);
     });
   });
 
-  // ---------- get_latest_sensor_snapshot ----------
+  // ---------- get_latest_sensor_snapshot (explicit regression cases) ----------
 
   describe("get_latest_sensor_snapshot", () => {
-    it("User A cannot read User B's tent snapshot (empty or non-B row)", async () => {
-      const res = await getSnapshotTool.handler(
-        { tentId: userB.tentId } as never,
-        makeCtx(userA.accessToken),
-      );
+    async function callAs(user: SeededUser | null, args: Record<string, unknown>) {
+      const res = await callTool("get_latest_sensor_snapshot", user, args, "explicit");
       assertMcpEnvelope(res);
       assertNoSecretLeakage(res);
-      const snap = (res.structuredContent as any)?.snapshot ?? null;
-      // Either empty (RLS-filtered) or, if surfaced, must not be B's row.
-      if (snap !== null) expect(snap.id).not.toBe(userB.snapshotId);
+      return res;
+    }
+
+    it("User A cannot read User B's tent snapshot (ownership-gated error, no leak)", async () => {
+      const res = await callAs(userA, { tentId: userB.tentId });
+      // Tent ownership is verified first; a foreign tent id surfaces as an
+      // error, never as another user's readings.
+      expect(res.isError).toBe(true);
+      assertNoForeignMarker(res, userB);
     });
 
-    it("User A sees own snapshot with correct shape and safe source label", async () => {
-      const res = await getSnapshotTool.handler(
-        { tentId: userA.tentId } as never,
-        makeCtx(userA.accessToken),
-      );
-      assertMcpEnvelope(res);
-      assertNoSecretLeakage(res);
+    it("User A sees own latest reading per metric with real source/quality labels", async () => {
+      const res = await callAs(userA, { tentId: userA.tentId });
       const snap = (res.structuredContent as any)?.snapshot;
       expect(snap).toBeTruthy();
-      expect(snap.id).toBe(userA.snapshotId);
-      expect(typeof snap.tent_id).toBe("string");
-      expect(snap.tent_id).toBe(userA.tentId);
-      expect(typeof snap.source).toBe("string");
-      expect(ALLOWED_SENSOR_SOURCES.has(snap.source)).toBe(true);
-      expect(isIsoTimestamp(snap.captured_at)).toBe(true);
-      for (const k of [
-        "temperature_c", "humidity_pct", "vpd_kpa", "co2_ppm",
-        "soil_moisture_pct", "ph", "ec_ms_cm", "confidence",
-      ]) {
-        if (k in snap && snap[k] !== null) expect(typeof snap[k]).toBe("number");
+      expect(snap.tentId).toBe(userA.tentId);
+      const readings = snap.readings as Record<string, any>;
+      expect(readings).toBeTruthy();
+      const metrics = Object.keys(readings);
+      expect(metrics).toContain("temperature_c");
+      expect(metrics).toContain("humidity_pct");
+      for (const [metric, row] of Object.entries(readings)) {
+        expect(row.metric).toBe(metric);
+        expect(row.tent_id).toBe(userA.tentId);
+        expect(typeof row.value).toBe("number");
+        expect(ALLOWED_SENSOR_SOURCES.has(row.source)).toBe(true);
+        expect(ALLOWED_SENSOR_QUALITIES.has(row.quality)).toBe(true);
+        expect(isIsoTimestamp(row.ts)).toBe(true);
+        expect(userA.readingIds).toContain(row.id);
+        // Contract: never exposes raw_payload.
+        expect("raw_payload" in row).toBe(false);
       }
-      // Contract: never exposes raw_payload.
-      expect("raw_payload" in snap).toBe(false);
+      assertNoForeignMarker(res, userB);
     });
 
-    it("User B sees own snapshot B", async () => {
-      const res = await getSnapshotTool.handler(
-        { tentId: userB.tentId } as never,
-        makeCtx(userB.accessToken),
-      );
-      assertMcpEnvelope(res);
-      assertNoSecretLeakage(res);
-      expect((res.structuredContent as any)?.snapshot?.id).toBe(userB.snapshotId);
+    it("User B sees own readings only", async () => {
+      const res = await callAs(userB, { tentId: userB.tentId });
+      const readings = ((res.structuredContent as any)?.snapshot?.readings ?? {}) as Record<
+        string,
+        any
+      >;
+      for (const row of Object.values(readings)) {
+        expect(userB.readingIds).toContain(row.id);
+        expect(userA.readingIds).not.toContain(row.id);
+      }
+      assertNoForeignMarker(res, userA);
     });
 
-    it("Empty state (no visible snapshot) has structuredContent.snapshot === null", async () => {
-      // Cross-user call is RLS-filtered → should be empty for a fresh tent.
-      // Use a random UUID that doesn't exist to force the empty branch.
-      const nonexistent = "00000000-0000-4000-8000-000000000001";
-      const res = await getSnapshotTool.handler(
-        { tentId: nonexistent } as never,
-        makeCtx(userA.accessToken),
-      );
-      assertMcpEnvelope(res);
+    it("Own tent with no readings has structuredContent.snapshot === null", async () => {
+      const res = await callAs(userA, { tentId: userA.emptyTentId });
+      expect(res.isError).toBeFalsy();
       const snap = (res.structuredContent as any)?.snapshot;
       expect(snap).toBeNull();
     });
 
+    it("Nonexistent tent id surfaces as ownership-gated error", async () => {
+      const nonexistent = "00000000-0000-4000-8000-000000000001";
+      const res = await callAs(userA, { tentId: nonexistent });
+      expect(res.isError).toBe(true);
+    });
+
     it("Unauthenticated caller is rejected", async () => {
-      const res = await getSnapshotTool.handler(
-        { tentId: userA.tentId } as never,
-        makeCtx(null),
+      const res = await callTool(
+        "get_latest_sensor_snapshot",
+        null,
+        { tentId: userA.tentId },
+        "explicit unauthenticated",
       );
       expect(res.isError).toBe(true);
     });
+  });
+
+  // ---------- Manifest-driven generated pagination/filter cases ----------
+
+  describe("manifest-driven pagination/filter isolation cases", () => {
+    /** Fill advertised uuid scope params with a user's own resource ids. */
+    function fillScope(
+      toolName: string,
+      scopeParams: string[],
+      owner: SeededUser,
+    ): Record<string, unknown> {
+      const args: Record<string, unknown> = {};
+      for (const name of scopeParams) {
+        if (name === "growId") args.growId = owner.primaryGrow.id;
+        else if (name === "tentId") args.tentId = owner.tentId;
+        else throw new Error(`no seeded fixture for advertised scope param ${name}`);
+      }
+      return args;
+    }
+
+    /** Per-tool extraction of returned row identities for scoping checks. */
+    function extractRowIds(toolName: string, res: Record<string, unknown>): string[] {
+      const structured = (res.structuredContent ?? {}) as Record<string, unknown>;
+      if (toolName === "list_grows") {
+        return ((structured.grows ?? []) as Array<{ id: string }>).map((r) => r.id);
+      }
+      if (toolName === "list_recent_diary_entries") {
+        return ((structured.entries ?? []) as Array<{ id: string }>).map((r) => r.id);
+      }
+      if (toolName === "get_latest_sensor_snapshot") {
+        const snapshot = structured.snapshot as {
+          readings?: Record<string, { id: string }>;
+        } | null;
+        return Object.values(snapshot?.readings ?? {}).map((r) => r.id);
+      }
+      return [];
+    }
+
+    function ownedIds(toolName: string, user: SeededUser): Set<string> {
+      if (toolName === "list_grows") return new Set(user.grows.map((g) => g.id));
+      if (toolName === "list_recent_diary_entries") return new Set(user.diaries.map((d) => d.id));
+      return new Set(user.readingIds);
+    }
+
+    for (const tool of manifest.mcp.tools) {
+      const cases = generateRlsCasesFromManifest(tool);
+      const axes = hasPaginationOrFilterAxes(tool);
+
+      if (!axes) {
+        it(`${tool.name}: advertises no pagination/filter params — generated coverage is N/A`, () => {
+          const nonScope = derivePaginationFilterParams(tool).filter(
+            (p) => p.kind !== "scope-filter",
+          );
+          expect(nonScope).toEqual([]);
+          // Still exactly one baseline case (scope-only), never invented args.
+          expect(cases.length).toBe(1);
+          expect(Object.keys(cases[0].args)).toEqual([]);
+        });
+      }
+
+      for (const c of cases) {
+        it(`${tool.name} ${c.label}: rows stay caller-scoped for both users`, async () => {
+          for (const [caller, other] of [
+            [userA, userB],
+            [userB, userA],
+          ] as Array<[SeededUser, SeededUser]>) {
+            const args = { ...c.args, ...fillScope(tool.name, c.scopeParams, caller) };
+            const res = await callTool(tool.name, caller, args, c.label);
+            assertMcpEnvelope(res);
+            assertNoSecretLeakage(res);
+            assertNoForeignMarker(res, other);
+            const owned = ownedIds(tool.name, caller);
+            const foreign = ownedIds(tool.name, other);
+            for (const id of extractRowIds(tool.name, res)) {
+              expect(owned.has(id), `${tool.name} returned non-owned row ${id}`).toBe(true);
+              expect(foreign.has(id), `${tool.name} leaked foreign row ${id}`).toBe(false);
+            }
+            if (typeof (args as { limit?: number }).limit === "number") {
+              const rowIds = extractRowIds(tool.name, res);
+              expect(rowIds.length).toBeLessThanOrEqual((args as { limit: number }).limit);
+            }
+          }
+        });
+
+        if (c.scopeParams.length > 0) {
+          it(`${tool.name} ${c.label}: foreign scope ids never leak the other user's rows`, async () => {
+            // User A supplies User B's resource ids.
+            const args = { ...c.args, ...fillScope(tool.name, c.scopeParams, userB) };
+            const res = await callTool(tool.name, userA, args, `${c.label} (foreign scope)`);
+            assertMcpEnvelope(res);
+            assertNoSecretLeakage(res);
+            assertNoForeignMarker(res, userB);
+            const bIds = ownedIds(tool.name, userB);
+            for (const id of extractRowIds(tool.name, res)) {
+              expect(bIds.has(id), `${tool.name} leaked foreign row ${id}`).toBe(false);
+            }
+          });
+        }
+
+        it(`${tool.name} ${c.label}: unauthenticated caller stays blocked`, async () => {
+          const args = { ...c.args, ...fillScope(tool.name, c.scopeParams, userA) };
+          const res = await callTool(tool.name, null, args, `${c.label} (unauthenticated)`);
+          expect(res.isError).toBe(true);
+          assertNoForeignMarker(res, userA);
+          assertNoForeignMarker(res, userB);
+        });
+      }
+    }
   });
 });

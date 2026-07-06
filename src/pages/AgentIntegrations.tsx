@@ -154,6 +154,14 @@ export default function AgentIntegrations({
     }
   }, [verifyHarness]);
 
+  const panelStatus = verifyResult?.status ?? "not_checked";
+  const panelLabel = verifyResult?.label ?? NOT_CHECKED_LABEL;
+  const panelDescription = verifyResult?.description ?? NOT_CHECKED_DESCRIPTION;
+  const panelGuidance = getVerifyStatusGuidance(panelStatus);
+
+  const [manifestModalOpen, setManifestModalOpen] = useState(false);
+
+
 
   return (
     <div className="min-h-dvh px-4 py-6 md:px-8">

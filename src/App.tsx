@@ -18,6 +18,7 @@ import RequireOperatorRole from "./components/RequireOperatorRole";
 const AppShell = lazy(() => import("@/components/AppShell"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Tents = lazy(() => import("./pages/Tents"));
@@ -32,6 +33,7 @@ const Tasks = lazy(() => import("./pages/Tasks"));
 const Alerts = lazy(() => import("./pages/Alerts"));
 const AlertDetail = lazy(() => import("./pages/AlertDetail"));
 const Settings = lazy(() => import("./pages/Settings"));
+const AgentIntegrations = lazy(() => import("./pages/AgentIntegrations"));
 const Timeline = lazy(() => import("./pages/Timeline"));
 const Grows = lazy(() => import("./pages/Grows"));
 const GrowDetail = lazy(() => import("./pages/GrowDetail"));
@@ -65,6 +67,9 @@ const Landing = lazy(() => import("./pages/Landing"));
 // Demo page removed — Verdant is positioned around real grow data only.
 const HardwareIntegrations = lazy(() => import("./pages/HardwareIntegrations"));
 const Pricing = lazy(() => import("./pages/Pricing"));
+const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
+const GuidePage = lazy(() => import("./pages/GuidePage"));
+const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
 const BillingPlaceholder = lazy(() => import("./pages/BillingPlaceholder"));
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));
@@ -134,6 +139,7 @@ const App = () => (
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                   {/* Deprecated auth entry points — redirect to canonical /auth to
                       prevent funnel leaks from old bookmarks, emails, ads, and
                       creator posts that still point to /login /signup /register. */}
@@ -149,6 +155,9 @@ const App = () => (
                   <Route path="/demo" element={<Navigate to="/welcome" replace />} />
                   <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/guides" element={<GuidesIndex />} />
+                  <Route path="/guides/:slug" element={<GuidePage />} />
+                  <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
                   <Route path="/billing/:plan" element={<BillingPlaceholder />} />
                   {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
                       no operator chrome (header, Quick Log) renders. */}
@@ -221,6 +230,7 @@ const App = () => (
                     />
 
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/settings/agent-integrations" element={<AgentIntegrations />} />
                     {/* Operator-only routes. Authenticated via AppShell's useRequireAuth,
                         then gated by server-side has_role('operator') via RequireOperatorRole.
                         Non-operator users see a calm access-restricted state. */}

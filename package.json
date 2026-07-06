@@ -15,6 +15,7 @@
     "format:check": "prettier --check .",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:mcp:rls:local": "bunx vitest run src/test/mcp-local-rls-integration.test.ts",
     "test:summarize-timeouts": "node scripts/summarize-vitest-timeouts.mjs",
     "verify:stabilization-pr-scope": "node scripts/verify-stabilization-pr-scope.mjs",
     "verify:stabilization-pr-staged": "node scripts/verify-stabilization-pr-scope.mjs --staged",
@@ -159,6 +160,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "@lovable.dev/mcp-js": "^0.20.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
@@ -211,7 +213,7 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
     "xlsx": "^0.18.5",
-    "zod": "^3.25.76"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",

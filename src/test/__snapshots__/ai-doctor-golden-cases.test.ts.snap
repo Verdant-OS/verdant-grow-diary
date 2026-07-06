@@ -2,6 +2,35 @@
 
 exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces stable JSON snapshots for every golden case 1`] = `
 {
+  "autoflower-recovery-risk-after-stress": {
+    "action_queue_suggestion": null,
+    "confidence": 0.1,
+    "evidence": [
+      "Plant context: id=plant-auto-recovery-1, stage=veg, strain=Fast Auto Test",
+      "Recent grow events (14d): 2",
+      "Vision pass: stub (image_quality_score=0)",
+    ],
+    "immediate_action": "Observe and re-check. Do not change inputs based on this stub pass.",
+    "likely_issue": "",
+    "missing_information": [
+      "No live or manual sensor readings in the last 7 days.",
+      "Image was not analyzed in this stub pass — no visual evidence available.",
+    ],
+    "possible_causes": [
+      "Insufficient evidence to enumerate likely causes; observe and re-check.",
+    ],
+    "risk_level": "low",
+    "summary": "Engine Phase 1 stub: insufficient trustworthy context for a real diagnosis.",
+    "three_day_recovery_plan": "Maintain stable conditions, log daily diary entries, and capture a fresh photo and manual snapshot each day so the next pass has trustworthy context.",
+    "twenty_four_hour_follow_up": "Re-confirm sensor freshness and source labels; log one fresh manual snapshot if no live readings are present.",
+    "what_not_to_do": [
+      "Do not adjust nutrient strength based on this output.",
+      "Do not change irrigation schedule based on this output.",
+      "Do not change equipment (lights, fans, heaters, humidifiers, pumps) based on this output.",
+      "Do not defoliate or transplant based on this output.",
+      "Do not treat stale or invalid sensor readings as current truth.",
+    ],
+  },
   "contradictory-live-normal-manual-alarming": {
     "action_queue_suggestion": null,
     "confidence": 0.1,
@@ -280,6 +309,35 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
       "Do not treat stale or invalid sensor readings as current truth.",
     ],
   },
+  "missing-ph-ec-context-after-feeding": {
+    "action_queue_suggestion": null,
+    "confidence": 0.1,
+    "evidence": [
+      "Plant context: id=plant-ph-ec-1, stage=veg, strain=Test Cultivar",
+      "Recent grow events (14d): 2",
+      "Vision pass: stub (image_quality_score=0)",
+    ],
+    "immediate_action": "Observe and re-check. Do not change inputs based on this stub pass.",
+    "likely_issue": "",
+    "missing_information": [
+      "No live or manual sensor readings in the last 7 days.",
+      "Image was not analyzed in this stub pass — no visual evidence available.",
+    ],
+    "possible_causes": [
+      "Insufficient evidence to enumerate likely causes; observe and re-check.",
+    ],
+    "risk_level": "low",
+    "summary": "Engine Phase 1 stub: insufficient trustworthy context for a real diagnosis.",
+    "three_day_recovery_plan": "Maintain stable conditions, log daily diary entries, and capture a fresh photo and manual snapshot each day so the next pass has trustworthy context.",
+    "twenty_four_hour_follow_up": "Re-confirm sensor freshness and source labels; log one fresh manual snapshot if no live readings are present.",
+    "what_not_to_do": [
+      "Do not adjust nutrient strength based on this output.",
+      "Do not change irrigation schedule based on this output.",
+      "Do not change equipment (lights, fans, heaters, humidifiers, pumps) based on this output.",
+      "Do not defoliate or transplant based on this output.",
+      "Do not treat stale or invalid sensor readings as current truth.",
+    ],
+  },
   "mixed-source-history": {
     "action_queue_suggestion": {
       "action_type": "advisory",
@@ -369,6 +427,42 @@ exports[`AI Doctor Golden Cases v1 — deterministic serialization > produces st
     ],
     "risk_level": "low",
     "summary": "Engine Phase 1 stub: observation-only summary based on supplied context.",
+    "three_day_recovery_plan": "Maintain stable conditions, log daily diary entries, and capture a fresh photo and manual snapshot each day so the next pass has trustworthy context.",
+    "twenty_four_hour_follow_up": "Re-confirm sensor freshness and source labels; log one fresh manual snapshot if no live readings are present.",
+    "what_not_to_do": [
+      "Do not adjust nutrient strength based on this output.",
+      "Do not change irrigation schedule based on this output.",
+      "Do not change equipment (lights, fans, heaters, humidifiers, pumps) based on this output.",
+      "Do not defoliate or transplant based on this output.",
+      "Do not treat stale or invalid sensor readings as current truth.",
+    ],
+  },
+  "stale-sensor-plus-leaf-symptom": {
+    "action_queue_suggestion": {
+      "action_type": "advisory",
+      "reason": "Some recent sensor readings are stale or invalid. Suggest a manual recheck before any further changes.",
+      "risk_level": "medium",
+      "status": "pending_approval",
+    },
+    "confidence": 0.1,
+    "evidence": [
+      "Plant context: id=plant-stale-symptom-1, stage=veg, strain=Test Cultivar",
+      "Sensor group stale: 2 reading(s) in last 7d",
+      "Recent grow events (14d): 1",
+      "Vision pass: stub (image_quality_score=0)",
+    ],
+    "immediate_action": "Observe and re-check. Do not change inputs based on this stub pass.",
+    "likely_issue": "",
+    "missing_information": [
+      "No live or manual sensor readings in the last 7 days.",
+      "Some recent sensor readings are stale or invalid — fresh confirmation needed.",
+      "Image was not analyzed in this stub pass — no visual evidence available.",
+    ],
+    "possible_causes": [
+      "Sensor pipeline issue (stale/invalid readings) — diagnosis cannot rely on these.",
+    ],
+    "risk_level": "medium",
+    "summary": "Engine Phase 1 stub: insufficient trustworthy context for a real diagnosis.",
     "three_day_recovery_plan": "Maintain stable conditions, log daily diary entries, and capture a fresh photo and manual snapshot each day so the next pass has trustworthy context.",
     "twenty_four_hour_follow_up": "Re-confirm sensor freshness and source labels; log one fresh manual snapshot if no live readings are present.",
     "what_not_to_do": [

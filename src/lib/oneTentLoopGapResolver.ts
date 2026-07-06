@@ -83,7 +83,6 @@ export interface OneTentLoopGap {
   evidence_checklist: readonly OneTentLoopGapEvidenceChecklistItem[];
 }
 
-
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -119,14 +118,7 @@ const DOWNSTREAM_MAP: Record<LoopStepId, readonly LoopStepId[]> = {
     "action-queue",
     "follow-up",
   ],
-  tent: [
-    "plant",
-    "sensor-snapshot",
-    "ai-doctor",
-    "alert",
-    "action-queue",
-    "follow-up",
-  ],
+  tent: ["plant", "sensor-snapshot", "ai-doctor", "alert", "action-queue", "follow-up"],
   plant: ["quick-log", "timeline", "ai-doctor", "follow-up"],
   "quick-log": ["timeline", "ai-doctor", "follow-up"],
   timeline: ["ai-doctor", "follow-up"],
@@ -148,33 +140,28 @@ const STATUS_TITLE_SUFFIX: Record<LoopStepStatus, string> = {
 };
 
 const STATUS_WHY: Record<LoopStepStatus, string> = {
-  passed:
-    "Evidence present. No blocking gap detected for this step from the current app state.",
+  passed: "Evidence present. No blocking gap detected for this step from the current app state.",
   needs_review:
     "Evidence exists but is incomplete or ambiguous, so this step cannot be treated as fully proven.",
   missing:
     "No supporting record was found, so the loop cannot be proven end-to-end from current app state.",
   blocked:
     "A safety fence prevents this step from being counted as proof (for example an Action Queue item without approval-required, or an executable device command marker).",
-  stale:
-    "The latest reading is too old to be trusted as current sensor truth for the loop.",
+  stale: "The latest reading is too old to be trusted as current sensor truth for the loop.",
   invalid:
     "The latest reading failed shape / range / source validation and cannot be treated as sensor truth.",
-  demo_only:
-    "Only demo or seeded data is available. Demo data is not real proof of the loop.",
+  demo_only: "Only demo or seeded data is available. Demo data is not real proof of the loop.",
 };
 
 const STATUS_NEXT_OBS: Record<LoopStepStatus, string> = {
-  passed:
-    "Continue observing the loop; no additional observation is required for this step.",
+  passed: "Continue observing the loop; no additional observation is required for this step.",
   needs_review:
     "Look for a more complete record (matching plant/tent/grow scope, timestamped, source-labeled).",
   missing:
     "Look for the next real record that would satisfy this step (with grow/tent/plant scope and a timestamp).",
   blocked:
     "Look for a corrected record that satisfies the safety fence (approval-required, no device command, correct scope).",
-  stale:
-    "Look for a fresher reading with an explicit source label and captured_at timestamp.",
+  stale: "Look for a fresher reading with an explicit source label and captured_at timestamp.",
   invalid:
     "Look for a well-formed reading (known metric, known source, sensible range, parseable captured_at).",
   demo_only:
@@ -182,20 +169,15 @@ const STATUS_NEXT_OBS: Record<LoopStepStatus, string> = {
 };
 
 const STATUS_SAFETY: Record<LoopStepStatus, string> = {
-  passed:
-    "Read-only view. Verified from current evidence; nothing new was recorded.",
-  needs_review:
-    "Read-only view. Not healthy — this step is only partially evidenced.",
+  passed: "Read-only view. Verified from current evidence; nothing new was recorded.",
+  needs_review: "Read-only view. Not healthy — this step is only partially evidenced.",
   missing:
     "Read-only view. Missing evidence is not proof of plant condition. Nothing will be created or automated by viewing this page.",
   blocked:
     "Read-only view. A safety fence has fired. Do not bypass it; investigate the underlying record.",
-  stale:
-    "Read-only view. Stale telemetry must never be shown as current sensor truth.",
-  invalid:
-    "Read-only view. Invalid telemetry is never healthy and never accurate.",
-  demo_only:
-    "Read-only view. Demo-only data is not proof of the real One-Tent Loop.",
+  stale: "Read-only view. Stale telemetry must never be shown as current sensor truth.",
+  invalid: "Read-only view. Invalid telemetry is never healthy and never accurate.",
+  demo_only: "Read-only view. Demo-only data is not proof of the real One-Tent Loop.",
 };
 
 const STATUS_TO_EVIDENCE_KIND: Record<LoopStepStatus, EvidenceProvenance> = {
@@ -216,14 +198,11 @@ const WHERE_BY_STEP: Record<OneTentLoopGapStepKey, string> = {
   grow: "Open the Grows page and confirm an active grow exists for this scope.",
   tent: "Open the Tent page for this grow and confirm a tent is set up.",
   plant: "Open the Plants page for this tent and confirm a plant is present.",
-  "quick-log":
-    "Open Daily Check / Quick Log for this plant and confirm a recent entry.",
-  timeline:
-    "Open the Timeline filtered to this plant/tent and confirm the entry linked correctly.",
+  "quick-log": "Open Daily Check / Quick Log for this plant and confirm a recent entry.",
+  timeline: "Open the Timeline filtered to this plant/tent and confirm the entry linked correctly.",
   "sensor-snapshot":
     "Open the Sensors page for this tent and confirm a fresh, source-labeled reading.",
-  "ai-doctor":
-    "Open the AI Doctor page for this plant and confirm the latest session context.",
+  "ai-doctor": "Open the AI Doctor page for this plant and confirm the latest session context.",
   alert: "Open the Alerts page and confirm a persisted alert row exists.",
   "action-queue":
     "Open the Action Queue and confirm the item is approval-required with no device command.",
@@ -336,9 +315,9 @@ function actionQueueSafetyGap(row: LoopStepRow): OneTentLoopGap | null {
       "An Action Queue item is not approval-required, or carries a device-command marker. Verdant treats this as a safety block, not proof.",
     where_to_resolve: WHERE_BY_STEP["action-queue"],
     suggested_next_observation:
-      "Look for the same item with approval_required=true and no device_command marker.",
+      "Look for the same item with approval_required=true and no device-control marker.",
     safety_note:
-      "Read-only view. Do not bypass the safety fence. Verdant will not auto-execute device commands.",
+      "Read-only view. Do not bypass the safety fence. Verdant will not run device commands automatically.",
     evidence_kind: "missing",
     source_label: firstSourceLabel(row),
     blocked_downstream_steps: DOWNSTREAM_MAP["action-queue"],
@@ -346,7 +325,6 @@ function actionQueueSafetyGap(row: LoopStepRow): OneTentLoopGap | null {
     evidence_checklist: [],
   };
 }
-
 
 /**
  * Optional plant-context gap: plant row is passed but the plant lacks
@@ -359,9 +337,7 @@ function plantContextGap(rows: readonly LoopStepRow[]): OneTentLoopGap | null {
   if (plant.status !== "passed" && plant.status !== "needs_review") return null;
   // Look for plant needs_review or "missing" style hints in missing_info.
   const missing = plant.missing_info ?? [];
-  const hasContextMiss = missing.some((m) =>
-    /(stage|medium|pot|pot size|pot_size)/i.test(m),
-  );
+  const hasContextMiss = missing.some((m) => /(stage|medium|pot|pot size|pot_size)/i.test(m));
   if (!hasContextMiss && plant.status !== "needs_review") return null;
   return {
     step_key: "plant-context",
@@ -375,15 +351,13 @@ function plantContextGap(rows: readonly LoopStepRow[]): OneTentLoopGap | null {
     where_to_resolve: WHERE_BY_STEP["plant-context"],
     suggested_next_observation:
       "Look for stage, medium, and pot size fields populated on the Plant details page.",
-    safety_note:
-      "Read-only view. Missing plant context is not proof of plant condition.",
+    safety_note: "Read-only view. Missing plant context is not proof of plant condition.",
     evidence_kind: "inferred",
     blocked_downstream_steps: ["ai-doctor", "follow-up"],
     is_real_data_gap: true,
     evidence_checklist: [],
   };
 }
-
 
 // ---------------------------------------------------------------------------
 // Evidence checklist builder
@@ -439,9 +413,7 @@ function stateFromStatus(status: LoopStepStatus): OneTentLoopGapEvidenceState {
  * downstream checklist items must never appear as `present`. Cascade to
  * `blocked` for hard-blocking statuses, otherwise `weak`.
  */
-function downstreamOverride(
-  gapStatus: OneTentLoopGapStatus,
-): OneTentLoopGapEvidenceState | null {
+function downstreamOverride(gapStatus: OneTentLoopGapStatus): OneTentLoopGapEvidenceState | null {
   switch (gapStatus) {
     case "missing":
     case "invalid":
@@ -474,9 +446,7 @@ export function buildOneTentLoopGapEvidenceChecklist(
   const items: OneTentLoopGapEvidenceChecklistItem[] = [];
   for (const stepId of CHECKLIST_STEP_ORDER) {
     const row = rowById.get(stepId);
-    let state: OneTentLoopGapEvidenceState = row
-      ? stateFromStatus(row.status)
-      : "unknown";
+    let state: OneTentLoopGapEvidenceState = row ? stateFromStatus(row.status) : "unknown";
     if (
       row &&
       override &&
@@ -505,14 +475,11 @@ export function buildOneTentLoopGapEvidenceChecklist(
 // Public entry points
 // ---------------------------------------------------------------------------
 
-
 /**
  * Rank every gap-eligible row into a stable priority-sorted list.
  * Exported for tests and text-report use. Deterministic.
  */
-export function rankOneTentLoopGaps(
-  rows: readonly LoopStepRow[],
-): OneTentLoopGap[] {
+export function rankOneTentLoopGaps(rows: readonly LoopStepRow[]): OneTentLoopGap[] {
   const gaps: OneTentLoopGap[] = [];
 
   for (const row of rows) {
@@ -547,8 +514,10 @@ export function rankOneTentLoopGaps(
   // Deterministic sort: priority asc, then step order asc, then title asc.
   gaps.sort((a, b) => {
     if (a.priority !== b.priority) return a.priority - b.priority;
-    const ai = a.step_key === "plant-context" ? 3.5 : BASE_PRIORITY[a.step_key as LoopStepId] ?? 99;
-    const bi = b.step_key === "plant-context" ? 3.5 : BASE_PRIORITY[b.step_key as LoopStepId] ?? 99;
+    const ai =
+      a.step_key === "plant-context" ? 3.5 : (BASE_PRIORITY[a.step_key as LoopStepId] ?? 99);
+    const bi =
+      b.step_key === "plant-context" ? 3.5 : (BASE_PRIORITY[b.step_key as LoopStepId] ?? 99);
     if (ai !== bi) return ai - bi;
     return a.title.localeCompare(b.title);
   });
@@ -556,22 +525,19 @@ export function rankOneTentLoopGaps(
   // Attach per-gap evidence checklist so downstream weakening reflects the
   // gap's own status.
   for (const g of gaps) {
-    (g as { evidence_checklist: readonly OneTentLoopGapEvidenceChecklistItem[] })
-      .evidence_checklist = buildOneTentLoopGapEvidenceChecklist(rows, g);
+    (
+      g as { evidence_checklist: readonly OneTentLoopGapEvidenceChecklistItem[] }
+    ).evidence_checklist = buildOneTentLoopGapEvidenceChecklist(rows, g);
   }
-
 
   return gaps;
 }
-
 
 /**
  * Resolve the single top real-data gap for the loop, or a "no blocking gap"
  * result when every step is a clean pass (or acceptable).
  */
-export function resolveTopOneTentLoopGap(
-  rows: readonly LoopStepRow[],
-): OneTentLoopGap {
+export function resolveTopOneTentLoopGap(rows: readonly LoopStepRow[]): OneTentLoopGap {
   const ranked = rankOneTentLoopGaps(rows);
   if (ranked.length === 0) {
     return {
@@ -595,14 +561,11 @@ export function resolveTopOneTentLoopGap(
   return ranked[0];
 }
 
-
 /**
  * Render the top gap as sanitized plain text for inclusion in the copyable
  * proof report. Never emits raw IDs, payloads, or secrets.
  */
-export function buildOneTentLoopTopGapTextBlock(
-  gap: OneTentLoopGap,
-): string {
+export function buildOneTentLoopTopGapTextBlock(gap: OneTentLoopGap): string {
   const lines: string[] = [];
   lines.push("Top real-data gap:");
   lines.push(`- Step: ${gap.step_key}`);
@@ -628,9 +591,7 @@ export function buildOneTentLoopTopGapTextBlock(
     lines.push("- Evidence checklist for this gap:");
     for (const item of gap.evidence_checklist) {
       const src = item.source_label ? ` · source=${item.source_label}` : "";
-      lines.push(
-        `    - ${item.label} [${item.state}]${src} — ${item.why_it_matters}`,
-      );
+      lines.push(`    - ${item.label} [${item.state}]${src} — ${item.why_it_matters}`);
     }
   } else {
     lines.push("- Evidence checklist for this gap: none");

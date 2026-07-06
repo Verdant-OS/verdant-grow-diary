@@ -128,7 +128,11 @@ describe("Manual Sensor Snapshot v1 — static safety", () => {
     for (const src of [RULES, CARD, SNAP, PANEL]) {
       expect(src).not.toMatch(/action_queue/i);
       expect(src).not.toMatch(/service_role/i);
-      expect(src).not.toMatch(/device[_-]?control/i);
+      // Negation-aware: the manual card renders the safety reassurance
+      // "not device control" (constant MANUAL_SENSOR_TRUTH_NOT_DEVICE_CONTROL_LINE
+      // + testid manual-reading-helper-not-device-control). Only a
+      // NON-negated device-control token is a violation.
+      expect(src).not.toMatch(/(?<!not[-_ ])device[_-]?control/i);
       expect(src).not.toMatch(/automation/i);
       expect(src).not.toMatch(/webhook/i);
     }

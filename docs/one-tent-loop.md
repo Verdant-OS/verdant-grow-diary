@@ -4,6 +4,16 @@ The minimum end-to-end operating loop Verdant must always support:
 
 `Grow → Tent → Plant → Quick Log → Timeline → Sensor Snapshot → AI Doctor → Alert → Approval-Required Action Queue`
 
+How to read each step below:
+
+- **Input** — the minimum data the step needs.
+- **Output** — the step's purpose: what it must produce.
+- **User sees** / **Next handoff** — the validation signal that the step
+  worked and feeds the next one.
+- **Required labels** — the step's safety requirement.
+- **Failure/degraded** — the common failure mode and the honest behavior
+  required when it happens.
+
 ## 1. Grow
 
 - **Input** — User creates a grow (name, start date, strategy).
@@ -84,3 +94,19 @@ The minimum end-to-end operating loop Verdant must always support:
 - **Required labels** — "Approval required". Source reference.
 - **Next handoff** — Grower approves / simulates / completes / rejects. No automatic execution.
 - **Failure/degraded** — Duplicate prevention via source de-dup. No hidden command execution path.
+
+## Definition of done
+
+The One-Tent Loop counts as working only when all of the following hold:
+
+- [ ] One grow can be created.
+- [ ] One tent can be created.
+- [ ] One plant can be created.
+- [ ] One Quick Log can be added.
+- [ ] Photo / log / sensor context can appear on the timeline.
+- [ ] AI Doctor uses that context cautiously (cites evidence, names missing
+      information, caps confidence on weak evidence).
+- [ ] An alert / recommendation can be reviewed by the grower.
+- [ ] The Action Queue remains approval-required end to end.
+- [ ] No fake live data anywhere in the loop.
+- [ ] No device control anywhere in the loop.

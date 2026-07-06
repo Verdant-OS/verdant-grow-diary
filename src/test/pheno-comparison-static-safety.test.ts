@@ -20,6 +20,7 @@ const FILES = [
   "src/lib/phenoCandidatePostCureViewModel.ts",
   "src/lib/phenoTraitScoringRules.ts",
   "src/lib/phenoKeeperDecisionModel.ts",
+  "src/lib/phenoKeeperLineageViewModel.ts",
 ];
 
 function read(p: string): string {

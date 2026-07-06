@@ -10,11 +10,12 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Copy, ExternalLink, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Copy, ExternalLink, ShieldCheck, FileText } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import ManifestSummaryModal from "@/components/mcp/ManifestSummaryModal";
 import {
   MCP_MANIFEST,
   buildConnectionDetailsText,
@@ -27,9 +28,13 @@ import {
 import {
   verifyMcpToolAccess,
   defaultBrowserHarness,
+  getVerifyStatusGuidance,
+  NOT_CHECKED_LABEL,
+  NOT_CHECKED_DESCRIPTION,
   type HarnessAdapter,
   type VerifyMcpToolAccessResult,
 } from "@/lib/mcp/verifyMcpToolAccess";
+
 
 type CopyState = "idle" | "copied" | "failed";
 

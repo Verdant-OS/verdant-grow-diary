@@ -7,6 +7,55 @@
 // - Asserts no visible token/secret-like strings render.
 import { test, expect, type Page } from "@playwright/test";
 
+// supabase-js derives its auth storage key as
+// `sb-${hostname.split(".")[0]}-auth-token` and (per this app's hardened
+// client) persists it in sessionStorage. Seed a CLEARLY-FAKE local session
+// under that key before the app boots so the protected /settings route's
+// guard renders the presenter-only page instead of redirecting to /auth.
+// No real token — every /auth + /rest request is still intercepted below,
+// so getUser() (used by useRequireAuth) resolves against the mock.
+//
+// NOTE: @supabase/auth-js v2 stores the session object DIRECTLY (validated
+// by _isValidSession requiring top-level access_token/refresh_token/
+// expires_at). It is NOT wrapped in the legacy `{ currentSession }` shape.
+const SB_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
+const SB_SESSION_KEY = `sb-${SB_PROJECT_REF}-auth-token`;
+
+// Fake, clearly-labeled signed-in user. Carries email_confirmed_at +
+// user_metadata.email_verified so AppShell's isEmailVerificationPending
+// gate (which fails CLOSED for unverified users, replacing the route
+// Outlet with a verification banner) treats this account as verified and
+// renders the Agent Integrations page.
+const FAKE_USER = {
+  id: "test-user-id",
+  aud: "authenticated",
+  email: "x@example.invalid",
+  email_confirmed_at: "2020-01-01T00:00:00.000Z",
+  confirmed_at: "2020-01-01T00:00:00.000Z",
+  user_metadata: { email_verified: true },
+};
+
+async function seedFakeSession(page: Page) {
+  await page.addInitScript(
+    ({ key, user }) => {
+      const fakeSession = {
+        access_token: "FAKE-ACCESS-TOKEN-NOT-REAL",
+        refresh_token: "FAKE-REFRESH-TOKEN-NOT-REAL",
+        token_type: "bearer",
+        expires_in: 3600,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        user,
+      };
+      try {
+        sessionStorage.setItem(key, JSON.stringify(fakeSession));
+      } catch {
+        /* ignore */
+      }
+    },
+    { key: SB_SESSION_KEY, user: FAKE_USER },
+  );
+}
+
 async function mockSignedInSupabase(page: Page) {
   await page.route(/\/auth\/v1\//, async (route, req) => {
     const url = req.url();
@@ -14,11 +63,7 @@ async function mockSignedInSupabase(page: Page) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          id: "test-user-id",
-          aud: "authenticated",
-          email: "x@example.invalid",
-        }),
+        body: JSON.stringify(FAKE_USER),
       });
       return;
     }
@@ -58,25 +103,22 @@ test.describe("Agent Integrations settings smoke (mocked, 1280x800)", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
   test.beforeEach(async ({ page }) => {
+    await seedFakeSession(page);
     await mockSignedInSupabase(page);
   });
 
-  test("page loads with fingerprint, tools, checklist, and safe verify default", async ({ page }) => {
+  test("page loads with fingerprint, tools, checklist, and safe verify default", async ({
+    page,
+  }) => {
     await page.goto("/settings/agent-integrations");
 
     await expect(page.getByTestId("manifest-identity")).toBeVisible();
     await expect(page.getByTestId("manifest-version")).toBeVisible();
     await expect(page.getByTestId("manifest-fingerprint")).toBeVisible();
-    await expect(page.getByTestId("manifest-tool-count")).toContainText(
-      "Tools advertised: 3",
-    );
+    await expect(page.getByTestId("manifest-tool-count")).toContainText("Tools advertised: 3");
 
     // Exact tool names present.
-    for (const name of [
-      "list_grows",
-      "list_recent_diary_entries",
-      "get_latest_sensor_snapshot",
-    ]) {
+    for (const name of ["list_grows", "list_recent_diary_entries", "get_latest_sensor_snapshot"]) {
       await expect(page.getByTestId(`mcp-tool-${name}`)).toBeVisible();
     }
 
@@ -102,17 +144,13 @@ test.describe("Agent Integrations settings smoke (mocked, 1280x800)", () => {
     await expect(page.getByTestId("verify-tool-access")).toBeVisible();
     const panel = page.getByTestId("verify-tool-access-result");
     await expect(panel).toHaveAttribute("data-status", "not_checked");
-    await expect(page.getByTestId("verify-tool-checked")).toContainText(
-      "list_grows",
-    );
+    await expect(page.getByTestId("verify-tool-checked")).toContainText("list_grows");
 
     // After clicking Verify with the default browser harness, we get
     // harness_unavailable — never authorized without a harness.
     await page.getByTestId("verify-tool-access-button").click();
     await expect(panel).toHaveAttribute("data-status", "harness_unavailable");
-    await expect(page.getByTestId("verify-next-step")).toContainText(
-      /configured local harness/i,
-    );
+    await expect(page.getByTestId("verify-next-step")).toContainText(/configured local harness/i);
 
     // Manifest summary modal opens + shows safe projection.
     await page.getByTestId("open-manifest-summary-modal").click();

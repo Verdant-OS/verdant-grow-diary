@@ -1,0 +1,92 @@
+name: Agent Integrations Playwright smoke (mocked)
+
+# Non-destructive Playwright smoke for /settings/agent-integrations.
+#
+# SAFETY:
+#  - Mocked/non-destructive only. Every Supabase /auth/v1/** and
+#    /rest/v1/** request is intercepted via page.route() inside the spec;
+#    no real Supabase endpoint is contacted.
+#  - No real accounts created, no OAuth performed, no service_role used.
+#  - No real grow data touched (the page is presenter-only metadata).
+#  - No E2E credentials, no elevated DB role, no secrets are read — so
+#    this runs cleanly on forked PRs with no repository secrets.
+#  - Uses the SAFE pull_request event only — never pull_request_target.
+#  - No schedule/cron trigger.
+
+on:
+  pull_request:
+    branches: [verdant-grow-diary]
+    paths:
+      - "e2e/agent-integrations-smoke.spec.ts"
+      - "src/pages/AgentIntegrations.tsx"
+      - "src/components/mcp/**"
+      - "src/lib/mcp/**"
+      - "playwright.config.ts"
+      - ".github/workflows/agent-integrations-smoke.yml"
+      - "package.json"
+      - "bun.lock"
+      - "bun.lockb"
+
+jobs:
+  agent-integrations-smoke:
+    name: Agent Integrations smoke (mocked / non-destructive)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Install Chromium only (with deps)
+        run: bunx playwright install chromium --with-deps
+
+      - name: Run Agent Integrations Playwright smoke (mocked)
+        run: bunx playwright test agent-integrations-smoke.spec.ts --project=chromium-mocked
+
+      - name: Upload Playwright report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: agent-integrations-playwright-report
+          path: playwright-report
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload Playwright test-results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: agent-integrations-test-results
+          path: test-results
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Job summary — mocked/non-destructive
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Agent Integrations Playwright smoke (mocked / non-destructive)";
+            echo "";
+            echo "- Spec: \`e2e/agent-integrations-smoke.spec.ts\`";
+            echo "- Project: \`chromium-mocked\`";
+            echo "- Mocked / non-destructive: **yes**";
+            echo "- No real accounts, OAuth, or service_role";
+            echo "- No real grow data touched";
+            echo "- All Supabase /auth/v1/** + /rest/v1/** traffic intercepted via page.route()";
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -213,7 +213,7 @@ describeIfHarness("MCP local RLS integration", () => {
   describe("list_grows", () => {
     it("User A sees only Grow A", async () => {
       const res = await listGrowsTool.handler({ includeArchived: false, limit: 25 } as never, makeCtx(userA.accessToken));
-      const ids = (res.structuredContent?.grows ?? []).map((g: { id: string }) => g.id);
+      const ids = ((res.structuredContent as any)?.grows ?? []).map((g: { id: string }) => g.id);
       expect(ids).toContain(userA.growId);
       expect(ids).not.toContain(userB.growId);
       assertNoSecretLeakage(res);
@@ -221,7 +221,7 @@ describeIfHarness("MCP local RLS integration", () => {
 
     it("User B sees only Grow B", async () => {
       const res = await listGrowsTool.handler({ includeArchived: false, limit: 25 } as never, makeCtx(userB.accessToken));
-      const ids = (res.structuredContent?.grows ?? []).map((g: { id: string }) => g.id);
+      const ids = ((res.structuredContent as any)?.grows ?? []).map((g: { id: string }) => g.id);
       expect(ids).toContain(userB.growId);
       expect(ids).not.toContain(userA.growId);
       assertNoSecretLeakage(res);
@@ -238,7 +238,7 @@ describeIfHarness("MCP local RLS integration", () => {
       const res = await listDiaryTool.handler({ growId: userB.growId, limit: 10 } as never,
         makeCtx(userA.accessToken),
       );
-      const ids = (res.structuredContent?.entries ?? []).map((e: { id: string }) => e.id);
+      const ids = ((res.structuredContent as any)?.entries ?? []).map((e: { id: string }) => e.id);
       expect(ids).not.toContain(userB.diaryId);
       assertNoSecretLeakage(res);
     });
@@ -247,7 +247,7 @@ describeIfHarness("MCP local RLS integration", () => {
       const res = await listDiaryTool.handler({ growId: userA.growId, limit: 10 } as never,
         makeCtx(userA.accessToken),
       );
-      const ids = (res.structuredContent?.entries ?? []).map((e: { id: string }) => e.id);
+      const ids = ((res.structuredContent as any)?.entries ?? []).map((e: { id: string }) => e.id);
       expect(ids).toContain(userA.diaryId);
       expect(ids).not.toContain(userB.diaryId);
       assertNoSecretLeakage(res);
@@ -257,7 +257,7 @@ describeIfHarness("MCP local RLS integration", () => {
       const res = await listDiaryTool.handler({ growId: userB.growId, limit: 10 } as never,
         makeCtx(userB.accessToken),
       );
-      const ids = (res.structuredContent?.entries ?? []).map((e: { id: string }) => e.id);
+      const ids = ((res.structuredContent as any)?.entries ?? []).map((e: { id: string }) => e.id);
       expect(ids).toContain(userB.diaryId);
       expect(ids).not.toContain(userA.diaryId);
       assertNoSecretLeakage(res);
@@ -276,7 +276,7 @@ describeIfHarness("MCP local RLS integration", () => {
       const res = await getSnapshotTool.handler({ tentId: userB.tentId } as never,
         makeCtx(userA.accessToken),
       );
-      const snap = res.structuredContent?.snapshot;
+      const snap = (res.structuredContent as any)?.snapshot;
       expect(snap?.id ?? null).not.toBe(userB.snapshotId);
       assertNoSecretLeakage(res);
     });
@@ -285,7 +285,7 @@ describeIfHarness("MCP local RLS integration", () => {
       const res = await getSnapshotTool.handler({ tentId: userA.tentId } as never,
         makeCtx(userA.accessToken),
       );
-      expect(res.structuredContent?.snapshot?.id).toBe(userA.snapshotId);
+      expect((res.structuredContent as any)?.snapshot?.id).toBe(userA.snapshotId);
       assertNoSecretLeakage(res);
     });
 
@@ -293,7 +293,7 @@ describeIfHarness("MCP local RLS integration", () => {
       const res = await getSnapshotTool.handler({ tentId: userB.tentId } as never,
         makeCtx(userB.accessToken),
       );
-      expect(res.structuredContent?.snapshot?.id).toBe(userB.snapshotId);
+      expect((res.structuredContent as any)?.snapshot?.id).toBe(userB.snapshotId);
       assertNoSecretLeakage(res);
     });
 

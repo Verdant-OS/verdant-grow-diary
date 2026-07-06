@@ -76,7 +76,18 @@ function OAuthStatusBadge({ status }: { status: OAuthStatus }) {
   );
 }
 
-export default function AgentIntegrations() {
+export type AgentIntegrationsProps = {
+  /**
+   * Optional injectable verification harness. Defaults to a browser-safe
+   * "unavailable" adapter so we never attempt live MCP calls from the UI.
+   * Tests inject a fake adapter to exercise the four presenter states.
+   */
+  verifyHarness?: HarnessAdapter;
+};
+
+export default function AgentIntegrations({
+  verifyHarness = defaultBrowserHarness,
+}: AgentIntegrationsProps = {}) {
   usePageSeo({
     title: "Agent integrations — Verdant Grow Diary",
     description:
@@ -99,6 +110,13 @@ export default function AgentIntegrations() {
   const consentUrl = `${appOrigin}${MCP_MANIFEST.consentPath}`;
   const oauthStatus = deriveOAuthStatus();
 
+  const manifestHash = useMemo(() => computeManifestHash(MCP_MANIFEST), []);
+  const manifestFingerprint = useMemo(
+    () => shortenManifestHash(manifestHash),
+    [manifestHash],
+  );
+  const toolNames = MCP_MANIFEST.tools.map((t) => t.name);
+
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const onCopy = useCallback(async () => {
     const payload = buildConnectionDetailsText(MCP_MANIFEST, supabaseOrigin, appOrigin);
@@ -117,6 +135,20 @@ export default function AgentIntegrations() {
       setCopyState("failed");
     }
   }, [supabaseOrigin, appOrigin]);
+
+  const [verifyResult, setVerifyResult] =
+    useState<VerifyMcpToolAccessResult | null>(null);
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const onVerify = useCallback(async () => {
+    setVerifyBusy(true);
+    try {
+      const result = await verifyMcpToolAccess({ adapter: verifyHarness });
+      setVerifyResult(result);
+    } finally {
+      setVerifyBusy(false);
+    }
+  }, [verifyHarness]);
+
 
   return (
     <div className="min-h-dvh px-4 py-6 md:px-8">

@@ -403,6 +403,7 @@ export default function AgentIntegrations({
                 href={consentUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Open Verdant OAuth consent route"
                 data-testid="open-oauth-consent-link"
               >
                 <ExternalLink className="mr-2 h-3 w-3" aria-hidden />
@@ -414,6 +415,7 @@ export default function AgentIntegrations({
                 href={manifestUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Open Verdant MCP manifest"
                 data-testid="view-mcp-manifest-link"
               >
                 <ExternalLink className="mr-2 h-3 w-3" aria-hidden />
@@ -423,6 +425,7 @@ export default function AgentIntegrations({
             <Button asChild size="sm" variant="outline">
               <a
                 href="#agent-tool-reference"
+                aria-label="Jump to Verdant agent tool reference"
                 data-testid="view-tool-reference-link"
               >
                 View agent tool reference
@@ -432,12 +435,24 @@ export default function AgentIntegrations({
               size="sm"
               variant="outline"
               onClick={onCopy}
+              aria-label="Copy Verdant MCP connection details"
               data-testid="checklist-copy-connection-details"
             >
               <Copy className="mr-2 h-3 w-3" aria-hidden />
               Copy connection details
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setManifestModalOpen(true)}
+              aria-label="View safe MCP manifest summary"
+              data-testid="checklist-open-manifest-summary-modal"
+            >
+              <FileText className="mr-2 h-3 w-3" aria-hidden />
+              View MCP manifest summary
+            </Button>
           </div>
+
           <p
             className="text-xs text-muted-foreground"
             data-testid="connect-agent-safety-copy"

@@ -8,8 +8,8 @@
  *     client that forwards the caller's OAuth token, so reads run as the
  *     signed-in user.
  *   - No raw_payload or secret exposure.
- *   - No fabricated live data — sensor rows preserve their `source` field
- *     verbatim so demo/stale/invalid stay labeled.
+ *   - No fabricated live data — sensor rows preserve their `source` and
+ *     `quality` fields verbatim so sim/degraded/stale/invalid stay labeled.
  *
  * The OAuth issuer must be the direct supabase.co host, built from the
  * project ref (VITE_SUPABASE_PROJECT_ID is inlined by Vite at build time).
@@ -19,8 +19,7 @@ import listGrowsTool from "./tools/list-grows";
 import listRecentDiaryEntriesTool from "./tools/list-recent-diary-entries";
 import getLatestSensorSnapshotTool from "./tools/get-latest-sensor-snapshot";
 
-const projectRef =
-  import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "project-ref-unset";
+const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "project-ref-unset";
 
 export default defineMcp({
   name: "verdant-grow-os-mcp",
@@ -29,19 +28,17 @@ export default defineMcp({
   instructions:
     "Read-only access to the signed-in Verdant grower's own data. " +
     "Use `list_grows` to enumerate grows, `list_recent_diary_entries` " +
-    "for recent log entries in a grow, and `get_latest_sensor_snapshot` " +
-    "to read the most recent sensor reading for a tent. Sensor rows " +
-    "always include their `source` label (live/manual/csv/demo/stale/" +
-    "invalid) — never treat non-live sources as current readings. " +
+    "for recent log entries in a grow the caller owns, and " +
+    "`get_latest_sensor_snapshot` for the most recent reading per " +
+    "metric in a tent the caller owns. Sensor readings always include " +
+    "their `source` label (manual/pi_bridge/sim) and `quality` label " +
+    "(ok/degraded/stale/invalid) — never treat readings with quality " +
+    "other than `ok`, or source `sim`, as current live data. " +
     "This server never writes, never approves Action Queue items, and " +
     "never controls devices.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",
   }),
-  tools: [
-    listGrowsTool,
-    listRecentDiaryEntriesTool,
-    getLatestSensorSnapshotTool,
-  ],
+  tools: [listGrowsTool, listRecentDiaryEntriesTool, getLatestSensorSnapshotTool],
 });

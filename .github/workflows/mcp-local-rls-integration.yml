@@ -1,0 +1,77 @@
+name: MCP local RLS integration
+
+# Runs the Verdant MCP read-only RLS integration harness against a fresh
+# LOCAL Supabase started by the Supabase CLI on the runner. No hosted
+# Supabase, no production secrets — the "service role" used here is the
+# ephemeral local key printed by `supabase status`, used only for seeding
+# and cleanup. MCP tool execution itself always routes through per-user
+# anon tokens (`supabaseForUser(ctx)`).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/lib/mcp/**"
+      - "src/test/mcp-local-rls-integration.test.ts"
+      - ".lovable/mcp/manifest.json"
+      - "supabase/migrations/**"
+      - ".github/workflows/mcp-local-rls-integration.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/lib/mcp/**"
+      - "src/test/mcp-local-rls-integration.test.ts"
+      - ".lovable/mcp/manifest.json"
+      - "supabase/migrations/**"
+      - ".github/workflows/mcp-local-rls-integration.yml"
+
+jobs:
+  mcp-local-rls:
+    name: MCP RLS harness (local Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase (with repo migrations)
+        run: |
+          supabase start --exclude studio,inbucket,imgproxy,pgadmin-schema-diff,pgbouncer,realtime,edge-runtime,logflare,vector
+
+      - name: Extract local Supabase env
+        id: sb
+        run: |
+          set -euo pipefail
+          # Machine-readable key=value output from Supabase CLI.
+          eval "$(supabase status -o env)"
+          {
+            echo "api_url=${API_URL}"
+            echo "anon_key=${ANON_KEY}"
+            echo "service_role_key=${SERVICE_ROLE_KEY}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run MCP local RLS integration test
+        env:
+          MCP_LOCAL_RLS_HARNESS: "1"
+          LOCAL_SUPABASE_URL: ${{ steps.sb.outputs.api_url }}
+          LOCAL_SUPABASE_ANON_KEY: ${{ steps.sb.outputs.anon_key }}
+          LOCAL_SUPABASE_SERVICE_ROLE_KEY: ${{ steps.sb.outputs.service_role_key }}
+        run: bunx vitest run src/test/mcp-local-rls-integration.test.ts --reporter=dot
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup || true

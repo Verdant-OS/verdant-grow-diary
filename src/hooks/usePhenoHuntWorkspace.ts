@@ -17,6 +17,12 @@ import {
   listKeeperDecisionsForHunt,
   type KeeperDecisionRow,
 } from "@/lib/phenoKeeperDecisionService";
+import {
+  upsertScoreRound,
+  listScoreRoundsForHunt,
+  type ScoreRoundRow,
+  type PhenoScoreRound,
+} from "@/lib/phenoScoreRoundsService";
 import type { PhenoKeeperDecision } from "@/lib/phenoKeeperDecisionModel";
 
 export type WorkspaceStatus = "idle" | "loading" | "ok" | "error";
@@ -27,6 +33,8 @@ export interface UsePhenoHuntWorkspaceState {
   candidates: PhenoCandidateInput[];
   scoresByPlant: Record<string, CandidateScoreRow>;
   decisionsByPlant: Record<string, KeeperDecisionRow>;
+  /** Per-round cards keyed "plantId:round". */
+  roundsByKey: Record<string, ScoreRoundRow>;
   error: string | null;
   saving: string | null;
   saveScore: (
@@ -38,6 +46,16 @@ export interface UsePhenoHuntWorkspaceState {
     plantId: string,
     decision: PhenoKeeperDecision,
     note?: string | null,
+  ) => Promise<boolean>;
+  saveRound: (
+    plantId: string,
+    round: PhenoScoreRound,
+    payload: {
+      loudTraits: Record<string, number>;
+      aromaDescriptors?: readonly string[];
+      noseNote?: string | null;
+      note?: string | null;
+    },
   ) => Promise<boolean>;
 }
 
@@ -51,6 +69,7 @@ export function usePhenoHuntWorkspace(
   const [candidates, setCandidates] = useState<PhenoCandidateInput[]>([]);
   const [scoresByPlant, setScoresByPlant] = useState<Record<string, CandidateScoreRow>>({});
   const [decisionsByPlant, setDecisionsByPlant] = useState<Record<string, KeeperDecisionRow>>({});
+  const [roundsByKey, setRoundsByKey] = useState<Record<string, ScoreRoundRow>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -70,15 +89,17 @@ export function usePhenoHuntWorkspace(
         setStatus("error");
         return;
       }
-      const [scores, decisions] = await Promise.all([
+      const [scores, decisions, rounds] = await Promise.all([
         listCandidateScoresForHunt(id),
         listKeeperDecisionsForHunt(id),
+        listScoreRoundsForHunt(id),
       ]);
       if (cancelled) return;
       setHunt(result.hunt);
       setCandidates([...result.candidates]);
       setScoresByPlant(scores);
       setDecisionsByPlant(decisions);
+      setRoundsByKey(rounds);
       setStatus("ok");
     })().catch(() => {
       if (cancelled) return;
@@ -128,15 +149,62 @@ export function usePhenoHuntWorkspace(
     [id],
   );
 
+  const saveRound = useCallback(
+    async (
+      plantId: string,
+      round: PhenoScoreRound,
+      payload: {
+        loudTraits: Record<string, number>;
+        aromaDescriptors?: readonly string[];
+        noseNote?: string | null;
+        note?: string | null;
+      },
+    ) => {
+      if (!id) return false;
+      setSaving(plantId);
+      const res = await upsertScoreRound({
+        huntId: id,
+        plantId,
+        round,
+        loudTraits: payload.loudTraits,
+        aromaDescriptors: payload.aromaDescriptors,
+        noseNote: payload.noseNote,
+        note: payload.note,
+      });
+      setSaving(null);
+      if (res.ok === true) {
+        setRoundsByKey((prev) => ({
+          ...prev,
+          [`${plantId}:${round}`]: {
+            plantId,
+            round,
+            traits: {},
+            loudTraits: payload.loudTraits,
+            aromaDescriptors: [...(payload.aromaDescriptors ?? [])],
+            noseNote: payload.noseNote ?? null,
+            note: payload.note ?? null,
+            observedAt: new Date().toISOString(),
+          },
+        }));
+        return true;
+      }
+      setError(res.error);
+      return false;
+    },
+    [id],
+  );
+
   return {
     status,
     hunt,
     candidates,
     scoresByPlant,
     decisionsByPlant,
+    roundsByKey,
     error,
     saving,
     saveScore,
     saveDecision,
+    saveRound,
   };
 }

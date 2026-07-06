@@ -21,10 +21,21 @@ import {
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
 import type { CandidateScoreRow } from "@/lib/phenoCandidateScoresService";
 import type { KeeperDecisionRow } from "@/lib/phenoKeeperDecisionService";
+import {
+  PHENO_SCORE_ROUNDS,
+  PHENO_SCORE_ROUND_LABELS,
+  type PhenoScoreRound,
+  type ScoreRoundRow,
+} from "@/lib/phenoScoreRoundsService";
+
+/** "overall" = the flat card (pheno_candidate_scores); rounds = staged cards. */
+type WorkspaceRound = "overall" | PhenoScoreRound;
 
 interface EditorProps {
   candidate: PhenoCandidateInput;
+  round: WorkspaceRound;
   score: CandidateScoreRow | undefined;
+  roundRow: ScoreRoundRow | undefined;
   decision: KeeperDecisionRow | undefined;
   saving: boolean;
   onSaveScore: (
@@ -32,22 +43,38 @@ interface EditorProps {
     traits: Record<string, number>,
     note: string | null,
   ) => Promise<boolean>;
+  onSaveRound: (
+    plantId: string,
+    round: PhenoScoreRound,
+    payload: {
+      loudTraits: Record<string, number>;
+      aromaDescriptors?: readonly string[];
+      noseNote?: string | null;
+      note?: string | null;
+    },
+  ) => Promise<boolean>;
   onSaveDecision: (plantId: string, decision: PhenoKeeperDecision) => Promise<boolean>;
 }
 
 function CandidateEditor({
   candidate,
+  round,
   score,
+  roundRow,
   decision,
   saving,
   onSaveScore,
+  onSaveRound,
   onSaveDecision,
 }: EditorProps) {
   const plantId = candidate.candidateId;
-  const [traits, setTraits] = useState<Record<string, number>>(() => ({
-    ...(score?.traits ?? {}),
-  }));
-  const [note, setNote] = useState<string>(score?.note ?? "");
+  const isRoundMode = round !== "overall";
+  const [traits, setTraits] = useState<Record<string, number>>(() =>
+    isRoundMode ? { ...(roundRow?.loudTraits ?? {}) } : { ...(score?.traits ?? {}) },
+  );
+  const [note, setNote] = useState<string>((isRoundMode ? roundRow?.note : score?.note) ?? "");
+  const [aroma, setAroma] = useState<string>((roundRow?.aromaDescriptors ?? []).join(", "));
+  const [noseNote, setNoseNote] = useState<string>(roundRow?.noseNote ?? "");
   const [decisionValue, setDecisionValue] = useState<PhenoKeeperDecision>(
     decision?.decision ?? DEFAULT_KEEPER_DECISION,
   );
@@ -67,7 +94,20 @@ function CandidateEditor({
   };
 
   const onSave = async () => {
-    const okScore = await onSaveScore(plantId, traits, note.trim() || null);
+    let okScore: boolean;
+    if (isRoundMode) {
+      okScore = await onSaveRound(plantId, round as PhenoScoreRound, {
+        loudTraits: traits,
+        aromaDescriptors: aroma
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        noseNote: noseNote.trim() || null,
+        note: note.trim() || null,
+      });
+    } else {
+      okScore = await onSaveScore(plantId, traits, note.trim() || null);
+    }
     const okDecision = await onSaveDecision(plantId, decisionValue);
     setSaved(okScore && okDecision);
   };
@@ -107,6 +147,40 @@ function CandidateEditor({
           </label>
         ))}
       </div>
+
+      {isRoundMode && (
+        <>
+          <label className="block text-sm">
+            <span className="mb-1 block">
+              Aroma / nose <span className="text-xs text-muted-foreground">(comma-separated)</span>
+            </span>
+            <input
+              type="text"
+              data-testid={`workspace-aroma-${plantId}`}
+              value={aroma}
+              onChange={(e) => {
+                setSaved(false);
+                setAroma(e.target.value);
+              }}
+              placeholder="gas, funk, candy…"
+              className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block">Nose note</span>
+            <input
+              type="text"
+              data-testid={`workspace-nose-note-${plantId}`}
+              value={noseNote}
+              onChange={(e) => {
+                setSaved(false);
+                setNoseNote(e.target.value);
+              }}
+              className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+            />
+          </label>
+        </>
+      )}
 
       <label className="block text-sm">
         <span className="mb-1 block">Notes</span>
@@ -164,6 +238,7 @@ function CandidateEditor({
 export default function PhenoHuntWorkspace() {
   const { id } = useParams<{ id: string }>();
   const ws = usePhenoHuntWorkspace(id);
+  const [round, setRound] = useState<WorkspaceRound>("overall");
 
   const candidates = useMemo(() => ws.candidates, [ws.candidates]);
 
@@ -190,6 +265,25 @@ export default function PhenoHuntWorkspace() {
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Hunt workspace: {ws.hunt?.name ?? "this hunt"}</h1>
         <p className="text-xs text-muted-foreground">{PHENO_KEEPER_DECISION_CAVEAT}</p>
+        <label className="flex items-center gap-2 pt-1 text-sm">
+          <span className="font-medium">Scoring round</span>
+          <select
+            data-testid="workspace-round-select"
+            value={round}
+            onChange={(e) => setRound(e.target.value as WorkspaceRound)}
+            className="rounded border border-border bg-background px-2 py-1"
+          >
+            <option value="overall">Overall</option>
+            {PHENO_SCORE_ROUNDS.map((r) => (
+              <option key={r} value={r}>
+                {PHENO_SCORE_ROUND_LABELS[r]}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-muted-foreground">
+            Score the same plant at each stage — rounds save separately.
+          </span>
+        </label>
       </header>
 
       {candidates.length === 0 ? (
@@ -200,12 +294,18 @@ export default function PhenoHuntWorkspace() {
         <div className="grid gap-4 md:grid-cols-2">
           {candidates.map((c) => (
             <CandidateEditor
-              key={c.candidateId}
+              // Re-mount on round change so prefill state re-initializes.
+              key={`${c.candidateId}:${round}`}
               candidate={c}
+              round={round}
               score={ws.scoresByPlant[c.candidateId]}
+              roundRow={
+                round === "overall" ? undefined : ws.roundsByKey[`${c.candidateId}:${round}`]
+              }
               decision={ws.decisionsByPlant[c.candidateId]}
               saving={ws.saving === c.candidateId}
               onSaveScore={ws.saveScore}
+              onSaveRound={ws.saveRound}
               onSaveDecision={ws.saveDecision}
             />
           ))}

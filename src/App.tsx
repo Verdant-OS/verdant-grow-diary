@@ -40,6 +40,7 @@ const GrowDetail = lazy(() => import("./pages/GrowDetail"));
 const PhenoHuntNew = lazy(() => import("./pages/PhenoHuntNew"));
 const PhenoHuntCompare = lazy(() => import("./pages/PhenoHuntCompare"));
 const PhenoHuntWorkspace = lazy(() => import("./pages/PhenoHuntWorkspace"));
+const PhenoKeepersPage = lazy(() => import("./pages/PhenoKeepersPage"));
 const Reports = lazy(() => import("./pages/Reports"));
 const PostGrowLearningReport = lazy(() => import("./pages/PostGrowLearningReport"));
 
@@ -199,6 +200,9 @@ const App = () => (
                       decisions. RLS-scoped writes of own data; suggest-only,
                       no AI/Action Queue/automation. */}
                   <Route path="/pheno-hunts/:id/workspace" element={<PhenoHuntWorkspace />} />
+                  {/* Keepers, clone lineage, and breeding crosses. RLS-scoped
+                      writes of own data; data/record-only, no automation. */}
+                  <Route path="/pheno-hunts/:id/keepers" element={<PhenoKeepersPage />} />
 
                   <Route element={<AppShell />}>
                     <Route path="/" element={<Dashboard />} />

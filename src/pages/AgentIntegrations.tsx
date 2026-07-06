@@ -123,7 +123,7 @@ export default function AgentIntegrations() {
 
         <PageHeader
           title="Agent integrations"
-          subtitle="Connect ChatGPT, Claude, Cursor, or another MCP-capable assistant to your Verdant grow data."
+          description="Connect ChatGPT, Claude, Cursor, or another MCP-capable assistant to your Verdant grow data."
         />
 
         <section

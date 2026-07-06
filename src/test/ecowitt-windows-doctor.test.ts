@@ -9,7 +9,7 @@
  *  - writeLaunchers refuses paths outside tmp/ecowitt-windows/
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -21,15 +21,45 @@ import {
 } from "../../scripts/dev/ecowitt-windows-doctor";
 
 const fakeIfaces = (): ReturnType<typeof import("node:os").networkInterfaces> => ({
-  lo: [{ address: "127.0.0.1", netmask: "255.0.0.0", family: "IPv4", mac: "00:00:00:00:00:00", internal: true, cidr: "127.0.0.1/8" }],
+  lo: [
+    {
+      address: "127.0.0.1",
+      netmask: "255.0.0.0",
+      family: "IPv4",
+      mac: "00:00:00:00:00:00",
+      internal: true,
+      cidr: "127.0.0.1/8",
+    },
+  ],
   "Ethernet 2": [
-    { address: "192.168.1.42", netmask: "255.255.255.0", family: "IPv4", mac: "aa:bb", internal: false, cidr: "192.168.1.42/24" },
+    {
+      address: "192.168.1.42",
+      netmask: "255.255.255.0",
+      family: "IPv4",
+      mac: "aa:bb",
+      internal: false,
+      cidr: "192.168.1.42/24",
+    },
   ],
   "vEthernet (WSL)": [
-    { address: "172.20.16.1", netmask: "255.255.240.0", family: "IPv4", mac: "aa:bb", internal: false, cidr: "172.20.16.1/20" },
+    {
+      address: "172.20.16.1",
+      netmask: "255.255.240.0",
+      family: "IPv4",
+      mac: "aa:bb",
+      internal: false,
+      cidr: "172.20.16.1/20",
+    },
   ],
   "vEthernet (Default Switch)": [
-    { address: "169.254.10.1", netmask: "255.255.0.0", family: "IPv4", mac: "aa:bb", internal: false, cidr: "169.254.10.1/16" },
+    {
+      address: "169.254.10.1",
+      netmask: "255.255.0.0",
+      family: "IPv4",
+      mac: "aa:bb",
+      internal: false,
+      cidr: "169.254.10.1/16",
+    },
   ],
 });
 
@@ -101,8 +131,12 @@ describe("buildLauncherFiles", () => {
 
   it("repo-command launchers include cd /d <repo-root> before bun", () => {
     const m = buildLauncherFiles("C:\\repo");
-    expect(m["02-start-http-bridge.cmd"]).toMatch(/cd \/d "C:\\repo"[\s\S]*bun run dev:ecowitt-http-bridge/);
-    expect(m["04-run-mqtt-dry-run.cmd"]).toMatch(/cd \/d "C:\\repo"[\s\S]*bun run dev:ecowitt-mqtt:dry-run/);
+    expect(m["02-start-http-bridge.cmd"]).toMatch(
+      /cd \/d "C:\\repo"[\s\S]*bun run dev:ecowitt-http-bridge/,
+    );
+    expect(m["04-run-mqtt-dry-run.cmd"]).toMatch(
+      /cd \/d "C:\\repo"[\s\S]*bun run dev:ecowitt-mqtt:dry-run/,
+    );
   });
 
   it("every .cmd starts with @echo off + chcp 65001 and ends with pause", () => {
@@ -147,9 +181,7 @@ describe("writeLaunchers", () => {
 
   it("refuses to write outside tmp/ecowitt-windows/", () => {
     tmp = mkdtempSync(join(tmpdir(), "ecowitt-doctor-"));
-    expect(() => writeLaunchers(resolve(tmp, "tmp/elsewhere"), tmp)).toThrow(
-      /refusing to write/i,
-    );
+    expect(() => writeLaunchers(resolve(tmp, "tmp/elsewhere"), tmp)).toThrow(/refusing to write/i);
   });
 
   it("refuses traversal segments in the requested outDir", () => {
@@ -163,18 +195,14 @@ describe("writeLaunchers", () => {
     tmp = mkdtempSync(join(tmpdir(), "ecowitt-doctor-"));
     const other = mkdtempSync(join(tmpdir(), "ecowitt-other-"));
     try {
-      expect(() => writeLaunchers(resolve(other, "tmp/ecowitt-windows"), tmp)).toThrow(
-        /refusing/i,
-      );
+      expect(() => writeLaunchers(resolve(other, "tmp/ecowitt-windows"), tmp)).toThrow(/refusing/i);
     } finally {
       rmSync(other, { recursive: true, force: true });
     }
   });
 
   it("refuses non-absolute repoRoot", () => {
-    expect(() => writeLaunchers("tmp/ecowitt-windows", "relative/repo")).toThrow(
-      /absolute/i,
-    );
+    expect(() => writeLaunchers("tmp/ecowitt-windows", "relative/repo")).toThrow(/absolute/i);
   });
 
   it("does not create files outside tmp/ecowitt-windows/ on a refused call", () => {
@@ -213,7 +241,7 @@ describe("writeLaunchers — checksum-based summary", () => {
     const out = resolve(tmp, "tmp/ecowitt-windows");
     writeLaunchers(out, tmp);
     const target = join(out, "02-start-http-bridge.cmd");
-    require("node:fs").writeFileSync(target, "modified content\r\n", "utf8");
+    writeFileSync(target, "modified content\r\n", "utf8");
     const b = writeLaunchers(out, tmp);
     expect(b.updated).toBe(1);
     expect(b.created).toBe(0);

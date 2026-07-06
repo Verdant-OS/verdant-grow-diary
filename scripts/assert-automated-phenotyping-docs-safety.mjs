@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * assert-automated-phenotyping-docs-safety
  * ----------------------------------------
@@ -25,11 +24,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = process.cwd();
-export const TARGET_FILE = join(
-  ROOT,
-  "docs",
-  "automated-phenotyping-protocol-v1.0.md",
-);
+export const TARGET_FILE = join(ROOT, "docs", "automated-phenotyping-protocol-v1.0.md");
 export const ALLOW_MARKER = "automated-phenotyping-docs-safety:allow";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,9 +64,7 @@ function compile(entry) {
   }
   const { phrase, wordBoundary } = entry;
   const body = escapeRe(phrase);
-  const pattern = wordBoundary
-    ? `(?<![A-Za-z0-9_])${body}(?![A-Za-z0-9_])`
-    : body;
+  const pattern = wordBoundary ? `(?<![A-Za-z0-9_])${body}(?![A-Za-z0-9_])` : body;
   return { phrase, re: new RegExp(pattern, "i") };
 }
 
@@ -145,7 +138,10 @@ export function checkDiaryTemplate(text) {
   const violations = [];
   const section = extractSection(text, /Diary Entry Template/i);
   if (!section) {
-    violations.push({ kind: "diary-template", message: "Section 'Diary Entry Template' not found." });
+    violations.push({
+      kind: "diary-template",
+      message: "Section 'Diary Entry Template' not found.",
+    });
     return violations;
   }
   for (const field of REQUIRED_DIARY_FIELDS) {
@@ -193,7 +189,10 @@ export function checkFilenameExamples(text) {
   const violations = [];
   const section = extractSection(text, /Filename Convention and Photo ID Mapping/i);
   if (!section) {
-    violations.push({ kind: "filename-convention", message: "Section 'Filename Convention' not found." });
+    violations.push({
+      kind: "filename-convention",
+      message: "Section 'Filename Convention' not found.",
+    });
     return violations;
   }
   // Match backtick-wrapped names and bare *.jpg names in headings/examples.
@@ -406,8 +405,7 @@ export function toStructuredFailures(text, filePath) {
       filePath,
       section: "Filename Convention and Photo ID Mapping",
       check: "filename-convention",
-      expected:
-        "filenames match {project}_{phenoId}_{stage}_{viewType}_{YYYY-MM-DD}_{NN}[.ext]",
+      expected: "filenames match {project}_{phenoId}_{stage}_{viewType}_{YYYY-MM-DD}_{NN}[.ext]",
       actual: v.message,
       reason: v.message,
     });

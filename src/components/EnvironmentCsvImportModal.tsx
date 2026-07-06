@@ -24,6 +24,7 @@ import {
   INITIAL_IMPORT_STATE,
   applyUnitChoice,
   buildCoveragePreview,
+  buildCsvImportDoneMessage,
   cancelImport,
   reduceParseResult,
   rowsToPersist,
@@ -42,6 +43,9 @@ export interface EnvironmentCsvImportModalProps {
   onOpenChange: (open: boolean) => void;
   onConfirm: (rows: readonly ParsedEnvironmentRow[]) => Promise<{
     insertedCount: number;
+    /** Rows skipped as duplicates (same file or already imported). Optional
+     *  for callers that predate duplicate-aware import. */
+    duplicateCount?: number;
     error: string | null;
   }>;
 }
@@ -70,15 +74,12 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
     fileInputRef.current?.click();
   }, []);
 
-  const handleFile = useCallback(
-    async (file: File | undefined) => {
-      if (!file) return;
-      setState(startParsingState());
-      const result = await parseEnvironmentCSV(file);
-      setState((prev) => reduceParseResult(prev, result));
-    },
-    [],
-  );
+  const handleFile = useCallback(async (file: File | undefined) => {
+    if (!file) return;
+    setState(startParsingState());
+    const result = await parseEnvironmentCSV(file);
+    setState((prev) => reduceParseResult(prev, result));
+  }, []);
 
   const handleUnit = useCallback((unit: "F" | "C") => {
     setState((prev) => applyUnitChoice(prev, unit));
@@ -102,6 +103,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
       ...prev,
       phase: "done",
       insertedCount: res.insertedCount,
+      duplicateCount: res.duplicateCount ?? 0,
     }));
   }, [state.parsed, onConfirm]);
 
@@ -117,9 +119,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
 
         {state.phase === "idle" ? (
           <div data-testid="csv-import-entry" className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Data is read-only and source-tagged.
-            </p>
+            <p className="text-xs text-muted-foreground">Data is read-only and source-tagged.</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -144,10 +144,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
           <div data-testid="csv-import-unit-confirm" className="space-y-3">
             <p className="text-sm font-medium">Quick check on temperature units.</p>
             <div className="flex gap-2">
-              <Button
-                onClick={() => handleUnit("F")}
-                data-testid="csv-import-unit-f"
-              >
+              <Button onClick={() => handleUnit("F")} data-testid="csv-import-unit-f">
                 This is °F
               </Button>
               <Button
@@ -220,7 +217,9 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
 
         {state.phase === "done" ? (
           <div data-testid="csv-import-done" className="space-y-2">
-            <p className="text-sm">Imported {state.insertedCount} CSV reading(s).</p>
+            <p className="text-sm">
+              {buildCsvImportDoneMessage(state.insertedCount, state.duplicateCount)}
+            </p>
             <DialogFooter>
               <Button onClick={handleClose}>Close</Button>
             </DialogFooter>

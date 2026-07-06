@@ -57,18 +57,14 @@ describe("'Not ready' copy on incomplete steps", () => {
   });
   it("step 3 says 'Not ready: no open alert found for the selected grow.'", () => {
     const vm = buildOneTentLiveProofViewModel(CTX, EMPTY_SIGNALS);
-    expect(vm.steps[2].message).toMatch(
-      /not ready: no open alert found for the selected grow/i,
-    );
+    expect(vm.steps[2].message).toMatch(/not ready: no open alert found for the selected grow/i);
   });
   it("step 4 says 'Not ready: alert has not been added to Action Queue.'", () => {
     const vm = buildOneTentLiveProofViewModel(CTX, {
       ...EMPTY_SIGNALS,
       hasMatchingOpenAlert: true,
     });
-    expect(vm.steps[3].message).toMatch(
-      /not ready: alert has not been added to action queue/i,
-    );
+    expect(vm.steps[3].message).toMatch(/not ready: alert has not been added to action queue/i);
   });
   it("step 5 says 'Not ready: linked Action Queue item is not completed.'", () => {
     const vm = buildOneTentLiveProofViewModel(CTX, {
@@ -78,9 +74,7 @@ describe("'Not ready' copy on incomplete steps", () => {
       linkedActionId: "act-7",
       linkedActionCompleted: false,
     });
-    expect(vm.steps[4].message).toMatch(
-      /not ready: linked action queue item is not completed/i,
-    );
+    expect(vm.steps[4].message).toMatch(/not ready: linked action queue item is not completed/i);
   });
 });
 
@@ -92,7 +86,7 @@ describe("Demo safety warning + demo run banner", () => {
   });
   it("warning does not include token/secret/endpoint-shaped strings", () => {
     const text = PROOF_DEMO_SAFETY_WARNING;
-    expect(text).not.toMatch(/eyJ[A-Za-z0-9_\-]+/); // JWT
+    expect(text).not.toMatch(/eyJ[A-Za-z0-9_-]+/); // JWT
     expect(text).not.toMatch(/sk_[A-Za-z0-9]{8,}/);
     expect(text).not.toMatch(/service_role/i);
     expect(text).not.toMatch(/https?:\/\//);

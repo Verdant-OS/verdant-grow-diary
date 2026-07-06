@@ -17,15 +17,9 @@ import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "..", "..");
 const CI_YML = readFileSync(resolve(ROOT, ".github/workflows/ci.yml"), "utf8");
-const DOCS_YML = readFileSync(
-  resolve(ROOT, ".github/workflows/docs-safety.yml"),
-  "utf8",
-);
+const DOCS_YML = readFileSync(resolve(ROOT, ".github/workflows/docs-safety.yml"), "utf8");
 const PKG = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
-const GUARD = readFileSync(
-  resolve(ROOT, "scripts/assert-client-secret-boundary.mjs"),
-  "utf8",
-);
+const GUARD = readFileSync(resolve(ROOT, "scripts/assert-client-secret-boundary.mjs"), "utf8");
 
 describe("Client Secret Boundary — CI wiring contract", () => {
   it("ci.yml runs the guard via npm script", () => {
@@ -79,9 +73,7 @@ describe("Client Secret Boundary — CI wiring contract", () => {
 
   it("guard maintains an empty EXACT_PATH_EXCEPTIONS set (no broad allowlist)", () => {
     // Parse the Set literal body and confirm no string entries.
-    const m = GUARD.match(
-      /EXACT_PATH_EXCEPTIONS\s*=\s*new Set\(\s*\[([\s\S]*?)\]\s*\)/,
-    );
+    const m = GUARD.match(/EXACT_PATH_EXCEPTIONS\s*=\s*new Set\(\s*\[([\s\S]*?)\]\s*\)/);
     expect(m).not.toBeNull();
     const body = (m?.[1] ?? "").replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
     expect(body).not.toMatch(/["'`]/);
@@ -106,7 +98,9 @@ describe("Client Secret Boundary — CI wiring contract", () => {
     const win = proofWindow(CI_YML);
     expect(win).toMatch(/client-secret-boundary-proof\.txt/);
     expect(win).toMatch(/name:\s*client-secret-boundary-proof-ci/);
-    expect(win).toMatch(/actions\/upload-artifact@v4/);
+    // Org policy requires full-SHA pinning; accept the pinned form
+    // (trailing "# v4" comment documents the version).
+    expect(win).toMatch(/actions\/upload-artifact@[a-f0-9]{40} # v4/);
     // No `if: always()` near the proof upload — it must be gated on guard success.
     expect(win).not.toMatch(/if:\s*always\(\)/);
   });
@@ -115,14 +109,16 @@ describe("Client Secret Boundary — CI wiring contract", () => {
     const win = proofWindow(DOCS_YML);
     expect(win).toMatch(/client-secret-boundary-proof\.txt/);
     expect(win).toMatch(/name:\s*client-secret-boundary-proof-docs-safety/);
-    expect(win).toMatch(/actions\/upload-artifact@v4/);
+    // Org policy requires full-SHA pinning; accept the pinned form
+    // (trailing "# v4" comment documents the version).
+    expect(win).toMatch(/actions\/upload-artifact@[a-f0-9]{40} # v4/);
     expect(win).not.toMatch(/if:\s*always\(\)/);
   });
 
   it("proof artifact heredoc body never contains secrets, tokens, env dumps, or raw logs", () => {
     const banned = [
       /Bearer\s+\S+/i,
-      /eyJ[A-Za-z0-9_\-]{6,}\./,
+      /eyJ[A-Za-z0-9_-]{6,}\./,
       /SUPABASE_SERVICE_ROLE_KEY\s*=\s*\S+/,
       /\benv\b\s*\|/, // `env |` style dumps
       /raw[_-]?payload/i,

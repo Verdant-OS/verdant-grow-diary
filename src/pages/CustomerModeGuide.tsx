@@ -13,13 +13,18 @@
  *   - All content is customer-facing placeholder copy until a
  *     share-token publishing backend exists.
  */
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import CustomerGuideSectionView from "@/components/customer/CustomerGuideSection";
 import CustomerGuideTimeline from "@/components/customer/CustomerGuideTimeline";
 import CustomerGuideQrBlock from "@/components/customer/CustomerGuideQrBlock";
 import CustomerGuideTrustFooter from "@/components/customer/CustomerGuideTrustFooter";
 import { buildCustomerModeGuideViewModel } from "@/lib/customerModeGuideViewModel";
+import { VERDANT_CUSTOMER_MODE_GROWER_FAQ } from "@/constants/verdantSeoContent";
+import {
+  buildFaqPageJsonLd,
+  safeJsonLdStringify,
+} from "@/lib/seoStructuredData";
 
 export default function CustomerModeGuide() {
   const params = useParams<{ shareId?: string }>();
@@ -28,6 +33,21 @@ export default function CustomerModeGuide() {
     () => buildCustomerModeGuideViewModel({ shareId }),
     [shareId],
   );
+
+  useEffect(() => {
+    const faq = buildFaqPageJsonLd({
+      questions: VERDANT_CUSTOMER_MODE_GROWER_FAQ,
+    });
+    const s = document.createElement("script");
+    s.type = "application/ld+json";
+    s.setAttribute("data-page-ldjson", "customer-mode-grower-faq");
+    s.text = safeJsonLdStringify(faq);
+    document.head.appendChild(s);
+    return () => {
+      s.remove();
+    };
+  }, []);
+
 
   return (
     <main
@@ -66,7 +86,39 @@ export default function CustomerModeGuide() {
           publishedOnlyCopy={vm.timeline.publishedOnlyCopy}
         />
 
+        <section
+          data-testid="customer-mode-grower-faq"
+          aria-labelledby="customer-mode-grower-faq-heading"
+          className="rounded-xl border border-border/60 bg-card/60 p-5"
+        >
+          <h2
+            id="customer-mode-grower-faq-heading"
+            className="text-base font-semibold tracking-tight"
+          >
+            Grower questions
+          </h2>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Verdant suggests; the grower decides. Verdant cannot touch your
+            equipment. Sensor readings are labeled by source — live, manual,
+            csv, demo, stale, or invalid.
+          </p>
+          <dl className="mt-4 space-y-4">
+            {VERDANT_CUSTOMER_MODE_GROWER_FAQ.map((item) => (
+              <div
+                key={item.question}
+                data-testid={`customer-mode-grower-faq-item`}
+              >
+                <dt className="text-sm font-medium">{item.question}</dt>
+                <dd className="mt-1 text-sm text-muted-foreground">
+                  {item.answer}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
         <CustomerGuideTrustFooter />
+
 
         <footer
           data-testid="customer-mode-guide-footer"

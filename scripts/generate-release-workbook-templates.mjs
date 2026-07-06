@@ -71,8 +71,7 @@ export const SEED_PRODUCTION_HEADERS = [
   "AA Verdant Action Queue Item",
 ];
 
-export const COMMERCIAL_REVIEW_SHEET =
-  "Commercial_Release_Review_Traceability";
+export const COMMERCIAL_REVIEW_SHEET = "Commercial_Release_Review_Traceability";
 export const COMMERCIAL_REVIEW_HEADERS = [
   "A Release Review ID",
   "B Candidate Line / Product Name",
@@ -114,8 +113,12 @@ export const COMMERCIAL_REVIEW_HEADERS = [
 export const ALLOWED_VALUES_SEED = {
   Generation: ["F1", "F2", "F3", "S1", "S2", "BC1", "BC2", "BC3", "Open Pollination", "Unknown"],
   "Isolation Method": [
-    "whole_tent", "branch_bag", "isolated_room", "manual_paint",
-    "open_pollination", "unknown",
+    "whole_tent",
+    "branch_bag",
+    "isolated_room",
+    "manual_paint",
+    "open_pollination",
+    "unknown",
   ],
   "Storage Method": ["fridge", "freezer", "room_temp", "cool_dark", "unknown", "other"],
   "Quality Flag (output only)": ["Pass", "Needs Review", "Hold", "Missing Test"],
@@ -129,11 +132,20 @@ export const ALLOWED_VALUES_REVIEW = {
   "Stress Testing Complete?": ["Yes", "No", "Waived"],
   "Herm / Stability Concern?": ["No", "Yes", "Unknown"],
   "Review Status (formula-suggested, max Release Candidate)": [
-    "Draft", "Needs Review", "Hold", "Release Candidate",
-    "Released (manual-only)", "Rejected (manual-only)", "Retest Required",
+    "Draft",
+    "Needs Review",
+    "Hold",
+    "Release Candidate",
+    "Released (manual-only)",
+    "Rejected (manual-only)",
+    "Retest Required",
   ],
   "Human Release Decision (manual-only)": [
-    "Not Reviewed", "Approved", "Rejected", "Hold for Retest", "Hold for More Data",
+    "Not Reviewed",
+    "Approved",
+    "Rejected",
+    "Hold for Retest",
+    "Hold for More Data",
   ],
 };
 
@@ -171,12 +183,62 @@ export function reviewStatusFormula(r) {
 
 // Seed Production rows. Use placeholder formulas in L/W; CSV stores
 // formula text verbatim so the contract is auditable in plain text.
-function seedRow({ rowIdx, id, project, generation, female, male, polD, iso, harvest, dryStart, total, cleaned, gtest, sample, d5, d7, final, finalDay, storage, temp, rh, notes, linked, checklistRow, diary, action }) {
+function seedRow({
+  rowIdx,
+  id,
+  project,
+  generation,
+  female,
+  male,
+  polD,
+  iso,
+  harvest,
+  dryStart,
+  total,
+  cleaned,
+  gtest,
+  sample,
+  d5,
+  d7,
+  final,
+  finalDay,
+  storage,
+  temp,
+  rh,
+  notes,
+  linked,
+  checklistRow,
+  diary,
+  action,
+}) {
   return [
-    id, project, generation, female, male, polD, iso, harvest, dryStart,
-    total, cleaned, viabilityFormula(rowIdx), gtest, sample, d5, d7,
-    final, finalDay, storage, temp, rh, notes,
-    qualityFlagFormula(rowIdx), linked, checklistRow, diary, action,
+    id,
+    project,
+    generation,
+    female,
+    male,
+    polD,
+    iso,
+    harvest,
+    dryStart,
+    total,
+    cleaned,
+    viabilityFormula(rowIdx),
+    gtest,
+    sample,
+    d5,
+    d7,
+    final,
+    finalDay,
+    storage,
+    temp,
+    rh,
+    notes,
+    qualityFlagFormula(rowIdx),
+    linked,
+    checklistRow,
+    diary,
+    action,
   ];
 }
 
@@ -184,84 +246,223 @@ export const SEED_EXAMPLE_ROWS = [
   // Row 2: blank template row with formulas only.
   seedRow({
     rowIdx: 2,
-    id: "", project: "", generation: "", female: "", male: "",
-    polD: "", iso: "", harvest: "", dryStart: "",
-    total: "", cleaned: "", gtest: "", sample: "", d5: "", d7: "",
-    final: "", finalDay: "", storage: "", temp: "", rh: "",
+    id: "",
+    project: "",
+    generation: "",
+    female: "",
+    male: "",
+    polD: "",
+    iso: "",
+    harvest: "",
+    dryStart: "",
+    total: "",
+    cleaned: "",
+    gtest: "",
+    sample: "",
+    d5: "",
+    d7: "",
+    final: "",
+    finalDay: "",
+    storage: "",
+    temp: "",
+    rh: "",
     notes: "Template row — populate fields, formulas auto-fill.",
-    linked: "", checklistRow: "", diary: "", action: "",
+    linked: "",
+    checklistRow: "",
+    diary: "",
+    action: "",
   }),
   // Row 3: Example 1 — normal Pass candidate signal.
   seedRow({
     rowIdx: 3,
-    id: "SPL-2026-Nimbus-01", project: "Nimbus", generation: "F2",
-    female: "Nimbus-mom-04", male: "Nimbus-dad-02",
-    polD: "2026-03-12", iso: "branch_bag",
-    harvest: "2026-04-30", dryStart: "2026-05-02",
-    total: 480, cleaned: 410,
-    gtest: "2026-05-20", sample: 60, d5: 50, d7: 55,
-    final: 56, finalDay: 10,
-    storage: "fridge", temp: "5C", rh: "20%",
-    notes: "Clean cure, no mold.", linked: "No",
-    checklistRow: "", diary: "diary://entry/sample-pass",
+    id: "SPL-2026-Nimbus-01",
+    project: "Nimbus",
+    generation: "F2",
+    female: "Nimbus-mom-04",
+    male: "Nimbus-dad-02",
+    polD: "2026-03-12",
+    iso: "branch_bag",
+    harvest: "2026-04-30",
+    dryStart: "2026-05-02",
+    total: 480,
+    cleaned: 410,
+    gtest: "2026-05-20",
+    sample: 60,
+    d5: 50,
+    d7: 55,
+    final: 56,
+    finalDay: 10,
+    storage: "fridge",
+    temp: "5C",
+    rh: "20%",
+    notes: "Clean cure, no mold.",
+    linked: "No",
+    checklistRow: "",
+    diary: "diary://entry/sample-pass",
     action: "",
   }),
   // Row 4: Example 2 — Hold / low viability.
   seedRow({
     rowIdx: 4,
-    id: "SPL-2026-Nimbus-02", project: "Nimbus", generation: "F2",
-    female: "Nimbus-mom-04", male: "Nimbus-dad-02",
-    polD: "2026-03-12", iso: "branch_bag",
-    harvest: "2026-04-30", dryStart: "2026-05-02",
-    total: 250, cleaned: 180,
-    gtest: "2026-05-20", sample: 60, d5: 32, d7: 38,
-    final: 40, finalDay: 10,
-    storage: "fridge", temp: "5C", rh: "20%",
-    notes: "Low germination — hold.", linked: "No",
-    checklistRow: "", diary: "diary://entry/sample-low-viability",
+    id: "SPL-2026-Nimbus-02",
+    project: "Nimbus",
+    generation: "F2",
+    female: "Nimbus-mom-04",
+    male: "Nimbus-dad-02",
+    polD: "2026-03-12",
+    iso: "branch_bag",
+    harvest: "2026-04-30",
+    dryStart: "2026-05-02",
+    total: 250,
+    cleaned: 180,
+    gtest: "2026-05-20",
+    sample: 60,
+    d5: 32,
+    d7: 38,
+    final: 40,
+    finalDay: 10,
+    storage: "fridge",
+    temp: "5C",
+    rh: "20%",
+    notes: "Low germination — hold.",
+    linked: "No",
+    checklistRow: "",
+    diary: "diary://entry/sample-low-viability",
     action: "",
   }),
   // Row 5: Example 3 — full release candidate signal.
   seedRow({
     rowIdx: 5,
-    id: "SPL-2026-Aurora-01", project: "Aurora", generation: "F3",
-    female: "Aurora-mom-01", male: "Aurora-dad-03",
-    polD: "2026-02-01", iso: "isolated_room",
-    harvest: "2026-03-25", dryStart: "2026-03-27",
-    total: 1200, cleaned: 1100,
-    gtest: "2026-04-15", sample: 100, d5: 92, d7: 96,
-    final: 97, finalDay: 10,
-    storage: "freezer", temp: "-15C", rh: "10%",
-    notes: "Strong cure, candidate for commercial review.", linked: "Yes",
-    checklistRow: "CHK-Aurora-001", diary: "diary://entry/sample-candidate",
+    id: "SPL-2026-Aurora-01",
+    project: "Aurora",
+    generation: "F3",
+    female: "Aurora-mom-01",
+    male: "Aurora-dad-03",
+    polD: "2026-02-01",
+    iso: "isolated_room",
+    harvest: "2026-03-25",
+    dryStart: "2026-03-27",
+    total: 1200,
+    cleaned: 1100,
+    gtest: "2026-04-15",
+    sample: 100,
+    d5: 92,
+    d7: 96,
+    final: 97,
+    finalDay: 10,
+    storage: "freezer",
+    temp: "-15C",
+    rh: "10%",
+    notes: "Strong cure, candidate for commercial review.",
+    linked: "Yes",
+    checklistRow: "CHK-Aurora-001",
+    diary: "diary://entry/sample-candidate",
     action: "draft://action/queue-suggested-review",
   }),
   // Row 6: Example 4 — data-incomplete hold.
   seedRow({
     rowIdx: 6,
-    id: "SPL-2026-Helix-01", project: "Helix", generation: "S1",
-    female: "Helix-mom-02", male: "selfed",
-    polD: "2026-03-01", iso: "branch_bag",
-    harvest: "2026-04-20", dryStart: "2026-04-22",
-    total: 320, cleaned: 290,
-    gtest: "", sample: "", d5: "", d7: "",
-    final: "", finalDay: "",
-    storage: "fridge", temp: "5C", rh: "25%",
-    notes: "Germination test not yet run.", linked: "No",
-    checklistRow: "", diary: "diary://entry/sample-pending-test",
+    id: "SPL-2026-Helix-01",
+    project: "Helix",
+    generation: "S1",
+    female: "Helix-mom-02",
+    male: "selfed",
+    polD: "2026-03-01",
+    iso: "branch_bag",
+    harvest: "2026-04-20",
+    dryStart: "2026-04-22",
+    total: 320,
+    cleaned: 290,
+    gtest: "",
+    sample: "",
+    d5: "",
+    d7: "",
+    final: "",
+    finalDay: "",
+    storage: "fridge",
+    temp: "5C",
+    rh: "25%",
+    notes: "Germination test not yet run.",
+    linked: "No",
+    checklistRow: "",
+    diary: "diary://entry/sample-pending-test",
     action: "",
   }),
 ];
 
-function reviewRow({ rowIdx, id, line, lot, project, gen, female, male, seedProdRow, checklistRow, phenoRows, fbsRows, viability, sample, gtest, storage, condDoc, parentage, multiEnv, stress, herm, terp, dry, yieldEv, pest, hash, testGrow, unresolved, missingCount, humanDecision, reviewer, reviewDate, diary, actionDraft, notes }) {
+function reviewRow({
+  rowIdx,
+  id,
+  line,
+  lot,
+  project,
+  gen,
+  female,
+  male,
+  seedProdRow,
+  checklistRow,
+  phenoRows,
+  fbsRows,
+  viability,
+  sample,
+  gtest,
+  storage,
+  condDoc,
+  parentage,
+  multiEnv,
+  stress,
+  herm,
+  terp,
+  dry,
+  yieldEv,
+  pest,
+  hash,
+  testGrow,
+  unresolved,
+  missingCount,
+  humanDecision,
+  reviewer,
+  reviewDate,
+  diary,
+  actionDraft,
+  notes,
+}) {
   return [
-    id, line, lot, project, gen, female, male,
-    seedProdRow, checklistRow, phenoRows, fbsRows,
-    viability, sample, gtest,
-    storage, condDoc, parentage, multiEnv, stress, herm,
-    terp, dry, yieldEv, pest, hash, testGrow,
-    unresolved, missingCount, reviewStatusFormula(rowIdx),
-    humanDecision, reviewer, reviewDate, diary, actionDraft, notes,
+    id,
+    line,
+    lot,
+    project,
+    gen,
+    female,
+    male,
+    seedProdRow,
+    checklistRow,
+    phenoRows,
+    fbsRows,
+    viability,
+    sample,
+    gtest,
+    storage,
+    condDoc,
+    parentage,
+    multiEnv,
+    stress,
+    herm,
+    terp,
+    dry,
+    yieldEv,
+    pest,
+    hash,
+    testGrow,
+    unresolved,
+    missingCount,
+    reviewStatusFormula(rowIdx),
+    humanDecision,
+    reviewer,
+    reviewDate,
+    diary,
+    actionDraft,
+    notes,
   ];
 }
 
@@ -269,38 +470,75 @@ export const REVIEW_EXAMPLE_ROWS = [
   // Row 2: template row with formula only.
   reviewRow({
     rowIdx: 2,
-    id: "", line: "", lot: "", project: "", gen: "", female: "", male: "",
-    seedProdRow: "", checklistRow: "", phenoRows: "", fbsRows: "",
-    viability: "", sample: "", gtest: "",
-    storage: "", condDoc: "", parentage: "", multiEnv: "", stress: "",
-    herm: "", terp: "", dry: "", yieldEv: "", pest: "", hash: "",
-    testGrow: "", unresolved: "",
+    id: "",
+    line: "",
+    lot: "",
+    project: "",
+    gen: "",
+    female: "",
+    male: "",
+    seedProdRow: "",
+    checklistRow: "",
+    phenoRows: "",
+    fbsRows: "",
+    viability: "",
+    sample: "",
+    gtest: "",
+    storage: "",
+    condDoc: "",
+    parentage: "",
+    multiEnv: "",
+    stress: "",
+    herm: "",
+    terp: "",
+    dry: "",
+    yieldEv: "",
+    pest: "",
+    hash: "",
+    testGrow: "",
+    unresolved: "",
     missingCount: 0,
-    humanDecision: "Not Reviewed", reviewer: "", reviewDate: "",
-    diary: "", actionDraft: "",
+    humanDecision: "Not Reviewed",
+    reviewer: "",
+    reviewDate: "",
+    diary: "",
+    actionDraft: "",
     notes: "Template row — Review Status auto-populates from formula.",
   }),
   // Row 3: Release Candidate signal.
   reviewRow({
     rowIdx: 3,
     id: "CRR-2026-Aurora-Lot01-r1",
-    line: "Aurora F3", lot: "SPL-2026-Aurora-01", project: "Aurora",
-    gen: "F3", female: "Aurora-mom-01", male: "Aurora-dad-03",
+    line: "Aurora F3",
+    lot: "SPL-2026-Aurora-01",
+    project: "Aurora",
+    gen: "F3",
+    female: "Aurora-mom-01",
+    male: "Aurora-dad-03",
     seedProdRow: "SPL-2026-Aurora-01",
     checklistRow: "CHK-Aurora-001",
     phenoRows: "PHENO-Aurora-A1, PHENO-Aurora-A2",
     fbsRows: "F1-Aurora-Project-01",
-    viability: 0.97, sample: 100, gtest: "2026-04-15",
-    storage: "freezer", condDoc: "Yes", parentage: "Yes",
-    multiEnv: "Yes", stress: "Yes", herm: "No",
+    viability: 0.97,
+    sample: 100,
+    gtest: "2026-04-15",
+    storage: "freezer",
+    condDoc: "Yes",
+    parentage: "Yes",
+    multiEnv: "Yes",
+    stress: "Yes",
+    herm: "No",
     terp: "Stable across 3 runs.",
     dry: "10-day dry, 14-day cure, no mold.",
     yieldEv: "Consistent within 5% across 3 grows.",
     pest: "No pest issues observed.",
-    hash: "n/a", testGrow: "Positive feedback from 2 test grows.",
-    unresolved: "", missingCount: 0,
+    hash: "n/a",
+    testGrow: "Positive feedback from 2 test grows.",
+    unresolved: "",
+    missingCount: 0,
     humanDecision: "Not Reviewed",
-    reviewer: "", reviewDate: "",
+    reviewer: "",
+    reviewDate: "",
     diary: "diary://entry/aurora-review-r1",
     actionDraft: "Draft: schedule final operator review (grower-approval-only).",
     notes: "Formula will suggest Release Candidate; Released is manual-only.",
@@ -309,20 +547,31 @@ export const REVIEW_EXAMPLE_ROWS = [
   reviewRow({
     rowIdx: 4,
     id: "CRR-2026-Nimbus-Lot02-r1",
-    line: "Nimbus F2", lot: "SPL-2026-Nimbus-02", project: "Nimbus",
-    gen: "F2", female: "Nimbus-mom-04", male: "Nimbus-dad-02",
+    line: "Nimbus F2",
+    lot: "SPL-2026-Nimbus-02",
+    project: "Nimbus",
+    gen: "F2",
+    female: "Nimbus-mom-04",
+    male: "Nimbus-dad-02",
     seedProdRow: "SPL-2026-Nimbus-02",
     checklistRow: "CHK-Nimbus-002",
     phenoRows: "PHENO-Nimbus-N1",
     fbsRows: "",
-    viability: 0.62, sample: 60, gtest: "2026-05-20",
-    storage: "fridge", condDoc: "Yes", parentage: "Yes",
-    multiEnv: "No", stress: "No", herm: "Unknown",
+    viability: 0.62,
+    sample: 60,
+    gtest: "2026-05-20",
+    storage: "fridge",
+    condDoc: "Yes",
+    parentage: "Yes",
+    multiEnv: "No",
+    stress: "No",
+    herm: "Unknown",
     terp: "Limited data.",
     dry: "Acceptable cure.",
     yieldEv: "Insufficient data — single grow.",
     pest: "No issues observed.",
-    hash: "n/a", testGrow: "",
+    hash: "n/a",
+    testGrow: "",
     unresolved: "Viability below 70%.",
     missingCount: 3,
     humanDecision: "Hold for Retest",
@@ -336,16 +585,31 @@ export const REVIEW_EXAMPLE_ROWS = [
   reviewRow({
     rowIdx: 5,
     id: "CRR-2026-Helix-Lot01-r1",
-    line: "Helix S1", lot: "SPL-2026-Helix-01", project: "Helix",
-    gen: "S1", female: "Helix-mom-02", male: "selfed",
+    line: "Helix S1",
+    lot: "SPL-2026-Helix-01",
+    project: "Helix",
+    gen: "S1",
+    female: "Helix-mom-02",
+    male: "selfed",
     seedProdRow: "SPL-2026-Helix-01",
     checklistRow: "",
     phenoRows: "",
     fbsRows: "",
-    viability: "", sample: "", gtest: "",
-    storage: "fridge", condDoc: "No", parentage: "Yes",
-    multiEnv: "No", stress: "No", herm: "Unknown",
-    terp: "", dry: "", yieldEv: "", pest: "", hash: "", testGrow: "",
+    viability: "",
+    sample: "",
+    gtest: "",
+    storage: "fridge",
+    condDoc: "No",
+    parentage: "Yes",
+    multiEnv: "No",
+    stress: "No",
+    herm: "Unknown",
+    terp: "",
+    dry: "",
+    yieldEv: "",
+    pest: "",
+    hash: "",
+    testGrow: "",
     unresolved: "Germination test not run; checklist row missing.",
     missingCount: 7,
     humanDecision: "Hold for More Data",
@@ -416,6 +680,64 @@ async function tryGenerateXlsx({ filePath, sheetName, headers, rows, readmeNote 
 }
 
 // ============================================================
+// Manifest serialization helpers
+// ============================================================
+
+/**
+ * Content fingerprint of a manifest, ignoring `generated_at`. Two
+ * manifests with the same fingerprint are the same artifact set —
+ * regenerating must not touch the timestamp (or the file) in that case.
+ */
+export function manifestContentFingerprint(manifest) {
+  const { generated_at: _ignored, ...rest } = manifest;
+  return JSON.stringify(rest);
+}
+
+/**
+ * Resolve `generated_at` for the manifest about to be written: reuse the
+ * previous file's timestamp when content is unchanged, otherwise stamp
+ * `now`. Wall-clock time is only used when the content actually changed.
+ */
+export function resolveGeneratedAt(manifest, previousRaw, now = new Date()) {
+  if (typeof previousRaw === "string" && previousRaw.length > 0) {
+    try {
+      const prev = JSON.parse(previousRaw);
+      if (
+        typeof prev?.generated_at === "string" &&
+        prev.generated_at.length > 0 &&
+        manifestContentFingerprint(prev) === manifestContentFingerprint(manifest)
+      ) {
+        return prev.generated_at;
+      }
+    } catch {
+      // Unreadable previous manifest — fall through to a fresh stamp.
+    }
+  }
+  return now.toISOString();
+}
+
+/**
+ * Format the manifest JSON with the repo's prettier config so the
+ * generator's output is byte-identical to what `prettier --write`
+ * (lint-staged) would produce — no churn between the two. Falls back to
+ * plain JSON.stringify text when prettier is unavailable.
+ */
+export async function formatManifestJson(jsonText, filePath) {
+  try {
+    const mod = await import("prettier");
+    const prettier = mod.default ?? mod;
+    const config = (await prettier.resolveConfig(filePath)) ?? {};
+    return await prettier.format(jsonText, {
+      ...config,
+      parser: "json",
+      filepath: filePath,
+    });
+  } catch {
+    return jsonText;
+  }
+}
+
+// ============================================================
 // Main
 // ============================================================
 
@@ -424,9 +746,15 @@ const SAFETY_NOTE =
 
 async function main() {
   const seedCsvPath = join(ARTIFACT_DIR, "seed-production-tracking-v1.3-template.csv");
-  const reviewCsvPath = join(ARTIFACT_DIR, "commercial-release-review-traceability-v1.3-template.csv");
+  const reviewCsvPath = join(
+    ARTIFACT_DIR,
+    "commercial-release-review-traceability-v1.3-template.csv",
+  );
   const seedXlsxPath = join(ARTIFACT_DIR, "seed-production-tracking-v1.3-template.xlsx");
-  const reviewXlsxPath = join(ARTIFACT_DIR, "commercial-release-review-traceability-v1.3-template.xlsx");
+  const reviewXlsxPath = join(
+    ARTIFACT_DIR,
+    "commercial-release-review-traceability-v1.3-template.xlsx",
+  );
   const contractsPath = join(ARTIFACT_DIR, "release-workbook-formula-contracts.md");
   const manifestPath = join(ARTIFACT_DIR, "release-workbook-template-manifest.json");
 
@@ -488,12 +816,17 @@ async function main() {
   // Compute hashes (deterministic) for every artifact actually on disk.
   const fileSpecs = [
     { path: seedCsvPath, kind: "csv", filename: "seed-production-tracking-v1.3-template.csv" },
-    { path: reviewCsvPath, kind: "csv", filename: "commercial-release-review-traceability-v1.3-template.csv" },
+    {
+      path: reviewCsvPath,
+      kind: "csv",
+      filename: "commercial-release-review-traceability-v1.3-template.csv",
+    },
     { path: contractsPath, kind: "markdown", filename: "release-workbook-formula-contracts.md" },
   ];
   if (xlsxResults.seed.ok) {
     fileSpecs.push({
-      path: seedXlsxPath, kind: "xlsx",
+      path: seedXlsxPath,
+      kind: "xlsx",
       filename: "seed-production-tracking-v1.3-template.xlsx",
       sheet_canonical_name: SEED_PRODUCTION_SHEET,
       xlsx_tab_name: SEED_PRODUCTION_SHEET.slice(0, 31),
@@ -501,7 +834,8 @@ async function main() {
   }
   if (xlsxResults.review.ok) {
     fileSpecs.push({
-      path: reviewXlsxPath, kind: "xlsx",
+      path: reviewXlsxPath,
+      kind: "xlsx",
       filename: "commercial-release-review-traceability-v1.3-template.xlsx",
       sheet_canonical_name: COMMERCIAL_REVIEW_SHEET,
       xlsx_tab_name: COMMERCIAL_REVIEW_SHEET.slice(0, 31),
@@ -517,10 +851,11 @@ async function main() {
   }));
   const hashes = Object.fromEntries(filesWithHashes.map((f) => [f.filename, f.sha256]));
 
-  // Manifest (always).
+  // Manifest (always). `generated_at` is resolved after the content is
+  // assembled: it only advances when the content actually changes.
   const manifest = {
     version: "v1.3",
-    generated_at: new Date().toISOString(),
+    generated_at: "",
     templates: {
       seed_production: {
         canonical_sheet: SEED_PRODUCTION_SHEET,
@@ -540,9 +875,9 @@ async function main() {
         headers: SEED_PRODUCTION_HEADERS,
         allowed_values: ALLOWED_VALUES_SEED,
         formula_contracts: {
-          L: "=IF(OR(N{r}=\"\",N{r}=0,Q{r}=\"\"),\"\",Q{r}/N{r})",
-          "viable_seed_ratio_helper": "=IF(OR(J{r}=\"\",J{r}=0,K{r}=\"\"),\"\",K{r}/J{r})",
-          W: "=IF(L{r}=\"\",\"Missing Test\",IF(N{r}<25,\"Hold\",IF(N{r}<50,\"Needs Review\",IF(L{r}<0.7,\"Hold\",IF(L{r}<0.85,\"Needs Review\",\"Pass\")))))",
+          L: '=IF(OR(N{r}="",N{r}=0,Q{r}=""),"",Q{r}/N{r})',
+          viable_seed_ratio_helper: '=IF(OR(J{r}="",J{r}=0,K{r}=""),"",K{r}/J{r})',
+          W: '=IF(L{r}="","Missing Test",IF(N{r}<25,"Hold",IF(N{r}<50,"Needs Review",IF(L{r}<0.7,"Hold",IF(L{r}<0.85,"Needs Review","Pass")))))',
         },
       },
       [COMMERCIAL_REVIEW_SHEET]: {
@@ -550,7 +885,7 @@ async function main() {
         allowed_values: ALLOWED_VALUES_REVIEW,
         formula_contracts: {
           AC_review_status_suggestion:
-            "=IF(AB{r}>0,\"Needs Review\",IF(M{r}<25,\"Hold\",IF(L{r}<0.7,\"Hold\",IF(M{r}<50,\"Needs Review\",IF(AND(L{r}>=0.85,AB{r}=0),\"Release Candidate\",\"Needs Review\")))))",
+            '=IF(AB{r}>0,"Needs Review",IF(M{r}<25,"Hold",IF(L{r}<0.7,"Hold",IF(M{r}<50,"Needs Review",IF(AND(L{r}>=0.85,AB{r}=0),"Release Candidate","Needs Review")))))',
           AD_human_release_decision: "manual-only",
           AB_missing_evidence_count: "operator-counted or documented helper formula",
         },
@@ -582,7 +917,22 @@ async function main() {
       deterministic: true,
     },
   };
-  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+  let previousRaw = null;
+  try {
+    previousRaw = readFileSync(manifestPath, "utf8");
+  } catch {
+    // First generation — no previous manifest to preserve a timestamp from.
+  }
+  manifest.generated_at = resolveGeneratedAt(manifest, previousRaw);
+  const manifestJson = await formatManifestJson(
+    JSON.stringify(manifest, null, 2) + "\n",
+    manifestPath,
+  );
+  // Skip the write entirely when nothing changed — keeps mtime stable and
+  // guarantees `git diff` stays clean across repeated runs.
+  if (manifestJson !== previousRaw) {
+    writeFileSync(manifestPath, manifestJson);
+  }
 
   // Self-check: re-hash the XLSX files and confirm deterministic output.
   for (const f of filesWithHashes) {

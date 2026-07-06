@@ -12,18 +12,14 @@
  *    forbidden tokens, and preserves CI failure after artifact upload.
  */
 import fs from "node:fs";
+import { spawnSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import { describe, it, expect } from "vitest";
 
 const ROOT = process.cwd();
-const WORKFLOW_PATH = path.join(
-  ROOT,
-  ".github/workflows/release-receipt-ci.yml",
-);
-const COMPOSER_PATH = path.join(
-  ROOT,
-  "scripts/ci/compose-release-receipt-inputs.mjs",
-);
+const WORKFLOW_PATH = path.join(ROOT, ".github/workflows/release-receipt-ci.yml");
+const COMPOSER_PATH = path.join(ROOT, "scripts/ci/compose-release-receipt-inputs.mjs");
 
 const workflow = fs.readFileSync(WORKFLOW_PATH, "utf8");
 const composer = fs.readFileSync(COMPOSER_PATH, "utf8");
@@ -122,9 +118,7 @@ describe("release-receipt CI workflow upload v1 — contract", () => {
 
   it("preserves CI failure with a final failing step after artifact upload", () => {
     const uploadIdx = workflow.indexOf("actions/upload-artifact");
-    const preserveIdx = workflow.indexOf(
-      "Preserve CI failure if any validation command failed",
-    );
+    const preserveIdx = workflow.indexOf("Preserve CI failure if any validation command failed");
     expect(uploadIdx).toBeGreaterThan(0);
     expect(preserveIdx).toBeGreaterThan(uploadIdx);
     // The preservation step must `exit 1` on non-success outcomes.
@@ -139,9 +133,7 @@ describe("release-receipt CI workflow upload v1 — contract", () => {
   });
 
   it("failed validation cannot emit a passing receipt (deterministic emitter rules)", async () => {
-    const { emitReleaseReceiptArtifact } = await import(
-      "@/lib/releaseReceiptEmitter"
-    );
+    const { emitReleaseReceiptArtifact } = await import("@/lib/releaseReceiptEmitter");
     const result = emitReleaseReceiptArtifact({
       artifactId: "ci-full-suite-contract-test",
       generatedAt: "2026-06-30T00:00:00.000Z",
@@ -188,12 +180,8 @@ describe("release-receipt CI workflow upload v1 — contract", () => {
       "Validate release-receipt.v1.json against trusted v1 contract",
     );
     const printIdx = workflow.indexOf("Print derived release receipt status");
-    const trustedIdx = workflow.indexOf(
-      "Upload release-receipt-v1 artifact (trusted)",
-    );
-    const preserveIdx = workflow.indexOf(
-      "Preserve CI failure if any validation command failed",
-    );
+    const trustedIdx = workflow.indexOf("Upload release-receipt-v1 artifact (trusted)");
+    const preserveIdx = workflow.indexOf("Preserve CI failure if any validation command failed");
     expect(emitIdx).toBeGreaterThan(0);
     expect(validateIdx).toBeGreaterThan(emitIdx);
     expect(printIdx).toBeGreaterThan(validateIdx);
@@ -210,12 +198,8 @@ describe("release-receipt CI workflow upload v1 — contract", () => {
     );
     expect(validateBlock).not.toMatch(/continue-on-error\s*:\s*true/);
     expect(validateBlock).toContain("Print derived release receipt status");
-    expect(validateBlock).toContain(
-      "scripts/validate-release-receipt-artifact.mjs",
-    );
-    expect(validateBlock).toContain(
-      "scripts/print-release-receipt-status.mjs",
-    );
+    expect(validateBlock).toContain("scripts/validate-release-receipt-artifact.mjs");
+    expect(validateBlock).toContain("scripts/print-release-receipt-status.mjs");
   });
 
   it("trusted upload references both validator and printer scripts in workflow", () => {
@@ -224,9 +208,7 @@ describe("release-receipt CI workflow upload v1 — contract", () => {
   });
 
   it("package.json exposes release-receipt:dry-run, :validate and :print-status", () => {
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),
-    );
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
     expect(pkg.scripts?.["release-receipt:dry-run"]).toMatch(
       /dry-run-release-receipt-workflow\.mjs/,
     );
@@ -239,8 +221,6 @@ describe("release-receipt CI workflow upload v1 — contract", () => {
   });
 
   it("validator and status printer exit nonzero on invalid receipt fixture", () => {
-    const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
-    const os = require("node:os") as typeof import("node:os");
     const tmp = path.join(os.tmpdir(), `bad-receipt-${Date.now()}.json`);
     fs.writeFileSync(tmp, JSON.stringify({ not: "a receipt" }), "utf8");
     try {
@@ -257,9 +237,9 @@ describe("release-receipt CI workflow upload v1 — contract", () => {
       );
       expect(p.status).not.toBe(0);
     } finally {
-      try {
+      if (fs.existsSync(tmp)) {
         fs.unlinkSync(tmp);
-      } catch {}
+      }
     }
   });
 
@@ -276,4 +256,3 @@ describe("release-receipt CI workflow upload v1 — contract", () => {
     expect(src).not.toContain("api.github.com");
   });
 });
-

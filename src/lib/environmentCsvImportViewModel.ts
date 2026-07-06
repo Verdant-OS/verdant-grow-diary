@@ -24,6 +24,8 @@ export interface ImportState {
   phase: ImportPhase;
   parsed: ParseEnvironmentCsvResult | null;
   insertedCount: number;
+  /** Rows skipped as duplicates (same file or already imported for this tent). */
+  duplicateCount: number;
   errorCode: string | null;
   errorMessage: string | null;
 }
@@ -32,6 +34,7 @@ export const INITIAL_IMPORT_STATE: ImportState = {
   phase: "idle",
   parsed: null,
   insertedCount: 0,
+  duplicateCount: 0,
   errorCode: null,
   errorMessage: null,
 };
@@ -61,10 +64,7 @@ export function reduceParseResult(
   };
 }
 
-export function applyUnitChoice(
-  state: ImportState,
-  unit: "F" | "C",
-): ImportState {
+export function applyUnitChoice(state: ImportState, unit: "F" | "C"): ImportState {
   if (state.phase !== "unit_confirm" || !state.parsed) return state;
   const renorm = renormalizeWithUnit(state.parsed, unit);
   return { ...state, parsed: renorm, phase: "preview" };
@@ -72,6 +72,21 @@ export function applyUnitChoice(
 
 export function cancelImport(): ImportState {
   return INITIAL_IMPORT_STATE;
+}
+
+/**
+ * Calm, grower-facing copy for a completed (non-error) CSV import.
+ * Never mentions raw database internals — duplicates are an expected,
+ * safe outcome, not a failure.
+ */
+export function buildCsvImportDoneMessage(insertedCount: number, duplicateCount: number): string {
+  if (insertedCount === 0 && duplicateCount > 0) {
+    return "No new readings imported. These readings already exist in Verdant.";
+  }
+  if (duplicateCount > 0) {
+    return `Imported ${insertedCount} CSV reading(s). Skipped ${duplicateCount} duplicate reading(s) already in Verdant.`;
+  }
+  return `Imported ${insertedCount} CSV reading(s).`;
 }
 
 /** Convenience wrapper that calls the parser and reduces the result. */
@@ -95,9 +110,7 @@ export interface CoveragePreview {
   partialMessage: string | null;
 }
 
-export function buildCoveragePreview(
-  parsed: ParseEnvironmentCsvResult | null,
-): CoveragePreview {
+export function buildCoveragePreview(parsed: ParseEnvironmentCsvResult | null): CoveragePreview {
   if (!parsed) {
     return {
       totalRows: 0,
@@ -114,8 +127,7 @@ export function buildCoveragePreview(
   const total = valid + skipped;
   let days = 0;
   if (parsed.dateRange) {
-    const ms =
-      Date.parse(parsed.dateRange.end) - Date.parse(parsed.dateRange.start);
+    const ms = Date.parse(parsed.dateRange.end) - Date.parse(parsed.dateRange.start);
     days = Math.max(1, Math.ceil(ms / 86_400_000));
   } else if (valid > 0) {
     days = 1;

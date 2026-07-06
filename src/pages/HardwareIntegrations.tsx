@@ -3,6 +3,11 @@ import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import {
+  SENSOR_SOURCE_KINDS,
+  SENSOR_SOURCE_LEGEND,
+  SENSOR_SOURCE_SHORT_LABEL,
+} from "@/constants/sensorSourceLabels";
 
 /**
  * Public hardware-neutral integration page.
@@ -106,6 +111,45 @@ export default function HardwareIntegrations() {
           ))}
         </div>
       </section>
+
+      <section
+        id="sensor-source-labels"
+        data-testid="sensor-source-legend"
+        className="px-6 py-12 max-w-4xl mx-auto"
+      >
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
+          Sensor source labels
+        </h2>
+        <p className="mt-3 text-center text-muted-foreground max-w-2xl mx-auto">
+          Verdant uses source labels on every reading so growers always know what
+          data they are looking at. CSV and historical imports are never promoted
+          to live. Demo data is never shown as live. Stale or invalid telemetry
+          is never treated as healthy or current.
+        </p>
+        <dl className="mt-8 grid gap-4 sm:grid-cols-2">
+          {SENSOR_SOURCE_KINDS.map((kind) => (
+            <div
+              key={kind}
+              data-testid={`sensor-source-legend-item-${kind}`}
+              className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-5"
+            >
+              <dt className="font-display text-base font-semibold">
+                {SENSOR_SOURCE_SHORT_LABEL[kind]}
+              </dt>
+              <dd className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                {SENSOR_SOURCE_LEGEND[kind]}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          <Link to="/how-ai-doctor-works" className="underline hover:text-foreground">
+            See how AI Doctor uses source-labeled context
+          </Link>
+        </p>
+      </section>
+
+
 
       <section className="px-6 py-12 max-w-3xl mx-auto text-center">
         <h2 className="font-display text-2xl md:text-3xl font-semibold">Partner value</h2>

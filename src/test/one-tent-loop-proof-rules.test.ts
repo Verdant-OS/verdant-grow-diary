@@ -18,7 +18,6 @@ import {
   type SensorSourceLabel,
 } from "@/lib/oneTentLoopProofRules";
 
-
 const NOW = Date.parse("2026-06-09T12:00:00.000Z");
 
 function fresh(): LoopEvidence {
@@ -73,7 +72,7 @@ function fresh(): LoopEvidence {
       id: "aq1",
       status: "pending_approval",
       approval_required: true,
-      has_device_command: false,
+      has_device_control_marker: false,
       reason: "raise humidity",
       risk_level: "low",
       linked_alert_id: "a1",
@@ -209,7 +208,7 @@ describe("evaluateActionQueue — approval-required and no device command", () =
       id: "aq1",
       status: "pending_approval",
       approval_required: true,
-      has_device_command: true,
+      has_device_control_marker: true,
     });
     expect(row.status).toBe("blocked");
     expect(row.missing_info.join(" ").toLowerCase()).toMatch(/executable device command/);
@@ -219,7 +218,7 @@ describe("evaluateActionQueue — approval-required and no device command", () =
       id: "aq1",
       status: "queued",
       approval_required: false,
-      has_device_command: false,
+      has_device_control_marker: false,
     });
     expect(row.status).toBe("blocked");
   });
@@ -228,7 +227,7 @@ describe("evaluateActionQueue — approval-required and no device command", () =
       id: "aq1",
       status: "pending_approval",
       approval_required: true,
-      has_device_command: false,
+      has_device_control_marker: false,
       reason: "raise rh",
       risk_level: "low",
       linked_alert_id: "a1",
@@ -312,11 +311,16 @@ describe("evaluateSensorSnapshot — stale across all telemetry sources", () => 
         expect(row.status).toBe("stale");
       }
       const enriched = enrichLoopStepRow(row, {
-        grow: null, tent: null, plant: null,
-        latest_quick_log: null, timeline: null,
+        grow: null,
+        tent: null,
+        plant: null,
+        latest_quick_log: null,
+        timeline: null,
         latest_sensor_snapshot: { source, captured_at },
-        latest_ai_doctor: null, latest_alert: null,
-        latest_action_queue: null, latest_follow_up: null,
+        latest_ai_doctor: null,
+        latest_alert: null,
+        latest_action_queue: null,
+        latest_follow_up: null,
       });
       expect(enriched.provenance === "stale" || enriched.provenance === "demo_only").toBe(true);
       expect(hasUnsafeHealthyClaim(collectRowText(enriched))).toBe(false);
@@ -324,10 +328,7 @@ describe("evaluateSensorSnapshot — stale across all telemetry sources", () => 
   }
 
   it("explicit source='stale' returns stale regardless of freshness", () => {
-    const row = evaluateSensorSnapshot(
-      { source: "stale", captured_at: FRESH_ISO },
-      NOW_MS,
-    );
+    const row = evaluateSensorSnapshot({ source: "stale", captured_at: FRESH_ISO }, NOW_MS);
     expect(row.status).toBe("stale");
     expect(hasUnsafeHealthyClaim(collectRowText(row))).toBe(false);
   });
@@ -335,10 +336,7 @@ describe("evaluateSensorSnapshot — stale across all telemetry sources", () => 
 
 describe("evaluateSensorSnapshot — invalid across all telemetry sources", () => {
   it("explicit source='invalid' returns invalid and never claims healthy", () => {
-    const row = evaluateSensorSnapshot(
-      { source: "invalid", captured_at: FRESH_ISO },
-      NOW_MS,
-    );
+    const row = evaluateSensorSnapshot({ source: "invalid", captured_at: FRESH_ISO }, NOW_MS);
     expect(row.status).toBe("invalid");
     expect(row.status).not.toBe("passed");
     expect(row.status).not.toBe("needs_review");
@@ -348,10 +346,7 @@ describe("evaluateSensorSnapshot — invalid across all telemetry sources", () =
   // Structural invalidity across sources (missing/malformed captured_at)
   for (const source of NON_TELEMETRY_SOURCES) {
     it(`${source} snapshot with malformed captured_at is never passed`, () => {
-      const row = evaluateSensorSnapshot(
-        { source, captured_at: "not-a-date" },
-        NOW_MS,
-      );
+      const row = evaluateSensorSnapshot({ source, captured_at: "not-a-date" }, NOW_MS);
       // Live requires verifiable freshness → stale. Manual/csv → needs_review
       // (still not passed). Demo → demo_only.
       expect(row.status).not.toBe("passed");
@@ -361,10 +356,7 @@ describe("evaluateSensorSnapshot — invalid across all telemetry sources", () =
     });
 
     it(`${source} snapshot with null captured_at is never passed`, () => {
-      const row = evaluateSensorSnapshot(
-        { source, captured_at: null },
-        NOW_MS,
-      );
+      const row = evaluateSensorSnapshot({ source, captured_at: null }, NOW_MS);
       expect(row.status).not.toBe("passed");
       if (source === "live") expect(row.status).toBe("stale");
       if (source === "demo") expect(row.status).toBe("demo_only");
@@ -379,8 +371,14 @@ describe("evaluateSensorSnapshot — unknown / malformed telemetry", () => {
     { name: "source missing", input: { source: null, captured_at: FRESH_ISO } },
     { name: "source undefined", input: { source: undefined, captured_at: FRESH_ISO } },
     { name: "source empty string", input: { source: "", captured_at: FRESH_ISO } },
-    { name: "source outside allowed labels ('unknown')", input: { source: "unknown", captured_at: FRESH_ISO } },
-    { name: "source outside allowed labels ('bogus')", input: { source: "bogus", captured_at: FRESH_ISO } },
+    {
+      name: "source outside allowed labels ('unknown')",
+      input: { source: "unknown", captured_at: FRESH_ISO },
+    },
+    {
+      name: "source outside allowed labels ('bogus')",
+      input: { source: "bogus", captured_at: FRESH_ISO },
+    },
     { name: "source is number", input: { source: 42, captured_at: FRESH_ISO } },
     { name: "source is object", input: { source: { hax: 1 }, captured_at: FRESH_ISO } },
   ];
@@ -391,11 +389,16 @@ describe("evaluateSensorSnapshot — unknown / malformed telemetry", () => {
       expect(row.status).not.toBe("passed");
       expect(["missing", "invalid", "needs_review"]).toContain(row.status);
       const enriched = enrichLoopStepRow(row, {
-        grow: null, tent: null, plant: null,
-        latest_quick_log: null, timeline: null,
+        grow: null,
+        tent: null,
+        plant: null,
+        latest_quick_log: null,
+        timeline: null,
         latest_sensor_snapshot: (c.input as never) ?? null,
-        latest_ai_doctor: null, latest_alert: null,
-        latest_action_queue: null, latest_follow_up: null,
+        latest_ai_doctor: null,
+        latest_alert: null,
+        latest_action_queue: null,
+        latest_follow_up: null,
       });
       // Unknown telemetry must never advertise "direct" (passed) provenance.
       expect(enriched.provenance).not.toBe("direct");

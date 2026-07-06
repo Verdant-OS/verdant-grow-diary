@@ -55,17 +55,21 @@ if (missing.length > 0) {
 console.log("▶ One-Tent Loop smoke test audit");
 console.log("  Running " + SUITES.length + " targeted Vitest suites...\n");
 
-const runner = existsSync(resolve(ROOT, "node_modules/.bin/vitest"))
-  ? ["node_modules/.bin/vitest", ["run", "--reporter=json", "--reporter=default", ...SUITES]]
-  : ["bunx", ["vitest", "run", "--reporter=json", "--reporter=default", ...SUITES]];
-
-// Use JSON reporter to stdout via a temp file for parsing.
+// Use JSON reporter to a temp file for parsing. Run the local vitest JS
+// entry through the current Node binary — spawnSync cannot execute the
+// extensionless node_modules/.bin shim on Windows. Fall back to bunx.
 const jsonPath = resolve(ROOT, ".one-tent-loop-smoke-report.json");
-const args = ["run", "--reporter=default", "--reporter=json", "--outputFile.json=" + jsonPath, ...SUITES];
-const cmd = existsSync(resolve(ROOT, "node_modules/.bin/vitest"))
-  ? "node_modules/.bin/vitest"
-  : "bunx";
-const finalArgs = cmd === "bunx" ? ["vitest", ...args] : args;
+const args = [
+  "run",
+  "--reporter=default",
+  "--reporter=json",
+  "--outputFile.json=" + jsonPath,
+  ...SUITES,
+];
+const localVitest = resolve(ROOT, "node_modules/vitest/vitest.mjs");
+const [cmd, finalArgs] = existsSync(localVitest)
+  ? [process.execPath, [localVitest, ...args]]
+  : ["bunx", ["vitest", ...args]];
 
 const res = spawnSync(cmd, finalArgs, { stdio: "inherit", cwd: ROOT });
 
@@ -84,29 +88,39 @@ let totalFail = 0;
 let totalSkip = 0;
 
 if (report && Array.isArray(report.testResults)) {
+  // Vitest reports absolute paths with forward slashes even on Windows,
+  // while ROOT uses the native separator — normalize both before matching.
+  const norm = (p) => String(p).replace(/\\/g, "/");
+  const rootPrefix = norm(ROOT) + "/";
   const byFile = new Map();
   for (const f of report.testResults) {
-    const rel = f.name?.replace(ROOT + "/", "") ?? f.name;
+    const rel = f.name ? norm(f.name).replace(rootPrefix, "") : f.name;
     byFile.set(rel, f);
   }
   for (const suite of SUITES) {
-    const f = byFile.get(suite) ?? byFile.get(resolve(ROOT, suite));
+    const f = byFile.get(suite) ?? byFile.get(norm(resolve(ROOT, suite)));
     if (!f) {
       rows.push({ suite, status: "MISSING", pass: 0, fail: 0, skip: 0 });
       totalFail += 1;
       continue;
     }
-    let pass = 0, fail = 0, skip = 0;
+    let pass = 0,
+      fail = 0,
+      skip = 0;
     for (const a of f.assertionResults ?? []) {
       if (a.status === "passed") pass += 1;
       else if (a.status === "failed") fail += 1;
       else skip += 1;
     }
-    totalPass += pass; totalFail += fail; totalSkip += skip;
+    totalPass += pass;
+    totalFail += fail;
+    totalSkip += skip;
     rows.push({
       suite,
       status: fail === 0 ? "PASS" : "FAIL",
-      pass, fail, skip,
+      pass,
+      fail,
+      skip,
     });
   }
 } else {
@@ -115,7 +129,9 @@ if (report && Array.isArray(report.testResults)) {
     rows.push({
       suite,
       status: res.status === 0 ? "PASS" : "UNKNOWN",
-      pass: 0, fail: 0, skip: 0,
+      pass: 0,
+      fail: 0,
+      skip: 0,
     });
   }
 }

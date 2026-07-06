@@ -36,4 +36,37 @@ describe("breedingActionQueue payloads", () => {
     const payloads = buildBreedingActionQueuePayloads(event, "grow_1");
     expect(payloads).toEqual([]);
   });
+
+  it("populates originating_timeline_events so calculateBreedingCycleStats can recover the subtype + timestamp", () => {
+    const event: BreedingEvent = {
+      id: "ev_456",
+      type: "pollination",
+      occurred_at: "2026-06-20T12:00:00Z",
+      details: { method: "hand" },
+    };
+    const payloads = buildBreedingActionQueuePayloads(event, "grow_1", "plant_1");
+    expect(payloads.length).toBeGreaterThan(0);
+    for (const p of payloads) {
+      const refs = p.originating_timeline_events as unknown as Array<Record<string, unknown>>;
+      expect(refs).toHaveLength(1);
+      expect(refs[0]).toEqual({
+        id: "ev_456",
+        type: "pollination",
+        occurred_at: "2026-06-20T12:00:00Z",
+        source: "manual",
+      });
+      // Never carries the event's `details` payload (method/intensity are not
+      // part of the OriginatingTimelineEventRef shape).
+      expect(refs[0]).not.toHaveProperty("details");
+    }
+  });
+
+  it("does not populate originating_timeline_events for unsupported events (empty payload list)", () => {
+    const event: BreedingEvent = {
+      id: "ev_999",
+      type: "water_plant",
+      occurred_at: "2026-06-20T12:00:00Z",
+    };
+    expect(buildBreedingActionQueuePayloads(event, "grow_1")).toEqual([]);
+  });
 });

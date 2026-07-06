@@ -12,8 +12,16 @@ import { resolve } from "node:path";
 const FILES = [
   "src/lib/phenoCandidateScoresService.ts",
   "src/lib/phenoKeeperDecisionService.ts",
+  "src/lib/phenoScoreRoundsService.ts",
   "src/hooks/usePhenoHuntWorkspace.ts",
   "src/pages/PhenoHuntWorkspace.tsx",
+];
+
+/** Tables the workspace write surface is allowed to write. */
+const ALLOWED_WRITE_TABLES = [
+  "pheno_candidate_scores",
+  "pheno_keeper_decisions",
+  "pheno_score_rounds",
 ];
 
 function stripComments(src: string): string {
@@ -71,7 +79,7 @@ describe("pheno hunt workspace — write-surface static safety", () => {
         // Any write (upsert/insert/update/delete) must be on an allowed table.
         if (/\.(upsert|insert|update|delete)\(/.test(ops)) {
           expect(
-            ["pheno_candidate_scores", "pheno_keeper_decisions"].includes(table),
+            ALLOWED_WRITE_TABLES.includes(table),
             `${path} writes to unexpected table: ${table}`,
           ).toBe(true);
         }

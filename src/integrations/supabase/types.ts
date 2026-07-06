@@ -1279,6 +1279,69 @@ export type Database = {
           },
         ]
       }
+      pheno_score_rounds: {
+        Row: {
+          aroma_descriptors: Json
+          created_at: string
+          hunt_id: string
+          id: string
+          loud_traits: Json
+          nose_note: string | null
+          note: string | null
+          observed_at: string | null
+          plant_id: string
+          round: string
+          traits: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aroma_descriptors?: Json
+          created_at?: string
+          hunt_id: string
+          id?: string
+          loud_traits?: Json
+          nose_note?: string | null
+          note?: string | null
+          observed_at?: string | null
+          plant_id: string
+          round: string
+          traits?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aroma_descriptors?: Json
+          created_at?: string
+          hunt_id?: string
+          id?: string
+          loud_traits?: Json
+          nose_note?: string | null
+          note?: string | null
+          observed_at?: string | null
+          plant_id?: string
+          round?: string
+          traits?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_score_rounds_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_score_rounds_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       photo_events: {
         Row: {
           caption: string | null

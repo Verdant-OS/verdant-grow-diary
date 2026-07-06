@@ -39,12 +39,16 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     roundsByKey: {},
     decisionHistoryByPlant: {},
     sexByPlant: {},
+    smokeByPlant: {},
+    labByKey: {},
     error: null,
     saving: null,
     saveScore,
     saveDecision,
     saveRound,
     saveSex,
+    saveSmokeTest: state.saveSmokeTest ?? vi.fn().mockResolvedValue(true),
+    saveLabResult: state.saveLabResult ?? vi.fn().mockResolvedValue(true),
     ...state,
   });
   const utils = render(

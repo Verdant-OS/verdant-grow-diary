@@ -33,6 +33,18 @@ import {
   listLatestSexObservationsForHunt,
   type SexObservationRow,
 } from "@/lib/phenoSexObservationService";
+import {
+  upsertSmokeTest,
+  listSmokeTestsForHunt,
+  type SmokeTestRow,
+} from "@/lib/phenoSmokeTestService";
+import {
+  upsertLabResult,
+  listLabResultsForHunt,
+  type LabResultRow,
+  type PhenoLabSource,
+  type TerpeneReading,
+} from "@/lib/phenoLabResultsService";
 import type { PhenoKeeperDecision } from "@/lib/phenoKeeperDecisionModel";
 import type { PhenoSexObservation } from "@/lib/phenoSexObservationModel";
 
@@ -50,6 +62,10 @@ export interface UsePhenoHuntWorkspaceState {
   decisionHistoryByPlant: Record<string, KeeperDecisionLogEntry[]>;
   /** Latest recorded sex observation per plant. */
   sexByPlant: Record<string, SexObservationRow>;
+  /** Post-cure smoke test per plant. */
+  smokeByPlant: Record<string, SmokeTestRow>;
+  /** Lab results keyed "plantId:source". */
+  labByKey: Record<string, LabResultRow>;
   error: string | null;
   saving: string | null;
   saveScore: (
@@ -73,6 +89,26 @@ export interface UsePhenoHuntWorkspaceState {
     },
   ) => Promise<boolean>;
   saveSex: (plantId: string, sex: PhenoSexObservation, note?: string | null) => Promise<boolean>;
+  saveSmokeTest: (
+    plantId: string,
+    payload: {
+      flavorDescriptors: readonly string[];
+      effectDescriptors: readonly string[];
+      smoothness: number | null;
+      potencyImpression: number | null;
+      verdict: string | null;
+    },
+  ) => Promise<boolean>;
+  saveLabResult: (
+    plantId: string,
+    source: PhenoLabSource,
+    payload: {
+      thcPct: number | null;
+      cbdPct: number | null;
+      totalCannabinoidsPct: number | null;
+      dominantTerpenes: readonly TerpeneReading[];
+    },
+  ) => Promise<boolean>;
 }
 
 export function usePhenoHuntWorkspace(
@@ -90,6 +126,8 @@ export function usePhenoHuntWorkspace(
     Record<string, KeeperDecisionLogEntry[]>
   >({});
   const [sexByPlant, setSexByPlant] = useState<Record<string, SexObservationRow>>({});
+  const [smokeByPlant, setSmokeByPlant] = useState<Record<string, SmokeTestRow>>({});
+  const [labByKey, setLabByKey] = useState<Record<string, LabResultRow>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -109,12 +147,14 @@ export function usePhenoHuntWorkspace(
         setStatus("error");
         return;
       }
-      const [scores, decisions, rounds, history, sexes] = await Promise.all([
+      const [scores, decisions, rounds, history, sexes, smokes, labs] = await Promise.all([
         listCandidateScoresForHunt(id),
         listKeeperDecisionsForHunt(id),
         listScoreRoundsForHunt(id),
         listKeeperDecisionHistoryForHunt(id),
         listLatestSexObservationsForHunt(id),
+        listSmokeTestsForHunt(id),
+        listLabResultsForHunt(id),
       ]);
       if (cancelled) return;
       setHunt(result.hunt);
@@ -124,6 +164,8 @@ export function usePhenoHuntWorkspace(
       setRoundsByKey(rounds);
       setDecisionHistoryByPlant(history);
       setSexByPlant(sexes);
+      setSmokeByPlant(smokes);
+      setLabByKey(labs);
       setStatus("ok");
     })().catch(() => {
       if (cancelled) return;
@@ -262,6 +304,64 @@ export function usePhenoHuntWorkspace(
     [id],
   );
 
+  const saveSmokeTest = useCallback(
+    async (
+      plantId: string,
+      payload: {
+        flavorDescriptors: readonly string[];
+        effectDescriptors: readonly string[];
+        smoothness: number | null;
+        potencyImpression: number | null;
+        verdict: string | null;
+      },
+    ) => {
+      if (!id) return false;
+      setSaving(plantId);
+      const res = await upsertSmokeTest({ huntId: id, plantId, ...payload });
+      setSaving(null);
+      if (res.ok === true) {
+        setSmokeByPlant((prev) => ({ ...prev, [plantId]: { plantId, ...payload } }));
+        return true;
+      }
+      setError(res.error);
+      return false;
+    },
+    [id],
+  );
+
+  const saveLabResult = useCallback(
+    async (
+      plantId: string,
+      source: PhenoLabSource,
+      payload: {
+        thcPct: number | null;
+        cbdPct: number | null;
+        totalCannabinoidsPct: number | null;
+        dominantTerpenes: readonly TerpeneReading[];
+      },
+    ) => {
+      if (!id) return false;
+      setSaving(plantId);
+      const res = await upsertLabResult({ huntId: id, plantId, source, ...payload });
+      setSaving(null);
+      if (res.ok === true) {
+        setLabByKey((prev) => ({
+          ...prev,
+          [`${plantId}:${source}`]: {
+            plantId,
+            source,
+            ...payload,
+            labVerified: source === "coa",
+          },
+        }));
+        return true;
+      }
+      setError(res.error);
+      return false;
+    },
+    [id],
+  );
+
   return {
     status,
     hunt,
@@ -271,11 +371,15 @@ export function usePhenoHuntWorkspace(
     roundsByKey,
     decisionHistoryByPlant,
     sexByPlant,
+    smokeByPlant,
+    labByKey,
     error,
     saving,
     saveScore,
     saveDecision,
     saveRound,
     saveSex,
+    saveSmokeTest,
+    saveLabResult,
   };
 }

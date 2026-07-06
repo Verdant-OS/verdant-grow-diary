@@ -1,0 +1,272 @@
+/**
+ * PhenoKeepersPage — /pheno-hunts/:id/keepers
+ *
+ * Keepers, clone lineage, and the breeding endgame (two-parent crosses) for a
+ * grower's own hunt. RLS-scoped writes of the grower's OWN records. Data/record-
+ * only: naming a keeper, adding a clone, or recording a cross starts no grow and
+ * drives no device. No AI, no Action Queue, no automation.
+ */
+import { useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
+import { usePhenoKeepers } from "@/hooks/usePhenoKeepers";
+import { buildPhenoKeeperLineage } from "@/lib/phenoKeeperLineageViewModel";
+
+export default function PhenoKeepersPage() {
+  const { id } = useParams<{ id: string }>();
+  const ks = usePhenoKeepers(id);
+
+  const [promotePlant, setPromotePlant] = useState("");
+  const [promoteName, setPromoteName] = useState("");
+  const [cloneLabels, setCloneLabels] = useState<Record<string, string>>({});
+  const [female, setFemale] = useState("");
+  const [male, setMale] = useState("");
+  const [crossName, setCrossName] = useState("");
+
+  const candidateLabelById = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const c of ks.candidates) m[c.candidateId] = c.candidateLabel ?? c.candidateId;
+    return m;
+  }, [ks.candidates]);
+
+  const lineage = useMemo(
+    () =>
+      buildPhenoKeeperLineage(
+        ks.keepers.map((k) => ({
+          keeperId: k.id,
+          keeperName: k.keeperName,
+          huntId: k.huntId,
+          huntName: ks.hunt?.name ?? null,
+          sourcePlantId: k.sourcePlantId,
+          sourceCandidateLabel: candidateLabelById[k.sourcePlantId] ?? null,
+          note: k.note,
+          createdAt: k.createdAt,
+        })),
+      ),
+    [ks.keepers, ks.hunt, candidateLabelById],
+  );
+
+  if (ks.status === "loading" || ks.status === "idle") {
+    return (
+      <div data-testid="pheno-keepers-loading" className="container mx-auto max-w-4xl px-4 py-6">
+        <p className="text-sm text-muted-foreground">Loading keepers…</p>
+      </div>
+    );
+  }
+  if (ks.status === "error") {
+    return (
+      <div data-testid="pheno-keepers-error" className="container mx-auto max-w-4xl px-4 py-6">
+        <p className="text-sm text-muted-foreground" role="alert">
+          {ks.error ?? "Could not load keepers."}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <main data-testid="pheno-keepers" className="container mx-auto max-w-4xl space-y-6 px-4 py-6">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold">
+          Keepers &amp; crosses: {ks.hunt?.name ?? "this hunt"}
+        </h1>
+        <p className="text-xs text-muted-foreground">
+          Preserve a keeper as clones and record breeding crosses. Recording anything here changes
+          nothing on its own — Verdant never starts a grow or acts for you.
+        </p>
+      </header>
+
+      {/* Promote a candidate to keeper */}
+      <section className="space-y-2 rounded-lg border border-border bg-card p-4">
+        <h2 className="text-lg font-semibold">Name a keeper</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            data-testid="keepers-promote-plant"
+            value={promotePlant}
+            onChange={(e) => setPromotePlant(e.target.value)}
+            className="rounded border border-border bg-background px-2 py-1 text-sm"
+          >
+            <option value="">Choose a candidate…</option>
+            {ks.candidates.map((c) => (
+              <option key={c.candidateId} value={c.candidateId}>
+                {c.candidateLabel ?? c.candidateId}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            data-testid="keepers-promote-name"
+            value={promoteName}
+            onChange={(e) => setPromoteName(e.target.value)}
+            placeholder="Keeper name"
+            className="rounded border border-border bg-background px-2 py-1 text-sm"
+          />
+          <button
+            type="button"
+            data-testid="keepers-promote-save"
+            disabled={ks.saving || !promotePlant || !promoteName.trim()}
+            onClick={async () => {
+              if (await ks.promoteToKeeper(promotePlant, promoteName)) {
+                setPromotePlant("");
+                setPromoteName("");
+              }
+            }}
+            className="rounded-md border border-border bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            Name keeper
+          </button>
+        </div>
+      </section>
+
+      {/* Keepers + clone lineage */}
+      <section className="space-y-2">
+        <h2 className="text-lg font-semibold">Keepers</h2>
+        {ks.keepers.length === 0 ? (
+          <p data-testid="pheno-keepers-empty" className="text-sm text-muted-foreground">
+            No keepers named yet.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {lineage.map((view) => (
+              <li
+                key={view.keeperId}
+                data-testid={`pheno-keeper-${view.keeperId}`}
+                className="space-y-2 rounded-lg border border-border bg-card p-4"
+              >
+                <div>
+                  <h3 className="font-semibold">{view.keeperName}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    From {view.origin.sourceCandidateLabel ?? "unknown candidate"} ·{" "}
+                    {view.origin.huntName ?? "this hunt"}
+                  </p>
+                </div>
+                <div className="text-xs">
+                  <span className="font-medium">
+                    Clones ({ks.clonesByKeeper[view.keeperId]?.length ?? 0}):
+                  </span>{" "}
+                  {(ks.clonesByKeeper[view.keeperId] ?? []).map((c) => c.cloneLabel).join(", ") ||
+                    "none yet"}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    data-testid={`keepers-clone-label-${view.keeperId}`}
+                    value={cloneLabels[view.keeperId] ?? ""}
+                    onChange={(e) =>
+                      setCloneLabels((prev) => ({ ...prev, [view.keeperId]: e.target.value }))
+                    }
+                    placeholder="Clone label (e.g. mother, cut #2)"
+                    className="rounded border border-border bg-background px-2 py-1 text-sm"
+                  />
+                  <button
+                    type="button"
+                    data-testid={`keepers-clone-add-${view.keeperId}`}
+                    disabled={ks.saving || !(cloneLabels[view.keeperId] ?? "").trim()}
+                    onClick={async () => {
+                      if (
+                        await ks.addKeeperClone(view.keeperId, cloneLabels[view.keeperId] ?? "")
+                      ) {
+                        setCloneLabels((prev) => ({ ...prev, [view.keeperId]: "" }));
+                      }
+                    }}
+                    className="rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
+                  >
+                    Add clone
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Record a cross */}
+      {ks.keepers.length >= 2 && (
+        <section className="space-y-2 rounded-lg border border-border bg-card p-4">
+          <h2 className="text-lg font-semibold">Record a cross</h2>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <label className="flex items-center gap-1">
+              ♀
+              <select
+                data-testid="keepers-cross-female"
+                value={female}
+                onChange={(e) => setFemale(e.target.value)}
+                className="rounded border border-border bg-background px-2 py-1"
+              >
+                <option value="">Female keeper…</option>
+                {ks.keepers.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.keeperName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span>×</span>
+            <label className="flex items-center gap-1">
+              ♂
+              <select
+                data-testid="keepers-cross-male"
+                value={male}
+                onChange={(e) => setMale(e.target.value)}
+                className="rounded border border-border bg-background px-2 py-1"
+              >
+                <option value="">Male keeper…</option>
+                {ks.keepers.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.keeperName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <input
+              type="text"
+              data-testid="keepers-cross-name"
+              value={crossName}
+              onChange={(e) => setCrossName(e.target.value)}
+              placeholder="Cross name (optional)"
+              className="rounded border border-border bg-background px-2 py-1"
+            />
+            <button
+              type="button"
+              data-testid="keepers-cross-save"
+              disabled={ks.saving || !female || !male || female === male}
+              onClick={async () => {
+                if (await ks.saveCross(female, male, crossName)) {
+                  setFemale("");
+                  setMale("");
+                  setCrossName("");
+                }
+              }}
+              className="rounded-md border border-border bg-primary px-3 py-1.5 font-medium text-primary-foreground disabled:opacity-50"
+            >
+              Record cross
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Crosses list */}
+      {ks.crosses.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-lg font-semibold">Crosses</h2>
+          <ul data-testid="pheno-crosses" className="space-y-1 text-sm">
+            {ks.crosses.map((x) => {
+              const f = ks.keepers.find((k) => k.id === x.femaleKeeperId)?.keeperName ?? "?";
+              const m = ks.keepers.find((k) => k.id === x.maleKeeperId)?.keeperName ?? "?";
+              return (
+                <li
+                  key={x.id}
+                  data-testid={`pheno-cross-${x.id}`}
+                  className="rounded border border-border px-2 py-1"
+                >
+                  <span className="font-medium">{x.crossName || `${f} × ${m}`}</span>{" "}
+                  <span className="text-muted-foreground">
+                    (♀ {f} × ♂ {m})
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+    </main>
+  );
+}

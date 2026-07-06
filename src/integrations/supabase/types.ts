@@ -1135,6 +1135,67 @@ export type Database = {
           },
         ]
       }
+      pheno_crosses: {
+        Row: {
+          created_at: string
+          cross_name: string | null
+          crossed_at: string | null
+          female_keeper_id: string
+          hunt_id: string | null
+          id: string
+          male_keeper_id: string
+          note: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          cross_name?: string | null
+          crossed_at?: string | null
+          female_keeper_id: string
+          hunt_id?: string | null
+          id?: string
+          male_keeper_id: string
+          note?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          cross_name?: string | null
+          crossed_at?: string | null
+          female_keeper_id?: string
+          hunt_id?: string | null
+          id?: string
+          male_keeper_id?: string
+          note?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_crosses_female_keeper_id_fkey"
+            columns: ["female_keeper_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_keepers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_crosses_male_keeper_id_fkey"
+            columns: ["male_keeper_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_keepers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_crosses_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pheno_hunts: {
         Row: {
           created_at: string
@@ -1176,6 +1237,67 @@ export type Database = {
             columns: ["tent_id"]
             isOneToOne: false
             referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_keeper_clones: {
+        Row: {
+          clone_label: string
+          clone_plant_id: string | null
+          created_at: string
+          id: string
+          keeper_id: string
+          note: string | null
+          parent_clone_id: string | null
+          taken_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          clone_label: string
+          clone_plant_id?: string | null
+          created_at?: string
+          id?: string
+          keeper_id: string
+          note?: string | null
+          parent_clone_id?: string | null
+          taken_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          clone_label?: string
+          clone_plant_id?: string | null
+          created_at?: string
+          id?: string
+          keeper_id?: string
+          note?: string | null
+          parent_clone_id?: string | null
+          taken_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_keeper_clones_keeper_id_fkey"
+            columns: ["keeper_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_keepers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_keeper_clones_parent_clone_id_fkey"
+            columns: ["parent_clone_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_keeper_clones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_keeper_clones_clone_plant_id_fkey"
+            columns: ["clone_plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
             referencedColumns: ["id"]
           },
         ]

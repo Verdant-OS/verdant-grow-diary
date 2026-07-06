@@ -99,6 +99,7 @@ const OneTentLiveProof = lazy(() => import("./pages/OneTentLiveProof"));
 const DemoProofWalkthrough = lazy(() => import("./pages/DemoProofWalkthrough"));
 const ContextualPhenoComparisonDemo = lazy(() => import("./pages/ContextualPhenoComparisonDemo"));
 const PhenoComparison = lazy(() => import("./pages/PhenoComparison"));
+const PhenoExpressionShowcase = lazy(() => import("./pages/PhenoExpressionShowcase"));
 const ReleaseReadiness = lazy(() => import("./pages/ReleaseReadiness"));
 
 const queryClient = new QueryClient();
@@ -186,6 +187,9 @@ const App = () => (
                       no fetch/Supabase/AI/writes. Mounted outside AppShell so
                       the read-only surface renders without operator chrome. */}
                   <Route path="/pheno-comparison" element={<PhenoComparison />} />
+                  {/* Mix-and-match showcase of ten example phenos (demo,
+                      fixture-only, network-free). Read-only. */}
+                  <Route path="/pheno-expression-showcase" element={<PhenoExpressionShowcase />} />
                   {/* LIVE per-hunt comparison. Reads the grower's own hunt via
                       RLS-scoped SELECT (empty/graceful without a session);
                       still read-only — no writes/AI/automation. */}

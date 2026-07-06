@@ -235,6 +235,30 @@ export default function AgentIntegrations({
                 {MCP_MANIFEST.version}
               </dd>
             </div>
+            <div data-testid="manifest-identity">
+              <dt className="text-muted-foreground">Manifest identity</dt>
+              <dd className="text-xs space-y-1">
+                <div>
+                  Manifest version:{" "}
+                  <span className="font-mono" data-testid="manifest-version">
+                    {MCP_MANIFEST.version}
+                  </span>
+                </div>
+                <div>
+                  Manifest fingerprint:{" "}
+                  <span className="font-mono" data-testid="manifest-fingerprint">
+                    {manifestFingerprint}
+                  </span>
+                </div>
+                <div data-testid="manifest-tool-count">
+                  Tools advertised: {toolNames.length}
+                </div>
+                <div className="text-muted-foreground">
+                  Last-known tools:{" "}
+                  <span className="font-mono">{toolNames.join(", ")}</span>
+                </div>
+              </dd>
+            </div>
           </dl>
 
           <div className="flex flex-wrap items-center gap-3">

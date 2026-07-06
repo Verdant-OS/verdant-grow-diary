@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Settings as SettingsIcon } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -288,6 +289,17 @@ export default function Settings() {
               </span>
             ))}
           </div>
+        </Tile>
+
+        <Tile name="Agent integrations" state="available">
+          <p className="text-sm text-muted-foreground mb-3">
+            Connect ChatGPT, Claude, or another MCP-capable assistant. Read-only
+            access to your grows, recent diary entries, and latest sensor
+            snapshots — never writes, AI Doctor runs, or device control.
+          </p>
+          <Button asChild size="sm" data-testid="agent-integrations-link">
+            <Link to="/settings/agent-integrations">Open agent integrations</Link>
+          </Button>
         </Tile>
       </div>
     </div>

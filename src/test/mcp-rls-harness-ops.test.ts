@@ -301,6 +301,13 @@ describe("MCP RLS harness ops — package script + README surface", () => {
     expect(wfCode).not.toMatch(/supabase\s+link/);
     expect(wfCode).not.toMatch(/db\s+push/);
     expect(wfCode).not.toMatch(/secrets\./);
+    // Org policy: every action must be pinned to a full-length commit SHA.
+    for (const line of wfCode.split("\n")) {
+      const uses = line.match(/uses:\s*(\S+)/);
+      if (uses) {
+        expect(uses[1], `action not SHA-pinned: ${uses[1]}`).toMatch(/@[0-9a-f]{40}$/);
+      }
+    }
     // Keys are masked before any later step can print them.
     expect(wf).toContain("::add-mask::");
     // Migrations are applied locally before the harness runs.

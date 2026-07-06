@@ -540,6 +540,14 @@ export default function AgentIntegrations({
           </ul>
         </section>
       </div>
+
+      <ManifestSummaryModal
+        open={manifestModalOpen}
+        onOpenChange={setManifestModalOpen}
+        manifest={MCP_MANIFEST}
+        fingerprint={manifestFingerprint}
+        manifestUrl={manifestUrl}
+      />
     </div>
   );
 }

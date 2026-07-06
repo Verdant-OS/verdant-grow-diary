@@ -137,6 +137,7 @@ const App = () => (
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                   {/* Deprecated auth entry points — redirect to canonical /auth to
                       prevent funnel leaks from old bookmarks, emails, ads, and
                       creator posts that still point to /login /signup /register. */}

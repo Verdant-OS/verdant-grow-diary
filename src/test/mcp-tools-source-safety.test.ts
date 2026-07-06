@@ -71,8 +71,13 @@ describe("MCP tool source-code safety scan", () => {
         expect(src).not.toMatch(/functions\.invoke/);
       });
 
-      it("never returns raw_payload", () => {
-        expect(src).not.toMatch(/raw_payload/);
+      it("never selects or exposes raw_payload as a field", () => {
+        // Strip block/line comments before checking so the safety note
+        // (which mentions raw_payload by design) doesn't trigger.
+        const codeOnly = src
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/(^|\s)\/\/.*$/gm, "");
+        expect(codeOnly).not.toMatch(/raw_payload/);
       });
     });
   }

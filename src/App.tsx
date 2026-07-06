@@ -38,6 +38,7 @@ const Timeline = lazy(() => import("./pages/Timeline"));
 const Grows = lazy(() => import("./pages/Grows"));
 const GrowDetail = lazy(() => import("./pages/GrowDetail"));
 const PhenoHuntNew = lazy(() => import("./pages/PhenoHuntNew"));
+const PhenoHuntCompare = lazy(() => import("./pages/PhenoHuntCompare"));
 const Reports = lazy(() => import("./pages/Reports"));
 const PostGrowLearningReport = lazy(() => import("./pages/PostGrowLearningReport"));
 
@@ -181,11 +182,14 @@ const App = () => (
                     element={<ContextualPhenoComparisonDemo />}
                   />
 
-                  {/* Read-only Pheno Comparison preview surface. Fixture-only,
+                  {/* Read-only Pheno Comparison PREVIEW surface. Fixture-only,
                       no fetch/Supabase/AI/writes. Mounted outside AppShell so
                       the read-only surface renders without operator chrome. */}
                   <Route path="/pheno-comparison" element={<PhenoComparison />} />
-                  <Route path="/pheno-hunts/:id/compare" element={<PhenoComparison />} />
+                  {/* LIVE per-hunt comparison. Reads the grower's own hunt via
+                      RLS-scoped SELECT (empty/graceful without a session);
+                      still read-only — no writes/AI/automation. */}
+                  <Route path="/pheno-hunts/:id/compare" element={<PhenoHuntCompare />} />
 
                   <Route element={<AppShell />}>
                     <Route path="/" element={<Dashboard />} />

@@ -128,6 +128,27 @@ jobs:
           echo "::error::Local Supabase not reachable after db reset"
           exit 1
 
+      - name: Diagnostic REST probes (no keys printed; error bodies only)
+        env:
+          LOCAL_URL: ${{ steps.sb.outputs.api_url }}
+          LOCAL_ANON: ${{ steps.sb.outputs.anon_key }}
+          LOCAL_SERVICE: ${{ steps.sb.outputs.service_role_key }}
+        run: |
+          set -euo pipefail
+          supabase --version
+          probe() {
+            local label="$1" key="$2"
+            local body code
+            body=$(mktemp)
+            code=$(curl -s -o "$body" -w "%{http_code}" \
+              "${LOCAL_URL}/rest/v1/grows?select=id&limit=1" \
+              -H "apikey: ${key}" -H "Authorization: Bearer ${key}")
+            echo "probe ${label}: HTTP ${code} body=$(head -c 300 "$body")"
+            rm -f "$body"
+          }
+          probe "service-role key" "${LOCAL_SERVICE}"
+          probe "anon key" "${LOCAL_ANON}"
+
       - name: Run MCP local RLS integration test
         env:
           MCP_LOCAL_RLS_HARNESS: "1"

@@ -138,6 +138,16 @@ type SeededUser = {
   diaries: SeededDiary[]; // multiple diary entries, all on primaryGrow
 };
 
+/** Full PostgREST/GoTrue error detail for seed failures (debugging aid). */
+function fmtDbError(
+  e: { message?: string; code?: string; details?: string; hint?: string; status?: number } | null,
+): string {
+  if (!e) return "unknown error (no data returned)";
+  return `${e.message} [code=${e.code ?? "?"} status=${e.status ?? "?"} details=${
+    e.details ?? "-"
+  } hint=${e.hint ?? "-"}]`;
+}
+
 function makeCtx(token: string | null): ToolContext {
   return {
     isAuthenticated: () => token !== null,
@@ -262,7 +272,7 @@ describeIfHarness("MCP local RLS integration", () => {
       email_confirm: true,
     });
     if (createErr || !created.user) {
-      throw new Error(`seedUser(${label}) createUser failed: ${createErr?.message}`);
+      throw new Error(`seedUser(${label}) createUser failed: ${fmtDbError(createErr)}`);
     }
     const userId = created.user.id;
 
@@ -283,7 +293,7 @@ describeIfHarness("MCP local RLS integration", () => {
       .from("grows")
       .insert(growRows)
       .select("id,name,is_archived");
-    if (growsErr || !growsData) throw new Error(`seed grows: ${growsErr?.message}`);
+    if (growsErr || !growsData) throw new Error(`seed grows: ${fmtDbError(growsErr)}`);
 
     const grows: SeededGrow[] = growsData.map((g) => ({
       id: g.id as string,
@@ -301,7 +311,8 @@ describeIfHarness("MCP local RLS integration", () => {
         { user_id: userId, name: `Tent-${marker}-empty` },
       ])
       .select("id,name");
-    if (tentErr || !tents || tents.length !== 2) throw new Error(`seed tents: ${tentErr?.message}`);
+    if (tentErr || !tents || tents.length !== 2)
+      throw new Error(`seed tents: ${fmtDbError(tentErr)}`);
     const tentId = tents.find((t) => !String(t.name).endsWith("-empty"))!.id as string;
     const emptyTentId = tents.find((t) => String(t.name).endsWith("-empty"))!.id as string;
 
@@ -318,7 +329,7 @@ describeIfHarness("MCP local RLS integration", () => {
       .from("diary_entries")
       .insert(diaryRows)
       .select("id,note,grow_id");
-    if (diaryErr || !diaryData) throw new Error(`seed diary: ${diaryErr?.message}`);
+    if (diaryErr || !diaryData) throw new Error(`seed diary: ${fmtDbError(diaryErr)}`);
     const diaries: SeededDiary[] = diaryData.map((d) => ({
       id: d.id as string,
       note: d.note as string,
@@ -347,7 +358,7 @@ describeIfHarness("MCP local RLS integration", () => {
         },
       ])
       .select("id");
-    if (readingsErr || !readings) throw new Error(`seed readings: ${readingsErr?.message}`);
+    if (readingsErr || !readings) throw new Error(`seed readings: ${fmtDbError(readingsErr)}`);
 
     const anonClient = createClient(url, anon, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -357,7 +368,7 @@ describeIfHarness("MCP local RLS integration", () => {
       password,
     });
     if (signInErr || !session.session) {
-      throw new Error(`seedUser(${label}) signIn failed: ${signInErr?.message}`);
+      throw new Error(`seedUser(${label}) signIn failed: ${fmtDbError(signInErr)}`);
     }
 
     return {

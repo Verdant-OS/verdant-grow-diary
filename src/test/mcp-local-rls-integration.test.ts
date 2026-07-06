@@ -212,7 +212,7 @@ describeIfHarness("MCP local RLS integration", () => {
 
   describe("list_grows", () => {
     it("User A sees only Grow A", async () => {
-      const res = await listGrowsTool.handler({}, makeCtx(userA.accessToken));
+      const res = await listGrowsTool.handler({ includeArchived: false, limit: 25 } as never, makeCtx(userA.accessToken));
       const ids = (res.structuredContent?.grows ?? []).map((g: { id: string }) => g.id);
       expect(ids).toContain(userA.growId);
       expect(ids).not.toContain(userB.growId);
@@ -220,7 +220,7 @@ describeIfHarness("MCP local RLS integration", () => {
     });
 
     it("User B sees only Grow B", async () => {
-      const res = await listGrowsTool.handler({}, makeCtx(userB.accessToken));
+      const res = await listGrowsTool.handler({ includeArchived: false, limit: 25 } as never, makeCtx(userB.accessToken));
       const ids = (res.structuredContent?.grows ?? []).map((g: { id: string }) => g.id);
       expect(ids).toContain(userB.growId);
       expect(ids).not.toContain(userA.growId);
@@ -228,7 +228,7 @@ describeIfHarness("MCP local RLS integration", () => {
     });
 
     it("Unauthenticated caller is rejected", async () => {
-      const res = await listGrowsTool.handler({}, makeCtx(null));
+      const res = await listGrowsTool.handler({ includeArchived: false, limit: 25 } as never, makeCtx(null));
       expect(res.isError).toBe(true);
     });
   });

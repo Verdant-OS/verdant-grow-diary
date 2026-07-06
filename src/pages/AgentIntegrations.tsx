@@ -275,9 +275,22 @@ export default function AgentIntegrations({
           </dl>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={onCopy} data-testid="copy-connection-details">
+            <Button
+              onClick={onCopy}
+              aria-label="Copy Verdant MCP connection details"
+              data-testid="copy-connection-details"
+            >
               <Copy className="mr-2 h-4 w-4" aria-hidden />
               Copy connection details
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setManifestModalOpen(true)}
+              aria-label="View safe MCP manifest summary"
+              data-testid="open-manifest-summary-modal"
+            >
+              <FileText className="mr-2 h-4 w-4" aria-hidden />
+              View MCP manifest
             </Button>
             <span
               role="status"
@@ -292,6 +305,7 @@ export default function AgentIntegrations({
                   : ""}
             </span>
           </div>
+
         </section>
 
         <section

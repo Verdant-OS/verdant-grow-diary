@@ -27,6 +27,7 @@ import {
   type PhenoScoreRound,
   type ScoreRoundRow,
 } from "@/lib/phenoScoreRoundsService";
+import type { KeeperDecisionLogEntry } from "@/lib/phenoKeeperDecisionLogService";
 
 /** "overall" = the flat card (pheno_candidate_scores); rounds = staged cards. */
 type WorkspaceRound = "overall" | PhenoScoreRound;
@@ -53,7 +54,12 @@ interface EditorProps {
       note?: string | null;
     },
   ) => Promise<boolean>;
-  onSaveDecision: (plantId: string, decision: PhenoKeeperDecision) => Promise<boolean>;
+  onSaveDecision: (
+    plantId: string,
+    decision: PhenoKeeperDecision,
+    reason: string | null,
+  ) => Promise<boolean>;
+  history: readonly KeeperDecisionLogEntry[];
 }
 
 function CandidateEditor({
@@ -66,9 +72,11 @@ function CandidateEditor({
   onSaveScore,
   onSaveRound,
   onSaveDecision,
+  history,
 }: EditorProps) {
   const plantId = candidate.candidateId;
   const isRoundMode = round !== "overall";
+  const [reason, setReason] = useState<string>("");
   const [traits, setTraits] = useState<Record<string, number>>(() =>
     isRoundMode ? { ...(roundRow?.loudTraits ?? {}) } : { ...(score?.traits ?? {}) },
   );
@@ -108,7 +116,7 @@ function CandidateEditor({
     } else {
       okScore = await onSaveScore(plantId, traits, note.trim() || null);
     }
-    const okDecision = await onSaveDecision(plantId, decisionValue);
+    const okDecision = await onSaveDecision(plantId, decisionValue, reason.trim() || null);
     setSaved(okScore && okDecision);
   };
 
@@ -215,6 +223,45 @@ function CandidateEditor({
         </select>
       </label>
 
+      <label className="block text-sm">
+        <span className="mb-1 block">
+          Reason <span className="text-xs text-muted-foreground">(kept in the decision log)</span>
+        </span>
+        <input
+          type="text"
+          data-testid={`workspace-reason-${plantId}`}
+          value={reason}
+          onChange={(e) => {
+            setSaved(false);
+            setReason(e.target.value);
+          }}
+          placeholder="Why keep/cull/hold?"
+          className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+        />
+      </label>
+
+      {history.length > 0 && (
+        <details data-testid={`workspace-decision-history-${plantId}`} className="text-xs">
+          <summary className="cursor-pointer text-muted-foreground">
+            Decision history ({history.length})
+          </summary>
+          <ul className="mt-1 space-y-1">
+            {history.map((h, i) => (
+              <li
+                key={`${h.decidedAt ?? "na"}-${i}`}
+                className="rounded border border-border px-2 py-1"
+              >
+                <span className="font-medium capitalize">{h.decision}</span>
+                {h.reason ? ` — ${h.reason}` : ""}
+                {h.decidedAt ? (
+                  <span className="ml-1 text-muted-foreground">({h.decidedAt.slice(0, 10)})</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -307,6 +354,7 @@ export default function PhenoHuntWorkspace() {
               onSaveScore={ws.saveScore}
               onSaveRound={ws.saveRound}
               onSaveDecision={ws.saveDecision}
+              history={ws.decisionHistoryByPlant[c.candidateId] ?? []}
             />
           ))}
         </div>

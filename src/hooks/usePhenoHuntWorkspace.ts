@@ -23,6 +23,11 @@ import {
   type ScoreRoundRow,
   type PhenoScoreRound,
 } from "@/lib/phenoScoreRoundsService";
+import {
+  appendKeeperDecision,
+  listKeeperDecisionHistoryForHunt,
+  type KeeperDecisionLogEntry,
+} from "@/lib/phenoKeeperDecisionLogService";
 import type { PhenoKeeperDecision } from "@/lib/phenoKeeperDecisionModel";
 
 export type WorkspaceStatus = "idle" | "loading" | "ok" | "error";
@@ -35,6 +40,8 @@ export interface UsePhenoHuntWorkspaceState {
   decisionsByPlant: Record<string, KeeperDecisionRow>;
   /** Per-round cards keyed "plantId:round". */
   roundsByKey: Record<string, ScoreRoundRow>;
+  /** Append-only decision history keyed by plant id, newest first. */
+  decisionHistoryByPlant: Record<string, KeeperDecisionLogEntry[]>;
   error: string | null;
   saving: string | null;
   saveScore: (
@@ -45,7 +52,7 @@ export interface UsePhenoHuntWorkspaceState {
   saveDecision: (
     plantId: string,
     decision: PhenoKeeperDecision,
-    note?: string | null,
+    reason?: string | null,
   ) => Promise<boolean>;
   saveRound: (
     plantId: string,
@@ -70,6 +77,9 @@ export function usePhenoHuntWorkspace(
   const [scoresByPlant, setScoresByPlant] = useState<Record<string, CandidateScoreRow>>({});
   const [decisionsByPlant, setDecisionsByPlant] = useState<Record<string, KeeperDecisionRow>>({});
   const [roundsByKey, setRoundsByKey] = useState<Record<string, ScoreRoundRow>>({});
+  const [decisionHistoryByPlant, setDecisionHistoryByPlant] = useState<
+    Record<string, KeeperDecisionLogEntry[]>
+  >({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -89,10 +99,11 @@ export function usePhenoHuntWorkspace(
         setStatus("error");
         return;
       }
-      const [scores, decisions, rounds] = await Promise.all([
+      const [scores, decisions, rounds, history] = await Promise.all([
         listCandidateScoresForHunt(id),
         listKeeperDecisionsForHunt(id),
         listScoreRoundsForHunt(id),
+        listKeeperDecisionHistoryForHunt(id),
       ]);
       if (cancelled) return;
       setHunt(result.hunt);
@@ -100,6 +111,7 @@ export function usePhenoHuntWorkspace(
       setScoresByPlant(scores);
       setDecisionsByPlant(decisions);
       setRoundsByKey(rounds);
+      setDecisionHistoryByPlant(history);
       setStatus("ok");
     })().catch(() => {
       if (cancelled) return;
@@ -131,19 +143,38 @@ export function usePhenoHuntWorkspace(
   );
 
   const saveDecision = useCallback(
-    async (plantId: string, decision: PhenoKeeperDecision, note?: string | null) => {
+    async (plantId: string, decision: PhenoKeeperDecision, reason?: string | null) => {
       if (!id) return false;
       setSaving(plantId);
-      const res = await recordKeeperDecision({ huntId: id, plantId, decision, note });
+      const at = new Date().toISOString();
+      // Current-decision store (flat, one row per candidate) …
+      const flat = await recordKeeperDecision({ huntId: id, plantId, decision, note: reason });
+      // … plus an immutable audit-trail row with the reason (append-only log).
+      const logged = await appendKeeperDecision({ huntId: id, plantId, decision, reason });
       setSaving(null);
-      if (res.ok === true) {
+      if (flat.ok === true && logged.ok === true) {
         setDecisionsByPlant((prev) => ({
           ...prev,
-          [plantId]: { plantId, decision, note: note ?? null, decidedAt: new Date().toISOString() },
+          [plantId]: { plantId, decision, note: reason ?? null, decidedAt: at },
+        }));
+        const entry: KeeperDecisionLogEntry = {
+          plantId,
+          decision,
+          reason: reason?.trim() || `Recorded ${decision}`,
+          note: null,
+          decidedAt: at,
+        };
+        setDecisionHistoryByPlant((prev) => ({
+          ...prev,
+          [plantId]: [entry, ...(prev[plantId] ?? [])],
         }));
         return true;
       }
-      setError(res.error);
+      setError(
+        (flat.ok === false && flat.error) ||
+          (logged.ok === false && logged.error) ||
+          "Could not record this decision.",
+      );
       return false;
     },
     [id],
@@ -201,6 +232,7 @@ export function usePhenoHuntWorkspace(
     scoresByPlant,
     decisionsByPlant,
     roundsByKey,
+    decisionHistoryByPlant,
     error,
     saving,
     saveScore,

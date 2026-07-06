@@ -1231,6 +1231,57 @@ export type Database = {
           },
         ]
       }
+      pheno_keeper_decisions_log: {
+        Row: {
+          created_at: string
+          decided_at: string
+          decision: string
+          hunt_id: string
+          id: string
+          note: string | null
+          plant_id: string
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string
+          decision: string
+          hunt_id: string
+          id?: string
+          note?: string | null
+          plant_id: string
+          reason: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string
+          decision?: string
+          hunt_id?: string
+          id?: string
+          note?: string | null
+          plant_id?: string
+          reason?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_keeper_decisions_log_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_keeper_decisions_log_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pheno_keepers: {
         Row: {
           created_at: string

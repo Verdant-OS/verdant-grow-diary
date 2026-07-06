@@ -13,6 +13,7 @@ const FILES = [
   "src/lib/phenoCandidateScoresService.ts",
   "src/lib/phenoKeeperDecisionService.ts",
   "src/lib/phenoScoreRoundsService.ts",
+  "src/lib/phenoKeeperDecisionLogService.ts",
   "src/hooks/usePhenoHuntWorkspace.ts",
   "src/pages/PhenoHuntWorkspace.tsx",
 ];
@@ -22,6 +23,7 @@ const ALLOWED_WRITE_TABLES = [
   "pheno_candidate_scores",
   "pheno_keeper_decisions",
   "pheno_score_rounds",
+  "pheno_keeper_decisions_log",
 ];
 
 function stripComments(src: string): string {

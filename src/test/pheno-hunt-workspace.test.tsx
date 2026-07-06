@@ -26,6 +26,7 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     scoresByPlant: {},
     decisionsByPlant: {},
     roundsByKey: {},
+    decisionHistoryByPlant: {},
     error: null,
     saving: null,
     saveScore,
@@ -78,13 +79,43 @@ describe("PhenoHuntWorkspace", () => {
       target: { value: "9" },
     });
     fireEvent.change(screen.getByTestId("workspace-decision-p1"), { target: { value: "keep" } });
+    fireEvent.change(screen.getByTestId("workspace-reason-p1"), {
+      target: { value: "loudest of the run" },
+    });
     fireEvent.click(screen.getByTestId("workspace-save-p1"));
 
     await waitFor(() => {
       expect(saveScore).toHaveBeenCalledWith("p1", { nose_loudness: 9 }, null);
-      expect(saveDecision).toHaveBeenCalledWith("p1", "keep");
+      expect(saveDecision).toHaveBeenCalledWith("p1", "keep", "loudest of the run");
     });
     expect(await screen.findByTestId("workspace-saved-p1")).toBeInTheDocument();
+  });
+
+  it("renders the append-only decision history when present", () => {
+    renderAt({
+      candidates: [{ candidateId: "p1", candidateLabel: "BD #1" }],
+      decisionHistoryByPlant: {
+        p1: [
+          {
+            plantId: "p1",
+            decision: "keep",
+            reason: "frostiest",
+            note: null,
+            decidedAt: "2026-03-02T00:00:00Z",
+          },
+          {
+            plantId: "p1",
+            decision: "hold",
+            reason: "wait for cure",
+            note: null,
+            decidedAt: "2026-02-20T00:00:00Z",
+          },
+        ],
+      },
+    });
+    const hist = screen.getByTestId("workspace-decision-history-p1");
+    expect(hist).toHaveTextContent(/frostiest/);
+    expect(hist).toHaveTextContent(/wait for cure/);
   });
 
   it("pre-fills existing saved scores and decisions", () => {

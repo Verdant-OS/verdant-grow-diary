@@ -18,7 +18,7 @@ name: MCP local RLS integration
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
     paths:
       - "src/lib/mcp/**"
       - "src/test/mcp-local-rls-integration.test.ts"
@@ -28,7 +28,7 @@ on:
       - "supabase/migrations/**"
       - ".github/workflows/mcp-local-rls-integration.yml"
   pull_request:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
     paths:
       - "src/lib/mcp/**"
       - "src/test/mcp-local-rls-integration.test.ts"

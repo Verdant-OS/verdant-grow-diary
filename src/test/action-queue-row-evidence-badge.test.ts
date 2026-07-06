@@ -15,10 +15,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
-const ACTION_QUEUE_SRC = readFileSync(
-  resolve(ROOT, "src/pages/ActionQueue.tsx"),
-  "utf8",
-);
+const ACTION_QUEUE_SRC = readFileSync(resolve(ROOT, "src/pages/ActionQueue.tsx"), "utf8");
 
 describe("Action Queue row evidence status badge", () => {
   it("ActionQueue.tsx imports the evidence view-model type and renders EvidenceStatusBadge", () => {
@@ -28,7 +25,7 @@ describe("Action Queue row evidence status badge", () => {
 
   it("pending rows reference evidence status data-testids for all three states", () => {
     expect(ACTION_QUEUE_SRC).toContain(
-      'data-testid={`action-queue-row-evidence-status-${vm.rowEvidenceStatus}`}',
+      "data-testid={`action-queue-row-evidence-status-${vm.rowEvidenceStatus}`}",
     );
   });
 
@@ -78,8 +75,12 @@ describe("Action Queue row evidence status badge", () => {
   });
 
   it("badge uses aria-label and title for accessible help text without noisy duplication", () => {
-    expect(ACTION_QUEUE_SRC).toMatch(/aria-label=\{\`Evidence: \$\{vm\.rowEvidenceStatusLabel\}\. \$\{vm\.rowEvidenceStatusHelp\}\`\}/);
+    expect(ACTION_QUEUE_SRC).toMatch(
+      /aria-label=\{`Evidence: \$\{vm\.rowEvidenceStatusLabel\}\. \$\{vm\.rowEvidenceStatusHelp\}`\}/,
+    );
     expect(ACTION_QUEUE_SRC).toMatch(/title=\{vm\.rowEvidenceStatusHelp\}/);
-    expect(ACTION_QUEUE_SRC).toMatch(/<span className="sr-only">\{vm\.rowEvidenceStatusHelp\}<\/span>/);
+    expect(ACTION_QUEUE_SRC).toMatch(
+      /<span className="sr-only">\{vm\.rowEvidenceStatusHelp\}<\/span>/,
+    );
   });
 });

@@ -247,6 +247,48 @@ proof surface must uphold the following:
   `bun run check:one-tent-loop-proof-never-healthy`
 
 
+## Local MCP RLS integration test
+
+Verdant exposes three **read-only** MCP tools (`list_grows`,
+`list_recent_diary_entries`, `get_latest_sensor_snapshot`). The test
+`src/test/mcp-local-rls-integration.test.ts` proves that these tools
+enforce Supabase Row-Level Security through the signed-in grower's
+OAuth/session token, including under `limit` and `includeArchived`
+options, and that responses never leak another user's rows, `raw_payload`,
+`service_role`, JWTs, or bridge/OAuth secrets.
+
+The suite is **local-only** and skips cleanly in CI/PRs where the
+harness is not configured. It never contacts hosted Supabase and never
+requires production secrets.
+
+**Required env vars**
+
+- `MCP_LOCAL_RLS_HARNESS=1`
+- `LOCAL_SUPABASE_URL` (e.g. `http://127.0.0.1:54321`)
+- `LOCAL_SUPABASE_ANON_KEY`
+- `LOCAL_SUPABASE_SERVICE_ROLE_KEY` — **local only**, used exclusively
+  for seeding/cleanup; MCP tool execution itself always routes through
+  `supabaseForUser(ctx)` with an anon-scoped user token.
+
+**Required local services**
+
+- Local Supabase running (e.g. `supabase start`) with this repo's
+  migrations applied (`supabase db reset` or `supabase migration up`).
+
+**Example command**
+
+```bash
+MCP_LOCAL_RLS_HARNESS=1 \
+LOCAL_SUPABASE_URL=http://127.0.0.1:54321 \
+LOCAL_SUPABASE_ANON_KEY=<local-anon-key> \
+LOCAL_SUPABASE_SERVICE_ROLE_KEY=<local-service-role-key> \
+bunx vitest run src/test/mcp-local-rls-integration.test.ts
+```
+
+CI runs this harness against a fresh local Supabase in the
+`mcp-local-rls-integration` workflow
+(`.github/workflows/mcp-local-rls-integration.yml`).
+
 
 ## Documentation
 

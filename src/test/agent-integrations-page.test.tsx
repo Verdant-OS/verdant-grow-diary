@@ -321,9 +321,109 @@ describe("AgentIntegrations page", () => {
       screen.getByTestId("connect-agent-safety-copy").textContent,
     ).toMatch(/read-only/i);
   });
+
+  it("checklist links carry accessible aria-labels", () => {
+    renderAgentIntegrations();
+    expect(
+      screen.getByTestId("open-oauth-consent-link").getAttribute("aria-label"),
+    ).toMatch(/OAuth consent/i);
+    expect(
+      screen.getByTestId("view-mcp-manifest-link").getAttribute("aria-label"),
+    ).toMatch(/MCP manifest/i);
+    expect(
+      screen
+        .getByTestId("view-tool-reference-link")
+        .getAttribute("aria-label"),
+    ).toMatch(/tool reference/i);
+    expect(
+      screen
+        .getByTestId("copy-connection-details")
+        .getAttribute("aria-label"),
+    ).toMatch(/connection details/i);
+    expect(
+      screen
+        .getByTestId("open-manifest-summary-modal")
+        .getAttribute("aria-label"),
+    ).toMatch(/safe MCP manifest summary/i);
+  });
+
+  it("next-step guidance changes with verification state (unauthorized)", async () => {
+    render(
+      <MemoryRouter initialEntries={["/settings/agent-integrations"]}>
+        <Routes>
+          <Route
+            path="/settings/agent-integrations"
+            element={
+              <AgentIntegrations
+                verifyHarness={{
+                  available: true,
+                  probe: async () => ({ ok: false, unauthenticated: true }),
+                }}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId("verify-tool-access-button"));
+    await waitFor(() => {
+      expect(
+        screen
+          .getByTestId("verify-tool-access-result")
+          .getAttribute("data-status"),
+      ).toBe("unauthorized");
+    });
+    expect(screen.getByTestId("verify-next-step").textContent).toMatch(
+      /complete OAuth consent/i,
+    );
+  });
+
+  it("View MCP manifest modal opens, renders the safe projection, and copy excludes secrets", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+
+    renderAgentIntegrations();
+    fireEvent.click(screen.getByTestId("open-manifest-summary-modal"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("manifest-summary-modal")).toBeTruthy();
+    });
+    expect(screen.getByTestId("manifest-summary-title").textContent).toMatch(
+      /safe MCP manifest summary/i,
+    );
+    expect(
+      screen.getByTestId("manifest-summary-tool-count").textContent,
+    ).toContain(String(MCP_MANIFEST.tools.length));
+    for (const t of MCP_MANIFEST.tools) {
+      expect(screen.getByTestId(`manifest-summary-tool-${t.name}`)).toBeTruthy();
+    }
+    expect(
+      screen.getByTestId("manifest-summary-safety-note").textContent,
+    ).toMatch(/does not include tokens/i);
+
+    // Copy button excludes secret-like values.
+    fireEvent.click(screen.getByTestId("manifest-summary-copy"));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const payload = writeText.mock.calls[0][0] as string;
+    expect(payload).toContain("Verdant Grow OS");
+    expect(payload).toContain("list_grows");
+    expect(containsSecretLikeValue(payload)).toBe(false);
+
+    // Modal DOM contains no token/secret-like strings.
+    const modalText =
+      screen.getByTestId("manifest-summary-modal").textContent ?? "";
+    expect(modalText).not.toMatch(/eyJ[A-Za-z0-9]{5,}\./);
+    expect(modalText.toLowerCase()).not.toContain("service_role");
+    expect(modalText.toLowerCase()).not.toContain("refresh_token");
+    expect(modalText.toLowerCase()).not.toContain("bearer ");
+  });
 });
 
 // ---------- OAuth consent route ----------
+
 
 function renderConsent(authorizationId: string | null) {
   const initial = authorizationId

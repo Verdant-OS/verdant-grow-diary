@@ -20,6 +20,16 @@ import {
   buildConnectionDetailsText,
   getSupabaseOrigin,
 } from "@/lib/mcp/manifestView";
+import {
+  computeManifestHash,
+  shortenManifestHash,
+} from "@/lib/mcp/manifestHash";
+import {
+  verifyMcpToolAccess,
+  defaultBrowserHarness,
+  type HarnessAdapter,
+  type VerifyMcpToolAccessResult,
+} from "@/lib/mcp/verifyMcpToolAccess";
 
 type CopyState = "idle" | "copied" | "failed";
 

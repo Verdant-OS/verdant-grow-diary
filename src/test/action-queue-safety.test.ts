@@ -53,7 +53,11 @@ function walk(dir: string, acc: string[] = []): string[] {
 const SCAN_PATHS = [
   ...walk(resolve(ROOT, "src")),
   ...walk(resolve(ROOT, "supabase/functions")),
-].filter((p) => !p.includes("/test/") && !p.endsWith(".test.ts") && !p.endsWith(".test.tsx"));
+].filter((p) => {
+  // Normalize Windows backslashes so the test-dir exclusion works on every OS.
+  const posix = p.replace(/\\/g, "/");
+  return !posix.includes("/test/") && !posix.endsWith(".test.ts") && !posix.endsWith(".test.tsx");
+});
 
 function readAll(): {
   text: string;
@@ -312,6 +316,14 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     // safety GUARANTEE rendered into the printed report — there is no
     // network, RPC, automation, or device-control surface in this file.
     const POST_GROW_REPORT_PRINT_RULES_PATH = resolve(ROOT, "src/lib/postGrowReportPrintRules.ts");
+    // Also allow-list (EXACT FILE PATH ONLY): postGrowPdfExport.ts is the PDF
+    // sibling of postGrowReportPrintRules.ts — a pure HTML-building/print
+    // helper whose copy renders the SAME grower-facing reassurance "Verdant
+    // does not auto-execute." into the exported PDF report. It has no
+    // network, RPC, automation, or device-control surface; the "static
+    // safety — no forbidden imports in PDF export code" suite in
+    // post-grow-report-pdf-export.test.tsx locks that down.
+    const POST_GROW_PDF_EXPORT_PATH = resolve(ROOT, "src/lib/postGrowPdfExport.ts");
     // Also allow-list (EXACT FILE PATH ONLY): verdantSeoCopy.ts carries the
     // VERDANT_FORBIDDEN_PUBLIC_PHRASES denylist — "autopilot" etc. appear
     // there ONLY as forbidden examples that the SEO safety tests assert
@@ -322,6 +334,7 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     const ALLOWED_AUTO_EXECUTE_PATHS = new Set([
       POST_GROW_REFLECTION_PROMPT_PATH,
       POST_GROW_REPORT_PRINT_RULES_PATH,
+      POST_GROW_PDF_EXPORT_PATH,
       VERDANT_SEO_COPY_PATH,
     ]);
     for (const re of [
@@ -432,6 +445,43 @@ describe("Action Queue safety — current posture (suggest-only by construction)
       /raw_payload/i,
     ]) {
       expect(src, `SEO copy file must not contain: ${re}`).not.toMatch(re);
+    }
+  });
+
+  it("2e. allow-listed PDF export file confines auto-execute tokens to the negated safety guarantee", () => {
+    const PDF_EXPORT_PATH = resolve(ROOT, "src/lib/postGrowPdfExport.ts");
+    const src = readFileSync(PDF_EXPORT_PATH, "utf8");
+
+    // Every auto-execute occurrence must be the negated grower-facing
+    // guarantee ("does not auto-execute") — never a positive automation claim.
+    const hits = [...src.matchAll(/\bauto[-_ ]?execute\b/gi)];
+    expect(hits.length, "allow-list entry is stale — token no longer present").toBeGreaterThan(0);
+    for (const m of hits) {
+      const before = src.slice(Math.max(0, m.index! - 30), m.index!);
+      expect(
+        /\b(does not|never|not)\s*$/i.test(before),
+        `auto-execute token at ${m.index} is not inside a negation: ...${before}${m[0]}`,
+      ).toBe(true);
+    }
+    // And none of the other forbidden auto-execute vocabulary may appear.
+    for (const re of [
+      /\bautopilot\b/i,
+      /\bauto[-_ ]?apply\b/i,
+      /\bexecute_action\b/i,
+      /\bdispatch_command\b/i,
+    ]) {
+      expect(src, `PDF export file must not contain: ${re}`).not.toMatch(re);
+    }
+    // Presenter copy only — no runtime danger surface may ever appear here.
+    for (const re of [
+      /\.rpc\(/i,
+      /service_role/i,
+      /\bmqtt\.connect\b/i,
+      /\bmqtt:\/\//i,
+      /supabase\s*\.\s*from\(/i,
+      /raw_payload/i,
+    ]) {
+      expect(src, `PDF export file must not contain: ${re}`).not.toMatch(re);
     }
   });
 });

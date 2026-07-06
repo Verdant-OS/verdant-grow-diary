@@ -4,7 +4,7 @@
  * Presenter only. Explains Verdant's AI Doctor as an evidence-aware,
  * cautious, grower-approved advisor. No Supabase, no AI calls, no
  * Action Queue writes, no device control. Copy is source-labeled and
- * avoids forbidden autopilot / device-control language.
+ * avoids forbidden automation / device-control language.
  */
 import { Link } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
@@ -124,12 +124,12 @@ export default function HowAiDoctorWorks() {
           <div className="mt-3 space-y-3 text-base text-foreground/90">
             <p>
               AI Doctor does not pretend certainty from one photo or one sensor reading. The
-              stronger your plant memory — diary entries, photos, and source-labeled sensor
-              context — the more useful the guidance becomes.
+              stronger your plant memory — diary entries, photos, and source-labeled sensor context
+              — the more useful the guidance becomes.
             </p>
             <p>
-              When context is thin, AI Doctor names what is missing instead of guessing around it.
-              A cautious "I need more information" is a valid answer.
+              When context is thin, AI Doctor names what is missing instead of guessing around it. A
+              cautious "I need more information" is a valid answer.
             </p>
             <p>
               Sensor readings carry their source label at every step: live, manual, csv, demo,
@@ -164,8 +164,8 @@ export default function HowAiDoctorWorks() {
             What "missing information" means
           </h2>
           <p className="mt-3 text-base text-foreground/90">
-            AI Doctor surfaces the specific gaps that would make its next review more useful.
-            Common examples:
+            AI Doctor surfaces the specific gaps that would make its next review more useful. Common
+            examples:
           </p>
           <ul
             data-testid="ai-doctor-missing-info-examples"
@@ -176,8 +176,8 @@ export default function HowAiDoctorWorks() {
             ))}
           </ul>
           <p className="mt-4 text-base text-foreground/90">
-            The next Quick Log or sensor snapshot the grower captures closes those gaps for the
-            next review.
+            The next Quick Log or sensor snapshot the grower captures closes those gaps for the next
+            review.
           </p>
         </section>
 
@@ -190,13 +190,13 @@ export default function HowAiDoctorWorks() {
           </h2>
           <div className="mt-3 space-y-3 text-base text-foreground/90">
             <p>
-              AI Doctor may suggest actions. The grower decides. Action Queue is
-              approval-required — every meaningful step waits on the human in the loop.
+              AI Doctor may suggest actions. The grower decides. Action Queue is approval-required —
+              every meaningful step waits on the human in the loop.
             </p>
             <p>
-              Verdant does not control lights, fans, irrigation, humidifiers, or other equipment.
-              AI Doctor cannot touch equipment. Its job is to make the next grower decision safer,
-              not to execute it.
+              Verdant does not control lights, fans, irrigation, humidifiers, or other equipment. AI
+              Doctor cannot touch equipment. Its job is to make the next grower decision safer, not
+              to execute it.
             </p>
             <p className="text-sm text-muted-foreground">
               Plant memory. Sensor truth. Grower-approved decisions.

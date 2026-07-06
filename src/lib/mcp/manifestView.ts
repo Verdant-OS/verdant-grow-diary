@@ -170,6 +170,46 @@ export function buildConnectionDetailsText(
 }
 
 /**
+ * Safe manifest summary — the text projection shown in the "View MCP
+ * manifest" modal and its Copy button. Contains only public metadata
+ * already exposed by the manifest view (server identity, version,
+ * fingerprint, tool names + params). Never includes tokens, secrets,
+ * OAuth credentials, raw headers, or private env values.
+ */
+export function buildSafeManifestSummaryText(
+  manifest: MCPManifestView = MCP_MANIFEST,
+  fingerprint: string,
+  manifestUrl?: string,
+): string {
+  const lines: string[] = [
+    `Verdant Grow OS — safe MCP manifest summary`,
+    `Server:      ${manifest.serverTitle} (${manifest.serverName})`,
+    `Version:     ${manifest.version}`,
+    `Fingerprint: ${fingerprint}`,
+    `Path:        ${manifest.path}`,
+  ];
+  if (manifestUrl && !/eyJ|bearer|service[_-]?role/i.test(manifestUrl)) {
+    lines.push(`Manifest:    ${manifestUrl}`);
+  }
+  lines.push(``, `Tools advertised: ${manifest.tools.length}`);
+  for (const tool of manifest.tools) {
+    lines.push(`  • ${tool.name}${tool.readOnly ? " (read-only)" : ""}`);
+    for (const p of tool.params) {
+      const flag = p.required ? "required" : "optional";
+      const extra = p.constraints ? ` [${p.constraints}]` : "";
+      lines.push(`      - ${p.name}: ${p.type} (${flag})${extra}`);
+    }
+    if (tool.params.length === 0) lines.push(`      - (no parameters)`);
+  }
+  lines.push(
+    ``,
+    `This is a safe manifest summary. It does not include tokens,`,
+    `secrets, OAuth credentials, or private environment values.`,
+  );
+  return lines.join("\n");
+}
+
+/**
  * Guard used by tests. Rejects strings that look like credentials so the
  * copy payload can never accidentally leak them.
  */
@@ -184,6 +224,7 @@ export const SECRET_LIKE_PATTERNS: ReadonlyArray<RegExp> = [
   /refresh[_-]?token/i,
   /bridge[_-]?token/i,
   /client[_-]?secret/i,
+  /access[_-]?token/i,
 ];
 
 export function containsSecretLikeValue(text: string): boolean {
@@ -192,3 +233,4 @@ export function containsSecretLikeValue(text: string): boolean {
   }
   return false;
 }
+

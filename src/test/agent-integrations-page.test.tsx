@@ -5,7 +5,7 @@
  * route Supabase client is mocked so we can exercise the three visible
  * states (unauthenticated → redirect to /auth, error, ready).
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -279,8 +279,3 @@ describe("OAuthConsent route regression", () => {
     });
   });
 });
-
-// (afterEach lives at module scope but only fires inside tests defined
-// after this point; import it explicitly to keep the top-of-file mock
-// block compact.)
-import { afterEach } from "vitest";

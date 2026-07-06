@@ -18,6 +18,7 @@ import RequireOperatorRole from "./components/RequireOperatorRole";
 const AppShell = lazy(() => import("@/components/AppShell"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Tents = lazy(() => import("./pages/Tents"));
@@ -137,6 +138,7 @@ const App = () => (
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                   {/* Deprecated auth entry points — redirect to canonical /auth to
                       prevent funnel leaks from old bookmarks, emails, ads, and
                       creator posts that still point to /login /signup /register. */}

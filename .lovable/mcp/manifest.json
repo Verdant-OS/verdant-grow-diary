@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "sdk_version": "0.20.0",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://knkwiiywfkbqznbxwqfh.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "verdant-grow-os-mcp",
+      "version": "0.1.0",
+      "title": "Verdant Grow OS"
+    },
+    "tools": [
+      {
+        "name": "list_grows",
+        "title": "List grows",
+        "description": "List the signed-in Verdant grower's own grows (id, name, stage, grow_type, archived flag, timestamps). Read-only.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "includeArchived": {
+              "description": "Include archived grows. Defaults to false.",
+              "type": "boolean"
+            },
+            "limit": {
+              "description": "Maximum rows to return (1–100). Defaults to 25.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_recent_diary_entries",
+        "title": "List recent diary entries",
+        "description": "List recent diary entries for one of the signed-in grower's grows. Read-only.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "growId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "Grow id to fetch diary entries for."
+            },
+            "limit": {
+              "description": "Maximum entries to return (1–50). Defaults to 10.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          "required": [
+            "growId"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_latest_sensor_snapshot",
+        "title": "Get latest sensor snapshot",
+        "description": "Fetch the single most recent sensor reading for one of the signed-in grower's tents. Includes temperature/humidity/vpd/co2 fields when present and always includes the `source` label (live/manual/csv/demo/stale/invalid). Never treat non-live sources as current readings. Read-only.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "tentId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "Tent id to fetch the latest reading for."
+            }
+          },
+          "required": [
+            "tentId"
+          ]
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

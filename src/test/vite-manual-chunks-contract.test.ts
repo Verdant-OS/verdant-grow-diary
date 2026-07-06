@@ -109,19 +109,33 @@ describe("vite manualChunks — app source is never forced into a vendor chunk",
 });
 
 describe("vite manualChunks — the config actually uses this helper", () => {
-  it("vite.config.ts imports viteManualChunks and does not inline a manualChunks body", async () => {
+  it("vite.config.ts wires manualChunks to the shared helper and nothing else", async () => {
     const { readFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
     const config = readFileSync(resolve(process.cwd(), "vite.config.ts"), "utf8");
-    // The config must reference the shared helper by name…
-    expect(config).toMatch(/viteManualChunks/);
+
+    // The config must import and reference the shared helper by name.
     expect(config).toMatch(/from ["']\.\/src\/lib\/build\/manualChunks["']/);
-    // …and must NOT reintroduce an inline manualChunks(id) implementation that
-    // could drift from (and silently bypass) this contract.
-    expect(
-      /manualChunks\s*\(/.test(config),
-      "vite.config.ts inlines a manualChunks(...) body again; route it through " +
-        "src/lib/build/manualChunks.ts so this contract test stays authoritative.",
-    ).toBe(false);
+    expect(config).toMatch(/manualChunks:\s*viteManualChunks\b/);
+
+    // Allowlist every `manualChunks` mention instead of blacklisting one
+    // inline syntax (a blacklist misses `manualChunks: (id) => {…}`,
+    // `manualChunks: function (id) {…}`, method shorthand, etc.). Each line
+    // that mentions the identifier must be either the helper's import path
+    // or the exact sanctioned wiring — any inline implementation fails.
+    const mentions = config.match(/^.*\bmanualChunks\b.*$/gm) ?? [];
+    expect(mentions.length).toBeGreaterThan(0);
+    for (const line of mentions) {
+      const isImportPathOrComment = line.includes("build/manualChunks");
+      const isSanctionedWiring = /manualChunks:\s*viteManualChunks\s*,?\s*$/.test(line.trim());
+      expect(
+        isImportPathOrComment || isSanctionedWiring,
+        `Unsanctioned manualChunks usage in vite.config.ts: "${line.trim()}". ` +
+          "Do not inline a manualChunks implementation (function, arrow, or method " +
+          "shorthand) — route it through src/lib/build/manualChunks.ts so this " +
+          "contract test stays authoritative. Splitting React-context/eval-order " +
+          "libraries out of `vendor` can reintroduce createContext white-screen failures.",
+      ).toBe(true);
+    }
   });
 });

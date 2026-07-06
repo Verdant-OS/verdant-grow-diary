@@ -52,8 +52,7 @@ export type MCPManifestView = {
  * missing so the page never renders a broken URL.
  */
 export function getSupabaseOrigin(): string {
-  const raw = (import.meta as { env?: Record<string, string | undefined> })
-    .env?.VITE_SUPABASE_URL;
+  const raw = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_SUPABASE_URL;
   if (typeof raw !== "string" || raw.length === 0) return "";
   return raw.replace(/\/+$/, "");
 }
@@ -93,8 +92,7 @@ export const MCP_MANIFEST: MCPManifestView = Object.freeze({
     {
       name: "list_recent_diary_entries",
       title: "List recent diary entries",
-      description:
-        "List recent diary entries for one of the signed-in grower's grows. Read-only.",
+      description: "List recent diary entries for one of the signed-in grower's grows. Read-only.",
       readOnly: true,
       params: [
         {
@@ -141,9 +139,7 @@ export function buildConnectionDetailsText(
   appOrigin: string = typeof window !== "undefined" ? window.location.origin : "",
 ): string {
   const endpoint = origin ? `${origin}${manifest.path}` : manifest.path;
-  const consentUrl = appOrigin
-    ? `${appOrigin}${manifest.consentPath}`
-    : manifest.consentPath;
+  const consentUrl = appOrigin ? `${appOrigin}${manifest.consentPath}` : manifest.consentPath;
   const lines: string[] = [
     `Verdant Grow OS — MCP connection`,
     `Server:   ${manifest.serverTitle} (${manifest.serverName}) v${manifest.version}`,
@@ -218,8 +214,10 @@ export const SECRET_LIKE_PATTERNS: ReadonlyArray<RegExp> = [
   /\bsbp_[A-Za-z0-9]{10,}/, // Supabase service role prefix
   /\bBearer\s+[A-Za-z0-9._-]+/i,
   /service[_-]?role/i,
+  // Also covers the ALL-CAPS service-role env var name (case-insensitive),
+  // so that name must not be spelled out literally here — the sensor
+  // intelligence safety scanner forbids the bare token in frontend files.
   /supabase[_-]?service[_-]?role[_-]?key/i,
-  /SUPABASE_SERVICE_ROLE_KEY/,
   /VITE_SUPABASE_PUBLISHABLE_KEY\s*[:=]/, // key literal, not the name in copy
   /refresh[_-]?token/i,
   /bridge[_-]?token/i,
@@ -233,4 +231,3 @@ export function containsSecretLikeValue(text: string): boolean {
   }
   return false;
 }
-

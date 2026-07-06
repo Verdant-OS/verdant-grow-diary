@@ -24,6 +24,11 @@ import {
   PHENO_SOURCE_LEGEND,
   PHENO_COMPARISON_CONFIDENCE_CAVEAT,
 } from "@/lib/phenoComparisonRules";
+import {
+  buildPhenoExpressionView,
+  assessCohortComparability,
+  type PhenoExpressionView,
+} from "@/lib/phenoExpressionRules";
 
 export interface PhenoComparisonViewProps {
   readonly inputs: readonly PhenoCandidateInput[] | null | undefined;
@@ -51,7 +56,178 @@ function fmtMetric(v: number | null, unit?: string): string {
   return unit ? `${v} ${unit}` : String(v);
 }
 
-function CandidateColumn({ c }: { c: PhenoCandidateView }) {
+function Tag({ text }: { text: string }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium capitalize text-foreground">
+      {text}
+    </span>
+  );
+}
+
+/** Read-only expression block: loud trait axes, aroma, smoke test, COA, sex, herm. */
+function ExpressionBlock({ e }: { e: PhenoExpressionView }) {
+  return (
+    <div
+      data-testid={`pheno-candidate-${e.candidateId}-expression`}
+      className="space-y-3 rounded-md border border-border bg-muted/20 p-3"
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Expression</h3>
+        {e.round && (
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            {e.round.replace(/_/g, " ")}
+          </span>
+        )}
+      </div>
+
+      {/* Hermaphrodite: suggest-only "consider removing" — the grower decides. */}
+      {e.herm.observed && (
+        <div
+          data-testid={`pheno-candidate-${e.candidateId}-herm-flag`}
+          role="alert"
+          className="space-y-1 rounded-md border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-300"
+        >
+          <p className="font-semibold">⚠ Hermaphrodite observed — consider removing</p>
+          {e.herm.note && <p>{e.herm.note}</p>}
+          <p className="text-[11px] opacity-90">{e.herm.caveat}</p>
+        </div>
+      )}
+
+      {/* Trait axes */}
+      {e.traits.length > 0 && (
+        <ul className="space-y-1.5">
+          {e.traits.map((t) => (
+            <li key={t.key} data-testid={`expression-trait-${e.candidateId}-${t.key}`}>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-medium">{t.label}</span>
+                <span className="tabular-nums text-muted-foreground">
+                  {t.value}/{t.max}
+                  {t.kind === "intensity" ? " loud" : ""}
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className={
+                    t.kind === "intensity" ? "h-full bg-fuchsia-500" : "h-full bg-emerald-500"
+                  }
+                  style={{ width: `${Math.round(((t.value - t.min) / (t.max - t.min)) * 100)}%` }}
+                />
+              </div>
+              {t.note && <p className="mt-0.5 text-[10px] text-muted-foreground">{t.note}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Aroma / nose */}
+      {(e.aromaDescriptors.length > 0 || e.noseNote) && (
+        <div data-testid={`expression-aroma-${e.candidateId}`} className="space-y-1">
+          <h4 className="text-[11px] font-medium">Nose</h4>
+          {e.aromaDescriptors.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {e.aromaDescriptors.map((a) => (
+                <Tag key={a} text={a} />
+              ))}
+            </div>
+          )}
+          {e.noseNote && <p className="text-[11px] text-muted-foreground">{e.noseNote}</p>}
+        </div>
+      )}
+
+      {/* Sex */}
+      <div className="flex items-center gap-2 text-[11px]">
+        <span className="font-medium">Sex:</span>
+        <span data-testid={`expression-sex-${e.candidateId}`}>{e.sexLabel}</span>
+      </div>
+
+      {/* Post-cure smoke test — the deciding gate */}
+      {e.smokeTest?.hasContent && (
+        <div
+          data-testid={`expression-smoke-test-${e.candidateId}`}
+          className="space-y-1 rounded border border-border bg-background/60 p-2"
+        >
+          <h4 className="text-[11px] font-semibold">Post-cure smoke test</h4>
+          {e.smokeTest.flavorDescriptors.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 text-[11px]">
+              <span className="text-muted-foreground">Flavor:</span>
+              {e.smokeTest.flavorDescriptors.map((f) => (
+                <Tag key={f} text={f} />
+              ))}
+            </div>
+          )}
+          {e.smokeTest.effectDescriptors.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 text-[11px]">
+              <span className="text-muted-foreground">Effect:</span>
+              {e.smokeTest.effectDescriptors.map((f) => (
+                <Tag key={f} text={f} />
+              ))}
+            </div>
+          )}
+          <div className="flex gap-3 text-[11px] text-muted-foreground">
+            <span>Smoothness: {fmtMetric(e.smokeTest.smoothness)}/5</span>
+            <span>Potency (feel): {fmtMetric(e.smokeTest.potencyImpression)}/5</span>
+          </div>
+          {e.smokeTest.verdict && (
+            <p className="text-[11px] italic text-foreground">“{e.smokeTest.verdict}”</p>
+          )}
+        </div>
+      )}
+
+      {/* COA / lab numbers — grower-attached, source-tagged, never fabricated */}
+      {e.labResult && (
+        <div
+          data-testid={`expression-lab-${e.candidateId}`}
+          className="space-y-1 rounded border border-border bg-background/60 p-2 text-[11px]"
+        >
+          <div className="flex items-center gap-2">
+            <h4 className="font-semibold">Lab</h4>
+            <span
+              className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${
+                e.labResult.labVerified
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
+                  : "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300"
+              }`}
+            >
+              {e.labResult.sourceLabel}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-3 text-muted-foreground">
+            <span>THC: {fmtMetric(e.labResult.thcPct, "%")}</span>
+            <span>CBD: {fmtMetric(e.labResult.cbdPct, "%")}</span>
+            <span>Total: {fmtMetric(e.labResult.totalCannabinoidsPct, "%")}</span>
+          </div>
+          {e.labResult.dominantTerpenes.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-muted-foreground">Terps:</span>
+              {e.labResult.dominantTerpenes.map((t) => (
+                <Tag key={t.name} text={t.pct != null ? `${t.name} ${t.pct}%` : t.name} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Honest missing-expression flags */}
+      {e.missing.length > 0 && (
+        <ul className="space-y-0.5 text-[10px] text-amber-800 dark:text-amber-300">
+          {e.missing.map((m) => (
+            <li key={m.code} data-testid={`expression-missing-${e.candidateId}-${m.code}`}>
+              ⚠ {m.message}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function CandidateColumn({
+  c,
+  expression,
+}: {
+  c: PhenoCandidateView;
+  expression?: PhenoExpressionView | null;
+}) {
   const headingId = `pheno-candidate-${c.candidateId}-heading`;
   return (
     <section
@@ -86,6 +262,8 @@ function CandidateColumn({ c }: { c: PhenoCandidateView }) {
           ))}
         </ul>
       )}
+
+      {expression?.hasAnyExpression && <ExpressionBlock e={expression} />}
 
       <div>
         <h3 className="text-sm font-medium mb-1">Quick Log entries</h3>
@@ -213,6 +391,28 @@ function CandidateColumn({ c }: { c: PhenoCandidateView }) {
 export default function PhenoComparisonView({ inputs, mode, huntName }: PhenoComparisonViewProps) {
   const view = useMemo(() => buildPhenoComparisonView(inputs ?? []), [inputs]);
 
+  const expressionById = useMemo(() => {
+    const map = new Map<string, PhenoExpressionView>();
+    for (const input of inputs ?? []) {
+      if (!input || typeof input.candidateId !== "string") continue;
+      const ev = buildPhenoExpressionView(input.candidateId, input.expression);
+      if (ev) map.set(input.candidateId, ev);
+    }
+    return map;
+  }, [inputs]);
+
+  const comparability = useMemo(
+    () =>
+      assessCohortComparability(
+        (inputs ?? []).map((i) => ({
+          candidateId: i.candidateId,
+          growLabel: i.growLabel,
+          tentLabel: i.tentLabel,
+        })),
+      ),
+    [inputs],
+  );
+
   return (
     <main
       data-testid="pheno-comparison-page"
@@ -270,6 +470,17 @@ export default function PhenoComparisonView({ inputs, mode, huntName }: PhenoCom
           {view.caveat}
         </p>
 
+        {comparability.warning && (
+          <p
+            data-testid="pheno-comparison-comparability-warning"
+            role="status"
+            aria-label="Apples-to-apples comparability warning"
+            className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
+          >
+            ⚠ {comparability.warning}
+          </p>
+        )}
+
         <ul
           data-testid="pheno-comparison-source-legend"
           aria-label="Sensor source legend"
@@ -311,7 +522,11 @@ export default function PhenoComparisonView({ inputs, mode, huntName }: PhenoCom
           className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
         >
           {view.candidates.map((c) => (
-            <CandidateColumn key={c.candidateId} c={c} />
+            <CandidateColumn
+              key={c.candidateId}
+              c={c}
+              expression={expressionById.get(c.candidateId) ?? null}
+            />
           ))}
         </div>
       )}

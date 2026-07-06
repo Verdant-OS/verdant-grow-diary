@@ -283,6 +283,20 @@ requires production secrets.
 
 - Local Supabase running (e.g. `supabase start`) with this repo's
   migrations applied (`supabase db reset` or `supabase migration up`).
+- **Local grants:** the local CLI stack does not grant API-role table
+  privileges the way hosted Lovable Cloud's migration runner does, so
+  every PostgREST request fails with `42501 permission denied` until you
+  mirror hosted reality (local database only):
+
+  ```sql
+  GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+  GRANT ALL ON TABLE public.grows, public.tents, public.diary_entries,
+    public.sensor_readings TO service_role;
+  GRANT SELECT ON TABLE public.grows, public.tents, public.diary_entries,
+    public.sensor_readings TO authenticated;
+  ```
+
+  The CI workflow runs this automatically after `supabase db reset --local`.
 
 **Run it**
 

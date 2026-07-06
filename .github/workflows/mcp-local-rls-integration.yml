@@ -77,6 +77,7 @@ jobs:
             echo "api_url=${API_URL}"
             echo "anon_key=${ANON_KEY}"
             echo "service_role_key=${SERVICE_ROLE_KEY}"
+            echo "db_url=${DB_URL}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Wait for local Supabase readiness
@@ -111,6 +112,28 @@ jobs:
           supabase db reset --local
           echo "Applied local migrations:"
           supabase migration list --local
+
+      - name: Grant hosted-parity API-role privileges (LOCAL database only)
+        env:
+          DB_URL: ${{ steps.sb.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          # The hosted (Lovable Cloud) migration runner grants API-role table
+          # privileges on new tables by default; the local CLI stack applies
+          # repo migrations without those grants, so every PostgREST request
+          # fails with 42501 regardless of RLS. Mirror hosted reality for
+          # exactly the tables this harness exercises — RLS remains the
+          # isolation boundary under test. This psql targets 127.0.0.1 only
+          # and never runs against a hosted project.
+          psql "${DB_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+          GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+          GRANT ALL ON TABLE
+            public.grows, public.tents, public.diary_entries, public.sensor_readings
+            TO service_role;
+          GRANT SELECT ON TABLE
+            public.grows, public.tents, public.diary_entries, public.sensor_readings
+            TO authenticated;
+          SQL
 
       - name: Re-check readiness after migration reset
         env:

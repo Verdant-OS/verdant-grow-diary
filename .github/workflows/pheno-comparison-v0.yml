@@ -94,8 +94,29 @@ jobs:
         run: |
           bunx playwright test \
             --project=chromium-mocked \
+            --reporter=list,html \
             e2e/pheno-comparison-responsive.spec.ts \
             e2e/pheno-comparison-reload.spec.ts \
             e2e/pheno-comparison-visual-style.spec.ts \
             e2e/pheno-hunts-compare-deep-link.spec.ts \
             e2e/pheno-hunts-compare-invalid-id.spec.ts
+
+      # On failure, upload Playwright debugging artifacts for triage:
+      # HTML report, traces/videos/screenshots (test-results/), and the
+      # visual-style review screenshots. Config uses trace/video/screenshot
+      # = *-on-failure, so nothing is captured on green runs.
+      #
+      # SAFETY: uploads ONLY report/results/review-screenshot paths. It never
+      # uploads e2e/ wholesale (which can hold e2e/.auth/user.json), nor .env,
+      # tokens, or any storageState auth artifacts.
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pheno-playwright-artifacts
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            playwright-report/
+            test-results/
+            e2e/screenshots/

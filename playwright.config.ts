@@ -29,8 +29,10 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: BASE_URL,
+    // Debugging artifacts kept only when a test fails (CI uploads them).
     trace: "retain-on-failure",
     video: "retain-on-failure",
+    screenshot: "only-on-failure",
   },
   // Mocked, non-destructive specs navigate to relative routes
   // (e.g. page.goto("/auth")), so baseURL must be backed by a running app.

@@ -40,6 +40,8 @@ artifacts/
 # Verdant SEO monitoring — local OAuth token cache
 .seo/
 
-# Playwright transient output (uploaded as CI artifacts, never committed)
+# Playwright generated artifacts (uploaded by CI on failure; never committed)
 test-results/
 playwright-report/
+e2e/screenshots/
+e2e/.auth/

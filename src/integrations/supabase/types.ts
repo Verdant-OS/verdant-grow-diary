@@ -1330,6 +1330,69 @@ export type Database = {
           },
         ]
       }
+      pheno_lab_results: {
+        Row: {
+          cbd_pct: number | null
+          created_at: string
+          dominant_terpenes: Json
+          hunt_id: string
+          id: string
+          note: string | null
+          plant_id: string
+          source: string
+          tested_at: string | null
+          thc_pct: number | null
+          total_cannabinoids_pct: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cbd_pct?: number | null
+          created_at?: string
+          dominant_terpenes?: Json
+          hunt_id: string
+          id?: string
+          note?: string | null
+          plant_id: string
+          source?: string
+          tested_at?: string | null
+          thc_pct?: number | null
+          total_cannabinoids_pct?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cbd_pct?: number | null
+          created_at?: string
+          dominant_terpenes?: Json
+          hunt_id?: string
+          id?: string
+          note?: string | null
+          plant_id?: string
+          source?: string
+          tested_at?: string | null
+          thc_pct?: number | null
+          total_cannabinoids_pct?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_lab_results_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_lab_results_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pheno_sex_observations: {
         Row: {
           created_at: string
@@ -1437,6 +1500,69 @@ export type Database = {
           },
           {
             foreignKeyName: "pheno_score_rounds_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_smoke_tests: {
+        Row: {
+          created_at: string
+          effect_descriptors: Json
+          flavor_descriptors: Json
+          hunt_id: string
+          id: string
+          note: string | null
+          plant_id: string
+          potency_impression: number | null
+          smoothness: number | null
+          tested_at: string | null
+          updated_at: string
+          user_id: string
+          verdict: string | null
+        }
+        Insert: {
+          created_at?: string
+          effect_descriptors?: Json
+          flavor_descriptors?: Json
+          hunt_id: string
+          id?: string
+          note?: string | null
+          plant_id: string
+          potency_impression?: number | null
+          smoothness?: number | null
+          tested_at?: string | null
+          updated_at?: string
+          user_id: string
+          verdict?: string | null
+        }
+        Update: {
+          created_at?: string
+          effect_descriptors?: Json
+          flavor_descriptors?: Json
+          hunt_id?: string
+          id?: string
+          note?: string | null
+          plant_id?: string
+          potency_impression?: number | null
+          smoothness?: number | null
+          tested_at?: string | null
+          updated_at?: string
+          user_id?: string
+          verdict?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_smoke_tests_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_smoke_tests_plant_id_fkey"
             columns: ["plant_id"]
             isOneToOne: false
             referencedRelation: "plants"

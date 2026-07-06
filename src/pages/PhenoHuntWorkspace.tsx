@@ -36,6 +36,252 @@ import {
   type PhenoSexObservation,
 } from "@/lib/phenoSexObservationModel";
 import { usePhenoHermCullSuggestion } from "@/hooks/usePhenoHermCullSuggestion";
+import type { SmokeTestRow } from "@/lib/phenoSmokeTestService";
+import type { LabResultRow, PhenoLabSource, TerpeneReading } from "@/lib/phenoLabResultsService";
+
+function toIntOrNull(raw: string): number | null {
+  const t = raw.trim();
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+function tags(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** Post-cure smoke test — the deciding gate. Own state + save. */
+function SmokeTestFields({
+  plantId,
+  row,
+  onSave,
+}: {
+  plantId: string;
+  row: SmokeTestRow | undefined;
+  onSave: (
+    plantId: string,
+    payload: {
+      flavorDescriptors: readonly string[];
+      effectDescriptors: readonly string[];
+      smoothness: number | null;
+      potencyImpression: number | null;
+      verdict: string | null;
+    },
+  ) => Promise<boolean>;
+}) {
+  const [flavor, setFlavor] = useState((row?.flavorDescriptors ?? []).join(", "));
+  const [effect, setEffect] = useState((row?.effectDescriptors ?? []).join(", "));
+  const [smoothness, setSmoothness] = useState(
+    row?.smoothness != null ? String(row.smoothness) : "",
+  );
+  const [potency, setPotency] = useState(
+    row?.potencyImpression != null ? String(row.potencyImpression) : "",
+  );
+  const [verdict, setVerdict] = useState(row?.verdict ?? "");
+  const [saved, setSaved] = useState(false);
+
+  return (
+    <details data-testid={`workspace-smoke-${plantId}`} className="text-sm">
+      <summary className="cursor-pointer font-medium">Post-cure smoke test</summary>
+      <div className="mt-2 space-y-2">
+        <input
+          type="text"
+          data-testid={`workspace-smoke-flavor-${plantId}`}
+          value={flavor}
+          onChange={(e) => {
+            setSaved(false);
+            setFlavor(e.target.value);
+          }}
+          placeholder="Flavor: gas, cream…"
+          className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+        />
+        <input
+          type="text"
+          data-testid={`workspace-smoke-effect-${plantId}`}
+          value={effect}
+          onChange={(e) => {
+            setSaved(false);
+            setEffect(e.target.value);
+          }}
+          placeholder="Effect: couchlock, euphoric…"
+          className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+        />
+        <div className="flex gap-2 text-xs">
+          <label className="flex items-center gap-1">
+            Smoothness
+            <input
+              type="number"
+              min={1}
+              max={5}
+              data-testid={`workspace-smoke-smoothness-${plantId}`}
+              value={smoothness}
+              onChange={(e) => {
+                setSaved(false);
+                setSmoothness(e.target.value);
+              }}
+              className="w-14 rounded border border-border bg-background px-1 py-0.5"
+            />
+          </label>
+          <label className="flex items-center gap-1">
+            Potency (feel)
+            <input
+              type="number"
+              min={1}
+              max={5}
+              data-testid={`workspace-smoke-potency-${plantId}`}
+              value={potency}
+              onChange={(e) => {
+                setSaved(false);
+                setPotency(e.target.value);
+              }}
+              className="w-14 rounded border border-border bg-background px-1 py-0.5"
+            />
+          </label>
+        </div>
+        <textarea
+          data-testid={`workspace-smoke-verdict-${plantId}`}
+          value={verdict}
+          onChange={(e) => {
+            setSaved(false);
+            setVerdict(e.target.value);
+          }}
+          rows={2}
+          placeholder="Verdict…"
+          className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+        />
+        <button
+          type="button"
+          data-testid={`workspace-save-smoke-${plantId}`}
+          onClick={async () => {
+            const ok = await onSave(plantId, {
+              flavorDescriptors: tags(flavor),
+              effectDescriptors: tags(effect),
+              smoothness: toIntOrNull(smoothness),
+              potencyImpression: toIntOrNull(potency),
+              verdict: verdict.trim() || null,
+            });
+            setSaved(ok);
+          }}
+          className="rounded border border-border bg-secondary px-2 py-1 text-xs font-medium"
+        >
+          Save smoke test
+        </button>
+        {saved && <span className="ml-2 text-xs text-emerald-600">Saved</span>}
+      </div>
+    </details>
+  );
+}
+
+/** COA / lab numbers — grower-attached, source-tagged, never fabricated. */
+function LabFields({
+  plantId,
+  row,
+  onSave,
+}: {
+  plantId: string;
+  row: LabResultRow | undefined;
+  onSave: (
+    plantId: string,
+    source: PhenoLabSource,
+    payload: {
+      thcPct: number | null;
+      cbdPct: number | null;
+      totalCannabinoidsPct: number | null;
+      dominantTerpenes: readonly TerpeneReading[];
+    },
+  ) => Promise<boolean>;
+}) {
+  const [source, setSource] = useState<PhenoLabSource>(row?.source ?? "coa");
+  const [thc, setThc] = useState(row?.thcPct != null ? String(row.thcPct) : "");
+  const [cbd, setCbd] = useState(row?.cbdPct != null ? String(row.cbdPct) : "");
+  const [terps, setTerps] = useState((row?.dominantTerpenes ?? []).map((t) => t.name).join(", "));
+  const [saved, setSaved] = useState(false);
+
+  return (
+    <details data-testid={`workspace-lab-${plantId}`} className="text-sm">
+      <summary className="cursor-pointer font-medium">Lab (COA)</summary>
+      <div className="mt-2 space-y-2">
+        <label className="flex items-center gap-2 text-xs">
+          Source
+          <select
+            data-testid={`workspace-lab-source-${plantId}`}
+            value={source}
+            onChange={(e) => {
+              setSaved(false);
+              setSource(e.target.value as PhenoLabSource);
+            }}
+            className="rounded border border-border bg-background px-2 py-1"
+          >
+            <option value="coa">COA (lab)</option>
+            <option value="estimate">Estimate</option>
+            <option value="unspecified">Unspecified</option>
+          </select>
+        </label>
+        <div className="flex gap-2 text-xs">
+          <label className="flex items-center gap-1">
+            THC %
+            <input
+              type="number"
+              step="0.1"
+              data-testid={`workspace-lab-thc-${plantId}`}
+              value={thc}
+              onChange={(e) => {
+                setSaved(false);
+                setThc(e.target.value);
+              }}
+              className="w-16 rounded border border-border bg-background px-1 py-0.5"
+            />
+          </label>
+          <label className="flex items-center gap-1">
+            CBD %
+            <input
+              type="number"
+              step="0.1"
+              data-testid={`workspace-lab-cbd-${plantId}`}
+              value={cbd}
+              onChange={(e) => {
+                setSaved(false);
+                setCbd(e.target.value);
+              }}
+              className="w-16 rounded border border-border bg-background px-1 py-0.5"
+            />
+          </label>
+        </div>
+        <input
+          type="text"
+          data-testid={`workspace-lab-terps-${plantId}`}
+          value={terps}
+          onChange={(e) => {
+            setSaved(false);
+            setTerps(e.target.value);
+          }}
+          placeholder="Dominant terps: caryophyllene, limonene…"
+          className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+        />
+        <button
+          type="button"
+          data-testid={`workspace-save-lab-${plantId}`}
+          onClick={async () => {
+            const ok = await onSave(plantId, source, {
+              thcPct: toIntOrNull(thc),
+              cbdPct: toIntOrNull(cbd),
+              totalCannabinoidsPct: null,
+              dominantTerpenes: tags(terps).map((name) => ({ name, pct: null })),
+            });
+            setSaved(ok);
+          }}
+          className="rounded border border-border bg-secondary px-2 py-1 text-xs font-medium"
+        >
+          Save lab
+        </button>
+        {saved && <span className="ml-2 text-xs text-emerald-600">Saved</span>}
+      </div>
+    </details>
+  );
+}
 
 /** "overall" = the flat card (pheno_candidate_scores); rounds = staged cards. */
 type WorkspaceRound = "overall" | PhenoScoreRound;
@@ -81,6 +327,28 @@ interface EditorProps {
   }) => Promise<boolean>;
   queuing: boolean;
   queued: boolean;
+  smokeRow: SmokeTestRow | undefined;
+  onSaveSmokeTest: (
+    plantId: string,
+    payload: {
+      flavorDescriptors: readonly string[];
+      effectDescriptors: readonly string[];
+      smoothness: number | null;
+      potencyImpression: number | null;
+      verdict: string | null;
+    },
+  ) => Promise<boolean>;
+  labRow: LabResultRow | undefined;
+  onSaveLabResult: (
+    plantId: string,
+    source: PhenoLabSource,
+    payload: {
+      thcPct: number | null;
+      cbdPct: number | null;
+      totalCannabinoidsPct: number | null;
+      dominantTerpenes: readonly TerpeneReading[];
+    },
+  ) => Promise<boolean>;
 }
 
 function CandidateEditor({
@@ -101,6 +369,10 @@ function CandidateEditor({
   onQueueRemoval,
   queuing,
   queued,
+  smokeRow,
+  onSaveSmokeTest,
+  labRow,
+  onSaveLabResult,
 }: EditorProps) {
   const plantId = candidate.candidateId;
   const isRoundMode = round !== "overall";
@@ -331,6 +603,9 @@ function CandidateEditor({
         </div>
       )}
 
+      <SmokeTestFields plantId={plantId} row={smokeRow} onSave={onSaveSmokeTest} />
+      <LabFields plantId={plantId} row={labRow} onSave={onSaveLabResult} />
+
       {history.length > 0 && (
         <details data-testid={`workspace-decision-history-${plantId}`} className="text-xs">
           <summary className="cursor-pointer text-muted-foreground">
@@ -454,6 +729,10 @@ export default function PhenoHuntWorkspace() {
               onQueueRemoval={herm.queueRemoval}
               queuing={herm.queuing === c.candidateId}
               queued={herm.queuedPlantIds.has(c.candidateId)}
+              smokeRow={ws.smokeByPlant[c.candidateId]}
+              onSaveSmokeTest={ws.saveSmokeTest}
+              labRow={ws.labByKey[`${c.candidateId}:coa`]}
+              onSaveLabResult={ws.saveLabResult}
             />
           ))}
         </div>

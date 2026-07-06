@@ -28,7 +28,13 @@ import {
   listKeeperDecisionHistoryForHunt,
   type KeeperDecisionLogEntry,
 } from "@/lib/phenoKeeperDecisionLogService";
+import {
+  appendSexObservation,
+  listLatestSexObservationsForHunt,
+  type SexObservationRow,
+} from "@/lib/phenoSexObservationService";
 import type { PhenoKeeperDecision } from "@/lib/phenoKeeperDecisionModel";
+import type { PhenoSexObservation } from "@/lib/phenoSexObservationModel";
 
 export type WorkspaceStatus = "idle" | "loading" | "ok" | "error";
 
@@ -42,6 +48,8 @@ export interface UsePhenoHuntWorkspaceState {
   roundsByKey: Record<string, ScoreRoundRow>;
   /** Append-only decision history keyed by plant id, newest first. */
   decisionHistoryByPlant: Record<string, KeeperDecisionLogEntry[]>;
+  /** Latest recorded sex observation per plant. */
+  sexByPlant: Record<string, SexObservationRow>;
   error: string | null;
   saving: string | null;
   saveScore: (
@@ -64,6 +72,7 @@ export interface UsePhenoHuntWorkspaceState {
       note?: string | null;
     },
   ) => Promise<boolean>;
+  saveSex: (plantId: string, sex: PhenoSexObservation, note?: string | null) => Promise<boolean>;
 }
 
 export function usePhenoHuntWorkspace(
@@ -80,6 +89,7 @@ export function usePhenoHuntWorkspace(
   const [decisionHistoryByPlant, setDecisionHistoryByPlant] = useState<
     Record<string, KeeperDecisionLogEntry[]>
   >({});
+  const [sexByPlant, setSexByPlant] = useState<Record<string, SexObservationRow>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -99,11 +109,12 @@ export function usePhenoHuntWorkspace(
         setStatus("error");
         return;
       }
-      const [scores, decisions, rounds, history] = await Promise.all([
+      const [scores, decisions, rounds, history, sexes] = await Promise.all([
         listCandidateScoresForHunt(id),
         listKeeperDecisionsForHunt(id),
         listScoreRoundsForHunt(id),
         listKeeperDecisionHistoryForHunt(id),
+        listLatestSexObservationsForHunt(id),
       ]);
       if (cancelled) return;
       setHunt(result.hunt);
@@ -112,6 +123,7 @@ export function usePhenoHuntWorkspace(
       setDecisionsByPlant(decisions);
       setRoundsByKey(rounds);
       setDecisionHistoryByPlant(history);
+      setSexByPlant(sexes);
       setStatus("ok");
     })().catch(() => {
       if (cancelled) return;
@@ -225,6 +237,31 @@ export function usePhenoHuntWorkspace(
     [id],
   );
 
+  const saveSex = useCallback(
+    async (plantId: string, sex: PhenoSexObservation, note?: string | null) => {
+      if (!id) return false;
+      setSaving(plantId);
+      const res = await appendSexObservation({ huntId: id, plantId, sex, note });
+      setSaving(null);
+      if (res.ok === true) {
+        setSexByPlant((prev) => ({
+          ...prev,
+          [plantId]: {
+            plantId,
+            sex,
+            hermObserved: sex === "hermaphrodite",
+            note: note ?? null,
+            observedAt: new Date().toISOString(),
+          },
+        }));
+        return true;
+      }
+      setError(res.error);
+      return false;
+    },
+    [id],
+  );
+
   return {
     status,
     hunt,
@@ -233,10 +270,12 @@ export function usePhenoHuntWorkspace(
     decisionsByPlant,
     roundsByKey,
     decisionHistoryByPlant,
+    sexByPlant,
     error,
     saving,
     saveScore,
     saveDecision,
     saveRound,
+    saveSex,
   };
 }

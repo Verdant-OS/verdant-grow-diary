@@ -29,6 +29,8 @@ export interface PhenoStressWorkspaceState {
   readonly summariesByPlant: Record<string, PhenoStressSummary>;
   readonly diaryOptions: readonly { id: string; label: string }[];
   readonly save: (draft: PhenoStressPersistDraft) => Promise<boolean>;
+  readonly update: (id: string, input: PhenoStressUpdateInput) => Promise<boolean>;
+  readonly remove: (id: string) => Promise<boolean>;
   readonly refresh: () => Promise<void>;
   readonly loading: boolean;
   readonly error: string | null;

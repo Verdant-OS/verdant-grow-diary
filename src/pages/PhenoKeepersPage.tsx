@@ -220,6 +220,7 @@ export default function PhenoKeepersPage() {
                   <div className="flex items-center gap-2">
                     <select
                       data-testid={`keeper-reverse-method-${view.keeperId}`}
+                      aria-label={`Reversal method for ${view.keeperName}`}
                       value={reversalMethods[view.keeperId] ?? "sts"}
                       onChange={(e) =>
                         setReversalMethods((prev) => ({ ...prev, [view.keeperId]: e.target.value }))
@@ -263,8 +264,16 @@ export default function PhenoKeepersPage() {
               ♀
               <select
                 data-testid="keepers-cross-female"
+                aria-label="Seed (female) keeper"
                 value={female}
-                onChange={(e) => setFemale(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setFemale(next);
+                  // A donor equal to the new seed is dropped from the options
+                  // below and would otherwise linger in state as an accidental
+                  // self-cross — clear it so the selection stays consistent.
+                  if (donor === next) setDonor("");
+                }}
                 className="rounded border border-border bg-background px-2 py-1"
               >
                 <option value="">Seed (female) keeper…</option>
@@ -281,6 +290,7 @@ export default function PhenoKeepersPage() {
               pollen
               <select
                 data-testid="keepers-cross-donor"
+                aria-label="Pollen donor"
                 value={donor}
                 onChange={(e) => setDonor(e.target.value)}
                 className="rounded border border-border bg-background px-2 py-1"

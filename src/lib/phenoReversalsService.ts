@@ -93,6 +93,26 @@ export async function listReversedKeeperIds(): Promise<string[]> {
   return [...ids];
 }
 
+/**
+ * Reversed keeper ids restricted to the given keepers — the scoped read the
+ * keepers page uses, so a hunt only loads the reversal ids for the keepers it
+ * renders instead of every reversal the grower has ever recorded.
+ */
+export async function listReversedKeeperIdsForKeepers(
+  keeperIds: ReadonlyArray<string>,
+): Promise<string[]> {
+  const ids = keeperIds.filter((k) => typeof k === "string" && k.trim() !== "");
+  if (ids.length === 0) return [];
+  const { data, error } = await phenoDb
+    .from("pheno_reversals")
+    .select("keeper_id")
+    .in("keeper_id", ids);
+  if (error || !data) return [];
+  const out = new Set<string>();
+  for (const r of data) if (r.keeper_id) out.add(r.keeper_id);
+  return [...out];
+}
+
 /** Whether a keeper has at least one reversal record. */
 export async function hasReversal(keeperId: string): Promise<boolean> {
   const id = typeof keeperId === "string" ? keeperId.trim() : "";

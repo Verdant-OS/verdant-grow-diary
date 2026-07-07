@@ -51,9 +51,14 @@ function makeSupabase(opts: {
 
   function reversalsSelect() {
     let filterKeeper: string | null = null;
+    let filterIds: string[] | null = null;
     const builder = {
       eq(col: string, val: string) {
         if (col === "keeper_id") filterKeeper = val;
+        return builder;
+      },
+      in(col: string, vals: string[]) {
+        if (col === "keeper_id") filterIds = vals;
         return builder;
       },
       order() {
@@ -63,12 +68,14 @@ function makeSupabase(opts: {
         return builder;
       },
       then(resolve: (v: { data: InsertRow[]; error: null }) => void) {
-        const rows =
-          filterKeeper != null
-            ? reversed.has(filterKeeper)
-              ? [{ id: "r", keeper_id: filterKeeper }]
-              : []
-            : [...reversed].map((k) => ({ keeper_id: k }));
+        let rows: InsertRow[];
+        if (filterKeeper != null) {
+          rows = reversed.has(filterKeeper) ? [{ id: "r", keeper_id: filterKeeper }] : [];
+        } else if (filterIds != null) {
+          rows = filterIds.filter((k) => reversed.has(k)).map((k) => ({ keeper_id: k }));
+        } else {
+          rows = [...reversed].map((k) => ({ keeper_id: k }));
+        }
         resolve({ data: rows, error: null });
       },
     };
@@ -100,7 +107,12 @@ function makeSupabase(opts: {
 }
 
 // Import AFTER the mock is registered.
-import { recordReversal, hasReversal, listReversedKeeperIds } from "@/lib/phenoReversalsService";
+import {
+  recordReversal,
+  hasReversal,
+  listReversedKeeperIds,
+  listReversedKeeperIdsForKeepers,
+} from "@/lib/phenoReversalsService";
 import { recordCross } from "@/lib/phenoKeepersService";
 
 beforeEach(() => {
@@ -149,6 +161,15 @@ describe("reversed-state derivation", () => {
     h.client = makeSupabase({ reversedKeeperIds: ["k1", "k2"] });
     const ids = await listReversedKeeperIds();
     expect(new Set(ids)).toEqual(new Set(["k1", "k2"]));
+  });
+
+  it("listReversedKeeperIdsForKeepers scopes to the given keeper ids (no overfetch)", async () => {
+    h.client = makeSupabase({ reversedKeeperIds: ["k1", "k2", "k9"] });
+    // Only ask about k1/k3 → only the reversed subset in that list comes back.
+    const ids = await listReversedKeeperIdsForKeepers(["k1", "k3"]);
+    expect(new Set(ids)).toEqual(new Set(["k1"]));
+    // Empty input short-circuits without a query.
+    expect(await listReversedKeeperIdsForKeepers([])).toEqual([]);
   });
 });
 

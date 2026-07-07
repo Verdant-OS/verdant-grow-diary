@@ -18,7 +18,7 @@ import {
   type CloneRow,
   type CrossRow,
 } from "@/lib/phenoKeepersService";
-import { recordReversal, listReversedKeeperIds } from "@/lib/phenoReversalsService";
+import { recordReversal, listReversedKeeperIdsForKeepers } from "@/lib/phenoReversalsService";
 
 export type KeepersStatus = "idle" | "loading" | "ok" | "error";
 
@@ -78,12 +78,16 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
         setStatus("error");
         return;
       }
-      const [keeperRows, crossRows, reversedIds] = await Promise.all([
+      const [keeperRows, crossRows] = await Promise.all([
         listKeepersForHunt(id),
         listCrossesForHunt(id),
-        listReversedKeeperIds(),
       ]);
-      const clones = await listClonesForKeepers(keeperRows.map((k) => k.id));
+      const keeperIds = keeperRows.map((k) => k.id);
+      // Scope the reversal read to this hunt's keepers, not every reversal.
+      const [clones, reversedIds] = await Promise.all([
+        listClonesForKeepers(keeperIds),
+        listReversedKeeperIdsForKeepers(keeperIds),
+      ]);
       if (cancelled) return;
       const byKeeper: Record<string, CloneRow[]> = {};
       for (const c of clones) (byKeeper[c.keeperId] ??= []).push(c);

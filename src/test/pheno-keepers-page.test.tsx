@@ -162,6 +162,23 @@ describe("PhenoKeepersPage — B4 reproduction UI", () => {
     expect(screen.getByTestId("keepers-cross-disabled-reason")).toHaveTextContent(/donor/i);
   });
 
+  it("clears a stale donor when the seed keeper is changed to that donor (no surprise S1)", () => {
+    renderAt({ keepers: [keeper("k1", "Gas"), keeper("k2", "Other")], reversedKeeperIds: ["k2"] });
+    fireEvent.change(screen.getByTestId("keepers-cross-female"), { target: { value: "k1" } });
+    fireEvent.change(screen.getByTestId("keepers-cross-donor"), { target: { value: "k2" } });
+    // Now switch the seed to k2 — the donor was k2, which must NOT linger as a
+    // self-cross. It resets, so submit is blocked asking for a donor.
+    fireEvent.change(screen.getByTestId("keepers-cross-female"), { target: { value: "k2" } });
+    expect((screen.getByTestId("keepers-cross-donor") as HTMLSelectElement).value).toBe("");
+    expect(screen.getByTestId("keepers-cross-disabled-reason")).toHaveTextContent(/donor/i);
+  });
+
+  it("gives the per-keeper reversal control an accessible label", () => {
+    renderAt({ keepers: [keeper("k1", "Gas")] });
+    // Announced by an accessible name, not just visual context.
+    expect(screen.getByLabelText(/Reversal method for Gas/i)).toBeInTheDocument();
+  });
+
   it("renders a selfing (null male) cross card as Self with an S1 badge — never blank", () => {
     renderAt({
       keepers: [keeper("k1", "Gas")],

@@ -36,6 +36,7 @@ import {
 } from "@/lib/quickLogV2Rules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
+import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 import {
@@ -340,30 +341,23 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     // Sync re-entry guard: if a photo-diary insert is already in
     // flight, drop the second call rather than creating a duplicate
     // entry. The outer handleSave guard covers the main save path,
-    // but this local ref protects the smallest surface (the direct
-    // supabase.from insert) so any future caller inherits the same
-    // guarantee without broadening the write helper.
+    // but this local ref protects the smallest surface so any future
+    // caller inherits the same guarantee without broadening the write
+    // helper. The actual insert lives in `createQuickLogPhotoDiaryEntry`
+    // so this presenter stays free of direct `supabase.from(...)` writes.
     if (photoDiaryInFlightRef.current) {
       return { ok: false, message: "Photo diary entry already in progress." };
     }
     photoDiaryInFlightRef.current = true;
     try {
-      const note = form.note.trim() || "Photo attached from Quick Log.";
-      const { error } = await supabase.from("diary_entries").insert({
-        grow_id: input.growId,
-        tent_id: input.tentId,
-        plant_id: input.plantId,
-        note,
-        photo_url: input.photoPath,
-        entry_at: new Date().toISOString(),
-        details: {
-          event_type: "quicklog_photo_attachment",
-          source: "manual",
-          attached_to_action: form.action,
-        },
-      } as never);
-      if (error) return { ok: false, message: `Photo diary entry failed: ${error.message}` };
-      return { ok: true };
+      return await createQuickLogPhotoDiaryEntry({
+        growId: input.growId,
+        tentId: input.tentId,
+        plantId: input.plantId,
+        photoPath: input.photoPath,
+        noteRaw: form.note,
+        action: form.action,
+      });
     } finally {
       photoDiaryInFlightRef.current = false;
     }

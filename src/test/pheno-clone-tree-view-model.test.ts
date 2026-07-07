@@ -65,6 +65,38 @@ describe("buildCloneTreeRows", () => {
     expect(rows.length).toBe(2); // no infinite loop, no duplication
   });
 
+  it("orders a cycle-only component deterministically regardless of input order", () => {
+    // A cycle has no external root, so entry falls to the leftover pass. That
+    // pass must not depend on source row order (listClonesForKeepers is
+    // unordered) — both orderings must yield the identical tree.
+    const forward = buildCloneTreeRows([
+      clone({ id: "A", parentCloneId: "B", cloneLabel: "A" }),
+      clone({ id: "B", parentCloneId: "A", cloneLabel: "B" }),
+    ]);
+    const reversed = buildCloneTreeRows([
+      clone({ id: "B", parentCloneId: "A", cloneLabel: "B" }),
+      clone({ id: "A", parentCloneId: "B", cloneLabel: "A" }),
+    ]);
+    expect(reversed).toEqual(forward);
+    // Deterministic entry: "A" sorts before "B", so it is the depth-0 root.
+    expect(forward.map((r) => [r.id, r.depth])).toEqual([
+      ["A", 0],
+      ["B", 1],
+    ]);
+  });
+
+  it("sorts siblings by the rendered label, so 'unnamed clone' orders as shown", () => {
+    // Raw whitespace ("  ") sorts before "m" by code point, but it *displays*
+    // as "unnamed clone" and must sort by that (after "m", before "z").
+    const rows = buildCloneTreeRows([
+      clone({ id: "root", cloneLabel: "root", takenAt: "2026-07-01" }),
+      clone({ id: "blank", parentCloneId: "root", cloneLabel: "  " }),
+      clone({ id: "mid", parentCloneId: "root", cloneLabel: "m" }),
+      clone({ id: "last", parentCloneId: "root", cloneLabel: "z" }),
+    ]);
+    expect(rows.map((r) => r.label)).toEqual(["root", "m", "unnamed clone", "z"]);
+  });
+
   it("names an unnamed clone safely and returns [] for no clones", () => {
     const [row] = buildCloneTreeRows([clone({ id: "x", cloneLabel: "  " })]);
     expect(row.label).toBe("unnamed clone");

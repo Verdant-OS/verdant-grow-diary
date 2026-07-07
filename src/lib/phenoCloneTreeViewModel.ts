@@ -29,6 +29,11 @@ export interface CloneTreeRow {
   readonly hasChildren: boolean;
 }
 
+/** The label as rendered — whitespace-only collapses to a stable placeholder. */
+function labelOf(c: CloneInput): string {
+  return c.cloneLabel && c.cloneLabel.trim() !== "" ? c.cloneLabel : "unnamed clone";
+}
+
 /** Order siblings by taken date (undated last), then label, then id (stable). */
 function compareClones(a: CloneInput, b: CloneInput): number {
   const at = a.takenAt ?? "";
@@ -36,8 +41,10 @@ function compareClones(a: CloneInput, b: CloneInput): number {
   if (at && bt && at !== bt) return at < bt ? -1 : 1;
   if (at && !bt) return -1;
   if (!at && bt) return 1;
-  const al = a.cloneLabel ?? "";
-  const bl = b.cloneLabel ?? "";
+  // Sort by the *rendered* label so display order matches sort order (a
+  // whitespace-only label shows as "unnamed clone", not as leading spaces).
+  const al = labelOf(a);
+  const bl = labelOf(b);
   if (al !== bl) return al < bl ? -1 : 1;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
@@ -74,7 +81,7 @@ export function buildCloneTreeRows(clones: ReadonlyArray<CloneInput>): CloneTree
     const kids = childrenOf.get(c.id) ?? [];
     rows.push({
       id: c.id,
-      label: c.cloneLabel && c.cloneLabel.trim() !== "" ? c.cloneLabel : "unnamed clone",
+      label: labelOf(c),
       depth,
       note: c.note ?? null,
       takenAt: c.takenAt ?? null,
@@ -85,8 +92,11 @@ export function buildCloneTreeRows(clones: ReadonlyArray<CloneInput>): CloneTree
 
   for (const r of roots) walk(r, 0);
   // Any clone left unvisited (only reachable inside a cycle) is surfaced as a
-  // root so nothing is silently dropped.
-  for (const c of byId.values()) if (!visited.has(c.id)) walk(c, 0);
+  // root so nothing is silently dropped. Sort the leftovers so the entry point
+  // — and thus the whole ordering — stays deterministic regardless of the
+  // source row order (which listClonesForKeepers doesn't guarantee).
+  const leftovers = [...byId.values()].filter((c) => !visited.has(c.id)).sort(compareClones);
+  for (const c of leftovers) walk(c, 0);
 
   return rows;
 }

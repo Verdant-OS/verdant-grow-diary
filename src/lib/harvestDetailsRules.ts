@@ -20,6 +20,10 @@ import {
   type QuickLogHarvestDetails,
   type QuickLogWeightUnit,
 } from "@/constants/quickLogActivityTypes";
+import {
+  formatGramsForDisplay,
+  normalizeHarvestWeightToGrams,
+} from "@/lib/harvestWeightUnitNormalization";
 
 /**
  * Normalize a weight input string into a safe, non-negative numeric

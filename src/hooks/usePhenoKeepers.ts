@@ -18,6 +18,7 @@ import {
   type CloneRow,
   type CrossRow,
 } from "@/lib/phenoKeepersService";
+import { recordReversal, listReversedKeeperIds } from "@/lib/phenoReversalsService";
 
 export type KeepersStatus = "idle" | "loading" | "ok" | "error";
 
@@ -28,11 +29,23 @@ export interface UsePhenoKeepersState {
   keepers: KeeperRow[];
   clonesByKeeper: Record<string, CloneRow[]>;
   crosses: CrossRow[];
+  /** Keeper ids the grower has recorded a reversal for (derived state). */
+  reversedKeeperIds: string[];
   error: string | null;
   saving: boolean;
   promoteToKeeper: (sourcePlantId: string, keeperName: string) => Promise<boolean>;
   addKeeperClone: (keeperId: string, cloneLabel: string) => Promise<boolean>;
-  saveCross: (femaleKeeperId: string, maleKeeperId: string, crossName: string) => Promise<boolean>;
+  /** Record a reversal on a keeper (append-only). */
+  markReversed: (keeperId: string, method: string) => Promise<boolean>;
+  /**
+   * Record a cross. Pass a distinct maleKeeperId for a two-parent cross, or
+   * null to self (S1) the female keeper. The service classifies the cross type.
+   */
+  saveCross: (
+    femaleKeeperId: string,
+    maleKeeperId: string | null,
+    crossName: string,
+  ) => Promise<boolean>;
 }
 
 export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeepersState {
@@ -44,6 +57,7 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
   const [keepers, setKeepers] = useState<KeeperRow[]>([]);
   const [clonesByKeeper, setClonesByKeeper] = useState<Record<string, CloneRow[]>>({});
   const [crosses, setCrosses] = useState<CrossRow[]>([]);
+  const [reversedKeeperIds, setReversedKeeperIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
@@ -64,9 +78,10 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
         setStatus("error");
         return;
       }
-      const [keeperRows, crossRows] = await Promise.all([
+      const [keeperRows, crossRows, reversedIds] = await Promise.all([
         listKeepersForHunt(id),
         listCrossesForHunt(id),
+        listReversedKeeperIds(),
       ]);
       const clones = await listClonesForKeepers(keeperRows.map((k) => k.id));
       if (cancelled) return;
@@ -77,6 +92,7 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
       setKeepers(keeperRows);
       setClonesByKeeper(byKeeper);
       setCrosses(crossRows);
+      setReversedKeeperIds(reversedIds);
       setStatus("ok");
     })().catch(() => {
       if (cancelled) return;
@@ -121,8 +137,23 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
     [reload],
   );
 
+  const markReversed = useCallback(
+    async (keeperId: string, method: string) => {
+      setSaving(true);
+      const res = await recordReversal({ keeperId, method });
+      setSaving(false);
+      if (res.ok === true) {
+        reload();
+        return true;
+      }
+      setError(res.error);
+      return false;
+    },
+    [reload],
+  );
+
   const saveCross = useCallback(
-    async (femaleKeeperId: string, maleKeeperId: string, crossName: string) => {
+    async (femaleKeeperId: string, maleKeeperId: string | null, crossName: string) => {
       if (!id) return false;
       setSaving(true);
       const res = await recordCross({
@@ -149,10 +180,12 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
     keepers,
     clonesByKeeper,
     crosses,
+    reversedKeeperIds,
     error,
     saving,
     promoteToKeeper,
     addKeeperClone,
+    markReversed,
     saveCross,
   };
 }

@@ -236,20 +236,33 @@ export function classifySexReveal(rawSignals: SexRevealSignals): SexRevealResult
   //
   // Weak-evidence discipline still applies. A CONFIRMED reversal read (the one
   // that says "collect pollen now" with no review) needs the same strength the
-  // rest of the classifier demands: multi-node pollen sacs (>= 2, matching
-  // confirmed_male) AND a usable image. Single-node pollen, banana-only, or a
-  // poor image keeps the reversed_female framing (never nudge a cull on a
-  // known-reversed plant) but stays review-required, low confidence, and asks
-  // for a sharper multi-node close-up before advising collection.
+  // rest of the classifier demands, PLUS actual female evidence:
+  //   - multi-node pollen sacs (>= 2, matching confirmed_male),
+  //   - a usable image, AND
+  //   - visible pistils (female evidence).
+  // The reversal override is for pollen ON A FEMALE. Without any pistils, a
+  // 2+-pollen-sac / no-pistil plant is what the classifier otherwise calls a
+  // confirmed MALE — so even with the reversal flag set, absent female
+  // evidence we must NOT confidently present real-male pollen as feminized or
+  // push collection. Single-node pollen, banana-only, a poor image, or no
+  // pistils all keep the reversed_female framing (never nudge a cull on a
+  // grower-flagged plant) but stay review-required and ask to confirm first.
   if (sig.intentionalReversal && showsPollenStructures) {
-    const confirmed = sig.pollenSacNodeCount >= 2 && !isPoorImage(sig);
+    const hasFemaleEvidence = sig.pistilNodeCount > 0;
+    const confirmed = sig.pollenSacNodeCount >= 2 && hasFemaleEvidence && !isPoorImage(sig);
     return {
       assessment: "reversed_female",
-      confidence: confirmed ? (sig.pistilNodeCount > 0 ? "high" : "medium") : "low",
+      confidence: confirmed ? "high" : "low",
       evidence: [...evidence, "Grower recorded a deliberate reversal on this plant."],
       missing_information: confirmed
         ? missing
-        : [...missing, "A sharper photo confirming pollen sacs at 2+ nodes before collecting."],
+        : [
+            ...missing,
+            "A sharper photo confirming pollen sacs at 2+ nodes before collecting.",
+            ...(hasFemaleEvidence
+              ? []
+              : ["Female pistils to confirm this is the reversed female and not a male."]),
+          ],
       // Only the confirmed read carries the "collect pollen" instruction; weak
       // or single-node evidence must not nudge collection before confirmation.
       immediate_action: confirmed

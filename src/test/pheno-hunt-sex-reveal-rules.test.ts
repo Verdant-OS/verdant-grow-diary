@@ -127,6 +127,21 @@ describe("classifySexReveal", () => {
     expect(res.follow_up.toLowerCase()).not.toMatch(/collect pollen/);
   });
 
+  it("reversal flag + pollen but NO pistils stays review-required (could be a real male)", () => {
+    // 2+ pollen sacs and zero pistils is what the classifier otherwise calls
+    // confirmed_male. Even with the reversal flag, absent female evidence we
+    // must not confidently present real-male pollen as feminized or push
+    // collection — keep it review-required and ask to confirm.
+    const res = classifySexReveal(
+      sig({ pistilNodeCount: 0, pollenSacNodeCount: 3, intentionalReversal: true }),
+    );
+    expect(res.assessment).toBe("reversed_female"); // respect grower intent, no cull nudge
+    expect(res.review_recommended).toBe(true);
+    expect(res.confidence).toBe("low");
+    expect(res.immediate_action.toLowerCase()).not.toMatch(/collect pollen/);
+    expect(res.missing_information.join(" ").toLowerCase()).toMatch(/pistil|not a male/);
+  });
+
   it("banana-only structures on a reversed female stay review-required (no clean pollen sacs)", () => {
     const res = classifySexReveal(
       sig({ pistilNodeCount: 2, bananaStructures: true, intentionalReversal: true }),

@@ -68,7 +68,9 @@ CREATE INDEX IF NOT EXISTS idx_breeding_events_donor
   ON public.breeding_events (donor_plant_id) WHERE donor_plant_id IS NOT NULL;
 
 -- Owner + parent-type validation: the parent grow_event must belong to the same
--- user and carry one of the 6 breeding event types.
+-- user and carry one of the 6 breeding event types. Any donor_plant_id must also
+-- be owned by the caller, so a client/API write cannot attach a cross-tenant
+-- plant UUID as a breeding donor (lineage/provenance integrity).
 CREATE OR REPLACE FUNCTION public.validate_breeding_event_owner()
 RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public AS $$
 DECLARE
@@ -88,6 +90,15 @@ BEGIN
     'pollen_shed_observed','stigmas_receptive','cross_harvest'
   ) THEN
     RAISE EXCEPTION 'breeding_events attached to non-breeding grow_event of type %', parent_type;
+  END IF;
+  -- Donor plant (optional) must be owned by the same user — prevents attaching a
+  -- cross-tenant plant UUID as a breeding donor via a direct client write.
+  IF NEW.donor_plant_id IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM public.plants p
+        WHERE p.id = NEW.donor_plant_id AND p.user_id = NEW.user_id
+     ) THEN
+    RAISE EXCEPTION 'breeding_events donor_plant_id % is not owned by the caller', NEW.donor_plant_id;
   END IF;
   RETURN NEW;
 END $$;

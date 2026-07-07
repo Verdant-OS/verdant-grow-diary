@@ -120,10 +120,13 @@ describe("recordReversal", () => {
     });
   });
 
-  it("normalizes an unknown/blank method to sts (DB CHECK only accepts four)", async () => {
+  it("preserves an unrecognized method as 'other' (never mislabels as sts)", async () => {
     h.client = makeSupabase({});
     await recordReversal({ keeperId: "k1", method: "bleach" });
-    expect(h.client.reversalInserts[0].method).toBe("sts");
+    expect(h.client.reversalInserts[0].method).toBe("other");
+    h.client = makeSupabase({});
+    await recordReversal({ keeperId: "k1" }); // unspecified → honest "other"
+    expect(h.client.reversalInserts[0].method).toBe("other");
   });
 
   it("rejects when signed out or when no keeper is chosen", async () => {
@@ -191,6 +194,19 @@ describe("recordCross — classifies via reversal state", () => {
     expect(r.ok).toBe(false);
     if (r.ok === false) expect(r.error).toMatch(/revers/i);
     expect(h.client.crossInserts.length).toBe(0);
+  });
+
+  it("REJECTS a blank/whitespace donor as an incomplete form — never silent selfing", async () => {
+    // A blank maleKeeperId is an omitted donor, NOT an intent to self. Even for
+    // a reversed mother it must be rejected (with the "pollen donor" message),
+    // not recorded as an S1. Preserves classifyCross's null-vs-blank guard.
+    for (const blank of ["", "   "]) {
+      h.client = makeSupabase({ reversedKeeperIds: ["mom"] });
+      const r = await recordCross({ femaleKeeperId: "mom", maleKeeperId: blank });
+      expect(r.ok).toBe(false);
+      if (r.ok === false) expect(r.error).toMatch(/pollen donor/i);
+      expect(h.client.crossInserts.length).toBe(0);
+    }
   });
 
   it("rejects when signed out", async () => {

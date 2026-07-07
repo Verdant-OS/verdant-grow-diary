@@ -40,9 +40,12 @@ export async function recordReversal(input: {
   if (!userId) return { ok: false, error: "Sign in to record a reversal." };
   const keeperId = (input.keeperId ?? "").trim();
   if (!keeperId) return { ok: false, error: "Choose the keeper you reversed." };
-  // Unknown/blank methods fall back to STS (the DB CHECK only accepts the four
-  // recognized methods; recording something is better than blocking the log).
-  const method = isReversalMethod(input.method) ? input.method : "sts";
+  // Unrecognized / blank methods fall back to "other", NOT "sts": the DB CHECK
+  // only accepts the four recognized values, and gating only needs the row to
+  // exist — so recording an honest "other" is better than mislabeling the
+  // grower's reversal history as STS. Callers (the B4 form) pass an explicit
+  // recognized method.
+  const method = isReversalMethod(input.method) ? input.method : "other";
 
   const { data, error } = await phenoDb
     .from("pheno_reversals")

@@ -160,12 +160,16 @@ export async function recordCross(input: {
   if (!userId) return { ok: false, error: "Sign in to record a cross." };
 
   const female = (input.femaleKeeperId ?? "").trim();
-  const rawMale = (input.maleKeeperId ?? "").trim();
-  // Null pollen id signals selfing; a distinct id is a two-parent cross.
-  const pollen = rawMale === "" || rawMale === female ? null : rawMale;
+  // PRESERVE the null-vs-blank distinction. Explicit null/omitted signals
+  // selfing; a (possibly blank) STRING is passed through to classifyCross,
+  // which rejects a blank donor as an incomplete two-parent form rather than
+  // silently selfing it. Do NOT coalesce "" → null here.
+  const pollen: string | null = input.maleKeeperId == null ? null : input.maleKeeperId.trim();
+  // Only a real, distinct donor has a reversal state worth querying.
+  const isDistinctDonor = pollen !== null && pollen !== "" && pollen !== female;
 
   const femaleReversed = await hasReversal(female);
-  const pollenReversed = pollen ? await hasReversal(pollen) : false;
+  const pollenReversed = isDistinctDonor ? await hasReversal(pollen as string) : false;
 
   const classified = classifyCross({
     femaleKeeperId: female,

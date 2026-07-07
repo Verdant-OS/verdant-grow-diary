@@ -117,6 +117,26 @@ describe("classifySexReveal", () => {
     expect(res.assessment).toBe("possible_herm");
   });
 
+  it("reversal on a POOR image stays review-required (no confident cull-free pollen action)", () => {
+    const res = classifySexReveal(
+      sig({
+        pistilNodeCount: 2,
+        pollenSacNodeCount: 2,
+        intentionalReversal: true,
+        imageQuality: "blurry",
+      }),
+    );
+    // Still reversed_female (never nudge a cull on a known-reversed plant)...
+    expect(res.assessment).toBe("reversed_female");
+    expect(res.what_not_to_do.some((s) => /do not cull/i.test(s))).toBe(true);
+    // ...but weak evidence must keep it review-required and low-confidence, and
+    // must NOT tell the grower to collect pollen off a blurry photo.
+    expect(res.review_recommended).toBe(true);
+    expect(res.confidence).toBe("low");
+    expect(res.follow_up.toLowerCase()).not.toMatch(/collect pollen/);
+    expect(res.follow_up.toLowerCase()).toMatch(/sharper|confirm/);
+  });
+
   it("reversal flag but no pollen yet (pistils only) falls through to normal female classification", () => {
     const res = classifySexReveal(
       sig({ pistilNodeCount: 3, pollenSacNodeCount: 0, intentionalReversal: true }),

@@ -92,7 +92,7 @@ export const SEX_REVEAL_COPY = {
     "node/bud-site photos before taking irreversible action.",
   reversed_female:
     "Reversed female — the pollen sacs here are the intended result of a " +
-    "chemical reversal, not a herm. Collect pollen for your self (S1) or " +
+    "chemical reversal, not a herm. Collect pollen for a self (S1) or " +
     "feminized cross, and keep it isolated from any unintended mothers.",
   confirmed_male:
     "Confirmed male. Isolate from any flowering females if pollen risk " +
@@ -218,22 +218,32 @@ export function classifySexReveal(rawSignals: SexRevealSignals): SexRevealResult
   // grower is breeding with). Only fires once pollen is actually showing —
   // pistils-only means the reversal has not produced pollen yet, so fall
   // through to the normal female classification.
+  //
+  // Weak-evidence discipline still applies: on a poor image the pollen read is
+  // untrusted, so we keep the reversed_female framing (never nudge a cull) but
+  // stay review-required with low confidence and a "get a sharper photo"
+  // follow-up — symmetric with how the possible_herm branch handles poor
+  // images.
   if (sig.intentionalReversal && showsPollenStructures) {
+    const poor = isPoorImage(sig);
     return {
       assessment: "reversed_female",
-      confidence: isPoorImage(sig) ? "low" : sig.pistilNodeCount > 0 ? "high" : "medium",
+      confidence: poor ? "low" : sig.pistilNodeCount > 0 ? "high" : "medium",
       evidence: [...evidence, "Grower recorded a deliberate reversal on this plant."],
-      missing_information: missing,
+      missing_information: poor
+        ? [...missing, "A sharper, multi-node photo to confirm the pollen sacs before collecting."]
+        : missing,
       immediate_action: SEX_REVEAL_COPY.reversed_female,
       what_not_to_do: [
         "Do not cull — these pollen structures are the intended result of the reversal.",
         "Do not treat this as a hermaphrodite; the reversal was applied on purpose.",
         "Do not let this pollen reach any unintended mothers — keep it isolated.",
       ],
-      follow_up:
-        "Collect pollen once the sacs mature and apply it to the intended seed " +
-        "mother (self / S1 or a feminized cross).",
-      review_recommended: false,
+      follow_up: poor
+        ? "Capture a sharper, multi-node close-up to confirm the pollen sacs before collecting."
+        : "Collect pollen once the sacs mature and apply it to the intended seed " +
+          "mother (a self / S1 or a feminized cross).",
+      review_recommended: poor,
     };
   }
 

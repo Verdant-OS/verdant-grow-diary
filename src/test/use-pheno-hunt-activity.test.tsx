@@ -89,6 +89,51 @@ describe("usePhenoHuntActivity", () => {
     ]);
   });
 
+  it("surfaces an error (not empty 'ok') when the hunt read returns { ok: false }", async () => {
+    loadCandidates.mockResolvedValue({ ok: false, error: "Could not load hunt candidates." });
+    listKeepers.mockResolvedValue([{ id: "k1", keeperName: "Gas" }]);
+    listCrosses.mockResolvedValue([]);
+    listReversals.mockResolvedValue([]);
+    listSex.mockResolvedValue({});
+    listDecisions.mockResolvedValue({});
+
+    const { result } = renderHook(() => usePhenoHuntActivity("h1"));
+    await waitFor(() => expect(result.current.status).toBe("error"));
+    expect(result.current.entries).toEqual([]);
+    // Errors out before the scoped reversal read runs.
+    expect(listReversals).not.toHaveBeenCalled();
+  });
+
+  it("clears the prior hunt's activity immediately on hunt change (no stale flash)", async () => {
+    loadCandidates.mockResolvedValue({ ok: true, hunt: { id: "h1", name: "H" }, candidates: [] });
+    listKeepers.mockResolvedValue([]);
+    listCrosses.mockResolvedValue([
+      {
+        id: "x1",
+        femaleKeeperId: "k1",
+        maleKeeperId: null,
+        crossType: "selfing_s1",
+        crossedAt: "2026-07-05",
+      },
+    ]);
+    listReversals.mockResolvedValue([]);
+    listSex.mockResolvedValue({});
+    listDecisions.mockResolvedValue({});
+
+    const { result, rerender } = renderHook(({ h }) => usePhenoHuntActivity(h), {
+      initialProps: { h: "h1" as string | null },
+    });
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+
+    // Switch to a hunt whose reads never resolve during the test: entries must
+    // clear right away rather than showing h1's cross under h2.
+    const pending = new Promise(() => {});
+    loadCandidates.mockReturnValue(pending);
+    rerender({ h: "h2" });
+    expect(result.current.status).toBe("loading");
+    expect(result.current.entries).toEqual([]);
+  });
+
   it("surfaces an error status without throwing when a read rejects", async () => {
     loadCandidates.mockRejectedValue(new Error("boom"));
     listKeepers.mockResolvedValue([]);

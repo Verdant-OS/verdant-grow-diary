@@ -40,6 +40,9 @@ export function usePhenoHuntActivity(huntId: string | null | undefined): UsePhen
     }
     let cancelled = false;
     setStatus("loading");
+    // Clear the prior hunt's activity up front so it can never flash under a new
+    // hunt while the reads are in flight (the section renders on entries.length).
+    setEntries([]);
     (async () => {
       const [candRes, keepers, crosses, sexByPlant, decisionsByPlant] = await Promise.all([
         loadPhenoHuntCandidates(id),
@@ -48,12 +51,21 @@ export function usePhenoHuntActivity(huntId: string | null | undefined): UsePhen
         listLatestSexObservationsForHunt(id),
         listKeeperDecisionHistoryForHunt(id),
       ]);
+      if (cancelled) return;
+      // A failed hunt read is a real error, not "no activity" — surface it
+      // instead of silently finishing "ok" with empty labels (matches
+      // usePhenoKeepers). `!== true`: strict:false won't narrow the union.
+      if (candRes.ok !== true) {
+        setEntries([]);
+        setStatus("error");
+        return;
+      }
+
       // Scope the reversal read to this hunt's keepers, not every reversal.
       const reversals = await listReversalsForKeepers(keepers.map((k) => k.id));
       if (cancelled) return;
 
       const candidateLabelById: Record<string, string | null> = {};
-      // `=== true` narrowing: strict:false means `!candRes.ok` won't narrow the union.
       if (candRes.ok === true) {
         for (const c of candRes.candidates)
           candidateLabelById[c.candidateId] = c.candidateLabel ?? null;

@@ -37,6 +37,9 @@ import {
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
+import { buildQuickLogTargetPanel } from "@/lib/quickLogTargetPanelViewModel";
+import QuickLogTargetPanel from "@/components/QuickLogTargetPanel";
+import { useGrows } from "@/store/grows";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 import {
@@ -178,6 +181,17 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   const resolvedTarget = useMemo(
     () => resolveQuickLogV2Target(options, form.selectedKey),
     [options, form.selectedKey],
+  );
+  const { grows } = useGrows();
+  const targetPanel = useMemo(
+    () =>
+      buildQuickLogTargetPanel({
+        resolved: resolvedTarget,
+        plants: plants as Parameters<typeof buildQuickLogTargetPanel>[0]["plants"],
+        tents: tents as Parameters<typeof buildQuickLogTargetPanel>[0]["tents"],
+        grows,
+      }),
+    [resolvedTarget, plants, tents, grows],
   );
   const resolvedContext = resolvedTarget.ok
     ? {
@@ -741,6 +755,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
                 Start by choosing a plant or tent above.
               </p>
             )}
+            <QuickLogTargetPanel panel={targetPanel} />
           </div>
 
           <div>

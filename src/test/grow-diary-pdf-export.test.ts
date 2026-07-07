@@ -124,6 +124,22 @@ describe("growDiaryPdfExport — HTML", () => {
     expect(html).toContain("Read-only report");
   });
 
+  it("renders a clear Charts unavailable section when chart data cannot be embedded", () => {
+    const m = buildGrowDiaryReportModel({
+      grow: { name: "G" },
+      counts: { diary: 2 },
+      recent,
+      chartsUnavailableReason: "Chart data could not be embedded from this view.",
+      now: NOW,
+    });
+    const html = buildGrowDiaryReportHtml(m);
+    expect(html).toContain('data-testid="grow-diary-pdf-charts-unavailable-section"');
+    expect(html).toContain("Charts unavailable");
+    expect(html).toContain("Chart data could not be embedded from this view.");
+    expect(html).toContain("Nothing was inferred or redrawn");
+    expect(html).toContain("Summary totals");
+  });
+
   it("includes safety footer and does not leak raw payload / token / secret markers", () => {
     const m = buildGrowDiaryReportModel({
       grow: { name: "G" },

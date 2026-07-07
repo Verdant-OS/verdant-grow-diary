@@ -343,7 +343,7 @@ export default function Upgrade() {
             onCheckout={handleCheckout}
             onFreeStart={() => {
               // Free tier is an app-entry action, never a Paddle checkout.
-              // Navigate via a real link for a11y in the footer note below.
+              navigate("/auth");
             }}
           />
         ))}

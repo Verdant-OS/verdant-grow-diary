@@ -172,7 +172,8 @@ describe("Upgrade page", () => {
   });
 
   it("founder sold-out state disables CTA", () => {
-    tierOverride.founderClaimed = 75;
+    const founder = PRICING_TIERS.find((t) => t.id === "founder_lifetime")!;
+    founder.cap = { total: 75, claimed: 75 };
     renderPage();
     const cta = screen.getByTestId(
       "tier-founder_lifetime-cta",

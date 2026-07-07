@@ -70,16 +70,32 @@ export function normalizeDiaryNoteText(raw: string | null | undefined): string {
   // 3. Collapse whitespace runs. Preserve newlines by first normalizing.
   text = text.replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n");
 
-  // 4. Collapse consecutive duplicate sentences. Split on sentence-ending
+  // 4. Collapse duplicate sentences. Split on sentence-ending
   //    punctuation while keeping the terminator attached.
+  //    - Adjacent identical sentences → keep one (works for any content).
+  //    - Non-adjacent identical sentences that begin with a known
+  //      section label (e.g. "Response check: Better.") → keep the first
+  //      only, since those come from label-append flows and are noise.
+  //    Non-label grower sentences that happen to repeat are preserved.
   const parts = text.split(/(?<=[.!?])\s+/);
+  const labelPrefixRe = new RegExp(
+    `^(?:${DIARY_NOTE_SECTION_LABELS.map((l) =>
+      l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    ).join("|")})\\s*:`,
+    "i",
+  );
   const out: string[] = [];
   let lastKey = "";
+  const seenLabelSentences = new Set<string>();
   for (const partRaw of parts) {
     const part = partRaw.trim();
     if (!part) continue;
     const key = part.toLowerCase().replace(/\s+/g, " ");
     if (key === lastKey) continue;
+    if (labelPrefixRe.test(part)) {
+      if (seenLabelSentences.has(key)) continue;
+      seenLabelSentences.add(key);
+    }
     out.push(part);
     lastKey = key;
   }

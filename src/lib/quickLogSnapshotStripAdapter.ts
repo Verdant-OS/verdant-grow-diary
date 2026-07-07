@@ -35,7 +35,8 @@ export type QuickLogSnapshotStripAction =
   | { kind: "none" }
   | { kind: "refresh"; label: string; href: string }
   | { kind: "review"; label: string; href: string }
-  | { kind: "add"; label: string; href: string };
+  | { kind: "add"; label: string; href: string }
+  | { kind: "edit"; label: string; href: string };
 
 export interface QuickLogSnapshotStripViewModel {
   status: QuickLogSnapshotStripStatus;

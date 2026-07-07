@@ -3,9 +3,8 @@
  * PHENOHUNT candidate / breeding program records.
  *
  * Presenter-only. Persists to localStorage keyed by (recordType, recordId)
- * so saved values survive across sessions without touching schema, RLS,
- * Edge Functions, Action Queue, AI, sensors, or device control. Defaults
- * populate empty fields but never overwrite anything already saved.
+ * so saved values survive across sessions without touching schema or RLS.
+ * Defaults populate empty fields but never overwrite anything already saved.
  */
 import { useEffect, useMemo, useState } from "react";
 import {

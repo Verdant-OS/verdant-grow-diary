@@ -447,6 +447,7 @@ export default function PlantDetail() {
       <PlantDetailHarvestWatchCard
         plantId={plant.id}
         hasPlantPhoto={!!plant.photo}
+        galleryPhotoCount={plantGalleryPhotoCount}
       />
       <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
       <PlantDetailAiDoctorReadiness

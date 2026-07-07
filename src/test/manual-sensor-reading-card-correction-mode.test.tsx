@@ -28,12 +28,14 @@ vi.mock("@/hooks/useInsertSensorReading", () => ({
 }));
 
 vi.mock("@/hooks/useInsertManualSnapshotEdit", () => ({
+  insertManualSnapshotEdit: (p: unknown) => editMutate(p),
   useInsertManualSnapshotEdit: () => ({ mutateAsync: editMutate, isPending: false }),
 }));
 
 vi.mock("@/lib/insertManualSensorReadingReturningId", () => ({
   insertManualSensorReadingReturningId: (p: unknown) => returningId(p),
 }));
+
 
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import type { ManualCorrectionContext } from "@/lib/manualSensorCorrectionContext";

@@ -95,6 +95,17 @@ const SENSORS_HREF = "/sensors";
  */
 export const MANUAL_SNAPSHOT_ENTRY_HREF = "/sensors#manual-reading";
 
+/**
+ * Edit action shown only when the current snapshot's source is `manual`.
+ * Never surfaced for `live`, `sim`, `demo`, `csv`, `stale`, or unknown —
+ * editing must never be used to overwrite live-ingest telemetry.
+ */
+export const MANUAL_SNAPSHOT_EDIT_ACTION: QuickLogSnapshotStripAction = {
+  kind: "edit",
+  label: "Edit manual readings",
+  href: MANUAL_SNAPSHOT_ENTRY_HREF,
+};
+
 function actionFor(status: QuickLogSnapshotStripStatus): QuickLogSnapshotStripAction {
   switch (status) {
     case "usable":
@@ -106,6 +117,28 @@ function actionFor(status: QuickLogSnapshotStripStatus): QuickLogSnapshotStripAc
     case "no_data":
       return { kind: "add", label: "Add snapshot", href: MANUAL_SNAPSHOT_ENTRY_HREF };
   }
+}
+
+/**
+ * Deterministic absolute-time formatter for the "Captured: …" line.
+ * Uses UTC + a fixed format so unit tests are stable across machines.
+ * Example: "Jul 7, 2026, 7:14 PM UTC".
+ */
+export function formatCapturedAtAbsolute(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return null;
+  const d = new Date(ms);
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const mo = MONTHS[d.getUTCMonth()];
+  const day = d.getUTCDate();
+  const yr = d.getUTCFullYear();
+  let h = d.getUTCHours();
+  const m = d.getUTCMinutes().toString().padStart(2, "0");
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${mo} ${day}, ${yr}, ${h}:${m} ${ampm} UTC`;
 }
 
 

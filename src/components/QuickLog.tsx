@@ -561,6 +561,16 @@ export default function QuickLog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitInFlightRef.current || busy || savedTarget) return;
+    submitInFlightRef.current = true;
+    try {
+      await runSubmit();
+    } finally {
+      submitInFlightRef.current = false;
+    }
+  }
+
+  async function runSubmit() {
     setSaveError(null);
 
     if (!user || !activeGrowId) {

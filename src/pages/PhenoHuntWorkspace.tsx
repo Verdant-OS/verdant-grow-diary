@@ -41,6 +41,7 @@ import type { LabResultRow, PhenoLabSource, TerpeneReading } from "@/lib/phenoLa
 import PhenoProductSamplingSection from "@/components/PhenoProductSamplingSection";
 import PhenoStressTestingSection from "@/components/PhenoStressTestingSection";
 import PhenoSamplingWorkspaceTools from "@/components/PhenoSamplingWorkspaceTools";
+import PhenoDocumentationSections from "@/components/PhenoDocumentationSections";
 import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
 import { usePhenoStressObservations } from "@/hooks/usePhenoStressObservations";
 

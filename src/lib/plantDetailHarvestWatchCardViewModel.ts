@@ -34,6 +34,10 @@ import {
   buildHarvestEvidenceHistory,
   type HarvestEvidenceHistory,
 } from "@/lib/harvestWatchEvidenceHistoryViewModel";
+import {
+  buildPhotoEvidenceDisplay,
+  type PhotoEvidenceReconciliationDisplay,
+} from "@/lib/plantPhotoEvidenceReconciliation";
 
 export interface PlantDetailHarvestWatchPlantLike {
   id: string;

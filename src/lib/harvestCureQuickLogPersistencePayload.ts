@@ -38,6 +38,11 @@ import {
   type HarvestDetailsInput,
   type HarvestDetailsValidation,
 } from "./harvestCureRules";
+import { normalizeHarvestWeightToGrams } from "./harvestWeightUnitNormalization";
+import {
+  QUICK_LOG_WEIGHT_UNITS,
+  type QuickLogWeightUnit,
+} from "@/constants/quickLogActivityTypes";
 
 /**
  * Minimal, server-shaped sensor snapshot envelope accepted by the
@@ -52,6 +57,26 @@ export interface HarvestCureSensorSnapshotInput {
   metrics: Record<string, number>;
 }
 
+/**
+ * Slice A3.1 — Vocab A (grower-entered value + unit) input on the harvest
+ * persistence boundary. Optional. When present, the builder canonicalizes
+ * to grams via `normalizeHarvestWeightToGrams` and stamps the ORIGINAL
+ * value + unit into `details.harvest` (jsonb passthrough — additive, no
+ * schema change) so the timeline can display "2 lb (907.18 g)".
+ *
+ * If Vocab A input is present but invalid (non-numeric / negative /
+ * unknown unit), the builder rejects with `invalid_harvest_details`
+ * rather than silently persisting the numeric value as grams.
+ */
+export interface HarvestVocabAInput {
+  /** Grower-entered wet weight text (e.g. "2", "12.5"). */
+  wet_weight_input?: string | number | null;
+  /** Grower-entered dry weight text. */
+  dry_weight_input?: string | number | null;
+  /** Grower-selected unit for the two values above. */
+  weight_unit?: string | null;
+}
+
 export interface HarvestCureQuickLogPersistenceInput {
   eventType: QuickLogHarvestCureEventType;
   /** Required. Server validates ownership. */
@@ -64,8 +89,14 @@ export interface HarvestCureQuickLogPersistenceInput {
   photoUrl?: string | null;
   /** Optional ISO timestamptz. */
   occurredAt?: string | null;
-  /** Operator-entered details for the chosen event_type. */
-  harvest?: HarvestDetailsInput | null;
+  /**
+   * Operator-entered details for the chosen event_type. Extends
+   * `HarvestDetailsInput` with the optional Vocab A fields so a single
+   * `harvest` object can carry either grams-numeric input (legacy) or
+   * value+unit input (Slice A3.1) — never both meaningfully for the same
+   * weight, since Vocab A takes precedence when present.
+   */
+  harvest?: (HarvestDetailsInput & HarvestVocabAInput) | null;
   cureCheck?: CureCheckDetailsInput | null;
   /** Optional sensor snapshot. Pass-through, source label preserved. */
   sensorSnapshot?: HarvestCureSensorSnapshotInput | null;

@@ -67,6 +67,24 @@ describe("deriveOffspringFeminization", () => {
     expect(deriveOffspringFeminization("feminized_cross")).toBe("feminized");
     expect(deriveOffspringFeminization("standard_f1")).toBe("regular");
   });
+
+  it("regular for the new non-feminized ways (channel decides their feminization)", () => {
+    // The type-only helper must NOT treat every non-standard way as feminized —
+    // an F2/BX/sib/outcross is regular unless made with reversal pollen.
+    for (const t of [
+      "filial",
+      "backcross",
+      "sib_cross",
+      "outcross",
+      "line_cross",
+      "ibl",
+    ] as const) {
+      expect(deriveOffspringFeminization(t)).toBe("regular");
+    }
+    for (const t of ["selfing_sn", "feminized_bx"] as const) {
+      expect(deriveOffspringFeminization(t)).toBe("feminized");
+    }
+  });
 });
 
 describe("lineageLabel", () => {
@@ -361,16 +379,25 @@ describe("validateBreedingCross", () => {
     ).toEqual({ ok: true, offspring: "feminized", label: "S2" });
   });
 
-  it("feminized cross: different female + reversal channel", () => {
-    expect(v({ crossType: "feminized_cross", channel: "colloidal_silver" })).toEqual({
-      ok: true,
-      offspring: "feminized",
-      label: "Fem F1",
-    });
+  it("feminized cross: different female + a reversed pollen donor on a reversal channel", () => {
+    expect(
+      v({ crossType: "feminized_cross", channel: "colloidal_silver", pollenReversed: true }),
+    ).toEqual({ ok: true, offspring: "feminized", label: "Fem F1" });
     expect(v({ crossType: "feminized_cross", channel: "colloidal_silver", isSelf: true }).ok).toBe(
       false,
     );
     expect(v({ crossType: "feminized_cross", channel: "natural_male" }).ok).toBe(false);
+  });
+
+  it("feminized cross: a reversal channel with a NON-reversed pollen donor is rejected", () => {
+    // Chemical reversal pollen must come from a keeper that was actually reversed.
+    expect(v({ crossType: "feminized_cross", channel: "sts", pollenReversed: false }).ok).toBe(
+      false,
+    );
+    // Rodelization is natural stress — no reversal record required.
+    expect(
+      v({ crossType: "feminized_cross", channel: "rodelization", pollenReversed: false }),
+    ).toEqual({ ok: true, offspring: "feminized", label: "Fem F1" });
   });
 
   it("backcross: needs a recurrent parent and a BX generation", () => {
@@ -385,12 +412,34 @@ describe("validateBreedingCross", () => {
     });
   });
 
-  it("feminized backcross: reversal channel + recurrent parent", () => {
+  it("feminized backcross: reversal channel + reversed donor + recurrent parent + a BX generation", () => {
     expect(
-      v({ crossType: "feminized_bx", channel: "sts", hasRecurrentParent: true, generation: 1 }),
+      v({
+        crossType: "feminized_bx",
+        channel: "sts",
+        pollenReversed: true,
+        hasRecurrentParent: true,
+        generation: 1,
+      }),
     ).toEqual({ ok: true, offspring: "feminized", label: "Fem BX1" });
     expect(
-      v({ crossType: "feminized_bx", channel: "sts", hasRecurrentParent: false, generation: 1 }).ok,
+      v({
+        crossType: "feminized_bx",
+        channel: "sts",
+        pollenReversed: true,
+        hasRecurrentParent: false,
+        generation: 1,
+      }).ok,
+    ).toBe(false);
+    // A feminized BX with no generation must be rejected, not defaulted to BX1.
+    expect(
+      v({
+        crossType: "feminized_bx",
+        channel: "sts",
+        pollenReversed: true,
+        hasRecurrentParent: true,
+        generation: null,
+      }).ok,
     ).toBe(false);
   });
 

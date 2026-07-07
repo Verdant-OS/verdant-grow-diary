@@ -351,11 +351,26 @@ export function validateBreedingCross(input: BreedingCrossInput): BreedingCrossV
         reason:
           "A feminized cross needs a reversal channel (the pollen must come from a reversed female).",
       };
-    if (crossType === "feminized_bx" && !input.hasRecurrentParent)
+    // Chemically-reversed pollen must come from a keeper that has a reversal on
+    // record; rodelization is natural stress, so it carries no reversal record.
+    if (channel !== "rodelization" && !input.pollenReversed)
       return {
         ok: false,
-        reason: "A backcross needs a recurrent parent (the line you are crossing back to).",
+        reason:
+          "The pollen donor must be reversed to make feminized pollen — reverse it first, or record the channel as rodelization.",
       };
+    if (crossType === "feminized_bx") {
+      if (!input.hasRecurrentParent)
+        return {
+          ok: false,
+          reason: "A backcross needs a recurrent parent (the line you are crossing back to).",
+        };
+      if (!(typeof input.generation === "number" && input.generation >= 1))
+        return {
+          ok: false,
+          reason: "A feminized backcross needs a generation of 1 or more (BX1, BX2, …).",
+        };
+    }
   }
 
   // Backcrosses (regular) need a recurrent parent + a real BX generation.
@@ -395,13 +410,13 @@ export function validateBreedingCross(input: BreedingCrossInput): BreedingCrossV
 }
 
 /**
- * Offspring feminization is DERIVED from the cross type, never stored
- * separately (so the two can never disagree). Feminized-pollen crosses —
- * selfing and feminized crosses — yield feminized seeds; a standard cross does
- * not.
+ * Whether a cross type is *inherently* feminized (selfing / feminized crosses),
+ * from the TYPE ALONE. This is the type-only question — a regular way (F2, BX,
+ * sib, outcross, …) is "regular" here even though it becomes feminized when made
+ * with reversal pollen. For the channel-aware answer use feminizationFromChannel.
  */
 export function deriveOffspringFeminization(crossType: CrossType): OffspringFeminization {
-  return crossType === "standard_f1" ? "regular" : "feminized";
+  return isFeminizedCrossType(crossType) ? "feminized" : "regular";
 }
 
 /** Minimal shape of an append-only reversal record for state derivation. */

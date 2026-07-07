@@ -37,6 +37,12 @@ import {
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
+import { createQuickLogVideoDiaryEntry } from "@/lib/quickLogVideoDiaryEntry";
+import {
+  ALLOWED_VIDEO_MIME_TYPES,
+  createBrowserVideoDurationProber,
+  validateVideoAttachment,
+} from "@/lib/videoAttachmentRules";
 import { buildQuickLogTargetPanel } from "@/lib/quickLogTargetPanelViewModel";
 import QuickLogTargetPanel from "@/components/QuickLogTargetPanel";
 import { useGrows } from "@/store/grows";
@@ -93,6 +99,8 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   const { user } = useAuth();
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
+  const videoDiaryInFlightRef = useRef(false);
   const plantsQ = usePlants() as {
     data?: unknown[];
     isLoading?: boolean;
@@ -160,6 +168,11 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   const [saveStatus, setSaveStatus] = useState<string>("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoMeta, setVideoMeta] = useState<
+    { mime: string; sizeBytes: number; durationS: number } | null
+  >(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
   // Synchronous in-flight guard. `saving`/`feedingSaving` are React
@@ -244,6 +257,20 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     if (libraryInputRef.current) libraryInputRef.current.value = "";
   }
 
+  function resetVideoSelection() {
+    setVideoFile(null);
+    setVideoMeta(null);
+    if (videoPreview) {
+      try {
+        URL.revokeObjectURL(videoPreview);
+      } catch {
+        /* noop */
+      }
+    }
+    setVideoPreview(null);
+    if (videoInputRef.current) videoInputRef.current.value = "";
+  }
+
   useEffect(() => {
     if (open) {
       setForm({
@@ -259,6 +286,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       saveInFlightRef.current = false;
       idempotencyKeyRef.current = 1;
       resetPhotoSelection();
+      resetVideoSelection();
     }
   }, [open, defaultTargetKey]);
 
@@ -329,6 +357,74 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     if (!file) return;
     handlePhotoSelected(file);
     e.currentTarget.value = "";
+  }
+
+  async function handleVideoInputChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.currentTarget.files?.[0] ?? null;
+    e.currentTarget.value = "";
+    if (!file) return;
+    setSaveStatus("Checking video…");
+    const meta = await validateVideoAttachment(
+      file,
+      createBrowserVideoDurationProber(),
+    );
+    if (meta.ok !== true) {
+      setLocalError(meta.message);
+      setSaveStatus("");
+      return;
+    }
+    setVideoFile(file);
+    setVideoMeta({ mime: meta.mime, sizeBytes: meta.sizeBytes, durationS: meta.durationS });
+    setVideoPreview(URL.createObjectURL(file));
+    setLocalError(null);
+    setSaveStatus("Video selected. Add a note if helpful, then save.");
+  }
+
+  async function uploadQuickLogVideo(
+    growId: string,
+  ): Promise<{ ok: true; path: string } | { ok: false; message: string }> {
+    if (!videoFile) return { ok: false, message: "No video selected." };
+    if (!user) return { ok: false, message: "Sign in to attach videos." };
+    const ext = (videoFile.name.split(".").pop() || "mp4").toLowerCase();
+    const path = `${user.id}/${growId}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+      .from("diary-videos")
+      .upload(path, videoFile, {
+        contentType: videoFile.type,
+        upsert: false,
+      });
+    if (error) return { ok: false, message: `Video upload failed: ${error.message}` };
+    return { ok: true, path };
+  }
+
+  async function createVideoDiaryEntry(input: {
+    growId: string;
+    tentId: string | null;
+    plantId: string | null;
+    videoPath: string;
+    mime: string;
+    sizeBytes: number;
+    durationS: number;
+  }): Promise<{ ok: true } | { ok: false; message: string }> {
+    if (videoDiaryInFlightRef.current) {
+      return { ok: false, message: "Video diary entry already in progress." };
+    }
+    videoDiaryInFlightRef.current = true;
+    try {
+      return await createQuickLogVideoDiaryEntry({
+        growId: input.growId,
+        tentId: input.tentId,
+        plantId: input.plantId,
+        videoPath: input.videoPath,
+        mime: input.mime,
+        sizeBytes: input.sizeBytes,
+        durationS: input.durationS,
+        noteRaw: form.note,
+        action: form.action,
+      });
+    } finally {
+      videoDiaryInFlightRef.current = false;
+    }
   }
 
   async function uploadQuickLogPhoto(
@@ -543,7 +639,41 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       }
     }
 
-    const successMessage = photoFile ? "Log and photo saved" : "Log saved";
+    if (videoFile && videoMeta && resolved.growId) {
+      setSaveStatus("Uploading video…");
+      const upload = await uploadQuickLogVideo(resolved.growId);
+      if (!upload.ok) {
+        setLocalError((upload as { message: string }).message);
+        setSaveStatus("");
+        return;
+      }
+      const videoEntry = await createVideoDiaryEntry({
+        growId: resolved.growId,
+        tentId: resolved.tentId ?? null,
+        plantId: resolved.plantId ?? null,
+        videoPath: upload.path,
+        mime: videoMeta.mime,
+        sizeBytes: videoMeta.sizeBytes,
+        durationS: videoMeta.durationS,
+      });
+      if (!videoEntry.ok) {
+        await supabase.storage
+          .from("diary-videos")
+          .remove([upload.path])
+          .catch(() => {});
+        setLocalError((videoEntry as { message: string }).message);
+        setSaveStatus("");
+        return;
+      }
+    }
+
+    const successMessage = photoFile
+      ? videoFile
+        ? "Log, photo, and video saved"
+        : "Log and photo saved"
+      : videoFile
+        ? "Log and video saved"
+        : "Log saved";
     setSaveStatus(successMessage);
     showTimelineConfirmation(successMessage, {
       targetType: resolved.targetType as "plant" | "tent",
@@ -566,6 +696,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       source: "quick_log_v2",
     });
     resetPhotoSelection();
+    resetVideoSelection();
     setPostSave({
       growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
       targetType: resolved.targetType as "plant" | "tent",
@@ -596,6 +727,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
     setFeedingDefaultsApplied(false);
     resetPhotoSelection();
+    resetVideoSelection();
   }
 
   function handleViewTimeline() {
@@ -912,6 +1044,63 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
               />
             </div>
           )}
+
+          {form.action !== "feed" && (
+            <div
+              className="rounded-md border border-border p-3"
+              data-testid="qlv2-video-attachment"
+            >
+              <Label>Video attachment</Label>
+              {videoPreview ? (
+                <div className="mt-2 space-y-2">
+                  <video
+                    src={videoPreview}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="aspect-video w-full rounded-md bg-black"
+                    data-testid="qlv2-video-preview"
+                    aria-label="Selected Quick Log video preview"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={resetVideoSelection}
+                    data-testid="qlv2-video-remove"
+                    aria-label="Remove selected Quick Log video"
+                  >
+                    Remove video
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    aria-controls="qlv2-video-input"
+                    onClick={() => videoInputRef.current?.click()}
+                  >
+                    Choose video
+                  </Button>
+                  <p className="text-sm text-muted-foreground">
+                    MP4, MOV, or WebM. Max 60 seconds and 100 MB. Optional.
+                  </p>
+                </div>
+              )}
+              <input
+                ref={videoInputRef}
+                id="qlv2-video-input"
+                type="file"
+                accept={ALLOWED_VIDEO_MIME_TYPES.join(",")}
+                className="sr-only"
+                aria-label="Choose a video from your library"
+                tabIndex={-1}
+                onChange={handleVideoInputChange}
+                data-testid="qlv2-video-input"
+              />
+            </div>
+          )}
+
 
           {form.action !== "feed" && (
             <div>

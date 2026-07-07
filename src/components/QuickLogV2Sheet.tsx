@@ -970,34 +970,83 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
           </div>
 
           <div className="space-y-2 pt-2">
-            <p
-              id="qlv2-save-helper"
-              className="text-sm text-muted-foreground"
-              data-testid="qlv2-save-helper"
-            >
-              {saveHelper}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={() => onOpenChange(false)}
-                disabled={saving}
+            {postSave ? (
+              <div
+                role="status"
+                aria-live="polite"
+                data-testid="qlv2-post-save"
+                className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2"
               >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                className="flex-1"
-                onClick={handleSave}
-                disabled={saving || feedingSaving || contextBlocked}
-                aria-describedby="qlv2-save-helper"
-                data-testid="qlv2-save"
-              >
-                {saving || feedingSaving ? "Saving…" : "Save"}
-              </Button>
-            </div>
+                <p
+                  className="text-sm font-medium text-foreground"
+                  data-testid="qlv2-post-save-message"
+                >
+                  {postSave.message}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Choose your next step. Log another entry, view your timeline, or close.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    onClick={handleViewTimeline}
+                    data-testid="qlv2-post-save-view"
+                  >
+                    {QUICK_LOG_POST_SAVE_VIEW_LABEL}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleLogAnother}
+                    data-testid="qlv2-post-save-another"
+                  >
+                    {QUICK_LOG_POST_SAVE_ANOTHER_LABEL}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="flex-1"
+                    onClick={() => onOpenChange(false)}
+                    data-testid="qlv2-post-save-close"
+                  >
+                    {QUICK_LOG_POST_SAVE_CLOSE_LABEL}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p
+                  id="qlv2-save-helper"
+                  className="text-sm text-muted-foreground"
+                  data-testid="qlv2-save-helper"
+                >
+                  {saveHelper}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => onOpenChange(false)}
+                    disabled={saving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    onClick={handleSave}
+                    disabled={saving || feedingSaving || contextBlocked}
+                    aria-describedby="qlv2-save-helper"
+                    data-testid="qlv2-save"
+                  >
+                    {saving || feedingSaving ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </SheetContent>

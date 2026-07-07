@@ -9,11 +9,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  deleteStressObservation,
   insertStressObservation,
   listDiaryOptionsForOwner,
   listStressObservationsForHunt,
+  updateStressObservation,
   type DiaryOptionRow,
   type PhenoStressObservationRow,
+  type PhenoStressUpdateInput,
 } from "@/lib/pheno/phenoStressObservationsApi";
 import {
   summarizeStressForCandidate,

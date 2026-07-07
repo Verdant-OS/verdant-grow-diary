@@ -10,7 +10,7 @@
 import { Scissors } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { formatHarvestWeightForDisplay } from "@/lib/harvestDetailsRules";
+import { formatHarvestWeightWithOriginal } from "@/lib/harvestDetailsRules";
 import type { QuickLogHarvestDetails } from "@/constants/quickLogActivityTypes";
 
 export interface HarvestTimelineCardProps {

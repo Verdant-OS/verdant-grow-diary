@@ -169,20 +169,22 @@ describe("buildQuickLogSnapshotStrip", () => {
     }
   });
 
-  it("all non-none actions point to /sensors", () => {
+  it("all non-none actions point to a /sensors surface (navigation only)", () => {
     const allStatuses: Array<{
       snapshot: SensorSnapshot | null;
       hasTent: boolean;
       loading?: boolean;
+      expectedHref: string;
     }> = [
-      { snapshot: snap({ ts: hoursAgo(48) }), hasTent: true }, // stale
-      { snapshot: snap({ source: "sim" }), hasTent: true }, // invalid
-      { snapshot: null, hasTent: true, loading: true }, // no_data
+      { snapshot: snap({ ts: hoursAgo(48) }), hasTent: true, expectedHref: "/sensors" }, // stale → refresh
+      { snapshot: snap({ source: "sim" }), hasTent: true, expectedHref: "/sensors" }, // invalid → review
+      { snapshot: null, hasTent: true, loading: true, expectedHref: "/sensors#manual-reading" }, // no_data → add (deep link)
     ];
-    for (const args of allStatuses) {
+    for (const { expectedHref, ...args } of allStatuses) {
       const v = buildQuickLogSnapshotStrip({ ...args, now: NOW });
       if (v.action.kind !== "none") {
-        expect(v.action.href).toBe("/sensors");
+        expect(v.action.href).toBe(expectedHref);
+        expect(v.action.href.startsWith("/sensors")).toBe(true);
       }
     }
   });

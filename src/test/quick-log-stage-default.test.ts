@@ -41,6 +41,10 @@ describe("resolveQuickLogStageDefault", () => {
     );
   });
 
+  it("a curing plant ('cure') defaults to the drying/curing stage, not the grow fallback", () => {
+    expect(resolveQuickLogStageDefault({ plantStage: "cure", growStage: "veg" })).toBe("drying");
+  });
+
   it("uses the active grow stage ONLY when plant stage is unavailable", () => {
     expect(resolveQuickLogStageDefault({ plantStage: null, growStage: "flower" })).toBe("flower");
     expect(resolveQuickLogStageDefault({ plantStage: undefined, growStage: "flush" })).toBe(
@@ -84,6 +88,15 @@ describe("normalizeQuickLogStage", () => {
     expect(normalizeQuickLogStage("  vegetative  ")).toBe("veg");
     expect(normalizeQuickLogStage("Drying / Curing")).toBe("drying");
     expect(normalizeQuickLogStage("SEEDLING")).toBe("seedling");
+  });
+
+  it("maps the plant-side 'cure' stage to the canonical drying value", () => {
+    // CreatePlantDialog / EditPlantDialog offer stage "cure", but grow.STAGES
+    // uses "drying" (labeled "Drying / Curing"). A curing plant must still
+    // resolve rather than falling through to null.
+    expect(normalizeQuickLogStage("cure")).toBe("drying");
+    expect(normalizeQuickLogStage("Cure")).toBe("drying");
+    expect(normalizeQuickLogStage("  CURING ")).toBe("drying");
   });
 
   it("returns null for empty, whitespace, unknown text, and non-strings", () => {

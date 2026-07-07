@@ -347,6 +347,26 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   }
 
   const handleSave = async () => {
+    // Synchronous re-entry guard: prevents a rapid double-click from
+    // scheduling two RPC saves before React flips `saving` state.
+    if (
+      !shouldAllowQuickLogSave({
+        saving,
+        inFlight: saveInFlightRef.current,
+        postSaveShown: postSave !== null,
+      })
+    ) {
+      return;
+    }
+    saveInFlightRef.current = true;
+    try {
+      await runHandleSave();
+    } finally {
+      saveInFlightRef.current = false;
+    }
+  };
+
+  const runHandleSave = async () => {
     setLocalError(null);
     setSaveStatus("");
     const resolved = resolveQuickLogV2Target(options, form.selectedKey);

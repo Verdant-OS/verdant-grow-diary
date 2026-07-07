@@ -373,6 +373,23 @@ describe("validateBreedingCross", () => {
     expect(v({ crossType: "filial", channel: "sts", pollenReversed: true, generation: 2 })).toEqual(
       { ok: true, offspring: "feminized", label: "F2" },
     );
+    // Rodelization is ALSO a feminized channel — a chemically-reversed donor can
+    // still shed THIS batch via natural stress. Must NOT be rejected as if it
+    // were a natural-male channel (only standard_f1/sib/outcross/etc. — the ways
+    // that can NEVER be feminized — reject a feminized channel at all; filial and
+    // backcross can legitimately be feminized).
+    expect(
+      v({ crossType: "filial", channel: "rodelization", pollenReversed: true, generation: 2 }),
+    ).toEqual({ ok: true, offspring: "feminized", label: "F2" });
+    expect(
+      v({
+        crossType: "backcross",
+        channel: "rodelization",
+        pollenReversed: true,
+        hasRecurrentParent: true,
+        generation: 1,
+      }),
+    ).toEqual({ ok: true, offspring: "feminized", label: "BX1" });
   });
 
   it("selfing: requires self + reversed mother + a reversal channel", () => {

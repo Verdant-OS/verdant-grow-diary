@@ -127,16 +127,9 @@ describe("manual sensor correction — hash + visible UI safety", () => {
   });
 
   it("QuickLog strip shows Correct action with UUIDs only in href, never in visible text", () => {
-    const view = {
-      status: "ok" as const,
-      title: "Sensor snapshot",
-      providerLabel: "Manual",
-      lines: [],
-    };
     const { getByTestId } = render(
       <MemoryRouter>
         <QuickLogSensorSnapshotStrip
-          view={view as never}
           tentId={TENT}
           manualCapturedAt={CTX.originalCapturedAt}
           manualReadingIds={CTX.originalReadingIds}

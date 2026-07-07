@@ -231,6 +231,9 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       setFeedingDefaultsApplied(false);
       setLocalError(null);
       setSaveStatus("");
+      setPostSave(null);
+      saveInFlightRef.current = false;
+      idempotencyKeyRef.current = 1;
       resetPhotoSelection();
     }
   }, [open, defaultTargetKey]);

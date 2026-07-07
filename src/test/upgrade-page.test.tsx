@@ -233,7 +233,7 @@ describe("Upgrade page", () => {
     expect(allAnswers).toMatch(/autopilot/);
     expect(allAnswers).toMatch(/paddle/);
     expect(allAnswers).toMatch(/founder/);
-    expect(allAnswers).toMatch(/cancel|stops when your billing/);
+    expect(allAnswers).toMatch(/cancel|stop when your billing/);
   });
 
   it("renders plan comparison table with all four tier columns", () => {

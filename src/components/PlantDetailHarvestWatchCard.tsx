@@ -54,8 +54,19 @@ interface PlantDetailHarvestWatchCardProps {
    * between "No photos yet" and "N photo evidence points".
    */
   galleryPhotoCount?: number | null;
+  /**
+   * Source of the evidence data. "demo" makes the evidence explanation
+   * explicit about sample records; defaults to "unknown".
+   */
+  dataSource?: "live" | "demo" | "unknown" | null;
+  /**
+   * Anchor / URL for the "View related activity" CTA. Defaults to
+   * "#plant-recent-activity", matching the Recent Activity panel anchor.
+   */
+  supportingRecordsHref?: string | null;
   className?: string;
 }
+
 
 function trendLabel(trend: string): string {
   switch (trend) {

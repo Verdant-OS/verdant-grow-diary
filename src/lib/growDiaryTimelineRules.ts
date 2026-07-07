@@ -9,6 +9,7 @@
  */
 
 import { normalizeDiaryEntry, type NormalizedDiaryEntry } from "./diaryEntryRules";
+import { normalizeDiaryNoteText } from "./diaryNoteFormatting";
 
 // ---------------------------------------------------------------------------
 // Types

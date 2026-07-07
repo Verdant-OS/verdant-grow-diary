@@ -18,6 +18,7 @@ export type SexRevealAssessment =
   | "confirmed_male"
   | "confirmed_female"
   | "possible_herm"
+  | "reversed_female"
   | "likely_male"
   | "likely_female"
   | "unclear";
@@ -52,6 +53,15 @@ export interface SexRevealSignals {
   imageQuality: SexRevealImageQuality;
   nodesVisible: number;
   reproductiveStructureVisible: boolean;
+  /**
+   * True when the grower has DELIBERATELY reversed this female (STS / colloidal
+   * silver) to make pollen. Optional; defaults to false so existing callers are
+   * unchanged. When true, pollen structures on a female are the INTENDED result
+   * of reversal — not a herm — and must not be flagged as `possible_herm` or
+   * nudge toward culling. Real reversal state is supplied by later slices
+   * (B3/B4) from the pheno_reversals log; until then this stays false.
+   */
+  intentionalReversal?: boolean;
 }
 
 export interface SexRevealResult {
@@ -80,15 +90,21 @@ export const SEX_REVEAL_COPY = {
   possible_herm:
     "Possible hermaphrodite traits detected. Confirm with multiple " +
     "node/bud-site photos before taking irreversible action.",
+  reversed_female:
+    "Reversed female — the pollen sacs here are the intended result of a " +
+    "chemical reversal, not a herm. Collect pollen for a self (S1) or " +
+    "feminized cross, and keep it isolated from any unintended mothers.",
+  reversed_female_unconfirmed:
+    "Possible reversed-female pollen, but this photo is too weak to confirm. " +
+    "Capture a sharper, multi-node close-up BEFORE collecting any pollen — and " +
+    "do not treat this as a herm; the reversal was applied on purpose.",
   confirmed_male:
     "Confirmed male. Isolate from any flowering females if pollen risk " +
     "matters. Grower decides next steps.",
   confirmed_female:
-    "Confirmed female. Continue normal care and keep observing for any " +
-    "later herm traits.",
+    "Confirmed female. Continue normal care and keep observing for any " + "later herm traits.",
   likely_female:
-    "Likely female preflower — recheck multiple upper nodes in 24–48 " +
-    "hours to confirm.",
+    "Likely female preflower — recheck multiple upper nodes in 24–48 " + "hours to confirm.",
 } as const;
 
 export const DO_NOT_CULL_FROM_ONE_PHOTO =
@@ -121,7 +137,13 @@ workflow. Follow these rules strictly:
 - Never label "confirmed_female" unless clear pistils / white hairs are
   visible at multiple nodes.
 - If pistils AND pollen sacs (or banana-shaped structures) are both
-  visible, classify as "possible_herm" and ask for confirmation photos.
+  visible, classify as "possible_herm" and ask for confirmation photos —
+  UNLESS the grower recorded a deliberate reversal on this plant (next rule).
+- If the grower recorded a DELIBERATE reversal (STS / colloidal silver) on
+  this plant, pollen sacs on a female are the INTENDED result: classify as
+  "reversed_female", never "possible_herm", and never suggest culling. On a
+  weak, blurry, or single-node photo, keep it review-required and ask for a
+  sharper close-up before advising any pollen collection.
 - If the only feature is a rounded preflower with no pistils, classify
   as "likely_male" — not confirmed_male.
 - If pistils are visible at only one node with no other evidence,
@@ -150,6 +172,12 @@ function normalize(sig: SexRevealSignals): SexRevealSignals {
     imageQuality: sig.imageQuality ?? "low_detail",
     nodesVisible: clampNonNeg(sig.nodesVisible),
     reproductiveStructureVisible: Boolean(sig.reproductiveStructureVisible),
+    // A SAFETY OVERRIDE (it suppresses the herm/cull path), so only a literal
+    // boolean `true` enables it — NOT any truthy value. Boolean("false") /
+    // Boolean("0") are `true`, so a decoded form/JSON/model payload string
+    // could otherwise flip the override on for a plant the caller meant as
+    // not-reversed. Callers must parse to a real boolean before classifying.
+    intentionalReversal: sig.intentionalReversal === true,
   };
 }
 
@@ -166,22 +194,16 @@ function isPoorImage(sig: SexRevealSignals): boolean {
 // Public classifier
 // ---------------------------------------------------------------------------
 
-export function classifySexReveal(
-  rawSignals: SexRevealSignals,
-): SexRevealResult {
+export function classifySexReveal(rawSignals: SexRevealSignals): SexRevealResult {
   const sig = normalize(rawSignals);
   const evidence: string[] = [];
   const missing: string[] = [];
 
   if (sig.pistilNodeCount > 0) {
-    evidence.push(
-      `Pistils visible at ${sig.pistilNodeCount} node(s).`,
-    );
+    evidence.push(`Pistils visible at ${sig.pistilNodeCount} node(s).`);
   }
   if (sig.pollenSacNodeCount > 0) {
-    evidence.push(
-      `Pollen sacs / rounded clusters visible at ${sig.pollenSacNodeCount} node(s).`,
-    );
+    evidence.push(`Pollen sacs / rounded clusters visible at ${sig.pollenSacNodeCount} node(s).`);
   }
   if (sig.bananaStructures) {
     evidence.push("Banana-shaped (nanner) structures visible.");
@@ -202,20 +224,72 @@ export function classifySexReveal(
     missing.push("Any visible preflower / reproductive structure.");
   }
 
+  const showsPollenStructures = sig.pollenSacNodeCount > 0 || sig.bananaStructures;
+
+  // ----- Intentional reversal wins over the herm branch -----------------
+  // A grower who chemically reversed this female WANTS it to make pollen.
+  // Pollen structures are the intended result, so this must NOT be flagged as
+  // a possible herm (which would nudge toward culling the very plant the
+  // grower is breeding with). Only fires once pollen is actually showing —
+  // pistils-only means the reversal has not produced pollen yet, so fall
+  // through to the normal female classification.
+  //
+  // Weak-evidence discipline still applies. A CONFIRMED reversal read (the one
+  // that says "collect pollen now" with no review) needs the same strength the
+  // rest of the classifier demands, PLUS actual female evidence:
+  //   - multi-node pollen sacs (>= 2, matching confirmed_male),
+  //   - a usable image, AND
+  //   - visible pistils (female evidence).
+  // The reversal override is for pollen ON A FEMALE. Without any pistils, a
+  // 2+-pollen-sac / no-pistil plant is what the classifier otherwise calls a
+  // confirmed MALE — so even with the reversal flag set, absent female
+  // evidence we must NOT confidently present real-male pollen as feminized or
+  // push collection. Single-node pollen, banana-only, a poor image, or no
+  // pistils all keep the reversed_female framing (never nudge a cull on a
+  // grower-flagged plant) but stay review-required and ask to confirm first.
+  if (sig.intentionalReversal && showsPollenStructures) {
+    const hasFemaleEvidence = sig.pistilNodeCount > 0;
+    const confirmed = sig.pollenSacNodeCount >= 2 && hasFemaleEvidence && !isPoorImage(sig);
+    return {
+      assessment: "reversed_female",
+      confidence: confirmed ? "high" : "low",
+      evidence: [...evidence, "Grower recorded a deliberate reversal on this plant."],
+      missing_information: confirmed
+        ? missing
+        : [
+            ...missing,
+            "A sharper photo confirming pollen sacs at 2+ nodes before collecting.",
+            ...(hasFemaleEvidence
+              ? []
+              : ["Female pistils to confirm this is the reversed female and not a male."]),
+          ],
+      // Only the confirmed read carries the "collect pollen" instruction; weak
+      // or single-node evidence must not nudge collection before confirmation.
+      immediate_action: confirmed
+        ? SEX_REVEAL_COPY.reversed_female
+        : SEX_REVEAL_COPY.reversed_female_unconfirmed,
+      what_not_to_do: [
+        "Do not cull — these pollen structures are the intended result of the reversal.",
+        "Do not treat this as a hermaphrodite; the reversal was applied on purpose.",
+        "Do not let this pollen reach any unintended mothers — keep it isolated.",
+      ],
+      follow_up: confirmed
+        ? "Collect pollen once the sacs mature and apply it to the intended seed " +
+          "mother (a self / S1 or a feminized cross)."
+        : "Capture a sharper close-up confirming pollen sacs at 2+ nodes before collecting.",
+      review_recommended: !confirmed,
+    };
+  }
+
   // ----- Herm trait wins over single-sex confirmation -------------------
-  const hasHermSignal =
-    sig.pistilNodeCount > 0 &&
-    (sig.pollenSacNodeCount > 0 || sig.bananaStructures);
+  const hasHermSignal = sig.pistilNodeCount > 0 && showsPollenStructures;
 
   if (hasHermSignal) {
     return {
       assessment: "possible_herm",
       confidence: isPoorImage(sig) ? "low" : "medium",
       evidence,
-      missing_information: [
-        ...missing,
-        "Confirmation photos of multiple nodes and bud sites.",
-      ],
+      missing_information: [...missing, "Confirmation photos of multiple nodes and bud sites."],
       immediate_action: SEX_REVEAL_COPY.possible_herm,
       what_not_to_do: [
         ...SHARED_WHAT_NOT_TO_DO_UNCERTAIN,
@@ -229,11 +303,7 @@ export function classifySexReveal(
   }
 
   // ----- Confirmed male: multi-node pollen sacs, no pistils -------------
-  if (
-    sig.pollenSacNodeCount >= 2 &&
-    sig.pistilNodeCount === 0 &&
-    !isPoorImage(sig)
-  ) {
+  if (sig.pollenSacNodeCount >= 2 && sig.pistilNodeCount === 0 && !isPoorImage(sig)) {
     return {
       assessment: "confirmed_male",
       confidence: "high",
@@ -244,8 +314,7 @@ export function classifySexReveal(
         "Do not place near flowering females unless pollination is the goal.",
         "Do not assume herm status without banana structures or pistils.",
       ],
-      follow_up:
-        "Keep isolated or remove from the flowering tent per grower decision.",
+      follow_up: "Keep isolated or remove from the flowering tent per grower decision.",
       review_recommended: false,
     };
   }
@@ -263,9 +332,7 @@ export function classifySexReveal(
       evidence,
       missing_information: missing,
       immediate_action: SEX_REVEAL_COPY.confirmed_female,
-      what_not_to_do: [
-        "Do not assume herm status without banana structures or sacs.",
-      ],
+      what_not_to_do: ["Do not assume herm status without banana structures or sacs."],
       follow_up:
         "Continue normal care; keep observing upper nodes and bud sites " +
         "for any later herm traits.",
@@ -279,59 +346,39 @@ export function classifySexReveal(
       assessment: "unclear",
       confidence: "low",
       evidence,
-      missing_information: missing.length
-        ? missing
-        : ["Sharper photos of multiple upper nodes."],
+      missing_information: missing.length ? missing : ["Sharper photos of multiple upper nodes."],
       immediate_action: SEX_REVEAL_COPY.unclear,
       what_not_to_do: [...SHARED_WHAT_NOT_TO_DO_UNCERTAIN],
-      follow_up:
-        "Capture sharper close-ups of 2–3 upper nodes and recheck in " +
-        "24–48 hours.",
+      follow_up: "Capture sharper close-ups of 2–3 upper nodes and recheck in " + "24–48 hours.",
       review_recommended: true,
     };
   }
 
   // ----- Likely male: rounded preflower, no pistils ---------------------
-  if (
-    sig.earlyRoundedNodeOnly &&
-    sig.pistilNodeCount === 0 &&
-    sig.pollenSacNodeCount < 2
-  ) {
+  if (sig.earlyRoundedNodeOnly && sig.pistilNodeCount === 0 && sig.pollenSacNodeCount < 2) {
     return {
       assessment: "likely_male",
       confidence: sig.pollenSacNodeCount === 1 ? "medium" : "low",
       evidence,
-      missing_information: [
-        ...missing,
-        "Confirmation of pollen sacs across multiple nodes.",
-      ],
+      missing_information: [...missing, "Confirmation of pollen sacs across multiple nodes."],
       immediate_action: SEX_REVEAL_COPY.likely_male,
       what_not_to_do: [...SHARED_WHAT_NOT_TO_DO_UNCERTAIN],
       follow_up:
-        "Recheck 2–3 upper nodes within 24–48 hours; isolate only if " +
-        "pollen risk matters.",
+        "Recheck 2–3 upper nodes within 24–48 hours; isolate only if " + "pollen risk matters.",
       review_recommended: true,
     };
   }
 
   // ----- Likely female: pistils at one node, no sacs --------------------
-  if (
-    sig.pistilNodeCount === 1 &&
-    sig.pollenSacNodeCount === 0 &&
-    !sig.bananaStructures
-  ) {
+  if (sig.pistilNodeCount === 1 && sig.pollenSacNodeCount === 0 && !sig.bananaStructures) {
     return {
       assessment: "likely_female",
       confidence: "low",
       evidence,
-      missing_information: [
-        ...missing,
-        "Pistils confirmed at additional upper nodes.",
-      ],
+      missing_information: [...missing, "Pistils confirmed at additional upper nodes."],
       immediate_action: SEX_REVEAL_COPY.likely_female,
       what_not_to_do: [...SHARED_WHAT_NOT_TO_DO_UNCERTAIN],
-      follow_up:
-        "Recheck 2–3 upper nodes within 24–48 hours to confirm female.",
+      follow_up: "Recheck 2–3 upper nodes within 24–48 hours to confirm female.",
       review_recommended: true,
     };
   }
@@ -341,14 +388,10 @@ export function classifySexReveal(
     assessment: "unclear",
     confidence: "low",
     evidence,
-    missing_information: missing.length
-      ? missing
-      : ["Sharper photos of multiple upper nodes."],
+    missing_information: missing.length ? missing : ["Sharper photos of multiple upper nodes."],
     immediate_action: SEX_REVEAL_COPY.unclear,
     what_not_to_do: [...SHARED_WHAT_NOT_TO_DO_UNCERTAIN],
-    follow_up:
-      "Capture sharper close-ups of 2–3 upper nodes and recheck in " +
-      "24–48 hours.",
+    follow_up: "Capture sharper close-ups of 2–3 upper nodes and recheck in " + "24–48 hours.",
     review_recommended: true,
   };
 }

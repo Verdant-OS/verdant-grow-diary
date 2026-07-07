@@ -402,6 +402,24 @@ export function validateBreedingCross(input: BreedingCrossInput): BreedingCrossV
     };
   }
 
+  // A CHEMICAL reversal channel (CS/STS/GA3) needs a reversed pollen donor — the
+  // pollen literally comes from a reversed female. The selfing/feminized branches
+  // above already enforce this; this closes a feminized filial/backcross (e.g. an
+  // F2 or BX made with STS pollen). Rodelization is natural stress, so exempt.
+  const chemicalReversal = channel === "colloidal_silver" || channel === "sts" || channel === "ga3";
+  if (
+    chemicalReversal &&
+    crossType !== "selfing_s1" &&
+    crossType !== "selfing_sn" &&
+    !input.pollenReversed
+  ) {
+    return {
+      ok: false,
+      reason:
+        "A reversal channel needs a reversed pollen donor — the pollen must come from a reversed female.",
+    };
+  }
+
   return {
     ok: true,
     offspring: feminizationFromChannel(channel, crossType),

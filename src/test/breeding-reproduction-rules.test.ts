@@ -443,6 +443,22 @@ describe("validateBreedingCross", () => {
     ).toBe(false);
   });
 
+  it("a feminized filial/backcross (chemical channel) needs a reversed pollen donor", () => {
+    // An F2 made with STS pollen is feminized, so the donor must be reversed.
+    expect(
+      v({ crossType: "filial", channel: "sts", generation: 2, pollenReversed: false }).ok,
+    ).toBe(false);
+    expect(v({ crossType: "filial", channel: "sts", generation: 2, pollenReversed: true })).toEqual(
+      { ok: true, offspring: "feminized", label: "F2" },
+    );
+    // A regular F2 (natural male) needs no reversed donor.
+    expect(v({ crossType: "filial", channel: "natural_male", generation: 2 })).toEqual({
+      ok: true,
+      offspring: "regular",
+      label: "F2",
+    });
+  });
+
   it("filial (F2+) needs a generation of 2 or more; a reversal channel makes it feminized", () => {
     expect(v({ crossType: "filial", generation: 1 }).ok).toBe(false);
     expect(v({ crossType: "filial", generation: 2 })).toEqual({
@@ -450,10 +466,12 @@ describe("validateBreedingCross", () => {
       offspring: "regular",
       label: "F2",
     });
-    expect(v({ crossType: "filial", channel: "sts", generation: 2 })).toEqual({
-      ok: true,
-      offspring: "feminized",
-      label: "F2",
-    });
+    expect(v({ crossType: "filial", channel: "sts", generation: 2, pollenReversed: true })).toEqual(
+      {
+        ok: true,
+        offspring: "feminized",
+        label: "F2",
+      },
+    );
   });
 });

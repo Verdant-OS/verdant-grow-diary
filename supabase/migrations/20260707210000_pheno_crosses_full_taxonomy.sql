@@ -24,10 +24,13 @@
 -- 1. New columns
 -- ---------------------------------------------------------------------------
 
+-- recurrent_parent_id CASCADEs like the female/male parents: deleting a keeper
+-- removes the crosses that reference it (SET NULL would strand a backcross with
+-- a null recurrent parent, violating pheno_crosses_recurrent_parent_by_type).
 ALTER TABLE public.pheno_crosses
   ADD COLUMN channel text,
   ADD COLUMN generation integer,
-  ADD COLUMN recurrent_parent_id uuid REFERENCES public.pheno_keepers(id) ON DELETE SET NULL;
+  ADD COLUMN recurrent_parent_id uuid REFERENCES public.pheno_keepers(id) ON DELETE CASCADE;
 
 -- channel: null (unspecified / legacy) or one of the six canonical routes.
 ALTER TABLE public.pheno_crosses
@@ -36,10 +39,16 @@ ALTER TABLE public.pheno_crosses
     OR channel IN ('natural_male', 'colloidal_silver', 'sts', 'ga3', 'rodelization', 'open_pollination')
   );
 
--- generation: null, or a positive F#/S#/BX# number.
+-- generation is TYPE-AWARE (mirrors validateBreedingCross): F2+/S2+ need >= 2,
+-- BX needs >= 1, and every non-generation way must leave it NULL. Legacy rows
+-- (the original 3 ways) have generation NULL and take the ELSE branch.
 ALTER TABLE public.pheno_crosses
   ADD CONSTRAINT pheno_crosses_generation_check CHECK (
-    generation IS NULL OR generation >= 1
+    CASE
+      WHEN cross_type IN ('filial', 'selfing_sn') THEN generation IS NOT NULL AND generation >= 2
+      WHEN cross_type IN ('backcross', 'feminized_bx') THEN generation IS NOT NULL AND generation >= 1
+      ELSE generation IS NULL
+    END
   );
 
 -- ---------------------------------------------------------------------------
@@ -73,7 +82,12 @@ ALTER TABLE public.pheno_crosses
 ALTER TABLE public.pheno_crosses
   ADD CONSTRAINT pheno_crosses_parents_by_type CHECK (
     (cross_type IN ('selfing_s1', 'selfing_sn') AND male_keeper_id IS NULL)
-    OR (cross_type = 'open_pollination')
+    -- Open pollination: the male parent may be absent, but if one is named it
+    -- must still be a DISTINCT keeper (never the mother herself).
+    OR (
+      cross_type = 'open_pollination'
+      AND (male_keeper_id IS NULL OR male_keeper_id <> female_keeper_id)
+    )
     OR (
       cross_type NOT IN ('selfing_s1', 'selfing_sn', 'open_pollination')
       AND male_keeper_id IS NOT NULL
@@ -81,10 +95,12 @@ ALTER TABLE public.pheno_crosses
     )
   );
 
--- A backcross must name the recurrent parent it crosses back to.
+-- A backcross MUST name the recurrent parent it crosses back to; every other
+-- way must leave it NULL (the column is meaningless off a backcross).
 ALTER TABLE public.pheno_crosses
-  ADD CONSTRAINT pheno_crosses_recurrent_parent_required CHECK (
-    cross_type NOT IN ('backcross', 'feminized_bx') OR recurrent_parent_id IS NOT NULL
+  ADD CONSTRAINT pheno_crosses_recurrent_parent_by_type CHECK (
+    (cross_type IN ('backcross', 'feminized_bx') AND recurrent_parent_id IS NOT NULL)
+    OR (cross_type NOT IN ('backcross', 'feminized_bx') AND recurrent_parent_id IS NULL)
   );
 
 -- ---------------------------------------------------------------------------
@@ -129,46 +145,67 @@ CREATE POLICY "pheno_crosses_insert_own"
     )
     AND (
       CASE
-        -- Selfing (S1/Sn): the mother pollinates itself, so she must be reversed,
-        -- and the channel must be a reversal method (or NULL, for legacy rows) —
-        -- never a natural male or open pollination.
-        WHEN cross_type IN ('selfing_s1', 'selfing_sn') THEN
-          (channel IS NULL OR channel IN ('colloidal_silver', 'sts', 'ga3', 'rodelization'))
-          AND EXISTS (
-            SELECT 1 FROM public.pheno_reversals r
-            WHERE r.keeper_id = female_keeper_id AND r.user_id = auth.uid()
-          )
-        -- Feminized crosses: reversed-female pollen onto another female, so the
-        -- channel must be a reversal method (or NULL, legacy). A CHEMICAL reversal
-        -- requires the pollen donor to have a reversal on record; rodelization is
-        -- natural stress and carries none.
-        WHEN cross_type IN ('feminized_cross', 'feminized_bx') THEN
-          (channel IS NULL OR channel IN ('colloidal_silver', 'sts', 'ga3', 'rodelization'))
-          AND (
-            channel = 'rodelization'
-            OR (
-              male_keeper_id IS NOT NULL AND EXISTS (
-                SELECT 1 FROM public.pheno_reversals r
-                WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
-              )
+        -- A CHEMICAL reversal channel (colloidal silver / STS / GA3) is what
+        -- makes feminized pollen, so the pollen SOURCE must have a reversal on
+        -- record — the mother for a self, the male donor otherwise. This is the
+        -- same requirement for a feminized cross AND a feminized filial/BX.
+        WHEN channel IN ('colloidal_silver', 'sts', 'ga3') THEN
+          (
+            cross_type IN ('selfing_s1', 'selfing_sn')
+            AND EXISTS (
+              SELECT 1 FROM public.pheno_reversals r
+              WHERE r.keeper_id = female_keeper_id AND r.user_id = auth.uid()
             )
           )
-        -- Filial (F2+) and backcross MAY legitimately be feminized (made with
-        -- reversal pollen) or regular, so they carry no reversal-record or
-        -- channel requirement — validateBreedingCross is their primary guard.
-        WHEN cross_type IN ('filial', 'backcross') THEN
-          TRUE
-        -- Every remaining regular way (standard_f1, ibl, sib_cross, outcross,
-        -- line_cross, test_cross, reciprocal_cross, three_way_cross,
-        -- open_pollination): the pollen must be a real male, so a reversal
-        -- channel (which makes feminized pollen) is forbidden AND the donor must
-        -- NOT be reversed. This preserves the original standard_f1 guard for ALL
-        -- channels, not only the channel-less path.
-        ELSE
-          (channel IS NULL OR channel NOT IN ('colloidal_silver', 'sts', 'ga3', 'rodelization'))
+          OR (
+            cross_type NOT IN ('selfing_s1', 'selfing_sn')
+            AND male_keeper_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1 FROM public.pheno_reversals r
+              WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+            )
+          )
+        -- Rodelization: feminized pollen from natural self-stress, so no reversal
+        -- record — but valid only for the ways that can be feminized.
+        WHEN channel = 'rodelization' THEN
+          cross_type IN (
+            'selfing_s1', 'selfing_sn', 'feminized_cross', 'feminized_bx', 'filial', 'backcross'
+          )
+        -- Natural male / open pollination: real male pollen, so an inherently-
+        -- feminized way is invalid here and the donor must NOT be reversed.
+        WHEN channel IN ('natural_male', 'open_pollination') THEN
+          cross_type NOT IN ('selfing_s1', 'selfing_sn', 'feminized_cross', 'feminized_bx')
           AND NOT EXISTS (
             SELECT 1 FROM public.pheno_reversals r
             WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+          )
+        -- Channel-less (legacy / current service): preserve the original 3-type
+        -- guard EXACTLY, require the reversal for the new inherently-feminized
+        -- types, and allow the remaining regular/feminizable ways.
+        ELSE
+          (
+            cross_type = 'standard_f1' AND NOT EXISTS (
+              SELECT 1 FROM public.pheno_reversals r
+              WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+            )
+          )
+          OR (
+            cross_type IN ('selfing_s1', 'selfing_sn') AND EXISTS (
+              SELECT 1 FROM public.pheno_reversals r
+              WHERE r.keeper_id = female_keeper_id AND r.user_id = auth.uid()
+            )
+          )
+          OR (
+            cross_type IN ('feminized_cross', 'feminized_bx')
+            AND male_keeper_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1 FROM public.pheno_reversals r
+              WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+            )
+          )
+          OR cross_type IN (
+            'filial', 'ibl', 'backcross', 'sib_cross', 'outcross', 'line_cross',
+            'open_pollination', 'test_cross', 'reciprocal_cross', 'three_way_cross'
           )
       END
     )
@@ -203,46 +240,67 @@ CREATE POLICY "pheno_crosses_update_own"
     )
     AND (
       CASE
-        -- Selfing (S1/Sn): the mother pollinates itself, so she must be reversed,
-        -- and the channel must be a reversal method (or NULL, for legacy rows) —
-        -- never a natural male or open pollination.
-        WHEN cross_type IN ('selfing_s1', 'selfing_sn') THEN
-          (channel IS NULL OR channel IN ('colloidal_silver', 'sts', 'ga3', 'rodelization'))
-          AND EXISTS (
-            SELECT 1 FROM public.pheno_reversals r
-            WHERE r.keeper_id = female_keeper_id AND r.user_id = auth.uid()
-          )
-        -- Feminized crosses: reversed-female pollen onto another female, so the
-        -- channel must be a reversal method (or NULL, legacy). A CHEMICAL reversal
-        -- requires the pollen donor to have a reversal on record; rodelization is
-        -- natural stress and carries none.
-        WHEN cross_type IN ('feminized_cross', 'feminized_bx') THEN
-          (channel IS NULL OR channel IN ('colloidal_silver', 'sts', 'ga3', 'rodelization'))
-          AND (
-            channel = 'rodelization'
-            OR (
-              male_keeper_id IS NOT NULL AND EXISTS (
-                SELECT 1 FROM public.pheno_reversals r
-                WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
-              )
+        -- A CHEMICAL reversal channel (colloidal silver / STS / GA3) is what
+        -- makes feminized pollen, so the pollen SOURCE must have a reversal on
+        -- record — the mother for a self, the male donor otherwise. This is the
+        -- same requirement for a feminized cross AND a feminized filial/BX.
+        WHEN channel IN ('colloidal_silver', 'sts', 'ga3') THEN
+          (
+            cross_type IN ('selfing_s1', 'selfing_sn')
+            AND EXISTS (
+              SELECT 1 FROM public.pheno_reversals r
+              WHERE r.keeper_id = female_keeper_id AND r.user_id = auth.uid()
             )
           )
-        -- Filial (F2+) and backcross MAY legitimately be feminized (made with
-        -- reversal pollen) or regular, so they carry no reversal-record or
-        -- channel requirement — validateBreedingCross is their primary guard.
-        WHEN cross_type IN ('filial', 'backcross') THEN
-          TRUE
-        -- Every remaining regular way (standard_f1, ibl, sib_cross, outcross,
-        -- line_cross, test_cross, reciprocal_cross, three_way_cross,
-        -- open_pollination): the pollen must be a real male, so a reversal
-        -- channel (which makes feminized pollen) is forbidden AND the donor must
-        -- NOT be reversed. This preserves the original standard_f1 guard for ALL
-        -- channels, not only the channel-less path.
-        ELSE
-          (channel IS NULL OR channel NOT IN ('colloidal_silver', 'sts', 'ga3', 'rodelization'))
+          OR (
+            cross_type NOT IN ('selfing_s1', 'selfing_sn')
+            AND male_keeper_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1 FROM public.pheno_reversals r
+              WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+            )
+          )
+        -- Rodelization: feminized pollen from natural self-stress, so no reversal
+        -- record — but valid only for the ways that can be feminized.
+        WHEN channel = 'rodelization' THEN
+          cross_type IN (
+            'selfing_s1', 'selfing_sn', 'feminized_cross', 'feminized_bx', 'filial', 'backcross'
+          )
+        -- Natural male / open pollination: real male pollen, so an inherently-
+        -- feminized way is invalid here and the donor must NOT be reversed.
+        WHEN channel IN ('natural_male', 'open_pollination') THEN
+          cross_type NOT IN ('selfing_s1', 'selfing_sn', 'feminized_cross', 'feminized_bx')
           AND NOT EXISTS (
             SELECT 1 FROM public.pheno_reversals r
             WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+          )
+        -- Channel-less (legacy / current service): preserve the original 3-type
+        -- guard EXACTLY, require the reversal for the new inherently-feminized
+        -- types, and allow the remaining regular/feminizable ways.
+        ELSE
+          (
+            cross_type = 'standard_f1' AND NOT EXISTS (
+              SELECT 1 FROM public.pheno_reversals r
+              WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+            )
+          )
+          OR (
+            cross_type IN ('selfing_s1', 'selfing_sn') AND EXISTS (
+              SELECT 1 FROM public.pheno_reversals r
+              WHERE r.keeper_id = female_keeper_id AND r.user_id = auth.uid()
+            )
+          )
+          OR (
+            cross_type IN ('feminized_cross', 'feminized_bx')
+            AND male_keeper_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1 FROM public.pheno_reversals r
+              WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+            )
+          )
+          OR cross_type IN (
+            'filial', 'ibl', 'backcross', 'sib_cross', 'outcross', 'line_cross',
+            'open_pollination', 'test_cross', 'reciprocal_cross', 'three_way_cross'
           )
       END
     )

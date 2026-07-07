@@ -18,10 +18,22 @@ import {
   reversalMethodLabel,
   isCrossType,
   isReversalMethod,
+  isChannel,
+  channelLabel,
+  isFeminizedChannel,
+  feminizationFromChannel,
+  crossTypeDisplay,
+  crossTypeName,
+  isFeminizedCrossType,
+  requiresRecurrentParent,
+  requiresGeneration,
+  validateBreedingCross,
   CROSS_TYPES,
+  CHANNELS,
   REVERSAL_METHODS,
   type CrossParticipants,
   type CrossClassification,
+  type BreedingCrossInput,
 } from "@/lib/genetics/breedingReproductionRules";
 
 const reversed = (id: string) => [{ keeperId: id }];
@@ -210,5 +222,189 @@ describe("type guards + label helpers", () => {
     expect(reversalMethodLabel("colloidal_silver")).toMatch(/Colloidal/);
     expect(reversalMethodLabel("mystery")).toBe("Reversal");
     expect(reversalMethodLabel(null)).toBe("Reversal");
+  });
+});
+
+describe("channels", () => {
+  it("isChannel accepts canonical channels and rejects junk", () => {
+    for (const c of CHANNELS) expect(isChannel(c)).toBe(true);
+    expect(isChannel("magic")).toBe(false);
+    expect(isChannel(null)).toBe(false);
+  });
+
+  it("channelLabel is safe for unknown values", () => {
+    expect(channelLabel("sts")).toMatch(/STS/);
+    expect(channelLabel("natural_male")).toMatch(/male/i);
+    expect(channelLabel("mystery")).toBe("Pollen");
+  });
+
+  it("only reversal channels are feminized (natural male + open are not)", () => {
+    expect(isFeminizedChannel("colloidal_silver")).toBe(true);
+    expect(isFeminizedChannel("sts")).toBe(true);
+    expect(isFeminizedChannel("ga3")).toBe(true);
+    expect(isFeminizedChannel("rodelization")).toBe(true);
+    expect(isFeminizedChannel("natural_male")).toBe(false);
+    expect(isFeminizedChannel("open_pollination")).toBe(false);
+  });
+});
+
+describe("feminizationFromChannel", () => {
+  it("derives feminization from the channel", () => {
+    expect(feminizationFromChannel("sts")).toBe("feminized");
+    expect(feminizationFromChannel("natural_male")).toBe("regular");
+    expect(feminizationFromChannel("open_pollination")).toBe("regular");
+  });
+
+  it("an inherently-feminized way is feminized even if the channel is omitted", () => {
+    expect(feminizationFromChannel(null, "selfing_s1")).toBe("feminized");
+    expect(feminizationFromChannel("natural_male", "feminized_cross")).toBe("feminized");
+  });
+
+  it("a filial or backcross made with reversal pollen is feminized", () => {
+    expect(feminizationFromChannel("sts", "filial")).toBe("feminized");
+    expect(feminizationFromChannel("natural_male", "filial")).toBe("regular");
+  });
+});
+
+describe("crossTypeDisplay + metadata helpers", () => {
+  it("applies the generation to F#/S#/BX# ways and leaves others alone", () => {
+    expect(crossTypeDisplay("standard_f1")).toBe("F1");
+    expect(crossTypeDisplay("filial", 3)).toBe("F3");
+    expect(crossTypeDisplay("filial", null)).toBe("F2"); // min for filial
+    expect(crossTypeDisplay("selfing_sn", 2)).toBe("S2");
+    expect(crossTypeDisplay("backcross", 2)).toBe("BX2");
+    expect(crossTypeDisplay("backcross", null)).toBe("BX1"); // min for BX
+    expect(crossTypeDisplay("feminized_bx", 1)).toBe("Fem BX1");
+    expect(crossTypeDisplay("sib_cross")).toBe("Sib");
+  });
+
+  it("crossTypeName is safe for unknown values", () => {
+    expect(crossTypeName("backcross")).toMatch(/Backcross/);
+    expect(crossTypeName("nonsense")).toBe("Cross");
+  });
+
+  it("flags feminized ways, recurrent-parent ways, and generation-carrying ways", () => {
+    expect(isFeminizedCrossType("selfing_s1")).toBe(true);
+    expect(isFeminizedCrossType("feminized_bx")).toBe(true);
+    expect(isFeminizedCrossType("standard_f1")).toBe(false);
+    expect(requiresRecurrentParent("backcross")).toBe(true);
+    expect(requiresRecurrentParent("feminized_bx")).toBe(true);
+    expect(requiresRecurrentParent("standard_f1")).toBe(false);
+    expect(requiresGeneration("filial")).toBe(true);
+    expect(requiresGeneration("backcross")).toBe(true);
+    expect(requiresGeneration("standard_f1")).toBe(false);
+  });
+});
+
+describe("validateBreedingCross", () => {
+  const base: BreedingCrossInput = {
+    crossType: "standard_f1",
+    channel: "natural_male",
+    isSelf: false,
+    femaleReversed: false,
+    pollenReversed: false,
+    hasRecurrentParent: false,
+    generation: null,
+  };
+  const v = (over: Partial<BreedingCrossInput>) => validateBreedingCross({ ...base, ...over });
+
+  it("accepts a standard F1 with a natural male", () => {
+    expect(v({})).toEqual({ ok: true, offspring: "regular", label: "F1" });
+  });
+
+  it("rejects a standard/sib/outcross ridden on a reversal channel (that would be feminized)", () => {
+    for (const crossType of ["standard_f1", "sib_cross", "outcross", "line_cross"] as const) {
+      const r = v({ crossType, channel: "sts" });
+      expect(r.ok).toBe(false);
+      if (r.ok === false) expect(r.reason).toMatch(/feminized|reversal/i);
+    }
+  });
+
+  it("selfing: requires self + reversed mother + a reversal channel", () => {
+    expect(
+      v({ crossType: "selfing_s1", channel: "sts", isSelf: true, femaleReversed: true }),
+    ).toEqual({
+      ok: true,
+      offspring: "feminized",
+      label: "S1",
+    });
+    expect(
+      v({ crossType: "selfing_s1", channel: "sts", isSelf: false, femaleReversed: true }).ok,
+    ).toBe(false);
+    expect(
+      v({ crossType: "selfing_s1", channel: "sts", isSelf: true, femaleReversed: false }).ok,
+    ).toBe(false);
+    expect(
+      v({ crossType: "selfing_s1", channel: "natural_male", isSelf: true, femaleReversed: true })
+        .ok,
+    ).toBe(false);
+  });
+
+  it("S2+ selfing needs a generation of 2 or more", () => {
+    expect(
+      v({
+        crossType: "selfing_sn",
+        channel: "sts",
+        isSelf: true,
+        femaleReversed: true,
+        generation: 1,
+      }).ok,
+    ).toBe(false);
+    expect(
+      v({
+        crossType: "selfing_sn",
+        channel: "sts",
+        isSelf: true,
+        femaleReversed: true,
+        generation: 2,
+      }),
+    ).toEqual({ ok: true, offspring: "feminized", label: "S2" });
+  });
+
+  it("feminized cross: different female + reversal channel", () => {
+    expect(v({ crossType: "feminized_cross", channel: "colloidal_silver" })).toEqual({
+      ok: true,
+      offspring: "feminized",
+      label: "Fem F1",
+    });
+    expect(v({ crossType: "feminized_cross", channel: "colloidal_silver", isSelf: true }).ok).toBe(
+      false,
+    );
+    expect(v({ crossType: "feminized_cross", channel: "natural_male" }).ok).toBe(false);
+  });
+
+  it("backcross: needs a recurrent parent and a BX generation", () => {
+    expect(v({ crossType: "backcross", hasRecurrentParent: false, generation: 1 }).ok).toBe(false);
+    expect(v({ crossType: "backcross", hasRecurrentParent: true, generation: null }).ok).toBe(
+      false,
+    );
+    expect(v({ crossType: "backcross", hasRecurrentParent: true, generation: 2 })).toEqual({
+      ok: true,
+      offspring: "regular",
+      label: "BX2",
+    });
+  });
+
+  it("feminized backcross: reversal channel + recurrent parent", () => {
+    expect(
+      v({ crossType: "feminized_bx", channel: "sts", hasRecurrentParent: true, generation: 1 }),
+    ).toEqual({ ok: true, offspring: "feminized", label: "Fem BX1" });
+    expect(
+      v({ crossType: "feminized_bx", channel: "sts", hasRecurrentParent: false, generation: 1 }).ok,
+    ).toBe(false);
+  });
+
+  it("filial (F2+) needs a generation of 2 or more; a reversal channel makes it feminized", () => {
+    expect(v({ crossType: "filial", generation: 1 }).ok).toBe(false);
+    expect(v({ crossType: "filial", generation: 2 })).toEqual({
+      ok: true,
+      offspring: "regular",
+      label: "F2",
+    });
+    expect(v({ crossType: "filial", channel: "sts", generation: 2 })).toEqual({
+      ok: true,
+      offspring: "feminized",
+      label: "F2",
+    });
   });
 });

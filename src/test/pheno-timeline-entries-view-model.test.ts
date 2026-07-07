@@ -35,6 +35,16 @@ describe("buildPhenoTimelineEntries — mapping", () => {
     expect(e.badge).toBe("Female");
   });
 
+  it("prefixes a sex observation with its candidate label when provided", () => {
+    const [e] = buildPhenoTimelineEntries({
+      sexObservations: [
+        { id: "s3", sex: "female", candidateLabel: "GMO #2", observedAt: "2026-07-01T00:00:00Z" },
+      ],
+    });
+    expect(e.title).toBe("GMO #2 — Sex recorded: Female");
+    expect(e.badge).toBe("Female");
+  });
+
   it("maps a keeper decision with candidate label and badge", () => {
     const [e] = buildPhenoTimelineEntries({
       keeperDecisions: [

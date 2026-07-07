@@ -39,6 +39,8 @@ export interface SexObservationInput {
   readonly id: string;
   readonly sex: string;
   readonly hermObserved?: boolean | null;
+  /** Candidate this observation is for — disambiguates multi-candidate hunts. */
+  readonly candidateLabel?: string | null;
   readonly note?: string | null;
   readonly observedAt?: string | null;
   readonly createdAt?: string | null;
@@ -98,11 +100,14 @@ function keeperNameOf(input: PhenoTimelineInput, id: string): string {
 function sexEntry(o: SexObservationInput): PhenoTimelineEntry {
   const herm = o.hermObserved === true || o.sex === "hermaphrodite";
   const sexLabel = SEX_LABEL[o.sex] ?? o.sex ?? "Unknown";
+  const who = o.candidateLabel && o.candidateLabel.trim() !== "" ? o.candidateLabel : null;
+  const base = herm ? "Hermaphrodite traits observed" : `Sex recorded: ${sexLabel}`;
   return {
     id: `sex:${o.id}`,
     kind: "sex_observation",
     occurredAt: o.observedAt ?? o.createdAt ?? null,
-    title: herm ? "Hermaphrodite traits observed" : `Sex recorded: ${sexLabel}`,
+    // Prefix with the candidate label so multi-candidate hunts aren't ambiguous.
+    title: who ? `${who} — ${base}` : base,
     detail: o.note ?? null,
     badge: herm ? "Herm" : sexLabel,
   };

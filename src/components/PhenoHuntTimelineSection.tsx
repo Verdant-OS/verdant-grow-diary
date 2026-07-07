@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { deletePhenoHunt, PhenoHuntError } from "@/lib/phenoHuntService";
+import { usePhenoHuntActivity } from "@/hooks/usePhenoHuntActivity";
+import PhenoTimelineEntries from "@/components/PhenoTimelineEntries";
 import { plantDetailPath } from "@/lib/routes";
 import { toast } from "sonner";
 
@@ -39,6 +41,10 @@ export default function PhenoHuntTimelineSection({ growId }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [removed, setRemoved] = useState(false);
+
+  // Read-only pheno activity (sex reveals, keeper decisions, reversals, crosses)
+  // for the resolved hunt. Stays idle until the hunt id is known.
+  const activity = usePhenoHuntActivity(hunt?.id ?? null);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,8 +155,8 @@ export default function PhenoHuntTimelineSection({ growId }: Props) {
         >
           <p className="text-sm font-medium mb-1">Delete this Pheno Hunt?</p>
           <p className="text-xs text-muted-foreground mb-3">
-            This removes the Pheno Hunt record and untags linked plants. It
-            will not delete plants, logs, photos, or timeline history.
+            This removes the Pheno Hunt record and untags linked plants. It will not delete plants,
+            logs, photos, or timeline history.
           </p>
           <div className="flex items-center gap-2">
             <Button
@@ -200,6 +206,15 @@ export default function PhenoHuntTimelineSection({ growId }: Props) {
             </li>
           ))}
         </ul>
+      )}
+
+      {activity.entries.length > 0 && (
+        <div className="mt-4 border-t border-border/40 pt-3" data-testid="pheno-hunt-activity">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            Pheno activity
+          </h3>
+          <PhenoTimelineEntries entries={activity.entries} />
+        </div>
       )}
     </section>
   );

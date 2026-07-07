@@ -1,0 +1,62 @@
+name: Dependency & Security CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Read-only workflow: no secrets used, no artifacts uploaded that could
+# contain tokens. See scripts/check-dependency-security.mjs for the
+# redaction contract on any surfaced audit text.
+permissions:
+  contents: read
+
+jobs:
+  security:
+    name: Lockfile policy, dependency audit, typecheck, build, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      # 1. Text-lockfile discipline: bun.lock only, exact pin for
+      #    @lovable.dev/mcp-js, no binary/npm/yarn/pnpm lockfiles.
+      - name: Lockfile policy check
+        run: bun run check:lockfile
+
+      # 2. Dependency security scan. Fails on any advisory for
+      #    @lovable.dev/mcp-js, esbuild, ajv, or any high/critical
+      #    finding. See scripts/check-dependency-security.mjs.
+      - name: Dependency security scan
+        run: bun run check:deps
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Build
+        run: bun run build
+
+      - name: Unit tests
+        run: bunx vitest run
+
+      # Playwright smoke suite (chromium project against the built app).
+      # `--project` is a no-op when the project name doesn't exist in
+      # playwright.config.ts; adjust the project name to match the repo's
+      # smoke project as needed.
+      - name: Install Playwright browsers (chromium only)
+        run: bunx playwright install --with-deps chromium
+
+      - name: Playwright smoke suite
+        run: bunx playwright test --project=chromium-mocked
+        continue-on-error: false

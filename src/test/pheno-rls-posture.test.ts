@@ -72,10 +72,14 @@ const APPEND_ONLY_TABLES = [
 
 const ALL_TABLES = [...MUTABLE_TABLES, ...APPEND_ONLY_TABLES];
 
-describe("every pheno table: RLS enabled + owner-scoped read/write", () => {
+describe("every pheno table: RLS enabled (never disabled) + owner-scoped read/write", () => {
   for (const t of ALL_TABLES) {
-    it(`${t}: RLS on; SELECT and INSERT policies are owner-scoped`, () => {
+    it(`${t}: RLS on, never disabled; SELECT/INSERT owner-scoped; NO permissive policy`, () => {
       expect(flat).toMatch(new RegExp(`ALTER TABLE public\\.${t} ENABLE ROW LEVEL SECURITY`));
+      // A later DISABLE would remove RLS even though the ENABLE lingers — reject it.
+      expect(flat).not.toMatch(
+        new RegExp(`ALTER TABLE public\\.${t} DISABLE ROW LEVEL SECURITY`, "i"),
+      );
       const policies = policiesOn(t);
       const ownerScoped = (kind: string) =>
         policies.some(
@@ -83,6 +87,14 @@ describe("every pheno table: RLS enabled + owner-scoped read/write", () => {
         );
       expect(ownerScoped("SELECT")).toBe(true);
       expect(ownerScoped("INSERT")).toBe(true);
+      // Postgres OR-combines permissive policies, so a single broad policy
+      // (e.g. FOR SELECT USING (true)) alongside the owner one exposes the
+      // table. Require EVERY pheno policy to carry the owner gate and reject any
+      // bare `true` USING/WITH CHECK.
+      for (const p of policies) {
+        expect(p).toMatch(/auth\.uid\(\) = user_id/);
+        expect(p).not.toMatch(/(USING|WITH CHECK)\s*\(\s*true\s*\)/i);
+      }
     });
   }
 });
@@ -98,10 +110,16 @@ describe("OPERATORS are excluded from every pheno table (private breeding IP)", 
   }
 });
 
-describe("no pheno table is exposed to the anon role", () => {
+describe("no pheno table is exposed to the anon or PUBLIC role", () => {
   for (const t of ALL_TABLES) {
-    it(`${t}: no GRANT … TO anon`, () => {
-      for (const g of grantsOn(t)) expect(g).not.toMatch(/TO anon\b/i);
+    it(`${t}: no grant reaches anon (anywhere in the grantee list) or PUBLIC`, () => {
+      for (const g of grantsOn(t)) {
+        // `TO authenticated, anon` and `TO PUBLIC` both expose the table to
+        // unauthenticated callers — reject anon anywhere and a grant to the
+        // PUBLIC role. (Match `TO PUBLIC`, NOT the `public.` schema qualifier.)
+        expect(g).not.toMatch(/\banon\b/i);
+        expect(g).not.toMatch(/\bTO\s+PUBLIC\b/i);
+      }
     });
   }
 });

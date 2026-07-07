@@ -167,6 +167,31 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
   },
 ];
 
+/**
+ * Resolve the concrete feature list shown for a tier.
+ *
+ * Pro Annual inherits Pro Monthly features. Founder Lifetime inherits Pro
+ * Monthly features plus founder-specific perks. Free and Pro Monthly return
+ * their own configured features. Unknown tier IDs return an empty list.
+ */
+export function resolveTierFeatures(tierId: string): string[] {
+  const tier = PRICING_TIERS.find((t) => t.id === tierId);
+  if (!tier) return [];
+
+  if (tierId === "pro_annual") {
+    const pro = PRICING_TIERS.find((t) => t.id === "pro_monthly");
+    return pro ? pro.features : tier.features;
+  }
+
+  if (tierId === "founder_lifetime") {
+    const pro = PRICING_TIERS.find((t) => t.id === "pro_monthly");
+    const base = pro ? pro.features : tier.features;
+    return [...base, "Founder badge & early-supporter perks"];
+  }
+
+  return tier.features;
+}
+
 export interface UpgradeFaqItem {
   q: string;
   a: string;

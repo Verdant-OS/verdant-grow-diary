@@ -235,3 +235,114 @@ describe("recordCross — classifies via reversal state", () => {
     expect((await recordCross({ femaleKeeperId: "mom", maleKeeperId: "dad" })).ok).toBe(false);
   });
 });
+
+describe("recordCross — explicit taxonomy path (validateBreedingCross)", () => {
+  it("persists a regular filial (F2) with channel + generation", async () => {
+    h.client = makeSupabase({ reversedKeeperIds: [] });
+    const r = await recordCross({
+      femaleKeeperId: "mom",
+      maleKeeperId: "dad",
+      crossType: "filial",
+      channel: "natural_male",
+      generation: 2,
+    });
+    expect(r.ok).toBe(true);
+    expect(h.client.crossInserts[0]).toMatchObject({
+      cross_type: "filial",
+      channel: "natural_male",
+      generation: 2,
+      male_keeper_id: "dad",
+      recurrent_parent_id: null,
+    });
+  });
+
+  it("persists a backcross with its recurrent parent + BX generation", async () => {
+    h.client = makeSupabase({ reversedKeeperIds: [] });
+    const r = await recordCross({
+      femaleKeeperId: "mom",
+      maleKeeperId: "dad",
+      crossType: "backcross",
+      channel: "natural_male",
+      generation: 1,
+      recurrentParentId: "recur",
+    });
+    expect(r.ok).toBe(true);
+    expect(h.client.crossInserts[0]).toMatchObject({
+      cross_type: "backcross",
+      generation: 1,
+      recurrent_parent_id: "recur",
+    });
+  });
+
+  it("persists a feminized BX (chemical channel + reversed donor)", async () => {
+    h.client = makeSupabase({ reversedKeeperIds: ["dad"] });
+    const r = await recordCross({
+      femaleKeeperId: "mom",
+      maleKeeperId: "dad",
+      crossType: "feminized_bx",
+      channel: "sts",
+      generation: 1,
+      recurrentParentId: "recur",
+    });
+    expect(r.ok).toBe(true);
+    expect(h.client.crossInserts[0]).toMatchObject({ cross_type: "feminized_bx", channel: "sts" });
+  });
+
+  it("persists an S2 self (null male) when the mother is reversed", async () => {
+    h.client = makeSupabase({ reversedKeeperIds: ["mom"] });
+    const r = await recordCross({
+      femaleKeeperId: "mom",
+      maleKeeperId: null,
+      crossType: "selfing_sn",
+      channel: "sts",
+      generation: 2,
+    });
+    expect(r.ok).toBe(true);
+    expect(h.client.crossInserts[0]).toMatchObject({
+      cross_type: "selfing_sn",
+      male_keeper_id: null,
+      generation: 2,
+    });
+  });
+
+  it("requires a channel on the explicit path", async () => {
+    h.client = makeSupabase({ reversedKeeperIds: [] });
+    const r = await recordCross({
+      femaleKeeperId: "mom",
+      maleKeeperId: "dad",
+      crossType: "filial",
+      generation: 2,
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok === false) expect(r.error).toMatch(/channel/i);
+    expect(h.client.crossInserts.length).toBe(0);
+  });
+
+  it("REJECTS a backcross with no recurrent parent (nothing persisted)", async () => {
+    h.client = makeSupabase({ reversedKeeperIds: [] });
+    const r = await recordCross({
+      femaleKeeperId: "mom",
+      maleKeeperId: "dad",
+      crossType: "backcross",
+      channel: "natural_male",
+      generation: 1,
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok === false) expect(r.error).toMatch(/recurrent parent/i);
+    expect(h.client.crossInserts.length).toBe(0);
+  });
+
+  it("REJECTS a feminized filial made with chemical pollen from an UNreversed donor", async () => {
+    h.client = makeSupabase({ reversedKeeperIds: [] });
+    const r = await recordCross({
+      femaleKeeperId: "mom",
+      maleKeeperId: "dad",
+      crossType: "filial",
+      channel: "sts",
+      generation: 2,
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok === false) expect(r.error).toMatch(/revers/i);
+    expect(h.client.crossInserts.length).toBe(0);
+  });
+});

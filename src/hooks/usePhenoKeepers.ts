@@ -18,7 +18,11 @@ import {
   type CloneRow,
   type CrossRow,
 } from "@/lib/phenoKeepersService";
-import { recordReversal, listReversedKeeperIdsForKeepers } from "@/lib/phenoReversalsService";
+import {
+  recordReversal,
+  listReversalsForKeepers,
+  type ReversalRow,
+} from "@/lib/phenoReversalsService";
 
 export type KeepersStatus = "idle" | "loading" | "ok" | "error";
 
@@ -29,6 +33,8 @@ export interface UsePhenoKeepersState {
   keepers: KeeperRow[];
   clonesByKeeper: Record<string, CloneRow[]>;
   crosses: CrossRow[];
+  /** Full reversal rows for this hunt's keepers (for the activity timeline). */
+  reversals: ReversalRow[];
   /** Keeper ids the grower has recorded a reversal for (derived state). */
   reversedKeeperIds: string[];
   error: string | null;
@@ -57,6 +63,7 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
   const [keepers, setKeepers] = useState<KeeperRow[]>([]);
   const [clonesByKeeper, setClonesByKeeper] = useState<Record<string, CloneRow[]>>({});
   const [crosses, setCrosses] = useState<CrossRow[]>([]);
+  const [reversals, setReversals] = useState<ReversalRow[]>([]);
   const [reversedKeeperIds, setReversedKeeperIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -84,11 +91,12 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
       ]);
       const keeperIds = keeperRows.map((k) => k.id);
       // Scope the reversal read to this hunt's keepers, not every reversal.
-      const [clones, reversedIds] = await Promise.all([
+      const [clones, reversalRows] = await Promise.all([
         listClonesForKeepers(keeperIds),
-        listReversedKeeperIdsForKeepers(keeperIds),
+        listReversalsForKeepers(keeperIds),
       ]);
       if (cancelled) return;
+      const reversedIds = [...new Set(reversalRows.map((r) => r.keeperId))];
       const byKeeper: Record<string, CloneRow[]> = {};
       for (const c of clones) (byKeeper[c.keeperId] ??= []).push(c);
       setHunt(result.hunt);
@@ -96,6 +104,7 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
       setKeepers(keeperRows);
       setClonesByKeeper(byKeeper);
       setCrosses(crossRows);
+      setReversals(reversalRows);
       setReversedKeeperIds(reversedIds);
       setStatus("ok");
     })().catch(() => {
@@ -184,6 +193,7 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
     keepers,
     clonesByKeeper,
     crosses,
+    reversals,
     reversedKeeperIds,
     error,
     saving,

@@ -50,14 +50,14 @@ export default function HarvestTimelineCard({
   plantDayLabel,
   stageDayLabel,
 }: HarvestTimelineCardProps) {
-  const wetDisplay = formatHarvestWeightForDisplay(
-    harvest?.wetWeight ?? null,
-    harvest?.weightUnit ?? null,
-  );
-  const dryDisplay = formatHarvestWeightForDisplay(
-    harvest?.dryWeight ?? null,
-    harvest?.weightUnit ?? null,
-  );
+  const wetDisplay = formatHarvestWeightWithOriginal({
+    wetOrDry: "wet",
+    details: harvest ?? null,
+  });
+  const dryDisplay = formatHarvestWeightWithOriginal({
+    wetOrDry: "dry",
+    details: harvest ?? null,
+  });
   const trimmedNote =
     typeof note === "string" && note.trim().length > 0 ? note.trim() : null;
   const hasContext = Boolean(

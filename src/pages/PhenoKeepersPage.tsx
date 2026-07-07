@@ -432,7 +432,7 @@ export default function PhenoKeepersPage() {
                     data-testid={`pheno-cross-badge-${x.id}`}
                     className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium"
                   >
-                    {crossLineageBadge(x.crossType)}
+                    {crossLineageBadge(x.crossType, x.generation, x.channel)}
                   </span>
                 </li>
               );

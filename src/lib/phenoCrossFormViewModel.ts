@@ -14,7 +14,8 @@ import {
   classifyCross,
   isKeeperReversed,
   isCrossType,
-  lineageLabel,
+  isFeminizedChannel,
+  crossTypeDisplay,
   REVERSAL_METHODS,
   reversalMethodLabel,
   type CrossClassification,
@@ -121,8 +122,26 @@ export function buildCrossFormViewModel(input: CrossFormInput): CrossFormViewMod
   };
 }
 
-/** Short lineage badge for a recorded cross type. */
-export function crossLineageBadge(crossType: string): string {
+/**
+ * Short lineage badge for a recorded cross type — GENERATION- and
+ * FEMINIZATION-aware. An F5 must never render identically to an F2, and a
+ * feminized backcross (reversal-channel pollen) must never render identically
+ * to a regular mixed-sex one — a breeder plants these expecting very different
+ * sex ratios.
+ *
+ *  - Legacy 3 types keep their original exact badges (never carry a
+ *    generation or a feminizing channel — validateBreedingCross forbids it).
+ *  - Everything else routes through crossTypeDisplay(crossType, generation)
+ *    for the real "F5"/"BX3"/"S4" (feminized_bx already renders "Fem BX#").
+ *  - filial/backcross are the only ways that are REGULAR by default but CAN
+ *    be feminized via a reversal-channel donor; when so, prefix "Fem " so it
+ *    is never confused with a regular-pollen cross of the same generation.
+ */
+export function crossLineageBadge(
+  crossType: string,
+  generation?: number | null,
+  channel?: string | null,
+): string {
   switch (crossType) {
     case "selfing_s1":
       return "S1 / Selfed";
@@ -130,9 +149,13 @@ export function crossLineageBadge(crossType: string): string {
       return "Feminized";
     case "standard_f1":
       return "F1";
-    default:
-      // The rest of the taxonomy (filial/backcross/…) shows its short label.
-      return isCrossType(crossType) ? lineageLabel(crossType) : "Cross";
+    default: {
+      if (!isCrossType(crossType)) return "Cross";
+      const base = crossTypeDisplay(crossType, generation);
+      const canBeFeminizedByChannel = crossType === "filial" || crossType === "backcross";
+      if (canBeFeminizedByChannel && isFeminizedChannel(channel)) return `Fem ${base}`;
+      return base;
+    }
   }
 }
 

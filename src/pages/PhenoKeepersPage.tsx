@@ -19,6 +19,10 @@ import {
 } from "@/lib/phenoCrossFormViewModel";
 import { buildPhenoTimelineEntries } from "@/lib/phenoTimelineEntriesViewModel";
 import PhenoTimelineEntries from "@/components/PhenoTimelineEntries";
+import { buildCloneTreeRows } from "@/lib/phenoCloneTreeViewModel";
+
+/** Depth → indent class (capped) so the clone lineage nests without inline styles. */
+const CLONE_INDENT = ["pl-0", "pl-3", "pl-6", "pl-9", "pl-12"] as const;
 
 export default function PhenoKeepersPage() {
   const { id } = useParams<{ id: string }>();
@@ -201,9 +205,31 @@ export default function PhenoKeepersPage() {
                 <div className="text-xs">
                   <span className="font-medium">
                     Clones ({ks.clonesByKeeper[view.keeperId]?.length ?? 0}):
-                  </span>{" "}
-                  {(ks.clonesByKeeper[view.keeperId] ?? []).map((c) => c.cloneLabel).join(", ") ||
-                    "none yet"}
+                  </span>
+                  {(() => {
+                    const rows = buildCloneTreeRows(ks.clonesByKeeper[view.keeperId] ?? []);
+                    if (rows.length === 0) {
+                      return <span className="text-muted-foreground"> none yet</span>;
+                    }
+                    return (
+                      <ul
+                        data-testid={`keeper-clone-tree-${view.keeperId}`}
+                        className="mt-1 space-y-0.5"
+                      >
+                        {rows.map((r) => (
+                          <li
+                            key={r.id}
+                            data-testid={`keeper-clone-node-${r.id}`}
+                            data-depth={r.depth}
+                            className={CLONE_INDENT[Math.min(r.depth, CLONE_INDENT.length - 1)]}
+                          >
+                            {r.depth > 0 && <span className="text-muted-foreground">└ </span>}
+                            {r.label}
+                          </li>
+                        ))}
+                      </ul>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-2">
                   <input

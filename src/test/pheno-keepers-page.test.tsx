@@ -26,7 +26,7 @@ function keeper(id: string, name: string) {
     sourcePlantId: `${id}-src`,
     keeperName: name,
     note: null,
-    createdAt: null,
+    createdAt: null, channel: null, generation: null, recurrentParentId: null,
   };
 }
 
@@ -243,7 +243,7 @@ describe("PhenoKeepersPage — B4 reproduction UI", () => {
           crossName: "Gas S1",
           note: null,
           crossedAt: null,
-          createdAt: null,
+          createdAt: null, channel: null, generation: null, recurrentParentId: null,
         },
       ],
     });
@@ -265,7 +265,7 @@ describe("PhenoKeepersPage — B4 reproduction UI", () => {
           crossName: null,
           note: null,
           crossedAt: null,
-          createdAt: null,
+          createdAt: null, channel: null, generation: null, recurrentParentId: null,
         },
         {
           id: "x2",
@@ -275,7 +275,7 @@ describe("PhenoKeepersPage — B4 reproduction UI", () => {
           crossName: null,
           note: null,
           crossedAt: null,
-          createdAt: null,
+          createdAt: null, channel: null, generation: null, recurrentParentId: null,
         },
       ],
     });
@@ -295,7 +295,7 @@ describe("PhenoKeepersPage — breeding activity timeline (C3)", () => {
           method: "sts",
           note: null,
           appliedAt: "2026-07-06T00:00:00Z",
-          createdAt: "2026-07-06T00:00:00Z",
+          createdAt: "2026-07-06T00:00:00Z", channel: null, generation: null, recurrentParentId: null,
         },
       ],
       crosses: [
@@ -307,7 +307,7 @@ describe("PhenoKeepersPage — breeding activity timeline (C3)", () => {
           crossName: "Gas S1",
           note: null,
           crossedAt: "2026-07-07T00:00:00Z",
-          createdAt: "2026-07-07T00:00:00Z",
+          createdAt: "2026-07-07T00:00:00Z", channel: null, generation: null, recurrentParentId: null,
         },
       ],
       reversedKeeperIds: ["k1"],

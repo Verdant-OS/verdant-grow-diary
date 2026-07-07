@@ -68,6 +68,30 @@ export default function BreedingProgramNew() {
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
+            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Default cultivars
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Prefills the maternal P1 label, lineage, and notes. You can edit every
+                field before saving.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {DEFAULT_CULTIVARS.map((cv) => (
+                  <Button
+                    key={cv.id}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    data-testid={`default-cultivar-${cv.id}`}
+                    onClick={() => applyDefaultCultivar(cv)}
+                  >
+                    {cv.cultivarName}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
             <div className="space-y-1">
               <Label htmlFor="name">Program name</Label>
               <Input
@@ -78,6 +102,7 @@ export default function BreedingProgramNew() {
                 required
               />
             </div>
+
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">

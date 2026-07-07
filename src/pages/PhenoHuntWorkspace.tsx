@@ -803,6 +803,16 @@ export default function PhenoHuntWorkspace() {
         onPersist={stress.save}
         summaries={stressSummaries}
       />
+      <PhenoStressObservationsList
+        rows={stress.rows}
+        candidates={candidates.map((c) => ({
+          candidateId: c.candidateId,
+          candidateLabel: c.candidateLabel,
+        }))}
+        diaryOptions={stress.diaryOptions}
+        onUpdate={stress.update}
+        onDelete={stress.remove}
+      />
       <PhenoProductSamplingSection />
       <PhenoSamplingWorkspaceTools
         candidates={candidates.map((c) => ({

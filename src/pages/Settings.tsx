@@ -411,7 +411,10 @@ export default function Settings() {
 
         {user?.id ? <StartScreenTile userId={user.id} /> : null}
 
+        <SubscriptionTile />
+
         <TemperatureUnitTile />
+
 
         <Tile name="Notifications" state="coming_soon">
           <p className="text-sm text-muted-foreground">

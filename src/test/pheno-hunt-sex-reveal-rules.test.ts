@@ -33,9 +33,7 @@ function expectAlwaysHasContext(res: SexRevealResult) {
 
 describe("classifySexReveal", () => {
   it("requires multiple pollen-sac nodes for confirmed_male", () => {
-    const single = classifySexReveal(
-      sig({ pollenSacNodeCount: 1, earlyRoundedNodeOnly: true }),
-    );
+    const single = classifySexReveal(sig({ pollenSacNodeCount: 1, earlyRoundedNodeOnly: true }));
     expect(single.assessment).not.toBe("confirmed_male");
 
     const many = classifySexReveal(sig({ pollenSacNodeCount: 3 }));
@@ -58,17 +56,13 @@ describe("classifySexReveal", () => {
   });
 
   it("returns unclear for blurry / single-node / no-feature inputs", () => {
-    const blurry = classifySexReveal(
-      sig({ imageQuality: "blurry", pollenSacNodeCount: 3 }),
-    );
+    const blurry = classifySexReveal(sig({ imageQuality: "blurry", pollenSacNodeCount: 3 }));
     expect(blurry.assessment).toBe("unclear");
 
     const oneNode = classifySexReveal(sig({ nodesVisible: 1 }));
     expect(oneNode.assessment).toBe("unclear");
 
-    const noFeature = classifySexReveal(
-      sig({ reproductiveStructureVisible: false }),
-    );
+    const noFeature = classifySexReveal(sig({ reproductiveStructureVisible: false }));
     expect(noFeature.assessment).toBe("unclear");
 
     for (const r of [blurry, oneNode, noFeature]) {
@@ -88,18 +82,49 @@ describe("classifySexReveal", () => {
   });
 
   it("pistils + pollen sacs → possible_herm", () => {
-    const res = classifySexReveal(
-      sig({ pistilNodeCount: 2, pollenSacNodeCount: 1 }),
-    );
+    const res = classifySexReveal(sig({ pistilNodeCount: 2, pollenSacNodeCount: 1 }));
     expect(res.assessment).toBe("possible_herm");
     expect(res.immediate_action).toBe(SEX_REVEAL_COPY.possible_herm);
   });
 
   it("pistils + banana structures → possible_herm", () => {
-    const res = classifySexReveal(
-      sig({ pistilNodeCount: 2, bananaStructures: true }),
-    );
+    const res = classifySexReveal(sig({ pistilNodeCount: 2, bananaStructures: true }));
     expect(res.assessment).toBe("possible_herm");
+  });
+
+  // ----- Part B (B1): intentional reversal must not read as a herm ---------
+  it("intentional reversal: pistils + pollen sacs → reversed_female, NOT possible_herm", () => {
+    const res = classifySexReveal(
+      sig({ pistilNodeCount: 2, pollenSacNodeCount: 2, intentionalReversal: true }),
+    );
+    expect(res.assessment).toBe("reversed_female");
+    expect(res.assessment).not.toBe("possible_herm");
+    expect(res.immediate_action).toBe(SEX_REVEAL_COPY.reversed_female);
+  });
+
+  it("intentional reversal never nudges toward culling and needs no review", () => {
+    const res = classifySexReveal(
+      sig({ pistilNodeCount: 2, bananaStructures: true, intentionalReversal: true }),
+    );
+    expect(res.assessment).toBe("reversed_female");
+    expect(res.review_recommended).toBe(false);
+    expect(res.what_not_to_do.some((s) => /do not cull/i.test(s))).toBe(true);
+    expectAlwaysHasContext(res);
+  });
+
+  it("WITHOUT the reversal flag, the same signals still read as possible_herm (default unchanged)", () => {
+    const res = classifySexReveal(sig({ pistilNodeCount: 2, pollenSacNodeCount: 2 }));
+    expect(res.assessment).toBe("possible_herm");
+  });
+
+  it("reversal flag but no pollen yet (pistils only) falls through to normal female classification", () => {
+    const res = classifySexReveal(
+      sig({ pistilNodeCount: 3, pollenSacNodeCount: 0, intentionalReversal: true }),
+    );
+    // No pollen structures means the reversal hasn't produced pollen; it must
+    // NOT claim reversed_female prematurely.
+    expect(res.assessment).not.toBe("reversed_female");
+    expect(res.assessment).toBe("confirmed_female");
   });
 
   it("never produces high confidence from weak evidence", () => {
@@ -174,21 +199,14 @@ describe("classifySexReveal", () => {
 
   it("exports a non-empty reusable prompt instruction block", () => {
     expect(SEX_REVEAL_PROMPT_INSTRUCTION.length).toBeGreaterThan(100);
-    expect(SEX_REVEAL_PROMPT_INSTRUCTION.toLowerCase()).toContain(
-      "never confirm plant sex",
-    );
+    expect(SEX_REVEAL_PROMPT_INSTRUCTION.toLowerCase()).toContain("never confirm plant sex");
   });
 });
 
 describe("phenoHuntSexRevealRules — static safety", () => {
-  const src = readFileSync(
-    resolve(process.cwd(), "src/lib/phenoHuntSexRevealRules.ts"),
-    "utf8",
-  );
+  const src = readFileSync(resolve(process.cwd(), "src/lib/phenoHuntSexRevealRules.ts"), "utf8");
   // Strip comments so docstrings don't trigger false positives.
-  const code = src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
   it("imports no AI / alerts / action-queue / device modules", () => {
     expect(code).not.toMatch(/from\s+["']@\/lib\/ai/);

@@ -29,17 +29,14 @@ vi.mock("@/hooks/useInsertManualSnapshotEdit", () => ({
 vi.mock("@/lib/insertManualSensorReadingReturningId", () => ({
   insertManualSensorReadingReturningId: vi.fn(),
 }));
-// The strip fetches its own state; return a manual, fresh snapshot so
-// the "Correct manual reading" affordance is eligible to render.
+// The strip fetches its own state; return an empty loader state so the
+// strict-metrics builder is not exercised. The "Correct manual reading"
+// affordance is driven by props, not by loader state, so it still
+// renders when the caller supplies real reading IDs.
 vi.mock("@/lib/sensor", () => ({
   useLatestTentSensorSnapshot: () => ({
-    status: "ready" as const,
-    snapshot: {
-      source: "manual",
-      captured_at: "2026-07-01T12:00:00.000Z",
-      temperature_c: 24,
-      humidity_pct: 58,
-    },
+    status: "empty" as const,
+    snapshot: { status: "empty", captured_at: null, source: null, metrics: {} },
   }),
 }));
 

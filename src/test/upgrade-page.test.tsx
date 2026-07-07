@@ -99,6 +99,16 @@ beforeEach(() => {
   paddleMock.checkoutOpen.mockReset();
   tierOverride.founderClaimed = 0;
   tierOverride.proMonthlyPriceId = "pri_pro_month";
+  // Mutate live pricing tiers so all paid CTAs are active by default; individual
+  // tests can override `tierOverride.*` (applied before renderPage()).
+  for (const t of PRICING_TIERS) {
+    if (t.id === "pro_monthly") t.paddlePriceId = tierOverride.proMonthlyPriceId;
+    if (t.id === "pro_annual") t.paddlePriceId = "pri_pro_annual";
+    if (t.id === "founder_lifetime") {
+      t.paddlePriceId = "pri_founder";
+      t.cap = { total: 75, claimed: tierOverride.founderClaimed };
+    }
+  }
   installFakePaddle();
 });
 

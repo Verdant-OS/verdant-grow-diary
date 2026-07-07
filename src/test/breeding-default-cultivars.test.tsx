@@ -6,7 +6,7 @@
  * the form's parent/cultivar fields.
  */
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
@@ -41,9 +41,8 @@ describe("BreedingProgramNew · default cultivars", () => {
 
   it("renders a quick-pick button for each default without any typing", () => {
     renderPage();
-    const section = screen.getByText(/default cultivars/i).closest("div")!;
     for (const cv of DEFAULT_CULTIVARS) {
-      const button = within(section).getByTestId(`default-cultivar-${cv.id}`);
+      const button = screen.getByTestId(`default-cultivar-${cv.id}`);
       expect(button).toBeTruthy();
       expect(button.textContent).toBe(cv.cultivarName);
     }

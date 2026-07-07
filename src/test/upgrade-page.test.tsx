@@ -84,13 +84,14 @@ function uninstallPaddle() {
 
 import Upgrade from "@/pages/Upgrade";
 
-function renderPage() {
+function renderPage(initialEntries: string[] = ["/upgrade"]) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <Upgrade />
     </MemoryRouter>,
   );
 }
+
 
 beforeEach(() => {
   paddleMock.configAvailable = true;

@@ -31,6 +31,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGrowPlant } from "@/hooks/useGrowData";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
+import { useDiaryEntries } from "@/hooks/use-diary-entries";
+import { normalizeDiaryEntries } from "@/lib/diaryEntryRules";
+import { buildPhotoHistory } from "@/lib/photoHistoryRules";
+import {
+  buildPlantPhotoStripItems,
+  PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
+} from "@/lib/plantPhotoPreviewStrip";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import { buildPlantDetailHarvestWatchCardViewModel } from "@/lib/plantDetailHarvestWatchCardViewModel";
 import type {

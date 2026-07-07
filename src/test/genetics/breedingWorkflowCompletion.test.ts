@@ -4,8 +4,8 @@
  * Guards the fixes that made the previously-orphaned breeding workflow
  * functional:
  *   1. action_queue payloads satisfy action_queue_target_present_chk
- *      (target_metric present) and carry NO phantom `due_at` column — the due
- *      date now lives inside suggested_change.
+ *      (target_metric present), carry NO phantom `due_at` column, and store
+ *      grower-facing readable copy in suggested_change (not a JSON blob).
  *   2. The intensity/method details collected by the form are reachable by the
  *      advisor branching (they were dead-on-arrival before the form collected
  *      them): heavy pollen shed → 1-day follow-up; STS reversal → extra
@@ -17,7 +17,7 @@ import { buildBreedingActionQueuePayloads } from "@/lib/genetics/breedingActionQ
 import type { BreedingEvent } from "@/lib/genetics/breedingTypes";
 
 describe("breeding workflow completion — action_queue payload shape", () => {
-  it("sets target_metric and keeps due date in suggested_change (no due_at column)", () => {
+  it("sets target_metric, no due_at column, and readable suggested_change copy", () => {
     const event: BreedingEvent = {
       id: "ev_1",
       type: "pollination",
@@ -30,9 +30,11 @@ describe("breeding workflow completion — action_queue payload shape", () => {
       expect(p.target_metric).toBe("breeding_workflow");
       // action_queue has no due_at column — must not be sent as a top-level key
       expect(p).not.toHaveProperty("due_at");
-      const change = JSON.parse(p.suggested_change as string);
-      expect(typeof change.due_at).toBe("string");
-      expect(Number.isNaN(Date.parse(change.due_at))).toBe(false);
+      // suggested_change is readable copy the Action Queue renders verbatim,
+      // not a JSON blob.
+      expect(typeof p.suggested_change).toBe("string");
+      expect((p.suggested_change as string).trim().startsWith("{")).toBe(false);
+      expect((p.suggested_change as string).length).toBeGreaterThan(0);
     }
   });
 });
@@ -47,8 +49,8 @@ describe("breeding workflow completion — details branching is reachable", () =
     };
     const payloads = buildBreedingActionQueuePayloads(event, "grow_1", "plant_1");
     expect(payloads).toHaveLength(1);
-    const change = JSON.parse(payloads[0].suggested_change as string);
-    expect(change.due_offset_days).toBe(1);
+    // heavy shed → high-risk (distinct from moderate's medium), proving
+    // details.intensity reached the advisor branching.
     expect(payloads[0].risk_level).toBe("high");
   });
 
@@ -61,8 +63,8 @@ describe("breeding workflow completion — details branching is reachable", () =
     };
     const payloads = buildBreedingActionQueuePayloads(event, "grow_1", "plant_1");
     expect(payloads).toHaveLength(1);
-    const change = JSON.parse(payloads[0].suggested_change as string);
-    expect(change.due_offset_days).toBe(2);
+    // moderate shed → medium risk, distinct from heavy's high.
+    expect(payloads[0].risk_level).toBe("medium");
   });
 
   it("STS-spray reversal adds a high-risk isolation check beyond the base pollen-window reminder", () => {

@@ -48,21 +48,6 @@ export function buildBreedingActionQueuePayloads(
   const suggestions = suggestBreedingFollowUpActions(eventLike);
 
   return suggestions.map((suggestion) => {
-    // Compute due_at = occurred_at + due_offset_days
-    const dueAtDate = new Date(occurredDate);
-    dueAtDate.setUTCDate(dueAtDate.getUTCDate() + suggestion.due_offset_days);
-
-    // Prepare suggested_change metadata. The computed due date lives here
-    // because action_queue has no dedicated `due_at` column.
-    const suggestedChange = {
-      title: suggestion.title,
-      next_steps: suggestion.next_steps,
-      reason: suggestion.reason,
-      due_offset_days: suggestion.due_offset_days,
-      due_at: dueAtDate.toISOString(),
-      source_event_id: event.id,
-    };
-
     return {
       grow_id: growId,
       plant_id: plantId,
@@ -74,9 +59,12 @@ export function buildBreedingActionQueuePayloads(
       // target_device must be present). Breeding follow-ups are workflow
       // reminders, not device/metric actions, so this is a stable sentinel.
       target_metric: "breeding_workflow",
+      // Grower-facing copy. Action Queue / Action Detail render
+      // suggested_change + reason verbatim (no JSON parsing), so store the
+      // readable recommendation here — matching every other action builder.
+      suggested_change: suggestion.title,
       reason: `${suggestion.reason} [event:${event.id}]`,
       risk_level: suggestion.risk_level,
-      suggested_change: JSON.stringify(suggestedChange),
     };
   });
 }

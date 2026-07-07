@@ -749,6 +749,16 @@ export default function Upgrade() {
         )}
       </header>
 
+      <UpgradeSuccessPanel
+        visible={
+          searchParams.get("checkout") === "success" ||
+          searchParams.get("upgrade") === "success"
+        }
+        currentPlanKnown={currentPlanKnown}
+        currentPlanId={currentPlanId}
+        planIdFromQuery={searchParams.get("plan")}
+      />
+
       <CheckoutStatusBanner
         configAvailable={paddleConfig.available}
         unavailableReason={paddleUnavailableReason}
@@ -757,6 +767,7 @@ export default function Upgrade() {
         ready={paddleReady}
         onRetry={retryPaddle}
       />
+
 
       <section
         aria-label="Pricing tiers"

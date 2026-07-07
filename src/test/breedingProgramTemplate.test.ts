@@ -93,8 +93,7 @@ describe("mergeCriteriaMet", () => {
     const current = { yield_evidence: true };
     const next = mergeCriteriaMet(current, {
       resin_aroma_notes: true,
-      // @ts-expect-error intentional junk
-      selected_offspring_recorded: "yes",
+      selected_offspring_recorded: "yes" as unknown as boolean,
     });
     expect(next).toEqual({ yield_evidence: true, resin_aroma_notes: true });
     expect(next).not.toBe(current);

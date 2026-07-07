@@ -282,6 +282,10 @@ export default function QuickLog({
   const viewPlantBtnRef = useRef<HTMLAnchorElement | null>(null);
   const hardwareUserTouchedRef = useRef(false);
   const snapshotUserTouchedRef = useRef(false);
+  // Synchronous in-flight guard so a rapid double-click cannot fire a
+  // second submit before `busy` state has propagated. Complements the
+  // existing `busy || !!savedTarget` button-disabled logic.
+  const submitInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!open || !prefill) return;

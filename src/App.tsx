@@ -41,6 +41,9 @@ const PhenoHuntNew = lazy(() => import("./pages/PhenoHuntNew"));
 const PhenoHuntCompare = lazy(() => import("./pages/PhenoHuntCompare"));
 const PhenoHuntWorkspace = lazy(() => import("./pages/PhenoHuntWorkspace"));
 const PhenoKeepersPage = lazy(() => import("./pages/PhenoKeepersPage"));
+const BreedingProgramsIndex = lazy(() => import("./pages/BreedingProgramsIndex"));
+const BreedingProgramNew = lazy(() => import("./pages/BreedingProgramNew"));
+const BreedingProgramDetail = lazy(() => import("./pages/BreedingProgramDetail"));
 const Reports = lazy(() => import("./pages/Reports"));
 const PostGrowLearningReport = lazy(() => import("./pages/PostGrowLearningReport"));
 
@@ -239,6 +242,9 @@ const App = () => (
                     <Route path="/grows" element={<Grows />} />
                     <Route path="/grows/:growId" element={<GrowDetail />} />
                     <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
+                    <Route path="/breeding" element={<BreedingProgramsIndex />} />
+                    <Route path="/breeding/new" element={<BreedingProgramNew />} />
+                    <Route path="/breeding/:programId" element={<BreedingProgramDetail />} />
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/reports/post-grow/:growId" element={<PostGrowLearningReport />} />
                     <Route

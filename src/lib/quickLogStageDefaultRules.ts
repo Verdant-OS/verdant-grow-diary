@@ -34,7 +34,7 @@ export const UNKNOWN_STAGE = "" as const;
  * normalize and Quick Log would show the wrong default stage. Keyed by the
  * lowercased incoming value/label.
  */
-const STAGE_ALIASES: Record<string, string> = {
+const STAGE_ALIASES: Record<string, (typeof STAGES)[number]["value"]> = {
   cure: "drying",
   curing: "drying",
 };

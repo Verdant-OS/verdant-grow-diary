@@ -10,8 +10,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-import { PRICING_TIERS, resolveTierFeatures } from "@/config/pricing";
-
 
 // --- Mocks (hoisted so vi.mock factories can reach them) --------------------
 const paddleMock = vi.hoisted(() => ({
@@ -30,7 +28,7 @@ const tierOverride = vi.hoisted(() => ({
 
 // Live-mutable pricing tiers: we mutate the ACTUAL imported array in
 // beforeEach so component reads see current test overrides.
-import { PRICING_TIERS } from "@/config/pricing";
+import { PRICING_TIERS, resolveTierFeatures } from "@/config/pricing";
 
 
 vi.mock("@/lib/paddleConfig", async () => {

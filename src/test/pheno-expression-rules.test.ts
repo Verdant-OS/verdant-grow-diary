@@ -134,6 +134,12 @@ describe("buildPhenoExpressionView", () => {
     });
     expect(reversed.herm.caveat).toBe(PHENO_HERM_REVERSED_CAVEAT);
     expect(reversed.herm.caveat.toLowerCase()).not.toContain("consider removing");
+    // Codex review: the reversal caveat must stay DECISION-NEUTRAL — it explains
+    // why pollen sacs appeared, but never tells the grower to keep the plant
+    // either (culling may still be right for unrelated reasons). Matches the
+    // suggest-only philosophy of the spontaneous-herm caveat.
+    expect(reversed.herm.caveat.toLowerCase()).not.toContain("keep it");
+    expect(reversed.herm.caveat.toLowerCase()).not.toContain("do not remove");
 
     // A spontaneous (non-reversed) herm is UNCHANGED — still nudges removal.
     const spontaneous = buildPhenoExpressionView("c1", {

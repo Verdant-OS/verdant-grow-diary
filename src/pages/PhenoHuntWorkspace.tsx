@@ -580,7 +580,8 @@ function CandidateEditor({
           <p className="font-medium text-foreground">Reversed female — pollen sacs expected.</p>
           <p className="opacity-90">
             This keeper has a recorded chemical reversal, so it is deliberately shedding pollen for
-            breeding. This is not a spontaneous hermaphrodite — keep it.
+            breeding. This is not a spontaneous hermaphrodite — the sex sacs alone are not a reason
+            to remove it.
           </p>
         </div>
       )}

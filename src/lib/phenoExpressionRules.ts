@@ -241,8 +241,13 @@ export interface PhenoHermSuggestion {
 export const PHENO_HERM_SUGGEST_CAVEAT =
   "A hermaphrodite was observed. Consider removing this plant to protect the run — Verdant never removes a plant for you; this is your call.";
 
+// Decision-neutral by design (Codex review): this only explains WHY pollen
+// sacs appeared (an intentional reversal, not a spontaneous herm) — it does
+// NOT tell the grower to keep the plant. Culling may still be the right call
+// for other reasons (structure, disease, …); Verdant never decides that either
+// way, matching PHENO_HERM_SUGGEST_CAVEAT's own "this is your call" stance.
 export const PHENO_HERM_REVERSED_CAVEAT =
-  "This keeper has a recorded chemical reversal — pollen sacs are EXPECTED on a reversed female used for breeding. This is not a spontaneous hermaphrodite; do not remove it.";
+  "This keeper has a recorded chemical reversal — pollen sacs are EXPECTED on a reversed female used for breeding. This is not a spontaneous hermaphrodite; the sex sacs alone are not a reason to remove it.";
 
 export interface PhenoExpressionView {
   readonly candidateId: string;

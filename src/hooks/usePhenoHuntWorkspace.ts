@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { loadPhenoHuntCandidates, type PhenoHuntSummary } from "@/lib/phenoHuntCandidatesService";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
 import { listKeepersForHunt } from "@/lib/phenoKeepersService";
-import { listReversalsForKeepers } from "@/lib/phenoReversalsService";
+import { listReversedKeeperIdsForKeepers } from "@/lib/phenoReversalsService";
 import {
   upsertCandidateScore,
   listCandidateScoresForHunt,
@@ -172,8 +172,9 @@ export function usePhenoHuntWorkspace(
       if (cancelled) return;
       // Reversed-keeper ids -> their SOURCE PLANT id (candidates are keyed by
       // plantId, reversals by keeperId; a keeper's sourcePlantId is the bridge).
+      // Only the id set is needed here, not full reversal rows (method/note/…).
       const reversedKeeperIds = new Set(
-        (await listReversalsForKeepers(keepers.map((k) => k.id))).map((r) => r.keeperId),
+        await listReversedKeeperIdsForKeepers(keepers.map((k) => k.id)),
       );
       if (cancelled) return;
       const reversedPlants = new Set(

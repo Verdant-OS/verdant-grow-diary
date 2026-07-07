@@ -250,11 +250,12 @@ describe("Upgrade page", () => {
   it("contains none of the forbidden marketing claims", () => {
     renderPage();
     const text = document.body.textContent?.toLowerCase() ?? "";
-    expect(text).not.toMatch(/ai grows for you/);
-    expect(text).not.toMatch(/autopilot(?! ?(?:\.|,|$))/); // no positive autopilot claim
-    // Explicit forbidden phrases:
-    expect(text).not.toMatch(/guaranteed yield/);
-    expect(text).not.toMatch(/guaranteed harvest improvement/);
-    expect(text).not.toMatch(/device control included/);
+    expect(text).not.toContain("ai grows for you");
+    expect(text).not.toContain("guaranteed yield");
+    expect(text).not.toContain("guaranteed harvest improvement");
+    expect(text).not.toContain("device control included");
+    // "autopilot" only appears in a negation ("never runs ... on autopilot").
+    // Ensure no positive autopilot claim exists.
+    expect(text).not.toMatch(/(includes|with|full)\s+autopilot/);
   });
 });

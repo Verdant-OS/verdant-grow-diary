@@ -992,6 +992,83 @@ export type Database = {
         }
         Relationships: []
       }
+      manual_sensor_snapshot_edits: {
+        Row: {
+          change_reason: string | null
+          changed_at: string
+          changed_fields: string[]
+          id: string
+          new_values: Json
+          old_values: Json
+          original_reading_id: string
+          plant_id: string | null
+          replacement_reading_id: string | null
+          source_after: string
+          source_before: string
+          tent_id: string
+          user_id: string
+        }
+        Insert: {
+          change_reason?: string | null
+          changed_at?: string
+          changed_fields: string[]
+          id?: string
+          new_values: Json
+          old_values: Json
+          original_reading_id: string
+          plant_id?: string | null
+          replacement_reading_id?: string | null
+          source_after: string
+          source_before: string
+          tent_id: string
+          user_id?: string
+        }
+        Update: {
+          change_reason?: string | null
+          changed_at?: string
+          changed_fields?: string[]
+          id?: string
+          new_values?: Json
+          old_values?: Json
+          original_reading_id?: string
+          plant_id?: string | null
+          replacement_reading_id?: string | null
+          source_after?: string
+          source_before?: string
+          tent_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manual_sensor_snapshot_edits_original_reading_id_fkey"
+            columns: ["original_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_sensor_snapshot_edits_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_sensor_snapshot_edits_replacement_reading_id_fkey"
+            columns: ["replacement_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_sensor_snapshot_edits_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nug_events: {
         Row: {
           amount: number

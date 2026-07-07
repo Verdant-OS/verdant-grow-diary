@@ -755,6 +755,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
                 Start by choosing a plant or tent above.
               </p>
             )}
+            <QuickLogTargetPanel panel={targetPanel} />
           </div>
 
           <div>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, CheckCircle2, Gauge, Info, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Gauge, History, Info, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import {
   buildManualReadingPayloads,
   validateManualEntry,
   type ManualEntryInput,
+  type ManualMetric,
 } from "@/lib/sensorReadingManualEntryRules";
 import {
   getManualSensorDeviceOptions,
@@ -49,6 +50,10 @@ import {
   MANUAL_SENSOR_TRUTH_NOT_DIAGNOSIS_LINE,
   MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE,
 } from "@/constants/manualSensorTruthCopy";
+import type { ManualCorrectionContext } from "@/lib/manualSensorCorrectionContext";
+import { insertManualSensorReadingReturningId } from "@/lib/insertManualSensorReadingReturningId";
+import { useInsertManualSnapshotEdit } from "@/hooks/useInsertManualSnapshotEdit";
+import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 
 interface TentOption {
   id: string;
@@ -62,6 +67,14 @@ interface Props {
   /** When provided, the post-save next-step links Alerts filtered to this grow. */
   growId?: string;
   onSaved?: (meta: { tentId: string; metricsSaved: number; createdAt: string }) => void;
+  /**
+   * When set, the card runs in correction mode: pre-fills original values,
+   * shows a banner referencing the original captured_at, and on save
+   * inserts a linked `manual_sensor_snapshot_edits` row per changed
+   * metric that has a known original reading ID. The original
+   * sensor_readings row is never touched. Source stays MANUAL.
+   */
+  correction?: ManualCorrectionContext | null;
 }
 
 interface LastSavedConfirmation {
@@ -79,20 +92,44 @@ const EMPTY: ManualEntryInput = {
   ppfd: "",
 };
 
+function celsiusToFahrenheit(c: number): number {
+  return c * (9 / 5) + 32;
+}
+
+function correctionToPrefill(ctx: ManualCorrectionContext | null | undefined): ManualEntryInput {
+  if (!ctx) return EMPTY;
+  const v = ctx.originalValues;
+  const out: ManualEntryInput = { ...EMPTY };
+  if (typeof v.temperature_c === "number") {
+    out.airTempF = String(Math.round(celsiusToFahrenheit(v.temperature_c) * 100) / 100);
+  }
+  if (typeof v.humidity_pct === "number") out.humidityPct = String(v.humidity_pct);
+  if (typeof v.vpd_kpa === "number") out.vpdKpa = String(v.vpd_kpa);
+  if (typeof v.co2_ppm === "number") out.co2Ppm = String(v.co2_ppm);
+  if (typeof v.soil_moisture_pct === "number") out.soilMoisturePct = String(v.soil_moisture_pct);
+  if (typeof v.ppfd === "number") out.ppfd = String(v.ppfd);
+  return out;
+}
+
 export default function ManualSensorReadingCard({
   tents,
   defaultTentId,
   successMessage,
   growId,
   onSaved,
+  correction,
 }: Props) {
-  const [tentId, setTentId] = useState<string>(defaultTentId ?? tents[0]?.id ?? "");
-  const [form, setForm] = useState<ManualEntryInput>(EMPTY);
+  const [tentId, setTentId] = useState<string>(
+    correction?.tentId ?? defaultTentId ?? tents[0]?.id ?? "",
+  );
+  const [form, setForm] = useState<ManualEntryInput>(() => correctionToPrefill(correction));
   const [devicePreset, setDevicePreset] = useState<string>("none");
   const [deviceCustom, setDeviceCustom] = useState<string>("");
   const [reviewOpen, setReviewOpen] = useState(false);
   const [lastSaved, setLastSaved] = useState<LastSavedConfirmation | null>(null);
   const insert = useInsertSensorReading();
+  const insertEdit = useInsertManualSnapshotEdit();
+  const isCorrection = !!correction;
 
   const devicePresets = useMemo(() => getManualSensorDeviceOptions(), []);
   const deviceNote = useMemo(() => {

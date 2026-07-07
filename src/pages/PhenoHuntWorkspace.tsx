@@ -38,6 +38,7 @@ import {
 import { usePhenoHermCullSuggestion } from "@/hooks/usePhenoHermCullSuggestion";
 import type { SmokeTestRow } from "@/lib/phenoSmokeTestService";
 import type { LabResultRow, PhenoLabSource, TerpeneReading } from "@/lib/phenoLabResultsService";
+import PhenoProductSamplingSection from "@/components/PhenoProductSamplingSection";
 
 function toIntOrNull(raw: string): number | null {
   const t = raw.trim();
@@ -761,6 +762,8 @@ export default function PhenoHuntWorkspace() {
           ))}
         </div>
       )}
+
+      <PhenoProductSamplingSection />
     </main>
   );
 }

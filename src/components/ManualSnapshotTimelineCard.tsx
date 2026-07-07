@@ -61,7 +61,7 @@ function severityIcon(severity: ManualSnapshotTimelineCardModel["severity"]) {
   return null;
 }
 
-export default function ManualSnapshotTimelineCard({ card }: Props) {
+export default function ManualSnapshotTimelineCard({ card, editSummary }: Props) {
   const quality = useMemo(() => {
     const fields: Record<string, number> = {};
     for (const r of card.readings) {

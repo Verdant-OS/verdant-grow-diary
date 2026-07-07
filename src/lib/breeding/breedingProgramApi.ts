@@ -163,7 +163,7 @@ export async function createBreedingProgram(
     step_key: s.step_key,
     generation_label: s.generation_label,
     instruction_summary: s.instruction_summary,
-    required_criteria: s.required_criteria as unknown as object,
+    required_criteria: JSON.parse(JSON.stringify(s.required_criteria)) as Json,
     status: s.status,
   }));
 

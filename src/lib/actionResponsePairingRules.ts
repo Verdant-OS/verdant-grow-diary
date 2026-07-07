@@ -8,6 +8,8 @@
  * no AI, no alerts, no Action Queue, no automation, no device control.
  */
 
+import { normalizeDiaryNoteText } from "./diaryNoteFormatting";
+
 export interface ActionResponsePairingRow {
   eventType: string;
   notePreview: string;

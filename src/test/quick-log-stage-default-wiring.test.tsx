@@ -106,6 +106,17 @@ describe("QuickLog stage defaulting — plant stage reaches the Select", () => {
     expect(stageText()).toMatch(/Flowering/);
   });
 
+  it("a curing plant ('cure') opens showing Drying / Curing (alias mapped)", () => {
+    // Plant dialogs store stage "cure"; grow.STAGES canonical is "drying".
+    growState.stage = "veg";
+    plantsData = [
+      { id: "p1", name: "Runtz", strain: "RZ", tent_id: "t1", grow_id: "g1", stage: "cure" },
+    ];
+    renderQL({ open: true, onOpenChange: () => {} });
+    expect(stageText()).toMatch(/Drying \/ Curing/);
+    expect(stageText()).not.toMatch(/Vegetative/);
+  });
+
   it("unknown context shows the blank placeholder — NOT Vegetative", () => {
     growState.stage = null; // neither plant nor grow stage known
     plantsData = [{ id: "p1", name: "Mystery", strain: "??", tent_id: "t1", grow_id: "g1" }];

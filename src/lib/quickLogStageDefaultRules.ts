@@ -26,20 +26,38 @@ import { STAGES } from "@/lib/grow";
 export const UNKNOWN_STAGE = "" as const;
 
 /**
+ * Cross-vocabulary aliases → canonical `STAGES` value.
+ *
+ * The PLANT stage vocabulary (CreatePlantDialog / EditPlantDialog) uses
+ * "cure", but the grow/timeline canonical (src/lib/grow.STAGES) uses "drying"
+ * (labeled "Drying / Curing"). Without this alias a curing plant would fail to
+ * normalize and Quick Log would show the wrong default stage. Keyed by the
+ * lowercased incoming value/label.
+ */
+const STAGE_ALIASES: Record<string, string> = {
+  cure: "drying",
+  curing: "drying",
+};
+
+/**
  * Normalize an arbitrary stored/observed stage into a canonical `STAGES`
  * value, or `null` when it is not a recognized stage.
  *
  * Matches case-insensitively against BOTH the canonical value (e.g. "flower")
  * and the human label (e.g. "Flowering" / "Drying / Curing"), so it is robust
- * whether a plant row stores the value or the label. Anything else — empty
+ * whether a plant row stores the value or the label. Cross-vocabulary aliases
+ * (plant-side "cure" → "drying") are resolved first. Anything else — empty
  * string, whitespace, unknown text, non-strings — normalizes to `null`.
  */
 export function normalizeQuickLogStage(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const needle = raw.trim().toLowerCase();
   if (needle === "") return null;
+  // Resolve cross-vocabulary aliases (e.g. plant-side "cure" → "drying")
+  // before matching, so a valid plant stage never falls through to null.
+  const target = STAGE_ALIASES[needle] ?? needle;
   const match = STAGES.find(
-    (s) => s.value.toLowerCase() === needle || s.label.toLowerCase() === needle,
+    (s) => s.value.toLowerCase() === target || s.label.toLowerCase() === target,
   );
   return match ? match.value : null;
 }

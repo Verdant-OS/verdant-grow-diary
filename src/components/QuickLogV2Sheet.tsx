@@ -251,9 +251,22 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     setForm((prev) => (prev[k] === v ? prev : { ...prev, [k]: v }));
 
   const handleAction = (a: QuickLogV2Action) => {
+    const prev = form.action;
     setField("action", a);
     setLocalError(null);
     setSaveStatus("");
+    if (prev === a) return;
+    // Leaving feed → clear feeding-only draft + defaults-applied flag so
+    // a stale line/products list can't ride along into a note/water save.
+    if (prev === "feed") {
+      setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+      setFeedingDefaultsApplied(false);
+    }
+    // Entering feed → maturity evidence surface hides; clear its draft
+    // so stale plant-maturity notes don't get retained under the hood.
+    if (a === "feed") {
+      setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
+    }
   };
 
   const photoGate = useMemo(() => buildQuickLogPhotoGateState(), []);

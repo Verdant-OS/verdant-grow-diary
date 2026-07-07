@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
+import { planQuickLogActionSwitchReset } from "@/lib/quickLogActionSwitchResetRules";
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import { STAGES } from "@/lib/grow";
 import {
@@ -462,6 +463,48 @@ export default function QuickLog({
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
+  }
+
+  /**
+   * Wrap setEventType so switching activity clears stale event-specific
+   * draft fields, previews, and the previous save's status. Scoped per
+   * `planQuickLogActionSwitchReset` — only fields owned by the family
+   * we're leaving get cleared. Global fields (target plant, note,
+   * stage, snapshot, remindAt) are preserved.
+   */
+  function handleEventTypeChange(next: string) {
+    const plan = planQuickLogActionSwitchReset(eventType, next);
+    setEventType(next);
+    if (!plan.changed) return;
+    if (plan.clearHarvest) {
+      setHarvestPhotoAngle("");
+      setHarvestPhotoLighting("");
+    }
+    if (plan.clearFeeding) {
+      setDetails(emptyDetails());
+      setHardware(emptyHardware());
+      hardwareUserTouchedRef.current = false;
+      setHardwareOpen(false);
+    }
+    if (plan.clearEnvironment) {
+      setEnvRoomTempF("");
+      setEnvHumidityPct("");
+      setEnvVpdKpa("");
+      setEnvWaterTempValue("");
+      setEnvWaterTempUnit("F");
+      setEnvEcMscm("");
+    }
+    if (plan.clearMaturity) {
+      setEarlyMilestone(null);
+      setEarlyVigor(null);
+      setEarlyNotes("");
+      setEarlyManuallyOpen(false);
+    }
+    if (plan.clearSaveStatus) {
+      setSavedTarget(null);
+      setSaveError(null);
+      setWateringError(null);
+    }
   }
 
   function resetForAnother() {
@@ -1209,7 +1252,7 @@ export default function QuickLog({
               <EventTypeSelector
                 id="quick-log-event-type"
                 value={eventType}
-                onValueChange={setEventType}
+                onValueChange={handleEventTypeChange}
               />
               <div>
                 <Label className="text-xs">Stage</Label>

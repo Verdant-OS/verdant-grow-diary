@@ -86,7 +86,30 @@ function severityIcon(severity: ManualSnapshotTimelineCardModel["severity"]) {
   return null;
 }
 
-export default function ManualSnapshotTimelineCard({ card, editSummary }: Props) {
+export default function ManualSnapshotTimelineCard({ card, editSummary, originalReadingIds }: Props) {
+  // Build correction context ONLY from real caller-supplied UUIDs and
+  // real captured numeric values. Never infer IDs from timestamp/metric.
+  const correctionHash = useMemo(() => {
+    if (card.source !== "manual") return null;
+    if (!originalReadingIds) return null;
+    const ids: Partial<Record<ManualCorrectionMetric, string>> = {};
+    const vals: Partial<Record<ManualCorrectionMetric, number>> = {};
+    for (const r of card.readings) {
+      const cm = CORRECTION_FIELD_MAP[r.field];
+      if (!cm) continue;
+      const id = originalReadingIds[r.field];
+      if (typeof id === "string" && id.length > 0) ids[cm] = id;
+      if (typeof r.value === "number" && Number.isFinite(r.value)) vals[cm] = r.value;
+    }
+    if (!hasCorrectableOriginalIds(ids)) return null;
+    return encodeManualCorrectionHash({
+      tentId: card.tentId,
+      originalCapturedAt: card.capturedAt,
+      originalReadingIds: ids,
+      originalValues: vals,
+    });
+  }, [card.source, card.readings, card.capturedAt, card.tentId, originalReadingIds]);
+
   const quality = useMemo(() => {
     const fields: Record<string, number> = {};
     for (const r of card.readings) {

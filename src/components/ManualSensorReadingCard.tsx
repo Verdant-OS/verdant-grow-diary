@@ -459,6 +459,49 @@ export default function ManualSensorReadingCard({
           </p>
         )}
 
+        {(enteredVpd !== null || derivedVpdFromTempRh !== null) && (
+          <div
+            className="rounded-md border border-border/40 bg-secondary/10 p-2 text-xs"
+            data-testid="manual-reading-vpd-comparison"
+            data-vpd-conflict={vpdConflictHint ? "true" : "false"}
+          >
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span
+                className="tabular-nums"
+                data-testid="manual-reading-vpd-entered"
+                data-value={enteredVpd ?? ""}
+              >
+                <span className="text-muted-foreground">Entered VPD:</span>{" "}
+                {enteredVpd !== null ? `${enteredVpd.toFixed(2)} kPa` : "—"}
+              </span>
+              <span
+                className="tabular-nums"
+                data-testid="manual-reading-vpd-derived"
+                data-value={derivedVpdFromTempRh ?? ""}
+              >
+                <span className="text-muted-foreground">Derived VPD (temp + RH):</span>{" "}
+                {derivedVpdFromTempRh !== null
+                  ? `${derivedVpdFromTempRh.toFixed(2)} kPa`
+                  : "—"}
+              </span>
+            </div>
+            {vpdConflictHint && (
+              <p
+                className="mt-1 flex items-start gap-1.5 text-amber-600 dark:text-amber-400"
+                data-testid="manual-reading-vpd-conflict-warning"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>{vpdConflictHint.message}</span>
+              </p>
+            )}
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Manual entry — derived VPD never relabels this reading as live.
+              Conflict threshold: {VPD_CONFLICT_THRESHOLD_KPA.toFixed(2)} kPa.
+            </p>
+          </div>
+        )}
+
+
         {advisor.warnings.length > 0 && (
           <ul className="space-y-1" data-testid="manual-reading-advisor-warnings">
             {advisor.warnings.map((w, i) => (

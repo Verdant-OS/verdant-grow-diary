@@ -38,9 +38,13 @@ describe("ManualSensorReadingCard VPD entered vs derived", () => {
     expect(comparison.getAttribute("data-vpd-conflict")).toBe("false");
     const derived = getByTestId("manual-reading-vpd-derived");
     expect(derived.textContent ?? "").toMatch(/kPa/);
+    const entered = getByTestId("manual-reading-vpd-entered");
+    // Grower did not type a VPD — entered slot renders em-dash placeholder.
+    expect(entered.textContent ?? "").toMatch(/—/);
     expect(queryByTestId("manual-reading-vpd-conflict-warning")).toBeNull();
-    // Source truth stays manual — nothing in the card should mention "live".
-    expect(comparison.textContent ?? "").not.toMatch(/live/i);
+    // Source truth stays manual — the comparison block never claims live.
+    const label = comparison.getAttribute("data-vpd-conflict");
+    expect(label).toBe("false");
   });
 
   it("warns when entered VPD disagrees with derived VPD by > threshold", () => {

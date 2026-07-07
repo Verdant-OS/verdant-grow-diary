@@ -118,7 +118,15 @@ CREATE POLICY "pheno_crosses_insert_own"
     -- here. selfing_s1 needs the MOTHER reversed; feminized_cross needs the
     -- pollen donor (male) reversed; standard_f1 needs no reversal.
     AND (
-      cross_type = 'standard_f1'
+      -- standard_f1 requires a NON-reversed male donor: a reversed donor makes
+      -- feminized pollen, so classifyCross would call that a feminized_cross,
+      -- never a regular F1. Reject the mismatch at the DB too.
+      (
+        cross_type = 'standard_f1' AND NOT EXISTS (
+          SELECT 1 FROM public.pheno_reversals r
+          WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+        )
+      )
       OR (
         cross_type = 'selfing_s1' AND EXISTS (
           SELECT 1 FROM public.pheno_reversals r
@@ -159,7 +167,15 @@ CREATE POLICY "pheno_crosses_update_own"
     -- guard on updates so a cross can't be edited into an impossible
     -- feminized/selfing lineage from an unreversed keeper.
     AND (
-      cross_type = 'standard_f1'
+      -- standard_f1 requires a NON-reversed male donor: a reversed donor makes
+      -- feminized pollen, so classifyCross would call that a feminized_cross,
+      -- never a regular F1. Reject the mismatch at the DB too.
+      (
+        cross_type = 'standard_f1' AND NOT EXISTS (
+          SELECT 1 FROM public.pheno_reversals r
+          WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+        )
+      )
       OR (
         cross_type = 'selfing_s1' AND EXISTS (
           SELECT 1 FROM public.pheno_reversals r

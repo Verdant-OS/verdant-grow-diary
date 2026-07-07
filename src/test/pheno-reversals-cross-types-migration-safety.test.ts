@@ -92,7 +92,11 @@ describe("pheno_crosses — cross_type + nullable male + guarded RLS", () => {
     // Present in BOTH the insert and update policies.
     expect(selfingGuards?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(femGuards?.length ?? 0).toBeGreaterThanOrEqual(2);
-    // standard_f1 stays exempt (no reversal required).
-    expect(flat).toMatch(/cross_type = 'standard_f1' OR/);
+    // standard_f1 must REJECT a reversed donor (a reversed donor → feminized,
+    // never regular F1), so the standard branch requires NOT EXISTS a reversal.
+    const standardGuards = flat.match(
+      /cross_type = 'standard_f1' AND NOT EXISTS\s*\(\s*SELECT 1 FROM public\.pheno_reversals r WHERE r\.keeper_id = male_keeper_id AND r\.user_id = auth\.uid\(\)\s*\)/g,
+    );
+    expect(standardGuards?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 });

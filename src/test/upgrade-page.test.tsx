@@ -286,10 +286,36 @@ describe("Upgrade page — success panel", () => {
     expect(screen.getByTestId("upgrade-success-panel")).toBeInTheDocument();
   });
 
-  it("shows unlocked features derived from PRICING_TIERS when ?plan= matches a tier", () => {
+  it("shows exact newly unlocked features for Pro Monthly from pricing config", () => {
     renderPage(["/upgrade?checkout=success&plan=pro_monthly"]);
     const panel = screen.getByTestId("upgrade-success-panel");
-    expect(panel.textContent?.toLowerCase()).toContain("cloud sync");
+    const featuresBlock = screen.getByTestId("upgrade-success-features");
+    expect(featuresBlock).toBeInTheDocument();
+    expect(featuresBlock.textContent).toMatch(/newly unlocked features/i);
+    const expected = resolveTierFeatures("pro_monthly");
+    for (const feature of expected) {
+      expect(panel.textContent).toContain(feature);
+    }
+  });
+
+  it("resolves Pro Annual features to the Pro Monthly feature list", () => {
+    renderPage(["/upgrade?checkout=success&plan=pro_annual"]);
+    const panel = screen.getByTestId("upgrade-success-panel");
+    const expected = resolveTierFeatures("pro_annual");
+    expect(expected).toEqual(resolveTierFeatures("pro_monthly"));
+    for (const feature of expected) {
+      expect(panel.textContent).toContain(feature);
+    }
+  });
+
+  it("resolves Founder Lifetime features to Pro features plus founder perks", () => {
+    renderPage(["/upgrade?checkout=success&plan=founder_lifetime"]);
+    const panel = screen.getByTestId("upgrade-success-panel");
+    const expected = resolveTierFeatures("founder_lifetime");
+    expect(expected).toContain("Founder badge & early-supporter perks");
+    for (const feature of resolveTierFeatures("pro_monthly")) {
+      expect(panel.textContent).toContain(feature);
+    }
   });
 
   it("does not call Paddle.Checkout.open when success panel is shown", () => {

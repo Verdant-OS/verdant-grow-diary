@@ -130,13 +130,24 @@ describe("crossLineageBadge", () => {
     expect(crossLineageBadge("selfing_s1")).toMatch(/S1/);
     expect(crossLineageBadge("mystery")).toBe("Cross");
   });
+
+  it("shows the taxonomy label for the new ways", () => {
+    expect(crossLineageBadge("filial")).toBe("F2+");
+    expect(crossLineageBadge("backcross")).toBe("BX");
+    expect(crossLineageBadge("feminized_bx")).toBe("Fem BX");
+    expect(crossLineageBadge("open_pollination")).toBe("OP");
+  });
 });
 
 describe("crossDonorLabel", () => {
-  it("renders Self for a selfing / null-male row, never blank", () => {
+  it("renders Self for a selfing row (S1 or Sn)", () => {
     expect(crossDonorLabel({ maleKeeperId: null, crossType: "selfing_s1" }, null)).toBe("Self");
-    expect(crossDonorLabel({ maleKeeperId: null, crossType: "standard_f1" }, "ignored")).toBe(
-      "Self",
+    expect(crossDonorLabel({ maleKeeperId: null, crossType: "selfing_sn" }, null)).toBe("Self");
+  });
+
+  it("renders 'Open pollination' for an open-pollination row with no named donor", () => {
+    expect(crossDonorLabel({ maleKeeperId: null, crossType: "open_pollination" }, null)).toBe(
+      "Open pollination",
     );
   });
 
@@ -145,6 +156,10 @@ describe("crossDonorLabel", () => {
       "Dessert",
     );
     expect(crossDonorLabel({ maleKeeperId: "k2", crossType: "standard_f1" }, null)).toBe(
+      "unknown keeper",
+    );
+    // An anomalous null-male non-selfing row no longer mislabels as "Self".
+    expect(crossDonorLabel({ maleKeeperId: null, crossType: "standard_f1" }, null)).toBe(
       "unknown keeper",
     );
   });

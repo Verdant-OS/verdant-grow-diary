@@ -3,8 +3,7 @@
  *
  * Structured default documentation sections + fields shown on PHENOHUNT
  * candidate / breeding program records so the grower documents progress
- * consistently. Presenter-only defaults: no AI, no Action Queue, no
- * automation, no device control, no sensor ingest, no schema changes.
+ * consistently. Presenter-only defaults with no schema changes.
  *
  * Section + field labels are exact and must not drift — tests assert them.
  */

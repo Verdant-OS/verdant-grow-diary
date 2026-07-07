@@ -53,6 +53,7 @@ import {
   PRICING_TIERS,
   PLAN_COMPARISON,
   UPGRADE_FAQ,
+  resolveTierFeatures,
   type PricingTier,
 } from "@/config/pricing";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";

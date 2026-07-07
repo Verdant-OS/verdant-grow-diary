@@ -702,7 +702,8 @@ export default function PhenoHuntWorkspace() {
   }
 
   return (
-    <main data-testid="pheno-workspace" className="container mx-auto max-w-5xl space-y-4 px-4 py-6">
+    <PhenoSamplingProvider>
+      <main data-testid="pheno-workspace" className="container mx-auto max-w-5xl space-y-4 px-4 py-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Hunt workspace: {ws.hunt?.name ?? "this hunt"}</h1>
         <p className="text-xs text-muted-foreground">{PHENO_KEEPER_DECISION_CAVEAT}</p>
@@ -773,6 +774,13 @@ export default function PhenoHuntWorkspace() {
         }))}
       />
       <PhenoProductSamplingSection />
-    </main>
+      <PhenoSamplingWorkspaceTools
+        candidates={candidates.map((c) => ({
+          candidateId: c.candidateId,
+          candidateLabel: c.candidateLabel,
+        }))}
+      />
+      </main>
+    </PhenoSamplingProvider>
   );
 }

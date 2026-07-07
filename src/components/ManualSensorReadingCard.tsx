@@ -259,7 +259,7 @@ export default function ManualSensorReadingCard({
           if (!changed) continue;
 
           try {
-            await insertEdit.mutateAsync({
+            await insertManualSnapshotEdit({
               original_reading_id: origId,
               replacement_reading_id: replacement.id,
               tent_id: tentId,

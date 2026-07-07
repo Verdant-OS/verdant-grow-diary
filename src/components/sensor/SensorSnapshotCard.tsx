@@ -12,6 +12,7 @@ import {
   type ClassifyOptions,
 } from "@/lib/sensor/sensorSnapshotFreshnessRules";
 import { detectSuspiciousMetrics } from "@/lib/sensor/sensorMetricSafetyRules";
+import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 
 export interface SensorSnapshotCardProps {
   snapshot: SensorSnapshot;

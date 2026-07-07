@@ -52,6 +52,7 @@ export default function SensorSnapshotCard({
   classifyOptions,
   className,
   testId = "sensor-snapshot-card",
+  edits,
 }: SensorSnapshotCardProps) {
   const freshness = classifySnapshotFreshness(snapshot, classifyOptions);
   const flags = detectSuspiciousMetrics(snapshot.metrics);

@@ -132,6 +132,35 @@ export function readPersistedHarvestDetails(
   if (wet !== null) out.wetWeight = wet;
   if (dry !== null) out.dryWeight = dry;
   if (unit !== null && (wet !== null || dry !== null)) out.weightUnit = unit;
+
+  // Slice A3.2 — read enriched grams + original value+unit passthrough
+  // when present. Never invent originals for legacy grams-only rows.
+  const origUnit =
+    typeof r.original_weight_unit === "string"
+      ? sanitizeHarvestWeightUnit(r.original_weight_unit)
+      : null;
+  const origWet =
+    typeof r.original_wet_weight === "string" || typeof r.original_wet_weight === "number"
+      ? sanitizeHarvestWeightInput(String(r.original_wet_weight))
+      : null;
+  const origDry =
+    typeof r.original_dry_weight === "string" || typeof r.original_dry_weight === "number"
+      ? sanitizeHarvestWeightInput(String(r.original_dry_weight))
+      : null;
+  const wetGrams =
+    typeof r.wet_weight_grams === "number" && Number.isFinite(r.wet_weight_grams) && r.wet_weight_grams >= 0
+      ? r.wet_weight_grams
+      : null;
+  const dryGrams =
+    typeof r.dry_weight_grams === "number" && Number.isFinite(r.dry_weight_grams) && r.dry_weight_grams >= 0
+      ? r.dry_weight_grams
+      : null;
+  if (origUnit) out.original_weight_unit = origUnit;
+  if (origWet !== null) out.original_wet_weight = origWet;
+  if (origDry !== null) out.original_dry_weight = origDry;
+  if (wetGrams !== null) out.wet_weight_grams = wetGrams;
+  if (dryGrams !== null) out.dry_weight_grams = dryGrams;
+
   if (Object.keys(out).length === 0) return null;
   return out;
 }
@@ -149,6 +178,42 @@ export function formatHarvestWeightForDisplay(
   if (safe === null) return null;
   if (!unit) return safe;
   return `${safe} ${unit}`;
+}
+
+/**
+ * Slice A3.2 — format one weight side (wet or dry) for the timeline
+ * card. Renders "2 lb (907.18 g)" when the grower's original unit was
+ * non-`g` AND canonical grams were persisted. Falls back to the plain
+ * Vocab A "value unit" for legacy grams-only rows. Never invents an
+ * original unit or grams for legacy rows.
+ */
+export function formatHarvestWeightWithOriginal(input: {
+  wetOrDry: "wet" | "dry";
+  details: QuickLogHarvestDetails | null | undefined;
+}): string | null {
+  const d = input.details;
+  if (!d) return null;
+  const isWet = input.wetOrDry === "wet";
+  const value = isWet ? d.wetWeight : d.dryWeight;
+  const unit = d.weightUnit ?? null;
+  const originalUnit = d.original_weight_unit ?? null;
+  const grams = isWet ? d.wet_weight_grams : d.dry_weight_grams;
+  const base = formatHarvestWeightForDisplay(value ?? null, unit);
+  if (!base) return null;
+  // Only enrich with canonical grams when we honestly have BOTH a
+  // non-`g` original unit AND a finite grams number persisted for this
+  // side. Legacy grams-only rows fall through to `base` unchanged.
+  if (
+    originalUnit &&
+    originalUnit !== "g" &&
+    typeof grams === "number" &&
+    Number.isFinite(grams) &&
+    grams >= 0
+  ) {
+    const g = formatGramsForDisplay(grams);
+    if (g !== null) return `${base} (${g} g)`;
+  }
+  return base;
 }
 
 // ---------------------------------------------------------------------------

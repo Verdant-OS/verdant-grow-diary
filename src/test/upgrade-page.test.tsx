@@ -286,10 +286,14 @@ describe("Upgrade page — success panel", () => {
     expect(screen.getByTestId("upgrade-success-panel")).toBeInTheDocument();
   });
 
-  it("shows unlocked features derived from PRICING_TIERS when ?plan= matches a tier", () => {
-    renderPage(["/upgrade?checkout=success&plan=pro_monthly"]);
+  it("shows exact unlocked features derived from PRICING_TIERS when ?plan= matches a tier", () => {
+    const expectedTier = PRICING_TIERS.find((t) => t.id === "pro_annual")!;
+    renderPage(["/upgrade?checkout=success&plan=pro_annual"]);
     const panel = screen.getByTestId("upgrade-success-panel");
-    expect(panel.textContent?.toLowerCase()).toContain("cloud sync");
+    for (const feature of expectedTier.features) {
+      expect(panel).toHaveTextContent(feature);
+    }
+    expect(panel).not.toHaveTextContent(/Everything in Pro/i);
   });
 
   it("does not call Paddle.Checkout.open when success panel is shown", () => {
@@ -304,4 +308,3 @@ describe("Upgrade page — success panel", () => {
     expect(screen.getByTestId("upgrade-success-plans")).toBeInTheDocument();
   });
 });
-

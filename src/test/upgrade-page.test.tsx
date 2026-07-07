@@ -130,7 +130,7 @@ describe("Upgrade page", () => {
   });
 
   it("keeps paid CTA disabled and shows 'Available soon' when paddlePriceId is null", () => {
-    tierOverride.proMonthlyPriceId = null;
+    PRICING_TIERS.find((t) => t.id === "pro_monthly")!.paddlePriceId = null;
     renderPage();
     const cta = screen.getByTestId("tier-pro_monthly-cta") as HTMLButtonElement;
     expect(cta).toBeDisabled();

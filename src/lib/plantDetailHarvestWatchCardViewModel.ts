@@ -101,6 +101,12 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
   plant: PlantDetailHarvestWatchPlantLike;
   recentActivityRows?: readonly PlantDetailHarvestWatchActivityLike[] | null;
   hasPlantPhoto?: boolean;
+  /**
+   * Number of gallery thumbnails currently rendered by Recent Photos for
+   * this plant. When provided, enables an explicit reconciliation note so
+   * "No photos yet" and "N photo evidence points" never contradict.
+   */
+  galleryPhotoCount?: number | null;
   now?: Date;
 }): PlantDetailHarvestWatchCardViewModel {
   const { plant } = params;

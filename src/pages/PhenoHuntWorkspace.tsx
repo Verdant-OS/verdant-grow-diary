@@ -42,6 +42,7 @@ import PhenoProductSamplingSection from "@/components/PhenoProductSamplingSectio
 import PhenoStressTestingSection from "@/components/PhenoStressTestingSection";
 import PhenoSamplingWorkspaceTools from "@/components/PhenoSamplingWorkspaceTools";
 import PhenoDocumentationSections from "@/components/PhenoDocumentationSections";
+import PhenoStressObservationsList from "@/components/PhenoStressObservationsList";
 import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
 import { usePhenoStressObservations } from "@/hooks/usePhenoStressObservations";
 

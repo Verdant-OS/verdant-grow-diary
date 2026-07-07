@@ -173,12 +173,27 @@ type PhenoCrossRow = {
   user_id: string;
   hunt_id: string | null;
   female_keeper_id: string;
-  male_keeper_id: string;
+  // B2: nullable — a selfing_s1 cross has a single parent (the reversed mother
+  // pollinates itself), so there is no distinct male parent.
+  male_keeper_id: string | null;
+  // B2: standard_f1 | feminized_cross | selfing_s1. Existing rows default to
+  // standard_f1 in the migration.
+  cross_type: string;
   cross_name: string | null;
   note: string | null;
   crossed_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type PhenoReversalRow = {
+  id: string;
+  user_id: string;
+  keeper_id: string;
+  method: string;
+  note: string | null;
+  applied_at: string | null;
+  created_at: string;
 };
 
 export interface PhenoDatabase {
@@ -255,7 +270,21 @@ export interface PhenoDatabase {
       >;
       pheno_crosses: Tbl<
         PhenoCrossRow,
-        "id" | "hunt_id" | "cross_name" | "note" | "crossed_at" | "created_at" | "updated_at"
+        | "id"
+        | "hunt_id"
+        | "male_keeper_id"
+        | "cross_type"
+        | "cross_name"
+        | "note"
+        | "crossed_at"
+        | "created_at"
+        | "updated_at"
+      >;
+      // APPEND-ONLY (SELECT+INSERT grant only): Update = never.
+      pheno_reversals: Tbl<
+        PhenoReversalRow,
+        "id" | "method" | "note" | "applied_at" | "created_at",
+        never
       >;
     };
     Views: Record<string, never>;

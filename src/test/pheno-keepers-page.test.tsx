@@ -150,6 +150,7 @@ describe("PhenoKeepersPage", () => {
           id: "x1",
           femaleKeeperId: "k1",
           maleKeeperId: "k2",
+          crossType: "standard_f1",
           crossName: "GasCake F1",
           note: null,
           crossedAt: null,

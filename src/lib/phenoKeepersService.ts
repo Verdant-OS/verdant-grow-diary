@@ -31,7 +31,11 @@ export interface CloneRow {
 export interface CrossRow {
   readonly id: string;
   readonly femaleKeeperId: string;
-  readonly maleKeeperId: string;
+  // B2: nullable — a selfing_s1 cross has no distinct male parent (the reversed
+  // mother pollinates itself). Readers/UI must treat null as "self".
+  readonly maleKeeperId: string | null;
+  // B2: standard_f1 | feminized_cross | selfing_s1 (see breedingReproductionRules).
+  readonly crossType: string;
   readonly crossName: string | null;
   readonly note: string | null;
   readonly crossedAt: string | null;
@@ -167,14 +171,15 @@ export async function listCrossesForHunt(huntId: string): Promise<CrossRow[]> {
   if (!id) return [];
   const { data, error } = await phenoDb
     .from("pheno_crosses")
-    .select("id, female_keeper_id, male_keeper_id, cross_name, note, crossed_at")
+    .select("id, female_keeper_id, male_keeper_id, cross_type, cross_name, note, crossed_at")
     .eq("hunt_id", id)
     .order("created_at", { ascending: false });
   if (error || !data) return [];
   return data.map((r) => ({
     id: r.id,
     femaleKeeperId: r.female_keeper_id,
-    maleKeeperId: r.male_keeper_id,
+    maleKeeperId: r.male_keeper_id ?? null,
+    crossType: r.cross_type ?? "standard_f1",
     crossName: r.cross_name ?? null,
     note: r.note ?? null,
     crossedAt: r.crossed_at ?? null,

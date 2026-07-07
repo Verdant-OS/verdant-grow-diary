@@ -35,6 +35,10 @@ import {
 } from "@/lib/manualSensorSnapshotQualityRules";
 import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
 import DerivedVpdStatus from "@/components/DerivedVpdStatus";
+import {
+  validateManualSensorSnapshotFields,
+  VPD_CONFLICT_THRESHOLD_KPA,
+} from "@/lib/manualSensorSnapshotFieldValidation";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
 import { isUuid } from "@/lib/isUuid";

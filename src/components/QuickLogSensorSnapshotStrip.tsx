@@ -178,6 +178,9 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
 
       {(view.ageLabel || view.capturedAtLabel || view.metrics.length > 0) && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          {view.ageLabel && (
+            <span data-testid="quicklog-sensor-snapshot-age">Captured {view.ageLabel}</span>
+          )}
           {view.capturedAtLabel && (
             <span
               data-testid="quicklog-sensor-snapshot-captured-at"
@@ -185,9 +188,6 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
             >
               Captured: {view.capturedAtLabel}
             </span>
-          )}
-          {view.ageLabel && (
-            <span data-testid="quicklog-sensor-snapshot-age">{view.ageLabel}</span>
           )}
           {view.metrics.map((m) => (
             <span key={m.label} data-testid={`quicklog-sensor-snapshot-metric-${m.label.toLowerCase()}`}>

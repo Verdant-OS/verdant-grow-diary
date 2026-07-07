@@ -52,6 +52,15 @@ export interface HarvestCardViewModel {
   trim_style?: QuickLogTrimStyle;
   wet_weight_grams?: number;
   dry_weight_grams?: number;
+  /**
+   * Slice A3.1 — grower's ORIGINAL entered value + unit, when the entry
+   * came in via Vocab A (value+unit). Timeline presenter can render
+   * "2 lb (907.18 g)" honestly instead of implying the number was grams.
+   * Absent for legacy grams-only rows.
+   */
+  original_wet_weight?: string;
+  original_dry_weight?: string;
+  original_weight_unit?: string;
   pheno_label?: string;
   keeper_candidate?: QuickLogKeeperStatus;
   quality_note?: string;

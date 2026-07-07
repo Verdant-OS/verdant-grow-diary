@@ -244,7 +244,7 @@ describe("manual sensor snapshot — Quick Log CTA deep link", () => {
     }
   });
 
-  it("usable manual snapshot exposes no action (already attached, no deep link)", () => {
+  it("usable manual snapshot exposes the Edit manual readings action (deep link to manual entry)", () => {
     const v = buildQuickLogStripFromTentState({
       status: "ready",
       snapshot: strictSnap(),
@@ -252,7 +252,11 @@ describe("manual sensor snapshot — Quick Log CTA deep link", () => {
       now: NOW,
     });
     expect(v.status).toBe("usable");
-    expect(v.action.kind).toBe("none");
+    expect(v.action.kind).toBe("edit");
+    if (v.action.kind === "edit") {
+      expect(v.action.href).toBe("/sensors#manual-reading");
+      expect(v.action.label).toBe("Edit manual readings");
+    }
   });
 });
 

@@ -1,127 +1,110 @@
-# Verdant Grow OS — Full Project Scope for Codex
+## Goal
 
-## 1. Product
+Extend the existing Pheno Hunt system so each hunt can run against a canonical 10-step breeding SOP (P1 → F1 → F2 → BX1F1 → BX1F2 → BX2F1 → BX3 → stabilization). Verdant shows the current step, its selection criteria, and candidate suggestions from real phenotype data. The grower approves every generation transition through the Action Queue. No blind advancement, no fabricated data.
 
-Verdant Grow OS. Standalone grower software.
+## Slice 0 — Fix RLS lineage check on pheno_keeper_clones (shipped)
 
-Promise: **Plant memory. Sensor truth. Better decisions.**
+- Migration replaced the tautological WITH CHECK with a predicate that verifies `parent_clone_id` exists, is owned by the caller, and shares the same `keeper_id`.
+- Security finding `pheno_keeper_clones_self_referential_check` cleared.
+- Follow-up in Slice 2 adds a runtime RLS harness (`scripts/run-pheno-keeper-clones-rls-harness.ts`) that proves cross-keeper parent linking is rejected.
 
-Target user: serious home + mid-tier cultivators who want honest data provenance, cautious AI, and grower approval on every consequential action.
+## Slice 1 — SOP as constants + advisor (pure, no schema)
 
-North-star loop (V0, non-negotiable):
+Deliverables:
 
-```text
-Grow -> Tent -> Plant -> Quick Log (Diary + Photo + Sensor Snapshot)
-       -> Timeline -> AI Doctor -> Alert -> Approval-Required Action Queue
-```
+- `src/constants/breedingSopSteps.ts` — the 10 canonical steps from the source SOP, encoded as a typed `readonly` array with `id`, `label`, `generation` (`P1|F1|F2|BX1F1|BX1F2|BX2F1|BX3F1|BX3Fn`), `parentStepIds`, `selectionCriteria` (structured: yield / resin / disease-resistance / flowering-time / aroma / effects, each `weight` + `required` + `notes`), `advanceRequires` (list of criteria that must be marked `met`), and `guidance` copy.
+- `src/lib/breeding/breedingSopEngine.ts` — pure functions:
+  - `getStep(id)`
+  - `getNextStep(currentId)`
+  - `evaluateCandidate(step, phenoScores)` → `{score, meetsRequired, missingCriteria[]}`
+  - `rankCandidates(step, candidates)` → deterministic sort with explicit tie-breakers
+  - `canAdvance(step, selectedCandidateIds, phenoScores)` → boolean + reasons
+- No I/O, no Supabase calls, no randomness. All logic covered by `src/test/breedingSopEngine.test.ts` (happy path, edge, null, deterministic, safety fence: never returns `canAdvance=true` when a required criterion is missing).
 
-Gate 1: 30-second Quick Log. Everything is judged by whether it strengthens Quick Log speed, completion rate, AI Doctor context richness, or the immediate next loop step.
+Files:
+- created `src/constants/breedingSopSteps.ts`
+- created `src/lib/breeding/breedingSopEngine.ts`
+- created `src/test/breedingSopEngine.test.ts`
 
-## 2. Stack
+## Slice 2 — Schema for programs + runtime RLS harness
 
-- React 18 + Vite 5 + TypeScript 5 + Tailwind v3 + shadcn/ui
-- Lovable Cloud backend (Supabase under the hood — never say "Supabase" to users)
-- Semantic HSL design tokens in `index.css` + `tailwind.config.ts`
-- Vitest for unit + component + static safety tests
-- Playwright (sandbox-driven) for runtime checks
+Deliverables:
 
-## 3. Layering (enforced)
+- Migration adds:
+  - `public.breeding_programs` (`id`, `user_id`, `hunt_id` FK → `pheno_hunts`, `name`, `p1_maternal_label`, `p1_paternal_label`, `notes`, timestamps).
+  - `public.breeding_program_steps` (`id`, `user_id`, `program_id` FK, `sop_step_id` text FK to constants, `status` enum `pending|active|complete|skipped`, `activated_at`, `completed_at`, `selected_clone_ids` uuid[], `criteria_met` jsonb, `note`, timestamps).
+- Both tables: `GRANT SELECT, INSERT, UPDATE, DELETE ... TO authenticated;` + `GRANT ALL ... TO service_role;` (no anon), RLS enabled, owner-only policies scoped by `auth.uid()`. All FKs validated via `EXISTS ... AND user_id = auth.uid()` in `WITH CHECK` — the exact pattern Slice 0 fixed, applied correctly from day one.
+- New static safety test `src/test/breeding-schema-safety.test.ts` asserts every new policy uses `auth.uid()`, no `USING (true)` / `WITH CHECK (true)`, and no anon grant on the two new tables — using the same fingerprints the `check:supabase-security` guardrail scans.
+- Runtime harness `scripts/run-pheno-keeper-clones-rls-harness.ts` creates two users, tries to link a clone under user A to a parent under user B, and asserts the insert is rejected. Same harness pattern extended for `breeding_programs` and `breeding_program_steps`.
 
-| Layer | Path |
-|---|---|
-| Constants / config | `src/constants/*` |
-| Pure rules | `src/lib/*Rules.ts` |
-| Advisors / engines | `src/lib/*Advisor.ts`, `*Engine.ts` |
-| View models | `src/lib/*ViewModel.ts` |
-| Hooks | `src/hooks/*` |
-| UI (presenters only) | `src/pages/*`, `src/components/*` |
-| Edge functions | `supabase/functions/*` |
-| Migrations | `supabase/migrations/*` |
+Files:
+- migration `supabase/migrations/<ts>_breeding_programs.sql`
+- created `src/test/breeding-schema-safety.test.ts`
+- created `scripts/run-pheno-keeper-clones-rls-harness.ts`
 
-UI never owns domain rules. No random. Deterministic. Null-safe. Test-backed.
+## Slice 3 — View models + read-only UI
 
-## 4. Current State (shipped, protected)
+Deliverables:
 
-- Sensor read-path: confidence scoring, calibration preview, source labeling (`live | manual | csv | demo | stale | invalid`).
-- Manual Sensor Snapshot: append-only edit history (`manual_sensor_snapshot_edits`), per-metric audit rows, correction wiring via `/sensors#manual-reading`, static + UI safety fences.
-- Quick Log v2: idempotent `quicklog_save_event` RPC, typed water/feed payloads, sensor snapshot capture.
-- Video import Slice 1: private `diary-videos` bucket, client-side rules (`videoAttachmentRules.ts` — 100 MB, 60 s, MP4/MOV/WebM), `TimelineVideoCard`, storage cleanup on entry removal, `photo_url = NULL` invariant preserved. Server-side bucket size/MIME limits still pending manual console step.
-- Billing: `billing_subscriptions` is truth. `profiles.tier` is XP only. AI credits server-enforced by `ai_credit_spend` RPC (Free: 3/grow, Pro/Founder: 100/month capped).
-- MCP / Agent Integrations: 3-tool read-only surface with OAuth, verification panel, CI harness. Browser harness intentionally unavailable.
-- Email infrastructure on `notify.verdantgrowdiary.com` (pending DNS verify).
+- `src/lib/breeding/breedingProgramViewModel.ts` — joins `breeding_programs` + `breeding_program_steps` + the SOP constants + user's `pheno_candidate_scores` / `pheno_smoke_tests` / `pheno_lab_results` into a `BreedingProgramSummary` with `currentStep`, `criteriaProgress`, `topCandidates` (ranked, evidence-tagged), and `blockedReasons`.
+- `src/hooks/useBreedingProgram.ts` — read-only fetch hook, no mutations, retries off, respects Supabase RLS.
+- `src/pages/BreedingProgram.tsx` — presenter route at `/breeding/:programId`. Sections: SOP step banner, criteria checklist, top-5 candidate table with evidence chips (yield / resin / disease / flowering / aroma / effects), grower notes read-only, `Suggest advance to next step` CTA (disabled with reason when `canAdvance` is false).
+- Link into existing Pheno Hunt detail page as `Open breeding program` when a program exists for that hunt.
+- No AI calls yet, no writes.
 
-## 5. Hard Safety Rules (Codex must obey)
+Files:
+- created `src/lib/breeding/breedingProgramViewModel.ts`
+- created `src/hooks/useBreedingProgram.ts`
+- created `src/pages/BreedingProgram.tsx`
+- edited `src/pages/PhenoHuntCompare.tsx` (or the existing hunt detail page) to add the deep link
 
-Never:
-- Fake live data. Never classify demo/stale/invalid/unknown as healthy.
-- Blind automation. No device control. Action Queue stays approval-required.
-- Expose `service_role`, bridge tokens, webhook secrets, raw payload internals, or private env values.
-- Reuse `profiles.tier` for billing gating.
-- Add checkout / webhook / provider SDKs during entitlement work unless requested.
-- Mutate `sensor_readings` for corrections — corrections append new rows + audit rows only.
-- Update `storage.buckets` via SQL migration (tooling blocks it).
-- Touch `src/integrations/supabase/client.ts`, `types.ts`, `.env`, or `supabase/config.toml` project-level settings.
-- Auto-create Action Queue items from alerts unless explicitly asked.
+## Slice 4 — Suggest-and-approve via Action Queue
 
-Always:
-- Preserve on every sensor reading: `source`, `captured_at`, `tent_id`, `plant_id?`, `confidence`, `raw_payload`.
-- CSV imports write `source: "csv"`; vendor lineage in `raw_payload.source_app`.
-- Every new `public.*` table gets `GRANT` + `ALTER TABLE ENABLE RLS` + policies in the same migration.
-- Roles live in `user_roles` + `has_role()` SECURITY DEFINER — never on `profiles`.
-- AI Doctor output includes: Summary, Likely issue, Confidence, Evidence, Missing info, Possible causes, Immediate action, What not to do, 24h follow-up, 3-day plan, Risk level, Action Queue suggestion (only if appropriate).
+Deliverables:
 
-## 6. Do-Not-Touch List
+- Edge function `supabase/functions/breeding-suggest-advance/index.ts`:
+  - JWT-verified, validates `program_id` ownership, calls `evaluateCandidate` / `canAdvance` server-side, and — if allowed — enqueues an `action_queue` row of kind `breeding_advance_step` with structured payload (`program_id`, `from_step_id`, `to_step_id`, `selected_clone_ids`, `evidence_snapshot`).
+  - Returns `{ok, action_queue_id, canAdvance, reasons[]}`.
+  - Uses `ai_credit_spend` RPC if AI ranking is requested; suggest-only path skips AI to preserve free tier.
+- The action queue row is **approval-required**. Grower approves in the existing queue UI; approval marks the current step `complete` and the next step `active`. No auto-execution, no device control.
+- Alerts and AI Doctor are not called from this slice.
+- Tests:
+  - `src/test/breeding-suggest-advance-safety.test.ts` — static scan asserts the edge function verifies JWT, never trusts client `user_id`, uses `service_role` only server-side, and always writes with `approval_required=true`.
+  - Runtime harness verifies a cross-user program id is rejected.
 
-- `src/integrations/supabase/*` (auto-gen)
-- `.env`, `supabase/config.toml` project-level settings
-- Existing sensor-ingest edge functions (`pi_ingest_commit_batch`, EcoWitt bridge)
-- Pheno / Claude / MCP surface unless the slice explicitly names it
-- Video/media pipeline outside the Slice 1 boundary
-- `diary_entries.photo_url` invariant (photos only; videos = NULL + `details.video`)
+Files:
+- created `supabase/functions/breeding-suggest-advance/index.ts`
+- created `src/test/breeding-suggest-advance-safety.test.ts`
+- extended runtime harness
 
-## 7. Open Slices (Codex can pick up, in priority order)
+## Non-goals (explicitly deferred)
 
-1. **Server-side `diary-videos` bucket limits** — manual console step (100 MB, MIME allow-list). Contract test already pins client rules.
-2. **Video Slice 2** — poster/thumbnail generation (canvas frame capture), video counts in a separate "Recent Videos" strip (never Recent Photos).
-3. **AI Doctor context enrichment** — feed manual snapshot corrections + audit trail into the evidence bundle.
-4. **Dashboard mobile regression** — PageHeader Option A/B decision still open from earlier triage.
-5. **EcoWitt physical validation** — gates further hardware-touching product features.
-6. **Email templates** — auth email scaffolding + first transactional (grow milestone / harvest recap) after DNS verify lands.
+- No changes to `pheno_hunts`, `pheno_keepers`, `pheno_candidate_scores`, `pheno_smoke_tests`, `pheno_lab_results` schemas.
+- No AI Doctor prompt changes, no new AI Doctor call path.
+- No device control, no environment automation, no auto-selfing/auto-crossing simulation.
+- No public-share / community surface.
+- No changes to Quick Log, sensor read-path, billing, or MCP.
 
-## 8. Required Response Format for Codex
+## Safety guarantees
 
-Every implementation task must return exactly:
+- Every new policy uses `auth.uid()` — no `USING (true)`, no `WITH CHECK (true)`.
+- Every cross-table check in RLS references the incoming row's column (the exact pattern Slice 0 fixed), enforced by `src/test/breeding-schema-safety.test.ts` + the `check:supabase-security` CI baseline.
+- All AI-tagged suggestions include a visible evidence snapshot; no fabricated data.
+- All step advancement flows through Action Queue with human approval — matches Verdant's read-only + approval-required posture.
+- Cultivation guidance follows workspace-knowledge rules: no bro-science, no aggressive stress recommendations for autoflowers, no nutrient escalations from weak evidence.
 
-```text
-Summary
-Requirements / assumptions
-Audit findings
-File-level plan
-Implementation notes
-Files changed
-Tests added / updated
-Validation commands
-Exact pass/fail counts
-Safety verdict
-Deferred items
-Risk / rollback notes
-```
+## Sequencing
 
-No "all green" claims without running. Report skipped validation honestly. Stop-ship over silent scope expansion.
+- Slice 0 — shipped now.
+- Slice 1 — small, pure, safe. Ready after your ack.
+- Slice 2 — schema + tests. Migration goes through the approval flow.
+- Slice 3 — UI. Read-only.
+- Slice 4 — edge function + Action Queue write. Last, because it is the only write path.
 
-## 9. Validation Toolbelt
+I will pause after each slice and wait for green validation counts before starting the next.
 
-- `bun run typecheck`
-- `bunx vitest run <targeted files> --reporter=dot`
-- `bunx vitest run src/test/action-queue-safety.test.ts` (safety fence — must stay green on every slice)
-- `node scripts/run-one-tent-loop-smoke-test-audit.mjs` (when present)
-- `bun run scripts/run-billing-rls-harness.ts` / `run-ai-credits-rls-harness.ts` for money-path work
-- Playwright via shell for UI regressions (see browser-use rules)
+## Open questions
 
-## 10. Working Style
-
-- Small additive slices over rewrites.
-- Audit first, then propose smallest file-level plan, then implement.
-- Prefer new pure helpers in `src/lib/` over expanding JSX.
-- Add static safety tests alongside behavior tests for every sensitive slice (writes, RLS, secrets, evidence counts, source labels).
-- On BLOCKED conditions (schema tool refuses, missing tool surface, ambiguous scope): stop and report — do not silently expand or fake completion.
+1. Should Slice 1's `guidance` copy include the source SOP text verbatim (attribution and licensing?), or a rewritten grower-facing paraphrase?
+2. Do you want the initial P1 pairing hard-coded to Afghan × Colombian as the source SOP describes, or generalized so any two P1 labels can seed a program from day one?
+3. AI-ranked candidate suggestion in Slice 4 — enable now (costs AI credits per suggest) or defer to a later slice and ship deterministic ranking only?

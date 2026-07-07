@@ -64,9 +64,15 @@ describe("Quick Log Playwright harness safety", () => {
   });
 
   it("contains no hardcoded credentials or service_role usage", () => {
-    for (const { file, body } of files) {
+    for (const { file, body, scrubbed } of files) {
       if (!/\.(ts|tsx)$/.test(file)) continue;
-      expect(body, `${file} must not reference service_role`).not.toMatch(/service_role/i);
+      // Scrubbed body has comments + string + regex literal bodies
+      // blanked, so denylist definitions like
+      //   { label: "service_role", re: /service_role/i }
+      // do not self-trigger — only real identifier usage does.
+      expect(scrubbed, `${file} must not reference service_role`).not.toMatch(/service_role/i);
+      // Passwords / bearer JWTs are literal-string leaks, so scan the
+      // raw body — a real leak would appear as a string literal.
       expect(body, `${file} must not hardcode passwords`).not.toMatch(
         /password\s*[:=]\s*["'][^"']+["']/i,
       );
@@ -75,7 +81,7 @@ describe("Quick Log Playwright harness safety", () => {
   });
 
   it("does not touch action_queue, functions.invoke, or mini-charts", () => {
-    for (const { file, body } of files) {
+    for (const { file, scrubbed } of files) {
       if (!/\.(ts|tsx)$/.test(file)) continue;
       // Auth route-protection specs legitimately list action_queue as a
       // private table they guard against — exempt them from this check.
@@ -88,25 +94,25 @@ describe("Quick Log Playwright harness safety", () => {
       // denylist names /rest/v1/action_queue and /functions/v1/ to BLOCK any
       // such request on /one-tent-loop-proof. The spec issues no such calls.
       if (/one-tent-loop-proof-never-healthy/.test(file)) continue;
-      expect(body, `${file} must not call action_queue`).not.toMatch(/action_queue/);
-      expect(body, `${file} must not call functions.invoke`).not.toMatch(/functions\.invoke/);
-      expect(body, `${file} must not import mini-chart UI`).not.toMatch(/MiniChart|mini-chart/);
+      expect(scrubbed, `${file} must not call action_queue`).not.toMatch(/action_queue/);
+      expect(scrubbed, `${file} must not call functions.invoke`).not.toMatch(/functions\.invoke/);
+      expect(scrubbed, `${file} must not import mini-chart UI`).not.toMatch(/MiniChart|mini-chart/);
     }
   });
 
   it("does not rely on localStorage attach persistence", () => {
-    for (const { file, body } of files) {
+    for (const { file, scrubbed } of files) {
       if (!/\.(ts|tsx)$/.test(file)) continue;
-      expect(body, `${file} must not toggle attach via localStorage`).not.toMatch(
+      expect(scrubbed, `${file} must not toggle attach via localStorage`).not.toMatch(
         /localStorage[\s\S]{0,40}attach/i,
       );
     }
   });
 
   it("does not introduce an auth-bypass or auto-login route", () => {
-    for (const { file, body } of files) {
+    for (const { file, scrubbed } of files) {
       if (!/\.(ts|tsx)$/.test(file)) continue; // docs may discuss the rule
-      expect(body, `${file} must not implement an auth bypass`).not.toMatch(
+      expect(scrubbed, `${file} must not implement an auth bypass`).not.toMatch(
         /skipAuth\s*=\s*true|bypassAuth\(|AUTH_BYPASS\s*=/,
       );
     }

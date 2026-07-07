@@ -51,6 +51,9 @@ describe("PhenoStressTestingSection", () => {
     fireEvent.change(screen.getByTestId("pheno-stress-status"), {
       target: { value: "planned" },
     });
+    fireEvent.change(screen.getByTestId("pheno-stress-start"), {
+      target: { value: "2026-07-07" },
+    });
     fireEvent.click(screen.getByTestId("pheno-stress-record"));
 
     const entry = screen.getByTestId("pheno-stress-entry-0");

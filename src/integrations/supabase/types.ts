@@ -2090,6 +2090,91 @@ export type Database = {
           },
         ]
       }
+      pheno_stress_observations: {
+        Row: {
+          created_at: string
+          disease_pest_notes: string | null
+          end_date: string | null
+          hunt_id: string
+          id: string
+          intensity: string
+          linked_diary_entry_id: string | null
+          notes: string | null
+          plant_id: string
+          plant_response: string | null
+          recommendation: string
+          recovery_notes: string | null
+          start_date: string
+          status: string
+          stress_factor: string
+          updated_at: string
+          user_id: string
+          yield_impact_notes: string | null
+        }
+        Insert: {
+          created_at?: string
+          disease_pest_notes?: string | null
+          end_date?: string | null
+          hunt_id: string
+          id?: string
+          intensity: string
+          linked_diary_entry_id?: string | null
+          notes?: string | null
+          plant_id: string
+          plant_response?: string | null
+          recommendation: string
+          recovery_notes?: string | null
+          start_date: string
+          status: string
+          stress_factor: string
+          updated_at?: string
+          user_id: string
+          yield_impact_notes?: string | null
+        }
+        Update: {
+          created_at?: string
+          disease_pest_notes?: string | null
+          end_date?: string | null
+          hunt_id?: string
+          id?: string
+          intensity?: string
+          linked_diary_entry_id?: string | null
+          notes?: string | null
+          plant_id?: string
+          plant_response?: string | null
+          recommendation?: string
+          recovery_notes?: string | null
+          start_date?: string
+          status?: string
+          stress_factor?: string
+          updated_at?: string
+          user_id?: string
+          yield_impact_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_stress_observations_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_stress_observations_linked_diary_entry_id_fkey"
+            columns: ["linked_diary_entry_id"]
+            isOneToOne: false
+            referencedRelation: "diary_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_stress_observations_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       photo_events: {
         Row: {
           caption: string | null

@@ -1,14 +1,15 @@
 /**
  * PhenoStressTestingSection — PHENOHUNT stress testing evaluation factor
  *
- * Lets a breeder document planned or observed stress-test conditions per
- * candidate, with observational fields and a keep/watch/reject label.
+ * Documents planned or observed stress-test conditions per candidate, with
+ * observational fields, a keep/watch/reject label, and inline validation.
+ * Optional owner-scoped persistence via `onPersist` and diary evidence
+ * selection via `diaryOptions`. Optional per-candidate summary cards.
  *
- * Local state only: no persistence, no AI, no Action Queue, no automation,
- * no device control, no sensor ingest, no schema changes. Diary linkage is
- * accepted as a freeform reference (diary entry id / URL) when available.
+ * No AI, no Action Queue, no automation, no device control, no sensor
+ * ingest.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   PHENO_STRESS_FACTOR_LABEL,
   PHENO_STRESS_INTRO,
@@ -23,10 +24,44 @@ import {
   type PhenoStressIntensity,
   type PhenoStressRecommendation,
 } from "@/constants/phenoStressTestingCopy";
+import {
+  validatePhenoStressDraft,
+  type PhenoStressIssues,
+} from "@/lib/pheno/phenoStressObservationValidation";
+import PhenoStressSummaryCard from "@/components/PhenoStressSummaryCard";
+import type { PhenoStressSummary } from "@/lib/pheno/phenoStressSummary";
+
+export interface PhenoStressDiaryOption {
+  readonly id: string;
+  readonly label: string;
+}
+
+export interface PhenoStressPersistDraft {
+  readonly plantId: string;
+  readonly stressFactor: string;
+  readonly status: PhenoStressStatus;
+  readonly startDate: string;
+  readonly endDate: string | null;
+  readonly intensity: PhenoStressIntensity;
+  readonly plantResponse: string | null;
+  readonly recoveryNotes: string | null;
+  readonly yieldImpactNotes: string | null;
+  readonly diseasePestNotes: string | null;
+  readonly recommendation: PhenoStressRecommendation;
+  readonly linkedDiaryEntryId: string | null;
+  readonly notes: string | null;
+}
 
 export interface PhenoStressTestingSectionProps {
-  /** Optional candidate options shown in the candidate-ID picker. */
   candidates?: readonly { candidateId: string; candidateLabel?: string | null }[];
+  /** Owner-scoped diary options rendered in the evidence selector. */
+  diaryOptions?: readonly PhenoStressDiaryOption[];
+  /** When provided, saved entries are persisted via this callback. */
+  onPersist?: (draft: PhenoStressPersistDraft) => Promise<boolean>;
+  /** Compact per-candidate summary cards to render above the form. */
+  summaries?: readonly (PhenoStressSummary & {
+    candidateLabel?: string | null;
+  })[];
 }
 
 const inputClass =
@@ -37,40 +72,107 @@ function Field({
   label,
   children,
   hint,
+  error,
 }: {
   id: string;
   label: string;
   children: React.ReactNode;
   hint?: string;
+  error?: string;
 }) {
   return (
     <label htmlFor={id} className="block text-sm">
       <span className="mb-1 block font-medium">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}
+      {error && (
+        <span
+          data-testid={`pheno-stress-error-${id.replace(/^pheno-stress-/, "")}`}
+          className="mt-1 block text-xs text-destructive"
+        >
+          {error}
+        </span>
+      )}
+      {hint && !error && (
+        <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>
+      )}
     </label>
   );
 }
 
+const nullIfBlank = (raw: string): string | null =>
+  raw.trim().length === 0 ? null : raw;
+
 export default function PhenoStressTestingSection({
   candidates,
+  diaryOptions,
+  onPersist,
+  summaries,
 }: PhenoStressTestingSectionProps) {
   const [draft, setDraft] = useState<PhenoStressObservationDraft>(
     PHENO_STRESS_DEFAULT_DRAFT,
   );
   const [entries, setEntries] = useState<PhenoStressObservationDraft[]>([]);
+  const [issues, setIssues] = useState<PhenoStressIssues>({});
+  const [saving, setSaving] = useState(false);
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   const patch = <K extends keyof PhenoStressObservationDraft>(
     key: K,
     value: PhenoStressObservationDraft[K],
-  ) => setDraft((prev) => ({ ...prev, [key]: value }));
+  ) => {
+    setSavedMessage(null);
+    setDraft((prev) => ({ ...prev, [key]: value }));
+  };
 
-  const record = (e: React.FormEvent) => {
+  const record = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!draft.candidateId.trim() || !draft.factor.trim()) return;
+    const validation = validatePhenoStressDraft({
+      plantId: draft.candidateId,
+      stressFactor: draft.factor,
+      status: draft.status,
+      startDate: draft.startDate,
+      endDate: draft.endDate,
+      intensity: draft.intensity,
+      recommendation: draft.recommendation,
+      plantResponse: draft.plantResponse,
+      recoveryNotes: draft.recoveryNotes,
+      yieldImpactNotes: draft.yieldImpactNotes,
+      diseasePestNotes: draft.diseasePestNotes,
+      linkedDiaryEntryId: draft.diaryEntryRef,
+      notes: draft.notes,
+    });
+    setIssues(validation.issues);
+    if (!validation.valid) return;
+
+    if (onPersist) {
+      setSaving(true);
+      try {
+        const ok = await onPersist({
+          plantId: draft.candidateId,
+          stressFactor: draft.factor,
+          status: draft.status as PhenoStressStatus,
+          startDate: draft.startDate,
+          endDate: nullIfBlank(draft.endDate),
+          intensity: draft.intensity as PhenoStressIntensity,
+          plantResponse: nullIfBlank(draft.plantResponse),
+          recoveryNotes: nullIfBlank(draft.recoveryNotes),
+          yieldImpactNotes: nullIfBlank(draft.yieldImpactNotes),
+          diseasePestNotes: nullIfBlank(draft.diseasePestNotes),
+          recommendation: draft.recommendation as PhenoStressRecommendation,
+          linkedDiaryEntryId: nullIfBlank(draft.diaryEntryRef),
+          notes: nullIfBlank(draft.notes),
+        });
+        if (ok) setSavedMessage("Saved to candidate record.");
+      } finally {
+        setSaving(false);
+      }
+    }
+
     setEntries((prev) => [...prev, draft]);
     setDraft({ ...PHENO_STRESS_DEFAULT_DRAFT, candidateId: draft.candidateId });
   };
+
+  const summaryList = useMemo(() => summaries ?? [], [summaries]);
 
   return (
     <section
@@ -107,12 +209,34 @@ export default function PhenoStressTestingSection({
         </ul>
       </div>
 
+      {summaryList.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold">Candidate stress status</h3>
+          <div
+            data-testid="pheno-stress-summary-grid"
+            className="mt-2 grid gap-2 md:grid-cols-2"
+          >
+            {summaryList.map((s) => (
+              <PhenoStressSummaryCard
+                key={s.plantId}
+                summary={s}
+                candidateLabel={s.candidateLabel}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       <form
         data-testid="pheno-stress-form"
         onSubmit={record}
         className="grid gap-3 md:grid-cols-2"
       >
-        <Field id="pheno-stress-candidate" label="Candidate ID">
+        <Field
+          id="pheno-stress-candidate"
+          label="Candidate ID"
+          error={issues.plantId}
+        >
           {candidates && candidates.length > 0 ? (
             <select
               id="pheno-stress-candidate"
@@ -140,7 +264,11 @@ export default function PhenoStressTestingSection({
           )}
         </Field>
 
-        <Field id="pheno-stress-factor" label="Stress factor">
+        <Field
+          id="pheno-stress-factor"
+          label="Stress factor"
+          error={issues.stressFactor}
+        >
           <select
             id="pheno-stress-factor"
             data-testid="pheno-stress-factor"
@@ -156,7 +284,11 @@ export default function PhenoStressTestingSection({
           </select>
         </Field>
 
-        <Field id="pheno-stress-status" label="Planned or observed">
+        <Field
+          id="pheno-stress-status"
+          label="Planned or observed"
+          error={issues.status}
+        >
           <select
             id="pheno-stress-status"
             data-testid="pheno-stress-status"
@@ -172,7 +304,11 @@ export default function PhenoStressTestingSection({
           </select>
         </Field>
 
-        <Field id="pheno-stress-intensity" label="Intensity">
+        <Field
+          id="pheno-stress-intensity"
+          label="Intensity"
+          error={issues.intensity}
+        >
           <select
             id="pheno-stress-intensity"
             data-testid="pheno-stress-intensity"
@@ -190,7 +326,11 @@ export default function PhenoStressTestingSection({
           </select>
         </Field>
 
-        <Field id="pheno-stress-start" label="Start date">
+        <Field
+          id="pheno-stress-start"
+          label="Start date"
+          error={issues.startDate}
+        >
           <input
             id="pheno-stress-start"
             data-testid="pheno-stress-start"
@@ -201,7 +341,12 @@ export default function PhenoStressTestingSection({
           />
         </Field>
 
-        <Field id="pheno-stress-end" label="End date">
+        <Field
+          id="pheno-stress-end"
+          label="End date"
+          hint="Required for observed entries; optional while planned."
+          error={issues.endDate}
+        >
           <input
             id="pheno-stress-end"
             data-testid="pheno-stress-end"
@@ -212,7 +357,12 @@ export default function PhenoStressTestingSection({
           />
         </Field>
 
-        <Field id="pheno-stress-response" label="Plant response">
+        <Field
+          id="pheno-stress-response"
+          label="Plant response"
+          hint="Required for observed entries."
+          error={issues.plantResponse}
+        >
           <textarea
             id="pheno-stress-response"
             data-testid="pheno-stress-response"
@@ -260,6 +410,7 @@ export default function PhenoStressTestingSection({
           id="pheno-stress-recommendation"
           label="Recommendation"
           hint="Keep / watch / reject — your call, based on the observations above."
+          error={issues.recommendation}
         >
           <select
             id="pheno-stress-recommendation"
@@ -284,16 +435,33 @@ export default function PhenoStressTestingSection({
         <Field
           id="pheno-stress-diary"
           label="Linked diary entry (optional)"
-          hint="Paste a diary entry id or URL to link supporting evidence."
+          hint="Attach one of your own diary entries as evidence."
         >
-          <input
-            id="pheno-stress-diary"
-            data-testid="pheno-stress-diary"
-            value={draft.diaryEntryRef}
-            onChange={(e) => patch("diaryEntryRef", e.target.value)}
-            className={inputClass}
-            placeholder="diary://entry/… or entry id"
-          />
+          {diaryOptions && diaryOptions.length > 0 ? (
+            <select
+              id="pheno-stress-diary"
+              data-testid="pheno-stress-diary-select"
+              value={draft.diaryEntryRef}
+              onChange={(e) => patch("diaryEntryRef", e.target.value)}
+              className={inputClass}
+            >
+              <option value="">No diary evidence linked</option>
+              {diaryOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              id="pheno-stress-diary"
+              data-testid="pheno-stress-diary"
+              value={draft.diaryEntryRef}
+              onChange={(e) => patch("diaryEntryRef", e.target.value)}
+              className={inputClass}
+              placeholder="diary entry id"
+            />
+          )}
         </Field>
 
         <div className="md:col-span-2">
@@ -309,14 +477,23 @@ export default function PhenoStressTestingSection({
           </Field>
         </div>
 
-        <div className="md:col-span-2">
+        <div className="md:col-span-2 flex items-center gap-3">
           <button
             type="submit"
             data-testid="pheno-stress-record"
-            className="rounded border border-border bg-secondary px-3 py-1.5 text-sm font-medium"
+            disabled={saving}
+            className="rounded border border-border bg-secondary px-3 py-1.5 text-sm font-medium disabled:opacity-60"
           >
-            Record stress observation
+            {saving ? "Saving…" : "Record stress observation"}
           </button>
+          {savedMessage && (
+            <span
+              data-testid="pheno-stress-saved"
+              className="text-xs text-emerald-600"
+            >
+              {savedMessage}
+            </span>
+          )}
         </div>
       </form>
 

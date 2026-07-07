@@ -42,6 +42,7 @@ import PhenoProductSamplingSection from "@/components/PhenoProductSamplingSectio
 import PhenoStressTestingSection from "@/components/PhenoStressTestingSection";
 import PhenoSamplingWorkspaceTools from "@/components/PhenoSamplingWorkspaceTools";
 import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
+import { usePhenoStressObservations } from "@/hooks/usePhenoStressObservations";
 
 function toIntOrNull(raw: string): number | null {
   const t = raw.trim();
@@ -679,9 +680,27 @@ export default function PhenoHuntWorkspace() {
   const { id } = useParams<{ id: string }>();
   const ws = usePhenoHuntWorkspace(id);
   const herm = usePhenoHermCullSuggestion();
+  const stress = usePhenoStressObservations(ws.hunt?.id ?? null);
   const [round, setRound] = useState<WorkspaceRound>("overall");
 
   const candidates = useMemo(() => ws.candidates, [ws.candidates]);
+  const stressSummaries = useMemo(
+    () =>
+      candidates.map((c) => ({
+        ...(stress.summariesByPlant[c.candidateId] ?? {
+          plantId: c.candidateId,
+          plannedCount: 0,
+          observedCount: 0,
+          mostRecentFactor: null,
+          mostRecentIntensity: null,
+          currentRecommendation: null,
+          keyNotesPreview: "",
+          hasDiaryEvidence: false,
+        }),
+        candidateLabel: c.candidateLabel,
+      })),
+    [candidates, stress.summariesByPlant],
+  );
 
   if (ws.status === "loading" || ws.status === "idle") {
     return (
@@ -772,6 +791,9 @@ export default function PhenoHuntWorkspace() {
           candidateId: c.candidateId,
           candidateLabel: c.candidateLabel,
         }))}
+        diaryOptions={stress.diaryOptions}
+        onPersist={stress.save}
+        summaries={stressSummaries}
       />
       <PhenoProductSamplingSection />
       <PhenoSamplingWorkspaceTools

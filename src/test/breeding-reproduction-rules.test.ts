@@ -93,6 +93,23 @@ describe("classifyCross — selfing (S1)", () => {
     if (r.ok) expect(r.crossType).toBe("selfing_s1");
   });
 
+  it("rejects a blank/whitespace pollen donor as incomplete — NOT selfing", () => {
+    // Mother is reversed, so the OLD behavior would have mis-read a blank
+    // donor as a valid S1. It must instead reject the missing donor and NOT
+    // return the "reverse first" message (that would misdescribe the problem).
+    for (const blank of ["", "   ", "\t"]) {
+      const r = classifyCross({
+        femaleKeeperId: "mom",
+        pollenKeeperId: blank,
+        femaleReversed: true,
+        pollenReversed: false,
+      });
+      assertRejected(r);
+      expect(r.reason).toMatch(/pollen donor/i);
+      expect(r.reason).not.toMatch(/reverse this keeper first/i);
+    }
+  });
+
   it("REJECTS selfing when the mother has not been reversed", () => {
     const r = classifyCross({
       femaleKeeperId: "k1",

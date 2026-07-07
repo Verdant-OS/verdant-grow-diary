@@ -111,8 +111,10 @@ export interface CrossParticipants {
   /** The seed-bearing (mother) keeper. Required. */
   readonly femaleKeeperId: string;
   /**
-   * The pollen-donor keeper. `null` (or equal to femaleKeeperId) means the
-   * grower is selfing — the reversed mother pollinates itself.
+   * The pollen-donor keeper. `null` (or an id equal to femaleKeeperId) means
+   * the grower is selfing — the reversed mother pollinates itself. A blank /
+   * whitespace string is treated as "donor not chosen" and rejected, NOT as
+   * selfing; pass `null` to self explicitly.
    */
   readonly pollenKeeperId: string | null;
   /** Whether the mother keeper has been reversed. */
@@ -125,13 +127,16 @@ export interface CrossParticipants {
  * Result of classifying a proposed cross.
  *
  * NARROWING NOTE: this project compiles with `strict: false` /
- * `strictNullChecks: false`, under which TypeScript does NOT narrow a
- * boolean-discriminated union on `!result.ok` (the same is true of the
- * codebase's `SaveResult`). Consumers must narrow with the explicit
- * comparison or the positive branch:
+ * `strictNullChecks: false`. Under that config, narrowing this union with
+ * `if (!result.ok)` is unreliable for reading a BRANCH-EXCLUSIVE field like
+ * `reason` (it can leave `result` as the whole union → TS2339). Narrow with
+ * the explicit comparison or the positive branch instead:
  *   if (result.ok === false) { …use result.reason… return; }
  *   // result is now the success branch → result.crossType, result.offspring…
- * Writing `if (!result.ok)` will leave `result` as the full union.
+ * (Result types that carry the SAME fields on both branches — e.g.
+ * `SoilMoistureCalibrationResult` — don't hit this, because no field is
+ * branch-exclusive. This union keeps `reason` exclusive to the failure branch,
+ * so prefer `=== false`.)
  */
 export type CrossClassification =
   | {
@@ -161,8 +166,15 @@ export function classifyCross(p: CrossParticipants): CrossClassification {
   const female = (p.femaleKeeperId ?? "").trim();
   if (!female) return { ok: false, reason: "Choose the seed (mother) keeper." };
 
-  const pollen = (p.pollenKeeperId ?? "").trim();
-  const selfing = pollen === "" || pollen === female;
+  // Selfing is signalled EXPLICITLY: a `null` pollen donor, or a donor id equal
+  // to the mother. A blank/whitespace donor STRING is an incomplete form (a
+  // dropdown left unset), not an intent to self — reject it so a half-filled
+  // cross can never be silently classified as an S1.
+  const rawPollen = p.pollenKeeperId;
+  if (rawPollen !== null && rawPollen.trim() === "") {
+    return { ok: false, reason: "Choose the pollen donor, or record this as a self (S1)." };
+  }
+  const selfing = rawPollen === null || rawPollen.trim() === female;
 
   if (selfing) {
     if (!p.femaleReversed) {

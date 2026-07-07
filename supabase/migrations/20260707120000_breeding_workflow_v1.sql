@@ -26,6 +26,7 @@ RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public AS $$
 BEGIN
   IF NEW.event_type NOT IN (
     'watering','feeding','training','observation','photo','environment',
+    'harvest','cure_check',
     'reversal_application','isolation_start','pollination',
     'pollen_shed_observed','stigmas_receptive','cross_harvest'
   ) THEN

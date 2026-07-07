@@ -490,6 +490,199 @@ export type Database = {
         }
         Relationships: []
       }
+      breeding_program_steps: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          criteria_met: Json
+          generation_label: string
+          id: string
+          instruction_summary: string
+          note: string | null
+          program_id: string
+          required_criteria: Json
+          status: string
+          step_index: number
+          step_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          criteria_met?: Json
+          generation_label: string
+          id?: string
+          instruction_summary: string
+          note?: string | null
+          program_id: string
+          required_criteria?: Json
+          status?: string
+          step_index: number
+          step_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          criteria_met?: Json
+          generation_label?: string
+          id?: string
+          instruction_summary?: string
+          note?: string | null
+          program_id?: string
+          required_criteria?: Json
+          status?: string
+          step_index?: number
+          step_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "breeding_program_steps_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "breeding_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      breeding_programs: {
+        Row: {
+          created_at: string
+          cross_pair_label: string | null
+          current_step_id: string | null
+          grow_id: string | null
+          id: string
+          name: string
+          notes: string | null
+          p1_maternal_label: string | null
+          p1_paternal_label: string | null
+          sop_version: string
+          starting_generation: string
+          status: string
+          target_traits: string[]
+          tent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          cross_pair_label?: string | null
+          current_step_id?: string | null
+          grow_id?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          p1_maternal_label?: string | null
+          p1_paternal_label?: string | null
+          sop_version?: string
+          starting_generation?: string
+          status?: string
+          target_traits?: string[]
+          tent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          cross_pair_label?: string | null
+          current_step_id?: string | null
+          grow_id?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          p1_maternal_label?: string | null
+          p1_paternal_label?: string | null
+          sop_version?: string
+          starting_generation?: string
+          status?: string
+          target_traits?: string[]
+          tent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "breeding_programs_current_step_fk"
+            columns: ["current_step_id"]
+            isOneToOne: false
+            referencedRelation: "breeding_program_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "breeding_programs_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "breeding_programs_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      breeding_step_evidence: {
+        Row: {
+          created_at: string
+          criterion_key: string
+          diary_entry_id: string
+          id: string
+          note: string | null
+          program_id: string
+          step_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          criterion_key: string
+          diary_entry_id: string
+          id?: string
+          note?: string | null
+          program_id: string
+          step_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          criterion_key?: string
+          diary_entry_id?: string
+          id?: string
+          note?: string | null
+          program_id?: string
+          step_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "breeding_step_evidence_diary_entry_id_fkey"
+            columns: ["diary_entry_id"]
+            isOneToOne: false
+            referencedRelation: "diary_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "breeding_step_evidence_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "breeding_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "breeding_step_evidence_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "breeding_program_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bridge_tokens: {
         Row: {
           created_at: string

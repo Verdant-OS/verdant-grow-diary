@@ -130,6 +130,28 @@ export default function PlantDetailHarvestWatchCard({
 }: PlantDetailHarvestWatchCardProps) {
   const { data: plant, isLoading: plantLoading } = useGrowPlant(plantId ?? undefined);
   const { data: rawRows, isLoading: activityLoading } = usePlantRecentActivity(plantId ?? null);
+  const { data: rawDiary } = useDiaryEntries();
+
+  const galleryPhotoCount = useMemo(() => {
+    if (!plantId || !rawDiary || rawDiary.length === 0) return 0;
+    const lifted = rawDiary.map((raw) => {
+      const r = (raw ?? {}) as Record<string, unknown>;
+      if (r.entry_type || r.entryType || r.event_type || r.eventType) return r;
+      const det = (r.details ?? null) as Record<string, unknown> | null;
+      const liftedType =
+        det && typeof det === "object" ? det.event_type : undefined;
+      return typeof liftedType === "string" && liftedType.length > 0
+        ? { ...r, entry_type: liftedType }
+        : r;
+    });
+    const normalized = normalizeDiaryEntries({ rawEntries: lifted });
+    const photoRows = buildPhotoHistory(normalized);
+    return buildPlantPhotoStripItems({
+      plantId,
+      rows: photoRows,
+      limit: PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
+    }).length;
+  }, [plantId, rawDiary]);
 
   const vm = useMemo(() => {
     if (!plant) return null;
@@ -141,8 +163,9 @@ export default function PlantDetailHarvestWatchCard({
       plant,
       recentActivityRows: rows,
       hasPlantPhoto,
+      galleryPhotoCount,
     });
-  }, [plant, rawRows, hasPlantPhoto]);
+  }, [plant, rawRows, hasPlantPhoto, galleryPhotoCount]);
 
   const onNextInspection = useCallback(() => {
     if (!vm || !plant) return;

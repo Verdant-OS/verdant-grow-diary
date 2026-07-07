@@ -40,6 +40,8 @@ import type { SmokeTestRow } from "@/lib/phenoSmokeTestService";
 import type { LabResultRow, PhenoLabSource, TerpeneReading } from "@/lib/phenoLabResultsService";
 import PhenoProductSamplingSection from "@/components/PhenoProductSamplingSection";
 import PhenoStressTestingSection from "@/components/PhenoStressTestingSection";
+import PhenoSamplingWorkspaceTools from "@/components/PhenoSamplingWorkspaceTools";
+import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
 
 function toIntOrNull(raw: string): number | null {
   const t = raw.trim();

@@ -98,7 +98,11 @@ function mapReversalRow(r: {
 export async function listReversalsForKeepers(
   keeperIds: ReadonlyArray<string>,
 ): Promise<ReversalRow[]> {
-  const ids = keeperIds.filter((k) => typeof k === "string" && k.trim() !== "");
+  const ids = [
+    ...new Set(
+      keeperIds.map((k) => (typeof k === "string" ? k.trim() : "")).filter((k) => k !== ""),
+    ),
+  ];
   if (ids.length === 0) return [];
   const { data, error } = await phenoDb
     .from("pheno_reversals")

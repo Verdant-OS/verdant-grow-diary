@@ -263,10 +263,16 @@ describe("PhenoKeepersPage — breeding activity timeline (C3)", () => {
       reversedKeeperIds: ["k1"],
     });
     const activity = screen.getByTestId("pheno-keepers-activity");
-    // Cross (07-07) is most recent → appears above the reversal (07-06).
     expect(activity).toHaveTextContent(/Cross recorded — Gas S1/);
     expect(activity).toHaveTextContent(/♀ Gas × Self/); // selfing renders Self
     expect(activity).toHaveTextContent(/Reversal applied — Gas/);
+    // Cross (07-07) is most recent → actually rendered ABOVE the reversal (07-06).
+    const text = activity.textContent ?? "";
+    const crossPos = text.indexOf("Cross recorded");
+    const reversalPos = text.indexOf("Reversal applied");
+    expect(crossPos).toBeGreaterThanOrEqual(0);
+    expect(reversalPos).toBeGreaterThanOrEqual(0);
+    expect(crossPos).toBeLessThan(reversalPos);
     // Entries carry their lineage/method badges.
     expect(within(activity).getByTestId("pheno-timeline-badge-cross:x1")).toHaveTextContent(/S1/);
   });

@@ -154,6 +154,8 @@ export function usePhenoStressObservations(
     summariesByPlant,
     diaryOptions,
     save,
+    update,
+    remove,
     refresh,
     loading,
     error,

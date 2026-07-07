@@ -189,6 +189,10 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
     row,
     advisoryLabel: "Advisory only — grower decides",
     evidenceLabel,
+    evidenceExplanation: photoEvidenceDisplay.explanation,
+    evidenceGalleryMismatch: photoEvidenceDisplay.hasGalleryMismatch,
+    evidenceMismatchNote: photoEvidenceDisplay.mismatchNote,
+    photoEvidenceDisplay,
     missingContext,
     nextObservation:
       photos > 0

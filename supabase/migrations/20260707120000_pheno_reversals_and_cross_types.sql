@@ -112,6 +112,26 @@ CREATE POLICY "pheno_crosses_insert_own"
         SELECT 1 FROM public.pheno_hunts h WHERE h.id = hunt_id AND h.user_id = auth.uid()
       )
     )
+    -- Reversal precondition (defense in depth, matching classifyCross): a
+    -- feminized batch cannot come from an unreversed keeper. A CHECK constraint
+    -- can't reference another table, but an RLS WITH CHECK can — so enforce it
+    -- here. selfing_s1 needs the MOTHER reversed; feminized_cross needs the
+    -- pollen donor (male) reversed; standard_f1 needs no reversal.
+    AND (
+      cross_type = 'standard_f1'
+      OR (
+        cross_type = 'selfing_s1' AND EXISTS (
+          SELECT 1 FROM public.pheno_reversals r
+          WHERE r.keeper_id = female_keeper_id AND r.user_id = auth.uid()
+        )
+      )
+      OR (
+        cross_type = 'feminized_cross' AND EXISTS (
+          SELECT 1 FROM public.pheno_reversals r
+          WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+        )
+      )
+    )
   );
 
 DROP POLICY "pheno_crosses_update_own" ON public.pheno_crosses;
@@ -133,6 +153,24 @@ CREATE POLICY "pheno_crosses_update_own"
     AND (
       hunt_id IS NULL OR EXISTS (
         SELECT 1 FROM public.pheno_hunts h WHERE h.id = hunt_id AND h.user_id = auth.uid()
+      )
+    )
+    -- Reversal precondition (see the insert policy): keep the same domain
+    -- guard on updates so a cross can't be edited into an impossible
+    -- feminized/selfing lineage from an unreversed keeper.
+    AND (
+      cross_type = 'standard_f1'
+      OR (
+        cross_type = 'selfing_s1' AND EXISTS (
+          SELECT 1 FROM public.pheno_reversals r
+          WHERE r.keeper_id = female_keeper_id AND r.user_id = auth.uid()
+        )
+      )
+      OR (
+        cross_type = 'feminized_cross' AND EXISTS (
+          SELECT 1 FROM public.pheno_reversals r
+          WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+        )
       )
     )
   );

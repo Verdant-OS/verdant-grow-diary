@@ -68,13 +68,31 @@ describe("pheno_crosses — cross_type + nullable male + guarded RLS", () => {
 
   it("guards the male-ownership RLS check so a NULL male can't pass trivially", () => {
     // The guard must appear in BOTH the recreated insert and update policies.
+    // Regex tolerates optional whitespace around EXISTS/parens (assert intent,
+    // not exact formatting).
     const guards = flat.match(
-      /male_keeper_id IS NULL OR EXISTS \( SELECT 1 FROM public\.pheno_keepers m WHERE m\.id = male_keeper_id AND m\.user_id = auth\.uid\(\) \)/g,
+      /male_keeper_id IS NULL OR EXISTS\s*\(\s*SELECT 1 FROM public\.pheno_keepers m WHERE m\.id = male_keeper_id AND m\.user_id = auth\.uid\(\)\s*\)/g,
     );
     expect(guards?.length ?? 0).toBeGreaterThanOrEqual(2);
     // Female + hunt ownership must still be enforced regardless of male.
     expect(flat).toMatch(
       /pheno_keepers f WHERE f\.id = female_keeper_id AND f\.user_id = auth\.uid\(\)/,
     );
+  });
+
+  it("enforces the reversal precondition on feminized/selfing crosses (defense in depth)", () => {
+    // A CHECK can't cross tables, so the RLS WITH CHECK must require a
+    // pheno_reversals row: selfing → mother reversed; feminized → male reversed.
+    const selfingGuards = flat.match(
+      /cross_type = 'selfing_s1' AND EXISTS\s*\(\s*SELECT 1 FROM public\.pheno_reversals r WHERE r\.keeper_id = female_keeper_id AND r\.user_id = auth\.uid\(\)\s*\)/g,
+    );
+    const femGuards = flat.match(
+      /cross_type = 'feminized_cross' AND EXISTS\s*\(\s*SELECT 1 FROM public\.pheno_reversals r WHERE r\.keeper_id = male_keeper_id AND r\.user_id = auth\.uid\(\)\s*\)/g,
+    );
+    // Present in BOTH the insert and update policies.
+    expect(selfingGuards?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(femGuards?.length ?? 0).toBeGreaterThanOrEqual(2);
+    // standard_f1 stays exempt (no reversal required).
+    expect(flat).toMatch(/cross_type = 'standard_f1' OR/);
   });
 });

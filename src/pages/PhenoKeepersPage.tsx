@@ -6,10 +6,17 @@
  * only: naming a keeper, adding a clone, or recording a cross starts no grow and
  * drives no device. No AI, no Action Queue, no automation.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { usePhenoKeepers } from "@/hooks/usePhenoKeepers";
 import { buildPhenoKeeperLineage } from "@/lib/phenoKeeperLineageViewModel";
+import {
+  buildCrossFormViewModel,
+  crossLineageBadge,
+  crossDonorLabel,
+  REVERSAL_METHOD_OPTIONS,
+  SELF_DONOR_VALUE,
+} from "@/lib/phenoCrossFormViewModel";
 
 export default function PhenoKeepersPage() {
   const { id } = useParams<{ id: string }>();
@@ -18,9 +25,37 @@ export default function PhenoKeepersPage() {
   const [promotePlant, setPromotePlant] = useState("");
   const [promoteName, setPromoteName] = useState("");
   const [cloneLabels, setCloneLabels] = useState<Record<string, string>>({});
+  const [reversalMethods, setReversalMethods] = useState<Record<string, string>>({});
   const [female, setFemale] = useState("");
-  const [male, setMale] = useState("");
+  const [donor, setDonor] = useState("");
   const [crossName, setCrossName] = useState("");
+
+  const reversedSet = useMemo(() => new Set(ks.reversedKeeperIds), [ks.reversedKeeperIds]);
+  const keeperNameById = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const k of ks.keepers) m[k.id] = k.keeperName;
+    return m;
+  }, [ks.keepers]);
+
+  // Reset the cross form when navigating to a different hunt so stale parents
+  // from the previous hunt can't linger in state (see buildCrossFormViewModel's
+  // validKeeperIds guard, which is the belt-and-suspenders backstop).
+  useEffect(() => {
+    setFemale("");
+    setDonor("");
+    setCrossName("");
+  }, [id]);
+
+  const crossForm = useMemo(
+    () =>
+      buildCrossFormViewModel({
+        femaleKeeperId: female,
+        donorSelection: donor,
+        reversedKeeperIds: ks.reversedKeeperIds,
+        validKeeperIds: ks.keepers.map((k) => k.id),
+      }),
+    [female, donor, ks.reversedKeeperIds, ks.keepers],
+  );
 
   const candidateLabelById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -132,7 +167,18 @@ export default function PhenoKeepersPage() {
                 className="space-y-2 rounded-lg border border-border bg-card p-4"
               >
                 <div>
-                  <h3 className="font-semibold">{view.keeperName}</h3>
+                  <h3 className="flex items-center gap-2 font-semibold">
+                    {view.keeperName}
+                    {reversedSet.has(view.keeperId) && (
+                      <span
+                        data-testid={`keeper-reversed-badge-${view.keeperId}`}
+                        className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
+                        title="Reversed — makes feminized pollen"
+                      >
+                        Reversed ♀→pollen
+                      </span>
+                    )}
+                  </h3>
                   <p className="text-xs text-muted-foreground">
                     From {view.origin.sourceCandidateLabel ?? "unknown candidate"} ·{" "}
                     {view.origin.huntName ?? "this hunt"}
@@ -172,14 +218,55 @@ export default function PhenoKeepersPage() {
                     Add clone
                   </button>
                 </div>
+                {/* Record a reversal (append-only): shown only until reversed. */}
+                {reversedSet.has(view.keeperId) ? (
+                  <p
+                    data-testid={`keeper-reversed-note-${view.keeperId}`}
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    Reversed — its pollen makes feminized (self / S1 or feminized-cross) seed.
+                  </p>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <select
+                      data-testid={`keeper-reverse-method-${view.keeperId}`}
+                      aria-label={`Reversal method for ${view.keeperName}`}
+                      value={reversalMethods[view.keeperId] ?? "sts"}
+                      onChange={(e) =>
+                        setReversalMethods((prev) => ({ ...prev, [view.keeperId]: e.target.value }))
+                      }
+                      className="rounded border border-border bg-background px-2 py-1 text-xs"
+                    >
+                      {REVERSAL_METHOD_OPTIONS.map((m) => (
+                        <option key={m.value} value={m.value}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      data-testid={`keeper-reverse-${view.keeperId}`}
+                      disabled={ks.saving}
+                      onClick={() =>
+                        ks.markReversed(view.keeperId, reversalMethods[view.keeperId] ?? "sts")
+                      }
+                      className="rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
+                    >
+                      Mark as reversed
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      {/* Record a cross */}
-      {ks.keepers.length >= 2 && (
+      {/* Record a cross — standard F1, feminized cross, or self (S1). The
+          resulting type is DERIVED from reversal state; the grower never forces
+          it, and the service classifies on save. Shown with a single keeper so
+          a reversed keeper can self. */}
+      {ks.keepers.length >= 1 && (
         <section className="space-y-2 rounded-lg border border-border bg-card p-4">
           <h2 className="text-lg font-semibold">Record a cross</h2>
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -187,33 +274,47 @@ export default function PhenoKeepersPage() {
               ♀
               <select
                 data-testid="keepers-cross-female"
+                aria-label="Seed (female) keeper"
                 value={female}
-                onChange={(e) => setFemale(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setFemale(next);
+                  // A donor equal to the new seed is dropped from the options
+                  // below and would otherwise linger in state as an accidental
+                  // self-cross — clear it so the selection stays consistent.
+                  if (donor === next) setDonor("");
+                }}
                 className="rounded border border-border bg-background px-2 py-1"
               >
-                <option value="">Female keeper…</option>
+                <option value="">Seed (female) keeper…</option>
                 {ks.keepers.map((k) => (
                   <option key={k.id} value={k.id}>
                     {k.keeperName}
+                    {reversedSet.has(k.id) ? " (reversed)" : ""}
                   </option>
                 ))}
               </select>
             </label>
             <span>×</span>
             <label className="flex items-center gap-1">
-              ♂
+              pollen
               <select
-                data-testid="keepers-cross-male"
-                value={male}
-                onChange={(e) => setMale(e.target.value)}
+                data-testid="keepers-cross-donor"
+                aria-label="Pollen donor"
+                value={donor}
+                onChange={(e) => setDonor(e.target.value)}
                 className="rounded border border-border bg-background px-2 py-1"
               >
-                <option value="">Male keeper…</option>
-                {ks.keepers.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.keeperName}
-                  </option>
-                ))}
+                <option value="">Pollen donor…</option>
+                <option value={SELF_DONOR_VALUE}>Self (S1) — same keeper</option>
+                {ks.keepers
+                  .filter((k) => k.id !== female)
+                  .map((k) => (
+                    <option key={k.id} value={k.id}>
+                      {k.keeperName}
+                      {reversedSet.has(k.id) ? " (reversed)" : ""}
+                    </option>
+                  ))}
               </select>
             </label>
             <input
@@ -227,11 +328,11 @@ export default function PhenoKeepersPage() {
             <button
               type="button"
               data-testid="keepers-cross-save"
-              disabled={ks.saving || !female || !male || female === male}
+              disabled={ks.saving || !crossForm.canSubmit}
               onClick={async () => {
-                if (await ks.saveCross(female, male, crossName)) {
+                if (await ks.saveCross(female, crossForm.pollenKeeperId, crossName)) {
                   setFemale("");
-                  setMale("");
+                  setDonor("");
                   setCrossName("");
                 }
               }}
@@ -240,6 +341,20 @@ export default function PhenoKeepersPage() {
               Record cross
             </button>
           </div>
+          {crossForm.canSubmit ? (
+            <p data-testid="keepers-cross-preview" className="text-xs text-muted-foreground">
+              Will be recorded as{" "}
+              <span className="font-medium text-foreground">{crossForm.previewBadge}</span>.
+            </p>
+          ) : (
+            <p
+              data-testid="keepers-cross-disabled-reason"
+              className="text-xs text-muted-foreground"
+              role="status"
+            >
+              {crossForm.disabledReason}
+            </p>
+          )}
         </section>
       )}
 
@@ -249,17 +364,24 @@ export default function PhenoKeepersPage() {
           <h2 className="text-lg font-semibold">Crosses</h2>
           <ul data-testid="pheno-crosses" className="space-y-1 text-sm">
             {ks.crosses.map((x) => {
-              const f = ks.keepers.find((k) => k.id === x.femaleKeeperId)?.keeperName ?? "?";
-              const m = ks.keepers.find((k) => k.id === x.maleKeeperId)?.keeperName ?? "?";
+              const f = keeperNameById[x.femaleKeeperId] ?? "unknown keeper";
+              // Donor side: a selfing / null-male row renders "Self", never blank.
+              const donorText = crossDonorLabel(x, keeperNameById[x.maleKeeperId ?? ""] ?? null);
               return (
                 <li
                   key={x.id}
                   data-testid={`pheno-cross-${x.id}`}
-                  className="rounded border border-border px-2 py-1"
+                  className="flex flex-wrap items-center gap-2 rounded border border-border px-2 py-1"
                 >
-                  <span className="font-medium">{x.crossName || `${f} × ${m}`}</span>{" "}
+                  <span className="font-medium">{x.crossName || `${f} × ${donorText}`}</span>
                   <span className="text-muted-foreground">
-                    (♀ {f} × ♂ {m})
+                    (♀ {f} × {donorText})
+                  </span>
+                  <span
+                    data-testid={`pheno-cross-badge-${x.id}`}
+                    className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium"
+                  >
+                    {crossLineageBadge(x.crossType)}
                   </span>
                 </li>
               );

@@ -164,6 +164,7 @@ const App = () => (
                   <Route path="/demo" element={<Navigate to="/welcome" replace />} />
                   <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/upgrade" element={<Upgrade />} />
                   <Route path="/guides" element={<GuidesIndex />} />
                   <Route path="/guides/:slug" element={<GuidePage />} />
                   <Route path="/glossary" element={<Glossary />} />

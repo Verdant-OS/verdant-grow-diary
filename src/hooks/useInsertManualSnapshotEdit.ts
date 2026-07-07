@@ -53,11 +53,11 @@ async function insertManualSnapshotEdit(
     tent_id: input.tent_id,
     plant_id: input.plant_id ?? null,
     change_reason: sanitizeChangeReason(input.change_reason ?? null),
-    old_values: diff.old_values as unknown as Record<string, number>,
-    new_values: diff.new_values as unknown as Record<string, number>,
-    changed_fields: diff.changed_fields as unknown as string[],
-    source_before: diff.source_before,
-    source_after: diff.source_after,
+    old_values: ok.old_values as unknown as Record<string, number>,
+    new_values: ok.new_values as unknown as Record<string, number>,
+    changed_fields: ok.changed_fields as unknown as string[],
+    source_before: ok.source_before,
+    source_after: ok.source_after,
   };
 
   const { data, error } = await supabase

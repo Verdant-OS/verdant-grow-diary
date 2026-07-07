@@ -277,6 +277,20 @@ export default function PlantDetailHarvestWatchCard({
             <div className="font-medium" data-testid="plant-detail-harvest-watch-evidence">
               {vm.evidenceLabel}
             </div>
+            <p
+              className="mt-1 text-[11px] text-muted-foreground"
+              data-testid="plant-detail-harvest-watch-evidence-explanation"
+            >
+              {vm.evidenceExplanation}
+            </p>
+            {vm.evidenceGalleryMismatch && (
+              <p
+                className="mt-1 text-[11px] text-[hsl(var(--warning))]"
+                data-testid="plant-detail-harvest-watch-evidence-mismatch"
+              >
+                {vm.evidenceMismatchNote}
+              </p>
+            )}
           </div>
         </div>
 

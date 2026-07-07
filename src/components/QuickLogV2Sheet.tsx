@@ -152,6 +152,16 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
+  const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
+  // Synchronous in-flight guard. `saving`/`feedingSaving` are React
+  // state and don't flip until the next paint, so rapid double-clicks
+  // can slip a second save through. This ref locks the entry point
+  // during the same tick.
+  const saveInFlightRef = useRef(false);
+  // Rotates on "Log another" so a fresh save cycle can't reuse the
+  // previous saved-summary state. Bumped whenever the grower starts
+  // a new logical submission from the same open sheet.
+  const idempotencyKeyRef = useRef(1);
 
   const options = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
 

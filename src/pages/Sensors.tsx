@@ -382,7 +382,11 @@ export default function Sensors() {
         {manualTents.length === 0 ? (
           <FirstTentSetupEmptyState surface="sensor_pairing" testId="sensors-first-tent-setup" />
         ) : (
-          <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
+          <ManualSensorReadingCard
+            tents={manualTents}
+            defaultTentId={defaultManualTentId}
+            correction={correctionCtx}
+          />
         )}
       </div>
       {manualTents.length > 0 && defaultManualTentId && (

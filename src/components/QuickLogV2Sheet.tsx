@@ -37,6 +37,9 @@ import {
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
+import { buildQuickLogTargetPanel } from "@/lib/quickLogTargetPanelViewModel";
+import QuickLogTargetPanel from "@/components/QuickLogTargetPanel";
+import { useGrows } from "@/store/grows";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 import {

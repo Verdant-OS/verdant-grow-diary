@@ -133,7 +133,11 @@ describe("classifySexReveal", () => {
     // must NOT tell the grower to collect pollen off a blurry photo.
     expect(res.review_recommended).toBe(true);
     expect(res.confidence).toBe("low");
+    // Neither the primary action NOR the follow-up may tell the grower to
+    // collect pollen off an unconfirmed (weak) photo.
+    expect(res.immediate_action.toLowerCase()).not.toMatch(/collect pollen/);
     expect(res.follow_up.toLowerCase()).not.toMatch(/collect pollen/);
+    expect(res.immediate_action).toBe(SEX_REVEAL_COPY.reversed_female_unconfirmed);
     expect(res.follow_up.toLowerCase()).toMatch(/sharper|confirm/);
   });
 

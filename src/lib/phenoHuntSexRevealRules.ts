@@ -94,6 +94,10 @@ export const SEX_REVEAL_COPY = {
     "Reversed female — the pollen sacs here are the intended result of a " +
     "chemical reversal, not a herm. Collect pollen for a self (S1) or " +
     "feminized cross, and keep it isolated from any unintended mothers.",
+  reversed_female_unconfirmed:
+    "Possible reversed-female pollen, but this photo is too weak to confirm. " +
+    "Capture a sharper, multi-node close-up BEFORE collecting any pollen — and " +
+    "do not treat this as a herm; the reversal was applied on purpose.",
   confirmed_male:
     "Confirmed male. Isolate from any flowering females if pollen risk " +
     "matters. Grower decides next steps.",
@@ -233,7 +237,11 @@ export function classifySexReveal(rawSignals: SexRevealSignals): SexRevealResult
       missing_information: poor
         ? [...missing, "A sharper, multi-node photo to confirm the pollen sacs before collecting."]
         : missing,
-      immediate_action: SEX_REVEAL_COPY.reversed_female,
+      // Poor image → the primary action must NOT tell the grower to collect
+      // pollen yet; only the confirmed (sharp) read carries the collect action.
+      immediate_action: poor
+        ? SEX_REVEAL_COPY.reversed_female_unconfirmed
+        : SEX_REVEAL_COPY.reversed_female,
       what_not_to_do: [
         "Do not cull — these pollen structures are the intended result of the reversal.",
         "Do not treat this as a hermaphrodite; the reversal was applied on purpose.",

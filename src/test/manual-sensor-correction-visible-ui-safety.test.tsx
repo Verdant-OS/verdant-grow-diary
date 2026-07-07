@@ -114,16 +114,9 @@ describe("manual sensor correction — hash + visible UI safety", () => {
   });
 
   it("QuickLog strip hides Correct action when original IDs are missing", () => {
-    const view = {
-      status: "ok" as const,
-      title: "Sensor snapshot",
-      providerLabel: "Manual",
-      lines: [],
-    };
     const { queryByTestId } = render(
       <MemoryRouter>
         <QuickLogSensorSnapshotStrip
-          view={view as never}
           tentId={TENT}
           manualCapturedAt={CTX.originalCapturedAt}
           // No manualReadingIds — affordance must be hidden.

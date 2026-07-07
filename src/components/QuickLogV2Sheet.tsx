@@ -182,6 +182,17 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     () => resolveQuickLogV2Target(options, form.selectedKey),
     [options, form.selectedKey],
   );
+  const { grows } = useGrows();
+  const targetPanel = useMemo(
+    () =>
+      buildQuickLogTargetPanel({
+        resolved: resolvedTarget,
+        plants: plants as Parameters<typeof buildQuickLogTargetPanel>[0]["plants"],
+        tents: tents as Parameters<typeof buildQuickLogTargetPanel>[0]["tents"],
+        grows,
+      }),
+    [resolvedTarget, plants, tents, grows],
+  );
   const resolvedContext = resolvedTarget.ok
     ? {
         plantId: resolvedTarget.plantId ?? null,

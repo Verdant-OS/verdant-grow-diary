@@ -44,6 +44,7 @@ const inputClass =
   "w-full rounded border border-border bg-background px-2 py-1 text-sm";
 
 export default function PhenoProductSamplingSection() {
+  const sampling = usePhenoSamplingOptional();
   const [testerCode, setTesterCode] = useState("");
   const [candidateId, setCandidateId] = useState("");
   const [sampleFormat, setSampleFormat] = useState(PHENO_SAMPLING_SAMPLE_FORMATS[0]);
@@ -107,6 +108,23 @@ export default function PhenoProductSamplingSection() {
         className="grid gap-3 md:grid-cols-2"
         onSubmit={(e) => {
           e.preventDefault();
+          const overallNum =
+            overall.trim() === "" ? null : Number(overall);
+          if (sampling) {
+            sampling.recordSubmission({
+              testerCode,
+              candidateId,
+              sampleFormat,
+              dryHit,
+              flavor,
+              burnQuality,
+              ashColor,
+              oilRing,
+              effect,
+              overall: Number.isFinite(overallNum) ? (overallNum as number) : null,
+              notes,
+            });
+          }
           setRecorded(true);
         }}
       >

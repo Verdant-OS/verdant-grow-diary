@@ -39,6 +39,7 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     roundsByKey: {},
     decisionHistoryByPlant: {},
     sexByPlant: {},
+    reversedPlantIds: new Set<string>(),
     smokeByPlant: {},
     labByKey: {},
     error: null,
@@ -178,6 +179,51 @@ describe("PhenoHuntWorkspace", () => {
         tentId: "t1",
       }),
     );
+  });
+
+  it("suppresses the cull nudge for a REVERSED female showing pollen sacs (the herm landmine)", () => {
+    // A keeper with a recorded chemical reversal is DELIBERATELY shedding
+    // pollen for breeding. Recording it as "hermaphrodite" must never trigger
+    // the removal alert / cull button — that would nudge culling the exact
+    // plant being bred with.
+    queueRemoval.mockClear();
+    renderAt({
+      candidates: [{ candidateId: "p1", candidateLabel: "BD #1" }],
+      sexByPlant: {
+        p1: {
+          plantId: "p1",
+          sex: "hermaphrodite",
+          hermObserved: true,
+          note: null,
+          observedAt: "2026-03-01T00:00:00Z",
+        },
+      },
+      reversedPlantIds: new Set(["p1"]),
+    });
+    expect(screen.queryByTestId("workspace-herm-flag-p1")).toBeNull();
+    expect(screen.queryByTestId("workspace-herm-queue-p1")).toBeNull();
+    const reversedNote = screen.getByTestId("workspace-herm-reversed-p1");
+    expect(reversedNote).toHaveTextContent(/pollen sacs expected/i);
+    expect(reversedNote).toHaveTextContent(/not.*spontaneous hermaphrodite/i);
+    expect(queueRemoval).not.toHaveBeenCalled();
+  });
+
+  it("a NON-reversed herm still surfaces the removal alert (landmine guard doesn't over-suppress)", () => {
+    renderAt({
+      candidates: [{ candidateId: "p1", candidateLabel: "BD #1" }],
+      sexByPlant: {
+        p1: {
+          plantId: "p1",
+          sex: "hermaphrodite",
+          hermObserved: true,
+          note: null,
+          observedAt: "2026-03-01T00:00:00Z",
+        },
+      },
+      reversedPlantIds: new Set(), // this keeper has NO recorded reversal
+    });
+    expect(screen.getByTestId("workspace-herm-flag-p1")).toHaveTextContent(/consider removing/i);
+    expect(screen.queryByTestId("workspace-herm-reversed-p1")).toBeNull();
   });
 
   it("switches to a staged round and saves via saveRound (with aroma + nose note)", async () => {

@@ -80,18 +80,31 @@ function ExpressionBlock({ e }: { e: PhenoExpressionView }) {
         )}
       </div>
 
-      {/* Hermaphrodite: suggest-only "consider removing" — the grower decides. */}
-      {e.herm.observed && (
-        <div
-          data-testid={`pheno-candidate-${e.candidateId}-herm-flag`}
-          role="alert"
-          className="space-y-1 rounded-md border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-300"
-        >
-          <p className="font-semibold">⚠ Hermaphrodite observed — consider removing</p>
-          {e.herm.note && <p>{e.herm.note}</p>}
-          <p className="text-[11px] opacity-90">{e.herm.caveat}</p>
-        </div>
-      )}
+      {/* Hermaphrodite: suggest-only "consider removing" — the grower decides.
+          REVERSAL-AWARE: a keeper with a recorded reversal shows a neutral
+          "expected" note instead of a cull alert (the reversed-female herm
+          landmine — never nudge culling the plant being bred with). */}
+      {e.herm.observed &&
+        (e.herm.reversed ? (
+          <div
+            data-testid={`pheno-candidate-${e.candidateId}-herm-reversed`}
+            className="space-y-1 rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground"
+          >
+            <p className="font-medium text-foreground">Reversed female — pollen sacs expected</p>
+            {e.herm.note && <p>{e.herm.note}</p>}
+            <p className="text-[11px] opacity-90">{e.herm.caveat}</p>
+          </div>
+        ) : (
+          <div
+            data-testid={`pheno-candidate-${e.candidateId}-herm-flag`}
+            role="alert"
+            className="space-y-1 rounded-md border border-red-500/50 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-300"
+          >
+            <p className="font-semibold">⚠ Hermaphrodite observed — consider removing</p>
+            {e.herm.note && <p>{e.herm.note}</p>}
+            <p className="text-[11px] opacity-90">{e.herm.caveat}</p>
+          </div>
+        ))}
 
       {/* Trait axes */}
       {e.traits.length > 0 && (

@@ -22,17 +22,18 @@ const lookup = (id: string | null | undefined) =>
 
 function baseRow(over: Partial<CrossRow>): CrossRow {
   return {
-    id: over.id ?? "cross-1",
-    femaleKeeperId: over.femaleKeeperId ?? "k-female",
-    maleKeeperId: over.maleKeeperId ?? "k-male",
-    crossType: over.crossType ?? "standard_f1",
-    crossName: over.crossName ?? null,
-    note: over.note ?? null,
-    crossedAt: over.crossedAt ?? null,
-    createdAt: over.createdAt ?? null,
-    channel: over.channel ?? null,
-    generation: over.generation ?? null,
-    recurrentParentId: over.recurrentParentId ?? null,
+    id: "cross-1",
+    femaleKeeperId: "k-female",
+    maleKeeperId: "k-male",
+    crossType: "standard_f1",
+    crossName: null,
+    note: null,
+    crossedAt: null,
+    createdAt: null,
+    channel: null,
+    generation: null,
+    recurrentParentId: null,
+    ...over,
   };
 }
 

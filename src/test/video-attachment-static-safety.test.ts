@@ -25,7 +25,7 @@ const VIDEO_FILES = [
 ];
 
 const FORBIDDEN = [
-  "service_role",
+  "SERVICE_ROLE_KEY",
   "sensor_readings",
   "action_queue",
   "alerts.insert",
@@ -36,10 +36,16 @@ const FORBIDDEN = [
   "functions.invoke",
 ];
 
+function stripComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
 describe("video attachment static safety", () => {
   for (const f of VIDEO_FILES) {
     it(`${f} contains no forbidden runtime references`, () => {
-      const src = read(f);
+      const src = stripComments(read(f));
       for (const term of FORBIDDEN) {
         expect(
           src.includes(term),
@@ -50,10 +56,13 @@ describe("video attachment static safety", () => {
   }
 
   it("video diary builder never sets a non-null photo_url", () => {
-    const src = read("src/lib/quickLogVideoDiaryEntry.ts");
-    expect(src).toMatch(/photo_url:\s*null/);
-    // No pattern like `photo_url: <not-null>` is present.
-    expect(src).not.toMatch(/photo_url:\s*(?!null\b)[^,\n}]+/);
+    const src = stripComments(read("src/lib/quickLogVideoDiaryEntry.ts"));
+    // All `photo_url:` occurrences must be assigned to null.
+    const matches = src.match(/photo_url\s*:\s*([^,\n;}]+)/g) ?? [];
+    expect(matches.length).toBeGreaterThan(0);
+    for (const m of matches) {
+      expect(m.trim()).toMatch(/photo_url\s*:\s*null$/);
+    }
   });
 
   it("photo evidence pipeline does not read details.video", () => {

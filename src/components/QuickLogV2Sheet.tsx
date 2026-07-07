@@ -62,6 +62,15 @@ import {
   type QuickLogMaturityEvidenceFormState,
 } from "@/lib/quickLogMaturityEvidenceRules";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
+import {
+  QUICK_LOG_POST_SAVE_VIEW_LABEL,
+  QUICK_LOG_POST_SAVE_ANOTHER_LABEL,
+  QUICK_LOG_POST_SAVE_CLOSE_LABEL,
+  buildQuickLogPostSaveMessage,
+  rotateQuickLogIdempotencyKey,
+  shouldAllowQuickLogSave,
+  type QuickLogPostSaveSuccess,
+} from "@/lib/quickLogSaveGuardRules";
 
 interface Props {
   open: boolean;

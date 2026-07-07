@@ -295,8 +295,11 @@ BEGIN
     SELECT grow_event_id INTO v_existing
       FROM public.quicklog_idempotency
      WHERE user_id = uid AND idempotency_key = p_idempotency_key;
-    -- Guard against the extremely unlikely case that the row disappeared
-    -- between the unique_violation and the re-read.
+    -- Guard: in theory the idempotency row could be missing here if it was
+    -- deleted between the unique_violation firing and this re-read (e.g. a
+    -- concurrent DELETE). In practice this is only possible outside normal
+    -- app flow (service-role maintenance), but we guard defensively so the
+    -- function always returns a typed envelope rather than null fields.
     IF NOT FOUND THEN
       RETURN jsonb_build_object('ok', false, 'reason', 'save_failed');
     END IF;

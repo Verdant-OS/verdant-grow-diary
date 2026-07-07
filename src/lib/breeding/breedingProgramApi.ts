@@ -6,6 +6,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import {
   BREEDING_PROGRAM_SOP_VERSION,
   getBreedingProgramTemplate,

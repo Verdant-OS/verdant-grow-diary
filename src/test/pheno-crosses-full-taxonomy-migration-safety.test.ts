@@ -62,8 +62,12 @@ describe("pheno_crosses full taxonomy migration — static safety", () => {
     // reject a donor with a recorded reversal — its pollen is feminized. This
     // holds on the natural_male/open channel arm AND the channel-less ELSE, in
     // BOTH the INSERT and UPDATE policies → the exact string appears >= 4x.
+    // Assert the full guard INCLUDING the per-user scoping (`AND r.user_id =
+    // auth.uid()`) — dropping that clause would silently change the policy's
+    // cross-user semantics while a laxer regex still passed. Case-insensitive
+    // to tolerate SQL keyword-casing changes.
     const guard =
-      /cross_type NOT IN \('selfing_s1', 'selfing_sn', 'feminized_cross', 'feminized_bx'\)\s+AND NOT EXISTS \(\s*SELECT 1 FROM public\.pheno_reversals r\s*WHERE r\.keeper_id = male_keeper_id/g;
+      /cross_type NOT IN \('selfing_s1', 'selfing_sn', 'feminized_cross', 'feminized_bx'\)\s+AND NOT EXISTS \(\s*SELECT 1 FROM public\.pheno_reversals r\s*WHERE r\.keeper_id = male_keeper_id AND r\.user_id = auth\.uid\(\)/gi;
     expect((SQL.match(guard) ?? []).length).toBeGreaterThanOrEqual(4);
 
     // The old fix-defeating unconditional allow-list (which let ibl/sib_cross/…

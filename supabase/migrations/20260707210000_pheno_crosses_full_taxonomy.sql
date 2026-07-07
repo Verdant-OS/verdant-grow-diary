@@ -187,12 +187,14 @@ CREATE POLICY "pheno_crosses_insert_own"
             SELECT 1 FROM public.pheno_reversals r
             WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
           )
-        -- Channel-less (legacy / current service): preserve the original 3-type
-        -- guard EXACTLY, and treat EVERY regular way uniformly (same rule as the
-        -- natural_male arm above): a real male donor, never a reversed female
-        -- whose pollen is feminized. A GENUINELY feminized filial/BX is only ever
-        -- recorded via an explicit reversal/rodelization channel (the arms above),
-        -- never through this channel-less path.
+        -- Channel-less (legacy / current service): treat EVERY regular way
+        -- uniformly (same rule as the natural_male arm above) — a real male
+        -- donor, never a reversed female whose pollen is feminized. This
+        -- generalizes the original standard_f1-only guard to the full taxonomy;
+        -- the selfing and feminized_cross/bx arms below keep their reversal
+        -- REQUIREMENT. A genuinely feminized filial/BX is only ever recorded via
+        -- an explicit reversal/rodelization channel (the arms above), never
+        -- through this channel-less path.
         ELSE
           (
             -- Every regular way (standard_f1, filial, backcross, ibl, sib_cross,
@@ -294,12 +296,14 @@ CREATE POLICY "pheno_crosses_update_own"
             SELECT 1 FROM public.pheno_reversals r
             WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
           )
-        -- Channel-less (legacy / current service): preserve the original 3-type
-        -- guard EXACTLY, and treat EVERY regular way uniformly (same rule as the
-        -- natural_male arm above): a real male donor, never a reversed female
-        -- whose pollen is feminized. A GENUINELY feminized filial/BX is only ever
-        -- recorded via an explicit reversal/rodelization channel (the arms above),
-        -- never through this channel-less path.
+        -- Channel-less (legacy / current service): treat EVERY regular way
+        -- uniformly (same rule as the natural_male arm above) — a real male
+        -- donor, never a reversed female whose pollen is feminized. This
+        -- generalizes the original standard_f1-only guard to the full taxonomy;
+        -- the selfing and feminized_cross/bx arms below keep their reversal
+        -- REQUIREMENT. A genuinely feminized filial/BX is only ever recorded via
+        -- an explicit reversal/rodelization channel (the arms above), never
+        -- through this channel-less path.
         ELSE
           (
             -- Every regular way (standard_f1, filial, backcross, ibl, sib_cross,

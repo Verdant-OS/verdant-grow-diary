@@ -52,7 +52,7 @@ import {
 } from "@/constants/manualSensorTruthCopy";
 import type { ManualCorrectionContext } from "@/lib/manualSensorCorrectionContext";
 import { insertManualSensorReadingReturningId } from "@/lib/insertManualSensorReadingReturningId";
-import { useInsertManualSnapshotEdit } from "@/hooks/useInsertManualSnapshotEdit";
+import { insertManualSnapshotEdit } from "@/hooks/useInsertManualSnapshotEdit";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 
 interface TentOption {

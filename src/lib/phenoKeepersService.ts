@@ -219,14 +219,24 @@ export async function recordCross(input: {
     // selfing uses the mother as its own donor; open pollination may omit the
     // donor; every other way needs a distinct, non-blank donor.
     const isSelfingType = input.crossType === "selfing_s1" || input.crossType === "selfing_sn";
+    const donorNamed = pollen !== null && pollen.trim() !== "";
     if (isSelfingType) {
       if (!isSelf)
         return {
           ok: false,
           error: "A selfing uses the mother as its own pollen donor — leave the donor empty.",
         };
-    } else if (input.crossType !== "open_pollination") {
-      if (pollen === null || pollen.trim() === "" || pollen.trim() === female)
+    } else if (input.crossType === "open_pollination") {
+      // Population pollen: a named donor is optional, but if given it must be a
+      // DISTINCT keeper (never the mother) to satisfy parents_by_type.
+      if (donorNamed && pollen!.trim() === female)
+        return {
+          ok: false,
+          error: "Choose a distinct pollen donor, or leave it empty for open pollination.",
+        };
+    } else {
+      // Every other two-parent way needs a distinct, non-blank donor.
+      if (!donorNamed || pollen!.trim() === female)
         return { ok: false, error: "Choose a distinct pollen donor for this cross." };
     }
 
@@ -276,7 +286,10 @@ export async function recordCross(input: {
   }
 
   const isSelfingType = crossType === "selfing_s1" || crossType === "selfing_sn";
-  const dbMale = isSelfingType ? null : pollen;
+  // Selfing has no distinct male; otherwise persist the donor, coalescing a
+  // blank/absent donor (only reachable for open_pollination) to NULL so we never
+  // write an empty-string uuid.
+  const dbMale = isSelfingType || pollen === null || pollen.trim() === "" ? null : pollen.trim();
 
   const { data, error } = await phenoDb
     .from("pheno_crosses")

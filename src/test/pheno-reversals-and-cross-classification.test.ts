@@ -377,6 +377,42 @@ describe("recordCross — explicit taxonomy path (validateBreedingCross)", () =>
     });
   });
 
+  it("open_pollination: a blank donor persists as null; the mother-as-donor is rejected", async () => {
+    // Blank donor → treated as "no named donor", persisted as null (never "").
+    h.client = makeSupabase({ reversedKeeperIds: [] });
+    const blank = await recordCross({
+      femaleKeeperId: "mom",
+      maleKeeperId: "   ",
+      crossType: "open_pollination",
+      channel: "open_pollination",
+    });
+    expect(blank.ok).toBe(true);
+    expect(h.client.crossInserts[0].male_keeper_id).toBeNull();
+    // A named donor equal to the mother is rejected (parents_by_type distinctness).
+    h.client = makeSupabase({ reversedKeeperIds: [] });
+    const selfDonor = await recordCross({
+      femaleKeeperId: "mom",
+      maleKeeperId: "mom",
+      crossType: "open_pollination",
+      channel: "open_pollination",
+    });
+    expect(selfDonor.ok).toBe(false);
+    if (selfDonor.ok === false) expect(selfDonor.error).toMatch(/distinct/i);
+    expect(h.client.crossInserts.length).toBe(0);
+  });
+
+  it("open_pollination: a distinct named donor is persisted", async () => {
+    h.client = makeSupabase({ reversedKeeperIds: [] });
+    const r = await recordCross({
+      femaleKeeperId: "mom",
+      maleKeeperId: "pop",
+      crossType: "open_pollination",
+      channel: "open_pollination",
+    });
+    expect(r.ok).toBe(true);
+    expect(h.client.crossInserts[0].male_keeper_id).toBe("pop");
+  });
+
   it("nulls generation + recurrent_parent for ways that don't carry them (matches DB shape)", async () => {
     h.client = makeSupabase({ reversedKeeperIds: [] });
     const r = await recordCross({

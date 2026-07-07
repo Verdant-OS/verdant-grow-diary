@@ -295,7 +295,7 @@ describe("PhenoKeepersPage — breeding activity timeline (C3)", () => {
           method: "sts",
           note: null,
           appliedAt: "2026-07-06T00:00:00Z",
-          createdAt: "2026-07-06T00:00:00Z", channel: null, generation: null, recurrentParentId: null,
+          createdAt: "2026-07-06T00:00:00Z",
         },
       ],
       crosses: [

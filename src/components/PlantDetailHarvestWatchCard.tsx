@@ -47,6 +47,13 @@ import { cn } from "@/lib/utils";
 interface PlantDetailHarvestWatchCardProps {
   plantId: string | null | undefined;
   hasPlantPhoto?: boolean;
+  /**
+   * Number of gallery thumbnails currently rendered by the Recent Photos
+   * strip for this plant. When provided, the Evidence tile shows an
+   * explicit reconciliation note so growers never see a contradiction
+   * between "No photos yet" and "N photo evidence points".
+   */
+  galleryPhotoCount?: number | null;
   className?: string;
 }
 

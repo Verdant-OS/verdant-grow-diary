@@ -11,7 +11,8 @@
  *  - No reads, no writes, no Supabase, no automation.
  */
 import { useMemo } from "react";
-import { Gauge, AlertTriangle, XCircle } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Gauge, AlertTriangle, XCircle, History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,11 @@ import {
   type ManualSensorSnapshotInput,
 } from "@/lib/manualSensorSnapshotQualityRules";
 import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
+import {
+  encodeManualCorrectionHash,
+  hasCorrectableOriginalIds,
+  type ManualCorrectionMetric,
+} from "@/lib/manualSensorCorrectionContext";
 
 /**
  * Map view-model reading fields to the sanitized quality-helper field names.
@@ -44,6 +50,16 @@ const FIELD_MAP: Readonly<Record<string, keyof ManualSensorSnapshotInput>> = {
   reservoir_ph: "ph",
 };
 
+/** Map view-model reading fields to the correction metric namespace. */
+const CORRECTION_FIELD_MAP: Readonly<Record<string, ManualCorrectionMetric>> = {
+  air_temp_c: "temperature_c",
+  humidity_pct: "humidity_pct",
+  vpd_kpa: "vpd_kpa",
+  co2_ppm: "co2_ppm",
+  soil_moisture_pct: "soil_moisture_pct",
+  ppfd: "ppfd",
+};
+
 interface EditSummary {
   count: number;
   lastChangedAt: string | null;
@@ -53,6 +69,15 @@ interface Props {
   card: ManualSnapshotTimelineCardModel;
   /** Optional summary of edit history for this snapshot. Presenter-only. */
   editSummary?: EditSummary;
+  /**
+   * Per-metric ORIGINAL sensor_readings row IDs, keyed by the same
+   * `field` used in `card.readings`. When at least one real uuid is
+   * present AND the card source is manual, a "Correct manual reading"
+   * link is rendered that deep-links to /sensors#manual-reading with
+   * the correction context. Never inferred from timestamp/metric — the
+   * caller must supply real IDs.
+   */
+  originalReadingIds?: Partial<Record<string, string>>;
 }
 
 function severityIcon(severity: ManualSnapshotTimelineCardModel["severity"]) {

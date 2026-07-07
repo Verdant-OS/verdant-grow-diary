@@ -1216,6 +1216,26 @@ export default function QuickLog({
                 setNote(e.target.value);
                 setSaveError(null);
               }}
+              onInput={(e) => {
+                // Native input events (paste, dictation, programmatic
+                // dispatchEvent) may bypass React's synthetic onChange in
+                // some environments. Mirror the DOM value into state so
+                // preview validation and save always see what the grower
+                // visibly typed.
+                const v = (e.currentTarget as HTMLTextAreaElement).value;
+                setNote((prev) => (prev === v ? prev : v));
+              }}
+              onCompositionEnd={(e) => {
+                // IME / dictation finalization: commit the final composed
+                // value into React state so validation clears immediately.
+                const v = (e.currentTarget as HTMLTextAreaElement).value;
+                setNote((prev) => (prev === v ? prev : v));
+              }}
+              onBlur={(e) => {
+                // Last-chance sync before the grower taps Save.
+                const v = e.currentTarget.value;
+                setNote((prev) => (prev === v ? prev : v));
+              }}
               placeholder="Watered, looking healthy, slight yellowing on a fan leaf…"
               rows={3}
               aria-label="Quick log observation note"
@@ -1224,6 +1244,7 @@ export default function QuickLog({
               autoCapitalize="sentences"
               spellCheck={true}
             />
+
           </section>
 
           {(() => {

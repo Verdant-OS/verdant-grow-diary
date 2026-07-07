@@ -223,7 +223,7 @@ export default function ManualSensorReadingCard({
   async function doSave() {
     // Belt-and-suspenders: even though Save buttons are disabled while
     // pending, guard against a second concurrent call from any path.
-    if (insert.isPending) return;
+    if (insert.isPending || insertEdit.isPending) return;
     const capturedMetrics = validation.metrics;
     const payloads = buildManualReadingPayloads({
       tentId,
@@ -231,14 +231,65 @@ export default function ManualSensorReadingCard({
       deviceNote,
     });
     try {
-      // Sequential keeps ordering deterministic and per-row error surfacing
-      // simple; manual entries are tiny (≤ 5 metrics).
-      for (const p of payloads) {
-        await insert.mutateAsync(p);
+      let auditWarnings = 0;
+      if (isCorrection && correction) {
+        // Correction save path — never touches the original row. For each
+        // metric we insert a NEW manual sensor_readings row (source stays
+        // MANUAL), then, when we have both the ORIGINAL reading id AND
+        // the metric's value actually changed, we insert ONE
+        // manual_sensor_snapshot_edits row linking original → replacement.
+        // If a replacement insert fails, we insert no audit row for that
+        // metric. If the audit insert fails after the replacement
+        // succeeds, we surface a warning but keep the replacement.
+        for (const p of payloads) {
+          const metric = p.metric as ManualMetric;
+          const origId = correction.originalReadingIds[metric];
+          const origValue = correction.originalValues[metric];
+          const changed =
+            typeof origValue === "number" ? Math.abs(origValue - p.value) > 1e-9 : true;
+
+          if (!origId) {
+            // No original ID for this metric — save through the standard
+            // path (no audit link possible). Never infer IDs.
+            await insert.mutateAsync(p);
+            continue;
+          }
+
+          const replacement = await insertManualSensorReadingReturningId(p);
+
+          if (!changed) continue;
+
+          try {
+            await insertEdit.mutateAsync({
+              original_reading_id: origId,
+              replacement_reading_id: replacement.id,
+              tent_id: tentId,
+              plant_id: null,
+              original: { source: "manual", [metric]: origValue as number },
+              replacement: { source: "manual", [metric]: p.value },
+              change_reason: null,
+            });
+          } catch (auditErr) {
+            auditWarnings += 1;
+             
+            console.warn("[manual-sensor-correction] audit insert failed", auditErr);
+          }
+        }
+      } else {
+        // Standard save: sequential keeps ordering deterministic and
+        // per-row error surfacing simple.
+        for (const p of payloads) {
+          await insert.mutateAsync(p);
+        }
       }
       const createdAt = new Date().toISOString();
       const successLine = buildManualSaveSuccessLine({ metrics: capturedMetrics });
       toast.success(successMessage ?? successLine);
+      if (auditWarnings > 0) {
+        toast.warning(
+          `Correction saved, but ${auditWarnings} edit history entr${auditWarnings === 1 ? "y" : "ies"} could not be recorded. The replacement readings are safe; the original stays in history.`,
+        );
+      }
       onSaved?.({
         tentId,
         metricsSaved: payloads.length,
@@ -259,6 +310,7 @@ export default function ManualSensorReadingCard({
       console.warn("[manual-sensor-save] failed");
     }
   }
+
 
   async function onSave() {
     if (!tentId) {

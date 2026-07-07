@@ -136,6 +136,85 @@ export async function insertStressObservation(
   return toRow(data as Row);
 }
 
+/**
+ * Update an existing PHENOHUNT stress observation. `created_at` is never sent
+ * so it stays as originally recorded; `updated_at` is refreshed database-side
+ * by the existing trigger. Ownership + integrity are re-checked by the
+ * pheno_stress_observations_update_own RLS policy.
+ */
+export type PhenoStressUpdateInput = Omit<PhenoStressInsertInput, "userId" | "huntId">;
+
+export async function updateStressObservation(
+  id: string,
+  input: PhenoStressUpdateInput,
+): Promise<PhenoStressObservationRow> {
+  const { data, error } = await supabase
+    .from("pheno_stress_observations")
+    .update({
+      plant_id: input.plantId,
+      stress_factor: input.stressFactor,
+      status: input.status,
+      start_date: input.startDate,
+      end_date: input.endDate,
+      intensity: input.intensity,
+      plant_response: input.plantResponse,
+      recovery_notes: input.recoveryNotes,
+      yield_impact_notes: input.yieldImpactNotes,
+      disease_pest_notes: input.diseasePestNotes,
+      recommendation: input.recommendation,
+      linked_diary_entry_id: input.linkedDiaryEntryId,
+      notes: input.notes,
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return toRow(data as Row);
+}
+
+/**
+ * Delete a single stress observation. RLS pheno_stress_observations_delete_own
+ * restricts this to the owner. Diary entries and candidate/plant records are
+ * never touched.
+ */
+export async function deleteStressObservation(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("pheno_stress_observations")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * Fetch stress observations linked to a diary entry, or (fallback) matching
+ * the diary entry's plant. RLS restricts results to the caller's own rows.
+ */
+export async function listStressObservationsForDiaryEntry(
+  diaryEntryId: string,
+  plantId?: string | null,
+): Promise<readonly PhenoStressObservationRow[]> {
+  const linkedQuery = supabase
+    .from("pheno_stress_observations")
+    .select("*")
+    .eq("linked_diary_entry_id", diaryEntryId)
+    .order("start_date", { ascending: false });
+  const { data: linked, error: linkedErr } = await linkedQuery;
+  if (linkedErr) throw linkedErr;
+  const linkedRows = (linked ?? []).map((r) => toRow(r as Row));
+  if (!plantId) return linkedRows;
+  const seen = new Set(linkedRows.map((r) => r.id));
+  const { data: plantRows, error: plantErr } = await supabase
+    .from("pheno_stress_observations")
+    .select("*")
+    .eq("plant_id", plantId)
+    .order("start_date", { ascending: false });
+  if (plantErr) throw plantErr;
+  const extras = (plantRows ?? [])
+    .map((r) => toRow(r as Row))
+    .filter((r) => !seen.has(r.id));
+  return [...linkedRows, ...extras];
+}
+
 export interface DiaryOptionRow {
   readonly id: string;
   readonly entryAt: string | null;

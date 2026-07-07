@@ -46,6 +46,13 @@ export interface QuickLogSnapshotStripViewModel {
   description: string;
   /** Captured timestamp (ISO) or null when no snapshot is available. */
   capturedAt: string | null;
+  /**
+   * Absolute, deterministic captured-at label ("Jul 7, 2026, 7:14 PM UTC")
+   * or null when there is no snapshot. Presented alongside the relative
+   * age so growers can always see the exact moment captured. Never
+   * relabels manual data as live.
+   */
+  capturedAtLabel: string | null;
   /** Human-friendly age string ("5 min ago", "2 days ago"), or null. */
   ageLabel: string | null;
   /** Selected metric chips, presenter-safe. Empty when unknown. */

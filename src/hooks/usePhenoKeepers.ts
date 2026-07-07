@@ -23,6 +23,14 @@ import {
   listReversalsForKeepers,
   type ReversalRow,
 } from "@/lib/phenoReversalsService";
+import {
+  listLatestSexObservationsForHunt,
+  type SexObservationRow,
+} from "@/lib/phenoSexObservationService";
+import {
+  listKeeperDecisionHistoryForHunt,
+  type KeeperDecisionLogEntry,
+} from "@/lib/phenoKeeperDecisionLogService";
 
 export type KeepersStatus = "idle" | "loading" | "ok" | "error";
 
@@ -37,6 +45,10 @@ export interface UsePhenoKeepersState {
   reversals: ReversalRow[];
   /** Keeper ids the grower has recorded a reversal for (derived state). */
   reversedKeeperIds: string[];
+  /** Latest sex observation per candidate (for the activity timeline). */
+  sexByPlant: Record<string, SexObservationRow>;
+  /** Keeper decision history per candidate, newest-first (for the timeline). */
+  decisionsByPlant: Record<string, KeeperDecisionLogEntry[]>;
   error: string | null;
   saving: boolean;
   promoteToKeeper: (sourcePlantId: string, keeperName: string) => Promise<boolean>;
@@ -65,6 +77,10 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
   const [crosses, setCrosses] = useState<CrossRow[]>([]);
   const [reversals, setReversals] = useState<ReversalRow[]>([]);
   const [reversedKeeperIds, setReversedKeeperIds] = useState<string[]>([]);
+  const [sexByPlant, setSexByPlant] = useState<Record<string, SexObservationRow>>({});
+  const [decisionsByPlant, setDecisionsByPlant] = useState<
+    Record<string, KeeperDecisionLogEntry[]>
+  >({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
@@ -85,9 +101,11 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
         setStatus("error");
         return;
       }
-      const [keeperRows, crossRows] = await Promise.all([
+      const [keeperRows, crossRows, sexRows, decisionRows] = await Promise.all([
         listKeepersForHunt(id),
         listCrossesForHunt(id),
+        listLatestSexObservationsForHunt(id),
+        listKeeperDecisionHistoryForHunt(id),
       ]);
       const keeperIds = keeperRows.map((k) => k.id);
       // Scope the reversal read to this hunt's keepers, not every reversal.
@@ -106,6 +124,8 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
       setCrosses(crossRows);
       setReversals(reversalRows);
       setReversedKeeperIds(reversedIds);
+      setSexByPlant(sexRows);
+      setDecisionsByPlant(decisionRows);
       setStatus("ok");
     })().catch(() => {
       if (cancelled) return;
@@ -195,6 +215,8 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
     crosses,
     reversals,
     reversedKeeperIds,
+    sexByPlant,
+    decisionsByPlant,
     error,
     saving,
     promoteToKeeper,

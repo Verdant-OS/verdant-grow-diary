@@ -17,7 +17,7 @@ import {
   REVERSAL_METHOD_OPTIONS,
   SELF_DONOR_VALUE,
 } from "@/lib/phenoCrossFormViewModel";
-import { buildPhenoTimelineEntries } from "@/lib/phenoTimelineEntriesViewModel";
+import { buildPhenoHuntActivityEntries } from "@/lib/phenoHuntActivityViewModel";
 import PhenoTimelineEntries from "@/components/PhenoTimelineEntries";
 import { buildCloneTreeRows } from "@/lib/phenoCloneTreeViewModel";
 
@@ -63,23 +63,34 @@ export default function PhenoKeepersPage() {
     [female, donor, ks.reversedKeeperIds, ks.keepers],
   );
 
-  // Chronological breeding activity for this hunt: reversals + crosses (with
-  // selfing rendered "Self" and F1/Feminized/S1 badges). Read-only.
-  const timelineEntries = useMemo(
-    () =>
-      buildPhenoTimelineEntries({
-        crosses: ks.crosses,
-        reversals: ks.reversals,
-        keeperName: (kid) => keeperNameById[kid] ?? null,
-      }),
-    [ks.crosses, ks.reversals, keeperNameById],
-  );
-
   const candidateLabelById = useMemo(() => {
     const m: Record<string, string> = {};
     for (const c of ks.candidates) m[c.candidateId] = c.candidateLabel ?? c.candidateId;
     return m;
   }, [ks.candidates]);
+
+  // Chronological pheno activity for this hunt: sex reveals, keeper decisions,
+  // reversals, and crosses (selfing rendered "Self"; F1/Feminized/S1 badges;
+  // each row labeled by candidate). Read-only.
+  const timelineEntries = useMemo(
+    () =>
+      buildPhenoHuntActivityEntries({
+        sexByPlant: ks.sexByPlant,
+        decisionsByPlant: ks.decisionsByPlant,
+        crosses: ks.crosses,
+        reversals: ks.reversals,
+        candidateLabelById,
+        keeperNameById,
+      }),
+    [
+      ks.sexByPlant,
+      ks.decisionsByPlant,
+      ks.crosses,
+      ks.reversals,
+      candidateLabelById,
+      keeperNameById,
+    ],
+  );
 
   const lineage = useMemo(
     () =>

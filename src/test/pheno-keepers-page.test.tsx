@@ -44,6 +44,8 @@ function renderAt(state: Partial<UsePhenoKeepersState>) {
     crosses: [],
     reversals: [],
     reversedKeeperIds: [],
+    sexByPlant: {},
+    decisionsByPlant: {},
     error: null,
     saving: false,
     promoteToKeeper,
@@ -328,6 +330,55 @@ describe("PhenoKeepersPage — breeding activity timeline (C3)", () => {
   it("hides the activity section when there is no reversal or cross", () => {
     renderAt({ keepers: [keeper("k1", "Gas")] });
     expect(screen.queryByTestId("pheno-keepers-activity")).toBeNull();
+  });
+
+  it("also surfaces sex reveals and keeper decisions on the activity timeline", () => {
+    renderAt({
+      keepers: [keeper("k1", "Gas")],
+      candidates: [{ candidateId: "p1", candidateLabel: "GMO #1" }],
+      sexByPlant: {
+        p1: {
+          plantId: "p1",
+          sex: "hermaphrodite",
+          hermObserved: true,
+          note: null,
+          observedAt: "2026-07-05T00:00:00Z",
+        },
+      },
+      decisionsByPlant: {
+        p1: [
+          {
+            plantId: "p1",
+            decision: "cull",
+            reason: "hermed at flip",
+            note: null,
+            decidedAt: "2026-07-06T00:00:00Z",
+          },
+        ],
+      },
+    });
+    const activity = screen.getByTestId("pheno-keepers-activity");
+    // Sex reveal + decision now appear here too (parity with the diary timeline),
+    // each labeled by candidate.
+    expect(activity).toHaveTextContent(/GMO #1 — Hermaphrodite traits observed/);
+    expect(activity).toHaveTextContent(/GMO #1: Cull/);
+    expect(within(activity).getByTestId("pheno-timeline-badge-sex:p1")).toHaveTextContent(/Herm/);
+  });
+
+  it("shows the activity section when only a sex reveal exists (no reversal or cross)", () => {
+    renderAt({
+      keepers: [keeper("k1", "Gas")],
+      sexByPlant: {
+        p1: {
+          plantId: "p1",
+          sex: "female",
+          hermObserved: false,
+          note: null,
+          observedAt: "2026-07-05T00:00:00Z",
+        },
+      },
+    });
+    expect(screen.getByTestId("pheno-keepers-activity")).toBeInTheDocument();
   });
 });
 

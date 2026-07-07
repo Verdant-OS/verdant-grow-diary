@@ -602,6 +602,7 @@ function UpgradeSuccessPanel({
     !!currentPlanId &&
     currentPlanId !== "free" &&
     (!planIdFromQuery || planIdFromQuery === currentPlanId);
+  const unlockedFeatures = resolvedId ? resolveTierFeatures(resolvedId) : [];
 
   return (
     <section
@@ -617,16 +618,16 @@ function UpgradeSuccessPanel({
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
         {activationConfirmed
-          ? "Your plan is active. Your unlocked features are listed below."
+          ? "Your plan is active. Your newly unlocked features are listed below."
           : "Your plan features should unlock shortly. If checkout completed, your account should update shortly — we're checking your account status."}
       </p>
-      {tier ? (
-        <div className="mt-4">
+      {tier && unlockedFeatures.length > 0 ? (
+        <div className="mt-4" data-testid="upgrade-success-features">
           <p className="text-sm font-medium">
-            {tier.name} — what unlocks next
+            {tier.name} — newly unlocked features
           </p>
           <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-            {tier.features.map((f) => (
+            {unlockedFeatures.map((f) => (
               <li key={f} className="flex items-start gap-2">
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <span>{f}</span>

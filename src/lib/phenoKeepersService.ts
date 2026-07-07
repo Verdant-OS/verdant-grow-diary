@@ -33,15 +33,21 @@ export interface CloneRow {
 export interface CrossRow {
   readonly id: string;
   readonly femaleKeeperId: string;
-  // B2: nullable — a selfing_s1 cross has no distinct male parent (the reversed
-  // mother pollinates itself). Readers/UI must treat null as "self".
+  // Nullable — a selfing_s1/selfing_sn/open_pollination cross may have no
+  // distinct male parent. Readers/UI must treat null as "self" or
+  // "open pollination", never as a broken row.
   readonly maleKeeperId: string | null;
-  // B2: standard_f1 | feminized_cross | selfing_s1 (see breedingReproductionRules).
+  // Full 15-value CrossType from breedingReproductionRules; legacy rows use
+  // the original 3 (standard_f1 | feminized_cross | selfing_s1).
   readonly crossType: string;
   readonly crossName: string | null;
   readonly note: string | null;
   readonly crossedAt: string | null;
   readonly createdAt: string | null;
+  // Full-taxonomy metadata (nullable — legacy rows have no channel/gen/rp).
+  readonly channel: string | null;
+  readonly generation: number | null;
+  readonly recurrentParentId: string | null;
 }
 
 export type SaveResult = { ok: true; id: string } | { ok: false; error: string };
@@ -207,19 +213,32 @@ export async function listCrossesForHunt(huntId: string): Promise<CrossRow[]> {
   const { data, error } = await phenoDb
     .from("pheno_crosses")
     .select(
-      "id, female_keeper_id, male_keeper_id, cross_type, cross_name, note, crossed_at, created_at",
+      "id, female_keeper_id, male_keeper_id, cross_type, cross_name, note, crossed_at, created_at, channel, generation, recurrent_parent_id",
     )
     .eq("hunt_id", id)
     .order("created_at", { ascending: false });
   if (error || !data) return [];
-  return data.map((r) => ({
-    id: r.id,
-    femaleKeeperId: r.female_keeper_id,
-    maleKeeperId: r.male_keeper_id ?? null,
-    crossType: r.cross_type ?? "standard_f1",
-    crossName: r.cross_name ?? null,
-    note: r.note ?? null,
-    crossedAt: r.crossed_at ?? null,
-    createdAt: r.created_at ?? null,
-  }));
+  return data.map((r) => {
+    const row = r as typeof r & {
+      channel?: string | null;
+      generation?: number | null;
+      recurrent_parent_id?: string | null;
+    };
+    return {
+      id: row.id,
+      femaleKeeperId: row.female_keeper_id,
+      maleKeeperId: row.male_keeper_id ?? null,
+      crossType: row.cross_type ?? "standard_f1",
+      crossName: row.cross_name ?? null,
+      note: row.note ?? null,
+      crossedAt: row.crossed_at ?? null,
+      createdAt: row.created_at ?? null,
+      channel: row.channel ?? null,
+      generation:
+        typeof row.generation === "number" && Number.isFinite(row.generation)
+          ? row.generation
+          : null,
+      recurrentParentId: row.recurrent_parent_id ?? null,
+    };
+  });
 }

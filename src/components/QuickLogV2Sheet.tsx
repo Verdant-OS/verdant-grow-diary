@@ -288,11 +288,11 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     feedingForm.products,
   ]);
 
-  // Idempotent: the note field is synced from multiple event paths
-  // (onChange + onInput + onCompositionEnd + onBlur), which often fire for
-  // the same user action. Returning the SAME object when the value is
-  // unchanged lets React bail out of the re-render, so duplicate event
-  // paths cost nothing and IME composition stays smooth.
+  // Idempotent: the note field receives value updates from multiple event
+  // paths (onChange + onInput + onCompositionEnd + onBlur), which often
+  // fire for the same user action. Returning the SAME object when the
+  // value is unchanged lets React bail out of the re-render, so duplicate
+  // event paths cost nothing and IME composition stays smooth.
   const setField = <K extends keyof QuickLogV2FormState>(k: K, v: QuickLogV2FormState[K]) =>
     setForm((prev) => (prev[k] === v ? prev : { ...prev, [k]: v }));
 

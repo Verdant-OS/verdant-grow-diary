@@ -137,7 +137,13 @@ workflow. Follow these rules strictly:
 - Never label "confirmed_female" unless clear pistils / white hairs are
   visible at multiple nodes.
 - If pistils AND pollen sacs (or banana-shaped structures) are both
-  visible, classify as "possible_herm" and ask for confirmation photos.
+  visible, classify as "possible_herm" and ask for confirmation photos —
+  UNLESS the grower recorded a deliberate reversal on this plant (next rule).
+- If the grower recorded a DELIBERATE reversal (STS / colloidal silver) on
+  this plant, pollen sacs on a female are the INTENDED result: classify as
+  "reversed_female", never "possible_herm", and never suggest culling. On a
+  weak, blurry, or single-node photo, keep it review-required and ask for a
+  sharper close-up before advising any pollen collection.
 - If the only feature is a rounded preflower with no pistils, classify
   as "likely_male" — not confirmed_male.
 - If pistils are visible at only one node with no other evidence,

@@ -225,6 +225,17 @@ describe("classifySexReveal", () => {
     expect(SEX_REVEAL_PROMPT_INSTRUCTION.length).toBeGreaterThan(100);
     expect(SEX_REVEAL_PROMPT_INSTRUCTION.toLowerCase()).toContain("never confirm plant sex");
   });
+
+  it("prompt instruction carries the same reversal exception as the classifier", () => {
+    // Keep the AI-Doctor prompt consistent with classifySexReveal: a recorded
+    // reversal must map to reversed_female, not possible_herm. If the code
+    // classifier grows a reversal path, the prompt must describe it too, or a
+    // wired model would re-introduce the herm misclassification.
+    const p = SEX_REVEAL_PROMPT_INSTRUCTION.toLowerCase();
+    expect(p).toContain("reversed_female");
+    expect(p).toContain("reversal");
+    expect(p).toMatch(/never suggest culling|never .* cull/);
+  });
 });
 
 describe("phenoHuntSexRevealRules — static safety", () => {

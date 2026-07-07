@@ -35,11 +35,18 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const MIG_DIR = resolve(process.cwd(), "supabase/migrations");
+// Strip SQL comments PER FILE (while newlines are intact) BEFORE flattening —
+// otherwise a `-- comment` on the line above a statement gets absorbed into it
+// when whitespace is collapsed, so e.g. a commented GRANT no longer starts with
+// "GRANT" and is missed. Block comments first, then line comments to EOL.
+function stripSqlComments(sql: string): string {
+  return sql.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g, " ");
+}
 // ALL migrations, not only *pheno*-named — a UUID-named file could touch pheno.
 const allSql = readdirSync(MIG_DIR)
   .filter((f) => f.endsWith(".sql"))
   .sort()
-  .map((f) => readFileSync(resolve(MIG_DIR, f), "utf8"))
+  .map((f) => stripSqlComments(readFileSync(resolve(MIG_DIR, f), "utf8")))
   .join("\n");
 const flat = allSql.replace(/\s+/g, " ");
 // Pheno policy/grant statements are simple single-statement DDL (no internal

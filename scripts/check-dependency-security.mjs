@@ -24,11 +24,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-export const BLOCKED_PACKAGES = Object.freeze([
-  "@lovable.dev/mcp-js",
-  "esbuild",
-  "ajv",
-]);
+export const BLOCKED_PACKAGES = Object.freeze(["@lovable.dev/mcp-js", "esbuild", "ajv"]);
 
 export const BLOCKED_SEVERITIES = Object.freeze(["high", "critical"]);
 
@@ -39,16 +35,18 @@ export const BLOCKED_SEVERITIES = Object.freeze(["high", "critical"]);
  */
 export function redactSecrets(text) {
   if (typeof text !== "string") return text;
-  return text
-    // JWT-shaped tokens: xxx.yyy.zzz (three base64 segments)
-    .replace(/\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, "[REDACTED_JWT]")
-    // GitHub / npm classic tokens
-    .replace(/\bghp_[A-Za-z0-9]{20,}\b/g, "[REDACTED_GH_TOKEN]")
-    .replace(/\bnpm_[A-Za-z0-9]{20,}\b/g, "[REDACTED_NPM_TOKEN]")
-    // Generic Bearer credentials
-    .replace(/Bearer\s+[A-Za-z0-9._\-]{16,}/gi, "Bearer [REDACTED]")
-    // sk-/pk- style API keys
-    .replace(/\b(sk|pk|rk)_[A-Za-z0-9]{16,}\b/g, "[REDACTED_KEY]");
+  return (
+    text
+      // JWT-shaped tokens: xxx.yyy.zzz (three base64 segments)
+      .replace(/\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, "[REDACTED_JWT]")
+      // GitHub / npm classic tokens
+      .replace(/\bghp_[A-Za-z0-9]{20,}\b/g, "[REDACTED_GH_TOKEN]")
+      .replace(/\bnpm_[A-Za-z0-9]{20,}\b/g, "[REDACTED_NPM_TOKEN]")
+      // Generic Bearer credentials
+      .replace(/Bearer\s+[A-Za-z0-9._\-]{16,}/gi, "Bearer [REDACTED]")
+      // sk-/pk- style API keys
+      .replace(/\b(sk|pk|rk)_[A-Za-z0-9]{16,}\b/g, "[REDACTED_KEY]")
+  );
 }
 
 /**
@@ -148,8 +146,7 @@ export function evaluateFindings(findings, options = {}) {
     if (blockedSeverities.has(f.severity)) {
       blocked.push(f);
       reasons.push(
-        `Advisory on "${f.package}" is ${f.severity} severity ` +
-          `(id=${f.id ?? "n/a"}).`,
+        `Advisory on "${f.package}" is ${f.severity} severity ` + `(id=${f.id ?? "n/a"}).`,
       );
     }
   }
@@ -167,9 +164,7 @@ function readInput(argv) {
   // Run bun audit --json. Bun exits non-zero when findings exist; that's fine.
   const res = spawnSync("bun", ["audit", "--json"], { encoding: "utf8" });
   if (res.error && res.error.code === "ENOENT") {
-    process.stderr.write(
-      "check-dependency-security: `bun` is not on PATH.\n",
-    );
+    process.stderr.write("check-dependency-security: `bun` is not on PATH.\n");
     process.exit(2);
   }
   return (res.stdout ?? "") + (res.stderr ?? "");

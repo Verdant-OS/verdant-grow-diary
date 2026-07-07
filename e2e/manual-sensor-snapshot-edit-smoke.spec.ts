@@ -13,8 +13,7 @@ import { test, expect } from "@playwright/test";
  * Skips when the fixture env is not provided so local + CI without the
  * smoke fixture stay green.
  */
-const STRIP_URL = process.env.E2E_MANUAL_SNAPSHOT_STRIP_URL
-  ?? process.env.E2E_QUICK_LOG_STRIP_URL;
+const STRIP_URL = process.env.E2E_MANUAL_SNAPSHOT_STRIP_URL ?? process.env.E2E_QUICK_LOG_STRIP_URL;
 
 test.describe("Manual sensor snapshot — Quick Log strip edit smoke", () => {
   test.skip(
@@ -22,7 +21,9 @@ test.describe("Manual sensor snapshot — Quick Log strip edit smoke", () => {
     "Set E2E_MANUAL_SNAPSHOT_STRIP_URL (or E2E_QUICK_LOG_STRIP_URL) to a page containing a manual snapshot to run this smoke.",
   );
 
-  test("edited manual snapshot still labels MANUAL and shows captured timestamp", async ({ page }) => {
+  test("edited manual snapshot still labels MANUAL and shows captured timestamp", async ({
+    page,
+  }) => {
     await page.goto(STRIP_URL!);
 
     const strip = page.getByTestId("quicklog-sensor-snapshot-strip");

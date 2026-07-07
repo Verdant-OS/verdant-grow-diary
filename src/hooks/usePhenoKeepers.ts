@@ -23,6 +23,7 @@ import {
   listReversalsForKeepers,
   type ReversalRow,
 } from "@/lib/phenoReversalsService";
+import type { CrossType, Channel } from "@/lib/genetics/breedingReproductionRules";
 import {
   listLatestSexObservationsForHunt,
   type SexObservationRow,
@@ -57,13 +58,24 @@ export interface UsePhenoKeepersState {
   markReversed: (keeperId: string, method: string) => Promise<boolean>;
   /**
    * Record a cross. Pass a distinct maleKeeperId for a two-parent cross, or
-   * null to self (S1) the female keeper. The service classifies the cross type.
+   * null to self (S1) the female keeper. With no `options` the service
+   * auto-classifies (standard_f1 / feminized_cross / selfing_s1); pass `options`
+   * to record an explicit breeding way + channel from the full taxonomy.
    */
   saveCross: (
     femaleKeeperId: string,
     maleKeeperId: string | null,
     crossName: string,
+    options?: SaveCrossOptions,
   ) => Promise<boolean>;
+}
+
+/** Explicit taxonomy for saveCross (omit to auto-classify the 3 basic ways). */
+export interface SaveCrossOptions {
+  crossType?: CrossType | null;
+  channel?: Channel | null;
+  generation?: number | null;
+  recurrentParentId?: string | null;
 }
 
 export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeepersState {
@@ -186,7 +198,12 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
   );
 
   const saveCross = useCallback(
-    async (femaleKeeperId: string, maleKeeperId: string | null, crossName: string) => {
+    async (
+      femaleKeeperId: string,
+      maleKeeperId: string | null,
+      crossName: string,
+      options?: SaveCrossOptions,
+    ) => {
       if (!id) return false;
       setSaving(true);
       const res = await recordCross({
@@ -194,6 +211,10 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
         femaleKeeperId,
         maleKeeperId,
         crossName: crossName.trim() || null,
+        crossType: options?.crossType ?? null,
+        channel: options?.channel ?? null,
+        generation: options?.generation ?? null,
+        recurrentParentId: options?.recurrentParentId ?? null,
       });
       setSaving(false);
       if (res.ok === true) {

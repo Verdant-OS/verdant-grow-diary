@@ -78,9 +78,7 @@ export function evaluatePolicy({ cwd, readFile = readFileSync, exists = existsSy
   }
 
   const declared =
-    pkgJson.dependencies?.[CRITICAL_PACKAGE] ??
-    pkgJson.devDependencies?.[CRITICAL_PACKAGE] ??
-    null;
+    pkgJson.dependencies?.[CRITICAL_PACKAGE] ?? pkgJson.devDependencies?.[CRITICAL_PACKAGE] ?? null;
   if (!declared) {
     errors.push(`${CRITICAL_PACKAGE} is not present in package.json dependencies.`);
   } else if (!isExactSemver(declared)) {

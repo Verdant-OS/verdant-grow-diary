@@ -87,11 +87,10 @@ export default function OperatorPhenoCrossesSection({
               const typeIsKnown = isCrossType(row.crossType);
               const female = keeperName(row.femaleKeeperId) ?? "Unknown mother";
               const donor = donorLabel(row, keeperName);
-              const showRecurrent =
-                typeIsKnown && requiresRecurrentParent(row.crossType);
+              const showRecurrent = typeIsKnown && requiresRecurrentParent(row.crossType);
               const recurrentName =
                 showRecurrent && row.recurrentParentId
-                  ? keeperName(row.recurrentParentId) ?? "Unknown recurrent parent"
+                  ? (keeperName(row.recurrentParentId) ?? "Unknown recurrent parent")
                   : null;
               const showChannel = isChannel(row.channel);
               const showGeneration =
@@ -124,9 +123,7 @@ export default function OperatorPhenoCrossesSection({
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span data-testid={`operator-pheno-cross-female-${row.id}`}>
-                      {female}
-                    </span>
+                    <span data-testid={`operator-pheno-cross-female-${row.id}`}>{female}</span>
                     <span aria-hidden className="text-muted-foreground">
                       ×
                     </span>
@@ -179,10 +176,7 @@ export default function OperatorPhenoCrossesSection({
                     </p>
                   )}
                   {row.crossName && (
-                    <p
-                      className="text-[11px]"
-                      data-testid={`operator-pheno-cross-name-${row.id}`}
-                    >
+                    <p className="text-[11px]" data-testid={`operator-pheno-cross-name-${row.id}`}>
                       Name: {row.crossName}
                     </p>
                   )}

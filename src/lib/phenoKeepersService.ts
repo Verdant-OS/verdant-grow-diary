@@ -9,7 +9,16 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { phenoDb } from "@/integrations/supabase/phenoTables";
-import { classifyCross } from "@/lib/genetics/breedingReproductionRules";
+import {
+  classifyCross,
+  validateBreedingCross,
+  isCrossType,
+  isChannel,
+  requiresRecurrentParent,
+  requiresGeneration,
+  type CrossType,
+  type Channel,
+} from "@/lib/genetics/breedingReproductionRules";
 import { hasReversal } from "@/lib/phenoReversalsService";
 
 export interface KeeperRow {
@@ -40,14 +49,17 @@ export interface CrossRow {
   // Full 15-value CrossType from breedingReproductionRules; legacy rows use
   // the original 3 (standard_f1 | feminized_cross | selfing_s1).
   readonly crossType: string;
+  // Pollen route (natural_male | colloidal_silver | sts | ga3 | rodelization |
+  // open_pollination); null for legacy / auto-classified crosses.
+  readonly channel: string | null;
+  // F#/S#/BX# generation when the way carries one; null otherwise.
+  readonly generation: number | null;
+  // The line a backcross crosses back to; null off a backcross.
+  readonly recurrentParentId: string | null;
   readonly crossName: string | null;
   readonly note: string | null;
   readonly crossedAt: string | null;
   readonly createdAt: string | null;
-  // Full-taxonomy metadata (nullable — legacy rows have no channel/gen/rp).
-  readonly channel: string | null;
-  readonly generation: number | null;
-  readonly recurrentParentId: string | null;
 }
 
 export type SaveResult = { ok: true; id: string } | { ok: false; error: string };
@@ -147,14 +159,20 @@ export async function listClonesForKeepers(keeperIds: readonly string[]): Promis
 }
 
 /**
- * Record a cross. Pass a distinct `maleKeeperId` for a two-parent cross, or
- * null/omit it (or the mother's own id) to SELF a reversed keeper (S1).
+ * Record a cross. Two modes:
  *
- * The cross type is CLASSIFIED, not trusted: reversal state is read from
- * pheno_reversals and fed to classifyCross, which decides standard_f1 /
- * feminized_cross / selfing_s1 and rejects impossible combinations (e.g.
- * selfing an unreversed keeper). The persisted cross_type + null-for-selfing
- * male match the DB's RLS precondition, so the service and the database agree.
+ *  - AUTO-CLASSIFY (no `crossType`): pass a distinct `maleKeeperId` for a
+ *    two-parent cross, or null/omit it to SELF a reversed keeper (S1). Reversal
+ *    state is read from pheno_reversals and fed to classifyCross, which picks
+ *    standard_f1 / feminized_cross / selfing_s1 and rejects impossible combos.
+ *    This is the original path — the current keepers UI uses it unchanged.
+ *
+ *  - EXPLICIT TAXONOMY (`crossType` given): the grower picked a full breeding
+ *    way (+ channel / generation / recurrent parent). validateBreedingCross
+ *    verifies the combination against the same rules the DB's RLS enforces, so
+ *    service and database agree; a selfing persists a null male.
+ *
+ * Either way the cross_type + null-for-selfing male match the DB precondition.
  */
 export async function recordCross(input: {
   huntId?: string | null;
@@ -162,33 +180,118 @@ export async function recordCross(input: {
   maleKeeperId?: string | null;
   crossName?: string | null;
   note?: string | null;
+  /** Explicit taxonomy (omit for the auto-classify path). */
+  crossType?: CrossType | null;
+  channel?: Channel | null;
+  generation?: number | null;
+  recurrentParentId?: string | null;
 }): Promise<SaveResult> {
   const userId = await currentUserId();
   if (!userId) return { ok: false, error: "Sign in to record a cross." };
 
   const female = (input.femaleKeeperId ?? "").trim();
+  if (!female) return { ok: false, error: "Choose the seed (mother) keeper." };
   // PRESERVE the null-vs-blank distinction. Explicit null/omitted signals
-  // selfing; a (possibly blank) STRING is passed through to classifyCross,
+  // selfing; a (possibly blank) STRING is passed through to the classifier,
   // which rejects a blank donor as an incomplete two-parent form rather than
   // silently selfing it. Do NOT coalesce "" → null here.
   const pollen: string | null = input.maleKeeperId == null ? null : input.maleKeeperId.trim();
+  const isSelf = pollen === null || pollen.trim() === female;
   // Only a real, distinct donor has a reversal state worth querying.
   const isDistinctDonor = pollen !== null && pollen !== "" && pollen !== female;
 
   const femaleReversed = await hasReversal(female);
   const pollenReversed = isDistinctDonor ? await hasReversal(pollen as string) : false;
 
-  const classified = classifyCross({
-    femaleKeeperId: female,
-    pollenKeeperId: pollen,
-    femaleReversed,
-    pollenReversed,
-  });
-  // Explicit `=== false` narrowing: this repo compiles with strictNullChecks
-  // off, under which `!classified.ok` does not narrow to the failure branch.
-  if (classified.ok === false) return { ok: false, error: classified.reason };
+  let crossType: CrossType;
+  let channel: Channel | null = null;
+  let generation: number | null = null;
+  let recurrentParentId: string | null = null;
 
-  const dbMale = classified.crossType === "selfing_s1" ? null : pollen;
+  if (input.crossType != null) {
+    // EXPLICIT taxonomy path.
+    if (!isCrossType(input.crossType)) return { ok: false, error: "Unknown cross type." };
+    if (input.channel != null && !isChannel(input.channel))
+      return { ok: false, error: "Unknown pollen channel." };
+    if (input.channel == null)
+      return { ok: false, error: "Choose how the pollen was made (the channel)." };
+
+    // Donor SHAPE (mirrors the DB's parents_by_type CHECK so the service rejects
+    // with a clear message instead of leaning on a generic DB failure): a
+    // selfing uses the mother as its own donor; open pollination may omit the
+    // donor; every other way needs a distinct, non-blank donor.
+    const isSelfingType = input.crossType === "selfing_s1" || input.crossType === "selfing_sn";
+    const donorNamed = pollen !== null && pollen.trim() !== "";
+    if (isSelfingType) {
+      if (!isSelf)
+        return {
+          ok: false,
+          error: "A selfing uses the mother as its own pollen donor — leave the donor empty.",
+        };
+    } else if (input.crossType === "open_pollination") {
+      // Population pollen: a named donor is optional, but if given it must be a
+      // DISTINCT keeper (never the mother) to satisfy parents_by_type.
+      if (donorNamed && pollen!.trim() === female)
+        return {
+          ok: false,
+          error: "Choose a distinct pollen donor, or leave it empty for open pollination.",
+        };
+    } else {
+      // Every other two-parent way needs a distinct, non-blank donor.
+      if (!donorNamed || pollen!.trim() === female)
+        return { ok: false, error: "Choose a distinct pollen donor for this cross." };
+    }
+
+    // Only backcrosses carry a recurrent parent; only F#/S#/BX# ways carry a
+    // generation. Null the rest so the persisted shape matches the DB's
+    // recurrent_parent_by_type + type-aware generation CHECKs exactly.
+    const recurrent =
+      requiresRecurrentParent(input.crossType) &&
+      typeof input.recurrentParentId === "string" &&
+      input.recurrentParentId.trim() !== ""
+        ? input.recurrentParentId.trim()
+        : null;
+    const gen =
+      requiresGeneration(input.crossType) &&
+      typeof input.generation === "number" &&
+      Number.isFinite(input.generation)
+        ? Math.trunc(input.generation)
+        : null;
+
+    const check = validateBreedingCross({
+      crossType: input.crossType,
+      channel: input.channel,
+      isSelf,
+      femaleReversed,
+      pollenReversed,
+      hasRecurrentParent: recurrent !== null,
+      generation: gen,
+    });
+    if (check.ok === false) return { ok: false, error: check.reason };
+
+    crossType = input.crossType;
+    channel = input.channel;
+    generation = gen;
+    recurrentParentId = recurrent;
+  } else {
+    // AUTO-CLASSIFY path (original behaviour).
+    const classified = classifyCross({
+      femaleKeeperId: female,
+      pollenKeeperId: pollen,
+      femaleReversed,
+      pollenReversed,
+    });
+    // Explicit `=== false` narrowing: this repo compiles with strictNullChecks
+    // off, under which `!classified.ok` does not narrow to the failure branch.
+    if (classified.ok === false) return { ok: false, error: classified.reason };
+    crossType = classified.crossType;
+  }
+
+  const isSelfingType = crossType === "selfing_s1" || crossType === "selfing_sn";
+  // Selfing has no distinct male; otherwise persist the donor, coalescing a
+  // blank/absent donor (only reachable for open_pollination) to NULL so we never
+  // write an empty-string uuid.
+  const dbMale = isSelfingType || pollen === null || pollen.trim() === "" ? null : pollen.trim();
 
   const { data, error } = await phenoDb
     .from("pheno_crosses")
@@ -197,7 +300,10 @@ export async function recordCross(input: {
       hunt_id: input.huntId ?? null,
       female_keeper_id: female,
       male_keeper_id: dbMale,
-      cross_type: classified.crossType,
+      cross_type: crossType,
+      channel,
+      generation,
+      recurrent_parent_id: recurrentParentId,
       cross_name: input.crossName ?? null,
       note: input.note ?? null,
     })
@@ -213,32 +319,23 @@ export async function listCrossesForHunt(huntId: string): Promise<CrossRow[]> {
   const { data, error } = await phenoDb
     .from("pheno_crosses")
     .select(
-      "id, female_keeper_id, male_keeper_id, cross_type, cross_name, note, crossed_at, created_at, channel, generation, recurrent_parent_id",
+      "id, female_keeper_id, male_keeper_id, cross_type, channel, generation, recurrent_parent_id, cross_name, note, crossed_at, created_at",
     )
     .eq("hunt_id", id)
     .order("created_at", { ascending: false });
   if (error || !data) return [];
-  return data.map((r) => {
-    const row = r as typeof r & {
-      channel?: string | null;
-      generation?: number | null;
-      recurrent_parent_id?: string | null;
-    };
-    return {
-      id: row.id,
-      femaleKeeperId: row.female_keeper_id,
-      maleKeeperId: row.male_keeper_id ?? null,
-      crossType: row.cross_type ?? "standard_f1",
-      crossName: row.cross_name ?? null,
-      note: row.note ?? null,
-      crossedAt: row.crossed_at ?? null,
-      createdAt: row.created_at ?? null,
-      channel: row.channel ?? null,
-      generation:
-        typeof row.generation === "number" && Number.isFinite(row.generation)
-          ? row.generation
-          : null,
-      recurrentParentId: row.recurrent_parent_id ?? null,
-    };
-  });
+  return data.map((r) => ({
+    id: r.id,
+    femaleKeeperId: r.female_keeper_id,
+    maleKeeperId: r.male_keeper_id ?? null,
+    crossType: r.cross_type ?? "standard_f1",
+    channel: r.channel ?? null,
+    generation:
+      typeof r.generation === "number" && Number.isFinite(r.generation) ? r.generation : null,
+    recurrentParentId: r.recurrent_parent_id ?? null,
+    crossName: r.cross_name ?? null,
+    note: r.note ?? null,
+    crossedAt: r.crossed_at ?? null,
+    createdAt: r.created_at ?? null,
+  }));
 }

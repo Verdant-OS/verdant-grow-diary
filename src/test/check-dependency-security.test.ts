@@ -9,7 +9,6 @@ import {
   redactSecrets,
   BLOCKED_PACKAGES,
   BLOCKED_SEVERITIES,
-  // @ts-ignore — .mjs script import
 } from "../../scripts/check-dependency-security.mjs";
 
 const CLEAN_JSON = JSON.stringify({ advisories: {} });

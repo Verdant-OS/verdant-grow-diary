@@ -7,7 +7,6 @@ import {
   isExactSemver,
   resolvedVersionInBunLock,
   evaluatePolicy,
-  // @ts-ignore — .mjs script import
 } from "../../scripts/check-bun-lockfile-policy.mjs";
 
 function makeFs(files: Record<string, string>) {
@@ -23,8 +22,7 @@ function makeFs(files: Record<string, string>) {
 
 const MCP = "@lovable.dev/mcp-js";
 const CWD = "/repo";
-const pkg = (spec: string) =>
-  JSON.stringify({ name: "verdant", dependencies: { [MCP]: spec } });
+const pkg = (spec: string) => JSON.stringify({ name: "verdant", dependencies: { [MCP]: spec } });
 const lockGood = `"${MCP}": ["${MCP}@0.20.0", "https://example/tgz", {}, "sha512-abc"]`;
 
 describe("isExactSemver", () => {
@@ -33,10 +31,18 @@ describe("isExactSemver", () => {
     (s) => expect(isExactSemver(s)).toBe(true),
   );
 
-  it.each(["^0.20.0", "~0.20.0", "0.20.x", "*", "latest", ">=0.20.0", "workspace:*", "file:./x", "git+https://x", ""])(
-    "rejects non-exact %s",
-    (s) => expect(isExactSemver(s)).toBe(false),
-  );
+  it.each([
+    "^0.20.0",
+    "~0.20.0",
+    "0.20.x",
+    "*",
+    "latest",
+    ">=0.20.0",
+    "workspace:*",
+    "file:./x",
+    "git+https://x",
+    "",
+  ])("rejects non-exact %s", (s) => expect(isExactSemver(s)).toBe(false));
 });
 
 describe("resolvedVersionInBunLock", () => {
@@ -77,19 +83,16 @@ describe("evaluatePolicy", () => {
     expect(r.errors.join(" ")).toMatch(/bun\.lockb/);
   });
 
-  it.each(["package-lock.json", "yarn.lock", "pnpm-lock.yaml"])(
-    "fails when %s exists",
-    (name) => {
-      const fs = makeFs({
-        "/repo/bun.lock": lockGood,
-        [`/repo/${name}`]: "x",
-        "/repo/package.json": pkg("0.20.0"),
-      });
-      const r = evaluatePolicy({ cwd: CWD, ...fs });
-      expect(r.ok).toBe(false);
-      expect(r.errors.join(" ")).toContain(name);
-    },
-  );
+  it.each(["package-lock.json", "yarn.lock", "pnpm-lock.yaml"])("fails when %s exists", (name) => {
+    const fs = makeFs({
+      "/repo/bun.lock": lockGood,
+      [`/repo/${name}`]: "x",
+      "/repo/package.json": pkg("0.20.0"),
+    });
+    const r = evaluatePolicy({ cwd: CWD, ...fs });
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toContain(name);
+  });
 
   it.each(["^0.20.0", "~0.20.0", "latest", "*"])(
     "fails when @lovable.dev/mcp-js uses %s",

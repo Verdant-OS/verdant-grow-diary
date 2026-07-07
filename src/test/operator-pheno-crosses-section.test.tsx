@@ -17,8 +17,7 @@ const NAMES: Record<string, string> = {
   "k-male": "Father",
   "k-rp": "Recurrent",
 };
-const lookup = (id: string | null | undefined) =>
-  id && id in NAMES ? NAMES[id] : null;
+const lookup = (id: string | null | undefined) => (id && id in NAMES ? NAMES[id] : null);
 
 function baseRow(over: Partial<CrossRow>): CrossRow {
   return {
@@ -45,9 +44,7 @@ describe("OperatorPhenoCrossesSection — taxonomy coverage", () => {
         crossType: t,
         // Selfing has no male parent; open_pollination may not.
         maleKeeperId:
-          t === "selfing_s1" || t === "selfing_sn" || t === "open_pollination"
-            ? null
-            : "k-male",
+          t === "selfing_s1" || t === "selfing_sn" || t === "open_pollination" ? null : "k-male",
         // Satisfy the generation UI branch for the types that require it.
         generation:
           t === "filial" || t === "selfing_sn"
@@ -55,8 +52,7 @@ describe("OperatorPhenoCrossesSection — taxonomy coverage", () => {
             : t === "backcross" || t === "feminized_bx"
               ? 1
               : null,
-        recurrentParentId:
-          t === "backcross" || t === "feminized_bx" ? "k-rp" : null,
+        recurrentParentId: t === "backcross" || t === "feminized_bx" ? "k-rp" : null,
       }),
     );
     const { getByTestId } = render(
@@ -107,9 +103,9 @@ describe("OperatorPhenoCrossesSection — taxonomy coverage", () => {
     const sn = getByTestId("operator-pheno-cross-donor-sn");
     expect(sn.textContent ?? "").toMatch(/self/i);
     // Generation renders for selfing_sn.
-    expect(
-      (getByTestId("operator-pheno-cross-generation-sn").textContent ?? "").trim(),
-    ).toMatch(/Generation:\s*3/);
+    expect((getByTestId("operator-pheno-cross-generation-sn").textContent ?? "").trim()).toMatch(
+      /Generation:\s*3/,
+    );
     // No blank / broken donor markers.
     expect(s1.textContent ?? "").not.toMatch(/^\s*$/);
   });
@@ -117,9 +113,7 @@ describe("OperatorPhenoCrossesSection — taxonomy coverage", () => {
   it("open pollination without a named male shows 'Open pollen', not blank", () => {
     const { getByTestId } = render(
       <OperatorPhenoCrossesSection
-        crosses={[
-          baseRow({ id: "op", crossType: "open_pollination", maleKeeperId: null }),
-        ]}
+        crosses={[baseRow({ id: "op", crossType: "open_pollination", maleKeeperId: null })]}
         keeperName={lookup}
       />,
     );
@@ -142,9 +136,7 @@ describe("OperatorPhenoCrossesSection — taxonomy coverage", () => {
         keeperName={lookup}
       />,
     );
-    expect(
-      (getByTestId("operator-pheno-cross-channel-with").textContent ?? ""),
-    ).toMatch(/STS/i);
+    expect(getByTestId("operator-pheno-cross-channel-with").textContent ?? "").toMatch(/STS/i);
     // No channel for the second row.
     expect(queryByTestId("operator-pheno-cross-channel-without")).toBeNull();
     // No generation for either — neither cross_type carries one.
@@ -167,18 +159,16 @@ describe("OperatorPhenoCrossesSection — taxonomy coverage", () => {
         keeperName={lookup}
       />,
     );
-    expect(
-      (getByTestId("operator-pheno-cross-recurrent-bx").textContent ?? ""),
-    ).toMatch(/Recurrent/i);
+    expect(getByTestId("operator-pheno-cross-recurrent-bx").textContent ?? "").toMatch(
+      /Recurrent/i,
+    );
     expect(queryByTestId("operator-pheno-cross-recurrent-std")).toBeNull();
   });
 
   it("invalid cross_type falls back safely (no crash, generic label)", () => {
     const { getByTestId } = render(
       <OperatorPhenoCrossesSection
-        crosses={[
-          baseRow({ id: "bad", crossType: "not_a_real_type" as unknown as string }),
-        ]}
+        crosses={[baseRow({ id: "bad", crossType: "not_a_real_type" as unknown as string })]}
         keeperName={lookup}
       />,
     );

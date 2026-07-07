@@ -134,18 +134,14 @@ export default function ManualSnapshotTimelineCard({ card }: Props) {
               "Confidence: unknown",
             ].map((label) => (
               <li key={label}>
-                <Badge
-                  variant="outline"
-                  className="h-5 px-1.5 text-[10px] font-normal"
-                >
+                <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-normal">
                   {label}
                 </Badge>
               </li>
             ))}
           </ul>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Historical reading — quality reflects captured values; not
-            current-room guidance.
+            Historical reading — quality reflects captured values; not current-room guidance.
           </p>
           {(quality.quality === "invalid" || quality.quality === "needs_review") && (
             <p
@@ -204,10 +200,7 @@ export default function ManualSnapshotTimelineCard({ card }: Props) {
           </p>
         )}
         {(card.errors.length > 0 || card.warnings.length > 0) && (
-          <ul
-            className="space-y-1 text-xs"
-            data-testid="manual-snapshot-timeline-card-validation"
-          >
+          <ul className="space-y-1 text-xs" data-testid="manual-snapshot-timeline-card-validation">
             {card.errors.map((m, i) => (
               <li
                 key={`err-${i}`}

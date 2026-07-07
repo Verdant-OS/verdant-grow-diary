@@ -20,7 +20,9 @@ vi.mock("@/hooks/useInsertSensorReading", () => ({
 function renderCard() {
   return render(
     <MemoryRouter>
-      <ManualSensorReadingCard tents={[{ id: "11111111-1111-1111-1111-111111111111", name: "Tent A" }]} />
+      <ManualSensorReadingCard
+        tents={[{ id: "11111111-1111-1111-1111-111111111111", name: "Tent A" }]}
+      />
     </MemoryRouter>,
   );
 }

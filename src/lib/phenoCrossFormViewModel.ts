@@ -13,6 +13,8 @@
 import {
   classifyCross,
   isKeeperReversed,
+  isCrossType,
+  lineageLabel,
   REVERSAL_METHODS,
   reversalMethodLabel,
   type CrossClassification,
@@ -129,19 +131,24 @@ export function crossLineageBadge(crossType: string): string {
     case "standard_f1":
       return "F1";
     default:
-      return "Cross";
+      // The rest of the taxonomy (filial/backcross/…) shows its short label.
+      return isCrossType(crossType) ? lineageLabel(crossType) : "Cross";
   }
 }
 
 /**
- * Donor-side display for a crosses-list row. A selfing row (or any null male)
- * renders "Self", never blank/broken text.
+ * Donor-side display for a crosses-list row. A selfing renders "Self" and an
+ * open pollination with no named donor renders "Open pollination" — never a
+ * blank cell or a mislabeled "Self".
  */
 export function crossDonorLabel(
   cross: { maleKeeperId: string | null; crossType: string },
   maleName: string | null,
 ): string {
-  if (cross.crossType === "selfing_s1" || cross.maleKeeperId == null) return "Self";
+  if (cross.crossType === "selfing_s1" || cross.crossType === "selfing_sn") return "Self";
+  if (cross.crossType === "open_pollination" && cross.maleKeeperId == null)
+    return "Open pollination";
+  if (cross.maleKeeperId == null) return "unknown keeper";
   return maleName && maleName.trim() !== "" ? maleName : "unknown keeper";
 }
 

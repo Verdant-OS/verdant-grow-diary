@@ -128,7 +128,6 @@ export default function ManualSensorReadingCard({
   const [reviewOpen, setReviewOpen] = useState(false);
   const [lastSaved, setLastSaved] = useState<LastSavedConfirmation | null>(null);
   const insert = useInsertSensorReading();
-  const insertEdit = useInsertManualSnapshotEdit();
   const isCorrection = !!correction;
 
   const devicePresets = useMemo(() => getManualSensorDeviceOptions(), []);

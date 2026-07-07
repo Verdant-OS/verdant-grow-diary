@@ -420,7 +420,15 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
         growEventId: (result as { growEventId?: string | null }).growEventId ?? null,
         source: "quick_log_v2_feed",
       });
-      onOpenChange(false);
+      setPostSave({
+        growEventId: (result as { growEventId?: string | null }).growEventId ?? null,
+        targetType: resolved.targetType as "plant" | "tent",
+        targetId: resolved.targetId as string,
+        tentId: resolved.tentId ?? null,
+        action: form.action,
+        message: FEEDING_SAVE_SUCCESS_MESSAGE,
+        savedAt: new Date().toISOString(),
+      });
       return;
     }
 

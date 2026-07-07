@@ -278,58 +278,42 @@ describe("quicklog_save_event — atomic write + companion diary", () => {
     );
   });
 
-  it("on failure, audits 'save_failed' with SQLSTATE (atomic rollback via RAISE)", () => {
+  it("on failure, audits 'save_failed' with SQLSTATE and returns safe JSON (no RAISE)", () => {
     // Safety property: any failure inside the atomic BEGIN block must (a)
     // record a `save_failed` audit row with SQLSTATE (no SQLERRM, no payload
-    // dumps) and (b) abort the surrounding transaction so no orphan rows
-    // are committed. The current SQL achieves (b) by re-raising after the
-    // audit insert — `RAISE` rolls the function's outer transaction back.
-    // A future migration may instead RETURN a safe `{ok:false,...}`
-    // envelope; either shape is safe as long as no partial writes commit
-    // and SQLERRM never leaks (asserted separately below).
+    // dumps) and (b) return a calm typed {ok:false, reason:'save_failed'}
+    // envelope so no orphan rows are committed and callers receive a safe
+    // response rather than a raw Postgres exception.
     const block = body.match(
       /BEGIN\s+INSERT\s+INTO\s+public\.grow_events[\s\S]*?EXCEPTION[\s\S]*?END\s*;/i,
     )?.[0] ?? "";
     expect(block).toMatch(/'save_failed'\s*,\s*SQLSTATE\b/);
-    const safeEnvelope =
-      /RETURN\s+jsonb_build_object\(\s*'ok'\s*,\s*false\s*,\s*'reason'\s*,\s*'save_failed'/i;
-    const reRaise = /\bRAISE\s*;/;
-    expect(safeEnvelope.test(block) || reRaise.test(block)).toBe(true);
+    expect(block).toMatch(
+      /RETURN\s+jsonb_build_object\(\s*'ok'\s*,\s*false\s*,\s*'reason'\s*,\s*'save_failed'/i,
+    );
+    expect(block).not.toMatch(/\bRAISE\s*;/);
   });
 
   it("SQLERRM is never used anywhere in the function body (no raw error leakage)", () => {
     expect(body).not.toMatch(/\bSQLERRM\b/);
   });
 
-  it("handles idempotency races safely (FOUND-precheck or unique_violation handler)", () => {
-    // Safety property: a concurrent replay of the same idempotency key must
-    // NOT commit a duplicate companion (grow_event + diary + idempotency)
-    // tuple. The current SQL achieves this by (a) a FOUND-precheck against
-    // quicklog_idempotency that returns the reused envelope before any
-    // INSERT, and (b) the atomic BEGIN/EXCEPTION block which rolls the
-    // whole transaction back on a unique_violation race so no partial
-    // rows persist. A future migration may add an explicit WHEN
-    // unique_violation handler that re-reads and returns reused=true;
-    // either shape preserves the safety property.
-    const hasFoundPrecheck =
-      /IF\s+FOUND\s+THEN[\s\S]{0,300}'duplicate_reused'[\s\S]{0,300}RETURN\s+jsonb_build_object\([\s\S]{0,200}'reused'\s*,\s*true/i.test(
-        body,
-      );
+  it("handles unique_violation as an idempotency race (re-reads + returns reused=true)", () => {
+    // The WHEN unique_violation branch must re-read quicklog_idempotency by
+    // (user_id, idempotency_key) and return the same {ok:true, reused:true,
+    // grow_event_id} envelope the explicit duplicate branch returns, so a
+    // concurrent replay collapses cleanly with no duplicate companion rows.
     const except = body.match(
-      /EXCEPTION[\s\S]*?WHEN\s+unique_violation\s+THEN([\s\S]*?)(?:WHEN\s+OTHERS\s+THEN|END\s*;)/i,
+      /EXCEPTION[\s\S]*?WHEN\s+unique_violation\s+THEN([\s\S]*?)WHEN\s+OTHERS\s+THEN/i,
     )?.[1] ?? "";
-    const hasUniqueViolationHandler =
-      except.length > 0 &&
-      /FROM\s+public\.quicklog_idempotency[\s\S]{0,200}user_id\s*=\s*uid\s+AND\s+idempotency_key\s*=\s*p_idempotency_key/i.test(
-        except,
-      ) &&
-      /RETURN\s+jsonb_build_object\(\s*'ok'\s*,\s*true[\s\S]{0,200}'reused'\s*,\s*true/i.test(
-        except,
-      );
-    expect(hasFoundPrecheck || hasUniqueViolationHandler).toBe(true);
-    // The duplicate_reused audit code must be emitted somewhere in the body
-    // regardless of which handler shape implements the race collapse.
-    expect(body).toMatch(/'duplicate_reused'/);
+    expect(except.length).toBeGreaterThan(0);
+    expect(except).toMatch(
+      /FROM\s+public\.quicklog_idempotency[\s\S]{0,200}user_id\s*=\s*uid\s+AND\s+idempotency_key\s*=\s*p_idempotency_key/i,
+    );
+    expect(except).toMatch(
+      /RETURN\s+jsonb_build_object\(\s*'ok'\s*,\s*true[\s\S]{0,200}'reused'\s*,\s*true/i,
+    );
+    expect(except).toMatch(/'duplicate_reused'/);
   });
 });
 

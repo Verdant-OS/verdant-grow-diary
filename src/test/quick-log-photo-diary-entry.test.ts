@@ -124,12 +124,15 @@ describe("createQuickLogPhotoDiaryEntry", () => {
 
 describe("QuickLogV2Sheet static safety — photo diary extraction", () => {
   it("QuickLogV2Sheet.tsx no longer contains a direct supabase.from(...) write", () => {
-    const src = readFileSync(
+    const raw = readFileSync(
       join(process.cwd(), "src", "components", "QuickLogV2Sheet.tsx"),
       "utf8",
     );
+    const stripped = raw
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
     // storage.from is allowed (photo upload); .from( on its own must be gone.
-    expect(src).not.toMatch(/[^.]supabase\.from\(/);
+    expect(stripped).not.toMatch(/[^.]supabase\.from\(/);
   });
 
   it("sheet imports the extracted helper", () => {

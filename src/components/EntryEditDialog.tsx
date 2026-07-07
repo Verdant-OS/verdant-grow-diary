@@ -202,6 +202,13 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
               </div>
             )}
           </div>
+
+          {entry && (
+            <DiaryStressObservationsSection
+              diaryEntryId={entry.id}
+              plantId={entry.plant_id ?? null}
+            />
+          )}
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">

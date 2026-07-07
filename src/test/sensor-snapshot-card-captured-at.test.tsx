@@ -25,7 +25,7 @@ describe("SensorSnapshotCard captured timestamp", () => {
     const { getByTestId } = render(
       <SensorSnapshotCard
         snapshot={SNAPSHOT}
-        classifyOptions={{ now: new Date(ISO) }}
+        classifyOptions={{ now: new Date(ISO).getTime() }}
       />,
     );
     const el = getByTestId("sensor-snapshot-card-captured-at");
@@ -38,7 +38,7 @@ describe("SensorSnapshotCard captured timestamp", () => {
     const { getByTestId } = render(
       <SensorSnapshotCard
         snapshot={SNAPSHOT}
-        classifyOptions={{ now: new Date(ISO) }}
+        classifyOptions={{ now: new Date(ISO).getTime() }}
       />,
     );
     const card = getByTestId("sensor-snapshot-card");

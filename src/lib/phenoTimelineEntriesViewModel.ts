@@ -66,6 +66,10 @@ export interface CrossInput {
   readonly femaleKeeperId: string;
   readonly maleKeeperId: string | null;
   readonly crossType: string;
+  /** F#/S#/BX# generation, when the way carries one — badge is wrong without it. */
+  readonly generation?: number | null;
+  /** Pollen route — a reversal channel on filial/backcross means feminized seed. */
+  readonly channel?: string | null;
   readonly crossName?: string | null;
   readonly crossedAt?: string | null;
   readonly createdAt?: string | null;
@@ -153,7 +157,7 @@ function crossEntry(input: PhenoTimelineInput, x: CrossInput): PhenoTimelineEntr
     occurredAt: x.crossedAt ?? x.createdAt ?? null,
     title: `Cross recorded — ${name}`,
     detail: `♀ ${female} × ${donor}`,
-    badge: crossLineageBadge(x.crossType),
+    badge: crossLineageBadge(x.crossType, x.generation, x.channel),
   };
 }
 

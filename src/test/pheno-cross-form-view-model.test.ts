@@ -131,11 +131,44 @@ describe("crossLineageBadge", () => {
     expect(crossLineageBadge("mystery")).toBe("Cross");
   });
 
-  it("shows the taxonomy label for the new ways", () => {
-    expect(crossLineageBadge("filial")).toBe("F2+");
-    expect(crossLineageBadge("backcross")).toBe("BX");
-    expect(crossLineageBadge("feminized_bx")).toBe("Fem BX");
+  it("shows the taxonomy label for the new ways (no generation -> the minimum for that way)", () => {
+    // James Loud review: a badge with no real generation must never claim a
+    // specific one it doesn't have — falls back to crossTypeDisplay's minimum
+    // (F2 for filial, BX1 for backcross), which is unreachable for real stored
+    // rows since the DB CHECK requires a generation on these types.
+    expect(crossLineageBadge("filial")).toBe("F2");
+    expect(crossLineageBadge("backcross")).toBe("BX1");
+    expect(crossLineageBadge("feminized_bx")).toBe("Fem BX1");
     expect(crossLineageBadge("open_pollination")).toBe("OP");
+  });
+
+  it("James Loud review #4/#5: shows the REAL generation, not a generic base badge", () => {
+    // An F5 must never render identically to an F2, and a BX3 must never
+    // render identically to a BX1 — a breeder reads generation depth off this
+    // badge (stabilization / how many backcross cycles).
+    expect(crossLineageBadge("filial", 5)).toBe("F5");
+    expect(crossLineageBadge("filial", 2)).toBe("F2");
+    expect(crossLineageBadge("selfing_sn", 4)).toBe("S4");
+    expect(crossLineageBadge("backcross", 3)).toBe("BX3");
+    expect(crossLineageBadge("feminized_bx", 2)).toBe("Fem BX2");
+  });
+
+  it("James Loud review #6: a feminized filial/backcross is marked Fem, never shown as regular", () => {
+    // A feminized F2/BX (reversal-channel donor) must be visually distinct from
+    // a regular mixed-sex one — a breeder planting it expects ~all-female, not
+    // a normal sex ratio to cull.
+    expect(crossLineageBadge("filial", 3, "sts")).toBe("Fem F3");
+    expect(crossLineageBadge("filial", 3, "colloidal_silver")).toBe("Fem F3");
+    expect(crossLineageBadge("filial", 3, "rodelization")).toBe("Fem F3");
+    expect(crossLineageBadge("backcross", 2, "sts")).toBe("Fem BX2");
+    // A NATURAL-male filial/backcross is unmarked (regular, as expected).
+    expect(crossLineageBadge("filial", 3, "natural_male")).toBe("F3");
+    expect(crossLineageBadge("backcross", 2, null)).toBe("BX2");
+    // Other ways never carry the Fem marker (they can't be feminized at all —
+    // validateBreedingCross forbids a reversal channel on them).
+    expect(crossLineageBadge("sib_cross", null, "sts")).toBe("Sib");
+    // Inherently-feminized ways already say so without a Fem prefix stacked on.
+    expect(crossLineageBadge("feminized_bx", 1, "sts")).toBe("Fem BX1");
   });
 });
 

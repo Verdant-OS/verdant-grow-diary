@@ -42,6 +42,7 @@ function renderAt(state: Partial<UsePhenoKeepersState>) {
     keepers: [],
     clonesByKeeper: {},
     crosses: [],
+    reversals: [],
     reversedKeeperIds: [],
     error: null,
     saving: false,
@@ -192,6 +193,7 @@ describe("PhenoKeepersPage — B4 reproduction UI", () => {
           crossName: "Gas S1",
           note: null,
           crossedAt: null,
+          createdAt: null,
         },
       ],
     });
@@ -213,6 +215,7 @@ describe("PhenoKeepersPage — B4 reproduction UI", () => {
           crossName: null,
           note: null,
           crossedAt: null,
+          createdAt: null,
         },
         {
           id: "x2",
@@ -222,11 +225,55 @@ describe("PhenoKeepersPage — B4 reproduction UI", () => {
           crossName: null,
           note: null,
           crossedAt: null,
+          createdAt: null,
         },
       ],
     });
     expect(screen.getByTestId("pheno-cross-badge-x1")).toHaveTextContent("F1");
     expect(screen.getByTestId("pheno-cross-badge-x2")).toHaveTextContent(/Feminized/);
+  });
+});
+
+describe("PhenoKeepersPage — breeding activity timeline (C3)", () => {
+  it("renders reversals and crosses as a chronological activity section", () => {
+    renderAt({
+      keepers: [keeper("k1", "Gas"), keeper("k2", "Dessert")],
+      reversals: [
+        {
+          id: "rv1",
+          keeperId: "k1",
+          method: "sts",
+          note: null,
+          appliedAt: "2026-07-06T00:00:00Z",
+          createdAt: "2026-07-06T00:00:00Z",
+        },
+      ],
+      crosses: [
+        {
+          id: "x1",
+          femaleKeeperId: "k1",
+          maleKeeperId: null,
+          crossType: "selfing_s1",
+          crossName: "Gas S1",
+          note: null,
+          crossedAt: "2026-07-07T00:00:00Z",
+          createdAt: "2026-07-07T00:00:00Z",
+        },
+      ],
+      reversedKeeperIds: ["k1"],
+    });
+    const activity = screen.getByTestId("pheno-keepers-activity");
+    // Cross (07-07) is most recent → appears above the reversal (07-06).
+    expect(activity).toHaveTextContent(/Cross recorded — Gas S1/);
+    expect(activity).toHaveTextContent(/♀ Gas × Self/); // selfing renders Self
+    expect(activity).toHaveTextContent(/Reversal applied — Gas/);
+    // Entries carry their lineage/method badges.
+    expect(within(activity).getByTestId("pheno-timeline-badge-cross:x1")).toHaveTextContent(/S1/);
+  });
+
+  it("hides the activity section when there is no reversal or cross", () => {
+    renderAt({ keepers: [keeper("k1", "Gas")] });
+    expect(screen.queryByTestId("pheno-keepers-activity")).toBeNull();
   });
 });
 

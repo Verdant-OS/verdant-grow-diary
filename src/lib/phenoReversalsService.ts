@@ -20,6 +20,7 @@ export interface ReversalRow {
   readonly method: string;
   readonly note: string | null;
   readonly appliedAt: string | null;
+  readonly createdAt: string | null;
 }
 
 export type SaveResult = { ok: true; id: string } | { ok: false; error: string };
@@ -68,17 +69,44 @@ export async function listReversalsForKeeper(keeperId: string): Promise<Reversal
   if (!id) return [];
   const { data, error } = await phenoDb
     .from("pheno_reversals")
-    .select("id, keeper_id, method, note, applied_at")
+    .select("id, keeper_id, method, note, applied_at, created_at")
     .eq("keeper_id", id)
     .order("created_at", { ascending: false });
   if (error || !data) return [];
-  return data.map((r) => ({
+  return data.map(mapReversalRow);
+}
+
+function mapReversalRow(r: {
+  id: string;
+  keeper_id: string;
+  method: string;
+  note: string | null;
+  applied_at: string | null;
+  created_at: string;
+}): ReversalRow {
+  return {
     id: r.id,
     keeperId: r.keeper_id,
     method: r.method,
     note: r.note ?? null,
     appliedAt: r.applied_at ?? null,
-  }));
+    createdAt: r.created_at ?? null,
+  };
+}
+
+/** Full reversal rows for the given keepers (scoped read for the hunt timeline). */
+export async function listReversalsForKeepers(
+  keeperIds: ReadonlyArray<string>,
+): Promise<ReversalRow[]> {
+  const ids = keeperIds.filter((k) => typeof k === "string" && k.trim() !== "");
+  if (ids.length === 0) return [];
+  const { data, error } = await phenoDb
+    .from("pheno_reversals")
+    .select("id, keeper_id, method, note, applied_at, created_at")
+    .in("keeper_id", ids)
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data.map(mapReversalRow);
 }
 
 /**

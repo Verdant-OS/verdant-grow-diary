@@ -17,6 +17,8 @@ import {
   REVERSAL_METHOD_OPTIONS,
   SELF_DONOR_VALUE,
 } from "@/lib/phenoCrossFormViewModel";
+import { buildPhenoTimelineEntries } from "@/lib/phenoTimelineEntriesViewModel";
+import PhenoTimelineEntries from "@/components/PhenoTimelineEntries";
 
 export default function PhenoKeepersPage() {
   const { id } = useParams<{ id: string }>();
@@ -55,6 +57,18 @@ export default function PhenoKeepersPage() {
         validKeeperIds: ks.keepers.map((k) => k.id),
       }),
     [female, donor, ks.reversedKeeperIds, ks.keepers],
+  );
+
+  // Chronological breeding activity for this hunt: reversals + crosses (with
+  // selfing rendered "Self" and F1/Feminized/S1 badges). Read-only.
+  const timelineEntries = useMemo(
+    () =>
+      buildPhenoTimelineEntries({
+        crosses: ks.crosses,
+        reversals: ks.reversals,
+        keeperName: (kid) => keeperNameById[kid] ?? null,
+      }),
+    [ks.crosses, ks.reversals, keeperNameById],
   );
 
   const candidateLabelById = useMemo(() => {
@@ -387,6 +401,15 @@ export default function PhenoKeepersPage() {
               );
             })}
           </ul>
+        </section>
+      )}
+
+      {/* Breeding activity timeline — reversals + crosses in one chronological
+          read-only view (C2 view-model + presenter). */}
+      {timelineEntries.length > 0 && (
+        <section data-testid="pheno-keepers-activity" className="space-y-2">
+          <h2 className="text-lg font-semibold">Breeding activity</h2>
+          <PhenoTimelineEntries entries={timelineEntries} />
         </section>
       )}
     </main>

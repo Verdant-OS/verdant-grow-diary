@@ -41,6 +41,7 @@ export interface CrossRow {
   readonly crossName: string | null;
   readonly note: string | null;
   readonly crossedAt: string | null;
+  readonly createdAt: string | null;
 }
 
 export type SaveResult = { ok: true; id: string } | { ok: false; error: string };
@@ -205,7 +206,9 @@ export async function listCrossesForHunt(huntId: string): Promise<CrossRow[]> {
   if (!id) return [];
   const { data, error } = await phenoDb
     .from("pheno_crosses")
-    .select("id, female_keeper_id, male_keeper_id, cross_type, cross_name, note, crossed_at")
+    .select(
+      "id, female_keeper_id, male_keeper_id, cross_type, cross_name, note, crossed_at, created_at",
+    )
     .eq("hunt_id", id)
     .order("created_at", { ascending: false });
   if (error || !data) return [];
@@ -217,5 +220,6 @@ export async function listCrossesForHunt(huntId: string): Promise<CrossRow[]> {
     crossName: r.cross_name ?? null,
     note: r.note ?? null,
     crossedAt: r.crossed_at ?? null,
+    createdAt: r.created_at ?? null,
   }));
 }

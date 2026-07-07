@@ -176,9 +176,18 @@ type PhenoCrossRow = {
   // B2: nullable — a selfing_s1 cross has a single parent (the reversed mother
   // pollinates itself), so there is no distinct male parent.
   male_keeper_id: string | null;
-  // B2: standard_f1 | feminized_cross | selfing_s1. Existing rows default to
-  // standard_f1 in the migration.
+  // Full breeding taxonomy (standard_f1 | feminized_cross | selfing_s1 | filial
+  // | ibl | selfing_sn | feminized_bx | backcross | sib_cross | outcross |
+  // line_cross | open_pollination | test_cross | reciprocal_cross |
+  // three_way_cross). Existing rows default to standard_f1.
   cross_type: string;
+  // Pollen route — natural_male | colloidal_silver | sts | ga3 | rodelization |
+  // open_pollination. Null for legacy rows / when unspecified.
+  channel: string | null;
+  // F#/S#/BX# generation (>= 1) when the way carries one; null otherwise.
+  generation: number | null;
+  // The line a backcross crosses back to; required for backcross / feminized_bx.
+  recurrent_parent_id: string | null;
   cross_name: string | null;
   note: string | null;
   crossed_at: string | null;
@@ -274,6 +283,9 @@ export interface PhenoDatabase {
         | "hunt_id"
         | "male_keeper_id"
         | "cross_type"
+        | "channel"
+        | "generation"
+        | "recurrent_parent_id"
         | "cross_name"
         | "note"
         | "crossed_at"

@@ -99,4 +99,4 @@ export const PHENO_SAMPLING_OIL_RING_OPTIONS: readonly string[] = [
 
 /** Reminder rendered next to ash/oil-ring fields so testers don't overclaim. */
 export const PHENO_SAMPLING_OBSERVATION_DISCLAIMER =
-  "Ash color and oil ring are observations only — neither one proves quality or superiority on its own. Weigh them alongside aroma, flavor, effect, and cure.";
+  "Ash color and oil ring are observations only — neither one is proof of quality or superiority on its own. Weigh them alongside aroma, flavor, effect, and cure.";

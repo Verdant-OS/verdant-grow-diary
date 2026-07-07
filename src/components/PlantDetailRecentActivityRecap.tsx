@@ -18,6 +18,7 @@ import {
 import { buildNoRecentLogRecovery } from "@/lib/noRecentLogRecoveryRules";
 import { buildOutcomeFollowUp } from "@/lib/outcomeFollowUpRules";
 import { buildActionResponsePairing } from "@/lib/actionResponsePairingRules";
+import { formatDiaryNoteForLabeledContainer } from "@/lib/diaryNoteFormatting";
 import {
   buildPlantStabilizeModeViewModel,
   shouldShowPlantStabilizeMode,

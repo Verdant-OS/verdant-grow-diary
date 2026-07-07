@@ -34,7 +34,7 @@ describe("buildManualSensorSnapshotEditDiff", () => {
       replacement: { source: "manual", temperature_c: 24, humidity_pct: 55 },
     });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("empty_diff");
+    if (r.ok === false) expect(r.reason).toBe("empty_diff");
   });
 
   it("rejects non-manual sources on either side", () => {
@@ -48,7 +48,7 @@ describe("buildManualSensorSnapshotEditDiff", () => {
         replacement: { source: repl, temperature_c: 25 },
       });
       expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.reason).toBe("non_manual_source");
+      if (r.ok === false) expect(r.reason).toBe("non_manual_source");
     }
   });
 

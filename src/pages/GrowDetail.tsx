@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +13,10 @@ import {
   Sparkles,
   Bell,
   SlidersHorizontal,
+  FileDown,
 } from "lucide-react";
+import { exportGrowDiaryReportAsPdf } from "@/lib/growDiaryPdfExport";
+
 import { useGrowDetailData, type GrowOutcomesState } from "@/hooks/useGrowDetailData";
 import {
   type CountValue,

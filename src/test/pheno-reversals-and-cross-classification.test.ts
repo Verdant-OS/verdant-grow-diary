@@ -345,4 +345,53 @@ describe("recordCross — explicit taxonomy path (validateBreedingCross)", () =>
     if (r.ok === false) expect(r.error).toMatch(/revers/i);
     expect(h.client.crossInserts.length).toBe(0);
   });
+
+  it("REJECTS a non-selfing way with a missing/blank/self donor (never a null-male insert)", async () => {
+    for (const bad of [null, "", "   ", "mom"]) {
+      h.client = makeSupabase({ reversedKeeperIds: [] });
+      const r = await recordCross({
+        femaleKeeperId: "mom",
+        maleKeeperId: bad,
+        crossType: "filial",
+        channel: "natural_male",
+        generation: 2,
+      });
+      expect(r.ok).toBe(false);
+      if (r.ok === false) expect(r.error).toMatch(/donor/i);
+      expect(h.client.crossInserts.length).toBe(0);
+    }
+  });
+
+  it("allows open_pollination with no named donor (population pollen)", async () => {
+    h.client = makeSupabase({ reversedKeeperIds: [] });
+    const r = await recordCross({
+      femaleKeeperId: "mom",
+      maleKeeperId: null,
+      crossType: "open_pollination",
+      channel: "open_pollination",
+    });
+    expect(r.ok).toBe(true);
+    expect(h.client.crossInserts[0]).toMatchObject({
+      cross_type: "open_pollination",
+      male_keeper_id: null,
+    });
+  });
+
+  it("nulls generation + recurrent_parent for ways that don't carry them (matches DB shape)", async () => {
+    h.client = makeSupabase({ reversedKeeperIds: [] });
+    const r = await recordCross({
+      femaleKeeperId: "mom",
+      maleKeeperId: "dad",
+      crossType: "standard_f1",
+      channel: "natural_male",
+      generation: 5,
+      recurrentParentId: "stray",
+    });
+    expect(r.ok).toBe(true);
+    expect(h.client.crossInserts[0]).toMatchObject({
+      cross_type: "standard_f1",
+      generation: null,
+      recurrent_parent_id: null,
+    });
+  });
 });

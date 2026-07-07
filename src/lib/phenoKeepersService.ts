@@ -14,6 +14,8 @@ import {
   validateBreedingCross,
   isCrossType,
   isChannel,
+  requiresRecurrentParent,
+  requiresGeneration,
   type CrossType,
   type Channel,
 } from "@/lib/genetics/breedingReproductionRules";
@@ -209,16 +211,40 @@ export async function recordCross(input: {
     if (!isCrossType(input.crossType)) return { ok: false, error: "Unknown cross type." };
     if (input.channel != null && !isChannel(input.channel))
       return { ok: false, error: "Unknown pollen channel." };
+    if (input.channel == null)
+      return { ok: false, error: "Choose how the pollen was made (the channel)." };
+
+    // Donor SHAPE (mirrors the DB's parents_by_type CHECK so the service rejects
+    // with a clear message instead of leaning on a generic DB failure): a
+    // selfing uses the mother as its own donor; open pollination may omit the
+    // donor; every other way needs a distinct, non-blank donor.
+    const isSelfingType = input.crossType === "selfing_s1" || input.crossType === "selfing_sn";
+    if (isSelfingType) {
+      if (!isSelf)
+        return {
+          ok: false,
+          error: "A selfing uses the mother as its own pollen donor — leave the donor empty.",
+        };
+    } else if (input.crossType !== "open_pollination") {
+      if (pollen === null || pollen.trim() === "" || pollen.trim() === female)
+        return { ok: false, error: "Choose a distinct pollen donor for this cross." };
+    }
+
+    // Only backcrosses carry a recurrent parent; only F#/S#/BX# ways carry a
+    // generation. Null the rest so the persisted shape matches the DB's
+    // recurrent_parent_by_type + type-aware generation CHECKs exactly.
     const recurrent =
-      typeof input.recurrentParentId === "string" && input.recurrentParentId.trim() !== ""
+      requiresRecurrentParent(input.crossType) &&
+      typeof input.recurrentParentId === "string" &&
+      input.recurrentParentId.trim() !== ""
         ? input.recurrentParentId.trim()
         : null;
     const gen =
-      typeof input.generation === "number" && Number.isFinite(input.generation)
+      requiresGeneration(input.crossType) &&
+      typeof input.generation === "number" &&
+      Number.isFinite(input.generation)
         ? Math.trunc(input.generation)
         : null;
-    if (input.channel == null)
-      return { ok: false, error: "Choose how the pollen was made (the channel)." };
 
     const check = validateBreedingCross({
       crossType: input.crossType,

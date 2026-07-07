@@ -80,6 +80,29 @@ export function buildHarvestDetailsPayload(
   // Only include the unit if at least one weight was entered.
   if (unit !== null && hasAnyWeight) out.weightUnit = unit;
   if (Object.keys(out).length === 0) return null;
+
+  // Slice A3.2 — when the grower entered a NON-`g` unit (oz/lb/kg),
+  // stamp canonical grams alongside the original value+unit so
+  // downstream consumers (reports, AI, timeline) see honest grams and
+  // the timeline can render "2 lb (907.18 g)". `g` entries stay
+  // unchanged (backward compatible with legacy shape and tests).
+  if (unit && unit !== "g" && hasAnyWeight) {
+    out.original_weight_unit = unit;
+    if (wet !== null) {
+      const n = normalizeHarvestWeightToGrams({ value: wet, unit });
+      if (n) {
+        out.wet_weight_grams = n.grams;
+        out.original_wet_weight = n.originalValue;
+      }
+    }
+    if (dry !== null) {
+      const n = normalizeHarvestWeightToGrams({ value: dry, unit });
+      if (n) {
+        out.dry_weight_grams = n.grams;
+        out.original_dry_weight = n.originalValue;
+      }
+    }
+  }
   return out;
 }
 

@@ -81,14 +81,14 @@ describe("harvest Vocab A → Vocab B boundary (persistence)", () => {
 
   it("Vocab A value with no unit is rejected — never coerced to grams", () => {
     const r = build({ wet_weight_input: "5" });
-    if (r.ok) throw new Error("expected rejection");
-    expect(r.reason).toBe("invalid_harvest_details");
+    expect(r.ok).toBe(false);
+    expect((r as { reason?: string }).reason).toBe("invalid_harvest_details");
   });
 
   it("Vocab A value with unknown unit is rejected", () => {
     const r = build({ wet_weight_input: "5", weight_unit: "pounds" });
-    if (r.ok) throw new Error("expected rejection");
-    expect(r.reason).toBe("invalid_harvest_details");
+    expect(r.ok).toBe(false);
+    expect((r as { reason?: string }).reason).toBe("invalid_harvest_details");
   });
 
   it("Vocab A negative / non-numeric value is rejected (never persisted as grams)", () => {

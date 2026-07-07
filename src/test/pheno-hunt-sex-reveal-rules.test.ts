@@ -102,14 +102,38 @@ describe("classifySexReveal", () => {
     expect(res.immediate_action).toBe(SEX_REVEAL_COPY.reversed_female);
   });
 
-  it("intentional reversal never nudges toward culling and needs no review", () => {
+  it("a CONFIRMED reversal (multi-node pollen, sharp) never nudges cull and needs no review", () => {
     const res = classifySexReveal(
-      sig({ pistilNodeCount: 2, bananaStructures: true, intentionalReversal: true }),
+      sig({ pistilNodeCount: 2, pollenSacNodeCount: 2, intentionalReversal: true }),
     );
     expect(res.assessment).toBe("reversed_female");
     expect(res.review_recommended).toBe(false);
     expect(res.what_not_to_do.some((s) => /do not cull/i.test(s))).toBe(true);
     expectAlwaysHasContext(res);
+  });
+
+  it("SINGLE-node pollen on a reversed female (even sharp) stays review-required", () => {
+    // isPoorImage only flags weak images; single-node pollen on a sharp photo
+    // must still not be a confirmed "collect now" read — mirrors the classifier
+    // requiring 2+ nodes for confirmed_male.
+    const res = classifySexReveal(
+      sig({ pistilNodeCount: 2, pollenSacNodeCount: 1, intentionalReversal: true }),
+    );
+    expect(res.assessment).toBe("reversed_female"); // still not a herm / cull nudge
+    expect(res.review_recommended).toBe(true);
+    expect(res.confidence).toBe("low");
+    expect(res.immediate_action).toBe(SEX_REVEAL_COPY.reversed_female_unconfirmed);
+    expect(res.immediate_action.toLowerCase()).not.toMatch(/collect pollen/);
+    expect(res.follow_up.toLowerCase()).not.toMatch(/collect pollen/);
+  });
+
+  it("banana-only structures on a reversed female stay review-required (no clean pollen sacs)", () => {
+    const res = classifySexReveal(
+      sig({ pistilNodeCount: 2, bananaStructures: true, intentionalReversal: true }),
+    );
+    expect(res.assessment).toBe("reversed_female");
+    expect(res.review_recommended).toBe(true);
+    expect(res.what_not_to_do.some((s) => /do not cull/i.test(s))).toBe(true);
   });
 
   it("WITHOUT the reversal flag, the same signals still read as possible_herm (default unchanged)", () => {

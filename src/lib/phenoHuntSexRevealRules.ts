@@ -229,35 +229,37 @@ export function classifySexReveal(rawSignals: SexRevealSignals): SexRevealResult
   // pistils-only means the reversal has not produced pollen yet, so fall
   // through to the normal female classification.
   //
-  // Weak-evidence discipline still applies: on a poor image the pollen read is
-  // untrusted, so we keep the reversed_female framing (never nudge a cull) but
-  // stay review-required with low confidence and a "get a sharper photo"
-  // follow-up — symmetric with how the possible_herm branch handles poor
-  // images.
+  // Weak-evidence discipline still applies. A CONFIRMED reversal read (the one
+  // that says "collect pollen now" with no review) needs the same strength the
+  // rest of the classifier demands: multi-node pollen sacs (>= 2, matching
+  // confirmed_male) AND a usable image. Single-node pollen, banana-only, or a
+  // poor image keeps the reversed_female framing (never nudge a cull on a
+  // known-reversed plant) but stays review-required, low confidence, and asks
+  // for a sharper multi-node close-up before advising collection.
   if (sig.intentionalReversal && showsPollenStructures) {
-    const poor = isPoorImage(sig);
+    const confirmed = sig.pollenSacNodeCount >= 2 && !isPoorImage(sig);
     return {
       assessment: "reversed_female",
-      confidence: poor ? "low" : sig.pistilNodeCount > 0 ? "high" : "medium",
+      confidence: confirmed ? (sig.pistilNodeCount > 0 ? "high" : "medium") : "low",
       evidence: [...evidence, "Grower recorded a deliberate reversal on this plant."],
-      missing_information: poor
-        ? [...missing, "A sharper, multi-node photo to confirm the pollen sacs before collecting."]
-        : missing,
-      // Poor image → the primary action must NOT tell the grower to collect
-      // pollen yet; only the confirmed (sharp) read carries the collect action.
-      immediate_action: poor
-        ? SEX_REVEAL_COPY.reversed_female_unconfirmed
-        : SEX_REVEAL_COPY.reversed_female,
+      missing_information: confirmed
+        ? missing
+        : [...missing, "A sharper photo confirming pollen sacs at 2+ nodes before collecting."],
+      // Only the confirmed read carries the "collect pollen" instruction; weak
+      // or single-node evidence must not nudge collection before confirmation.
+      immediate_action: confirmed
+        ? SEX_REVEAL_COPY.reversed_female
+        : SEX_REVEAL_COPY.reversed_female_unconfirmed,
       what_not_to_do: [
         "Do not cull — these pollen structures are the intended result of the reversal.",
         "Do not treat this as a hermaphrodite; the reversal was applied on purpose.",
         "Do not let this pollen reach any unintended mothers — keep it isolated.",
       ],
-      follow_up: poor
-        ? "Capture a sharper, multi-node close-up to confirm the pollen sacs before collecting."
-        : "Collect pollen once the sacs mature and apply it to the intended seed " +
-          "mother (a self / S1 or a feminized cross).",
-      review_recommended: poor,
+      follow_up: confirmed
+        ? "Collect pollen once the sacs mature and apply it to the intended seed " +
+          "mother (a self / S1 or a feminized cross)."
+        : "Capture a sharper close-up confirming pollen sacs at 2+ nodes before collecting.",
+      review_recommended: !confirmed,
     };
   }
 

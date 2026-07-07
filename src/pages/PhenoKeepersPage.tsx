@@ -6,7 +6,7 @@
  * only: naming a keeper, adding a clone, or recording a cross starts no grow and
  * drives no device. No AI, no Action Queue, no automation.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { usePhenoKeepers } from "@/hooks/usePhenoKeepers";
 import { buildPhenoKeeperLineage } from "@/lib/phenoKeeperLineageViewModel";
@@ -37,14 +37,24 @@ export default function PhenoKeepersPage() {
     return m;
   }, [ks.keepers]);
 
+  // Reset the cross form when navigating to a different hunt so stale parents
+  // from the previous hunt can't linger in state (see buildCrossFormViewModel's
+  // validKeeperIds guard, which is the belt-and-suspenders backstop).
+  useEffect(() => {
+    setFemale("");
+    setDonor("");
+    setCrossName("");
+  }, [id]);
+
   const crossForm = useMemo(
     () =>
       buildCrossFormViewModel({
         femaleKeeperId: female,
         donorSelection: donor,
         reversedKeeperIds: ks.reversedKeeperIds,
+        validKeeperIds: ks.keepers.map((k) => k.id),
       }),
-    [female, donor, ks.reversedKeeperIds],
+    [female, donor, ks.reversedKeeperIds, ks.keepers],
   );
 
   const candidateLabelById = useMemo(() => {

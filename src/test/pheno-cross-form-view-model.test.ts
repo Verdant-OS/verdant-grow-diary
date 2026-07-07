@@ -79,6 +79,39 @@ describe("buildCrossFormViewModel", () => {
     expect(vm.pollenKeeperId).toBeNull();
   });
 
+  it("treats a stale female id (not in the current hunt's keepers) as unselected", () => {
+    const vm = buildCrossFormViewModel({
+      femaleKeeperId: "from-other-hunt",
+      donorSelection: "also-other-hunt",
+      reversedKeeperIds: [],
+      validKeeperIds: ["k1", "k2"], // current hunt only
+    });
+    expect(vm.canSubmit).toBe(false);
+    expect(vm.disabledReason).toMatch(/female/i);
+  });
+
+  it("drops a stale donor id but keeps a valid female", () => {
+    const vm = buildCrossFormViewModel({
+      femaleKeeperId: "k1",
+      donorSelection: "stale-donor",
+      reversedKeeperIds: [],
+      validKeeperIds: ["k1", "k2"],
+    });
+    expect(vm.canSubmit).toBe(false);
+    expect(vm.disabledReason).toMatch(/donor/i);
+  });
+
+  it("still allows a valid in-hunt selection when validKeeperIds is provided", () => {
+    const vm = buildCrossFormViewModel({
+      femaleKeeperId: "k1",
+      donorSelection: "k2",
+      reversedKeeperIds: [],
+      validKeeperIds: ["k1", "k2"],
+    });
+    expect(vm.canSubmit).toBe(true);
+    expect(vm.previewBadge).toBe("F1");
+  });
+
   it("selfing an UNREVERSED keeper is blocked with a reversal reason", () => {
     const vm = buildCrossFormViewModel({
       femaleKeeperId: "k1",

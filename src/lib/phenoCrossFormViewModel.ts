@@ -26,6 +26,13 @@ export interface CrossFormInput {
   /** Donor dropdown value: a keeper id, "" (none chosen), or SELF_DONOR_VALUE. */
   donorSelection: string;
   reversedKeeperIds: ReadonlyArray<string>;
+  /**
+   * The keeper ids that belong to the CURRENT hunt. When provided, a female or
+   * donor id not in this set is treated as unselected — this prevents stale
+   * parent ids (e.g. carried over when navigating between hunts) from enabling
+   * a save with keepers that aren't part of the hunt being viewed.
+   */
+  validKeeperIds?: ReadonlyArray<string>;
 }
 
 export interface CrossFormViewModel {
@@ -51,8 +58,14 @@ function toReversalRecords(ids: ReadonlyArray<string>) {
  * Selfing is signalled by the SELF sentinel or by choosing the mother as donor.
  */
 export function buildCrossFormViewModel(input: CrossFormInput): CrossFormViewModel {
-  const female = (input.femaleKeeperId ?? "").trim();
-  const sel = (input.donorSelection ?? "").trim();
+  const validSet = input.validKeeperIds ? new Set(input.validKeeperIds) : null;
+  // A stale female id (not in the current hunt) is treated as unselected.
+  const femaleRaw = (input.femaleKeeperId ?? "").trim();
+  const female = validSet && femaleRaw !== "" && !validSet.has(femaleRaw) ? "" : femaleRaw;
+  const selRaw = (input.donorSelection ?? "").trim();
+  // A stale non-self donor id (not in the current hunt) is likewise dropped.
+  const sel =
+    selRaw !== SELF_DONOR_VALUE && validSet && selRaw !== "" && !validSet.has(selRaw) ? "" : selRaw;
   const isSelf = sel === SELF_DONOR_VALUE || (sel !== "" && sel === female);
 
   if (!female) {

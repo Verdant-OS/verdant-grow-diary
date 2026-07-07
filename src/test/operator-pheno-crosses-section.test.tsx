@@ -82,6 +82,63 @@ describe("OperatorPhenoCrossesSection — taxonomy coverage", () => {
     }
   });
 
+  it("renders the EXACT canonical lineage badge (generation- and feminization-aware)", () => {
+    // Regression guard: the operator badge used to concatenate the generation
+    // onto the placeholder label ("F2+" + 3 = "F2+3", "S2+" + 4 = "S2+4") and
+    // ignore the channel (a feminized F2/BX looked identical to a regular one).
+    // It now routes through the shared crossLineageBadge, so these must be the
+    // real designations, byte-for-byte matching the keepers page / cross form.
+    const cases: Array<{ id: string; row: Partial<CrossRow>; badge: string }> = [
+      { id: "f1", row: { crossType: "standard_f1" }, badge: "F1" },
+      { id: "f3", row: { crossType: "filial", generation: 3 }, badge: "F3" },
+      { id: "s1", row: { crossType: "selfing_s1", maleKeeperId: null }, badge: "S1 / Selfed" },
+      {
+        id: "s4",
+        row: { crossType: "selfing_sn", maleKeeperId: null, generation: 4 },
+        badge: "S4",
+      },
+      {
+        id: "bx2",
+        row: { crossType: "backcross", generation: 2, recurrentParentId: "k-rp" },
+        badge: "BX2",
+      },
+      {
+        id: "fbx1",
+        row: { crossType: "feminized_bx", generation: 1, recurrentParentId: "k-rp" },
+        badge: "Fem BX1",
+      },
+      { id: "fem", row: { crossType: "feminized_cross", channel: "sts" }, badge: "Feminized" },
+      // A reversal-channel (feminized) filial / backcross gets the "Fem " prefix.
+      { id: "femf2", row: { crossType: "filial", generation: 2, channel: "sts" }, badge: "Fem F2" },
+      {
+        id: "membx2",
+        row: {
+          crossType: "backcross",
+          generation: 2,
+          channel: "colloidal_silver",
+          recurrentParentId: "k-rp",
+        },
+        badge: "Fem BX2",
+      },
+      // A regular-channel filial stays plain (never labeled feminized).
+      {
+        id: "regf2",
+        row: { crossType: "filial", generation: 2, channel: "natural_male" },
+        badge: "F2",
+      },
+    ];
+    const { getByTestId } = render(
+      <OperatorPhenoCrossesSection
+        crosses={cases.map((c) => baseRow({ id: c.id, ...c.row }))}
+        keeperName={lookup}
+      />,
+    );
+    for (const c of cases) {
+      const badge = getByTestId(`operator-pheno-cross-badge-${c.id}`);
+      expect((badge.textContent ?? "").trim(), `badge for ${c.id}`).toBe(c.badge);
+    }
+  });
+
   it("selfing rows render Self / S1 (never blank donor)", () => {
     const { getByTestId } = render(
       <OperatorPhenoCrossesSection

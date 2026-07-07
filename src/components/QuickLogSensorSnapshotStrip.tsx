@@ -254,6 +254,17 @@ export default function QuickLogSensorSnapshotStrip({
           {view.action.label}
         </a>
       )}
+      {correctionHref && (
+        <a
+          href={correctionHref}
+          data-testid="quicklog-sensor-snapshot-correct-action"
+          aria-label="Correct manual reading — opens sensors page"
+          className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline rounded-sm focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <History className="h-3 w-3" aria-hidden />
+          Correct manual reading
+        </a>
+      )}
     </section>
   );
 }

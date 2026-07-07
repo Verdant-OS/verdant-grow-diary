@@ -75,6 +75,7 @@ const HardwareIntegrations = lazy(() => import("./pages/HardwareIntegrations"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
+const Glossary = lazy(() => import("./pages/Glossary"));
 const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
 const BillingPlaceholder = lazy(() => import("./pages/BillingPlaceholder"));
 const Leads = lazy(() => import("./pages/Leads"));

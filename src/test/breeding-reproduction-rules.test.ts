@@ -338,6 +338,60 @@ describe("validateBreedingCross", () => {
     }
   });
 
+  it("REJECTS a REVERSED donor recorded on a natural-male channel (feminized, not regular)", () => {
+    // A donor with a reversal on record is a reversed female — its pollen is
+    // feminized, so labeling the cross regular (natural_male) mislabels an
+    // all-female batch as a mixed-sex F1. Must reject on any non-reversal channel.
+    for (const crossType of [
+      "standard_f1",
+      "filial",
+      "sib_cross",
+      "outcross",
+      "backcross",
+    ] as const) {
+      for (const channel of ["natural_male", "open_pollination"] as const) {
+        const r = v({
+          crossType,
+          channel,
+          pollenReversed: true,
+          hasRecurrentParent: crossType === "backcross",
+          generation: crossType === "filial" ? 2 : crossType === "backcross" ? 1 : null,
+        });
+        expect(r.ok, `${crossType}+${channel}+reversed donor must reject`).toBe(false);
+        if (r.ok === false) expect(r.reason).toMatch(/reversed female|feminized|reversal channel/i);
+      }
+    }
+    // A real (non-reversed) male donor on natural_male is still a valid regular F1.
+    expect(v({ crossType: "standard_f1", channel: "natural_male", pollenReversed: false })).toEqual(
+      {
+        ok: true,
+        offspring: "regular",
+        label: "F1",
+      },
+    );
+    // A reversed donor is fine on a chemical channel → feminized (unchanged).
+    expect(v({ crossType: "filial", channel: "sts", pollenReversed: true, generation: 2 })).toEqual(
+      { ok: true, offspring: "feminized", label: "F2" },
+    );
+    // Rodelization is ALSO a feminized channel — a chemically-reversed donor can
+    // still shed THIS batch via natural stress. Must NOT be rejected as if it
+    // were a natural-male channel (only standard_f1/sib/outcross/etc. — the ways
+    // that can NEVER be feminized — reject a feminized channel at all; filial and
+    // backcross can legitimately be feminized).
+    expect(
+      v({ crossType: "filial", channel: "rodelization", pollenReversed: true, generation: 2 }),
+    ).toEqual({ ok: true, offspring: "feminized", label: "F2" });
+    expect(
+      v({
+        crossType: "backcross",
+        channel: "rodelization",
+        pollenReversed: true,
+        hasRecurrentParent: true,
+        generation: 1,
+      }),
+    ).toEqual({ ok: true, offspring: "feminized", label: "BX1" });
+  });
+
   it("selfing: requires self + reversed mother + a reversal channel", () => {
     expect(
       v({ crossType: "selfing_s1", channel: "sts", isSelf: true, femaleReversed: true }),

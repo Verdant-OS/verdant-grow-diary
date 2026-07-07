@@ -420,6 +420,22 @@ export function validateBreedingCross(input: BreedingCrossInput): BreedingCrossV
     };
   }
 
+  // A reversed pollen DONOR is a reversed female — its pollen carries only female
+  // genetics, so any seed it makes is FEMINIZED and it can ONLY be recorded on a
+  // feminized channel (a chemical reversal OR rodelization — a chemically-
+  // reversed keeper can still shed THIS batch of pollen via natural stress, and
+  // either way the pollen is feminized). Recording it as a natural male (or open
+  // pollination) would mislabel a feminized batch as a regular mixed-sex cross —
+  // a reversed female has no natural-male pollen. Mirrors classifyCross (a
+  // reversed donor is a feminized_cross, never a standard F1) on every channel.
+  if (input.pollenReversed && !feminizedChannel) {
+    return {
+      ok: false,
+      reason:
+        "That donor is a reversed female — its pollen is feminized, so record the cross on a reversal channel (colloidal silver / STS / GA3 / rodelization), not a natural male.",
+    };
+  }
+
   return {
     ok: true,
     offspring: feminizationFromChannel(channel, crossType),

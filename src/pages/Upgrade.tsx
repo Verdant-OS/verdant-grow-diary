@@ -14,12 +14,13 @@
  *  - enforce the founder cap (server-side responsibility; `claimed` shown here
  *    is display-only)
  *  - expose secrets, service_role, or Paddle API keys
+ *  - open Paddle without an explicit user confirmation
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,9 +32,28 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 
-import { PRICING_TIERS, type PricingTier } from "@/config/pricing";
+import {
+  PRICING_TIERS,
+  PLAN_COMPARISON,
+  UPGRADE_FAQ,
+  type PricingTier,
+} from "@/config/pricing";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import {
   resolvePaddleConfig,
@@ -67,21 +87,33 @@ function useSoldOut(tier: PricingTier): boolean {
   return !!tier.cap && tier.cap.claimed >= tier.cap.total;
 }
 
-/** Load Paddle.js on demand. Returns Paddle global once ready, or null on failure. */
+/**
+ * Load Paddle.js on demand. Returns Paddle global once ready, or null on
+ * failure. `retry()` bumps an attempt counter to re-run initialization; it
+ * never opens checkout by itself.
+ */
 function usePaddle(config: PaddleConfig): {
   ready: boolean;
   loading: boolean;
   error: string | null;
   paddle: PaddleGlobal | null;
+  retry: () => void;
 } {
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!config.available) return;
+    if (!config.available) {
+      setReady(false);
+      setLoading(false);
+      return;
+    }
+    setError(null);
     if (window.Paddle?.Checkout) {
       setReady(true);
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -132,10 +164,111 @@ function usePaddle(config: PaddleConfig): {
       setLoading(false);
     };
     document.head.appendChild(script);
-  }, [config]);
+  }, [config, attempt]);
 
-  return { ready, loading, error, paddle: ready ? window.Paddle ?? null : null };
+  const retry = useCallback(() => {
+    setError(null);
+    setReady(false);
+    setAttempt((a) => a + 1);
+  }, []);
+
+  return {
+    ready,
+    loading,
+    error,
+    paddle: ready ? window.Paddle ?? null : null,
+    retry,
+  };
 }
+
+// ---------- Status banner ---------------------------------------------------
+
+interface StatusBannerProps {
+  configAvailable: boolean;
+  unavailableReason: string | null;
+  loading: boolean;
+  error: string | null;
+  ready: boolean;
+  onRetry: () => void;
+}
+
+function CheckoutStatusBanner({
+  configAvailable,
+  unavailableReason,
+  loading,
+  error,
+  ready,
+  onRetry,
+}: StatusBannerProps) {
+  // Ready and no error → no noisy banner.
+  if (ready && !error && configAvailable) return null;
+
+  let variant: "info" | "warn" | "error" = "info";
+  let title = "";
+  let body = "";
+  let showRetry = false;
+
+  if (!configAvailable) {
+    variant = "warn";
+    title = "Checkout unavailable";
+    body =
+      unavailableReason ??
+      "Checkout is temporarily unavailable. You can still start free while paid checkout is being prepared.";
+  } else if (error) {
+    variant = "error";
+    title = "Checkout is temporarily unavailable.";
+    body =
+      "We couldn't initialize the payment overlay. You can still start free while paid checkout is being prepared.";
+    showRetry = true;
+  } else if (loading) {
+    variant = "info";
+    title = "Preparing checkout…";
+    body = "Loading the payment overlay. This only takes a moment.";
+  } else {
+    return null;
+  }
+
+  return (
+    <div
+      role={variant === "info" ? "status" : "alert"}
+      aria-live={variant === "info" ? "polite" : "assertive"}
+      data-testid="checkout-status-banner"
+      data-variant={variant}
+      className={cn(
+        "mt-6 rounded-lg border p-4 text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3",
+        variant === "info" &&
+          "border-border/60 bg-muted/40 text-muted-foreground",
+        variant === "warn" &&
+          "border-amber-500/40 bg-amber-500/5 text-foreground",
+        variant === "error" &&
+          "border-destructive/50 bg-destructive/5 text-foreground",
+      )}
+    >
+      <div className="flex items-start gap-2">
+        {loading && (
+          <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-muted-foreground" />
+        )}
+        <div>
+          <p className="font-medium">{title}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{body}</p>
+        </div>
+      </div>
+      {showRetry && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={onRetry}
+          data-testid="checkout-status-retry"
+        >
+          Retry checkout setup
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ---------- Tier card -------------------------------------------------------
 
 interface TierCardProps {
   tier: PricingTier;
@@ -160,7 +293,6 @@ function TierCard({
   const priceIdMissing = tier.paddlePriceId === null;
   const isCurrent = currentPlanKnown && currentPlanId === tier.id;
 
-  // Compose CTA state.
   let ctaLabel = "Get started";
   let ctaDisabled = false;
   let ctaHint: string | null = null;
@@ -254,6 +386,192 @@ function TierCard({
   );
 }
 
+// ---------- Comparison table ------------------------------------------------
+
+function ComparisonCell({ value }: { value: string | boolean }) {
+  if (typeof value === "boolean") {
+    return value ? (
+      <Check className="mx-auto h-4 w-4 text-primary" aria-label="Included" />
+    ) : (
+      <X
+        className="mx-auto h-4 w-4 text-muted-foreground/60"
+        aria-label="Not included"
+      />
+    );
+  }
+  return <span className="text-sm">{value}</span>;
+}
+
+function PlanComparisonTable() {
+  return (
+    <section
+      aria-label="Plan comparison"
+      className="mt-16"
+      data-testid="plan-comparison"
+    >
+      <h2 className="font-display text-2xl font-semibold text-center">
+        Compare plans
+      </h2>
+      <div className="mt-6 overflow-x-auto rounded-lg border border-border/60">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead className="bg-muted/40">
+            <tr>
+              <th className="p-3 text-left font-medium">Feature</th>
+              {PRICING_TIERS.map((t) => (
+                <th
+                  key={t.id}
+                  className="p-3 text-center font-medium"
+                  data-testid={`compare-header-${t.id}`}
+                >
+                  {t.name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {PLAN_COMPARISON.map((row, idx) => (
+              <tr
+                key={row.label}
+                className={cn(
+                  "border-t border-border/40",
+                  idx % 2 === 1 && "bg-muted/20",
+                )}
+              >
+                <td className="p-3 text-left font-medium">{row.label}</td>
+                {PRICING_TIERS.map((t) => (
+                  <td key={t.id} className="p-3 text-center">
+                    <ComparisonCell value={row.values[t.id] ?? false} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+// ---------- FAQ -------------------------------------------------------------
+
+function UpgradeFaq() {
+  return (
+    <section
+      aria-label="Frequently asked questions"
+      className="mt-16"
+      data-testid="upgrade-faq"
+    >
+      <h2 className="font-display text-2xl font-semibold text-center">
+        Frequently asked questions
+      </h2>
+      <Accordion type="single" collapsible className="mt-6 mx-auto max-w-3xl">
+        {UPGRADE_FAQ.map((item, i) => (
+          <AccordionItem key={item.q} value={`faq-${i}`}>
+            <AccordionTrigger className="text-left">{item.q}</AccordionTrigger>
+            <AccordionContent className="text-sm text-muted-foreground">
+              {item.a}
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    </section>
+  );
+}
+
+// ---------- Confirmation dialog --------------------------------------------
+
+interface ConfirmState {
+  tier: PricingTier;
+}
+
+interface ConfirmDialogProps {
+  state: ConfirmState | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+function billingPeriodLabel(p: PricingTier["billingPeriod"]): string {
+  switch (p) {
+    case "monthly":
+      return "Monthly billing";
+    case "annual":
+      return "Annual billing";
+    case "lifetime":
+      return "One-time payment";
+    case "free":
+    default:
+      return "Free";
+  }
+}
+
+function CheckoutConfirmDialog({
+  state,
+  onCancel,
+  onConfirm,
+}: ConfirmDialogProps) {
+  const open = state !== null;
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onCancel();
+      }}
+    >
+      <DialogContent data-testid="checkout-confirm-dialog">
+        {state && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Confirm your plan</DialogTitle>
+              <DialogDescription>
+                You'll review payment details in Paddle before purchase. No
+                charge is made yet.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="rounded-md border border-border/60 p-4 text-sm">
+              <div className="flex items-baseline justify-between">
+                <span className="font-medium">{state.tier.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {billingPeriodLabel(state.tier.billingPeriod)}
+                </span>
+              </div>
+              <div className="mt-2 flex items-baseline gap-1">
+                <span
+                  className="text-2xl font-bold"
+                  data-testid="checkout-confirm-price"
+                >
+                  {state.tier.priceDisplay}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {state.tier.priceSubtext}
+                </span>
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onCancel}
+                data-testid="checkout-confirm-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={onConfirm}
+                data-testid="checkout-confirm-continue"
+              >
+                Continue to checkout
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------- Page ------------------------------------------------------------
+
 export default function Upgrade() {
   const paddleConfig = useMemo(() => resolvePaddleConfig(), []);
   const navigate = useNavigate();
@@ -261,17 +579,34 @@ export default function Upgrade() {
     ? null
     : unavailableMessage(paddleConfig.reason ?? "missing_environment");
 
-  const { ready: paddleReady, paddle } = usePaddle(paddleConfig);
+  const {
+    ready: paddleReady,
+    loading: paddleLoading,
+    error: paddleError,
+    paddle,
+    retry: retryPaddle,
+  } = usePaddle(paddleConfig);
   const { loading: entLoading, entitlement } = useMyEntitlements();
 
-  // Current plan is "known" only if we're done loading AND we have a display id.
   const currentPlanKnown = !entLoading && !!entitlement?.displayPlanId;
   const currentPlanId = currentPlanKnown
     ? (entitlement.displayPlanId as string)
     : null;
 
-  const handleCheckout = (tier: PricingTier) => {
-    // Interlock: never fire checkout against a null price ID.
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+
+  const openConfirm = (tier: PricingTier) => {
+    // Defensive interlock: never surface confirmation for inert CTAs.
+    if (!tier.paddlePriceId) return;
+    if (!paddleConfig.available || !paddle?.Checkout) return;
+    setConfirmState({ tier });
+  };
+
+  const handleConfirm = () => {
+    const tier = confirmState?.tier;
+    setConfirmState(null);
+    if (!tier) return;
+    // Re-check interlocks at the moment of firing checkout.
     if (!tier.paddlePriceId) {
       toast.error("Checkout is not available for this plan yet.");
       return;
@@ -288,9 +623,7 @@ export default function Upgrade() {
             "Checkout complete. Your plan will update once confirmed.",
           );
         },
-        closeCallback: () => {
-          // Cancel is not an error — quiet dismissal.
-        },
+        closeCallback: () => {},
       });
     } catch (e) {
       toast.error(
@@ -318,15 +651,16 @@ export default function Upgrade() {
             plan…
           </p>
         )}
-        {paddleUnavailableReason && (
-          <p
-            className="mt-3 text-xs text-muted-foreground"
-            data-testid="upgrade-paddle-unavailable"
-          >
-            {paddleUnavailableReason}
-          </p>
-        )}
       </header>
+
+      <CheckoutStatusBanner
+        configAvailable={paddleConfig.available}
+        unavailableReason={paddleUnavailableReason}
+        loading={paddleLoading}
+        error={paddleError}
+        ready={paddleReady}
+        onRetry={retryPaddle}
+      />
 
       <section
         aria-label="Pricing tiers"
@@ -340,22 +674,29 @@ export default function Upgrade() {
             currentPlanKnown={currentPlanKnown}
             paddleReady={paddleReady}
             paddleUnavailableReason={paddleUnavailableReason}
-            onCheckout={handleCheckout}
-            onFreeStart={() => {
-              // Free tier is an app-entry action, never a Paddle checkout.
-              navigate("/auth");
-            }}
+            onCheckout={openConfirm}
+            onFreeStart={() => navigate("/auth")}
           />
         ))}
       </section>
 
-      <p className="mt-8 text-center text-xs text-muted-foreground">
+      <PlanComparisonTable />
+
+      <UpgradeFaq />
+
+      <p className="mt-12 text-center text-xs text-muted-foreground">
         New to Verdant?{" "}
         <Link to="/auth" className="underline underline-offset-4">
           Create a free account
         </Link>
         .
       </p>
+
+      <CheckoutConfirmDialog
+        state={confirmState}
+        onCancel={() => setConfirmState(null)}
+        onConfirm={handleConfirm}
+      />
     </main>
   );
 }

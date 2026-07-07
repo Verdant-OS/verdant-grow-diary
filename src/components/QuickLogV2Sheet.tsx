@@ -62,6 +62,15 @@ import {
   type QuickLogMaturityEvidenceFormState,
 } from "@/lib/quickLogMaturityEvidenceRules";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
+import {
+  QUICK_LOG_POST_SAVE_VIEW_LABEL,
+  QUICK_LOG_POST_SAVE_ANOTHER_LABEL,
+  QUICK_LOG_POST_SAVE_CLOSE_LABEL,
+  buildQuickLogPostSaveMessage,
+  rotateQuickLogIdempotencyKey,
+  shouldAllowQuickLogSave,
+  type QuickLogPostSaveSuccess,
+} from "@/lib/quickLogSaveGuardRules";
 
 interface Props {
   open: boolean;
@@ -143,6 +152,16 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
+  const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
+  // Synchronous in-flight guard. `saving`/`feedingSaving` are React
+  // state and don't flip until the next paint, so rapid double-clicks
+  // can slip a second save through. This ref locks the entry point
+  // during the same tick.
+  const saveInFlightRef = useRef(false);
+  // Rotates on "Log another" so a fresh save cycle can't reuse the
+  // previous saved-summary state. Bumped whenever the grower starts
+  // a new logical submission from the same open sheet.
+  const idempotencyKeyRef = useRef(1);
 
   const options = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
 
@@ -212,6 +231,9 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       setFeedingDefaultsApplied(false);
       setLocalError(null);
       setSaveStatus("");
+      setPostSave(null);
+      saveInFlightRef.current = false;
+      idempotencyKeyRef.current = 1;
       resetPhotoSelection();
     }
   }, [open, defaultTargetKey]);
@@ -325,6 +347,26 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   }
 
   const handleSave = async () => {
+    // Synchronous re-entry guard: prevents a rapid double-click from
+    // scheduling two RPC saves before React flips `saving` state.
+    if (
+      !shouldAllowQuickLogSave({
+        saving,
+        inFlight: saveInFlightRef.current,
+        postSaveShown: postSave !== null,
+      })
+    ) {
+      return;
+    }
+    saveInFlightRef.current = true;
+    try {
+      await runHandleSave();
+    } finally {
+      saveInFlightRef.current = false;
+    }
+  };
+
+  const runHandleSave = async () => {
     setLocalError(null);
     setSaveStatus("");
     const resolved = resolveQuickLogV2Target(options, form.selectedKey);
@@ -378,7 +420,15 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
         growEventId: (result as { growEventId?: string | null }).growEventId ?? null,
         source: "quick_log_v2_feed",
       });
-      onOpenChange(false);
+      setPostSave({
+        growEventId: (result as { growEventId?: string | null }).growEventId ?? null,
+        targetType: resolved.targetType as "plant" | "tent",
+        targetId: resolved.targetId as string,
+        tentId: resolved.tentId ?? null,
+        action: form.action,
+        message: FEEDING_SAVE_SUCCESS_MESSAGE,
+        savedAt: new Date().toISOString(),
+      });
       return;
     }
 
@@ -482,8 +532,48 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       source: "quick_log_v2",
     });
     resetPhotoSelection();
-    onOpenChange(false);
+    setPostSave({
+      growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
+      targetType: resolved.targetType as "plant" | "tent",
+      targetId: resolved.targetId as string,
+      tentId: resolved.tentId ?? null,
+      action: form.action,
+      message: buildQuickLogPostSaveMessage(form.action, Boolean(photoFile)),
+      savedAt: new Date().toISOString(),
+    });
   };
+
+  /**
+   * Post-save "Log another" — rotates the client idempotency key and
+   * clears the just-saved summary + event-specific draft so a fresh
+   * save cycle can proceed. Preserves the selected target so the
+   * grower doesn't lose their place.
+   */
+  function handleLogAnother() {
+    idempotencyKeyRef.current = rotateQuickLogIdempotencyKey(idempotencyKeyRef.current);
+    setPostSave(null);
+    setLocalError(null);
+    setSaveStatus("");
+    setForm((prev) => ({
+      ...EMPTY_QUICKLOG_V2_FORM,
+      selectedKey: prev.selectedKey,
+    }));
+    setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+    setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
+    setFeedingDefaultsApplied(false);
+    resetPhotoSelection();
+  }
+
+  function handleViewTimeline() {
+    if (!postSave) return;
+    const nav = buildQuickLogTimelineNavTarget({
+      targetType: postSave.targetType,
+      targetId: postSave.targetId,
+      growEventId: postSave.growEventId,
+    });
+    onOpenChange(false);
+    navigateToTimeline(nav.href, nav.hash, nav.path);
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -880,34 +970,83 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
           </div>
 
           <div className="space-y-2 pt-2">
-            <p
-              id="qlv2-save-helper"
-              className="text-sm text-muted-foreground"
-              data-testid="qlv2-save-helper"
-            >
-              {saveHelper}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={() => onOpenChange(false)}
-                disabled={saving}
+            {postSave ? (
+              <div
+                role="status"
+                aria-live="polite"
+                data-testid="qlv2-post-save"
+                className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2"
               >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                className="flex-1"
-                onClick={handleSave}
-                disabled={saving || feedingSaving || contextBlocked}
-                aria-describedby="qlv2-save-helper"
-                data-testid="qlv2-save"
-              >
-                {saving || feedingSaving ? "Saving…" : "Save"}
-              </Button>
-            </div>
+                <p
+                  className="text-sm font-medium text-foreground"
+                  data-testid="qlv2-post-save-message"
+                >
+                  {postSave.message}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Choose your next step. Log another entry, view your timeline, or close.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    onClick={handleViewTimeline}
+                    data-testid="qlv2-post-save-view"
+                  >
+                    {QUICK_LOG_POST_SAVE_VIEW_LABEL}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleLogAnother}
+                    data-testid="qlv2-post-save-another"
+                  >
+                    {QUICK_LOG_POST_SAVE_ANOTHER_LABEL}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="flex-1"
+                    onClick={() => onOpenChange(false)}
+                    data-testid="qlv2-post-save-close"
+                  >
+                    {QUICK_LOG_POST_SAVE_CLOSE_LABEL}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p
+                  id="qlv2-save-helper"
+                  className="text-sm text-muted-foreground"
+                  data-testid="qlv2-save-helper"
+                >
+                  {saveHelper}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => onOpenChange(false)}
+                    disabled={saving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    onClick={handleSave}
+                    disabled={saving || feedingSaving || contextBlocked}
+                    aria-describedby="qlv2-save-helper"
+                    data-testid="qlv2-save"
+                  >
+                    {saving || feedingSaving ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </SheetContent>

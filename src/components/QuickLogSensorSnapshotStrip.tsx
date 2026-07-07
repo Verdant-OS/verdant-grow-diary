@@ -102,7 +102,14 @@ function isPillRedundantWithBadge(
   return trustLabel.trim().toLowerCase() === PILL_LABEL[status].toLowerCase();
 }
 
-export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, attached = true }: Props) {
+export default function QuickLogSensorSnapshotStrip({
+  growId: _growId,
+  tentId,
+  attached = true,
+  manualReadingIds,
+  manualCapturedAt,
+  manualValues,
+}: Props) {
   const state = useLatestTentSensorSnapshot(tentId ?? null);
   const view = buildQuickLogStripFromTentState({
     status: state.status,
@@ -130,6 +137,25 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
       : null;
   const showTrustBadge = shouldRenderTrustBadge(view.status, view.trustBadge.label);
   const pillIsRedundant = isPillRedundantWithBadge(view.status, view.trustBadge.label);
+
+  // "Correct manual reading" affordance — only for manual snapshots
+  // with real original reading IDs supplied by the caller. Never
+  // inferred from timestamp/metric. Hidden for live/demo/csv/stale/
+  // invalid snapshots and when tentId is missing.
+  const effectiveSource = vm.display?.effectiveSource ?? null;
+  const correctionHref =
+    tentId &&
+    effectiveSource === "manual" &&
+    manualCapturedAt &&
+    hasCorrectableOriginalIds(manualReadingIds)
+      ? `/sensors${encodeManualCorrectionHash({
+          tentId,
+          originalCapturedAt: manualCapturedAt,
+          originalReadingIds: manualReadingIds ?? {},
+          originalValues: manualValues ?? {},
+        })}`
+      : null;
+
 
   return (
     <section

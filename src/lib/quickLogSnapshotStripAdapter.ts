@@ -226,6 +226,7 @@ export function buildQuickLogSnapshotStrip(
       title: TITLES.no_data,
       description: DESCRIPTIONS.no_data,
       capturedAt: null,
+      capturedAtLabel: null,
       ageLabel: null,
       metrics: [],
       action: actionFor("no_data"),

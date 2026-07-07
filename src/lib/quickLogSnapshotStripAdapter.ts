@@ -407,6 +407,7 @@ export function buildQuickLogStripFromTentState(
       title: TITLES.no_data,
       description: DESCRIPTIONS.no_data,
       capturedAt: null,
+      capturedAtLabel: null,
       ageLabel: null,
       metrics: [],
       action: actionFor("no_data"),
@@ -427,15 +428,22 @@ export function buildQuickLogStripFromTentState(
   const description = usableButDetached
     ? "Toggle “Attach sensor snapshot” to include it in this log."
     : DESCRIPTIONS[status];
-  const action: QuickLogSnapshotStripAction = usableButDetached
+  const baseAction: QuickLogSnapshotStripAction = usableButDetached
     ? { kind: "none" }
     : actionFor(status);
+  const action: QuickLogSnapshotStripAction =
+    !usableButDetached &&
+    snapshot.source === "manual" &&
+    (status === "usable" || status === "stale")
+      ? MANUAL_SNAPSHOT_EDIT_ACTION
+      : baseAction;
 
   return {
     status,
     title,
     description,
     capturedAt: snapshot.captured_at,
+    capturedAtLabel: formatCapturedAtAbsolute(snapshot.captured_at),
     ageLabel,
     metrics: buildStrictMetrics(snapshot),
     action,

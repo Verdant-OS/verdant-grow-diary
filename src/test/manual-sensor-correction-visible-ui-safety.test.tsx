@@ -29,6 +29,19 @@ vi.mock("@/hooks/useInsertManualSnapshotEdit", () => ({
 vi.mock("@/lib/insertManualSensorReadingReturningId", () => ({
   insertManualSensorReadingReturningId: vi.fn(),
 }));
+// The strip fetches its own state; return a manual, fresh snapshot so
+// the "Correct manual reading" affordance is eligible to render.
+vi.mock("@/lib/sensor", () => ({
+  useLatestTentSensorSnapshot: () => ({
+    status: "ready" as const,
+    snapshot: {
+      source: "manual",
+      captured_at: "2026-07-01T12:00:00.000Z",
+      temperature_c: 24,
+      humidity_pct: 58,
+    },
+  }),
+}));
 
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";

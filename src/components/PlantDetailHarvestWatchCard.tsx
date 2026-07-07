@@ -249,29 +249,67 @@ export default function PlantDetailHarvestWatchCard({
               {row.harvestWindow.caption}
             </p>
           </div>
-          <div className="rounded-lg border border-border/50 bg-background/40 p-3">
-            <div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div
+            className="rounded-lg border border-border/50 bg-background/40 p-3"
+            data-testid="evidence-tile"
+            aria-labelledby="evidence-tile-heading"
+            aria-describedby="evidence-tile-explanation-text"
+          >
+            <div
+              id="evidence-tile-heading"
+              className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground"
+            >
               <Camera className="h-3.5 w-3.5" /> Evidence
             </div>
-            <div className="font-medium" data-testid="plant-detail-harvest-watch-evidence">
-              {vm.evidenceLabel}
+            <div
+              className="font-medium"
+              data-testid="evidence-tile-count"
+              data-count={vm.photoEvidenceDisplay.count}
+            >
+              <span data-testid="plant-detail-harvest-watch-evidence">{vm.evidenceLabel}</span>
             </div>
             <p
+              id="evidence-tile-explanation-text"
               className="mt-1 text-[11px] text-muted-foreground"
-              data-testid="plant-detail-harvest-watch-evidence-explanation"
+              data-testid="evidence-tile-explanation"
             >
-              {vm.evidenceExplanation}
+              <span data-testid="plant-detail-harvest-watch-evidence-explanation">
+                {vm.evidenceExplanation}
+              </span>
+            </p>
+            <p
+              className="mt-1 text-[11px] text-muted-foreground"
+              data-testid="evidence-tile-source-label"
+              data-source={vm.photoEvidenceDisplay.dataSource}
+            >
+              {vm.photoEvidenceDisplay.sourceLabel}
             </p>
             {vm.evidenceGalleryMismatch && (
               <p
                 className="mt-1 text-[11px] text-[hsl(var(--warning))]"
-                data-testid="plant-detail-harvest-watch-evidence-mismatch"
+                data-testid="evidence-tile-mismatch-note"
+                role="note"
+                aria-live="polite"
               >
-                {vm.evidenceMismatchNote}
+                <span data-testid="plant-detail-harvest-watch-evidence-mismatch">
+                  {vm.evidenceMismatchNote}
+                </span>
               </p>
+            )}
+            {vm.photoEvidenceDisplay.showSupportingRecordsCta && (
+              <a
+                href={vm.photoEvidenceDisplay.supportingRecordsHref}
+                data-testid="evidence-tile-supporting-records-link"
+                aria-label={vm.photoEvidenceDisplay.supportingRecordsCtaAriaLabel}
+                className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-primary underline-offset-2 hover:underline focus-visible:underline"
+              >
+                {vm.photoEvidenceDisplay.supportingRecordsCtaLabel}
+                <ChevronRight className="h-3 w-3" aria-hidden="true" />
+              </a>
             )}
           </div>
         </div>
+
 
         <div
           className="rounded-lg border border-border/50 bg-background/40 p-3"

@@ -50,6 +50,24 @@ export function isKnownQuickLogStage(raw: unknown): boolean {
 }
 
 /**
+ * Should stage defaulting be re-armed for a plant-selection change?
+ *
+ * TRUE only when the grower moves between two DIFFERENT real plants — i.e. a
+ * genuine switch. Callers must pass the last NON-EMPTY plant id as
+ * `prevPlantId` so a switch that passes through the cleared "Choose a plant…"
+ * state (A → "" → B) is still recognized as A→B, not two fresh auto-selects.
+ *
+ * FALSE for:
+ *  - the initial "" → plant auto-select (prevPlantId === ""): keep any stage
+ *    the grower picked before the plant resolved,
+ *  - clearing the selection (nextPlantId === ""): nothing to default to yet,
+ *  - re-selecting the same plant.
+ */
+export function isUserDrivenPlantSwitch(prevPlantId: string, nextPlantId: string): boolean {
+  return prevPlantId !== "" && nextPlantId !== "" && prevPlantId !== nextPlantId;
+}
+
+/**
  * Resolve the stage the Quick Log form should default to.
  *
  * Priority: selected plant stage → active grow stage → UNKNOWN ("").

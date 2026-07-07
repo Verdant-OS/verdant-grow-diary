@@ -19,6 +19,7 @@ import {
   resolveQuickLogStageDefault,
   normalizeQuickLogStage,
   isKnownQuickLogStage,
+  isUserDrivenPlantSwitch,
   UNKNOWN_STAGE,
 } from "@/lib/quickLogStageDefaultRules";
 import { STAGES } from "@/lib/grow";
@@ -111,6 +112,29 @@ describe("isKnownQuickLogStage", () => {
     expect(isKnownQuickLogStage("")).toBe(false);
     expect(isKnownQuickLogStage("banana")).toBe(false);
     expect(isKnownQuickLogStage(null)).toBe(false);
+  });
+});
+
+describe("isUserDrivenPlantSwitch (stage re-default gate)", () => {
+  it("is true only for a move between two different real plants", () => {
+    expect(isUserDrivenPlantSwitch("A", "B")).toBe(true);
+    expect(isUserDrivenPlantSwitch("A", "A")).toBe(false);
+  });
+
+  it("is false for the initial ''→plant auto-select (keeps a pre-picked stage)", () => {
+    expect(isUserDrivenPlantSwitch("", "P")).toBe(false);
+  });
+
+  it("is false when the selection is cleared to '' (nothing to default to yet)", () => {
+    expect(isUserDrivenPlantSwitch("A", "")).toBe(false);
+  });
+
+  it("recognizes a switch that passes through the cleared state when caller tracks the last non-empty id", () => {
+    // Callers pass the LAST NON-EMPTY plant id as prev, so A → "" → B is seen
+    // as A→B (true) even though plantId momentarily became "".
+    expect(isUserDrivenPlantSwitch("A", "B")).toBe(true);
+    // ...and re-selecting the same plant after a clear is NOT a switch.
+    expect(isUserDrivenPlantSwitch("A", "A")).toBe(false);
   });
 });
 

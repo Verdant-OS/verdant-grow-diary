@@ -33,6 +33,7 @@ import { STAGES } from "@/lib/grow";
 import {
   resolveQuickLogStageDefault,
   normalizeQuickLogStage,
+  isUserDrivenPlantSwitch,
 } from "@/lib/quickLogStageDefaultRules";
 import { EC_UNITS, EC_UNIT_LABEL, type EcUnit } from "@/constants/units";
 import {
@@ -323,15 +324,16 @@ export default function QuickLog({
   // should win. It must NOT clear the touched flag on the initial ""→P
   // auto-select (async plants load / prefill / last-target), because the grower
   // may have already picked a stage before the plant resolved; clobbering that
-  // would silently discard their choice. Ordered BEFORE the defaulting effect
-  // so the flag is settled before the default is recomputed.
+  // would silently discard their choice. prevPlantIdRef tracks the last
+  // NON-EMPTY plant id so a switch that passes through the cleared "Choose a
+  // plant…" state (A → "" → B) is still seen as A→B. Ordered BEFORE the
+  // defaulting effect so the flag is settled before the default is recomputed.
   useEffect(() => {
     if (!open) return;
-    const prevPlantId = prevPlantIdRef.current;
-    prevPlantIdRef.current = plantId;
-    if (prevPlantId && plantId && prevPlantId !== plantId) {
+    if (isUserDrivenPlantSwitch(prevPlantIdRef.current, plantId)) {
       stageUserTouchedRef.current = false;
     }
+    if (plantId) prevPlantIdRef.current = plantId;
   }, [open, plantId]);
 
   // Slice A2: default the stage from the selected plant, else the active grow.

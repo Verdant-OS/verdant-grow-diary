@@ -65,6 +65,13 @@ export default function Sensors() {
   const { data: realTents = [] } = useTentRows();
   const [tentId, setTentId] = useState<string>(tents[0]?.id ?? "t1");
   const [searchParams, setSearchParams] = useSearchParams();
+  const correctionCtx = useMemo(
+    () => (typeof window !== "undefined" ? decodeManualCorrectionHash(window.location.hash) : null),
+    // Re-parse whenever the search string changes so nav updates flow through.
+    // Hash changes still require a route change to re-render; that's fine for
+    // the deep-link flow (external navigation from Timeline).
+    [searchParams],
+  );
   const urlSensorSources = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
   const filtered = readings.filter((r) => r.tentId === tentId);
   const latest = filtered.length > 0 ? filtered[filtered.length - 1] : null;

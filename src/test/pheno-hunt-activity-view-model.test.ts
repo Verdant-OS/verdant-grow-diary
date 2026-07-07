@@ -15,18 +15,22 @@ describe("buildPhenoHuntActivityEntries", () => {
     expect(buildPhenoHuntActivityEntries({ sexByPlant: {}, decisionsByPlant: {} })).toEqual([]);
   });
 
-  it("emits one sex entry per candidate (latest), flagging herm", () => {
+  it("emits one sex entry per candidate (latest), flagging herm + labeling each", () => {
     const rows = buildPhenoHuntActivityEntries({
       sexByPlant: {
         p1: { plantId: "p1", sex: "female", observedAt: "2026-07-01" },
         p2: { plantId: "p2", sex: "hermaphrodite", hermObserved: true, observedAt: "2026-07-02" },
       },
+      candidateLabelById: { p1: "GMO #1", p2: "GMO #2" },
     });
     const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
     expect(rows).toHaveLength(2);
     expect(byId["sex:p1"].kind).toBe("sex_observation");
     expect(byId["sex:p1"].badge).toBe("Female");
     expect(byId["sex:p2"].badge).toBe("Herm");
+    // Multi-candidate hunts must say which candidate each sex row is for.
+    expect(byId["sex:p1"].title).toContain("GMO #1");
+    expect(byId["sex:p2"].title).toContain("GMO #2");
   });
 
   it("collapses decision history to the newest decision per candidate, with label + reason", () => {

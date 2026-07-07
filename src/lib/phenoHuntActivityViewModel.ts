@@ -72,6 +72,7 @@ export function buildPhenoHuntActivityEntries(input: PhenoHuntActivityInput): Ph
       id: o.plantId,
       sex: o.sex,
       hermObserved: o.hermObserved ?? null,
+      candidateLabel: labelForPlant(input, o.plantId),
       note: o.note ?? null,
       observedAt: o.observedAt ?? null,
     }));

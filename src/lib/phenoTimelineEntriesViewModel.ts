@@ -13,6 +13,7 @@
  */
 import { crossDonorLabel, crossLineageBadge } from "@/lib/phenoCrossFormViewModel";
 import { reversalMethodLabel } from "@/lib/genetics/breedingReproductionRules";
+import { keeperDecisionLabel, normalizeKeeperDecision } from "@/lib/phenoKeeperDecisionModel";
 
 export type PhenoTimelineKind = "sex_observation" | "keeper_decision" | "reversal" | "cross";
 
@@ -28,13 +29,19 @@ export interface PhenoTimelineEntry {
   readonly badge: string | null;
 }
 
-/** Minimal input row shapes — a subset of the service Row types. */
+/**
+ * Minimal input row shapes — a subset of the service Row types. Each carries an
+ * optional `createdAt`: the grower's explicit date (observed/decided/applied/
+ * crossed_at) may be null, but the row always has a created_at, so a recorded
+ * event still lands at its creation time on the timeline instead of "undated".
+ */
 export interface SexObservationInput {
   readonly id: string;
   readonly sex: string;
   readonly hermObserved?: boolean | null;
   readonly note?: string | null;
   readonly observedAt?: string | null;
+  readonly createdAt?: string | null;
 }
 export interface KeeperDecisionInput {
   readonly id: string;
@@ -42,6 +49,7 @@ export interface KeeperDecisionInput {
   readonly candidateLabel?: string | null;
   readonly note?: string | null;
   readonly decidedAt?: string | null;
+  readonly createdAt?: string | null;
 }
 export interface ReversalInput {
   readonly id: string;
@@ -49,6 +57,7 @@ export interface ReversalInput {
   readonly method: string;
   readonly note?: string | null;
   readonly appliedAt?: string | null;
+  readonly createdAt?: string | null;
 }
 export interface CrossInput {
   readonly id: string;
@@ -57,6 +66,7 @@ export interface CrossInput {
   readonly crossType: string;
   readonly crossName?: string | null;
   readonly crossedAt?: string | null;
+  readonly createdAt?: string | null;
 }
 
 export interface PhenoTimelineInput {
@@ -75,15 +85,14 @@ const SEX_LABEL: Record<string, string> = {
   unknown: "Unknown",
 };
 
-const DECISION_LABEL: Record<string, string> = {
-  keep: "Keep",
-  cull: "Cull",
-  hold: "Hold",
-};
-
-function keeperNameOf(input: PhenoTimelineInput, id: string): string {
+/** Resolved keeper name, or null when unknown/blank. */
+function rawKeeperName(input: PhenoTimelineInput, id: string): string | null {
   const n = input.keeperName?.(id);
-  return n && n.trim() !== "" ? n : "a keeper";
+  return n && n.trim() !== "" ? n : null;
+}
+/** Keeper name with the standard placeholder (matches crossDonorLabel). */
+function keeperNameOf(input: PhenoTimelineInput, id: string): string {
+  return rawKeeperName(input, id) ?? "unknown keeper";
 }
 
 function sexEntry(o: SexObservationInput): PhenoTimelineEntry {
@@ -92,7 +101,7 @@ function sexEntry(o: SexObservationInput): PhenoTimelineEntry {
   return {
     id: `sex:${o.id}`,
     kind: "sex_observation",
-    occurredAt: o.observedAt ?? null,
+    occurredAt: o.observedAt ?? o.createdAt ?? null,
     title: herm ? "Hermaphrodite traits observed" : `Sex recorded: ${sexLabel}`,
     detail: o.note ?? null,
     badge: herm ? "Herm" : sexLabel,
@@ -100,12 +109,13 @@ function sexEntry(o: SexObservationInput): PhenoTimelineEntry {
 }
 
 function decisionEntry(d: KeeperDecisionInput): PhenoTimelineEntry {
-  const label = DECISION_LABEL[d.decision] ?? d.decision;
+  // Canonical labels (incl. "Undecided") from the shared decision model.
+  const label = keeperDecisionLabel(normalizeKeeperDecision(d.decision));
   const who = d.candidateLabel && d.candidateLabel.trim() !== "" ? d.candidateLabel : null;
   return {
     id: `decision:${d.id}`,
     kind: "keeper_decision",
-    occurredAt: d.decidedAt ?? null,
+    occurredAt: d.decidedAt ?? d.createdAt ?? null,
     title: who ? `Keeper decision — ${who}: ${label}` : `Keeper decision: ${label}`,
     detail: d.note ?? null,
     badge: label,
@@ -116,7 +126,7 @@ function reversalEntry(input: PhenoTimelineInput, r: ReversalInput): PhenoTimeli
   return {
     id: `reversal:${r.id}`,
     kind: "reversal",
-    occurredAt: r.appliedAt ?? null,
+    occurredAt: r.appliedAt ?? r.createdAt ?? null,
     title: `Reversal applied — ${keeperNameOf(input, r.keeperId)}`,
     detail: r.note ?? null,
     badge: reversalMethodLabel(r.method),
@@ -125,15 +135,17 @@ function reversalEntry(input: PhenoTimelineInput, r: ReversalInput): PhenoTimeli
 
 function crossEntry(input: PhenoTimelineInput, x: CrossInput): PhenoTimelineEntry {
   const female = keeperNameOf(input, x.femaleKeeperId);
+  // Pass the RAW (nullable) donor name so crossDonorLabel applies its own
+  // "unknown keeper" fallback — no double placeholder.
   const donor = crossDonorLabel(
     { maleKeeperId: x.maleKeeperId, crossType: x.crossType },
-    x.maleKeeperId ? keeperNameOf(input, x.maleKeeperId) : null,
+    x.maleKeeperId ? rawKeeperName(input, x.maleKeeperId) : null,
   );
   const name = x.crossName && x.crossName.trim() !== "" ? x.crossName : `${female} × ${donor}`;
   return {
     id: `cross:${x.id}`,
     kind: "cross",
-    occurredAt: x.crossedAt ?? null,
+    occurredAt: x.crossedAt ?? x.createdAt ?? null,
     title: `Cross recorded — ${name}`,
     detail: `♀ ${female} × ${donor}`,
     badge: crossLineageBadge(x.crossType),

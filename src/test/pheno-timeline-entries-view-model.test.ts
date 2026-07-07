@@ -93,15 +93,39 @@ describe("buildPhenoTimelineEntries — mapping", () => {
     expect(e.badge).toMatch(/S1/);
   });
 
-  it("falls back to a safe keeper placeholder when a name is unknown", () => {
+  it("falls back to the standard 'unknown keeper' placeholder when a name is unknown", () => {
     const [e] = buildPhenoTimelineEntries({
       crosses: [
         { id: "x3", femaleKeeperId: "ghost", maleKeeperId: "dad", crossType: "standard_f1" },
       ],
       keeperName,
     });
-    expect(e.title).toMatch(/a keeper × Dessert/);
-    expect(e.title).not.toMatch(/undefined|null/);
+    expect(e.title).toMatch(/unknown keeper × Dessert/);
+    expect(e.title).not.toMatch(/undefined|null|a keeper/);
+  });
+
+  it("labels an undecided keeper decision via the shared model", () => {
+    const [e] = buildPhenoTimelineEntries({
+      keeperDecisions: [{ id: "d2", decision: "undecided", decidedAt: "2026-07-02T00:00:00Z" }],
+    });
+    expect(e.title).toMatch(/Undecided/);
+    expect(e.badge).toBe("Undecided");
+  });
+
+  it("uses createdAt when the grower-set date is null (recorded event, not undated)", () => {
+    const [e] = buildPhenoTimelineEntries({
+      reversals: [
+        {
+          id: "r9",
+          keeperId: "rev",
+          method: "sts",
+          appliedAt: null,
+          createdAt: "2026-07-09T00:00:00Z",
+        },
+      ],
+      keeperName,
+    });
+    expect(e.occurredAt).toBe("2026-07-09T00:00:00Z");
   });
 });
 

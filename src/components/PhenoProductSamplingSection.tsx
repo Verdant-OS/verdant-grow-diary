@@ -210,7 +210,7 @@ export default function PhenoProductSamplingSection() {
         <Field
           id="pheno-sampling-ash"
           label="Ash color"
-          hint="Observation only — ash color does not prove quality."
+          hint="Observation only — ash color alone is not proof of quality."
         >
           <select
             id="pheno-sampling-ash"
@@ -233,7 +233,7 @@ export default function PhenoProductSamplingSection() {
         <Field
           id="pheno-sampling-oil-ring"
           label="Oil ring observation"
-          hint="Observation only — oil ring alone does not prove superiority."
+          hint="Observation only — oil ring alone is not proof of superiority."
         >
           <select
             id="pheno-sampling-oil-ring"

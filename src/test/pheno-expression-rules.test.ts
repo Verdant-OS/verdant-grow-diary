@@ -4,6 +4,7 @@ import {
   assessCohortComparability,
   LOUD_TRAIT_AXES,
   PHENO_HERM_SUGGEST_CAVEAT,
+  PHENO_HERM_REVERSED_CAVEAT,
   type PhenoExpressionInput,
 } from "@/lib/phenoExpressionRules";
 
@@ -113,6 +114,51 @@ describe("buildPhenoExpressionView", () => {
     // no herm observed → no action
     const fem = buildPhenoExpressionView("c1", { sex: "female" })!;
     expect(fem.herm).toMatchObject({ observed: false, action: null });
+  });
+
+  it("REVERSED-FEMALE HERM LANDMINE: a reversed keeper's pollen sacs never suggest a cull", () => {
+    // James Loud pheno review, HIGH: a keeper with a recorded chemical reversal
+    // is DELIBERATELY shedding pollen for breeding. Its herm observation must
+    // read as expected, never as a spontaneous-herm cull nudge.
+    const reversed = buildPhenoExpressionView("c1", {
+      sex: "hermaphrodite",
+      hermObserved: true,
+      hermNote: "pollen sacs wk4 (post-STS)",
+      intentionalReversal: true,
+    })!;
+    expect(reversed.herm).toMatchObject({
+      observed: true,
+      reversed: true,
+      action: "reversed_expected",
+      note: "pollen sacs wk4 (post-STS)",
+    });
+    expect(reversed.herm.caveat).toBe(PHENO_HERM_REVERSED_CAVEAT);
+    expect(reversed.herm.caveat.toLowerCase()).not.toContain("consider removing");
+
+    // A spontaneous (non-reversed) herm is UNCHANGED — still nudges removal.
+    const spontaneous = buildPhenoExpressionView("c1", {
+      sex: "hermaphrodite",
+      hermObserved: true,
+      intentionalReversal: false,
+    })!;
+    expect(spontaneous.herm).toMatchObject({
+      observed: true,
+      reversed: false,
+      action: "consider_removing",
+    });
+    expect(spontaneous.herm.caveat).toBe(PHENO_HERM_SUGGEST_CAVEAT);
+
+    // Omitting intentionalReversal entirely defaults to "not reversed" (safe
+    // default — never silently suppress the alert without an explicit signal).
+    const omitted = buildPhenoExpressionView("c1", { sex: "hermaphrodite", hermObserved: true })!;
+    expect(omitted.herm.action).toBe("consider_removing");
+
+    // A reversed keeper with NO herm observed still has no action at all.
+    const reversedNoHerm = buildPhenoExpressionView("c1", {
+      sex: "female",
+      intentionalReversal: true,
+    })!;
+    expect(reversedNoHerm.herm).toMatchObject({ observed: false, action: null, reversed: true });
   });
 
   it("flags every kind of missing expression data honestly", () => {

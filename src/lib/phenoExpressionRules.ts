@@ -156,6 +156,14 @@ export interface PhenoExpressionInput {
   /** True when a hermaphrodite / intersex trait was OBSERVED (never inferred). */
   readonly hermObserved?: boolean;
   readonly hermNote?: string | null;
+  /**
+   * True when this candidate has a recorded INTENTIONAL chemical reversal (a
+   * pheno_reversals row for its keeper). A reversed female is DELIBERATELY made
+   * to shed pollen for breeding, so its pollen sacs are expected — it must never
+   * be nudged toward culling as a spontaneous hermaphrodite (the reversed-female
+   * herm landmine). Grower-recorded only; never inferred.
+   */
+  readonly intentionalReversal?: boolean;
   readonly labResult?: PhenoLabResultInput | null;
 }
 
@@ -216,14 +224,25 @@ const EXPRESSION_MISSING_MESSAGES: Record<PhenoExpressionMissingCode, string> = 
 
 export interface PhenoHermSuggestion {
   readonly observed: boolean;
-  /** Suggest-only: the grower decides. Null when no herm was observed. */
-  readonly action: "consider_removing" | null;
+  /**
+   * Suggest-only, and REVERSAL-AWARE:
+   *  - "consider_removing": a spontaneous herm (not reversed) — the grower decides.
+   *  - "reversed_expected": pollen sacs on a keeper with a recorded reversal —
+   *    expected, NEVER a cull nudge (the reversed-female herm landmine).
+   *  - null: no herm observed.
+   */
+  readonly action: "consider_removing" | "reversed_expected" | null;
+  /** True when this candidate has a recorded intentional chemical reversal. */
+  readonly reversed: boolean;
   readonly note: string | null;
   readonly caveat: string;
 }
 
 export const PHENO_HERM_SUGGEST_CAVEAT =
   "A hermaphrodite was observed. Consider removing this plant to protect the run — Verdant never removes a plant for you; this is your call.";
+
+export const PHENO_HERM_REVERSED_CAVEAT =
+  "This keeper has a recorded chemical reversal — pollen sacs are EXPECTED on a reversed female used for breeding. This is not a spontaneous hermaphrodite; do not remove it.";
 
 export interface PhenoExpressionView {
   readonly candidateId: string;
@@ -387,12 +406,17 @@ export function buildPhenoExpressionView(
   const labResult = buildLabResultView(input.labResult);
   const sex = normalizeSexObservation(input.sex);
   const hermObserved = input.hermObserved === true;
+  const reversed = input.intentionalReversal === true;
 
+  // Reversed-female herm landmine guard: a keeper with a recorded reversal was
+  // DELIBERATELY made to shed pollen, so an observed "herm" is expected and must
+  // NOT be nudged toward culling — it is the plant being bred with.
   const herm: PhenoHermSuggestion = {
     observed: hermObserved,
-    action: hermObserved ? "consider_removing" : null,
+    reversed,
+    action: hermObserved ? (reversed ? "reversed_expected" : "consider_removing") : null,
     note: cleanString(input.hermNote),
-    caveat: hermObserved ? PHENO_HERM_SUGGEST_CAVEAT : "",
+    caveat: hermObserved ? (reversed ? PHENO_HERM_REVERSED_CAVEAT : PHENO_HERM_SUGGEST_CAVEAT) : "",
   };
 
   const missingFlags: PhenoExpressionMissingFlag[] = [];

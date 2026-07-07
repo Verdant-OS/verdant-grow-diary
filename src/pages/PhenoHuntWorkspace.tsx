@@ -315,6 +315,8 @@ interface EditorProps {
   ) => Promise<boolean>;
   history: readonly KeeperDecisionLogEntry[];
   sexRow: SexObservationRow | undefined;
+  /** This candidate's keeper has a recorded chemical reversal (expected pollen). */
+  reversed: boolean;
   onSaveSex: (plantId: string, sex: PhenoSexObservation) => Promise<boolean>;
   growId: string | null;
   tentId: string | null;
@@ -363,6 +365,7 @@ function CandidateEditor({
   onSaveDecision,
   history,
   sexRow,
+  reversed,
   onSaveSex,
   growId,
   tentId,
@@ -422,7 +425,13 @@ function CandidateEditor({
     setSaved(okScore && okDecision && okSex);
   };
 
-  const isHerm = sex === "hermaphrodite" || sexRow?.hermObserved === true;
+  const hermObserved = sex === "hermaphrodite" || sexRow?.hermObserved === true;
+  // Reversed-female herm landmine: a keeper with a recorded chemical reversal is
+  // DELIBERATELY made to shed pollen, so its pollen sacs are EXPECTED — never
+  // nudge culling the plant being bred with. Only a spontaneous (non-reversed)
+  // herm surfaces the removal alert + cull button.
+  const isHerm = hermObserved && !reversed;
+  const isReversedFemale = hermObserved && reversed;
 
   return (
     <section
@@ -562,6 +571,19 @@ function CandidateEditor({
           ))}
         </select>
       </label>
+
+      {isReversedFemale && (
+        <div
+          data-testid={`workspace-herm-reversed-${plantId}`}
+          className="rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground"
+        >
+          <p className="font-medium text-foreground">Reversed female — pollen sacs expected.</p>
+          <p className="opacity-90">
+            This keeper has a recorded chemical reversal, so it is deliberately shedding pollen for
+            breeding. This is not a spontaneous hermaphrodite — keep it.
+          </p>
+        </div>
+      )}
 
       {isHerm && (
         <div
@@ -723,6 +745,7 @@ export default function PhenoHuntWorkspace() {
               onSaveDecision={ws.saveDecision}
               history={ws.decisionHistoryByPlant[c.candidateId] ?? []}
               sexRow={ws.sexByPlant[c.candidateId]}
+              reversed={ws.reversedPlantIds.has(c.candidateId)}
               onSaveSex={ws.saveSex}
               growId={ws.hunt?.growId ?? null}
               tentId={ws.hunt?.tentId ?? null}

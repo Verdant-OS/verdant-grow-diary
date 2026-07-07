@@ -7,6 +7,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { loadPhenoHuntCandidates, type PhenoHuntSummary } from "@/lib/phenoHuntCandidatesService";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
+import { listKeepersForHunt } from "@/lib/phenoKeepersService";
+import { listReversalsForKeepers } from "@/lib/phenoReversalsService";
 import {
   upsertCandidateScore,
   listCandidateScoresForHunt,
@@ -62,6 +64,11 @@ export interface UsePhenoHuntWorkspaceState {
   decisionHistoryByPlant: Record<string, KeeperDecisionLogEntry[]>;
   /** Latest recorded sex observation per plant. */
   sexByPlant: Record<string, SexObservationRow>;
+  /**
+   * Source-plant ids of candidates whose keeper has a recorded chemical reversal.
+   * Used to suppress the herm/cull nudge on a reversed female (pollen expected).
+   */
+  reversedPlantIds: Set<string>;
   /** Post-cure smoke test per plant. */
   smokeByPlant: Record<string, SmokeTestRow>;
   /** Lab results keyed "plantId:source". */
@@ -126,6 +133,7 @@ export function usePhenoHuntWorkspace(
     Record<string, KeeperDecisionLogEntry[]>
   >({});
   const [sexByPlant, setSexByPlant] = useState<Record<string, SexObservationRow>>({});
+  const [reversedPlantIds, setReversedPlantIds] = useState<Set<string>>(new Set());
   const [smokeByPlant, setSmokeByPlant] = useState<Record<string, SmokeTestRow>>({});
   const [labByKey, setLabByKey] = useState<Record<string, LabResultRow>>({});
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +155,7 @@ export function usePhenoHuntWorkspace(
         setStatus("error");
         return;
       }
-      const [scores, decisions, rounds, history, sexes, smokes, labs] = await Promise.all([
+      const [scores, decisions, rounds, history, sexes, smokes, labs, keepers] = await Promise.all([
         listCandidateScoresForHunt(id),
         listKeeperDecisionsForHunt(id),
         listScoreRoundsForHunt(id),
@@ -155,8 +163,22 @@ export function usePhenoHuntWorkspace(
         listLatestSexObservationsForHunt(id),
         listSmokeTestsForHunt(id),
         listLabResultsForHunt(id),
+        // A candidate promoted to keeper may have a recorded chemical reversal
+        // (pheno_reversals) — needed to suppress the herm/cull nudge on the
+        // reversed-female-herm landmine (pollen sacs are EXPECTED on a
+        // deliberately reversed breeding female).
+        listKeepersForHunt(id),
       ]);
       if (cancelled) return;
+      // Reversed-keeper ids -> their SOURCE PLANT id (candidates are keyed by
+      // plantId, reversals by keeperId; a keeper's sourcePlantId is the bridge).
+      const reversedKeeperIds = new Set(
+        (await listReversalsForKeepers(keepers.map((k) => k.id))).map((r) => r.keeperId),
+      );
+      if (cancelled) return;
+      const reversedPlants = new Set(
+        keepers.filter((k) => reversedKeeperIds.has(k.id)).map((k) => k.sourcePlantId),
+      );
       setHunt(result.hunt);
       setCandidates([...result.candidates]);
       setScoresByPlant(scores);
@@ -164,6 +186,7 @@ export function usePhenoHuntWorkspace(
       setRoundsByKey(rounds);
       setDecisionHistoryByPlant(history);
       setSexByPlant(sexes);
+      setReversedPlantIds(reversedPlants);
       setSmokeByPlant(smokes);
       setLabByKey(labs);
       setStatus("ok");
@@ -371,6 +394,7 @@ export function usePhenoHuntWorkspace(
     roundsByKey,
     decisionHistoryByPlant,
     sexByPlant,
+    reversedPlantIds,
     smokeByPlant,
     labByKey,
     error,

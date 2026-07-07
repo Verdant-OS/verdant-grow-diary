@@ -44,7 +44,7 @@ describe("buildQuickLogSnapshotStrip", () => {
     expect(v.status).toBe("no_data");
     expect(v.title).toBe("No sensor snapshot attached");
     expect(v.description).toBe("Add a snapshot so this log has room context.");
-    expect(v.action).toEqual({ kind: "add", label: "Add snapshot", href: "/sensors" });
+    expect(v.action).toEqual({ kind: "add", label: "Add snapshot", href: "/sensors#manual-reading" });
   });
 
   it("no_data — exact copy when snapshot source is unavailable", () => {

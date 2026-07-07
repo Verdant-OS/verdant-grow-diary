@@ -8,6 +8,7 @@
  * stays comparable across candidates.
  */
 import { useState } from "react";
+import { usePhenoSamplingOptional } from "@/context/PhenoSamplingContext";
 import {
   PHENO_SAMPLING_HEADING,
   PHENO_SAMPLING_INTRO_PARAGRAPHS,

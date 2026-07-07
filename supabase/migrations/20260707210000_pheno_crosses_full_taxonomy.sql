@@ -176,17 +176,31 @@ CREATE POLICY "pheno_crosses_insert_own"
             ELSE FALSE
           END
         -- Natural male / open pollination: real male pollen, so an inherently-
-        -- feminized way is invalid. No donor-reversal check — validateBreedingCross
-        -- keys off the channel only for these, and an open-pollination contributor
-        -- may have an unrelated historical reversal on record.
+        -- feminized way is invalid AND the donor must NOT be a reversed female
+        -- (whose pollen carries only female genetics -> feminized seed; a
+        -- reversed female has no natural-male pollen). A NULL donor (open
+        -- pollination population) passes. Mirrors validateBreedingCross's
+        -- reversed-donor guard and the channel-less arm below.
         WHEN channel IN ('natural_male', 'open_pollination') THEN
           cross_type NOT IN ('selfing_s1', 'selfing_sn', 'feminized_cross', 'feminized_bx')
+          AND NOT EXISTS (
+            SELECT 1 FROM public.pheno_reversals r
+            WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+          )
         -- Channel-less (legacy / current service): preserve the original 3-type
-        -- guard EXACTLY (incl. standard_f1 -> donor NOT reversed), require the
-        -- reversal for the new inherently-feminized types, allow the rest.
+        -- guard EXACTLY, and treat EVERY regular way uniformly (same rule as the
+        -- natural_male arm above): a real male donor, never a reversed female
+        -- whose pollen is feminized. A GENUINELY feminized filial/BX is only ever
+        -- recorded via an explicit reversal/rodelization channel (the arms above),
+        -- never through this channel-less path.
         ELSE
           (
-            cross_type = 'standard_f1' AND NOT EXISTS (
+            -- Every regular way (standard_f1, filial, backcross, ibl, sib_cross,
+            -- outcross, line_cross, open_pollination, test_cross, reciprocal_cross,
+            -- three_way_cross): donor must NOT be reversed. A NULL donor (open
+            -- pollination) passes.
+            cross_type NOT IN ('selfing_s1', 'selfing_sn', 'feminized_cross', 'feminized_bx')
+            AND NOT EXISTS (
               SELECT 1 FROM public.pheno_reversals r
               WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
             )
@@ -204,10 +218,6 @@ CREATE POLICY "pheno_crosses_insert_own"
               SELECT 1 FROM public.pheno_reversals r
               WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
             )
-          )
-          OR cross_type IN (
-            'filial', 'ibl', 'backcross', 'sib_cross', 'outcross', 'line_cross',
-            'open_pollination', 'test_cross', 'reciprocal_cross', 'three_way_cross'
           )
       END
     )
@@ -273,17 +283,31 @@ CREATE POLICY "pheno_crosses_update_own"
             ELSE FALSE
           END
         -- Natural male / open pollination: real male pollen, so an inherently-
-        -- feminized way is invalid. No donor-reversal check — validateBreedingCross
-        -- keys off the channel only for these, and an open-pollination contributor
-        -- may have an unrelated historical reversal on record.
+        -- feminized way is invalid AND the donor must NOT be a reversed female
+        -- (whose pollen carries only female genetics -> feminized seed; a
+        -- reversed female has no natural-male pollen). A NULL donor (open
+        -- pollination population) passes. Mirrors validateBreedingCross's
+        -- reversed-donor guard and the channel-less arm below.
         WHEN channel IN ('natural_male', 'open_pollination') THEN
           cross_type NOT IN ('selfing_s1', 'selfing_sn', 'feminized_cross', 'feminized_bx')
+          AND NOT EXISTS (
+            SELECT 1 FROM public.pheno_reversals r
+            WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
+          )
         -- Channel-less (legacy / current service): preserve the original 3-type
-        -- guard EXACTLY (incl. standard_f1 -> donor NOT reversed), require the
-        -- reversal for the new inherently-feminized types, allow the rest.
+        -- guard EXACTLY, and treat EVERY regular way uniformly (same rule as the
+        -- natural_male arm above): a real male donor, never a reversed female
+        -- whose pollen is feminized. A GENUINELY feminized filial/BX is only ever
+        -- recorded via an explicit reversal/rodelization channel (the arms above),
+        -- never through this channel-less path.
         ELSE
           (
-            cross_type = 'standard_f1' AND NOT EXISTS (
+            -- Every regular way (standard_f1, filial, backcross, ibl, sib_cross,
+            -- outcross, line_cross, open_pollination, test_cross, reciprocal_cross,
+            -- three_way_cross): donor must NOT be reversed. A NULL donor (open
+            -- pollination) passes.
+            cross_type NOT IN ('selfing_s1', 'selfing_sn', 'feminized_cross', 'feminized_bx')
+            AND NOT EXISTS (
               SELECT 1 FROM public.pheno_reversals r
               WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
             )
@@ -301,10 +325,6 @@ CREATE POLICY "pheno_crosses_update_own"
               SELECT 1 FROM public.pheno_reversals r
               WHERE r.keeper_id = male_keeper_id AND r.user_id = auth.uid()
             )
-          )
-          OR cross_type IN (
-            'filial', 'ibl', 'backcross', 'sib_cross', 'outcross', 'line_cross',
-            'open_pollination', 'test_cross', 'reciprocal_cross', 'three_way_cross'
           )
       END
     )

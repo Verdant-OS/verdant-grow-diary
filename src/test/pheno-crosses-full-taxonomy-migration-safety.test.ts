@@ -56,4 +56,19 @@ describe("pheno_crosses full taxonomy migration — static safety", () => {
     expect(SQL).not.toMatch(/GRANT[^;]+TO\s+(anon|PUBLIC)\b/i);
     expect(SQL).not.toMatch(/service_role/i);
   });
+
+  it("bans reversed-female donors on every regular way in both policies (no allow-list escape)", () => {
+    // The reversed-donor guard: a regular (non-inherently-feminized) way must
+    // reject a donor with a recorded reversal — its pollen is feminized. This
+    // holds on the natural_male/open channel arm AND the channel-less ELSE, in
+    // BOTH the INSERT and UPDATE policies → the exact string appears >= 4x.
+    const guard =
+      /cross_type NOT IN \('selfing_s1', 'selfing_sn', 'feminized_cross', 'feminized_bx'\)\s+AND NOT EXISTS \(\s*SELECT 1 FROM public\.pheno_reversals r\s*WHERE r\.keeper_id = male_keeper_id/g;
+    expect((SQL.match(guard) ?? []).length).toBeGreaterThanOrEqual(4);
+
+    // The old fix-defeating unconditional allow-list (which let ibl/sib_cross/…
+    // pass regardless of a reversed donor) must NOT reappear. Guard against the
+    // specific `OR cross_type IN ('ibl', ...)` escape hatch.
+    expect(SQL).not.toMatch(/OR\s+cross_type IN \(\s*'ibl',\s*'sib_cross'/);
+  });
 });

@@ -58,6 +58,14 @@ export interface PlantDetailHarvestWatchCardViewModel {
   row: HarvestWatchRowViewModel;
   advisoryLabel: string;
   evidenceLabel: string;
+  /** Explanation of what "photo evidence point" means (pure, presenter-safe). */
+  evidenceExplanation: string;
+  /** True when evidence count exceeds Recent Photos gallery count. */
+  evidenceGalleryMismatch: boolean;
+  /** Reconciliation note shown when gallery/evidence surfaces would otherwise contradict. */
+  evidenceMismatchNote: string;
+  /** Full reconciliation display (label + explanation + mismatch metadata). */
+  photoEvidenceDisplay: PhotoEvidenceReconciliationDisplay;
   missingContext: string[];
   nextObservation: string;
   stageLabel: string;

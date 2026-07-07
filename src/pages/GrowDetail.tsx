@@ -141,8 +141,39 @@ export default function GrowDetail() {
             <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
             Edit targets
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="grow-detail-export-pdf"
+            onClick={() => {
+              const result = exportGrowDiaryReportAsPdf({
+                grow: {
+                  name: grow.name,
+                  startedAt: grow.started_at,
+                  stage: grow.stage,
+                },
+                counts: {
+                  diary: counts.diary,
+                  alerts: counts.alertsOpen,
+                },
+                recent: recent.status === "ok" ? recent.items : [],
+              });
+              if (result === "unavailable") {
+                toast.error(
+                  "Couldn't open the export window. Check popup blockers and try again.",
+                );
+              } else {
+                toast.success("Grow diary export opened. Choose 'Save as PDF' to save.");
+              }
+            }}
+          >
+            <FileDown className="h-4 w-4" aria-hidden="true" />
+            Export PDF
+          </Button>
         </div>
       </header>
+
 
 
       {/* One-Tent Loop continuity card. No specific tent is "selected"

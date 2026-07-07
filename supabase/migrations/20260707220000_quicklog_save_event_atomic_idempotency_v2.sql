@@ -295,6 +295,11 @@ BEGIN
     SELECT grow_event_id INTO v_existing
       FROM public.quicklog_idempotency
      WHERE user_id = uid AND idempotency_key = p_idempotency_key;
+    -- Guard against the extremely unlikely case that the row disappeared
+    -- between the unique_violation and the re-read.
+    IF NOT FOUND THEN
+      RETURN jsonb_build_object('ok', false, 'reason', 'save_failed');
+    END IF;
     INSERT INTO public.quicklog_audit_events (user_id, idempotency_key, grow_event_id, status)
       VALUES (uid, p_idempotency_key, v_existing, 'duplicate_reused');
     RETURN jsonb_build_object('ok', true, 'grow_event_id', v_existing, 'reused', true);

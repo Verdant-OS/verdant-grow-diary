@@ -222,7 +222,7 @@ export default function ManualSensorReadingCard({
   async function doSave() {
     // Belt-and-suspenders: even though Save buttons are disabled while
     // pending, guard against a second concurrent call from any path.
-    if (insert.isPending || insertEdit.isPending) return;
+    if (insert.isPending) return;
     const capturedMetrics = validation.metrics;
     const payloads = buildManualReadingPayloads({
       tentId,

@@ -4,7 +4,17 @@ import { Settings as SettingsIcon } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/store/auth";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { PRICING_TIERS } from "@/config/pricing";
 import {
   describeSettingsTile,
   settingsTileAriaLabel,
@@ -26,6 +36,7 @@ import {
   saveTemperatureUnitPreference,
   clearTemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+
 
 interface TileProps {
   name: string;

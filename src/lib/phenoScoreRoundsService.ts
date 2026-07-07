@@ -10,6 +10,7 @@
  * automation. Descriptive only — nothing here ranks or picks.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { phenoDb } from "@/integrations/supabase/phenoTables";
 
 export const PHENO_SCORE_ROUNDS = [
   "veg",
@@ -73,7 +74,7 @@ export async function upsertScoreRound(input: {
   const userId = await currentUserId();
   if (!userId) return { ok: false, error: "Sign in to save round scores." };
   if (!isPhenoScoreRound(input.round)) return { ok: false, error: "Unknown round." };
-  const { error } = await supabase.from("pheno_score_rounds").upsert(
+  const { error } = await phenoDb.from("pheno_score_rounds").upsert(
     {
       user_id: userId,
       hunt_id: input.huntId,
@@ -100,7 +101,7 @@ export async function listScoreRoundsForHunt(
 ): Promise<Record<string, ScoreRoundRow>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
-  const { data, error } = await supabase
+  const { data, error } = await phenoDb
     .from("pheno_score_rounds")
     .select("plant_id, round, traits, loud_traits, aroma_descriptors, nose_note, note, observed_at")
     .eq("hunt_id", id);

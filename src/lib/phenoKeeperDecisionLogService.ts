@@ -10,6 +10,7 @@
  * automation, no plant deletes.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { phenoDb } from "@/integrations/supabase/phenoTables";
 import {
   normalizeKeeperDecision,
   keeperDecisionLabel,
@@ -46,7 +47,7 @@ export async function appendKeeperDecision(input: {
     typeof input.reason === "string" && input.reason.trim().length > 0
       ? input.reason.trim()
       : `Recorded ${keeperDecisionLabel(decision)}`;
-  const { error } = await supabase.from("pheno_keeper_decisions_log").insert({
+  const { error } = await phenoDb.from("pheno_keeper_decisions_log").insert({
     user_id: userId,
     hunt_id: input.huntId,
     plant_id: input.plantId,
@@ -64,7 +65,7 @@ export async function listKeeperDecisionHistoryForHunt(
 ): Promise<Record<string, KeeperDecisionLogEntry[]>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
-  const { data, error } = await supabase
+  const { data, error } = await phenoDb
     .from("pheno_keeper_decisions_log")
     .select("plant_id, decision, reason, note, decided_at")
     .eq("hunt_id", id)

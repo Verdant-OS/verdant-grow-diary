@@ -8,6 +8,7 @@
  * consistency. No service_role, no AI, no automation.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { phenoDb } from "@/integrations/supabase/phenoTables";
 import type { Json } from "@/integrations/supabase/types";
 
 export const PHENO_LAB_SOURCES = ["coa", "estimate", "unspecified"] as const;
@@ -70,7 +71,7 @@ export async function upsertLabResult(input: {
   const userId = await currentUserId();
   if (!userId) return { ok: false, error: "Sign in to save lab results." };
   const source = normalizeSource(input.source);
-  const { error } = await supabase.from("pheno_lab_results").upsert(
+  const { error } = await phenoDb.from("pheno_lab_results").upsert(
     {
       user_id: userId,
       hunt_id: input.huntId,
@@ -94,7 +95,7 @@ export async function upsertLabResult(input: {
 export async function listLabResultsForHunt(huntId: string): Promise<Record<string, LabResultRow>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
-  const { data, error } = await supabase
+  const { data, error } = await phenoDb
     .from("pheno_lab_results")
     .select("plant_id, source, thc_pct, cbd_pct, total_cannabinoids_pct, dominant_terpenes")
     .eq("hunt_id", id);

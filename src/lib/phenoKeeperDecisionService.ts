@@ -9,6 +9,7 @@
  * consistency. No service_role, no AI, no automation, no plant deletes.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { phenoDb } from "@/integrations/supabase/phenoTables";
 import { normalizeKeeperDecision, type PhenoKeeperDecision } from "@/lib/phenoKeeperDecisionModel";
 
 export interface KeeperDecisionRow {
@@ -35,7 +36,7 @@ export async function recordKeeperDecision(input: {
 }): Promise<SaveResult> {
   const userId = await currentUserId();
   if (!userId) return { ok: false, error: "Sign in to record a decision." };
-  const { error } = await supabase.from("pheno_keeper_decisions").upsert(
+  const { error } = await phenoDb.from("pheno_keeper_decisions").upsert(
     {
       user_id: userId,
       hunt_id: input.huntId,
@@ -56,7 +57,7 @@ export async function listKeeperDecisionsForHunt(
 ): Promise<Record<string, KeeperDecisionRow>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
-  const { data, error } = await supabase
+  const { data, error } = await phenoDb
     .from("pheno_keeper_decisions")
     .select("plant_id, decision, note, decided_at")
     .eq("hunt_id", id);

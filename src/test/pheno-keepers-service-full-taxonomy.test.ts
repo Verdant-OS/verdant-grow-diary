@@ -4,10 +4,13 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const orderMock = vi.fn();
-const eqMock = vi.fn(() => ({ order: orderMock }));
-const selectMock = vi.fn(() => ({ eq: eqMock }));
-const fromMock = vi.fn(() => ({ select: selectMock }));
+const { fromMock, selectMock, eqMock, orderMock } = vi.hoisted(() => {
+  const orderMock = vi.fn();
+  const eqMock = vi.fn(() => ({ order: orderMock }));
+  const selectMock = vi.fn(() => ({ eq: eqMock }));
+  const fromMock = vi.fn(() => ({ select: selectMock }));
+  return { fromMock, selectMock, eqMock, orderMock };
+});
 
 vi.mock("@/integrations/supabase/phenoTables", () => ({
   phenoDb: { from: fromMock },

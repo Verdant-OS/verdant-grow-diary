@@ -266,7 +266,7 @@ export function buildQuickLogSnapshotStrip(
   const description = usableButDetached
     ? "Toggle “Attach sensor snapshot” to include it in this log."
     : DESCRIPTIONS[status];
-  const baseAction = usableButDetached ? actionFor("no_data" as const) : action;
+  const baseAction = usableButDetached ? actionFor("no_data" as const) : actionFor(status);
   // When the resolved snapshot is a MANUAL reading and the strip is not
   // in a detached-toggle state, prefer the edit action so growers can
   // correct/update the manual reading directly. Never applied for live,

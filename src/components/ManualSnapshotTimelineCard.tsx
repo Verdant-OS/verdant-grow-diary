@@ -44,8 +44,15 @@ const FIELD_MAP: Readonly<Record<string, keyof ManualSensorSnapshotInput>> = {
   reservoir_ph: "ph",
 };
 
+interface EditSummary {
+  count: number;
+  lastChangedAt: string | null;
+}
+
 interface Props {
   card: ManualSnapshotTimelineCardModel;
+  /** Optional summary of edit history for this snapshot. Presenter-only. */
+  editSummary?: EditSummary;
 }
 
 function severityIcon(severity: ManualSnapshotTimelineCardModel["severity"]) {

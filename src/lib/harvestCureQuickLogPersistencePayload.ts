@@ -38,6 +38,11 @@ import {
   type HarvestDetailsInput,
   type HarvestDetailsValidation,
 } from "./harvestCureRules";
+import { normalizeHarvestWeightToGrams } from "./harvestWeightUnitNormalization";
+import {
+  QUICK_LOG_WEIGHT_UNITS,
+  type QuickLogWeightUnit,
+} from "@/constants/quickLogActivityTypes";
 
 /**
  * Minimal, server-shaped sensor snapshot envelope accepted by the
@@ -52,6 +57,26 @@ export interface HarvestCureSensorSnapshotInput {
   metrics: Record<string, number>;
 }
 
+/**
+ * Slice A3.1 — Vocab A (grower-entered value + unit) input on the harvest
+ * persistence boundary. Optional. When present, the builder canonicalizes
+ * to grams via `normalizeHarvestWeightToGrams` and stamps the ORIGINAL
+ * value + unit into `details.harvest` (jsonb passthrough — additive, no
+ * schema change) so the timeline can display "2 lb (907.18 g)".
+ *
+ * If Vocab A input is present but invalid (non-numeric / negative /
+ * unknown unit), the builder rejects with `invalid_harvest_details`
+ * rather than silently persisting the numeric value as grams.
+ */
+export interface HarvestVocabAInput {
+  /** Grower-entered wet weight text (e.g. "2", "12.5"). */
+  wet_weight_input?: string | number | null;
+  /** Grower-entered dry weight text. */
+  dry_weight_input?: string | number | null;
+  /** Grower-selected unit for the two values above. */
+  weight_unit?: string | null;
+}
+
 export interface HarvestCureQuickLogPersistenceInput {
   eventType: QuickLogHarvestCureEventType;
   /** Required. Server validates ownership. */
@@ -64,8 +89,14 @@ export interface HarvestCureQuickLogPersistenceInput {
   photoUrl?: string | null;
   /** Optional ISO timestamptz. */
   occurredAt?: string | null;
-  /** Operator-entered details for the chosen event_type. */
-  harvest?: HarvestDetailsInput | null;
+  /**
+   * Operator-entered details for the chosen event_type. Extends
+   * `HarvestDetailsInput` with the optional Vocab A fields so a single
+   * `harvest` object can carry either grams-numeric input (legacy) or
+   * value+unit input (Slice A3.1) — never both meaningfully for the same
+   * weight, since Vocab A takes precedence when present.
+   */
+  harvest?: (HarvestDetailsInput & HarvestVocabAInput) | null;
   cureCheck?: CureCheckDetailsInput | null;
   /** Optional sensor snapshot. Pass-through, source label preserved. */
   sensorSnapshot?: HarvestCureSensorSnapshotInput | null;
@@ -130,6 +161,109 @@ function validateSensorSnapshot(
   return "ok";
 }
 
+function isVocabAWeightPresent(v: string | number | null | undefined): boolean {
+  if (v === null || v === undefined) return false;
+  if (typeof v === "number") return Number.isFinite(v);
+  return typeof v === "string" && v.trim().length > 0;
+}
+
+/**
+ * Slice A3.1 — merge Vocab A (value+unit) into Vocab B (grams) on the
+ * harvest details input, returning both the grams-shaped input the
+ * validator expects AND a bag of `original_*` passthrough keys to stamp
+ * into `details.harvest`. Never mutates the caller's object.
+ *
+ *  - Absent Vocab A input → pass through unchanged.
+ *  - Vocab A input present but invalid (non-numeric / negative /
+ *    unknown unit) → return an error validation so the RPC boundary
+ *    rejects rather than silently persisting the numeric value as grams.
+ *  - Vocab A input present and valid → set `wet_weight_grams`/
+ *    `dry_weight_grams` to canonical grams and expose originals.
+ *  - When both Vocab A weight input AND numeric grams are provided for
+ *    the same side, Vocab A wins (single source of truth). Callers must
+ *    not mix them for the same weight.
+ */
+function applyHarvestVocabAConversion(
+  raw: (HarvestDetailsInput & HarvestVocabAInput) | null | undefined,
+): {
+  harvest: HarvestDetailsInput;
+  originals: Record<string, unknown>;
+  error?: HarvestDetailsValidation;
+} {
+  if (!raw) return { harvest: {} as HarvestDetailsInput, originals: {} };
+  const {
+    wet_weight_input,
+    dry_weight_input,
+    weight_unit,
+    ...rest
+  } = raw as HarvestDetailsInput & HarvestVocabAInput;
+
+  const hasWet = isVocabAWeightPresent(wet_weight_input);
+  const hasDry = isVocabAWeightPresent(dry_weight_input);
+  const hasUnit =
+    typeof weight_unit === "string" &&
+    (QUICK_LOG_WEIGHT_UNITS as readonly string[]).includes(weight_unit.trim());
+
+  // No Vocab A input at all → passthrough. This preserves 100% of the
+  // legacy grams-only behavior for existing callers.
+  if (!hasWet && !hasDry) return { harvest: { ...rest }, originals: {} };
+
+  // Vocab A weight given but no valid unit → reject at the boundary.
+  if (!hasUnit) {
+    return {
+      harvest: {} as HarvestDetailsInput,
+      originals: {},
+      error: {
+        ok: false,
+        errors: {
+          ...(hasWet ? { wet_weight_grams: "invalid_number" as const } : {}),
+          ...(hasDry ? { dry_weight_grams: "invalid_number" as const } : {}),
+        },
+        value: {},
+      },
+    };
+  }
+
+  const unit = (weight_unit as string).trim() as QuickLogWeightUnit;
+  const harvest: HarvestDetailsInput = { ...rest };
+  const originals: Record<string, unknown> = { original_weight_unit: unit };
+
+  if (hasWet) {
+    const n = normalizeHarvestWeightToGrams({ value: wet_weight_input!, unit });
+    if (!n) {
+      return {
+        harvest: {} as HarvestDetailsInput,
+        originals: {},
+        error: {
+          ok: false,
+          errors: { wet_weight_grams: "invalid_number" as const },
+          value: {},
+        },
+      };
+    }
+    harvest.wet_weight_grams = n.grams;
+    originals.original_wet_weight = n.originalValue;
+  }
+  if (hasDry) {
+    const n = normalizeHarvestWeightToGrams({ value: dry_weight_input!, unit });
+    if (!n) {
+      return {
+        harvest: {} as HarvestDetailsInput,
+        originals: {},
+        error: {
+          ok: false,
+          errors: { dry_weight_grams: "invalid_number" as const },
+          value: {},
+        },
+      };
+    }
+    harvest.dry_weight_grams = n.grams;
+    originals.original_dry_weight = n.originalValue;
+  }
+
+  return { harvest, originals };
+}
+
 export function buildHarvestCureQuickLogPersistencePayload(
   input: HarvestCureQuickLogPersistenceInput,
 ): HarvestCurePersistenceBuildResult {
@@ -160,13 +294,29 @@ export function buildHarvestCureQuickLogPersistencePayload(
   let detailsValue: Record<string, unknown>;
 
   if (input.eventType === QUICK_LOG_HARVEST_EVENT_TYPE) {
-    const v = validateHarvestDetails(input.harvest ?? null);
+    // Slice A3.1 — Vocab A → Vocab B conversion at the RPC boundary.
+    // If the caller passed grower-entered value+unit, canonicalize to
+    // grams via the single-source-of-truth helper BEFORE validation, so
+    // an "oz"/"lb"/"kg" entry never lands in `wet_weight_grams` as a
+    // raw number. Non-empty invalid input is rejected — never coerced.
+    const vocabAResult = applyHarvestVocabAConversion(input.harvest);
+    if (vocabAResult.error) {
+      return {
+        ok: false,
+        reason: "invalid_harvest_details",
+        validation: vocabAResult.error,
+      };
+    }
+    const v = validateHarvestDetails(vocabAResult.harvest);
     if (!v.ok) {
       return { ok: false, reason: "invalid_harvest_details", validation: v };
     }
     validation = v;
     detailsKey = "harvest";
-    detailsValue = { ...v.value };
+    // Stamp original value+unit alongside canonical grams. jsonb keys
+    // are additive; no schema change. Timeline view-model consumes them
+    // to display "2 lb (907.18 g)" honestly.
+    detailsValue = { ...v.value, ...vocabAResult.originals };
   } else {
     const v = validateCureCheckDetails(input.cureCheck ?? null);
     if (!v.ok) {

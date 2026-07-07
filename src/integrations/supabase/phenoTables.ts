@@ -28,10 +28,20 @@ import type { Json } from "./types";
 type WithDefaults<Row, Defaulted extends keyof Row> = Omit<Row, Defaulted> &
   Partial<Pick<Row, Defaulted>>;
 
-interface Tbl<Row extends Record<string, unknown>, Defaulted extends keyof Row> {
+/**
+ * Table shape for the typed boundary. `Update` defaults to Partial<Row>;
+ * APPEND-ONLY tables (no UPDATE/DELETE grant or policy in their migration)
+ * pass `never` so `.update(...)` is rejected at compile time, matching the
+ * DB contract.
+ */
+interface Tbl<
+  Row extends Record<string, unknown>,
+  Defaulted extends keyof Row,
+  Update = Partial<Row>,
+> {
   Row: Row;
   Insert: WithDefaults<Row, Defaulted>;
-  Update: Partial<Row>;
+  Update: Update;
   Relationships: [];
 }
 
@@ -182,9 +192,11 @@ export interface PhenoDatabase {
         PhenoKeeperDecisionRow,
         "id" | "decision" | "note" | "decided_at" | "created_at" | "updated_at"
       >;
+      // APPEND-ONLY (SELECT+INSERT grant only): Update = never.
       pheno_keeper_decisions_log: Tbl<
         PhenoKeeperDecisionLogRow,
-        "id" | "note" | "decided_at" | "created_at"
+        "id" | "note" | "decided_at" | "created_at",
+        never
       >;
       pheno_score_rounds: Tbl<
         PhenoScoreRoundRow,
@@ -198,9 +210,11 @@ export interface PhenoDatabase {
         | "created_at"
         | "updated_at"
       >;
+      // APPEND-ONLY (SELECT+INSERT grant only): Update = never.
       pheno_sex_observations: Tbl<
         PhenoSexObservationRow,
-        "id" | "sex" | "herm_observed" | "note" | "observed_at" | "created_at"
+        "id" | "sex" | "herm_observed" | "note" | "observed_at" | "created_at",
+        never
       >;
       pheno_smoke_tests: Tbl<
         PhenoSmokeTestRow,

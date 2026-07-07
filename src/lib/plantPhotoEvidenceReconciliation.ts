@@ -118,7 +118,7 @@ export function buildPhotoEvidenceDisplay(
     explanation = "No diary entries flagged as photo evidence yet.";
   } else if (dataSource === "demo") {
     explanation =
-      "Demo evidence points are sample records for preview only. They do not represent live gallery photos.";
+      "Demo evidence points are sample records for preview only. They are not photos uploaded to your gallery.";
   } else if (dataSource === "live") {
     explanation =
       "Diary entries flagged as containing a photo from your grow. Counted from Recent Activity — not the same as gallery thumbnails.";

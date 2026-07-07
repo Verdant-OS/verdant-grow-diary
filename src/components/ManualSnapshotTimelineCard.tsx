@@ -185,6 +185,18 @@ export default function ManualSnapshotTimelineCard({ card, editSummary, original
             </span>
           </p>
         )}
+        {correctionHash && (
+          <p className="mt-1">
+            <Link
+              to={`/sensors${correctionHash}`}
+              data-testid="manual-snapshot-timeline-card-correct-action"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+            >
+              <History className="h-3 w-3" aria-hidden />
+              Correct manual reading
+            </Link>
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-2 pt-0">
         <section

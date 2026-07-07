@@ -8,6 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { createBreedingProgram } from "@/lib/breeding/breedingProgramApi";
 import { BREEDING_GENERATIONS } from "@/constants/breedingSopSteps";
+import {
+  DEFAULT_CULTIVARS,
+  formatCultivarNotes,
+  type DefaultCultivar,
+} from "@/constants/defaultCultivars";
 
 export default function BreedingProgramNew() {
   const navigate = useNavigate();

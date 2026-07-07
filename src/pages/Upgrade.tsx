@@ -256,6 +256,7 @@ function TierCard({
 
 export default function Upgrade() {
   const paddleConfig = useMemo(() => resolvePaddleConfig(), []);
+  const navigate = useNavigate();
   const paddleUnavailableReason = paddleConfig.available
     ? null
     : unavailableMessage(paddleConfig.reason ?? "missing_environment");

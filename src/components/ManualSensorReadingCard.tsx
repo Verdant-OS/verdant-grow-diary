@@ -123,6 +123,58 @@ export default function ManualSensorReadingCard({
     return evaluateManualSensorSnapshotQuality(snap);
   }, [validation.metrics]);
 
+  // Entered vs derived VPD comparison. Uses only sanitized numeric metrics —
+  // never relabels source. If the grower entered a VPD that disagrees with
+  // temp/RH-derived VPD by more than `VPD_CONFLICT_THRESHOLD_KPA`, the
+  // validator returns a warn hint on `vpdKpa`; we surface it inline.
+  const fieldValidation = useMemo(() => {
+    const fields: {
+      temperatureC?: number;
+      humidityPct?: number;
+      vpdKpa?: number;
+    } = {};
+    for (const m of validation.metrics) {
+      if (m.metric === "temperature_c") fields.temperatureC = m.value;
+      else if (m.metric === "humidity_pct") fields.humidityPct = m.value;
+      else if (m.metric === "vpd_kpa") fields.vpdKpa = m.value;
+    }
+    return validateManualSensorSnapshotFields({
+      source: "manual",
+      capturedAt: new Date().toISOString(),
+      ...fields,
+    });
+  }, [validation.metrics]);
+  const enteredVpd = fieldValidation.derivedVpd.kind === "entered"
+    ? fieldValidation.derivedVpd.vpdKpa
+    : null;
+  const derivedVpdFromTempRh = useMemo(() => {
+    // Compute derived VPD independently so we can render entered vs derived
+    // side-by-side even when the grower typed a VPD (entered wins for
+    // `derivedVpd.kind === "entered"`).
+    const fresh = validateManualSensorSnapshotFields({
+      source: "manual",
+      captured_at: new Date().toISOString(),
+      ...(fieldValidation.derivedVpd.kind === "entered"
+        ? {
+            // Recompute without the entered VPD to expose the derived value.
+            temperatureC: (() => {
+              const t = validation.metrics.find((m) => m.metric === "temperature_c");
+              return t ? t.value : undefined;
+            })(),
+            humidityPct: (() => {
+              const h = validation.metrics.find((m) => m.metric === "humidity_pct");
+              return h ? h.value : undefined;
+            })(),
+          }
+        : {}),
+    } as Parameters<typeof validateManualSensorSnapshotFields>[0]);
+    return fresh.derivedVpd.kind === "derived" ? fresh.derivedVpd.vpdKpa : null;
+  }, [fieldValidation, validation.metrics]);
+  const vpdConflictHint = fieldValidation.hints.find(
+    (h) => h.field === "vpdKpa" && h.severity === "warn",
+  );
+
+
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
     // Any edit invalidates a previously-shown review prompt so it must be

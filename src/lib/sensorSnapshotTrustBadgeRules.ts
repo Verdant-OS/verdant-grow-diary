@@ -142,17 +142,15 @@ export function classifySnapshotTrustBadge(
       // No reading present is absence, not invalid telemetry.
       return view("none", providerLabel);
     case "live":
-      // We refuse to promote "live" without a resolver verdict, but
-      // absence of a verdict on a bare "live" label is still
-      // absence, not a validation failure.
-      return view("none", providerLabel);
+      // We refuse to promote "live" without a resolver verdict.
+      return view("invalid", providerLabel);
     default:
       // Any vendor/provider key (ecowitt, ecowitt_mqtt, mqtt, ...) is
-      // NOT a trust label — never auto-promote to Live. Treat as
-      // "none" (no verified snapshot) rather than falsely invalid.
-      return view("none", providerLabel);
+      // NOT a trust label — never auto-promote to Live.
+      return view("invalid", providerLabel);
   }
 }
+
 
 
 function mapNonLiveSource(src: string): SnapshotTrustBadge {

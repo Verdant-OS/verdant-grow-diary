@@ -34,6 +34,10 @@ import {
   buildHarvestEvidenceHistory,
   type HarvestEvidenceHistory,
 } from "@/lib/harvestWatchEvidenceHistoryViewModel";
+import {
+  buildPhotoEvidenceDisplay,
+  type PhotoEvidenceReconciliationDisplay,
+} from "@/lib/plantPhotoEvidenceReconciliation";
 
 export interface PlantDetailHarvestWatchPlantLike {
   id: string;
@@ -54,6 +58,14 @@ export interface PlantDetailHarvestWatchCardViewModel {
   row: HarvestWatchRowViewModel;
   advisoryLabel: string;
   evidenceLabel: string;
+  /** Explanation of what "photo evidence point" means (pure, presenter-safe). */
+  evidenceExplanation: string;
+  /** True when evidence count exceeds Recent Photos gallery count. */
+  evidenceGalleryMismatch: boolean;
+  /** Reconciliation note shown when gallery/evidence surfaces would otherwise contradict. */
+  evidenceMismatchNote: string;
+  /** Full reconciliation display (label + explanation + mismatch metadata). */
+  photoEvidenceDisplay: PhotoEvidenceReconciliationDisplay;
   missingContext: string[];
   nextObservation: string;
   stageLabel: string;
@@ -89,6 +101,12 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
   plant: PlantDetailHarvestWatchPlantLike;
   recentActivityRows?: readonly PlantDetailHarvestWatchActivityLike[] | null;
   hasPlantPhoto?: boolean;
+  /**
+   * Number of gallery thumbnails currently rendered by Recent Photos for
+   * this plant. When provided, enables an explicit reconciliation note so
+   * "No photos yet" and "N photo evidence points" never contradict.
+   */
+  galleryPhotoCount?: number | null;
   now?: Date;
 }): PlantDetailHarvestWatchCardViewModel {
   const { plant } = params;
@@ -126,7 +144,11 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
     "Close-up harvest photos / trichome notes",
   ];
 
-  const evidenceLabel = `${row.readiness.score == null ? "Evidence building" : "Evidence ready for review"} · ${photos} photo evidence point${photos === 1 ? "" : "s"}`;
+  const photoEvidenceDisplay = buildPhotoEvidenceDisplay({
+    evidenceCount: photos,
+    galleryPhotoCount: params.galleryPhotoCount ?? null,
+  });
+  const evidenceLabel = `${row.readiness.score == null ? "Evidence building" : "Evidence ready for review"} · ${photoEvidenceDisplay.label}`;
 
   // v0 evidence checklist / grouping / state. Callers may pass either the
   // lightweight PlantDetailHarvestWatchActivityLike shape or the full
@@ -167,6 +189,10 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
     row,
     advisoryLabel: "Advisory only — grower decides",
     evidenceLabel,
+    evidenceExplanation: photoEvidenceDisplay.explanation,
+    evidenceGalleryMismatch: photoEvidenceDisplay.hasGalleryMismatch,
+    evidenceMismatchNote: photoEvidenceDisplay.mismatchNote,
+    photoEvidenceDisplay,
     missingContext,
     nextObservation:
       photos > 0

@@ -47,6 +47,13 @@ import { cn } from "@/lib/utils";
 interface PlantDetailHarvestWatchCardProps {
   plantId: string | null | undefined;
   hasPlantPhoto?: boolean;
+  /**
+   * Number of gallery thumbnails currently rendered by the Recent Photos
+   * strip for this plant. When provided, the Evidence tile shows an
+   * explicit reconciliation note so growers never see a contradiction
+   * between "No photos yet" and "N photo evidence points".
+   */
+  galleryPhotoCount?: number | null;
   className?: string;
 }
 
@@ -119,6 +126,7 @@ function dispatchNextInspection(
 export default function PlantDetailHarvestWatchCard({
   plantId,
   hasPlantPhoto = false,
+  galleryPhotoCount,
   className,
 }: PlantDetailHarvestWatchCardProps) {
   const { data: plant, isLoading: plantLoading } = useGrowPlant(plantId ?? undefined);
@@ -134,8 +142,9 @@ export default function PlantDetailHarvestWatchCard({
       plant,
       recentActivityRows: rows,
       hasPlantPhoto,
+      galleryPhotoCount: galleryPhotoCount ?? null,
     });
-  }, [plant, rawRows, hasPlantPhoto]);
+  }, [plant, rawRows, hasPlantPhoto, galleryPhotoCount]);
 
   const onNextInspection = useCallback(() => {
     if (!vm || !plant) return;
@@ -247,6 +256,20 @@ export default function PlantDetailHarvestWatchCard({
             <div className="font-medium" data-testid="plant-detail-harvest-watch-evidence">
               {vm.evidenceLabel}
             </div>
+            <p
+              className="mt-1 text-[11px] text-muted-foreground"
+              data-testid="plant-detail-harvest-watch-evidence-explanation"
+            >
+              {vm.evidenceExplanation}
+            </p>
+            {vm.evidenceGalleryMismatch && (
+              <p
+                className="mt-1 text-[11px] text-[hsl(var(--warning))]"
+                data-testid="plant-detail-harvest-watch-evidence-mismatch"
+              >
+                {vm.evidenceMismatchNote}
+              </p>
+            )}
           </div>
         </div>
 

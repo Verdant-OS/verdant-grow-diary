@@ -532,7 +532,15 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       source: "quick_log_v2",
     });
     resetPhotoSelection();
-    onOpenChange(false);
+    setPostSave({
+      growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
+      targetType: resolved.targetType as "plant" | "tent",
+      targetId: resolved.targetId as string,
+      tentId: resolved.tentId ?? null,
+      action: form.action,
+      message: buildQuickLogPostSaveMessage(form.action, Boolean(photoFile)),
+      savedAt: new Date().toISOString(),
+    });
   };
 
   return (

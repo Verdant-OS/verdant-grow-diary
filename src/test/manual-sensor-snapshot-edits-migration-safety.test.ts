@@ -14,9 +14,14 @@ const MIG_DIR = join(process.cwd(), "supabase", "migrations");
 
 function findMigration(): string {
   const files = readdirSync(MIG_DIR);
-  const match = files.find((f) => f.endsWith("_manual_sensor_snapshot_edits.sql"));
-  if (!match) throw new Error("manual_sensor_snapshot_edits migration not found");
-  return readFileSync(join(MIG_DIR, match), "utf8");
+  for (const f of files) {
+    if (!f.endsWith(".sql")) continue;
+    const body = readFileSync(join(MIG_DIR, f), "utf8");
+    if (/create\s+table\s+public\.manual_sensor_snapshot_edits/i.test(body)) {
+      return body;
+    }
+  }
+  throw new Error("manual_sensor_snapshot_edits migration not found");
 }
 
 describe("manual_sensor_snapshot_edits migration posture", () => {

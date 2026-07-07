@@ -1,10 +1,19 @@
 /**
  * C1 — Pheno RLS posture (Operator / Customer access contract).
  *
- * Encodes and locks the access model for the pheno-hunt tables, reading the
- * actual migration SQL (the same files applied to live knkw). The contract:
+ * Encodes and locks the access model for the ELEVEN new, OWNER-ONLY pheno
+ * tables added by the Part B / pheno-hunt build (listed in ALL_TABLES),
+ * reading the actual migration SQL (the same files applied to live knkw).
  *
- *  - Every pheno table has RLS ENABLED.
+ * SCOPE NOTE: the pre-existing `pheno_hunts` (and the not-yet-deployed
+ * `pheno_hunt_candidates`) have a DIFFERENT, operator-accessible design
+ * (their policies call `has_role(...)`), so they are intentionally NOT in
+ * this owner-only guard — asserting operator-exclusion on them would be wrong.
+ * If their posture ever needs locking, add a separate guard with the right
+ * (operator-allowed) contract.
+ *
+ * The contract for the owner-only tables:
+ *  - Every listed table has RLS ENABLED (and is never DISABLE'd later).
  *  - Reads and writes are OWNER-SCOPED (`auth.uid() = user_id`) — a customer
  *    only ever sees/creates/edits their own rows.
  *  - OPERATORS ARE EXCLUDED: no policy ON a pheno table uses
@@ -45,9 +54,9 @@ function policiesOn(table: string): string[] {
   return statements.filter((s) => /CREATE POLICY/i.test(s) && onTable(s, table));
 }
 function grantsToAuthenticatedOn(table: string): string[] {
-  return statements.filter(
-    (s) => /^GRANT\b/i.test(s) && onTable(s, table) && /TO authenticated\b/i.test(s),
-  );
+  // `authenticated` ANYWHERE in the grantee list — not only right after `TO` —
+  // so `GRANT UPDATE ON … TO auditor, authenticated` is still inspected.
+  return grantsOn(table).filter((s) => /\bauthenticated\b/i.test(s));
 }
 function grantsOn(table: string): string[] {
   return statements.filter((s) => /^GRANT\b/i.test(s) && onTable(s, table));
@@ -72,7 +81,7 @@ const APPEND_ONLY_TABLES = [
 
 const ALL_TABLES = [...MUTABLE_TABLES, ...APPEND_ONLY_TABLES];
 
-describe("every pheno table: RLS enabled (never disabled) + owner-scoped read/write", () => {
+describe("every new owner-only pheno table: RLS enabled (never disabled) + owner-scoped read/write", () => {
   for (const t of ALL_TABLES) {
     it(`${t}: RLS on, never disabled; SELECT/INSERT owner-scoped; NO permissive policy`, () => {
       expect(flat).toMatch(new RegExp(`ALTER TABLE public\\.${t} ENABLE ROW LEVEL SECURITY`));

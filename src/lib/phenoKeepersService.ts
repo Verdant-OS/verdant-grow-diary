@@ -213,19 +213,32 @@ export async function listCrossesForHunt(huntId: string): Promise<CrossRow[]> {
   const { data, error } = await phenoDb
     .from("pheno_crosses")
     .select(
-      "id, female_keeper_id, male_keeper_id, cross_type, cross_name, note, crossed_at, created_at",
+      "id, female_keeper_id, male_keeper_id, cross_type, cross_name, note, crossed_at, created_at, channel, generation, recurrent_parent_id",
     )
     .eq("hunt_id", id)
     .order("created_at", { ascending: false });
   if (error || !data) return [];
-  return data.map((r) => ({
-    id: r.id,
-    femaleKeeperId: r.female_keeper_id,
-    maleKeeperId: r.male_keeper_id ?? null,
-    crossType: r.cross_type ?? "standard_f1",
-    crossName: r.cross_name ?? null,
-    note: r.note ?? null,
-    crossedAt: r.crossed_at ?? null,
-    createdAt: r.created_at ?? null,
-  }));
+  return data.map((r) => {
+    const row = r as typeof r & {
+      channel?: string | null;
+      generation?: number | null;
+      recurrent_parent_id?: string | null;
+    };
+    return {
+      id: row.id,
+      femaleKeeperId: row.female_keeper_id,
+      maleKeeperId: row.male_keeper_id ?? null,
+      crossType: row.cross_type ?? "standard_f1",
+      crossName: row.cross_name ?? null,
+      note: row.note ?? null,
+      crossedAt: row.crossed_at ?? null,
+      createdAt: row.created_at ?? null,
+      channel: row.channel ?? null,
+      generation:
+        typeof row.generation === "number" && Number.isFinite(row.generation)
+          ? row.generation
+          : null,
+      recurrentParentId: row.recurrent_parent_id ?? null,
+    };
+  });
 }

@@ -30,6 +30,10 @@ import { useGrows } from "@/store/grows";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import { STAGES } from "@/lib/grow";
+import {
+  resolveQuickLogStageDefault,
+  normalizeQuickLogStage,
+} from "@/lib/quickLogStageDefaultRules";
 import { EC_UNITS, EC_UNIT_LABEL, type EcUnit } from "@/constants/units";
 import {
   MANUAL_SENSOR_TRUTH_TITLE,
@@ -214,7 +218,17 @@ export default function QuickLog({
     !plants.some((p) => typeof p.tent_id === "string" && p.tent_id.length > 0);
 
   const [note, setNote] = useState("");
-  const [stage, setStage] = useState(activeGrow?.stage || "veg");
+  // Slice A2: stage starts UNKNOWN ("") and is defaulted from the selected
+  // plant / active grow by the effect below. It is NOT hardcoded to "veg" —
+  // an unknown context must stay unknown, not be mislabeled Vegetative.
+  const [stage, setStage] = useState<string>("");
+  // True once the grower picks a stage by hand; suppresses re-defaulting so
+  // we never clobber their explicit choice. Mirrors snapshotUserTouchedRef.
+  const stageUserTouchedRef = useRef(false);
+  // Tracks the previously selected plant so we can distinguish a real
+  // user-driven plant switch (re-default) from the initial ""→P auto-select
+  // (keep any stage the grower already picked).
+  const prevPlantIdRef = useRef<string>("");
   const [eventType, setEventType] = useState<string>("observation");
   const [plantId, setPlantId] = useState<string>("");
   const [snapshot, setSnapshot] = useState(false);
@@ -304,6 +318,37 @@ export default function QuickLog({
     [activeTents, selectedPlant?.tent_id],
   );
 
+  // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
+  // from one already-selected plant to a different one — the new target's stage
+  // should win. It must NOT clear the touched flag on the initial ""→P
+  // auto-select (async plants load / prefill / last-target), because the grower
+  // may have already picked a stage before the plant resolved; clobbering that
+  // would silently discard their choice. Ordered BEFORE the defaulting effect
+  // so the flag is settled before the default is recomputed.
+  useEffect(() => {
+    if (!open) return;
+    const prevPlantId = prevPlantIdRef.current;
+    prevPlantIdRef.current = plantId;
+    if (prevPlantId && plantId && prevPlantId !== plantId) {
+      stageUserTouchedRef.current = false;
+    }
+  }, [open, plantId]);
+
+  // Slice A2: default the stage from the selected plant, else the active grow.
+  // Skipped once the grower has manually chosen a stage (touched ref). The
+  // `stage` column on the plant row is read structurally — a narrow, explicit
+  // read that does not depend on the generated types exposing it, and never
+  // widens the value to `any`.
+  useEffect(() => {
+    if (!open) return;
+    if (stageUserTouchedRef.current) return;
+    const resolved = resolveQuickLogStageDefault({
+      plantStage: (selectedPlant as { stage?: unknown } | null)?.stage ?? null,
+      growStage: activeGrow?.stage ?? null,
+    });
+    setStage((prev) => (prev === resolved ? prev : resolved));
+  }, [open, selectedPlant, activeGrow?.stage]);
+
   useEffect(() => {
     if (!open) return;
     if (plantId) return;
@@ -350,7 +395,6 @@ export default function QuickLog({
   useEffect(() => {
     if (!open) return;
     snapshotUserTouchedRef.current = false;
-     
   }, [open, selectedPlant?.tent_id]);
 
   useEffect(() => {
@@ -391,6 +435,9 @@ export default function QuickLog({
     setShowMore(false);
     setEventType("observation");
     setPlantId("");
+    setStage("");
+    stageUserTouchedRef.current = false;
+    prevPlantIdRef.current = "";
     setSnapshot(false);
     snapshotUserTouchedRef.current = false;
     setRemindAt("");
@@ -563,7 +610,9 @@ export default function QuickLog({
       if (!result.ok) {
         const reason = result.reason ?? "save_failed";
         const message = quickLogReasonToOperatorMessage(reason);
-        setSaveError(`${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`);
+        setSaveError(
+          `${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`,
+        );
         // Surface the (allow-listed) reason code alongside the friendly
         // copy so the operator and tests can correlate the failure with
         // logs without exposing tokens, endpoints, or raw payloads.
@@ -573,7 +622,18 @@ export default function QuickLog({
         return;
       }
 
-      if (activeGrow && stage !== activeGrow.stage) {
+      // Persist the stage back to the grow ONLY when the grower changed it by
+      // hand. Originally `stage` initialized to the grow's own stage, so this
+      // writeback fired only on a manual edit; Slice A2 now defaults `stage`
+      // from the selected PLANT, which can differ from the grow, so we gate on
+      // the touched ref to avoid silently mutating the grow's stage on an
+      // ordinary save. Still never writes an unknown/empty stage.
+      if (
+        activeGrow &&
+        stageUserTouchedRef.current &&
+        normalizeQuickLogStage(stage) &&
+        stage !== activeGrow.stage
+      ) {
         await supabase.from("grows").update({ stage }).eq("id", activeGrowId);
       }
 
@@ -680,7 +740,6 @@ export default function QuickLog({
         />
 
         <form onSubmit={submit} className="grid gap-4">
-
           {(() => {
             const draftPreview = buildQuickLogDraftPreview({ prefill });
             if (!draftPreview.show) return null;
@@ -1067,9 +1126,7 @@ export default function QuickLog({
               data-testid="quick-log-snapshot-manual-truth"
               className="rounded-lg border border-border/50 bg-background/40 p-2 text-[11px] leading-snug space-y-0.5"
             >
-              <p className="font-medium text-foreground">
-                {MANUAL_SENSOR_TRUTH_TITLE}
-              </p>
+              <p className="font-medium text-foreground">{MANUAL_SENSOR_TRUTH_TITLE}</p>
               <ul className="text-muted-foreground space-y-0.5">
                 {MANUAL_SENSOR_TRUTH_LINES.map((line) => (
                   <li key={line} data-testid="quick-log-snapshot-manual-truth-line">
@@ -1086,7 +1143,6 @@ export default function QuickLog({
                 )}
               </ul>
             </div>
-
 
             {tentSetupRequired ? (
               <p
@@ -1155,9 +1211,15 @@ export default function QuickLog({
               />
               <div>
                 <Label className="text-xs">Stage</Label>
-                <Select value={stage} onValueChange={setStage}>
-                  <SelectTrigger>
-                    <SelectValue />
+                <Select
+                  value={stage}
+                  onValueChange={(v) => {
+                    stageUserTouchedRef.current = true;
+                    setStage(v);
+                  }}
+                >
+                  <SelectTrigger data-testid="quick-log-stage-select">
+                    <SelectValue placeholder="Select stage" />
                   </SelectTrigger>
                   <SelectContent>
                     {STAGES.map((s) => (
@@ -1244,7 +1306,6 @@ export default function QuickLog({
               autoCapitalize="sentences"
               spellCheck={true}
             />
-
           </section>
 
           {(() => {

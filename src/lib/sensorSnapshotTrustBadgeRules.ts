@@ -115,11 +115,13 @@ export function classifySnapshotTrustBadge(
         return view("invalid", providerLabel);
       case "empty":
       default:
-        return view("invalid", providerLabel);
+        // Absence is NOT invalid telemetry. Growers logging manually
+        // without a snapshot must see "No snapshot", never "Invalid".
+        return view("none", providerLabel);
     }
   }
 
-  if (input.empty) return view("invalid", providerLabel);
+  if (input.empty) return view("none", providerLabel);
 
   // No resolver status — fall back to source heuristics, defensively.
   switch (src) {
@@ -134,18 +136,24 @@ export function classifySnapshotTrustBadge(
     case "stale":
       return view("stale", providerLabel);
     case "invalid":
+      return view("invalid", providerLabel);
     case "unavailable":
     case "":
-      return view("invalid", providerLabel);
+      // No reading present is absence, not invalid telemetry.
+      return view("none", providerLabel);
     case "live":
-      // We refuse to promote "live" without a resolver verdict.
-      return view("invalid", providerLabel);
+      // We refuse to promote "live" without a resolver verdict, but
+      // absence of a verdict on a bare "live" label is still
+      // absence, not a validation failure.
+      return view("none", providerLabel);
     default:
       // Any vendor/provider key (ecowitt, ecowitt_mqtt, mqtt, ...) is
-      // NOT a trust label — never auto-promote to Live.
-      return view("invalid", providerLabel);
+      // NOT a trust label — never auto-promote to Live. Treat as
+      // "none" (no verified snapshot) rather than falsely invalid.
+      return view("none", providerLabel);
   }
 }
+
 
 function mapNonLiveSource(src: string): SnapshotTrustBadge {
   switch (src) {

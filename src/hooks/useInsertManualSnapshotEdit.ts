@@ -42,7 +42,7 @@ async function insertManualSnapshotEdit(
     original: input.original,
     replacement: input.replacement,
   });
-  if (!diff.ok) {
+  if (diff.ok !== true) {
     throw new Error(`cannot build manual edit diff: ${diff.reason}`);
   }
 

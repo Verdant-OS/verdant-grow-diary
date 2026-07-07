@@ -8,6 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { createBreedingProgram } from "@/lib/breeding/breedingProgramApi";
 import { BREEDING_GENERATIONS } from "@/constants/breedingSopSteps";
+import {
+  DEFAULT_CULTIVARS,
+  formatCultivarNotes,
+  type DefaultCultivar,
+} from "@/constants/defaultCultivars";
 
 export default function BreedingProgramNew() {
   const navigate = useNavigate();
@@ -24,6 +29,18 @@ export default function BreedingProgramNew() {
 
   const set = <K extends keyof typeof form>(k: K, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  function applyDefaultCultivar(cv: DefaultCultivar) {
+    setForm((f) => ({
+      ...f,
+      p1_maternal_label: cv.cultivarName,
+      cross_pair_label: cv.lineage,
+      notes: f.notes && f.notes.trim().length > 0
+        ? `${f.notes}\n\n${formatCultivarNotes(cv)}`
+        : formatCultivarNotes(cv),
+    }));
+    toast({ title: `Prefilled from ${cv.cultivarName}` });
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,6 +80,30 @@ export default function BreedingProgramNew() {
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
+            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Default cultivars
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Prefills the maternal P1 label, lineage, and notes. You can edit every
+                field before saving.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {DEFAULT_CULTIVARS.map((cv) => (
+                  <Button
+                    key={cv.id}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    data-testid={`default-cultivar-${cv.id}`}
+                    onClick={() => applyDefaultCultivar(cv)}
+                  >
+                    {cv.cultivarName}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
             <div className="space-y-1">
               <Label htmlFor="name">Program name</Label>
               <Input
@@ -73,6 +114,7 @@ export default function BreedingProgramNew() {
                 required
               />
             </div>
+
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">

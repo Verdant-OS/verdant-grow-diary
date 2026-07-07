@@ -35,6 +35,10 @@ import {
 } from "@/lib/manualSensorSnapshotQualityRules";
 import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
 import DerivedVpdStatus from "@/components/DerivedVpdStatus";
+import {
+  validateManualSensorSnapshotFields,
+  VPD_CONFLICT_THRESHOLD_KPA,
+} from "@/lib/manualSensorSnapshotFieldValidation";
 import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
 import { isUuid } from "@/lib/isUuid";
@@ -118,6 +122,59 @@ export default function ManualSensorReadingCard({
     };
     return evaluateManualSensorSnapshotQuality(snap);
   }, [validation.metrics]);
+
+  // Entered vs derived VPD comparison. Uses only sanitized numeric metrics —
+  // never relabels source. If the grower entered a VPD that disagrees with
+  // temp/RH-derived VPD by more than `VPD_CONFLICT_THRESHOLD_KPA`, the
+  // validator returns a warn hint on `vpdKpa`; we surface it inline.
+  //
+  // We only treat VPD as "entered" when the grower literally typed one in
+  // the VPD field (form.vpdKpa is a non-empty string). Auto-derived VPD
+  // that appears in validation.metrics from temp+RH must NOT be treated as
+  // entered — that would suppress the derived display and mask conflicts.
+  const fieldValidation = useMemo(() => {
+    const fields: {
+      temperatureC?: number;
+      humidityPct?: number;
+      vpdKpa?: number;
+    } = {};
+    for (const m of validation.metrics) {
+      if (m.metric === "temperature_c") fields.temperatureC = m.value;
+      else if (m.metric === "humidity_pct") fields.humidityPct = m.value;
+    }
+    const rawVpd = typeof form.vpdKpa === "string" ? form.vpdKpa.trim() : "";
+    if (rawVpd.length > 0) {
+      const n = Number(rawVpd);
+      if (Number.isFinite(n)) fields.vpdKpa = n;
+    }
+    return validateManualSensorSnapshotFields({
+      source: "manual",
+      capturedAt: new Date().toISOString(),
+      ...fields,
+    });
+  }, [validation.metrics, form.vpdKpa]);
+  const enteredVpd = fieldValidation.derivedVpd.kind === "entered"
+    ? fieldValidation.derivedVpd.vpdKpa
+    : null;
+  const derivedVpdFromTempRh = useMemo(() => {
+    // Compute derived VPD independently so we can render entered vs derived
+    // side-by-side even when the grower typed a VPD.
+    const t = validation.metrics.find((m) => m.metric === "temperature_c");
+    const h = validation.metrics.find((m) => m.metric === "humidity_pct");
+    if (!t || !h) return null;
+    const fresh = validateManualSensorSnapshotFields({
+      source: "manual",
+      capturedAt: new Date().toISOString(),
+      temperatureC: t.value,
+      humidityPct: h.value,
+    });
+    return fresh.derivedVpd.kind === "derived" ? fresh.derivedVpd.vpdKpa : null;
+  }, [validation.metrics]);
+  const vpdConflictHint = fieldValidation.hints.find(
+    (h) => h.field === "vpdKpa" && h.severity === "warn",
+  );
+
+
 
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -402,6 +459,49 @@ export default function ManualSensorReadingCard({
             Saved as the VPD value unless you enter one.
           </p>
         )}
+
+        {(enteredVpd !== null || derivedVpdFromTempRh !== null) && (
+          <div
+            className="rounded-md border border-border/40 bg-secondary/10 p-2 text-xs"
+            data-testid="manual-reading-vpd-comparison"
+            data-vpd-conflict={vpdConflictHint ? "true" : "false"}
+          >
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span
+                className="tabular-nums"
+                data-testid="manual-reading-vpd-entered"
+                data-value={enteredVpd ?? ""}
+              >
+                <span className="text-muted-foreground">Entered VPD:</span>{" "}
+                {enteredVpd !== null ? `${enteredVpd.toFixed(2)} kPa` : "—"}
+              </span>
+              <span
+                className="tabular-nums"
+                data-testid="manual-reading-vpd-derived"
+                data-value={derivedVpdFromTempRh ?? ""}
+              >
+                <span className="text-muted-foreground">Derived VPD (temp + RH):</span>{" "}
+                {derivedVpdFromTempRh !== null
+                  ? `${derivedVpdFromTempRh.toFixed(2)} kPa`
+                  : "—"}
+              </span>
+            </div>
+            {vpdConflictHint && (
+              <p
+                className="mt-1 flex items-start gap-1.5 text-amber-600 dark:text-amber-400"
+                data-testid="manual-reading-vpd-conflict-warning"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>{vpdConflictHint.message}</span>
+              </p>
+            )}
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Manual entry — derived VPD never relabels this reading as live.
+              Conflict threshold: {VPD_CONFLICT_THRESHOLD_KPA.toFixed(2)} kPa.
+            </p>
+          </div>
+        )}
+
 
         {advisor.warnings.length > 0 && (
           <ul className="space-y-1" data-testid="manual-reading-advisor-warnings">

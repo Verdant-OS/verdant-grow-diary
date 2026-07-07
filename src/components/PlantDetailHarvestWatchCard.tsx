@@ -138,6 +138,8 @@ export default function PlantDetailHarvestWatchCard({
   plantId,
   hasPlantPhoto = false,
   galleryPhotoCount,
+  dataSource,
+  supportingRecordsHref,
   className,
 }: PlantDetailHarvestWatchCardProps) {
   const { data: plant, isLoading: plantLoading } = useGrowPlant(plantId ?? undefined);
@@ -154,8 +156,11 @@ export default function PlantDetailHarvestWatchCard({
       recentActivityRows: rows,
       hasPlantPhoto,
       galleryPhotoCount: galleryPhotoCount ?? null,
+      dataSource: dataSource ?? null,
+      supportingRecordsHref: supportingRecordsHref ?? null,
     });
-  }, [plant, rawRows, hasPlantPhoto, galleryPhotoCount]);
+  }, [plant, rawRows, hasPlantPhoto, galleryPhotoCount, dataSource, supportingRecordsHref]);
+
 
   const onNextInspection = useCallback(() => {
     if (!vm || !plant) return;

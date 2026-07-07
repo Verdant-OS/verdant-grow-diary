@@ -14,11 +14,28 @@ import {
 import { detectSuspiciousMetrics } from "@/lib/sensor/sensorMetricSafetyRules";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 
+export interface SensorSnapshotEditHistoryEntry {
+  id: string;
+  changed_at: string;
+  changed_fields: string[];
+  old_values: Record<string, number>;
+  new_values: Record<string, number>;
+  change_reason: string | null;
+  source_before: "manual";
+  source_after: "manual";
+}
+
 export interface SensorSnapshotCardProps {
   snapshot: SensorSnapshot;
   classifyOptions?: ClassifyOptions;
   className?: string;
   testId?: string;
+  /**
+   * Optional edit history for a manual snapshot. Presenter-only; parent
+   * fetches. When empty/undefined a clean empty state is rendered only
+   * for manual snapshots (never for live/csv/demo/…).
+   */
+  edits?: SensorSnapshotEditHistoryEntry[];
 }
 
 const METRIC_DISPLAY: Array<{ key: string; label: string; unit?: string }> = [

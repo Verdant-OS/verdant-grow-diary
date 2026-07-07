@@ -30,6 +30,18 @@ export default function BreedingProgramNew() {
   const set = <K extends keyof typeof form>(k: K, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  function applyDefaultCultivar(cv: DefaultCultivar) {
+    setForm((f) => ({
+      ...f,
+      p1_maternal_label: cv.cultivarName,
+      cross_pair_label: cv.lineage,
+      notes: f.notes && f.notes.trim().length > 0
+        ? `${f.notes}\n\n${formatCultivarNotes(cv)}`
+        : formatCultivarNotes(cv),
+    }));
+    toast({ title: `Prefilled from ${cv.cultivarName}` });
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) {

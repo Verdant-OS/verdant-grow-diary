@@ -8,6 +8,7 @@
  * drives no device. No service_role, no AI, no automation.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { phenoDb } from "@/integrations/supabase/phenoTables";
 
 export interface KeeperRow {
   readonly id: string;
@@ -54,7 +55,7 @@ export async function nameKeeper(input: {
   if (!userId) return { ok: false, error: "Sign in to name a keeper." };
   const name = input.keeperName.trim();
   if (!name) return { ok: false, error: "Give the keeper a name." };
-  const { data, error } = await supabase
+  const { data, error } = await phenoDb
     .from("pheno_keepers")
     .insert({
       user_id: userId,
@@ -72,7 +73,7 @@ export async function nameKeeper(input: {
 export async function listKeepersForHunt(huntId: string): Promise<KeeperRow[]> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return [];
-  const { data, error } = await supabase
+  const { data, error } = await phenoDb
     .from("pheno_keepers")
     .select("id, hunt_id, source_plant_id, keeper_name, note, created_at")
     .eq("hunt_id", id)
@@ -99,7 +100,7 @@ export async function addClone(input: {
   if (!userId) return { ok: false, error: "Sign in to add a clone." };
   const label = input.cloneLabel.trim();
   if (!label) return { ok: false, error: "Give the clone a label." };
-  const { data, error } = await supabase
+  const { data, error } = await phenoDb
     .from("pheno_keeper_clones")
     .insert({
       user_id: userId,
@@ -117,7 +118,7 @@ export async function addClone(input: {
 export async function listClonesForKeepers(keeperIds: readonly string[]): Promise<CloneRow[]> {
   const ids = [...new Set(keeperIds.filter((k) => typeof k === "string" && k.length > 0))];
   if (ids.length === 0) return [];
-  const { data, error } = await supabase
+  const { data, error } = await phenoDb
     .from("pheno_keeper_clones")
     .select("id, keeper_id, parent_clone_id, clone_label, note, taken_at")
     .in("keeper_id", ids);
@@ -145,7 +146,7 @@ export async function recordCross(input: {
   if (input.femaleKeeperId === input.maleKeeperId) {
     return { ok: false, error: "Pick two different keeper parents." };
   }
-  const { data, error } = await supabase
+  const { data, error } = await phenoDb
     .from("pheno_crosses")
     .insert({
       user_id: userId,
@@ -164,7 +165,7 @@ export async function recordCross(input: {
 export async function listCrossesForHunt(huntId: string): Promise<CrossRow[]> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return [];
-  const { data, error } = await supabase
+  const { data, error } = await phenoDb
     .from("pheno_crosses")
     .select("id, female_keeper_id, male_keeper_id, cross_name, note, crossed_at")
     .eq("hunt_id", id)

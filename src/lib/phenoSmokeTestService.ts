@@ -9,6 +9,7 @@
  * no automation. Descriptive only.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { phenoDb } from "@/integrations/supabase/phenoTables";
 
 export interface SmokeTestRow {
   readonly plantId: string;
@@ -46,7 +47,7 @@ export async function upsertSmokeTest(input: {
 }): Promise<SaveResult> {
   const userId = await currentUserId();
   if (!userId) return { ok: false, error: "Sign in to save a smoke test." };
-  const { error } = await supabase.from("pheno_smoke_tests").upsert(
+  const { error } = await phenoDb.from("pheno_smoke_tests").upsert(
     {
       user_id: userId,
       hunt_id: input.huntId,
@@ -67,7 +68,7 @@ export async function upsertSmokeTest(input: {
 export async function listSmokeTestsForHunt(huntId: string): Promise<Record<string, SmokeTestRow>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
-  const { data, error } = await supabase
+  const { data, error } = await phenoDb
     .from("pheno_smoke_tests")
     .select(
       "plant_id, flavor_descriptors, effect_descriptors, smoothness, potency_impression, verdict",

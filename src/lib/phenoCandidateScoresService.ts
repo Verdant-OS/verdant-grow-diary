@@ -9,6 +9,7 @@
  * device control, no automation. Recording a score acts on nothing.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { phenoDb } from "@/integrations/supabase/phenoTables";
 
 export interface CandidateScoreRow {
   readonly plantId: string;
@@ -32,7 +33,7 @@ export async function upsertCandidateScore(input: {
 }): Promise<SaveResult> {
   const userId = await currentUserId();
   if (!userId) return { ok: false, error: "Sign in to save scores." };
-  const { error } = await supabase.from("pheno_candidate_scores").upsert(
+  const { error } = await phenoDb.from("pheno_candidate_scores").upsert(
     {
       user_id: userId,
       hunt_id: input.huntId,
@@ -52,7 +53,7 @@ export async function listCandidateScoresForHunt(
 ): Promise<Record<string, CandidateScoreRow>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
-  const { data, error } = await supabase
+  const { data, error } = await phenoDb
     .from("pheno_candidate_scores")
     .select("plant_id, traits, note")
     .eq("hunt_id", id);

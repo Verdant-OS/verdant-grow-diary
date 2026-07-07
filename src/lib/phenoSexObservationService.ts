@@ -11,6 +11,7 @@
  * suggestion is a separate, approval-required flow the grower confirms.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { phenoDb } from "@/integrations/supabase/phenoTables";
 import { normalizeSexObservation, type PhenoSexObservation } from "@/lib/phenoSexObservationModel";
 
 export interface SexObservationRow {
@@ -38,7 +39,7 @@ export async function appendSexObservation(input: {
   const userId = await currentUserId();
   if (!userId) return { ok: false, error: "Sign in to record an observation." };
   const sex = normalizeSexObservation(input.sex);
-  const { error } = await supabase.from("pheno_sex_observations").insert({
+  const { error } = await phenoDb.from("pheno_sex_observations").insert({
     user_id: userId,
     hunt_id: input.huntId,
     plant_id: input.plantId,
@@ -56,7 +57,7 @@ export async function listLatestSexObservationsForHunt(
 ): Promise<Record<string, SexObservationRow>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
-  const { data, error } = await supabase
+  const { data, error } = await phenoDb
     .from("pheno_sex_observations")
     .select("plant_id, sex, herm_observed, note, observed_at")
     .eq("hunt_id", id)

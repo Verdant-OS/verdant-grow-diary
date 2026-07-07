@@ -235,6 +235,7 @@ export default function PlantDetail() {
   const contextTentId = searchParams.get("tentId");
   const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
   const { data: tent } = useGrowTent(plant?.tentId);
+  const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null]);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null]);
 

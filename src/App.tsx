@@ -75,6 +75,7 @@ const HardwareIntegrations = lazy(() => import("./pages/HardwareIntegrations"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
+const Glossary = lazy(() => import("./pages/Glossary"));
 const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
 const BillingPlaceholder = lazy(() => import("./pages/BillingPlaceholder"));
 const Leads = lazy(() => import("./pages/Leads"));
@@ -164,6 +165,7 @@ const App = () => (
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/guides" element={<GuidesIndex />} />
                   <Route path="/guides/:slug" element={<GuidePage />} />
+                  <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
                   <Route path="/billing/:plan" element={<BillingPlaceholder />} />
                   {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so

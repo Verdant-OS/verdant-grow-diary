@@ -109,6 +109,54 @@ describe("PhenoKeepersPage — base flows", () => {
   });
 });
 
+describe("PhenoKeepersPage — clone lineage tree (C4)", () => {
+  it("renders clones as a nested tree with depth (mother → cut → cut-of-cut)", () => {
+    renderAt({
+      keepers: [keeper("k1", "Gas")],
+      clonesByKeeper: {
+        k1: [
+          {
+            id: "m",
+            keeperId: "k1",
+            parentCloneId: null,
+            cloneLabel: "mother",
+            note: null,
+            takenAt: "2026-07-01",
+          },
+          {
+            id: "c1",
+            keeperId: "k1",
+            parentCloneId: "m",
+            cloneLabel: "cut #1",
+            note: null,
+            takenAt: "2026-07-02",
+          },
+          {
+            id: "c1a",
+            keeperId: "k1",
+            parentCloneId: "c1",
+            cloneLabel: "cut #1a",
+            note: null,
+            takenAt: "2026-07-03",
+          },
+        ],
+      },
+    });
+    const tree = screen.getByTestId("keeper-clone-tree-k1");
+    expect(within(tree).getByTestId("keeper-clone-node-m")).toHaveAttribute("data-depth", "0");
+    expect(within(tree).getByTestId("keeper-clone-node-c1")).toHaveAttribute("data-depth", "1");
+    expect(within(tree).getByTestId("keeper-clone-node-c1a")).toHaveAttribute("data-depth", "2");
+    expect(tree).toHaveTextContent(/mother/);
+    expect(tree).toHaveTextContent(/cut #1a/);
+  });
+
+  it("shows 'none yet' when a keeper has no clones", () => {
+    renderAt({ keepers: [keeper("k1", "Gas")], clonesByKeeper: {} });
+    expect(screen.queryByTestId("keeper-clone-tree-k1")).toBeNull();
+    expect(screen.getByTestId("pheno-keeper-k1")).toHaveTextContent(/none yet/);
+  });
+});
+
 describe("PhenoKeepersPage — B4 reproduction UI", () => {
   it("shows a Reversed badge and hides the reverse control once reversed", () => {
     renderAt({ keepers: [keeper("k1", "Gas")], reversedKeeperIds: ["k1"] });

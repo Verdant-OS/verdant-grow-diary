@@ -16,6 +16,7 @@ const ISO = "2026-07-01T12:00:00.000Z";
 const SNAPSHOT: SensorSnapshot = {
   source: "manual",
   captured_at: ISO,
+  tent_id: "tent-1",
   metrics: { temp_f: 75, rh: 55 },
 };
 

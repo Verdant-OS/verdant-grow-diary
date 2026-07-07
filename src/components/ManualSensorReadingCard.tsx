@@ -339,14 +339,32 @@ export default function ManualSensorReadingCard({
   );
 
   return (
-    <Card className="glass" data-testid="manual-sensor-reading-card">
+    <Card
+      className="glass"
+      data-testid="manual-sensor-reading-card"
+      data-correction-mode={isCorrection ? "true" : "false"}
+    >
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base font-display">
           <Gauge className="h-4 w-4" />
-          Add Manual Sensor Reading
+          {isCorrection ? "Correct Manual Sensor Reading" : "Add Manual Sensor Reading"}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {isCorrection && correction && (
+          <div
+            className="flex items-start gap-2 rounded-md border border-primary/40 bg-primary/5 p-2 text-xs"
+            data-testid="manual-reading-correction-banner"
+            role="status"
+          >
+            <History className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+            <p>
+              Correcting manual reading captured at{" "}
+              <strong>{formatSnapshotTimestamp(correction.originalCapturedAt)}</strong>. The
+              original stays in history; Verdant saves linked corrections.
+            </p>
+          </div>
+        )}
         {tentSetupRequired ? (
           <FirstTentSetupEmptyState
             surface="manual_sensor"

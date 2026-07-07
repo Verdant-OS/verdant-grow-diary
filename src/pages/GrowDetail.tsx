@@ -34,6 +34,7 @@ import {
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import ActionOutcomeLearningReport from "@/components/ActionOutcomeLearningReport";
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
+import StartBreedingLogButton from "@/components/StartBreedingLogButton";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 
@@ -127,6 +128,7 @@ export default function GrowDetail() {
 
         <div className="mt-4 flex flex-wrap gap-2">
           <StartPhenoHuntButton growId={grow.id} />
+          <StartBreedingLogButton growId={grow.id} />
           <Button
             type="button"
             variant="outline"

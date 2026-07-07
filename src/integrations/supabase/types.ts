@@ -1711,6 +1711,54 @@ export type Database = {
         }
         Relationships: []
       }
+      breeding_events: {
+        Row: {
+          created_at: string
+          details: Json
+          donor_plant_id: string | null
+          event_id: string
+          intensity: string | null
+          method: string | null
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          donor_plant_id?: string | null
+          event_id: string
+          intensity?: string | null
+          method?: string | null
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          donor_plant_id?: string | null
+          event_id?: string
+          intensity?: string | null
+          method?: string | null
+          notes?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "breeding_events_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "grow_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "breeding_events_donor_plant_id_fkey"
+            columns: ["donor_plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       watering_events: {
         Row: {
           created_at: string
@@ -1894,6 +1942,20 @@ export type Database = {
       }
       purge_billing_subscription_update_audit: {
         Args: { p_retention_days?: number }
+        Returns: Json
+      }
+      breeding_log_save_event: {
+        Args: {
+          p_details?: Json
+          p_event_type: string
+          p_grow_id: string
+          p_intensity?: string
+          p_method?: string
+          p_notes?: string
+          p_occurred_at?: string
+          p_plant_id: string
+          p_tent_id?: string
+        }
         Returns: Json
       }
       quicklog_save_event: {

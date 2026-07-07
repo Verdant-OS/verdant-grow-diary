@@ -21,9 +21,14 @@ describe("breedingActionQueue payloads", () => {
       expect(p.status).toBe("pending_approval");
       expect(p.reason).toContain("[event:ev_123]");
 
+      // target_metric must be present to satisfy action_queue_target_present_chk.
+      expect(p.target_metric).toBe("breeding_workflow");
+
       const suggestedChange = JSON.parse(p.suggested_change as string);
       expect(suggestedChange.source_event_id).toBe("ev_123");
-      expect(p.due_at).toBeDefined();
+      // due date now travels inside suggested_change (no action_queue.due_at column).
+      expect(suggestedChange.due_at).toBeDefined();
+      expect(p).not.toHaveProperty("due_at");
     });
   });
 

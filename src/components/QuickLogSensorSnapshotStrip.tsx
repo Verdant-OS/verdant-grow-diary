@@ -138,14 +138,14 @@ export default function QuickLogSensorSnapshotStrip({
   const showTrustBadge = shouldRenderTrustBadge(view.status, view.trustBadge.label);
   const pillIsRedundant = isPillRedundantWithBadge(view.status, view.trustBadge.label);
 
-  // "Correct manual reading" affordance — only for manual snapshots
-  // with real original reading IDs supplied by the caller. Never
-  // inferred from timestamp/metric. Hidden for live/demo/csv/stale/
-  // invalid snapshots and when tentId is missing.
-  const effectiveSource = vm.display?.effectiveSource ?? null;
+  // "Correct manual reading" affordance — only when the caller supplied
+  // real original reading IDs for a manual snapshot. The caller is the
+  // gate: they only pass `manualReadingIds` + `manualCapturedAt` for a
+  // MANUAL snapshot. Never inferred from timestamp/metric. Hidden when
+  // tentId is missing, when IDs contain no real UUIDs, or when no
+  // capturedAt is supplied.
   const correctionHref =
     tentId &&
-    effectiveSource === "manual" &&
     manualCapturedAt &&
     hasCorrectableOriginalIds(manualReadingIds)
       ? `/sensors${encodeManualCorrectionHash({
@@ -155,6 +155,7 @@ export default function QuickLogSensorSnapshotStrip({
           originalValues: manualValues ?? {},
         })}`
       : null;
+
 
 
   return (

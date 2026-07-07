@@ -543,6 +543,38 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     });
   };
 
+  /**
+   * Post-save "Log another" — rotates the client idempotency key and
+   * clears the just-saved summary + event-specific draft so a fresh
+   * save cycle can proceed. Preserves the selected target so the
+   * grower doesn't lose their place.
+   */
+  function handleLogAnother() {
+    idempotencyKeyRef.current = rotateQuickLogIdempotencyKey(idempotencyKeyRef.current);
+    setPostSave(null);
+    setLocalError(null);
+    setSaveStatus("");
+    setForm((prev) => ({
+      ...EMPTY_QUICKLOG_V2_FORM,
+      selectedKey: prev.selectedKey,
+    }));
+    setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+    setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
+    setFeedingDefaultsApplied(false);
+    resetPhotoSelection();
+  }
+
+  function handleViewTimeline() {
+    if (!postSave) return;
+    const nav = buildQuickLogTimelineNavTarget({
+      targetType: postSave.targetType,
+      targetId: postSave.targetId,
+      growEventId: postSave.growEventId,
+    });
+    onOpenChange(false);
+    navigateToTimeline(nav.href, nav.hash, nav.path);
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent

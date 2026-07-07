@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       id: eventRow.id,
       type: eventRow.event_type,
       occurred_at: eventRow.occurred_at,
-      details: mergedDetails as any,
+      details: mergedDetails,
       plant_id: eventRow.plant_id ?? undefined,
       tent_id: eventRow.tent_id ?? undefined,
     };

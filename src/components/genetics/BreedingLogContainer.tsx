@@ -30,21 +30,17 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
       //    auth.uid() trust boundary + ownership checks server-side; the client
       //    never sends a user_id.
       const selectedPlant = plants.find((p) => p.id === data.plantId);
-      const details = (data.details ?? {}) as Record<string, unknown>;
+      const details = (data.details ?? {}) as Record<string, string>;
 
-      const { data: rpcData, error: rpcError } = await supabase.rpc(
-        "breeding_log_save_event",
-        {
-          p_grow_id: activeGrowId,
-          p_plant_id: data.plantId,
-          p_event_type: data.subType,
-          p_tent_id: selectedPlant?.tent_id ?? null,
-          p_method: typeof details.method === "string" ? details.method : null,
-          p_intensity:
-            typeof details.intensity === "string" ? details.intensity : null,
-          p_details: details as never,
-        },
-      );
+      const { data: rpcData, error: rpcError } = await supabase.rpc("breeding_log_save_event", {
+        p_grow_id: activeGrowId,
+        p_plant_id: data.plantId,
+        p_event_type: data.subType,
+        p_tent_id: selectedPlant?.tent_id ?? null,
+        p_method: typeof details.method === "string" ? details.method : null,
+        p_intensity: typeof details.intensity === "string" ? details.intensity : null,
+        p_details: details,
+      });
 
       if (rpcError) {
         throw new Error(`Failed to save event: ${rpcError.message}`);

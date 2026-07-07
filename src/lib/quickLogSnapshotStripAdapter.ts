@@ -84,6 +84,15 @@ const DESCRIPTIONS: Record<QuickLogSnapshotStripStatus, string> = {
 };
 
 const SENSORS_HREF = "/sensors";
+/**
+ * Deep-link fragment for the Manual Sensor Reading anchor inside
+ * `/sensors` (see `<section id="manual-reading">` in `src/pages/Sensors.tsx`).
+ * Used by the "Add snapshot" CTA so growers who have no snapshot yet
+ * can enter a manual reading in one tap without hunting for the form.
+ * The manual entry surface labels the reading `source: manual` — this
+ * link never claims to add live data.
+ */
+export const MANUAL_SNAPSHOT_ENTRY_HREF = "/sensors#manual-reading";
 
 function actionFor(status: QuickLogSnapshotStripStatus): QuickLogSnapshotStripAction {
   switch (status) {
@@ -94,7 +103,7 @@ function actionFor(status: QuickLogSnapshotStripStatus): QuickLogSnapshotStripAc
     case "invalid":
       return { kind: "review", label: "Review sensor intake", href: SENSORS_HREF };
     case "no_data":
-      return { kind: "add", label: "Add snapshot", href: SENSORS_HREF };
+      return { kind: "add", label: "Add snapshot", href: MANUAL_SNAPSHOT_ENTRY_HREF };
   }
 }
 

@@ -19,13 +19,16 @@ import path from "node:path";
 // recursive e2e/ + src/ scans below do not flake under sharded
 // validation load.
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
+import { scrubExecutableSource } from "./utils/scrubExecutableSource";
 
 installScannerGuardrail({ file: __filename });
 
 const E2E_DIR = path.resolve(__dirname, "../../e2e");
 
-function readAll(): { file: string; body: string }[] {
-  const out: { file: string; body: string }[] = [];
+type ScannedFile = { file: string; body: string; scrubbed: string };
+
+function readAll(): ScannedFile[] {
+  const out: ScannedFile[] = [];
   const walk = (dir: string) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, entry.name);
@@ -36,7 +39,13 @@ function readAll(): { file: string; body: string }[] {
         continue;
       }
       if (/\.(ts|tsx|md)$/.test(entry.name)) {
-        out.push({ file: p, body: fs.readFileSync(p, "utf8") });
+        const body = fs.readFileSync(p, "utf8");
+        // Only .ts/.tsx are executable; .md gets no scrub (kept verbatim
+        // but never scanned by the identifier-usage checks below).
+        const scrubbed = /\.(ts|tsx)$/.test(entry.name)
+          ? scrubExecutableSource(body)
+          : body;
+        out.push({ file: p, body, scrubbed });
       }
     }
   };

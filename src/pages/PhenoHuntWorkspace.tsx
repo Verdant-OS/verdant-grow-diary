@@ -635,6 +635,12 @@ function CandidateEditor({
       <SmokeTestFields plantId={plantId} row={smokeRow} onSave={onSaveSmokeTest} />
       <LabFields plantId={plantId} row={labRow} onSave={onSaveLabResult} />
 
+      <PhenoDocumentationSections
+        recordId={plantId}
+        recordType="candidate"
+        title="Candidate documentation"
+      />
+
       {history.length > 0 && (
         <details data-testid={`workspace-decision-history-${plantId}`} className="text-xs">
           <summary className="cursor-pointer text-muted-foreground">

@@ -138,7 +138,7 @@ export async function insertStressObservation(
 
 export interface DiaryOptionRow {
   readonly id: string;
-  readonly entryDate: string | null;
+  readonly entryAt: string | null;
   readonly plantId: string | null;
   readonly notePreview: string;
 }
@@ -152,21 +152,21 @@ export async function listDiaryOptionsForOwner(
 ): Promise<readonly DiaryOptionRow[]> {
   const { data, error } = await supabase
     .from("diary_entries")
-    .select("id, entry_date, plant_id, content")
-    .order("entry_date", { ascending: false })
+    .select("id, entry_at, plant_id, note")
+    .order("entry_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
   return (data ?? []).map((d) => {
     const row = d as {
       id: string;
-      entry_date: string | null;
+      entry_at: string | null;
       plant_id: string | null;
-      content: string | null;
+      note: string | null;
     };
-    const preview = (row.content ?? "").trim().slice(0, 80);
+    const preview = (row.note ?? "").trim().slice(0, 80);
     return {
       id: row.id,
-      entryDate: row.entry_date,
+      entryAt: row.entry_at,
       plantId: row.plant_id,
       notePreview: preview,
     };

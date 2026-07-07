@@ -42,10 +42,12 @@ export interface CloneRow {
 export interface CrossRow {
   readonly id: string;
   readonly femaleKeeperId: string;
-  // B2: nullable — a selfing_s1 cross has no distinct male parent (the reversed
-  // mother pollinates itself). Readers/UI must treat null as "self".
+  // Nullable — a selfing_s1/selfing_sn/open_pollination cross may have no
+  // distinct male parent. Readers/UI must treat null as "self" or
+  // "open pollination", never as a broken row.
   readonly maleKeeperId: string | null;
-  // Full breeding taxonomy (see breedingReproductionRules.CrossType).
+  // Full 15-value CrossType from breedingReproductionRules; legacy rows use
+  // the original 3 (standard_f1 | feminized_cross | selfing_s1).
   readonly crossType: string;
   // Pollen route (natural_male | colloidal_silver | sts | ga3 | rodelization |
   // open_pollination); null for legacy / auto-classified crosses.
@@ -328,7 +330,8 @@ export async function listCrossesForHunt(huntId: string): Promise<CrossRow[]> {
     maleKeeperId: r.male_keeper_id ?? null,
     crossType: r.cross_type ?? "standard_f1",
     channel: r.channel ?? null,
-    generation: r.generation ?? null,
+    generation:
+      typeof r.generation === "number" && Number.isFinite(r.generation) ? r.generation : null,
     recurrentParentId: r.recurrent_parent_id ?? null,
     crossName: r.cross_name ?? null,
     note: r.note ?? null,

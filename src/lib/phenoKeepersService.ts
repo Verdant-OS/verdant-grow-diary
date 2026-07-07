@@ -9,6 +9,8 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { phenoDb } from "@/integrations/supabase/phenoTables";
+import { classifyCross } from "@/lib/genetics/breedingReproductionRules";
+import { hasReversal } from "@/lib/phenoReversalsService";
 
 export interface KeeperRow {
   readonly id: string;
@@ -137,26 +139,58 @@ export async function listClonesForKeepers(keeperIds: readonly string[]): Promis
   }));
 }
 
-/** Record a two-parent cross (female keeper × male keeper). */
+/**
+ * Record a cross. Pass a distinct `maleKeeperId` for a two-parent cross, or
+ * null/omit it (or the mother's own id) to SELF a reversed keeper (S1).
+ *
+ * The cross type is CLASSIFIED, not trusted: reversal state is read from
+ * pheno_reversals and fed to classifyCross, which decides standard_f1 /
+ * feminized_cross / selfing_s1 and rejects impossible combinations (e.g.
+ * selfing an unreversed keeper). The persisted cross_type + null-for-selfing
+ * male match the DB's RLS precondition, so the service and the database agree.
+ */
 export async function recordCross(input: {
   huntId?: string | null;
   femaleKeeperId: string;
-  maleKeeperId: string;
+  maleKeeperId?: string | null;
   crossName?: string | null;
   note?: string | null;
 }): Promise<SaveResult> {
   const userId = await currentUserId();
   if (!userId) return { ok: false, error: "Sign in to record a cross." };
-  if (input.femaleKeeperId === input.maleKeeperId) {
-    return { ok: false, error: "Pick two different keeper parents." };
-  }
+
+  const female = (input.femaleKeeperId ?? "").trim();
+  // PRESERVE the null-vs-blank distinction. Explicit null/omitted signals
+  // selfing; a (possibly blank) STRING is passed through to classifyCross,
+  // which rejects a blank donor as an incomplete two-parent form rather than
+  // silently selfing it. Do NOT coalesce "" → null here.
+  const pollen: string | null = input.maleKeeperId == null ? null : input.maleKeeperId.trim();
+  // Only a real, distinct donor has a reversal state worth querying.
+  const isDistinctDonor = pollen !== null && pollen !== "" && pollen !== female;
+
+  const femaleReversed = await hasReversal(female);
+  const pollenReversed = isDistinctDonor ? await hasReversal(pollen as string) : false;
+
+  const classified = classifyCross({
+    femaleKeeperId: female,
+    pollenKeeperId: pollen,
+    femaleReversed,
+    pollenReversed,
+  });
+  // Explicit `=== false` narrowing: this repo compiles with strictNullChecks
+  // off, under which `!classified.ok` does not narrow to the failure branch.
+  if (classified.ok === false) return { ok: false, error: classified.reason };
+
+  const dbMale = classified.crossType === "selfing_s1" ? null : pollen;
+
   const { data, error } = await phenoDb
     .from("pheno_crosses")
     .insert({
       user_id: userId,
       hunt_id: input.huntId ?? null,
-      female_keeper_id: input.femaleKeeperId,
-      male_keeper_id: input.maleKeeperId,
+      female_keeper_id: female,
+      male_keeper_id: dbMale,
+      cross_type: classified.crossType,
       cross_name: input.crossName ?? null,
       note: input.note ?? null,
     })

@@ -9,11 +9,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  deleteStressObservation,
   insertStressObservation,
   listDiaryOptionsForOwner,
   listStressObservationsForHunt,
+  updateStressObservation,
   type DiaryOptionRow,
   type PhenoStressObservationRow,
+  type PhenoStressUpdateInput,
 } from "@/lib/pheno/phenoStressObservationsApi";
 import {
   summarizeStressForCandidate,
@@ -26,6 +29,8 @@ export interface PhenoStressWorkspaceState {
   readonly summariesByPlant: Record<string, PhenoStressSummary>;
   readonly diaryOptions: readonly { id: string; label: string }[];
   readonly save: (draft: PhenoStressPersistDraft) => Promise<boolean>;
+  readonly update: (id: string, input: PhenoStressUpdateInput) => Promise<boolean>;
+  readonly remove: (id: string) => Promise<boolean>;
   readonly refresh: () => Promise<void>;
   readonly loading: boolean;
   readonly error: string | null;
@@ -95,6 +100,31 @@ export function usePhenoStressObservations(
     [huntId, userId],
   );
 
+  const update = useCallback(
+    async (id: string, input: PhenoStressUpdateInput): Promise<boolean> => {
+      try {
+        const updated = await updateStressObservation(id, input);
+        setRows((prev) => prev.map((r) => (r.id === id ? updated : r)));
+        return true;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        return false;
+      }
+    },
+    [],
+  );
+
+  const remove = useCallback(async (id: string): Promise<boolean> => {
+    try {
+      await deleteStressObservation(id);
+      setRows((prev) => prev.filter((r) => r.id !== id));
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  }, []);
+
   const summariesByPlant = useMemo(() => {
     const map: Record<string, PhenoStressSummary> = {};
     const plantIds = new Set(rows.map((r) => r.plantId));
@@ -124,6 +154,8 @@ export function usePhenoStressObservations(
     summariesByPlant,
     diaryOptions,
     save,
+    update,
+    remove,
     refresh,
     loading,
     error,

@@ -42,6 +42,7 @@ import PhenoProductSamplingSection from "@/components/PhenoProductSamplingSectio
 import PhenoStressTestingSection from "@/components/PhenoStressTestingSection";
 import PhenoSamplingWorkspaceTools from "@/components/PhenoSamplingWorkspaceTools";
 import PhenoDocumentationSections from "@/components/PhenoDocumentationSections";
+import PhenoStressObservationsList from "@/components/PhenoStressObservationsList";
 import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
 import { usePhenoStressObservations } from "@/hooks/usePhenoStressObservations";
 
@@ -801,6 +802,16 @@ export default function PhenoHuntWorkspace() {
         diaryOptions={stress.diaryOptions}
         onPersist={stress.save}
         summaries={stressSummaries}
+      />
+      <PhenoStressObservationsList
+        rows={stress.rows}
+        candidates={candidates.map((c) => ({
+          candidateId: c.candidateId,
+          candidateLabel: c.candidateLabel,
+        }))}
+        diaryOptions={stress.diaryOptions}
+        onUpdate={stress.update}
+        onDelete={stress.remove}
       />
       <PhenoProductSamplingSection />
       <PhenoSamplingWorkspaceTools

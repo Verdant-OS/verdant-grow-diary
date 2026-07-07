@@ -32,7 +32,7 @@ export interface InsertManualSnapshotEditRow {
   changed_at: string;
 }
 
-async function insertManualSnapshotEdit(
+export async function insertManualSnapshotEdit(
   input: InsertManualSnapshotEditInput,
 ): Promise<InsertManualSnapshotEditRow> {
   if (!input?.original_reading_id) throw new Error("original_reading_id required");

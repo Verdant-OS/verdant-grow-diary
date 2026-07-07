@@ -35,6 +35,8 @@ describe("breeding workflow completion — action_queue payload shape", () => {
       expect(typeof p.suggested_change).toBe("string");
       expect((p.suggested_change as string).trim().startsWith("{")).toBe(false);
       expect((p.suggested_change as string).length).toBeGreaterThan(0);
+      // preserves the computed follow-up due date (readable, YYYY-MM-DD).
+      expect(p.suggested_change as string).toMatch(/\d{4}-\d{2}-\d{2}/);
     }
   });
 });

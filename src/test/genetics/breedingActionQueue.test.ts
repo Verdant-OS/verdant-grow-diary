@@ -29,6 +29,8 @@ describe("breedingActionQueue payloads", () => {
       expect(typeof p.suggested_change).toBe("string");
       expect((p.suggested_change as string).trim().startsWith("{")).toBe(false);
       expect((p.suggested_change as string).length).toBeGreaterThan(0);
+      // preserves the computed follow-up due date in readable form (YYYY-MM-DD).
+      expect(p.suggested_change as string).toMatch(/\d{4}-\d{2}-\d{2}/);
       expect(p).not.toHaveProperty("due_at");
     });
   });

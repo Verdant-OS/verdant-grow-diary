@@ -96,6 +96,26 @@ Deno.serve(async (req) => {
     }
 
     const rows = insertedRows ?? [];
+
+    // Persist a 'created' Action Queue audit event per row so breeding
+    // follow-ups appear in the Action Queue timeline/detail history like the
+    // AI Coach and alert hand-off paths. Best-effort: an audit failure must not
+    // fail the response or roll back the action_queue rows (append-only log).
+    if (rows.length > 0) {
+      const auditRows = rows.map((r: { id: string; plant_id: string | null }) => ({
+        action_queue_id: r.id,
+        grow_id: eventRow.grow_id,
+        event_type: "created",
+        previous_status: null,
+        new_status: "pending_approval",
+        note: "Breeding follow-up suggested",
+      }));
+      const { error: auditErr } = await supabase.from("action_queue_events").insert(auditRows);
+      if (auditErr) {
+        console.error("action_queue_events insert error", auditErr);
+      }
+    }
+
     return json({
       ok: true,
       inserted: rows.length,

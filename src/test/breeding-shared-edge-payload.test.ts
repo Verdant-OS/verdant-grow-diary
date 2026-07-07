@@ -30,6 +30,8 @@ describe("edge breeding action_queue payloads (_shared)", () => {
       expect(typeof p.suggested_change).toBe("string");
       expect(p.suggested_change.trim().startsWith("{")).toBe(false);
       expect(p.suggested_change.length).toBeGreaterThan(0);
+      // preserves the computed follow-up due date in readable form.
+      expect(p.suggested_change).toMatch(/\d{4}-\d{2}-\d{2}/);
     }
   });
 

@@ -33,15 +33,21 @@ export interface CloneRow {
 export interface CrossRow {
   readonly id: string;
   readonly femaleKeeperId: string;
-  // B2: nullable — a selfing_s1 cross has no distinct male parent (the reversed
-  // mother pollinates itself). Readers/UI must treat null as "self".
+  // Nullable — a selfing_s1/selfing_sn/open_pollination cross may have no
+  // distinct male parent. Readers/UI must treat null as "self" or
+  // "open pollination", never as a broken row.
   readonly maleKeeperId: string | null;
-  // B2: standard_f1 | feminized_cross | selfing_s1 (see breedingReproductionRules).
+  // Full 15-value CrossType from breedingReproductionRules; legacy rows use
+  // the original 3 (standard_f1 | feminized_cross | selfing_s1).
   readonly crossType: string;
   readonly crossName: string | null;
   readonly note: string | null;
   readonly crossedAt: string | null;
   readonly createdAt: string | null;
+  // Full-taxonomy metadata (nullable — legacy rows have no channel/gen/rp).
+  readonly channel: string | null;
+  readonly generation: number | null;
+  readonly recurrentParentId: string | null;
 }
 
 export type SaveResult = { ok: true; id: string } | { ok: false; error: string };

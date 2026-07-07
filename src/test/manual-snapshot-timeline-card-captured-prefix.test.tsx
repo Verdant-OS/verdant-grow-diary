@@ -20,8 +20,8 @@ const CARD: CardModel = {
   severity: "ok",
   isTentLevel: false,
   readings: [
-    { field: "air_temp_c", value: 24, derived: false },
-    { field: "humidity_pct", value: 55, derived: false },
+    { field: "air_temp_c", value: 24, unit: "°C", derived: false },
+    { field: "humidity_pct", value: 55, unit: "%", derived: false },
   ],
   notes: null,
   errors: [],

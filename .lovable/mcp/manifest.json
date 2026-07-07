@@ -5,7 +5,9 @@
   "auth": {
     "type": "oauth",
     "issuer": "https://knkwiiywfkbqznbxwqfh.supabase.co/auth/v1",
-    "accepted_audiences": ["authenticated"]
+    "accepted_audiences": [
+      "authenticated"
+    ]
   },
   "mcp": {
     "server": {
@@ -67,7 +69,9 @@
               "maximum": 50
             }
           },
-          "required": ["growId"]
+          "required": [
+            "growId"
+          ]
         },
         "outputSchema": null
       },
@@ -91,7 +95,9 @@
               "description": "Tent id to fetch the latest readings for."
             }
           },
-          "required": ["tentId"]
+          "required": [
+            "tentId"
+          ]
         },
         "outputSchema": null
       }

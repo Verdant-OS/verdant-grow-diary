@@ -41,6 +41,7 @@ import type { LabResultRow, PhenoLabSource, TerpeneReading } from "@/lib/phenoLa
 import PhenoProductSamplingSection from "@/components/PhenoProductSamplingSection";
 import PhenoStressTestingSection from "@/components/PhenoStressTestingSection";
 import PhenoSamplingWorkspaceTools from "@/components/PhenoSamplingWorkspaceTools";
+import PhenoDocumentationSections from "@/components/PhenoDocumentationSections";
 import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
 import { usePhenoStressObservations } from "@/hooks/usePhenoStressObservations";
 
@@ -633,6 +634,12 @@ function CandidateEditor({
 
       <SmokeTestFields plantId={plantId} row={smokeRow} onSave={onSaveSmokeTest} />
       <LabFields plantId={plantId} row={labRow} onSave={onSaveLabResult} />
+
+      <PhenoDocumentationSections
+        recordId={plantId}
+        recordType="candidate"
+        title="Candidate documentation"
+      />
 
       {history.length > 0 && (
         <details data-testid={`workspace-decision-history-${plantId}`} className="text-xs">

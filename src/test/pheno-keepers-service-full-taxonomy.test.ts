@@ -59,7 +59,8 @@ describe("listCrossesForHunt — full taxonomy read-model", () => {
 
     const rows = await listCrossesForHunt("hunt-1");
     // Query includes the new columns.
-    const selectArg = selectMock.mock.calls[0]?.[0] as string;
+    const call = selectMock.mock.calls[0] as unknown as [string];
+    const selectArg = call[0];
     expect(selectArg).toContain("channel");
     expect(selectArg).toContain("generation");
     expect(selectArg).toContain("recurrent_parent_id");

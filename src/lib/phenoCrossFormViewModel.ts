@@ -14,7 +14,6 @@ import {
   classifyCross,
   isKeeperReversed,
   isCrossType,
-  isFeminizedCrossType,
   isFeminizedChannel,
   crossTypeDisplay,
   REVERSAL_METHODS,

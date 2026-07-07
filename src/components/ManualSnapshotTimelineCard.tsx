@@ -105,8 +105,14 @@ export default function ManualSnapshotTimelineCard({ card }: Props) {
         <p
           className="text-xs text-muted-foreground"
           data-testid="manual-snapshot-timeline-card-captured-at"
+          title={card.capturedAt ?? undefined}
+          aria-label={
+            card.capturedAt
+              ? `Captured: ${formatSnapshotTimestamp(card.capturedAt)} (${card.capturedAt})`
+              : undefined
+          }
         >
-          {formatSnapshotTimestamp(card.capturedAt)}
+          {`Captured: ${formatSnapshotTimestamp(card.capturedAt)}`}
         </p>
       </CardHeader>
       <CardContent className="space-y-2 pt-0">

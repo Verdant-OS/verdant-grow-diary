@@ -49,7 +49,7 @@ interface Tbl<
 // Row shapes — one per migration. Keep in lockstep with supabase/migrations/.
 // ---------------------------------------------------------------------------
 
-interface PhenoCandidateScoreRow extends Record<string, unknown> {
+type PhenoCandidateScoreRow = {
   id: string;
   user_id: string;
   hunt_id: string;
@@ -58,9 +58,9 @@ interface PhenoCandidateScoreRow extends Record<string, unknown> {
   note: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-interface PhenoKeeperDecisionRow extends Record<string, unknown> {
+type PhenoKeeperDecisionRow = {
   id: string;
   user_id: string;
   hunt_id: string;
@@ -70,9 +70,9 @@ interface PhenoKeeperDecisionRow extends Record<string, unknown> {
   decided_at: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-interface PhenoKeeperDecisionLogRow extends Record<string, unknown> {
+type PhenoKeeperDecisionLogRow = {
   id: string;
   user_id: string;
   hunt_id: string;
@@ -82,9 +82,9 @@ interface PhenoKeeperDecisionLogRow extends Record<string, unknown> {
   note: string | null;
   decided_at: string;
   created_at: string;
-}
+};
 
-interface PhenoScoreRoundRow extends Record<string, unknown> {
+type PhenoScoreRoundRow = {
   id: string;
   user_id: string;
   hunt_id: string;
@@ -98,9 +98,9 @@ interface PhenoScoreRoundRow extends Record<string, unknown> {
   observed_at: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-interface PhenoSexObservationRow extends Record<string, unknown> {
+type PhenoSexObservationRow = {
   id: string;
   user_id: string;
   hunt_id: string;
@@ -110,9 +110,9 @@ interface PhenoSexObservationRow extends Record<string, unknown> {
   note: string | null;
   observed_at: string;
   created_at: string;
-}
+};
 
-interface PhenoSmokeTestRow extends Record<string, unknown> {
+type PhenoSmokeTestRow = {
   id: string;
   user_id: string;
   hunt_id: string;
@@ -126,9 +126,9 @@ interface PhenoSmokeTestRow extends Record<string, unknown> {
   tested_at: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-interface PhenoLabResultRow extends Record<string, unknown> {
+type PhenoLabResultRow = {
   id: string;
   user_id: string;
   hunt_id: string;
@@ -142,9 +142,9 @@ interface PhenoLabResultRow extends Record<string, unknown> {
   tested_at: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-interface PhenoKeeperRow extends Record<string, unknown> {
+type PhenoKeeperRow = {
   id: string;
   user_id: string;
   hunt_id: string;
@@ -153,9 +153,9 @@ interface PhenoKeeperRow extends Record<string, unknown> {
   note: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-interface PhenoKeeperCloneRow extends Record<string, unknown> {
+type PhenoKeeperCloneRow = {
   id: string;
   user_id: string;
   keeper_id: string;
@@ -166,9 +166,9 @@ interface PhenoKeeperCloneRow extends Record<string, unknown> {
   taken_at: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
-interface PhenoCrossRow extends Record<string, unknown> {
+type PhenoCrossRow = {
   id: string;
   user_id: string;
   hunt_id: string | null;
@@ -179,7 +179,7 @@ interface PhenoCrossRow extends Record<string, unknown> {
   crossed_at: string | null;
   created_at: string;
   updated_at: string;
-}
+};
 
 export interface PhenoDatabase {
   public: {

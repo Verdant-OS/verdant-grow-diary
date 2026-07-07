@@ -44,8 +44,15 @@ const FIELD_MAP: Readonly<Record<string, keyof ManualSensorSnapshotInput>> = {
   reservoir_ph: "ph",
 };
 
+interface EditSummary {
+  count: number;
+  lastChangedAt: string | null;
+}
+
 interface Props {
   card: ManualSnapshotTimelineCardModel;
+  /** Optional summary of edit history for this snapshot. Presenter-only. */
+  editSummary?: EditSummary;
 }
 
 function severityIcon(severity: ManualSnapshotTimelineCardModel["severity"]) {
@@ -54,7 +61,7 @@ function severityIcon(severity: ManualSnapshotTimelineCardModel["severity"]) {
   return null;
 }
 
-export default function ManualSnapshotTimelineCard({ card }: Props) {
+export default function ManualSnapshotTimelineCard({ card, editSummary }: Props) {
   const quality = useMemo(() => {
     const fields: Record<string, number> = {};
     for (const r of card.readings) {
@@ -114,6 +121,22 @@ export default function ManualSnapshotTimelineCard({ card }: Props) {
         >
           {`Captured: ${formatSnapshotTimestamp(card.capturedAt)}`}
         </p>
+        {editSummary && editSummary.count > 0 && (
+          <p
+            className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+            data-testid="manual-snapshot-timeline-card-edited-chip"
+            data-edit-count={editSummary.count}
+            title={editSummary.lastChangedAt ?? undefined}
+          >
+            <span className="rounded-full border border-border/50 bg-secondary/40 px-1.5 py-0.5">
+              Edited{" "}
+              {editSummary.lastChangedAt
+                ? formatSnapshotTimestamp(editSummary.lastChangedAt)
+                : "—"}{" "}
+              · {editSummary.count} field{editSummary.count === 1 ? "" : "s"}
+            </span>
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-2 pt-0">
         <section

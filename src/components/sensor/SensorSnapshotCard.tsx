@@ -14,11 +14,28 @@ import {
 import { detectSuspiciousMetrics } from "@/lib/sensor/sensorMetricSafetyRules";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 
+export interface SensorSnapshotEditHistoryEntry {
+  id: string;
+  changed_at: string;
+  changed_fields: string[];
+  old_values: Record<string, number>;
+  new_values: Record<string, number>;
+  change_reason: string | null;
+  source_before: "manual";
+  source_after: "manual";
+}
+
 export interface SensorSnapshotCardProps {
   snapshot: SensorSnapshot;
   classifyOptions?: ClassifyOptions;
   className?: string;
   testId?: string;
+  /**
+   * Optional edit history for a manual snapshot. Presenter-only; parent
+   * fetches. When empty/undefined a clean empty state is rendered only
+   * for manual snapshots (never for live/csv/demo/…).
+   */
+  edits?: SensorSnapshotEditHistoryEntry[];
 }
 
 const METRIC_DISPLAY: Array<{ key: string; label: string; unit?: string }> = [
@@ -35,6 +52,7 @@ export default function SensorSnapshotCard({
   classifyOptions,
   className,
   testId = "sensor-snapshot-card",
+  edits,
 }: SensorSnapshotCardProps) {
   const freshness = classifySnapshotFreshness(snapshot, classifyOptions);
   const flags = detectSuspiciousMetrics(snapshot.metrics);
@@ -127,6 +145,75 @@ export default function SensorSnapshotCard({
             </li>
           ))}
         </ul>
+      )}
+
+      {freshness.source === "manual" && (
+        <section
+          data-testid={`${testId}-edit-history`}
+          aria-label="Manual sensor snapshot edit history"
+          className="border-t border-border/60 pt-2 space-y-1"
+        >
+          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Edit history
+          </h4>
+          {!edits || edits.length === 0 ? (
+            <p
+              data-testid={`${testId}-edit-history-empty`}
+              className="text-[11px] text-muted-foreground italic"
+            >
+              No corrections recorded.
+            </p>
+          ) : (
+            <ul
+              data-testid={`${testId}-edit-history-list`}
+              className="space-y-1.5"
+            >
+              {edits.map((e) => (
+                <li
+                  key={e.id}
+                  data-testid={`${testId}-edit-history-entry`}
+                  data-source-before={e.source_before}
+                  data-source-after={e.source_after}
+                  className="rounded-md border border-border/40 bg-secondary/10 p-1.5 text-[11px] space-y-1"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="text-muted-foreground">
+                      Edited {formatSnapshotTimestamp(e.changed_at)}
+                    </span>
+                    <span
+                      className="text-[10px] uppercase tracking-wide text-muted-foreground"
+                      data-testid={`${testId}-edit-history-entry-source`}
+                    >
+                      Source: manual → manual
+                    </span>
+                  </div>
+                  <ul className="space-y-0.5">
+                    {e.changed_fields.map((f) => (
+                      <li
+                        key={f}
+                        data-testid={`${testId}-edit-history-field-${f}`}
+                        className="flex items-baseline justify-between gap-2 font-mono"
+                      >
+                        <span className="text-muted-foreground">{f}</span>
+                        <span className="tabular-nums">
+                          {e.old_values[f] ?? "—"} → {e.new_values[f] ?? "—"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {e.change_reason && (
+                    <p
+                      data-testid={`${testId}-edit-history-entry-reason`}
+                      className="text-[11px] text-foreground/90"
+                    >
+                      Reason: {e.change_reason}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
     </div>
   );

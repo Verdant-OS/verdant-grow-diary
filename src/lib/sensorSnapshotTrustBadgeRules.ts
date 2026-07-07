@@ -24,7 +24,8 @@ export type SnapshotTrustBadge =
   | "invalid"
   | "manual"
   | "demo"
-  | "csv";
+  | "csv"
+  | "none";
 
 export interface SnapshotTrustBadgeView {
   badge: SnapshotTrustBadge;
@@ -55,6 +56,7 @@ const HELPER: Record<SnapshotTrustBadge, string> = {
   manual: "Entered by grower",
   demo: "Sample data, not real sensor telemetry",
   csv: "Imported reading",
+  none: "Manual log only — no sensor snapshot attached",
 };
 
 const LABEL: Record<SnapshotTrustBadge, string> = {
@@ -64,6 +66,7 @@ const LABEL: Record<SnapshotTrustBadge, string> = {
   manual: "Manual",
   demo: "Demo",
   csv: "CSV",
+  none: "No snapshot",
 };
 
 const SEVERITY: Record<SnapshotTrustBadge, SnapshotTrustBadgeView["severity"]> = {
@@ -73,6 +76,7 @@ const SEVERITY: Record<SnapshotTrustBadge, SnapshotTrustBadgeView["severity"]> =
   manual: "info",
   demo: "info",
   csv: "info",
+  none: "info",
 };
 
 const ATTACHABLE: Record<SnapshotTrustBadge, boolean> = {
@@ -82,7 +86,9 @@ const ATTACHABLE: Record<SnapshotTrustBadge, boolean> = {
   manual: true,
   demo: false,
   csv: true,
+  none: false,
 };
+
 
 /**
  * Classify a snapshot's trust badge. Resolver status (when present)

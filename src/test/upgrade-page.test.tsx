@@ -215,15 +215,25 @@ describe("Upgrade page", () => {
     expect(paddleMock.checkoutOpen).not.toHaveBeenCalled();
   });
 
-  it("renders FAQ with billing, data ownership, founder, cancel, and no-autopilot copy", () => {
+  it("renders FAQ with billing, data ownership, founder, cancel, and no-autopilot copy", async () => {
+    const { UPGRADE_FAQ } = await import("@/config/pricing");
     renderPage();
+    // FAQ triggers are always visible; validate trigger text is rendered.
     const faq = screen.getByTestId("upgrade-faq");
-    const text = faq.textContent ?? "";
-    expect(text).toMatch(/billing/i);
-    expect(text).toMatch(/own your grow data|grow history/i);
-    expect(text).toMatch(/Founder/i);
-    expect(text).toMatch(/cancel/i);
-    expect(text).toMatch(/does not control|not run.*autopilot|never runs your grow on autopilot/i);
+    const triggerText = faq.textContent ?? "";
+    expect(triggerText).toMatch(/billing/i);
+    expect(triggerText).toMatch(/grow data/i);
+    expect(triggerText).toMatch(/Founder/i);
+    expect(triggerText).toMatch(/cancel/i);
+    expect(triggerText).toMatch(/equipment|autopilot/i);
+    // Answer copy (source of truth) must include the safety statements.
+    const allAnswers = UPGRADE_FAQ.map((f) => f.a).join(" ").toLowerCase();
+    expect(allAnswers).toMatch(/does not sell grower data/);
+    expect(allAnswers).toMatch(/does not control/);
+    expect(allAnswers).toMatch(/autopilot/);
+    expect(allAnswers).toMatch(/paddle/);
+    expect(allAnswers).toMatch(/founder/);
+    expect(allAnswers).toMatch(/cancel|stops when your billing/);
   });
 
   it("renders plan comparison table with all four tier columns", () => {

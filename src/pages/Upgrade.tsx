@@ -18,8 +18,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+
 import { Check, Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

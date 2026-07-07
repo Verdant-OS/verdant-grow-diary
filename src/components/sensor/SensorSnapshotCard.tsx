@@ -12,6 +12,7 @@ import {
   type ClassifyOptions,
 } from "@/lib/sensor/sensorSnapshotFreshnessRules";
 import { detectSuspiciousMetrics } from "@/lib/sensor/sensorMetricSafetyRules";
+import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 
 export interface SensorSnapshotCardProps {
   snapshot: SensorSnapshot;
@@ -64,6 +65,18 @@ export default function SensorSnapshotCard({
           className="text-[11px] text-muted-foreground"
         >
           {freshness.ageLabel}
+        </span>
+        <span
+          data-testid={`${testId}-captured-at`}
+          title={snapshot.captured_at ?? undefined}
+          aria-label={
+            snapshot.captured_at
+              ? `Captured: ${formatSnapshotTimestamp(snapshot.captured_at)} (${snapshot.captured_at})`
+              : "Captured: Unknown time"
+          }
+          className="text-[11px] text-muted-foreground"
+        >
+          {`Captured: ${formatSnapshotTimestamp(snapshot.captured_at)}`}
         </span>
         {demo && (
           <span

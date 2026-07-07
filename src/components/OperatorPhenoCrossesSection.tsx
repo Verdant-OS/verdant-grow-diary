@@ -22,10 +22,10 @@ import {
   crossTypeName,
   isChannel,
   isCrossType,
-  lineageLabel,
   requiresGeneration,
   requiresRecurrentParent,
 } from "@/lib/genetics/breedingReproductionRules";
+import { crossLineageBadge } from "@/lib/phenoCrossFormViewModel";
 
 interface Props {
   crosses: readonly CrossRow[];
@@ -51,14 +51,15 @@ function donorLabel(
   return row.maleKeeperId ? "Unknown donor" : "Donor not recorded";
 }
 
+// Generation- AND feminization-aware badge, shared with the keepers page and the
+// cross form so the operator view can never drift from the grower view. Routing
+// through the canonical presenter yields the real designations ("F3", "S4",
+// "BX2", "Fem BX1") instead of the placeholder-concatenated "F2+3"/"S2+4" this
+// used to render, and restores the "Fem " prefix for a reversal-channel
+// filial/backcross (a feminized F2/BX must never look like a regular mixed-sex
+// cross). Unknown/legacy types still fall back to "Cross" inside the presenter.
 function lineageBadge(row: CrossRow): string {
-  if (!isCrossType(row.crossType)) return "Cross";
-  const base = lineageLabel(row.crossType);
-  // Append generation only when the taxonomy expects one AND we have it.
-  if (requiresGeneration(row.crossType) && typeof row.generation === "number") {
-    return `${base}${row.generation}`;
-  }
-  return base;
+  return crossLineageBadge(row.crossType, row.generation, row.channel);
 }
 
 export default function OperatorPhenoCrossesSection({

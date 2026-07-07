@@ -25,27 +25,10 @@ const tierOverride = vi.hoisted(() => ({
   proMonthlyPriceId: "pri_pro_month" as string | null,
 }));
 
-vi.mock("@/config/pricing", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/config/pricing")
-  >("@/config/pricing");
-  // Return live tiers whose fields we can mutate between tests.
-  return {
-    ...actual,
-    PRICING_TIERS: actual.PRICING_TIERS.map((t) => {
-      if (t.id === "pro_monthly") {
-        return { ...t, paddlePriceId: tierOverride.proMonthlyPriceId };
-      }
-      if (t.id === "founder_lifetime") {
-        return {
-          ...t,
-          cap: { total: 75, claimed: tierOverride.founderClaimed },
-        };
-      }
-      return { ...t };
-    }),
-  };
-});
+// Live-mutable pricing tiers: we mutate the ACTUAL imported array in
+// beforeEach so component reads see current test overrides.
+import { PRICING_TIERS } from "@/config/pricing";
+
 
 vi.mock("@/lib/paddleConfig", async () => {
   const actual = await vi.importActual<

@@ -8,6 +8,8 @@
  * no AI, no alerts, no Action Queue, no automation, no device control.
  */
 
+import { normalizeDiaryNoteText } from "./diaryNoteFormatting";
+
 export interface ActionResponsePairingRow {
   eventType: string;
   notePreview: string;
@@ -113,7 +115,10 @@ function isAction(row: ActionResponsePairingRow): boolean {
 }
 
 function label(row: ActionResponsePairingRow): string {
-  const note = (row.notePreview ?? "").trim();
+  // Normalize repeated section labels and missing-space concat artifacts
+  // before clipping. Keeps grower content intact; only collapses
+  // "Response check: Response check:" and "Nats.Response" style noise.
+  const note = normalizeDiaryNoteText(row.notePreview).trim();
   const fallback = (row.eventType ?? "log").replace(/_/g, " ").trim() || "log";
   const source = note || fallback;
   return source.length <= MAX_LABEL ? source : `${source.slice(0, MAX_LABEL - 1).trimEnd()}…`;

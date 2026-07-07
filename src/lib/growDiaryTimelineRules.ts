@@ -9,6 +9,7 @@
  */
 
 import { normalizeDiaryEntry, type NormalizedDiaryEntry } from "./diaryEntryRules";
+import { normalizeDiaryNoteText } from "./diaryNoteFormatting";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -238,8 +239,10 @@ function titleForEventType(eventType: string): string {
 
 function clipNotePreview(note: string, maxLen: number): string {
   if (!note) return "";
-  // Collapse whitespace so previews don't surface formatting artifacts.
-  const flat = note.replace(/\s+/g, " ").trim();
+  // Normalize repeated section labels + missing-space concat artifacts
+  // BEFORE clipping so the preview reads cleanly. Collapse whitespace so
+  // previews don't surface formatting artifacts.
+  const flat = normalizeDiaryNoteText(note).replace(/\s+/g, " ").trim();
   if (flat.length <= maxLen) return flat;
   return flat.slice(0, Math.max(0, maxLen - 1)).trimEnd() + "…";
 }

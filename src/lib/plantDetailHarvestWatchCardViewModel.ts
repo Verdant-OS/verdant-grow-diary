@@ -144,7 +144,11 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
     "Close-up harvest photos / trichome notes",
   ];
 
-  const evidenceLabel = `${row.readiness.score == null ? "Evidence building" : "Evidence ready for review"} · ${photos} photo evidence point${photos === 1 ? "" : "s"}`;
+  const photoEvidenceDisplay = buildPhotoEvidenceDisplay({
+    evidenceCount: photos,
+    galleryPhotoCount: params.galleryPhotoCount ?? null,
+  });
+  const evidenceLabel = `${row.readiness.score == null ? "Evidence building" : "Evidence ready for review"} · ${photoEvidenceDisplay.label}`;
 
   // v0 evidence checklist / grouping / state. Callers may pass either the
   // lightweight PlantDetailHarvestWatchActivityLike shape or the full

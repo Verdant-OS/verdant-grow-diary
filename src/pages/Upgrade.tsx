@@ -18,8 +18,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+
 import { Check, Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -570,11 +571,106 @@ function CheckoutConfirmDialog({
   );
 }
 
+// ---------- Upgrade success confirmation ------------------------------------
+
+/**
+ * Presenter-only success panel. Reads ?checkout=success or ?upgrade=success
+ * from the URL. Never calls Paddle, never writes entitlements. Explains what
+ * unlocks based on the resolved current plan when known; otherwise says the
+ * account will update shortly.
+ */
+function UpgradeSuccessPanel({
+  visible,
+  currentPlanKnown,
+  currentPlanId,
+  planIdFromQuery,
+}: {
+  visible: boolean;
+  currentPlanKnown: boolean;
+  currentPlanId: string | null;
+  planIdFromQuery: string | null;
+}) {
+  if (!visible) return null;
+  const resolvedId = currentPlanKnown
+    ? currentPlanId
+    : (planIdFromQuery ?? null);
+  const tier =
+    (resolvedId && PRICING_TIERS.find((t) => t.id === resolvedId)) || null;
+  const activationConfirmed =
+    currentPlanKnown &&
+    !!currentPlanId &&
+    currentPlanId !== "free" &&
+    (!planIdFromQuery || planIdFromQuery === currentPlanId);
+
+  return (
+    <section
+      role="status"
+      aria-live="polite"
+      data-testid="upgrade-success-panel"
+      data-plan={resolvedId ?? "unknown"}
+      data-activated={activationConfirmed ? "true" : "false"}
+      className="mt-8 rounded-lg border border-primary/40 bg-primary/5 p-5"
+    >
+      <h2 className="font-display text-xl font-semibold">
+        Upgrade checkout complete
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {activationConfirmed
+          ? "Your plan is active. Your unlocked features are listed below."
+          : "Your plan features should unlock shortly. If checkout completed, your account should update shortly — we're checking your account status."}
+      </p>
+      {tier ? (
+        <div className="mt-4">
+          <p className="text-sm font-medium">
+            {tier.name} — what unlocks next
+          </p>
+          <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+            {tier.features.map((f) => (
+              <li key={f} className="flex items-start gap-2">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <span>{f}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-muted-foreground">
+          We're checking your account status. If checkout completed, your
+          account should update shortly.
+        </p>
+      )}
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Button asChild size="sm" data-testid="upgrade-success-settings">
+          <Link to="/settings">Go to Settings</Link>
+        </Button>
+        <Button
+          asChild
+          size="sm"
+          variant="outline"
+          data-testid="upgrade-success-diary"
+        >
+          <Link to="/logs">View grow diary</Link>
+        </Button>
+        <Button
+          asChild
+          size="sm"
+          variant="ghost"
+          data-testid="upgrade-success-plans"
+        >
+          <Link to="/upgrade">Back to plans</Link>
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 // ---------- Page ------------------------------------------------------------
 
 export default function Upgrade() {
   const paddleConfig = useMemo(() => resolvePaddleConfig(), []);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
   const paddleUnavailableReason = paddleConfig.available
     ? null
     : unavailableMessage(paddleConfig.reason ?? "missing_environment");
@@ -653,6 +749,16 @@ export default function Upgrade() {
         )}
       </header>
 
+      <UpgradeSuccessPanel
+        visible={
+          searchParams.get("checkout") === "success" ||
+          searchParams.get("upgrade") === "success"
+        }
+        currentPlanKnown={currentPlanKnown}
+        currentPlanId={currentPlanId}
+        planIdFromQuery={searchParams.get("plan")}
+      />
+
       <CheckoutStatusBanner
         configAvailable={paddleConfig.available}
         unavailableReason={paddleUnavailableReason}
@@ -661,6 +767,7 @@ export default function Upgrade() {
         ready={paddleReady}
         onRetry={retryPaddle}
       />
+
 
       <section
         aria-label="Pricing tiers"

@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
+
 // --- Mocks (hoisted so vi.mock factories can reach them) --------------------
 const paddleMock = vi.hoisted(() => ({
   configAvailable: true as boolean,
@@ -83,13 +84,14 @@ function uninstallPaddle() {
 
 import Upgrade from "@/pages/Upgrade";
 
-function renderPage() {
+function renderPage(initialEntries: string[] = ["/upgrade"]) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <Upgrade />
     </MemoryRouter>,
   );
 }
+
 
 beforeEach(() => {
   paddleMock.configAvailable = true;
@@ -263,3 +265,43 @@ describe("Upgrade page", () => {
     expect(text).not.toMatch(/(includes|with|full)\s+autopilot/);
   });
 });
+
+describe("Upgrade page — success panel", () => {
+  it("does not render success panel without query param", () => {
+    renderPage();
+    expect(screen.queryByTestId("upgrade-success-panel")).toBeNull();
+  });
+
+  it("renders success panel when ?checkout=success is present", () => {
+    renderPage(["/upgrade?checkout=success"]);
+    const panel = screen.getByTestId("upgrade-success-panel");
+    expect(panel).toBeInTheDocument();
+    // With mocked unknown plan, activation must NOT be falsely confirmed.
+    expect(panel.getAttribute("data-activated")).toBe("false");
+    expect(panel.textContent).toMatch(/checking your account status|should update shortly/i);
+  });
+
+  it("renders success panel when ?upgrade=success is present", () => {
+    renderPage(["/upgrade?upgrade=success"]);
+    expect(screen.getByTestId("upgrade-success-panel")).toBeInTheDocument();
+  });
+
+  it("shows unlocked features derived from PRICING_TIERS when ?plan= matches a tier", () => {
+    renderPage(["/upgrade?checkout=success&plan=pro_monthly"]);
+    const panel = screen.getByTestId("upgrade-success-panel");
+    expect(panel.textContent?.toLowerCase()).toContain("cloud sync");
+  });
+
+  it("does not call Paddle.Checkout.open when success panel is shown", () => {
+    renderPage(["/upgrade?checkout=success&plan=pro_monthly"]);
+    expect(paddleMock.checkoutOpen).not.toHaveBeenCalled();
+  });
+
+  it("provides Settings, diary, and back-to-plans CTAs", () => {
+    renderPage(["/upgrade?checkout=success"]);
+    expect(screen.getByTestId("upgrade-success-settings")).toBeInTheDocument();
+    expect(screen.getByTestId("upgrade-success-diary")).toBeInTheDocument();
+    expect(screen.getByTestId("upgrade-success-plans")).toBeInTheDocument();
+  });
+});
+

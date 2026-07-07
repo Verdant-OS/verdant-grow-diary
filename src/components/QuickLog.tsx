@@ -29,6 +29,16 @@ import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { planQuickLogActionSwitchReset } from "@/lib/quickLogActionSwitchResetRules";
+import {
+  QUICK_LOG_POST_SAVE_TITLE,
+  QUICK_LOG_POST_SAVE_VIEW_LABEL,
+  QUICK_LOG_POST_SAVE_ANOTHER_LABEL,
+  QUICK_LOG_POST_SAVE_CLOSE_LABEL,
+  QUICK_LOG_SAVE_FAILED_MESSAGE,
+  QUICK_LOG_CLOSE_BLOCKED_HINT,
+  buildQuickLogPostSaveDescription,
+  shouldBlockQuickLogClose,
+} from "@/lib/quickLogSaveGuardRules";
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import { STAGES } from "@/lib/grow";
 import {
@@ -737,7 +747,7 @@ export default function QuickLog({
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to save";
-      setSaveError(`${message}. Your input is still here — retry when connection is stable.`);
+      setSaveError(QUICK_LOG_SAVE_FAILED_MESSAGE);
       toast.error(message);
       console.error("[QuickLog] unexpected error", err);
     } finally {
@@ -767,8 +777,20 @@ export default function QuickLog({
     <Dialog
       open={open}
       onOpenChange={(o) => {
+        if (!o) {
+          const blocked = shouldBlockQuickLogClose({
+            saving: busy,
+            inFlight: submitInFlightRef.current,
+          });
+          if (blocked) {
+            toast.message(QUICK_LOG_CLOSE_BLOCKED_HINT);
+            return;
+          }
+          onOpenChange(false);
+          reset();
+          return;
+        }
         onOpenChange(o);
-        if (!o) reset();
       }}
     >
       <DialogContent className="glass max-w-md max-h-[90vh] overflow-y-auto">
@@ -1967,13 +1989,23 @@ export default function QuickLog({
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="h-4 w-4 text-primary mt-0.5" aria-hidden="true" />
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Saved</p>
-                  <p className="text-[12px] text-muted-foreground">
-                    Logged {savedVerb(savedTarget.eventType)} to{" "}
-                    <strong className="text-foreground font-semibold">{savedTarget.name}</strong>
-                    {savedTarget.tentName ? <> · {savedTarget.tentName}</> : null}
-                    {savedTarget.growName ? <> · {savedTarget.growName}</> : null}
-                    {" · just now"}
+                  <p
+                    className="text-sm font-semibold text-foreground"
+                    data-testid="quick-log-post-save-title"
+                  >
+                    {QUICK_LOG_POST_SAVE_TITLE}
+                  </p>
+                  <p
+                    className="text-[12px] text-muted-foreground"
+                    data-testid="quick-log-post-save-description"
+                  >
+                    {buildQuickLogPostSaveDescription({
+                      targetName: savedTarget.name,
+                      tentName: savedTarget.tentName ?? null,
+                      growName: savedTarget.growName ?? null,
+                      action: savedVerb(savedTarget.eventType),
+                      photoAttached: false,
+                    })}
                   </p>
                 </div>
               </div>
@@ -1991,7 +2023,7 @@ export default function QuickLog({
                     onOpenChange(false);
                   }}
                 >
-                  View {savedTarget.name}
+                  {QUICK_LOG_POST_SAVE_VIEW_LABEL}
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
                 <Button
@@ -2000,7 +2032,7 @@ export default function QuickLog({
                   data-testid="quick-log-post-save-another"
                   onClick={resetForAnother}
                 >
-                  Log another for {savedTarget.name}
+                  {QUICK_LOG_POST_SAVE_ANOTHER_LABEL}
                 </Button>
                 <Button
                   type="button"
@@ -2008,7 +2040,7 @@ export default function QuickLog({
                   data-testid="quick-log-post-save-close"
                   onClick={() => onOpenChange(false)}
                 >
-                  Close
+                  {QUICK_LOG_POST_SAVE_CLOSE_LABEL}
                 </Button>
               </div>
             </div>

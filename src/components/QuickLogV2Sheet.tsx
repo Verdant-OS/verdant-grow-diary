@@ -66,9 +66,14 @@ import {
   QUICK_LOG_POST_SAVE_VIEW_LABEL,
   QUICK_LOG_POST_SAVE_ANOTHER_LABEL,
   QUICK_LOG_POST_SAVE_CLOSE_LABEL,
+  QUICK_LOG_POST_SAVE_TITLE,
+  QUICK_LOG_SAVE_FAILED_MESSAGE,
+  QUICK_LOG_CLOSE_BLOCKED_HINT,
   buildQuickLogPostSaveMessage,
+  buildQuickLogPostSaveDescription,
   rotateQuickLogIdempotencyKey,
   shouldAllowQuickLogSave,
+  shouldBlockQuickLogClose,
   type QuickLogPostSaveSuccess,
 } from "@/lib/quickLogSaveGuardRules";
 
@@ -162,6 +167,10 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   // previous saved-summary state. Bumped whenever the grower starts
   // a new logical submission from the same open sheet.
   const idempotencyKeyRef = useRef(1);
+  // Dedicated synchronous guard for the photo-diary insert path so
+  // rapid re-taps during photo capture/upload cannot enqueue a second
+  // insert before the first resolves. Reset in try/finally.
+  const photoDiaryInFlightRef = useRef(false);
 
   const options = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
 
@@ -328,22 +337,36 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     plantId: string | null;
     photoPath: string;
   }): Promise<{ ok: true } | { ok: false; message: string }> {
-    const note = form.note.trim() || "Photo attached from Quick Log.";
-    const { error } = await supabase.from("diary_entries").insert({
-      grow_id: input.growId,
-      tent_id: input.tentId,
-      plant_id: input.plantId,
-      note,
-      photo_url: input.photoPath,
-      entry_at: new Date().toISOString(),
-      details: {
-        event_type: "quicklog_photo_attachment",
-        source: "manual",
-        attached_to_action: form.action,
-      },
-    } as never);
-    if (error) return { ok: false, message: `Photo diary entry failed: ${error.message}` };
-    return { ok: true };
+    // Sync re-entry guard: if a photo-diary insert is already in
+    // flight, drop the second call rather than creating a duplicate
+    // entry. The outer handleSave guard covers the main save path,
+    // but this local ref protects the smallest surface (the direct
+    // supabase.from insert) so any future caller inherits the same
+    // guarantee without broadening the write helper.
+    if (photoDiaryInFlightRef.current) {
+      return { ok: false, message: "Photo diary entry already in progress." };
+    }
+    photoDiaryInFlightRef.current = true;
+    try {
+      const note = form.note.trim() || "Photo attached from Quick Log.";
+      const { error } = await supabase.from("diary_entries").insert({
+        grow_id: input.growId,
+        tent_id: input.tentId,
+        plant_id: input.plantId,
+        note,
+        photo_url: input.photoPath,
+        entry_at: new Date().toISOString(),
+        details: {
+          event_type: "quicklog_photo_attachment",
+          source: "manual",
+          attached_to_action: form.action,
+        },
+      } as never);
+      if (error) return { ok: false, message: `Photo diary entry failed: ${error.message}` };
+      return { ok: true };
+    } finally {
+      photoDiaryInFlightRef.current = false;
+    }
   }
 
   const handleSave = async () => {
@@ -490,7 +513,10 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
           .remove([uploadedPath])
           .catch(() => {});
       }
-      setLocalError(reasonToMessage(res.reason || "save_failed"));
+      const reason = res.reason || "save_failed";
+      setLocalError(
+        reason === "save_failed" ? QUICK_LOG_SAVE_FAILED_MESSAGE : reasonToMessage(reason),
+      );
       setSaveStatus("");
       return;
     }
@@ -575,8 +601,30 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     navigateToTimeline(nav.href, nav.hash, nav.path);
   }
 
+  /**
+   * Intercept Sheet open-state changes so backdrop / escape / swipe
+   * dismissals cannot close the sheet mid-save. Opening is always
+   * allowed. Closing is blocked while `saving`, `feedingSaving`, or
+   * either sync in-flight ref is claimed; in that case we surface a
+   * short, non-blocking toast so the grower knows why the dismissal
+   * was refused.
+   */
+  function handleSheetOpenChange(next: boolean) {
+    if (!next) {
+      const blocked = shouldBlockQuickLogClose({
+        saving: saving || feedingSaving,
+        inFlight: saveInFlightRef.current || photoDiaryInFlightRef.current,
+      });
+      if (blocked) {
+        toast.message(QUICK_LOG_CLOSE_BLOCKED_HINT);
+        return;
+      }
+    }
+    onOpenChange(next);
+  }
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleSheetOpenChange}>
       <SheetContent
         side="bottom"
         className="max-h-[92vh] overflow-y-auto text-base"
@@ -978,20 +1026,34 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
                 className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2"
               >
                 <p
-                  className="text-sm font-medium text-foreground"
-                  data-testid="qlv2-post-save-message"
+                  className="text-sm font-semibold text-foreground"
+                  data-testid="quick-log-post-save-title"
                 >
-                  {postSave.message}
+                  {QUICK_LOG_POST_SAVE_TITLE}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Choose your next step. Log another entry, view your timeline, or close.
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid="quick-log-post-save-description"
+                >
+                  {buildQuickLogPostSaveDescription({
+                    targetName: resolvedTarget.ok
+                      ? (options.find(
+                          (o) =>
+                            `${o.type}:${o.id}` === form.selectedKey,
+                        )?.label ?? null)
+                      : null,
+                    tentName: null,
+                    growName: null,
+                    action: postSave.action,
+                    photoAttached: /photo/i.test(postSave.message),
+                  })}
                 </p>
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Button
                     type="button"
                     className="flex-1"
                     onClick={handleViewTimeline}
-                    data-testid="qlv2-post-save-view"
+                    data-testid="quick-log-post-save-view"
                   >
                     {QUICK_LOG_POST_SAVE_VIEW_LABEL}
                   </Button>
@@ -1000,7 +1062,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
                     variant="outline"
                     className="flex-1"
                     onClick={handleLogAnother}
-                    data-testid="qlv2-post-save-another"
+                    data-testid="quick-log-post-save-another"
                   >
                     {QUICK_LOG_POST_SAVE_ANOTHER_LABEL}
                   </Button>
@@ -1009,7 +1071,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
                     variant="ghost"
                     className="flex-1"
                     onClick={() => onOpenChange(false)}
-                    data-testid="qlv2-post-save-close"
+                    data-testid="quick-log-post-save-close"
                   >
                     {QUICK_LOG_POST_SAVE_CLOSE_LABEL}
                   </Button>

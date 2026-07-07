@@ -83,3 +83,73 @@ export function buildQuickLogPostSaveMessage(action: string, photoAttached: bool
   if (!action) return base;
   return `${base} — ${action}`;
 }
+
+// -------------------------------------------------------------------
+// Unified post-save + error copy shared by QuickLogV2Sheet and the
+// legacy QuickLog dialog so both paths render identical CTAs and
+// failure guidance. Presenters must import these constants — never
+// hardcode duplicate strings.
+// -------------------------------------------------------------------
+
+export const QUICK_LOG_POST_SAVE_TITLE = "Saved" as const;
+
+/**
+ * Practical, non-technical retry guidance. Renders in the dedicated
+ * error area. Draft values remain in place after a failure — this
+ * string states that plainly so the grower knows they can retry.
+ */
+export const QUICK_LOG_SAVE_FAILED_MESSAGE =
+  "Save failed. Your draft is still here. Check your connection and try again." as const;
+
+export interface QuickLogPostSaveDescriptionInput {
+  /** Human-readable name of the target plant / tent (already trimmed). */
+  targetName: string | null;
+  /** Optional tent name to append when the target is a plant. */
+  tentName?: string | null;
+  /** Optional grow name to append after tent name. */
+  growName?: string | null;
+  /** Free-text action verb (e.g. "note", "feeding", "watering"). */
+  action: string | null;
+  /** Was a photo saved alongside the log? */
+  photoAttached: boolean;
+}
+
+/**
+ * Build the description line shown under the "Saved" title in the
+ * post-save card. Deterministic. Never claims yield / quality /
+ * diagnosis — just confirms what persisted and where.
+ */
+export function buildQuickLogPostSaveDescription(
+  input: QuickLogPostSaveDescriptionInput,
+): string {
+  const verb = (input.action ?? "").trim() || "entry";
+  const withPhoto = input.photoAttached ? " with photo" : "";
+  const target = (input.targetName ?? "").trim();
+  const scopeParts: string[] = [];
+  if (target) scopeParts.push(target);
+  const tent = (input.tentName ?? "").trim();
+  if (tent) scopeParts.push(tent);
+  const grow = (input.growName ?? "").trim();
+  if (grow) scopeParts.push(grow);
+  const scope = scopeParts.length ? ` to ${scopeParts.join(" · ")}` : "";
+  return `Logged ${verb}${withPhoto}${scope} · just now`;
+}
+
+export interface QuickLogCloseGuardInput {
+  /** True while any Quick Log save (form / photo diary) is in-flight. */
+  saving: boolean;
+  /** Additional sync in-flight indicator (ref-based). */
+  inFlight: boolean;
+}
+
+/**
+ * True when Cancel/Close/Escape/backdrop should be blocked because a
+ * save is currently in flight. The presenter is responsible for the
+ * ARIA disabled state + explanation.
+ */
+export function shouldBlockQuickLogClose(input: QuickLogCloseGuardInput): boolean {
+  return Boolean(input.saving || input.inFlight);
+}
+
+export const QUICK_LOG_CLOSE_BLOCKED_HINT =
+  "Save in progress — wait for it to finish before closing." as const;

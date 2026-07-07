@@ -281,7 +281,7 @@ describe("QuickLog — Log another for {plant}", () => {
       prefill: { plantId: "p2", growId: "g1" },
     });
     const btn = await saveOnce();
-    expect(btn.textContent ?? "").toMatch(/Log another for 505 Headbanger/);
+    expect(btn.textContent ?? "").toMatch(/Log another/);
     expect(btn.tabIndex).not.toBe(-1);
     btn.focus();
     expect(document.activeElement).toBe(btn);

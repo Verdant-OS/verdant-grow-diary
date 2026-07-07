@@ -191,13 +191,29 @@ export function buildHarvestCureQuickLogPersistencePayload(
   let detailsValue: Record<string, unknown>;
 
   if (input.eventType === QUICK_LOG_HARVEST_EVENT_TYPE) {
-    const v = validateHarvestDetails(input.harvest ?? null);
+    // Slice A3.1 — Vocab A → Vocab B conversion at the RPC boundary.
+    // If the caller passed grower-entered value+unit, canonicalize to
+    // grams via the single-source-of-truth helper BEFORE validation, so
+    // an "oz"/"lb"/"kg" entry never lands in `wet_weight_grams` as a
+    // raw number. Non-empty invalid input is rejected — never coerced.
+    const vocabAResult = applyHarvestVocabAConversion(input.harvest);
+    if (vocabAResult.error) {
+      return {
+        ok: false,
+        reason: "invalid_harvest_details",
+        validation: vocabAResult.error,
+      };
+    }
+    const v = validateHarvestDetails(vocabAResult.harvest);
     if (!v.ok) {
       return { ok: false, reason: "invalid_harvest_details", validation: v };
     }
     validation = v;
     detailsKey = "harvest";
-    detailsValue = { ...v.value };
+    // Stamp original value+unit alongside canonical grams. jsonb keys
+    // are additive; no schema change. Timeline view-model consumes them
+    // to display "2 lb (907.18 g)" honestly.
+    detailsValue = { ...v.value, ...vocabAResult.originals };
   } else {
     const v = validateCureCheckDetails(input.cureCheck ?? null);
     if (!v.ok) {

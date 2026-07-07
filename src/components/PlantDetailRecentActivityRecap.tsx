@@ -222,11 +222,17 @@ export default function PlantDetailRecentActivityRecap({
                   <div className="grid gap-1 text-emerald-50/85">
                     <p>
                       <span className="font-medium">What changed:</span>{" "}
-                      {actionResponsePair.actionLabel}
+                      {formatDiaryNoteForLabeledContainer(
+                        actionResponsePair.actionLabel,
+                        "What changed",
+                      )}
                     </p>
                     <p>
                       <span className="font-medium">Response:</span>{" "}
-                      {actionResponsePair.responseLabel}
+                      {formatDiaryNoteForLabeledContainer(
+                        actionResponsePair.responseLabel,
+                        "Response",
+                      )}
                     </p>
                   </div>
                   <p className="text-emerald-50/75">{actionResponsePair.helper}</p>

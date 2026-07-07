@@ -83,7 +83,7 @@ describe("GrowDetail — Export PDF button", () => {
     expect(btn).toBeInTheDocument();
     fireEvent.click(btn);
     expect(exportSpy).toHaveBeenCalledTimes(1);
-    const arg = exportSpy.mock.calls[0][0] as { grow: { name: string } };
+    const arg = (exportSpy.mock.calls[0] as unknown as [{ grow: { name: string } }])[0];
     expect(arg.grow.name).toBe("OG Kush");
   });
 });

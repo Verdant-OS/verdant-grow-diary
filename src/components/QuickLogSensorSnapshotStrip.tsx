@@ -14,7 +14,7 @@
  * only the strict resolver's `fresh_live` status counts as Live.
  */
 
-import { Gauge } from "lucide-react";
+import { Gauge, History } from "lucide-react";
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import {
   buildQuickLogStripFromTentState,
@@ -23,6 +23,11 @@ import {
 import SnapshotTrustBadge from "@/components/SnapshotTrustBadge";
 import { buildQuickLogSensorSnapshotViewModel } from "@/lib/quickLogSensorSnapshotViewModel";
 import { adaptQuickLogSensorContextInput } from "@/lib/quickLogSensorSnapshotViewModelAdapter";
+import {
+  encodeManualCorrectionHash,
+  hasCorrectableOriginalIds,
+  type ManualCorrectionMetric,
+} from "@/lib/manualSensorCorrectionContext";
 
 
 interface Props {
@@ -33,6 +38,19 @@ interface Props {
    * omitted, defaults to true so legacy callers/tests keep their behavior.
    */
   attached?: boolean;
+  /**
+   * Per-metric ORIGINAL sensor_readings row IDs for the currently-shown
+   * MANUAL snapshot. When supplied AND at least one is a real uuid AND
+   * the resolved source is manual, the strip renders a "Correct manual
+   * reading" link that deep-links to /sensors#manual-reading with the
+   * correction context. Never inferred from timestamp/metric — callers
+   * must pass real IDs. When absent, the affordance is hidden.
+   */
+  manualReadingIds?: Partial<Record<ManualCorrectionMetric, string>>;
+  /** Captured_at of the currently-shown manual snapshot (for the banner). */
+  manualCapturedAt?: string | null;
+  /** Optional numeric values for prefill; safe subset only. */
+  manualValues?: Partial<Record<ManualCorrectionMetric, number>>;
 }
 
 const TONE: Record<QuickLogSnapshotStripStatus, string> = {

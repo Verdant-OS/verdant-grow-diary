@@ -141,6 +141,27 @@ describe("classifySexReveal", () => {
     expect(res.assessment).toBe("possible_herm");
   });
 
+  it("only a LITERAL true enables the reversal override (truthy strings do NOT)", () => {
+    // The reversal flag suppresses the herm/cull path, so a decoded "false"/"0"
+    // string must not flip it on. Only real boolean true takes the branch.
+    for (const truthyNonBool of ["false", "0", "no", 1, {}]) {
+      const res = classifySexReveal(
+        sig({
+          pistilNodeCount: 2,
+          pollenSacNodeCount: 2,
+          intentionalReversal: truthyNonBool as unknown as boolean,
+        }),
+      );
+      expect(res.assessment).toBe("possible_herm");
+    }
+    // Sanity: the literal true DOES take the reversal branch.
+    expect(
+      classifySexReveal(
+        sig({ pistilNodeCount: 2, pollenSacNodeCount: 2, intentionalReversal: true }),
+      ).assessment,
+    ).toBe("reversed_female");
+  });
+
   it("reversal on a POOR image stays review-required (no confident cull-free pollen action)", () => {
     const res = classifySexReveal(
       sig({

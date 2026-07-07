@@ -172,7 +172,12 @@ function normalize(sig: SexRevealSignals): SexRevealSignals {
     imageQuality: sig.imageQuality ?? "low_detail",
     nodesVisible: clampNonNeg(sig.nodesVisible),
     reproductiveStructureVisible: Boolean(sig.reproductiveStructureVisible),
-    intentionalReversal: Boolean(sig.intentionalReversal),
+    // A SAFETY OVERRIDE (it suppresses the herm/cull path), so only a literal
+    // boolean `true` enables it — NOT any truthy value. Boolean("false") /
+    // Boolean("0") are `true`, so a decoded form/JSON/model payload string
+    // could otherwise flip the override on for a plant the caller meant as
+    // not-reversed. Callers must parse to a real boolean before classifying.
+    intentionalReversal: sig.intentionalReversal === true,
   };
 }
 

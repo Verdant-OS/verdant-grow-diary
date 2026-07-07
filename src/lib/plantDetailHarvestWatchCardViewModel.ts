@@ -107,6 +107,16 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
    * "No photos yet" and "N photo evidence points" never contradict.
    */
   galleryPhotoCount?: number | null;
+  /**
+   * Source of the evidence rows behind the count. When "demo", copy is
+   * explicit about sample records — never claims live gallery photos exist.
+   */
+  dataSource?: import("@/lib/plantPhotoEvidenceReconciliation").PhotoEvidenceDataSource | null;
+  /**
+   * Anchor / URL for the "View related activity" CTA. Defaults to
+   * "#plant-recent-activity".
+   */
+  supportingRecordsHref?: string | null;
   now?: Date;
 }): PlantDetailHarvestWatchCardViewModel {
   const { plant } = params;
@@ -147,6 +157,8 @@ export function buildPlantDetailHarvestWatchCardViewModel(params: {
   const photoEvidenceDisplay = buildPhotoEvidenceDisplay({
     evidenceCount: photos,
     galleryPhotoCount: params.galleryPhotoCount ?? null,
+    dataSource: params.dataSource ?? null,
+    supportingRecordsHref: params.supportingRecordsHref ?? null,
   });
   const evidenceLabel = `${row.readiness.score == null ? "Evidence building" : "Evidence ready for review"} · ${photoEvidenceDisplay.label}`;
 

@@ -128,7 +128,11 @@ export default function PlantRecentActivityPanel({ plantId, plantName }: Props) 
   });
 
   return (
-    <Card data-testid="plant-recent-activity-panel" className="mt-4">
+    <Card
+      id="plant-recent-activity"
+      data-testid="plant-recent-activity-panel"
+      className="mt-4 scroll-mt-20"
+    >
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
           <NotebookPen className="h-4 w-4" /> Recent Plant Activity

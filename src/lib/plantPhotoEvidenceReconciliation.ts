@@ -14,6 +14,8 @@
  * "No photos yet" and "N photo evidence points".
  */
 
+export type PhotoEvidenceDataSource = "live" | "demo" | "unknown";
+
 export interface PhotoEvidenceReconciliationInput {
   /** Number of diary/activity entries flagged as photo evidence for this plant. */
   evidenceCount: number;
@@ -23,6 +25,18 @@ export interface PhotoEvidenceReconciliationInput {
    * and generic explanation, but cannot compute the gallery-mismatch note.
    */
   galleryPhotoCount?: number | null;
+  /**
+   * Source of the evidence rows behind the count. When "demo", copy is
+   * explicit that the records are sample previews — never claims live
+   * gallery photos exist. Defaults to "unknown".
+   */
+  dataSource?: PhotoEvidenceDataSource | null;
+  /**
+   * Anchor / URL that points at the supporting records (typically the
+   * Recent Activity panel). Defaults to "#plant-recent-activity" so the
+   * default CTA always has a safe, in-page target.
+   */
+  supportingRecordsHref?: string | null;
 }
 
 export interface PhotoEvidenceReconciliationDisplay {
@@ -43,12 +57,43 @@ export interface PhotoEvidenceReconciliationDisplay {
    * are consistent).
    */
   mismatchNote: string;
+  /** Normalized data source ("live" | "demo" | "unknown"). */
+  dataSource: PhotoEvidenceDataSource;
+  /** Short source label, e.g. "Source: Demo · sample records for preview". */
+  sourceLabel: string;
+  /** True when a CTA to supporting records should render (evidence > 0). */
+  showSupportingRecordsCta: boolean;
+  /** Href for the supporting records CTA. */
+  supportingRecordsHref: string;
+  /** Visible CTA label. */
+  supportingRecordsCtaLabel: string;
+  /** Accessible name for the CTA. */
+  supportingRecordsCtaAriaLabel: string;
 }
 
 function normalizeCount(n: number | null | undefined): number {
   if (typeof n !== "number" || !Number.isFinite(n) || n < 0) return 0;
   return Math.floor(n);
 }
+
+function normalizeSource(
+  s: PhotoEvidenceDataSource | null | undefined,
+): PhotoEvidenceDataSource {
+  return s === "live" || s === "demo" ? s : "unknown";
+}
+
+function normalizeHref(href: string | null | undefined): string {
+  if (typeof href !== "string") return "#plant-recent-activity";
+  const trimmed = href.trim();
+  if (!trimmed) return "#plant-recent-activity";
+  return trimmed;
+}
+
+const SOURCE_LABELS: Record<PhotoEvidenceDataSource, string> = {
+  live: "Source: Your grow data",
+  demo: "Source: Demo · sample records for preview",
+  unknown: "Source: Unspecified",
+};
 
 /**
  * Build a deterministic label + explanation for a photo-evidence count.
@@ -63,19 +108,56 @@ export function buildPhotoEvidenceDisplay(
     input.galleryPhotoCount === undefined || input.galleryPhotoCount === null
       ? null
       : normalizeCount(input.galleryPhotoCount);
+  const dataSource = normalizeSource(input.dataSource);
+  const supportingRecordsHref = normalizeHref(input.supportingRecordsHref);
 
   const label = `${count} photo evidence point${count === 1 ? "" : "s"}`;
-  const explanation =
-    count === 0
-      ? "No diary entries flagged as photo evidence yet."
-      : "Diary entries flagged as containing a photo. Counted from Recent Activity — not the same as gallery thumbnails.";
+
+  let explanation: string;
+  if (count === 0) {
+    explanation = "No diary entries flagged as photo evidence yet.";
+  } else if (dataSource === "demo") {
+    explanation =
+      "Demo evidence points are sample records for preview only. They are not photos uploaded to your gallery.";
+  } else if (dataSource === "live") {
+    explanation =
+      "Diary entries flagged as containing a photo from your grow. Counted from Recent Activity — not the same as gallery thumbnails.";
+  } else {
+    explanation =
+      "Diary entries flagged as containing a photo. Counted from Recent Activity — not the same as gallery thumbnails. Source unspecified.";
+  }
 
   const hasGalleryMismatch = gallery !== null && count > 0 && gallery < count;
-  const mismatchNote = hasGalleryMismatch
-    ? gallery === 0
-      ? "Recent Photos shows no gallery thumbnails yet — the evidence points come from diary notes that referenced a photo. Open Recent Activity to review the supporting entries."
-      : "Some evidence points do not have a gallery thumbnail yet. Open Recent Activity to review the supporting entries."
-    : "";
+  let mismatchNote = "";
+  if (hasGalleryMismatch) {
+    if (dataSource === "demo") {
+      mismatchNote =
+        "These are demo evidence points — they do not populate the Recent Photos gallery. Open Recent Activity to review the sample entries.";
+    } else if (gallery === 0) {
+      mismatchNote =
+        "Recent Photos shows no gallery thumbnails yet — the evidence points come from diary notes that referenced a photo. Open Recent Activity to review the supporting entries.";
+    } else {
+      mismatchNote =
+        "Some evidence points do not have a gallery thumbnail yet. Open Recent Activity to review the supporting entries.";
+    }
+  }
 
-  return { count, label, explanation, hasGalleryMismatch, mismatchNote };
+  const showSupportingRecordsCta = count > 0;
+  const supportingRecordsCtaLabel = "View related activity";
+  const supportingRecordsCtaAriaLabel =
+    "View supporting photo evidence in Recent Activity.";
+
+  return {
+    count,
+    label,
+    explanation,
+    hasGalleryMismatch,
+    mismatchNote,
+    dataSource,
+    sourceLabel: SOURCE_LABELS[dataSource],
+    showSupportingRecordsCta,
+    supportingRecordsHref,
+    supportingRecordsCtaLabel,
+    supportingRecordsCtaAriaLabel,
+  };
 }

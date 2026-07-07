@@ -333,9 +333,9 @@ export default function PhenoStressObservationsList({
                           }
                           className={inputClass}
                         >
-                          {PHENO_STRESS_FACTOR_OPTIONS.map((f) => (
-                            <option key={f.value} value={f.value}>
-                              {f.label}
+                          {PHENO_STRESS_FACTOR_OPTIONS.map((v) => (
+                            <option key={v} value={v}>
+                              {v}
                             </option>
                           ))}
                         </select>
@@ -350,9 +350,9 @@ export default function PhenoStressObservationsList({
                           }
                           className={inputClass}
                         >
-                          {PHENO_STRESS_STATUS_OPTIONS.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
+                          {PHENO_STRESS_STATUS_OPTIONS.map((v) => (
+                            <option key={v} value={v}>
+                              {v}
                             </option>
                           ))}
                         </select>
@@ -367,9 +367,9 @@ export default function PhenoStressObservationsList({
                           }
                           className={inputClass}
                         >
-                          {PHENO_STRESS_INTENSITY_OPTIONS.map((i) => (
-                            <option key={i.value} value={i.value}>
-                              {i.label}
+                          {PHENO_STRESS_INTENSITY_OPTIONS.map((v) => (
+                            <option key={v} value={v}>
+                              {v}
                             </option>
                           ))}
                         </select>
@@ -384,9 +384,9 @@ export default function PhenoStressObservationsList({
                           }
                           className={inputClass}
                         >
-                          {PHENO_STRESS_RECOMMENDATION_OPTIONS.map((r) => (
-                            <option key={r.value} value={r.value}>
-                              {r.label}
+                          {PHENO_STRESS_RECOMMENDATION_OPTIONS.map((v) => (
+                            <option key={v} value={v}>
+                              {v}
                             </option>
                           ))}
                         </select>

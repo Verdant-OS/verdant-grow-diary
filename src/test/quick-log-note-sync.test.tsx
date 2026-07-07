@@ -22,13 +22,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { useRef, useState } from "react";
-import {
-  render,
-  screen,
-  fireEvent,
-  cleanup,
-  act,
-} from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 
 afterEach(() => cleanup());
@@ -45,8 +39,7 @@ function NoteHarness({
   const [note, setNote] = useState("");
   const ref = useRef<HTMLTextAreaElement | null>(null);
 
-  const syncFromEvent = (v: string) =>
-    setNote((prev) => (prev === v ? prev : v));
+  const syncFromEvent = (v: string) => setNote((prev) => (prev === v ? prev : v));
 
   const preview = evaluateQuickLogPreview({
     note,
@@ -63,21 +56,13 @@ function NoteHarness({
         ref={ref}
         value={note}
         onChange={(e) => setNote(e.target.value)}
-        onInput={(e) =>
-          syncFromEvent((e.currentTarget as HTMLTextAreaElement).value)
-        }
-        onCompositionEnd={(e) =>
-          syncFromEvent((e.currentTarget as HTMLTextAreaElement).value)
-        }
+        onInput={(e) => syncFromEvent((e.currentTarget as HTMLTextAreaElement).value)}
+        onCompositionEnd={(e) => syncFromEvent((e.currentTarget as HTMLTextAreaElement).value)}
         onBlur={(e) => syncFromEvent(e.currentTarget.value)}
       />
       <span data-testid="missing">{missing ? "yes" : "no"}</span>
       <span data-testid="state-note">{note}</span>
-      <button
-        type="button"
-        data-testid="submit"
-        onClick={() => onSubmit?.({ note, missing })}
-      >
+      <button type="button" data-testid="submit" onClick={() => onSubmit?.({ note, missing })}>
         Save
       </button>
     </div>
@@ -156,5 +141,53 @@ describe("Quick Log note validation sync (Slice A1)", () => {
     expect(seen!.note).toBe(ta.value);
     expect(seen!.note).toBe("Visible = payload");
     expect(seen!.missing).toBe(false);
+  });
+
+  it("paste then submit: payload note equals the visible textarea value", () => {
+    let seen: { note: string; missing: boolean } | null = null;
+    render(<NoteHarness onSubmit={(p) => (seen = p)} />);
+    const ta = get("note") as HTMLTextAreaElement;
+    ta.value = "Pasted then saved";
+    fireEvent.input(ta);
+    fireEvent.click(get("submit"));
+    expect(ta.value).toBe("Pasted then saved");
+    expect(seen!.note).toBe(ta.value);
+    expect(seen!.missing).toBe(false);
+  });
+
+  it("native dispatch then submit: payload note equals the visible textarea value", () => {
+    let seen: { note: string; missing: boolean } | null = null;
+    render(<NoteHarness onSubmit={(p) => (seen = p)} />);
+    const ta = get("note") as HTMLTextAreaElement;
+    act(() => {
+      ta.value = "Native then saved";
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    fireEvent.click(get("submit"));
+    expect(ta.value).toBe("Native then saved");
+    expect(seen!.note).toBe(ta.value);
+    expect(seen!.missing).toBe(false);
+  });
+
+  it("compositionEnd then submit: payload note equals the visible textarea value", () => {
+    let seen: { note: string; missing: boolean } | null = null;
+    render(<NoteHarness onSubmit={(p) => (seen = p)} />);
+    const ta = get("note") as HTMLTextAreaElement;
+    ta.value = "口述筆記を保存";
+    fireEvent.compositionEnd(ta, { data: "口述筆記を保存" });
+    fireEvent.click(get("submit"));
+    expect(ta.value).toBe("口述筆記を保存");
+    expect(seen!.note).toBe(ta.value);
+    expect(seen!.missing).toBe(false);
+  });
+
+  it("whitespace-only note stays blocked all the way to the submit payload", () => {
+    let seen: { note: string; missing: boolean } | null = null;
+    render(<NoteHarness onSubmit={(p) => (seen = p)} />);
+    const ta = get("note") as HTMLTextAreaElement;
+    fireEvent.change(ta, { target: { value: "  \n\t " } });
+    fireEvent.click(get("submit"));
+    // The note:missing rule still flags it at the moment of submit.
+    expect(seen!.missing).toBe(true);
   });
 });

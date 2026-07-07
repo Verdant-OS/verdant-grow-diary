@@ -88,9 +88,7 @@ describe("scrubExecutableSource — scanner self-match safety", () => {
 
   it("handles empty / non-string input safely", () => {
     expect(scrubExecutableSource("")).toBe("");
-    // @ts-expect-error deliberate wrong-type check
-    expect(scrubExecutableSource(null)).toBe("");
-    // @ts-expect-error deliberate wrong-type check
-    expect(scrubExecutableSource(undefined)).toBe("");
+    expect(scrubExecutableSource(null as unknown as string)).toBe("");
+    expect(scrubExecutableSource(undefined as unknown as string)).toBe("");
   });
 });

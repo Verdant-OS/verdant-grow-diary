@@ -17,6 +17,8 @@ import type { ReactElement } from "react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import QuickLog from "@/components/QuickLog";
+import { RecentQuickLogActivityPanel } from "@/components/QuickLogHistoryPanels";
+import { exportGrowDiaryReportAsPdf } from "@/lib/growDiaryPdfExport";
 
 function renderWithClient(ui: ReactElement) {
   const client = new QueryClient({
@@ -72,9 +74,21 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() },
 }));
 
+vi.mock("@/lib/growDiaryPdfExport", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/growDiaryPdfExport")
+  >("@/lib/growDiaryPdfExport");
+  return {
+    ...actual,
+    exportGrowDiaryReportAsPdf: vi.fn(() => "printed"),
+  };
+});
+
 beforeEach(() => {
   saveMock.mockReset();
   saveMock.mockResolvedValue({ ok: true });
+  vi.mocked(exportGrowDiaryReportAsPdf).mockReset();
+  vi.mocked(exportGrowDiaryReportAsPdf).mockReturnValue("printed");
 });
 
 describe("QuickLog habit-capture polish — presentation", () => {
@@ -162,9 +176,57 @@ describe("QuickLog habit-capture polish — presentation", () => {
   });
 });
 
+describe("QuickLog history summary — diary PDF export", () => {
+  const rawEntries = [
+    {
+      id: "entry-1",
+      note: "Watered and checked runoff.\n\nHardware readings (manual handheld):\n- Feed/Input pH: 6.2",
+      photo_url: null,
+      stage: "veg",
+      details: { event_type: "watering" },
+      entry_at: "2026-07-06T10:00:00.000Z",
+    },
+    {
+      id: "entry-2",
+      note: "Canopy photo",
+      photo_url: "https://example.test/photo.jpg",
+      stage: "veg",
+      details: { event_type: "photo" },
+      entry_at: "2026-07-05T10:00:00.000Z",
+    },
+  ];
+
+  it("renders an Export diary PDF button on the recent diary summary list", () => {
+    render(<RecentQuickLogActivityPanel rawEntries={rawEntries} />);
+    const button = screen.getByTestId("quicklog-history-export-diary-pdf");
+    expect(button).toBeInTheDocument();
+    expect(button).toHaveTextContent(/Export diary PDF/i);
+  });
+
+  it("exports counts and recent rows from the diary summary list", () => {
+    render(<RecentQuickLogActivityPanel rawEntries={rawEntries} limit={10} />);
+    fireEvent.click(screen.getByTestId("quicklog-history-export-diary-pdf"));
+
+    expect(exportGrowDiaryReportAsPdf).toHaveBeenCalledTimes(1);
+    const input = vi.mocked(exportGrowDiaryReportAsPdf).mock.calls[0][0];
+    expect(input.grow.name).toBe("Diary Summary");
+    expect(input.counts.diary).toBe(2);
+    expect(input.counts.watering).toBe(1);
+    expect(input.counts.photo).toBe(1);
+    expect(input.recent).toHaveLength(2);
+    expect(input.recent[0].title).toMatch(/watering/i);
+    expect(input.recent[0].detail).toMatch(/Manual handheld readings included/i);
+    expect(input.chartsUnavailableReason).toMatch(/diary summary list/i);
+  });
+});
+
 describe("QuickLog habit-capture polish — static safety", () => {
   const SRC = readFileSync(
     resolve(__dirname, "../components/QuickLog.tsx"),
+    "utf8",
+  );
+  const HISTORY_SRC = readFileSync(
+    resolve(__dirname, "../components/QuickLogHistoryPanels.tsx"),
     "utf8",
   );
 
@@ -175,6 +237,11 @@ describe("QuickLog habit-capture polish — static safety", () => {
     expect(SRC).not.toMatch(/service_role|SERVICE_ROLE/);
     expect(SRC).not.toMatch(/bridge.?token|BRIDGE_TOKEN/i);
     expect(SRC).not.toMatch(/turn on|turn off|run pump|run fan|run light|relay|actuator/i);
+  });
+
+  it("history summary export does not add database mutations", () => {
+    expect(HISTORY_SRC).not.toMatch(/from "@\/integrations\/supabase\//);
+    expect(HISTORY_SRC).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
   });
 
   it("manual readings copy explicitly clarifies it is not telemetry", () => {

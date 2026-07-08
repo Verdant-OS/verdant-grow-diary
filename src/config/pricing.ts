@@ -23,11 +23,21 @@ export interface PricingTier {
   billingPeriod: BillingPeriod;
   /** null until the Paddle price is created. CTA must be inert when null. */
   paddlePriceId: string | null;
+  /** Exact feature strings shown on pricing cards and the upgrade success panel. */
   features: string[];
   highlighted?: boolean;
   /** Founder Lifetime only. Display-only counters. */
   cap?: { total: number; claimed: number };
 }
+
+const PRO_UNLOCKED_FEATURES = [
+  "Cloud sync & backup",
+  "Multi-tent tracking",
+  "Exports & data ownership",
+  "Full grow history",
+  "Priority support",
+  "Advanced grow reports (planned)",
+];
 
 export const PRICING_TIERS: PricingTier[] = [
   {
@@ -47,12 +57,7 @@ export const PRICING_TIERS: PricingTier[] = [
     billingPeriod: "monthly",
     paddlePriceId: null,
     highlighted: true,
-    features: [
-      "Cloud sync & backup",
-      "Multi-tent",
-      "Exports & data ownership",
-      "Full grow history",
-    ],
+    features: [...PRO_UNLOCKED_FEATURES],
   },
   {
     id: "pro_annual",
@@ -61,7 +66,7 @@ export const PRICING_TIERS: PricingTier[] = [
     priceSubtext: "per year",
     billingPeriod: "annual",
     paddlePriceId: null,
-    features: ["Everything in Pro", "Best value"],
+    features: [...PRO_UNLOCKED_FEATURES, "Annual billing value"],
   },
   {
     id: "founder_lifetime",
@@ -71,7 +76,11 @@ export const PRICING_TIERS: PricingTier[] = [
     billingPeriod: "lifetime",
     paddlePriceId: null,
     cap: { total: 75, claimed: 0 },
-    features: ["Pro, forever", "Founder perks"],
+    features: [
+      ...PRO_UNLOCKED_FEATURES,
+      "Ongoing Pro-level access",
+      "Founder badge & early-supporter perks",
+    ],
   },
 ];
 
@@ -252,7 +261,7 @@ export interface UpgradeFaqItem {
 }
 
 /**
- * FAQ copy for /upgrade. Avoids forbidden claims (autopilot, guaranteed yield,
+ * FAQ copy for /upgrade. Avoids forbidden claims (hands-free grow control, guaranteed yield,
  * "AI grows for you", device control). Data-ownership language never implies
  * Verdant sells grower data.
  */
@@ -275,7 +284,7 @@ export const UPGRADE_FAQ: UpgradeFaqItem[] = [
   },
   {
     q: "Does Verdant control my equipment?",
-    a: "No. Verdant does not control lights, pumps, fans, or any other equipment, and never runs your grow on autopilot. Every consequential action stays grower-approved.",
+    a: "No. Verdant does not control lights, pumps, fans, or any other equipment, and never runs your grow for you. Every consequential action stays grower-approved.",
   },
   {
     q: "How does the AI help?",

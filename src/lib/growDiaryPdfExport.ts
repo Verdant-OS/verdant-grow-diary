@@ -110,42 +110,46 @@ function isoDate(d: Date): string {
 }
 
 function safeSlug(s: string): string {
-  return (s || "grow")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60) || "grow";
+  return (
+    (s || "grow")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "grow"
+  );
 }
 
 export function buildGrowDiaryReportFilename(growName: string, now: Date): string {
   return `verdant-grow-diary-${safeSlug(growName)}-${isoDate(now)}.pdf`;
 }
 
-export function buildGrowDiaryReportModel(
-  input: BuildGrowDiaryReportInput,
-): GrowDiaryPdfModel {
+export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): GrowDiaryPdfModel {
   const now = input.now ?? new Date();
   const plantNames = (input.grow.plantNames ?? []).filter(Boolean);
   const scopeParts: string[] = [input.grow.name];
   if (input.grow.tentName) scopeParts.push(`Tent: ${input.grow.tentName}`);
   if (plantNames.length > 0) {
-    scopeParts.push(`Plants: ${plantNames.slice(0, 6).join(", ")}${plantNames.length > 6 ? "…" : ""}`);
+    scopeParts.push(
+      `Plants: ${plantNames.slice(0, 6).join(", ")}${plantNames.length > 6 ? "…" : ""}`,
+    );
   }
 
-  const startedIso = input.grow.startedAt
-    ? tryDateLabel(input.grow.startedAt)
-    : null;
-  const dateRangeLabel = startedIso
-    ? `${startedIso} → ${isoDate(now)}`
-    : `Through ${isoDate(now)}`;
+  const startedIso = input.grow.startedAt ? tryDateLabel(input.grow.startedAt) : null;
+  const dateRangeLabel = startedIso ? `${startedIso} → ${isoDate(now)}` : `Through ${isoDate(now)}`;
 
   const countsRows = [
     { label: "Diary entries", value: countText(input.counts.diary) },
     { label: "Waterings", value: countText(input.counts.watering) },
     { label: "Feedings", value: countText(input.counts.feeding) },
     { label: "Photos", value: countText(input.counts.photo) },
-    { label: "Sensor snapshots", value: countText(input.counts.sensorSnapshots) },
-    { label: "Alerts / recommendations", value: countText(input.counts.alerts) },
+    {
+      label: "Sensor snapshots",
+      value: countText(input.counts.sensorSnapshots),
+    },
+    {
+      label: "Alerts / recommendations",
+      value: countText(input.counts.alerts),
+    },
   ];
 
   const events = (input.recent ?? []).slice(0, 50).map((r) => ({
@@ -182,12 +186,11 @@ export function buildGrowDiaryReportModel(
   }));
   const chartsUnavailableNote =
     charts.length === 0
-      ? input.chartsUnavailableReason ??
-        "Charts were not available in this export. Refer to the counts and events tables below."
+      ? (input.chartsUnavailableReason ??
+        "No chart data was available to embed at export time. Use the summary totals and logged events below as the source data.")
       : null;
 
-  const diaryCount =
-    typeof input.counts.diary === "number" ? input.counts.diary : 0;
+  const diaryCount = typeof input.counts.diary === "number" ? input.counts.diary : 0;
   const isEmpty = diaryCount === 0 && events.length === 0;
 
   return {
@@ -203,7 +206,7 @@ export function buildGrowDiaryReportModel(
     chartsUnavailableNote,
     isEmpty,
     safetyFooter:
-      "Read-only report. Verdant does not control equipment or run grows on autopilot. Sensor source labels are preserved; stale/invalid/demo readings are not treated as healthy.",
+      "Read-only report. Verdant does not control equipment or run your grow for you. Sensor source labels are preserved; stale/invalid/demo readings are not treated as healthy.",
   };
 }
 
@@ -251,8 +254,10 @@ export function buildGrowDiaryReportHtml(model: GrowDiaryPdfModel): string {
     : `<p class="muted">No sensor snapshots included in this export.</p>`;
 
   const chartsBlock = model.charts.length
-    ? `<ul>${model.charts.map((c) => `<li><strong>${esc(c.label)}:</strong> ${esc(c.summary)}</li>`).join("")}</ul>`
-    : `<p class="muted" data-testid="grow-diary-pdf-charts-unavailable">${esc(model.chartsUnavailableNote ?? "Charts unavailable.")}</p>`;
+    ? `<ul>${model.charts
+        .map((c) => `<li><strong>${esc(c.label)}:</strong> ${esc(c.summary)}</li>`)
+        .join("")}</ul>`
+    : `<div class="callout" data-testid="grow-diary-pdf-charts-unavailable-section"><h3>Charts unavailable</h3><p class="muted" data-testid="grow-diary-pdf-charts-unavailable">${esc(model.chartsUnavailableNote ?? "Charts unavailable.")}</p><p class="muted">Nothing was inferred or redrawn. Use Summary totals, Key logged events, and Sensor source provenance for the underlying data.</p></div>`;
 
   const emptyBanner = model.isEmpty
     ? `<p class="muted" data-testid="grow-diary-pdf-empty-state">This grow has no logged diary entries yet. This report captures the current empty state so you have a baseline.</p>`
@@ -268,6 +273,7 @@ export function buildGrowDiaryReportHtml(model: GrowDiaryPdfModel): string {
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:#111;line-height:1.5;padding:32px;max-width:880px;margin:0 auto}
   h1{font-size:22px;margin:0 0 4px}
   h2{font-size:15px;margin:20px 0 6px;border-bottom:1px solid #ddd;padding-bottom:4px}
+  h3{font-size:13px;margin:0 0 4px}
   p{margin:6px 0}
   ul{margin:6px 0;padding-left:20px}
   table{width:100%;border-collapse:collapse;margin:6px 0;font-size:12px}
@@ -279,6 +285,7 @@ export function buildGrowDiaryReportHtml(model: GrowDiaryPdfModel): string {
   .badge.healthy{border-color:#2a7}
   .badge.flag{border-color:#c62;color:#a40}
   .sources{list-style:none;padding-left:0}
+  .callout{border:1px dashed #aaa;border-radius:8px;background:#fafafa;padding:10px 12px;margin-top:8px}
   .safety{margin-top:24px;padding:10px 12px;border:1px solid #999;border-radius:8px;background:#f9f9f9;font-size:12px}
   @media print{body{padding:0}.no-print{display:none}}
 </style>
@@ -320,12 +327,7 @@ export function exportGrowDiaryReportAsPdf(
   input: BuildGrowDiaryReportInput,
   opts: ExportGrowDiaryReportOptions = {},
 ): ExportGrowDiaryReportResult {
-  const win =
-    opts.win !== undefined
-      ? opts.win
-      : typeof window !== "undefined"
-        ? window
-        : null;
+  const win = opts.win !== undefined ? opts.win : typeof window !== "undefined" ? window : null;
   if (!win || typeof win.open !== "function") return "unavailable";
   const model = buildGrowDiaryReportModel(input);
   const html = buildGrowDiaryReportHtml(model);

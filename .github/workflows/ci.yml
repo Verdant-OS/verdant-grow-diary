@@ -198,70 +198,38 @@ jobs:
         run: bun run build
 
   # Full Vitest suite, sharded across parallel runners. Pulled out of the
-  # `test` job because the whole suite (~21k tests, ~24 min, jsdom-heavy) both
-  # exceeded the 20-minute job timeout and exhausted a single runner's heap
-  # (OOM) when run as one `bunx vitest run`.
+  # `test` job so the whole suite (~21k tests, jsdom-heavy) doesn't exceed the
+  # 20-minute job timeout when run on a single runner.
   #
-  # 36 shards run on independent 16 GB runners. jsdom DOM / module state is not
-  # fully freed between files, so a worker's heap grows with the number of files
-  # it handles; with 6 shards (and even 14) one shard accumulated a cluster of
-  # memory-heavy files and OOM'd. 36 shards (a) cut each shard to ~1/36 of the
-  # files so per-worker accumulation stays low, and (b) reshuffle vitest's
-  # hash-based file distribution so the heavy files spread across shards.
+  # 8 shards run on independent 16 GB runners; each covers ~1/8 of the files
+  # (~200) via vitest's hash-based file distribution. Measured on Linux/Node 20
+  # at the cap below, a shard runs the vitest step in ~90s — well under the
+  # 20-minute job timeout even with checkout + install + ripgrep setup — with
+  # peak worker heap far below the ceiling.
+  #
+  # History: the suite was briefly split into 36 shards to keep each worker
+  # below an OOM. That OOM was NOT diffuse jsdom accumulation — it was a single
+  # test file (ecowitt-bridge-status-page) whose unstable useToast mock spun an
+  # unbounded render loop that exhausted the worker heap. With that fixed (#188),
+  # shard count is bounded only by the per-shard wall-clock budget, so 8 shards
+  # is ample. If the suite grows and a shard nears the timeout, raise the count
+  # (update the matrix list AND the `/N` divisor together).
   #
   # `NODE_OPTIONS=--max-old-space-size=3584` keeps total memory container-safe:
   # the forks pool runs ~4 workers on a 4-vCPU runner, so 4 x 3584 MB ≈ 14 GB,
   # under the 16 GB runner. A lower ceiling than the file load requires also
-  # means any residual OOM fails fast instead of GC-thrashing to the timeout.
+  # means any regression OOM fails fast instead of GC-thrashing to the timeout.
   #
   # `fail-fast: false` so one shard failing still reports the others.
   # See docs/testing/ci-full-suite-shards.md.
   full-suite:
-    name: Full test suite (shard ${{ matrix.shard }}/36)
+    name: Full test suite (shard ${{ matrix.shard }}/8)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        shard:
-          [
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            11,
-            12,
-            13,
-            14,
-            15,
-            16,
-            17,
-            18,
-            19,
-            20,
-            21,
-            22,
-            23,
-            24,
-            25,
-            26,
-            27,
-            28,
-            29,
-            30,
-            31,
-            32,
-            33,
-            34,
-            35,
-            36,
-          ]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -292,4 +260,4 @@ jobs:
       - name: Run test shard
         env:
           NODE_OPTIONS: --max-old-space-size=3584
-        run: bunx vitest run --shard=${{ matrix.shard }}/36
+        run: bunx vitest run --shard=${{ matrix.shard }}/8

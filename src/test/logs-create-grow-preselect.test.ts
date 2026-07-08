@@ -14,7 +14,7 @@ const EDIT = readFileSync(resolve(ROOT, "src/components/EntryEditDialog.tsx"), "
 
 describe("Logs — preselect grow on create from /logs?growId=…", () => {
   it("Timeline pulls setActiveGrowId from the grows store", () => {
-    expect(TIMELINE).toMatch(/setActiveGrowId\s*\}\s*=\s*useGrows\(\)/);
+    expect(TIMELINE).toMatch(/setActiveGrowId\s*[,}][\s\S]{0,400}=\s*useGrows\(\)/);
   });
 
   it("syncs URL growId into the active grow store when valid", () => {
@@ -44,6 +44,8 @@ describe("Logs — preselect grow on create from /logs?growId=…", () => {
 
   it("does not introduce ai-coach, device-control, or service_role surface", () => {
     expect(TIMELINE).not.toMatch(/ai-coach|ai_coach/);
-    expect(TIMELINE).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i);
+    expect(TIMELINE).not.toMatch(
+      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
+    );
   });
 });

@@ -48,7 +48,10 @@ const INTENTIONAL_BYPASSES: ReadonlyArray<{
   {
     file: "pages/Timeline.tsx",
     why: "Legacy diary-entry shape {temp, rh, vpd, co2, soil} predates Quick Log v1. Quick Log items render via DiaryEntryBadges/TimelineMemorySection; this chip is for pre-Quick-Log rows only.",
-    marker: "{ ts?: string; temp?: number; rh?: number; vpd?: number;",
+    // Marker is the distinctive expression that reads Timeline's own inline
+    // sensor shape (not v1's). Kept as a single contiguous token so prettier
+    // reflowing the accompanying type literal onto multiple lines can't break it.
+    marker: "sensor_snapshot ?? e.details?.sensor",
   },
   {
     file: "components/EcowittLatestSnapshotCard.tsx",
@@ -73,15 +76,12 @@ const INTENTIONAL_BYPASSES: ReadonlyArray<{
 ];
 
 describe("Quick Log v1 snapshot normalizer — consumer boundary", () => {
-  it.each(QUICK_LOG_V1_CONSUMERS)(
-    "$file imports the shared normalizer",
-    ({ file }) => {
-      const src = readSrc(file);
-      expect(src.length).toBeGreaterThan(0);
-      expect(src).toMatch(/normalizeQuickLogSnapshotMetrics/);
-      expect(src).toMatch(/quickLogSnapshotMetricNormalizer/);
-    },
-  );
+  it.each(QUICK_LOG_V1_CONSUMERS)("$file imports the shared normalizer", ({ file }) => {
+    const src = readSrc(file);
+    expect(src.length).toBeGreaterThan(0);
+    expect(src).toMatch(/normalizeQuickLogSnapshotMetrics/);
+    expect(src).toMatch(/quickLogSnapshotMetricNormalizer/);
+  });
 
   it("AI Doctor v1 adapter consumes the companion view (transitively normalized)", () => {
     const src = readSrc("lib/quick-log/quickLogAiDoctorContextAdapter.ts");

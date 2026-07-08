@@ -17,14 +17,8 @@ import SafeByDesignNotice from "@/components/SafeByDesignNotice";
 
 const ROOT = resolve(__dirname, "../..");
 const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
-const VM = readFileSync(
-  resolve(ROOT, "src/lib/dashboardActionQueueViewModel.ts"),
-  "utf8",
-);
-const NOTICE = readFileSync(
-  resolve(ROOT, "src/components/SafeByDesignNotice.tsx"),
-  "utf8",
-);
+const VM = readFileSync(resolve(ROOT, "src/lib/dashboardActionQueueViewModel.ts"), "utf8");
+const NOTICE = readFileSync(resolve(ROOT, "src/components/SafeByDesignNotice.tsx"), "utf8");
 
 describe("SafeByDesignNotice — component", () => {
   it("renders Safe by Design / Read-Only / Approval Required tokens", () => {
@@ -55,9 +49,7 @@ describe("SafeByDesignNotice — component", () => {
 describe("Dashboard Approval-Required Action Queue — static source", () => {
   it("renders the SafeByDesignNotice inside the pending actions section", () => {
     expect(DASHBOARD).toContain('data-testid="dashboard-approval-queue-section"');
-    expect(DASHBOARD).toContain(
-      'testId="dashboard-approval-queue-safe-by-design"',
-    );
+    expect(DASHBOARD).toContain('testId="dashboard-approval-queue-safe-by-design"');
     expect(DASHBOARD).toContain("SafeByDesignNotice");
   });
 
@@ -67,12 +59,8 @@ describe("Dashboard Approval-Required Action Queue — static source", () => {
   });
 
   it("renders Review & Approve and Dismiss controls that route to the action detail (no inline execution)", () => {
-    expect(DASHBOARD).toContain(
-      'data-testid="dashboard-approval-queue-item-approve"',
-    );
-    expect(DASHBOARD).toContain(
-      'data-testid="dashboard-approval-queue-item-dismiss"',
-    );
+    expect(DASHBOARD).toContain('data-testid="dashboard-approval-queue-item-approve"');
+    expect(DASHBOARD).toContain('data-testid="dashboard-approval-queue-item-dismiss"');
     // Both controls must be Links to actionDetailPath — no onClick handler
     // that writes/executes anything.
     expect(DASHBOARD).toMatch(
@@ -84,7 +72,7 @@ describe("Dashboard Approval-Required Action Queue — static source", () => {
   });
 
   it("clarifies that approving never sends a device command", () => {
-    expect(DASHBOARD).toMatch(/never sends a\s*command to fans, lights, pumps/);
+    expect(DASHBOARD).toMatch(/never sends a\s+command to fans,\s+lights,\s+pumps/);
   });
 
   it("displays related grow/tent/source/status context chips for each item", () => {

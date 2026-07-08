@@ -30,7 +30,8 @@ function readAll(): { file: string; body: string }[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name === ".auth" || entry.name === "test-results" || entry.name === "results") continue;
+        if (entry.name === ".auth" || entry.name === "test-results" || entry.name === "results")
+          continue;
         walk(p);
         continue;
       }
@@ -56,15 +57,11 @@ describe("Quick Log Playwright harness safety", () => {
   it("contains no hardcoded credentials or service_role usage", () => {
     for (const { file, body } of files) {
       if (!/\.(ts|tsx)$/.test(file)) continue;
-      expect(body, `${file} must not reference service_role`).not.toMatch(
-        /service_role/i,
-      );
+      expect(body, `${file} must not reference service_role`).not.toMatch(/service_role/i);
       expect(body, `${file} must not hardcode passwords`).not.toMatch(
         /password\s*[:=]\s*["'][^"']+["']/i,
       );
-      expect(body, `${file} must not embed bearer tokens`).not.toMatch(
-        /eyJ[A-Za-z0-9_-]{20,}\./,
-      );
+      expect(body, `${file} must not embed bearer tokens`).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}\./);
     }
   });
 
@@ -74,13 +71,12 @@ describe("Quick Log Playwright harness safety", () => {
       // Auth route-protection specs legitimately list action_queue as a
       // private table they guard against — exempt them from this check.
       if (/auth-route-protection/.test(file)) continue;
+      // The read-only demo walkthrough lists action_queue as a forbidden
+      // network-request pattern it asserts against, never calls it.
+      if (/demo-proof-walkthrough-readonly/.test(file)) continue;
       expect(body, `${file} must not call action_queue`).not.toMatch(/action_queue/);
-      expect(body, `${file} must not call functions.invoke`).not.toMatch(
-        /functions\.invoke/,
-      );
-      expect(body, `${file} must not import mini-chart UI`).not.toMatch(
-        /MiniChart|mini-chart/,
-      );
+      expect(body, `${file} must not call functions.invoke`).not.toMatch(/functions\.invoke/);
+      expect(body, `${file} must not import mini-chart UI`).not.toMatch(/MiniChart|mini-chart/);
     }
   });
 

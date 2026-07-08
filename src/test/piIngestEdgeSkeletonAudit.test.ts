@@ -16,7 +16,6 @@ import { resolve } from "node:path";
 import { installScannerGuardrail } from "./support/scannerGuardrailHarness";
 installScannerGuardrail({ file: __filename });
 
-
 const ROOT = resolve(__dirname, "../..");
 const AUDIT_PATH = resolve(ROOT, "docs/pi-ingest-edge-skeleton-audit.md");
 const FN_DIR = resolve(ROOT, "supabase/functions/pi-ingest-readings");
@@ -28,13 +27,9 @@ const CONTRACT_PATH = resolve(ROOT, "docs/pi-ingest-readings-contract.md");
 
 const AUDIT = existsSync(AUDIT_PATH) ? readFileSync(AUDIT_PATH, "utf8") : "";
 const PLAN = existsSync(PLAN_PATH) ? readFileSync(PLAN_PATH, "utf8") : "";
-const CONTRACT = existsSync(CONTRACT_PATH)
-  ? readFileSync(CONTRACT_PATH, "utf8")
-  : "";
+const CONTRACT = existsSync(CONTRACT_PATH) ? readFileSync(CONTRACT_PATH, "utf8") : "";
 const INDEX_SRC = existsSync(FN_INDEX) ? readFileSync(FN_INDEX, "utf8") : "";
-const RESOLVER_SRC = existsSync(FN_RESOLVER)
-  ? readFileSync(FN_RESOLVER, "utf8")
-  : "";
+const RESOLVER_SRC = existsSync(FN_RESOLVER) ? readFileSync(FN_RESOLVER, "utf8") : "";
 
 function readFnDirAll(): string {
   if (!existsSync(FN_DIR)) return "";
@@ -130,10 +125,7 @@ describe("pi-ingest edge skeleton audit — decryption confinement", () => {
         if (st.isDirectory()) walk(p);
         else if (/\.(ts|tsx)$/.test(name)) {
           const text = readFileSync(p, "utf8");
-          if (
-            /crypto\.subtle\.decrypt\s*\(/.test(text) ||
-            /\bcreateDecipheriv\s*\(/.test(text)
-          ) {
+          if (/crypto\.subtle\.decrypt\s*\(/.test(text) || /\bcreateDecipheriv\s*\(/.test(text)) {
             offenders.push(p);
           }
         }
@@ -145,11 +137,15 @@ describe("pi-ingest edge skeleton audit — decryption confinement", () => {
 
   it("crypto.ts is either absent or audit doc notes its absence", () => {
     if (!existsSync(FN_CRYPTO)) {
-      expect(AUDIT).toMatch(/crypto\.ts[\s\S]{0,80}(not exist|does not exist|absent|never broken out)/i);
+      expect(AUDIT).toMatch(
+        /crypto\.ts[\s\S]{0,80}(not exist|does not exist|absent|never broken out)/i,
+      );
     } else {
       const src = readFileSync(FN_CRYPTO, "utf8");
       // If it exists later, must be a pure helper — no DB / no env / no logs of secrets.
-      expect(src).not.toMatch(/from\(\s*["'](sensor_readings|alerts|action_queue|pi_ingest_idempotency_keys)["']/);
+      expect(src).not.toMatch(
+        /from\(\s*["'](sensor_readings|alerts|action_queue|pi_ingest_idempotency_keys)["']/,
+      );
       expect(src).not.toMatch(/console\.(log|warn|error)\([^)]*\b(secret|ciphertext|nonce|key)\b/i);
     }
   });
@@ -166,7 +162,6 @@ describe("pi-ingest edge skeleton audit — secret mapping prohibitions", () => 
     expect(FN_ALL).not.toMatch(/secret\s*:\s*[A-Za-z_.]*\.?secret_ciphertext\b/);
     expect(FN_ALL).not.toMatch(/\bsecret_ciphertext\s+as\s+secret\b/);
   });
-
 });
 
 describe("pi-ingest edge skeleton audit — logging prohibitions", () => {
@@ -193,6 +188,10 @@ describe("pi-ingest edge skeleton audit — service_role confinement", () => {
           // Skip test files — they may mention the env name in
           // guardrail assertions without ever reading its value.
           if (/\.(test|spec)\.(ts|tsx)$/.test(name)) continue;
+          // proofReportRedactionRules.ts lists the string as a
+          // redaction-denylist keyword (to scrub it from proof reports) —
+          // it never reads the env var's value.
+          if (p.replace(/\\/g, "/").endsWith("src/lib/proofReportRedactionRules.ts")) continue;
           const text = readFileSync(p, "utf8");
           if (/SUPABASE_SERVICE_ROLE_KEY/.test(text)) offenders.push(p);
         }
@@ -201,7 +200,6 @@ describe("pi-ingest edge skeleton audit — service_role confinement", () => {
     walk(resolve(ROOT, "src"));
     expect(offenders).toEqual([]);
   });
-
 });
 
 describe("pi-ingest edge skeleton audit — supporting docs intact", () => {

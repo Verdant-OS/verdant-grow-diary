@@ -3,8 +3,17 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import EcowittBridgeStatus from "@/pages/EcowittBridgeStatus";
 
+// IMPORTANT: return a STABLE object/toast identity. The real useToast hook
+// memoizes `toast`; a mock that returns a fresh `{ toast: vi.fn() }` on every
+// call makes `toast` change each render, which recreates the auto-refresh
+// `useCallback` in EcowittLocalForwardingStatusWidget, which re-fires its mount
+// `useEffect([autoFetch, refresh])` every render. Because those re-renders hop
+// across the `await fetch` task boundary, React's max-update-depth guard never
+// trips, so the loop is unbounded and OOMs the worker (the CI full-suite shard
+// heap-limit crash). Keeping the identity stable makes the effect run once.
+const { toastApi } = vi.hoisted(() => ({ toastApi: { toast: vi.fn() } }));
 vi.mock("@/hooks/use-toast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
+  useToast: () => toastApi,
 }));
 
 function renderPage() {

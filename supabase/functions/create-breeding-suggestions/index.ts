@@ -31,7 +31,9 @@ Deno.serve(async (req) => {
     // 1. Fetch the event
     const { data: eventRow, error: fetchErr } = await supabase
       .from("grow_events")
-      .select("id, event_type, occurred_at, grow_id, plant_id, tent_id, details")
+      .select(
+        "id, event_type, occurred_at, grow_id, plant_id, tent_id, breeding_events(method, intensity, details)",
+      )
       .eq("id", body.event_id)
       .maybeSingle();
 
@@ -44,12 +46,28 @@ Deno.serve(async (req) => {
       return json({ error: "event not found" }, 404);
     }
 
-    // 2. Map row to BreedingEvent
+    // 2. Map row to BreedingEvent. Breeding details live in the breeding_events
+    //    subtype; flatten method/intensity so the advisor's branching sees them.
+    const subRaw = (eventRow as { breeding_events?: unknown }).breeding_events;
+    const sub = (Array.isArray(subRaw) ? subRaw[0] : subRaw) as
+      | {
+          method?: string | null;
+          intensity?: string | null;
+          details?: Record<string, unknown> | null;
+        }
+      | null
+      | undefined;
+    const mergedDetails: Record<string, unknown> = {
+      ...((sub?.details as Record<string, unknown>) ?? {}),
+      ...(sub?.method ? { method: sub.method } : {}),
+      ...(sub?.intensity ? { intensity: sub.intensity } : {}),
+    };
+
     const breedingEvent: BreedingEvent = {
       id: eventRow.id,
       type: eventRow.event_type,
       occurred_at: eventRow.occurred_at,
-      details: eventRow.details as any,
+      details: mergedDetails,
       plant_id: eventRow.plant_id ?? undefined,
       tent_id: eventRow.tent_id ?? undefined,
     };
@@ -78,6 +96,26 @@ Deno.serve(async (req) => {
     }
 
     const rows = insertedRows ?? [];
+
+    // Persist a 'created' Action Queue audit event per row so breeding
+    // follow-ups appear in the Action Queue timeline/detail history like the
+    // AI Coach and alert hand-off paths. Best-effort: an audit failure must not
+    // fail the response or roll back the action_queue rows (append-only log).
+    if (rows.length > 0) {
+      const auditRows = rows.map((r: { id: string; plant_id: string | null }) => ({
+        action_queue_id: r.id,
+        grow_id: eventRow.grow_id,
+        event_type: "created",
+        previous_status: null,
+        new_status: "pending_approval",
+        note: "Breeding follow-up suggested",
+      }));
+      const { error: auditErr } = await supabase.from("action_queue_events").insert(auditRows);
+      if (auditErr) {
+        console.error("action_queue_events insert error", auditErr);
+      }
+    }
+
     return json({
       ok: true,
       inserted: rows.length,

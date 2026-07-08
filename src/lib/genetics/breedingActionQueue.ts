@@ -17,9 +17,9 @@ export function isSupportedBreedingEventType(eventType: string): eventType is Br
 
 export type ActionQueueInsert = Database["public"]["Tables"]["action_queue"]["Insert"];
 
-export interface BreedingActionQueuePayload extends ActionQueueInsert {
-  due_at?: string; // Appended since the type might not have it yet
-}
+// action_queue has no `due_at` column; the follow-up due date is carried inside
+// the `suggested_change` JSON instead. The payload is a plain ActionQueueInsert.
+export type BreedingActionQueuePayload = ActionQueueInsert;
 
 function toBreedingEventLike(event: BreedingEvent): BreedingEventLike {
   return {
@@ -48,19 +48,11 @@ export function buildBreedingActionQueuePayloads(
   const suggestions = suggestBreedingFollowUpActions(eventLike);
 
   return suggestions.map((suggestion) => {
-    // Compute due_at = occurred_at + due_offset_days
-    const dueAtDate = new Date(occurredDate);
-    dueAtDate.setUTCDate(dueAtDate.getUTCDate() + suggestion.due_offset_days);
-
-    // Prepare suggested_change metadata
-    const suggestedChange = {
-      title: suggestion.title,
-      next_steps: suggestion.next_steps,
-      reason: suggestion.reason,
-      due_offset_days: suggestion.due_offset_days,
-      source_event_id: event.id,
-    };
-
+    // Follow-up due date = event date + the advisor's offset. action_queue has
+    // no due_at column, so carry it in the readable copy.
+    const dueAt = new Date(occurredDate);
+    dueAt.setUTCDate(dueAt.getUTCDate() + suggestion.due_offset_days);
+    const dueLabel = dueAt.toISOString().slice(0, 10);
     return {
       grow_id: growId,
       plant_id: plantId,
@@ -68,10 +60,16 @@ export function buildBreedingActionQueuePayloads(
       action_type: "breeding_follow_up",
       status: "pending_approval",
       source: "manual",
+      // Satisfies action_queue_target_present_chk (target_metric OR
+      // target_device must be present). Breeding follow-ups are workflow
+      // reminders, not device/metric actions, so this is a stable sentinel.
+      target_metric: "breeding_workflow",
+      // Grower-facing copy — Action Queue / Action Detail render
+      // suggested_change + reason verbatim (no JSON parsing). Keep it readable
+      // AND preserve the computed due date.
+      suggested_change: `${suggestion.title} — by ${dueLabel}`,
       reason: `${suggestion.reason} [event:${event.id}]`,
       risk_level: suggestion.risk_level,
-      suggested_change: JSON.stringify(suggestedChange),
-      due_at: dueAtDate.toISOString(),
     };
   });
 }

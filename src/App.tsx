@@ -27,6 +27,7 @@ import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
 import GrowDetail from "./pages/GrowDetail";
 import PhenoHuntNew from "./pages/PhenoHuntNew";
+import BreedingLogNew from "./pages/BreedingLogNew";
 import PhenoComparison from "./pages/PhenoComparison";
 import Reports from "./pages/Reports";
 import PostGrowLearningReport from "./pages/PostGrowLearningReport";
@@ -168,6 +169,7 @@ const App = () => (
                 <Route path="/grows" element={<Grows />} />
                 <Route path="/grows/:growId" element={<GrowDetail />} />
                 <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
+                <Route path="/breeding/new" element={<BreedingLogNew />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/reports/post-grow/:growId" element={<PostGrowLearningReport />} />
                 <Route

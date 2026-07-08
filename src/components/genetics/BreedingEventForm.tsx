@@ -42,13 +42,23 @@ const EVENT_TYPE_LABELS: Record<BreedingEventType, string> = {
 export function BreedingEventForm({ plants, busy, onSubmit, onCancel }: Props) {
   const [plantId, setPlantId] = useState<string>("");
   const [subType, setSubType] = useState<BreedingEventType | "">("");
+  const [method, setMethod] = useState<string>("");
+  const [intensity, setIntensity] = useState<string>("");
+
+  // These inputs feed the deterministic follow-up advisor: reversal `method`
+  // and pollen-shed `intensity` change which reminders (and timing) are queued.
+  const showMethod = subType === "reversal_application";
+  const showIntensity = subType === "pollen_shed_observed";
 
   const canSubmit = plantId !== "" && subType !== "" && !busy;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    onSubmit({ plantId, subType: subType as BreedingEventType, details: {} });
+    const details: Record<string, string> = {};
+    if (showMethod && method) details.method = method;
+    if (showIntensity && intensity) details.intensity = intensity;
+    onSubmit({ plantId, subType: subType as BreedingEventType, details });
   };
 
   return (
@@ -88,6 +98,45 @@ export function BreedingEventForm({ plants, busy, onSubmit, onCancel }: Props) {
           </SelectContent>
         </Select>
       </div>
+
+      {showMethod ? (
+        <div className="space-y-2">
+          <Label htmlFor="breeding-method">Reversal method</Label>
+          <Select value={method} onValueChange={setMethod} disabled={busy}>
+            <SelectTrigger id="breeding-method">
+              <SelectValue placeholder="Select method…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sts_spray">STS spray</SelectItem>
+              <SelectItem value="colloidal_silver">Colloidal silver</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Chemical methods can shed pollen earlier — this adds an isolation
+            check to your follow-ups.
+          </p>
+        </div>
+      ) : null}
+
+      {showIntensity ? (
+        <div className="space-y-2">
+          <Label htmlFor="breeding-intensity">Pollen shed intensity</Label>
+          <Select value={intensity} onValueChange={setIntensity} disabled={busy}>
+            <SelectTrigger id="breeding-intensity">
+              <SelectValue placeholder="Select intensity…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="light">Light</SelectItem>
+              <SelectItem value="moderate">Moderate</SelectItem>
+              <SelectItem value="heavy">Heavy</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Heavy shed narrows the receptive-window follow-up to ~1 day.
+          </p>
+        </div>
+      ) : null}
 
       <div className="flex gap-2 justify-end pt-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={busy}>

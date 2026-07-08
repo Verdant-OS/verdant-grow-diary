@@ -27,7 +27,7 @@ const tierOverride = vi.hoisted(() => ({
 
 // Live-mutable pricing tiers: we mutate the ACTUAL imported array in
 // beforeEach so component reads see current test overrides.
-import { PRICING_TIERS } from "@/config/pricing";
+import { PRICING_TIERS, resolveTierFeatures } from "@/config/pricing";
 
 vi.mock("@/lib/paddleConfig", async () => {
   const actual = await vi.importActual<typeof import("@/lib/paddleConfig")>("@/lib/paddleConfig");
@@ -270,14 +270,65 @@ describe("Upgrade page — success panel", () => {
     expect(screen.getByTestId("upgrade-success-panel")).toBeInTheDocument();
   });
 
-  it("shows exact unlocked features derived from PRICING_TIERS when ?plan= matches a tier", () => {
-    const expectedTier = PRICING_TIERS.find((t) => t.id === "pro_annual")!;
+  it("shows exact newly unlocked features for Pro Monthly from pricing config", () => {
+    renderPage(["/upgrade?checkout=success&plan=pro_monthly"]);
+    const panel = screen.getByTestId("upgrade-success-panel");
+    const featuresBlock = screen.getByTestId("upgrade-success-features");
+    expect(featuresBlock).toBeInTheDocument();
+    expect(featuresBlock.textContent).toMatch(/newly unlocked features/i);
+    const expected = resolveTierFeatures("pro_monthly");
+    for (const feature of expected) {
+      expect(panel.textContent).toContain(feature);
+    }
+  });
+
+  it("resolves Pro Annual features to the Pro Monthly feature list", () => {
     renderPage(["/upgrade?checkout=success&plan=pro_annual"]);
     const panel = screen.getByTestId("upgrade-success-panel");
-    for (const feature of expectedTier.features) {
-      expect(panel).toHaveTextContent(feature);
+    const expected = resolveTierFeatures("pro_annual");
+    expect(expected).toEqual(resolveTierFeatures("pro_monthly"));
+    for (const feature of expected) {
+      expect(panel.textContent).toContain(feature);
     }
+    // No generic placeholder copy — features must be listed explicitly.
     expect(panel).not.toHaveTextContent(/Everything in Pro/i);
+  });
+
+  it("resolves Founder Lifetime features to Pro features plus founder perks", () => {
+    renderPage(["/upgrade?checkout=success&plan=founder_lifetime"]);
+    const panel = screen.getByTestId("upgrade-success-panel");
+    const expected = resolveTierFeatures("founder_lifetime");
+    expect(expected).toContain("Founder badge & early-supporter perks");
+    for (const feature of resolveTierFeatures("pro_monthly")) {
+      expect(panel.textContent).toContain(feature);
+    }
+  });
+
+  it("orders inherited features deterministically across tiers (canonical order)", async () => {
+    const { CANONICAL_FEATURE_ORDER } = await import("@/config/pricing");
+    const pro = resolveTierFeatures("pro_monthly");
+    const annual = resolveTierFeatures("pro_annual");
+    const founder = resolveTierFeatures("founder_lifetime");
+
+    // Same shared features must appear in the same relative order everywhere.
+    const rank = (list: string[]) =>
+      list.map((f) => CANONICAL_FEATURE_ORDER.indexOf(f));
+    for (const list of [pro, annual, founder]) {
+      const r = rank(list);
+      const sorted = [...r].sort((a, b) => a - b);
+      expect(r).toEqual(sorted);
+    }
+
+    // Shared subset (pro ∩ founder) is ordered identically in both tiers.
+    const proSet = new Set(pro);
+    const founderShared = founder.filter((f) => proSet.has(f));
+    const proShared = pro.filter((f) => new Set(founder).has(f));
+    expect(founderShared).toEqual(proShared);
+
+    // Founder perk is anchored at the end of the canonical order.
+    expect(founder[founder.length - 1]).toBe(
+      "Founder badge & early-supporter perks",
+    );
   });
 
   it("does not call Paddle.Checkout.open when success panel is shown", () => {

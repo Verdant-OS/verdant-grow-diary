@@ -202,12 +202,12 @@ jobs:
   # exceeded the 20-minute job timeout and exhausted a single runner's heap
   # (OOM) when run as one `bunx vitest run`.
   #
-  # 14 shards run on independent 16 GB runners. jsdom DOM / module state is not
+  # 20 shards run on independent 16 GB runners. jsdom DOM / module state is not
   # fully freed between files, so a worker's heap grows with the number of files
-  # it handles; with only 6 shards one shard accumulated a cluster of memory-
-  # heavy files and OOM'd. 14 shards (a) cut each shard to ~1/14 of the files so
-  # per-worker accumulation stays low, and (b) reshuffle vitest's hash-based file
-  # distribution so the heavy files spread across shards instead of clustering.
+  # it handles; with 6 shards (and even 14) one shard accumulated a cluster of
+  # memory-heavy files and OOM'd. 20 shards (a) cut each shard to ~1/20 of the
+  # files so per-worker accumulation stays low, and (b) reshuffle vitest's
+  # hash-based file distribution so the heavy files spread across shards.
   #
   # `NODE_OPTIONS=--max-old-space-size=3584` keeps total memory container-safe:
   # the forks pool runs ~4 workers on a 4-vCPU runner, so 4 x 3584 MB ≈ 14 GB,
@@ -217,13 +217,13 @@ jobs:
   # `fail-fast: false` so one shard failing still reports the others.
   # See docs/testing/ci-full-suite-shards.md.
   full-suite:
-    name: Full test suite (shard ${{ matrix.shard }}/14)
+    name: Full test suite (shard ${{ matrix.shard }}/20)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -254,4 +254,4 @@ jobs:
       - name: Run test shard
         env:
           NODE_OPTIONS: --max-old-space-size=3584
-        run: bunx vitest run --shard=${{ matrix.shard }}/14
+        run: bunx vitest run --shard=${{ matrix.shard }}/20

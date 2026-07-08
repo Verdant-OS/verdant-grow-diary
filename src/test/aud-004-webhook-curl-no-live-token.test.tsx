@@ -23,8 +23,13 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+// Return a STABLE toast identity. A fresh `{ toast: vi.fn() }` on every render
+// changes `toast`'s identity each render, which can spin an unbounded re-render
+// loop in any component whose effect depends on a toast-derived callback (this
+// OOMed the CI full-suite worker via ecowitt-bridge-status-page). Preventive.
+const { toastApi } = vi.hoisted(() => ({ toastApi: { toast: vi.fn() } }));
 vi.mock("@/components/ui/use-toast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
+  useToast: () => toastApi,
 }));
 
 import TentSensorWebhookSettingsCard from "@/components/TentSensorWebhookSettingsCard";

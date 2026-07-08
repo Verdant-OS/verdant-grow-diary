@@ -20,14 +20,18 @@ Two jobs in `.github/workflows/ci.yml`:
 - **`test`** — lint, typecheck, all stop-ship static-safety gates, the scanner
   guardrail sentinel, and `Build`. Fast; no longer runs the full suite, so it
   reaches `Build` and can go green on its own.
-- **`full-suite`** — a `matrix.shard: [1, 2, 3, 4]` job. Each shard runs
-  `bunx vitest run --shard=<n>/4` on its own runner. Vitest partitions the file
-  set deterministically, so the four shards together cover 100% of the suite.
+- **`full-suite`** — a `matrix.shard: [1, 2, 3, 4, 5, 6]` job. Each shard runs
+  `bunx vitest run --shard=<n>/6` on its own runner. Vitest partitions the file
+  set deterministically, so the six shards together cover 100% of the suite.
 
-Each shard covers ~1/4 of the files, so:
+Each shard covers ~1/6 of the files, so:
 
 - wall-clock per shard drops to a few minutes (well under the 20-minute cap), and
-- peak memory per runner drops ~4x, which removes the OOM.
+- peak memory per runner drops sharply.
+
+The shard command also sets `NODE_OPTIONS=--max-old-space-size=6144`: a 4-shard
+split still OOM'd on the shard holding the heaviest jsdom files, so the per-worker
+heap ceiling is raised (the 16 GB runner has ample headroom for this).
 
 `fail-fast: false` keeps the other shards running when one fails, so a single
 failure still surfaces the full picture instead of cancelling siblings.
@@ -36,4 +40,4 @@ failure still surfaces the full picture instead of cancelling siblings.
 
 Update **both** the `matrix.shard` list and the `/N` divisor in the
 `Run test shard` command — they must agree. Raise N if the suite grows and a
-single shard again approaches the timeout.
+single shard again approaches the timeout or memory ceiling.

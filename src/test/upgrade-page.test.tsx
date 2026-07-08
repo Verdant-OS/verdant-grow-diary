@@ -318,6 +318,33 @@ describe("Upgrade page — success panel", () => {
     }
   });
 
+  it("orders inherited features deterministically across tiers (canonical order)", async () => {
+    const { CANONICAL_FEATURE_ORDER } = await import("@/config/pricing");
+    const pro = resolveTierFeatures("pro_monthly");
+    const annual = resolveTierFeatures("pro_annual");
+    const founder = resolveTierFeatures("founder_lifetime");
+
+    // Same shared features must appear in the same relative order everywhere.
+    const rank = (list: string[]) =>
+      list.map((f) => CANONICAL_FEATURE_ORDER.indexOf(f));
+    for (const list of [pro, annual, founder]) {
+      const r = rank(list);
+      const sorted = [...r].sort((a, b) => a - b);
+      expect(r).toEqual(sorted);
+    }
+
+    // Shared subset (pro ∩ founder) is ordered identically in both tiers.
+    const proSet = new Set(pro);
+    const founderShared = founder.filter((f) => proSet.has(f));
+    const proShared = pro.filter((f) => new Set(founder).has(f));
+    expect(founderShared).toEqual(proShared);
+
+    // Founder perk is anchored at the end of the canonical order.
+    expect(founder[founder.length - 1]).toBe(
+      "Founder badge & early-supporter perks",
+    );
+  });
+
   it("does not call Paddle.Checkout.open when success panel is shown", () => {
     renderPage(["/upgrade?checkout=success&plan=pro_monthly"]);
     expect(paddleMock.checkoutOpen).not.toHaveBeenCalled();

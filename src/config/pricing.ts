@@ -182,7 +182,7 @@ export interface UpgradeFaqItem {
 }
 
 /**
- * FAQ copy for /upgrade. Avoids forbidden claims (autopilot, guaranteed yield,
+ * FAQ copy for /upgrade. Avoids forbidden claims (hands-free grow control, guaranteed yield,
  * "AI grows for you", device control). Data-ownership language never implies
  * Verdant sells grower data.
  */
@@ -205,7 +205,7 @@ export const UPGRADE_FAQ: UpgradeFaqItem[] = [
   },
   {
     q: "Does Verdant control my equipment?",
-    a: "No. Verdant does not control lights, pumps, fans, or any other equipment, and never runs your grow on autopilot. Every consequential action stays grower-approved.",
+    a: "No. Verdant does not control lights, pumps, fans, or any other equipment, and never runs your grow for you. Every consequential action stays grower-approved.",
   },
   {
     q: "How does the AI help?",

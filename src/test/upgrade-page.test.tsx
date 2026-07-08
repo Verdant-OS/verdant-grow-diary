@@ -10,7 +10,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-
 // --- Mocks (hoisted so vi.mock factories can reach them) --------------------
 const paddleMock = vi.hoisted(() => ({
   configAvailable: true as boolean,
@@ -30,11 +29,8 @@ const tierOverride = vi.hoisted(() => ({
 // beforeEach so component reads see current test overrides.
 import { PRICING_TIERS } from "@/config/pricing";
 
-
 vi.mock("@/lib/paddleConfig", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/lib/paddleConfig")
-  >("@/lib/paddleConfig");
+  const actual = await vi.importActual<typeof import("@/lib/paddleConfig")>("@/lib/paddleConfig");
   return {
     ...actual,
     resolvePaddleConfig: () =>
@@ -92,7 +88,6 @@ function renderPage(initialEntries: string[] = ["/upgrade"]) {
   );
 }
 
-
 beforeEach(() => {
   paddleMock.configAvailable = true;
   paddleMock.ready = true;
@@ -117,9 +112,7 @@ beforeEach(() => {
 afterEach(() => {
   uninstallPaddle();
   // Remove any injected paddle.js script tags.
-  document
-    .querySelectorAll('script[src*="paddle.com"]')
-    .forEach((s) => s.remove());
+  document.querySelectorAll('script[src*="paddle.com"]').forEach((s) => s.remove());
 });
 
 describe("Upgrade page", () => {
@@ -151,9 +144,7 @@ describe("Upgrade page", () => {
     fireEvent.click(screen.getByTestId("tier-pro_annual-cta"));
     const dialog = screen.getByTestId("checkout-confirm-dialog");
     expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByTestId("checkout-confirm-price").textContent).toMatch(
-      /\$/,
-    );
+    expect(within(dialog).getByTestId("checkout-confirm-price").textContent).toMatch(/\$/);
     expect(paddleMock.checkoutOpen).not.toHaveBeenCalled();
   });
 
@@ -177,9 +168,7 @@ describe("Upgrade page", () => {
     const founder = PRICING_TIERS.find((t) => t.id === "founder_lifetime")!;
     founder.cap = { total: 75, claimed: 75 };
     renderPage();
-    const cta = screen.getByTestId(
-      "tier-founder_lifetime-cta",
-    ) as HTMLButtonElement;
+    const cta = screen.getByTestId("tier-founder_lifetime-cta") as HTMLButtonElement;
     expect(cta).toBeDisabled();
     expect(cta.textContent).toMatch(/Sold out/i);
   });
@@ -199,9 +188,7 @@ describe("Upgrade page", () => {
     uninstallPaddle();
     renderPage();
     // The hook injects a <script> tag; simulate its error event.
-    const script = document.querySelector<HTMLScriptElement>(
-      'script[src*="paddle.com"]',
-    );
+    const script = document.querySelector<HTMLScriptElement>('script[src*="paddle.com"]');
     expect(script).toBeTruthy();
     await act(async () => {
       script!.dispatchEvent(new Event("error"));
@@ -217,7 +204,7 @@ describe("Upgrade page", () => {
     expect(paddleMock.checkoutOpen).not.toHaveBeenCalled();
   });
 
-  it("renders FAQ with billing, data ownership, founder, cancel, and no-autopilot copy", async () => {
+  it("renders FAQ with billing, data ownership, founder, cancel, and approval-first equipment safety copy", async () => {
     const { UPGRADE_FAQ } = await import("@/config/pricing");
     renderPage();
     // FAQ triggers are always visible; validate trigger text is rendered.
@@ -229,10 +216,13 @@ describe("Upgrade page", () => {
     expect(triggerText).toMatch(/cancel/i);
     expect(triggerText).toMatch(/equipment|autopilot/i);
     // Answer copy (source of truth) must include the safety statements.
-    const allAnswers = UPGRADE_FAQ.map((f) => f.a).join(" ").toLowerCase();
+    const allAnswers = UPGRADE_FAQ.map((f) => f.a)
+      .join(" ")
+      .toLowerCase();
     expect(allAnswers).toMatch(/does not sell grower data/);
     expect(allAnswers).toMatch(/does not control/);
-    expect(allAnswers).toMatch(/autopilot/);
+    expect(allAnswers).toMatch(/runs your grow for you/);
+    expect(allAnswers).toMatch(/grower-approved/);
     expect(allAnswers).toMatch(/paddle/);
     expect(allAnswers).toMatch(/founder/);
     expect(allAnswers).toMatch(/cancel|stop when your billing/);
@@ -242,15 +232,9 @@ describe("Upgrade page", () => {
     renderPage();
     const table = screen.getByTestId("plan-comparison");
     expect(within(table).getByTestId("compare-header-free")).toBeInTheDocument();
-    expect(
-      within(table).getByTestId("compare-header-pro_monthly"),
-    ).toBeInTheDocument();
-    expect(
-      within(table).getByTestId("compare-header-pro_annual"),
-    ).toBeInTheDocument();
-    expect(
-      within(table).getByTestId("compare-header-founder_lifetime"),
-    ).toBeInTheDocument();
+    expect(within(table).getByTestId("compare-header-pro_monthly")).toBeInTheDocument();
+    expect(within(table).getByTestId("compare-header-pro_annual")).toBeInTheDocument();
+    expect(within(table).getByTestId("compare-header-founder_lifetime")).toBeInTheDocument();
   });
 
   it("contains none of the forbidden marketing claims", () => {

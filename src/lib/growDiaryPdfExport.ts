@@ -119,16 +119,11 @@ function safeSlug(s: string): string {
   );
 }
 
-export function buildGrowDiaryReportFilename(
-  growName: string,
-  now: Date,
-): string {
+export function buildGrowDiaryReportFilename(growName: string, now: Date): string {
   return `verdant-grow-diary-${safeSlug(growName)}-${isoDate(now)}.pdf`;
 }
 
-export function buildGrowDiaryReportModel(
-  input: BuildGrowDiaryReportInput,
-): GrowDiaryPdfModel {
+export function buildGrowDiaryReportModel(input: BuildGrowDiaryReportInput): GrowDiaryPdfModel {
   const now = input.now ?? new Date();
   const plantNames = (input.grow.plantNames ?? []).filter(Boolean);
   const scopeParts: string[] = [input.grow.name];
@@ -139,12 +134,8 @@ export function buildGrowDiaryReportModel(
     );
   }
 
-  const startedIso = input.grow.startedAt
-    ? tryDateLabel(input.grow.startedAt)
-    : null;
-  const dateRangeLabel = startedIso
-    ? `${startedIso} → ${isoDate(now)}`
-    : `Through ${isoDate(now)}`;
+  const startedIso = input.grow.startedAt ? tryDateLabel(input.grow.startedAt) : null;
+  const dateRangeLabel = startedIso ? `${startedIso} → ${isoDate(now)}` : `Through ${isoDate(now)}`;
 
   const countsRows = [
     { label: "Diary entries", value: countText(input.counts.diary) },
@@ -195,12 +186,11 @@ export function buildGrowDiaryReportModel(
   }));
   const chartsUnavailableNote =
     charts.length === 0
-      ? input.chartsUnavailableReason ??
-        "No chart data was available to embed at export time. Use the summary totals and logged events below as the source data."
+      ? (input.chartsUnavailableReason ??
+        "No chart data was available to embed at export time. Use the summary totals and logged events below as the source data.")
       : null;
 
-  const diaryCount =
-    typeof input.counts.diary === "number" ? input.counts.diary : 0;
+  const diaryCount = typeof input.counts.diary === "number" ? input.counts.diary : 0;
   const isEmpty = diaryCount === 0 && events.length === 0;
 
   return {
@@ -216,7 +206,7 @@ export function buildGrowDiaryReportModel(
     chartsUnavailableNote,
     isEmpty,
     safetyFooter:
-      "Read-only report. Verdant does not control equipment or run grows on autopilot. Sensor source labels are preserved; stale/invalid/demo readings are not treated as healthy.",
+      "Read-only report. Verdant does not control equipment or run your grow for you. Sensor source labels are preserved; stale/invalid/demo readings are not treated as healthy.",
   };
 }
 
@@ -238,10 +228,7 @@ function esc(v: string): string {
 
 export function buildGrowDiaryReportHtml(model: GrowDiaryPdfModel): string {
   const countsRows = model.countsRows
-    .map(
-      (r) =>
-        `<tr><th scope="row">${esc(r.label)}</th><td>${esc(r.value)}</td></tr>`,
-    )
+    .map((r) => `<tr><th scope="row">${esc(r.label)}</th><td>${esc(r.value)}</td></tr>`)
     .join("");
 
   const eventsRows = model.events.length
@@ -340,12 +327,7 @@ export function exportGrowDiaryReportAsPdf(
   input: BuildGrowDiaryReportInput,
   opts: ExportGrowDiaryReportOptions = {},
 ): ExportGrowDiaryReportResult {
-  const win =
-    opts.win !== undefined
-      ? opts.win
-      : typeof window !== "undefined"
-        ? window
-        : null;
+  const win = opts.win !== undefined ? opts.win : typeof window !== "undefined" ? window : null;
   if (!win || typeof win.open !== "function") return "unavailable";
   const model = buildGrowDiaryReportModel(input);
   const html = buildGrowDiaryReportHtml(model);

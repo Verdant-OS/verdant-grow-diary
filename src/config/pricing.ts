@@ -168,28 +168,82 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
 ];
 
 /**
+ * Canonical feature ordering.
+ *
+ * Built once from PRICING_TIERS in declaration order: each feature is
+ * indexed the first time it appears across tiers, then explicit founder
+ * perks appended last. Every tier's resolved feature list is sorted by
+ * this index so inherited features render in the SAME relative order
+ * across tiers (Free features first, then Pro-added, then Founder-added).
+ *
+ * Deterministic, presenter-only. No randomness, no locale-dependent sort.
+ */
+const FOUNDER_PERK_FEATURE = "Founder badge & early-supporter perks";
+
+export const CANONICAL_FEATURE_ORDER: readonly string[] = (() => {
+  const seen = new Set<string>();
+  const order: string[] = [];
+  for (const tier of PRICING_TIERS) {
+    for (const feature of tier.features) {
+      if (!seen.has(feature)) {
+        seen.add(feature);
+        order.push(feature);
+      }
+    }
+  }
+  if (!seen.has(FOUNDER_PERK_FEATURE)) {
+    order.push(FOUNDER_PERK_FEATURE);
+  }
+  return Object.freeze(order);
+})();
+
+function sortByCanonicalOrder(features: readonly string[]): string[] {
+  const indexOf = (f: string) => {
+    const i = CANONICAL_FEATURE_ORDER.indexOf(f);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  // Dedupe (preserve first occurrence), then sort by canonical index with
+  // original position as a stable tie-breaker for unknown features.
+  const deduped: string[] = [];
+  const seen = new Set<string>();
+  for (const f of features) {
+    if (!seen.has(f)) {
+      seen.add(f);
+      deduped.push(f);
+    }
+  }
+  const withPos = deduped.map((f, i) => ({ f, i, k: indexOf(f) }));
+  withPos.sort((a, b) => (a.k - b.k) || (a.i - b.i));
+  return withPos.map((x) => x.f);
+}
+
+/**
  * Resolve the concrete feature list shown for a tier.
  *
  * Pro Annual inherits Pro Monthly features. Founder Lifetime inherits Pro
  * Monthly features plus founder-specific perks. Free and Pro Monthly return
  * their own configured features. Unknown tier IDs return an empty list.
+ *
+ * Output is ALWAYS sorted by CANONICAL_FEATURE_ORDER so inherited features
+ * render in a consistent order across tiers.
  */
 export function resolveTierFeatures(tierId: string): string[] {
   const tier = PRICING_TIERS.find((t) => t.id === tierId);
   if (!tier) return [];
 
+  let raw: string[];
   if (tierId === "pro_annual") {
     const pro = PRICING_TIERS.find((t) => t.id === "pro_monthly");
-    return pro ? pro.features : tier.features;
-  }
-
-  if (tierId === "founder_lifetime") {
+    raw = pro ? [...pro.features] : [...tier.features];
+  } else if (tierId === "founder_lifetime") {
     const pro = PRICING_TIERS.find((t) => t.id === "pro_monthly");
-    const base = pro ? pro.features : tier.features;
-    return [...base, "Founder badge & early-supporter perks"];
+    const base = pro ? [...pro.features] : [...tier.features];
+    raw = [...base, FOUNDER_PERK_FEATURE];
+  } else {
+    raw = [...tier.features];
   }
 
-  return tier.features;
+  return sortByCanonicalOrder(raw);
 }
 
 export interface UpgradeFaqItem {

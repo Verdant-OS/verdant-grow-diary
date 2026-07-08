@@ -21,7 +21,7 @@ beforeEach(() => {
 // worker process. Cheap and idempotent; does not change test behavior.
 afterEach(() => {
   cleanup();
-  document.body.innerHTML = "";
+  document.body.replaceChildren();
 });
 
 Object.defineProperty(window, "matchMedia", {

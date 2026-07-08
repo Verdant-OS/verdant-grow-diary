@@ -46,17 +46,23 @@ describe("Action Queue detail view", () => {
   it("guards transitions on terminal statuses via shared helper", () => {
     expect(DETAIL).toMatch(/from "@\/lib\/actionQueueTransitions"/);
     expect(DETAIL).toMatch(/isTerminalStatus/);
-    expect(DETAIL).toMatch(/!isTerminalStatus\(row\.status\) && \(\(\) => \{/);
+    expect(DETAIL).toMatch(/!isTerminalStatus\(row\.status\)\s*&&\s*\(\(\) => \{/);
     expect(DETAIL).toMatch(/if \(!row \|\| isTerminal\(row\.status\)\) return;/);
   });
 
   it("imports the shared transition guards (canApprove/canSimulate/canReject/canComplete/canCancel)", () => {
-    expect(DETAIL).toMatch(/import \{[\s\S]*?canApprove[\s\S]*?canSimulate[\s\S]*?canReject[\s\S]*?canComplete[\s\S]*?canCancel[\s\S]*?\} from "@\/lib\/actionQueueTransitions"/);
+    expect(DETAIL).toMatch(
+      /import \{[\s\S]*?canApprove[\s\S]*?canSimulate[\s\S]*?canReject[\s\S]*?canComplete[\s\S]*?canCancel[\s\S]*?\} from "@\/lib\/actionQueueTransitions"/,
+    );
   });
 
   it("does not allow editing audit events (no update on action_queue_events)", () => {
-    expect(DETAIL).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.update\(/);
-    expect(DETAIL).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.delete\(/);
+    expect(DETAIL).not.toMatch(
+      /\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.update\(/,
+    );
+    expect(DETAIL).not.toMatch(
+      /\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.delete\(/,
+    );
   });
 
   it("audit insert omits user_id (DB default auth.uid() wins)", () => {

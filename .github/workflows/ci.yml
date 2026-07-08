@@ -234,6 +234,13 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # ripgrep (rg) is required by scripts invoked from tests in the full
+      # suite (e.g. scan-gamification-direct-inserts.mjs). It is not
+      # preinstalled on the runner; without it those tests' child process
+      # exits 2. Mirrors the same step in the `test` job.
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
       - name: Run test shard
         env:
           NODE_OPTIONS: --max-old-space-size=6144

@@ -20,12 +20,12 @@ Two jobs in `.github/workflows/ci.yml`:
 - **`test`** — lint, typecheck, all stop-ship static-safety gates, the scanner
   guardrail sentinel, and `Build`. Fast; no longer runs the full suite, so it
   reaches `Build` and can go green on its own.
-- **`full-suite`** — a `matrix.shard: [1 … 20]` job. Each shard runs
-  `bunx vitest run --shard=<n>/20` on its own runner. Vitest partitions the file
-  set deterministically (by path hash), so the 20 shards together cover 100% of
+- **`full-suite`** — a `matrix.shard: [1 … 36]` job. Each shard runs
+  `bunx vitest run --shard=<n>/36` on its own runner. Vitest partitions the file
+  set deterministically (by path hash), so the 36 shards together cover 100% of
   the suite.
 
-Each shard covers ~1/20 of the files, so:
+Each shard covers ~1/36 of the files, so:
 
 - wall-clock per shard drops to a few minutes (well under the 20-minute cap), and
 - peak memory per runner stays low.
@@ -35,7 +35,7 @@ Each shard covers ~1/20 of the files, so:
 jsdom DOM / module state is not fully freed between test files, so a worker's
 heap grows with the number of files it processes. With only 6 shards, one shard
 accumulated a cluster of memory-heavy files and OOM'd (a worker GC-thrashed up to
-6 GB and died). Going to 20 shards fixes this two ways: each shard handles far
+6 GB and died). Going to 36 shards fixes this two ways: each shard handles far
 fewer files (less accumulation per worker), and the hash-based redistribution
 spreads the heavy files across shards instead of clustering them.
 

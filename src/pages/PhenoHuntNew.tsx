@@ -14,6 +14,8 @@ import {
   validatePhenoHuntDraft,
 } from "@/lib/phenoHuntService";
 import { logsPath } from "@/lib/routes";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { canWriteFeatureData } from "@/lib/featureEntitlements";
 
 interface PlantOption {
   id: string;
@@ -28,6 +30,7 @@ interface GrowInfo {
 
 export default function PhenoHuntNew() {
   const { user } = useAuth();
+  const { entitlement } = useMyEntitlements();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const growId = params.get("growId");

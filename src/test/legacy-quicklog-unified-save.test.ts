@@ -11,15 +11,14 @@ const TENT_ID = "22222222-2222-2222-2222-222222222222";
 
 const baseInput = {
   eventType: "observation",
+  idempotencyKey: "quicklog-v2-test-key-legacy",
   noteWithHardware: "Leaves curling slightly",
   plantId: PLANT_ID,
   plantTentId: TENT_ID,
   details: { ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" },
 };
 
-function assertFail(
-  r: LegacyUnifiedBuildResult,
-): { ok: false; reason: string; message: string } {
+function assertFail(r: LegacyUnifiedBuildResult): { ok: false; reason: string; message: string } {
   expect(r.ok).toBe(false);
   return r as { ok: false; reason: string; message: string };
 }

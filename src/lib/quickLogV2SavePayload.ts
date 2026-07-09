@@ -17,6 +17,12 @@ export interface QuickLogV2SavePayload {
   p_vpd_kpa: number | null;
   p_occurred_at: string | null;
   p_details?: Record<string, unknown> | null;
+  /**
+   * Server-side idempotency key (8..200 chars). One key per logical
+   * submission: retries of the same submission MUST reuse the key so
+   * quicklog_save_manual dedupes instead of double-writing the diary.
+   */
+  p_idempotency_key: string;
 }
 
 export interface BuildQuickLogV2PayloadInput {
@@ -29,11 +35,11 @@ export interface BuildQuickLogV2PayloadInput {
   vpdKpa: string;
   occurredAt?: string | null;
   details?: Record<string, unknown> | null;
+  idempotencyKey: string;
 }
 
 export type BuildResult =
-  | { ok: true; payload: QuickLogV2SavePayload }
-  | { ok: false; reason: string };
+  { ok: true; payload: QuickLogV2SavePayload } | { ok: false; reason: string };
 
 function parseOptionalNumber(raw: string): number | null | "invalid" {
   const trimmed = raw?.trim?.() ?? "";
@@ -43,9 +49,7 @@ function parseOptionalNumber(raw: string): number | null | "invalid" {
   return n;
 }
 
-export function buildQuickLogV2SavePayload(
-  input: BuildQuickLogV2PayloadInput,
-): BuildResult {
+export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): BuildResult {
   const { resolved, action } = input;
   if (!resolved?.ok || !resolved.targetType || !resolved.targetId) {
     return { ok: false, reason: "target_unresolved" };
@@ -58,6 +62,11 @@ export function buildQuickLogV2SavePayload(
   }
   if (action !== "water" && action !== "note") {
     return { ok: false, reason: "invalid_action" };
+  }
+
+  const idempotencyKey = (input.idempotencyKey ?? "").trim();
+  if (idempotencyKey.length < 8 || idempotencyKey.length > 200) {
+    return { ok: false, reason: "invalid_idempotency_key" };
   }
 
   let volume: number | null = null;
@@ -93,6 +102,7 @@ export function buildQuickLogV2SavePayload(
       p_vpd_kpa: v,
       p_occurred_at: input.occurredAt ?? null,
       ...(input.details ? { p_details: input.details } : {}),
+      p_idempotency_key: idempotencyKey,
     },
   };
 }

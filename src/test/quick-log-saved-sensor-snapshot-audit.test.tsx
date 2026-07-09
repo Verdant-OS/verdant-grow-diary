@@ -72,6 +72,7 @@ describe("Quick Log save path — csv sensor snapshot", () => {
     });
     const r = buildLegacyQuickLogUnifiedPayload({
       eventType: "observation",
+      idempotencyKey: "quicklog-v2-test-key-fix",
       noteWithHardware: "csv import context",
       plantId: "p1",
       plantTentId: "t1",
@@ -109,6 +110,7 @@ describe("Quick Log save path — missing sensor context", () => {
 
     const r = buildLegacyQuickLogUnifiedPayload({
       eventType: "observation",
+      idempotencyKey: "quicklog-v2-test-key-fix",
       noteWithHardware: "no sensor available",
       plantId: "p1",
       plantTentId: "t1",
@@ -181,9 +183,7 @@ describe("Quick Log timeline rendering — saved sensor snapshot", () => {
     );
     const root = screen.getByTestId("timeline-snapshot-summary");
     expect(root.getAttribute("data-source")).toBe("manual");
-    expect(
-      screen.getByTestId("timeline-snapshot-summary-source-badge"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-snapshot-summary-source-badge")).toBeInTheDocument();
     const cap = screen.getByTestId("timeline-snapshot-summary-captured-at");
     expect(cap).toHaveTextContent(CAPTURED);
     const age = screen.getByTestId("timeline-snapshot-summary-age");
@@ -204,9 +204,7 @@ describe("Quick Log timeline rendering — saved sensor snapshot", () => {
     const root = screen.getByTestId("timeline-snapshot-summary");
     expect(root.getAttribute("data-source")).toBe("csv");
     expect(root.textContent?.toLowerCase()).not.toMatch(/\blive\b/);
-    expect(
-      screen.getByTestId("timeline-snapshot-summary-captured-at"),
-    ).toHaveTextContent(CAPTURED);
+    expect(screen.getByTestId("timeline-snapshot-summary-captured-at")).toHaveTextContent(CAPTURED);
   });
 
   it("renders stale snapshot with not-trustworthy warning copy", () => {
@@ -220,9 +218,7 @@ describe("Quick Log timeline rendering — saved sensor snapshot", () => {
         now={TIMELINE_NOW}
       />,
     );
-    expect(
-      screen.getByTestId("timeline-snapshot-summary-not-trustworthy"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-snapshot-summary-not-trustworthy")).toBeInTheDocument();
   });
 
   it("renders invalid snapshot with not-trustworthy warning copy", () => {
@@ -236,9 +232,7 @@ describe("Quick Log timeline rendering — saved sensor snapshot", () => {
         now={TIMELINE_NOW}
       />,
     );
-    expect(
-      screen.getByTestId("timeline-snapshot-summary-not-trustworthy"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-snapshot-summary-not-trustworthy")).toBeInTheDocument();
   });
 
   it("renders demo snapshot as non-trustworthy, never as live", () => {
@@ -255,16 +249,12 @@ describe("Quick Log timeline rendering — saved sensor snapshot", () => {
     const root = screen.getByTestId("timeline-snapshot-summary");
     expect(root.getAttribute("data-trustworthy")).toBe("false");
     expect(root.textContent?.toLowerCase()).not.toMatch(/\blive\b/);
-    expect(
-      screen.getByTestId("timeline-snapshot-summary-not-trustworthy"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-snapshot-summary-not-trustworthy")).toBeInTheDocument();
   });
 
   it("renders neutral missing-snapshot note when no input is attached (does not block save UI)", () => {
     render(<TimelineSensorSnapshotSummary input={null} />);
-    expect(
-      screen.getByTestId("timeline-snapshot-summary-missing"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-snapshot-summary-missing")).toBeInTheDocument();
   });
 
   it("never renders raw_payload, tokens, MAC addresses, passkeys, or private IDs", () => {

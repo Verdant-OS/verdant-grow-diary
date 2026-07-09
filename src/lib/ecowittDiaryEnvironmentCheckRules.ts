@@ -26,9 +26,7 @@ export function environmentCheckTimelineHref(
   capturedAt: string | null | undefined,
   growId?: string | null,
 ): string {
-  const base = growId
-    ? `/timeline?growId=${encodeURIComponent(growId)}`
-    : "/timeline";
+  const base = growId ? `/timeline?growId=${encodeURIComponent(growId)}` : "/timeline";
   if (!capturedAt) return base;
   const anchor = `#ecowitt-environment-check-${encodeURIComponent(capturedAt)}`;
   return `${base}${anchor}`;
@@ -95,17 +93,16 @@ export interface DiaryEnvironmentCheckDraft {
     p_humidity_pct: number | null;
     p_vpd_kpa: number | null;
     p_occurred_at: string;
+    /** Deterministic per-reading key: a re-log of the same captured_at dedupes server-side. */
+    p_idempotency_key: string;
   };
 }
 
 function fToC(f: number): number {
-  return Math.round(((f - 32) * (5 / 9)) * 100) / 100;
+  return Math.round((f - 32) * (5 / 9) * 100) / 100;
 }
 
-function findAccepted(
-  rows: readonly DiaryDraftMetric[],
-  key: string,
-): number | null {
+function findAccepted(rows: readonly DiaryDraftMetric[], key: string): number | null {
   const r = rows.find((x) => x.key === key && x.status === "accepted");
   return r && typeof r.value === "number" ? r.value : null;
 }
@@ -138,6 +135,7 @@ export function buildDiaryEnvironmentCheckDraft(
       p_humidity_pct: null,
       p_vpd_kpa: null,
       p_occurred_at: input.capturedAt ?? "",
+      p_idempotency_key: `ecowitt-env-check-${input.capturedAt ?? "unknown"}`,
     },
   };
 
@@ -201,6 +199,7 @@ export function buildDiaryEnvironmentCheckDraft(
       p_humidity_pct: humidity,
       p_vpd_kpa: vpd,
       p_occurred_at: input.capturedAt,
+      p_idempotency_key: `ecowitt-env-check-${input.capturedAt}`,
     },
   };
 }
@@ -209,9 +208,7 @@ export function buildDiaryEnvironmentCheckDraft(
  * Sanitize draft outputs before they ever reach the diary insert path —
  * strips secret-y keys from any embedded payload echoes. Pure.
  */
-export function redactDiaryDraft(
-  draft: DiaryEnvironmentCheckDraft,
-): DiaryEnvironmentCheckDraft {
+export function redactDiaryDraft(draft: DiaryEnvironmentCheckDraft): DiaryEnvironmentCheckDraft {
   return {
     ...draft,
     rpcPayload: {

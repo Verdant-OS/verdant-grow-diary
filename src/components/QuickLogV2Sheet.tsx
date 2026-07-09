@@ -95,6 +95,15 @@ interface Props {
 
 const NOTE_LIMIT = 500;
 
+/** Fresh server-side idempotency key for one logical Quick Log submission. */
+function newQuickLogSaveKey(): string {
+  const uuid =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  return `quicklog-v2-${uuid}`;
+}
+
 export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }: Props) {
   const { user } = useAuth();
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -169,9 +178,11 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoMeta, setVideoMeta] = useState<
-    { mime: string; sizeBytes: number; durationS: number } | null
-  >(null);
+  const [videoMeta, setVideoMeta] = useState<{
+    mime: string;
+    sizeBytes: number;
+    durationS: number;
+  } | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
@@ -184,6 +195,11 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
   // previous saved-summary state. Bumped whenever the grower starts
   // a new logical submission from the same open sheet.
   const idempotencyKeyRef = useRef(1);
+  // Server-side idempotency key for quicklog_save_manual. One key per
+  // LOGICAL submission: it stays stable across retries (so the RPC
+  // dedupes instead of double-writing the diary) and rotates only when
+  // a new submission starts ("Log another" / full success).
+  const saveIdempotencyKeyRef = useRef<string>(newQuickLogSaveKey());
   // Dedicated synchronous guard for the photo-diary insert path so
   // rapid re-taps during photo capture/upload cannot enqueue a second
   // insert before the first resolves. Reset in try/finally.
@@ -364,10 +380,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     e.currentTarget.value = "";
     if (!file) return;
     setSaveStatus("Checking video…");
-    const meta = await validateVideoAttachment(
-      file,
-      createBrowserVideoDurationProber(),
-    );
+    const meta = await validateVideoAttachment(file, createBrowserVideoDurationProber());
     if (meta.ok !== true) {
       setLocalError(meta.message);
       setSaveStatus("");
@@ -387,12 +400,10 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
     if (!user) return { ok: false, message: "Sign in to attach videos." };
     const ext = (videoFile.name.split(".").pop() || "mp4").toLowerCase();
     const path = `${user.id}/${growId}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage
-      .from("diary-videos")
-      .upload(path, videoFile, {
-        contentType: videoFile.type,
-        upsert: false,
-      });
+    const { error } = await supabase.storage.from("diary-videos").upload(path, videoFile, {
+      contentType: videoFile.type,
+      upsert: false,
+    });
     if (error) return { ok: false, message: `Video upload failed: ${error.message}` };
     return { ok: true, path };
   }
@@ -595,6 +606,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       humidityPct: form.humidityPct,
       vpdKpa: form.vpdKpa,
       details: maturityEvidence.details,
+      idempotencyKey: saveIdempotencyKeyRef.current,
     });
     if (built.ok !== true) {
       if (uploadedPath) {
@@ -625,6 +637,15 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       return;
     }
 
+    // The log row is committed from here on. Companion-media failures are
+    // PARTIAL SUCCESS: the grower's entry is saved and must be presented as
+    // saved (returning early here used to show a failure and invite a Retry
+    // that re-ran the whole save — the duplication the idempotency key now
+    // also guards against server-side).
+    let mediaFailure: string | null = null;
+    let photoAttached = false;
+    let videoAttached = false;
+
     if (uploadedPath && resolved.growId) {
       const photoEntry = await createPhotoDiaryEntry({
         growId: resolved.growId,
@@ -632,10 +653,14 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
         plantId: resolved.plantId ?? null,
         photoPath: uploadedPath,
       });
-      if (!photoEntry.ok) {
-        setLocalError((photoEntry as { message: string }).message);
-        setSaveStatus("");
-        return;
+      if (photoEntry.ok) {
+        photoAttached = true;
+      } else {
+        mediaFailure = (photoEntry as { message: string }).message;
+        await supabase.storage
+          .from("diary-photos")
+          .remove([uploadedPath])
+          .catch(() => {});
       }
     }
 
@@ -643,38 +668,46 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       setSaveStatus("Uploading video…");
       const upload = await uploadQuickLogVideo(resolved.growId);
       if (!upload.ok) {
-        setLocalError((upload as { message: string }).message);
-        setSaveStatus("");
-        return;
-      }
-      const videoEntry = await createVideoDiaryEntry({
-        growId: resolved.growId,
-        tentId: resolved.tentId ?? null,
-        plantId: resolved.plantId ?? null,
-        videoPath: upload.path,
-        mime: videoMeta.mime,
-        sizeBytes: videoMeta.sizeBytes,
-        durationS: videoMeta.durationS,
-      });
-      if (!videoEntry.ok) {
-        await supabase.storage
-          .from("diary-videos")
-          .remove([upload.path])
-          .catch(() => {});
-        setLocalError((videoEntry as { message: string }).message);
-        setSaveStatus("");
-        return;
+        mediaFailure = (upload as { message: string }).message;
+      } else {
+        const videoEntry = await createVideoDiaryEntry({
+          growId: resolved.growId,
+          tentId: resolved.tentId ?? null,
+          plantId: resolved.plantId ?? null,
+          videoPath: upload.path,
+          mime: videoMeta.mime,
+          sizeBytes: videoMeta.sizeBytes,
+          durationS: videoMeta.durationS,
+        });
+        if (videoEntry.ok) {
+          videoAttached = true;
+        } else {
+          await supabase.storage
+            .from("diary-videos")
+            .remove([upload.path])
+            .catch(() => {});
+          mediaFailure = (videoEntry as { message: string }).message;
+        }
       }
     }
 
-    const successMessage = photoFile
-      ? videoFile
+    // This logical submission is complete (log row committed) — rotate the
+    // server idempotency key so the NEXT submission gets a fresh key, while
+    // any accidental resubmission of this one still dedupes server-side.
+    saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+
+    const successMessage = photoAttached
+      ? videoAttached
         ? "Log, photo, and video saved"
         : "Log and photo saved"
-      : videoFile
+      : videoAttached
         ? "Log and video saved"
         : "Log saved";
     setSaveStatus(successMessage);
+    if (mediaFailure) {
+      // Non-blocking notice: the entry is saved; only the attachment failed.
+      setLocalError(`Log saved — attachment failed: ${mediaFailure}`);
+    }
     showTimelineConfirmation(successMessage, {
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,
@@ -703,7 +736,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
       targetId: resolved.targetId as string,
       tentId: resolved.tentId ?? null,
       action: form.action,
-      message: buildQuickLogPostSaveMessage(form.action, Boolean(photoFile)),
+      message: buildQuickLogPostSaveMessage(form.action, photoAttached),
       savedAt: new Date().toISOString(),
     });
   };
@@ -716,6 +749,7 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
    */
   function handleLogAnother() {
     idempotencyKeyRef.current = rotateQuickLogIdempotencyKey(idempotencyKeyRef.current);
+    saveIdempotencyKeyRef.current = newQuickLogSaveKey();
     setPostSave(null);
     setLocalError(null);
     setSaveStatus("");
@@ -1101,7 +1135,6 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
             </div>
           )}
 
-
           {form.action !== "feed" && (
             <div>
               <Label htmlFor="qlv2-note">Note (optional)</Label>
@@ -1235,10 +1268,8 @@ export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }
                 >
                   {buildQuickLogPostSaveDescription({
                     targetName: resolvedTarget.ok
-                      ? (options.find(
-                          (o) =>
-                            `${o.type}:${o.id}` === form.selectedKey,
-                        )?.label ?? null)
+                      ? (options.find((o) => `${o.type}:${o.id}` === form.selectedKey)?.label ??
+                        null)
                       : null,
                     tentName: null,
                     growName: null,

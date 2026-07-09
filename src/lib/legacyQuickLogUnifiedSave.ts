@@ -38,8 +38,7 @@ export const SUPPORTED_LEGACY_EVENT_TYPES = [
   "note",
   "environment",
 ] as const;
-export type SupportedLegacyEventType =
-  (typeof SUPPORTED_LEGACY_EVENT_TYPES)[number];
+export type SupportedLegacyEventType = (typeof SUPPORTED_LEGACY_EVENT_TYPES)[number];
 
 export function isSupportedLegacyEventType(value: string): value is SupportedLegacyEventType {
   return (SUPPORTED_LEGACY_EVENT_TYPES as readonly string[]).includes(value);
@@ -63,6 +62,12 @@ export interface LegacyQuickLogDetails {
 
 export interface LegacyQuickLogFormInput {
   eventType: string;
+  /**
+   * Server-side idempotency key for quicklog_save_manual (8..200 chars).
+   * One key per logical submission; retries must reuse it so the RPC
+   * dedupes instead of double-writing.
+   */
+  idempotencyKey: string;
   /** Note after hardware readings have been appended via existing helper. */
   noteWithHardware: string;
   plantId: string | null;
@@ -99,8 +104,7 @@ export interface LegacyQuickLogFormInput {
 }
 
 export type LegacyUnifiedBuildResult =
-  | { ok: true; payload: QuickLogV2SavePayload }
-  | { ok: false; reason: string; message: string };
+  { ok: true; payload: QuickLogV2SavePayload } | { ok: false; reason: string; message: string };
 
 function trimStr(value: string | undefined | null): string {
   return (value ?? "").toString().trim();
@@ -190,6 +194,7 @@ export function buildLegacyQuickLogUnifiedPayload(
         p_vpd_kpa: null,
         p_occurred_at: null,
         p_details: detailsEnvelope,
+        p_idempotency_key: input.idempotencyKey,
       },
     };
   }
@@ -215,6 +220,7 @@ export function buildLegacyQuickLogUnifiedPayload(
       p_vpd_kpa: null,
       p_occurred_at: null,
       p_details: detailsEnvelope,
+      p_idempotency_key: input.idempotencyKey,
     },
   };
 }

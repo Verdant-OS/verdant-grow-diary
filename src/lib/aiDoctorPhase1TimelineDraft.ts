@@ -15,27 +15,19 @@
  *  - Reject missing selected plant or missing result.
  */
 
-import type {
-  AiDoctorDiagnosisResult,
-} from "@/lib/aiDoctorEnginePhase1Foundation";
+import type { AiDoctorDiagnosisResult } from "@/lib/aiDoctorEnginePhase1Foundation";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 
-export const AI_DOCTOR_PHASE1_TIMELINE_SOURCE =
-  "ai_doctor_phase1_evidence" as const;
-export const AI_DOCTOR_PHASE1_TIMELINE_KIND =
-  "ai_doctor_phase1_evidence" as const;
+export const AI_DOCTOR_PHASE1_TIMELINE_SOURCE = "ai_doctor_phase1_evidence" as const;
+export const AI_DOCTOR_PHASE1_TIMELINE_KIND = "ai_doctor_phase1_evidence" as const;
 export const AI_DOCTOR_PHASE1_ENGINE_VERSION = "phase1" as const;
 export const AI_DOCTOR_PHASE1_RECEIPT_VERSION = "v1" as const;
-export const AI_DOCTOR_PHASE1_EVIDENCE_LABEL =
-  "AI Doctor Phase 1 evidence" as const;
+export const AI_DOCTOR_PHASE1_EVIDENCE_LABEL = "AI Doctor Phase 1 evidence" as const;
 export const AI_DOCTOR_PHASE1_EVIDENCE_DISCLAIMER =
   "Saved as evidence only. This is not an approved action and does not control equipment." as const;
 
 export type AiDoctorPhase1TimelineBlockedReason =
-  | "missing_plant_id"
-  | "missing_grow_id"
-  | "missing_result"
-  | "missing_summary";
+  "missing_plant_id" | "missing_grow_id" | "missing_result" | "missing_summary";
 
 export interface AiDoctorPhase1TimelinePlantIdentity {
   plant_id?: string | null;
@@ -101,8 +93,7 @@ export interface AiDoctorPhase1TimelineDraftBlocked {
 }
 
 export type AiDoctorPhase1TimelineDraftResult =
-  | AiDoctorPhase1TimelineDraftOk
-  | AiDoctorPhase1TimelineDraftBlocked;
+  AiDoctorPhase1TimelineDraftOk | AiDoctorPhase1TimelineDraftBlocked;
 
 function stableHash(input: string): string {
   let h = 0x811c9dc5;
@@ -172,8 +163,7 @@ export function buildAiDoctorPhase1TimelineDraft(
   if (!identity?.plant_id) reasons.push("missing_plant_id");
   if (!identity?.grow_id) reasons.push("missing_grow_id");
   if (!result) reasons.push("missing_result");
-  else if (!result.summary || result.summary.trim() === "")
-    reasons.push("missing_summary");
+  else if (!result.summary || result.summary.trim() === "") reasons.push("missing_summary");
 
   if (reasons.length > 0 || !result) {
     return deepFreeze({
@@ -233,6 +223,7 @@ export function buildAiDoctorPhase1TimelineDraft(
     p_vpd_kpa: null,
     p_occurred_at: occurredAt,
     p_details: details as unknown as Record<string, unknown>,
+    p_idempotency_key: idempotencyKey,
   };
 
   return deepFreeze({

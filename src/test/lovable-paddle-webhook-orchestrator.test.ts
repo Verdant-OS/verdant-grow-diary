@@ -95,32 +95,33 @@ function makeFixture(overrides: Partial<{
   const updateCalls: Fixture['updateCalls'] = [];
 
   const deps: Deps = {
-    insertEventReceived: vi.fn(async (input) => {
+    insertEventReceived: vi.fn(async (input): ReturnType<Deps['insertEventReceived']> => {
       insertCalls.push(input);
       if (overrides.insertResult) return overrides.insertResult;
       if (existingByEventId.has(input.paddle_event_id)) return { ok: true, duplicate: true };
       existingByEventId.set(input.paddle_event_id, { processing_status: 'received' });
       return { ok: true };
     }),
-    getExistingEvent: vi.fn(async (id) => {
+    getExistingEvent: vi.fn(async (id): ReturnType<Deps['getExistingEvent']> => {
       if (overrides.lookupResult) return overrides.lookupResult;
       return { ok: true, row: existingByEventId.get(id) ?? null };
     }),
-    upsertSubscription: vi.fn(async (row) => {
+    upsertSubscription: vi.fn(async (row): ReturnType<Deps['upsertSubscription']> => {
       upsertCalls.push(row);
       return overrides.upsertResult ?? { ok: true };
     }),
-    updateSubscription: vi.fn(async (id, patch) => {
+    updateSubscription: vi.fn(async (id, patch): ReturnType<Deps['updateSubscription']> => {
       updateCalls.push({ id, patch });
       return overrides.updateResult ?? { ok: true };
     }),
-    markEvent: vi.fn(async (id, patch) => {
+    markEvent: vi.fn(async (id, patch): ReturnType<Deps['markEvent']> => {
       markCalls.push({ id, patch });
       if (overrides.markResult) return overrides.markResult;
       existingByEventId.set(id, { processing_status: patch.processing_status });
       return { ok: true };
     }),
   };
+
 
   return { deps, existingByEventId, markCalls, upsertCalls, updateCalls, insertCalls };
 }

@@ -15,6 +15,16 @@ export interface CreatePhenoHuntInput {
   plantIds: readonly string[];
   /** Optional per-plant label overrides. */
   labels?: Readonly<Record<string, string>>;
+  /** Selected evidence goal ids captured during onboarding. */
+  evidenceGoals?: readonly string[];
+  /** Optional hunt notes captured during onboarding basics step. */
+  notes?: string | null;
+  /**
+   * When true, records `setup_completed_at = now()` on the created hunt.
+   * When false/undefined the hunt is created with setup still pending so the
+   * workspace shows a "Continue setup" progress card.
+   */
+  markSetupComplete?: boolean;
 }
 
 export interface CreatePhenoHuntResult {

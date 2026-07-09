@@ -7,6 +7,10 @@ import { usePageSeo } from "@/hooks/usePageSeo";
  * Uses the app's existing token-based styling; no bespoke palette.
  * Legal pages are public and unauthenticated by design so payment
  * providers and buyers can reach them without a login wall.
+ *
+ * SEO: each route gets per-page title, description, canonical, and
+ * OpenGraph / Twitter metadata via usePageSeo. og:url and the canonical
+ * link both resolve to https://verdantgrowdiary.com{path}.
  */
 export function LegalPageShell({
   title,

@@ -116,14 +116,14 @@ export async function handleVerifiedEvent(
     payload: rawPayload,
   });
 
-  if (!insertRes.ok) {
+  if ('error' in insertRes) {
     // Cannot even record the event — refuse to acknowledge so Paddle retries.
     return { httpStatus: 500, reason: `event_log_insert_failed:${redactError(insertRes.error)}` };
   }
 
   if (insertRes.duplicate) {
     const existing = await deps.getExistingEvent(paddleEventId);
-    if (!existing.ok) {
+    if ('error' in existing) {
       return { httpStatus: 500, reason: `event_log_lookup_failed:${redactError(existing.error)}` };
     }
     const prior = existing.row?.processing_status;
@@ -143,7 +143,7 @@ export async function handleVerifiedEvent(
       skip_reason: decision.reason,
       last_error: null,
     });
-    if (!mark.ok) {
+    if ('error' in mark) {
       return { httpStatus: 500, reason: `mark_skipped_failed:${redactError(mark.error)}` };
     }
     return { httpStatus: 200, reason: `skipped:${decision.reason}` };
@@ -157,15 +157,16 @@ export async function handleVerifiedEvent(
     writeRes = await deps.updateSubscription(decision.paddleSubscriptionId, decision.patch, env);
   }
 
-  if (!writeRes.ok) {
+  if ('error' in writeRes) {
+    const err = writeRes.error;
     // Best-effort mark 'failed'; the 500 is what guarantees Paddle retry.
     await deps.markEvent(paddleEventId, {
       processing_status: 'failed',
       processed_ok: false,
       skip_reason: null,
-      last_error: redactError(writeRes.error),
+      last_error: redactError(err),
     });
-    return { httpStatus: 500, reason: `write_failed:${redactError(writeRes.error)}` };
+    return { httpStatus: 500, reason: `write_failed:${redactError(err)}` };
   }
 
   // 4) Mark processed.
@@ -175,7 +176,7 @@ export async function handleVerifiedEvent(
     skip_reason: null,
     last_error: null,
   });
-  if (!mark.ok) {
+  if ('error' in mark) {
     // Subscription upsert is idempotent (unique paddle_subscription_id), so
     // a Paddle retry re-applies the same row and re-attempts this mark.
     return { httpStatus: 500, reason: `mark_processed_failed:${redactError(mark.error)}` };
@@ -183,3 +184,4 @@ export async function handleVerifiedEvent(
 
   return { httpStatus: 200, reason: `processed:${decision.kind}` };
 }
+

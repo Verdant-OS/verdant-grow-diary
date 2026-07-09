@@ -22,10 +22,12 @@ const entMode = vi.hoisted(() => ({
   current: "pro" as "pro" | "founder" | "free" | "canceled",
 }));
 
-const createPhenoHuntMock = vi.hoisted(() => vi.fn(async () => ({
-  huntId: "hunt-1",
-  taggedPlantIds: ["p1", "p2"],
-})));
+const createPhenoHuntMock = vi.hoisted(() =>
+  vi.fn(async (_input: { growId: string; plantIds: string[]; name: string; tentId?: string | null }) => ({
+    huntId: "hunt-1",
+    taggedPlantIds: ["p1", "p2"],
+  })),
+);
 
 const supabaseMock = vi.hoisted(() => {
   const growRow = { id: "grow-1", name: "Basement A" };

@@ -44,10 +44,23 @@ const REPORT_TXT = path.join(RESULTS_DIR, "quicklog-smoke-report.txt");
  * is simply absent). Used for both the initial open and every reopen.
  */
 async function openQuickLogDialog(page: import("@playwright/test").Page) {
-  await page
+  // Prefer the plant page's own Quick Log button (inside <main>): it opens
+  // the FULL Quick Log dialog this checklist exercises. The AppShell header's
+  // global fast-add button opens a compact summary dialog with no form body
+  // (no note textarea, no optional details, no watering field), which would
+  // pass the early steps and then fail every form assertion.
+  const mainButton = page
+    .locator("main")
     .getByRole("button", { name: /quick log|log entry|\+ log/i })
-    .first()
-    .click();
+    .first();
+  const anyButton = page
+    .getByRole("button", { name: /quick log|log entry|\+ log/i })
+    .first();
+  const inMain = await mainButton
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  await (inMain ? mainButton : anyButton).click();
   const noteMenuItem = page
     .getByRole("menuitem", { name: /^note$/i })
     .or(page.getByRole("option", { name: /^note$/i }))

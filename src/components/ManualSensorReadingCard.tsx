@@ -35,6 +35,8 @@ import {
   type ManualSensorSnapshotInput,
 } from "@/lib/manualSensorSnapshotQualityRules";
 import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
+import ManualSensorSnapshotReviewPanel from "@/components/ManualSensorSnapshotReviewPanel";
+import { reviewManualSensorSnapshot } from "@/lib/sensorSnapshotReviewRules";
 import DerivedVpdStatus from "@/components/DerivedVpdStatus";
 import {
   validateManualSensorSnapshotFields,

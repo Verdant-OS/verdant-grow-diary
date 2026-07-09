@@ -194,7 +194,39 @@ export default function Auth() {
       setSignUpError(sanitizeAuthError("signUp", error));
       signUpEmailRef.current?.focus();
       return;
+  }
+
+  async function sendMagicLink() {
+    if (magicBusy) return;
+    setMagicNotice(null);
+    setSignInError(null);
+    const trimmed = email.trim();
+    if (!trimmed || !trimmed.includes("@")) {
+      setSignInError("Enter your email address to receive a sign-in link.");
+      signInEmailRef.current?.focus();
+      return;
     }
+    setMagicBusy(true);
+    try {
+      // Generic response regardless of account existence — do not leak
+      // whether the address is registered. `shouldCreateUser: false` keeps
+      // magic link a sign-in mechanism, not a covert signup.
+      await supabase.auth.signInWithOtp({
+        email: trimmed,
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo: `${window.location.origin}${redirectTo}`,
+        },
+      });
+    } catch {
+      /* swallow — generic notice below */
+    } finally {
+      setMagicBusy(false);
+      setMagicNotice(
+        "If an account exists for that email, we've sent a sign-in link. Check your inbox.",
+      );
+    }
+  }
     setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
     nav(postSignInTarget(), { replace: true });
   }

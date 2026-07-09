@@ -376,6 +376,25 @@ export default function Auth() {
                 >
                   {busy ? "Signing in…" : "Sign in"}
                 </Button>
+                <div className="grid gap-2 pt-2 border-t border-border/40 mt-1">
+                  <p className="text-[11px] text-muted-foreground">
+                    Prefer not to type a password? We can email you a one-time
+                    sign-in link instead.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={magicBusy}
+                    aria-busy={magicBusy}
+                    onClick={sendMagicLink}
+                  >
+                    {magicBusy ? "Sending sign-in link…" : "Email me a sign-in link"}
+                  </Button>
+                  {magicNotice ? (
+                    <AuthInlineMessage role="status">{magicNotice}</AuthInlineMessage>
+                  ) : null}
+                </div>
               </form>
             </TabsContent>
 

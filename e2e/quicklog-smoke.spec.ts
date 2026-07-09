@@ -134,14 +134,20 @@ test.describe("Quick Log smoke checklist", () => {
         return "helper text present";
       });
 
+      let snapshotJumpActivated = false;
       await report.run(10, "Activate stale-snapshot jump link", async () => {
         const link = dialog.getByTestId("quick-log-review-jump-snapshot");
         if ((await link.count()) === 0) return "no snapshot jump link (acceptable)";
         await link.click();
+        snapshotJumpActivated = true;
         return "activated";
       });
 
       await report.run(11, "Focus moves to attach snapshot section", async () => {
+        // Only meaningful when step 10 actually activated the snapshot jump.
+        // Fixtures without a stale snapshot render no jump link, so focus is
+        // never moved here — asserting it would fail spuriously.
+        if (!snapshotJumpActivated) return "no snapshot jump to activate (acceptable)";
         const section = dialog.getByTestId("quick-log-snapshot-attach-section");
         if ((await section.count()) === 0) return "no attach section (acceptable)";
         await expect(section).toBeFocused();
@@ -257,14 +263,12 @@ test.describe("Quick Log smoke checklist", () => {
       fs.writeFileSync(REPORT_JSON, json);
       fs.writeFileSync(REPORT_TXT, text);
 
-       
       console.log(`\n${text}\n`);
-       
+
       console.log(`Quick Log smoke report: ${path.relative(process.cwd(), REPORT_JSON)}`);
 
       const fail = report.firstFailure();
       if (fail) {
-         
         console.log(
           `FAILED step ${fail.step}: ${fail.label}\n  evidence: ${fail.evidence}\n  report: ${path.relative(process.cwd(), REPORT_JSON)}`,
         );

@@ -102,6 +102,23 @@ function buildDeps(): Deps {
       if (error) return { ok: false, error: error.message };
       return { ok: true };
     },
+    async resolvePriceExternalIdByPaddleId(env, paddlePriceId) {
+      // Reverse-lookup the price so we can identify founder_lifetime even
+      // when the transaction.completed payload omits importMeta.externalId.
+      // Env-aware: uses sandbox/live credentials via getPaddleClient(env),
+      // so no hardcoded pri_... ids are baked into the code.
+      try {
+        const paddle = getPaddleClient(env);
+        const price = await paddle.prices.get(paddlePriceId);
+        // Paddle SDK camelCases → importMeta.externalId
+        const externalId =
+          (price as { importMeta?: { externalId?: string } | null } | null)
+            ?.importMeta?.externalId ?? null;
+        return { ok: true, externalId };
+      } catch (e) {
+        return { ok: false, error: String(e instanceof Error ? e.message : e) };
+      }
+    },
   };
 }
 

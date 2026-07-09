@@ -4,8 +4,10 @@ Asserts that maybe_forward() builds an outbound JSON body that matches
 the contract sensor-ingest-webhook expects:
 
   - top-level: tent_id (UUID), source="ecowitt", vendor, captured_at, metrics
-  - metadata.tent_id, metadata.verdant_source (lineage), metadata.remote_addr
+  - metadata.tent_id, metadata.verdant_source (lineage)
   - PASSKEY stripped from any forwarded raw_payload
+  - remote_addr (private LAN IP) never forwarded — local network detail is
+    not sensor lineage
   - never contains bridge token, Authorization, vbt_, JWT-shaped value,
     or service-role markers
 """
@@ -103,7 +105,8 @@ class GoldenContractTests(unittest.TestCase):
         md = payload["metadata"]
         self.assertEqual(md["tent_id"], VALID_TENT_UUID)
         self.assertEqual(md["verdant_source"], "live")
-        self.assertEqual(md["remote_addr"], "192.168.68.75")
+        # The gateway's private LAN address must never be forwarded.
+        self.assertNotIn("remote_addr", md)
 
         # raw_payload exists only with PASSKEY stripped
         raw = md["raw_payload"]
@@ -114,6 +117,7 @@ class GoldenContractTests(unittest.TestCase):
         # Forbidden values nowhere in body
         body_text = json.dumps(payload)
         self.assertNotIn("DEVICESECRET-DO-NOT-LEAK", body_text)
+        self.assertNotIn("192.168.68.75", body_text)
         self.assertNotIn(BRIDGE_TOKEN, body_text)
         self.assertNotIn("Authorization", body_text)
         self.assertNotRegex(body_text, r"vbt_[A-Za-z0-9_\-]{6,}")
@@ -133,7 +137,9 @@ class GoldenContractTests(unittest.TestCase):
             "vendor": golden["vendor"],
             "metrics": golden["metrics"],
             "metadata": {
-                "remote_addr": golden["metadata"]["remote_addr"],
+                # remote_addr is supplied on the inbound reading and must be
+                # stripped, so it is deliberately absent from the golden keyset.
+                "remote_addr": "192.168.68.75",
                 "raw_payload": {**golden["metadata"]["raw_payload"], "PASSKEY": "X"},
             },
         }
@@ -148,6 +154,9 @@ class GoldenContractTests(unittest.TestCase):
         text = FIXTURE_PATH.read_text(encoding="utf-8")
         self.assertNotIn("PASSKEY", text)
         self.assertNotIn("passkey", text.lower())
+        # No private LAN addresses in the golden contract either.
+        self.assertNotRegex(text, r"\b(192\.168|10\.|172\.(1[6-9]|2[0-9]|3[01]))\.")
+        self.assertNotIn("remote_addr", text)
         self.assertNotRegex(text, r"vbt_[A-Za-z0-9_\-]{6,}")
         self.assertIsNone(JWT_RE.search(text))
         self.assertNotIn("Authorization", text)

@@ -11,7 +11,6 @@
   "metadata": {
     "tent_id": "11111111-2222-3333-4444-555555555555",
     "verdant_source": "live",
-    "remote_addr": "192.168.68.75",
     "raw_payload": {
       "stationtype": "GW1200B_V1.4.7",
       "model": "GW1200B",

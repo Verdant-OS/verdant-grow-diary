@@ -658,6 +658,11 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
         for k, v in metadata_in.items():
             if k == "raw_payload":
                 continue
+            # Never forward the gateway's private LAN address: it is local
+            # network detail, not sensor lineage (runbook redaction list —
+            # private IPs must not leave the LAN).
+            if k == "remote_addr":
+                continue
             safe_metadata[str(k)] = v
     safe_metadata["tent_id"] = tent_id
     safe_metadata["verdant_source"] = verdant_source
@@ -848,6 +853,11 @@ _SECRET_FIELD_NAMES = {
     _SR_MARKER + "_key",
     "supabase_" + _SR_MARKER + "_key",
     "private_api_key",
+    # EcoWitt device-auth + device-identity fields. The gateway PASSKEY is
+    # a device secret (MAC-derived, not rotatable without re-pairing) and
+    # MAC is a station identifier — both are on the runbook redaction list.
+    "passkey",
+    "mac",
 }
 
 _REDACTED = "[REDACTED]"

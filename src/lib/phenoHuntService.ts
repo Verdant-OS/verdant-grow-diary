@@ -232,8 +232,9 @@ export interface UpdatePhenoHuntGoalInput {
 
 /**
  * Update the persisted goal. RLS (owner row policies + RESTRICTIVE
- * has_pheno_tracker_entitlement) rejects Free/canceled/expired writers at
- * the database; the rejection surfaces as a PhenoHuntError.
+ * pheno-entitlement policies) rejects Free/canceled/expired writers at the
+ * database; a rejection OR a silently-filtered update (0 rows matched)
+ * surfaces as a PhenoHuntError — never a fake success.
  */
 export async function updatePhenoHuntGoal(
   input: UpdatePhenoHuntGoalInput,
@@ -244,15 +245,20 @@ export async function updatePhenoHuntGoal(
   if (!goal) throw new PhenoHuntError("Hunt goal is required.");
   if (goal.length > 500) throw new PhenoHuntError("Hunt goal is too long (max 500 characters).");
 
-  const { error } = await client
+  const { data, error } = await client
     .from("pheno_hunts")
     .update({ goal } as never)
-    .eq("id", input.huntId);
+    .eq("id", input.huntId)
+    .select("goal")
+    .maybeSingle();
 
   if (error) {
     throw new PhenoHuntError(`Could not save hunt goal: ${error.message}`, error);
   }
-  return { goal };
+  if (!data) {
+    throw new PhenoHuntError("Hunt goal was not saved (hunt missing or write rejected).");
+  }
+  return { goal: (data as { goal: string | null }).goal ?? goal };
 }
 
 export interface ConfirmPhenoHuntSetupInput {

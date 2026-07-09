@@ -31,6 +31,12 @@ describe("pheno_hunt_setup_state migration safety", () => {
     expect(sql).toMatch(/WHERE setup_confirmed_at IS NULL/);
   });
 
+  it("backfill is rerun-safe: bounded to hunts created before the migration", () => {
+    // Re-applying the migration must never force-confirm a new-flow hunt
+    // that is legitimately mid-setup.
+    expect(sql).toMatch(/AND created_at < '2026-07-09T21:00:00Z'/);
+  });
+
   it("changes no policies, grants, or triggers", () => {
     expect(sql).not.toMatch(/CREATE POLICY/i);
     expect(sql).not.toMatch(/DROP POLICY/i);

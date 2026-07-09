@@ -111,6 +111,32 @@ describe("workspace readiness + Evidence Packet Map", () => {
     expect(screen.queryByTestId("continue-setup-banner")).toBeNull();
   });
 
+  it("keeper decisions alone never advance the stage (decisions are not evidence)", () => {
+    renderWorkspace({
+      hunt: {
+        id: "h1",
+        name: "Blue Dream Hunt",
+        growId: "g1",
+        tentId: null,
+        goal: "Find the keeper",
+        setupConfirmedAt: "2026-07-01T00:00:00.000Z",
+      },
+      candidates: [candidate("p1", "#1"), candidate("p2", "#2")],
+      decisionsByPlant: {
+        p1: { plantId: "p1", decision: "keep", note: null, decidedAt: "2026-07-02T00:00:00.000Z" },
+        p2: { plantId: "p2", decision: "cull", note: null, decidedAt: "2026-07-02T00:00:00.000Z" },
+      },
+    });
+    // Both candidates were "decided" with zero recorded observations — the
+    // hunt must NOT read as comparison-ready.
+    expect(screen.getByTestId("hunt-readiness-stage").getAttribute("data-stage")).toBe(
+      "ready_for_tracking",
+    );
+    expect(
+      screen.getByTestId("evidence-packet-row-p1").getAttribute("data-has-evidence"),
+    ).toBe("false");
+  });
+
   it("evidence on one candidate only stays Ready for tracking", () => {
     renderWorkspace({
       hunt: {

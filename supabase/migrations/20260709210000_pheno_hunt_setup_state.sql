@@ -40,9 +40,12 @@ END $$;
 
 -- Backfill: hunts created before guided setup existed are treated as
 -- confirmed so existing workspaces never regress to "continue setup".
+-- Bounded by this migration's own timestamp so a re-application can never
+-- force-confirm a new-flow hunt that is legitimately mid-setup.
 UPDATE public.pheno_hunts
 SET setup_confirmed_at = created_at
-WHERE setup_confirmed_at IS NULL;
+WHERE setup_confirmed_at IS NULL
+  AND created_at < '2026-07-09T21:00:00Z';
 
 COMMENT ON COLUMN public.pheno_hunts.goal IS
   'Grower-stated hunt goal captured during guided setup; shown in the workspace Evidence Packet Map. 1-500 chars or NULL (legacy hunts).';

@@ -151,11 +151,21 @@ describe("loadPhenoHuntSetup", () => {
 
 describe("updatePhenoHuntGoal", () => {
   it("persists the trimmed goal", async () => {
-    const { client, calls } = makeFakeClient(() => ({ data: null, error: null }));
+    const { client, calls } = makeFakeClient(() => ({
+      data: { goal: "New goal" },
+      error: null,
+    }));
     const res = await updatePhenoHuntGoal({ huntId: "h1", goal: "  New goal  " }, client);
     expect(res.goal).toBe("New goal");
     const upd = calls.find((c) => c.op === "update");
     expect(upd?.payload).toEqual({ goal: "New goal" });
+  });
+
+  it("a silently-filtered update (0 rows: cross-user or RLS-blocked) is NOT a success", async () => {
+    const { client } = makeFakeClient(() => ({ data: null, error: null }));
+    await expect(
+      updatePhenoHuntGoal({ huntId: "someone-elses-hunt", goal: "Goal" }, client),
+    ).rejects.toBeInstanceOf(PhenoHuntError);
   });
 
   it("rejects an empty goal without touching the database", async () => {

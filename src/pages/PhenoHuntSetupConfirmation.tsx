@@ -99,8 +99,10 @@ export default function PhenoHuntSetupConfirmation() {
     setSavingGoal(true);
     try {
       const saved = await updatePhenoHuntGoal({ huntId: state.huntId, goal: trimmedGoal });
+      // Update only the persisted baseline — never the textarea, so
+      // keystrokes typed while the save was in flight are not clobbered
+      // (they simply keep the goal dirty against the new baseline).
       setState({ ...state, goal: saved.goal });
-      setGoal(saved.goal);
       toast.success("Hunt goal saved");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save hunt goal");

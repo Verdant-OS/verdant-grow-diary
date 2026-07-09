@@ -94,6 +94,19 @@ export function getCreatorBetaFormUrl(): string | null {
   return trimmed;
 }
 
+/**
+ * Post-demo feedback form URL. Same safety contract as the intake URL:
+ * only absolute http(s) targets are honored; anything else is treated as
+ * unset and renders a disabled placeholder (never a broken/unsafe link).
+ */
+export function getBetaFeedbackFormUrl(): string | null {
+  const raw = (import.meta.env.VITE_BETA_FEEDBACK_FORM_URL ?? "") as string;
+  const trimmed = typeof raw === "string" ? raw.trim() : "";
+  if (!trimmed) return null;
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+  return trimmed;
+}
+
 export interface BetaLandingProps {
   variant: BetaVariant;
   copy: BetaLandingCopy;
@@ -106,6 +119,9 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
   const search = currentSearch ?? (typeof window !== "undefined" ? window.location.search : "");
   const formUrl = rawUrl ? preserveUtmOnUrl(rawUrl, search) : null;
   const primaryLabel = formUrl ? "Request beta access" : "Beta form coming soon";
+  const rawFeedbackUrl = getBetaFeedbackFormUrl();
+  const feedbackUrl = rawFeedbackUrl ? preserveUtmOnUrl(rawFeedbackUrl, search) : null;
+  const feedbackLabel = feedbackUrl ? "Share post-demo feedback" : "Feedback form coming soon";
   const testIdRoot = `${variant}-beta`;
 
   return (
@@ -260,6 +276,78 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
             <p className="text-xs text-muted-foreground">
               After the walkthrough, testers share feedback through the
               intake form linked above. Everything stays grower-approved.
+            </p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section
+        id="post-demo-feedback"
+        className="px-6 py-10 max-w-4xl mx-auto"
+        aria-labelledby="post-demo-feedback-heading"
+        data-testid={`${testIdRoot}-feedback`}
+      >
+        <Card>
+          <CardHeader>
+            <h2
+              id="post-demo-feedback-heading"
+              className="text-xl font-semibold leading-none tracking-tight"
+            >
+              Post-demo feedback
+            </h2>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <p className="text-muted-foreground">
+              After the walkthrough, share what was clear, what was confusing,
+              and what evidence surfaces you would rely on in a real grow.
+              Feedback is submitted through an external form — Verdant does
+              not store, track, or auto-analyze responses here.
+            </p>
+            <ul
+              className="space-y-1.5 text-sm text-muted-foreground"
+              data-testid={`${testIdRoot}-feedback-prompts`}
+            >
+              {[
+                "What felt trustworthy?",
+                "What felt unclear or overconfident?",
+                "What evidence was missing for your workflow?",
+                "What would you want to see before recommending Verdant to another grower or breeder?",
+              ].map((prompt) => (
+                <li key={prompt} className="flex gap-2">
+                  <span aria-hidden="true" className="text-primary">•</span>
+                  <span>{prompt}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="pt-2">
+              {feedbackUrl ? (
+                <Button asChild size="lg" variant="secondary" className="min-h-11">
+                  <a
+                    href={feedbackUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid={`${testIdRoot}-feedback-cta`}
+                  >
+                    <span>{feedbackLabel}</span>
+                    <span className="sr-only"> (opens in a new tab)</span>
+                  </a>
+                </Button>
+              ) : (
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  disabled
+                  aria-disabled="true"
+                  className="min-h-11"
+                  data-testid={`${testIdRoot}-feedback-cta-disabled`}
+                >
+                  {feedbackLabel}
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              No account required. No analytics. The breeder or grower always
+              decides what to share.
             </p>
           </CardContent>
         </Card>

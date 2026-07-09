@@ -106,6 +106,7 @@ describe("LegalPageShell: canonical + OG + Twitter + JSON-LD per route", () => {
       // OG/Twitter tags exist and og:url mirrors the canonical.
       const meta = (sel: string) =>
         document.head.querySelector<HTMLMetaElement>(sel)?.getAttribute("content") ?? null;
+      expect(meta('meta[name="description"]')).toBeTruthy();
       expect(meta('meta[property="og:title"]')).toContain(r.name);
       expect(meta('meta[property="og:description"]')).toBeTruthy();
       expect(meta('meta[property="og:url"]')).toBe(url);
@@ -115,6 +116,7 @@ describe("LegalPageShell: canonical + OG + Twitter + JSON-LD per route", () => {
       expect(meta('meta[name="twitter:card"]')).toBe("summary_large_image");
       expect(meta('meta[name="twitter:title"]')).toContain(r.name);
       expect(meta('meta[name="twitter:description"]')).toBeTruthy();
+      expect(meta('meta[name="twitter:image"]')).toMatch(/^https?:\/\//);
 
       // Exactly one JSON-LD script for this legal page and it parses cleanly.
       const scripts = document.querySelectorAll(

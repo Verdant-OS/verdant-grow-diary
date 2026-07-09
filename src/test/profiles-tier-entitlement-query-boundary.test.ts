@@ -112,6 +112,24 @@ describe("profiles.tier entitlement-query boundary", () => {
     expect(offenders, offenders.join("\n")).toEqual([]);
   });
 
+  it("no migration SQL function whose body mentions billing/entitlement reads profiles.tier", () => {
+    const migrations = files.filter((f) => /\.sql$/i.test(f));
+    const offenders: string[] = [];
+    const billingRx = /(billing|entitlement|subscription|plan_id|founder|pro_monthly|pro_annual|has_pheno_tracker_entitlement|resolve_entitlement)/i;
+    for (const f of migrations) {
+      const src = readFileSync(f, "utf8");
+      // Split on CREATE ... FUNCTION boundaries to inspect each body.
+      const funcs = src.split(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\b/i);
+      for (let i = 1; i < funcs.length; i++) {
+        const body = funcs[i];
+        if (billingRx.test(body) && /profiles\.tier/.test(body)) {
+          offenders.push(`${f}: billing/entitlement function reads profiles.tier`);
+        }
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
   it("useMyEntitlements never queries the profiles table", () => {
     const src = readFileSync(
       resolve(ROOT, "src/hooks/useMyEntitlements.ts"),

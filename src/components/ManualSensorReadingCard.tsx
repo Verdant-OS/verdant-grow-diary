@@ -688,12 +688,12 @@ export default function ManualSensorReadingCard({
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2 pt-1">
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => setReviewOpen(false)}
-                      data-testid="manual-sensor-review-cancel"
+                      data-testid="manual-sensor-review-back"
                     >
-                      Cancel
+                      Back to edit
                     </Button>
                     <Button
                       variant="outline"

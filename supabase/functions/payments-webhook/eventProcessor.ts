@@ -38,9 +38,11 @@ export type SkipReason =
   | 'missing_product_external_id'
   | 'unknown_price_id'
   | 'missing_subscription_id'
+  | 'missing_transaction_id'
   | 'unhandled_event_type'
   | 'lifetime_price_only_for_transactions'
-  | 'non_lifetime_transaction';
+  | 'non_lifetime_transaction'
+  | 'unknown_lifetime_price_id';
 
 export interface SubscriptionUpsertRow {
   user_id: string;
@@ -164,37 +166,43 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
   }
 
   // Transaction completed → the ONLY path that records founder_lifetime.
-  // Recurring plans (pro_monthly / pro_annual) already come through the
-  // subscription events above; we skip them here to avoid double-writes.
+  // Recurring plans (pro_monthly / pro_annual) come through subscription
+  // events; the transaction event for those carries a `subscriptionId` and
+  // is skipped here to avoid double-writes.
+  //
+  // NOTE: transaction.completed payloads frequently do NOT include
+  // `price.importMeta.externalId` — the orchestrator resolves the Paddle
+  // internal price id via the Paddle API before calling decide() and
+  // mutates the event to fill it in. If it is still missing here, the
+  // price cannot be identified reliably → skip as unknown_lifetime_price_id.
   if (type === 'transaction.completed') {
     const tx = data as TransactionData;
     if (tx.status && tx.status !== 'completed' && tx.status !== 'paid') {
       return { kind: 'skip', reason: 'non_lifetime_transaction' };
     }
+    if (tx.subscriptionId) {
+      // Recurring subscription payment — handled via subscription events.
+      return { kind: 'skip', reason: 'non_lifetime_transaction' };
+    }
     const item = firstItem(tx);
     const priceExt = item?.price?.importMeta?.externalId;
-    if (!priceExt) return { kind: 'skip', reason: 'missing_price_external_id' };
+    if (!priceExt) return { kind: 'skip', reason: 'unknown_lifetime_price_id' };
     if (priceExt !== 'founder_lifetime') {
-      // pro_monthly / pro_annual belong to subscription events; skip here.
-      return { kind: 'skip', reason: 'non_lifetime_transaction' };
+      return { kind: 'skip', reason: 'unknown_lifetime_price_id' };
     }
     const userId = tx.customData?.userId;
     if (!userId) return { kind: 'skip', reason: 'missing_user_id' };
-    // We synthesize a stable pseudo-subscription id from the transaction id
-    // so lifetime rows share the subscriptions unique-key discipline and
-    // never overwrite a real subscription row.
-    const pseudoSubId = `lifetime_${tx.id ?? ''}`;
-    if (!tx.id) return { kind: 'skip', reason: 'missing_subscription_id' };
+    if (!tx.id) return { kind: 'skip', reason: 'missing_transaction_id' };
+    // Synthesize a stable pseudo-subscription id from the transaction id so
+    // lifetime rows share the subscriptions unique-key discipline and never
+    // collide with real subscription rows.
+    const pseudoSubId = `lifetime_${tx.id}`;
     return {
       kind: 'record_lifetime',
       row: {
         user_id: userId,
         paddle_subscription_id: pseudoSubId,
         paddle_customer_id: tx.customerId ?? '',
-        // Founder lifetime product_id is not carried on transaction items
-        // (see paddle-webhooks knowledge). price_id is the tier signal
-        // Phase 2b will read; we mirror it into product_id so the row
-        // still has the value shape subscription rows use.
         product_id: 'founder_lifetime',
         price_id: 'founder_lifetime',
         status: 'active',
@@ -210,6 +218,41 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
   }
 
   return { kind: 'skip', reason: 'unhandled_event_type' };
+}
+
+/**
+ * If this is a `transaction.completed` event with no subscriptionId and no
+ * `price.importMeta.externalId`, return the Paddle internal price id so the
+ * orchestrator can resolve it via the Paddle API. Otherwise null (no lookup
+ * needed).
+ *
+ * We do NOT run this lookup for subscription events — those payloads reliably
+ * carry importMeta.externalId. We also skip it for recurring transactions
+ * (`subscriptionId` present) since those get skipped as non_lifetime anyway.
+ */
+export function transactionPriceIdNeedingLookup(event: EventLike): string | null {
+  if (event.eventType !== 'transaction.completed') return null;
+  const data = (event.data ?? {}) as TransactionData;
+  if (data.subscriptionId) return null;
+  const item = firstItem(data);
+  if (!item?.price) return null;
+  const alreadyResolved = item.price.importMeta?.externalId;
+  if (alreadyResolved) return null;
+  return item.price.id ?? null;
+}
+
+/**
+ * Mutate an event to attach a resolved price external id. Called by the
+ * orchestrator after `transactionPriceIdNeedingLookup` returned a paddle
+ * price id and the resolver produced an external id (which may be null if
+ * the price is unknown to our catalog).
+ */
+export function attachResolvedPriceExternalId(event: EventLike, externalId: string | null): void {
+  if (!event.data) return;
+  const data = event.data as TransactionData;
+  const item = firstItem(data);
+  if (!item?.price) return;
+  item.price.importMeta = { externalId: externalId ?? undefined };
 }
 
 /**

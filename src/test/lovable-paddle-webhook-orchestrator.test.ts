@@ -289,3 +289,131 @@ describe('redactError', () => {
     expect(redactError('x'.repeat(2000)).length).toBe(500);
   });
 });
+
+/**
+ * Founder Lifetime resolver integration:
+ * transaction.completed events frequently omit importMeta.externalId, so
+ * the orchestrator must call resolvePriceExternalIdByPaddleId(env, priceId)
+ * before decide() to identify founder_lifetime by paddle price id.
+ */
+function txEventNoExternalId(priceId = 'pri_lifetime_sandbox', eventId = 'evt_tx_lookup_1') {
+  return {
+    eventId,
+    eventType: 'transaction.completed',
+    data: {
+      id: 'txn_lookup_1',
+      customerId: 'ctm_abc',
+      status: 'completed',
+      customData: { userId: 'user-uuid-2' },
+      items: [{ price: { id: priceId, productId: 'pro_lifetime' } }],
+    },
+  };
+}
+
+describe('handleVerifiedEvent — founder_lifetime price resolution', () => {
+  it('resolves paddle price id → founder_lifetime and records lifetime row', async () => {
+    const f = makeFixture();
+    const resolver = vi.fn(async () => ({ ok: true as const, externalId: 'founder_lifetime' }));
+    (f.deps as Deps).resolvePriceExternalIdByPaddleId = resolver;
+
+    const res = await handleVerifiedEvent(
+      f.deps,
+      txEventNoExternalId('pri_lifetime_sandbox'),
+      'sandbox',
+      NOW,
+      {},
+    );
+    expect(res.httpStatus).toBe(200);
+    expect(res.reason).toBe('processed:record_lifetime');
+    expect(resolver).toHaveBeenCalledWith('sandbox', 'pri_lifetime_sandbox');
+    expect(f.upsertCalls).toHaveLength(1);
+    expect(f.upsertCalls[0].price_id).toBe('founder_lifetime');
+    expect(f.upsertCalls[0].paddle_subscription_id).toBe('lifetime_txn_lookup_1');
+    expect(f.upsertCalls[0].current_period_end).toBeNull();
+  });
+
+  it('skips as unknown_lifetime_price_id when resolver returns null (unknown price)', async () => {
+    const f = makeFixture();
+    (f.deps as Deps).resolvePriceExternalIdByPaddleId = vi.fn(
+      async () => ({ ok: true as const, externalId: null }),
+    );
+    const res = await handleVerifiedEvent(
+      f.deps,
+      txEventNoExternalId('pri_unknown'),
+      'sandbox',
+      NOW,
+      {},
+    );
+    expect(res.httpStatus).toBe(200);
+    expect(res.reason).toBe('skipped:unknown_lifetime_price_id');
+    expect(f.upsertCalls).toHaveLength(0);
+  });
+
+  it('skips as unknown_lifetime_price_id when resolver returns pro_monthly (double-write guard)', async () => {
+    const f = makeFixture();
+    (f.deps as Deps).resolvePriceExternalIdByPaddleId = vi.fn(
+      async () => ({ ok: true as const, externalId: 'pro_monthly' }),
+    );
+    const res = await handleVerifiedEvent(
+      f.deps,
+      txEventNoExternalId('pri_pro_m'),
+      'sandbox',
+      NOW,
+      {},
+    );
+    expect(res.reason).toBe('skipped:unknown_lifetime_price_id');
+    expect(f.upsertCalls).toHaveLength(0);
+  });
+
+  it('returns 500 when resolver fails (transient) so Paddle retries', async () => {
+    const f = makeFixture();
+    (f.deps as Deps).resolvePriceExternalIdByPaddleId = vi.fn(
+      async () => ({ ok: false as const, error: 'network timeout' }),
+    );
+    const res = await handleVerifiedEvent(
+      f.deps,
+      txEventNoExternalId('pri_x'),
+      'sandbox',
+      NOW,
+      {},
+    );
+    expect(res.httpStatus).toBe(500);
+    expect(res.reason).toMatch(/^price_lookup_failed:/);
+    expect(f.upsertCalls).toHaveLength(0);
+  });
+
+  it('does NOT call the resolver for recurring transactions (subscriptionId set)', async () => {
+    const f = makeFixture();
+    const resolver = vi.fn(async () => ({ ok: true as const, externalId: 'founder_lifetime' }));
+    (f.deps as Deps).resolvePriceExternalIdByPaddleId = resolver;
+
+    const ev = txEventNoExternalId('pri_x', 'evt_recurring_1');
+    (ev.data as { subscriptionId?: string }).subscriptionId = 'sub_abc';
+
+    const res = await handleVerifiedEvent(f.deps, ev, 'sandbox', NOW, {});
+    expect(resolver).not.toHaveBeenCalled();
+    expect(res.reason).toBe('skipped:non_lifetime_transaction');
+  });
+
+  it('idempotent duplicate: second delivery of the same lifetime tx is a no-op', async () => {
+    const f = makeFixture();
+    (f.deps as Deps).resolvePriceExternalIdByPaddleId = vi.fn(
+      async () => ({ ok: true as const, externalId: 'founder_lifetime' }),
+    );
+    const ev = txEventNoExternalId('pri_lifetime_sandbox', 'evt_dup_lifetime');
+
+    const first = await handleVerifiedEvent(f.deps, ev, 'sandbox', NOW, {});
+    expect(first.reason).toBe('processed:record_lifetime');
+
+    const second = await handleVerifiedEvent(
+      f.deps,
+      txEventNoExternalId('pri_lifetime_sandbox', 'evt_dup_lifetime'),
+      'sandbox',
+      NOW,
+      {},
+    );
+    expect(second.reason).toBe('duplicate_processed');
+    // Only one upsert total.
+    expect(f.upsertCalls).toHaveLength(1);
+  });
+});

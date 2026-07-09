@@ -21,8 +21,10 @@
  * index.ts is a thin transport wrapper around this function.
  */
 import {
+  attachResolvedPriceExternalId,
   auditFields,
   decide,
+  transactionPriceIdNeedingLookup,
   type Decision,
   type PaddleEnv,
 } from './eventProcessor.ts';
@@ -73,6 +75,21 @@ export interface Deps {
     env: PaddleEnv,
   ): Promise<IoResult>;
   markEvent(paddle_event_id: string, patch: MarkPatch): Promise<IoResult>;
+  /**
+   * Reverse-lookup a Paddle internal price id (`pri_...`) into the
+   * human-readable `importMeta.externalId` (e.g. `"founder_lifetime"`).
+   * Called for one-time `transaction.completed` events where the event
+   * payload does not carry importMeta. Returns `externalId: null` if the
+   * price exists but has no import_meta.external_id — the orchestrator
+   * treats that as "unknown price" and the event is skipped.
+   *
+   * Optional so unit-test fixtures for subscription paths don't need to
+   * provide it. The runtime wires this in index.ts.
+   */
+  resolvePriceExternalIdByPaddleId?(
+    env: PaddleEnv,
+    paddlePriceId: string,
+  ): Promise<{ ok: true; externalId: string | null } | { ok: false; error: string }>;
 }
 
 export interface HandleResult {
@@ -133,7 +150,23 @@ export async function handleVerifiedEvent(
     // prior is 'received' or 'failed' (or row somehow missing) → reprocess.
   }
 
-  // 2) Decide.
+  // 2) Resolve transaction price external id if needed.
+  // transaction.completed payloads may omit importMeta.externalId. If we
+  // have a Paddle internal price id, look it up so decide() can identify
+  // founder_lifetime vs recurring. A resolver error is transient → 500.
+  const priceIdToResolve = transactionPriceIdNeedingLookup(event);
+  if (priceIdToResolve && deps.resolvePriceExternalIdByPaddleId) {
+    const resolved = await deps.resolvePriceExternalIdByPaddleId(env, priceIdToResolve);
+    if ('error' in resolved) {
+      return {
+        httpStatus: 500,
+        reason: `price_lookup_failed:${redactError(resolved.error)}`,
+      };
+    }
+    attachResolvedPriceExternalId(event, resolved.externalId);
+  }
+
+  // 3) Decide.
   const decision = decide(event, env, now);
 
   if (decision.kind === 'skip') {

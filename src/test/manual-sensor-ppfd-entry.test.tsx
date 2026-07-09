@@ -129,6 +129,7 @@ describe("ManualSensorReadingCard — PPFD save roundtrip", () => {
     fireEvent.change(ppfd, { target: { value: "780" } });
     const save = screen.getByTestId("manual-reading-save") as HTMLButtonElement;
     fireEvent.click(save);
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
     // Poll briefly for the async insert to flush.
     for (let i = 0; i < 25 && insertedRows.length === 0; i++) {
       await new Promise((r) => setTimeout(r, 20));

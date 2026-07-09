@@ -75,6 +75,21 @@ export interface Deps {
     env: PaddleEnv,
   ): Promise<IoResult>;
   markEvent(paddle_event_id: string, patch: MarkPatch): Promise<IoResult>;
+  /**
+   * Reverse-lookup a Paddle internal price id (`pri_...`) into the
+   * human-readable `importMeta.externalId` (e.g. `"founder_lifetime"`).
+   * Called for one-time `transaction.completed` events where the event
+   * payload does not carry importMeta. Returns `externalId: null` if the
+   * price exists but has no import_meta.external_id — the orchestrator
+   * treats that as "unknown price" and the event is skipped.
+   *
+   * Optional so unit-test fixtures for subscription paths don't need to
+   * provide it. The runtime wires this in index.ts.
+   */
+  resolvePriceExternalIdByPaddleId?(
+    env: PaddleEnv,
+    paddlePriceId: string,
+  ): Promise<{ ok: true; externalId: string | null } | { ok: false; error: string }>;
 }
 
 export interface HandleResult {

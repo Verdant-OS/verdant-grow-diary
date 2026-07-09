@@ -343,3 +343,244 @@ describe("Upgrade page — success panel", () => {
     expect(screen.getByTestId("upgrade-success-plans")).toBeInTheDocument();
   });
 });
+
+describe("Upgrade page — success panel feature row identity", () => {
+  it("assigns deterministic keys via successPanelFeatureRowKey for known features", async () => {
+    const { successPanelFeatureRowKey, CANONICAL_FEATURE_ORDER } = await import(
+      "@/config/pricing"
+    );
+    for (let i = 0; i < CANONICAL_FEATURE_ORDER.length; i++) {
+      expect(successPanelFeatureRowKey(CANONICAL_FEATURE_ORDER[i])).toBe(
+        `feat-${i}`,
+      );
+    }
+  });
+
+  it("assigns deterministic non-colliding keys for unknown feature strings", async () => {
+    const { successPanelFeatureRowKey } = await import("@/config/pricing");
+    const a = successPanelFeatureRowKey("Totally Made-Up Feature!");
+    const b = successPanelFeatureRowKey("Totally Made-Up Feature!");
+    const c = successPanelFeatureRowKey("Another Unknown");
+    expect(a).toBe(b);
+    expect(a.startsWith("feat-x-")).toBe(true);
+    expect(a).not.toBe(c);
+    // Never collides with canonical numeric-index namespace.
+    expect(a).not.toMatch(/^feat-\d+$/);
+  });
+
+  it("falls back to a stable placeholder for empty / punctuation-only strings", async () => {
+    const { successPanelFeatureRowKey } = await import("@/config/pricing");
+    expect(successPanelFeatureRowKey("")).toBe("feat-x-unknown");
+    expect(successPanelFeatureRowKey("!!!")).toBe("feat-x-unknown");
+  });
+
+  it("renders each feature row with a data-feature-key attribute", () => {
+    renderPage(["/upgrade?checkout=success&plan=pro_monthly"]);
+    const rows = screen.getAllByTestId("upgrade-success-feature-row");
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      const key = row.getAttribute("data-feature-key");
+      expect(key).toBeTruthy();
+      expect(key!).toMatch(/^feat-(\d+|x-[a-z0-9-]+)$/);
+    }
+    // All keys unique within the panel.
+    const keys = rows.map((r) => r.getAttribute("data-feature-key")!);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("shares identical row keys for features common to multiple tiers", () => {
+    renderPage(["/upgrade?checkout=success&plan=pro_monthly"]);
+    const proKeys = new Map(
+      screen
+        .getAllByTestId("upgrade-success-feature-row")
+        .map((r) => [r.textContent?.trim(), r.getAttribute("data-feature-key")]),
+    );
+
+    // Re-render for founder tier.
+    renderPage(["/upgrade?checkout=success&plan=founder_lifetime"]);
+    const founderRows = screen.getAllByTestId("upgrade-success-feature-row");
+    let sharedChecked = 0;
+    for (const row of founderRows) {
+      const label = row.textContent?.trim();
+      if (label && proKeys.has(label)) {
+        expect(row.getAttribute("data-feature-key")).toBe(proKeys.get(label));
+        sharedChecked++;
+      }
+    }
+    expect(sharedChecked).toBeGreaterThan(0);
+  });
+});
+
+describe("Upgrade page — success panel feature order snapshots", () => {
+  const rowSnapshot = () =>
+    screen.getAllByTestId("upgrade-success-feature-row").map((row) => ({
+      key: row.getAttribute("data-feature-key"),
+      text: row.textContent?.trim(),
+    }));
+
+  it("locks feature row order for Pro Monthly", () => {
+    renderPage(["/upgrade?checkout=success&plan=pro_monthly"]);
+    expect(rowSnapshot()).toMatchSnapshot();
+  });
+
+  it("locks feature row order for Pro Annual", () => {
+    renderPage(["/upgrade?checkout=success&plan=pro_annual"]);
+    expect(rowSnapshot()).toMatchSnapshot();
+  });
+
+  it("locks feature row order for Founder Lifetime", () => {
+    renderPage(["/upgrade?checkout=success&plan=founder_lifetime"]);
+    expect(rowSnapshot()).toMatchSnapshot();
+  });
+});
+
+describe("sortSuccessPanelFeatures — unknown feature sorting", () => {
+  it("sorts known canonical features before unknown features", async () => {
+    const { sortSuccessPanelFeatures, CANONICAL_FEATURE_ORDER } = await import(
+      "@/config/pricing"
+    );
+    const known1 = CANONICAL_FEATURE_ORDER[0];
+    const known2 = CANONICAL_FEATURE_ORDER[1] ?? CANONICAL_FEATURE_ORDER[0];
+    const input = ["zzz_unknown", known2, "aaa_unknown", known1];
+    const out = sortSuccessPanelFeatures(input);
+    const knownsInOut = out.filter(
+      (f) => CANONICAL_FEATURE_ORDER.indexOf(f) !== -1,
+    );
+    const unknowns = out.filter(
+      (f) => CANONICAL_FEATURE_ORDER.indexOf(f) === -1,
+    );
+    // Knowns first, in canonical order.
+    expect(knownsInOut).toEqual(
+      [...knownsInOut].sort(
+        (a, b) =>
+          CANONICAL_FEATURE_ORDER.indexOf(a) -
+          CANONICAL_FEATURE_ORDER.indexOf(b),
+      ),
+    );
+    // Every unknown appears after every known.
+    const lastKnownIdx = out.lastIndexOf(knownsInOut[knownsInOut.length - 1]);
+    const firstUnknownIdx = out.indexOf(unknowns[0]);
+    expect(firstUnknownIdx).toBeGreaterThan(lastKnownIdx);
+  });
+
+  it("tie-breaks unknown features lexically (not by input index)", async () => {
+    const { sortSuccessPanelFeatures } = await import("@/config/pricing");
+    const out = sortSuccessPanelFeatures([
+      "unknown_z",
+      "unknown_a",
+      "unknown_m",
+      "unknown_b",
+    ]);
+    expect(out).toEqual(["unknown_a", "unknown_b", "unknown_m", "unknown_z"]);
+  });
+
+  it("is pure and does not mutate its input", async () => {
+    const { sortSuccessPanelFeatures } = await import("@/config/pricing");
+    const input = ["unknown_z", "unknown_a"];
+    const snapshot = [...input];
+    sortSuccessPanelFeatures(input);
+    expect(input).toEqual(snapshot);
+  });
+
+  it("dedupes repeated entries deterministically", async () => {
+    const { sortSuccessPanelFeatures } = await import("@/config/pricing");
+    const out = sortSuccessPanelFeatures([
+      "unknown_a",
+      "unknown_a",
+      "unknown_b",
+      "unknown_a",
+    ]);
+    expect(out).toEqual(["unknown_a", "unknown_b"]);
+  });
+
+  it("orders known features by canonical index, not by input order", async () => {
+    const { sortSuccessPanelFeatures, CANONICAL_FEATURE_ORDER } = await import(
+      "@/config/pricing"
+    );
+    if (CANONICAL_FEATURE_ORDER.length < 2) return;
+    const first = CANONICAL_FEATURE_ORDER[0];
+    const last = CANONICAL_FEATURE_ORDER[CANONICAL_FEATURE_ORDER.length - 1];
+    // Feed reversed: last-canonical first, first-canonical second.
+    const out = sortSuccessPanelFeatures([last, first]);
+    expect(out).toEqual([first, last]);
+  });
+
+  it("is deterministic across repeated calls with the same input", async () => {
+    const { sortSuccessPanelFeatures, CANONICAL_FEATURE_ORDER } = await import(
+      "@/config/pricing"
+    );
+    const input = [
+      "unknown_z",
+      CANONICAL_FEATURE_ORDER[0],
+      "unknown_a",
+      CANONICAL_FEATURE_ORDER[1] ?? CANONICAL_FEATURE_ORDER[0],
+      "unknown_m",
+    ];
+    const runs = Array.from({ length: 5 }, () =>
+      sortSuccessPanelFeatures(input),
+    );
+    for (let i = 1; i < runs.length; i++) {
+      expect(runs[i]).toEqual(runs[0]);
+    }
+  });
+
+  it("does not depend on runtime locale for unknown tie-break", async () => {
+    // ASCII-only unknowns: sort must be codepoint-based (a < b < ... < z),
+    // which is what a locale-independent comparator produces. localeCompare
+    // under certain locales can reorder or ignore case/punctuation — this
+    // asserts we do NOT rely on that behavior.
+    const { sortSuccessPanelFeatures } = await import("@/config/pricing");
+    const input = ["unknown-b", "unknown-A", "unknown-a", "unknown-B"];
+    const out = sortSuccessPanelFeatures(input);
+    // Uppercase codepoints (< 'a') come before lowercase.
+    expect(out).toEqual(["unknown-A", "unknown-B", "unknown-a", "unknown-b"]);
+  });
+});
+
+describe("Upgrade success panel — multi-unknown render determinism", () => {
+  it("keeps data-feature-key values unique and deterministically ordered when multiple unknowns are present", async () => {
+    const { PRICING_TIERS: TIERS } = await import("@/config/pricing");
+    const pro = TIERS.find((t) => t.id === "pro_monthly")!;
+    const original = [...pro.features];
+    // Inject multiple unknown feature strings alongside canonical features.
+    pro.features = [
+      ...original,
+      "Zeta experimental perk",
+      "Alpha experimental perk",
+      "Mid experimental perk",
+    ] as unknown as typeof pro.features;
+    try {
+      renderPage(["/upgrade?checkout=success&plan=pro_monthly"]);
+      const rows = screen.getAllByTestId("upgrade-success-feature-row");
+      const keys = rows.map((r) => r.getAttribute("data-feature-key")!);
+      // All keys unique.
+      expect(new Set(keys).size).toBe(keys.length);
+      // Known (`feat-\d+`) rows all appear before unknown (`feat-x-…`) rows.
+      const firstUnknown = keys.findIndex((k) => k.startsWith("feat-x-"));
+      const lastKnown = (() => {
+        let idx = -1;
+        keys.forEach((k, i) => {
+          if (/^feat-\d+$/.test(k)) idx = i;
+        });
+        return idx;
+      })();
+      expect(firstUnknown).toBeGreaterThan(-1);
+      expect(firstUnknown).toBeGreaterThan(lastKnown);
+      // Unknown block itself is lexically ordered by underlying text.
+      const unknownRows = rows.slice(firstUnknown);
+      const unknownTexts = unknownRows.map((r) => r.textContent?.trim() ?? "");
+      expect(unknownTexts).toEqual([...unknownTexts].sort());
+    } finally {
+      pro.features = original as unknown as typeof pro.features;
+    }
+  });
+});
+
+describe("Upgrade success panel — source guard", () => {
+  it("does not use array-index keys for feature rows in Upgrade.tsx", async () => {
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile("src/pages/Upgrade.tsx", "utf8");
+    expect(src).not.toMatch(/key=\{\s*(?:index|i|idx)\s*\}/);
+  });
+});
+

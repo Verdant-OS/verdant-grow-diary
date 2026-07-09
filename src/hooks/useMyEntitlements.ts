@@ -52,24 +52,33 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
       }
 
       setLoading(true);
-      // Generated Supabase types include billing_subscriptions; no cast needed.
-      // This read is RLS-protected (select-own) and PRESENTATION-ONLY.
-      // Authoritative entitlement is enforced server-side (see
-      // docs/paid-launch-entitlement-blocker.md).
-      const { data, error } = await supabase
-        .from("billing_subscriptions")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      // Both reads are RLS-protected (select-own) and PRESENTATION-ONLY.
+      // Server-side enforcement is authoritative for cost/security gates.
+      const [subRes, rolesRes] = await Promise.all([
+        supabase
+          .from("billing_subscriptions")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("role", "staff")
+          .maybeSingle(),
+      ]);
 
       if (cancelled) return;
 
-      if (error) {
+      const isStaff = !rolesRes.error && rolesRes.data != null;
+
+      if (subRes.error) {
         // Fail safe to free capabilities; do not block the UI.
-        setEntitlement(FREE_NOW());
+        // Staff still lifts to Pro-tier for display.
+        setEntitlement(resolveEntitlements(null, new Date(), { isStaff }));
       } else {
-        const row = (data ?? null) as BillingSubscriptionRow | null;
-        setEntitlement(resolveEntitlements(row, new Date()));
+        const row = (subRes.data ?? null) as BillingSubscriptionRow | null;
+        setEntitlement(resolveEntitlements(row, new Date(), { isStaff }));
       }
       setLoading(false);
     }

@@ -333,7 +333,7 @@ export function exportGrowDiaryReportAsPdf(
   const html = buildGrowDiaryReportHtml(model);
   let popup: Window | null = null;
   try {
-    popup = win.open("", "_blank", "noopener,noreferrer");
+    popup = win.open("", "_blank", "width=900,height=1100");
   } catch {
     return "unavailable";
   }

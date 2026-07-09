@@ -34,6 +34,7 @@ const TIER_MENTION_ALLOWLIST: RegExp[] = [
   /src\/test\/profiles-tier-entitlement-query-boundary\.test\.ts$/,
   /src\/test\/profiles-gamification-write-protection\.test\.ts$/,
   /src\/test\/integration\/profiles-gamification-write-protection\.integration\.test\.ts$/,
+  /src\/test\/integration\/profiles-entitlement-resolution-boundary\.integration\.test\.ts$/,
   // Migrations own the schema. `profiles.tier` may appear as a column
   // definition, default, comment, or trigger body. We separately assert
   // that no billing/entitlement SQL function reads it (see next `it`).

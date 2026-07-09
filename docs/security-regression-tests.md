@@ -62,12 +62,25 @@ supabase db reset
 export SUPABASE_URL=http://127.0.0.1:54321
 export SUPABASE_ANON_KEY=...          # from `supabase status`
 export SUPABASE_SERVICE_ROLE_KEY=...  # local only; NEVER production
+# optional: export SUPABASE_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
 bun run test:pi-ingest-db-security
 bun run test:storage-db-security
 bun run test:profiles-db-security
 bun run test:security-db-local
 ```
+
+### Opt-in CI
+
+The `Security DB Local` GitHub workflow only runs the harnesses when
+explicitly enabled. Either:
+
+- Trigger via **Actions → Security DB Local → Run workflow** with the
+  `run_db_security` input set to `true`, or
+- Set the repository variable `ENABLE_DB_SECURITY_LANE` to `'true'`.
+
+Without one of those, the job checks out nothing, boots nothing, and
+writes a skip notice to the run summary. It is never a required check.
 
 ### Blocked behavior
 
@@ -83,18 +96,28 @@ They never fake a pass. Required CI never depends on these variables.
 - `test:storage-db-security` — proves diary photo/video buckets are
   owner-scoped and public buckets are read-only for anon.
 - `test:profiles-db-security` — proves authenticated clients cannot
-  update `profiles.tier`, `profiles.level`, or `profiles.nugs_total`,
-  that mixed blocked+allowed updates are atomic (no partial mutation),
-  that legitimate profile edits (`display_name`, `current_badge`) still
-  succeed, and that cross-user profile writes remain blocked by RLS.
-  Runtime companion to the static
-  `src/test/profiles-gamification-write-protection.test.ts` and
+  update `profiles.tier`, `profiles.level`, or `profiles.nugs_total`;
+  cannot DELETE their own or any other user's profile; cannot bypass the
+  gamification trigger via an RPC path; that destructive combinations
+  (null / zero / negative) are rejected; that mixed blocked+allowed
+  updates are atomic; that legitimate profile edits (`display_name`,
+  `current_badge`) still succeed; and that all rejected errors are
+  sanitized (no provider / customer / subscription / service_role /
+  JWT / stack-frame leakage). Also runs
+  `profiles-entitlement-resolution-boundary.integration.test.ts`, which
+  wraps the authenticated Supabase client in a query-recording Proxy,
+  drives the real Verdant entitlement path (billing_subscriptions +
+  subscriptions + user_roles → `resolveUnionEntitlements`) for free /
+  pro_monthly / founder_lifetime / canceled seeds, and asserts the
+  resolver never reads `public.profiles`. Runtime companion to the
+  static `src/test/profiles-gamification-write-protection.test.ts` and
   `src/test/profiles-tier-entitlement-query-boundary.test.ts`.
 
 Current status: **scaffolded / expanding**. Vitest specs live under
 `src/test/pi-ingest-commit-batch-replay.integration.test.ts`,
-`src/test/storage-policy-security.integration.test.ts`, and
-`src/test/integration/profiles-gamification-write-protection.integration.test.ts`
+`src/test/storage-policy-security.integration.test.ts`,
+`src/test/integration/profiles-gamification-write-protection.integration.test.ts`,
+and `src/test/integration/profiles-entitlement-resolution-boundary.integration.test.ts`,
 and grow as local fixtures stabilise. Static contract coverage in Tier 1
 already guards the policy shapes.
 

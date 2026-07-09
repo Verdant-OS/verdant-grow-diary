@@ -36,8 +36,13 @@ if (missing.length > 0) {
 import("node:child_process").then(({ spawn }) => {
   const child = spawn(
     process.execPath,
-    ["--experimental-vm-modules", "node_modules/vitest/vitest.mjs", "run",
-      "src/test/integration/profiles-gamification-write-protection.integration.test.ts"],
+    [
+      "--experimental-vm-modules",
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "src/test/integration/profiles-gamification-write-protection.integration.test.ts",
+      "src/test/integration/profiles-entitlement-resolution-boundary.integration.test.ts",
+    ],
     { stdio: "inherit", env: process.env },
   );
   child.on("exit", (code) => process.exit(code ?? 1));

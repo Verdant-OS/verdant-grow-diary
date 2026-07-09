@@ -51,7 +51,9 @@ describe("staff-grant trigger migration", () => {
     expect(sql).toContain("'cheekhimself@gmail.com'");
     // No wildcard/like/regex/domain-only matches sneaking in.
     expect(sql).not.toMatch(/NEW\.email\s+LIKE/i);
-    expect(sql).not.toMatch(/verdantgrowdiary\.com'\s*\)/i.compile ? /a^/ : /@verdantgrowdiary\.com'\s*\)/); // domain-only literal forbidden
+    // Domain-only match (e.g. right-hand side of `LIKE '%@verdantgrowdiary.com'`) forbidden.
+    expect(sql).not.toMatch(/'%@verdantgrowdiary\.com'/i);
+    expect(sql).not.toMatch(/split_part\s*\(\s*NEW\.email/i);
   });
 
   it("inserts the staff role with ON CONFLICT DO NOTHING", () => {

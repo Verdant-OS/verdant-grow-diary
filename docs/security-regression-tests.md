@@ -65,6 +65,7 @@ export SUPABASE_SERVICE_ROLE_KEY=...  # local only; NEVER production
 
 bun run test:pi-ingest-db-security
 bun run test:storage-db-security
+bun run test:profiles-db-security
 bun run test:security-db-local
 ```
 
@@ -81,12 +82,25 @@ They never fake a pass. Required CI never depends on these variables.
   `action_queue` rows on rejection.
 - `test:storage-db-security` — proves diary photo/video buckets are
   owner-scoped and public buckets are read-only for anon.
+- `test:profiles-db-security` — proves authenticated clients cannot
+  update `profiles.tier`, `profiles.level`, or `profiles.nugs_total`,
+  that mixed blocked+allowed updates are atomic (no partial mutation),
+  that legitimate profile edits (`display_name`, `current_badge`) still
+  succeed, and that cross-user profile writes remain blocked by RLS.
+  Runtime companion to the static
+  `src/test/profiles-gamification-write-protection.test.ts` and
+  `src/test/profiles-tier-entitlement-query-boundary.test.ts`.
 
-Current status: **scaffolded**. Vitest specs live under
-`src/test/pi-ingest-commit-batch-replay.integration.test.ts` and
-`src/test/storage-policy-security.integration.test.ts` and grow as local
-fixtures stabilise. Static contract coverage in Tier 1 already guards
-the policy shapes.
+Current status: **scaffolded / expanding**. Vitest specs live under
+`src/test/pi-ingest-commit-batch-replay.integration.test.ts`,
+`src/test/storage-policy-security.integration.test.ts`, and
+`src/test/integration/profiles-gamification-write-protection.integration.test.ts`
+and grow as local fixtures stabilise. Static contract coverage in Tier 1
+already guards the policy shapes.
+
+> **Never** paste `SUPABASE_SERVICE_ROLE_KEY`, auth JWTs, or refresh
+> tokens into chat, screenshots, logs, or issue comments. This harness
+> uses the service role only for test setup/teardown and never logs it.
 
 ## Security hygiene
 

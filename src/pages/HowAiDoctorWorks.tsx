@@ -80,7 +80,7 @@ export const AI_DOCTOR_MISSING_INFO_EXAMPLES: ReadonlyArray<string> = [
 
 export default function HowAiDoctorWorks() {
   usePageSeo({
-    title: "How AI Doctor Works | Verdant",
+    title: "How AI Doctor Works | Verdant Grow Diary",
     description:
       "See how Verdant AI Doctor uses logs, photos, source-labeled sensor context, evidence, confidence, and missing information to support grower-approved decisions.",
     path: HOW_AI_DOCTOR_WORKS_PATH,

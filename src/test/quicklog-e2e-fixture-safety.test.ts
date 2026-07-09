@@ -163,6 +163,7 @@ describe("Disposable E2E fixture safety helpers", () => {
 describe("E2E fixture safety: source-level guardrails", () => {
   const files = [
     "e2e/lib/fixtureSafety.ts",
+    "e2e/lib/authedTest.ts",
     "e2e/fixture-safety.spec.ts",
   ];
 
@@ -194,13 +195,24 @@ describe("E2E fixture safety: source-level guardrails", () => {
     }
   });
 
-  it("fixture spec relies on normal login (storageState) and not on token injection", () => {
+  it("fixture spec relies on normal login (replayed via authedTest) and not on token injection", () => {
     const spec = read("e2e/fixture-safety.spec.ts");
-    expect(spec).toMatch(/from\s+["']@playwright\/test["']/);
+    // The spec imports the shared authed test base, which replays the
+    // sessionStorage snapshot captured by auth.setup.ts's REAL /auth UI
+    // login (the app intentionally keeps its Supabase session in
+    // sessionStorage — see docs/auth-security.md — which Playwright's
+    // storageState cannot carry). No fabricated or hardcoded tokens.
+    expect(spec).toMatch(/from\s+["']\.\/lib\/authedTest["']/);
     // Uses normal page.goto + assertions, no localStorage token poke
     expect(spec).not.toMatch(/localStorage[\s\S]{0,40}(token|session|auth)/i);
     expect(spec).toContain("validateFixtureEnv");
     expect(spec).toContain("pageTextMatchesFixture");
+    // The authed base itself must come from @playwright/test and must only
+    // replay the auth.setup snapshot — never mint or embed tokens.
+    const base = read("e2e/lib/authedTest.ts");
+    expect(base).toMatch(/from\s+["']@playwright\/test["']/);
+    expect(base).toContain("session-storage.json");
+    expect(base).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}\./);
   });
 });
 

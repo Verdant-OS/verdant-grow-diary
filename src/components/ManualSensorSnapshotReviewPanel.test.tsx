@@ -35,6 +35,21 @@ describe("ManualSensorSnapshotReviewPanel", () => {
     expect(panel.textContent ?? "").not.toMatch(/\blive\b/i);
   });
 
+  it("clean state is compact: Manual chip, ready line, no preview, no confidence chip, no 'healthy'/'live'", () => {
+    render(<ManualSensorSnapshotReviewPanel result={baseResult()} />);
+    const panel = screen.getByTestId("manual-sensor-snapshot-review-panel");
+    expect(panel.getAttribute("data-clean")).toBe("true");
+    expect(screen.getByTestId("snapshot-source-chip")).toHaveTextContent(/^manual$/);
+    expect(screen.getByTestId("snapshot-ready-status")).toHaveTextContent(
+      /Ready — this will save as manual data\./,
+    );
+    expect(screen.queryByTestId("snapshot-normalized-preview")).toBeNull();
+    expect(screen.queryByTestId("snapshot-confidence-chip")).toBeNull();
+    const text = (panel.textContent ?? "").toLowerCase();
+    expect(text).not.toMatch(/\bhealthy\b/);
+    expect(text).not.toMatch(/\blive\b/);
+  });
+
   it("uses data-can-save='true' when no blockers and 'false' when blocked", () => {
     const { rerender } = render(
       <ManualSensorSnapshotReviewPanel result={baseResult()} />,
@@ -42,7 +57,7 @@ describe("ManualSensorSnapshotReviewPanel", () => {
     expect(
       screen.getByTestId("manual-sensor-snapshot-review-panel").getAttribute("data-can-save"),
     ).toBe("true");
-    expect(screen.getByTestId("snapshot-ready-status")).toHaveTextContent(/ready to save/i);
+    expect(screen.getByTestId("snapshot-ready-status")).toHaveTextContent(/ready/i);
 
     rerender(
       <ManualSensorSnapshotReviewPanel
@@ -64,6 +79,11 @@ describe("ManualSensorSnapshotReviewPanel", () => {
       screen.getByTestId("manual-sensor-snapshot-review-panel").getAttribute("data-can-save"),
     ).toBe("false");
     expect(screen.getByTestId("snapshot-ready-status")).toHaveTextContent(/fix blockers/i);
+    // Warning/blocker state renders preview + confidence chip labeled as data confidence.
+    expect(screen.getByTestId("snapshot-normalized-preview")).toBeInTheDocument();
+    expect(screen.getByTestId("snapshot-confidence-chip")).toHaveTextContent(
+      /low data confidence/i,
+    );
   });
 
   it("gives blocker findings role='alert' and warning findings role='status'", () => {

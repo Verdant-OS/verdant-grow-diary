@@ -34,9 +34,10 @@ const TIER_MENTION_ALLOWLIST: RegExp[] = [
   /src\/test\/profiles-tier-entitlement-query-boundary\.test\.ts$/,
   /src\/test\/profiles-gamification-write-protection\.test\.ts$/,
   /src\/test\/integration\/profiles-gamification-write-protection\.integration\.test\.ts$/,
-  // Trigger migration itself
-  /supabase\/migrations\/.*profiles.*gamification.*\.sql$/i,
-  /supabase\/migrations\/.*block_gamification.*\.sql$/i,
+  // Migrations own the schema. `profiles.tier` may appear as a column
+  // definition, default, comment, or trigger body. We separately assert
+  // that no billing/entitlement SQL function reads it (see next `it`).
+  /supabase\/migrations\/.*\.sql$/i,
 ];
 
 // Any file within an entitlement/billing path must NOT mention profiles.tier

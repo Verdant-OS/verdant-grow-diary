@@ -19,9 +19,11 @@ export interface PhenoHuntSummary {
   name: string;
   growId: string | null;
   tentId: string | null;
-  evidenceGoals: string[];
-  notes: string | null;
-  setupCompletedAt: string | null;
+  /** Selected evidence goal ids persisted at onboarding. Optional so older
+   * test stubs and callers stay compatible. */
+  evidenceGoals?: string[];
+  notes?: string | null;
+  setupCompletedAt?: string | null;
 }
 
 export type LoadPhenoHuntCandidatesResult =

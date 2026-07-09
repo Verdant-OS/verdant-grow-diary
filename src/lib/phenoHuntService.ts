@@ -23,7 +23,10 @@ export interface CreatePhenoHuntResult {
 }
 
 export class PhenoHuntError extends Error {
-  constructor(message: string, public cause?: unknown) {
+  constructor(
+    message: string,
+    public cause?: unknown,
+  ) {
     super(message);
     this.name = "PhenoHuntError";
   }
@@ -45,10 +48,7 @@ export interface PhenoHuntDraft {
   plantIds: readonly string[];
 }
 
-export type PhenoHuntValidationError =
-  | "name_required"
-  | "grow_required"
-  | "no_candidates";
+export type PhenoHuntValidationError = "name_required" | "grow_required" | "no_candidates";
 
 export function validatePhenoHuntDraft(
   draft: PhenoHuntDraft,
@@ -83,41 +83,58 @@ export async function createPhenoHunt(
     .single();
 
   if (huntErr || !hunt) {
-    throw new PhenoHuntError(
-      huntErr?.message ?? "Could not create pheno hunt.",
-      huntErr,
-    );
+    throw new PhenoHuntError(huntErr?.message ?? "Could not create pheno hunt.", huntErr);
   }
 
   const huntId = (hunt as { id: string }).id;
   const tagged: string[] = [];
 
-  // Tag each candidate plant. Per-plant update keeps each label correct and
-  // RLS-scoped without smuggling other plants' rows into a bulk update.
-  for (let i = 0; i < input.plantIds.length; i++) {
-    const plantId = input.plantIds[i];
-    const override = input.labels?.[plantId]?.trim();
-    const label = override && override.length > 0
-      ? override
-      : defaultCandidateLabel(i);
-
-    const { error: updErr } = await client
-      .from("plants")
-      .update({
-        pheno_hunt_id: huntId,
-        candidate_label: label,
-      } as never)
-      .eq("id", plantId);
-
-    if (updErr) {
-      // Best-effort rollback of the hunt row (RLS allows the owner to delete).
+  // Tag each candidate plant. Per-plant updates keep each label correct and
+  // RLS-scoped without smuggling other plants' rows into a bulk update, but
+  // run in bounded-concurrency chunks so a 100-candidate hunt is ~10 round
+  // trips of wall clock, not 100 serial ones (scale audit M1).
+  const TAG_CHUNK_SIZE = 10;
+  for (let start = 0; start < input.plantIds.length; start += TAG_CHUNK_SIZE) {
+    const chunk = input.plantIds.slice(start, start + TAG_CHUNK_SIZE);
+    const results = await Promise.all(
+      chunk.map(async (plantId, offset) => {
+        const override = input.labels?.[plantId]?.trim();
+        const label =
+          override && override.length > 0 ? override : defaultCandidateLabel(start + offset);
+        const { error: updErr } = await client
+          .from("plants")
+          .update({
+            pheno_hunt_id: huntId,
+            candidate_label: label,
+          } as never)
+          .eq("id", plantId);
+        return { plantId, updErr };
+      }),
+    );
+    const failed = results.find((r) => r.updErr);
+    for (const r of results) {
+      if (!r.updErr) tagged.push(r.plantId);
+    }
+    if (failed?.updErr) {
+      // Best-effort rollback: untag anything already tagged, then remove the
+      // hunt row (RLS allows the owner to delete/update own rows). Rollback
+      // failures are swallowed — they must never mask the original error.
+      if (tagged.length > 0) {
+        try {
+          await client
+            .from("plants")
+            .update({ pheno_hunt_id: null, candidate_label: null } as never)
+            .in("id", tagged);
+        } catch {
+          // best-effort only
+        }
+      }
       await client.from("pheno_hunts").delete().eq("id", huntId);
       throw new PhenoHuntError(
-        `Could not tag candidate plant: ${updErr.message}`,
-        updErr,
+        `Could not tag candidate plant: ${failed.updErr.message}`,
+        failed.updErr,
       );
     }
-    tagged.push(plantId);
   }
 
   return { huntId, taggedPlantIds: tagged };
@@ -157,10 +174,7 @@ export async function deletePhenoHunt(
     .eq("pheno_hunt_id", huntId);
 
   if (selErr) {
-    throw new PhenoHuntError(
-      `Could not read linked plants: ${selErr.message}`,
-      selErr,
-    );
+    throw new PhenoHuntError(`Could not read linked plants: ${selErr.message}`, selErr);
   }
 
   const linkedIds = (linked ?? []).map((r) => (r as { id: string }).id);
@@ -175,23 +189,14 @@ export async function deletePhenoHunt(
       .eq("pheno_hunt_id", huntId);
 
     if (untagErr) {
-      throw new PhenoHuntError(
-        `Could not untag linked plants: ${untagErr.message}`,
-        untagErr,
-      );
+      throw new PhenoHuntError(`Could not untag linked plants: ${untagErr.message}`, untagErr);
     }
   }
 
-  const { error: delErr } = await client
-    .from("pheno_hunts")
-    .delete()
-    .eq("id", huntId);
+  const { error: delErr } = await client.from("pheno_hunts").delete().eq("id", huntId);
 
   if (delErr) {
-    throw new PhenoHuntError(
-      `Could not delete pheno hunt: ${delErr.message}`,
-      delErr,
-    );
+    throw new PhenoHuntError(`Could not delete pheno hunt: ${delErr.message}`, delErr);
   }
 
   return { huntId, untaggedPlantIds: linkedIds };

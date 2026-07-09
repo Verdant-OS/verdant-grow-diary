@@ -57,12 +57,28 @@ export async function listLatestSexObservationsForHunt(
 ): Promise<Record<string, SexObservationRow>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
-  const { data, error } = await phenoDb
-    .from("pheno_sex_observations")
+  // Latest-per-plant view keeps the transfer at one row per candidate no
+  // matter how much append-only history accumulates (scale audit C1). The
+  // legacy full-history read remains as a fallback for deploy skew where
+  // the view migration has not landed yet.
+  let data:
+    | { plant_id: string | null; sex: string | null; herm_observed: boolean | null; note: string | null; observed_at: string | null }[]
+    | null = null;
+  const viaView = await phenoDb
+    .from("pheno_sex_observations_latest")
     .select("plant_id, sex, herm_observed, note, observed_at")
-    .eq("hunt_id", id)
-    .order("observed_at", { ascending: false });
-  if (error || !data) return {};
+    .eq("hunt_id", id);
+  if (!viaView.error && viaView.data) {
+    data = viaView.data;
+  } else {
+    const legacy = await phenoDb
+      .from("pheno_sex_observations")
+      .select("plant_id, sex, herm_observed, note, observed_at")
+      .eq("hunt_id", id)
+      .order("observed_at", { ascending: false });
+    if (legacy.error || !legacy.data) return {};
+    data = legacy.data;
+  }
   const map: Record<string, SexObservationRow> = {};
   for (const row of data) {
     if (!row.plant_id || map[row.plant_id]) continue; // first = latest (desc order)

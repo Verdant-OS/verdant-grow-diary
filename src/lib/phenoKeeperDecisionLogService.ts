@@ -69,7 +69,11 @@ export async function listKeeperDecisionHistoryForHunt(
     .from("pheno_keeper_decisions_log")
     .select("plant_id, decision, reason, note, decided_at")
     .eq("hunt_id", id)
-    .order("decided_at", { ascending: false });
+    .order("decided_at", { ascending: false })
+    // Bounded recent history (newest first): the log is append-only and
+    // grows forever; the workspace/keepers views only render recent
+    // decisions per candidate (scale audit C1).
+    .limit(500);
   if (error || !data) return {};
   const map: Record<string, KeeperDecisionLogEntry[]> = {};
   for (const row of data) {

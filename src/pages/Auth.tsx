@@ -71,6 +71,8 @@ export default function Auth() {
   const [resendNowTick, setResendNowTick] = useState<number>(() => Date.now());
   const [signUpError, setSignUpError] = useState<string | null>(null);
   const [signUpSuccess, setSignUpSuccess] = useState<string | null>(null);
+  const [magicBusy, setMagicBusy] = useState(false);
+  const [magicNotice, setMagicNotice] = useState<string | null>(null);
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotError, setForgotError] = useState<string | null>(null);

@@ -263,11 +263,13 @@ const App = () => (
                     <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                     <Route path="/grows" element={<Grows />} />
                     <Route path="/grows/:growId" element={<GrowDetail />} />
-                    {/* Pheno Tracker is a Verdant Pro feature. Free users see
-                        an upgrade card; canceled Pro users see a read-only
-                        banner over their existing records where the surface
-                        supports it. Public read-only /pheno-comparison and
-                        /pheno-hunts/:id/compare remain ungated above. */}
+                    {/* Pheno Tracker is a Verdant Pro feature. Free and
+                        canceled/expired users see an upgrade card. Public
+                        read-only /pheno-comparison and /pheno-hunts/:id/compare
+                        remain ungated above so historical records stay
+                        viewable — we never hide diary history as a billing
+                        punishment. Server-side entitlement enforcement is a
+                        follow-up slice; this PR is UI/route gating only. */}
                     <Route
                       path="/pheno-hunts/new"
                       element={
@@ -279,7 +281,7 @@ const App = () => (
                     <Route
                       path="/pheno-hunts/:id/workspace"
                       element={
-                        <PhenoTrackerUpgradeGate allowReadOnly>
+                        <PhenoTrackerUpgradeGate>
                           <PhenoHuntWorkspace />
                         </PhenoTrackerUpgradeGate>
                       }
@@ -287,7 +289,7 @@ const App = () => (
                     <Route
                       path="/pheno-hunts/:id/keepers"
                       element={
-                        <PhenoTrackerUpgradeGate allowReadOnly>
+                        <PhenoTrackerUpgradeGate>
                           <PhenoKeepersPage />
                         </PhenoTrackerUpgradeGate>
                       }

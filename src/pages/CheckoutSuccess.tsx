@@ -150,9 +150,9 @@ export default function CheckoutSuccess() {
               Check status
             </Button>
           )}
-          <Link to="/">
+          <Link to={safeReturnTo ?? "/"} data-testid="checkout-success-primary-link">
             <Button size="lg" variant={confirmed ? "default" : "outline"}>
-              Go to my grow
+              {safeReturnTo ? "Continue" : "Go to my grow"}
             </Button>
           </Link>
           <Link to="/settings">

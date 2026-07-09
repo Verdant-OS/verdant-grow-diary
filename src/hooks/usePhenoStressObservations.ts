@@ -6,7 +6,7 @@
  * No AI, no Action Queue, no automation, no device control, no sensor
  * ingest.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   deleteStressObservation,
@@ -45,6 +45,16 @@ export function usePhenoStressObservations(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Refresh loads race unmount (route change away from the workspace, test
+  // teardown): never setState after unmount.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const refresh = useCallback(async () => {
     if (!huntId) return;
     setLoading(true);
@@ -55,13 +65,15 @@ export function usePhenoStressObservations(
         listDiaryOptionsForOwner(50),
         supabase.auth.getUser(),
       ]);
+      if (!mountedRef.current) return;
       setRows([...obs]);
       setDiary([...diaryRows]);
       setUserId(userRes.data.user?.id ?? null);
     } catch (err) {
+      if (!mountedRef.current) return;
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [huntId]);
 

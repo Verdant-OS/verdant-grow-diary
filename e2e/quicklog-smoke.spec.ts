@@ -34,6 +34,34 @@ const RESULTS_DIR = path.resolve(process.cwd(), "e2e/results");
 const REPORT_JSON = path.join(RESULTS_DIR, "quicklog-smoke-report.json");
 const REPORT_TXT = path.join(RESULTS_DIR, "quicklog-smoke-report.txt");
 
+/**
+ * Open the Quick Log dialog from any Quick Log button.
+ *
+ * The Quick Log buttons (including the global fast-add button in AppShell)
+ * open a type-picker menu first ("Choose what you want to log."). Pick
+ * "Note" — the least side-effectful type — to reach the actual dialog.
+ * Entry points that open the dialog directly are still supported (the menu
+ * is simply absent). Used for both the initial open and every reopen.
+ */
+async function openQuickLogDialog(page: import("@playwright/test").Page) {
+  await page
+    .getByRole("button", { name: /quick log|log entry|\+ log/i })
+    .first()
+    .click();
+  const noteMenuItem = page
+    .getByRole("menuitem", { name: /^note$/i })
+    .or(page.getByRole("option", { name: /^note$/i }))
+    .first();
+  const menuAppeared = await noteMenuItem
+    .waitFor({ state: "visible", timeout: 3_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (menuAppeared) {
+    await noteMenuItem.click();
+  }
+  await expect(page.getByRole("dialog")).toBeVisible();
+}
+
 test.describe("Quick Log smoke checklist", () => {
   test.skip(!PLANT_URL, "Set E2E_GROW_1_PLANT_URL to a Grow #1 plant page to run this smoke test.");
 
@@ -43,27 +71,7 @@ test.describe("Quick Log smoke checklist", () => {
     try {
       await page.goto(PLANT_URL!);
 
-      await page
-        .getByRole("button", { name: /quick log|log entry|\+ log/i })
-        .first()
-        .click();
-
-      // The Quick Log button now opens a type-picker menu first ("Choose
-      // what you want to log."). Pick "Note" — the least side-effectful
-      // type — to open the actual Quick Log dialog. Older entry points that
-      // open the dialog directly are still supported (menu simply absent).
-      const noteMenuItem = page
-        .getByRole("menuitem", { name: /^note$/i })
-        .or(page.getByRole("option", { name: /^note$/i }))
-        .first();
-      const menuAppeared = await noteMenuItem
-        .waitFor({ state: "visible", timeout: 3_000 })
-        .then(() => true)
-        .catch(() => false);
-      if (menuAppeared) {
-        await noteMenuItem.click();
-      }
-
+      await openQuickLogDialog(page);
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
 
@@ -227,11 +235,9 @@ test.describe("Quick Log smoke checklist", () => {
       await report.run(24, "Close and reopen Quick Log", async () => {
         await dialog.getByTestId("quick-log-post-save-close").click();
         await expect(page.getByRole("dialog")).toHaveCount(0);
-        await page
-          .getByRole("button", { name: /quick log|log entry|\+ log/i })
-          .first()
-          .click();
-        await expect(page.getByRole("dialog")).toBeVisible();
+        // Reopening hits the same type-picker menu as the initial open —
+        // reuse the shared helper (Codex review on #193).
+        await openQuickLogDialog(page);
         return "reopened";
       });
 

@@ -277,6 +277,9 @@ describe("Workflow: fixture verification gates smoke", () => {
     expect(wf).not.toMatch(/pull_request_target/);
     expect(wf).not.toMatch(/service_role/i);
     expect(fs.existsSync(path.join(ROOT, "e2e/.auth/user.json"))).toBe(false);
+    expect(
+      fs.existsSync(path.join(ROOT, "e2e/.auth/session-storage.json")),
+    ).toBe(false);
   });
 });
 

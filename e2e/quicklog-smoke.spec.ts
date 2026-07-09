@@ -176,7 +176,14 @@ test.describe("Quick Log smoke checklist", () => {
       });
 
       await report.run(13, "Leave Watering (ml) blank", async () => {
+        // The Watering (ml) field lives inside the collapsed "Add more
+        // details" section, so it is not rendered until that section is
+        // expanded (or a blank-ml save auto-expands it). Expand it here so
+        // the blank-value assertion is deterministic.
         const ml = dialog.getByTestId("quicklog-watering-ml");
+        if ((await ml.count()) === 0) {
+          await dialog.getByRole("switch", { name: /add more details/i }).click();
+        }
         await expect(ml).toHaveValue("");
         return "ml empty";
       });

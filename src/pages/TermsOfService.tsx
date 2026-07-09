@@ -2,7 +2,12 @@ import { LegalPageShell } from "./legal/LegalPageShell";
 
 export default function TermsOfService() {
   return (
-    <LegalPageShell title="Terms of Service" lastUpdated="July 9, 2026">
+    <LegalPageShell
+      title="Terms of Service"
+      lastUpdated="July 9, 2026"
+      path="/terms"
+      description="Terms of Service for Verdant Grow Diary — seller identity, Paddle Merchant of Record disclosure, acceptable use, and plain-language liability terms."
+    >
       <h2>1. Who you are contracting with</h2>
       <p>
         Verdant Grow Diary ("Verdant", "the Service", "we", "us") is operated

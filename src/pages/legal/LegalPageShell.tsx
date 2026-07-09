@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { usePageSeo } from "@/hooks/usePageSeo";
 
 /**
  * Shared shell for public legal pages (Terms, Privacy, Refund).
@@ -10,12 +11,22 @@ import { Link } from "react-router-dom";
 export function LegalPageShell({
   title,
   lastUpdated,
+  path,
+  description,
   children,
 }: {
   title: string;
   lastUpdated: string;
+  /** Canonical path (e.g. "/terms") for SEO discovery. */
+  path: string;
+  description: string;
   children: ReactNode;
 }) {
+  usePageSeo({
+    title: `${title} | Verdant Grow Diary`,
+    description,
+    path,
+  });
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border/40 px-6 py-4">

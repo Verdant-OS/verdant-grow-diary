@@ -2,7 +2,12 @@ import { LegalPageShell } from "./legal/LegalPageShell";
 
 export default function PrivacyPolicy() {
   return (
-    <LegalPageShell title="Privacy Policy" lastUpdated="July 9, 2026">
+    <LegalPageShell
+      title="Privacy Policy"
+      lastUpdated="July 9, 2026"
+      path="/privacy"
+      description="Privacy Policy for Verdant Grow Diary — what data is collected and why, retention, your rights, and Paddle's role as Merchant of Record payment processor."
+    >
       <h2>1. Who we are</h2>
       <p>
         Verdant Grow Diary is operated by{" "}

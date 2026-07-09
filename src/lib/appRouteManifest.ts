@@ -306,6 +306,19 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/plants", access: "auth" },
   { path: "/plants/:id", access: "auth" },
   { path: "/pricing", access: "public" },
+  {
+    path: "/privacy",
+    access: "public",
+    description: "Privacy Policy (public legal page; Paddle named as payment processor / MoR).",
+  },
+  { path: "/privacy-policy", access: "redirect", description: "→ /privacy (legal alias)" },
+  {
+    path: "/refund",
+    access: "public",
+    description: "Refund Policy (public legal page; 30-day money-back guarantee, Paddle MoR).",
+  },
+  { path: "/refund-policy", access: "redirect", description: "→ /refund (legal alias)" },
+  { path: "/refunds", access: "redirect", description: "→ /refund (legal alias)" },
   { path: "/register", access: "redirect", description: "→ /auth" },
   { path: "/reports", access: "auth" },
   { path: "/reports/post-grow/:growId", access: "auth", description: "Post-grow learning report." },
@@ -324,6 +337,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/tasks", access: "auth" },
   { path: "/tents", access: "auth" },
   { path: "/tents/:id", access: "auth" },
+  {
+    path: "/terms",
+    access: "public",
+    description: "Terms of Service (public legal page; seller + Paddle MoR disclosure).",
+  },
+  { path: "/terms-of-service", access: "redirect", description: "→ /terms (legal alias)" },
   { path: "/timeline", access: "auth" },
   {
     path: "/upgrade",

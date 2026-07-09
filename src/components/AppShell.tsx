@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import LegalFooterLinks from "@/components/LegalFooterLinks";
 import { Outlet, useNavigate } from "react-router-dom";
 import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -123,6 +124,14 @@ export default function AppShell() {
             ) : (
               <Outlet />
             )}
+            {/* In-flow legal footer: stays at the end of scrolled content
+                (never fixed), so the mobile FAB cannot clip it. */}
+            <footer
+              data-testid="app-shell-legal-footer"
+              className="mt-10 border-t border-border/40 pt-4"
+            >
+              <LegalFooterLinks className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground" />
+            </footer>
           </main>
         </div>
 

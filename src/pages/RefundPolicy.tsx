@@ -2,7 +2,12 @@ import { LegalPageShell } from "./legal/LegalPageShell";
 
 export default function RefundPolicy() {
   return (
-    <LegalPageShell title="Refund Policy" lastUpdated="July 9, 2026">
+    <LegalPageShell
+      title="Refund Policy"
+      lastUpdated="July 9, 2026"
+      path="/refund"
+      description="Verdant Grow Diary refund policy — 30-day money-back guarantee on paid plans, with refunds through Paddle (paddle.net) as Merchant of Record."
+    >
       <h2>30-day money-back guarantee</h2>
       <p>
         Verdant Grow Diary (operated by <strong>Matthew Tyler Cheek</strong>)

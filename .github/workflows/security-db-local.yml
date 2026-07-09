@@ -85,9 +85,15 @@ jobs:
           echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> "$GITHUB_ENV"
           echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
 
-      - name: Apply migrations (db reset)
+      - name: Apply migrations (db reset with grant-parity seed)
         if: env.ENABLED == 'true'
-        run: supabase db reset --no-seed 2>&1 | tee supabase-db-reset.log
+        # NOT --no-seed: supabase/seed.sql restores the production GRANT
+        # baseline that fresh local stacks (hardened default ACL) omit.
+        # Without it the harnesses' authenticated setup (tents/profiles
+        # inserts) fails with 42501 before any assertion runs. The seed is
+        # local-only and never touches the hosted project. See
+        # docs/security-regression-tests.md.
+        run: supabase db reset 2>&1 | tee supabase-db-reset.log
 
       - name: Profiles DB security
         if: env.ENABLED == 'true'

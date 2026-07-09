@@ -32,6 +32,27 @@ if (missing.length > 0) {
   process.exit(2);
 }
 
+// Refuse to run mutating service-role setup against a non-local project.
+// The spec itself also skips unless the URL is local, but fail loudly here
+// so a misconfigured runner surfaces a BLOCKED exit rather than skip-to-green.
+function isLocalSupabaseUrl(u) {
+  try {
+    const h = new URL(u).hostname.toLowerCase();
+    return ["127.0.0.1", "localhost", "::1", "0.0.0.0"].includes(h) || h.endsWith(".localhost");
+  } catch {
+    return false;
+  }
+}
+if (!isLocalSupabaseUrl(process.env.SUPABASE_URL)) {
+  console.error(
+    `BLOCKED: SUPABASE_URL is not a local loopback host.\n` +
+      `This harness creates/deletes auth users, tents, sensor readings, and\n` +
+      `idempotency rows; it must only run against a local \`supabase start\`\n` +
+      `stack (127.0.0.1 / localhost).`,
+  );
+  process.exit(2);
+}
+
 // When env is present, delegate to the vitest integration spec. Kept
 // separate from `test:security-regression` so required CI stays fast
 // and does not depend on a local database.
@@ -39,7 +60,7 @@ import("node:child_process").then(({ spawn }) => {
   const child = spawn(
     process.execPath,
     ["--experimental-vm-modules", "node_modules/vitest/vitest.mjs", "run",
-      "src/test/pi-ingest-commit-batch-replay.integration.test.ts"],
+      "src/test/integration/pi-ingest-commit-batch-replay.integration.test.ts"],
     { stdio: "inherit", env: process.env },
   );
   child.on("exit", (code) => process.exit(code ?? 1));

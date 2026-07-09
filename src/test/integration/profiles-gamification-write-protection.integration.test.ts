@@ -22,7 +22,26 @@ import { expectSanitizedDbError } from "./_helpers/sanitizedDbError";
 const URL = process.env.SUPABASE_URL ?? "";
 const ANON = process.env.SUPABASE_ANON_KEY ?? "";
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-const hasLocalSupabase = !!URL && !!ANON && !!SERVICE;
+// Safety gate: these suites do REAL service-role setup/teardown (create and
+// delete auth users, mutate app tables / storage). They must NEVER run
+// against a remote project, even if SUPABASE_* happen to be exported in a
+// shell or CI pointed at staging/production and the repo-wide `vitest run`
+// discovers this file. Require a LOCAL loopback Supabase URL.
+function isLocalSupabaseUrl(u: string): boolean {
+  try {
+    const h = new globalThis.URL(u).hostname.toLowerCase();
+    return (
+      h === "127.0.0.1" ||
+      h === "localhost" ||
+      h === "::1" ||
+      h === "0.0.0.0" ||
+      h.endsWith(".localhost")
+    );
+  } catch {
+    return false;
+  }
+}
+const hasLocalSupabase = !!URL && !!ANON && !!SERVICE && isLocalSupabaseUrl(URL);
 
 const d = hasLocalSupabase ? describe : describe.skip;
 

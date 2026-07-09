@@ -88,4 +88,71 @@ describe("PhenoHuntSetupProgressCard", () => {
     );
     expect(onMarkComplete).toHaveBeenCalledTimes(1);
   });
+
+  it("renders Setup complete and Comparison readiness as separate status lines", () => {
+    render(
+      <PhenoHuntSetupProgressCard
+        hunt={hunt({ setupCompletedAt: "2026-08-01T00:00:00Z" })}
+        candidateCount={2}
+      />,
+    );
+    const setupLine = screen.getByTestId("pheno-workspace-setup-progress-setup-status");
+    const compLine = screen.getByTestId("pheno-workspace-setup-progress-comparison-status");
+    expect(setupLine.textContent).toMatch(/Setup complete/);
+    expect(setupLine.textContent).toMatch(/Yes/);
+    // Default comparisonReadiness is not_ready — even when setup is done.
+    expect(compLine.textContent).toMatch(/Not comparison-ready yet/);
+  });
+
+  it("does not label a setup-complete hunt as Comparison-ready by default", () => {
+    render(
+      <PhenoHuntSetupProgressCard
+        hunt={hunt({ setupCompletedAt: "2026-08-01T00:00:00Z" })}
+        candidateCount={2}
+      />,
+    );
+    const card = screen.getByTestId("pheno-workspace-setup-progress");
+    expect(card.getAttribute("data-comparison-readiness")).toBe("not_ready");
+    expect(card.textContent).not.toMatch(/\bComparison-ready\b(?!\s*means)/);
+  });
+
+  it("reflects explicit comparisonReadiness prop values", () => {
+    const { rerender } = render(
+      <PhenoHuntSetupProgressCard
+        hunt={hunt({ setupCompletedAt: "2026-08-01T00:00:00Z" })}
+        candidateCount={2}
+        comparisonReadiness="comparison_ready"
+      />,
+    );
+    expect(
+      screen
+        .getByTestId("pheno-workspace-setup-progress-comparison-status")
+        .textContent,
+    ).toMatch(/Comparison-ready/);
+
+    rerender(
+      <PhenoHuntSetupProgressCard
+        hunt={hunt({ setupCompletedAt: "2026-08-01T00:00:00Z" })}
+        candidateCount={2}
+        comparisonReadiness="pending_until_cure"
+      />,
+    );
+    expect(
+      screen
+        .getByTestId("pheno-workspace-setup-progress-comparison-status")
+        .textContent,
+    ).toMatch(/Pending until cure/);
+  });
+
+  it("renders Setup complete and Comparison-ready definitions", () => {
+    render(
+      <PhenoHuntSetupProgressCard hunt={hunt()} candidateCount={2} onMarkComplete={vi.fn()} />,
+    );
+    expect(
+      screen.getByTestId("pheno-workspace-setup-progress-definition-setup").textContent,
+    ).toMatch(/Setup complete means your hunt has candidates and evidence goals\./);
+    expect(
+      screen.getByTestId("pheno-workspace-setup-progress-definition-comparison").textContent,
+    ).toMatch(/Comparison-ready means each candidate has enough evidence to compare honestly\./);
+  });
 });

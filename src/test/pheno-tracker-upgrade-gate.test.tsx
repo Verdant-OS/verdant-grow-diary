@@ -1,8 +1,9 @@
 /**
  * pheno-tracker-upgrade-gate.test.tsx
- * Free → upgrade card + single CTA + demo link. Pro → children. Canceled Pro
- * with allowReadOnly → read-only banner + children. Copy checks + forbidden
- * phrase absence.
+ *
+ * Free → improved upgrade card + single primary CTA + demo link + returnTo.
+ * Pro → children. Founder → children. Canceled Pro + allowReadOnly → banner +
+ * children. Forbidden marketing phrases stay absent.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
@@ -54,9 +55,12 @@ const FORBIDDEN = [
   /device control/i,
 ];
 
-function renderGate(props: Partial<React.ComponentProps<typeof PhenoTrackerUpgradeGate>> = {}) {
+function renderGate(
+  props: Partial<React.ComponentProps<typeof PhenoTrackerUpgradeGate>> = {},
+  initialPath = "/pheno-hunts/new",
+) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialPath]}>
       <PhenoTrackerUpgradeGate {...props}>
         <div data-testid="gated-child">Real workspace</div>
       </PhenoTrackerUpgradeGate>
@@ -74,19 +78,44 @@ describe("PhenoTrackerUpgradeGate", () => {
     expect(screen.queryByTestId("gated-child")).toBeNull();
   });
 
-  it("Free user sees upgrade card with a single primary CTA + demo link", () => {
+  it("Free user sees improved upgrade card with new copy + single primary CTA + demo link", () => {
     mode.current = "free";
     renderGate();
     expect(screen.getByText(/Pheno Tracker is a Pro feature\./i)).toBeDefined();
+    expect(
+      screen.getByText(
+        /Track candidate evidence, compare phenos, preserve keeper decisions, and document post-cure results\./i,
+      ),
+    ).toBeDefined();
+    expect(
+      screen.getByText(
+        /Use it to see what changed, what held up after cure, and what deserves another run\./i,
+      ),
+    ).toBeDefined();
+
     const upgradeLinks = screen.getAllByRole("link", { name: /upgrade to pro/i });
-    // Exactly one primary CTA (single button link).
     expect(upgradeLinks.length).toBe(1);
-    expect(upgradeLinks[0].getAttribute("href")).toBe("/upgrade");
-    expect(screen.getByTestId("pheno-tracker-upgrade-gate-demo-link").getAttribute("href"))
-      .toBe("/pheno-comparison");
+    // returnTo carried into the upgrade href for the gated Pheno route.
+    expect(upgradeLinks[0].getAttribute("href")).toBe(
+      "/upgrade?returnTo=%2Fpheno-hunts%2Fnew",
+    );
+
+    const demo = screen.getByTestId("pheno-tracker-upgrade-gate-demo-link");
+    expect(demo.getAttribute("href")).toBe("/pheno-comparison");
+    expect(demo.textContent).toMatch(/View Pheno Demo/i);
+
     expect(screen.queryByTestId("gated-child")).toBeNull();
     const body = document.body.textContent ?? "";
     for (const rx of FORBIDDEN) expect(body).not.toMatch(rx);
+  });
+
+  it("returnTo param is scoped to gated Pheno pathnames", () => {
+    mode.current = "free";
+    renderGate({}, "/pheno-hunts/abc/workspace");
+    const upgrade = screen.getAllByRole("link", { name: /upgrade to pro/i })[0];
+    expect(upgrade.getAttribute("href")).toBe(
+      "/upgrade?returnTo=%2Fpheno-hunts%2Fabc%2Fworkspace",
+    );
   });
 
   it("Pro user sees children (no gate)", () => {

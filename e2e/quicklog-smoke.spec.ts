@@ -47,6 +47,23 @@ test.describe("Quick Log smoke checklist", () => {
         .getByRole("button", { name: /quick log|log entry|\+ log/i })
         .first()
         .click();
+
+      // The Quick Log button now opens a type-picker menu first ("Choose
+      // what you want to log."). Pick "Note" — the least side-effectful
+      // type — to open the actual Quick Log dialog. Older entry points that
+      // open the dialog directly are still supported (menu simply absent).
+      const noteMenuItem = page
+        .getByRole("menuitem", { name: /^note$/i })
+        .or(page.getByRole("option", { name: /^note$/i }))
+        .first();
+      const menuAppeared = await noteMenuItem
+        .waitFor({ state: "visible", timeout: 3_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (menuAppeared) {
+        await noteMenuItem.click();
+      }
+
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
 

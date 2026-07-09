@@ -17,6 +17,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { expectSanitizedDbError } from "./_helpers/sanitizedDbError";
 
 const URL = process.env.SUPABASE_URL ?? "";
 const ANON = process.env.SUPABASE_ANON_KEY ?? "";
@@ -25,53 +26,8 @@ const hasLocalSupabase = !!URL && !!ANON && !!SERVICE;
 
 const d = hasLocalSupabase ? describe : describe.skip;
 
-// ─── Sanitized error assertions ──────────────────────────────────────────
-// Blocked gamification / RLS errors must never leak provider / customer /
-// subscription identifiers, service_role material, JWT-shaped tokens,
-// authorization headers, private env names, stack traces, or file:line refs.
-const FORBIDDEN_LEAKS: RegExp[] = [
-  /service[_-]?role/i,
-  /SUPABASE_SERVICE_ROLE_KEY/i,
-  /PAYMENTS?_.*SECRET/i,
-  /PADDLE_.*SECRET/i,
-  /sk_live_/i,
-  /sk_test_/i,
-  /cus_[A-Za-z0-9]+/,
-  /sub_[A-Za-z0-9]+/,
-  /pdl_[A-Za-z0-9]+/,
-  /pri_[A-Za-z0-9]+/,
-  /pro_[A-Za-z0-9]+/,
-  /paddle/i,
-  /stripe/i,
-  /provider/i,
-  /customer/i,
-  /subscription/i,
-  /bearer\s+/i,
-  /authorization/i,
-  /refresh[_-]?token/i,
-  /access[_-]?token/i,
-  /eyJ[a-zA-Z0-9_-]+\./, // JWT-shaped
-  /\bat\s+.+:\d+:\d+/, // stack frame like "at file.ts:42:11"
-  /\/(?:home|Users|var|root)\/[^\s'"]+:\d+:\d+/,
-];
-
-export function expectSanitizedDbError(err: unknown): void {
-  // Accept null / undefined (caller may want to assert separately).
-  if (err == null) return;
-  const obj = err as Record<string, unknown>;
-  const parts = [
-    obj.message,
-    obj.details,
-    obj.hint,
-    obj.code,
-    typeof obj.status === "number" ? String(obj.status) : obj.status,
-  ]
-    .filter((v) => typeof v === "string")
-    .join("\n");
-  for (const rx of FORBIDDEN_LEAKS) {
-    expect(parts, `leaked pattern ${rx}`).not.toMatch(rx);
-  }
-}
+// Re-export so existing importers continue to work.
+export { expectSanitizedDbError };
 
 interface TestUser {
   id: string;

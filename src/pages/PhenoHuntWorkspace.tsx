@@ -869,6 +869,20 @@ export default function PhenoHuntWorkspace() {
           </label>
         </header>
 
+        {ws.hunt ? (
+          <PhenoHuntSetupProgressCard
+            hunt={{
+              ...ws.hunt,
+              setupCompletedAt: setupCompletedLocal ?? ws.hunt.setupCompletedAt ?? null,
+            }}
+            candidateCount={candidates.length}
+            onMarkComplete={handleMarkSetupComplete}
+            saving={setupSaving}
+          />
+        ) : null}
+
+
+
         {candidates.length === 0 ? (
           <p data-testid="pheno-workspace-empty" className="text-sm text-muted-foreground">
             No candidates tagged to this hunt yet.

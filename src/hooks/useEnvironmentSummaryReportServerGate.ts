@@ -50,7 +50,7 @@ export function useEnvironmentSummaryReportServerGate(): EnvironmentSummaryRepor
       try {
         const { data, error } = await supabase.functions.invoke(
           "environment-summary-report-entitlement",
-          { body: { billing_env: getPaddleEnvironment() } },
+          { body: {} },
         );
         if (cancelled) return;
         // supabase-js surfaces non-2xx as `error` with a status; treat any

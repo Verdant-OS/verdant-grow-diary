@@ -132,4 +132,75 @@ describe("computePhenoHuntOnboardingViewModel", () => {
     expect(notConfirmed.steps.find((s) => s.id === "confirmation")!.complete).toBe(false);
     expect(confirmed.steps.find((s) => s.id === "confirmation")!.complete).toBe(true);
   });
+
+  // ---- Setup complete vs Comparison-ready separation ----
+
+  it("setupCompleted true + missing evidence → Setup complete but Not comparison-ready yet", () => {
+    // 1 candidate = tracking_only, no candidate evidence recorded.
+    const vm = computePhenoHuntOnboardingViewModel(
+      draft({ candidateIds: ["p1"], setupCompleted: true }),
+    );
+    const confirmation = vm.steps.find((s) => s.id === "confirmation")!;
+    expect(confirmation.complete).toBe(true);
+    // Readiness must not be comparison_ready just because setup is confirmed.
+    expect(vm.readiness).not.toBe("comparison_ready");
+    expect(vm.readinessLabel).toBe("Not comparison-ready yet");
+  });
+
+  it("2+ candidates + goals + missing phenotype notes → Ready for tracking + Not comparison-ready in checklist", () => {
+    const vm = computePhenoHuntOnboardingViewModel(
+      draft({
+        candidateIds: ["p1", "p2"],
+        candidateEvidence: [
+          { candidateId: "p1", hasPhenotypeNote: false },
+          { candidateId: "p2", hasPhenotypeNote: false },
+        ],
+      }),
+    );
+    // The view model's `readiness` label reflects candidate eligibility; the
+    // checklist reflects actual evidence gaps. Both must be visible.
+    const note = vm.checklist.find((c) => c.id === "phenotype_notes")!;
+    expect(note.status).toBe("missing");
+    expect(note.detail).toMatch(/no phenotype notes/i);
+    // The candidate count is comparison-eligible but evidence gaps remain.
+    expect(vm.candidateStatus).toBe("comparison_eligible");
+  });
+
+  it("full required evidence + 2+ candidates → readiness label is Comparison-ready", () => {
+    const vm = computePhenoHuntOnboardingViewModel(
+      draft({
+        candidateIds: ["p1", "p2"],
+        candidateEvidence: [
+          { candidateId: "p1", hasPhenotypeNote: true, hasPhotoOrObservation: true, hasLabel: true },
+          { candidateId: "p2", hasPhenotypeNote: true, hasPhotoOrObservation: true, hasLabel: true },
+        ],
+      }),
+    );
+    expect(vm.readiness).toBe("comparison_ready");
+    expect(vm.readinessLabel).toBe("Comparison-ready");
+  });
+
+  it("post-cure checklist item stays pending until cure", () => {
+    const vm = computePhenoHuntOnboardingViewModel(draft());
+    const post = vm.checklist.find((c) => c.id === "post_cure")!;
+    expect(post.status).toBe("pending");
+    expect(post.detail).toMatch(/pending until cure/i);
+  });
+
+  it("replication readiness stays pending, never inferred comparison-ready", () => {
+    const vm = computePhenoHuntOnboardingViewModel(draft());
+    const repl = vm.checklist.find((c) => c.id === "replication_readiness")!;
+    expect(repl.status).toBe("pending");
+    expect(repl.detail).toMatch(/pending/i);
+    // Even with full early evidence, replication readiness stays pending.
+    const full = computePhenoHuntOnboardingViewModel(
+      draft({
+        candidateEvidence: [
+          { candidateId: "p1", hasPhenotypeNote: true, hasPhotoOrObservation: true, hasLabel: true },
+          { candidateId: "p2", hasPhenotypeNote: true, hasPhotoOrObservation: true, hasLabel: true },
+        ],
+      }),
+    );
+    expect(full.checklist.find((c) => c.id === "replication_readiness")!.status).toBe("pending");
+  });
 });

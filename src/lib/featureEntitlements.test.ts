@@ -89,13 +89,11 @@ describe("featureEntitlements", () => {
   });
 
   it("helper source contains no localStorage/sessionStorage access", async () => {
-    // Static: import the module source and grep. Ensures no client-flag
-    // override can grant Pro access.
-    const src = await import("node:fs").then((fs) =>
-      fs.readFileSync(
-        new URL("../lib/featureEntitlements.ts", import.meta.url),
-        "utf8",
-      ),
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const src = fs.readFileSync(
+      path.resolve(process.cwd(), "src/lib/featureEntitlements.ts"),
+      "utf8",
     );
     expect(src).not.toMatch(/localStorage/);
     expect(src).not.toMatch(/sessionStorage/);

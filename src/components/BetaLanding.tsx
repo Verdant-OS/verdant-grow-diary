@@ -119,6 +119,9 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
   const search = currentSearch ?? (typeof window !== "undefined" ? window.location.search : "");
   const formUrl = rawUrl ? preserveUtmOnUrl(rawUrl, search) : null;
   const primaryLabel = formUrl ? "Request beta access" : "Beta form coming soon";
+  const rawFeedbackUrl = getBetaFeedbackFormUrl();
+  const feedbackUrl = rawFeedbackUrl ? preserveUtmOnUrl(rawFeedbackUrl, search) : null;
+  const feedbackLabel = feedbackUrl ? "Share post-demo feedback" : "Feedback form coming soon";
   const testIdRoot = `${variant}-beta`;
 
   return (

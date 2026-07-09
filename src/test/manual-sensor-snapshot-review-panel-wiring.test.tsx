@@ -1,7 +1,7 @@
 /**
  * Wiring test — the structured ManualSensorSnapshotReviewPanel appears inside
- * the existing review prompt, exposes the "manual" source, and gates
- * "Save anyway" on canSave. Normal readings still bypass the prompt.
+ * the mandatory review gate for EVERY manual save (normal, warning, blocker).
+ * Confirm gates the insert path; blocker states disable Confirm.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -38,30 +38,27 @@ function setField(label: RegExp, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 }
 
-describe("ManualSensorReadingCard — review panel wiring", () => {
+describe("ManualSensorReadingCard — review panel wiring inside mandatory gate", () => {
   beforeEach(() => {
     insertSpy.mockClear();
     insertSpy.mockResolvedValue(undefined);
   });
 
-  it("renders the structured review panel inside the review prompt", () => {
+  it("renders the structured review panel inside the review gate", () => {
     renderCard();
-    setField(/Air temp/i, "24"); // suspicious → prompt opens
+    setField(/Air temp/i, "24"); // warning: °C-looking value in °F field
     setField(/Humidity/i, "55");
     fireEvent.click(screen.getByTestId("manual-reading-save"));
 
     const prompt = screen.getByTestId("manual-reading-review-prompt");
-    expect(prompt).toBeInTheDocument();
     const panel = screen.getByTestId("manual-sensor-snapshot-review-panel");
     expect(prompt.contains(panel)).toBe(true);
-
-    // Source label is always "manual", never "live".
     expect(screen.getByTestId("snapshot-source-chip")).toHaveTextContent(/^manual$/);
     expect(panel.getAttribute("data-source")).toBe("manual");
     expect(prompt.textContent ?? "").not.toMatch(/\blive\b/i);
   });
 
-  it("Save anyway remains enabled when review has warnings only (canSave=true)", async () => {
+  it("warning-only readings confirm through the existing insert path with source=manual", async () => {
     renderCard();
     setField(/Air temp/i, "24");
     setField(/Humidity/i, "55");
@@ -70,24 +67,31 @@ describe("ManualSensorReadingCard — review panel wiring", () => {
     const panel = screen.getByTestId("manual-sensor-snapshot-review-panel");
     expect(panel.getAttribute("data-can-save")).toBe("true");
 
-    const saveAnyway = screen.getByTestId("manual-reading-review-save-anyway");
-    expect(saveAnyway).not.toBeDisabled();
+    const confirm = screen.getByTestId("manual-sensor-review-confirm");
+    expect(confirm).not.toBeDisabled();
+    expect(confirm.textContent ?? "").toMatch(/confirm manual snapshot/i);
 
-    fireEvent.click(saveAnyway);
+    fireEvent.click(confirm);
     await waitFor(() => expect(insertSpy).toHaveBeenCalled());
-    // Every payload row is source: "manual" — never "live".
     for (const call of insertSpy.mock.calls) {
       expect(call[0].source).toBe("manual");
+      expect(call[0].source).not.toBe("live");
     }
   });
 
-  it("normal readings still save without the review prompt or panel appearing", async () => {
+  it("normal readings also route through the gate before insert", async () => {
     renderCard();
     setField(/Air temp/i, "76");
     setField(/Humidity/i, "55");
     fireEvent.click(screen.getByTestId("manual-reading-save"));
+    // Insert must not fire until Confirm is clicked.
+    expect(insertSpy).not.toHaveBeenCalled();
+    expect(screen.getByTestId("manual-sensor-review-gate").getAttribute("data-state")).toBe("ok");
+
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
     await waitFor(() => expect(insertSpy).toHaveBeenCalled());
-    expect(screen.queryByTestId("manual-reading-review-prompt")).toBeNull();
-    expect(screen.queryByTestId("manual-sensor-snapshot-review-panel")).toBeNull();
+    for (const call of insertSpy.mock.calls) {
+      expect(call[0].source).toBe("manual");
+    }
   });
 });

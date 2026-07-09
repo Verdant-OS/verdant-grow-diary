@@ -31,8 +31,15 @@ export function LegalPageShell({
     description,
     path,
   });
+  const canonicalUrl = `${SITE_ORIGIN}${path}`;
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <>
+      {createPortal(
+        <link rel="canonical" href={canonicalUrl} />,
+        document.head,
+      )}
+      <main className="min-h-screen bg-background text-foreground">
+
       <header className="border-b border-border/40 px-6 py-4">
         <div className="mx-auto max-w-3xl flex items-center justify-between text-sm">
           <Link to="/welcome" className="font-semibold hover:text-primary">

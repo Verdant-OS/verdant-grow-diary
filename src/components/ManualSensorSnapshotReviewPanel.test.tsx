@@ -116,10 +116,18 @@ describe("ManualSensorSnapshotReviewPanel", () => {
     expect(screen.getByTestId("snapshot-finding-vpd_high")).toHaveAttribute("role", "status");
   });
 
-  it("only lists preview fields that are present (nulls hidden)", () => {
+  it("only lists preview fields that are present (nulls hidden) — non-clean state", () => {
     render(
       <ManualSensorSnapshotReviewPanel
         result={baseResult({
+          findings: [
+            {
+              key: "vpd_high",
+              severity: "warning",
+              label: "VPD",
+              message: "VPD is unusually high.",
+            },
+          ],
           normalizedPreview: {
             tempF: 75,
             humidity: null,

@@ -1,16 +1,25 @@
 /**
- * Lovable built-in Paddle webhook sink (Phase 2a).
+ * Lovable built-in Paddle webhook sink (Phase 2a + reliability patch).
  *
- * Writes to `public.subscriptions` and appends to
- * `public.lovable_paddle_events` for idempotency + audit.
+ * Thin transport wrapper around the pure `handleVerifiedEvent`
+ * orchestrator. All lifecycle / duplicate / failure semantics live in
+ * orchestrator.ts and are unit-tested there.
  *
- * Does NOT change entitlements. Phase 2b bridges the resolver.
- * Does NOT touch `billing_subscriptions`, `paddle_events`, or the BYO
- * `paddle-webhook/` function — those remain the BYO source of truth.
+ * Response contract (see orchestrator.ts for the full state machine):
+ *   - non-POST                        → 405
+ *   - bad env query param             → 400
+ *   - invalid Paddle signature        → 400
+ *   - event durably recorded + write  → 200
+ *   - duplicate already processed     → 200 (no-op)
+ *   - duplicate previously failed     → reprocess, 200/500 per result
+ *   - any DB failure before durable
+ *     success                         → 500 so Paddle retries
+ *
+ * Does NOT touch entitlements, gates, or the BYO paddle-webhook stack.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { verifyWebhook, type PaddleEnv } from '../_shared/paddle.ts';
-import { auditFields, decide } from './eventProcessor.ts';
+import { handleVerifiedEvent, type Deps, type EventLikeWithId } from './orchestrator.ts';
 
 let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
@@ -23,98 +32,77 @@ function getSupabase() {
   return _supabase;
 }
 
-function looksLikeEventId(v: unknown): v is string {
-  return typeof v === 'string' && v.length > 0;
-}
-
-async function logEvent(
-  event: { eventId?: string; occurredAt?: string; eventType?: string; data?: unknown },
-  env: PaddleEnv,
-  processedOk: boolean,
-  skipReason: string | null,
-  rawPayload: string,
-) {
-  const eventId = looksLikeEventId(event.eventId)
-    ? event.eventId
-    : `synthetic_${crypto.randomUUID()}`;
-  const audit = auditFields(
-    event as Parameters<typeof auditFields>[0],
-    env,
-  );
-  // Idempotent insert keyed by paddle_event_id (unique). Duplicate deliveries
-  // return a conflict, which is exactly the idempotency guarantee we want.
-  try {
-    await getSupabase().from('lovable_paddle_events').insert({
-      paddle_event_id: eventId,
-      event_type: audit.event_type,
-      environment: audit.environment,
-      user_id: audit.user_id,
-      paddle_subscription_id: audit.paddle_subscription_id,
-      paddle_transaction_id: audit.paddle_transaction_id,
-      price_external_id: audit.price_external_id,
-      product_external_id: audit.product_external_id,
-      processed_ok: processedOk,
-      skip_reason: skipReason,
-      payload: safeParseJson(rawPayload),
-    });
-  } catch (e) {
-    // Duplicate = already processed. Any other error is logged but does not
-    // fail the 200 back to Paddle (Paddle would just retry).
-    console.log('lovable_paddle_events insert non-fatal error:', String(e));
-  }
-}
-
 function safeParseJson(s: string): unknown {
-  try { return JSON.parse(s); } catch { return { _raw: s.slice(0, 4000) }; }
+  try {
+    return JSON.parse(s);
+  } catch {
+    return { _raw: s.slice(0, 4000) };
+  }
 }
 
-async function processEvent(
-  event: unknown,
-  env: PaddleEnv,
-  rawPayload: string,
-) {
-  const decision = decide(event as Parameters<typeof decide>[0], env, new Date());
-
-  const evId = (event as { eventId?: string }).eventId;
-
-  if (decision.kind === 'skip') {
-    console.log('lovable-paddle skip:', decision.reason, 'event:', (event as { eventType?: string }).eventType);
-    await logEvent(event as Parameters<typeof logEvent>[0], env, false, decision.reason, rawPayload);
-    return;
-  }
-
-  if (decision.kind === 'upsert_subscription' || decision.kind === 'record_lifetime') {
-    // Idempotent on paddle_subscription_id (unique index).
-    const { error } = await getSupabase()
-      .from('subscriptions')
-      .upsert(decision.row, { onConflict: 'paddle_subscription_id' });
-    if (error) {
-      console.error('subscriptions upsert error:', error.message);
-      await logEvent(event as Parameters<typeof logEvent>[0], env, false, `db_error:${error.message}`, rawPayload);
-      return;
-    }
-    await logEvent(event as Parameters<typeof logEvent>[0], env, true, null, rawPayload);
-    return;
-  }
-
-  if (decision.kind === 'update_subscription') {
-    const { error } = await getSupabase()
-      .from('subscriptions')
-      .update(decision.patch)
-      .eq('paddle_subscription_id', decision.paddleSubscriptionId)
-      .eq('environment', env);
-    if (error) {
-      console.error('subscriptions update error:', error.message);
-      await logEvent(event as Parameters<typeof logEvent>[0], env, false, `db_error:${error.message}`, rawPayload);
-      return;
-    }
-    await logEvent(event as Parameters<typeof logEvent>[0], env, true, null, rawPayload);
-    return;
-  }
-
-  // Exhaustive; TS narrows to never.
-  const _: never = decision;
-  return _;
+function buildDeps(): Deps {
+  const sb = getSupabase();
+  return {
+    async insertEventReceived({ paddle_event_id, audit, payload }) {
+      const { error } = await sb.from('lovable_paddle_events').insert({
+        paddle_event_id,
+        event_type: audit.event_type,
+        environment: audit.environment,
+        user_id: audit.user_id,
+        paddle_subscription_id: audit.paddle_subscription_id,
+        paddle_transaction_id: audit.paddle_transaction_id,
+        price_external_id: audit.price_external_id,
+        product_external_id: audit.product_external_id,
+        processing_status: 'received',
+        processed_ok: false,
+        skip_reason: null,
+        last_error: null,
+        payload,
+      });
+      if (!error) return { ok: true };
+      // 23505 = unique_violation on paddle_event_id → duplicate delivery.
+      if ((error as { code?: string }).code === '23505') {
+        return { ok: true, duplicate: true };
+      }
+      return { ok: false, error: error.message };
+    },
+    async getExistingEvent(paddle_event_id) {
+      const { data, error } = await sb
+        .from('lovable_paddle_events')
+        .select('processing_status')
+        .eq('paddle_event_id', paddle_event_id)
+        .maybeSingle();
+      if (error) return { ok: false, error: error.message };
+      return {
+        ok: true,
+        row: (data ?? null) as { processing_status: 'received' | 'processed' | 'skipped' | 'failed' } | null,
+      };
+    },
+    async upsertSubscription(row) {
+      const { error } = await sb
+        .from('subscriptions')
+        .upsert(row, { onConflict: 'paddle_subscription_id' });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
+    async updateSubscription(paddle_subscription_id, patch, env) {
+      const { error } = await sb
+        .from('subscriptions')
+        .update(patch)
+        .eq('paddle_subscription_id', paddle_subscription_id)
+        .eq('environment', env);
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
+    async markEvent(paddle_event_id, patch) {
+      const { error } = await sb
+        .from('lovable_paddle_events')
+        .update(patch)
+        .eq('paddle_event_id', paddle_event_id);
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
+  };
 }
 
 Deno.serve(async (req) => {
@@ -128,31 +116,40 @@ Deno.serve(async (req) => {
     return new Response('Invalid env', { status: 400 });
   }
 
-  // We need the raw body twice: once for Paddle signature verification
-  // (via verifyWebhook) and once to persist as-is into the audit log.
-  // verifyWebhook consumes req.text(), so we clone first.
+  // Clone before verifyWebhook consumes the body — we persist the raw
+  // payload for audit.
   const cloned = req.clone();
   const rawBody = await cloned.text();
 
-  let event: unknown;
+  let event: EventLikeWithId;
   try {
-    event = await verifyWebhook(req, env);
+    event = (await verifyWebhook(req, env)) as EventLikeWithId;
   } catch (e) {
     console.error('paddle signature verification failed:', String(e));
     return new Response('Invalid signature', { status: 400 });
   }
 
+  let result;
   try {
-    await processEvent(event, env, rawBody);
+    result = await handleVerifiedEvent(
+      buildDeps(),
+      event,
+      env,
+      new Date(),
+      safeParseJson(rawBody),
+    );
   } catch (e) {
-    // Log but still 200 — Paddle will retry a 5xx forever and we don't want
-    // duplicate deliveries when the failure was transient. Idempotency
-    // protects us on retry.
-    console.error('processEvent error:', String(e));
+    console.error('handleVerifiedEvent threw:', String(e));
+    // Uncaught throw → treat as transient, ask Paddle to retry.
+    return new Response(JSON.stringify({ error: 'internal' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
-  return new Response(JSON.stringify({ received: true }), {
-    status: 200,
+  console.log('payments-webhook result:', result.reason);
+  return new Response(JSON.stringify({ status: result.reason }), {
+    status: result.httpStatus,
     headers: { 'Content-Type': 'application/json' },
   });
 });

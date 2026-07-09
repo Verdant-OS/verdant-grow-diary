@@ -11,7 +11,6 @@ import RootErrorBoundary from "@/components/RootErrorBoundary";
 import RequireOperatorRole from "./components/RequireOperatorRole";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 
-
 // Route pages and the authenticated AppShell are code-split so the public
 // marketing / auth entry paths (/welcome, /pricing, /hardware-integrations,
 // /pheno-comparison, /auth) never download the entire authenticated app.
@@ -217,13 +216,6 @@ const App = () => (
                       RLS-scoped SELECT (empty/graceful without a session);
                       still read-only — no writes/AI/automation. */}
                   <Route path="/pheno-hunts/:id/compare" element={<PhenoHuntCompare />} />
-                  {/* Grower's own hunt workspace: enter trait scores + keeper
-                      decisions. RLS-scoped writes of own data; suggest-only,
-                      no AI/Action Queue/automation. */}
-                  <Route path="/pheno-hunts/:id/workspace" element={<PhenoHuntWorkspace />} />
-                  {/* Keepers, clone lineage, and breeding crosses. RLS-scoped
-                      writes of own data; data/record-only, no automation. */}
-                  <Route path="/pheno-hunts/:id/keepers" element={<PhenoKeepersPage />} />
 
                   <Route element={<AppShell />}>
                     <Route path="/" element={<Dashboard />} />
@@ -260,6 +252,12 @@ const App = () => (
                     <Route path="/grows" element={<Grows />} />
                     <Route path="/grows/:growId" element={<GrowDetail />} />
                     <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
+                    {/* Write-capable hunt surfaces live BEHIND the auth gate:
+                        workspace (trait scores + keeper decisions) and keepers
+                        (clone lineage + crosses) do RLS-scoped writes of own
+                        data. Read-only compare/showcase stay public above. */}
+                    <Route path="/pheno-hunts/:id/workspace" element={<PhenoHuntWorkspace />} />
+                    <Route path="/pheno-hunts/:id/keepers" element={<PhenoKeepersPage />} />
                     <Route path="/breeding" element={<BreedingProgramsIndex />} />
                     <Route path="/breeding/new" element={<BreedingProgramNew />} />
                     <Route path="/breeding/:programId" element={<BreedingProgramDetail />} />

@@ -13,16 +13,25 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
   useSensorReadings: () => ({ data: [], isLoading: false, error: null }),
 }));
 
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    from: () => ({
-      select: () => ({
-        eq: () => ({ order: async () => ({ data: [], error: null }) }),
+vi.mock("@/integrations/supabase/client", () => {
+  // Chain tail must support every read shape the rendered surfaces use:
+  // .order() (lists) and .maybeSingle() (useMyEntitlements subscription +
+  // staff-role reads), including a second chained .eq().
+  const tail = {
+    order: async () => ({ data: [], error: null }),
+    maybeSingle: async () => ({ data: null, error: null }),
+  };
+  return {
+    supabase: {
+      from: () => ({
+        select: () => ({
+          eq: () => ({ ...tail, eq: () => tail }),
+        }),
       }),
-    }),
-    functions: { invoke: async () => ({ data: { ok: true }, error: null }) },
-  },
-}));
+      functions: { invoke: async () => ({ data: { ok: true }, error: null }) },
+    },
+  };
+});
 
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { email: "grower@example.com" }, signOut: vi.fn() }),

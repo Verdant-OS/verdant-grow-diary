@@ -58,11 +58,8 @@ import {
   type PricingTier,
 } from "@/config/pricing";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
-import {
-  resolvePaddleConfig,
-  unavailableMessage,
-  type PaddleConfig,
-} from "@/lib/paddleConfig";
+import { logsPath } from "@/lib/routes";
+import { resolvePaddleConfig, unavailableMessage, type PaddleConfig } from "@/lib/paddleConfig";
 
 // --- Paddle overlay typing (loose — we only call a couple of methods). -------
 interface PaddleCheckoutOpenPayload {
@@ -121,9 +118,7 @@ function usePaddle(config: PaddleConfig): {
     }
     setLoading(true);
 
-    const existing = document.querySelector<HTMLScriptElement>(
-      `script[src="${PADDLE_JS_SRC}"]`,
-    );
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${PADDLE_JS_SRC}"]`);
 
     const init = () => {
       try {
@@ -179,7 +174,7 @@ function usePaddle(config: PaddleConfig): {
     ready,
     loading,
     error,
-    paddle: ready ? window.Paddle ?? null : null,
+    paddle: ready ? (window.Paddle ?? null) : null,
     retry,
   };
 }
@@ -239,18 +234,13 @@ function CheckoutStatusBanner({
       data-variant={variant}
       className={cn(
         "mt-6 rounded-lg border p-4 text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3",
-        variant === "info" &&
-          "border-border/60 bg-muted/40 text-muted-foreground",
-        variant === "warn" &&
-          "border-amber-500/40 bg-amber-500/5 text-foreground",
-        variant === "error" &&
-          "border-destructive/50 bg-destructive/5 text-foreground",
+        variant === "info" && "border-border/60 bg-muted/40 text-muted-foreground",
+        variant === "warn" && "border-amber-500/40 bg-amber-500/5 text-foreground",
+        variant === "error" && "border-destructive/50 bg-destructive/5 text-foreground",
       )}
     >
       <div className="flex items-start gap-2">
-        {loading && (
-          <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-muted-foreground" />
-        )}
+        {loading && <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-muted-foreground" />}
         <div>
           <p className="font-medium">{title}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{body}</p>
@@ -335,28 +325,18 @@ function TierCard({
       )}
     >
       {tier.highlighted && (
-        <Badge
-          className="absolute -top-3 left-1/2 -translate-x-1/2"
-          variant="default"
-        >
+        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2" variant="default">
           Most popular
         </Badge>
       )}
       <CardHeader>
         <CardTitle className="font-display text-xl">{tier.name}</CardTitle>
         <CardDescription>
-          <span className="text-3xl font-bold text-foreground">
-            {tier.priceDisplay}
-          </span>{" "}
-          <span className="text-sm text-muted-foreground">
-            {tier.priceSubtext}
-          </span>
+          <span className="text-3xl font-bold text-foreground">{tier.priceDisplay}</span>{" "}
+          <span className="text-sm text-muted-foreground">{tier.priceSubtext}</span>
         </CardDescription>
         {tier.cap && (
-          <p
-            className="mt-1 text-xs text-muted-foreground"
-            data-testid={`tier-${tier.id}-cap`}
-          >
+          <p className="mt-1 text-xs text-muted-foreground" data-testid={`tier-${tier.id}-cap`}>
             {tier.cap.claimed} of {tier.cap.total} claimed
           </p>
         )}
@@ -381,9 +361,7 @@ function TierCard({
         >
           {ctaLabel}
         </Button>
-        {ctaHint && (
-          <p className="text-xs text-muted-foreground text-center">{ctaHint}</p>
-        )}
+        {ctaHint && <p className="text-xs text-muted-foreground text-center">{ctaHint}</p>}
       </CardFooter>
     </Card>
   );
@@ -396,10 +374,7 @@ function ComparisonCell({ value }: { value: string | boolean }) {
     return value ? (
       <Check className="mx-auto h-4 w-4 text-primary" aria-label="Included" />
     ) : (
-      <X
-        className="mx-auto h-4 w-4 text-muted-foreground/60"
-        aria-label="Not included"
-      />
+      <X className="mx-auto h-4 w-4 text-muted-foreground/60" aria-label="Not included" />
     );
   }
   return <span className="text-sm">{value}</span>;
@@ -407,14 +382,8 @@ function ComparisonCell({ value }: { value: string | boolean }) {
 
 function PlanComparisonTable() {
   return (
-    <section
-      aria-label="Plan comparison"
-      className="mt-16"
-      data-testid="plan-comparison"
-    >
-      <h2 className="font-display text-2xl font-semibold text-center">
-        Compare plans
-      </h2>
+    <section aria-label="Plan comparison" className="mt-16" data-testid="plan-comparison">
+      <h2 className="font-display text-2xl font-semibold text-center">Compare plans</h2>
       <div className="mt-6 overflow-x-auto rounded-lg border border-border/60">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-muted/40">
@@ -435,10 +404,7 @@ function PlanComparisonTable() {
             {PLAN_COMPARISON.map((row, idx) => (
               <tr
                 key={row.label}
-                className={cn(
-                  "border-t border-border/40",
-                  idx % 2 === 1 && "bg-muted/20",
-                )}
+                className={cn("border-t border-border/40", idx % 2 === 1 && "bg-muted/20")}
               >
                 <td className="p-3 text-left font-medium">{row.label}</td>
                 {PRICING_TIERS.map((t) => (
@@ -459,11 +425,7 @@ function PlanComparisonTable() {
 
 function UpgradeFaq() {
   return (
-    <section
-      aria-label="Frequently asked questions"
-      className="mt-16"
-      data-testid="upgrade-faq"
-    >
+    <section aria-label="Frequently asked questions" className="mt-16" data-testid="upgrade-faq">
       <h2 className="font-display text-2xl font-semibold text-center">
         Frequently asked questions
       </h2>
@@ -471,9 +433,7 @@ function UpgradeFaq() {
         {UPGRADE_FAQ.map((item, i) => (
           <AccordionItem key={item.q} value={`faq-${i}`}>
             <AccordionTrigger className="text-left">{item.q}</AccordionTrigger>
-            <AccordionContent className="text-sm text-muted-foreground">
-              {item.a}
-            </AccordionContent>
+            <AccordionContent className="text-sm text-muted-foreground">{item.a}</AccordionContent>
           </AccordionItem>
         ))}
       </Accordion>
@@ -507,11 +467,7 @@ function billingPeriodLabel(p: PricingTier["billingPeriod"]): string {
   }
 }
 
-function CheckoutConfirmDialog({
-  state,
-  onCancel,
-  onConfirm,
-}: ConfirmDialogProps) {
+function CheckoutConfirmDialog({ state, onCancel, onConfirm }: ConfirmDialogProps) {
   const open = state !== null;
   return (
     <Dialog
@@ -526,8 +482,7 @@ function CheckoutConfirmDialog({
             <DialogHeader>
               <DialogTitle>Confirm your plan</DialogTitle>
               <DialogDescription>
-                You'll review payment details in Paddle before purchase. No
-                charge is made yet.
+                You'll review payment details in Paddle before purchase. No charge is made yet.
               </DialogDescription>
             </DialogHeader>
             <div className="rounded-md border border-border/60 p-4 text-sm">
@@ -538,15 +493,10 @@ function CheckoutConfirmDialog({
                 </span>
               </div>
               <div className="mt-2 flex items-baseline gap-1">
-                <span
-                  className="text-2xl font-bold"
-                  data-testid="checkout-confirm-price"
-                >
+                <span className="text-2xl font-bold" data-testid="checkout-confirm-price">
                   {state.tier.priceDisplay}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {state.tier.priceSubtext}
-                </span>
+                <span className="text-xs text-muted-foreground">{state.tier.priceSubtext}</span>
               </div>
             </div>
             <DialogFooter className="gap-2">
@@ -558,11 +508,7 @@ function CheckoutConfirmDialog({
               >
                 Cancel
               </Button>
-              <Button
-                type="button"
-                onClick={onConfirm}
-                data-testid="checkout-confirm-continue"
-              >
+              <Button type="button" onClick={onConfirm} data-testid="checkout-confirm-continue">
                 Continue to checkout
               </Button>
             </DialogFooter>
@@ -593,11 +539,8 @@ function UpgradeSuccessPanel({
   planIdFromQuery: string | null;
 }) {
   if (!visible) return null;
-  const resolvedId = currentPlanKnown
-    ? currentPlanId
-    : (planIdFromQuery ?? null);
-  const tier =
-    (resolvedId && PRICING_TIERS.find((t) => t.id === resolvedId)) || null;
+  const resolvedId = currentPlanKnown ? currentPlanId : (planIdFromQuery ?? null);
+  const tier = (resolvedId && PRICING_TIERS.find((t) => t.id === resolvedId)) || null;
   const activationConfirmed =
     currentPlanKnown &&
     !!currentPlanId &&
@@ -614,9 +557,7 @@ function UpgradeSuccessPanel({
       data-activated={activationConfirmed ? "true" : "false"}
       className="mt-8 rounded-lg border border-primary/40 bg-primary/5 p-5"
     >
-      <h2 className="font-display text-xl font-semibold">
-        Upgrade checkout complete
-      </h2>
+      <h2 className="font-display text-xl font-semibold">Upgrade checkout complete</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         {activationConfirmed
           ? "Your plan is active. Your newly unlocked features are listed below."
@@ -624,9 +565,7 @@ function UpgradeSuccessPanel({
       </p>
       {tier && unlockedFeatures.length > 0 ? (
         <div className="mt-4" data-testid="upgrade-success-features">
-          <p className="text-sm font-medium">
-            {tier.name} — newly unlocked features
-          </p>
+          <p className="text-sm font-medium">{tier.name} — newly unlocked features</p>
           <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
             {unlockedFeatures.map((f) => {
               const rowKey = successPanelFeatureRowKey(f);
@@ -646,28 +585,18 @@ function UpgradeSuccessPanel({
         </div>
       ) : (
         <p className="mt-3 text-sm text-muted-foreground">
-          We're checking your account status. If checkout completed, your
-          account should update shortly.
+          We're checking your account status. If checkout completed, your account should update
+          shortly.
         </p>
       )}
       <div className="mt-5 flex flex-wrap gap-2">
         <Button asChild size="sm" data-testid="upgrade-success-settings">
           <Link to="/settings">Go to Settings</Link>
         </Button>
-        <Button
-          asChild
-          size="sm"
-          variant="outline"
-          data-testid="upgrade-success-diary"
-        >
-          <Link to="/logs">View grow diary</Link>
+        <Button asChild size="sm" variant="outline" data-testid="upgrade-success-diary">
+          <Link to={logsPath()}>View grow diary</Link>
         </Button>
-        <Button
-          asChild
-          size="sm"
-          variant="ghost"
-          data-testid="upgrade-success-plans"
-        >
+        <Button asChild size="sm" variant="ghost" data-testid="upgrade-success-plans">
           <Link to="/upgrade">Back to plans</Link>
         </Button>
       </div>
@@ -696,9 +625,7 @@ export default function Upgrade() {
   const { loading: entLoading, entitlement } = useMyEntitlements();
 
   const currentPlanKnown = !entLoading && !!entitlement?.displayPlanId;
-  const currentPlanId = currentPlanKnown
-    ? (entitlement.displayPlanId as string)
-    : null;
+  const currentPlanId = currentPlanKnown ? (entitlement.displayPlanId as string) : null;
 
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
@@ -726,16 +653,12 @@ export default function Upgrade() {
       paddle.Checkout.open({
         items: [{ priceId: tier.paddlePriceId, quantity: 1 }],
         successCallback: () => {
-          toast.success(
-            "Checkout complete. Your plan will update once confirmed.",
-          );
+          toast.success("Checkout complete. Your plan will update once confirmed.");
         },
         closeCallback: () => {},
       });
     } catch (e) {
-      toast.error(
-        e instanceof Error ? e.message : "Checkout failed to open.",
-      );
+      toast.error(e instanceof Error ? e.message : "Checkout failed to open.");
     }
   };
 
@@ -746,24 +669,21 @@ export default function Upgrade() {
           Choose your Verdant plan
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Plant memory, sensor truth, and grower-approved action. Prices shown
-          are provisional.
+          Plant memory, sensor truth, and grower-approved action. Prices shown are provisional.
         </p>
         {entLoading && (
           <p
             className="mt-3 inline-flex items-center gap-2 text-xs text-muted-foreground"
             data-testid="upgrade-loading"
           >
-            <Loader2 className="h-3 w-3 animate-spin" /> Loading your current
-            plan…
+            <Loader2 className="h-3 w-3 animate-spin" /> Loading your current plan…
           </p>
         )}
       </header>
 
       <UpgradeSuccessPanel
         visible={
-          searchParams.get("checkout") === "success" ||
-          searchParams.get("upgrade") === "success"
+          searchParams.get("checkout") === "success" || searchParams.get("upgrade") === "success"
         }
         currentPlanKnown={currentPlanKnown}
         currentPlanId={currentPlanId}
@@ -778,7 +698,6 @@ export default function Upgrade() {
         ready={paddleReady}
         onRetry={retryPaddle}
       />
-
 
       <section
         aria-label="Pricing tiers"

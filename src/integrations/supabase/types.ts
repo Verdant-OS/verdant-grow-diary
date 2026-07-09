@@ -2935,7 +2935,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      pheno_sex_observations_latest: {
+        Row: {
+          herm_observed: boolean | null
+          hunt_id: string | null
+          note: string | null
+          observed_at: string | null
+          plant_id: string | null
+          sex: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_sex_observations_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_sex_observations_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       ai_credit_allowance: {
@@ -3111,6 +3137,7 @@ export type Database = {
           p_action: string
           p_details?: Json
           p_humidity_pct?: number
+          p_idempotency_key?: string
           p_note?: string
           p_occurred_at?: string
           p_target_id: string

@@ -223,6 +223,19 @@ export function usePhenoHuntWorkspace(
   const saveDecision = useCallback(
     async (plantId: string, decision: PhenoKeeperDecision, reason?: string | null) => {
       if (!id) return false;
+      // Dirty-check (scale audit C2): the Save button fires decision + sex
+      // together on every click; only append to the immutable audit log when
+      // the value actually changed, otherwise each save mints redundant
+      // append-only rows forever.
+      const existingDecision = decisionsByPlant[plantId];
+      const normalizedReason = reason?.trim() || null;
+      if (
+        existingDecision &&
+        existingDecision.decision === decision &&
+        (existingDecision.note?.trim() || null) === normalizedReason
+      ) {
+        return true;
+      }
       setSaving(plantId);
       const at = new Date().toISOString();
       // Current-decision store (flat, one row per candidate) …
@@ -255,7 +268,7 @@ export function usePhenoHuntWorkspace(
       );
       return false;
     },
-    [id],
+    [id, decisionsByPlant],
   );
 
   const saveRound = useCallback(
@@ -306,6 +319,17 @@ export function usePhenoHuntWorkspace(
   const saveSex = useCallback(
     async (plantId: string, sex: PhenoSexObservation, note?: string | null) => {
       if (!id) return false;
+      // Dirty-check (scale audit C2): skip the append when the latest
+      // recorded observation already matches.
+      const existingSex = sexByPlant[plantId];
+      const normalizedNote = note?.trim() || null;
+      if (
+        existingSex &&
+        existingSex.sex === sex &&
+        (existingSex.note?.trim() || null) === normalizedNote
+      ) {
+        return true;
+      }
       setSaving(plantId);
       const res = await appendSexObservation({ huntId: id, plantId, sex, note });
       setSaving(null);
@@ -325,7 +349,7 @@ export function usePhenoHuntWorkspace(
       setError(res.error);
       return false;
     },
-    [id],
+    [id, sexByPlant],
   );
 
   const saveSmokeTest = useCallback(

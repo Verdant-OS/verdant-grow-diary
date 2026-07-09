@@ -138,10 +138,16 @@ export function usePhenoStressObservations(
   }, []);
 
   const summariesByPlant = useMemo(() => {
+    // Single-pass group-by, then summarize each candidate's own slice —
+    // avoids re-filtering the full row set once per candidate (scale
+    // audit M4: O(candidates x rows) -> O(rows)).
+    const grouped: Record<string, PhenoStressObservationRow[]> = {};
+    for (const r of rows) {
+      (grouped[r.plantId] ??= []).push(r);
+    }
     const map: Record<string, PhenoStressSummary> = {};
-    const plantIds = new Set(rows.map((r) => r.plantId));
-    for (const pid of plantIds) {
-      map[pid] = summarizeStressForCandidate(pid, rows);
+    for (const [pid, own] of Object.entries(grouped)) {
+      map[pid] = summarizeStressForCandidate(pid, own);
     }
     return map;
   }, [rows]);

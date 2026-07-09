@@ -92,32 +92,48 @@ export async function createPhenoHunt(
   const huntId = (hunt as { id: string }).id;
   const tagged: string[] = [];
 
-  // Tag each candidate plant. Per-plant update keeps each label correct and
-  // RLS-scoped without smuggling other plants' rows into a bulk update.
-  for (let i = 0; i < input.plantIds.length; i++) {
-    const plantId = input.plantIds[i];
-    const override = input.labels?.[plantId]?.trim();
-    const label = override && override.length > 0
-      ? override
-      : defaultCandidateLabel(i);
-
-    const { error: updErr } = await client
-      .from("plants")
-      .update({
-        pheno_hunt_id: huntId,
-        candidate_label: label,
-      } as never)
-      .eq("id", plantId);
-
-    if (updErr) {
-      // Best-effort rollback of the hunt row (RLS allows the owner to delete).
+  // Tag each candidate plant. Per-plant updates keep each label correct and
+  // RLS-scoped without smuggling other plants' rows into a bulk update, but
+  // run in bounded-concurrency chunks so a 100-candidate hunt is ~10 round
+  // trips of wall clock, not 100 serial ones (scale audit M1).
+  const TAG_CHUNK_SIZE = 10;
+  for (let start = 0; start < input.plantIds.length; start += TAG_CHUNK_SIZE) {
+    const chunk = input.plantIds.slice(start, start + TAG_CHUNK_SIZE);
+    const results = await Promise.all(
+      chunk.map(async (plantId, offset) => {
+        const override = input.labels?.[plantId]?.trim();
+        const label = override && override.length > 0
+          ? override
+          : defaultCandidateLabel(start + offset);
+        const { error: updErr } = await client
+          .from("plants")
+          .update({
+            pheno_hunt_id: huntId,
+            candidate_label: label,
+          } as never)
+          .eq("id", plantId);
+        return { plantId, updErr };
+      }),
+    );
+    const failed = results.find((r) => r.updErr);
+    for (const r of results) {
+      if (!r.updErr) tagged.push(r.plantId);
+    }
+    if (failed?.updErr) {
+      // Best-effort rollback: untag anything already tagged, then remove the
+      // hunt row (RLS allows the owner to delete/update own rows).
+      if (tagged.length > 0) {
+        await client
+          .from("plants")
+          .update({ pheno_hunt_id: null, candidate_label: null } as never)
+          .in("id", tagged);
+      }
       await client.from("pheno_hunts").delete().eq("id", huntId);
       throw new PhenoHuntError(
-        `Could not tag candidate plant: ${updErr.message}`,
-        updErr,
+        `Could not tag candidate plant: ${failed.updErr.message}`,
+        failed.updErr,
       );
     }
-    tagged.push(plantId);
   }
 
   return { huntId, taggedPlantIds: tagged };

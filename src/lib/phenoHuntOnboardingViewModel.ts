@@ -115,6 +115,7 @@ const STEP_LABEL: Record<PhenoOnboardingStepId, string> = {
   goals: "Evidence goals",
   packet_preview: "Evidence packet map",
   checklist: "Comparison-ready checklist",
+  confirmation: "Setup complete",
 };
 
 function candidateStatus(count: number): PhenoCandidateCountStatus {

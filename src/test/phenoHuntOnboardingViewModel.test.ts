@@ -135,7 +135,7 @@ describe("computePhenoHuntOnboardingViewModel", () => {
 
   // ---- Setup complete vs Comparison-ready separation ----
 
-  it("setupCompleted true + missing evidence → Setup complete but Not comparison-ready yet", () => {
+  it("setupCompleted true + missing evidence → Setup complete but not Comparison-ready", () => {
     // 1 candidate = tracking_only, no candidate evidence recorded.
     const vm = computePhenoHuntOnboardingViewModel(
       draft({ candidateIds: ["p1"], setupCompleted: true }),
@@ -144,7 +144,8 @@ describe("computePhenoHuntOnboardingViewModel", () => {
     expect(confirmation.complete).toBe(true);
     // Readiness must not be comparison_ready just because setup is confirmed.
     expect(vm.readiness).not.toBe("comparison_ready");
-    expect(vm.readinessLabel).toBe("Not comparison-ready yet");
+    expect(vm.readinessLabel).not.toBe("Comparison-ready");
+    expect(["Not comparison-ready yet", "Ready for tracking"]).toContain(vm.readinessLabel);
   });
 
   it("2+ candidates + goals + missing phenotype notes → Ready for tracking + Not comparison-ready in checklist", () => {

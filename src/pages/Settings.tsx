@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import AccountPlanBadge from "@/components/AccountPlanBadge";
 import { PRICING_TIERS } from "@/config/pricing";
 import {
   describeSettingsTile,
@@ -295,14 +296,15 @@ function SubscriptionTile() {
         data-staff={isStaff ? "true" : "false"}
       >
         <div>
-          <p className="text-sm">
-            Current plan:{" "}
+          <p className="text-sm flex items-center gap-2 flex-wrap">
+            <span>Current plan:</span>
             <span
               className="font-medium text-foreground"
               data-testid="settings-subscription-plan"
             >
               {label}
             </span>
+            <AccountPlanBadge entitlement={entitlement} loading={loading} />
           </p>
           {isStaff && (
             <p

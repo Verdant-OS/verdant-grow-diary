@@ -29,8 +29,10 @@
 
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { resolveEntitlements } from "../../../src/lib/entitlements/resolveEntitlements.ts";
-import type { BillingSubscriptionRow } from "../../../src/lib/entitlements/types.ts";
+import {
+  loadUnionEntitlement,
+  pickExpectedBillingEnvironment,
+} from "../_shared/unionEntitlementLookup.ts";
 
 const ALLOWED_FEATURES = new Set<string>([
   "ai_doctor_report",
@@ -174,25 +176,22 @@ Deno.serve(async (req) => {
     return json(401, { ok: false, reason: "not_authenticated" });
   }
 
-  const { data: rows, error: rowErr } = await supabase
-    .from("billing_subscriptions")
-    .select(
-      "id,user_id,plan_id,status,provider,provider_customer_id,provider_subscription_id,current_period_end,cancel_at_period_end,founder_number,created_at,updated_at",
-    )
-    .limit(1);
+  const expectedBillingEnvironment = pickExpectedBillingEnvironment(
+    (raw as Record<string, unknown> | null)?.billing_env,
+  );
+  const { entitlement, lookupFailed } = await loadUnionEntitlement(
+    supabase,
+    expectedBillingEnvironment,
+    new Date(),
+  );
 
-  if (rowErr) {
+  if (lookupFailed) {
     return json(403, {
       ok: false,
       reason: "entitlement_lookup_failed",
       feature,
     });
   }
-
-  const row = (rows && rows.length > 0 ? rows[0] : null) as
-    | BillingSubscriptionRow
-    | null;
-  const entitlement = resolveEntitlements(row, new Date());
 
   if (entitlement.capabilities.advancedExports !== true) {
     return json(403, {
@@ -201,6 +200,7 @@ Deno.serve(async (req) => {
       feature,
       display_plan_id: entitlement.displayPlanId,
       effective_plan_id: entitlement.effectivePlanId,
+      source: entitlement.source,
     });
   }
 
@@ -230,6 +230,7 @@ Deno.serve(async (req) => {
     feature,
     display_plan_id: entitlement.displayPlanId,
     effective_plan_id: entitlement.effectivePlanId,
+    source: entitlement.source,
     capabilities: { advancedExports: true },
   });
 });

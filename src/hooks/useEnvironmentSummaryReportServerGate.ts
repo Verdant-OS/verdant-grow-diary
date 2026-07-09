@@ -18,6 +18,7 @@
  *  - No DB writes, no sensor ingest, no automation, no device control.
  */
 import { useEffect, useRef, useState } from "react";
+import { getPaddleEnvironment } from "@/lib/paddle";
 import { supabase } from "@/integrations/supabase/client";
 
 export type EnvironmentSummaryReportGateStatus =
@@ -49,7 +50,7 @@ export function useEnvironmentSummaryReportServerGate(): EnvironmentSummaryRepor
       try {
         const { data, error } = await supabase.functions.invoke(
           "environment-summary-report-entitlement",
-          { body: {} },
+          { body: { billing_env: getPaddleEnvironment() } },
         );
         if (cancelled) return;
         // supabase-js surfaces non-2xx as `error` with a status; treat any

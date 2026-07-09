@@ -17,6 +17,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getPaddleEnvironment } from "@/lib/paddle";
 
 export type LiveSensorSurface =
   | "live_sensor_stream"
@@ -68,6 +69,7 @@ export async function checkLiveSensorEntitlement(
     if (scope.growId) body.grow_id = scope.growId;
     if (scope.tentId) body.tent_id = scope.tentId;
     if (scope.plantId) body.plant_id = scope.plantId;
+    body.billing_env = getPaddleEnvironment();
 
     const { data, error } = await supabase.functions.invoke(
       "live-sensor-entitlement",

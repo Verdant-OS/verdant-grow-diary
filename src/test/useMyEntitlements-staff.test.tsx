@@ -45,6 +45,8 @@ vi.mock("@/integrations/supabase/client", () => {
     const chain: Record<string, unknown> = {};
     chain.select = () => chain;
     chain.eq = () => chain;
+    chain.order = () => chain;
+    chain.limit = () => chain;
     chain.maybeSingle = async () => result;
     return chain;
   };
@@ -53,6 +55,9 @@ vi.mock("@/integrations/supabase/client", () => {
       from: (table: string) => {
         if (table === "billing_subscriptions") return makeChain(currentPlan.value.billing);
         if (table === "user_roles") return makeChain(currentPlan.value.roles);
+        // Phase 2b: hook also reads public.subscriptions (Lovable Paddle sink).
+        // Default to empty; tests can override via currentPlan.value.lovable.
+        if (table === "subscriptions") return makeChain((currentPlan.value as unknown as {lovable?: QueryResult}).lovable ?? { data: null, error: null });
         return makeChain({ data: null, error: null });
       },
     },

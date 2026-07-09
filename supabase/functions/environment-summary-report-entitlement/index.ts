@@ -23,8 +23,10 @@
 
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { resolveEntitlements } from "../../../src/lib/entitlements/resolveEntitlements.ts";
-import type { BillingSubscriptionRow } from "../../../src/lib/entitlements/types.ts";
+import {
+  loadUnionEntitlement,
+  pickExpectedBillingEnvironment,
+} from "../_shared/unionEntitlementLookup.ts";
 
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
@@ -63,15 +65,28 @@ Deno.serve(async (req) => {
 
   // RLS: select-own. We do NOT pass user_id from the client; the
   // authenticated query is scoped by the JWT.
-  const { data: rows, error: rowErr } = await supabase
-    .from("billing_subscriptions")
-    .select(
-      "id,user_id,plan_id,status,provider,provider_customer_id,provider_subscription_id,current_period_end,cancel_at_period_end,founder_number,created_at,updated_at",
-    )
-    .limit(1);
+  const url = new URL(req.url);
+  let bodyEnv: unknown = null;
+  if (req.method === "POST") {
+    try {
+      const parsed = await req.json();
+      if (parsed && typeof parsed === "object") {
+        bodyEnv = (parsed as Record<string, unknown>).billing_env;
+      }
+    } catch {
+      // Empty/invalid body is fine here — env falls back to query/sandbox.
+    }
+  }
+  const expectedBillingEnvironment = pickExpectedBillingEnvironment(
+    bodyEnv ?? url.searchParams.get("billing_env"),
+  );
+  const { entitlement, lookupFailed } = await loadUnionEntitlement(
+    supabase,
+    expectedBillingEnvironment,
+    new Date(),
+  );
 
-  if (rowErr) {
-    // Fail closed.
+  if (lookupFailed) {
     return json(403, {
       ok: false,
       reason: "entitlement_lookup_failed",
@@ -79,19 +94,14 @@ Deno.serve(async (req) => {
     });
   }
 
-  const row = (rows && rows.length > 0 ? rows[0] : null) as
-    | BillingSubscriptionRow
-    | null;
-  const entitlement = resolveEntitlements(row, new Date());
-
   if (entitlement.capabilities.advancedExports !== true) {
     return json(403, {
       ok: false,
       reason: "upgrade_required",
       feature: "environment_summary_report",
-      // Safe presentation hints only. No raw row, no secrets.
       display_plan_id: entitlement.displayPlanId,
       effective_plan_id: entitlement.effectivePlanId,
+      source: entitlement.source,
     });
   }
 
@@ -100,6 +110,7 @@ Deno.serve(async (req) => {
     feature: "environment_summary_report",
     display_plan_id: entitlement.displayPlanId,
     effective_plan_id: entitlement.effectivePlanId,
+    source: entitlement.source,
     capabilities: { advancedExports: true },
   });
 });

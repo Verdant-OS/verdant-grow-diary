@@ -95,7 +95,13 @@ describe("featureEntitlements", () => {
       path.resolve(process.cwd(), "src/lib/featureEntitlements.ts"),
       "utf8",
     );
-    expect(src).not.toMatch(/localStorage/);
-    expect(src).not.toMatch(/sessionStorage/);
+    // Strip block + line comments so a docstring mention of the forbidden
+    // globals does not falsely fail the test. Only executable references
+    // should be forbidden.
+    const code = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    expect(code).not.toMatch(/localStorage/);
+    expect(code).not.toMatch(/sessionStorage/);
   });
 });

@@ -129,7 +129,9 @@ export function buildPostGrowReportPdfHtml(model: PostGrowReportPdfModel): strin
   <section id="sensor-provenance-legend" data-testid="post-grow-pdf-provenance-legend" aria-labelledby="post-grow-pdf-provenance-legend-heading"><h2 id="post-grow-pdf-provenance-legend-heading">${escapeHtml(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)}</h2><table aria-label="${escapeHtml(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)}"><caption class="muted">${escapeHtml(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)}</caption><thead><tr><th scope="col">Label</th><th scope="col">Meaning</th></tr></thead><tbody>${POST_GROW_SENSOR_PROVENANCE_LEGEND.map(
     (row) =>
       `<tr><th scope="row"><span class="badge ${row.healthy ? "healthy" : "flag"}" aria-label="${escapeHtml(provenanceBadgeAriaLabel(row))}">${escapeHtml(row.label)}</span></th><td>${escapeHtml(row.description)}</td></tr>`,
-  ).join("")}</tbody></table><p class="muted" data-testid="post-grow-pdf-provenance-review-note">${escapeHtml(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE)}</p></section>
+  ).join(
+    "",
+  )}</tbody></table><p class="muted" data-testid="post-grow-pdf-provenance-review-note">${escapeHtml(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE)}</p></section>
 
   <p class="muted">${escapeHtml(model.provenanceLegend)}</p>
   <p class="safety" data-testid="post-grow-pdf-safety-note">${escapeHtml(model.safetyFooter)}</p>
@@ -156,13 +158,22 @@ export function exportPostGrowReportAsPdf(
   const win = opts.win !== undefined ? opts.win : typeof window !== "undefined" ? window : null;
   if (!win || typeof win.open !== "function") return "unavailable";
   const now = opts.now ?? new Date();
-  const model = buildPostGrowReportPdfModel(vm, { now, sensorReadingSources: opts.sensorReadingSources });
+  const model = buildPostGrowReportPdfModel(vm, {
+    now,
+    // Default to the view model's own reading sources so the PDF's
+    // provenance summary is populated without every caller re-plumbing it.
+    sensorReadingSources: opts.sensorReadingSources ?? vm.sensorReadingSources,
+  });
   const html = buildPostGrowReportPdfHtml(model);
   const filenameTitle = buildPdfExportTitle(vm.header.growName, now);
 
   let popup: Window | null = null;
   try {
-    popup = win.open("", "_blank", "noopener,noreferrer");
+    // No "noopener"/"noreferrer" features here: per spec they make
+    // window.open return null, which broke export in real browsers. The
+    // popup is a same-origin about:blank document we document.write
+    // ourselves, so there is no cross-origin opener risk to sever.
+    popup = win.open("", "_blank");
   } catch {
     return "unavailable";
   }

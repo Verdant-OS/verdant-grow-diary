@@ -31,6 +31,7 @@ function makeVm(
 ): PostGrowLearningReportViewModel {
   return {
     eligible: true,
+    sensorReadingSources: [{ source: "manual" }],
     ineligibleReason: null,
     header: {
       growId: "g1",
@@ -44,9 +45,39 @@ function makeVm(
     executiveSummary: ["Run had a useful post-grow record."],
     dataCompleteness: { score: 60, label: "Useful", present: [], missing: [] },
     environment: [
-      { key: "temperature_c", label: "Temperature", unit: "°C", count: 12, avg: 24, min: 22, max: 26, stablePct: 80, sparkline: [] },
-      { key: "humidity_pct", label: "Humidity", unit: "%", count: 9, avg: 55, min: 50, max: 60, stablePct: 70, sparkline: [] },
-      { key: "vpd_kpa", label: "VPD", unit: "kPa", count: 0, avg: null, min: null, max: null, stablePct: null, sparkline: [] },
+      {
+        key: "temperature_c",
+        label: "Temperature",
+        unit: "°C",
+        count: 12,
+        avg: 24,
+        min: 22,
+        max: 26,
+        stablePct: 80,
+        sparkline: [],
+      },
+      {
+        key: "humidity_pct",
+        label: "Humidity",
+        unit: "%",
+        count: 9,
+        avg: 55,
+        min: 50,
+        max: 60,
+        stablePct: 70,
+        sparkline: [],
+      },
+      {
+        key: "vpd_kpa",
+        label: "VPD",
+        unit: "kPa",
+        count: 0,
+        avg: null,
+        min: null,
+        max: null,
+        stablePct: null,
+        sparkline: [],
+      },
     ],
     postHarvest: { yieldGrams: 100, points: [], weightLossPct: null, rhStabilized: null },
     actionEffectiveness: { completedActions: 3, outcomeNotes: 1, observations: [] },
@@ -84,9 +115,9 @@ function expectNoForbiddenText() {
 describe("Post-Grow Report UI Polish v1 — header helper + safety notes", () => {
   it("renders the header helper copy", () => {
     render(<PostGrowReportHeaderHelper />);
-    expect(
-      screen.getByTestId("post-grow-report-header-helper").textContent,
-    ).toContain(REPORT_HEADER_HELPER_COPY);
+    expect(screen.getByTestId("post-grow-report-header-helper").textContent).toContain(
+      REPORT_HEADER_HELPER_COPY,
+    );
     expectNoForbiddenText();
     cleanup();
   });
@@ -153,16 +184,14 @@ describe("Post-Grow Report UI Polish v1 — section labels & empty states", () =
 
   it("Executive Summary card carries the 'What changed' subtitle", () => {
     render(<PostGrowExecutiveSummaryCard vm={makeVm()} />);
-    expect(
-      screen.getByTestId("post-grow-executive-summary-subtitle").textContent,
-    ).toBe(REPORT_SECTION_LABELS.whatChanged);
+    expect(screen.getByTestId("post-grow-executive-summary-subtitle").textContent).toBe(
+      REPORT_SECTION_LABELS.whatChanged,
+    );
     cleanup();
   });
 
   it("Executive Summary empty state stays factual (no 'No issues')", () => {
-    render(
-      <PostGrowExecutiveSummaryCard vm={makeVm({ executiveSummary: [] })} />,
-    );
+    render(<PostGrowExecutiveSummaryCard vm={makeVm({ executiveSummary: [] })} />);
     const empty = screen.getByTestId("post-grow-executive-summary-empty");
     expect(empty.textContent).toBe(REPORT_EMPTY_SUMMARY_COPY);
     const bodyLower = (document.body.textContent ?? "").toLowerCase();
@@ -181,27 +210,25 @@ describe("Post-Grow Report UI Polish v1 — section labels & empty states", () =
         <PhotoGridCard vm={makeVm()} />
       </MemoryRouter>,
     );
-    expect(
-      screen.getByTestId("post-grow-environment-stability-subtitle").textContent,
-    ).toContain(REPORT_SECTION_LABELS.whatWasLogged);
-    expect(
-      screen.getByTestId("post-grow-post-harvest-subtitle").textContent,
-    ).toContain(REPORT_SECTION_LABELS.whatWasLogged);
-    expect(
-      screen.getByTestId("post-grow-action-effectiveness-subtitle").textContent,
-    ).toBe(REPORT_SECTION_LABELS.actionsReviewed);
-    expect(
-      screen.getByTestId("post-grow-photo-grid-subtitle").textContent,
-    ).toContain(REPORT_SECTION_LABELS.whatWasLogged);
+    expect(screen.getByTestId("post-grow-environment-stability-subtitle").textContent).toContain(
+      REPORT_SECTION_LABELS.whatWasLogged,
+    );
+    expect(screen.getByTestId("post-grow-post-harvest-subtitle").textContent).toContain(
+      REPORT_SECTION_LABELS.whatWasLogged,
+    );
+    expect(screen.getByTestId("post-grow-action-effectiveness-subtitle").textContent).toBe(
+      REPORT_SECTION_LABELS.actionsReviewed,
+    );
+    expect(screen.getByTestId("post-grow-photo-grid-subtitle").textContent).toContain(
+      REPORT_SECTION_LABELS.whatWasLogged,
+    );
     expectNoForbiddenText();
     cleanup();
   });
 
   it("preserves the Print / Save PDF CTA from Slice B", () => {
     render(<ExportSummaryButtons vm={makeVm()} />);
-    expect(screen.getByTestId("post-grow-export-print").textContent).toContain(
-      "Print / Save PDF",
-    );
+    expect(screen.getByTestId("post-grow-export-print").textContent).toContain("Print / Save PDF");
     expectNoForbiddenText();
     cleanup();
   });

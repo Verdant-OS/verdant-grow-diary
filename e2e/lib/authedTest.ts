@@ -41,6 +41,7 @@ export const test = base.extend({
         { entries: saved.entries, appOrigin: saved.origin },
       );
     }
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- Playwright fixture `use`, not a React hook
     await use(context);
   },
 });

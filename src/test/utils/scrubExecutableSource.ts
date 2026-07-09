@@ -74,7 +74,7 @@ function stripStringLiteralBodies(src: string): string {
 function stripRegexLiteralBodies(src: string): string {
   // Match: leading boundary char (kept), `/`, body, `/`, optional flags.
   return src.replace(
-    /(^|[=(,;:!&|?{}\[\n>])(\s*)\/(?:\\.|[^/\\\n])+\/[gimsuy]*/g,
+    /(^|[=(,;:!&|?{}[\n>])(\s*)\/(?:\\.|[^/\\\n])+\/[gimsuy]*/g,
     (_m, prefix: string, ws: string) => `${prefix}${ws}/ /`,
   );
 }

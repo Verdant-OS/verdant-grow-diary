@@ -65,6 +65,12 @@ export interface PhenoOnboardingDraft {
   readonly candidateIds: ReadonlyArray<string>;
   readonly evidenceGoals: ReadonlyArray<PhenoEvidenceGoalId>;
   /**
+   * True once the grower has explicitly confirmed setup is complete. Used
+   * by the confirmation step and by the workspace "Continue setup" card.
+   * Never inferred — grower must click.
+   */
+  readonly setupCompleted?: boolean;
+  /**
    * Optional per-candidate data the grower has already recorded (e.g. an
    * initial phenotype note or a photo). Passed in from the workspace once
    * the hunt exists; during first-run onboarding this is usually empty.

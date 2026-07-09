@@ -262,13 +262,35 @@ const App = () => (
                     <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                     <Route path="/grows" element={<Grows />} />
                     <Route path="/grows/:growId" element={<GrowDetail />} />
-                    <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
-                    {/* Write-capable hunt surfaces live BEHIND the auth gate:
-                        workspace (trait scores + keeper decisions) and keepers
-                        (clone lineage + crosses) do RLS-scoped writes of own
-                        data. Read-only compare/showcase stay public above. */}
-                    <Route path="/pheno-hunts/:id/workspace" element={<PhenoHuntWorkspace />} />
-                    <Route path="/pheno-hunts/:id/keepers" element={<PhenoKeepersPage />} />
+                    {/* Pheno Tracker is a Verdant Pro feature. Free users see
+                        an upgrade card; canceled Pro users see a read-only
+                        banner over their existing records where the surface
+                        supports it. Public read-only /pheno-comparison and
+                        /pheno-hunts/:id/compare remain ungated above. */}
+                    <Route
+                      path="/pheno-hunts/new"
+                      element={
+                        <PhenoTrackerUpgradeGate>
+                          <PhenoHuntNew />
+                        </PhenoTrackerUpgradeGate>
+                      }
+                    />
+                    <Route
+                      path="/pheno-hunts/:id/workspace"
+                      element={
+                        <PhenoTrackerUpgradeGate allowReadOnly>
+                          <PhenoHuntWorkspace />
+                        </PhenoTrackerUpgradeGate>
+                      }
+                    />
+                    <Route
+                      path="/pheno-hunts/:id/keepers"
+                      element={
+                        <PhenoTrackerUpgradeGate allowReadOnly>
+                          <PhenoKeepersPage />
+                        </PhenoTrackerUpgradeGate>
+                      }
+                    />
                     <Route path="/breeding" element={<BreedingProgramsIndex />} />
                     <Route path="/breeding/new" element={<BreedingProgramNew />} />
                     <Route path="/breeding/:programId" element={<BreedingProgramDetail />} />

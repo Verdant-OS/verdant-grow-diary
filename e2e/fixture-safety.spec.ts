@@ -52,6 +52,13 @@ test("disposable E2E fixture is configured and visible on the target plant page"
     page.getByText(envCheck.expected.plant, { exact: false }).first(),
   ).toBeVisible({ timeout: 20_000 });
 
+  // The "Current Tent" context card hydrates from a separate fetch after
+  // the plant header renders — wait for the tent name too, or the text
+  // snapshot below races the card and false-negatives the tent check.
+  await expect(
+    page.getByText(envCheck.expected.tent, { exact: false }).first(),
+  ).toBeVisible({ timeout: 20_000 });
+
   const bodyText = (await page.locator("body").innerText()).slice(0, 50_000);
   const pageCheck = pageTextMatchesFixture(bodyText, envCheck.expected, {
     accountHint: process.env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT,

@@ -50,17 +50,15 @@ describe("pheno tracker server-side entitlement enforcement", () => {
 
   it("names RESTRICTIVE pro-required policies for every pheno_* write table", () => {
     for (const t of PHENO_WRITE_TABLES) {
-      expect(migrations, `${t} insert policy name`).toContain(
-        `${t}_pro_required_insert`,
-      );
-      expect(migrations, `${t} update policy name`).toContain(
-        `${t}_pro_required_update`,
-      );
-      expect(migrations, `${t} delete policy name`).toContain(
-        `${t}_pro_required_delete`,
+      // Each table is enumerated in the DO block that generates policies.
+      expect(migrations, `${t} listed in policy-generation block`).toContain(
+        `'${t}'`,
       );
     }
-    // The restrictive predicate is applied for all three write verbs.
+    // Policy-name pattern and predicate are shared.
+    expect(migrations).toContain("_pro_required_insert");
+    expect(migrations).toContain("_pro_required_update");
+    expect(migrations).toContain("_pro_required_delete");
     expect(migrations).toMatch(/AS RESTRICTIVE FOR INSERT/);
     expect(migrations).toMatch(/AS RESTRICTIVE FOR UPDATE/);
     expect(migrations).toMatch(/AS RESTRICTIVE FOR DELETE/);

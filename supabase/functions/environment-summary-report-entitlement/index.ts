@@ -65,21 +65,9 @@ Deno.serve(async (req) => {
 
   // RLS: select-own. We do NOT pass user_id from the client; the
   // authenticated query is scoped by the JWT.
-  const url = new URL(req.url);
-  let bodyEnv: unknown = null;
-  if (req.method === "POST") {
-    try {
-      const parsed = await req.json();
-      if (parsed && typeof parsed === "object") {
-        bodyEnv = (parsed as Record<string, unknown>).billing_env;
-      }
-    } catch {
-      // Empty/invalid body is fine here — env falls back to query/sandbox.
-    }
-  }
-  const expectedBillingEnvironment = pickExpectedBillingEnvironment(
-    bodyEnv ?? url.searchParams.get("billing_env"),
-  );
+  // Server-authoritative billing environment: NEVER trust client body/query
+  // `billing_env`. A spoofed request cannot flip sandbox<->live matching.
+  const expectedBillingEnvironment = resolveServerBillingEnvironment();
   const { entitlement, lookupFailed } = await loadUnionEntitlement(
     supabase,
     expectedBillingEnvironment,

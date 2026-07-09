@@ -71,6 +71,43 @@ export function validatePhenoHuntDraft(
   return errs;
 }
 
+/** Known evidence goal ids — mirrors phenoEvidenceGoals to avoid an import
+ * cycle in tests that stub the goals module. Sanitizer only allows short
+ * text keys and dedupes. */
+const KNOWN_EVIDENCE_GOAL_IDS = new Set([
+  "structure",
+  "vigor",
+  "aroma",
+  "resin",
+  "stretch",
+  "stress_resistance",
+  "disease_resistance",
+  "yield",
+  "post_harvest",
+  "post_cure",
+  "replication_readiness",
+  "keeper_decision",
+]);
+
+export function sanitizeEvidenceGoals(
+  input: readonly string[] | null | undefined,
+): string[] {
+  if (!input || !Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of input) {
+    if (typeof raw !== "string") continue;
+    const v = raw.trim();
+    if (!v || v.length > 64) continue;
+    if (!KNOWN_EVIDENCE_GOAL_IDS.has(v)) continue;
+    if (seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+    if (out.length >= 32) break;
+  }
+  return out;
+}
+
 export async function createPhenoHunt(
   input: CreatePhenoHuntInput,
   client: SupabaseClient = defaultClient,

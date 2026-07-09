@@ -18,6 +18,26 @@ if (missing.length > 0) {
   process.exit(2);
 }
 
+// Refuse to run mutating service-role setup against a non-local project.
+// The spec itself also skips unless the URL is local, but fail loudly here
+// so a misconfigured runner surfaces a BLOCKED exit rather than skip-to-green.
+function isLocalSupabaseUrl(u) {
+  try {
+    const h = new URL(u).hostname.toLowerCase();
+    return ["127.0.0.1", "localhost", "::1", "0.0.0.0"].includes(h) || h.endsWith(".localhost");
+  } catch {
+    return false;
+  }
+}
+if (!isLocalSupabaseUrl(process.env.SUPABASE_URL)) {
+  console.error(
+    `BLOCKED: SUPABASE_URL is not a local loopback host.\n` +
+      `This harness creates/deletes auth users and objects; it must only run\n` +
+      `against a local \`supabase start\` stack (127.0.0.1 / localhost).`,
+  );
+  process.exit(2);
+}
+
 import("node:child_process").then(({ spawn }) => {
   const child = spawn(
     process.execPath,

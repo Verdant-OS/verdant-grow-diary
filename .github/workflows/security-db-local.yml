@@ -91,14 +91,22 @@ jobs:
 
       - name: Profiles DB security
         if: env.ENABLED == 'true'
+        id: profiles-db
         run: bun run test:profiles-db-security 2>&1 | tee profiles-db.log
+
+      - name: Customer Mode isolation
+        if: env.ENABLED == 'true'
+        id: customer-mode-db
+        run: bun run test:customer-mode-db-security 2>&1 | tee customer-mode-db.log
 
       - name: Aggregate DB security lane
         if: env.ENABLED == 'true'
+        id: aggregate
         run: bun run test:security-db-local 2>&1 | tee security-db-local.log
 
       - name: Upload failure artifacts
         if: failure() && env.ENABLED == 'true'
+        id: upload-artifacts
         uses: actions/upload-artifact@v4
         with:
           name: security-db-local-artifacts
@@ -106,11 +114,58 @@ jobs:
             supabase-start.log
             supabase-db-reset.log
             profiles-db.log
+            customer-mode-db.log
             security-db-local.log
             test-results/**
             artifacts/security-db/**
           if-no-files-found: ignore
           retention-days: 14
+
+      - name: Write job summary
+        if: always()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set +e
+          {
+            echo "## Security DB Local"
+            echo ""
+            if [ "${ENABLED:-false}" != "true" ]; then
+              echo "**Status:** disabled"
+              echo ""
+              echo "Lane is opt-in. Enable via workflow_dispatch input"
+              echo "\`run_db_security=true\` or repo variable"
+              echo "\`ENABLE_DB_SECURITY_LANE=true\`."
+            else
+              case "$JOB_STATUS" in
+                success) echo "**Status:** passed" ;;
+                failure) echo "**Status:** failed" ;;
+                cancelled) echo "**Status:** cancelled" ;;
+                *) echo "**Status:** $JOB_STATUS" ;;
+              esac
+              echo ""
+              echo "**Tests requested:**"
+              echo "- profiles DB security (\`test:profiles-db-security\`)"
+              echo "- customer mode isolation (\`test:customer-mode-db-security\`)"
+              echo "- aggregate lane (\`test:security-db-local\`)"
+              echo ""
+              echo "**Artifact:** \`security-db-local-artifacts\` (uploaded on failure only, 14-day retention)"
+              echo ""
+              echo "Artifact paths (when uploaded):"
+              echo "- \`profiles-db.log\`, \`customer-mode-db.log\`, \`security-db-local.log\`"
+              echo "- \`supabase-start.log\`, \`supabase-db-reset.log\` (sanitized)"
+              echo "- \`test-results/\`, \`artifacts/security-db/\` (if produced)"
+              echo ""
+              if [ "$JOB_STATUS" != "failure" ]; then
+                echo "_No failure artifacts uploaded for this run._"
+              fi
+            fi
+            echo ""
+            echo "**Run:** ${RUN_URL}"
+            echo ""
+            echo "_Summary contains no secrets, service-role values, JWTs, or DB URLs._"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Stop local Supabase
         if: always() && env.ENABLED == 'true'

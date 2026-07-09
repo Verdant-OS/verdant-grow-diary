@@ -17,61 +17,36 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { expectSanitizedDbError } from "./_helpers/sanitizedDbError";
 
 const URL = process.env.SUPABASE_URL ?? "";
 const ANON = process.env.SUPABASE_ANON_KEY ?? "";
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-const hasLocalSupabase = !!URL && !!ANON && !!SERVICE;
+// Safety gate: these suites do REAL service-role setup/teardown (create and
+// delete auth users, mutate app tables / storage). They must NEVER run
+// against a remote project, even if SUPABASE_* happen to be exported in a
+// shell or CI pointed at staging/production and the repo-wide `vitest run`
+// discovers this file. Require a LOCAL loopback Supabase URL.
+function isLocalSupabaseUrl(u: string): boolean {
+  try {
+    const h = new globalThis.URL(u).hostname.toLowerCase();
+    return (
+      h === "127.0.0.1" ||
+      h === "localhost" ||
+      h === "::1" ||
+      h === "0.0.0.0" ||
+      h.endsWith(".localhost")
+    );
+  } catch {
+    return false;
+  }
+}
+const hasLocalSupabase = !!URL && !!ANON && !!SERVICE && isLocalSupabaseUrl(URL);
 
 const d = hasLocalSupabase ? describe : describe.skip;
 
-// ─── Sanitized error assertions ──────────────────────────────────────────
-// Blocked gamification / RLS errors must never leak provider / customer /
-// subscription identifiers, service_role material, JWT-shaped tokens,
-// authorization headers, private env names, stack traces, or file:line refs.
-const FORBIDDEN_LEAKS: RegExp[] = [
-  /service[_-]?role/i,
-  /SUPABASE_SERVICE_ROLE_KEY/i,
-  /PAYMENTS?_.*SECRET/i,
-  /PADDLE_.*SECRET/i,
-  /sk_live_/i,
-  /sk_test_/i,
-  /cus_[A-Za-z0-9]+/,
-  /sub_[A-Za-z0-9]+/,
-  /pdl_[A-Za-z0-9]+/,
-  /pri_[A-Za-z0-9]+/,
-  /pro_[A-Za-z0-9]+/,
-  /paddle/i,
-  /stripe/i,
-  /provider/i,
-  /customer/i,
-  /subscription/i,
-  /bearer\s+/i,
-  /authorization/i,
-  /refresh[_-]?token/i,
-  /access[_-]?token/i,
-  /eyJ[a-zA-Z0-9_-]+\./, // JWT-shaped
-  /\bat\s+.+:\d+:\d+/, // stack frame like "at file.ts:42:11"
-  /\/(?:home|Users|var|root)\/[^\s'"]+:\d+:\d+/,
-];
-
-export function expectSanitizedDbError(err: unknown): void {
-  // Accept null / undefined (caller may want to assert separately).
-  if (err == null) return;
-  const obj = err as Record<string, unknown>;
-  const parts = [
-    obj.message,
-    obj.details,
-    obj.hint,
-    obj.code,
-    typeof obj.status === "number" ? String(obj.status) : obj.status,
-  ]
-    .filter((v) => typeof v === "string")
-    .join("\n");
-  for (const rx of FORBIDDEN_LEAKS) {
-    expect(parts, `leaked pattern ${rx}`).not.toMatch(rx);
-  }
-}
+// Re-export so existing importers continue to work.
+export { expectSanitizedDbError };
 
 interface TestUser {
   id: string;
@@ -342,4 +317,95 @@ d("profiles gamification write protection (local DB)", () => {
     expect(after.level).toBe(before.level);
     expect(after.nugs_total).toBe(before.nugs_total);
   });
+
+  // ── Single-field RPC coverage — proves the trigger fires whichever
+  // gamification column is touched, not just the triple-write path.
+  it("J1/J2/J3: RPC single-field gamification updates are each blocked", async () => {
+    if (!rpcAvailable) {
+      console.warn(
+        "[profiles gamification] RPC single-field path BLOCKED — local exec_sql unavailable",
+      );
+      return;
+    }
+    const before = await readProfileAsAdmin(admin, userA.id);
+    const patches: Array<{ tag: string; args: Record<string, unknown> }> = [
+      { tag: "tier", args: { _profile_user_id: userA.id, _tier: "pro", _level: null, _nugs: null } },
+      { tag: "level", args: { _profile_user_id: userA.id, _tier: null, _level: 42, _nugs: null } },
+      { tag: "nugs", args: { _profile_user_id: userA.id, _tier: null, _level: null, _nugs: 999 } },
+    ];
+    for (const p of patches) {
+      const { error } = await userA.client.rpc(TEST_RPC_NAME as never, p.args as never);
+      expect(error, `RPC ${p.tag} attempt should be rejected`).not.toBeNull();
+      expectSanitizedDbError(error);
+    }
+    const after = await readProfileAsAdmin(admin, userA.id);
+    expect(after.tier).toBe(before.tier);
+    expect(after.level).toBe(before.level);
+    expect(after.nugs_total).toBe(before.nugs_total);
+  });
+
+  // ── Mixed attack: user A tries a blocked+allowed profile write AND
+  // probes user B's entitlement in the same authenticated session. The
+  // profile must be atomic (nothing changes), and the entitlement RPC
+  // must refuse cross-user probing without leaking B's plan state.
+  it("K: mixed attack — atomic profile rejection + cross-user entitlement probe denial", async () => {
+    // Seed user B with an active Pro row so a leak would be observable.
+    const proEnd = new Date(Date.now() + 30 * 24 * 3600_000).toISOString();
+    const { error: seedErr } = await admin
+      .from("billing_subscriptions")
+      .upsert({
+        user_id: userB.id,
+        plan_id: "pro_monthly",
+        status: "active",
+        provider: "paddle",
+        current_period_end: proEnd,
+        cancel_at_period_end: false,
+      });
+    if (seedErr) throw new Error("seed userB billing failed");
+
+    try {
+      const beforeA = await readProfileAsAdmin(admin, userA.id);
+      const beforeB = await readProfileAsAdmin(admin, userB.id);
+      const attemptedName = `mixed-attack-${Date.now()}`;
+
+      // (a) Mixed blocked+allowed update on own profile — must fail atomically.
+      const { error: mixErr } = await userA.client
+        .from("profiles")
+        .update({ tier: "pro", level: 99, display_name: attemptedName })
+        .eq("user_id", userA.id);
+      expect(mixErr).not.toBeNull();
+      expectSanitizedDbError(mixErr);
+
+      // (b) Cross-user entitlement probe via the public entitlement function.
+      //     Must return false (or a sanitized error) — never leak B's plan.
+      const { data: probeData, error: probeErr } = await userA.client.rpc(
+        "has_pheno_tracker_entitlement" as never,
+        { _user_id: userB.id } as never,
+      );
+      if (probeErr) {
+        expectSanitizedDbError(probeErr);
+      } else {
+        expect(probeData, "cross-user entitlement probe must not reveal Pro").toBe(false);
+      }
+
+      // (c) Own-user probe still works — proves the function isn't broken.
+      const { data: selfProbe, error: selfErr } = await userA.client.rpc(
+        "has_pheno_tracker_entitlement" as never,
+        { _user_id: userA.id } as never,
+      );
+      if (selfErr) expectSanitizedDbError(selfErr);
+      else expect(typeof selfProbe).toBe("boolean");
+
+      // (d) No mutation landed anywhere.
+      const afterA = await readProfileAsAdmin(admin, userA.id);
+      const afterB = await readProfileAsAdmin(admin, userB.id);
+      expect(afterA.tier).toBe(beforeA.tier);
+      expect(afterA.level).toBe(beforeA.level);
+      expect(afterA.display_name).toBe(beforeA.display_name);
+      expect(afterA.display_name).not.toBe(attemptedName);
+      expect(afterB).toEqual(beforeB);
+    } finally {
+      await admin.from("billing_subscriptions").delete().eq("user_id", userB.id);
+    }
+  }, 45_000);
 });

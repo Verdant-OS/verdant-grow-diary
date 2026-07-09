@@ -10,6 +10,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import Settings from "@/pages/Settings";
 import { loadTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
@@ -32,7 +33,7 @@ beforeEach(() => {
 
 describe("Settings · Units tile (temperature display preference)", () => {
   it("renders the tile with Fahrenheit-default copy and both options", () => {
-    render(<Settings />);
+    render(<MemoryRouter><Settings /></MemoryRouter>);
     expect(screen.getByText("Display temperature as")).toBeInTheDocument();
     expect(
       screen.getByText("Stored sensor values are unchanged."),
@@ -44,7 +45,7 @@ describe("Settings · Units tile (temperature display preference)", () => {
   });
 
   it("Saves the celsius choice to local preference (no DB writes)", () => {
-    render(<Settings />);
+    render(<MemoryRouter><Settings /></MemoryRouter>);
     fireEvent.click(screen.getByTestId("temperature-unit-option-celsius"));
     fireEvent.click(screen.getByTestId("temperature-unit-save"));
     expect(loadTemperatureUnitPreference()).toBe("celsius");
@@ -54,7 +55,7 @@ describe("Settings · Units tile (temperature display preference)", () => {
   });
 
   it("Reset restores the Fahrenheit default", () => {
-    render(<Settings />);
+    render(<MemoryRouter><Settings /></MemoryRouter>);
     fireEvent.click(screen.getByTestId("temperature-unit-option-celsius"));
     fireEvent.click(screen.getByTestId("temperature-unit-save"));
     expect(loadTemperatureUnitPreference()).toBe("celsius");

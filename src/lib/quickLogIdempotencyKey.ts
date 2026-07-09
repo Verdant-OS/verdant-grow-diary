@@ -8,9 +8,14 @@
  * Server contract: 8..200 chars.
  */
 export function newQuickLogSaveKey(): string {
-  const uuid =
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
-  return `quicklog-v2-${uuid}`;
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `quicklog-v2-${crypto.randomUUID()}`;
+  }
+  // Older WebCrypto without randomUUID: same entropy source, hex-encoded.
+  // (The key is a per-user dedupe token, not a credential, but CSPRNG
+  // randomness keeps collision odds negligible and CodeQL quiet.)
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `quicklog-v2-${hex}`;
 }

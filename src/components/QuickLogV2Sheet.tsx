@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
+import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,15 +95,6 @@ interface Props {
 }
 
 const NOTE_LIMIT = 500;
-
-/** Fresh server-side idempotency key for one logical Quick Log submission. */
-function newQuickLogSaveKey(): string {
-  const uuid =
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
-  return `quicklog-v2-${uuid}`;
-}
 
 export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }: Props) {
   const { user } = useAuth();

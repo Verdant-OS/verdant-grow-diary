@@ -675,9 +675,9 @@ export default function Pricing() {
           Software only. We do not sell cannabis, seeds, or cultivation equipment.
         </p>
         <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-4 gap-y-1">
-          <Link to="/terms" className="hover:text-foreground">Terms</Link>
-          <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
-          <Link to="/refund" className="hover:text-foreground">Refunds</Link>
+          <Link to="/terms" className="hover:text-foreground">Terms of Service</Link>
+          <Link to="/privacy" className="hover:text-foreground">Privacy Policy</Link>
+          <Link to="/refund" className="hover:text-foreground">Refund Policy</Link>
         </nav>
         <p className="text-xs">
           Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as

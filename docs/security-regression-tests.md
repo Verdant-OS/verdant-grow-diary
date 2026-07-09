@@ -140,14 +140,45 @@ They never fake a pass. Required CI never depends on these variables.
   resolver never reads `public.profiles`. Runtime companion to the
   static `src/test/profiles-gamification-write-protection.test.ts` and
   `src/test/profiles-tier-entitlement-query-boundary.test.ts`.
+- `test:customer-mode-db-security` — audits the repo for any Customer
+  Mode data surface (tables, RPCs, edge functions, share-token routes)
+  and, when local Supabase is up, proves an anonymous client cannot read
+  operator rows from `grows`, `tents`, `plants`, `diary_entries`,
+  `sensor_readings`, `alerts`, `action_queue`, `pheno_hunts`,
+  `pheno_keepers`, `billing_subscriptions`, or `subscriptions`, cannot
+  INSERT into any operator write table, and cannot resolve operator
+  entitlement via `has_pheno_tracker_entitlement`. The audit fails
+  loudly if Customer Mode grows a backend without paired isolation
+  coverage.
 
-Current status: **scaffolded / expanding**. Vitest specs live under
-`src/test/pi-ingest-commit-batch-replay.integration.test.ts`,
-`src/test/storage-policy-security.integration.test.ts`,
-`src/test/integration/profiles-gamification-write-protection.integration.test.ts`,
-and `src/test/integration/profiles-entitlement-resolution-boundary.integration.test.ts`,
-and grow as local fixtures stabilise. Static contract coverage in Tier 1
-already guards the policy shapes.
+### Sanitized DB error shape
+
+`src/test/integration/_helpers/sanitizedDbError.ts` centralises the
+`expectSanitizedDbError` matcher used across every DB harness. Postgres
+error text (message / details / hint / code / status) must contain none
+of: billing/entitlement table names (`billing_subscriptions`,
+`paddle_events`, `payment_customers`, `billing_subscription_update_audit`,
+`entitlement(s)`); provider IDs / column names (`paddle`, `stripe`,
+`provider_customer_id`, `provider_subscription_id`, `cus_*`, `sub_*`,
+`pdl_*`, `pri_*`); tier / plan / period leakage (`profiles.tier`,
+`select tier from profiles`, `displayPlanId`, `effectivePlanId`,
+`plan_id`, `current_period_end`); auth/secret material (`service_role`,
+`SUPABASE_SERVICE_ROLE_KEY`, `Authorization: …`, `Bearer …`, JWT-shaped
+strings, `refresh_token`, `access_token`); stack frames, absolute
+`/home|/Users|/var|/root|/opt|/workspace` paths with `:line:column`, or
+leaked `CREATE FUNCTION` / `RETURNS … AS $$` bodies. Fixture coverage
+lives in `src/test/sanitized-db-error-helper.test.ts` (fast lane).
+
+### Workflow summary
+
+`.github/workflows/security-db-local.yml` always writes a
+`$GITHUB_STEP_SUMMARY` reporting lane status (disabled / passed /
+failed / cancelled), tests requested, artifact name
+(`security-db-local-artifacts`, upload-on-failure only, 14-day
+retention), which sanitized log paths are inside it, and a link to the
+current run. The summary itself contains no secrets, JWTs, or DB URLs.
+
+
 
 > **Never** paste `SUPABASE_SERVICE_ROLE_KEY`, auth JWTs, or refresh
 > tokens into chat, screenshots, logs, or issue comments. This harness

@@ -25,9 +25,18 @@ const POLL_TIMEOUT_MS = 10_000;
 
 export default function CheckoutSuccess() {
   const { loading, entitlement, refetch } = useMyEntitlements();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const confirmed =
     !loading && entitlement.isActive && entitlement.effectivePlanId !== "free";
+
+  // Sanitize the returnTo query param. Never trust the raw value: only
+  // same-origin absolute app paths are allowed (see checkoutReturnTo).
+  const safeReturnTo = useMemo(
+    () => sanitizeCheckoutReturnTo(searchParams.get("returnTo")),
+    [searchParams],
+  );
 
   usePageSeo({
     title: confirmed

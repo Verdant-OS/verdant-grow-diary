@@ -112,6 +112,7 @@ export default function PhenoHuntNew() {
     };
   }, [growId, tentId]);
 
+  const [setupConfirmed, setSetupConfirmed] = useState(false);
   const candidateIds = useMemo(() => Array.from(selected), [selected]);
 
   const vm = useMemo(
@@ -123,8 +124,9 @@ export default function PhenoHuntNew() {
         notes,
         candidateIds,
         evidenceGoals,
+        setupCompleted: setupConfirmed,
       }),
-    [name, growId, tentId, notes, candidateIds, evidenceGoals],
+    [name, growId, tentId, notes, candidateIds, evidenceGoals, setupConfirmed],
   );
 
   const canSave = vm.canCreate && !saving && !!user;

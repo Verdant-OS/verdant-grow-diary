@@ -18,6 +18,8 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Type check (fail fast)
+        run: bun run typecheck
       - name: Static client/published secret scan
         run: bun run test:security-static
       - name: Payments webhook security tests

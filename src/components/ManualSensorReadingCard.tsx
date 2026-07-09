@@ -163,7 +163,7 @@ export default function ManualSensorReadingCard({
 
   // Structured pre-save review (source: "manual", never live). Renders inside
   // the review prompt so the grower sees findings + normalized preview before
-  // confirming. Blockers here also disable "Save anyway".
+  // confirming. Blockers here also disable the Confirm button.
   const snapshotReview = useMemo(() => {
     return reviewManualSensorSnapshot({
       tempF: form.airTempF,

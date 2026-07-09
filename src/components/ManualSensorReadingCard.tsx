@@ -161,6 +161,23 @@ export default function ManualSensorReadingCard({
     return evaluateManualSensorSnapshotQuality(snap);
   }, [validation.metrics]);
 
+  // Structured pre-save review (source: "manual", never live). Renders inside
+  // the review prompt so the grower sees findings + normalized preview before
+  // confirming. Blockers here also disable "Save anyway".
+  const snapshotReview = useMemo(() => {
+    return reviewManualSensorSnapshot({
+      tempF: form.airTempF,
+      humidity: form.humidityPct,
+      vpdKpa: form.vpdKpa,
+      soilWaterContent: form.soilMoisturePct,
+      co2Ppm: form.co2Ppm,
+      ppfd: form.ppfd,
+      capturedAt: new Date().toISOString(),
+      tentId: tentId || null,
+    });
+  }, [form, tentId]);
+
+
   // Entered vs derived VPD comparison. Uses only sanitized numeric metrics —
   // never relabels source. If the grower entered a VPD that disagrees with
   // temp/RH-derived VPD by more than `VPD_CONFLICT_THRESHOLD_KPA`, the

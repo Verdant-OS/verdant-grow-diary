@@ -15,7 +15,7 @@ const RULES = read("src/lib/postGrowLearningReportRules.ts");
 describe("Post-Grow Learning Report route wiring", () => {
   it("mounts the on-demand report route", () => {
     expect(APP).toContain("PostGrowLearningReport");
-    expect(APP).toContain('/reports/post-grow/:growId');
+    expect(APP).toContain("/reports/post-grow/:growId");
   });
 
   it("links only completed/archive-stage grows from GrowDetail", () => {
@@ -56,7 +56,12 @@ describe("Post-Grow Learning Report safety", () => {
       all.matchAll(/target_device:\s*([^,;\n}]+)/g),
       (match) => match[1].trim(),
     );
-    expect(all).not.toMatch(/create table|alter table|policy|service_role|functions\.invoke|ai_doctor|openai/i);
+    // "create/alter policy" targets RLS SQL specifically — the bare token
+    // "policy" now legitimately appears in App.tsx via the public legal
+    // routes (/privacy-policy alias, PrivacyPolicy/RefundPolicy pages).
+    expect(all).not.toMatch(
+      /create table|alter table|create policy|alter policy|drop policy|service_role|functions\.invoke|ai_doctor|openai/i,
+    );
     expect(targetDeviceAssignments.length).toBeGreaterThan(0);
     expect(targetDeviceAssignments.every((value) => value.startsWith("null"))).toBe(true);
     expect(all).not.toMatch(/relay\.|actuator|dispatchCommand|device_control/i);

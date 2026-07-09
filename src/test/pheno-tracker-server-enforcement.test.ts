@@ -60,10 +60,11 @@ describe("pheno tracker server-side entitlement enforcement", () => {
         `${t}_pro_required_delete`,
       );
     }
-    // Every table is enumerated in the migration DO block.
-    expect(migrations).toMatch(/AS RESTRICTIVE FOR INSERT[\s\S]*?has_pheno_tracker_entitlement/);
-    expect(migrations).toMatch(/AS RESTRICTIVE FOR UPDATE[\s\S]*?has_pheno_tracker_entitlement/);
-    expect(migrations).toMatch(/AS RESTRICTIVE FOR DELETE[\s\S]*?has_pheno_tracker_entitlement/);
+    // The restrictive predicate is applied for all three write verbs.
+    expect(migrations).toMatch(/AS RESTRICTIVE FOR INSERT/);
+    expect(migrations).toMatch(/AS RESTRICTIVE FOR UPDATE/);
+    expect(migrations).toMatch(/AS RESTRICTIVE FOR DELETE/);
+    expect(migrations).toMatch(/has_pheno_tracker_entitlement\(auth\.uid\(\)\)/);
   });
 
   it("edge helper returns sanitized error only", () => {

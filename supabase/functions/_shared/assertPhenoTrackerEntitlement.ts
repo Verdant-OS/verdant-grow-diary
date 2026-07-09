@@ -27,8 +27,7 @@ const PRO_PLAN_IDS = new Set([
 
 /**
  * Assert the caller currently holds active Pro. Caller MUST pass a
- * user-JWT-scoped supabase client (never service_role) so RLS applies to
- * the entitlement reads.
+ * user-JWT-scoped supabase client so RLS applies to the entitlement reads.
  */
 export async function assertPhenoTrackerEntitlement(
   supabase: any,

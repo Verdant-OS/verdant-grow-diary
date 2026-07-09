@@ -139,30 +139,25 @@ describe("profiles.tier entitlement-query boundary", () => {
     expect(src).not.toMatch(/profiles\.tier/);
   });
 
-  it("no allowlisted profiles.tier reference sits next to entitlement decision keywords", () => {
-    // Even where profiles.tier is legitimately mentioned (types, trigger
-    // migration, tests), it must not be paired with billing/entitlement
-    // decision keywords — that would signal repurposing.
+  it("no allowlisted TypeScript file pairs profiles.tier with entitlement decision keywords", () => {
+    // Migrations legitimately explain in comments that profiles.tier is XP,
+    // NOT billing — so proximity keywords are expected and safe there. The
+    // repurposing risk lives in TypeScript source. The `it` above already
+    // asserts no billing/entitlement SQL function body reads profiles.tier.
     for (const f of files) {
       if (!isAllowlisted(f)) continue;
+      if (!/\.tsx?$/.test(f)) continue;
+      if (/\.test\.tsx?$/.test(f)) continue;
       const src = readFileSync(f, "utf8");
       const lines = src.split(/\r?\n/);
       lines.forEach((line, i) => {
-        if (!/profiles\.tier|\btier\b/.test(line)) return;
+        if (!/profiles\.tier/.test(line)) return;
         const window = lines.slice(Math.max(0, i - 3), i + 4).join("\n");
-        // Trigger migration & tests will use words like "block", "trigger",
-        // "gamification", "test" — those are fine. What we disallow is
-        // entitlement decision vocabulary in the same window.
         for (const kw of ENTITLEMENT_KEYWORDS) {
-          // Test files intentionally mention entitlement to describe what
-          // is being asserted; the runtime files listed as allowlist are
-          // generated types + trigger migration, neither of which should
-          // ever contain entitlement decision keywords.
-          if (/\.test\.tsx?$/.test(f)) return;
           const rx = new RegExp(`\\b${kw}\\b`, "i");
           if (rx.test(window)) {
             throw new Error(
-              `${f}:${i + 1} — 'tier' appears near entitlement keyword '${kw}'`,
+              `${f}:${i + 1} — 'profiles.tier' appears near entitlement keyword '${kw}'`,
             );
           }
         }

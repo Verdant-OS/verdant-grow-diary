@@ -11,8 +11,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  attachResolvedPriceExternalId,
   auditFields,
   decide,
+  transactionPriceIdNeedingLookup,
 } from '../../supabase/functions/payments-webhook/eventProcessor';
 
 const NOW = new Date('2026-07-09T12:00:00.000Z');

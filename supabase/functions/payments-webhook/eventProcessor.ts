@@ -12,7 +12,10 @@
  * the workspace layering rule (business logic outside JSX / edge glue).
  */
 
-import type { PaddleEnv } from '../_shared/paddle.ts';
+// Local copy of PaddleEnv so this pure module never pulls the Deno-only
+// shared util into the frontend typecheck graph (unit tests import it
+// from src/test/**). The canonical export lives in ../_shared/paddle.ts.
+export type PaddleEnv = 'sandbox' | 'live';
 
 // The known human-readable price IDs we accept. Anything else is a config
 // mistake (a product created outside create_product/create_price) and is

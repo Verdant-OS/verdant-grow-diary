@@ -1,0 +1,92 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Upgrade page — success panel feature order snapshots > locks feature row order for Founder Lifetime 1`] = `
+[
+  {
+    "key": "feat-3",
+    "text": "Cloud sync & backup",
+  },
+  {
+    "key": "feat-4",
+    "text": "Multi-tent tracking",
+  },
+  {
+    "key": "feat-5",
+    "text": "Exports & data ownership",
+  },
+  {
+    "key": "feat-6",
+    "text": "Full grow history",
+  },
+  {
+    "key": "feat-7",
+    "text": "Priority support",
+  },
+  {
+    "key": "feat-8",
+    "text": "Advanced grow reports (planned)",
+  },
+  {
+    "key": "feat-11",
+    "text": "Founder badge & early-supporter perks",
+  },
+]
+`;
+
+exports[`Upgrade page — success panel feature order snapshots > locks feature row order for Pro Annual 1`] = `
+[
+  {
+    "key": "feat-3",
+    "text": "Cloud sync & backup",
+  },
+  {
+    "key": "feat-4",
+    "text": "Multi-tent tracking",
+  },
+  {
+    "key": "feat-5",
+    "text": "Exports & data ownership",
+  },
+  {
+    "key": "feat-6",
+    "text": "Full grow history",
+  },
+  {
+    "key": "feat-7",
+    "text": "Priority support",
+  },
+  {
+    "key": "feat-8",
+    "text": "Advanced grow reports (planned)",
+  },
+]
+`;
+
+exports[`Upgrade page — success panel feature order snapshots > locks feature row order for Pro Monthly 1`] = `
+[
+  {
+    "key": "feat-3",
+    "text": "Cloud sync & backup",
+  },
+  {
+    "key": "feat-4",
+    "text": "Multi-tent tracking",
+  },
+  {
+    "key": "feat-5",
+    "text": "Exports & data ownership",
+  },
+  {
+    "key": "feat-6",
+    "text": "Full grow history",
+  },
+  {
+    "key": "feat-7",
+    "text": "Priority support",
+  },
+  {
+    "key": "feat-8",
+    "text": "Advanced grow reports (planned)",
+  },
+]
+`;

@@ -206,13 +206,17 @@ export const CANONICAL_FEATURE_ORDER: readonly string[] = (() => {
   return Object.freeze(order);
 })();
 
-function sortByCanonicalOrder(features: readonly string[]): string[] {
-  const indexOf = (f: string) => {
-    const i = CANONICAL_FEATURE_ORDER.indexOf(f);
-    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
-  };
-  // Dedupe (preserve first occurrence), then sort by canonical index with
-  // original position as a stable tie-breaker for unknown features.
+/**
+ * Sort features by canonical order.
+ *
+ * Known features (present in CANONICAL_FEATURE_ORDER) render first, in
+ * canonical index order. Unknown features render AFTER all known
+ * features, deterministically tie-broken by locale-independent
+ * lexicographic order of the raw feature string. Pure and mutation-safe.
+ */
+export function sortSuccessPanelFeatures(
+  features: readonly string[],
+): string[] {
   const deduped: string[] = [];
   const seen = new Set<string>();
   for (const f of features) {
@@ -221,9 +225,21 @@ function sortByCanonicalOrder(features: readonly string[]): string[] {
       deduped.push(f);
     }
   }
-  const withPos = deduped.map((f, i) => ({ f, i, k: indexOf(f) }));
-  withPos.sort((a, b) => (a.k - b.k) || (a.i - b.i));
-  return withPos.map((x) => x.f);
+  return [...deduped].sort((a, b) => {
+    const ia = CANONICAL_FEATURE_ORDER.indexOf(a);
+    const ib = CANONICAL_FEATURE_ORDER.indexOf(b);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    // Both unknown: stable, locale-independent lexicographic order.
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  });
+}
+
+function sortByCanonicalOrder(features: readonly string[]): string[] {
+  return sortSuccessPanelFeatures(features);
 }
 
 /**

@@ -1,6 +1,11 @@
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import {
+  buildLegalPageJsonLd,
+  VERDANT_LEGAL_PAGE_JSON_LD_SELECTOR,
+} from "@/lib/seo/legalPageStructuredData";
+import { safeJsonLdStringify } from "@/lib/seoStructuredData";
 
 /**
  * Shared shell for public legal pages (Terms, Privacy, Refund).

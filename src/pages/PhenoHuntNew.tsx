@@ -5,15 +5,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useAuth } from "@/store/auth";
+import { createPhenoHunt, defaultHuntName } from "@/lib/phenoHuntService";
 import {
-  createPhenoHunt,
-  defaultHuntName,
-  validatePhenoHuntDraft,
-} from "@/lib/phenoHuntService";
-import { logsPath } from "@/lib/routes";
+  PHENO_GOAL_MAX_LENGTH,
+  validatePhenoHuntOnboardingDraft,
+} from "@/lib/phenoHuntOnboardingViewModel";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canWriteFeatureData } from "@/lib/featureEntitlements";
 
@@ -40,6 +40,7 @@ export default function PhenoHuntNew() {
   const [plants, setPlants] = useState<PlantOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
+  const [goal, setGoal] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
@@ -83,8 +84,8 @@ export default function PhenoHuntNew() {
 
   const plantIds = useMemo(() => Array.from(selected), [selected]);
   const errors = useMemo(
-    () => validatePhenoHuntDraft({ name, plantIds }, growId),
-    [name, plantIds, growId],
+    () => validatePhenoHuntOnboardingDraft({ name, goal, plantIds }, growId),
+    [name, goal, plantIds, growId],
   );
   const canSave = errors.length === 0 && !saving && !!user;
 
@@ -111,14 +112,15 @@ export default function PhenoHuntNew() {
     }
     setSaving(true);
     try {
-      await createPhenoHunt({
+      const created = await createPhenoHunt({
         growId,
         tentId: tentId ?? null,
         name: name.trim(),
+        goal: goal.trim(),
         plantIds,
       });
-      toast.success("Pheno hunt created");
-      navigate(logsPath(growId));
+      toast.success("Pheno hunt created — review and confirm your setup");
+      navigate(`/pheno-hunts/${created.huntId}/setup`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create pheno hunt");
       setSaving(false);
@@ -173,6 +175,23 @@ export default function PhenoHuntNew() {
             placeholder="e.g. Summer Pheno Hunt"
             data-testid="ph-name-input"
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="ph-goal">Hunt goal</Label>
+          <Textarea
+            id="ph-goal"
+            value={goal}
+            onChange={(e) => setGoal(e.target.value)}
+            maxLength={PHENO_GOAL_MAX_LENGTH}
+            rows={3}
+            placeholder="e.g. Find the loudest gas pheno with the tightest node spacing"
+            data-testid="ph-goal-input"
+          />
+          <p className="text-xs text-muted-foreground">
+            Your goal is saved with the hunt and shown in the workspace. You
+            can refine it before confirming setup.
+          </p>
         </div>
 
         <div className="space-y-2">

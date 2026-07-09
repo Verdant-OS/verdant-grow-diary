@@ -19,6 +19,10 @@ export interface PhenoHuntSummary {
   name: string;
   growId: string | null;
   tentId: string | null;
+  /** Persisted guided-setup goal. Optional: legacy call sites/mocks omit it. */
+  goal?: string | null;
+  /** NULL/undefined = setup unconfirmed ("continue setup"). */
+  setupConfirmedAt?: string | null;
 }
 
 export type LoadPhenoHuntCandidatesResult =
@@ -34,7 +38,7 @@ export async function loadPhenoHuntCandidates(
 
   const { data: huntRow, error: huntError } = await supabase
     .from("pheno_hunts")
-    .select("id, name, grow_id, tent_id")
+    .select("id, name, grow_id, tent_id, goal, setup_confirmed_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -67,6 +71,9 @@ export async function loadPhenoHuntCandidates(
       name: huntRow.name,
       growId: huntRow.grow_id ?? null,
       tentId: huntRow.tent_id ?? null,
+      goal: (huntRow as { goal?: string | null }).goal ?? null,
+      setupConfirmedAt:
+        (huntRow as { setup_confirmed_at?: string | null }).setup_confirmed_at ?? null,
     },
     candidates,
   };

@@ -1613,27 +1613,33 @@ export type Database = {
       pheno_hunts: {
         Row: {
           created_at: string
+          goal: string | null
           grow_id: string
           id: string
           name: string
+          setup_confirmed_at: string | null
           tent_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          goal?: string | null
           grow_id: string
           id?: string
           name: string
+          setup_confirmed_at?: string | null
           tent_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          goal?: string | null
           grow_id?: string
           id?: string
           name?: string
+          setup_confirmed_at?: string | null
           tent_id?: string | null
           updated_at?: string
           user_id?: string

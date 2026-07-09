@@ -40,6 +40,7 @@ const Timeline = lazy(() => import("./pages/Timeline"));
 const Grows = lazy(() => import("./pages/Grows"));
 const GrowDetail = lazy(() => import("./pages/GrowDetail"));
 const PhenoHuntNew = lazy(() => import("./pages/PhenoHuntNew"));
+const PhenoHuntSetupConfirmation = lazy(() => import("./pages/PhenoHuntSetupConfirmation"));
 const PhenoHuntCompare = lazy(() => import("./pages/PhenoHuntCompare"));
 const PhenoHuntWorkspace = lazy(() => import("./pages/PhenoHuntWorkspace"));
 const PhenoKeepersPage = lazy(() => import("./pages/PhenoKeepersPage"));
@@ -275,6 +276,14 @@ const App = () => (
                       element={
                         <PhenoTrackerUpgradeGate>
                           <PhenoHuntNew />
+                        </PhenoTrackerUpgradeGate>
+                      }
+                    />
+                    <Route
+                      path="/pheno-hunts/:id/setup"
+                      element={
+                        <PhenoTrackerUpgradeGate>
+                          <PhenoHuntSetupConfirmation />
                         </PhenoTrackerUpgradeGate>
                       }
                     />

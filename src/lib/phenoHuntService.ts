@@ -11,6 +11,11 @@ export interface CreatePhenoHuntInput {
   growId: string;
   tentId?: string | null;
   name: string;
+  /**
+   * Grower-stated hunt goal, persisted on the hunt row so "continue setup"
+   * and the workspace Evidence Packet Map can restore it. Blank -> NULL.
+   */
+  goal?: string | null;
   /** Plant IDs to tag as candidates. Order determines default labels. */
   plantIds: readonly string[];
   /** Optional per-plant label overrides. */
@@ -72,12 +77,15 @@ export async function createPhenoHunt(
     throw new PhenoHuntError("Select at least one candidate plant.");
   }
 
+  const goal = input.goal?.trim() || null;
+
   const { data: hunt, error: huntErr } = await client
     .from("pheno_hunts")
     .insert({
       grow_id: input.growId,
       tent_id: input.tentId ?? null,
       name,
+      goal,
     } as never)
     .select("id")
     .single();
@@ -138,6 +146,159 @@ export async function createPhenoHunt(
   }
 
   return { huntId, taggedPlantIds: tagged };
+}
+
+export interface PhenoHuntSetupCandidate {
+  id: string;
+  name: string;
+  candidateLabel: string | null;
+}
+
+export interface PhenoHuntSetupState {
+  huntId: string;
+  name: string;
+  goal: string | null;
+  growId: string | null;
+  tentId: string | null;
+  /** NULL while setup is unconfirmed ("continue setup"). */
+  setupConfirmedAt: string | null;
+  candidates: PhenoHuntSetupCandidate[];
+}
+
+/**
+ * Load the persisted setup state for a hunt (goal + confirmation stamp +
+ * tagged candidates). RLS-scoped to the owner; SELECT only.
+ */
+export async function loadPhenoHuntSetup(
+  huntId: string,
+  client: SupabaseClient = defaultClient,
+): Promise<PhenoHuntSetupState> {
+  const id = typeof huntId === "string" ? huntId.trim() : "";
+  if (!id) throw new PhenoHuntError("Hunt id is required.");
+
+  const { data: hunt, error: huntErr } = await client
+    .from("pheno_hunts")
+    .select("id, name, goal, grow_id, tent_id, setup_confirmed_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (huntErr) {
+    throw new PhenoHuntError(`Could not load hunt setup: ${huntErr.message}`, huntErr);
+  }
+  if (!hunt) throw new PhenoHuntError("Pheno hunt not found.");
+
+  const { data: plants, error: plantsErr } = await client
+    .from("plants")
+    .select("id, name, candidate_label")
+    .eq("pheno_hunt_id", id)
+    .eq("is_archived", false);
+
+  if (plantsErr) {
+    throw new PhenoHuntError(`Could not load hunt candidates: ${plantsErr.message}`, plantsErr);
+  }
+
+  const row = hunt as {
+    id: string;
+    name: string;
+    goal: string | null;
+    grow_id: string | null;
+    tent_id: string | null;
+    setup_confirmed_at: string | null;
+  };
+
+  return {
+    huntId: row.id,
+    name: row.name,
+    goal: row.goal ?? null,
+    growId: row.grow_id ?? null,
+    tentId: row.tent_id ?? null,
+    setupConfirmedAt: row.setup_confirmed_at ?? null,
+    candidates: ((plants ?? []) as Array<{
+      id: string;
+      name: string;
+      candidate_label: string | null;
+    }>).map((p) => ({
+      id: p.id,
+      name: p.name,
+      candidateLabel: p.candidate_label ?? null,
+    })),
+  };
+}
+
+export interface UpdatePhenoHuntGoalInput {
+  huntId: string;
+  goal: string;
+}
+
+/**
+ * Update the persisted goal. RLS (owner row policies + RESTRICTIVE
+ * has_pheno_tracker_entitlement) rejects Free/canceled/expired writers at
+ * the database; the rejection surfaces as a PhenoHuntError.
+ */
+export async function updatePhenoHuntGoal(
+  input: UpdatePhenoHuntGoalInput,
+  client: SupabaseClient = defaultClient,
+): Promise<{ goal: string }> {
+  if (!input.huntId) throw new PhenoHuntError("Hunt id is required.");
+  const goal = input.goal.trim();
+  if (!goal) throw new PhenoHuntError("Hunt goal is required.");
+  if (goal.length > 500) throw new PhenoHuntError("Hunt goal is too long (max 500 characters).");
+
+  const { error } = await client
+    .from("pheno_hunts")
+    .update({ goal } as never)
+    .eq("id", input.huntId);
+
+  if (error) {
+    throw new PhenoHuntError(`Could not save hunt goal: ${error.message}`, error);
+  }
+  return { goal };
+}
+
+export interface ConfirmPhenoHuntSetupInput {
+  huntId: string;
+  /** Injectable for tests; defaults to now. */
+  confirmedAtIso?: string;
+}
+
+/**
+ * Stamp setup_confirmed_at. Idempotent: only a NULL stamp is written, and the
+ * authoritative stamp is re-read afterwards, so re-confirming never moves an
+ * existing timestamp. Entitlement-blocked writers surface a PhenoHuntError
+ * (RLS rejection) — never a silent fake success.
+ */
+export async function confirmPhenoHuntSetup(
+  input: ConfirmPhenoHuntSetupInput,
+  client: SupabaseClient = defaultClient,
+): Promise<{ setupConfirmedAt: string }> {
+  if (!input.huntId) throw new PhenoHuntError("Hunt id is required.");
+  const stamp = input.confirmedAtIso ?? new Date().toISOString();
+
+  const { error: updErr } = await client
+    .from("pheno_hunts")
+    .update({ setup_confirmed_at: stamp } as never)
+    .eq("id", input.huntId)
+    .is("setup_confirmed_at", null);
+
+  if (updErr) {
+    throw new PhenoHuntError(`Could not confirm hunt setup: ${updErr.message}`, updErr);
+  }
+
+  const { data, error: selErr } = await client
+    .from("pheno_hunts")
+    .select("setup_confirmed_at")
+    .eq("id", input.huntId)
+    .maybeSingle();
+
+  if (selErr) {
+    throw new PhenoHuntError(`Could not read setup confirmation: ${selErr.message}`, selErr);
+  }
+  const confirmedAt = (data as { setup_confirmed_at: string | null } | null)
+    ?.setup_confirmed_at;
+  if (!confirmedAt) {
+    throw new PhenoHuntError("Hunt setup was not confirmed (hunt missing or write rejected).");
+  }
+  return { setupConfirmedAt: confirmedAt };
 }
 
 export interface DeletePhenoHuntInput {

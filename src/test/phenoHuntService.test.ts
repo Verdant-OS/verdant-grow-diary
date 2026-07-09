@@ -107,6 +107,7 @@ describe("phenoHuntService", () => {
         grow_id: "g1",
         tent_id: "t1",
         name: "Hunt",
+        goal: null,
       });
       expect(plantUpdates).toEqual([
         { id: "p1", values: { pheno_hunt_id: "h1", candidate_label: "#1" } },

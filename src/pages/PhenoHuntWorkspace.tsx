@@ -43,6 +43,7 @@ import PhenoProductSamplingSection from "@/components/PhenoProductSamplingSectio
 import PhenoStressTestingSection from "@/components/PhenoStressTestingSection";
 import PhenoSamplingWorkspaceTools from "@/components/PhenoSamplingWorkspaceTools";
 import PhenoDocumentationSections from "@/components/PhenoDocumentationSections";
+import PhenoHuntProgressPanel from "@/components/PhenoHuntProgressPanel";
 import PhenoStressObservationsList from "@/components/PhenoStressObservationsList";
 import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
 import { usePhenoStressObservations } from "@/hooks/usePhenoStressObservations";
@@ -846,6 +847,22 @@ export default function PhenoHuntWorkspace() {
             </span>
           </label>
         </header>
+
+        {ws.hunt ? (
+          <PhenoHuntProgressPanel
+            huntId={ws.hunt.id}
+            goal={ws.hunt.goal ?? null}
+            setupConfirmedAt={ws.hunt.setupConfirmedAt ?? null}
+            candidates={candidates}
+            signals={{
+              scoresByPlant: ws.scoresByPlant,
+              roundsByKey: ws.roundsByKey,
+              sexByPlant: ws.sexByPlant,
+              smokeByPlant: ws.smokeByPlant,
+              labByKey: ws.labByKey,
+            }}
+          />
+        ) : null}
 
         {candidates.length === 0 ? (
           <p data-testid="pheno-workspace-empty" className="text-sm text-muted-foreground">

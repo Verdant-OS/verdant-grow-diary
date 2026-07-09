@@ -21,6 +21,34 @@ import type {
 } from "../../../src/lib/entitlements/lovablePaddleAdapter.ts";
 import type { ResolvedEntitlement } from "../../../src/lib/entitlements/types.ts";
 
+/**
+ * Server-authoritative billing environment resolver.
+ *
+ * Trust order:
+ *   1. Explicit `PAYMENTS_ENVIRONMENT` env var (`live` | `sandbox`).
+ *   2. Presence of exactly one of PADDLE_LIVE_API_KEY / PADDLE_SANDBOX_API_KEY.
+ *   3. Conservative default: `sandbox` (never overgrants live).
+ *
+ * IMPORTANT: never derived from request body / query. Any caller-provided
+ * `billing_env` is ignored — a spoofed body cannot flip the server's
+ * expected environment.
+ */
+export function resolveServerBillingEnvironment(
+  getEnv: (name: string) => string | undefined = (n) => Deno.env.get(n),
+): LovableBillingEnvironment {
+  const explicit = getEnv("PAYMENTS_ENVIRONMENT");
+  if (explicit === "live" || explicit === "sandbox") return explicit;
+  const hasLive = !!getEnv("PADDLE_LIVE_API_KEY");
+  const hasSandbox = !!getEnv("PADDLE_SANDBOX_API_KEY");
+  if (hasLive && !hasSandbox) return "live";
+  if (hasSandbox && !hasLive) return "sandbox";
+  return "sandbox";
+}
+
+/**
+ * @deprecated Retained only for tests that still exercise the removed
+ * client-body path. Server code MUST use `resolveServerBillingEnvironment`.
+ */
 export function pickExpectedBillingEnvironment(
   raw: unknown,
 ): LovableBillingEnvironment {

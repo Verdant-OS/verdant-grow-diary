@@ -32,6 +32,7 @@ import FirstRunChecklist from "@/components/FirstRunChecklist";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
 import OperatorModeCallout from "@/components/OperatorModeCallout";
+import { usePageSeo } from "@/hooks/usePageSeo";
 import ReleaseReadinessOperatorCard from "@/components/ReleaseReadinessOperatorCard";
 import LineageRepairCta from "@/components/LineageRepairCta";
 

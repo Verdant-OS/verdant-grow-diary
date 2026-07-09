@@ -1,0 +1,88 @@
+name: Security DB (local Supabase)
+
+# OPTIONAL job — DB-backed security harnesses. Not a required check.
+# Required PR gate remains `test:security-regression`. Do not mark this
+# job required until it has been stable across multiple PRs.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-security-db-local:
+    name: test:security-db-local
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Optional: never blocks the merge queue.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        id: supabase-start
+        run: |
+          set -e
+          supabase start --workdir . 2>&1 | tee supabase-start.log
+          echo "started=true" >> "$GITHUB_OUTPUT"
+
+      - name: Export local Supabase env
+        id: supabase-env
+        run: |
+          set -e
+          STATUS_JSON="$(supabase status -o json)"
+          SUPABASE_URL="$(echo "$STATUS_JSON" | jq -r '.API_URL // .api_url // empty')"
+          SUPABASE_ANON_KEY="$(echo "$STATUS_JSON" | jq -r '.ANON_KEY // .anon_key // empty')"
+          SUPABASE_SERVICE_ROLE_KEY="$(echo "$STATUS_JSON" | jq -r '.SERVICE_ROLE_KEY // .service_role_key // empty')"
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "BLOCKED: local Supabase did not expose required keys."
+            exit 2
+          fi
+          # Local-only keys. Do NOT echo values.
+          echo "SUPABASE_URL=$SUPABASE_URL" >> "$GITHUB_ENV"
+          echo "::add-mask::$SUPABASE_ANON_KEY"
+          echo "::add-mask::$SUPABASE_SERVICE_ROLE_KEY"
+          echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+
+      - name: Apply migrations (db reset)
+        run: supabase db reset --no-seed 2>&1 | tee supabase-db-reset.log
+
+      - name: Pi-ingest DB replay tests
+        run: bun run test:pi-ingest-db-security 2>&1 | tee pi-ingest-db.log
+
+      - name: Storage policy DB tests
+        run: bun run test:storage-db-security 2>&1 | tee storage-db.log
+
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-db-local-logs
+          path: |
+            supabase-start.log
+            supabase-db-reset.log
+            pi-ingest-db.log
+            storage-db.log
+            test-results/**
+            artifacts/security-db/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup || true

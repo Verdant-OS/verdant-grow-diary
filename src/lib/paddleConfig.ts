@@ -1,20 +1,32 @@
 /**
- * Paddle sandbox configuration reader.
+ * Paddle sandbox configuration reader — BYO (bring-your-own-key) PATH.
  *
- * Verdant is in SANDBOX-ONLY mode for Paddle payments. This module:
+ * @deprecated Phase 1 payments wiring moved to Lovable built-in Paddle
+ * (`src/lib/paddle.ts` + `src/hooks/usePaddleCheckout.ts`). The
+ * `/billing/:plan` route is no longer the user-facing checkout entry;
+ * `Pricing.tsx` CTAs now open the built-in Paddle overlay directly.
  *
+ * This file is kept only because:
+ *  - the `BillingPlaceholder` route still renders it as a safety fallback
+ *  - the operator audit pages (`OperatorPaddleProcessingAudit`,
+ *    `OperatorBillingSubscriptionUpdateAudit`,
+ *    `OperatorBillingEntitlementResolutionAudit`) and the
+ *    `paddle-webhook` edge function reference the same historical
+ *    `billing_subscriptions` / `paddle_events` schema.
+ *
+ * Phase 2 will bridge Lovable's `subscriptions` table into
+ * `resolveEntitlements` and formally retire this module.
+ *
+ * ORIGINAL PURPOSE (still valid until Phase 2):
  *  - reads Paddle config from VITE_PADDLE_* environment variables
  *  - REFUSES to initialize if the environment is "live" or "production"
- *  - returns a safe "unavailable" state when any required value is missing,
- *    so the billing UI can render an explicit unavailable message instead
- *    of pretending checkout works
+ *  - returns a safe "unavailable" state when any required value is missing
  *
  * No real money. No live charges. No entitlement changes.
  *
- * Entitlements (e.g. Pro access) are NEVER granted from the client. They
- * are only granted server-side after a verified Paddle webhook event is
- * received and recorded in the `paddle_events` table.
+ * Entitlements (e.g. Pro access) are NEVER granted from the client.
  */
+
 
 export const PADDLE_SANDBOX_ENV = "sandbox" as const;
 

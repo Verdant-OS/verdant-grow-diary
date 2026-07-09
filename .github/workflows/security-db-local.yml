@@ -11,9 +11,9 @@ name: Security DB Local
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
   push:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
   workflow_dispatch:
     inputs:
       run_db_security:

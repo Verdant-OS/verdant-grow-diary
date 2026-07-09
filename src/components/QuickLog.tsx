@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -660,6 +661,7 @@ export default function QuickLog({
         : null;
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
+        idempotencyKey: newQuickLogSaveKey(),
         noteWithHardware,
         plantId: selectedPlant.id,
         plantTentId: selectedPlant.tent_id ?? null,

@@ -14,7 +14,7 @@
  * the adapter — no implicit env inference beyond that single boundary.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
@@ -33,20 +33,28 @@ export interface UseMyEntitlementsResult {
   refetch: () => Promise<void>;
 }
 
-const FREE_NOW = (): ResolvedEntitlement =>
-  resolveEntitlements(null, new Date());
+const FREE_NOW = (): ResolvedEntitlement => resolveEntitlements(null, new Date());
 
 export function useMyEntitlements(): UseMyEntitlementsResult {
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState<boolean>(true);
-  const [entitlement, setEntitlement] = useState<ResolvedEntitlement>(
-    () => FREE_NOW(),
-  );
+  const [entitlement, setEntitlement] = useState<ResolvedEntitlement>(() => FREE_NOW());
 
   const expectedBillingEnvironment = useMemo(() => getPaddleEnvironment(), []);
 
+  // The three subscription reads race unmount (route change, test
+  // teardown): never setState after unmount.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const doLoad = useCallback(async () => {
     if (!user) {
+      if (!mountedRef.current) return;
       setEntitlement(FREE_NOW());
       setLoading(false);
       return;
@@ -54,11 +62,7 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
     setLoading(true);
     // All three reads are RLS-protected (select-own) and PRESENTATION-ONLY.
     const [byoRes, lovableRes, rolesRes] = await Promise.all([
-      supabase
-        .from("billing_subscriptions")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle(),
+      supabase.from("billing_subscriptions").select("*").eq("user_id", user.id).maybeSingle(),
       supabase
         .from("subscriptions")
         .select("*")
@@ -76,13 +80,12 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
     ]);
 
     const isStaff = !rolesRes.error && rolesRes.data != null;
-    const byoRow = byoRes.error
-      ? null
-      : (byoRes.data ?? null) as BillingSubscriptionRow | null;
+    const byoRow = byoRes.error ? null : ((byoRes.data ?? null) as BillingSubscriptionRow | null);
     const lovableRow = lovableRes.error
       ? null
-      : (lovableRes.data ?? null) as LovableSubscriptionRow | null;
+      : ((lovableRes.data ?? null) as LovableSubscriptionRow | null);
 
+    if (!mountedRef.current) return;
     setEntitlement(
       resolveUnionEntitlements({
         byoRow,

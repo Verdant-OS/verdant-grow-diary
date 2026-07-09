@@ -33,14 +33,8 @@ const FN = readFileSync(
   resolve(ROOT, "supabase/functions/live-sensor-entitlement/index.ts"),
   "utf8",
 );
-const HOOK = readFileSync(
-  resolve(ROOT, "src/hooks/useLiveSensorServerGate.ts"),
-  "utf8",
-);
-const DOC = readFileSync(
-  resolve(ROOT, "docs/paid-launch-entitlement-blocker.md"),
-  "utf8",
-);
+const HOOK = readFileSync(resolve(ROOT, "src/hooks/useLiveSensorServerGate.ts"), "utf8");
+const DOC = readFileSync(resolve(ROOT, "docs/paid-launch-entitlement-blocker.md"), "utf8");
 
 // --- edge function source safety ------------------------------------------
 
@@ -244,6 +238,8 @@ describe("static guard — capabilities.liveSensors is never used as an authorit
     resolve(ROOT, "src/components/PremiumLiveSensorGate.tsx"),
     resolve(ROOT, "src/test/premium-live-sensor-gate.test.tsx"),
     resolve(ROOT, "src/test/premium-live-sensor-gate-hardening.test.tsx"),
+    // Union-entitlement gate tests assert (not implement) the gate contract.
+    resolve(ROOT, "src/test/server-union-entitlement-gate.test.ts"),
   ]);
 
   it("only the entitlements catalog + this gate file reference capabilities.liveSensors as a gate", () => {
@@ -271,9 +267,7 @@ describe("free / non-premium sensor surfaces are NOT relabeled or removed", () =
   it("imported CSV history panel still labels readings as historical, not live", () => {
     const f = resolve(ROOT, "src/components/ImportedSensorHistoryPanel.tsx");
     if (!existsSync(f)) return;
-    expect(readFileSync(f, "utf8")).toMatch(
-      /historical context, not live sensor data/i,
-    );
+    expect(readFileSync(f, "utf8")).toMatch(/historical context, not live sensor data/i);
   });
 
   it("InfoPopover plant-data tooltip still distinguishes saved workspace data from a live sensor reading", () => {

@@ -93,6 +93,7 @@ describe("Environment Check Quick Log — save payload semantics", () => {
   it("save payload routes envelope to p_details.environment_check (manual semantics, not sensor / not csv / not live)", () => {
     const r = buildLegacyQuickLogUnifiedPayload({
       eventType: "environment",
+      idempotencyKey: "quicklog-v2-test-key-env",
       noteWithHardware: "midday env check",
       plantId: "plant-1",
       plantTentId: "tent-1",
@@ -125,6 +126,7 @@ describe("Environment Check Quick Log — save payload semantics", () => {
     expect(empty).toBeNull();
     const r = buildLegacyQuickLogUnifiedPayload({
       eventType: "environment",
+      idempotencyKey: "quicklog-v2-test-key-fix",
       noteWithHardware: "",
       plantId: "plant-1",
       plantTentId: "tent-1",

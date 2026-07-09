@@ -163,6 +163,7 @@ describe("quickLogV2SavePayload note contract (pure)", () => {
     temperatureC: "",
     humidityPct: "",
     vpdKpa: "",
+    idempotencyKey: "quicklog-v2-test-key-0002",
   };
 
   it("an entered note reaches the payload as the exact trimmed value", () => {

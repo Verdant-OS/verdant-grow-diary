@@ -60,8 +60,7 @@ function simulateQuickLogInsert(opts: {
       source: "manual",
       note: opts.note ?? null,
       is_deleted: false,
-      watering_events:
-        opts.volumeMl != null ? { volume_ml: opts.volumeMl } : null,
+      watering_events: opts.volumeMl != null ? { volume_ml: opts.volumeMl } : null,
     },
   ];
   if (opts.env && opts.envId) {
@@ -104,6 +103,7 @@ describe("Quick Log save payload (write path)", () => {
         // payload builder only reads ok/targetType/targetId.
       } as unknown as Parameters<typeof buildQuickLogV2SavePayload>[0]["resolved"],
       action: "water",
+      idempotencyKey: "quicklog-v2-test-key-0003",
       volumeMl: "500",
       note: "Top-feed, full strength",
       temperatureC: "24",
@@ -273,8 +273,7 @@ describe("static safety: Quick Log + Timeline write/read paths", () => {
   // not get mistaken for actual call sites.
   const stripComments = (s: string): string =>
     s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
-  const load = (rel: string): string =>
-    stripComments(readFileSync(join(root, rel), "utf8"));
+  const load = (rel: string): string => stripComments(readFileSync(join(root, rel), "utf8"));
   const files: Record<string, string> = {
     save: load("src/hooks/useQuickLogV2Save.ts"),
     payload: load("src/lib/quickLogV2SavePayload.ts"),
@@ -296,14 +295,7 @@ describe("static safety: Quick Log + Timeline write/read paths", () => {
   });
 
   it("timeline read hook is SELECT-only — no insert/update/delete/upsert/rpc/invoke", () => {
-    const forbidden = [
-      ".insert(",
-      ".update(",
-      ".delete(",
-      ".upsert(",
-      ".rpc(",
-      "functions.invoke",
-    ];
+    const forbidden = [".insert(", ".update(", ".delete(", ".upsert(", ".rpc(", "functions.invoke"];
     for (const needle of forbidden) {
       expect(files.hook, needle).not.toContain(needle);
     }
@@ -317,12 +309,7 @@ describe("static safety: Quick Log + Timeline write/read paths", () => {
   });
 
   it("no device-control or automation execution paths", () => {
-    const banned = [
-      /device\.execute/i,
-      /automation_executed/i,
-      /actuator\.write/i,
-      /relay\.set/i,
-    ];
+    const banned = [/device\.execute/i, /automation_executed/i, /actuator\.write/i, /relay\.set/i];
     for (const [name, src] of Object.entries(files)) {
       for (const re of banned) {
         expect(src, name).not.toMatch(re);

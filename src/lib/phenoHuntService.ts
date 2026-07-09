@@ -82,13 +82,29 @@ export async function createPhenoHunt(
     throw new PhenoHuntError("Select at least one candidate plant.");
   }
 
+  // Sanitize evidence goals into a bounded list of short text keys — never
+  // leak arbitrary client-supplied JSON into the DB. The DB check constraint
+  // also enforces jsonb array type, but this is the app-layer guard.
+  const evidenceGoals = sanitizeEvidenceGoals(input.evidenceGoals);
+  const trimmedNotes =
+    typeof input.notes === "string" && input.notes.trim().length > 0
+      ? input.notes.trim().slice(0, 4000)
+      : null;
+
+  const insertRow: Record<string, unknown> = {
+    grow_id: input.growId,
+    tent_id: input.tentId ?? null,
+    name,
+    evidence_goals: evidenceGoals,
+    notes: trimmedNotes,
+  };
+  if (input.markSetupComplete) {
+    insertRow.setup_completed_at = new Date().toISOString();
+  }
+
   const { data: hunt, error: huntErr } = await client
     .from("pheno_hunts")
-    .insert({
-      grow_id: input.growId,
-      tent_id: input.tentId ?? null,
-      name,
-    } as never)
+    .insert(insertRow as never)
     .select("id")
     .single();
 

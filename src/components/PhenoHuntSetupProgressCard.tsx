@@ -3,15 +3,38 @@
  * card. Purely reflects the persisted hunt (evidence_goals, setup_completed_at)
  * + the loaded candidate count. Never infers evidence completion. Grower
  * clicks "Mark setup complete" to stamp setup_completed_at via the parent.
+ *
+ * Setup complete ≠ Comparison-ready. This card renders them as two
+ * separate status lines and includes the canonical definitions from
+ * `phenoOnboardingCopy` so growers are never misled.
  */
 import type { PhenoHuntSummary } from "@/lib/phenoHuntCandidatesService";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Circle } from "lucide-react";
 import { PHENO_EVIDENCE_GOALS } from "@/lib/phenoEvidenceGoals";
+import {
+  PHENO_COMPARISON_READY_DEFINITION,
+  PHENO_SETUP_COMPLETE_DEFINITION,
+  PHENO_STATUS_LABELS,
+} from "@/constants/phenoOnboardingCopy";
+
+export type PhenoWorkspaceComparisonReadiness =
+  | "not_ready"
+  | "ready_for_tracking"
+  | "missing_evidence"
+  | "pending_until_harvest"
+  | "pending_until_cure"
+  | "comparison_ready";
 
 export interface PhenoHuntSetupProgressCardProps {
   hunt: PhenoHuntSummary;
   candidateCount: number;
+  /**
+   * Comparison-readiness reported by the workspace based on real recorded
+   * evidence. Never derived from setup state. Defaults to "not_ready" so
+   * we never imply comparison-ready without evidence.
+   */
+  comparisonReadiness?: PhenoWorkspaceComparisonReadiness;
   onMarkComplete?: () => void;
   saving?: boolean;
   "data-testid"?: string;
@@ -24,9 +47,22 @@ interface ProgressItem {
   detail: string;
 }
 
+const COMPARISON_READINESS_LABEL: Record<
+  PhenoWorkspaceComparisonReadiness,
+  string
+> = {
+  not_ready: PHENO_STATUS_LABELS.notComparisonReadyYet,
+  ready_for_tracking: PHENO_STATUS_LABELS.readyForTracking,
+  missing_evidence: PHENO_STATUS_LABELS.missingEvidence,
+  pending_until_harvest: PHENO_STATUS_LABELS.pendingUntilHarvest,
+  pending_until_cure: PHENO_STATUS_LABELS.pendingUntilCure,
+  comparison_ready: PHENO_STATUS_LABELS.comparisonReady,
+};
+
 export default function PhenoHuntSetupProgressCard({
   hunt,
   candidateCount,
+  comparisonReadiness = "not_ready",
   onMarkComplete,
   saving,
   ...rest
@@ -74,22 +110,44 @@ export default function PhenoHuntSetupProgressCard({
 
   const missing = items.filter((i) => !i.complete);
   const allDone = missing.length === 0;
+  const comparisonLabel = COMPARISON_READINESS_LABEL[comparisonReadiness];
 
   return (
     <section
       data-testid={testId}
       data-setup-complete={setupDone ? "true" : "false"}
       data-missing-count={missing.length}
+      data-comparison-readiness={comparisonReadiness}
       className="glass rounded-2xl p-4 space-y-3"
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">
-          {allDone ? "Setup complete" : "Continue setup"}
+          {allDone
+            ? PHENO_STATUS_LABELS.setupComplete
+            : "Continue setup"}
         </h2>
         <span className="text-xs text-muted-foreground" data-testid={`${testId}-count`}>
           {items.length - missing.length} of {items.length} steps done
         </span>
       </div>
+
+      {/* Setup vs Comparison-ready — always two separate lines. */}
+      <div
+        className="grid gap-1 text-xs"
+        data-testid={`${testId}-status-lines`}
+      >
+        <div data-testid={`${testId}-setup-status`}>
+          <span className="font-medium">{PHENO_STATUS_LABELS.setupComplete}:</span>{" "}
+          <span className="text-muted-foreground">
+            {setupDone ? "Yes" : "Not yet"}
+          </span>
+        </div>
+        <div data-testid={`${testId}-comparison-status`}>
+          <span className="font-medium">Comparison readiness:</span>{" "}
+          <span className="text-muted-foreground">{comparisonLabel}</span>
+        </div>
+      </div>
+
       <ul className="space-y-1.5">
         {items.map((i) => {
           const Icon = i.complete ? CheckCircle2 : Circle;
@@ -115,6 +173,19 @@ export default function PhenoHuntSetupProgressCard({
           );
         })}
       </ul>
+
+      <div
+        className="text-xs text-muted-foreground space-y-1 pt-1 border-t border-border/50"
+        data-testid={`${testId}-definitions`}
+      >
+        <p data-testid={`${testId}-definition-setup`}>
+          {PHENO_SETUP_COMPLETE_DEFINITION}
+        </p>
+        <p data-testid={`${testId}-definition-comparison`}>
+          {PHENO_COMPARISON_READY_DEFINITION}
+        </p>
+      </div>
+
       {!setupDone && onMarkComplete ? (
         <div className="flex justify-end">
           <Button

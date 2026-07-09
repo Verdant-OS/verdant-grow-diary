@@ -261,19 +261,19 @@ export function computePhenoHuntOnboardingViewModel(
       id: "post_harvest",
       label: "Post-harvest notes",
       status: "pending",
-      detail: "Recorded after harvest",
+      detail: "Pending until harvest",
     },
     {
       id: "post_cure",
       label: "Post-cure notes",
       status: "pending",
-      detail: "Recorded after cure — post-cure follow-up pending",
+      detail: "Pending until cure — post-cure follow-up pending",
     },
     {
       id: "replication_readiness",
       label: "Replication readiness",
       status: "pending",
-      detail: "Clones / mother assignment recorded when available",
+      detail: "Pending until clones / mother assignment are recorded",
     },
   ];
 

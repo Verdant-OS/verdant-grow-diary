@@ -152,6 +152,12 @@ function groupReadings(rows: SensorReadingRow[]): DashReading[] {
 }
 
 export default function Dashboard() {
+  usePageSeo({
+    title: "Grow Room Dashboard | Verdant Grow Diary",
+    description:
+      "Track tents, plants, sensor snapshots, environment stability, and grow activity in one grower-controlled dashboard.",
+    path: "/",
+  });
   // Shared URL `?growId=` resolution against RLS-loaded grows. When growId is
   // absent or invalid, hooks fetch the user's full set (legacy behavior).
   const { urlGrowId, scopedGrow, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();

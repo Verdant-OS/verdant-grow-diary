@@ -170,14 +170,18 @@ export default function PhenoHuntNew() {
     }
     setSaving(true);
     try {
-      await createPhenoHunt({
+      const res = await createPhenoHunt({
         growId,
         tentId: tentId ?? null,
         name: name.trim(),
         plantIds: candidateIds,
+        evidenceGoals,
+        notes: notes.trim() || null,
+        markSetupComplete: setupConfirmed,
       });
       toast.success("Pheno hunt created");
-      navigate(logsPath(growId));
+      // Enter the workspace — grower can continue setup from there.
+      navigate(`/pheno-hunts/${res.huntId}/workspace`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create pheno hunt");
       setSaving(false);

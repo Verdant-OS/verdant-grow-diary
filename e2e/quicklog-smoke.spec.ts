@@ -169,10 +169,15 @@ test.describe("Quick Log smoke checklist", () => {
       });
 
       await report.run(12, "Select Watering event type", async () => {
-        await dialog
-          .getByRole("button", { name: /watering/i })
-          .first()
-          .click();
+        // Scope to the activity-type chip group: a bare /watering/i .first()
+        // can match other watering-labelled controls, silently leaving the
+        // event type on the (prefilled) note — which then SAVES instead of
+        // triggering the blank-ml validation this checklist exercises.
+        const wateringChip = dialog
+          .getByRole("group", { name: /quick log activity/i })
+          .getByRole("button", { name: /^watering$/i });
+        await wateringChip.click();
+        await expect(wateringChip).toHaveAttribute("aria-pressed", "true");
         return "watering selected";
       });
 

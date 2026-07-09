@@ -8,6 +8,7 @@ import { AuthProvider } from "@/store/auth";
 import { GrowsProvider } from "@/store/grows";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
 import RootErrorBoundary from "@/components/RootErrorBoundary";
+import PhenoTrackerUpgradeGate from "@/components/PhenoTrackerUpgradeGate";
 import RequireOperatorRole from "./components/RequireOperatorRole";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 

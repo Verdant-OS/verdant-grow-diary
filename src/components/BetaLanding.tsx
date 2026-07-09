@@ -94,6 +94,19 @@ export function getCreatorBetaFormUrl(): string | null {
   return trimmed;
 }
 
+/**
+ * Post-demo feedback form URL. Same safety contract as the intake URL:
+ * only absolute http(s) targets are honored; anything else is treated as
+ * unset and renders a disabled placeholder (never a broken/unsafe link).
+ */
+export function getBetaFeedbackFormUrl(): string | null {
+  const raw = (import.meta.env.VITE_BETA_FEEDBACK_FORM_URL ?? "") as string;
+  const trimmed = typeof raw === "string" ? raw.trim() : "";
+  if (!trimmed) return null;
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+  return trimmed;
+}
+
 export interface BetaLandingProps {
   variant: BetaVariant;
   copy: BetaLandingCopy;

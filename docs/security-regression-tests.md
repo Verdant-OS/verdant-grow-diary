@@ -67,8 +67,12 @@ export SUPABASE_SERVICE_ROLE_KEY=...  # local only; NEVER production
 bun run test:pi-ingest-db-security
 bun run test:storage-db-security
 bun run test:profiles-db-security
-bun run test:security-db-local
+bun run test:customer-mode-db-security
+bun run test:security-db-local     # aggregate — runs all of the above
 ```
+
+Each individual runner exits with code `2` and a `BLOCKED:` message when
+required env vars are missing so it never fakes a pass.
 
 ### Local grant parity (`supabase/seed.sql`)
 

@@ -3078,6 +3078,10 @@ export type Database = {
         Args: { _tent_id: string }
         Returns: Json
       }
+      has_pheno_tracker_entitlement: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

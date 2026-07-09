@@ -6,20 +6,17 @@
  * no localStorage/sessionStorage/client flags.
  *
  * PRESENTATION SAFETY:
- *   These helpers are used to render upgrade gates in the UI. They are NOT
- *   the authoritative security boundary for paid writes. Writes/exports for
- *   paid features must ALSO be protected by:
- *     - Supabase RLS on the underlying tables (already in place for
- *       pheno_hunts, pheno_candidate_scores, pheno_keeper_decisions, etc.),
- *     - and, for cost/entitlement-sensitive endpoints, a server-side
- *       entitlement re-check (see supabase/functions/_shared/unionEntitlementLookup.ts).
- *
- *   TODO (server-side gating): There is no server-side entitlement check
- *   today for `pheno_tracker` write paths — Free clients are prevented from
- *   writing by UI-only gating and by the client build not calling the write
- *   helpers from the gated state. RLS still prevents cross-user writes. A
- *   dedicated `assert_pheno_tracker_entitlement()` RPC or Edge check should
- *   be added before we claim server-side paid enforcement.
+ *   These helpers render upgrade gates in the UI. They are NOT the
+ *   authoritative security boundary. Paid writes for `pheno_tracker` are
+ *   enforced server-side by:
+ *     - Ownership RLS on every pheno_* table (auth.uid() = user_id, plus
+ *       hunt/plant consistency), and
+ *     - RESTRICTIVE RLS policies on all pheno_* write paths that require
+ *       `public.has_pheno_tracker_entitlement(auth.uid())` for
+ *       INSERT/UPDATE/DELETE. Free / expired / canceled / paused users are
+ *       rejected at the database even if they bypass the UI.
+ *     - Edge callers should use
+ *       `supabase/functions/_shared/assertPhenoTrackerEntitlement.ts`.
  */
 
 import type {

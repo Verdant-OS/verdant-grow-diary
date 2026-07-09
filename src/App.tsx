@@ -84,6 +84,9 @@ const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
 const BillingPlaceholder = lazy(() => import("./pages/BillingPlaceholder"));
 const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
 const CheckoutCancel = lazy(() => import("./pages/CheckoutCancel"));
+const Terms = lazy(() => import("./pages/legal/Terms"));
+const Privacy = lazy(() => import("./pages/legal/Privacy"));
+const Refund = lazy(() => import("./pages/legal/Refund"));
 
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));

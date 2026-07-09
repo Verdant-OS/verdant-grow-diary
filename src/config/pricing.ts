@@ -255,6 +255,30 @@ export function resolveTierFeatures(tierId: string): string[] {
   return sortByCanonicalOrder(raw);
 }
 
+/**
+ * Success panel feature row identity.
+ *
+ * Returns a deterministic, stable key for a feature string suitable for
+ * React `key` props and DOM `data-*` attributes. Known canonical features
+ * map to `feat-<canonical-index>` so the SAME feature has the SAME key
+ * across every tier's success panel. Unknown / unrecognized feature
+ * strings fall back to `feat-x-<slug>` where the slug is a normalized
+ * form of the string, ensuring identity is still deterministic and does
+ * not collide with canonical indices.
+ *
+ * Pure, presenter-only. No randomness, no locale-dependent behavior.
+ */
+export function successPanelFeatureRowKey(feature: string): string {
+  const idx = CANONICAL_FEATURE_ORDER.indexOf(feature);
+  if (idx !== -1) return `feat-${idx}`;
+  const slug = feature
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+  return `feat-x-${slug || "unknown"}`;
+}
+
 export interface UpgradeFaqItem {
   q: string;
   a: string;

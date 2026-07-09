@@ -54,6 +54,7 @@ import {
   PLAN_COMPARISON,
   UPGRADE_FAQ,
   resolveTierFeatures,
+  successPanelFeatureRowKey,
   type PricingTier,
 } from "@/config/pricing";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -627,12 +628,20 @@ function UpgradeSuccessPanel({
             {tier.name} — newly unlocked features
           </p>
           <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-            {unlockedFeatures.map((f) => (
-              <li key={f} className="flex items-start gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <span>{f}</span>
-              </li>
-            ))}
+            {unlockedFeatures.map((f) => {
+              const rowKey = successPanelFeatureRowKey(f);
+              return (
+                <li
+                  key={rowKey}
+                  data-feature-key={rowKey}
+                  data-testid="upgrade-success-feature-row"
+                  className="flex items-start gap-2"
+                >
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <span>{f}</span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : (

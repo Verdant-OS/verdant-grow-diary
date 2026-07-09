@@ -17,7 +17,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getPaddleEnvironment } from "@/lib/paddle";
+
 
 export type LiveSensorSurface =
   | "live_sensor_stream"

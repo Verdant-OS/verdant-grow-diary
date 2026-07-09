@@ -34,7 +34,9 @@ import type { ResolvedEntitlement } from "../../../src/lib/entitlements/types.ts
  * expected environment.
  */
 export function resolveServerBillingEnvironment(
-  getEnv: (name: string) => string | undefined = (n) => Deno.env.get(n),
+  getEnv: (name: string) => string | undefined = (n) =>
+    (globalThis as { Deno?: { env: { get(n: string): string | undefined } } })
+      .Deno?.env.get(n),
 ): LovableBillingEnvironment {
   const explicit = getEnv("PAYMENTS_ENVIRONMENT");
   if (explicit === "live" || explicit === "sandbox") return explicit;

@@ -19,6 +19,7 @@
     "format:check": "prettier --check .",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:legal-seo": "vitest run src/test/legal-pages-structured-data.test.tsx",
     "test:mcp:rls:local": "bunx vitest run src/test/mcp-local-rls-integration.test.ts",
     "test:staff-role-rls-harness": "bun run scripts/run-staff-role-rls-harness.ts",
     "test:summarize-timeouts": "node scripts/summarize-vitest-timeouts.mjs",

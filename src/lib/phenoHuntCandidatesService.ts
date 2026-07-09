@@ -19,6 +19,9 @@ export interface PhenoHuntSummary {
   name: string;
   growId: string | null;
   tentId: string | null;
+  evidenceGoals: string[];
+  notes: string | null;
+  setupCompletedAt: string | null;
 }
 
 export type LoadPhenoHuntCandidatesResult =

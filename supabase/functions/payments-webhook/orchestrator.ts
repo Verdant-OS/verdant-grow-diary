@@ -21,8 +21,10 @@
  * index.ts is a thin transport wrapper around this function.
  */
 import {
+  attachResolvedPriceExternalId,
   auditFields,
   decide,
+  transactionPriceIdNeedingLookup,
   type Decision,
   type PaddleEnv,
 } from './eventProcessor.ts';

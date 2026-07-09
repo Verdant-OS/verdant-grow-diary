@@ -28,18 +28,14 @@ const PLANT_URL = process.env.E2E_GROW_1_PLANT_URL;
 // `??` alone is not enough: an unset GitHub Actions var referenced via
 // `env:` arrives as an EMPTY STRING (not undefined), which would produce an
 // empty regex that strict-mode-matches every option in the plant select.
-const TARGET_NAME =
-  process.env.E2E_GROW_2_PLANT_NAME?.trim() || "505 Headbanger";
+const TARGET_NAME = process.env.E2E_GROW_2_PLANT_NAME?.trim() || "505 Headbanger";
 
 const RESULTS_DIR = path.resolve(process.cwd(), "e2e/results");
 const REPORT_JSON = path.join(RESULTS_DIR, "quicklog-smoke-report.json");
 const REPORT_TXT = path.join(RESULTS_DIR, "quicklog-smoke-report.txt");
 
 test.describe("Quick Log smoke checklist", () => {
-  test.skip(
-    !PLANT_URL,
-    "Set E2E_GROW_1_PLANT_URL to a Grow #1 plant page to run this smoke test.",
-  );
+  test.skip(!PLANT_URL, "Set E2E_GROW_1_PLANT_URL to a Grow #1 plant page to run this smoke test.");
 
   test("authenticated end-to-end checklist", async ({ page }, testInfo) => {
     const report = new SmokeChecklistReporter();
@@ -73,14 +69,10 @@ test.describe("Quick Log smoke checklist", () => {
 
       const plantSelect = dialog.getByTestId("quick-log-plant-select");
       await plantSelect.click();
-      await page
-        .getByRole("option", { name: new RegExp(TARGET_NAME, "i") })
-        .click();
+      await page.getByRole("option", { name: new RegExp(TARGET_NAME, "i") }).click();
 
       await report.run(4, "Mismatch banner appears", async () => {
-        await expect(
-          dialog.getByTestId("quick-log-plant-mismatch-banner"),
-        ).toBeVisible();
+        await expect(dialog.getByTestId("quick-log-plant-mismatch-banner")).toBeVisible();
         return "banner visible";
       });
 
@@ -90,15 +82,28 @@ test.describe("Quick Log smoke checklist", () => {
       });
 
       await report.run(6, "Tab reaches issue links", async () => {
-        await dialog.getByTestId("quick-log-plant-select").focus();
-        for (let i = 0; i < 12; i++) {
-          await page.keyboard.press("Tab");
-          const id = await page.evaluate(
+        const focusedTestId = () =>
+          page.evaluate(
             () => (document.activeElement as HTMLElement | null)?.dataset?.testid ?? "",
           );
-          if (id?.startsWith("quick-log-review-jump-")) return `focused ${id}`;
+        // The "Review before saving" region renders ABOVE the target card,
+        // so from the plant select the nearest keyboard path to the jump
+        // links is backwards (Shift+Tab). Walk backwards first, then fall
+        // back to a forward walk large enough to wrap the dialog's focus
+        // trap, so this step survives future reordering of the dialog.
+        await dialog.getByTestId("quick-log-plant-select").focus();
+        for (let i = 0; i < 12; i++) {
+          await page.keyboard.press("Shift+Tab");
+          const id = await focusedTestId();
+          if (id.startsWith("quick-log-review-jump-")) return `focused ${id} (Shift+Tab x${i + 1})`;
         }
-        throw new Error("Did not reach review jump link via Tab");
+        await dialog.getByTestId("quick-log-plant-select").focus();
+        for (let i = 0; i < 40; i++) {
+          await page.keyboard.press("Tab");
+          const id = await focusedTestId();
+          if (id.startsWith("quick-log-review-jump-")) return `focused ${id} (Tab x${i + 1})`;
+        }
+        throw new Error("Did not reach review jump link via Tab or Shift+Tab");
       });
 
       await report.run(7, "Activate plant-mismatch jump link", async () => {
@@ -136,7 +141,10 @@ test.describe("Quick Log smoke checklist", () => {
       });
 
       await report.run(12, "Select Watering event type", async () => {
-        await dialog.getByRole("button", { name: /watering/i }).first().click();
+        await dialog
+          .getByRole("button", { name: /watering/i })
+          .first()
+          .click();
         return "watering selected";
       });
 
@@ -243,14 +251,14 @@ test.describe("Quick Log smoke checklist", () => {
       fs.writeFileSync(REPORT_JSON, json);
       fs.writeFileSync(REPORT_TXT, text);
 
-      // eslint-disable-next-line no-console
+       
       console.log(`\n${text}\n`);
-      // eslint-disable-next-line no-console
+       
       console.log(`Quick Log smoke report: ${path.relative(process.cwd(), REPORT_JSON)}`);
 
       const fail = report.firstFailure();
       if (fail) {
-        // eslint-disable-next-line no-console
+         
         console.log(
           `FAILED step ${fail.step}: ${fail.label}\n  evidence: ${fail.evidence}\n  report: ${path.relative(process.cwd(), REPORT_JSON)}`,
         );

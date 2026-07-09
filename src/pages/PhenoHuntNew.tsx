@@ -382,6 +382,46 @@ export default function PhenoHuntNew() {
         </section>
       )}
 
+      {currentStep === "confirmation" && (
+        <section
+          className="glass rounded-2xl p-4 space-y-3"
+          data-testid="pheno-step-confirmation"
+        >
+          <h2 className="text-sm font-semibold">Setup complete</h2>
+          <p className="text-sm text-muted-foreground">
+            You choose the candidates and evidence goals — Verdant preserves
+            what you record. Confirm to enter your hunt workspace. You can
+            update evidence goals from the workspace at any time.
+          </p>
+          <ul className="text-xs text-muted-foreground space-y-1" data-testid="pheno-confirmation-summary">
+            <li>• Candidates selected: {candidateIds.length}</li>
+            <li>• Evidence goals selected: {evidenceGoals.length}</li>
+            <li>• Readiness: {vm.readinessLabel}</li>
+          </ul>
+          <label className="flex items-start gap-2 text-sm">
+            <Checkbox
+              id="pheno-setup-confirm"
+              checked={setupConfirmed}
+              onCheckedChange={(v) => setSetupConfirmed(v === true)}
+              data-testid="pheno-setup-confirm-toggle"
+            />
+            <span>
+              I've reviewed setup and I'm ready to start the hunt.
+            </span>
+          </label>
+          {vm.blockingReasons.length > 0 ? (
+            <ul
+              className="mt-3 space-y-1 text-xs text-muted-foreground"
+              data-testid="pheno-confirmation-blocking"
+            >
+              {vm.blockingReasons.map((r) => (
+                <li key={r}>• {r}</li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Button

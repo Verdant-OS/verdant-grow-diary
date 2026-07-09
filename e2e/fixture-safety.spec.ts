@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./lib/authedTest";
 import {
   validateFixtureEnv,
   pageTextMatchesFixture,
@@ -43,6 +43,21 @@ test("disposable E2E fixture is configured and visible on the target plant page"
   await expect
     .poll(() => page.url(), { timeout: 20_000 })
     .not.toContain("/auth");
+
+  // The plant page fetches its data asynchronously (it first renders a
+  // "Loading plant" status). Wait for the expected plant name to actually
+  // render before reading page text, otherwise this check asserts against
+  // the loading skeleton and false-negatives a perfectly good fixture.
+  await expect(
+    page.getByText(envCheck.expected.plant, { exact: false }).first(),
+  ).toBeVisible({ timeout: 20_000 });
+
+  // The "Current Tent" context card hydrates from a separate fetch after
+  // the plant header renders — wait for the tent name too, or the text
+  // snapshot below races the card and false-negatives the tent check.
+  await expect(
+    page.getByText(envCheck.expected.tent, { exact: false }).first(),
+  ).toBeVisible({ timeout: 20_000 });
 
   const bodyText = (await page.locator("body").innerText()).slice(0, 50_000);
   const pageCheck = pageTextMatchesFixture(bodyText, envCheck.expected, {

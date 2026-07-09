@@ -2020,7 +2020,11 @@ export default function QuickLog({
                     if (typeof document !== "undefined") {
                       (document.activeElement as HTMLElement | null)?.blur?.();
                     }
+                    // Match the Dialog wrapper's close path: without reset()
+                    // the component (kept mounted in AppShell) reopens showing
+                    // the stale post-save panel instead of a fresh form.
                     onOpenChange(false);
+                    reset();
                   }}
                 >
                   {QUICK_LOG_POST_SAVE_VIEW_LABEL}
@@ -2038,7 +2042,12 @@ export default function QuickLog({
                   type="button"
                   variant="ghost"
                   data-testid="quick-log-post-save-close"
-                  onClick={() => onOpenChange(false)}
+                  onClick={() => {
+                    // Same reset-on-close as the Dialog wrapper path — see
+                    // the View-plant handler above.
+                    onOpenChange(false);
+                    reset();
+                  }}
                 >
                   {QUICK_LOG_POST_SAVE_CLOSE_LABEL}
                 </Button>

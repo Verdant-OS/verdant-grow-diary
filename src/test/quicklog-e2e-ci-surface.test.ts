@@ -22,6 +22,9 @@ const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8");
 describe("Quick Log Playwright CI surface", () => {
   it("does not commit storageState", () => {
     expect(fs.existsSync(path.join(ROOT, "e2e/.auth/user.json"))).toBe(false);
+    expect(
+      fs.existsSync(path.join(ROOT, "e2e/.auth/session-storage.json")),
+    ).toBe(false);
   });
 
   it("CI workflow has NO schedule/cron trigger (no automated writes to a real grow)", () => {

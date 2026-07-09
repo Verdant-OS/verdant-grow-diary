@@ -58,6 +58,7 @@ import {
   type PricingTier,
 } from "@/config/pricing";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import PhenoTrackerPreviewCard from "@/components/PhenoTrackerPreviewCard";
 import { logsPath } from "@/lib/routes";
 import { resolvePaddleConfig, unavailableMessage, type PaddleConfig } from "@/lib/paddleConfig";
 

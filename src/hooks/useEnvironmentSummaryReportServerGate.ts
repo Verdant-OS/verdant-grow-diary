@@ -18,7 +18,7 @@
  *  - No DB writes, no sensor ingest, no automation, no device control.
  */
 import { useEffect, useRef, useState } from "react";
-import { getPaddleEnvironment } from "@/lib/paddle";
+
 import { supabase } from "@/integrations/supabase/client";
 
 export type EnvironmentSummaryReportGateStatus =

@@ -343,14 +343,16 @@ export default function ManualSensorReadingCard({
       toast.error(validation.errors[0] ?? "Reading is invalid.");
       return;
     }
-    // Suspicious values → show review prompt instead of saving immediately.
-    // Normal readings (no advisor warnings) save exactly as before.
-    if (advisor.warnings.length > 0 && !reviewOpen) {
+    // Every manual snapshot must go through the review gate before insert.
+    // Normal, warning, and blocker cases all open the review panel; only
+    // confirming from within the panel actually calls the insert path.
+    if (!reviewOpen) {
       setReviewOpen(true);
       return;
     }
     await doSave();
   }
+
 
   const tentSetupRequired = shouldRequireFirstTentSetup(
     tents.map((t) => ({ id: t.id, is_archived: false })),

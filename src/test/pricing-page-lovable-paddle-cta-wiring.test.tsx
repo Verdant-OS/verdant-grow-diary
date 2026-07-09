@@ -139,14 +139,19 @@ describe("Pricing page — built-in Paddle wiring", () => {
 });
 
 describe("Checkout success / cancel copy", () => {
-  it("success page renders the confirmed active copy", () => {
+  it("success page renders the pending confirmation copy by default (truth copy — no client-side grant)", () => {
+    // Phase 2b truth copy: without a resolved active paid entitlement the
+    // page must NOT overclaim "Pro is active". The confirmed heading only
+    // appears once useMyEntitlements returns an active paid plan (covered
+    // by src/test/checkout-success-entitlement-truth-copy.test.tsx).
     render(
       <MemoryRouter>
         <CheckoutSuccess />
       </MemoryRouter>,
     );
     expect(screen.getByTestId("checkout-success-page")).toBeInTheDocument();
-    expect(screen.getByText(/Verdant Pro is active\./)).toBeInTheDocument();
+    expect(screen.getByTestId("checkout-success-pending-heading")).toBeInTheDocument();
+    expect(screen.queryByTestId("checkout-success-confirmed-heading")).toBeNull();
   });
 
   it("cancel page renders the no-charge copy", () => {

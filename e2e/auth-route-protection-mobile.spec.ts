@@ -61,6 +61,9 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/actions",
   "/sensors",
   "/settings",
+  // write-capable pheno hunt surfaces — moved behind the auth gate
+  "/pheno-hunts/:id/workspace",
+  "/pheno-hunts/:id/keepers",
 ];
 
 const PUBLIC_MOBILE_ROUTES: string[] = [
@@ -79,9 +82,9 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/creator-beta",
   "/glossary",
   "/pheno-expression-showcase",
-  "/pheno-hunts/:id/keepers",
-  "/pheno-hunts/:id/workspace",
   "/upgrade",
+  "/checkout/success",
+  "/checkout/cancel",
 ];
 
 // Internal fixture-only demo surfaces DELIBERATELY mounted OUTSIDE AppShell

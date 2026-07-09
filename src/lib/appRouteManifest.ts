@@ -84,6 +84,16 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/breeding", access: "auth", description: "Breeding programs index." },
   { path: "/breeding/:programId", access: "auth", description: "Breeding program detail." },
   { path: "/breeding/new", access: "auth", description: "New breeding program." },
+  {
+    path: "/checkout/cancel",
+    access: "public",
+    description: "Paddle checkout cancel return page (public by checkout-flow requirement).",
+  },
+  {
+    path: "/checkout/success",
+    access: "public",
+    description: "Paddle checkout success return page (public by checkout-flow requirement).",
+  },
   { path: "/creator-beta", access: "public", description: "Creator beta landing page." },
   {
     path: "/customer/:shareId",
@@ -281,15 +291,15 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   {
     path: "/pheno-hunts/:id/keepers",
-    access: "public",
+    access: "auth",
     description:
-      "Keepers / clone lineage / crosses. Mounted outside AppShell; RLS-scoped reads+writes of own data only, graceful empty state signed-out.",
+      "Keepers / clone lineage / crosses. Write-capable (RLS-scoped own data) — mounted behind the auth gate inside AppShell.",
   },
   {
     path: "/pheno-hunts/:id/workspace",
-    access: "public",
+    access: "auth",
     description:
-      "Hunt workspace (scores + keeper decisions). Mounted outside AppShell; RLS-scoped reads+writes of own data only, graceful empty state signed-out.",
+      "Hunt workspace (scores + keeper decisions). Write-capable (RLS-scoped own data) — mounted behind the auth gate inside AppShell.",
   },
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
   { path: "/pi-ingest-status", access: "operator" },

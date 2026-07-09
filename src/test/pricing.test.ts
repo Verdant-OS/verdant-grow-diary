@@ -215,11 +215,18 @@ describe("CTAs", () => {
     expect(PAGE).toMatch(/Claim Founder Lifetime/);
   });
 
-  it("wires CTAs to /auth and /billing placeholder routes", () => {
+  it("wires CTAs to /auth and Paddle checkout price keys", () => {
+    // Free CTA stays a plain /auth link; paid CTAs open the Paddle overlay
+    // via usePaddleCheckout (which itself bounces signed-out users to
+    // /auth). The old /billing/:plan placeholder links are retired from
+    // this page — the placeholder route itself stays mounted for legacy
+    // deep links.
     expect(PAGE).toMatch(/to="\/auth"/);
-    expect(PAGE).toMatch(/\/billing\/pro-monthly/);
-    expect(PAGE).toMatch(/\/billing\/pro-annual/);
-    expect(PAGE).toMatch(/\/billing\/founder-lifetime/);
+    expect(PAGE).toMatch(/usePaddleCheckout/);
+    expect(PAGE).toMatch(/openCheckout\(/);
+    expect(PAGE).toMatch(/pro_monthly/);
+    expect(PAGE).toMatch(/pro_annual/);
+    expect(PAGE).toMatch(/founder_lifetime/);
   });
 
   it("fires analytics events for each CTA", () => {
@@ -313,9 +320,16 @@ describe("Safety: no private data on public page", () => {
 
   it("does not import supabase client or private hooks", () => {
     expect(PAGE).not.toMatch(/@\/integrations\/supabase\/client/);
-    // usePageSeo is a safe SEO <head> hook (no supabase/network/data); any
+    // Allowed: usePageSeo (SEO <head> only) and usePaddleCheckout
+    // (auth-state + Paddle overlay; signed-out users bounce to /auth). Any
     // other @/hooks import (dashboard data hooks) remains forbidden.
-    expect(PAGE).not.toMatch(/@\/hooks\/(?!usePageSeo\b)/);
+    expect(PAGE).not.toMatch(/@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b)/);
+    // And the checkout hook itself must stay free of private data reads —
+    // it may read auth session state, never tables or the supabase client.
+    const CHECKOUT_HOOK = readSrc("hooks/usePaddleCheckout.ts");
+    expect(CHECKOUT_HOOK).not.toMatch(/@\/integrations\/supabase\/client/);
+    expect(CHECKOUT_HOOK).not.toMatch(/supabase\s*\.\s*from\(/);
+    expect(CHECKOUT_HOOK).not.toMatch(/service_role/);
   });
 
   it("introduces no service_role or ai-coach call", () => {

@@ -23,7 +23,10 @@ const SESSION_STORAGE_PATH = path.resolve("e2e/.auth/session-storage.json");
 setup("authenticate", async ({ page }) => {
   fs.mkdirSync(path.dirname(STORAGE_PATH), { recursive: true });
 
-  if (fs.existsSync(STORAGE_PATH) && fs.existsSync(SESSION_STORAGE_PATH)) {
+  const haveStorageState = fs.existsSync(STORAGE_PATH);
+  const haveSessionSnapshot = fs.existsSync(SESSION_STORAGE_PATH);
+
+  if (haveStorageState && haveSessionSnapshot) {
     setup.info().annotations.push({
       type: "auth",
       description:
@@ -36,13 +39,30 @@ setup("authenticate", async ({ page }) => {
   const password = process.env.E2E_TEST_PASSWORD;
 
   if (!email || !password) {
+    // A PARTIAL snapshot (one file without the other — e.g. an old
+    // user.json from before the sessionStorage split, or a stale cache)
+    // must fail loudly: with only user.json the chromium-authed project
+    // would happily load cookies while authedTest has no sessionStorage to
+    // replay, so every authed spec would run logged out and bounce to
+    // /auth with a confusing failure far from the real cause.
+    if (haveStorageState || haveSessionSnapshot) {
+      throw new Error(
+        "Partial auth state in e2e/.auth/ (found " +
+          (haveStorageState ? "user.json" : "session-storage.json") +
+          " without its counterpart). Delete the e2e/.auth/ directory, or " +
+          "set E2E_TEST_EMAIL / E2E_TEST_PASSWORD so this setup can " +
+          "regenerate both files together.",
+      );
+    }
     setup.skip(
       true,
       "Missing E2E_TEST_EMAIL / E2E_TEST_PASSWORD and no pre-generated " +
-        "e2e/.auth/user.json. See e2e/README.md for safe setup instructions.",
+        "e2e/.auth/ state. See e2e/README.md for safe setup instructions.",
     );
     return;
   }
+  // Credentials present: fall through to a fresh login, which rewrites BOTH
+  // files together (a partial snapshot is treated as stale, not reused).
 
   await page.goto("/auth");
   // The Auth page keeps all three tab panels (sign in / create account /

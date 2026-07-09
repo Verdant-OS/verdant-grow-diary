@@ -7,9 +7,10 @@
  * and acts on nothing — no AI, no Action Queue, no automation, no device
  * control. Verdant never picks a phenotype for you.
  */
-import { useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { usePhenoHuntWorkspace } from "@/hooks/usePhenoHuntWorkspace";
+import { buildPhenoHuntCsv, phenoHuntCsvFilename } from "@/lib/phenoHuntCsvExport";
 import { LOUD_TRAIT_AXES } from "@/lib/phenoExpressionRules";
 import {
   PHENO_KEEPER_DECISIONS,
@@ -293,6 +294,13 @@ function LabFields({
 /** "overall" = the flat card (pheno_candidate_scores); rounds = staged cards. */
 type WorkspaceRound = "overall" | PhenoScoreRound;
 
+// Stable empty history so memoized cards without history keep identical props
+// across parent re-renders (a fresh [] per render would defeat React.memo).
+const EMPTY_HISTORY: readonly KeeperDecisionLogEntry[] = [];
+
+/** Cards rendered per "Show more" click — keeps first paint bounded at 300+. */
+const CANDIDATE_PAGE_SIZE = 30;
+
 interface EditorProps {
   candidate: PhenoCandidateInput;
   round: WorkspaceRound;
@@ -321,6 +329,8 @@ interface EditorProps {
     reason: string | null,
   ) => Promise<boolean>;
   history: readonly KeeperDecisionLogEntry[];
+  /** Fetches this candidate's decision history when its section is opened. */
+  onLoadHistory: (plantId: string) => Promise<void>;
   sexRow: SexObservationRow | undefined;
   /** This candidate's keeper has a recorded chemical reversal (expected pollen). */
   reversed: boolean;
@@ -360,7 +370,11 @@ interface EditorProps {
   ) => Promise<boolean>;
 }
 
-function CandidateEditor({
+// Memoized: at commercial scale (hundreds of candidates) every save toggles
+// parent state twice, and without memo each toggle re-renders EVERY heavy
+// card. Save callbacks are useCallback-stable and per-candidate row props
+// only change identity for the candidate that actually saved.
+const CandidateEditor = memo(function CandidateEditor({
   candidate,
   round,
   score,
@@ -371,6 +385,7 @@ function CandidateEditor({
   onSaveRound,
   onSaveDecision,
   history,
+  onLoadHistory,
   sexRow,
   reversed,
   onSaveSex,
@@ -398,6 +413,7 @@ function CandidateEditor({
     decision?.decision ?? DEFAULT_KEEPER_DECISION,
   );
   const [saved, setSaved] = useState(false);
+  const [historyRequested, setHistoryRequested] = useState(false);
 
   const setTrait = (key: string, raw: string) => {
     setSaved(false);
@@ -640,13 +656,25 @@ function CandidateEditor({
         recordId={plantId}
         recordType="candidate"
         title="Candidate documentation"
+        defaultOpen={false}
       />
 
-      {history.length > 0 && (
-        <details data-testid={`workspace-decision-history-${plantId}`} className="text-xs">
-          <summary className="cursor-pointer text-muted-foreground">
-            Decision history ({history.length})
-          </summary>
+      <details
+        data-testid={`workspace-decision-history-${plantId}`}
+        className="text-xs"
+        onToggle={(e) => {
+          // Fetched per candidate on first open — a hunt-wide history read is
+          // unbounded at commercial scale, and most cards are never expanded.
+          if ((e.target as HTMLDetailsElement).open) {
+            setHistoryRequested(true);
+            void onLoadHistory(plantId);
+          }
+        }}
+      >
+        <summary className="cursor-pointer text-muted-foreground">
+          Decision history{history.length > 0 ? ` (${history.length})` : ""}
+        </summary>
+        {history.length > 0 ? (
           <ul className="mt-1 space-y-1">
             {history.map((h, i) => (
               <li
@@ -661,8 +689,12 @@ function CandidateEditor({
               </li>
             ))}
           </ul>
-        </details>
-      )}
+        ) : (
+          <p className="mt-1 text-muted-foreground">
+            {historyRequested ? "No decisions recorded yet." : "Open to load history."}
+          </p>
+        )}
+      </details>
 
       <div className="flex items-center gap-3">
         <button
@@ -682,7 +714,7 @@ function CandidateEditor({
       </div>
     </section>
   );
-}
+});
 
 export default function PhenoHuntWorkspace() {
   const { id } = useParams<{ id: string }>();
@@ -690,8 +722,65 @@ export default function PhenoHuntWorkspace() {
   const herm = usePhenoHermCullSuggestion();
   const stress = usePhenoStressObservations(ws.hunt?.id ?? null);
   const [round, setRound] = useState<WorkspaceRound>("overall");
+  const [filterText, setFilterText] = useState("");
+  const [filterDecision, setFilterDecision] = useState<"all" | "undecided" | PhenoKeeperDecision>(
+    "all",
+  );
+  const [visibleCount, setVisibleCount] = useState(CANDIDATE_PAGE_SIZE);
+
+  // Round cards are fetched per selected round, not all five upfront.
+  useEffect(() => {
+    if (round !== "overall") void ws.loadRound(round);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadRound is idempotent per round
+  }, [round, ws.loadRound]);
 
   const candidates = useMemo(() => ws.candidates, [ws.candidates]);
+
+  // Text + decision filters so a specific plant is findable among hundreds.
+  // Filtering narrows the view only — it never orders by score or suggests
+  // which candidate to keep.
+  const filteredCandidates = useMemo(() => {
+    const text = filterText.trim().toLowerCase();
+    return candidates.filter((c) => {
+      if (text) {
+        const hay = `${c.candidateLabel ?? ""} ${c.candidateId} ${c.strain ?? ""}`.toLowerCase();
+        if (!hay.includes(text)) return false;
+      }
+      if (filterDecision !== "all") {
+        const d = ws.decisionsByPlant[c.candidateId]?.decision;
+        if (filterDecision === "undecided") {
+          if (d && d !== "undecided") return false;
+        } else if (d !== filterDecision) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [candidates, filterText, filterDecision, ws.decisionsByPlant]);
+
+  const visibleCandidates = useMemo(
+    () => filteredCandidates.slice(0, visibleCount),
+    [filteredCandidates, visibleCount],
+  );
+
+  const onExportCsv = () => {
+    const csv = buildPhenoHuntCsv({
+      huntName: ws.hunt?.name ?? "hunt",
+      candidates,
+      scoresByPlant: ws.scoresByPlant,
+      decisionsByPlant: ws.decisionsByPlant,
+      sexByPlant: ws.sexByPlant,
+      smokeByPlant: ws.smokeByPlant,
+      labByKey: ws.labByKey,
+    });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = phenoHuntCsvFilename(ws.hunt?.name ?? "hunt");
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   const stressSummaries = useMemo(
     () =>
       candidates.map((c) => ({
@@ -730,96 +819,164 @@ export default function PhenoHuntWorkspace() {
 
   return (
     <PhenoSamplingProvider>
-      <main data-testid="pheno-workspace" className="container mx-auto max-w-5xl space-y-4 px-4 py-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">Hunt workspace: {ws.hunt?.name ?? "this hunt"}</h1>
-        <p className="text-xs text-muted-foreground">{PHENO_KEEPER_DECISION_CAVEAT}</p>
-        <label className="flex items-center gap-2 pt-1 text-sm">
-          <span className="font-medium">Scoring round</span>
-          <select
-            data-testid="workspace-round-select"
-            value={round}
-            onChange={(e) => setRound(e.target.value as WorkspaceRound)}
-            className="rounded border border-border bg-background px-2 py-1"
-          >
-            <option value="overall">Overall</option>
-            {PHENO_SCORE_ROUNDS.map((r) => (
-              <option key={r} value={r}>
-                {PHENO_SCORE_ROUND_LABELS[r]}
-              </option>
-            ))}
-          </select>
-          <span className="text-xs text-muted-foreground">
-            Score the same plant at each stage — rounds save separately.
-          </span>
-        </label>
-      </header>
+      <main
+        data-testid="pheno-workspace"
+        className="container mx-auto max-w-5xl space-y-4 px-4 py-6"
+      >
+        <header className="space-y-1">
+          <h1 className="text-2xl font-semibold">Hunt workspace: {ws.hunt?.name ?? "this hunt"}</h1>
+          <p className="text-xs text-muted-foreground">{PHENO_KEEPER_DECISION_CAVEAT}</p>
+          <label className="flex items-center gap-2 pt-1 text-sm">
+            <span className="font-medium">Scoring round</span>
+            <select
+              data-testid="workspace-round-select"
+              value={round}
+              onChange={(e) => setRound(e.target.value as WorkspaceRound)}
+              className="rounded border border-border bg-background px-2 py-1"
+            >
+              <option value="overall">Overall</option>
+              {PHENO_SCORE_ROUNDS.map((r) => (
+                <option key={r} value={r}>
+                  {PHENO_SCORE_ROUND_LABELS[r]}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">
+              Score the same plant at each stage — rounds save separately.
+            </span>
+          </label>
+        </header>
 
-      {candidates.length === 0 ? (
-        <p data-testid="pheno-workspace-empty" className="text-sm text-muted-foreground">
-          No candidates tagged to this hunt yet.
-        </p>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {candidates.map((c) => (
-            <CandidateEditor
-              // Re-mount on round change so prefill state re-initializes.
-              key={`${c.candidateId}:${round}`}
-              candidate={c}
-              round={round}
-              score={ws.scoresByPlant[c.candidateId]}
-              roundRow={
-                round === "overall" ? undefined : ws.roundsByKey[`${c.candidateId}:${round}`]
-              }
-              decision={ws.decisionsByPlant[c.candidateId]}
-              saving={ws.saving === c.candidateId}
-              onSaveScore={ws.saveScore}
-              onSaveRound={ws.saveRound}
-              onSaveDecision={ws.saveDecision}
-              history={ws.decisionHistoryByPlant[c.candidateId] ?? []}
-              sexRow={ws.sexByPlant[c.candidateId]}
-              reversed={ws.reversedPlantIds.has(c.candidateId)}
-              onSaveSex={ws.saveSex}
-              growId={ws.hunt?.growId ?? null}
-              tentId={ws.hunt?.tentId ?? null}
-              onQueueRemoval={herm.queueRemoval}
-              queuing={herm.queuing === c.candidateId}
-              queued={herm.queuedPlantIds.has(c.candidateId)}
-              smokeRow={ws.smokeByPlant[c.candidateId]}
-              onSaveSmokeTest={ws.saveSmokeTest}
-              labRow={ws.labByKey[`${c.candidateId}:coa`]}
-              onSaveLabResult={ws.saveLabResult}
-            />
-          ))}
-        </div>
-      )}
+        {candidates.length === 0 ? (
+          <p data-testid="pheno-workspace-empty" className="text-sm text-muted-foreground">
+            No candidates tagged to this hunt yet.
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <input
+                type="search"
+                data-testid="workspace-filter-text"
+                value={filterText}
+                onChange={(e) => {
+                  setFilterText(e.target.value);
+                  setVisibleCount(CANDIDATE_PAGE_SIZE);
+                }}
+                placeholder="Find a candidate (label, strain)…"
+                className="w-56 rounded border border-border bg-background px-2 py-1"
+              />
+              <label className="flex items-center gap-1 text-xs">
+                Decision
+                <select
+                  data-testid="workspace-filter-decision"
+                  value={filterDecision}
+                  onChange={(e) => {
+                    setFilterDecision(e.target.value as typeof filterDecision);
+                    setVisibleCount(CANDIDATE_PAGE_SIZE);
+                  }}
+                  className="rounded border border-border bg-background px-2 py-1"
+                >
+                  <option value="all">All</option>
+                  <option value="undecided">Undecided</option>
+                  {PHENO_KEEPER_DECISIONS.filter((d) => d !== "undecided").map((d) => (
+                    <option key={d} value={d}>
+                      {PHENO_KEEPER_DECISION_LABELS[d]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span data-testid="workspace-visible-count" className="text-xs text-muted-foreground">
+                Showing {visibleCandidates.length} of {filteredCandidates.length} candidates
+                {filteredCandidates.length !== candidates.length
+                  ? ` (filtered from ${candidates.length})`
+                  : ""}
+              </span>
+              <button
+                type="button"
+                data-testid="workspace-export-csv"
+                onClick={onExportCsv}
+                className="ml-auto rounded border border-border bg-secondary px-2 py-1 text-xs font-medium"
+              >
+                Export hunt CSV
+              </button>
+            </div>
 
-      <PhenoStressTestingSection
-        candidates={candidates.map((c) => ({
-          candidateId: c.candidateId,
-          candidateLabel: c.candidateLabel,
-        }))}
-        diaryOptions={stress.diaryOptions}
-        onPersist={stress.save}
-        summaries={stressSummaries}
-      />
-      <PhenoStressObservationsList
-        rows={stress.rows}
-        candidates={candidates.map((c) => ({
-          candidateId: c.candidateId,
-          candidateLabel: c.candidateLabel,
-        }))}
-        diaryOptions={stress.diaryOptions}
-        onUpdate={stress.update}
-        onDelete={stress.remove}
-      />
-      <PhenoProductSamplingSection />
-      <PhenoSamplingWorkspaceTools
-        candidates={candidates.map((c) => ({
-          candidateId: c.candidateId,
-          candidateLabel: c.candidateLabel,
-        }))}
-      />
+            <div className="grid gap-4 md:grid-cols-2">
+              {visibleCandidates.map((c) => (
+                <CandidateEditor
+                  // Re-mount on round change so prefill state re-initializes.
+                  key={`${c.candidateId}:${round}`}
+                  candidate={c}
+                  round={round}
+                  score={ws.scoresByPlant[c.candidateId]}
+                  roundRow={
+                    round === "overall" ? undefined : ws.roundsByKey[`${c.candidateId}:${round}`]
+                  }
+                  decision={ws.decisionsByPlant[c.candidateId]}
+                  saving={ws.saving === c.candidateId}
+                  onSaveScore={ws.saveScore}
+                  onSaveRound={ws.saveRound}
+                  onSaveDecision={ws.saveDecision}
+                  history={ws.decisionHistoryByPlant[c.candidateId] ?? EMPTY_HISTORY}
+                  onLoadHistory={ws.loadDecisionHistory}
+                  sexRow={ws.sexByPlant[c.candidateId]}
+                  reversed={ws.reversedPlantIds.has(c.candidateId)}
+                  onSaveSex={ws.saveSex}
+                  growId={ws.hunt?.growId ?? null}
+                  tentId={ws.hunt?.tentId ?? null}
+                  onQueueRemoval={herm.queueRemoval}
+                  queuing={herm.queuing === c.candidateId}
+                  queued={herm.queuedPlantIds.has(c.candidateId)}
+                  smokeRow={ws.smokeByPlant[c.candidateId]}
+                  onSaveSmokeTest={ws.saveSmokeTest}
+                  labRow={ws.labByKey[`${c.candidateId}:coa`]}
+                  onSaveLabResult={ws.saveLabResult}
+                />
+              ))}
+            </div>
+
+            {filteredCandidates.length > visibleCount && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  data-testid="workspace-show-more"
+                  onClick={() => setVisibleCount((n) => n + CANDIDATE_PAGE_SIZE)}
+                  className="rounded border border-border bg-secondary px-3 py-1.5 text-sm font-medium"
+                >
+                  Show {Math.min(CANDIDATE_PAGE_SIZE, filteredCandidates.length - visibleCount)}{" "}
+                  more
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        <PhenoStressTestingSection
+          candidates={candidates.map((c) => ({
+            candidateId: c.candidateId,
+            candidateLabel: c.candidateLabel,
+          }))}
+          diaryOptions={stress.diaryOptions}
+          onPersist={stress.save}
+          summaries={stressSummaries}
+        />
+        <PhenoStressObservationsList
+          rows={stress.rows}
+          candidates={candidates.map((c) => ({
+            candidateId: c.candidateId,
+            candidateLabel: c.candidateLabel,
+          }))}
+          diaryOptions={stress.diaryOptions}
+          onUpdate={stress.update}
+          onDelete={stress.remove}
+        />
+        <PhenoProductSamplingSection />
+        <PhenoSamplingWorkspaceTools
+          candidates={candidates.map((c) => ({
+            candidateId: c.candidateId,
+            candidateLabel: c.candidateLabel,
+          }))}
+        />
       </main>
     </PhenoSamplingProvider>
   );

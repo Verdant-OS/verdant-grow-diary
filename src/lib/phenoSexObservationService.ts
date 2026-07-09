@@ -62,7 +62,13 @@ export async function listLatestSexObservationsForHunt(
   // legacy full-history read remains as a fallback for deploy skew where
   // the view migration has not landed yet.
   let data:
-    | { plant_id: string | null; sex: string | null; herm_observed: boolean | null; note: string | null; observed_at: string | null }[]
+    | {
+        plant_id: string | null;
+        sex: string | null;
+        herm_observed: boolean | null;
+        note: string | null;
+        observed_at: string | null;
+      }[]
     | null = null;
   const viaView = await phenoDb
     .from("pheno_sex_observations_latest")
@@ -75,7 +81,11 @@ export async function listLatestSexObservationsForHunt(
       .from("pheno_sex_observations")
       .select("plant_id, sex, herm_observed, note, observed_at")
       .eq("hunt_id", id)
-      .order("observed_at", { ascending: false });
+      .order("observed_at", { ascending: false })
+      // Deploy-skew fallback only: newest-first keeps latest-per-plant
+      // derivation correct within the cap, and the explicit bound stops an
+      // unbounded full-history read of an append-only table.
+      .limit(2000);
     if (legacy.error || !legacy.data) return {};
     data = legacy.data;
   }

@@ -29,6 +29,14 @@ interface Props {
   diaryOptions?: readonly PhenoDocDiaryOption[];
   /** Storage adapter override (tests). Defaults to window.localStorage. */
   storage?: Pick<Storage, "getItem" | "setItem">;
+  /**
+   * When false, sections start collapsed, their fields mount only once a
+   * section is opened, and saved values hydrate lazily on first open. Set by
+   * surfaces that render one instance PER CANDIDATE (28 always-mounted fields
+   * and a synchronous storage read per instance don't scale to hundreds of
+   * cards). Defaults to true — the standalone all-open behavior.
+   */
+  defaultOpen?: boolean;
 }
 
 function storageKey(recordType: PhenoDocRecordType, recordId: string): string {
@@ -55,6 +63,7 @@ export default function PhenoDocumentationSections({
   title = "Documentation",
   diaryOptions,
   storage,
+  defaultOpen = true,
 }: Props) {
   const store = useMemo<Pick<Storage, "getItem" | "setItem">>(
     () =>
@@ -65,39 +74,55 @@ export default function PhenoDocumentationSections({
     [storage],
   );
 
-  const [values, setValues] = useState<PhenoDocumentationValues>(() =>
-    mergeDocumentationValues(loadSaved(store, recordType, recordId)),
+  // Lazy hydration: null = storage not read yet (collapsed mode only). The
+  // eager path preserves the original mount-time read for defaultOpen users.
+  const [values, setValues] = useState<PhenoDocumentationValues | null>(() =>
+    defaultOpen ? mergeDocumentationValues(loadSaved(store, recordType, recordId)) : null,
   );
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [openSections, setOpenSections] = useState<ReadonlySet<string>>(new Set());
 
   // Re-hydrate if the record identity changes (e.g. switching candidates).
   useEffect(() => {
-    setValues(mergeDocumentationValues(loadSaved(store, recordType, recordId)));
+    setValues(
+      defaultOpen ? mergeDocumentationValues(loadSaved(store, recordType, recordId)) : null,
+    );
+    setOpenSections(new Set());
     setSavedAt(null);
-  }, [store, recordType, recordId]);
+  }, [store, recordType, recordId, defaultOpen]);
+
+  function hydrated(): PhenoDocumentationValues {
+    return values ?? mergeDocumentationValues(loadSaved(store, recordType, recordId));
+  }
 
   function setField(sectionKey: string, fieldKey: string, value: string) {
     setSavedAt(null);
-    setValues((prev) => ({
-      ...prev,
-      [sectionKey]: {
-        ...prev[sectionKey],
-        fields: { ...prev[sectionKey].fields, [fieldKey]: value },
-      },
-    }));
+    setValues((prev) => {
+      const base = prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId));
+      return {
+        ...base,
+        [sectionKey]: {
+          ...base[sectionKey],
+          fields: { ...base[sectionKey].fields, [fieldKey]: value },
+        },
+      };
+    });
   }
 
   function setDiary(sectionKey: string, diaryEntryId: string | null) {
     setSavedAt(null);
-    setValues((prev) => ({
-      ...prev,
-      [sectionKey]: { ...prev[sectionKey], diaryEntryId },
-    }));
+    setValues((prev) => {
+      const base = prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId));
+      return {
+        ...base,
+        [sectionKey]: { ...base[sectionKey], diaryEntryId },
+      };
+    });
   }
 
   function onSave() {
     try {
-      store.setItem(storageKey(recordType, recordId), JSON.stringify(values));
+      store.setItem(storageKey(recordType, recordId), JSON.stringify(hydrated()));
       setSavedAt(Date.now());
     } catch {
       // storage may be unavailable; keep values in-memory
@@ -113,71 +138,92 @@ export default function PhenoDocumentationSections({
       <header>
         <h3 className="text-base font-semibold">{title}</h3>
         <p className="text-xs text-muted-foreground">
-          Default documentation for this record. Every field is editable and saved values
-          persist. Defaults never overwrite what you have already entered.
+          Default documentation for this record. Every field is editable and saved values persist.
+          Defaults never overwrite what you have already entered.
         </p>
       </header>
 
       {PHENO_DOCUMENTATION_DEFAULTS.map((section) => {
-        const sVals = values[section.key];
+        const sectionOpen = defaultOpen || openSections.has(section.key);
+        // Fields mount only for open sections; values hydrate on first open.
+        const sVals = sectionOpen ? hydrated()[section.key] : null;
         return (
           <details
             key={section.key}
             data-testid={`pheno-doc-section-${section.key}`}
             className="rounded border border-border bg-background/40 p-3 text-sm"
-            open
+            open={defaultOpen ? true : undefined}
+            onToggle={
+              defaultOpen
+                ? undefined
+                : (e) => {
+                    const isOpen = (e.target as HTMLDetailsElement).open;
+                    setValues(
+                      (prev) =>
+                        prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId)),
+                    );
+                    setOpenSections((prev) => {
+                      const next = new Set(prev);
+                      if (isOpen) next.add(section.key);
+                      else next.delete(section.key);
+                      return next;
+                    });
+                  }
+            }
           >
             <summary className="cursor-pointer font-medium">{section.title}</summary>
-            <div className="mt-2 space-y-2">
-              {section.fields.map((f) => {
-                const id = `${recordType}-${recordId}-${section.key}-${f.key}`;
-                return (
-                  <label key={f.key} className="block text-xs">
-                    <span className="mb-1 block font-medium text-foreground">{f.label}</span>
-                    {f.multiline ? (
-                      <textarea
-                        id={id}
-                        data-testid={`pheno-doc-field-${section.key}-${f.key}`}
-                        rows={2}
-                        value={sVals.fields[f.key] ?? ""}
-                        onChange={(e) => setField(section.key, f.key, e.target.value)}
-                        className="w-full rounded border border-border bg-background px-2 py-1"
-                      />
-                    ) : (
-                      <input
-                        id={id}
-                        type="text"
-                        data-testid={`pheno-doc-field-${section.key}-${f.key}`}
-                        value={sVals.fields[f.key] ?? ""}
-                        onChange={(e) => setField(section.key, f.key, e.target.value)}
-                        className="w-full rounded border border-border bg-background px-2 py-1"
-                      />
-                    )}
-                  </label>
-                );
-              })}
+            {sVals && (
+              <div className="mt-2 space-y-2">
+                {section.fields.map((f) => {
+                  const id = `${recordType}-${recordId}-${section.key}-${f.key}`;
+                  return (
+                    <label key={f.key} className="block text-xs">
+                      <span className="mb-1 block font-medium text-foreground">{f.label}</span>
+                      {f.multiline ? (
+                        <textarea
+                          id={id}
+                          data-testid={`pheno-doc-field-${section.key}-${f.key}`}
+                          rows={2}
+                          value={sVals.fields[f.key] ?? ""}
+                          onChange={(e) => setField(section.key, f.key, e.target.value)}
+                          className="w-full rounded border border-border bg-background px-2 py-1"
+                        />
+                      ) : (
+                        <input
+                          id={id}
+                          type="text"
+                          data-testid={`pheno-doc-field-${section.key}-${f.key}`}
+                          value={sVals.fields[f.key] ?? ""}
+                          onChange={(e) => setField(section.key, f.key, e.target.value)}
+                          className="w-full rounded border border-border bg-background px-2 py-1"
+                        />
+                      )}
+                    </label>
+                  );
+                })}
 
-              {diaryOptions && diaryOptions.length > 0 && (
-                <label className="block text-xs">
-                  <span className="mb-1 block font-medium text-foreground">
-                    Diary reference (optional)
-                  </span>
-                  <select
-                    data-testid={`pheno-doc-diary-${section.key}`}
-                    value={sVals.diaryEntryId ?? ""}
-                    onChange={(e) => setDiary(section.key, e.target.value || null)}
-                    className="w-full rounded border border-border bg-background px-2 py-1"
-                  >
-                    <option value="">— none —</option>
-                    {diaryOptions.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </div>
+                {diaryOptions && diaryOptions.length > 0 && (
+                  <label className="block text-xs">
+                    <span className="mb-1 block font-medium text-foreground">
+                      Diary reference (optional)
+                    </span>
+                    <select
+                      data-testid={`pheno-doc-diary-${section.key}`}
+                      value={sVals.diaryEntryId ?? ""}
+                      onChange={(e) => setDiary(section.key, e.target.value || null)}
+                      className="w-full rounded border border-border bg-background px-2 py-1"
+                    >
+                      <option value="">— none —</option>
+                      {diaryOptions.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+            )}
           </details>
         );
       })}

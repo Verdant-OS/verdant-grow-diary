@@ -4,12 +4,13 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { fromMock, selectMock, eqMock, orderMock } = vi.hoisted(() => {
-  const orderMock = vi.fn();
+const { fromMock, selectMock, eqMock, orderMock, limitMock } = vi.hoisted(() => {
+  const limitMock = vi.fn();
+  const orderMock = vi.fn(() => ({ limit: limitMock }));
   const eqMock = vi.fn(() => ({ order: orderMock }));
   const selectMock = vi.fn(() => ({ eq: eqMock }));
   const fromMock = vi.fn(() => ({ select: selectMock }));
-  return { fromMock, selectMock, eqMock, orderMock };
+  return { fromMock, selectMock, eqMock, orderMock, limitMock };
 });
 
 vi.mock("@/integrations/supabase/phenoTables", () => ({
@@ -22,7 +23,8 @@ vi.mock("@/integrations/supabase/client", () => ({
 import { listCrossesForHunt } from "@/lib/phenoKeepersService";
 
 beforeEach(() => {
-  orderMock.mockReset();
+  limitMock.mockReset();
+  orderMock.mockClear();
   eqMock.mockClear();
   selectMock.mockClear();
   fromMock.mockClear();
@@ -30,7 +32,7 @@ beforeEach(() => {
 
 describe("listCrossesForHunt — full taxonomy read-model", () => {
   it("selects channel / generation / recurrent_parent_id and maps them null-safely", async () => {
-    orderMock.mockResolvedValue({
+    limitMock.mockResolvedValue({
       data: [
         {
           id: "x1",
@@ -79,7 +81,7 @@ describe("listCrossesForHunt — full taxonomy read-model", () => {
   });
 
   it("returns [] on error without throwing (safe read)", async () => {
-    orderMock.mockResolvedValue({ data: null, error: { message: "boom" } });
+    limitMock.mockResolvedValue({ data: null, error: { message: "boom" } });
     const rows = await listCrossesForHunt("hunt-1");
     expect(rows).toEqual([]);
   });

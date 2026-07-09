@@ -103,7 +103,11 @@ export async function listStressObservationsForHunt(
     .from("pheno_stress_observations")
     .select("*")
     .eq("hunt_id", huntId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    // Newest 1000 observations: this table grows per interaction with no
+    // ceiling, and an uncapped read is silently truncated at the server's
+    // configured maximum anyway — make the bound explicit and newest-first.
+    .limit(1000);
   if (error) throw error;
   return (data ?? []).map((r) => toRow(r as Row));
 }
@@ -178,10 +182,7 @@ export async function updateStressObservation(
  * never touched.
  */
 export async function deleteStressObservation(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("pheno_stress_observations")
-    .delete()
-    .eq("id", id);
+  const { error } = await supabase.from("pheno_stress_observations").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -209,9 +210,7 @@ export async function listStressObservationsForDiaryEntry(
     .eq("plant_id", plantId)
     .order("start_date", { ascending: false });
   if (plantErr) throw plantErr;
-  const extras = (plantRows ?? [])
-    .map((r) => toRow(r as Row))
-    .filter((r) => !seen.has(r.id));
+  const extras = (plantRows ?? []).map((r) => toRow(r as Row)).filter((r) => !seen.has(r.id));
   return [...linkedRows, ...extras];
 }
 
@@ -226,9 +225,7 @@ export interface DiaryOptionRow {
  * Lightweight diary lookup for the evidence selector — RLS restricts the
  * result to the caller's own diary entries.
  */
-export async function listDiaryOptionsForOwner(
-  limit = 50,
-): Promise<readonly DiaryOptionRow[]> {
+export async function listDiaryOptionsForOwner(limit = 50): Promise<readonly DiaryOptionRow[]> {
   const { data, error } = await supabase
     .from("diary_entries")
     .select("id, entry_at, plant_id, note")

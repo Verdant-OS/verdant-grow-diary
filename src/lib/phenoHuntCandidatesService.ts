@@ -51,14 +51,12 @@ export async function loadPhenoHuntCandidates(
 
   const plants = (plantRows ?? []) as PhenoHuntCandidatePlantRow[];
 
-  const growNameById = await loadNameMap(
-    "grows",
-    distinct([huntRow.grow_id, ...plants.map((p) => p.grow_id)]),
-  );
-  const tentNameById = await loadNameMap(
-    "tents",
-    distinct([huntRow.tent_id, ...plants.map((p) => p.tent_id)]),
-  );
+  // Independent lookups — one round trip instead of two serial hops on the
+  // workspace's critical loading path.
+  const [growNameById, tentNameById] = await Promise.all([
+    loadNameMap("grows", distinct([huntRow.grow_id, ...plants.map((p) => p.grow_id)])),
+    loadNameMap("tents", distinct([huntRow.tent_id, ...plants.map((p) => p.tent_id)])),
+  ]);
 
   const candidates = adaptPhenoHuntCandidates({ plants, growNameById, tentNameById });
 

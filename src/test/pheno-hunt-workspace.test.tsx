@@ -44,6 +44,8 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     labByKey: {},
     error: null,
     saving: null,
+    loadDecisionHistory: state.loadDecisionHistory ?? vi.fn().mockResolvedValue(undefined),
+    loadRound: state.loadRound ?? vi.fn().mockResolvedValue(undefined),
     saveScore,
     saveDecision,
     saveRound,

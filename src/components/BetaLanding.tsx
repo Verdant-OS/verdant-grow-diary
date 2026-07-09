@@ -18,7 +18,7 @@
  */
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import BrandLogo from "@/components/BrandLogo";
 import { preserveUtmOnUrl } from "@/lib/utm/preserveUtm";
 
@@ -238,11 +238,9 @@ export default function BetaLanding({ variant, copy, currentSearch }: BetaLandin
       >
         <Card>
           <CardHeader>
-            <CardTitle asChild>
-              <h2 id="watch-demo-heading" className="text-xl">
-                Watch demo walkthrough
-              </h2>
-            </CardTitle>
+            <h2 id="watch-demo-heading" className="text-xl font-semibold leading-none tracking-tight">
+              Watch demo walkthrough
+            </h2>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <p className="text-muted-foreground">
@@ -287,9 +285,7 @@ function BetaCard({ title, items, testId }: BetaCardProps) {
   return (
     <Card data-testid={testId}>
       <CardHeader>
-        <CardTitle asChild>
-          <h2 className="text-base">{title}</h2>
-        </CardTitle>
+        <h2 className="text-base font-semibold leading-none tracking-tight">{title}</h2>
       </CardHeader>
       <CardContent>
         <ul className="space-y-1.5 text-sm text-muted-foreground">

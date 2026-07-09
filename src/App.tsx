@@ -73,6 +73,7 @@ const Landing = lazy(() => import("./pages/Landing"));
 // Demo page removed — Verdant is positioned around real grow data only.
 const HardwareIntegrations = lazy(() => import("./pages/HardwareIntegrations"));
 const CreatorBeta = lazy(() => import("./pages/CreatorBeta"));
+const BreederBeta = lazy(() => import("./pages/BreederBeta"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Upgrade = lazy(() => import("./pages/Upgrade"));
 const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
@@ -165,7 +166,7 @@ const App = () => (
                   <Route path="/demo" element={<Navigate to="/welcome" replace />} />
                   <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
                   <Route path="/creator-beta" element={<CreatorBeta />} />
-                  <Route path="/breeder-beta" element={<Navigate to="/creator-beta" replace />} />
+                  <Route path="/breeder-beta" element={<BreederBeta />} />
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/upgrade" element={<Upgrade />} />
                   <Route path="/guides" element={<GuidesIndex />} />

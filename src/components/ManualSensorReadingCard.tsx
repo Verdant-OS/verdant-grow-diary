@@ -675,6 +675,9 @@ export default function ManualSensorReadingCard({
                     </li>
                   ))}
                 </ul>
+                <div data-testid="manual-reading-review-panel-slot">
+                  <ManualSensorSnapshotReviewPanel result={snapshotReview} />
+                </div>
                 <div className="flex flex-col sm:flex-row gap-2 pt-1">
                   <Button
                     variant="outline"
@@ -687,7 +690,7 @@ export default function ManualSensorReadingCard({
                   <Button
                     size="sm"
                     onClick={doSave}
-                    disabled={insert.isPending}
+                    disabled={insert.isPending || !snapshotReview.canSave}
                     data-testid="manual-reading-review-save-anyway"
                   >
                     {insert.isPending ? (

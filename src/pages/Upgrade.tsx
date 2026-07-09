@@ -720,7 +720,12 @@ export default function Upgrade() {
 
       <PlanComparisonTable />
 
+      <section aria-label="Pheno Tracker preview" className="mt-10">
+        <PhenoTrackerPreviewCard />
+      </section>
+
       <UpgradeFaq />
+
 
       <p className="mt-12 text-center text-xs text-muted-foreground">
         New to Verdant?{" "}

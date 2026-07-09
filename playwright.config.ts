@@ -30,7 +30,14 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     // Debugging artifacts kept only when a test fails (CI uploads them).
-    trace: "retain-on-failure",
+    //
+    // Traces record network request/response headers and bodies. Real-auth
+    // runs (E2E_TEST_EMAIL present) would bake the disposable test account's
+    // Supabase bearer/session tokens into trace zips that the workflow
+    // uploads as public-ish CI artifacts — so tracing is DISABLED for those
+    // runs. Screenshots and videos are pixels (no headers) and stay on.
+    // Mocked/unauthenticated runs keep failure traces (no real tokens).
+    trace: process.env.E2E_TEST_EMAIL ? "off" : "retain-on-failure",
     video: "retain-on-failure",
     screenshot: "only-on-failure",
   },

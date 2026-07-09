@@ -730,6 +730,25 @@ export default function PhenoHuntWorkspace() {
     "all",
   );
   const [visibleCount, setVisibleCount] = useState(CANDIDATE_PAGE_SIZE);
+  const [setupSaving, setSetupSaving] = useState(false);
+  // Optimistic override so the card flips to "setup complete" instantly
+  // after the grower confirms — the persisted hunt row is still authoritative.
+  const [setupCompletedLocal, setSetupCompletedLocal] = useState<string | null>(null);
+
+  const handleMarkSetupComplete = async () => {
+    if (!ws.hunt?.id || setupSaving) return;
+    setSetupSaving(true);
+    try {
+      await updatePhenoHuntSetup({ huntId: ws.hunt.id, markSetupComplete: true });
+      setSetupCompletedLocal(new Date().toISOString());
+    } catch {
+      // Silent — no toast dependency here; workspace already surfaces
+      // network errors elsewhere. Grower can retry.
+    } finally {
+      setSetupSaving(false);
+    }
+  };
+
 
   // Round cards are fetched per selected round, not all five upfront.
   useEffect(() => {

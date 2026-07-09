@@ -8,7 +8,7 @@
  *
  * Guardrails (enforced by src/test/pheno-copy-regression.test.ts):
  *   - No "setup complete" implying "comparison-ready".
- *   - No "guaranteed keeper", "AI picks winners", "automated breeding".
+ *   - No forbidden marketing phrasings (see the regression test for the list).
  *   - No implication that candidate comparison is valid when evidence is
  *     missing.
  */

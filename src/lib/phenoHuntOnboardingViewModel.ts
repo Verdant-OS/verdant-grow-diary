@@ -23,7 +23,8 @@ export type PhenoOnboardingStepId =
   | "candidates"
   | "goals"
   | "packet_preview"
-  | "checklist";
+  | "checklist"
+  | "confirmation";
 
 export const PHENO_ONBOARDING_STEP_ORDER: ReadonlyArray<PhenoOnboardingStepId> = [
   "basics",
@@ -31,6 +32,7 @@ export const PHENO_ONBOARDING_STEP_ORDER: ReadonlyArray<PhenoOnboardingStepId> =
   "goals",
   "packet_preview",
   "checklist",
+  "confirmation",
 ];
 
 export type PhenoCandidateCountStatus =

@@ -66,8 +66,18 @@ setup("authenticate", async ({ page }) => {
   // Snapshot sessionStorage (where the Supabase session actually lives) so
   // authed specs can re-inject it. Same sensitivity and lifecycle as
   // user.json: gitignored, never uploaded as an artifact.
-  const sessionStorageDump = await page.evaluate(() =>
+  //
+  // Record the ORIGIN we actually signed in on rather than assuming
+  // E2E_BASE_URL: published hosts can 302 to the canonical custom domain
+  // (e.g. *.lovable.app -> verdantgrowdiary.com), and sessionStorage is
+  // origin-scoped — injecting on the configured-but-redirected origin would
+  // silently leave every authed spec logged out.
+  const entries = await page.evaluate(() =>
     JSON.stringify(window.sessionStorage),
   );
-  fs.writeFileSync(SESSION_STORAGE_PATH, sessionStorageDump);
+  const signedInOrigin = new URL(page.url()).origin;
+  fs.writeFileSync(
+    SESSION_STORAGE_PATH,
+    JSON.stringify({ origin: signedInOrigin, entries: JSON.parse(entries) }),
+  );
 });

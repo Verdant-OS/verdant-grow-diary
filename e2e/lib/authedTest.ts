@@ -24,12 +24,12 @@ const SESSION_STORAGE_PATH = path.resolve("e2e/.auth/session-storage.json");
 export const test = base.extend({
   context: async ({ context }, use) => {
     if (fs.existsSync(SESSION_STORAGE_PATH)) {
-      const entries = JSON.parse(
+      // { origin, entries } — auth.setup records the origin it actually
+      // signed in on (published hosts can 302 to the canonical domain, and
+      // sessionStorage is origin-scoped), so we inject on that same origin.
+      const saved = JSON.parse(
         fs.readFileSync(SESSION_STORAGE_PATH, "utf-8"),
-      ) as Record<string, string>;
-      const appOrigin = new URL(
-        process.env.E2E_BASE_URL?.trim() || "http://localhost:5173",
-      ).origin;
+      ) as { origin: string; entries: Record<string, string> };
       await context.addInitScript(
         (arg: { entries: Record<string, string>; appOrigin: string }) => {
           if (window.location.origin === arg.appOrigin) {
@@ -38,7 +38,7 @@ export const test = base.extend({
             }
           }
         },
-        { entries, appOrigin },
+        { entries: saved.entries, appOrigin: saved.origin },
       );
     }
     await use(context);

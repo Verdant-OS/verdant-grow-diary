@@ -14,20 +14,26 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
-  // Chain tail must support every read shape the rendered surfaces use:
-  // .order() (lists) and .maybeSingle() (useMyEntitlements subscription +
-  // staff-role reads), including a second chained .eq().
-  const tail = {
-    order: async () => ({ data: [], error: null }),
-    maybeSingle: async () => ({ data: null, error: null }),
+  // Durable chainable query mock: every builder method returns the chain,
+  // awaiting the chain resolves an empty list, and maybeSingle/single
+  // resolve null rows. Survives chain reshuffles (e.g. useMyEntitlements
+  // now reads billing_subscriptions AND subscriptions with
+  // .eq().eq().order().limit().maybeSingle()).
+  const makeQuery = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const q: any = {};
+    for (const m of ["select", "eq", "neq", "in", "order", "limit", "range", "gte", "lte"]) {
+      q[m] = () => q;
+    }
+    q.maybeSingle = async () => ({ data: null, error: null });
+    q.single = async () => ({ data: null, error: null });
+    q.then = (onFulfilled: (v: unknown) => unknown) =>
+      Promise.resolve({ data: [], error: null }).then(onFulfilled);
+    return q;
   };
   return {
     supabase: {
-      from: () => ({
-        select: () => ({
-          eq: () => ({ ...tail, eq: () => tail }),
-        }),
-      }),
+      from: () => makeQuery(),
       functions: { invoke: async () => ({ data: { ok: true }, error: null }) },
     },
   };

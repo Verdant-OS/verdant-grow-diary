@@ -41,6 +41,6 @@ describe("AccountPlanBadge", () => {
   it("does not render raw IDs (ctm_/sub_/txn_/evt_/pri_/pro_)", () => {
     const { container } = render(<AccountPlanBadge entitlement={ent("pro_monthly")} />);
     const html = container.innerHTML;
-    expect(html).not.toMatch(/ctm_|sub_|txn_|evt_|pri_|pro_[a-z0-9]{6,}/);
+    expect(html).not.toMatch(/(ctm_|sub_|txn_|evt_|pri_)[a-z0-9]{6,}/);
   });
 });

@@ -108,6 +108,8 @@ describe("profiles gamification write-protection (regression for profiles.tier f
     const files = walk(SRC_DIR).filter(
       (p) =>
         !p.endsWith("profiles-gamification-write-protection.test.ts") &&
+        !p.endsWith("profiles-gamification-write-protection.integration.test.ts") &&
+        !p.endsWith("profiles-tier-entitlement-query-boundary.test.ts") &&
         // entitlements-purity.test.ts already asserts the same and mentions
         // the XP tier names as literals in its assertion strings.
         !p.endsWith("entitlements-purity.test.ts"),

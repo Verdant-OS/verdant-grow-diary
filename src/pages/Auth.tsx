@@ -194,6 +194,9 @@ export default function Auth() {
       setSignUpError(sanitizeAuthError("signUp", error));
       signUpEmailRef.current?.focus();
       return;
+    }
+    setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
+    nav(postSignInTarget(), { replace: true });
   }
 
   async function sendMagicLink() {
@@ -226,9 +229,6 @@ export default function Auth() {
         "If an account exists for that email, we've sent a sign-in link. Check your inbox.",
       );
     }
-  }
-    setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
-    nav(postSignInTarget(), { replace: true });
   }
 
   async function requestReset(e: React.FormEvent) {

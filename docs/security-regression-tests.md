@@ -70,6 +70,30 @@ bun run test:profiles-db-security
 bun run test:security-db-local
 ```
 
+### Local grant parity (`supabase/seed.sql`)
+
+`supabase db reset` applies `supabase/seed.sql` after migrations. It exists
+because the hosted project (created 2026-05) is grandfathered on Supabase's
+**legacy default privileges** — anon/authenticated/service_role receive DML
+grants on new public tables automatically, and RLS is the real guard — while
+fresh local stacks from the current CLI ship the **hardened default ACL**
+(no client DML on new tables). Without the seed, a plain `db reset` leaves
+~36 app tables (plants, tents, diary_entries, profiles, …) unreadable by
+clients, which does not match production and makes the runtime harnesses
+fail during setup with `42501 permission denied` instead of exercising RLS
+and triggers.
+
+The seed restores the production GRANT baseline and then re-applies the
+migrations' deliberate hardening REVOKEs (existence-guarded), so those stay
+authoritative. It runs **only** on local/preview `db reset` — it is never
+applied to the hosted project. If a table is deliberately locked down at the
+GRANT layer in a migration, add it to the deny-list in the seed as well.
+
+Verified end-to-end 2026-07-09: with the seed in place, both profiles
+harness suites pass 14/14 against a fresh `supabase start` + `db reset`
+(write-protection 10/10 including trigger and RPC paths; entitlement
+resolution 4/4 with zero `public.profiles` queries).
+
 ### Opt-in CI
 
 The `Security DB Local` GitHub workflow only runs the harnesses when

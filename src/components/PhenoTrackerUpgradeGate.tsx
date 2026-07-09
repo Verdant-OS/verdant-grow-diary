@@ -1,5 +1,5 @@
-import { type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { type ReactNode, useMemo } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
@@ -17,11 +17,18 @@ import {
  *     when `allowReadOnly` is true. The wrapped surface is responsible for
  *     rendering read-only state.
  *   - Everyone else (Free, unauthenticated, unknown): renders the calm
- *     upgrade card with an Upgrade CTA and an optional "View demo" link.
+ *     upgrade card with an Upgrade CTA and an optional "View Pheno Demo" link.
+ *
+ * The Upgrade CTA carries a `returnTo` search param pointing at the current
+ * gated pathname. The billing/success flow does not yet consume it — see
+ * follow-up note in `docs/security-regression-tests.md` or the Upgrade page
+ * TODO. This is safe: unknown params are ignored today.
  *
  * SAFETY: UI gating only. Write paths must ALSO check
  * `canWriteFeatureData(entitlement, "pheno_tracker")` before firing any
- * Supabase write. This component does not accept any client flag override.
+ * Supabase write, and are enforced server-side by RESTRICTIVE RLS backed by
+ * `public.has_pheno_tracker_entitlement(auth.uid())`. This component does
+ * not accept any client flag override.
  */
 export interface PhenoTrackerUpgradeGateProps {
   children: ReactNode;
@@ -33,6 +40,27 @@ export interface PhenoTrackerUpgradeGateProps {
   "data-testid"?: string;
 }
 
+const FEATURE_BULLETS: ReadonlyArray<string> = [
+  "Pheno hunts with candidate evidence",
+  "Side-by-side pheno comparison",
+  "Keeper decisions with your own notes",
+  "Replication readiness signals",
+  "Post-harvest and post-cure documentation",
+  "Export your pheno report",
+];
+
+function buildUpgradeHref(pathname: string): string {
+  // Only forward a same-origin, absolute app path. Never forward query, hash,
+  // or external URLs. This is defence in depth against redirect abuse.
+  const safe =
+    typeof pathname === "string" && pathname.startsWith("/") && !pathname.startsWith("//")
+      ? pathname
+      : null;
+  if (!safe) return "/upgrade";
+  const params = new URLSearchParams({ returnTo: safe });
+  return `/upgrade?${params.toString()}`;
+}
+
 export default function PhenoTrackerUpgradeGate({
   children,
   allowReadOnly = false,
@@ -41,6 +69,11 @@ export default function PhenoTrackerUpgradeGate({
 }: PhenoTrackerUpgradeGateProps) {
   const testId = rest["data-testid"] ?? "pheno-tracker-upgrade-gate";
   const { entitlement, loading } = useMyEntitlements();
+  const location = useLocation();
+  const upgradeHref = useMemo(
+    () => buildUpgradeHref(location.pathname),
+    [location.pathname],
+  );
 
   if (loading) {
     return (
@@ -70,7 +103,7 @@ export default function PhenoTrackerUpgradeGate({
           Your Pro plan is inactive. You can still view your existing Pheno
           Tracker records. Resubscribe to create, edit, compare, or export.
           <Link
-            to="/upgrade"
+            to={upgradeHref}
             className="ml-2 font-medium text-primary hover:underline"
           >
             Upgrade to Pro
@@ -98,17 +131,15 @@ export default function PhenoTrackerUpgradeGate({
         Pheno Tracker is a Pro feature.
       </h2>
       <p className="mt-3 text-sm text-muted-foreground">
-        Track candidate plants, evidence packets, keeper decisions, replication
-        readiness, and post-cure notes. Upgrade to Pro to run real pheno hunts.
+        Track candidate evidence, compare phenos, preserve keeper decisions,
+        and document post-cure results.
       </p>
-      <ul className="mt-4 space-y-2 text-sm">
-        {[
-          "Create and score real pheno hunts",
-          "Compare candidates side-by-side",
-          "Save keeper decisions with your own notes",
-          "Preserve replication and post-cure evidence",
-          "Export your pheno report",
-        ].map((line) => (
+      <p className="mt-2 text-sm text-muted-foreground">
+        Use it to see what changed, what held up after cure, and what deserves
+        another run.
+      </p>
+      <ul className="mt-4 space-y-2 text-sm" data-testid={`${testId}-bullets`}>
+        {FEATURE_BULLETS.map((line) => (
           <li key={line} className="flex items-start gap-2">
             <span
               aria-hidden="true"
@@ -119,7 +150,7 @@ export default function PhenoTrackerUpgradeGate({
         ))}
       </ul>
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <Link to="/upgrade" data-testid={`${testId}-upgrade-link`}>
+        <Link to={upgradeHref} data-testid={`${testId}-upgrade-link`}>
           <Button size="lg">Upgrade to Pro</Button>
         </Link>
         {demoHref ? (
@@ -128,7 +159,7 @@ export default function PhenoTrackerUpgradeGate({
             data-testid={`${testId}-demo-link`}
             className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"
           >
-            View demo
+            View Pheno Demo
           </Link>
         ) : null}
       </div>

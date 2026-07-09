@@ -54,6 +54,7 @@ import {
   PLAN_COMPARISON,
   UPGRADE_FAQ,
   resolveTierFeatures,
+  successPanelFeatureRowKey,
   type PricingTier,
 } from "@/config/pricing";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";

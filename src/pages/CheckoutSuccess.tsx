@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
 import AccountPlanBadge from "@/components/AccountPlanBadge";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
 /**
@@ -24,9 +25,18 @@ const POLL_TIMEOUT_MS = 10_000;
 
 export default function CheckoutSuccess() {
   const { loading, entitlement, refetch } = useMyEntitlements();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const confirmed =
     !loading && entitlement.isActive && entitlement.effectivePlanId !== "free";
+
+  // Sanitize the returnTo query param. Never trust the raw value: only
+  // same-origin absolute app paths are allowed (see checkoutReturnTo).
+  const safeReturnTo = useMemo(
+    () => sanitizeCheckoutReturnTo(searchParams.get("returnTo")),
+    [searchParams],
+  );
 
   usePageSeo({
     title: confirmed
@@ -53,6 +63,19 @@ export default function CheckoutSuccess() {
     }, POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, [confirmed, refetch]);
+
+  // Auto-redirect to the sanitized returnTo path ONLY after entitlement has
+  // confirmed active Pro. Waiting on `confirmed` prevents flicker back into
+  // the upgrade gate on a gated Pheno route. If returnTo is missing or
+  // unsafe, we stay on this page (existing behavior).
+  const redirectedRef = useRef(false);
+  useEffect(() => {
+    if (!confirmed) return;
+    if (!safeReturnTo) return;
+    if (redirectedRef.current) return;
+    redirectedRef.current = true;
+    navigate(safeReturnTo, { replace: true });
+  }, [confirmed, safeReturnTo, navigate]);
 
   return (
     <main
@@ -127,9 +150,9 @@ export default function CheckoutSuccess() {
               Check status
             </Button>
           )}
-          <Link to="/">
+          <Link to={safeReturnTo ?? "/"} data-testid="checkout-success-primary-link">
             <Button size="lg" variant={confirmed ? "default" : "outline"}>
-              Go to my grow
+              {safeReturnTo ? "Continue" : "Go to my grow"}
             </Button>
           </Link>
           <Link to="/settings">

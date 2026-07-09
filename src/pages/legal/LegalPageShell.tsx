@@ -1,6 +1,10 @@
 import { type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { usePageSeo } from "@/hooks/usePageSeo";
+
+const SITE_ORIGIN = "https://verdantgrowdiary.com";
+
 
 /**
  * Shared shell for public legal pages (Terms, Privacy, Refund).

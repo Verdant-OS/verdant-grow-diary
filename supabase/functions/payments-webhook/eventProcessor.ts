@@ -221,6 +221,41 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
 }
 
 /**
+ * If this is a `transaction.completed` event with no subscriptionId and no
+ * `price.importMeta.externalId`, return the Paddle internal price id so the
+ * orchestrator can resolve it via the Paddle API. Otherwise null (no lookup
+ * needed).
+ *
+ * We do NOT run this lookup for subscription events — those payloads reliably
+ * carry importMeta.externalId. We also skip it for recurring transactions
+ * (`subscriptionId` present) since those get skipped as non_lifetime anyway.
+ */
+export function transactionPriceIdNeedingLookup(event: EventLike): string | null {
+  if (event.eventType !== 'transaction.completed') return null;
+  const data = (event.data ?? {}) as TransactionData;
+  if (data.subscriptionId) return null;
+  const item = firstItem(data);
+  if (!item?.price) return null;
+  const alreadyResolved = item.price.importMeta?.externalId;
+  if (alreadyResolved) return null;
+  return item.price.id ?? null;
+}
+
+/**
+ * Mutate an event to attach a resolved price external id. Called by the
+ * orchestrator after `transactionPriceIdNeedingLookup` returned a paddle
+ * price id and the resolver produced an external id (which may be null if
+ * the price is unknown to our catalog).
+ */
+export function attachResolvedPriceExternalId(event: EventLike, externalId: string | null): void {
+  if (!event.data) return;
+  const data = event.data as TransactionData;
+  const item = firstItem(data);
+  if (!item?.price) return;
+  item.price.importMeta = { externalId: externalId ?? undefined };
+}
+
+/**
  * Extract audit-log fields for lovable_paddle_events. Called for every
  * event we accept (both processed and skipped) so operators can trace
  * why an event did or didn't produce a row.

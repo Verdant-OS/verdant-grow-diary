@@ -49,8 +49,12 @@ const FORBIDDEN_LEAKS: RegExp[] = [
 function expectSanitizedDbError(err: unknown): void {
   if (err == null) return;
   const obj = err as Record<string, unknown>;
-  const parts = [obj.message, obj.details, obj.hint, obj.code]
-    .filter((v) => typeof v === "string")
+  // Coerce EVERY present field to string (including numeric ones like
+  // `status`) so the leak scan covers non-string carriers, not just the
+  // known text fields.
+  const parts = Object.values(obj)
+    .filter((v) => v != null && typeof v !== "object" && typeof v !== "function")
+    .map((v) => String(v))
     .join("\n");
   for (const rx of FORBIDDEN_LEAKS) {
     expect(parts, `leaked pattern ${rx}`).not.toMatch(rx);
@@ -124,7 +128,7 @@ d("pi_ingest_commit_batch replay + boundary proof (local DB)", () => {
     intruder = await createTestUser("intruder");
     tentId = await createTent(owner, "PI E2E Proof Tent");
     foreignTentId = await createTent(intruder, "PI E2E Foreign Tent");
-  });
+  }, 45_000); // multiple admin round-trips — match the profiles suite budget
 
   afterAll(async () => {
     // Service-role teardown only; ignore errors so cleanup never masks results.
@@ -134,7 +138,7 @@ d("pi_ingest_commit_batch replay + boundary proof (local DB)", () => {
       await admin.from("tents").delete().eq("user_id", u.id);
       await admin.auth.admin.deleteUser(u.id).catch(() => {});
     }
-  });
+  }, 30_000);
 
   it("anon client cannot execute the commit RPC", async () => {
     const anonClient = createClient(URL, ANON, { auth: { persistSession: false } });
@@ -212,6 +216,15 @@ d("pi_ingest_commit_batch replay + boundary proof (local DB)", () => {
   });
 
   it("commit against another user's tent hard-fails and writes nothing", async () => {
+    const readingsBefore = async () =>
+      (
+        await admin
+          .from("sensor_readings")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", owner.id)
+      ).count ?? 0;
+    const before = await readingsBefore();
+
     const { error } = await admin.rpc(RPC, {
       p_user_id: owner.id,
       p_bridge_id: BRIDGE_ID,
@@ -222,12 +235,14 @@ d("pi_ingest_commit_batch replay + boundary proof (local DB)", () => {
     expect(error!.message).toMatch(/tent does not belong to user/i);
     expectSanitizedDbError(error);
 
-    const { count } = await admin
+    // Nothing persisted: neither a ledger row nor a sensor_readings row.
+    const { count: keyCount } = await admin
       .from("pi_ingest_idempotency_keys")
       .select("id", { count: "exact", head: true })
       .eq("user_id", owner.id)
       .eq("idempotency_key", "cross-tent-key1");
-    expect(count).toBe(0);
+    expect(keyCount).toBe(0);
+    expect(await readingsBefore(), "no sensor_readings written on rejection").toBe(before);
   });
 
   it("one invalid row aborts the whole batch atomically", async () => {

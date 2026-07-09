@@ -47,8 +47,12 @@ const FORBIDDEN_LEAKS: RegExp[] = [
 function expectSanitizedStorageError(err: unknown): void {
   if (err == null) return;
   const obj = err as Record<string, unknown>;
-  const parts = [obj.message, obj.error, obj.statusCode]
-    .filter((v) => typeof v === "string")
+  // Coerce EVERY present field to string (including numeric ones like
+  // `statusCode`) so the leak scan covers non-string carriers, not just
+  // the known text fields.
+  const parts = Object.values(obj)
+    .filter((v) => v != null && typeof v !== "object" && typeof v !== "function")
+    .map((v) => String(v))
     .join("\n");
   for (const rx of FORBIDDEN_LEAKS) {
     expect(parts, `leaked pattern ${rx}`).not.toMatch(rx);
@@ -88,7 +92,7 @@ d("diary-photos storage policy boundaries (local DB)", () => {
     alice = await createTestUser("alice");
     bob = await createTestUser("bob");
     alicePath = `${alice.id}/e2e-proof.txt`;
-  });
+  }, 45_000); // admin user creation + sign-in — match the profiles suite budget
 
   afterAll(async () => {
     for (const u of [alice, bob].filter(Boolean)) {
@@ -100,7 +104,7 @@ d("diary-photos storage policy boundaries (local DB)", () => {
       }
       await admin.auth.admin.deleteUser(u.id).catch(() => {});
     }
-  });
+  }, 30_000);
 
   it("the diary-photos bucket is private", async () => {
     const { data, error } = await admin.storage.getBucket(BUCKET);

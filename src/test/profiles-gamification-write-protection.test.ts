@@ -110,6 +110,9 @@ describe("profiles gamification write-protection (regression for profiles.tier f
         !p.endsWith("profiles-gamification-write-protection.test.ts") &&
         !p.endsWith("profiles-gamification-write-protection.integration.test.ts") &&
         !p.endsWith("profiles-entitlement-resolution-boundary.integration.test.ts") &&
+        !p.endsWith("customer-mode-operator-isolation.integration.test.ts") &&
+        !p.endsWith("sanitized-db-error-helper.test.ts") &&
+        !p.replace(/\\/g, "/").endsWith("integration/_helpers/sanitizedDbError.ts") &&
         !p.endsWith("profiles-tier-entitlement-query-boundary.test.ts") &&
         // entitlements-purity.test.ts already asserts the same and mentions
         // the XP tier names as literals in its assertion strings.

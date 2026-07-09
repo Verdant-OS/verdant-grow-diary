@@ -9,6 +9,8 @@ import { GrowsProvider } from "@/store/grows";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
 import RootErrorBoundary from "@/components/RootErrorBoundary";
 import RequireOperatorRole from "./components/RequireOperatorRole";
+import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
+
 
 // Route pages and the authenticated AppShell are code-split so the public
 // marketing / auth entry paths (/welcome, /pricing, /hardware-integrations,
@@ -81,6 +83,9 @@ const GuidePage = lazy(() => import("./pages/GuidePage"));
 const Glossary = lazy(() => import("./pages/Glossary"));
 const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
 const BillingPlaceholder = lazy(() => import("./pages/BillingPlaceholder"));
+const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
+const CheckoutCancel = lazy(() => import("./pages/CheckoutCancel"));
+
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));
 const IngestInspector = lazy(() => import("./pages/IngestInspector"));
@@ -146,6 +151,8 @@ const App = () => (
           <AnalyticsShell />
           <AuthProvider>
             <GrowsProvider>
+              <PaymentTestModeBanner />
+
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
@@ -174,6 +181,9 @@ const App = () => (
                   <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
                   <Route path="/billing/:plan" element={<BillingPlaceholder />} />
+                  <Route path="/checkout/success" element={<CheckoutSuccess />} />
+                  <Route path="/checkout/cancel" element={<CheckoutCancel />} />
+
                   {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
                       no operator chrome (header, Quick Log) renders. */}
                   <Route path="/customer/:shareId" element={<CustomerModeGuide />} />

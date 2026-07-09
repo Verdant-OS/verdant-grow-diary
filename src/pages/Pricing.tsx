@@ -664,15 +664,24 @@ export default function Pricing() {
         </div>
       </section>
 
-      <footer className="px-6 py-10 border-t border-border/40 text-sm text-muted-foreground text-center">
+      <footer className="px-6 py-10 border-t border-border/40 text-sm text-muted-foreground text-center space-y-2">
         <p>
           Verdant Grow Diary ·{" "}
           <a className="hover:text-foreground" href="https://verdantgrowdiary.com">
             verdantgrowdiary.com
           </a>
         </p>
-        <p className="mt-1">
+        <p>
           Software only. We do not sell cannabis, seeds, or cultivation equipment.
+        </p>
+        <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+          <Link to="/terms" className="hover:text-foreground">Terms</Link>
+          <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+          <Link to="/refund" className="hover:text-foreground">Refunds</Link>
+        </nav>
+        <p className="text-xs">
+          Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as
+          Merchant of Record. 30-day money-back guarantee.
         </p>
       </footer>
     </main>

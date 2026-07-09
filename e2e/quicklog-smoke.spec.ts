@@ -197,8 +197,21 @@ test.describe("Quick Log smoke checklist", () => {
           (await wateringErr.count()) > 0
             ? await wateringErr.isVisible()
             : (await saveErr.count()) > 0 && (await saveErr.isVisible());
-        if (!shown) throw new Error("Blank save produced no visible validation error");
-        return "blocked with a visible validation error";
+        if (shown) return "blocked with a visible validation error";
+        // Real browsers can block the submit BEFORE the app handler runs:
+        // the native `required` constraint shows a "Please fill out this
+        // field" bubble that lives outside the DOM, so neither app error
+        // element renders (CI screenshot evidence on #193). Accept that
+        // mechanism via ValidityState.
+        for (const testId of ["quicklog-watering-ml", "quicklog-note"]) {
+          const field = dialog.getByTestId(testId);
+          if ((await field.count()) === 0) continue;
+          const valueMissing = await field.evaluate(
+            (el) => (el as HTMLInputElement | HTMLTextAreaElement).validity?.valueMissing ?? false,
+          );
+          if (valueMissing) return `blocked by native required validation (${testId})`;
+        }
+        throw new Error("Blank save produced no visible validation error");
       });
 
       await report.run(14, "Satisfy required fields (note; watering ml when present)", async () => {

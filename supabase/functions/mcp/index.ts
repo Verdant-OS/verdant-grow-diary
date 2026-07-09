@@ -2,7 +2,194 @@
 // To take ownership, delete this banner line; the plugin then leaves the file alone.
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
+// src/lib/mcp/index.ts
+import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.20.0";
+
+// src/lib/mcp/tools/list-grows.ts
+import { defineTool } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z } from "npm:zod@^4.4.3";
+
+// src/lib/mcp/tools/_supabase.ts
+import { createClient } from "npm:@supabase/supabase-js@^2.105.4";
+function supabaseForUser(ctx) {
+  const url = process.env.SUPABASE_URL;
+  const anon = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY;
+  if (!url || !anon) {
+    throw new Error("Supabase env not configured for MCP tool");
+  }
+  return createClient(url, anon, {
+    global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+function unauthenticated() {
+  return {
+    content: [{ type: "text", text: "Not authenticated." }],
+    isError: true
+  };
+}
+
+// src/lib/mcp/tools/list-grows.ts
+var list_grows_default = defineTool({
+  name: "list_grows",
+  title: "List grows",
+  description: "List the signed-in Verdant grower's own grows (id, name, stage, grow_type, archived flag, timestamps). Read-only.",
+  inputSchema: {
+    includeArchived: z.boolean().optional().describe("Include archived grows. Defaults to false."),
+    limit: z.number().int().min(1).max(100).optional().describe("Maximum rows to return (1\u2013100). Defaults to 25.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ includeArchived, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) return unauthenticated();
+    const supabase = supabaseForUser(ctx);
+    let query = supabase.from("grows").select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at").order("updated_at", { ascending: false }).limit(limit ?? 25);
+    if (!includeArchived) query = query.eq("is_archived", false);
+    const { data, error } = await query;
+    if (error) {
+      return {
+        content: [{ type: "text", text: `Error: ${error.message}` }],
+        isError: true
+      };
+    }
+    const rows = data ?? [];
+    return {
+      content: [
+        {
+          type: "text",
+          text: rows.length === 0 ? "No grows found." : `Found ${rows.length} grow(s):
+${JSON.stringify(rows, null, 2)}`
+        }
+      ],
+      structuredContent: { grows: rows }
+    };
+  }
+});
+
+// src/lib/mcp/tools/list-recent-diary-entries.ts
+import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z2 } from "npm:zod@^4.4.3";
+var list_recent_diary_entries_default = defineTool2({
+  name: "list_recent_diary_entries",
+  title: "List recent diary entries",
+  description: "List recent diary entries for one of the signed-in grower's own grows. The grow must belong to the caller. Read-only.",
+  inputSchema: {
+    growId: z2.string().uuid().describe("Grow id to fetch diary entries for."),
+    limit: z2.number().int().min(1).max(50).optional().describe("Maximum entries to return (1\u201350). Defaults to 10.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ growId, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) return unauthenticated();
+    const supabase = supabaseForUser(ctx);
+    const { data: grow, error: growError } = await supabase.from("grows").select("id").eq("id", growId).maybeSingle();
+    if (growError) {
+      return {
+        content: [{ type: "text", text: `Error: ${growError.message}` }],
+        isError: true
+      };
+    }
+    if (!grow) {
+      return {
+        content: [{ type: "text", text: "Grow not found for the signed-in grower." }],
+        isError: true
+      };
+    }
+    const { data, error } = await supabase.from("diary_entries").select("id,grow_id,plant_id,tent_id,stage,note,entry_at,created_at").eq("grow_id", growId).order("entry_at", { ascending: false }).limit(limit ?? 10);
+    if (error) {
+      return {
+        content: [{ type: "text", text: `Error: ${error.message}` }],
+        isError: true
+      };
+    }
+    const rows = data ?? [];
+    return {
+      content: [
+        {
+          type: "text",
+          text: rows.length === 0 ? "No diary entries found for that grow." : `Found ${rows.length} entry(ies):
+${JSON.stringify(rows, null, 2)}`
+        }
+      ],
+      structuredContent: { entries: rows }
+    };
+  }
+});
+
+// src/lib/mcp/tools/get-latest-sensor-snapshot.ts
+import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.20.0";
+import { z as z3 } from "npm:zod@^4.4.3";
+var SCAN_LIMIT = 50;
+var get_latest_sensor_snapshot_default = defineTool3({
+  name: "get_latest_sensor_snapshot",
+  title: "Get latest sensor snapshot",
+  description: "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct) for one of the signed-in grower's own tents. Every reading includes its `source` label (manual/pi_bridge/sim) and `quality` label (ok/degraded/stale/invalid). Never treat readings with quality other than `ok`, or source `sim`, as current live data. Read-only.",
+  inputSchema: {
+    tentId: z3.string().uuid().describe("Tent id to fetch the latest readings for.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ tentId }, ctx) => {
+    if (!ctx.isAuthenticated()) return unauthenticated();
+    const supabase = supabaseForUser(ctx);
+    const { data: tent, error: tentError } = await supabase.from("tents").select("id,name").eq("id", tentId).maybeSingle();
+    if (tentError) {
+      return {
+        content: [{ type: "text", text: `Error: ${tentError.message}` }],
+        isError: true
+      };
+    }
+    if (!tent) {
+      return {
+        content: [{ type: "text", text: "Tent not found for the signed-in grower." }],
+        isError: true
+      };
+    }
+    const { data, error } = await supabase.from("sensor_readings").select("id,tent_id,metric,value,quality,source,ts,captured_at").eq("tent_id", tentId).order("ts", { ascending: false }).limit(SCAN_LIMIT);
+    if (error) {
+      return {
+        content: [{ type: "text", text: `Error: ${error.message}` }],
+        isError: true
+      };
+    }
+    const rows = data ?? [];
+    if (rows.length === 0) {
+      return {
+        content: [{ type: "text", text: "No sensor readings found for that tent." }],
+        structuredContent: { snapshot: null }
+      };
+    }
+    const readings = {};
+    for (const row of rows) {
+      if (!(row.metric in readings)) readings[row.metric] = row;
+    }
+    const summary = Object.values(readings).map(
+      (r) => `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, at: ${r.captured_at ?? r.ts})`
+    ).join("\n");
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Latest readings for tent "${tent.name}":
+${summary}`
+        }
+      ],
+      structuredContent: { snapshot: { tentId, readings } }
+    };
+  }
+});
+
+// src/lib/mcp/index.ts
+var projectRef = "knkwiiywfkbqznbxwqfh";
+var mcp_default = defineMcp({
+  name: "verdant-grow-os-mcp",
+  title: "Verdant Grow OS",
+  version: "0.1.0",
+  instructions: "Read-only access to the signed-in Verdant grower's own data. Use `list_grows` to enumerate grows, `list_recent_diary_entries` for recent log entries in a grow the caller owns, and `get_latest_sensor_snapshot` for the most recent reading per metric in a tent the caller owns. Sensor readings always include their `source` label (manual/pi_bridge/sim) and `quality` label (ok/degraded/stale/invalid) \u2014 never treat readings with quality other than `ok`, or source `sim`, as current live data. This server never writes, never approves Action Queue items, and never controls devices.",
+  auth: auth.oauth.issuer({
+    issuer: `https://${projectRef}.supabase.co/auth/v1`,
+    acceptedAudiences: "authenticated"
+  }),
+  tools: [list_grows_default, list_recent_diary_entries_default, get_latest_sensor_snapshot_default]
+});
+
 // lovable-mcp-supabase-entry.ts
-import mcp from "npm:C:\\Temp\\vgd-fix\\src\\lib\\mcp\\index.ts";
 import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.20.0/stacks/supabase";
-Deno.serve(createSupabaseHandler(mcp, { functionName: "mcp" }));
+Deno.serve(createSupabaseHandler(mcp_default, { functionName: "mcp" }));

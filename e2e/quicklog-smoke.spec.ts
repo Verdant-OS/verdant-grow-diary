@@ -44,23 +44,24 @@ const REPORT_TXT = path.join(RESULTS_DIR, "quicklog-smoke-report.txt");
  * is simply absent). Used for both the initial open and every reopen.
  */
 async function openQuickLogDialog(page: import("@playwright/test").Page) {
-  // Prefer the plant page's own Quick Log button (inside <main>): it opens
-  // the FULL Quick Log dialog this checklist exercises. The AppShell header's
-  // global fast-add button opens a compact summary dialog with no form body
-  // (no note textarea, no optional details, no watering field), which would
-  // pass the early steps and then fail every form assertion.
-  const mainButton = page
-    .locator("main")
-    .getByRole("button", { name: /quick log|log entry|\+ log/i })
-    .first();
+  // The app has THREE Quick Log surfaces; only one is the FULL dialog this
+  // checklist exercises (src/components/QuickLog.tsx, mounted in AppShell):
+  //  - plant-detail-quick-action-quicklog dispatches the prefill event that
+  //    opens the FULL dialog  <-- what we want
+  //  - the AppShell header's global fast-add opens a compact summary dialog
+  //    with no form body
+  //  - the One-Tent Loop card's CTA opens a simplified Target/Action/Photo
+  //    dialog with no quick-log-plant-select
+  // Prefer the precise testid; fall back to name matching for other pages.
+  const preciseButton = page.getByTestId("plant-detail-quick-action-quicklog");
   const anyButton = page
     .getByRole("button", { name: /quick log|log entry|\+ log/i })
     .first();
-  const inMain = await mainButton
+  const havePrecise = await preciseButton
     .waitFor({ state: "visible", timeout: 5_000 })
     .then(() => true)
     .catch(() => false);
-  await (inMain ? mainButton : anyButton).click();
+  await (havePrecise ? preciseButton : anyButton).click();
   const noteMenuItem = page
     .getByRole("menuitem", { name: /^note$/i })
     .or(page.getByRole("option", { name: /^note$/i }))

@@ -35,6 +35,8 @@ import {
   type ManualSensorSnapshotInput,
 } from "@/lib/manualSensorSnapshotQualityRules";
 import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
+import ManualSensorSnapshotReviewPanel from "@/components/ManualSensorSnapshotReviewPanel";
+import { reviewManualSensorSnapshot } from "@/lib/sensorSnapshotReviewRules";
 import DerivedVpdStatus from "@/components/DerivedVpdStatus";
 import {
   validateManualSensorSnapshotFields,
@@ -158,6 +160,23 @@ export default function ManualSensorReadingCard({
     };
     return evaluateManualSensorSnapshotQuality(snap);
   }, [validation.metrics]);
+
+  // Structured pre-save review (source: "manual", never live). Renders inside
+  // the review prompt so the grower sees findings + normalized preview before
+  // confirming. Blockers here also disable "Save anyway".
+  const snapshotReview = useMemo(() => {
+    return reviewManualSensorSnapshot({
+      tempF: form.airTempF,
+      humidity: form.humidityPct,
+      vpdKpa: form.vpdKpa,
+      soilWaterContent: form.soilMoisturePct,
+      co2Ppm: form.co2Ppm,
+      ppfd: form.ppfd,
+      capturedAt: new Date().toISOString(),
+      tentId: tentId || null,
+    });
+  }, [form, tentId]);
+
 
   // Entered vs derived VPD comparison. Uses only sanitized numeric metrics —
   // never relabels source. If the grower entered a VPD that disagrees with
@@ -656,6 +675,9 @@ export default function ManualSensorReadingCard({
                     </li>
                   ))}
                 </ul>
+                <div data-testid="manual-reading-review-panel-slot">
+                  <ManualSensorSnapshotReviewPanel result={snapshotReview} />
+                </div>
                 <div className="flex flex-col sm:flex-row gap-2 pt-1">
                   <Button
                     variant="outline"
@@ -668,7 +690,7 @@ export default function ManualSensorReadingCard({
                   <Button
                     size="sm"
                     onClick={doSave}
-                    disabled={insert.isPending}
+                    disabled={insert.isPending || !snapshotReview.canSave}
                     data-testid="manual-reading-review-save-anyway"
                   >
                     {insert.isPending ? (

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
 import AccountPlanBadge from "@/components/AccountPlanBadge";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
 /**

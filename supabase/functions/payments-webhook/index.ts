@@ -18,7 +18,7 @@
  * Does NOT touch entitlements, gates, or the BYO paddle-webhook stack.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { verifyWebhook, type PaddleEnv } from '../_shared/paddle.ts';
+import { verifyWebhook, getPaddleClient, type PaddleEnv } from '../_shared/paddle.ts';
 import { handleVerifiedEvent, type Deps, type EventLikeWithId } from './orchestrator.ts';
 
 let _supabase: ReturnType<typeof createClient> | null = null;

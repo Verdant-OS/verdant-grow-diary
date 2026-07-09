@@ -200,6 +200,10 @@ export default function Timeline() {
     if (urlGrowId !== storeGrowId) setActiveGrowId(urlGrowId);
   }, [urlGrowId, grows, storeGrowId, setActiveGrowId]);
   const [entries, setEntries] = useState<Entry[]>([]);
+  // Keyset pagination (audit M1): the diary is unbounded but the page used
+  // to silently cap at the newest 100 rows and report "Showing 100 of 100".
+  const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [alertEvents, setAlertEvents] = useState<AlertEventRow[]>([]);
@@ -283,9 +287,10 @@ export default function Timeline() {
     }
 
     setLoading(true);
-    const { data } = await supabase.from("diary_entries")
-      .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+    const { data, count } = await supabase.from("diary_entries")
+      .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", { count: "exact" })
       .eq("grow_id", activeGrowId).order("entry_at", { ascending: false }).limit(100);
+    setEntriesTotal(typeof count === "number" ? count : null);
     const rows = (data as Entry[]) || [];
     const paths = rows.map((r) => r.photo_url).filter((p): p is string => !!p && !p.startsWith("http"));
     if (paths.length) {
@@ -328,6 +333,47 @@ export default function Timeline() {
     setAlertEvents((ale as unknown as AlertEventRow[]) || []);
 
     setLoading(false);
+  }
+
+  /**
+   * Keyset "Load older" — fetches the next page strictly before the oldest
+   * loaded entry_at. Read-only, owner-scoped by RLS, same signing pass as
+   * the initial page for storage photo paths.
+   */
+  async function loadOlder() {
+    if (!activeGrowId || loadingOlder || entries.length === 0) return;
+    const cursor = entries[entries.length - 1]?.entry_at;
+    if (!cursor) return;
+    setLoadingOlder(true);
+    try {
+      const { data } = await supabase.from("diary_entries")
+        .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+        .eq("grow_id", activeGrowId)
+        .lt("entry_at", cursor)
+        .order("entry_at", { ascending: false })
+        .limit(100);
+      const older = (data as Entry[]) || [];
+      const paths = older
+        .map((r) => r.photo_url)
+        .filter((p): p is string => !!p && !p.startsWith("http"));
+      if (paths.length) {
+        const { data: signed } = await supabase.storage
+          .from("diary-photos")
+          .createSignedUrls(paths, 3600);
+        const map = new Map((signed || []).map((s2) => [s2.path as string, s2.signedUrl]));
+        older.forEach((r) => {
+          if (r.photo_url && map.has(r.photo_url)) r.photo_url = map.get(r.photo_url)!;
+        });
+      }
+      if (older.length) {
+        setEntries((prev) => {
+          const seen = new Set(prev.map((e) => e.id));
+          return [...prev, ...older.filter((e) => !seen.has(e.id))];
+        });
+      }
+    } finally {
+      setLoadingOlder(false);
+    }
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -701,9 +747,25 @@ export default function Timeline() {
           data-testid="timeline-results-count"
           aria-live="polite"
         >
-          Showing {filtered.length} of {entries.length}{" "}
-          {entries.length === 1 ? "entry" : "entries"}
+          Showing {filtered.length} of {entriesTotal ?? entries.length}{" "}
+          {(entriesTotal ?? entries.length) === 1 ? "entry" : "entries"}
+          {entriesTotal !== null && entriesTotal > entries.length
+            ? ` (${entries.length} loaded)`
+            : ""}
         </p>
+        {entriesTotal !== null && entriesTotal > entries.length && (
+          <button
+            type="button"
+            data-testid="timeline-load-older"
+            className="text-xs underline text-muted-foreground hover:text-foreground disabled:opacity-50"
+            onClick={() => void loadOlder()}
+            disabled={loadingOlder}
+          >
+            {loadingOlder
+              ? "Loading older entries…"
+              : `Load older entries (${entriesTotal - entries.length} more)`}
+          </button>
+        )}
         {highlight && highlightIsMissingFromList(filtered, highlight) && (() => {
           const blockers = detectTimelineHighlightBlockers({
             searchQuery,

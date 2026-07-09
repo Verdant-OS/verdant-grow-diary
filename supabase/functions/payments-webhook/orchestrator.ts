@@ -150,7 +150,23 @@ export async function handleVerifiedEvent(
     // prior is 'received' or 'failed' (or row somehow missing) → reprocess.
   }
 
-  // 2) Decide.
+  // 2) Resolve transaction price external id if needed.
+  // transaction.completed payloads may omit importMeta.externalId. If we
+  // have a Paddle internal price id, look it up so decide() can identify
+  // founder_lifetime vs recurring. A resolver error is transient → 500.
+  const priceIdToResolve = transactionPriceIdNeedingLookup(event);
+  if (priceIdToResolve && deps.resolvePriceExternalIdByPaddleId) {
+    const resolved = await deps.resolvePriceExternalIdByPaddleId(env, priceIdToResolve);
+    if ('error' in resolved) {
+      return {
+        httpStatus: 500,
+        reason: `price_lookup_failed:${redactError(resolved.error)}`,
+      };
+    }
+    attachResolvedPriceExternalId(event, resolved.externalId);
+  }
+
+  // 3) Decide.
   const decision = decide(event, env, now);
 
   if (decision.kind === 'skip') {

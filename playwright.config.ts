@@ -26,7 +26,11 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   fullyParallel: false,
   retries: 0,
-  reporter: [["list"]],
+  // The list reporter feeds CI logs; the html reporter produces the
+  // playwright-report/ directory that the workflow's artifact guard requires
+  // and uploads. With tracing disabled on real-auth runs (see `use` below),
+  // the report contains only screenshots/videos — no network headers.
+  reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: BASE_URL,
     // Debugging artifacts kept only when a test fails (CI uploads them).

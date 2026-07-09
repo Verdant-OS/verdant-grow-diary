@@ -180,6 +180,11 @@ jobs:
       - name: Route manifest + Alerts quick-link drift
         run: bunx vitest run src/test/route-manifest-sync.test.ts src/test/alerts-route-quick-link-contract.test.tsx
 
+      # Legal pages must emit canonical, OpenGraph, Twitter, and WebPage JSON-LD
+      # metadata on /privacy, /terms, and /refund. Runs on every build.
+      - name: Legal page SEO structured data
+        run: bun run test:legal-seo
+
       # Stop-ship: QuickLog RPC static trust-boundary guardrails. Always runs.
       - name: QuickLog RPC static trust-boundary
         run: bun run test:db:quicklog-rpc-static

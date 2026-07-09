@@ -1,21 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Loader2, Sprout } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Sprout } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useAuth } from "@/store/auth";
 import {
   createPhenoHunt,
   defaultHuntName,
-  validatePhenoHuntDraft,
 } from "@/lib/phenoHuntService";
 import { logsPath } from "@/lib/routes";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canWriteFeatureData } from "@/lib/featureEntitlements";
+import {
+  PHENO_ONBOARDING_STEP_ORDER,
+  computePhenoHuntOnboardingViewModel,
+  defaultEvidenceGoalSelection,
+  type PhenoOnboardingStepId,
+} from "@/lib/phenoHuntOnboardingViewModel";
+import type { PhenoEvidenceGoalId } from "@/lib/phenoEvidenceGoals";
+import PhenoHuntOnboardingStepper from "@/components/PhenoHuntOnboardingStepper";
+import PhenoEvidenceGoalsSelector from "@/components/PhenoEvidenceGoalsSelector";
+import PhenoFirstEvidencePacketMapPreview from "@/components/PhenoFirstEvidencePacketMapPreview";
+import PhenoComparisonReadyChecklist from "@/components/PhenoComparisonReadyChecklist";
 
 interface PlantOption {
   id: string;
@@ -28,6 +39,21 @@ interface GrowInfo {
   name: string;
 }
 
+/**
+ * PhenoHuntNew — guided Pheno Tracker first-run flow.
+ *
+ * Steps: basics → candidates → evidence goals → evidence packet map preview
+ * → comparison-ready checklist → create.
+ *
+ * SAFETY:
+ *  - Route is wrapped in PhenoTrackerUpgradeGate (Free/canceled users never
+ *    mount this page).
+ *  - Write path re-checks `canWriteFeatureData` before firing
+ *    `createPhenoHunt` — belt and suspenders on top of RLS + the
+ *    RESTRICTIVE `has_pheno_tracker_entitlement` policies.
+ *  - Evidence goals and checklist are onboarding-only UX. They are not
+ *    persisted to the DB (no schema changes in this slice).
+ */
 export default function PhenoHuntNew() {
   const { user } = useAuth();
   const { entitlement } = useMyEntitlements();
@@ -40,7 +66,12 @@ export default function PhenoHuntNew() {
   const [plants, setPlants] = useState<PlantOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
+  const [notes, setNotes] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [evidenceGoals, setEvidenceGoals] = useState<PhenoEvidenceGoalId[]>(
+    () => defaultEvidenceGoalSelection(),
+  );
+  const [currentStep, setCurrentStep] = useState<PhenoOnboardingStepId>("basics");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -81,14 +112,24 @@ export default function PhenoHuntNew() {
     };
   }, [growId, tentId]);
 
-  const plantIds = useMemo(() => Array.from(selected), [selected]);
-  const errors = useMemo(
-    () => validatePhenoHuntDraft({ name, plantIds }, growId),
-    [name, plantIds, growId],
-  );
-  const canSave = errors.length === 0 && !saving && !!user;
+  const candidateIds = useMemo(() => Array.from(selected), [selected]);
 
-  const toggle = (id: string) => {
+  const vm = useMemo(
+    () =>
+      computePhenoHuntOnboardingViewModel({
+        name,
+        growId: growId ?? null,
+        tentId: tentId ?? null,
+        notes,
+        candidateIds,
+        evidenceGoals,
+      }),
+    [name, growId, tentId, notes, candidateIds, evidenceGoals],
+  );
+
+  const canSave = vm.canCreate && !saving && !!user;
+
+  const toggleCandidate = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -97,14 +138,30 @@ export default function PhenoHuntNew() {
     });
   };
 
+  const toggleGoal = (id: PhenoEvidenceGoalId) => {
+    setEvidenceGoals((prev) =>
+      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id],
+    );
+  };
+
+  const stepIndex = PHENO_ONBOARDING_STEP_ORDER.indexOf(currentStep);
+  const goStep = (delta: number) => {
+    const next = PHENO_ONBOARDING_STEP_ORDER[stepIndex + delta];
+    if (next) setCurrentStep(next);
+  };
+
+  const selectedCandidates = useMemo(
+    () => plants.filter((p) => selected.has(p.id)),
+    [plants, selected],
+  );
+
   const onSave = async () => {
     if (!canSave || !growId) return;
-    // Belt-and-suspenders: the route-level PhenoTrackerUpgradeGate blocks
-    // Free users from mounting this page. Re-check here so any future direct
-    // handler invocation (deep link race, dev-tools state, cached mount) still
-    // cannot reach createPhenoHunt without an active Pro/lifetime entitlement.
-    // NOTE: not authoritative — server-side entitlement enforcement is a
-    // follow-up slice. RLS still prevents cross-user writes today.
+    // Belt-and-suspenders: server-side RESTRICTIVE RLS +
+    // has_pheno_tracker_entitlement already enforce this; re-check here so
+    // any future direct handler invocation (deep link race, dev tools,
+    // cached mount) still cannot reach createPhenoHunt without an active
+    // Pro/lifetime entitlement.
     if (!canWriteFeatureData(entitlement, "pheno_tracker")) {
       toast.error("Pheno Tracker is a Pro feature. Upgrade to Pro to start a hunt.");
       return;
@@ -115,7 +172,7 @@ export default function PhenoHuntNew() {
         growId,
         tentId: tentId ?? null,
         name: name.trim(),
-        plantIds,
+        plantIds: candidateIds,
       });
       toast.success("Pheno hunt created");
       navigate(logsPath(growId));
@@ -124,7 +181,6 @@ export default function PhenoHuntNew() {
       setSaving(false);
     }
   };
-
 
   if (loading) {
     return (
@@ -149,7 +205,7 @@ export default function PhenoHuntNew() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-4 space-y-4">
+    <div className="max-w-3xl mx-auto p-4 space-y-4" data-testid="pheno-hunt-onboarding">
       <BackLink to={`/grows/${growId}`} />
 
       <header className="glass rounded-2xl p-4">
@@ -158,31 +214,68 @@ export default function PhenoHuntNew() {
           <h1 className="text-xl font-display font-bold">Start Pheno Hunt</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Tag plants in <span className="font-medium">{grow.name}</span>
-          {tentId ? " (this tent)" : ""} as candidates for this hunt.
+          Guided setup for <span className="font-medium">{grow.name}</span>
+          {tentId ? " (this tent)" : ""}. You choose the candidates and evidence goals —
+          Verdant preserves what you record.
         </p>
       </header>
 
-      <section className="glass rounded-2xl p-4 space-y-3">
-        <div className="space-y-2">
-          <Label htmlFor="ph-name">Hunt name</Label>
-          <Input
-            id="ph-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Summer Pheno Hunt"
-            data-testid="ph-name-input"
-          />
-        </div>
+      <PhenoHuntOnboardingStepper
+        steps={vm.steps}
+        currentStepId={currentStep}
+        onStepSelect={setCurrentStep}
+      />
 
-        <div className="space-y-2">
+      {currentStep === "basics" && (
+        <section
+          className="glass rounded-2xl p-4 space-y-3"
+          data-testid="pheno-step-basics"
+        >
+          <h2 className="text-sm font-semibold">Hunt basics</h2>
+          <div className="space-y-2">
+            <Label htmlFor="ph-name">Hunt name</Label>
+            <Input
+              id="ph-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Summer Pheno Hunt"
+              data-testid="ph-name-input"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Linked grow</Label>
+            <div className="text-sm text-muted-foreground">
+              {grow.name}
+              {tentId ? " (scoped to this tent)" : ""}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="ph-notes">Notes (optional)</Label>
+            <Textarea
+              id="ph-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Context for this hunt — pack, cross, or hypothesis."
+              data-testid="ph-notes-input"
+            />
+          </div>
+        </section>
+      )}
+
+      {currentStep === "candidates" && (
+        <section
+          className="glass rounded-2xl p-4 space-y-3"
+          data-testid="pheno-step-candidates"
+        >
           <div className="flex items-center justify-between">
-            <Label>Candidate plants</Label>
-            <span className="text-xs text-muted-foreground">
-              {selected.size} selected
+            <h2 className="text-sm font-semibold">Candidate plants</h2>
+            <span
+              className="text-xs text-muted-foreground"
+              data-testid="pheno-candidate-status"
+            >
+              {vm.candidateStatusLabel}
             </span>
           </div>
-
           {plants.length === 0 ? (
             <div
               className="rounded-lg border border-dashed p-6 text-center space-y-3"
@@ -211,7 +304,7 @@ export default function PhenoHuntNew() {
                     <Checkbox
                       id={`ph-${p.id}`}
                       checked={checked}
-                      onCheckedChange={() => toggle(p.id)}
+                      onCheckedChange={() => toggleCandidate(p.id)}
                       data-testid={`ph-toggle-${p.id}`}
                     />
                     <label htmlFor={`ph-${p.id}`} className="flex-1 min-w-0 cursor-pointer">
@@ -225,13 +318,94 @@ export default function PhenoHuntNew() {
               })}
             </ul>
           )}
-        </div>
+        </section>
+      )}
 
-        <div className="flex items-center justify-end gap-2 pt-2">
+      {currentStep === "goals" && (
+        <section
+          className="glass rounded-2xl p-4 space-y-3"
+          data-testid="pheno-step-goals"
+        >
+          <h2 className="text-sm font-semibold">Evidence goals</h2>
+          <p className="text-xs text-muted-foreground">
+            Choose what you plan to track. You decide what matters — Verdant
+            preserves the evidence you record.
+          </p>
+          <PhenoEvidenceGoalsSelector
+            selected={evidenceGoals}
+            onToggle={toggleGoal}
+          />
+        </section>
+      )}
+
+      {currentStep === "packet_preview" && (
+        <section
+          className="glass rounded-2xl p-4 space-y-3"
+          data-testid="pheno-step-packet-preview"
+        >
+          <h2 className="text-sm font-semibold">First Evidence Packet Map</h2>
+          <p className="text-xs text-muted-foreground">
+            Preview of the packet shape for your candidates. Every cell starts
+            at <span className="font-medium">Not recorded</span> — you fill them
+            in from the workspace.
+          </p>
+          <PhenoFirstEvidencePacketMapPreview
+            vm={vm}
+            candidates={selectedCandidates}
+          />
+        </section>
+      )}
+
+      {currentStep === "checklist" && (
+        <section
+          className="glass rounded-2xl p-4 space-y-3"
+          data-testid="pheno-step-checklist"
+        >
+          <h2 className="text-sm font-semibold">Comparison-ready checklist</h2>
+          <PhenoComparisonReadyChecklist vm={vm} />
+          {vm.blockingReasons.length > 0 ? (
+            <ul
+              className="mt-3 space-y-1 text-xs text-muted-foreground"
+              data-testid="pheno-blocking-reasons"
+            >
+              {vm.blockingReasons.map((r) => (
+                <li key={r}>• {r}</li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => goStep(-1)}
+            disabled={stepIndex === 0}
+            data-testid="pheno-step-prev"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" /> Back
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => goStep(1)}
+            disabled={stepIndex === PHENO_ONBOARDING_STEP_ORDER.length - 1}
+            data-testid="pheno-step-next"
+          >
+            Next <ArrowRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
           <Button variant="ghost" asChild>
             <Link to={`/grows/${growId}`}>Cancel</Link>
           </Button>
-          <Button onClick={onSave} disabled={!canSave} data-testid="ph-save-btn">
+          <Button
+            onClick={onSave}
+            disabled={!canSave}
+            data-testid="ph-save-btn"
+          >
             {saving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
@@ -242,7 +416,7 @@ export default function PhenoHuntNew() {
             )}
           </Button>
         </div>
-      </section>
+      </div>
     </div>
   );
 }

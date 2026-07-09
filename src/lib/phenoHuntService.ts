@@ -23,7 +23,10 @@ export interface CreatePhenoHuntResult {
 }
 
 export class PhenoHuntError extends Error {
-  constructor(message: string, public cause?: unknown) {
+  constructor(
+    message: string,
+    public cause?: unknown,
+  ) {
     super(message);
     this.name = "PhenoHuntError";
   }
@@ -45,10 +48,7 @@ export interface PhenoHuntDraft {
   plantIds: readonly string[];
 }
 
-export type PhenoHuntValidationError =
-  | "name_required"
-  | "grow_required"
-  | "no_candidates";
+export type PhenoHuntValidationError = "name_required" | "grow_required" | "no_candidates";
 
 export function validatePhenoHuntDraft(
   draft: PhenoHuntDraft,
@@ -83,10 +83,7 @@ export async function createPhenoHunt(
     .single();
 
   if (huntErr || !hunt) {
-    throw new PhenoHuntError(
-      huntErr?.message ?? "Could not create pheno hunt.",
-      huntErr,
-    );
+    throw new PhenoHuntError(huntErr?.message ?? "Could not create pheno hunt.", huntErr);
   }
 
   const huntId = (hunt as { id: string }).id;
@@ -102,9 +99,8 @@ export async function createPhenoHunt(
     const results = await Promise.all(
       chunk.map(async (plantId, offset) => {
         const override = input.labels?.[plantId]?.trim();
-        const label = override && override.length > 0
-          ? override
-          : defaultCandidateLabel(start + offset);
+        const label =
+          override && override.length > 0 ? override : defaultCandidateLabel(start + offset);
         const { error: updErr } = await client
           .from("plants")
           .update({
@@ -121,12 +117,17 @@ export async function createPhenoHunt(
     }
     if (failed?.updErr) {
       // Best-effort rollback: untag anything already tagged, then remove the
-      // hunt row (RLS allows the owner to delete/update own rows).
+      // hunt row (RLS allows the owner to delete/update own rows). Rollback
+      // failures are swallowed — they must never mask the original error.
       if (tagged.length > 0) {
-        await client
-          .from("plants")
-          .update({ pheno_hunt_id: null, candidate_label: null } as never)
-          .in("id", tagged);
+        try {
+          await client
+            .from("plants")
+            .update({ pheno_hunt_id: null, candidate_label: null } as never)
+            .in("id", tagged);
+        } catch {
+          // best-effort only
+        }
       }
       await client.from("pheno_hunts").delete().eq("id", huntId);
       throw new PhenoHuntError(
@@ -173,10 +174,7 @@ export async function deletePhenoHunt(
     .eq("pheno_hunt_id", huntId);
 
   if (selErr) {
-    throw new PhenoHuntError(
-      `Could not read linked plants: ${selErr.message}`,
-      selErr,
-    );
+    throw new PhenoHuntError(`Could not read linked plants: ${selErr.message}`, selErr);
   }
 
   const linkedIds = (linked ?? []).map((r) => (r as { id: string }).id);
@@ -191,23 +189,14 @@ export async function deletePhenoHunt(
       .eq("pheno_hunt_id", huntId);
 
     if (untagErr) {
-      throw new PhenoHuntError(
-        `Could not untag linked plants: ${untagErr.message}`,
-        untagErr,
-      );
+      throw new PhenoHuntError(`Could not untag linked plants: ${untagErr.message}`, untagErr);
     }
   }
 
-  const { error: delErr } = await client
-    .from("pheno_hunts")
-    .delete()
-    .eq("id", huntId);
+  const { error: delErr } = await client.from("pheno_hunts").delete().eq("id", huntId);
 
   if (delErr) {
-    throw new PhenoHuntError(
-      `Could not delete pheno hunt: ${delErr.message}`,
-      delErr,
-    );
+    throw new PhenoHuntError(`Could not delete pheno hunt: ${delErr.message}`, delErr);
   }
 
   return { huntId, untaggedPlantIds: linkedIds };

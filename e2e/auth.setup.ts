@@ -15,14 +15,19 @@ import path from "node:path";
  *      elevated DB role usage, and NO token injection.
  */
 const STORAGE_PATH = path.resolve("e2e/.auth/user.json");
+// The app stores the Supabase session in sessionStorage (auth hardening; see
+// docs/auth-security.md), which Playwright's storageState does NOT capture.
+// We snapshot it separately; e2e/lib/authedTest.ts re-injects it per test.
+const SESSION_STORAGE_PATH = path.resolve("e2e/.auth/session-storage.json");
 
 setup("authenticate", async ({ page }) => {
   fs.mkdirSync(path.dirname(STORAGE_PATH), { recursive: true });
 
-  if (fs.existsSync(STORAGE_PATH)) {
+  if (fs.existsSync(STORAGE_PATH) && fs.existsSync(SESSION_STORAGE_PATH)) {
     setup.info().annotations.push({
       type: "auth",
-      description: "Reusing existing storageState at e2e/.auth/user.json.",
+      description:
+        "Reusing existing auth state at e2e/.auth/ (user.json + session-storage.json).",
     });
     return;
   }
@@ -57,4 +62,12 @@ setup("authenticate", async ({ page }) => {
     .not.toContain("/auth");
 
   await page.context().storageState({ path: STORAGE_PATH });
+
+  // Snapshot sessionStorage (where the Supabase session actually lives) so
+  // authed specs can re-inject it. Same sensitivity and lifecycle as
+  // user.json: gitignored, never uploaded as an artifact.
+  const sessionStorageDump = await page.evaluate(() =>
+    JSON.stringify(window.sessionStorage),
+  );
+  fs.writeFileSync(SESSION_STORAGE_PATH, sessionStorageDump);
 });

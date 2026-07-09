@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./lib/authedTest";
 import fs from "node:fs";
 import path from "node:path";
 import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";

@@ -23,7 +23,7 @@
  */
 import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getPaddleEnvironment } from "@/lib/paddle";
+
 
 export type PremiumExportFeature =
   | "ai_doctor_report"

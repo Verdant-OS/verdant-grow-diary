@@ -696,14 +696,6 @@ export default function ManualSensorReadingCard({
                       Back to edit
                     </Button>
                     <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setReviewOpen(false)}
-                      data-testid="manual-sensor-review-back"
-                    >
-                      Back to edit
-                    </Button>
-                    <Button
                       size="sm"
                       onClick={doSave}
                       disabled={insert.isPending || hasBlocker}

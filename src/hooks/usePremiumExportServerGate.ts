@@ -78,7 +78,7 @@ export async function checkPremiumExportEntitlement(
     if (scope.endDate) body.end_date = scope.endDate;
     // Phase 2b: pass the client-derived billing environment so the server
     // union resolver ignores mismatched Lovable Paddle rows.
-    body.billing_env = getPaddleEnvironment();
+    // billing_env is derived server-side; never sent from the client.
 
     const { data, error } = await supabase.functions.invoke(
       "premium-export-entitlement",

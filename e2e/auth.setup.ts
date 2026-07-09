@@ -40,8 +40,12 @@ setup("authenticate", async ({ page }) => {
   }
 
   await page.goto("/auth");
-  await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(password);
+  // The Auth page keeps all three tab panels (sign in / create account /
+  // forgot password) mounted, so label-based lookups match 3 email and 3
+  // password inputs (Playwright strict-mode violation). Pin to the sign-in
+  // panel's stable input ids instead.
+  await page.locator("#signin-email").fill(email);
+  await page.locator("#signin-password").fill(password);
   await page
     .getByRole("button", { name: /sign in|log in|continue/i })
     .first()

@@ -343,3 +343,70 @@ describe("Upgrade page — success panel", () => {
     expect(screen.getByTestId("upgrade-success-plans")).toBeInTheDocument();
   });
 });
+
+describe("Upgrade page — success panel feature row identity", () => {
+  it("assigns deterministic keys via successPanelFeatureRowKey for known features", async () => {
+    const { successPanelFeatureRowKey, CANONICAL_FEATURE_ORDER } = await import(
+      "@/config/pricing"
+    );
+    for (let i = 0; i < CANONICAL_FEATURE_ORDER.length; i++) {
+      expect(successPanelFeatureRowKey(CANONICAL_FEATURE_ORDER[i])).toBe(
+        `feat-${i}`,
+      );
+    }
+  });
+
+  it("assigns deterministic non-colliding keys for unknown feature strings", async () => {
+    const { successPanelFeatureRowKey } = await import("@/config/pricing");
+    const a = successPanelFeatureRowKey("Totally Made-Up Feature!");
+    const b = successPanelFeatureRowKey("Totally Made-Up Feature!");
+    const c = successPanelFeatureRowKey("Another Unknown");
+    expect(a).toBe(b);
+    expect(a.startsWith("feat-x-")).toBe(true);
+    expect(a).not.toBe(c);
+    // Never collides with canonical numeric-index namespace.
+    expect(a).not.toMatch(/^feat-\d+$/);
+  });
+
+  it("falls back to a stable placeholder for empty / punctuation-only strings", async () => {
+    const { successPanelFeatureRowKey } = await import("@/config/pricing");
+    expect(successPanelFeatureRowKey("")).toBe("feat-x-unknown");
+    expect(successPanelFeatureRowKey("!!!")).toBe("feat-x-unknown");
+  });
+
+  it("renders each feature row with a data-feature-key attribute", () => {
+    renderPage(["/upgrade?checkout=success&plan=pro_monthly"]);
+    const rows = screen.getAllByTestId("upgrade-success-feature-row");
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      const key = row.getAttribute("data-feature-key");
+      expect(key).toBeTruthy();
+      expect(key!).toMatch(/^feat-(\d+|x-[a-z0-9-]+)$/);
+    }
+    // All keys unique within the panel.
+    const keys = rows.map((r) => r.getAttribute("data-feature-key")!);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("shares identical row keys for features common to multiple tiers", () => {
+    renderPage(["/upgrade?checkout=success&plan=pro_monthly"]);
+    const proKeys = new Map(
+      screen
+        .getAllByTestId("upgrade-success-feature-row")
+        .map((r) => [r.textContent?.trim(), r.getAttribute("data-feature-key")]),
+    );
+
+    // Re-render for founder tier.
+    renderPage(["/upgrade?checkout=success&plan=founder_lifetime"]);
+    const founderRows = screen.getAllByTestId("upgrade-success-feature-row");
+    let sharedChecked = 0;
+    for (const row of founderRows) {
+      const label = row.textContent?.trim();
+      if (label && proKeys.has(label)) {
+        expect(row.getAttribute("data-feature-key")).toBe(proKeys.get(label));
+        sharedChecked++;
+      }
+    }
+    expect(sharedChecked).toBeGreaterThan(0);
+  });
+});

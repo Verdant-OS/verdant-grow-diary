@@ -205,6 +205,31 @@ type PhenoReversalRow = {
   created_at: string;
 };
 
+type PhenoMaleEvaluationRow = {
+  id: string;
+  user_id: string;
+  hunt_id: string | null;
+  plant_id: string;
+  strain_lineage: string | null;
+  // Operator 1-10 rubric ratings keyed by axis; ranges validated in the app by
+  // phenoMaleEvaluationRules.
+  ratings: Json;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type PhenoPollenViabilityTestRow = {
+  id: string;
+  user_id: string;
+  evaluation_id: string;
+  result: string;
+  germination_pct: number | null;
+  note: string | null;
+  tested_at: string | null;
+  created_at: string;
+};
+
 export interface PhenoDatabase {
   public: {
     Tables: {
@@ -296,6 +321,16 @@ export interface PhenoDatabase {
       pheno_reversals: Tbl<
         PhenoReversalRow,
         "id" | "method" | "note" | "applied_at" | "created_at",
+        never
+      >;
+      pheno_male_evaluations: Tbl<
+        PhenoMaleEvaluationRow,
+        "id" | "hunt_id" | "strain_lineage" | "ratings" | "note" | "created_at" | "updated_at"
+      >;
+      // APPEND-ONLY (SELECT+INSERT grant only): Update = never.
+      pheno_pollen_viability_tests: Tbl<
+        PhenoPollenViabilityTestRow,
+        "id" | "result" | "germination_pct" | "note" | "tested_at" | "created_at",
         never
       >;
     };

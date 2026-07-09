@@ -24,9 +24,9 @@ export function LegalPageShell({
             Verdant Grow Diary
           </Link>
           <nav className="flex gap-4 text-muted-foreground">
-            <Link to="/terms" className="hover:text-foreground">Terms</Link>
-            <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
-            <Link to="/refund" className="hover:text-foreground">Refunds</Link>
+            <Link to="/terms" className="hover:text-foreground">Terms of Service</Link>
+            <Link to="/privacy" className="hover:text-foreground">Privacy Policy</Link>
+            <Link to="/refund" className="hover:text-foreground">Refund Policy</Link>
           </nav>
         </div>
       </header>

@@ -32,10 +32,7 @@ import {
   slugifyGrowName,
 } from "@/lib/postGrowReportRules";
 import { buildPostGrowReportPdfModel } from "@/lib/postGrowReportViewModel";
-import {
-  buildPostGrowReportPdfHtml,
-  exportPostGrowReportAsPdf,
-} from "@/lib/postGrowPdfExport";
+import { buildPostGrowReportPdfHtml, exportPostGrowReportAsPdf } from "@/lib/postGrowPdfExport";
 import type { PostGrowLearningReportViewModel } from "@/lib/postGrowLearningReportRules";
 import {
   EnvironmentStabilityCard,
@@ -50,6 +47,7 @@ function baseVm(
 ): PostGrowLearningReportViewModel {
   return {
     eligible: true,
+    sensorReadingSources: [{ source: "manual" }],
     ineligibleReason: null,
     header: {
       growId: "grow_internal_abc123",
@@ -118,7 +116,7 @@ describe("postGrowReportRules — filename + sanitization", () => {
   it("builds deterministic lowercase filename with no unsafe characters", () => {
     const filename = buildPdfExportFilename("Blue Dream #1", NOW);
     expect(filename).toBe("verdant-post-grow-report-blue-dream-1-2026-04-15.pdf");
-    expect(filename).toMatch(/^[a-z0-9.\-]+$/);
+    expect(filename).toMatch(/^[a-z0-9.-]+$/);
   });
 
   it("builds a deterministic title", () => {
@@ -209,9 +207,7 @@ describe("postGrowReportViewModel — sanitized model builder", () => {
   });
 
   it("excludes internal ids from user-facing fields", () => {
-    const html = buildPostGrowReportPdfHtml(
-      buildPostGrowReportPdfModel(baseVm(), { now: NOW }),
-    );
+    const html = buildPostGrowReportPdfHtml(buildPostGrowReportPdfModel(baseVm(), { now: NOW }));
     expect(html).not.toContain("grow_internal_abc123");
   });
 
@@ -290,9 +286,17 @@ describe("PDF sensor provenance legend", () => {
 
   it("does not describe demo, stale, or invalid as live, current, or healthy", () => {
     const html = htmlFor(baseVm()).toLowerCase();
-    const forbidden = ["demo is live", "stale is live", "invalid is live",
-      "demo is current", "stale is current", "invalid is current",
-      "demo is healthy", "stale is healthy", "invalid is healthy"];
+    const forbidden = [
+      "demo is live",
+      "stale is live",
+      "invalid is live",
+      "demo is current",
+      "stale is current",
+      "invalid is current",
+      "demo is healthy",
+      "stale is healthy",
+      "invalid is healthy",
+    ];
     for (const phrase of forbidden) expect(html).not.toContain(phrase);
     // sanity: legend text itself never claims these are healthy.
     expect(html).toMatch(/should not be treated as current/);
@@ -364,9 +368,15 @@ describe("PDF provenance review note", () => {
   it("does not describe demo/stale/invalid as live, current, or healthy", () => {
     const note = POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE.toLowerCase();
     for (const bad of [
-      "demo is live", "stale is live", "invalid is live",
-      "demo is current", "stale is current", "invalid is current",
-      "demo is healthy", "stale is healthy", "invalid is healthy",
+      "demo is live",
+      "stale is live",
+      "invalid is live",
+      "demo is current",
+      "stale is current",
+      "invalid is current",
+      "demo is healthy",
+      "stale is healthy",
+      "invalid is healthy",
       "safe to act",
     ]) {
       expect(note).not.toContain(bad);
@@ -419,9 +429,9 @@ describe("EnvironmentStabilityCard — in-app provenance badges", () => {
     }
     // Non-healthy badges are titled with the shared description that
     // warns not to treat them as current.
-    expect(
-      screen.getByTestId("post-grow-provenance-badge-stale").getAttribute("title"),
-    ).toMatch(/should not be treated as current/i);
+    expect(screen.getByTestId("post-grow-provenance-badge-stale").getAttribute("title")).toMatch(
+      /should not be treated as current/i,
+    );
   });
 
   it("does not render the badge strip when no sensor sources are supplied", () => {
@@ -435,9 +445,9 @@ describe("EnvironmentStabilityCard — in-app provenance badges", () => {
     render(<EnvironmentStabilityCard metrics={[]} />);
     expect(screen.getByTestId("post-grow-environment-stability")).toBeTruthy();
     expect(screen.queryByTestId("post-grow-provenance-badges")).toBeNull();
-    expect(
-      screen.getByTestId("post-grow-sensor-empty-state").textContent,
-    ).toBe(POST_GROW_SENSOR_EMPTY_STATE_COPY);
+    expect(screen.getByTestId("post-grow-sensor-empty-state").textContent).toBe(
+      POST_GROW_SENSOR_EMPTY_STATE_COPY,
+    );
   });
 
   it("shows in-app empty-state copy when metrics have zero readings", () => {
@@ -464,12 +474,7 @@ describe("EnvironmentStabilityCard — in-app provenance badges", () => {
   });
 
   it("gives each provenance badge an accessible label with its meaning and is keyboard focusable", () => {
-    render(
-      <EnvironmentStabilityCard
-        metrics={[]}
-        sensorSourceKinds={["manual", "stale"]}
-      />,
-    );
+    render(<EnvironmentStabilityCard metrics={[]} sensorSourceKinds={["manual", "stale"]} />);
     const manual = screen.getByTestId("post-grow-provenance-badge-manual");
     expect(manual.getAttribute("aria-label")).toBe(
       "Sensor provenance: Manual. Reading entered by the grower.",
@@ -496,9 +501,7 @@ describe("PDF sensor empty-state + semantic legend", () => {
   });
 
   it("uses semantic table markup for the legend (caption, scope, aria-label)", () => {
-    const html = buildPostGrowReportPdfHtml(
-      buildPostGrowReportPdfModel(baseVm(), { now: NOW }),
-    );
+    const html = buildPostGrowReportPdfHtml(buildPostGrowReportPdfModel(baseVm(), { now: NOW }));
     expect(html).toMatch(/<table aria-label="Sensor provenance legend">/);
     expect(html).toMatch(/<caption[^>]*>Sensor provenance legend<\/caption>/);
     expect(html).toMatch(/<th scope="col">Label<\/th>/);
@@ -518,13 +521,14 @@ describe("Export action — click integration (browser-level)", () => {
       focus: vi.fn(),
       print: vi.fn(),
     };
-    const openSpy = vi
-      .spyOn(window, "open")
-      .mockImplementation(() => popup as unknown as Window);
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => popup as unknown as Window);
 
+    // Empty-state premise: this VM has NO sensor data at all, so the PDF
+    // must render the empty-state copy (the sources now default from the
+    // view model, so they must be explicitly empty here).
     render(
       <MemoryRouter>
-        <ExportSummaryButtons vm={baseVm({ environment: [] })} />
+        <ExportSummaryButtons vm={baseVm({ environment: [], sensorReadingSources: [] })} />
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByTestId("post-grow-export-pdf"));
@@ -542,31 +546,78 @@ describe("Export action — click integration (browser-level)", () => {
 
     openSpy.mockRestore();
   });
+
+  it("clicking Export PDF renders provenance rows from the view model's own reading sources", () => {
+    const write = vi.fn();
+    const popup = {
+      document: { write, close: vi.fn(), title: "" } as unknown as Document,
+      focus: vi.fn(),
+      print: vi.fn(),
+    };
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => popup as unknown as Window);
+
+    render(
+      <MemoryRouter>
+        <ExportSummaryButtons
+          vm={baseVm({
+            sensorReadingSources: [{ source: "manual" }, { source: "csv" }],
+          })}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId("post-grow-export-pdf"));
+
+    const html = write.mock.calls[0][0] as string;
+    // Sources flow from the VM without the call site re-plumbing them:
+    // the provenance list renders real rows instead of the empty state.
+    expect(html).not.toContain(POST_GROW_SENSOR_EMPTY_STATE_COPY);
+    expect(html).toContain('<ul class="sources">');
+    expect(html).toMatch(/>Manual<\/span> · 1 reading/);
+    expect(html).toMatch(/>CSV<\/span> · 1 reading/);
+
+    openSpy.mockRestore();
+  });
+
+  it("opens the print window WITHOUT noopener/noreferrer (they null the handle and break export)", () => {
+    const write = vi.fn();
+    const popup = {
+      document: { write, close: vi.fn(), title: "" } as unknown as Document,
+      focus: vi.fn(),
+      print: vi.fn(),
+    };
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => popup as unknown as Window);
+
+    render(
+      <MemoryRouter>
+        <ExportSummaryButtons vm={baseVm()} />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId("post-grow-export-pdf"));
+
+    expect(openSpy).toHaveBeenCalled();
+    const features = openSpy.mock.calls[0][2];
+    expect(features ?? "").not.toMatch(/noopener|noreferrer/);
+
+    openSpy.mockRestore();
+  });
 });
 
 describe("SensorProvenanceLegend — in-app presenter", () => {
   it("renders heading, all six canonical labels, and the manual-review note", () => {
     render(<SensorProvenanceLegend />);
-    expect(
-      screen.getByTestId("post-grow-sensor-provenance-legend"),
-    ).toBeTruthy();
+    expect(screen.getByTestId("post-grow-sensor-provenance-legend")).toBeTruthy();
     expect(screen.getByText(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)).toBeTruthy();
     for (const row of POST_GROW_SENSOR_PROVENANCE_LEGEND) {
-      const badge = screen.getByTestId(
-        `post-grow-sensor-provenance-legend-badge-${row.kind}`,
-      );
+      const badge = screen.getByTestId(`post-grow-sensor-provenance-legend-badge-${row.kind}`);
       expect(badge.textContent).toBe(row.label);
-      expect(badge.getAttribute("aria-label")).toBe(
-        provenanceBadgeAriaLabel(row),
-      );
+      expect(badge.getAttribute("aria-label")).toBe(provenanceBadgeAriaLabel(row));
       expect(badge.getAttribute("title")).toBe(row.description);
       expect(badge.getAttribute("tabindex")).toBe("0");
       expect(badge.className).toMatch(/focus-visible:ring/);
     }
-    expect(
-      screen.getByTestId("post-grow-sensor-provenance-legend-review-note")
-        .textContent,
-    ).toBe(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE);
+    expect(screen.getByTestId("post-grow-sensor-provenance-legend-review-note").textContent).toBe(
+      POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE,
+    );
   });
 });
 
@@ -579,9 +630,7 @@ describe("EnvironmentStabilityCard — What do these badges mean? control", () =
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(toggle.getAttribute("aria-controls")).toBeTruthy();
     // Legend is not rendered until opened.
-    expect(
-      screen.queryByTestId("post-grow-sensor-provenance-legend"),
-    ).toBeNull();
+    expect(screen.queryByTestId("post-grow-sensor-provenance-legend")).toBeNull();
   });
 
   it("opens the in-app legend on click and updates aria-expanded", () => {
@@ -601,19 +650,17 @@ describe("EnvironmentStabilityCard — What do these badges mean? control", () =
       ).toBeTruthy();
     }
     // Manual-review note visible.
-    expect(
-      screen.getByTestId("post-grow-sensor-provenance-legend-review-note")
-        .textContent,
-    ).toBe(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE);
+    expect(screen.getByTestId("post-grow-sensor-provenance-legend-review-note").textContent).toBe(
+      POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE,
+    );
   });
 });
 
 describe("PDF export — no demo fallback when no sensor snapshots exist (regression)", () => {
   it("never fabricates demo readings or sensor rows when the report has no sensor data", () => {
-    const model = buildPostGrowReportPdfModel(
-      baseVm({ environment: [] }),
-      { now: NOW /* no sensorReadingSources provided */ },
-    );
+    const model = buildPostGrowReportPdfModel(baseVm({ environment: [] }), {
+      now: NOW /* no sensorReadingSources provided */,
+    });
     // No environment metric rows and no sensor source rows are fabricated.
     expect(model.environment).toEqual([]);
     expect(model.sensorSources).toEqual([]);
@@ -653,9 +700,7 @@ describe("PDF export — no demo fallback when no sensor snapshots exist (regres
 describe("SensorProvenanceLegend — mobile layout polish", () => {
   it("uses responsive stacked-on-mobile classes and no truncation on rows or labels", () => {
     render(<SensorProvenanceLegend />);
-    const rowsContainer = screen.getByTestId(
-      "post-grow-sensor-provenance-legend-rows",
-    );
+    const rowsContainer = screen.getByTestId("post-grow-sensor-provenance-legend-rows");
     const rowEls = rowsContainer.querySelectorAll(
       '[data-testid^="post-grow-sensor-provenance-legend-row-"]',
     );
@@ -668,9 +713,7 @@ describe("SensorProvenanceLegend — mobile layout polish", () => {
       expect(el.className).toMatch(/sm:flex-row/);
     }
     for (const row of POST_GROW_SENSOR_PROVENANCE_LEGEND) {
-      const badge = screen.getByTestId(
-        `post-grow-sensor-provenance-legend-badge-${row.kind}`,
-      );
+      const badge = screen.getByTestId(`post-grow-sensor-provenance-legend-badge-${row.kind}`);
       expect(badge.className).not.toMatch(/\btruncate\b/);
       expect(badge.className).not.toMatch(/\bwhitespace-nowrap\b/);
       expect(badge.textContent).toBe(row.label);
@@ -678,18 +721,15 @@ describe("SensorProvenanceLegend — mobile layout polish", () => {
       expect(badge.getAttribute("tabindex")).toBe("0");
       expect(badge.className).toMatch(/focus-visible:ring/);
     }
-    expect(
-      screen.getByTestId("post-grow-sensor-provenance-legend-review-note")
-        .textContent,
-    ).toBe(POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE);
+    expect(screen.getByTestId("post-grow-sensor-provenance-legend-review-note").textContent).toBe(
+      POST_GROW_SENSOR_PROVENANCE_REVIEW_NOTE,
+    );
   });
 });
 
 describe("PDF export — provenance anchor navigation", () => {
   function html(): string {
-    return buildPostGrowReportPdfHtml(
-      buildPostGrowReportPdfModel(baseVm(), { now: NOW }),
-    );
+    return buildPostGrowReportPdfHtml(buildPostGrowReportPdfModel(baseVm(), { now: NOW }));
   }
 
   it("gives the legend section a stable id anchor target", () => {
@@ -698,9 +738,7 @@ describe("PDF export — provenance anchor navigation", () => {
 
   it("renders a visible 'Back to provenance legend' anchor near Environment Stability", () => {
     const out = html();
-    expect(out).toMatch(
-      /href="#sensor-provenance-legend"[^>]*>Back to provenance legend<\/a>/,
-    );
+    expect(out).toMatch(/href="#sensor-provenance-legend"[^>]*>Back to provenance legend<\/a>/);
     const anchorIdx = out.indexOf("Back to provenance legend");
     const legendIdx = out.indexOf('id="sensor-provenance-legend"');
     expect(anchorIdx).toBeGreaterThan(-1);
@@ -715,5 +753,3 @@ describe("PDF export — provenance anchor navigation", () => {
     expect(snippet).not.toMatch(/<script/i);
   });
 });
-
-

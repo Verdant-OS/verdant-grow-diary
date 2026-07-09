@@ -312,6 +312,12 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     // safety GUARANTEE rendered into the printed report — there is no
     // network, RPC, automation, or device-control surface in this file.
     const POST_GROW_REPORT_PRINT_RULES_PATH = resolve(ROOT, "src/lib/postGrowReportPrintRules.ts");
+    // Also allow-list (EXACT FILE PATH ONLY): postGrowPdfExport.ts is the
+    // PDF twin of postGrowReportPrintRules.ts — a pure HTML builder whose
+    // copy carries the same grower-facing reassurance "Verdant does not
+    // auto-execute." No network, RPC, automation, or device-control
+    // surface exists in this file.
+    const POST_GROW_PDF_EXPORT_PATH = resolve(ROOT, "src/lib/postGrowPdfExport.ts");
     // Also allow-list (EXACT FILE PATH ONLY): verdantSeoCopy.ts carries the
     // VERDANT_FORBIDDEN_PUBLIC_PHRASES denylist — "autopilot" etc. appear
     // there ONLY as forbidden examples that the SEO safety tests assert
@@ -322,6 +328,7 @@ describe("Action Queue safety — current posture (suggest-only by construction)
     const ALLOWED_AUTO_EXECUTE_PATHS = new Set([
       POST_GROW_REFLECTION_PROMPT_PATH,
       POST_GROW_REPORT_PRINT_RULES_PATH,
+      POST_GROW_PDF_EXPORT_PATH,
       VERDANT_SEO_COPY_PATH,
     ]);
     for (const re of [
@@ -432,6 +439,36 @@ describe("Action Queue safety — current posture (suggest-only by construction)
       /raw_payload/i,
     ]) {
       expect(src, `SEO copy file must not contain: ${re}`).not.toMatch(re);
+    }
+  });
+
+  it("2e. allow-listed PDF export file confines auto-execute tokens to the negated safety reassurance", () => {
+    const PDF_EXPORT_PATH = resolve(ROOT, "src/lib/postGrowPdfExport.ts");
+    const src = readFileSync(PDF_EXPORT_PATH, "utf8");
+
+    // Every auto-execute occurrence must be the grower-facing guarantee
+    // ("does not auto-execute") — negated, never an executable path.
+    const hits = [...src.matchAll(/auto[-_ ]?execute/gi)];
+    expect(hits.length).toBeGreaterThan(0);
+    for (const m of hits) {
+      const before = src.slice(Math.max(0, m.index! - 30), m.index!);
+      expect(
+        /\bnot\s+$/i.test(before) || /\bnever\s+$/i.test(before),
+        `auto-execute at ${m.index} is not negated reassurance: …${before}[${m[0]}]`,
+      ).toBe(true);
+    }
+
+    // Pure HTML builder only — no runtime danger surface may appear here.
+    for (const re of [
+      /\.rpc\(/i,
+      /service_role/i,
+      /\bmqtt\.connect\b/i,
+      /\bmqtt:\/\//i,
+      /supabase\s*\.\s*from\(/i,
+      /\bfetch\(/i,
+      /device_command/i,
+    ]) {
+      expect(src, `PDF export file must not contain: ${re}`).not.toMatch(re);
     }
   });
 });

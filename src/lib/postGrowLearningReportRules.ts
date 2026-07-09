@@ -95,6 +95,13 @@ export interface PostGrowLearningReportViewModel {
   executiveSummary: string[];
   dataCompleteness: DataCompletenessView;
   environment: MetricAggregateView[];
+  /**
+   * Raw `source` labels of every sensor reading that fed this report.
+   * Carried so the in-app provenance badges and the PDF source summary
+   * render from the same truth. Labels are normalized downstream by
+   * `normalizeReportSensorSource` — never trusted verbatim for display.
+   */
+  sensorReadingSources: Array<{ source: string | null }>;
   postHarvest: {
     yieldGrams: number | null;
     points: PostHarvestPoint[];
@@ -206,7 +213,9 @@ function buildPostHarvestPoints(diaries: PostGrowDiaryLike[]): PostHarvestPoint[
   return diaries
     .filter((d) => {
       const eventType = readEventType(d.details).toLowerCase();
-      return eventType.includes("dry") || eventType.includes("cure") || eventType.includes("harvest");
+      return (
+        eventType.includes("dry") || eventType.includes("cure") || eventType.includes("harvest")
+      );
     })
     .map((d, index) => ({
       label: `Checkpoint ${index + 1}`,
@@ -219,7 +228,12 @@ function buildPostHarvestPoints(diaries: PostGrowDiaryLike[]): PostHarvestPoint[
         "wet_weight_grams",
         "wet_weight_g",
       ]),
-      rhPct: readNumberFromDetails(d.details, ["rh_pct", "humidity_pct", "jar_rh_pct", "room_rh_pct"]),
+      rhPct: readNumberFromDetails(d.details, [
+        "rh_pct",
+        "humidity_pct",
+        "jar_rh_pct",
+        "room_rh_pct",
+      ]),
     }))
     .sort((a, b) => Date.parse(a.capturedAt) - Date.parse(b.capturedAt));
 }
@@ -253,7 +267,9 @@ function findLatestLesson(diaries: PostGrowDiaryLike[]): { entryId: string | nul
   const matches = diaries
     .filter((d) => readEventType(d.details) === POST_GROW_LESSON_EVENT_TYPE)
     .sort((a, b) => Date.parse(b.entry_at) - Date.parse(a.entry_at));
-  return matches[0] ? { entryId: matches[0].id, text: matches[0].note ?? "" } : { entryId: null, text: "" };
+  return matches[0]
+    ? { entryId: matches[0].id, text: matches[0].note ?? "" }
+    : { entryId: null, text: "" };
 }
 
 function buildExecutiveSummary(input: {
@@ -271,10 +287,14 @@ function buildExecutiveSummary(input: {
     lines.push(`Final recorded yield: ${formatNumber(input.harvest.yield_grams, 1)} g.`);
   }
   if (vpd?.avg != null) {
-    lines.push(`Average recorded VPD: ${formatNumber(vpd.avg, 2)} kPa across ${vpd.count} readings.`);
+    lines.push(
+      `Average recorded VPD: ${formatNumber(vpd.avg, 2)} kPa across ${vpd.count} readings.`,
+    );
   }
   if (input.points.length > 0) {
-    lines.push(`${input.points.length} dry/cure checkpoint${input.points.length === 1 ? "" : "s"} found.`);
+    lines.push(
+      `${input.points.length} dry/cure checkpoint${input.points.length === 1 ? "" : "s"} found.`,
+    );
   }
   lines.push("Use this report as plant memory, not as proof that one action caused the result.");
   return lines;
@@ -291,9 +311,10 @@ export function buildPostGrowLearningReportViewModel(input: {
   const diaries = input.diaryEntries ?? [];
   const sensorReadings = input.sensorReadings ?? [];
   const actions = input.actions ?? [];
-  const latestHarvest = [...harvests].sort(
-    (a, b) => Date.parse(b.harvested_at ?? "") - Date.parse(a.harvested_at ?? ""),
-  )[0] ?? null;
+  const latestHarvest =
+    [...harvests].sort(
+      (a, b) => Date.parse(b.harvested_at ?? "") - Date.parse(a.harvested_at ?? ""),
+    )[0] ?? null;
   const stage = input.grow.stage ?? "unknown";
   const archived = input.grow.is_archived === true;
   const eligible = archived || stage === "harvest" || stage === "drying";
@@ -320,14 +341,13 @@ export function buildPostGrowLearningReportViewModel(input: {
   const weighted = points.filter((p) => p.weightGrams !== null);
   const firstWeight = weighted[0]?.weightGrams ?? null;
   const lastWeight = weighted[weighted.length - 1]?.weightGrams ?? null;
-  const weightLossPct = firstWeight && lastWeight !== null && firstWeight > 0
-    ? ((firstWeight - lastWeight) / firstWeight) * 100
-    : null;
+  const weightLossPct =
+    firstWeight && lastWeight !== null && firstWeight > 0
+      ? ((firstWeight - lastWeight) / firstWeight) * 100
+      : null;
   const rhValues = points.map((p) => p.rhPct).filter((v): v is number => v !== null);
   const lastRh = rhValues.slice(-3);
-  const rhStabilized = lastRh.length >= 3
-    ? Math.max(...lastRh) - Math.min(...lastRh) <= 3
-    : null;
+  const rhStabilized = lastRh.length >= 3 ? Math.max(...lastRh) - Math.min(...lastRh) <= 3 : null;
   const completedActions = actions.filter((a) => a.status === "completed");
   const outcomeNotes = diaries.filter((d) => readEventType(d.details) === "action_outcome").length;
   const observations = [
@@ -361,6 +381,7 @@ export function buildPostGrowLearningReportViewModel(input: {
     }),
     dataCompleteness: completeness,
     environment,
+    sensorReadingSources: sensorReadings.map((r) => ({ source: r.source ?? null })),
     postHarvest: {
       yieldGrams: latestHarvest?.yield_grams ?? null,
       points,
@@ -396,7 +417,8 @@ export function buildPostGrowLessonActionQueueDraft(input: {
     suggested_change: lesson
       ? `Review this lesson before planning the next grow: ${lesson}`
       : "Review post-grow lessons before planning the next grow.",
-    reason: "Created from the Post-Grow Learning Report. Grower approval required before any action is taken.",
+    reason:
+      "Created from the Post-Grow Learning Report. Grower approval required before any action is taken.",
     risk_level: "low",
     source: "manual",
     status: "pending_approval",

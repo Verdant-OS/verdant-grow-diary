@@ -18,17 +18,14 @@ import type {
   PostGrowLearningReportViewModel,
 } from "./postGrowLearningReportRules";
 
-export const PRINT_HELPER_COPY =
-  "Use your browser print dialog to save this report as PDF.";
-export const PRINT_UNAVAILABLE_COPY =
-  "Print export is unavailable in this environment.";
+export const PRINT_HELPER_COPY = "Use your browser print dialog to save this report as PDF.";
+export const PRINT_UNAVAILABLE_COPY = "Print export is unavailable in this environment.";
 export const PRINT_READ_ONLY_NOTE = "Read-only report.";
 export const PRINT_DATA_SOURCE_NOTE =
   "Data sources are shown as logged. Missing data is treated as missing, not healthy.";
 export const PRINT_SAFETY_NOTE =
   "Verdant suggestions remain grower-approved. This report does not include device commands.";
-export const PRINT_EMPTY_SECTION_COPY =
-  "Not enough evidence to summarize this section.";
+export const PRINT_EMPTY_SECTION_COPY = "Not enough evidence to summarize this section.";
 export const PRINT_NO_DATA_COPY = "No logged data yet.";
 
 /**
@@ -185,7 +182,11 @@ export function openPostGrowReportPrintWindow(
   if (!win || typeof win.open !== "function") return "unavailable";
   let popup: Window | null = null;
   try {
-    popup = win.open("", "_blank", "noopener,noreferrer");
+    // No "noopener"/"noreferrer" features here: per spec they make
+    // window.open return null, which broke printing in real browsers. The
+    // popup is a same-origin about:blank document we document.write
+    // ourselves, so there is no cross-origin opener risk to sever.
+    popup = win.open("", "_blank");
   } catch {
     return "unavailable";
   }

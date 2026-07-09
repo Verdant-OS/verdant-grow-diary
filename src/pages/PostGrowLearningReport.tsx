@@ -98,7 +98,9 @@ export default function PostGrowLearningReport() {
         <EmptyState
           icon={<Leaf className="h-6 w-6" />}
           title="Post-grow report not ready"
-          description={report.ineligibleReason ?? "Archive or complete this grow before generating a report."}
+          description={
+            report.ineligibleReason ?? "Archive or complete this grow before generating a report."
+          }
         />
       </div>
     );
@@ -144,7 +146,10 @@ export default function PostGrowLearningReport() {
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        <EnvironmentStabilityCard metrics={report.environment} />
+        <EnvironmentStabilityCard
+          metrics={report.environment}
+          sensorSourceKinds={report.sensorReadingSources.map((r) => r.source)}
+        />
         <PostHarvestPerformanceCard vm={report} />
         <ActionEffectivenessCard vm={report} />
         <LessonsCard

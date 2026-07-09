@@ -264,3 +264,44 @@ export async function deletePhenoHunt(
 
   return { huntId, untaggedPlantIds: linkedIds };
 }
+
+export interface UpdatePhenoHuntSetupInput {
+  huntId: string;
+  /** New evidence-goal id list (sanitized before write). */
+  evidenceGoals?: readonly string[];
+  /** Freeform hunt notes (nullable to clear). */
+  notes?: string | null;
+  /** When true, stamps setup_completed_at=now(). When false, clears it. */
+  markSetupComplete?: boolean;
+}
+
+/**
+ * Update the onboarding-only fields on an existing hunt. Owner-only via RLS
+ * (Users update own pheno_hunts) plus the RESTRICTIVE Pro entitlement policy.
+ * Never touches candidate plants, keeper decisions, scores, or lab data.
+ */
+export async function updatePhenoHuntSetup(
+  input: UpdatePhenoHuntSetupInput,
+  client: SupabaseClient = defaultClient,
+): Promise<void> {
+  if (!input.huntId) throw new PhenoHuntError("Hunt id is required.");
+  const patch: Record<string, unknown> = {};
+  if (input.evidenceGoals !== undefined) {
+    patch.evidence_goals = sanitizeEvidenceGoals(input.evidenceGoals);
+  }
+  if (input.notes !== undefined) {
+    const t = typeof input.notes === "string" ? input.notes.trim() : "";
+    patch.notes = t.length > 0 ? t.slice(0, 4000) : null;
+  }
+  if (input.markSetupComplete === true) {
+    patch.setup_completed_at = new Date().toISOString();
+  } else if (input.markSetupComplete === false) {
+    patch.setup_completed_at = null;
+  }
+  if (Object.keys(patch).length === 0) return;
+  const { error } = await client
+    .from("pheno_hunts")
+    .update(patch as never)
+    .eq("id", input.huntId);
+  if (error) throw new PhenoHuntError(`Could not update hunt setup: ${error.message}`, error);
+}

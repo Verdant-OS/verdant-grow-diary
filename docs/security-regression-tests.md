@@ -62,12 +62,25 @@ supabase db reset
 export SUPABASE_URL=http://127.0.0.1:54321
 export SUPABASE_ANON_KEY=...          # from `supabase status`
 export SUPABASE_SERVICE_ROLE_KEY=...  # local only; NEVER production
+# optional: export SUPABASE_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
 bun run test:pi-ingest-db-security
 bun run test:storage-db-security
 bun run test:profiles-db-security
 bun run test:security-db-local
 ```
+
+### Opt-in CI
+
+The `Security DB Local` GitHub workflow only runs the harnesses when
+explicitly enabled. Either:
+
+- Trigger via **Actions → Security DB Local → Run workflow** with the
+  `run_db_security` input set to `true`, or
+- Set the repository variable `ENABLE_DB_SECURITY_LANE` to `'true'`.
+
+Without one of those, the job checks out nothing, boots nothing, and
+writes a skip notice to the run summary. It is never a required check.
 
 ### Blocked behavior
 

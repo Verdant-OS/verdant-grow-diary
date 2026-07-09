@@ -163,7 +163,7 @@ export default function ManualSensorReadingCard({
 
   // Structured pre-save review (source: "manual", never live). Renders inside
   // the review prompt so the grower sees findings + normalized preview before
-  // confirming. Blockers here also disable "Save anyway".
+  // confirming. Blockers here also disable the Confirm button.
   const snapshotReview = useMemo(() => {
     return reviewManualSensorSnapshot({
       tempF: form.airTempF,
@@ -343,14 +343,16 @@ export default function ManualSensorReadingCard({
       toast.error(validation.errors[0] ?? "Reading is invalid.");
       return;
     }
-    // Suspicious values → show review prompt instead of saving immediately.
-    // Normal readings (no advisor warnings) save exactly as before.
-    if (advisor.warnings.length > 0 && !reviewOpen) {
+    // Every manual snapshot must go through the review gate before insert.
+    // Normal, warning, and blocker cases all open the review panel; only
+    // confirming from within the panel actually calls the insert path.
+    if (!reviewOpen) {
       setReviewOpen(true);
       return;
     }
     await doSave();
   }
+
 
   const tentSetupRequired = shouldRequireFirstTentSetup(
     tents.map((t) => ({ id: t.id, is_archived: false })),
@@ -654,57 +656,74 @@ export default function ManualSensorReadingCard({
               </ul>
             )}
 
-            {reviewOpen && advisor.warnings.length > 0 && (
-              <div
-                className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 space-y-2"
-                data-testid="manual-reading-review-prompt"
-                role="alertdialog"
-                aria-label="Review suspicious readings before saving"
-              >
-                <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                  Double-check these readings before saving.
-                </p>
-                <ul className="space-y-1">
-                  {advisor.warnings.map((w, i) => (
-                    <li
-                      key={`rev-${i}`}
-                      className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300"
-                    >
-                      <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                      <span>{w}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div data-testid="manual-reading-review-panel-slot">
+            {reviewOpen && (() => {
+              const hasBlocker = !snapshotReview.canSave;
+              const hasWarning =
+                !hasBlocker &&
+                (advisor.warnings.length > 0 ||
+                  snapshotReview.findings.some((f) => f.severity === "warning"));
+              const gateMessage = hasBlocker
+                ? "Resolve blockers before saving this snapshot."
+                : hasWarning
+                  ? "Review warnings before saving."
+                  : "Confirm to save this manual snapshot to plant history.";
+              return (
+                <div
+                  className="rounded-md border border-border/60 bg-muted/30 p-3 space-y-3"
+                  data-testid="manual-reading-review-prompt"
+                  role="alertdialog"
+                  aria-label="Review manual snapshot before saving"
+                  aria-describedby="manual-sensor-review-gate"
+                >
                   <ManualSensorSnapshotReviewPanel result={snapshotReview} />
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setReviewOpen(false)}
-                    data-testid="manual-reading-review-edit"
+                  <p
+                    id="manual-sensor-review-gate"
+                    data-testid="manual-sensor-review-gate"
+                    data-state={
+                      hasBlocker ? "blocker" : hasWarning ? "warning" : "ok"
+                    }
+                    className="text-xs font-medium"
                   >
-                    Edit readings
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={doSave}
-                    disabled={insert.isPending || !snapshotReview.canSave}
-                    data-testid="manual-reading-review-save-anyway"
-                  >
-                    {insert.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Saving
-                      </>
-                    ) : (
-                      "Save anyway"
-                    )}
-                  </Button>
+                    {gateMessage}
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setReviewOpen(false)}
+                      data-testid="manual-sensor-review-cancel"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReviewOpen(false)}
+                      data-testid="manual-sensor-review-back"
+                    >
+                      Back to edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={doSave}
+                      disabled={insert.isPending || hasBlocker}
+                      data-testid="manual-sensor-review-confirm"
+                    >
+                      {insert.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Saving
+                        </>
+                      ) : (
+                        "Confirm manual snapshot"
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
+
+
 
             <section
               className="rounded-md border border-border/50 bg-muted/30 p-3 space-y-2"

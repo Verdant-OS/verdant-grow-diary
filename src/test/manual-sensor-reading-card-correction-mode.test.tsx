@@ -97,6 +97,7 @@ describe("ManualSensorReadingCard — correction mode", () => {
     // Change only humidity from 58 → 62. Air temp stays at prefill 75.2°F ≈ 24°C.
     fireEvent.change(getByLabelText(/Humidity/i), { target: { value: "62" } });
     fireEvent.click(getByTestId("manual-reading-save"));
+    fireEvent.click(getByTestId("manual-sensor-review-confirm"));
 
     await waitFor(() => expect(returningId).toHaveBeenCalled());
     // Replacement inserts: one for temp_c (unchanged but still routed
@@ -126,6 +127,7 @@ describe("ManualSensorReadingCard — correction mode", () => {
     fireEvent.change(getByLabelText(/Air temp/i), { target: { value: "78" } }); // was ~75.2
     fireEvent.change(getByLabelText(/Humidity/i), { target: { value: "62" } });
     fireEvent.click(getByTestId("manual-reading-save"));
+    fireEvent.click(getByTestId("manual-sensor-review-confirm"));
 
     await waitFor(() => expect(editMutate).toHaveBeenCalledTimes(2));
     for (const call of editMutate.mock.calls) {
@@ -156,6 +158,7 @@ describe("ManualSensorReadingCard — correction mode", () => {
     // Change temp so an audit is created for it.
     fireEvent.change(getByLabelText(/Air temp/i), { target: { value: "78" } });
     fireEvent.click(getByTestId("manual-reading-save"));
+    fireEvent.click(getByTestId("manual-sensor-review-confirm"));
 
     await waitFor(() => expect(editMutate).toHaveBeenCalledTimes(1));
     // Standard insert path was called for humidity (no origId).
@@ -176,6 +179,7 @@ describe("ManualSensorReadingCard — correction mode", () => {
     fireEvent.change(getByLabelText(/Humidity/i), { target: { value: "62" } });
     fireEvent.change(getByLabelText(/Air temp/i), { target: { value: "78" } });
     fireEvent.click(getByTestId("manual-reading-save"));
+    fireEvent.click(getByTestId("manual-sensor-review-confirm"));
 
     await waitFor(() => expect(returningId).toHaveBeenCalled());
     // No audit rows because save aborted on the first failure — critically,

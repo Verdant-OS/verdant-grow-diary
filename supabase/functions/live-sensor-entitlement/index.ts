@@ -147,9 +147,8 @@ Deno.serve(async (req) => {
     return json(401, { ok: false, reason: "not_authenticated" });
   }
 
-  const expectedBillingEnvironment = pickExpectedBillingEnvironment(
-    (raw as Record<string, unknown> | null)?.billing_env,
-  );
+  // Server-authoritative: NEVER trust client-supplied billing_env.
+  const expectedBillingEnvironment = resolveServerBillingEnvironment();
   const { entitlement, lookupFailed } = await loadUnionEntitlement(
     supabase,
     expectedBillingEnvironment,

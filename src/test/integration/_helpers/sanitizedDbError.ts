@@ -83,13 +83,14 @@ export const FORBIDDEN_LEAK_PATTERNS: ReadonlyArray<RegExp> = [
  * separately). Uses only string fields from the error shape — never logs
  * or serializes the raw object outside vitest's assertion messages.
  */
-export function expectSanitizedDbError(err: unknown): void {
-  if (err == null) return;
-  // Lazy import so this module stays usable in non-vitest contexts.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { expect } = require("vitest") as { expect: (v: unknown, m?: string) => { not: { toMatch: (rx: RegExp) => void } } };
+/**
+ * Compose the shape buffer scanned for leaks. Exported for direct unit
+ * testing without needing vitest's `expect` inside the helper.
+ */
+export function composeDbErrorShape(err: unknown): string {
+  if (err == null) return "";
   const obj = err as Record<string, unknown>;
-  const parts = [
+  return [
     obj.message,
     obj.details,
     obj.hint,
@@ -98,7 +99,24 @@ export function expectSanitizedDbError(err: unknown): void {
   ]
     .filter((v) => typeof v === "string")
     .join("\n");
+}
+
+/**
+ * Returns the first forbidden pattern that matches, or null if the error
+ * shape is sanitized. Pure — no vitest dependency.
+ */
+export function findDbErrorLeak(err: unknown): RegExp | null {
+  const parts = composeDbErrorShape(err);
+  if (!parts) return null;
   for (const rx of FORBIDDEN_LEAK_PATTERNS) {
-    expect(parts, `leaked pattern ${rx}`).not.toMatch(rx);
+    if (rx.test(parts)) return rx;
+  }
+  return null;
+}
+
+export function expectSanitizedDbError(err: unknown): void {
+  const leak = findDbErrorLeak(err);
+  if (leak) {
+    throw new Error(`DB error leaked forbidden pattern ${leak}`);
   }
 }

@@ -1521,7 +1521,7 @@ export default function Dashboard() {
           Select a grow to see scoped activity.
         </p>
       )}
-    </div>
+    </main>
   );
 }
 

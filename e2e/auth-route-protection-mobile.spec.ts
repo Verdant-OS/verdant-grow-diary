@@ -85,6 +85,9 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/upgrade",
   "/checkout/success",
   "/checkout/cancel",
+  "/terms",
+  "/privacy",
+  "/refund",
 ];
 
 // Internal fixture-only demo surfaces DELIBERATELY mounted OUTSIDE AppShell

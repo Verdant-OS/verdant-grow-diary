@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import LegalFooterLinks from "@/components/LegalFooterLinks";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
@@ -180,6 +181,7 @@ export default function HardwareIntegrations() {
             verdantgrowdiary.com
           </a>
         </p>
+        <LegalFooterLinks className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground" />
       </footer>
     </main>
   );

@@ -25,7 +25,11 @@ import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
  *   - Does not attach stale/non-usable snapshots.
  */
 const PLANT_URL = process.env.E2E_GROW_1_PLANT_URL;
-const TARGET_NAME = process.env.E2E_GROW_2_PLANT_NAME ?? "505 Headbanger";
+// `??` alone is not enough: an unset GitHub Actions var referenced via
+// `env:` arrives as an EMPTY STRING (not undefined), which would produce an
+// empty regex that strict-mode-matches every option in the plant select.
+const TARGET_NAME =
+  process.env.E2E_GROW_2_PLANT_NAME?.trim() || "505 Headbanger";
 
 const RESULTS_DIR = path.resolve(process.cwd(), "e2e/results");
 const REPORT_JSON = path.join(RESULTS_DIR, "quicklog-smoke-report.json");

@@ -137,13 +137,13 @@ describe("ManualSensorReadingCard — mandatory review gate", () => {
     expect(screen.getByTestId("manual-reading-review-prompt")).toBeInTheDocument();
   });
 
-  it("Cancel closes the gate without saving", () => {
+  it("Cancel button is no longer rendered (Back to edit is the only close action)", () => {
     renderCard();
     setField(/Air temp/i, "76");
     setField(/Humidity/i, "55");
     fireEvent.click(screen.getByTestId("manual-reading-save"));
-    fireEvent.click(screen.getByTestId("manual-sensor-review-cancel"));
-    expect(screen.queryByTestId("manual-reading-review-prompt")).toBeNull();
+    expect(screen.queryByTestId("manual-sensor-review-cancel")).toBeNull();
+    expect(screen.getByTestId("manual-sensor-review-back")).toBeInTheDocument();
     expect(insertSpy).not.toHaveBeenCalled();
   });
 

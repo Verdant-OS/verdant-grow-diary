@@ -13,6 +13,7 @@ import {
   type GlossaryCategory,
   type GlossaryTerm,
 } from "@/constants/glossaryTerms";
+import { usePageSeo } from "@/hooks/usePageSeo";
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
@@ -26,6 +27,12 @@ function slugFor(letter: string): string {
 }
 
 export default function Glossary() {
+  usePageSeo({
+    title: "Cannabis Cultivation Glossary | Verdant Grow Diary",
+    description:
+      "Alphabetized reference of cannabis breeding, cultivation, and phenotype terms — searchable and category-filterable for serious growers.",
+    path: "/glossary",
+  });
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<GlossaryCategory | "All">("All");
 

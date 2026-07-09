@@ -69,6 +69,12 @@ export default function HardwareIntegrations() {
         </div>
       </section>
 
+      <section className="px-6 pt-2 max-w-5xl mx-auto text-center">
+        <h2 className="font-display text-2xl md:text-3xl font-semibold">
+          Integration benefits
+        </h2>
+      </section>
+
       <section className="px-6 py-10 max-w-5xl mx-auto grid gap-6 md:grid-cols-2">
         <Card title="Why hardware integrations matter">
           Sensors, controllers, and cameras already produce the ground truth of a grow. When Verdant

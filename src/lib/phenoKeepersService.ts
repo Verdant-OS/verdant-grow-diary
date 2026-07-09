@@ -146,7 +146,12 @@ export async function listClonesForKeepers(keeperIds: readonly string[]): Promis
   const { data, error } = await phenoDb
     .from("pheno_keeper_clones")
     .select("id, keeper_id, parent_clone_id, clone_label, note, taken_at")
-    .in("keeper_id", ids);
+    .in("keeper_id", ids)
+    // Deterministic order + explicit bound: clones accumulate indefinitely
+    // per keeper, and an uncapped read is silently truncated at the server's
+    // configured ceiling in whatever order Postgres returns.
+    .order("taken_at", { ascending: true })
+    .limit(2000);
   if (error || !data) return [];
   return data.map((r) => ({
     id: r.id,
@@ -322,7 +327,10 @@ export async function listCrossesForHunt(huntId: string): Promise<CrossRow[]> {
       "id, female_keeper_id, male_keeper_id, cross_type, channel, generation, recurrent_parent_id, cross_name, note, crossed_at, created_at",
     )
     .eq("hunt_id", id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    // Newest 500 crosses: breeding history is append-only and unbounded over
+    // seasons; the page labels the list when the cap is reached.
+    .limit(500);
   if (error || !data) return [];
   return data.map((r) => ({
     id: r.id,

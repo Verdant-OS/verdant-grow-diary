@@ -94,17 +94,26 @@ export async function upsertScoreRound(input: {
 }
 
 /**
- * Load all round cards for a hunt, keyed "plantId:round". RLS-scoped read.
+ * Load round cards for a hunt, keyed "plantId:round". RLS-scoped read.
+ *
+ * Pass `round` to fetch a single round's cards — the workspace shows one
+ * round at a time, and all-rounds-at-once is candidates × 5 rows (1,500 at
+ * 300 candidates), enough to cross PostgREST's silent default row ceiling.
+ * The explicit limit turns any residual truncation deterministic instead of
+ * server-configuration-dependent.
  */
 export async function listScoreRoundsForHunt(
   huntId: string,
+  round?: PhenoScoreRound,
 ): Promise<Record<string, ScoreRoundRow>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
-  const { data, error } = await phenoDb
+  let query = phenoDb
     .from("pheno_score_rounds")
     .select("plant_id, round, traits, loud_traits, aroma_descriptors, nose_note, note, observed_at")
     .eq("hunt_id", id);
+  if (round && isPhenoScoreRound(round)) query = query.eq("round", round);
+  const { data, error } = await query.limit(1000);
   if (error || !data) return {};
   const map: Record<string, ScoreRoundRow> = {};
   for (const row of data) {

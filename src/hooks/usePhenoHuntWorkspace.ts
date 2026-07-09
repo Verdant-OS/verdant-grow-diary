@@ -4,7 +4,7 @@
  * but suggest-only: saving a score or decision persists the grower's own data
  * and acts on nothing. No AI, no Action Queue, no automation.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { loadPhenoHuntCandidates, type PhenoHuntSummary } from "@/lib/phenoHuntCandidatesService";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
 import { listKeepersForHunt } from "@/lib/phenoKeepersService";
@@ -27,7 +27,7 @@ import {
 } from "@/lib/phenoScoreRoundsService";
 import {
   appendKeeperDecision,
-  listKeeperDecisionHistoryForHunt,
+  listKeeperDecisionHistoryForPlant,
   type KeeperDecisionLogEntry,
 } from "@/lib/phenoKeeperDecisionLogService";
 import {
@@ -58,10 +58,18 @@ export interface UsePhenoHuntWorkspaceState {
   candidates: PhenoCandidateInput[];
   scoresByPlant: Record<string, CandidateScoreRow>;
   decisionsByPlant: Record<string, KeeperDecisionRow>;
-  /** Per-round cards keyed "plantId:round". */
+  /** Per-round cards keyed "plantId:round", loaded on demand via loadRound. */
   roundsByKey: Record<string, ScoreRoundRow>;
-  /** Append-only decision history keyed by plant id, newest first. */
+  /**
+   * Append-only decision history keyed by plant id, newest first. Populated
+   * on demand per candidate via loadDecisionHistory (a hunt-wide fetch is
+   * unbounded at commercial scale) plus optimistic appends after saves.
+   */
   decisionHistoryByPlant: Record<string, KeeperDecisionLogEntry[]>;
+  /** Fetch one candidate's decision history on demand (idempotent per plant). */
+  loadDecisionHistory: (plantId: string) => Promise<void>;
+  /** Fetch one scoring round's cards on demand (idempotent per round). */
+  loadRound: (round: PhenoScoreRound) => Promise<void>;
   /** Latest recorded sex observation per plant. */
   sexByPlant: Record<string, SexObservationRow>;
   /**
@@ -138,6 +146,10 @@ export function usePhenoHuntWorkspace(
   const [labByKey, setLabByKey] = useState<Record<string, LabResultRow>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  // On-demand fetch guards: which plants' histories / which rounds are loaded
+  // (or in flight). Reset when the hunt changes.
+  const historyLoadedRef = useRef<Set<string>>(new Set());
+  const roundsLoadedRef = useRef<Set<PhenoScoreRound>>(new Set());
 
   useEffect(() => {
     if (!id) {
@@ -147,6 +159,10 @@ export function usePhenoHuntWorkspace(
     let cancelled = false;
     setStatus("loading");
     setError(null);
+    historyLoadedRef.current = new Set();
+    roundsLoadedRef.current = new Set();
+    setDecisionHistoryByPlant({});
+    setRoundsByKey({});
     (async () => {
       const result = await loadPhenoHuntCandidates(id);
       if (cancelled) return;
@@ -155,11 +171,12 @@ export function usePhenoHuntWorkspace(
         setStatus("error");
         return;
       }
-      const [scores, decisions, rounds, history, sexes, smokes, labs, keepers] = await Promise.all([
+      // Decision history and round cards are NOT fetched here: both grow with
+      // candidates × time and are only viewed one candidate / one round at a
+      // time — loadDecisionHistory / loadRound fetch them on demand.
+      const [scores, decisions, sexes, smokes, labs, keepers] = await Promise.all([
         listCandidateScoresForHunt(id),
         listKeeperDecisionsForHunt(id),
-        listScoreRoundsForHunt(id),
-        listKeeperDecisionHistoryForHunt(id),
         listLatestSexObservationsForHunt(id),
         listSmokeTestsForHunt(id),
         listLabResultsForHunt(id),
@@ -184,8 +201,6 @@ export function usePhenoHuntWorkspace(
       setCandidates([...result.candidates]);
       setScoresByPlant(scores);
       setDecisionsByPlant(decisions);
-      setRoundsByKey(rounds);
-      setDecisionHistoryByPlant(history);
       setSexByPlant(sexes);
       setReversedPlantIds(reversedPlants);
       setSmokeByPlant(smokes);
@@ -200,6 +215,32 @@ export function usePhenoHuntWorkspace(
       cancelled = true;
     };
   }, [id]);
+
+  const loadDecisionHistory = useCallback(
+    async (plantId: string) => {
+      if (!id || !plantId || historyLoadedRef.current.has(plantId)) return;
+      historyLoadedRef.current.add(plantId);
+      const entries = await listKeeperDecisionHistoryForPlant(id, plantId);
+      // Optimistic entries appended by saves while the fetch was in flight
+      // are a subset of what the server returns (the save wrote them), so the
+      // fetched list is authoritative — but keep any existing entries when the
+      // fetch returned nothing (offline / error path returns []).
+      setDecisionHistoryByPlant((prev) =>
+        entries.length > 0 ? { ...prev, [plantId]: entries } : prev,
+      );
+    },
+    [id],
+  );
+
+  const loadRound = useCallback(
+    async (round: PhenoScoreRound) => {
+      if (!id || roundsLoadedRef.current.has(round)) return;
+      roundsLoadedRef.current.add(round);
+      const cards = await listScoreRoundsForHunt(id, round);
+      setRoundsByKey((prev) => ({ ...cards, ...prev }));
+    },
+    [id],
+  );
 
   const saveScore = useCallback(
     async (plantId: string, traits: Record<string, number>, note?: string | null) => {
@@ -424,6 +465,8 @@ export function usePhenoHuntWorkspace(
     labByKey,
     error,
     saving,
+    loadDecisionHistory,
+    loadRound,
     saveScore,
     saveDecision,
     saveRound,

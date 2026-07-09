@@ -59,6 +59,37 @@ export async function appendKeeperDecision(input: {
   return { ok: true };
 }
 
+/**
+ * One candidate's own decision history, newest first. The workspace fetches
+ * this on demand when a card's history section is opened: a hunt-wide read
+ * capped at N rows is unfair at commercial scale (300 candidates share the
+ * cap and most get zero rows), while per-candidate reads ride the
+ * (hunt_id, plant_id, decided_at DESC) index and stay small.
+ */
+export async function listKeeperDecisionHistoryForPlant(
+  huntId: string,
+  plantId: string,
+): Promise<KeeperDecisionLogEntry[]> {
+  const hunt = typeof huntId === "string" ? huntId.trim() : "";
+  const plant = typeof plantId === "string" ? plantId.trim() : "";
+  if (!hunt || !plant) return [];
+  const { data, error } = await phenoDb
+    .from("pheno_keeper_decisions_log")
+    .select("plant_id, decision, reason, note, decided_at")
+    .eq("hunt_id", hunt)
+    .eq("plant_id", plant)
+    .order("decided_at", { ascending: false })
+    .limit(50);
+  if (error || !data) return [];
+  return data.map((row) => ({
+    plantId: plant,
+    decision: normalizeKeeperDecision(row.decision),
+    reason: typeof row.reason === "string" ? row.reason : "",
+    note: row.note ?? null,
+    decidedAt: row.decided_at ?? null,
+  }));
+}
+
 /** Full decision history for a hunt, newest first, keyed by plant id. */
 export async function listKeeperDecisionHistoryForHunt(
   huntId: string,

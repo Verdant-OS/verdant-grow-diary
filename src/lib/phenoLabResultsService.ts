@@ -98,7 +98,10 @@ export async function listLabResultsForHunt(huntId: string): Promise<Record<stri
   const { data, error } = await phenoDb
     .from("pheno_lab_results")
     .select("plant_id, source, thc_pct, cbd_pct, total_cannabinoids_pct, dominant_terpenes")
-    .eq("hunt_id", id);
+    .eq("hunt_id", id)
+    // Up to 3 rows per candidate (coa/estimate/unspecified); explicit bound
+    // keeps large hunts from hitting the server's silent row ceiling.
+    .limit(1500);
   if (error || !data) return {};
   const map: Record<string, LabResultRow> = {};
   for (const row of data) {

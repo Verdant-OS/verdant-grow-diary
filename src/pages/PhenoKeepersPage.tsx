@@ -6,10 +6,14 @@
  * only: naming a keeper, adding a clone, or recording a cross starts no grow and
  * drives no device. No AI, no Action Queue, no automation.
  */
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { usePhenoKeepers } from "@/hooks/usePhenoKeepers";
-import { buildPhenoKeeperLineage } from "@/lib/phenoKeeperLineageViewModel";
+import {
+  buildPhenoKeeperLineage,
+  type PhenoKeeperLineageView,
+} from "@/lib/phenoKeeperLineageViewModel";
+import type { CloneRow } from "@/lib/phenoKeepersService";
 import {
   buildCrossFormViewModel,
   crossLineageBadge,
@@ -24,14 +28,145 @@ import { buildCloneTreeRows } from "@/lib/phenoCloneTreeViewModel";
 /** Depth → indent class (capped) so the clone lineage nests without inline styles. */
 const CLONE_INDENT = ["pl-0", "pl-3", "pl-6", "pl-9", "pl-12"] as const;
 
+// Stable empty clone list so memoized KeeperCards without clones keep identical
+// props across parent re-renders (a fresh [] per render would defeat memo).
+const EMPTY_CLONES: readonly CloneRow[] = [];
+
+interface KeeperCardProps {
+  view: PhenoKeeperLineageView;
+  clones: readonly CloneRow[];
+  reversed: boolean;
+  saving: boolean;
+  onAddClone: (keeperId: string, label: string) => Promise<boolean>;
+  onMarkReversed: (keeperId: string, method: string) => void;
+}
+
+// Memoized with row-LOCAL input state: at commercial scale a hunt can have
+// many keepers, and previously the clone-label / reversal-method inputs lived
+// in page-level Record<id,value> maps — every keystroke re-rendered the whole
+// keeper list AND rebuilt every keeper's clone tree. Holding the inputs here
+// scopes each keystroke to its own card, and memo keeps a save on one card
+// from re-rendering the rest.
+const KeeperCard = memo(function KeeperCard({
+  view,
+  clones,
+  reversed,
+  saving,
+  onAddClone,
+  onMarkReversed,
+}: KeeperCardProps) {
+  const [cloneLabel, setCloneLabel] = useState("");
+  const [reversalMethod, setReversalMethod] = useState("sts");
+  const cloneRows = useMemo(() => buildCloneTreeRows([...clones]), [clones]);
+
+  return (
+    <li
+      data-testid={`pheno-keeper-${view.keeperId}`}
+      className="space-y-2 rounded-lg border border-border bg-card p-4"
+    >
+      <div>
+        <h3 className="flex items-center gap-2 font-semibold">
+          {view.keeperName}
+          {reversed && (
+            <span
+              data-testid={`keeper-reversed-badge-${view.keeperId}`}
+              className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
+              title="Reversed — makes feminized pollen"
+            >
+              Reversed ♀→pollen
+            </span>
+          )}
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          From {view.origin.sourceCandidateLabel ?? "unknown candidate"} ·{" "}
+          {view.origin.huntName ?? "this hunt"}
+        </p>
+      </div>
+      <div className="text-xs">
+        <span className="font-medium">Clones ({clones.length}):</span>
+        {cloneRows.length === 0 ? (
+          <span className="text-muted-foreground"> none yet</span>
+        ) : (
+          <ul data-testid={`keeper-clone-tree-${view.keeperId}`} className="mt-1 space-y-0.5">
+            {cloneRows.map((r) => (
+              <li
+                key={r.id}
+                data-testid={`keeper-clone-node-${r.id}`}
+                data-depth={r.depth}
+                className={CLONE_INDENT[Math.min(r.depth, CLONE_INDENT.length - 1)]}
+              >
+                {r.depth > 0 && <span className="text-muted-foreground">└ </span>}
+                {r.label}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          data-testid={`keepers-clone-label-${view.keeperId}`}
+          value={cloneLabel}
+          onChange={(e) => setCloneLabel(e.target.value)}
+          placeholder="Clone label (e.g. mother, cut #2)"
+          className="rounded border border-border bg-background px-2 py-1 text-sm"
+        />
+        <button
+          type="button"
+          data-testid={`keepers-clone-add-${view.keeperId}`}
+          disabled={saving || !cloneLabel.trim()}
+          onClick={async () => {
+            if (await onAddClone(view.keeperId, cloneLabel)) setCloneLabel("");
+          }}
+          className="rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
+        >
+          Add clone
+        </button>
+      </div>
+      {reversed ? (
+        <p
+          data-testid={`keeper-reversed-note-${view.keeperId}`}
+          className="text-[11px] text-muted-foreground"
+        >
+          Reversed — its pollen makes feminized (self / S1 or feminized-cross) seed.
+        </p>
+      ) : (
+        <div className="flex items-center gap-2">
+          <select
+            data-testid={`keeper-reverse-method-${view.keeperId}`}
+            aria-label={`Reversal method for ${view.keeperName}`}
+            value={reversalMethod}
+            onChange={(e) => setReversalMethod(e.target.value)}
+            className="rounded border border-border bg-background px-2 py-1 text-xs"
+          >
+            {REVERSAL_METHOD_OPTIONS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            data-testid={`keeper-reverse-${view.keeperId}`}
+            disabled={saving}
+            onClick={() => onMarkReversed(view.keeperId, reversalMethod)}
+            className="rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
+          >
+            Mark as reversed
+          </button>
+        </div>
+      )}
+    </li>
+  );
+});
+
 export default function PhenoKeepersPage() {
   const { id } = useParams<{ id: string }>();
   const ks = usePhenoKeepers(id);
 
   const [promotePlant, setPromotePlant] = useState("");
   const [promoteName, setPromoteName] = useState("");
-  const [cloneLabels, setCloneLabels] = useState<Record<string, string>>({});
-  const [reversalMethods, setReversalMethods] = useState<Record<string, string>>({});
+  const [keeperFilter, setKeeperFilter] = useState("");
   const [female, setFemale] = useState("");
   const [donor, setDonor] = useState("");
   const [crossName, setCrossName] = useState("");
@@ -108,6 +243,12 @@ export default function PhenoKeepersPage() {
       ),
     [ks.keepers, ks.hunt, candidateLabelById],
   );
+
+  const visibleLineage = useMemo(() => {
+    const q = keeperFilter.trim().toLowerCase();
+    if (!q) return lineage;
+    return lineage.filter((v) => v.keeperName.toLowerCase().includes(q));
+  }, [lineage, keeperFilter]);
 
   if (ks.status === "loading" || ks.status === "idle") {
     return (
@@ -188,128 +329,31 @@ export default function PhenoKeepersPage() {
             No keepers named yet.
           </p>
         ) : (
-          <ul className="space-y-3">
-            {lineage.map((view) => (
-              <li
-                key={view.keeperId}
-                data-testid={`pheno-keeper-${view.keeperId}`}
-                className="space-y-2 rounded-lg border border-border bg-card p-4"
-              >
-                <div>
-                  <h3 className="flex items-center gap-2 font-semibold">
-                    {view.keeperName}
-                    {reversedSet.has(view.keeperId) && (
-                      <span
-                        data-testid={`keeper-reversed-badge-${view.keeperId}`}
-                        className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
-                        title="Reversed — makes feminized pollen"
-                      >
-                        Reversed ♀→pollen
-                      </span>
-                    )}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    From {view.origin.sourceCandidateLabel ?? "unknown candidate"} ·{" "}
-                    {view.origin.huntName ?? "this hunt"}
-                  </p>
-                </div>
-                <div className="text-xs">
-                  <span className="font-medium">
-                    Clones ({ks.clonesByKeeper[view.keeperId]?.length ?? 0}):
-                  </span>
-                  {(() => {
-                    const rows = buildCloneTreeRows(ks.clonesByKeeper[view.keeperId] ?? []);
-                    if (rows.length === 0) {
-                      return <span className="text-muted-foreground"> none yet</span>;
-                    }
-                    return (
-                      <ul
-                        data-testid={`keeper-clone-tree-${view.keeperId}`}
-                        className="mt-1 space-y-0.5"
-                      >
-                        {rows.map((r) => (
-                          <li
-                            key={r.id}
-                            data-testid={`keeper-clone-node-${r.id}`}
-                            data-depth={r.depth}
-                            className={CLONE_INDENT[Math.min(r.depth, CLONE_INDENT.length - 1)]}
-                          >
-                            {r.depth > 0 && <span className="text-muted-foreground">└ </span>}
-                            {r.label}
-                          </li>
-                        ))}
-                      </ul>
-                    );
-                  })()}
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    data-testid={`keepers-clone-label-${view.keeperId}`}
-                    value={cloneLabels[view.keeperId] ?? ""}
-                    onChange={(e) =>
-                      setCloneLabels((prev) => ({ ...prev, [view.keeperId]: e.target.value }))
-                    }
-                    placeholder="Clone label (e.g. mother, cut #2)"
-                    className="rounded border border-border bg-background px-2 py-1 text-sm"
-                  />
-                  <button
-                    type="button"
-                    data-testid={`keepers-clone-add-${view.keeperId}`}
-                    disabled={ks.saving || !(cloneLabels[view.keeperId] ?? "").trim()}
-                    onClick={async () => {
-                      if (
-                        await ks.addKeeperClone(view.keeperId, cloneLabels[view.keeperId] ?? "")
-                      ) {
-                        setCloneLabels((prev) => ({ ...prev, [view.keeperId]: "" }));
-                      }
-                    }}
-                    className="rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
-                  >
-                    Add clone
-                  </button>
-                </div>
-                {/* Record a reversal (append-only): shown only until reversed. */}
-                {reversedSet.has(view.keeperId) ? (
-                  <p
-                    data-testid={`keeper-reversed-note-${view.keeperId}`}
-                    className="text-[11px] text-muted-foreground"
-                  >
-                    Reversed — its pollen makes feminized (self / S1 or feminized-cross) seed.
-                  </p>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <select
-                      data-testid={`keeper-reverse-method-${view.keeperId}`}
-                      aria-label={`Reversal method for ${view.keeperName}`}
-                      value={reversalMethods[view.keeperId] ?? "sts"}
-                      onChange={(e) =>
-                        setReversalMethods((prev) => ({ ...prev, [view.keeperId]: e.target.value }))
-                      }
-                      className="rounded border border-border bg-background px-2 py-1 text-xs"
-                    >
-                      {REVERSAL_METHOD_OPTIONS.map((m) => (
-                        <option key={m.value} value={m.value}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      data-testid={`keeper-reverse-${view.keeperId}`}
-                      disabled={ks.saving}
-                      onClick={() =>
-                        ks.markReversed(view.keeperId, reversalMethods[view.keeperId] ?? "sts")
-                      }
-                      className="rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
-                    >
-                      Mark as reversed
-                    </button>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
+          <>
+            {lineage.length > 8 && (
+              <input
+                type="search"
+                data-testid="keepers-filter"
+                value={keeperFilter}
+                onChange={(e) => setKeeperFilter(e.target.value)}
+                placeholder="Filter keepers by name…"
+                className="w-56 rounded border border-border bg-background px-2 py-1 text-sm"
+              />
+            )}
+            <ul className="space-y-3">
+              {visibleLineage.map((view) => (
+                <KeeperCard
+                  key={view.keeperId}
+                  view={view}
+                  clones={ks.clonesByKeeper[view.keeperId] ?? EMPTY_CLONES}
+                  reversed={reversedSet.has(view.keeperId)}
+                  saving={ks.saving}
+                  onAddClone={ks.addKeeperClone}
+                  onMarkReversed={ks.markReversed}
+                />
+              ))}
+            </ul>
+          </>
         )}
       </section>
 

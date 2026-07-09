@@ -30,6 +30,7 @@ interface GrowInfo {
 
 export default function PhenoHuntNew() {
   const { user } = useAuth();
+  const { entitlement } = useMyEntitlements();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const growId = params.get("growId");

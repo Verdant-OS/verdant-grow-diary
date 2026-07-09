@@ -284,12 +284,15 @@ function SubscriptionTile() {
   const isFree = !loading && (planId === "free" || (!tier && !planId));
   const isPaid = !loading && !!tier && planId !== "free";
 
+  const isStaff = !!entitlement?.isStaff;
+
   return (
     <Tile name="Subscription" state="available">
       <div
         className="flex items-center justify-between gap-2 mb-2"
         data-testid="settings-subscription"
         data-plan={planId ?? "unknown"}
+        data-staff={isStaff ? "true" : "false"}
       >
         <div>
           <p className="text-sm">
@@ -301,6 +304,14 @@ function SubscriptionTile() {
               {label}
             </span>
           </p>
+          {isStaff && (
+            <p
+              className="text-xs text-muted-foreground mt-1"
+              data-testid="settings-subscription-staff-note"
+            >
+              Internal staff — Pro capabilities, 10,000 AI credits/month.
+            </p>
+          )}
           {!loading && !tier && (
             <p className="text-xs text-muted-foreground">
               We couldn't determine your plan right now. Your grow data is safe
@@ -309,6 +320,7 @@ function SubscriptionTile() {
           )}
         </div>
       </div>
+
 
       {tier && (
         <ul

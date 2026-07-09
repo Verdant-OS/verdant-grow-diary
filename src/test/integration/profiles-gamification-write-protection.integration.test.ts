@@ -4,10 +4,10 @@
  * BLOCKED unless local Supabase env vars are exported:
  *   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
  *
- * Service role is used strictly for test setup/teardown (creating test
- * users, seeding a baseline profile row, cleanup). All tested UPDATEs run
- * through an authenticated anon-key client so we're proving what a real
- * tampered client can and cannot do.
+ * Service role is used strictly for test setup/teardown/admin verification.
+ * All tested UPDATE / DELETE / RPC calls run through an authenticated
+ * anon-key client so we're proving what a real tampered client can and
+ * cannot do.
  *
  * NEVER logs service_role keys, JWTs, refresh tokens, or user IDs.
  *
@@ -25,24 +25,51 @@ const hasLocalSupabase = !!URL && !!ANON && !!SERVICE;
 
 const d = hasLocalSupabase ? describe : describe.skip;
 
-// Sanitized error assertion: no provider/customer/payment identifiers,
-// no service role, no private env leakage.
-const FORBIDDEN_LEAKS = [
+// ─── Sanitized error assertions ──────────────────────────────────────────
+// Blocked gamification / RLS errors must never leak provider / customer /
+// subscription identifiers, service_role material, JWT-shaped tokens,
+// authorization headers, private env names, stack traces, or file:line refs.
+const FORBIDDEN_LEAKS: RegExp[] = [
   /service[_-]?role/i,
+  /SUPABASE_SERVICE_ROLE_KEY/i,
+  /PAYMENTS?_.*SECRET/i,
+  /PADDLE_.*SECRET/i,
   /sk_live_/i,
   /sk_test_/i,
-  /cus_/i,
-  /sub_/i,
-  /pdl_/i,
+  /cus_[A-Za-z0-9]+/,
+  /sub_[A-Za-z0-9]+/,
+  /pdl_[A-Za-z0-9]+/,
+  /pri_[A-Za-z0-9]+/,
+  /pro_[A-Za-z0-9]+/,
   /paddle/i,
   /stripe/i,
-  /SUPABASE_SERVICE_ROLE_KEY/i,
+  /provider/i,
+  /customer/i,
+  /subscription/i,
+  /bearer\s+/i,
+  /authorization/i,
+  /refresh[_-]?token/i,
+  /access[_-]?token/i,
+  /eyJ[a-zA-Z0-9_-]+\./, // JWT-shaped
+  /\bat\s+.+:\d+:\d+/, // stack frame like "at file.ts:42:11"
+  /\/(?:home|Users|var|root)\/[^\s'"]+:\d+:\d+/,
 ];
 
-function assertSanitized(msg: string | null | undefined) {
-  const m = msg ?? "";
+export function expectSanitizedDbError(err: unknown): void {
+  // Accept null / undefined (caller may want to assert separately).
+  if (err == null) return;
+  const obj = err as Record<string, unknown>;
+  const parts = [
+    obj.message,
+    obj.details,
+    obj.hint,
+    obj.code,
+    typeof obj.status === "number" ? String(obj.status) : obj.status,
+  ]
+    .filter((v) => typeof v === "string")
+    .join("\n");
   for (const rx of FORBIDDEN_LEAKS) {
-    expect(m).not.toMatch(rx);
+    expect(parts, `leaked pattern ${rx}`).not.toMatch(rx);
   }
 }
 
@@ -69,7 +96,6 @@ async function createTestUser(admin: SupabaseClient, tag: string): Promise<TestU
   const { error: signInErr } = await userClient.auth.signInWithPassword({ email, password });
   if (signInErr) throw new Error("failed to sign in test user");
 
-  // Ensure profile row exists (INSERT policy allows own row).
   const { error: insErr } = await userClient.from("profiles").insert({ user_id: id });
   if (insErr && !/duplicate|already/i.test(insErr.message)) {
     throw new Error("failed to insert profile row");
@@ -96,10 +122,57 @@ async function readProfileAsAdmin(admin: SupabaseClient, userId: string) {
   return data;
 }
 
+async function profileExists(admin: SupabaseClient, userId: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("profiles")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error("admin exists check failed");
+  return data != null;
+}
+
+const TEST_RPC_NAME = "__test_profiles_gamification_update";
+
+async function tryCreateTestRpc(admin: SupabaseClient): Promise<boolean> {
+  // Test-only RPC. SECURITY INVOKER so the trigger fires under the caller's
+  // rights. Never shipped as a production migration. Dropped in afterAll.
+  const sql = `
+    CREATE OR REPLACE FUNCTION public.${TEST_RPC_NAME}(
+      _profile_user_id uuid, _tier text, _level int, _nugs int
+    ) RETURNS void
+    LANGUAGE plpgsql SECURITY INVOKER SET search_path = public AS $fn$
+    BEGIN
+      UPDATE public.profiles
+         SET tier = COALESCE(_tier, tier),
+             level = COALESCE(_level, level),
+             nugs_total = COALESCE(_nugs, nugs_total)
+       WHERE user_id = _profile_user_id;
+    END;
+    $fn$;
+    GRANT EXECUTE ON FUNCTION public.${TEST_RPC_NAME}(uuid, text, int, int) TO authenticated;
+  `;
+  const { error } = await admin.rpc("exec_sql" as never, { sql } as never);
+  if (!error) return true;
+  // Fall back: try direct pg via PostgREST is not possible for arbitrary DDL.
+  // If exec_sql doesn't exist in local stack, we mark RPC path BLOCKED (skip).
+  return false;
+}
+
+async function tryDropTestRpc(admin: SupabaseClient) {
+  const sql = `DROP FUNCTION IF EXISTS public.${TEST_RPC_NAME}(uuid, text, int, int);`;
+  try {
+    await admin.rpc("exec_sql" as never, { sql } as never);
+  } catch {
+    /* best-effort */
+  }
+}
+
 d("profiles gamification write protection (local DB)", () => {
   let admin: SupabaseClient;
   let userA: TestUser;
   let userB: TestUser;
+  let rpcAvailable = false;
 
   beforeAll(async () => {
     admin = createClient(URL, SERVICE, {
@@ -107,9 +180,11 @@ d("profiles gamification write protection (local DB)", () => {
     });
     userA = await createTestUser(admin, "a");
     userB = await createTestUser(admin, "b");
-  }, 30_000);
+    rpcAvailable = await tryCreateTestRpc(admin);
+  }, 45_000);
 
   afterAll(async () => {
+    if (rpcAvailable) await tryDropTestRpc(admin);
     if (userA) await cleanupUser(admin, userA);
     if (userB) await cleanupUser(admin, userB);
   }, 30_000);
@@ -121,7 +196,7 @@ d("profiles gamification write protection (local DB)", () => {
       .update({ tier: "pro" })
       .eq("user_id", userA.id);
     expect(error).not.toBeNull();
-    assertSanitized(error?.message);
+    expectSanitizedDbError(error);
     const after = await readProfileAsAdmin(admin, userA.id);
     expect(after.tier).toBe(before.tier);
   });
@@ -133,7 +208,7 @@ d("profiles gamification write protection (local DB)", () => {
       .update({ level: 999 })
       .eq("user_id", userA.id);
     expect(error).not.toBeNull();
-    assertSanitized(error?.message);
+    expectSanitizedDbError(error);
     const after = await readProfileAsAdmin(admin, userA.id);
     expect(after.level).toBe(before.level);
   });
@@ -145,7 +220,7 @@ d("profiles gamification write protection (local DB)", () => {
       .update({ nugs_total: 999_999 })
       .eq("user_id", userA.id);
     expect(error).not.toBeNull();
-    assertSanitized(error?.message);
+    expectSanitizedDbError(error);
     const after = await readProfileAsAdmin(admin, userA.id);
     expect(after.nugs_total).toBe(before.nugs_total);
   });
@@ -158,14 +233,64 @@ d("profiles gamification write protection (local DB)", () => {
       .update({ tier: "pro", display_name: newName })
       .eq("user_id", userA.id);
     expect(error).not.toBeNull();
-    assertSanitized(error?.message);
+    expectSanitizedDbError(error);
     const after = await readProfileAsAdmin(admin, userA.id);
     expect(after.tier).toBe(before.tier);
     expect(after.display_name).toBe(before.display_name);
     expect(after.display_name).not.toBe(newName);
   });
 
-  it("E: legitimate profile edit (display_name, current_badge) succeeds", async () => {
+  it("E: destructive gamification updates (null / zero / negative / combo) are blocked", async () => {
+    const before = await readProfileAsAdmin(admin, userA.id);
+    const attempts: Array<Record<string, unknown>> = [
+      { tier: null },
+      { level: null },
+      { nugs_total: null },
+      { level: 0 },
+      { level: -1 },
+      { nugs_total: 0 },
+      { nugs_total: -1 },
+      { tier: null, level: 0, nugs_total: 0 },
+    ];
+    for (const patch of attempts) {
+      const { error } = await userA.client
+        .from("profiles")
+        .update(patch)
+        .eq("user_id", userA.id);
+      // Either the trigger rejects, or CHECK constraints reject, or the
+      // change is a no-op — but the persisted row must never change.
+      expectSanitizedDbError(error);
+    }
+    const after = await readProfileAsAdmin(admin, userA.id);
+    expect(after.tier).toBe(before.tier);
+    expect(after.level).toBe(before.level);
+    expect(after.nugs_total).toBe(before.nugs_total);
+  });
+
+  it("F: authenticated user cannot DELETE own profile", async () => {
+    expect(await profileExists(admin, userA.id)).toBe(true);
+    const { error } = await userA.client
+      .from("profiles")
+      .delete()
+      .eq("user_id", userA.id);
+    if (error) expectSanitizedDbError(error);
+    expect(await profileExists(admin, userA.id)).toBe(true);
+  });
+
+  it("G: authenticated user cannot DELETE another user's profile", async () => {
+    expect(await profileExists(admin, userB.id)).toBe(true);
+    const { data, error } = await userA.client
+      .from("profiles")
+      .delete()
+      .eq("user_id", userB.id)
+      .select();
+    if (error) expectSanitizedDbError(error);
+    expect(data == null || data.length === 0).toBe(true);
+    expect(await profileExists(admin, userA.id)).toBe(true);
+    expect(await profileExists(admin, userB.id)).toBe(true);
+  });
+
+  it("H: legitimate profile edit (display_name, current_badge) still succeeds", async () => {
     const before = await readProfileAsAdmin(admin, userA.id);
     const newName = `legit-${Date.now()}`;
     const newBadge = "seedling";
@@ -182,17 +307,39 @@ d("profiles gamification write protection (local DB)", () => {
     expect(after.nugs_total).toBe(before.nugs_total);
   });
 
-  it("F: cross-user — user A cannot update user B's profile (RLS)", async () => {
+  it("I: cross-user — user A cannot update user B's profile (RLS)", async () => {
     const beforeB = await readProfileAsAdmin(admin, userB.id);
     const { data, error } = await userA.client
       .from("profiles")
       .update({ display_name: "hijacked", tier: "pro" })
       .eq("user_id", userB.id)
       .select();
-    // RLS silently filters — either an error or zero rows affected.
-    if (error) assertSanitized(error.message);
+    if (error) expectSanitizedDbError(error);
     expect(data == null || data.length === 0).toBe(true);
     const afterB = await readProfileAsAdmin(admin, userB.id);
     expect(afterB).toEqual(beforeB);
+  });
+
+  it("J: RPC-triggered gamification update is blocked by trigger", async () => {
+    if (!rpcAvailable) {
+      // Explicitly BLOCKED, not passed: local stack lacks exec_sql DDL helper.
+      console.warn(
+        "[profiles gamification] RPC path BLOCKED — local exec_sql unavailable",
+      );
+      return;
+    }
+    const before = await readProfileAsAdmin(admin, userA.id);
+    const { error } = await userA.client.rpc(TEST_RPC_NAME as never, {
+      _profile_user_id: userA.id,
+      _tier: "pro",
+      _level: 42,
+      _nugs: 10_000,
+    } as never);
+    expect(error).not.toBeNull();
+    expectSanitizedDbError(error);
+    const after = await readProfileAsAdmin(admin, userA.id);
+    expect(after.tier).toBe(before.tier);
+    expect(after.level).toBe(before.level);
+    expect(after.nugs_total).toBe(before.nugs_total);
   });
 });

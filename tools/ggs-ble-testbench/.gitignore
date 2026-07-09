@@ -1,0 +1,6 @@
+# Captured BLE frames are local evidence, not committed. Device addresses in
+# capture logs are already redacted, but the frames themselves are per-tent.
+captures/*.jsonl
+__pycache__/
+*.pyc
+.env

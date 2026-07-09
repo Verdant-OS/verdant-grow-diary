@@ -18,6 +18,40 @@ vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "u1" } }),
 }));
 
+// PhenoHuntNew became Pro-gated: it calls useMyEntitlements, which otherwise
+// fires a real billing_subscriptions/subscriptions query the mocked supabase
+// client above doesn't implement (leaking an unhandled rejection). Return a
+// stable, non-loading Pro entitlement so the page renders its normal
+// empty-state / candidate UI and no entitlement query runs. Async factory +
+// dynamic import so the real resolver survives vi.mock hoisting.
+vi.mock("@/hooks/useMyEntitlements", async () => {
+  const { resolveEntitlements } = await import("@/lib/entitlements/resolveEntitlements");
+  const proEntitlement = resolveEntitlements(
+    {
+      id: "r",
+      user_id: "u1",
+      plan_id: "pro_monthly",
+      status: "active",
+      provider: "paddle",
+      provider_customer_id: null,
+      provider_subscription_id: null,
+      current_period_end: "2099-01-01Z",
+      cancel_at_period_end: false,
+      founder_number: null,
+      created_at: "",
+      updated_at: "",
+    },
+    new Date("2026-08-01Z"),
+  );
+  return {
+    useMyEntitlements: () => ({
+      loading: false,
+      entitlement: proEntitlement,
+      refetch: async () => {},
+    }),
+  };
+});
+
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));

@@ -51,10 +51,11 @@ DELETE FROM public.pheno_hunts                WHERE id = :'hunt';
 DELETE FROM public.tents                      WHERE id = :'tent';
 DELETE FROM public.grows                      WHERE id = :'grow';
 
--- Grow + tent + hunt.
-INSERT INTO public.grows (id, user_id, name, grow_type, stage, started_at, notes, is_archived)
+-- Grow + tent + hunt. Boolean flags are left at their column defaults; this
+-- is labeled demo data, never an incident-repair row.
+INSERT INTO public.grows (id, user_id, name, grow_type, stage, started_at, notes)
 VALUES (:'grow', :'owner', 'DEMO — Loud Pack S1 Hunt (sample data)', 'tent', 'flower',
-        now() - interval '78 days', 'Labeled demo data for product walkthrough. Not a real grow.', false);
+        now() - interval '78 days', 'Labeled demo data for product walkthrough. Not a real grow.');
 
 INSERT INTO public.tents (id, user_id, name, stage, grow_id)
 VALUES (:'tent', :'owner', 'DEMO — Hunt Tent A', 'flower', :'grow');

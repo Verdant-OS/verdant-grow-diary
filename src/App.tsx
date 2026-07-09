@@ -185,6 +185,14 @@ const App = () => (
                   <Route path="/billing/:plan" element={<BillingPlaceholder />} />
                   <Route path="/checkout/success" element={<CheckoutSuccess />} />
                   <Route path="/checkout/cancel" element={<CheckoutCancel />} />
+                  <Route path="/terms" element={<Terms />} />
+                  <Route path="/privacy" element={<Privacy />} />
+                  <Route path="/refund" element={<Refund />} />
+                  <Route path="/refunds" element={<Navigate to="/refund" replace />} />
+                  <Route path="/refund-policy" element={<Navigate to="/refund" replace />} />
+                  <Route path="/terms-of-service" element={<Navigate to="/terms" replace />} />
+                  <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
+
 
                   {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
                       no operator chrome (header, Quick Log) renders. */}

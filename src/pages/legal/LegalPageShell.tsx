@@ -77,5 +77,6 @@ export function LegalPageShell({
         </footer>
       </article>
     </main>
+    </>
   );
 }

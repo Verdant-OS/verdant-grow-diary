@@ -244,3 +244,46 @@ describe('auditFields', () => {
     expect(a.paddle_subscription_id).toBe('txn_abc'); // TransactionData.id
   });
 });
+
+describe('transactionPriceIdNeedingLookup', () => {
+  it('returns null for subscription events', () => {
+    expect(transactionPriceIdNeedingLookup(subEvent())).toBeNull();
+  });
+
+  it('returns null when importMeta.externalId is already resolved', () => {
+    expect(transactionPriceIdNeedingLookup(txEvent())).toBeNull();
+  });
+
+  it('returns null when the transaction has a subscriptionId (recurring)', () => {
+    expect(
+      transactionPriceIdNeedingLookup(txEvent({ subscriptionId: 'sub_x' })),
+    ).toBeNull();
+  });
+
+  it('returns the paddle price id when external id is missing and no subscriptionId', () => {
+    const ev = txEvent({ items: [{ price: { id: 'pri_needs_lookup' } }] });
+    expect(transactionPriceIdNeedingLookup(ev)).toBe('pri_needs_lookup');
+  });
+
+  it('returns null when there is no price id at all', () => {
+    const ev = txEvent({ items: [{ price: {} }] });
+    expect(transactionPriceIdNeedingLookup(ev)).toBeNull();
+  });
+});
+
+describe('attachResolvedPriceExternalId', () => {
+  it('fills in a resolved external id on the first item', () => {
+    const ev = txEvent({ items: [{ price: { id: 'pri_x' } }] });
+    attachResolvedPriceExternalId(ev, 'founder_lifetime');
+    // After attach, decide() should now record lifetime.
+    const d = decide(ev, 'sandbox', NOW);
+    expect(d.kind).toBe('record_lifetime');
+  });
+
+  it('is a no-op when the external id is null (unknown)', () => {
+    const ev = txEvent({ items: [{ price: { id: 'pri_x' } }] });
+    attachResolvedPriceExternalId(ev, null);
+    const d = decide(ev, 'sandbox', NOW);
+    expect(d).toEqual({ kind: 'skip', reason: 'unknown_lifetime_price_id' });
+  });
+});

@@ -37,7 +37,7 @@ export async function loadPhenoHuntCandidates(
 
   const { data: huntRow, error: huntError } = await supabase
     .from("pheno_hunts")
-    .select("id, name, grow_id, tent_id")
+    .select("id, name, grow_id, tent_id, evidence_goals, notes, setup_completed_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -63,6 +63,15 @@ export async function loadPhenoHuntCandidates(
 
   const candidates = adaptPhenoHuntCandidates({ plants, growNameById, tentNameById });
 
+  const rawGoals = (huntRow as { evidence_goals?: unknown }).evidence_goals;
+  const evidenceGoals = Array.isArray(rawGoals)
+    ? rawGoals.filter((v): v is string => typeof v === "string")
+    : [];
+  const rawNotes = (huntRow as { notes?: unknown }).notes;
+  const notes = typeof rawNotes === "string" ? rawNotes : null;
+  const rawSetup = (huntRow as { setup_completed_at?: unknown }).setup_completed_at;
+  const setupCompletedAt = typeof rawSetup === "string" ? rawSetup : null;
+
   return {
     ok: true,
     hunt: {
@@ -70,6 +79,9 @@ export async function loadPhenoHuntCandidates(
       name: huntRow.name,
       growId: huntRow.grow_id ?? null,
       tentId: huntRow.tent_id ?? null,
+      evidenceGoals,
+      notes,
+      setupCompletedAt,
     },
     candidates,
   };

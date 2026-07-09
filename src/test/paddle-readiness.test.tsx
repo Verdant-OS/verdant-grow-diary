@@ -19,11 +19,7 @@ import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import BillingPlaceholder from "@/pages/BillingPlaceholder";
-import {
-  resolvePaddleConfig,
-  unavailableMessage,
-  PADDLE_SANDBOX_ENV,
-} from "@/lib/paddleConfig";
+import { resolvePaddleConfig, unavailableMessage, PADDLE_SANDBOX_ENV } from "@/lib/paddleConfig";
 
 // Module-level env override for render tests. import.meta.env does not cross
 // ESM module boundaries, so we proxy the no-args call from BillingPlaceholder.
@@ -55,6 +51,11 @@ const readRoot = (p: string) => readFileSync(resolve(root, p), "utf8");
 const BILLING_SRC = readSrc("pages/BillingPlaceholder.tsx");
 const CONFIG_SRC = readSrc("lib/paddleConfig.ts");
 const WEBHOOK_SRC = readRoot("supabase/functions/paddle-webhook/index.ts");
+// The signature-verification primitives were extracted into a shared module
+// that index.ts imports; the crypto assertions below scan the receiver +
+// verifier together so the guarantee holds whether the impl is inlined or shared.
+const VERIFIER_SRC = readRoot("supabase/functions/paddle-webhook/verifyPaddleSignature.ts");
+const WEBHOOK_VERIFY_SRC = WEBHOOK_SRC + "\n" + VERIFIER_SRC;
 const ENV_EXAMPLE = readRoot(".env.example");
 const BILLING_DOC = readRoot("docs/billing.md");
 
@@ -237,9 +238,10 @@ describe("Paddle webhook scaffolding", () => {
 
   it("verifies the Paddle-Signature header via HMAC-SHA256", () => {
     expect(WEBHOOK_SRC).toMatch(/paddle-signature/i);
-    expect(WEBHOOK_SRC).toMatch(/HMAC/);
-    expect(WEBHOOK_SRC).toMatch(/SHA-256/);
-    expect(WEBHOOK_SRC).toMatch(/constantTimeEqual/);
+    // Crypto primitives live in the shared verifier module index.ts imports.
+    expect(WEBHOOK_VERIFY_SRC).toMatch(/HMAC/);
+    expect(WEBHOOK_VERIFY_SRC).toMatch(/SHA-256/);
+    expect(WEBHOOK_VERIFY_SRC).toMatch(/constantTimeEqual/);
   });
 
   it("refuses when PADDLE_ENVIRONMENT is not sandbox", () => {

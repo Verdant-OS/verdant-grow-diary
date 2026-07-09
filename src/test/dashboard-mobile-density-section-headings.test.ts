@@ -12,15 +12,14 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const DASHBOARD = readFileSync(
-  resolve(__dirname, "../../src/pages/Dashboard.tsx"),
-  "utf8",
-);
+const DASHBOARD = readFileSync(resolve(__dirname, "../../src/pages/Dashboard.tsx"), "utf8");
 
 describe("Dashboard · mobile density section headings", () => {
   it("wraps Dashboard root in mobile-friendly vertical spacing", () => {
+    // Root may be a <div> or the semantic <main> landmark — both are valid
+    // wrappers; what matters is the mobile-density spacing + stable testid.
     expect(DASHBOARD).toMatch(
-      /<div\s+className="space-y-4 md:space-y-6"\s+data-testid="dashboard-root"/,
+      /<(?:div|main)\s+className="space-y-4 md:space-y-6"\s+data-testid="dashboard-root"/,
     );
   });
 
@@ -32,9 +31,7 @@ describe("Dashboard · mobile density section headings", () => {
       ["dashboard-section-heading-recent-activity", "Recent activity"],
     ];
     for (const [testId, label] of expectations) {
-      const pattern = new RegExp(
-        `data-testid="${testId}"[\\s\\S]{0,400}>\\s*${label}\\s*<`,
-      );
+      const pattern = new RegExp(`data-testid="${testId}"[\\s\\S]{0,400}>\\s*${label}\\s*<`);
       expect(DASHBOARD).toMatch(pattern);
     }
   });
@@ -59,9 +56,8 @@ describe("Dashboard · mobile density section headings", () => {
 
   it("does not reintroduce legacy 'Daily Grow Check' primary CTA copy", () => {
     // The PageHeader CTA was unified to "Quick Log" in slice 2.
-    const headerActions = DASHBOARD.match(
-      /dashboard-daily-grow-check-entry[\s\S]{0,400}<\/Button>/,
-    )?.[0] ?? "";
+    const headerActions =
+      DASHBOARD.match(/dashboard-daily-grow-check-entry[\s\S]{0,400}<\/Button>/)?.[0] ?? "";
     expect(headerActions).not.toMatch(/>Daily Grow Check</);
   });
 

@@ -23,17 +23,19 @@ const BILLING_SQL = readdirSync(MIGRATIONS_DIR)
 
 describe("billing_subscriptions migration shape", () => {
   it("creates the table in public", () => {
-    expect(BILLING_SQL).toMatch(
-      /CREATE\s+TABLE\s+public\.billing_subscriptions/i,
-    );
+    expect(BILLING_SQL).toMatch(/CREATE\s+TABLE\s+public\.billing_subscriptions/i);
   });
 
   it("plan_id has CHECK constraint with the four allowed values", () => {
-    expect(BILLING_SQL).toMatch(/plan_id[\s\S]{0,200}CHECK\s*\(\s*plan_id\s+IN\s*\(\s*'free'\s*,\s*'pro_monthly'\s*,\s*'pro_annual'\s*,\s*'founder_lifetime'\s*\)\s*\)/i);
+    expect(BILLING_SQL).toMatch(
+      /plan_id[\s\S]{0,200}CHECK\s*\(\s*plan_id\s+IN\s*\(\s*'free'\s*,\s*'pro_monthly'\s*,\s*'pro_annual'\s*,\s*'founder_lifetime'\s*\)\s*\)/i,
+    );
   });
 
   it("status has CHECK constraint with the five allowed values", () => {
-    expect(BILLING_SQL).toMatch(/status[\s\S]{0,200}CHECK\s*\(\s*status\s+IN\s*\(\s*'active'\s*,\s*'past_due'\s*,\s*'canceled'\s*,\s*'paused'\s*,\s*'expired'\s*\)\s*\)/i);
+    expect(BILLING_SQL).toMatch(
+      /status[\s\S]{0,200}CHECK\s*\(\s*status\s+IN\s*\(\s*'active'\s*,\s*'past_due'\s*,\s*'canceled'\s*,\s*'paused'\s*,\s*'expired'\s*\)\s*\)/i,
+    );
   });
 
   it("provider CHECK rejects values other than stripe/paddle (NULL allowed)", () => {
@@ -43,15 +45,11 @@ describe("billing_subscriptions migration shape", () => {
   });
 
   it("founder_number CHECK constrains to 1..75 (rejects 0 and 76)", () => {
-    expect(BILLING_SQL).toMatch(
-      /founder_number[\s\S]{0,200}BETWEEN\s+1\s+AND\s+75/i,
-    );
+    expect(BILLING_SQL).toMatch(/founder_number[\s\S]{0,200}BETWEEN\s+1\s+AND\s+75/i);
   });
 
   it("user_id is NOT NULL UNIQUE and references auth.users", () => {
-    expect(BILLING_SQL).toMatch(
-      /user_id\s+uuid\s+NOT\s+NULL\s+UNIQUE\s+REFERENCES\s+auth\.users/i,
-    );
+    expect(BILLING_SQL).toMatch(/user_id\s+uuid\s+NOT\s+NULL\s+UNIQUE\s+REFERENCES\s+auth\.users/i);
   });
 
   it("partial unique index on founder_number WHERE NOT NULL", () => {
@@ -104,27 +102,35 @@ describe("billing_subscriptions RLS — locked down by design", () => {
     );
   });
 
+  // The `FOR <cmd>` clause must be matched WITHIN the same CREATE POLICY
+  // statement as the billing_subscriptions target — hence `[^;]*?`, not
+  // `[\s\S]*?`. BILLING_SQL concatenates every migration mentioning
+  // billing_subscriptions, which now includes the has_pheno_tracker_entitlement
+  // function (it reads billing_subscriptions). A cross-statement `[\s\S]*?`
+  // falsely matched the billing SELECT policy against an unrelated `FOR INSERT`
+  // from a pheno RESTRICTIVE policy elsewhere in the blob. Prod confirms
+  // billing_subscriptions has ONLY a SELECT read-own policy.
   it("declares NO client INSERT policy", () => {
     expect(BILLING_SQL).not.toMatch(
-      /CREATE\s+POLICY[^;]*ON\s+public\.billing_subscriptions[\s\S]*?FOR\s+INSERT/i,
+      /CREATE\s+POLICY[^;]*ON\s+public\.billing_subscriptions[^;]*?FOR\s+INSERT/i,
     );
   });
 
   it("declares NO client UPDATE policy", () => {
     expect(BILLING_SQL).not.toMatch(
-      /CREATE\s+POLICY[^;]*ON\s+public\.billing_subscriptions[\s\S]*?FOR\s+UPDATE/i,
+      /CREATE\s+POLICY[^;]*ON\s+public\.billing_subscriptions[^;]*?FOR\s+UPDATE/i,
     );
   });
 
   it("declares NO client DELETE policy", () => {
     expect(BILLING_SQL).not.toMatch(
-      /CREATE\s+POLICY[^;]*ON\s+public\.billing_subscriptions[\s\S]*?FOR\s+DELETE/i,
+      /CREATE\s+POLICY[^;]*ON\s+public\.billing_subscriptions[^;]*?FOR\s+DELETE/i,
     );
   });
 
   it("declares no FOR ALL policy that would allow client writes", () => {
     expect(BILLING_SQL).not.toMatch(
-      /CREATE\s+POLICY[^;]*ON\s+public\.billing_subscriptions[\s\S]*?FOR\s+ALL/i,
+      /CREATE\s+POLICY[^;]*ON\s+public\.billing_subscriptions[^;]*?FOR\s+ALL/i,
     );
   });
 });

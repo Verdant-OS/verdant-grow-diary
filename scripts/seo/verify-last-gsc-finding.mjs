@@ -17,18 +17,39 @@
  *   --now <iso>                             Override "now" (deterministic tests).
  *   --allowlist <path>                      Override allowlist path.
  */
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, appendFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { loadGscCredentials, getAccessToken, inspectUrl, summarizeInspection } from "./gscClient.mjs";
+import {
+  loadGscCredentials,
+  getAccessToken,
+  inspectUrl,
+  summarizeInspection,
+} from "./gscClient.mjs";
 import {
   loadAllowlist,
   findExpiredEntriesMatchingUrls,
+  simulateAllowlistForUrls,
   DEFAULT_ALLOWLIST_PATH,
 } from "./seoAllowlist.mjs";
+import { groupRegressionOutcomes, renderRegressionGroupsMarkdown } from "./seoDiff.mjs";
+
+/** Best-effort append to the GitHub Actions job step summary. Never throws. */
+function appendStepSummary(md) {
+  const target = process.env.GITHUB_STEP_SUMMARY;
+  if (!target) return;
+  try {
+    appendFileSync(target, md.endsWith("\n") ? md : md + "\n");
+  } catch {
+    // step summary is best-effort; the artifact file is authoritative
+  }
+}
 
 const CONFIG_PATH = resolve(process.cwd(), "config/seo-last-gsc-finding.json");
 const ARTIFACT_DIR = resolve(process.cwd(), "artifacts/seo");
-const DEFAULT_PREVIOUS = resolve(process.cwd(), "artifacts/seo/previous/gsc-last-finding-verification.json");
+const DEFAULT_PREVIOUS = resolve(
+  process.cwd(),
+  "artifacts/seo/previous/gsc-last-finding-verification.json",
+);
 
 function parseArgs(argv) {
   const out = {
@@ -69,7 +90,9 @@ function evaluate(summary, expected) {
     checks.push({ name: "robots_allowed", ok, observed: summary.robotsTxtState });
   }
   if (expected.noindex_absent) {
-    const ok = !summary.indexingState || !/BLOCKED_BY_META_TAG|BLOCKED_BY_HTTP_HEADER/i.test(summary.indexingState);
+    const ok =
+      !summary.indexingState ||
+      !/BLOCKED_BY_META_TAG|BLOCKED_BY_HTTP_HEADER/i.test(summary.indexingState);
     checks.push({ name: "noindex_absent", ok, observed: summary.indexingState });
   }
   if (expected.canonical_matches) {
@@ -98,8 +121,13 @@ function runRegressionOnlyMode({ config, allowlistPath, previousPath, now }) {
   const previousResolvedUrls = new Set(
     (previous?.results ?? []).filter((r) => r.resolved).map((r) => r.url),
   );
+  // Full previous URL set (resolved OR not) so no_baseline (never recorded)
+  // and still_unresolved (recorded but not resolved) are distinguishable.
+  const previousUrlSet = new Set((previous?.results ?? []).map((r) => r.url));
   const allowlist = loadAllowlist(allowlistPath);
   const urls = config.affected_urls ?? [];
+  const sim = simulateAllowlistForUrls(urls, allowlist, now ?? undefined);
+  const simByUrl = new Map(sim.map((s) => [s.url, s]));
   const perUrl = urls.map((url) => {
     const expiredCovering = findExpiredEntriesMatchingUrls(allowlist, [url], now ?? undefined);
     const wasResolved = previousResolvedUrls.has(url);
@@ -113,6 +141,23 @@ function runRegressionOnlyMode({ config, allowlistPath, previousPath, now }) {
   });
   const regressions = perUrl.filter((r) => r.regressed);
   const status = regressions.length > 0 ? "regression" : "no_regression";
+
+  // Group per-URL outcomes into the six stable buckets (additive; the legacy
+  // status / urls[] / regression_count / exit codes are unchanged).
+  const outcome_groups = groupRegressionOutcomes(
+    perUrl.map((r) => ({
+      url: r.url,
+      was_resolved: r.previously_resolved,
+      in_previous_baseline: previousUrlSet.has(r.url),
+      regressed: r.regressed,
+      expired_allowlist_ids: r.expired_allowlist_entries_covering_url.map((e) => e.id),
+      expected_noindex_ids: (simByUrl.get(r.url)?.matched_expected_noindex_entries ?? []).map(
+        (e) => e.id,
+      ),
+    })),
+    { previousAvailable: previous != null },
+  );
+
   const payload = {
     mode: "fail-only-previously-resolved-expired",
     status,
@@ -123,6 +168,7 @@ function runRegressionOnlyMode({ config, allowlistPath, previousPath, now }) {
     previous_available: previous != null,
     regression_count: regressions.length,
     urls: perUrl,
+    outcome_groups,
   };
   writeFileSync(
     resolve(ARTIFACT_DIR, "gsc-last-finding-verification.json"),
@@ -133,7 +179,8 @@ function runRegressionOnlyMode({ config, allowlistPath, previousPath, now }) {
     "",
     `Mode: **fail-only-previously-resolved-expired**`,
     `Status: **${status}**`,
-    `Previous verification: ${previous ? "\`" + previousPath + "\`" : "_(none — baseline mode, cannot regress)_"}`,
+    `Previous verification: ${previous ? "\`" + previousPath + "\`" : "_`NO_BASELINE` — no previous run, cannot regress_"}`,
+    `Regressions: **${regressions.length}** (exit ${regressions.length > 0 ? "4" : "0"})`,
     "",
     "| URL | Previously resolved | Expired allowlist coverage | Regression |",
     "| --- | --- | --- | --- |",
@@ -146,8 +193,10 @@ function runRegressionOnlyMode({ config, allowlistPath, previousPath, now }) {
         } | ${r.regressed ? "❌" : "✅"} |`,
     ),
     "",
+    renderRegressionGroupsMarkdown(outcome_groups),
   ].join("\n");
   writeFileSync(resolve(ARTIFACT_DIR, "gsc-last-finding-verification.md"), md);
+  appendStepSummary(md);
   console.log(`Regression-only check: ${status} (${regressions.length} regression(s)).`);
   process.exit(regressions.length > 0 ? 4 : 0);
 }
@@ -199,7 +248,11 @@ async function main() {
   if (!creds.ok) {
     writeFileSync(
       resolve(ARTIFACT_DIR, "gsc-last-finding-verification.json"),
-      JSON.stringify({ status: "skipped", reason: "gsc_oauth_not_configured", missing: creds.missing }, null, 2),
+      JSON.stringify(
+        { status: "skipped", reason: "gsc_oauth_not_configured", missing: creds.missing },
+        null,
+        2,
+      ),
     );
     console.log("GSC OAuth not configured — skipping last-finding verification.");
     process.exit(0);
@@ -239,11 +292,12 @@ async function main() {
 
   const allResolved =
     results.length > 0 && results.every((r) => r.resolved) && expiredCovering.length === 0;
-  const status = expiredCovering.length > 0
-    ? "unresolved_expired_allowlist"
-    : allResolved
-      ? "resolved"
-      : "unresolved";
+  const status =
+    expiredCovering.length > 0
+      ? "unresolved_expired_allowlist"
+      : allResolved
+        ? "resolved"
+        : "unresolved";
   const payload = {
     status,
     finding_id: config.finding_id,
@@ -266,9 +320,7 @@ async function main() {
     ...(expiredCovering.length
       ? [
           `⚠️ Refusing to mark resolved: ${expiredCovering.length} expired allowlist entr${expiredCovering.length === 1 ? "y" : "ies"} still cover the affected URLs.`,
-          ...expiredCovering.map(
-            (e) => `- \`${e.section}[${e.id}]\` expired on ${e.expires_on}`,
-          ),
+          ...expiredCovering.map((e) => `- \`${e.section}[${e.id}]\` expired on ${e.expires_on}`),
           ``,
         ]
       : []),

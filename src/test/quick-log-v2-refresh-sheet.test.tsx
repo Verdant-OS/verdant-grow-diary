@@ -106,7 +106,10 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
     expect(keys).toContain(JSON.stringify(["quick_log_grouped_timeline"]));
     expect(keys).toContain(JSON.stringify(["timeline_memory"]));
     expect(keys).toContain(JSON.stringify(["plant_recent_activity", "plant-1"]));
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+    // Post-save hardening: successful save shows the post-save panel and
+    // keeps the sheet open until the grower explicitly closes it.
+    expect(await screen.findByTestId("qlv2-post-save")).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 
   it("tent-targeted save invalidates tent grouped timeline keys", async () => {

@@ -18,6 +18,7 @@ import RequireOperatorRole from "./components/RequireOperatorRole";
 const AppShell = lazy(() => import("@/components/AppShell"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Tents = lazy(() => import("./pages/Tents"));
@@ -32,10 +33,17 @@ const Tasks = lazy(() => import("./pages/Tasks"));
 const Alerts = lazy(() => import("./pages/Alerts"));
 const AlertDetail = lazy(() => import("./pages/AlertDetail"));
 const Settings = lazy(() => import("./pages/Settings"));
+const AgentIntegrations = lazy(() => import("./pages/AgentIntegrations"));
 const Timeline = lazy(() => import("./pages/Timeline"));
 const Grows = lazy(() => import("./pages/Grows"));
 const GrowDetail = lazy(() => import("./pages/GrowDetail"));
 const PhenoHuntNew = lazy(() => import("./pages/PhenoHuntNew"));
+const PhenoHuntCompare = lazy(() => import("./pages/PhenoHuntCompare"));
+const PhenoHuntWorkspace = lazy(() => import("./pages/PhenoHuntWorkspace"));
+const PhenoKeepersPage = lazy(() => import("./pages/PhenoKeepersPage"));
+const BreedingProgramsIndex = lazy(() => import("./pages/BreedingProgramsIndex"));
+const BreedingProgramNew = lazy(() => import("./pages/BreedingProgramNew"));
+const BreedingProgramDetail = lazy(() => import("./pages/BreedingProgramDetail"));
 const Reports = lazy(() => import("./pages/Reports"));
 const PostGrowLearningReport = lazy(() => import("./pages/PostGrowLearningReport"));
 
@@ -64,9 +72,13 @@ const DailyCheck = lazy(() => import("./pages/DailyCheck"));
 const Landing = lazy(() => import("./pages/Landing"));
 // Demo page removed — Verdant is positioned around real grow data only.
 const HardwareIntegrations = lazy(() => import("./pages/HardwareIntegrations"));
+const CreatorBeta = lazy(() => import("./pages/CreatorBeta"));
+const BreederBeta = lazy(() => import("./pages/BreederBeta"));
 const Pricing = lazy(() => import("./pages/Pricing"));
+const Upgrade = lazy(() => import("./pages/Upgrade"));
 const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
+const Glossary = lazy(() => import("./pages/Glossary"));
 const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
 const BillingPlaceholder = lazy(() => import("./pages/BillingPlaceholder"));
 const Leads = lazy(() => import("./pages/Leads"));
@@ -96,6 +108,7 @@ const OneTentLiveProof = lazy(() => import("./pages/OneTentLiveProof"));
 const DemoProofWalkthrough = lazy(() => import("./pages/DemoProofWalkthrough"));
 const ContextualPhenoComparisonDemo = lazy(() => import("./pages/ContextualPhenoComparisonDemo"));
 const PhenoComparison = lazy(() => import("./pages/PhenoComparison"));
+const PhenoExpressionShowcase = lazy(() => import("./pages/PhenoExpressionShowcase"));
 const ReleaseReadiness = lazy(() => import("./pages/ReleaseReadiness"));
 
 const queryClient = new QueryClient();
@@ -137,6 +150,7 @@ const App = () => (
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                   {/* Deprecated auth entry points — redirect to canonical /auth to
                       prevent funnel leaks from old bookmarks, emails, ads, and
                       creator posts that still point to /login /signup /register. */}
@@ -151,9 +165,13 @@ const App = () => (
                       Old bookmarks redirect to the landing page. */}
                   <Route path="/demo" element={<Navigate to="/welcome" replace />} />
                   <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
+                  <Route path="/creator-beta" element={<CreatorBeta />} />
+                  <Route path="/breeder-beta" element={<BreederBeta />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/upgrade" element={<Upgrade />} />
                   <Route path="/guides" element={<GuidesIndex />} />
                   <Route path="/guides/:slug" element={<GuidePage />} />
+                  <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
                   <Route path="/billing/:plan" element={<BillingPlaceholder />} />
                   {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
@@ -178,11 +196,24 @@ const App = () => (
                     element={<ContextualPhenoComparisonDemo />}
                   />
 
-                  {/* Read-only Pheno Comparison preview surface. Fixture-only,
+                  {/* Read-only Pheno Comparison PREVIEW surface. Fixture-only,
                       no fetch/Supabase/AI/writes. Mounted outside AppShell so
                       the read-only surface renders without operator chrome. */}
                   <Route path="/pheno-comparison" element={<PhenoComparison />} />
-                  <Route path="/pheno-hunts/:id/compare" element={<PhenoComparison />} />
+                  {/* Mix-and-match showcase of ten example phenos (demo,
+                      fixture-only, network-free). Read-only. */}
+                  <Route path="/pheno-expression-showcase" element={<PhenoExpressionShowcase />} />
+                  {/* LIVE per-hunt comparison. Reads the grower's own hunt via
+                      RLS-scoped SELECT (empty/graceful without a session);
+                      still read-only — no writes/AI/automation. */}
+                  <Route path="/pheno-hunts/:id/compare" element={<PhenoHuntCompare />} />
+                  {/* Grower's own hunt workspace: enter trait scores + keeper
+                      decisions. RLS-scoped writes of own data; suggest-only,
+                      no AI/Action Queue/automation. */}
+                  <Route path="/pheno-hunts/:id/workspace" element={<PhenoHuntWorkspace />} />
+                  {/* Keepers, clone lineage, and breeding crosses. RLS-scoped
+                      writes of own data; data/record-only, no automation. */}
+                  <Route path="/pheno-hunts/:id/keepers" element={<PhenoKeepersPage />} />
 
                   <Route element={<AppShell />}>
                     <Route path="/" element={<Dashboard />} />
@@ -219,6 +250,9 @@ const App = () => (
                     <Route path="/grows" element={<Grows />} />
                     <Route path="/grows/:growId" element={<GrowDetail />} />
                     <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
+                    <Route path="/breeding" element={<BreedingProgramsIndex />} />
+                    <Route path="/breeding/new" element={<BreedingProgramNew />} />
+                    <Route path="/breeding/:programId" element={<BreedingProgramDetail />} />
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/reports/post-grow/:growId" element={<PostGrowLearningReport />} />
                     <Route
@@ -227,6 +261,7 @@ const App = () => (
                     />
 
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/settings/agent-integrations" element={<AgentIntegrations />} />
                     {/* Operator-only routes. Authenticated via AppShell's useRequireAuth,
                         then gated by server-side has_role('operator') via RequireOperatorRole.
                         Non-operator users see a calm access-restricted state. */}

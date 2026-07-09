@@ -28,6 +28,7 @@ export function sanitizeAuthRedirect(
 
   if (typeof value !== "string") return safeFallback;
   // Reject control chars / whitespace / null bytes anywhere.
+  // eslint-disable-next-line no-control-regex -- deliberately match C0 control chars + DEL (plus whitespace) to reject them
   if (/[\s\u0000-\u001f\u007f]/.test(value)) return safeFallback;
   if (value.length === 0 || value.length > 512) return safeFallback;
   if (!value.startsWith("/")) return safeFallback;

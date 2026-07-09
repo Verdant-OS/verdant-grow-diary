@@ -35,7 +35,8 @@ export type QuickLogSnapshotStripAction =
   | { kind: "none" }
   | { kind: "refresh"; label: string; href: string }
   | { kind: "review"; label: string; href: string }
-  | { kind: "add"; label: string; href: string };
+  | { kind: "add"; label: string; href: string }
+  | { kind: "edit"; label: string; href: string };
 
 export interface QuickLogSnapshotStripViewModel {
   status: QuickLogSnapshotStripStatus;
@@ -45,6 +46,13 @@ export interface QuickLogSnapshotStripViewModel {
   description: string;
   /** Captured timestamp (ISO) or null when no snapshot is available. */
   capturedAt: string | null;
+  /**
+   * Absolute, deterministic captured-at label ("Jul 7, 2026, 7:14 PM UTC")
+   * or null when there is no snapshot. Presented alongside the relative
+   * age so growers can always see the exact moment captured. Never
+   * relabels manual data as live.
+   */
+  capturedAtLabel: string | null;
   /** Human-friendly age string ("5 min ago", "2 days ago"), or null. */
   ageLabel: string | null;
   /** Selected metric chips, presenter-safe. Empty when unknown. */
@@ -84,6 +92,26 @@ const DESCRIPTIONS: Record<QuickLogSnapshotStripStatus, string> = {
 };
 
 const SENSORS_HREF = "/sensors";
+/**
+ * Deep-link fragment for the Manual Sensor Reading anchor inside
+ * `/sensors` (see `<section id="manual-reading">` in `src/pages/Sensors.tsx`).
+ * Used by the "Add snapshot" CTA so growers who have no snapshot yet
+ * can enter a manual reading in one tap without hunting for the form.
+ * The manual entry surface labels the reading `source: manual` — this
+ * link never claims to add live data.
+ */
+export const MANUAL_SNAPSHOT_ENTRY_HREF = "/sensors#manual-reading";
+
+/**
+ * Edit action shown only when the current snapshot's source is `manual`.
+ * Never surfaced for `live`, `sim`, `demo`, `csv`, `stale`, or unknown —
+ * editing must never be used to overwrite live-ingest telemetry.
+ */
+export const MANUAL_SNAPSHOT_EDIT_ACTION: QuickLogSnapshotStripAction = {
+  kind: "edit",
+  label: "Edit manual readings",
+  href: MANUAL_SNAPSHOT_ENTRY_HREF,
+};
 
 function actionFor(status: QuickLogSnapshotStripStatus): QuickLogSnapshotStripAction {
   switch (status) {
@@ -94,8 +122,30 @@ function actionFor(status: QuickLogSnapshotStripStatus): QuickLogSnapshotStripAc
     case "invalid":
       return { kind: "review", label: "Review sensor intake", href: SENSORS_HREF };
     case "no_data":
-      return { kind: "add", label: "Add snapshot", href: SENSORS_HREF };
+      return { kind: "add", label: "Add snapshot", href: MANUAL_SNAPSHOT_ENTRY_HREF };
   }
+}
+
+/**
+ * Deterministic absolute-time formatter for the "Captured: …" line.
+ * Uses UTC + a fixed format so unit tests are stable across machines.
+ * Example: "Jul 7, 2026, 7:14 PM UTC".
+ */
+export function formatCapturedAtAbsolute(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return null;
+  const d = new Date(ms);
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const mo = MONTHS[d.getUTCMonth()];
+  const day = d.getUTCDate();
+  const yr = d.getUTCFullYear();
+  let h = d.getUTCHours();
+  const m = d.getUTCMinutes().toString().padStart(2, "0");
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${mo} ${day}, ${yr}, ${h}:${m} ${ampm} UTC`;
 }
 
 
@@ -176,6 +226,7 @@ export function buildQuickLogSnapshotStrip(
       title: TITLES.no_data,
       description: DESCRIPTIONS.no_data,
       capturedAt: null,
+      capturedAtLabel: null,
       ageLabel: null,
       metrics: [],
       action: actionFor("no_data"),
@@ -215,17 +266,24 @@ export function buildQuickLogSnapshotStrip(
   const description = usableButDetached
     ? "Toggle “Attach sensor snapshot” to include it in this log."
     : DESCRIPTIONS[status];
-  const action = usableButDetached ? actionFor("no_data" as const) : actionFor(status);
-  // Detached usable still surfaces no nav button (toggle is the action).
-  const finalAction: QuickLogSnapshotStripAction = usableButDetached
-    ? { kind: "none" }
-    : action;
+  const baseAction = usableButDetached ? actionFor("no_data" as const) : actionFor(status);
+  // When the resolved snapshot is a MANUAL reading and the strip is not
+  // in a detached-toggle state, prefer the edit action so growers can
+  // correct/update the manual reading directly. Never applied for live,
+  // sim, demo, csv, or unknown sources.
+  const finalAction: QuickLogSnapshotStripAction =
+    usableButDetached
+      ? { kind: "none" }
+      : src === "manual" && (status === "usable" || status === "stale")
+        ? MANUAL_SNAPSHOT_EDIT_ACTION
+        : baseAction;
 
   return {
     status,
     title,
     description,
     capturedAt: snapshot.ts,
+    capturedAtLabel: formatCapturedAtAbsolute(snapshot.ts),
     ageLabel,
     metrics: buildMetrics(snapshot),
     action: finalAction,
@@ -349,6 +407,7 @@ export function buildQuickLogStripFromTentState(
       title: TITLES.no_data,
       description: DESCRIPTIONS.no_data,
       capturedAt: null,
+      capturedAtLabel: null,
       ageLabel: null,
       metrics: [],
       action: actionFor("no_data"),
@@ -369,15 +428,22 @@ export function buildQuickLogStripFromTentState(
   const description = usableButDetached
     ? "Toggle “Attach sensor snapshot” to include it in this log."
     : DESCRIPTIONS[status];
-  const action: QuickLogSnapshotStripAction = usableButDetached
+  const baseAction: QuickLogSnapshotStripAction = usableButDetached
     ? { kind: "none" }
     : actionFor(status);
+  const action: QuickLogSnapshotStripAction =
+    !usableButDetached &&
+    snapshot.source === "manual" &&
+    (status === "usable" || status === "stale")
+      ? MANUAL_SNAPSHOT_EDIT_ACTION
+      : baseAction;
 
   return {
     status,
     title,
     description,
     capturedAt: snapshot.captured_at,
+    capturedAtLabel: formatCapturedAtAbsolute(snapshot.captured_at),
     ageLabel,
     metrics: buildStrictMetrics(snapshot),
     action,

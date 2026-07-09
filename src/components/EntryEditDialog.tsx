@@ -9,6 +9,7 @@ import { Loader2, Plus, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { STAGES } from "@/lib/grow";
 import { toast } from "sonner";
+import DiaryStressObservationsSection from "@/components/DiaryStressObservationsSection";
 
 interface Entry {
   id: string;
@@ -17,6 +18,7 @@ interface Entry {
   stage: string | null;
   details: Record<string, unknown>;
   entry_at: string;
+  plant_id?: string | null;
 }
 
 interface Props {
@@ -200,6 +202,13 @@ export default function EntryEditDialog({ entry, open, onOpenChange, onSaved, on
               </div>
             )}
           </div>
+
+          {entry && (
+            <DiaryStressObservationsSection
+              diaryEntryId={entry.id}
+              plantId={entry.plant_id ?? null}
+            />
+          )}
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">

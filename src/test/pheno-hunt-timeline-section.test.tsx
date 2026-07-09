@@ -30,6 +30,13 @@ vi.mock("sonner", () => ({
   },
 }));
 
+// The read-only activity hook is exercised via its own view-model + hook wiring;
+// here we mock it so the section test stays deterministic and offline.
+const activityMock = vi.fn((..._a: unknown[]) => ({ status: "ok", entries: [] as unknown[] }));
+vi.mock("@/hooks/usePhenoHuntActivity", () => ({
+  usePhenoHuntActivity: (...a: unknown[]) => activityMock(...a),
+}));
+
 interface SetupOpts {
   hunt?: { id: string; name: string } | null;
   candidates?: {
@@ -84,6 +91,8 @@ describe("PhenoHuntTimelineSection", () => {
     deleteHuntMock.mockReset();
     toastSuccess.mockReset();
     toastError.mockReset();
+    activityMock.mockReset();
+    activityMock.mockReturnValue({ status: "ok", entries: [] });
   });
 
   it("renders candidate plant links pointing to plant detail routes", async () => {
@@ -99,9 +108,7 @@ describe("PhenoHuntTimelineSection", () => {
       ],
     });
     renderSection();
-    const link = (await screen.findByTestId(
-      "pheno-hunt-candidate-link-p1",
-    )) as HTMLAnchorElement;
+    const link = (await screen.findByTestId("pheno-hunt-candidate-link-p1")) as HTMLAnchorElement;
     expect(link.getAttribute("href")).toBe("/plants/p1?tentId=t1");
     expect(link.textContent).toContain("#1");
     expect(link.textContent).toContain("Blueberry Auto");
@@ -111,9 +118,7 @@ describe("PhenoHuntTimelineSection", () => {
     setup({ candidates: [] });
     renderSection();
     fireEvent.click(await screen.findByTestId("pheno-hunt-delete-btn"));
-    expect(
-      screen.getByTestId("pheno-hunt-delete-confirm"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("pheno-hunt-delete-confirm")).toBeInTheDocument();
     expect(deleteHuntMock).not.toHaveBeenCalled();
   });
 
@@ -138,9 +143,7 @@ describe("PhenoHuntTimelineSection", () => {
     await waitFor(() => expect(deleteHuntMock).toHaveBeenCalledTimes(1));
     expect(deleteHuntMock).toHaveBeenCalledWith({ huntId: "h1" });
     await waitFor(() =>
-      expect(toastSuccess).toHaveBeenCalledWith(
-        expect.stringMatching(/untagged/i),
-      ),
+      expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/untagged/i)),
     );
   });
 
@@ -151,9 +154,42 @@ describe("PhenoHuntTimelineSection", () => {
     fireEvent.click(await screen.findByTestId("pheno-hunt-delete-btn"));
     fireEvent.click(screen.getByTestId("pheno-hunt-delete-confirm-btn"));
     await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith(
-        expect.stringMatching(/Could not delete/i),
-      ),
+      expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/Could not delete/i)),
     );
+  });
+
+  it("renders the pheno activity timeline for the resolved hunt", async () => {
+    activityMock.mockReturnValue({
+      status: "ok",
+      entries: [
+        {
+          id: "cross:x1",
+          kind: "cross",
+          occurredAt: "2026-07-06",
+          title: "Cross recorded — GasCake S1",
+          detail: "♀ Gas × Self (Gas)",
+          badge: "S1 / Selfed",
+        },
+      ],
+    });
+    setup({ candidates: [] });
+    renderSection();
+    // The activity block appears once the hunt resolves...
+    const block = await screen.findByTestId("pheno-hunt-activity");
+    expect(block).toHaveTextContent(/Cross recorded/);
+    expect(screen.getByTestId("pheno-timeline-entry-cross:x1")).toBeInTheDocument();
+    // ...and the hook is scoped to the resolved hunt id, not the grow id.
+    await waitFor(() => expect(activityMock).toHaveBeenCalledWith("h1"));
+  });
+
+  it("omits the activity block when the hunt has no pheno activity", async () => {
+    activityMock.mockReturnValue({ status: "ok", entries: [] });
+    setup({
+      candidates: [{ id: "p1", name: "Plant", strain: null, candidate_label: "#1", tent_id: null }],
+    });
+    renderSection();
+    // Wait for the section to render (candidate link present), then assert no activity.
+    await screen.findByTestId("pheno-hunt-candidate-link-p1");
+    expect(screen.queryByTestId("pheno-hunt-activity")).toBeNull();
   });
 });

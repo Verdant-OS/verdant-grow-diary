@@ -50,6 +50,33 @@ describe("Breeding V0 safety: no execution on approval", () => {
       expect(p.action_type).toBe("breeding_follow_up");
     }
   });
+
+  it("originating_timeline_events refs carry no forbidden/secret-like fields", () => {
+    const event: BreedingEvent = {
+      id: "ev-safety-2",
+      type: "cross_harvest",
+      occurred_at: "2026-06-20T12:00:00Z",
+    };
+    const payloads = buildBreedingActionQueuePayloads(event, "grow-1", "plant-1", "tent-1");
+    expect(payloads.length).toBeGreaterThan(0);
+    for (const p of payloads) {
+      const refs = p.originating_timeline_events as unknown as Array<Record<string, unknown>>;
+      expect(refs).toHaveLength(1);
+      for (const forbidden of [
+        "raw_payload",
+        "service_role",
+        "bridge_token",
+        "api_key",
+        "access_token",
+        "refresh_token",
+        "user_id",
+        "device_command",
+      ]) {
+        expect(refs[0]).not.toHaveProperty(forbidden);
+      }
+      expect(Object.keys(refs[0]).sort()).toEqual(["id", "occurred_at", "source", "type"]);
+    }
+  });
 });
 
 describe("Breeding V0 safety: payload privacy", () => {

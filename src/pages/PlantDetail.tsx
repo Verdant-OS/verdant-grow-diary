@@ -25,6 +25,7 @@ import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
 import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
+import { usePlantGalleryPhotoCount } from "@/hooks/usePlantGalleryPhotoCount";
 import PlantDetailHarvestEvidenceReportMount from "@/components/PlantDetailHarvestEvidenceReportMount";
 import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
 import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadiness";
@@ -235,6 +236,7 @@ export default function PlantDetail() {
   const contextTentId = searchParams.get("tentId");
   const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
   const { data: tent } = useGrowTent(plant?.tentId);
+  const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null]);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null]);
 
@@ -447,6 +449,7 @@ export default function PlantDetail() {
       <PlantDetailHarvestWatchCard
         plantId={plant.id}
         hasPlantPhoto={!!plant.photo}
+        galleryPhotoCount={plantGalleryPhotoCount}
       />
       <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
       <PlantDetailAiDoctorReadiness

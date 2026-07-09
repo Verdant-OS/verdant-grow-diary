@@ -28,8 +28,24 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
+import { planQuickLogActionSwitchReset } from "@/lib/quickLogActionSwitchResetRules";
+import {
+  QUICK_LOG_POST_SAVE_TITLE,
+  QUICK_LOG_POST_SAVE_VIEW_LABEL,
+  QUICK_LOG_POST_SAVE_ANOTHER_LABEL,
+  QUICK_LOG_POST_SAVE_CLOSE_LABEL,
+  QUICK_LOG_SAVE_FAILED_MESSAGE,
+  QUICK_LOG_CLOSE_BLOCKED_HINT,
+  buildQuickLogPostSaveDescription,
+  shouldBlockQuickLogClose,
+} from "@/lib/quickLogSaveGuardRules";
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import { STAGES } from "@/lib/grow";
+import {
+  resolveQuickLogStageDefault,
+  normalizeQuickLogStage,
+  isUserDrivenPlantSwitch,
+} from "@/lib/quickLogStageDefaultRules";
 import { EC_UNITS, EC_UNIT_LABEL, type EcUnit } from "@/constants/units";
 import {
   MANUAL_SENSOR_TRUTH_TITLE,
@@ -214,7 +230,17 @@ export default function QuickLog({
     !plants.some((p) => typeof p.tent_id === "string" && p.tent_id.length > 0);
 
   const [note, setNote] = useState("");
-  const [stage, setStage] = useState(activeGrow?.stage || "veg");
+  // Slice A2: stage starts UNKNOWN ("") and is defaulted from the selected
+  // plant / active grow by the effect below. It is NOT hardcoded to "veg" —
+  // an unknown context must stay unknown, not be mislabeled Vegetative.
+  const [stage, setStage] = useState<string>("");
+  // True once the grower picks a stage by hand; suppresses re-defaulting so
+  // we never clobber their explicit choice. Mirrors snapshotUserTouchedRef.
+  const stageUserTouchedRef = useRef(false);
+  // Tracks the previously selected plant so we can distinguish a real
+  // user-driven plant switch (re-default) from the initial ""→P auto-select
+  // (keep any stage the grower already picked).
+  const prevPlantIdRef = useRef<string>("");
   const [eventType, setEventType] = useState<string>("observation");
   const [plantId, setPlantId] = useState<string>("");
   const [snapshot, setSnapshot] = useState(false);
@@ -266,6 +292,10 @@ export default function QuickLog({
   const viewPlantBtnRef = useRef<HTMLAnchorElement | null>(null);
   const hardwareUserTouchedRef = useRef(false);
   const snapshotUserTouchedRef = useRef(false);
+  // Synchronous in-flight guard so a rapid double-click cannot fire a
+  // second submit before `busy` state has propagated. Complements the
+  // existing `busy || !!savedTarget` button-disabled logic.
+  const submitInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!open || !prefill) return;
@@ -303,6 +333,38 @@ export default function QuickLog({
     () => activeTents.find((t) => t.id === selectedPlant?.tent_id) ?? null,
     [activeTents, selectedPlant?.tent_id],
   );
+
+  // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
+  // from one already-selected plant to a different one — the new target's stage
+  // should win. It must NOT clear the touched flag on the initial ""→P
+  // auto-select (async plants load / prefill / last-target), because the grower
+  // may have already picked a stage before the plant resolved; clobbering that
+  // would silently discard their choice. prevPlantIdRef tracks the last
+  // NON-EMPTY plant id so a switch that passes through the cleared "Choose a
+  // plant…" state (A → "" → B) is still seen as A→B. Ordered BEFORE the
+  // defaulting effect so the flag is settled before the default is recomputed.
+  useEffect(() => {
+    if (!open) return;
+    if (isUserDrivenPlantSwitch(prevPlantIdRef.current, plantId)) {
+      stageUserTouchedRef.current = false;
+    }
+    if (plantId) prevPlantIdRef.current = plantId;
+  }, [open, plantId]);
+
+  // Slice A2: default the stage from the selected plant, else the active grow.
+  // Skipped once the grower has manually chosen a stage (touched ref). The
+  // `stage` column on the plant row is read structurally — a narrow, explicit
+  // read that does not depend on the generated types exposing it, and never
+  // widens the value to `any`.
+  useEffect(() => {
+    if (!open) return;
+    if (stageUserTouchedRef.current) return;
+    const resolved = resolveQuickLogStageDefault({
+      plantStage: (selectedPlant as { stage?: unknown } | null)?.stage ?? null,
+      growStage: activeGrow?.stage ?? null,
+    });
+    setStage((prev) => (prev === resolved ? prev : resolved));
+  }, [open, selectedPlant, activeGrow?.stage]);
 
   useEffect(() => {
     if (!open) return;
@@ -350,7 +412,6 @@ export default function QuickLog({
   useEffect(() => {
     if (!open) return;
     snapshotUserTouchedRef.current = false;
-     
   }, [open, selectedPlant?.tent_id]);
 
   useEffect(() => {
@@ -391,6 +452,9 @@ export default function QuickLog({
     setShowMore(false);
     setEventType("observation");
     setPlantId("");
+    setStage("");
+    stageUserTouchedRef.current = false;
+    prevPlantIdRef.current = "";
     setSnapshot(false);
     snapshotUserTouchedRef.current = false;
     setRemindAt("");
@@ -413,6 +477,48 @@ export default function QuickLog({
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
+  }
+
+  /**
+   * Wrap setEventType so switching activity clears stale event-specific
+   * draft fields, previews, and the previous save's status. Scoped per
+   * `planQuickLogActionSwitchReset` — only fields owned by the family
+   * we're leaving get cleared. Global fields (target plant, note,
+   * stage, snapshot, remindAt) are preserved.
+   */
+  function handleEventTypeChange(next: string) {
+    const plan = planQuickLogActionSwitchReset(eventType, next);
+    setEventType(next);
+    if (!plan.changed) return;
+    if (plan.clearHarvest) {
+      setHarvestPhotoAngle("");
+      setHarvestPhotoLighting("");
+    }
+    if (plan.clearFeeding) {
+      setDetails(emptyDetails());
+      setHardware(emptyHardware());
+      hardwareUserTouchedRef.current = false;
+      setHardwareOpen(false);
+    }
+    if (plan.clearEnvironment) {
+      setEnvRoomTempF("");
+      setEnvHumidityPct("");
+      setEnvVpdKpa("");
+      setEnvWaterTempValue("");
+      setEnvWaterTempUnit("F");
+      setEnvEcMscm("");
+    }
+    if (plan.clearMaturity) {
+      setEarlyMilestone(null);
+      setEarlyVigor(null);
+      setEarlyNotes("");
+      setEarlyManuallyOpen(false);
+    }
+    if (plan.clearSaveStatus) {
+      setSavedTarget(null);
+      setSaveError(null);
+      setWateringError(null);
+    }
   }
 
   function resetForAnother() {
@@ -465,6 +571,16 @@ export default function QuickLog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitInFlightRef.current || busy || savedTarget) return;
+    submitInFlightRef.current = true;
+    try {
+      await runSubmit();
+    } finally {
+      submitInFlightRef.current = false;
+    }
+  }
+
+  async function runSubmit() {
     setSaveError(null);
 
     if (!user || !activeGrowId) {
@@ -563,7 +679,9 @@ export default function QuickLog({
       if (!result.ok) {
         const reason = result.reason ?? "save_failed";
         const message = quickLogReasonToOperatorMessage(reason);
-        setSaveError(`${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`);
+        setSaveError(
+          `${message} Your input is still here — retry when you have re-selected a valid grow, tent, and plant.`,
+        );
         // Surface the (allow-listed) reason code alongside the friendly
         // copy so the operator and tests can correlate the failure with
         // logs without exposing tokens, endpoints, or raw payloads.
@@ -573,7 +691,18 @@ export default function QuickLog({
         return;
       }
 
-      if (activeGrow && stage !== activeGrow.stage) {
+      // Persist the stage back to the grow ONLY when the grower changed it by
+      // hand. Originally `stage` initialized to the grow's own stage, so this
+      // writeback fired only on a manual edit; Slice A2 now defaults `stage`
+      // from the selected PLANT, which can differ from the grow, so we gate on
+      // the touched ref to avoid silently mutating the grow's stage on an
+      // ordinary save. Still never writes an unknown/empty stage.
+      if (
+        activeGrow &&
+        stageUserTouchedRef.current &&
+        normalizeQuickLogStage(stage) &&
+        stage !== activeGrow.stage
+      ) {
         await supabase.from("grows").update({ stage }).eq("id", activeGrowId);
       }
 
@@ -618,7 +747,7 @@ export default function QuickLog({
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to save";
-      setSaveError(`${message}. Your input is still here — retry when connection is stable.`);
+      setSaveError(QUICK_LOG_SAVE_FAILED_MESSAGE);
       toast.error(message);
       console.error("[QuickLog] unexpected error", err);
     } finally {
@@ -648,8 +777,20 @@ export default function QuickLog({
     <Dialog
       open={open}
       onOpenChange={(o) => {
+        if (!o) {
+          const blocked = shouldBlockQuickLogClose({
+            saving: busy,
+            inFlight: submitInFlightRef.current,
+          });
+          if (blocked) {
+            toast.message(QUICK_LOG_CLOSE_BLOCKED_HINT);
+            return;
+          }
+          onOpenChange(false);
+          reset();
+          return;
+        }
         onOpenChange(o);
-        if (!o) reset();
       }}
     >
       <DialogContent className="glass max-w-md max-h-[90vh] overflow-y-auto">
@@ -680,7 +821,6 @@ export default function QuickLog({
         />
 
         <form onSubmit={submit} className="grid gap-4">
-
           {(() => {
             const draftPreview = buildQuickLogDraftPreview({ prefill });
             if (!draftPreview.show) return null;
@@ -1067,9 +1207,7 @@ export default function QuickLog({
               data-testid="quick-log-snapshot-manual-truth"
               className="rounded-lg border border-border/50 bg-background/40 p-2 text-[11px] leading-snug space-y-0.5"
             >
-              <p className="font-medium text-foreground">
-                {MANUAL_SENSOR_TRUTH_TITLE}
-              </p>
+              <p className="font-medium text-foreground">{MANUAL_SENSOR_TRUTH_TITLE}</p>
               <ul className="text-muted-foreground space-y-0.5">
                 {MANUAL_SENSOR_TRUTH_LINES.map((line) => (
                   <li key={line} data-testid="quick-log-snapshot-manual-truth-line">
@@ -1086,7 +1224,6 @@ export default function QuickLog({
                 )}
               </ul>
             </div>
-
 
             {tentSetupRequired ? (
               <p
@@ -1151,13 +1288,19 @@ export default function QuickLog({
               <EventTypeSelector
                 id="quick-log-event-type"
                 value={eventType}
-                onValueChange={setEventType}
+                onValueChange={handleEventTypeChange}
               />
               <div>
                 <Label className="text-xs">Stage</Label>
-                <Select value={stage} onValueChange={setStage}>
-                  <SelectTrigger>
-                    <SelectValue />
+                <Select
+                  value={stage}
+                  onValueChange={(v) => {
+                    stageUserTouchedRef.current = true;
+                    setStage(v);
+                  }}
+                >
+                  <SelectTrigger data-testid="quick-log-stage-select">
+                    <SelectValue placeholder="Select stage" />
                   </SelectTrigger>
                   <SelectContent>
                     {STAGES.map((s) => (
@@ -1215,6 +1358,26 @@ export default function QuickLog({
               onChange={(e) => {
                 setNote(e.target.value);
                 setSaveError(null);
+              }}
+              onInput={(e) => {
+                // Native input events (paste, dictation, programmatic
+                // dispatchEvent) may bypass React's synthetic onChange in
+                // some environments. Mirror the DOM value into state so
+                // preview validation and save always see what the grower
+                // visibly typed.
+                const v = (e.currentTarget as HTMLTextAreaElement).value;
+                setNote((prev) => (prev === v ? prev : v));
+              }}
+              onCompositionEnd={(e) => {
+                // IME / dictation finalization: commit the final composed
+                // value into React state so validation clears immediately.
+                const v = (e.currentTarget as HTMLTextAreaElement).value;
+                setNote((prev) => (prev === v ? prev : v));
+              }}
+              onBlur={(e) => {
+                // Last-chance sync before the grower taps Save.
+                const v = e.currentTarget.value;
+                setNote((prev) => (prev === v ? prev : v));
               }}
               placeholder="Watered, looking healthy, slight yellowing on a fan leaf…"
               rows={3}
@@ -1826,13 +1989,23 @@ export default function QuickLog({
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="h-4 w-4 text-primary mt-0.5" aria-hidden="true" />
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Saved</p>
-                  <p className="text-[12px] text-muted-foreground">
-                    Logged {savedVerb(savedTarget.eventType)} to{" "}
-                    <strong className="text-foreground font-semibold">{savedTarget.name}</strong>
-                    {savedTarget.tentName ? <> · {savedTarget.tentName}</> : null}
-                    {savedTarget.growName ? <> · {savedTarget.growName}</> : null}
-                    {" · just now"}
+                  <p
+                    className="text-sm font-semibold text-foreground"
+                    data-testid="quick-log-post-save-title"
+                  >
+                    {QUICK_LOG_POST_SAVE_TITLE}
+                  </p>
+                  <p
+                    className="text-[12px] text-muted-foreground"
+                    data-testid="quick-log-post-save-description"
+                  >
+                    {buildQuickLogPostSaveDescription({
+                      targetName: savedTarget.name,
+                      tentName: savedTarget.tentName ?? null,
+                      growName: savedTarget.growName ?? null,
+                      action: savedVerb(savedTarget.eventType),
+                      photoAttached: false,
+                    })}
                   </p>
                 </div>
               </div>
@@ -1847,10 +2020,14 @@ export default function QuickLog({
                     if (typeof document !== "undefined") {
                       (document.activeElement as HTMLElement | null)?.blur?.();
                     }
+                    // Match the Dialog wrapper's close path: without reset()
+                    // the component (kept mounted in AppShell) reopens showing
+                    // the stale post-save panel instead of a fresh form.
                     onOpenChange(false);
+                    reset();
                   }}
                 >
-                  View {savedTarget.name}
+                  {QUICK_LOG_POST_SAVE_VIEW_LABEL}
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
                 <Button
@@ -1859,15 +2036,20 @@ export default function QuickLog({
                   data-testid="quick-log-post-save-another"
                   onClick={resetForAnother}
                 >
-                  Log another for {savedTarget.name}
+                  {QUICK_LOG_POST_SAVE_ANOTHER_LABEL}
                 </Button>
                 <Button
                   type="button"
                   variant="ghost"
                   data-testid="quick-log-post-save-close"
-                  onClick={() => onOpenChange(false)}
+                  onClick={() => {
+                    // Same reset-on-close as the Dialog wrapper path — see
+                    // the View-plant handler above.
+                    onOpenChange(false);
+                    reset();
+                  }}
                 >
-                  Close
+                  {QUICK_LOG_POST_SAVE_CLOSE_LABEL}
                 </Button>
               </div>
             </div>

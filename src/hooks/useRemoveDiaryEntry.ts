@@ -30,6 +30,8 @@ export interface RemoveDiaryEntryArgs {
   plantId?: string | null;
   tentId?: string | null;
   growId?: string | null;
+  /** Optional storage path in `diary-videos` bucket to clean up after delete. */
+  videoPath?: string | null;
 }
 
 export interface UseRemoveDiaryEntryResult {
@@ -50,6 +52,7 @@ export function useRemoveDiaryEntry(
       plantId,
       tentId,
       growId,
+      videoPath,
     }: RemoveDiaryEntryArgs): Promise<boolean> => {
       if (!id) return false;
       setIsRemoving(true);
@@ -63,6 +66,12 @@ export function useRemoveDiaryEntry(
           console.warn("[diary] remove failed", { code: error.code });
           toast.error(REMOVE_LOG_ERROR_TOAST);
           return false;
+        }
+        if (videoPath && typeof videoPath === "string" && videoPath.trim() !== "") {
+          await supabase.storage
+            .from("diary-videos")
+            .remove([videoPath])
+            .catch(() => {});
         }
         toast.success(getRemoveSuccessToast(isPhotoLog));
         const meta: DiaryEntryRemovalMetadata = {

@@ -11,6 +11,8 @@
  *
  * Read-only. No writes, no automation, no device control.
  */
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -97,24 +99,12 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
     render(<EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />, {
       wrapper: wrap(),
     });
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-metric-temp_f")).toBeInTheDocument(),
-    );
-    expect(screen.getByTestId("ecowitt-metric-temp_f").textContent).toBe(
-      "78.6 °F",
-    );
-    expect(screen.getByTestId("ecowitt-metric-humidity_pct").textContent).toBe(
-      "56 %",
-    );
-    expect(screen.getByTestId("ecowitt-metric-soil_moisture_pct").textContent).toBe(
-      "45 %",
-    );
-    expect(screen.getByTestId("ecowitt-metric-co2_ppm").textContent).toBe(
-      "966 ppm",
-    );
-    expect(screen.getByTestId("ecowitt-metric-vpd_kpa").textContent).toMatch(
-      /kPa/,
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-metric-temp_f")).toBeInTheDocument());
+    expect(screen.getByTestId("ecowitt-metric-temp_f").textContent).toBe("78.6 °F");
+    expect(screen.getByTestId("ecowitt-metric-humidity_pct").textContent).toBe("56 %");
+    expect(screen.getByTestId("ecowitt-metric-soil_moisture_pct").textContent).toBe("45 %");
+    expect(screen.getByTestId("ecowitt-metric-co2_ppm").textContent).toBe("966 ppm");
+    expect(screen.getByTestId("ecowitt-metric-vpd_kpa").textContent).toMatch(/kPa/);
   });
 
   it("shows empty state when no EcoWitt data exists", async () => {
@@ -122,9 +112,7 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
     render(<EcowittLatestSnapshotCard tentId={TENT_A} now={NOW} />, {
       wrapper: wrap(),
     });
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-snapshot-empty")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("ecowitt-snapshot-empty")).toBeInTheDocument());
     expect(
       screen.getByText(
         "No EcoWitt readings yet. Send a local test payload to verify the integration.",
@@ -149,16 +137,10 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
       wrapper: wrap(),
     });
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ecowitt-test-sender-badge"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ecowitt-test-sender-badge")).toBeInTheDocument(),
     );
-    expect(
-      screen.getByTestId("ecowitt-test-sender-badge").textContent,
-    ).toBe("Local Test Payload");
-    expect(screen.getByTestId("ecowitt-transport").textContent).toBe(
-      "Transport: mqtt_local_test",
-    );
+    expect(screen.getByTestId("ecowitt-test-sender-badge").textContent).toBe("Local Test Payload");
+    expect(screen.getByTestId("ecowitt-transport").textContent).toBe("Transport: mqtt_local_test");
   });
 
   it("displays stale/fresh status using existing logic", async () => {
@@ -177,34 +159,19 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
       wrapper: wrap(),
     });
     await waitFor(() =>
-      expect(
-        screen.getByTestId("ecowitt-snapshot-freshness"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("ecowitt-snapshot-freshness")).toBeInTheDocument(),
     );
-    expect(screen.getByTestId("ecowitt-snapshot-freshness").textContent).toBe(
-      "stale",
-    );
-    expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe(
-      "Stale",
-    );
+    expect(screen.getByTestId("ecowitt-snapshot-freshness").textContent).toBe("stale");
+    expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe("Stale");
   });
 
   it("shows tent name when provided", async () => {
     rowsMock = [ecowittRow({})];
-    render(
-      <EcowittLatestSnapshotCard
-        tentId={TENT_A}
-        tentName="Tent Alpha"
-        now={NOW}
-      />,
-      { wrapper: wrap() },
-    );
-    await waitFor(() =>
-      expect(screen.getByTestId("ecowitt-tent-name")).toBeInTheDocument(),
-    );
-    expect(screen.getByTestId("ecowitt-tent-name").textContent).toBe(
-      "Tent Alpha",
-    );
+    render(<EcowittLatestSnapshotCard tentId={TENT_A} tentName="Tent Alpha" now={NOW} />, {
+      wrapper: wrap(),
+    });
+    await waitFor(() => expect(screen.getByTestId("ecowitt-tent-name")).toBeInTheDocument());
+    expect(screen.getByTestId("ecowitt-tent-name").textContent).toBe("Tent Alpha");
   });
 });
 
@@ -213,8 +180,6 @@ describe("EcowittLatestSnapshotCard — proof card behavior", () => {
 // ---------------------------------------------------------------------------
 describe("EcowittLatestSnapshotCard — source code safety", () => {
   it("component source does not reference action_queue", () => {
-    const fs = require("node:fs");
-    const path = require("node:path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/EcowittLatestSnapshotCard.tsx"),
       "utf8",
@@ -227,8 +192,6 @@ describe("EcowittLatestSnapshotCard — source code safety", () => {
   });
 
   it("component source does not call ingest or write endpoints", () => {
-    const fs = require("node:fs");
-    const path = require("node:path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../components/EcowittLatestSnapshotCard.tsx"),
       "utf8",
@@ -240,8 +203,6 @@ describe("EcowittLatestSnapshotCard — source code safety", () => {
   });
 
   it("hook source does not reference action_queue or ingest writes", () => {
-    const fs = require("node:fs");
-    const path = require("node:path");
     const src = fs.readFileSync(
       path.resolve(__dirname, "../hooks/useEcowittLatestSnapshot.ts"),
       "utf8",

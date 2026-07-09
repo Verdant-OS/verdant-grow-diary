@@ -26,11 +26,24 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   fullyParallel: false,
   retries: 0,
-  reporter: [["list"]],
+  // The list reporter feeds CI logs; the html reporter produces the
+  // playwright-report/ directory that the workflow's artifact guard requires
+  // and uploads. With tracing disabled on real-auth runs (see `use` below),
+  // the report contains only screenshots/videos — no network headers.
+  reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: BASE_URL,
-    trace: "retain-on-failure",
+    // Debugging artifacts kept only when a test fails (CI uploads them).
+    //
+    // Traces record network request/response headers and bodies. Real-auth
+    // runs (E2E_TEST_EMAIL present) would bake the disposable test account's
+    // Supabase bearer/session tokens into trace zips that the workflow
+    // uploads as public-ish CI artifacts — so tracing is DISABLED for those
+    // runs. Screenshots and videos are pixels (no headers) and stay on.
+    // Mocked/unauthenticated runs keep failure traces (no real tokens).
+    trace: process.env.E2E_TEST_EMAIL ? "off" : "retain-on-failure",
     video: "retain-on-failure",
+    screenshot: "only-on-failure",
   },
   // Mocked, non-destructive specs navigate to relative routes
   // (e.g. page.goto("/auth")), so baseURL must be backed by a running app.

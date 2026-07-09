@@ -17,7 +17,6 @@ import {
   type Finding,
 } from "@/test/utils/contextualPhenoComparisonStaticSafety";
 
-
 describe("contextualPhenoComparisonStaticSafety — scanner", () => {
   it("detects write/API operations", () => {
     const src = [
@@ -102,7 +101,7 @@ describe("contextualPhenoComparisonStaticSafety — formatters", () => {
       line: 42,
       category: "ranking/selection",
       phrase: "winner",
-      excerpt: "const label = \"Winner\";",
+      excerpt: 'const label = "Winner";',
     },
     {
       file: "src/pages/ContextualPhenoComparisonDemo.tsx",
@@ -125,8 +124,8 @@ describe("contextualPhenoComparisonStaticSafety — formatters", () => {
     const report = formatLocalReport(findings);
     expect(report).toContain("Contextual Pheno Comparison static safety failed");
     expect(report).toContain("src/components/ContextualPhenoComparisonPanel.tsx");
-    expect(report).toContain("- line 42 [ranking/selection] \"winner\"");
-    expect(report).toContain("- line 88 [write/API operation] \"functions-invoke\"");
+    expect(report).toContain('- line 42 [ranking/selection] "winner"');
+    expect(report).toContain('- line 88 [write/API operation] "functions-invoke"');
   });
 
   it("returns empty local report for no findings", () => {
@@ -140,7 +139,7 @@ describe("contextualPhenoComparisonStaticSafety — formatters", () => {
       /^::error file=src\/components\/ContextualPhenoComparisonPanel\.tsx,line=42,title=Contextual Pheno Comparison safety::/,
     );
     expect(lines[0]).toContain("[ranking/selection]");
-    expect(lines[0]).toContain("\"winner\"");
+    expect(lines[0]).toContain('"winner"');
   });
 
   it("sanitises newlines and :: in annotation messages", () => {
@@ -228,7 +227,7 @@ describe("contextualPhenoComparisonStaticSafety — compact JSON diagnostics", (
     line: 42,
     category: "ranking/selection",
     phrase: "winner",
-    excerpt: "const label = \"Winner\";",
+    excerpt: 'const label = "Winner";',
   };
   const f2: Finding = {
     file: "src/pages/ContextualPhenoComparisonDemo.tsx",
@@ -280,7 +279,12 @@ describe("contextualPhenoComparisonStaticSafety — compact JSON diagnostics", (
       excerpt: "line1\nline2\rline3\t\x07ok",
     };
     const parsed = JSON.parse(formatFindingsJson([dirty]));
-    expect(parsed[0].sourceLineSnippet).not.toMatch(/[\n\r\t\x00-\x1f]/);
+    expect(parsed[0].sourceLineSnippet.includes("\n")).toBe(false);
+    expect(parsed[0].sourceLineSnippet.includes("\r")).toBe(false);
+    expect(parsed[0].sourceLineSnippet.includes("\t")).toBe(false);
+    expect([...parsed[0].sourceLineSnippet].some((ch: string) => ch.charCodeAt(0) < 32)).toBe(
+      false,
+    );
     expect(parsed[0].sourceLineSnippet).toContain("line1 line2 line3");
   });
 
@@ -291,4 +295,3 @@ describe("contextualPhenoComparisonStaticSafety — compact JSON diagnostics", (
     expect(json.length).toBeLessThan(1_000);
   });
 });
-

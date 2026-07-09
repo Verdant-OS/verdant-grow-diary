@@ -4,7 +4,7 @@ import * as path from "path";
 
 const ADR_PATH = path.resolve(
   __dirname,
-  "../../docs/integrations/spider-farmer-ggs-backhaul-decision.md"
+  "../../docs/integrations/spider-farmer-ggs-backhaul-decision.md",
 );
 
 function readAdr(): string {
@@ -54,13 +54,11 @@ describe("Spider Farmer GGS Backhaul ADR", () => {
     it("preserves step 1: placement + antenna + clean power + channel discipline", () => {
       const adr = readAdr();
       // Isolate the escalation ladder table to avoid matching the Decision section
-      const ladderMatch = adr.match(/## Escalation Ladder[\s\S]*?(?=## |\Z)/);
+      const ladderMatch = adr.match(/## Escalation Ladder[\s\S]*?(?=## |Z)/);
       expect(ladderMatch).toBeTruthy();
       const ladder = ladderMatch![0];
 
-      const step1Index = ladder.search(
-        /placement.*antenna.*clean power.*channel discipline/i
-      );
+      const step1Index = ladder.search(/placement.*antenna.*clean power.*channel discipline/i);
       const step2Index = ladder.search(/roaming stability tuning/i);
       const step3Index = ladder.search(/Go-Back-N buffering/i);
       const step4Index = ladder.search(/Selective Repeat/i);

@@ -2,7 +2,7 @@
  * contextual-pheno-comparison-a11y-viewports —
  *
  * Screen-reader / a11y regression for the Contextual Pheno Comparison
- * v0 panel at mobile (375px) and tablet (768px) widths.
+ * v0 panel at mobile (375px), tablet (768px), and desktop (1024px) widths.
  *
  * jsdom does not compute responsive layout; viewport width is set so
  * media-query-aware code branches match, but assertions target DOM
@@ -29,9 +29,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     {},
     {
       get() {
-        throw new Error(
-          "ContextualPhenoComparison a11y viewport test must not touch supabase.",
-        );
+        throw new Error("ContextualPhenoComparison a11y viewport test must not touch supabase.");
       },
     },
   ),
@@ -40,6 +38,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 const VIEWPORTS: ReadonlyArray<{ name: string; width: number; height: number }> = [
   { name: "mobile-375", width: 375, height: 812 },
   { name: "tablet-768", width: 768, height: 1024 },
+  { name: "desktop-1024", width: 1024, height: 768 },
 ];
 
 function setViewport(width: number, height: number) {
@@ -57,9 +56,7 @@ function setViewport(width: number, height: number) {
 }
 
 function renderPanel() {
-  const view = buildContextualPhenoComparisonView(
-    CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS,
-  );
+  const view = buildContextualPhenoComparisonView(CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS);
   return { view, ...render(<ContextualPhenoComparisonPanel view={view} />) };
 }
 
@@ -106,9 +103,7 @@ for (const vp of VIEWPORTS) {
     it("caveat and plant count remain readable (present in DOM, not aria-hidden)", () => {
       renderPanel();
       const caveat = screen.getByTestId("contextual-pheno-comparison-caveat");
-      const count = screen.getByTestId(
-        "contextual-pheno-comparison-plant-count",
-      );
+      const count = screen.getByTestId("contextual-pheno-comparison-plant-count");
       expect(caveat).toBeInTheDocument();
       expect(caveat).not.toHaveAttribute("aria-hidden", "true");
       expect(count).toBeInTheDocument();
@@ -172,9 +167,8 @@ for (const vp of VIEWPORTS) {
       renderPanel();
       const panel = screen.getByTestId("contextual-pheno-comparison-panel");
       expect(
-        panel.querySelectorAll(
-          "button, a[href], input, select, textarea, form, [role='button']",
-        ).length,
+        panel.querySelectorAll("button, a[href], input, select, textarea, form, [role='button']")
+          .length,
       ).toBe(0);
     });
   });

@@ -4,7 +4,7 @@
  * Presenter only. Explains Verdant's AI Doctor as an evidence-aware,
  * cautious, grower-approved advisor. No Supabase, no AI calls, no
  * Action Queue writes, no device control. Copy is source-labeled and
- * avoids every phrase in VERDANT_FORBIDDEN_PUBLIC_PHRASES.
+ * avoids forbidden automation / device-control language.
  */
 import { Link } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";

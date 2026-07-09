@@ -1,9 +1,20 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Settings as SettingsIcon } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/store/auth";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { PRICING_TIERS } from "@/config/pricing";
 import {
   describeSettingsTile,
   settingsTileAriaLabel,
@@ -25,6 +36,7 @@ import {
   saveTemperatureUnitPreference,
   clearTemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+
 
 interface TileProps {
   name: string;
@@ -247,6 +259,148 @@ function TemperatureUnitTile() {
   );
 }
 
+/**
+ * Subscription tile — READ-ONLY presenter.
+ *
+ * Reads the caller's entitlement via useMyEntitlements (RLS-protected select-own).
+ * Features are read from PRICING_TIERS (single source of truth).
+ * Manage/Cancel buttons are placeholders — they never call Paddle, never call
+ * the billing API, and never write account status. They open an informational
+ * dialog only.
+ */
+function SubscriptionTile() {
+  const { loading, entitlement } = useMyEntitlements();
+  const [dialog, setDialog] = useState<null | "manage" | "cancel">(null);
+
+  const planId = entitlement?.displayPlanId ?? null;
+  const tier = planId ? PRICING_TIERS.find((t) => t.id === planId) ?? null : null;
+
+  const label = loading
+    ? "Loading…"
+    : tier
+      ? tier.name
+      : "Plan status unavailable";
+
+  const isFree = !loading && (planId === "free" || (!tier && !planId));
+  const isPaid = !loading && !!tier && planId !== "free";
+
+  const isStaff = !!entitlement?.isStaff;
+
+  return (
+    <Tile name="Subscription" state="available">
+      <div
+        className="flex items-center justify-between gap-2 mb-2"
+        data-testid="settings-subscription"
+        data-plan={planId ?? "unknown"}
+        data-staff={isStaff ? "true" : "false"}
+      >
+        <div>
+          <p className="text-sm">
+            Current plan:{" "}
+            <span
+              className="font-medium text-foreground"
+              data-testid="settings-subscription-plan"
+            >
+              {label}
+            </span>
+          </p>
+          {isStaff && (
+            <p
+              className="text-xs text-muted-foreground mt-1"
+              data-testid="settings-subscription-staff-note"
+            >
+              Internal staff — Pro capabilities, 10,000 AI credits/month.
+            </p>
+          )}
+          {!loading && !tier && (
+            <p className="text-xs text-muted-foreground">
+              We couldn't determine your plan right now. Your grow data is safe
+              — try refreshing in a moment.
+            </p>
+          )}
+        </div>
+      </div>
+
+
+      {tier && (
+        <ul
+          className="mt-2 space-y-1 text-xs text-muted-foreground"
+          data-testid="settings-subscription-features"
+        >
+          {tier.features.map((f) => (
+            <li key={f}>• {f}</li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-wrap gap-2 mt-3">
+        {isFree && (
+          <Button
+            asChild
+            size="sm"
+            data-testid="settings-subscription-upgrade"
+          >
+            <Link to="/upgrade">Upgrade to Pro</Link>
+          </Button>
+        )}
+        {isPaid && (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              data-testid="settings-subscription-manage"
+              onClick={() => setDialog("manage")}
+            >
+              Manage subscription
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              data-testid="settings-subscription-cancel"
+              onClick={() => setDialog("cancel")}
+            >
+              Cancel plan
+            </Button>
+          </>
+        )}
+      </div>
+
+      <Dialog
+        open={dialog !== null}
+        onOpenChange={(o) => {
+          if (!o) setDialog(null);
+        }}
+      >
+        <DialogContent data-testid="settings-subscription-dialog">
+          <DialogHeader>
+            <DialogTitle>
+              {dialog === "cancel"
+                ? "Cancel plan"
+                : "Manage subscription"}
+            </DialogTitle>
+            <DialogDescription>
+              Billing management is coming soon. No changes have been made to
+              your account. For now, contact support if you need subscription
+              help.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDialog(null)}
+              data-testid="settings-subscription-dialog-close"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Tile>
+  );
+}
+
+
+
 export default function Settings() {
   const { user, signOut } = useAuth();
   const integrations = ["Spider Farmer", "AC Infinity", "Vivosun", "Raspberry Pi 5"];
@@ -269,7 +423,10 @@ export default function Settings() {
 
         {user?.id ? <StartScreenTile userId={user.id} /> : null}
 
+        <SubscriptionTile />
+
         <TemperatureUnitTile />
+
 
         <Tile name="Notifications" state="coming_soon">
           <p className="text-sm text-muted-foreground">
@@ -288,6 +445,17 @@ export default function Settings() {
               </span>
             ))}
           </div>
+        </Tile>
+
+        <Tile name="Agent integrations" state="available">
+          <p className="text-sm text-muted-foreground mb-3">
+            Connect ChatGPT, Claude, or another MCP-capable assistant. Read-only
+            access to your grows, recent diary entries, and latest sensor
+            snapshots — never writes, AI Doctor runs, or device control.
+          </p>
+          <Button asChild size="sm" data-testid="agent-integrations-link">
+            <Link to="/settings/agent-integrations">Open agent integrations</Link>
+          </Button>
         </Tile>
       </div>
     </div>

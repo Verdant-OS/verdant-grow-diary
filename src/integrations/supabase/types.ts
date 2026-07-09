@@ -490,6 +490,199 @@ export type Database = {
         }
         Relationships: []
       }
+      breeding_program_steps: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          criteria_met: Json
+          generation_label: string
+          id: string
+          instruction_summary: string
+          note: string | null
+          program_id: string
+          required_criteria: Json
+          status: string
+          step_index: number
+          step_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          criteria_met?: Json
+          generation_label: string
+          id?: string
+          instruction_summary: string
+          note?: string | null
+          program_id: string
+          required_criteria?: Json
+          status?: string
+          step_index: number
+          step_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          criteria_met?: Json
+          generation_label?: string
+          id?: string
+          instruction_summary?: string
+          note?: string | null
+          program_id?: string
+          required_criteria?: Json
+          status?: string
+          step_index?: number
+          step_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "breeding_program_steps_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "breeding_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      breeding_programs: {
+        Row: {
+          created_at: string
+          cross_pair_label: string | null
+          current_step_id: string | null
+          grow_id: string | null
+          id: string
+          name: string
+          notes: string | null
+          p1_maternal_label: string | null
+          p1_paternal_label: string | null
+          sop_version: string
+          starting_generation: string
+          status: string
+          target_traits: string[]
+          tent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          cross_pair_label?: string | null
+          current_step_id?: string | null
+          grow_id?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          p1_maternal_label?: string | null
+          p1_paternal_label?: string | null
+          sop_version?: string
+          starting_generation?: string
+          status?: string
+          target_traits?: string[]
+          tent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          cross_pair_label?: string | null
+          current_step_id?: string | null
+          grow_id?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          p1_maternal_label?: string | null
+          p1_paternal_label?: string | null
+          sop_version?: string
+          starting_generation?: string
+          status?: string
+          target_traits?: string[]
+          tent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "breeding_programs_current_step_fk"
+            columns: ["current_step_id"]
+            isOneToOne: false
+            referencedRelation: "breeding_program_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "breeding_programs_grow_id_fkey"
+            columns: ["grow_id"]
+            isOneToOne: false
+            referencedRelation: "grows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "breeding_programs_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      breeding_step_evidence: {
+        Row: {
+          created_at: string
+          criterion_key: string
+          diary_entry_id: string
+          id: string
+          note: string | null
+          program_id: string
+          step_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          criterion_key: string
+          diary_entry_id: string
+          id?: string
+          note?: string | null
+          program_id: string
+          step_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          criterion_key?: string
+          diary_entry_id?: string
+          id?: string
+          note?: string | null
+          program_id?: string
+          step_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "breeding_step_evidence_diary_entry_id_fkey"
+            columns: ["diary_entry_id"]
+            isOneToOne: false
+            referencedRelation: "diary_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "breeding_step_evidence_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "breeding_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "breeding_step_evidence_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "breeding_program_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bridge_tokens: {
         Row: {
           created_at: string
@@ -584,6 +777,93 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      email_send_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          message_id: string | null
+          metadata: Json | null
+          recipient_email: string
+          status: string
+          template_name: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_id?: string | null
+          metadata?: Json | null
+          recipient_email: string
+          status: string
+          template_name: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_id?: string | null
+          metadata?: Json | null
+          recipient_email?: string
+          status?: string
+          template_name?: string
+        }
+        Relationships: []
+      }
+      email_send_state: {
+        Row: {
+          auth_email_ttl_minutes: number
+          batch_size: number
+          id: number
+          retry_after_until: string | null
+          send_delay_ms: number
+          transactional_email_ttl_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          auth_email_ttl_minutes?: number
+          batch_size?: number
+          id?: number
+          retry_after_until?: string | null
+          send_delay_ms?: number
+          transactional_email_ttl_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          auth_email_ttl_minutes?: number
+          batch_size?: number
+          id?: number
+          retry_after_until?: string | null
+          send_delay_ms?: number
+          transactional_email_ttl_minutes?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_unsubscribe_tokens: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          token: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: []
       }
       environment_events: {
         Row: {
@@ -992,6 +1272,83 @@ export type Database = {
         }
         Relationships: []
       }
+      manual_sensor_snapshot_edits: {
+        Row: {
+          change_reason: string | null
+          changed_at: string
+          changed_fields: string[]
+          id: string
+          new_values: Json
+          old_values: Json
+          original_reading_id: string
+          plant_id: string | null
+          replacement_reading_id: string | null
+          source_after: string
+          source_before: string
+          tent_id: string
+          user_id: string
+        }
+        Insert: {
+          change_reason?: string | null
+          changed_at?: string
+          changed_fields: string[]
+          id?: string
+          new_values: Json
+          old_values: Json
+          original_reading_id: string
+          plant_id?: string | null
+          replacement_reading_id?: string | null
+          source_after: string
+          source_before: string
+          tent_id: string
+          user_id?: string
+        }
+        Update: {
+          change_reason?: string | null
+          changed_at?: string
+          changed_fields?: string[]
+          id?: string
+          new_values?: Json
+          old_values?: Json
+          original_reading_id?: string
+          plant_id?: string | null
+          replacement_reading_id?: string | null
+          source_after?: string
+          source_before?: string
+          tent_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manual_sensor_snapshot_edits_original_reading_id_fkey"
+            columns: ["original_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_sensor_snapshot_edits_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_sensor_snapshot_edits_replacement_reading_id_fkey"
+            columns: ["replacement_reading_id"]
+            isOneToOne: false
+            referencedRelation: "sensor_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_sensor_snapshot_edits_tent_id_fkey"
+            columns: ["tent_id"]
+            isOneToOne: false
+            referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nug_events: {
         Row: {
           amount: number
@@ -1087,6 +1444,118 @@ export type Database = {
         }
         Relationships: []
       }
+      pheno_candidate_scores: {
+        Row: {
+          created_at: string
+          hunt_id: string
+          id: string
+          note: string | null
+          plant_id: string
+          traits: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hunt_id: string
+          id?: string
+          note?: string | null
+          plant_id: string
+          traits?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hunt_id?: string
+          id?: string
+          note?: string | null
+          plant_id?: string
+          traits?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_candidate_scores_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_candidate_scores_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_crosses: {
+        Row: {
+          created_at: string
+          cross_name: string | null
+          cross_type: string
+          crossed_at: string | null
+          female_keeper_id: string
+          hunt_id: string | null
+          id: string
+          male_keeper_id: string | null
+          note: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          cross_name?: string | null
+          cross_type?: string
+          crossed_at?: string | null
+          female_keeper_id: string
+          hunt_id?: string | null
+          id?: string
+          male_keeper_id?: string | null
+          note?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          cross_name?: string | null
+          cross_type?: string
+          crossed_at?: string | null
+          female_keeper_id?: string
+          hunt_id?: string | null
+          id?: string
+          male_keeper_id?: string | null
+          note?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_crosses_female_keeper_id_fkey"
+            columns: ["female_keeper_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_keepers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_crosses_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_crosses_male_keeper_id_fkey"
+            columns: ["male_keeper_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_keepers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pheno_hunts: {
         Row: {
           created_at: string
@@ -1128,6 +1597,580 @@ export type Database = {
             columns: ["tent_id"]
             isOneToOne: false
             referencedRelation: "tents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_keeper_clones: {
+        Row: {
+          clone_label: string
+          clone_plant_id: string | null
+          created_at: string
+          id: string
+          keeper_id: string
+          note: string | null
+          parent_clone_id: string | null
+          taken_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          clone_label: string
+          clone_plant_id?: string | null
+          created_at?: string
+          id?: string
+          keeper_id: string
+          note?: string | null
+          parent_clone_id?: string | null
+          taken_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          clone_label?: string
+          clone_plant_id?: string | null
+          created_at?: string
+          id?: string
+          keeper_id?: string
+          note?: string | null
+          parent_clone_id?: string | null
+          taken_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_keeper_clones_clone_plant_id_fkey"
+            columns: ["clone_plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_keeper_clones_keeper_id_fkey"
+            columns: ["keeper_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_keepers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_keeper_clones_parent_clone_id_fkey"
+            columns: ["parent_clone_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_keeper_clones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_keeper_decisions: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decision: string
+          hunt_id: string
+          id: string
+          note: string | null
+          plant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decision?: string
+          hunt_id: string
+          id?: string
+          note?: string | null
+          plant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decision?: string
+          hunt_id?: string
+          id?: string
+          note?: string | null
+          plant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_keeper_decisions_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_keeper_decisions_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_keeper_decisions_log: {
+        Row: {
+          created_at: string
+          decided_at: string
+          decision: string
+          hunt_id: string
+          id: string
+          note: string | null
+          plant_id: string
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string
+          decision: string
+          hunt_id: string
+          id?: string
+          note?: string | null
+          plant_id: string
+          reason: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string
+          decision?: string
+          hunt_id?: string
+          id?: string
+          note?: string | null
+          plant_id?: string
+          reason?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_keeper_decisions_log_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_keeper_decisions_log_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_keepers: {
+        Row: {
+          created_at: string
+          hunt_id: string
+          id: string
+          keeper_name: string
+          note: string | null
+          source_plant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hunt_id: string
+          id?: string
+          keeper_name: string
+          note?: string | null
+          source_plant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hunt_id?: string
+          id?: string
+          keeper_name?: string
+          note?: string | null
+          source_plant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_keepers_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_keepers_source_plant_id_fkey"
+            columns: ["source_plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_lab_results: {
+        Row: {
+          cbd_pct: number | null
+          created_at: string
+          dominant_terpenes: Json
+          hunt_id: string
+          id: string
+          note: string | null
+          plant_id: string
+          source: string
+          tested_at: string | null
+          thc_pct: number | null
+          total_cannabinoids_pct: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cbd_pct?: number | null
+          created_at?: string
+          dominant_terpenes?: Json
+          hunt_id: string
+          id?: string
+          note?: string | null
+          plant_id: string
+          source?: string
+          tested_at?: string | null
+          thc_pct?: number | null
+          total_cannabinoids_pct?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cbd_pct?: number | null
+          created_at?: string
+          dominant_terpenes?: Json
+          hunt_id?: string
+          id?: string
+          note?: string | null
+          plant_id?: string
+          source?: string
+          tested_at?: string | null
+          thc_pct?: number | null
+          total_cannabinoids_pct?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_lab_results_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_lab_results_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_reversals: {
+        Row: {
+          applied_at: string | null
+          created_at: string
+          id: string
+          keeper_id: string
+          method: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          applied_at?: string | null
+          created_at?: string
+          id?: string
+          keeper_id: string
+          method?: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          applied_at?: string | null
+          created_at?: string
+          id?: string
+          keeper_id?: string
+          method?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_reversals_keeper_id_fkey"
+            columns: ["keeper_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_keepers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_score_rounds: {
+        Row: {
+          aroma_descriptors: Json
+          created_at: string
+          hunt_id: string
+          id: string
+          loud_traits: Json
+          nose_note: string | null
+          note: string | null
+          observed_at: string | null
+          plant_id: string
+          round: string
+          traits: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aroma_descriptors?: Json
+          created_at?: string
+          hunt_id: string
+          id?: string
+          loud_traits?: Json
+          nose_note?: string | null
+          note?: string | null
+          observed_at?: string | null
+          plant_id: string
+          round: string
+          traits?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aroma_descriptors?: Json
+          created_at?: string
+          hunt_id?: string
+          id?: string
+          loud_traits?: Json
+          nose_note?: string | null
+          note?: string | null
+          observed_at?: string | null
+          plant_id?: string
+          round?: string
+          traits?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_score_rounds_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_score_rounds_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_sex_observations: {
+        Row: {
+          created_at: string
+          herm_observed: boolean
+          hunt_id: string
+          id: string
+          note: string | null
+          observed_at: string
+          plant_id: string
+          sex: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          herm_observed?: boolean
+          hunt_id: string
+          id?: string
+          note?: string | null
+          observed_at?: string
+          plant_id: string
+          sex?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          herm_observed?: boolean
+          hunt_id?: string
+          id?: string
+          note?: string | null
+          observed_at?: string
+          plant_id?: string
+          sex?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_sex_observations_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_sex_observations_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_smoke_tests: {
+        Row: {
+          created_at: string
+          effect_descriptors: Json
+          flavor_descriptors: Json
+          hunt_id: string
+          id: string
+          note: string | null
+          plant_id: string
+          potency_impression: number | null
+          smoothness: number | null
+          tested_at: string | null
+          updated_at: string
+          user_id: string
+          verdict: string | null
+        }
+        Insert: {
+          created_at?: string
+          effect_descriptors?: Json
+          flavor_descriptors?: Json
+          hunt_id: string
+          id?: string
+          note?: string | null
+          plant_id: string
+          potency_impression?: number | null
+          smoothness?: number | null
+          tested_at?: string | null
+          updated_at?: string
+          user_id: string
+          verdict?: string | null
+        }
+        Update: {
+          created_at?: string
+          effect_descriptors?: Json
+          flavor_descriptors?: Json
+          hunt_id?: string
+          id?: string
+          note?: string | null
+          plant_id?: string
+          potency_impression?: number | null
+          smoothness?: number | null
+          tested_at?: string | null
+          updated_at?: string
+          user_id?: string
+          verdict?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_smoke_tests_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_smoke_tests_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pheno_stress_observations: {
+        Row: {
+          created_at: string
+          disease_pest_notes: string | null
+          end_date: string | null
+          hunt_id: string
+          id: string
+          intensity: string
+          linked_diary_entry_id: string | null
+          notes: string | null
+          plant_id: string
+          plant_response: string | null
+          recommendation: string
+          recovery_notes: string | null
+          start_date: string
+          status: string
+          stress_factor: string
+          updated_at: string
+          user_id: string
+          yield_impact_notes: string | null
+        }
+        Insert: {
+          created_at?: string
+          disease_pest_notes?: string | null
+          end_date?: string | null
+          hunt_id: string
+          id?: string
+          intensity: string
+          linked_diary_entry_id?: string | null
+          notes?: string | null
+          plant_id: string
+          plant_response?: string | null
+          recommendation: string
+          recovery_notes?: string | null
+          start_date: string
+          status: string
+          stress_factor: string
+          updated_at?: string
+          user_id: string
+          yield_impact_notes?: string | null
+        }
+        Update: {
+          created_at?: string
+          disease_pest_notes?: string | null
+          end_date?: string | null
+          hunt_id?: string
+          id?: string
+          intensity?: string
+          linked_diary_entry_id?: string | null
+          notes?: string | null
+          plant_id?: string
+          plant_response?: string | null
+          recommendation?: string
+          recovery_notes?: string | null
+          start_date?: string
+          status?: string
+          stress_factor?: string
+          updated_at?: string
+          user_id?: string
+          yield_impact_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pheno_stress_observations_hunt_id_fkey"
+            columns: ["hunt_id"]
+            isOneToOne: false
+            referencedRelation: "pheno_hunts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_stress_observations_linked_diary_entry_id_fkey"
+            columns: ["linked_diary_entry_id"]
+            isOneToOne: false
+            referencedRelation: "diary_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pheno_stress_observations_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
             referencedColumns: ["id"]
           },
         ]
@@ -1527,6 +2570,30 @@ export type Database = {
         }
         Relationships: []
       }
+      suppressed_emails: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          metadata: Json | null
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          metadata?: Json | null
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          metadata?: Json | null
+          reason?: string
+        }
+        Relationships: []
+      }
       tents: {
         Row: {
           brand: string | null
@@ -1854,6 +2921,15 @@ export type Database = {
         }
         Returns: string
       }
+      delete_email: {
+        Args: { message_id: number; queue_name: string }
+        Returns: boolean
+      }
+      email_queue_dispatch: { Args: never; Returns: undefined }
+      enqueue_email: {
+        Args: { payload: Json; queue_name: string }
+        Returns: number
+      }
       evaluate_vpd_drift_ewma: {
         Args: {
           p_alpha?: number
@@ -1885,6 +2961,15 @@ export type Database = {
       merge_duplicate_plant: {
         Args: { source_plant_id: string; target_plant_id: string }
         Returns: Json
+      }
+      move_to_dlq: {
+        Args: {
+          dlq_name: string
+          message_id: number
+          payload: Json
+          source_queue: string
+        }
+        Returns: number
       }
       pi_ingest_commit_batch: {
         Args: {
@@ -1934,9 +3019,17 @@ export type Database = {
         }
         Returns: Json
       }
+      read_email_batch: {
+        Args: { batch_size: number; queue_name: string; vt: number }
+        Returns: {
+          message: Json
+          msg_id: number
+          read_ct: number
+        }[]
+      }
     }
     Enums: {
-      app_role: "operator" | "customer"
+      app_role: "operator" | "customer" | "staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2064,7 +3157,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["operator", "customer"],
+      app_role: ["operator", "customer", "staff"],
     },
   },
 } as const

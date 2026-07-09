@@ -95,6 +95,7 @@ describe("ManualSensorReadingCard — snapshot quality badge", () => {
     setField(/Air temp/i, "75");
     setField(/Humidity/i, "55");
     fireEvent.click(screen.getByTestId("manual-reading-save"));
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
     await waitFor(() => expect(insertSpy).toHaveBeenCalled());
   });
 });

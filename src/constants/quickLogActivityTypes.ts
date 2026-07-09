@@ -53,6 +53,18 @@ export interface QuickLogHarvestDetails {
   wetWeight?: string;
   dryWeight?: string;
   weightUnit?: QuickLogWeightUnit;
+  /**
+   * Slice A3.2 — canonical grams + grower's ORIGINAL value+unit,
+   * additive to the Vocab A fields above. Present ONLY when the grower
+   * entered a non-`g` unit (oz/lb/kg), so g-only entries keep their
+   * original persisted shape unchanged (backward compatible).
+   * Timeline presenter renders "2 lb (907.18 g)" when both exist.
+   */
+  wet_weight_grams?: number;
+  dry_weight_grams?: number;
+  original_wet_weight?: string;
+  original_dry_weight?: string;
+  original_weight_unit?: QuickLogWeightUnit;
 }
 
 /**

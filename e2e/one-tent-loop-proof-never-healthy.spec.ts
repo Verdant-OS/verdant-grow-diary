@@ -43,9 +43,7 @@ const FORBIDDEN_PATH_FRAGMENTS: ReadonlyArray<RegExp> = [
   /ai\.gateway\.lovable\.dev/i,
 ];
 
-const SAFE_NON_GET_HOSTS: ReadonlyArray<RegExp> = [
-  /\/auth\/v1\/(token|user|session|logout)/i,
-];
+const SAFE_NON_GET_HOSTS: ReadonlyArray<RegExp> = [/\/auth\/v1\/(token|user|session|logout)/i];
 
 function isForbidden(req: Request): boolean {
   const method = req.method().toUpperCase();
@@ -127,13 +125,8 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
     // reached the proof surface.
     const url = new URL(page.url());
     if (url.pathname === "/one-tent-loop-proof") {
-      const writeControlCount = await page
-        .locator("button, form, input, select, textarea")
-        .count();
-      expect(
-        writeControlCount,
-        "Proof presenter must render zero write controls",
-      ).toBe(0);
+      const writeControlCount = await page.locator("button, form, input, select, textarea").count();
+      expect(writeControlCount, "Proof presenter must render zero write controls").toBe(0);
 
       // Exact deterministic label assertions for the safe rendered
       // states. Any step card that renders one of these statuses MUST
@@ -144,7 +137,9 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
       // when the DOM shows the state.
       const SAFE_STATES = ["stale", "invalid", "demo_only", "missing", "needs_review"] as const;
       for (const state of SAFE_STATES) {
-        const cards = page.locator(`[data-testid^="loop-live-proof-step-"][data-status="${state}"]`);
+        const cards = page.locator(
+          `[data-testid^="loop-live-proof-step-"][data-status="${state}"]`,
+        );
         const count = await cards.count();
         for (let i = 0; i < count; i++) {
           const card = cards.nth(i);
@@ -180,9 +175,7 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
         await expect(topGap).toHaveAttribute("data-step-key", /.+/);
         await expect(topGap).toHaveAttribute("data-status", /.+/);
 
-        const checklist = page.getByTestId(
-          "one-tent-loop-live-proof-top-gap-checklist",
-        );
+        const checklist = page.getByTestId("one-tent-loop-live-proof-top-gap-checklist");
         if ((await checklist.count()) > 0) {
           const items = checklist.locator(
             '[data-testid^="one-tent-loop-live-proof-top-gap-checklist-item-"]',
@@ -214,12 +207,11 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
               // telemetry. We check the whole subtree's class list and
               // any inline icon/aria hooks.
               const classAttr = (await item.getAttribute("class")) ?? "";
-              const innerClasses =
-                (await item
-                  .locator("*")
-                  .evaluateAll((els) =>
-                    els.map((el) => (el as HTMLElement).className || "").join(" "),
-                  )) as unknown as string;
+              const innerClasses = (await item
+                .locator("*")
+                .evaluateAll((els) =>
+                  els.map((el) => (el as HTMLElement).className || "").join(" "),
+                )) as unknown as string;
               const allClasses = `${classAttr} ${innerClasses}`.toLowerCase();
               const forbiddenVisuals = [
                 /\bbg-(green|emerald|lime|teal)-\d+/,
@@ -260,9 +252,7 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
               ).toBe(0);
 
               // Honest label must remain visible (do not silently hide the gap).
-              const stateBadge = item.locator(
-                `[data-testid$="-state"]`,
-              );
+              const stateBadge = item.locator(`[data-testid$="-state"]`);
               if ((await stateBadge.count()) > 0) {
                 const badgeText = (await stateBadge.first().innerText()).trim();
                 expect(
@@ -281,15 +271,31 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
           // advertises present/healthy via data-* hooks, and never surfaces
           // a check/verified aria label. Kept as a named block so the
           // unknown-state contract is inspectable in isolation.
-          const UNKNOWN_EQUIVALENTS = ["unknown", "missing", "blocked"] as const;
+          // "Equivalent" spans every non-present checklist state, not just the
+          // three hard cases — telemetry-weak rows (weak/stale/invalid/
+          // demo_only) must not read as success/checkmark either.
+          const UNKNOWN_EQUIVALENTS = [
+            "unknown",
+            "missing",
+            "blocked",
+            "weak",
+            "stale",
+            "invalid",
+            "demo_only",
+          ] as const;
           // Wording that must never appear inside an unknown/equivalent
           // checklist item — either as visible text or via aria/icon hooks.
           const FORBIDDEN_UNKNOWN_WORDING = [
             /\bpresent\b/i,
-            /\bsuccess\b/i,
+            /\bok\b/i,
+            /\bsuccess(ful)?\b/i,
             /\bcheckmark\b/i,
             /check[-\s]?mark/i,
             /check[-\s]?circle/i,
+            /\bcheck(ed)?\b/i,
+            /\bcomplete(d)?\b/i,
+            /\bpassed\b/i,
+            /\bready\b/i,
             /\bverified\b/i,
             /validated live/i,
             /confirmed safe/i,
@@ -366,10 +372,8 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
               ).toBe(false);
             }
           }
-
         }
       }
-
 
       // If a copyable text report block is present, assert the same
       // wording rules apply to its plaintext.
@@ -381,7 +385,6 @@ test.describe("/one-tent-loop-proof — never-healthy browser regression", () =>
           `Text report contained unsafe wording:\n${reportText.slice(0, 800)}`,
         ).toBe(false);
       }
-
     } else {
       // Route-level render was blocked by auth — documented and expected.
       // Vitest fuzz + presenter tests cover the rendered-proof invariants.

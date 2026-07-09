@@ -99,6 +99,6 @@ describe("billing level two docs consistency", () => {
   });
 
   it("collectively blocks grow-room / device automation", () => {
-    expect(/grow[- ]room[\/ ]device automation|device automation/i.test(combined)).toBe(true);
+    expect(/grow[- ]room[/ ]device automation|device automation/i.test(combined)).toBe(true);
   });
 });

@@ -71,6 +71,8 @@ export default function Auth() {
   const [resendNowTick, setResendNowTick] = useState<number>(() => Date.now());
   const [signUpError, setSignUpError] = useState<string | null>(null);
   const [signUpSuccess, setSignUpSuccess] = useState<string | null>(null);
+  const [magicBusy, setMagicBusy] = useState(false);
+  const [magicNotice, setMagicNotice] = useState<string | null>(null);
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotError, setForgotError] = useState<string | null>(null);
@@ -195,6 +197,38 @@ export default function Auth() {
     }
     setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
     nav(postSignInTarget(), { replace: true });
+  }
+
+  async function sendMagicLink() {
+    if (magicBusy) return;
+    setMagicNotice(null);
+    setSignInError(null);
+    const trimmed = email.trim();
+    if (!trimmed || !trimmed.includes("@")) {
+      setSignInError("Enter your email address to receive a sign-in link.");
+      signInEmailRef.current?.focus();
+      return;
+    }
+    setMagicBusy(true);
+    try {
+      // Generic response regardless of account existence — do not leak
+      // whether the address is registered. `shouldCreateUser: false` keeps
+      // magic link a sign-in mechanism, not a covert signup.
+      await supabase.auth.signInWithOtp({
+        email: trimmed,
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo: `${window.location.origin}${redirectTo}`,
+        },
+      });
+    } catch {
+      /* swallow — generic notice below */
+    } finally {
+      setMagicBusy(false);
+      setMagicNotice(
+        "If an account exists for that email, we've sent a sign-in link. Check your inbox.",
+      );
+    }
   }
 
   async function requestReset(e: React.FormEvent) {
@@ -342,6 +376,25 @@ export default function Auth() {
                 >
                   {busy ? "Signing in…" : "Sign in"}
                 </Button>
+                <div className="grid gap-2 pt-2 border-t border-border/40 mt-1">
+                  <p className="text-[11px] text-muted-foreground">
+                    Prefer not to type a password? We can email you a one-time
+                    sign-in link instead.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={magicBusy}
+                    aria-busy={magicBusy}
+                    onClick={sendMagicLink}
+                  >
+                    {magicBusy ? "Sending sign-in link…" : "Email me a sign-in link"}
+                  </Button>
+                  {magicNotice ? (
+                    <AuthInlineMessage role="status">{magicNotice}</AuthInlineMessage>
+                  ) : null}
+                </div>
               </form>
             </TabsContent>
 

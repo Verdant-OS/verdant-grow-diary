@@ -143,4 +143,40 @@ describe("QuickLog component wiring", () => {
       /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|relay|actuator/i,
     );
   });
+
+  it("syncs the note textarea via onChange, onInput, onCompositionEnd, and onBlur", () => {
+    // Slice A1: visible textarea value, preview validation, and save
+    // payload must always agree. All four event paths must be present so
+    // paste, native input dispatch, IME/dictation, and blur-before-submit
+    // update React state before the note:missing rule runs.
+    expect(QUICKLOG).toMatch(/data-testid="quicklog-note"[\s\S]{0,1200}onChange=/);
+    expect(QUICKLOG).toMatch(/data-testid="quicklog-note"[\s\S]{0,1500}onInput=/);
+    expect(QUICKLOG).toMatch(
+      /data-testid="quicklog-note"[\s\S]{0,1800}onCompositionEnd=/,
+    );
+    expect(QUICKLOG).toMatch(/data-testid="quicklog-note"[\s\S]{0,2000}onBlur=/);
+  });
 });
+
+describe("evaluateQuickLogPreview note validation", () => {
+  it("keeps note:missing for whitespace-only notes", () => {
+    const r = evaluateQuickLogPreview(base({ note: "   \t\n  " }));
+    const w = r.warnings.find((x) => x.code === "note:missing");
+    expect(w).toBeTruthy();
+    expect(w?.severity).toBe("info");
+  });
+
+  it("clears note:missing when any non-whitespace character is present", () => {
+    const r = evaluateQuickLogPreview(base({ note: "a" }));
+    expect(r.warnings.find((x) => x.code === "note:missing")).toBeUndefined();
+    expect(r.warnings.find((x) => x.code === "note:ok")).toBeTruthy();
+  });
+
+  it("clears note:missing for pasted multi-line notes", () => {
+    const r = evaluateQuickLogPreview(
+      base({ note: "Line 1\nLine 2 with details" }),
+    );
+    expect(r.warnings.find((x) => x.code === "note:missing")).toBeUndefined();
+  });
+});
+

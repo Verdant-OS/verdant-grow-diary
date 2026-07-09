@@ -1277,12 +1277,14 @@ export type Database = {
           environment: string
           event_type: string
           id: string
+          last_error: string | null
           paddle_event_id: string
           paddle_subscription_id: string | null
           paddle_transaction_id: string | null
           payload: Json
           price_external_id: string | null
           processed_ok: boolean
+          processing_status: string
           product_external_id: string | null
           received_at: string
           skip_reason: string | null
@@ -1292,12 +1294,14 @@ export type Database = {
           environment: string
           event_type: string
           id?: string
+          last_error?: string | null
           paddle_event_id: string
           paddle_subscription_id?: string | null
           paddle_transaction_id?: string | null
           payload: Json
           price_external_id?: string | null
           processed_ok?: boolean
+          processing_status?: string
           product_external_id?: string | null
           received_at?: string
           skip_reason?: string | null
@@ -1307,12 +1311,14 @@ export type Database = {
           environment?: string
           event_type?: string
           id?: string
+          last_error?: string | null
           paddle_event_id?: string
           paddle_subscription_id?: string | null
           paddle_transaction_id?: string | null
           payload?: Json
           price_external_id?: string | null
           processed_ok?: boolean
+          processing_status?: string
           product_external_id?: string | null
           received_at?: string
           skip_reason?: string | null

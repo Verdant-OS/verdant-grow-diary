@@ -64,6 +64,19 @@ export default function CheckoutSuccess() {
     return () => clearInterval(id);
   }, [confirmed, refetch]);
 
+  // Auto-redirect to the sanitized returnTo path ONLY after entitlement has
+  // confirmed active Pro. Waiting on `confirmed` prevents flicker back into
+  // the upgrade gate on a gated Pheno route. If returnTo is missing or
+  // unsafe, we stay on this page (existing behavior).
+  const redirectedRef = useRef(false);
+  useEffect(() => {
+    if (!confirmed) return;
+    if (!safeReturnTo) return;
+    if (redirectedRef.current) return;
+    redirectedRef.current = true;
+    navigate(safeReturnTo, { replace: true });
+  }, [confirmed, safeReturnTo, navigate]);
+
   return (
     <main
       className="min-h-screen bg-background text-foreground flex flex-col"

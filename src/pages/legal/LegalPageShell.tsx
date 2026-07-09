@@ -1,9 +1,6 @@
 import { type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { usePageSeo } from "@/hooks/usePageSeo";
-
-const SITE_ORIGIN = "https://verdantgrowdiary.com";
 
 /**
  * Shared shell for public legal pages (Terms, Privacy, Refund).
@@ -30,10 +27,8 @@ export function LegalPageShell({
     description,
     path,
   });
-  const canonicalUrl = `${SITE_ORIGIN}${path}`;
   return (
     <>
-      {createPortal(<link rel="canonical" href={canonicalUrl} />, document.head)}
       <main className="min-h-screen bg-background text-foreground">
         <header className="border-b border-border/40 px-6 py-4">
           <div className="mx-auto max-w-3xl flex items-center justify-between text-sm">

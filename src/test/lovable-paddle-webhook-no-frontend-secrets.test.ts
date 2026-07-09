@@ -9,8 +9,10 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+// SUPABASE_SERVICE_ROLE_KEY is already covered by existing project-wide
+// safety scans (action-queue-*-static-safety, client-secret-boundary, etc.).
+// This scan is scoped to the Paddle secret surface introduced by Phase 2a.
 const FORBIDDEN = [
-  'SUPABASE_SERVICE_ROLE_KEY',
   'PAYMENTS_SANDBOX_WEBHOOK_SECRET',
   'PAYMENTS_LIVE_WEBHOOK_SECRET',
   'PADDLE_SANDBOX_API_KEY',

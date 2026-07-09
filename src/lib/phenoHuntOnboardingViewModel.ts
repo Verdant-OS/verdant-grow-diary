@@ -195,6 +195,14 @@ export function computePhenoHuntOnboardingViewModel(
       label: STEP_LABEL.checklist,
       complete: nameOk && growOk && candidateCount >= 1 && goalsOk,
     },
+    {
+      id: "confirmation",
+      label: STEP_LABEL.confirmation,
+      complete: !!draft.setupCompleted && nameOk && growOk && candidateCount >= 1 && goalsOk,
+      reason: draft.setupCompleted
+        ? undefined
+        : "Confirm setup to enter the workspace",
+    },
   ];
 
   const evidenceMap = new Map<string, NonNullable<PhenoOnboardingDraft["candidateEvidence"]>[number]>();

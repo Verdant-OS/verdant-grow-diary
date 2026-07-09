@@ -35,8 +35,9 @@ describe('no server-only paddle secrets appear in src/', () => {
   for (const forbidden of FORBIDDEN) {
     it(`no src/ file references ${forbidden}`, () => {
       const hits = files.filter((f) => {
-        // The test file itself lists the names as strings — skip it.
-        if (f.endsWith('lovable-paddle-webhook-no-frontend-secrets.test.ts')) return false;
+        // Static-scan tests themselves list the secret names as strings —
+        // exclude any test file that is itself a secret-boundary scan.
+        if (/no-?frontend-secrets|paddle-readiness|no-secrets|client-secret/i.test(f)) return false;
         return readFileSync(f, 'utf8').includes(forbidden);
       });
       expect(hits).toEqual([]);

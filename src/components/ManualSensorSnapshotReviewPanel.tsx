@@ -48,6 +48,11 @@ function findingRole(severity: SensorSnapshotReviewFinding["severity"]): string 
 export default function ManualSensorSnapshotReviewPanel({ result }: Props) {
   const { source, confidence, findings, normalizedPreview, canSave } = result;
 
+  // Clean state: no blockers, no findings at all → render a compact panel
+  // that keeps the mandatory review gate but reduces visual friction for
+  // valid manual readings. Never uses "healthy" or "live" language.
+  const isClean = canSave && findings.length === 0;
+
   const presentPreview = PREVIEW_FIELDS.filter(({ key }) => {
     const v = normalizedPreview[key];
     return v !== null && v !== undefined;
@@ -58,6 +63,7 @@ export default function ManualSensorSnapshotReviewPanel({ result }: Props) {
       data-testid="manual-sensor-snapshot-review-panel"
       data-can-save={canSave ? "true" : "false"}
       data-source={source}
+      data-clean={isClean ? "true" : "false"}
     >
       <CardHeader className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -67,12 +73,14 @@ export default function ManualSensorSnapshotReviewPanel({ result }: Props) {
           <Badge variant="outline" data-testid="snapshot-source-chip">
             {source}
           </Badge>
-          <Badge
-            variant={confidenceVariant(confidence)}
-            data-testid="snapshot-confidence-chip"
-          >
-            {confidence} confidence
-          </Badge>
+          {!isClean && (
+            <Badge
+              variant={confidenceVariant(confidence)}
+              data-testid="snapshot-confidence-chip"
+            >
+              {confidence} data confidence
+            </Badge>
+          )}
         </div>
         {normalizedPreview.capturedAt ? (
           <p className="text-xs text-muted-foreground">
@@ -84,53 +92,64 @@ export default function ManualSensorSnapshotReviewPanel({ result }: Props) {
         ) : null}
       </CardHeader>
       <CardContent className="space-y-4">
-        <p
-          className="text-sm font-medium"
-          data-testid="snapshot-ready-status"
-        >
-          {canSave
-            ? "Ready to save this manual snapshot."
-            : "Fix blockers before saving."}
-        </p>
-
-        {findings.length > 0 && (
-          <ul
-            className="space-y-2"
-            data-testid="snapshot-findings"
+        {isClean ? (
+          <p
+            className="text-sm font-medium"
+            data-testid="snapshot-ready-status"
           >
-            {findings.map((f) => (
-              <li
-                key={f.key}
-                role={findingRole(f.severity)}
-                data-severity={f.severity}
-                data-testid={`snapshot-finding-${f.key}`}
-                className="text-sm"
-              >
-                <span className="font-medium">{f.label}: </span>
-                <span className="text-muted-foreground">{f.message}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {presentPreview.length > 0 && (
-          <div>
-            <h3 className="text-sm font-medium mb-2">Normalized preview</h3>
-            <dl
-              className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm"
-              data-testid="snapshot-normalized-preview"
+            Ready — this will save as manual data.
+          </p>
+        ) : (
+          <>
+            <p
+              className="text-sm font-medium"
+              data-testid="snapshot-ready-status"
             >
-              {presentPreview.map(({ key, label, unit }) => (
-                <div key={key} className="contents">
-                  <dt className="text-muted-foreground">{label}</dt>
-                  <dd data-testid={`snapshot-preview-${key}`}>
-                    {String(normalizedPreview[key])}
-                    {unit ? ` ${unit}` : ""}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
+              {canSave
+                ? "Ready to save this manual snapshot."
+                : "Fix blockers before saving."}
+            </p>
+
+            {findings.length > 0 && (
+              <ul
+                className="space-y-2"
+                data-testid="snapshot-findings"
+              >
+                {findings.map((f) => (
+                  <li
+                    key={f.key}
+                    role={findingRole(f.severity)}
+                    data-severity={f.severity}
+                    data-testid={`snapshot-finding-${f.key}`}
+                    className="text-sm"
+                  >
+                    <span className="font-medium">{f.label}: </span>
+                    <span className="text-muted-foreground">{f.message}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {presentPreview.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium mb-2">Normalized preview</h3>
+                <dl
+                  className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm"
+                  data-testid="snapshot-normalized-preview"
+                >
+                  {presentPreview.map(({ key, label, unit }) => (
+                    <div key={key} className="contents">
+                      <dt className="text-muted-foreground">{label}</dt>
+                      <dd data-testid={`snapshot-preview-${key}`}>
+                        {String(normalizedPreview[key])}
+                        {unit ? ` ${unit}` : ""}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

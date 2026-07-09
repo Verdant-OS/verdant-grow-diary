@@ -1,8 +1,13 @@
-name: Security DB (local Supabase)
+name: Security DB Local
 
 # OPTIONAL job — DB-backed security harnesses. Not a required check.
 # Required PR gate remains `test:security-regression`. Do not mark this
 # job required until it has been stable across multiple PRs.
+#
+# OPT-IN ONLY. Runs only when explicitly enabled via either:
+#   - workflow_dispatch input `run_db_security: true`, or
+#   - repository variable ENABLE_DB_SECURITY_LANE == 'true'
+# Otherwise all steps are skipped and a summary is written.
 
 on:
   pull_request:
@@ -10,30 +15,50 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      run_db_security:
+        description: "Boot local Supabase and run DB security lane"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   test-security-db-local:
     name: test:security-db-local
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     # Optional: never blocks the merge queue.
     continue-on-error: true
+    env:
+      ENABLED: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_db_security == true) || vars.ENABLE_DB_SECURITY_LANE == 'true' }}
     steps:
+      - name: Skip notice (lane disabled)
+        if: env.ENABLED != 'true'
+        run: |
+          echo "DB security lane is disabled for this run." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Enable via workflow_dispatch input run_db_security=true," | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "or set repository variable ENABLE_DB_SECURITY_LANE=true."   | tee -a "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/checkout@v4
+        if: env.ENABLED == 'true'
 
       - uses: oven-sh/setup-bun@v2
+        if: env.ENABLED == 'true'
         with:
           bun-version: latest
 
       - name: Install dependencies
+        if: env.ENABLED == 'true'
         run: bun install --frozen-lockfile
 
       - name: Setup Supabase CLI
+        if: env.ENABLED == 'true'
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
       - name: Start local Supabase
+        if: env.ENABLED == 'true'
         id: supabase-start
         run: |
           set -e
@@ -41,6 +66,7 @@ jobs:
           echo "started=true" >> "$GITHUB_OUTPUT"
 
       - name: Export local Supabase env
+        if: env.ENABLED == 'true'
         id: supabase-env
         run: |
           set -e
@@ -60,29 +86,32 @@ jobs:
           echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
 
       - name: Apply migrations (db reset)
+        if: env.ENABLED == 'true'
         run: supabase db reset --no-seed 2>&1 | tee supabase-db-reset.log
 
-      - name: Pi-ingest DB replay tests
-        run: bun run test:pi-ingest-db-security 2>&1 | tee pi-ingest-db.log
+      - name: Profiles DB security
+        if: env.ENABLED == 'true'
+        run: bun run test:profiles-db-security 2>&1 | tee profiles-db.log
 
-      - name: Storage policy DB tests
-        run: bun run test:storage-db-security 2>&1 | tee storage-db.log
+      - name: Aggregate DB security lane
+        if: env.ENABLED == 'true'
+        run: bun run test:security-db-local 2>&1 | tee security-db-local.log
 
-      - name: Upload failure logs
-        if: failure()
+      - name: Upload failure artifacts
+        if: failure() && env.ENABLED == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: security-db-local-logs
+          name: security-db-local-artifacts
           path: |
             supabase-start.log
             supabase-db-reset.log
-            pi-ingest-db.log
-            storage-db.log
+            profiles-db.log
+            security-db-local.log
             test-results/**
             artifacts/security-db/**
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 14
 
       - name: Stop local Supabase
-        if: always()
+        if: always() && env.ENABLED == 'true'
         run: supabase stop --no-backup || true

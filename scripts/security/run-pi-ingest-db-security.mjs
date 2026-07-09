@@ -39,7 +39,7 @@ import("node:child_process").then(({ spawn }) => {
   const child = spawn(
     process.execPath,
     ["--experimental-vm-modules", "node_modules/vitest/vitest.mjs", "run",
-      "src/test/pi-ingest-commit-batch-replay.integration.test.ts"],
+      "src/test/integration/pi-ingest-commit-batch-replay.integration.test.ts"],
     { stdio: "inherit", env: process.env },
   );
   child.on("exit", (code) => process.exit(code ?? 1));

@@ -114,11 +114,25 @@ They never fake a pass. Required CI never depends on these variables.
 
 ### What the harnesses cover
 
-- `test:pi-ingest-db-security` — proves `pi_ingest_commit_batch` rejects
-  cross-tent and cross-user replays and creates no `sensor_readings` or
-  `action_queue` rows on rejection.
-- `test:storage-db-security` — proves diary photo/video buckets are
-  owner-scoped and public buckets are read-only for anon.
+- `test:pi-ingest-db-security` — proves `pi_ingest_commit_batch` is
+  executable by service_role only (anon/authenticated get 42501); that
+  full and partial batch replays are rejected per `(user_id,
+  idempotency_key)` without duplicate `sensor_readings`; that a
+  cross-user tent hard-fails and persists nothing; that one invalid row
+  aborts the whole batch atomically; that commits never write `alerts`
+  or `action_queue` rows; that the idempotency ledger is owner-scoped
+  (own rows visible, other users' rows invisible) and
+  `pi_ingest_bridge_credentials` is unreadable through the API; and that
+  every rejection error is sanitized (no service_role / JWT / auth-header
+  / stack-frame leakage).
+- `test:storage-db-security` — proves the `diary-photos` bucket is
+  private and folder-scoped: users can upload / read / delete only under
+  their own `<user_id>/…` prefix; cross-user upload is denied (verified
+  by service-side object absence); cross-user download is denied;
+  cross-user listing exposes nothing; anonymous download is denied; and
+  cross-user delete is a no-op (verified by the object's survival, since
+  the storage API can return success-with-empty for RLS-filtered
+  removes). Denial errors are checked against the same leak deny-list.
 - `test:profiles-db-security` — proves authenticated clients cannot
   update `profiles.tier`, `profiles.level`, or `profiles.nugs_total`;
   cannot DELETE their own or any other user's profile; cannot bypass the
@@ -137,13 +151,15 @@ They never fake a pass. Required CI never depends on these variables.
   static `src/test/profiles-gamification-write-protection.test.ts` and
   `src/test/profiles-tier-entitlement-query-boundary.test.ts`.
 
-Current status: **scaffolded / expanding**. Vitest specs live under
-`src/test/pi-ingest-commit-batch-replay.integration.test.ts`,
-`src/test/storage-policy-security.integration.test.ts`,
+Current status: **implemented and verified end-to-end** (2026-07-09,
+fresh `supabase start` + `db reset` + grant-parity seed): profiles
+14/14, pi-ingest 9/9, storage 9/9. Vitest specs live under
+`src/test/integration/pi-ingest-commit-batch-replay.integration.test.ts`,
+`src/test/integration/storage-policy-security.integration.test.ts`,
 `src/test/integration/profiles-gamification-write-protection.integration.test.ts`,
-and `src/test/integration/profiles-entitlement-resolution-boundary.integration.test.ts`,
-and grow as local fixtures stabilise. Static contract coverage in Tier 1
-already guards the policy shapes.
+and `src/test/integration/profiles-entitlement-resolution-boundary.integration.test.ts`.
+Static contract coverage in Tier 1 continues to guard the policy shapes
+on every PR.
 
 > **Never** paste `SUPABASE_SERVICE_ROLE_KEY`, auth JWTs, or refresh
 > tokens into chat, screenshots, logs, or issue comments. This harness

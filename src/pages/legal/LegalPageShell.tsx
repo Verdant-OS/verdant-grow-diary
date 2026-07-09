@@ -36,8 +36,17 @@ export function LegalPageShell({
     description,
     path,
   });
+  const jsonLd = safeJsonLdStringify(
+    buildLegalPageJsonLd({ path, name: title, description }),
+  );
   return (
     <>
+      <script
+        type="application/ld+json"
+        data-seo={VERDANT_LEGAL_PAGE_JSON_LD_SELECTOR}
+        data-testid={VERDANT_LEGAL_PAGE_JSON_LD_SELECTOR}
+        dangerouslySetInnerHTML={{ __html: jsonLd }}
+      />
       <main className="min-h-screen bg-background text-foreground">
         <header className="border-b border-border/40 px-6 py-4">
           <div className="mx-auto max-w-3xl flex items-center justify-between text-sm">

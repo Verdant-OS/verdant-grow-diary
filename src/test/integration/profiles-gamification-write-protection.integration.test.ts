@@ -298,4 +298,95 @@ d("profiles gamification write protection (local DB)", () => {
     expect(after.level).toBe(before.level);
     expect(after.nugs_total).toBe(before.nugs_total);
   });
+
+  // ── Single-field RPC coverage — proves the trigger fires whichever
+  // gamification column is touched, not just the triple-write path.
+  it("J1/J2/J3: RPC single-field gamification updates are each blocked", async () => {
+    if (!rpcAvailable) {
+      console.warn(
+        "[profiles gamification] RPC single-field path BLOCKED — local exec_sql unavailable",
+      );
+      return;
+    }
+    const before = await readProfileAsAdmin(admin, userA.id);
+    const patches: Array<{ tag: string; args: Record<string, unknown> }> = [
+      { tag: "tier", args: { _profile_user_id: userA.id, _tier: "pro", _level: null, _nugs: null } },
+      { tag: "level", args: { _profile_user_id: userA.id, _tier: null, _level: 42, _nugs: null } },
+      { tag: "nugs", args: { _profile_user_id: userA.id, _tier: null, _level: null, _nugs: 999 } },
+    ];
+    for (const p of patches) {
+      const { error } = await userA.client.rpc(TEST_RPC_NAME as never, p.args as never);
+      expect(error, `RPC ${p.tag} attempt should be rejected`).not.toBeNull();
+      expectSanitizedDbError(error);
+    }
+    const after = await readProfileAsAdmin(admin, userA.id);
+    expect(after.tier).toBe(before.tier);
+    expect(after.level).toBe(before.level);
+    expect(after.nugs_total).toBe(before.nugs_total);
+  });
+
+  // ── Mixed attack: user A tries a blocked+allowed profile write AND
+  // probes user B's entitlement in the same authenticated session. The
+  // profile must be atomic (nothing changes), and the entitlement RPC
+  // must refuse cross-user probing without leaking B's plan state.
+  it("K: mixed attack — atomic profile rejection + cross-user entitlement probe denial", async () => {
+    // Seed user B with an active Pro row so a leak would be observable.
+    const proEnd = new Date(Date.now() + 30 * 24 * 3600_000).toISOString();
+    const { error: seedErr } = await admin
+      .from("billing_subscriptions")
+      .upsert({
+        user_id: userB.id,
+        plan_id: "pro_monthly",
+        status: "active",
+        provider: "paddle",
+        current_period_end: proEnd,
+        cancel_at_period_end: false,
+      });
+    if (seedErr) throw new Error("seed userB billing failed");
+
+    try {
+      const beforeA = await readProfileAsAdmin(admin, userA.id);
+      const beforeB = await readProfileAsAdmin(admin, userB.id);
+      const attemptedName = `mixed-attack-${Date.now()}`;
+
+      // (a) Mixed blocked+allowed update on own profile — must fail atomically.
+      const { error: mixErr } = await userA.client
+        .from("profiles")
+        .update({ tier: "pro", level: 99, display_name: attemptedName })
+        .eq("user_id", userA.id);
+      expect(mixErr).not.toBeNull();
+      expectSanitizedDbError(mixErr);
+
+      // (b) Cross-user entitlement probe via the public entitlement function.
+      //     Must return false (or a sanitized error) — never leak B's plan.
+      const { data: probeData, error: probeErr } = await userA.client.rpc(
+        "has_pheno_tracker_entitlement" as never,
+        { _user_id: userB.id } as never,
+      );
+      if (probeErr) {
+        expectSanitizedDbError(probeErr);
+      } else {
+        expect(probeData, "cross-user entitlement probe must not reveal Pro").toBe(false);
+      }
+
+      // (c) Own-user probe still works — proves the function isn't broken.
+      const { data: selfProbe, error: selfErr } = await userA.client.rpc(
+        "has_pheno_tracker_entitlement" as never,
+        { _user_id: userA.id } as never,
+      );
+      if (selfErr) expectSanitizedDbError(selfErr);
+      else expect(typeof selfProbe).toBe("boolean");
+
+      // (d) No mutation landed anywhere.
+      const afterA = await readProfileAsAdmin(admin, userA.id);
+      const afterB = await readProfileAsAdmin(admin, userB.id);
+      expect(afterA.tier).toBe(beforeA.tier);
+      expect(afterA.level).toBe(beforeA.level);
+      expect(afterA.display_name).toBe(beforeA.display_name);
+      expect(afterA.display_name).not.toBe(attemptedName);
+      expect(afterB).toEqual(beforeB);
+    } finally {
+      await admin.from("billing_subscriptions").delete().eq("user_id", userB.id);
+    }
+  }, 45_000);
 });

@@ -99,6 +99,16 @@ export default function PhenoHuntNew() {
 
   const onSave = async () => {
     if (!canSave || !growId) return;
+    // Belt-and-suspenders: the route-level PhenoTrackerUpgradeGate blocks
+    // Free users from mounting this page. Re-check here so any future direct
+    // handler invocation (deep link race, dev-tools state, cached mount) still
+    // cannot reach createPhenoHunt without an active Pro/lifetime entitlement.
+    // NOTE: not authoritative — server-side entitlement enforcement is a
+    // follow-up slice. RLS still prevents cross-user writes today.
+    if (!canWriteFeatureData(entitlement, "pheno_tracker")) {
+      toast.error("Pheno Tracker is a Pro feature. Upgrade to Pro to start a hunt.");
+      return;
+    }
     setSaving(true);
     try {
       await createPhenoHunt({
@@ -114,6 +124,7 @@ export default function PhenoHuntNew() {
       setSaving(false);
     }
   };
+
 
   if (loading) {
     return (

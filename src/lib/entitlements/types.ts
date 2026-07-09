@@ -76,4 +76,12 @@ export interface ResolvedEntitlement {
     | "canceled"
     | "past_due"
     | "paused";
+  /**
+   * True when the caller holds the server-granted `staff` role
+   * (verified allow-list, server-side trigger). Staff receive
+   * Pro-tier capabilities for UX display, but AI credits stay
+   * enforced server-side at the Pro monthly cap. Never authoritative
+   * for cost/security gates.
+   */
+  isStaff: boolean;
 }

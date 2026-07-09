@@ -5,17 +5,14 @@
  * Pure: no React, no Supabase, no fetch, no internal now(). `now` MUST be
  * passed in by the caller so the function is deterministic and testable.
  *
- * Branches:
- *  - null row → free caps, active. Absence of row = free user.
- *  - status 'active' AND (current_period_end IS NULL OR > now) → plan caps,
- *    isActive true.
- *  - status in past_due/canceled/expired/paused, OR period elapsed →
- *    free caps, isActive false. paused retains plan identity in displayPlanId
- *    so UX can show "Pro — paused; resume to restore".
- *  - unknown plan_id → free caps, isActive false, degraded.
- *  - unknown status → free caps, isActive false, degraded.
- *
- * Never silently keeps Pro after expiry.
+ * Staff override (UX-only):
+ *  - When `opts.isStaff` is true, callers receive Pro-tier capabilities for
+ *    presentation regardless of billing row. `isStaff` is set on the result.
+ *  - This is NEVER authoritative for cost/security gates. AI credit spend
+ *    is still capped and metered server-side (see ai_credit_spend).
+ *  - If a real active paid row exists, that wins for displayPlanId; staff
+ *    only lifts capabilities/isActive when the billing row would otherwise
+ *    resolve to free/degraded.
  */
 
 import type {
@@ -40,6 +37,39 @@ function isKnownStatus(value: unknown): value is SubscriptionStatus {
     (KNOWN_STATUSES as ReadonlyArray<string>).includes(value);
 }
 
+export interface ResolveEntitlementsOptions {
+  /**
+   * Verified staff role from the server-side `user_roles` trigger.
+   * Presentation-only capability lift; never used for security or spend.
+   */
+  isStaff?: boolean;
+}
+
+function applyStaffLift(
+  base: ResolvedEntitlement,
+  isStaff: boolean,
+): ResolvedEntitlement {
+  if (!isStaff) return base;
+  // If the caller already has an active paid plan, keep its display identity
+  // and capabilities — staff never downgrades a real subscription.
+  if (base.isActive && base.effectivePlanId !== "free") {
+    return { ...base, isStaff: true };
+  }
+  // Otherwise lift to Pro-tier capabilities for UX display.
+  return {
+    ...base,
+    effectivePlanId: "pro_monthly",
+    // Preserve any real displayPlanId (e.g. "pro_monthly" paused) so
+    // messaging like "Pro — paused" still reads correctly. Fall back to
+    // pro_monthly if there was no plan identity to preserve.
+    displayPlanId:
+      base.displayPlanId !== "free" ? base.displayPlanId : "pro_monthly",
+    isActive: true,
+    capabilities: PLAN_CATALOG.pro_monthly,
+    isStaff: true,
+  };
+}
+
 function freeFallback(
   displayPlanId: PlanId,
   status: SubscriptionStatus | "unknown",
@@ -53,16 +83,20 @@ function freeFallback(
     capabilities: FREE_CAPABILITIES,
     degraded: reason !== null && reason !== "null_row_free",
     degradedReason: reason,
+    isStaff: false,
   };
 }
 
 export function resolveEntitlements(
   row: BillingSubscriptionRow | null,
   now: Date,
+  opts: ResolveEntitlementsOptions = {},
 ): ResolvedEntitlement {
+  const isStaff = opts.isStaff === true;
+
   // Absence = free.
   if (row == null) {
-    return {
+    return applyStaffLift({
       effectivePlanId: "free",
       displayPlanId: "free",
       status: "active",
@@ -70,15 +104,16 @@ export function resolveEntitlements(
       capabilities: FREE_CAPABILITIES,
       degraded: false,
       degradedReason: "null_row_free",
-    };
+      isStaff: false,
+    }, isStaff);
   }
 
   // Defensive: DB CHECKs prevent these but the client type is widened.
   if (!isKnownPlanId(row.plan_id)) {
-    return freeFallback("free", "unknown", "unknown_plan_id");
+    return applyStaffLift(freeFallback("free", "unknown", "unknown_plan_id"), isStaff);
   }
   if (!isKnownStatus(row.status)) {
-    return freeFallback(row.plan_id, "unknown", "unknown_status");
+    return applyStaffLift(freeFallback(row.plan_id, "unknown", "unknown_status"), isStaff);
   }
 
   const planId = row.plan_id as PlanId;
@@ -94,7 +129,7 @@ export function resolveEntitlements(
   }
 
   if (status === "active" && !periodElapsed) {
-    return {
+    return applyStaffLift({
       effectivePlanId: planId,
       displayPlanId: planId,
       status,
@@ -102,7 +137,8 @@ export function resolveEntitlements(
       capabilities: PLAN_CATALOG[planId],
       degraded: false,
       degradedReason: null,
-    };
+      isStaff: false,
+    }, isStaff);
   }
 
   // Degraded paths — retain displayPlanId for UX messaging.
@@ -113,7 +149,7 @@ export function resolveEntitlements(
     : status === "expired" ? "expired"
     : "expired"; // active + periodElapsed
 
-  return {
+  return applyStaffLift({
     effectivePlanId: "free",
     displayPlanId: planId,
     status,
@@ -121,5 +157,6 @@ export function resolveEntitlements(
     capabilities: FREE_CAPABILITIES,
     degraded: true,
     degradedReason: reason,
-  };
+    isStaff: false,
+  }, isStaff);
 }

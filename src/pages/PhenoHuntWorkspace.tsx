@@ -46,6 +46,9 @@ import PhenoDocumentationSections from "@/components/PhenoDocumentationSections"
 import PhenoStressObservationsList from "@/components/PhenoStressObservationsList";
 import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
 import { usePhenoStressObservations } from "@/hooks/usePhenoStressObservations";
+import PhenoHuntSetupProgressCard from "@/components/PhenoHuntSetupProgressCard";
+import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
+import { useState as useReactState } from "react";
 
 function toIntOrNull(raw: string): number | null {
   const t = raw.trim();

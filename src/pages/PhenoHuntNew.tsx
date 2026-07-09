@@ -13,7 +13,7 @@ import {
   createPhenoHunt,
   defaultHuntName,
 } from "@/lib/phenoHuntService";
-import { logsPath } from "@/lib/routes";
+
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canWriteFeatureData } from "@/lib/featureEntitlements";
 import {
@@ -112,6 +112,7 @@ export default function PhenoHuntNew() {
     };
   }, [growId, tentId]);
 
+  const [setupConfirmed, setSetupConfirmed] = useState(false);
   const candidateIds = useMemo(() => Array.from(selected), [selected]);
 
   const vm = useMemo(
@@ -123,8 +124,9 @@ export default function PhenoHuntNew() {
         notes,
         candidateIds,
         evidenceGoals,
+        setupCompleted: setupConfirmed,
       }),
-    [name, growId, tentId, notes, candidateIds, evidenceGoals],
+    [name, growId, tentId, notes, candidateIds, evidenceGoals, setupConfirmed],
   );
 
   const canSave = vm.canCreate && !saving && !!user;
@@ -168,14 +170,18 @@ export default function PhenoHuntNew() {
     }
     setSaving(true);
     try {
-      await createPhenoHunt({
+      const res = await createPhenoHunt({
         growId,
         tentId: tentId ?? null,
         name: name.trim(),
         plantIds: candidateIds,
+        evidenceGoals,
+        notes: notes.trim() || null,
+        markSetupComplete: setupConfirmed,
       });
       toast.success("Pheno hunt created");
-      navigate(logsPath(growId));
+      // Enter the workspace — grower can continue setup from there.
+      navigate(`/pheno-hunts/${res.huntId}/workspace`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create pheno hunt");
       setSaving(false);
@@ -367,6 +373,46 @@ export default function PhenoHuntNew() {
             <ul
               className="mt-3 space-y-1 text-xs text-muted-foreground"
               data-testid="pheno-blocking-reasons"
+            >
+              {vm.blockingReasons.map((r) => (
+                <li key={r}>• {r}</li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      )}
+
+      {currentStep === "confirmation" && (
+        <section
+          className="glass rounded-2xl p-4 space-y-3"
+          data-testid="pheno-step-confirmation"
+        >
+          <h2 className="text-sm font-semibold">Setup complete</h2>
+          <p className="text-sm text-muted-foreground">
+            You choose the candidates and evidence goals — Verdant preserves
+            what you record. Confirm to enter your hunt workspace. You can
+            update evidence goals from the workspace at any time.
+          </p>
+          <ul className="text-xs text-muted-foreground space-y-1" data-testid="pheno-confirmation-summary">
+            <li>• Candidates selected: {candidateIds.length}</li>
+            <li>• Evidence goals selected: {evidenceGoals.length}</li>
+            <li>• Readiness: {vm.readinessLabel}</li>
+          </ul>
+          <label className="flex items-start gap-2 text-sm">
+            <Checkbox
+              id="pheno-setup-confirm"
+              checked={setupConfirmed}
+              onCheckedChange={(v) => setSetupConfirmed(v === true)}
+              data-testid="pheno-setup-confirm-toggle"
+            />
+            <span>
+              I've reviewed setup and I'm ready to start the hunt.
+            </span>
+          </label>
+          {vm.blockingReasons.length > 0 ? (
+            <ul
+              className="mt-3 space-y-1 text-xs text-muted-foreground"
+              data-testid="pheno-confirmation-blocking"
             >
               {vm.blockingReasons.map((r) => (
                 <li key={r}>• {r}</li>

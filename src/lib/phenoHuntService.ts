@@ -15,6 +15,16 @@ export interface CreatePhenoHuntInput {
   plantIds: readonly string[];
   /** Optional per-plant label overrides. */
   labels?: Readonly<Record<string, string>>;
+  /** Selected evidence goal ids captured during onboarding. */
+  evidenceGoals?: readonly string[];
+  /** Optional hunt notes captured during onboarding basics step. */
+  notes?: string | null;
+  /**
+   * When true, records `setup_completed_at = now()` on the created hunt.
+   * When false/undefined the hunt is created with setup still pending so the
+   * workspace shows a "Continue setup" progress card.
+   */
+  markSetupComplete?: boolean;
 }
 
 export interface CreatePhenoHuntResult {
@@ -61,6 +71,43 @@ export function validatePhenoHuntDraft(
   return errs;
 }
 
+/** Known evidence goal ids — mirrors phenoEvidenceGoals to avoid an import
+ * cycle in tests that stub the goals module. Sanitizer only allows short
+ * text keys and dedupes. */
+const KNOWN_EVIDENCE_GOAL_IDS = new Set([
+  "structure",
+  "vigor",
+  "aroma",
+  "resin",
+  "stretch",
+  "stress_resistance",
+  "disease_resistance",
+  "yield",
+  "post_harvest",
+  "post_cure",
+  "replication_readiness",
+  "keeper_decision",
+]);
+
+export function sanitizeEvidenceGoals(
+  input: readonly string[] | null | undefined,
+): string[] {
+  if (!input || !Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of input) {
+    if (typeof raw !== "string") continue;
+    const v = raw.trim();
+    if (!v || v.length > 64) continue;
+    if (!KNOWN_EVIDENCE_GOAL_IDS.has(v)) continue;
+    if (seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+    if (out.length >= 32) break;
+  }
+  return out;
+}
+
 export async function createPhenoHunt(
   input: CreatePhenoHuntInput,
   client: SupabaseClient = defaultClient,
@@ -72,13 +119,29 @@ export async function createPhenoHunt(
     throw new PhenoHuntError("Select at least one candidate plant.");
   }
 
+  // Sanitize evidence goals into a bounded list of short text keys — never
+  // leak arbitrary client-supplied JSON into the DB. The DB check constraint
+  // also enforces jsonb array type, but this is the app-layer guard.
+  const evidenceGoals = sanitizeEvidenceGoals(input.evidenceGoals);
+  const trimmedNotes =
+    typeof input.notes === "string" && input.notes.trim().length > 0
+      ? input.notes.trim().slice(0, 4000)
+      : null;
+
+  const insertRow: Record<string, unknown> = {
+    grow_id: input.growId,
+    tent_id: input.tentId ?? null,
+    name,
+    evidence_goals: evidenceGoals,
+    notes: trimmedNotes,
+  };
+  if (input.markSetupComplete) {
+    insertRow.setup_completed_at = new Date().toISOString();
+  }
+
   const { data: hunt, error: huntErr } = await client
     .from("pheno_hunts")
-    .insert({
-      grow_id: input.growId,
-      tent_id: input.tentId ?? null,
-      name,
-    } as never)
+    .insert(insertRow as never)
     .select("id")
     .single();
 
@@ -200,4 +263,45 @@ export async function deletePhenoHunt(
   }
 
   return { huntId, untaggedPlantIds: linkedIds };
+}
+
+export interface UpdatePhenoHuntSetupInput {
+  huntId: string;
+  /** New evidence-goal id list (sanitized before write). */
+  evidenceGoals?: readonly string[];
+  /** Freeform hunt notes (nullable to clear). */
+  notes?: string | null;
+  /** When true, stamps setup_completed_at=now(). When false, clears it. */
+  markSetupComplete?: boolean;
+}
+
+/**
+ * Update the onboarding-only fields on an existing hunt. Owner-only via RLS
+ * (Users update own pheno_hunts) plus the RESTRICTIVE Pro entitlement policy.
+ * Never touches candidate plants, keeper decisions, scores, or lab data.
+ */
+export async function updatePhenoHuntSetup(
+  input: UpdatePhenoHuntSetupInput,
+  client: SupabaseClient = defaultClient,
+): Promise<void> {
+  if (!input.huntId) throw new PhenoHuntError("Hunt id is required.");
+  const patch: Record<string, unknown> = {};
+  if (input.evidenceGoals !== undefined) {
+    patch.evidence_goals = sanitizeEvidenceGoals(input.evidenceGoals);
+  }
+  if (input.notes !== undefined) {
+    const t = typeof input.notes === "string" ? input.notes.trim() : "";
+    patch.notes = t.length > 0 ? t.slice(0, 4000) : null;
+  }
+  if (input.markSetupComplete === true) {
+    patch.setup_completed_at = new Date().toISOString();
+  } else if (input.markSetupComplete === false) {
+    patch.setup_completed_at = null;
+  }
+  if (Object.keys(patch).length === 0) return;
+  const { error } = await client
+    .from("pheno_hunts")
+    .update(patch as never)
+    .eq("id", input.huntId);
+  if (error) throw new PhenoHuntError(`Could not update hunt setup: ${error.message}`, error);
 }

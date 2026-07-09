@@ -46,6 +46,9 @@ import PhenoDocumentationSections from "@/components/PhenoDocumentationSections"
 import PhenoStressObservationsList from "@/components/PhenoStressObservationsList";
 import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
 import { usePhenoStressObservations } from "@/hooks/usePhenoStressObservations";
+import PhenoHuntSetupProgressCard from "@/components/PhenoHuntSetupProgressCard";
+import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
+
 
 function toIntOrNull(raw: string): number | null {
   const t = raw.trim();
@@ -727,6 +730,25 @@ export default function PhenoHuntWorkspace() {
     "all",
   );
   const [visibleCount, setVisibleCount] = useState(CANDIDATE_PAGE_SIZE);
+  const [setupSaving, setSetupSaving] = useState(false);
+  // Optimistic override so the card flips to "setup complete" instantly
+  // after the grower confirms — the persisted hunt row is still authoritative.
+  const [setupCompletedLocal, setSetupCompletedLocal] = useState<string | null>(null);
+
+  const handleMarkSetupComplete = async () => {
+    if (!ws.hunt?.id || setupSaving) return;
+    setSetupSaving(true);
+    try {
+      await updatePhenoHuntSetup({ huntId: ws.hunt.id, markSetupComplete: true });
+      setSetupCompletedLocal(new Date().toISOString());
+    } catch {
+      // Silent — no toast dependency here; workspace already surfaces
+      // network errors elsewhere. Grower can retry.
+    } finally {
+      setSetupSaving(false);
+    }
+  };
+
 
   // Round cards are fetched per selected round, not all five upfront.
   useEffect(() => {
@@ -846,6 +868,20 @@ export default function PhenoHuntWorkspace() {
             </span>
           </label>
         </header>
+
+        {ws.hunt ? (
+          <PhenoHuntSetupProgressCard
+            hunt={{
+              ...ws.hunt,
+              setupCompletedAt: setupCompletedLocal ?? ws.hunt.setupCompletedAt ?? null,
+            }}
+            candidateCount={candidates.length}
+            onMarkComplete={handleMarkSetupComplete}
+            saving={setupSaving}
+          />
+        ) : null}
+
+
 
         {candidates.length === 0 ? (
           <p data-testid="pheno-workspace-empty" className="text-sm text-muted-foreground">

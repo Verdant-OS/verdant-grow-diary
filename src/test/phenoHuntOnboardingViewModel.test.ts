@@ -122,6 +122,14 @@ describe("computePhenoHuntOnboardingViewModel", () => {
       "goals",
       "packet_preview",
       "checklist",
+      "confirmation",
     ]);
+  });
+
+  it("confirmation step is only complete after setupCompleted flip", () => {
+    const notConfirmed = computePhenoHuntOnboardingViewModel(draft());
+    const confirmed = computePhenoHuntOnboardingViewModel(draft({ setupCompleted: true }));
+    expect(notConfirmed.steps.find((s) => s.id === "confirmation")!.complete).toBe(false);
+    expect(confirmed.steps.find((s) => s.id === "confirmation")!.complete).toBe(true);
   });
 });

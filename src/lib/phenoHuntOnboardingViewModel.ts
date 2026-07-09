@@ -23,7 +23,8 @@ export type PhenoOnboardingStepId =
   | "candidates"
   | "goals"
   | "packet_preview"
-  | "checklist";
+  | "checklist"
+  | "confirmation";
 
 export const PHENO_ONBOARDING_STEP_ORDER: ReadonlyArray<PhenoOnboardingStepId> = [
   "basics",
@@ -31,6 +32,7 @@ export const PHENO_ONBOARDING_STEP_ORDER: ReadonlyArray<PhenoOnboardingStepId> =
   "goals",
   "packet_preview",
   "checklist",
+  "confirmation",
 ];
 
 export type PhenoCandidateCountStatus =
@@ -62,6 +64,12 @@ export interface PhenoOnboardingDraft {
   readonly notes: string;
   readonly candidateIds: ReadonlyArray<string>;
   readonly evidenceGoals: ReadonlyArray<PhenoEvidenceGoalId>;
+  /**
+   * True once the grower has explicitly confirmed setup is complete. Used
+   * by the confirmation step and by the workspace "Continue setup" card.
+   * Never inferred — grower must click.
+   */
+  readonly setupCompleted?: boolean;
   /**
    * Optional per-candidate data the grower has already recorded (e.g. an
    * initial phenotype note or a photo). Passed in from the workspace once
@@ -107,6 +115,7 @@ const STEP_LABEL: Record<PhenoOnboardingStepId, string> = {
   goals: "Evidence goals",
   packet_preview: "Evidence packet map",
   checklist: "Comparison-ready checklist",
+  confirmation: "Setup complete",
 };
 
 function candidateStatus(count: number): PhenoCandidateCountStatus {
@@ -185,6 +194,14 @@ export function computePhenoHuntOnboardingViewModel(
       id: "checklist",
       label: STEP_LABEL.checklist,
       complete: nameOk && growOk && candidateCount >= 1 && goalsOk,
+    },
+    {
+      id: "confirmation",
+      label: STEP_LABEL.confirmation,
+      complete: !!draft.setupCompleted && nameOk && growOk && candidateCount >= 1 && goalsOk,
+      reason: draft.setupCompleted
+        ? undefined
+        : "Confirm setup to enter the workspace",
     },
   ];
 

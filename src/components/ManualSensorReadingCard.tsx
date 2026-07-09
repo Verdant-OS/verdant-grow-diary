@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, CheckCircle2, Gauge, History, Info, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  Gauge,
+  History,
+  Info,
+  Loader2,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { tempFFromC } from "@/lib/temperatureUnits";
 import {
   buildManualSaveSuccessLine,
   mapManualSaveErrorToUserMessage,
@@ -94,16 +103,13 @@ const EMPTY: ManualEntryInput = {
   ppfd: "",
 };
 
-function celsiusToFahrenheit(c: number): number {
-  return c * (9 / 5) + 32;
-}
-
 function correctionToPrefill(ctx: ManualCorrectionContext | null | undefined): ManualEntryInput {
   if (!ctx) return EMPTY;
   const v = ctx.originalValues;
   const out: ManualEntryInput = { ...EMPTY };
   if (typeof v.temperature_c === "number") {
-    out.airTempF = String(Math.round(celsiusToFahrenheit(v.temperature_c) * 100) / 100);
+    const f = tempFFromC(v.temperature_c);
+    if (f !== null) out.airTempF = String(Math.round(f * 100) / 100);
   }
   if (typeof v.humidity_pct === "number") out.humidityPct = String(v.humidity_pct);
   if (typeof v.vpd_kpa === "number") out.vpdKpa = String(v.vpd_kpa);
@@ -176,7 +182,6 @@ export default function ManualSensorReadingCard({
       tentId: tentId || null,
     });
   }, [form, tentId]);
-
 
   // Entered vs derived VPD comparison. Uses only sanitized numeric metrics —
   // never relabels source. If the grower entered a VPD that disagrees with
@@ -289,7 +294,7 @@ export default function ManualSensorReadingCard({
             });
           } catch (auditErr) {
             auditWarnings += 1;
-             
+
             console.warn("[manual-sensor-correction] audit insert failed", auditErr);
           }
         }
@@ -324,11 +329,10 @@ export default function ManualSensorReadingCard({
       const msg = mapManualSaveErrorToUserMessage(err);
       toast.error(msg);
       // Developer-safe diagnostic: console only, not in UI.
-       
+
       console.warn("[manual-sensor-save] failed");
     }
   }
-
 
   async function onSave() {
     if (!tentId) {
@@ -352,7 +356,6 @@ export default function ManualSensorReadingCard({
     }
     await doSave();
   }
-
 
   const tentSetupRequired = shouldRequireFirstTentSetup(
     tents.map((t) => ({ id: t.id, is_archived: false })),
@@ -656,66 +659,63 @@ export default function ManualSensorReadingCard({
               </ul>
             )}
 
-            {reviewOpen && (() => {
-              const hasBlocker = !snapshotReview.canSave;
-              const hasWarning =
-                !hasBlocker &&
-                (advisor.warnings.length > 0 ||
-                  snapshotReview.findings.some((f) => f.severity === "warning"));
-              const gateMessage = hasBlocker
-                ? "Resolve blockers before saving this snapshot."
-                : hasWarning
-                  ? "Review warnings before saving."
-                  : "Confirm to save this manual snapshot to plant history.";
-              return (
-                <div
-                  className="rounded-md border border-border/60 bg-muted/30 p-3 space-y-3"
-                  data-testid="manual-reading-review-prompt"
-                  role="alertdialog"
-                  aria-label="Review manual snapshot before saving"
-                  aria-describedby="manual-sensor-review-gate"
-                >
-                  <ManualSensorSnapshotReviewPanel result={snapshotReview} />
-                  <p
-                    id="manual-sensor-review-gate"
-                    data-testid="manual-sensor-review-gate"
-                    data-state={
-                      hasBlocker ? "blocker" : hasWarning ? "warning" : "ok"
-                    }
-                    className="text-xs font-medium"
+            {reviewOpen &&
+              (() => {
+                const hasBlocker = !snapshotReview.canSave;
+                const hasWarning =
+                  !hasBlocker &&
+                  (advisor.warnings.length > 0 ||
+                    snapshotReview.findings.some((f) => f.severity === "warning"));
+                const gateMessage = hasBlocker
+                  ? "Resolve blockers before saving this snapshot."
+                  : hasWarning
+                    ? "Review warnings before saving."
+                    : "Confirm to save this manual snapshot to plant history.";
+                return (
+                  <div
+                    className="rounded-md border border-border/60 bg-muted/30 p-3 space-y-3"
+                    data-testid="manual-reading-review-prompt"
+                    role="alertdialog"
+                    aria-label="Review manual snapshot before saving"
+                    aria-describedby="manual-sensor-review-gate"
                   >
-                    {gateMessage}
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setReviewOpen(false)}
-                      data-testid="manual-sensor-review-back"
+                    <ManualSensorSnapshotReviewPanel result={snapshotReview} />
+                    <p
+                      id="manual-sensor-review-gate"
+                      data-testid="manual-sensor-review-gate"
+                      data-state={hasBlocker ? "blocker" : hasWarning ? "warning" : "ok"}
+                      className="text-xs font-medium"
                     >
-                      Back to edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={doSave}
-                      disabled={insert.isPending || hasBlocker}
-                      data-testid="manual-sensor-review-confirm"
-                    >
-                      {insert.isPending ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Saving
-                        </>
-                      ) : (
-                        "Confirm manual snapshot"
-                      )}
-                    </Button>
+                      {gateMessage}
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReviewOpen(false)}
+                        data-testid="manual-sensor-review-back"
+                      >
+                        Back to edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={doSave}
+                        disabled={insert.isPending || hasBlocker}
+                        data-testid="manual-sensor-review-confirm"
+                      >
+                        {insert.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Saving
+                          </>
+                        ) : (
+                          "Confirm manual snapshot"
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              );
-            })()}
-
-
+                );
+              })()}
 
             <section
               className="rounded-md border border-border/50 bg-muted/30 p-3 space-y-2"

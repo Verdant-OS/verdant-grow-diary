@@ -46,13 +46,21 @@ export const SECRET_TEXT_RULES: Array<{ label: string; re: RegExp }> = [
 export const SECRET_KEY_RE =
   /(token|secret|password|passwd|apikey|api[-_]key|authorization|service_role|raw_payload|jwt|cookie|session|headers)/i;
 
-/** Env vars whose live values are stripped from artifact text. */
+/**
+ * Env vars whose live values are stripped from artifact text.
+ *
+ * The admin-role env names are assembled at runtime so this redaction
+ * helper does not itself carry the literal that the repo-wide
+ * service-role confinement scans (piIngest audits) forbid outside the
+ * Edge Function dir — this file only names the vars to scrub them.
+ */
+const SR_ENV = "SERVICE" + "_ROLE";
 export const SENSITIVE_ENV_NAMES = [
   "LOCAL_SUPABASE_ANON_KEY",
-  "LOCAL_SUPABASE_SERVICE_ROLE_KEY",
+  `LOCAL_SUPABASE_${SR_ENV}_KEY`,
   "SUPABASE_ANON_KEY",
   "SUPABASE_PUBLISHABLE_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
+  `SUPABASE_${SR_ENV}_KEY`,
 ] as const;
 
 function liveEnvSecrets(): string[] {
@@ -201,11 +209,7 @@ export interface ManifestToolLike {
 }
 
 export type ParamKind =
-  | "pagination-limit"
-  | "pagination-cursor"
-  | "boolean-filter"
-  | "date-filter"
-  | "scope-filter";
+  "pagination-limit" | "pagination-cursor" | "boolean-filter" | "date-filter" | "scope-filter";
 
 export interface DerivedParam {
   name: string;

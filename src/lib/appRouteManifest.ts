@@ -66,6 +66,11 @@ export interface AppRouteEntry {
 export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "*", access: "public", description: "NotFound catch-all." },
   { path: "/", access: "auth", description: "Dashboard." },
+  {
+    path: "/.lovable/oauth/consent",
+    access: "public",
+    description: "Lovable MCP OAuth consent page (public by protocol requirement).",
+  },
   { path: "/action-queue", access: "redirect", description: "→ /actions" },
   { path: "/actions", access: "auth" },
   { path: "/actions/:actionId", access: "auth" },
@@ -75,6 +80,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/alerts/:alertId", access: "auth" },
   { path: "/auth", access: "public" },
   { path: "/billing/:plan", access: "public", description: "Billing placeholder." },
+  { path: "/breeder-beta", access: "public", description: "Breeder beta landing page." },
+  { path: "/breeding", access: "auth", description: "Breeding programs index." },
+  { path: "/breeding/:programId", access: "auth", description: "Breeding program detail." },
+  { path: "/breeding/new", access: "auth", description: "New breeding program." },
+  { path: "/creator-beta", access: "public", description: "Creator beta landing page." },
   {
     path: "/customer/:shareId",
     access: "public",
@@ -98,6 +108,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },
   { path: "/features", access: "redirect", description: "→ /welcome" },
+  { path: "/glossary", access: "public", description: "Public grower glossary (SEO)." },
   {
     path: "/grow-lineage",
     access: "auth",
@@ -258,10 +269,27 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Read-only Pheno Comparison preview surface (demo-labeled fixtures, no writes).",
   },
   {
+    path: "/pheno-expression-showcase",
+    access: "public",
+    description: "Mix-and-match pheno showcase (demo-labeled fixtures, network-free, no writes).",
+  },
+  {
     path: "/pheno-hunts/:id/compare",
     access: "public",
     description:
       "Read-only Pheno Comparison preview surface, per-hunt route alias (demo-labeled fixtures, no writes).",
+  },
+  {
+    path: "/pheno-hunts/:id/keepers",
+    access: "public",
+    description:
+      "Keepers / clone lineage / crosses. Mounted outside AppShell; RLS-scoped reads+writes of own data only, graceful empty state signed-out.",
+  },
+  {
+    path: "/pheno-hunts/:id/workspace",
+    access: "public",
+    description:
+      "Hunt workspace (scores + keeper decisions). Mounted outside AppShell; RLS-scoped reads+writes of own data only, graceful empty state signed-out.",
   },
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
   { path: "/pi-ingest-status", access: "operator" },
@@ -277,11 +305,21 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/sensors/ecowitt-audit", access: "operator" },
   { path: "/sensors/ingest-normalizer", access: "operator" },
   { path: "/settings", access: "auth" },
+  {
+    path: "/settings/agent-integrations",
+    access: "auth",
+    description: "Agent integrations (MCP) settings.",
+  },
   { path: "/signup", access: "redirect", description: "→ /auth" },
   { path: "/tasks", access: "auth" },
   { path: "/tents", access: "auth" },
   { path: "/tents/:id", access: "auth" },
   { path: "/timeline", access: "auth" },
+  {
+    path: "/upgrade",
+    access: "public",
+    description: "Upgrade / pricing page with Paddle sandbox checkout.",
+  },
   { path: "/welcome", access: "public" },
 ];
 

@@ -74,6 +74,14 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/customer/:shareId",
   "/pheno-comparison",
   "/pheno-hunts/:id/compare",
+  "/.lovable/oauth/consent",
+  "/breeder-beta",
+  "/creator-beta",
+  "/glossary",
+  "/pheno-expression-showcase",
+  "/pheno-hunts/:id/keepers",
+  "/pheno-hunts/:id/workspace",
+  "/upgrade",
 ];
 
 // Internal fixture-only demo surfaces DELIBERATELY mounted OUTSIDE AppShell

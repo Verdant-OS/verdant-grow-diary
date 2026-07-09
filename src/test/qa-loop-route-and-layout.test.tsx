@@ -51,7 +51,7 @@ describe("QA-LOOP-03 Settings mobile tile layout", () => {
     expect(src).toMatch(/flex-col\s+sm:flex-row/);
   });
 
-  it("renders all four tiles with a badge that is not absolutely positioned", async () => {
+  it("renders every settings tile with a badge that is not absolutely positioned", async () => {
     vi.doMock("@/store/auth", () => ({
       useAuth: () => ({ user: { email: "g@example.com" }, signOut: vi.fn() }),
     }));
@@ -61,8 +61,14 @@ describe("QA-LOOP-03 Settings mobile tile layout", () => {
         <Settings />
       </MemoryRouter>,
     );
+    // Settings has grown from the original four tiles (Profile,
+    // Notifications, Integrations + one preference tile) to six rendered
+    // tiles (adds Start screen / Units / Subscription / Agent integrations
+    // variants depending on state). The layout contract under test is the
+    // badge positioning, not the tile inventory — pin the current count so
+    // silent tile additions still surface here deliberately.
     const badges = screen.getAllByTestId("settings-tile-badge");
-    expect(badges).toHaveLength(4);
+    expect(badges).toHaveLength(6);
     for (const b of badges) {
       // Badge should be in-flow (no fixed/absolute) so the FAB cannot clip it.
       const cls = b.className;

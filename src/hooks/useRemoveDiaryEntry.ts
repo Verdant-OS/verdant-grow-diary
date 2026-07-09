@@ -4,7 +4,9 @@
  * - Hard-deletes ONE diary_entries row by id via the authenticated client.
  * - RLS enforces owner-only deletion. No service role, no admin bypass.
  * - Scope is strictly the diary entry. No other tables are touched.
- * - Does NOT delete storage objects (no tested helper exists for that today).
+ * - Storage access is limited to best-effort cleanup of the entry's OWN
+ *   video object in the `diary-videos` bucket (owner-scoped by storage
+ *   policy); failures are swallowed and never block the entry removal.
  * - Toast copy is fixed and never echoes raw DB errors.
  * - On success, invalidates read-side query caches so Timeline, Plant
  *   Detail recent activity, Tent Plant Roster recency, Tent Detail
@@ -14,10 +16,7 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  REMOVE_LOG_ERROR_TOAST,
-  getRemoveSuccessToast,
-} from "@/lib/diaryEntryRemovalRules";
+import { REMOVE_LOG_ERROR_TOAST, getRemoveSuccessToast } from "@/lib/diaryEntryRemovalRules";
 import {
   buildDiaryRemovalInvalidationKeys,
   type DiaryEntryRemovalMetadata,
@@ -39,9 +38,7 @@ export interface UseRemoveDiaryEntryResult {
   isRemoving: boolean;
 }
 
-export function useRemoveDiaryEntry(
-  onRemoved?: (id: string) => void,
-): UseRemoveDiaryEntryResult {
+export function useRemoveDiaryEntry(onRemoved?: (id: string) => void): UseRemoveDiaryEntryResult {
   const [isRemoving, setIsRemoving] = useState(false);
   const queryClient = useQueryClient();
 
@@ -57,10 +54,7 @@ export function useRemoveDiaryEntry(
       if (!id) return false;
       setIsRemoving(true);
       try {
-        const { error } = await supabase
-          .from("diary_entries")
-          .delete()
-          .eq("id", id);
+        const { error } = await supabase.from("diary_entries").delete().eq("id", id);
         if (error) {
           // Safe diagnostic only; UI copy is generic.
           console.warn("[diary] remove failed", { code: error.code });

@@ -39,7 +39,7 @@ describe('no server-only paddle secrets appear in src/', () => {
       const hits = files.filter((f) => {
         // Static-scan tests themselves list the secret names as strings —
         // exclude any test file that is itself a secret-boundary scan.
-        if (/no-?frontend-secrets|paddle-readiness|no-secrets|client-secret/i.test(f)) return false;
+        if (/no-?frontend-secrets|paddle-readiness|no-secrets|client-secret|server-billing-env-trust/i.test(f)) return false;
         return readFileSync(f, 'utf8').includes(forbidden);
       });
       expect(hits).toEqual([]);

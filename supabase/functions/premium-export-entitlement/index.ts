@@ -31,7 +31,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   loadUnionEntitlement,
-  pickExpectedBillingEnvironment,
+  resolveServerBillingEnvironment,
 } from "../_shared/unionEntitlementLookup.ts";
 
 const ALLOWED_FEATURES = new Set<string>([
@@ -176,9 +176,8 @@ Deno.serve(async (req) => {
     return json(401, { ok: false, reason: "not_authenticated" });
   }
 
-  const expectedBillingEnvironment = pickExpectedBillingEnvironment(
-    (raw as Record<string, unknown> | null)?.billing_env,
-  );
+  // Server-authoritative: NEVER trust client-supplied billing_env.
+  const expectedBillingEnvironment = resolveServerBillingEnvironment();
   const { entitlement, lookupFailed } = await loadUnionEntitlement(
     supabase,
     expectedBillingEnvironment,

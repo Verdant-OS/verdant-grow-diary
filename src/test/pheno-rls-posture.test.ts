@@ -78,12 +78,14 @@ const MUTABLE_TABLES = [
   "pheno_lab_results",
   "pheno_keeper_clones",
   "pheno_crosses",
+  "pheno_male_evaluations",
 ] as const;
 
 const APPEND_ONLY_TABLES = [
   "pheno_keeper_decisions_log",
   "pheno_sex_observations",
   "pheno_reversals",
+  "pheno_pollen_viability_tests",
 ] as const;
 
 const ALL_TABLES = [...MUTABLE_TABLES, ...APPEND_ONLY_TABLES];

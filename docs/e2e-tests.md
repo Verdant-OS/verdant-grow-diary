@@ -155,3 +155,71 @@ bun run test:pheno-paid-smoke             # preflight + Playwright smoke
 Never paste passwords, cookies, session tokens, `service_role`, or hunt
 ids into chat, PR descriptions, or CI logs. The preflight script prints
 only `PRESENT` / `SKIPPED` — never the value.
+
+## Pheno Tracker paid-user smoke — session & fixture harness
+
+Scripts:
+
+- `bun run test:pheno-paid-smoke:preflight` — presence check only; never
+  prints secret values. Exits 0 on clean SKIP, 1 only if a session env var
+  points to an unreadable file.
+- `bun run test:pheno-paid-smoke:sessions` — signs into `/auth` in a
+  headless browser for each role whose email + password env vars are set,
+  and writes:
+  - `e2e/.auth/pheno-free.json` + `.session-storage.json`
+  - `e2e/.auth/pheno-pro.json` + `.session-storage.json`
+  - `e2e/.auth/pheno-founder.json` + `.session-storage.json`
+  - `e2e/.auth/pheno-canceled.json` + `.session-storage.json`
+- `bun run test:pheno-paid-smoke:seed` — **currently BLOCKED**. See the
+  header of `scripts/e2e/seed-pheno-paid-smoke-fixtures.mjs` for the
+  exact list of comparison-readiness source tables that still need
+  confirmation before this script can safely write fixtures.
+- `bun run test:pheno-paid-smoke` — runs preflight, then the paid-user
+  Playwright smoke. Every scenario is env-gated; missing inputs skip
+  cleanly with a reason.
+
+Required env vars (all optional; missing = SKIPPED):
+
+```
+E2E_BASE_URL
+E2E_PHENO_FREE_EMAIL / E2E_PHENO_FREE_PASSWORD
+E2E_PHENO_PRO_EMAIL / E2E_PHENO_PRO_PASSWORD
+E2E_PHENO_FOUNDER_EMAIL / E2E_PHENO_FOUNDER_PASSWORD
+E2E_PHENO_CANCELED_EMAIL / E2E_PHENO_CANCELED_PASSWORD
+E2E_PHENO_FREE_SESSION_FILE     (=> e2e/.auth/pheno-free.json)
+E2E_PHENO_PRO_SESSION_FILE      (=> e2e/.auth/pheno-pro.json)
+E2E_PHENO_FOUNDER_SESSION_FILE  (=> e2e/.auth/pheno-founder.json)
+E2E_PHENO_CANCELED_SESSION_FILE (=> e2e/.auth/pheno-canceled.json)
+E2E_PHENO_HUNT_ID_MISSING_EVIDENCE
+E2E_PHENO_HUNT_ID_COMPARISON_READY
+```
+
+Local workflow:
+
+1. Create four test accounts in the running app; assign entitlements
+   through the normal admin UI (never by pasting service_role in the
+   browser).
+2. Export the credential env vars locally (never commit them).
+3. `bun run test:pheno-paid-smoke:sessions` to mint storageState files.
+4. Export `E2E_PHENO_*_SESSION_FILE` pointing at the generated JSON.
+5. Seed hunt fixtures manually via the UI until the seed script is
+   unblocked, and export `E2E_PHENO_HUNT_ID_*` accordingly.
+6. `bun run test:pheno-paid-smoke`.
+
+Result taxonomy:
+
+- **PASS** — scenario ran and asserted successfully.
+- **SKIPPED** — required env/session/fixture missing; expected in CI and
+  in Lovable Cloud sandbox.
+- **BLOCKED** — a script refused to run because a hard prerequisite is
+  missing (e.g. seed script waiting on schema confirmation).
+- **FAIL** — assertion failed, or a session env var pointed at an
+  unreadable file.
+
+Safety reminders:
+
+- Do NOT paste real credentials into chat.
+- Do NOT commit `e2e/.auth/*` or `e2e/.fixtures/*` (gitignored).
+- Do NOT set `SUPABASE_SERVICE_ROLE_KEY` in any browser-visible env.
+- Cleanup: `rm -rf e2e/.auth e2e/.fixtures` between runs to force a
+  fresh session mint.

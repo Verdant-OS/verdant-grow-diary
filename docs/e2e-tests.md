@@ -20,9 +20,12 @@ visually stable, accessible, inert, and free of verdict/keeper/ranking copy.
 
 | Spec | What it proves |
 | ---- | -------------- |
-| `e2e/pheno-disabled-compare-visual-regression.spec.ts` | One scenario per disabled reason (Missing evidence, Pending until harvest, Pending until cure, Replication readiness pending). Asserts disabled button, `aria-describedby` helper text, exact reason copy, no `/compare` link, no forbidden verdict/keeper/ranking copy. Captures a region screenshot artifact per reason. Also proves the disabled state persists across intra-workspace navigation. |
-| `e2e/pheno-workspace-missing-evidence-anchors.spec.ts` | Missing-evidence next-step links point at `/pheno-hunts/:id/workspace#<anchor>` (never `/compare`). Clicking scrolls to the target and Compare stays disabled. Replication readiness item has no anchor/button, cannot change route/hash, cannot enable Compare. |
+| `e2e/pheno-disabled-compare-visual-regression.spec.ts` | One scenario per disabled reason. Asserts disabled button, `aria-describedby` helper, exact reason copy, no `/compare` link, no forbidden verdict/keeper/ranking copy. Captures a region screenshot artifact per reason. |
+| `e2e/pheno-disabled-compare-workspace-navigation.spec.ts` | Compare stays disabled and helper reason unchanged after intra-workspace navigation (desktop + mobile). |
+| `e2e/pheno-disabled-compare-direct-navigation.spec.ts` | Direct `/pheno-hunts/:id/compare` navigation shows the "Not comparison-ready yet" warning, exposes no active comparison / ranking / verdict / keeper UI, links back to the workspace, and fires no comparison-execution / ranking / keeper / AI-comparison / Action Queue write network requests. |
+| `e2e/pheno-workspace-missing-evidence-anchors.spec.ts` | Missing-evidence next-step links point at `/pheno-hunts/:id/workspace#<anchor>` (never `/compare`). Clicking scrolls to the target and Compare stays disabled. |
 | `e2e/pheno-comparison-visual-regression.spec.ts` | Public `/pheno-comparison` demo + optional authenticated `/compare` and workspace snapshots. |
+
 
 ## Fixture env vars
 
@@ -45,12 +48,31 @@ pre-generated `e2e/.auth/user.json` + `e2e/.auth/session-storage.json` or
 
 ```bash
 bunx playwright test e2e/pheno-disabled-compare-visual-regression.spec.ts
+bunx playwright test e2e/pheno-disabled-compare-workspace-navigation.spec.ts
+bunx playwright test e2e/pheno-disabled-compare-direct-navigation.spec.ts
 bunx playwright test e2e/pheno-workspace-missing-evidence-anchors.spec.ts
+
+# Env-aware runner (skips cleanly if no fixture env vars are set):
+bun run test:pheno-disabled-compare-e2e
 ```
 
-Screenshots are written under `e2e/screenshots/`. This repo does **not**
-maintain committed pixel baselines for these specs — copy/structure
-assertions are the real guard; screenshots are artifacts for humans.
+Screenshots are written under `e2e/screenshots/` and uploaded by the
+`Pheno disabled Compare E2E` workflow as the
+`pheno-disabled-compare-screenshots` artifact (14-day retention, uploaded
+with `if: always()` so partial-skip runs still preserve any rendered
+images). This repo does **not** maintain committed pixel baselines — copy,
+structure, and network assertions are the real guard.
+
+## Network denylist
+
+The direct-navigation spec fails if any of these fire while Compare is
+disabled: `/compare-candidates`, `/pheno-comparison-result`,
+`/pheno-rank`, `/keeper-recommendation`, `/comparison-verdict`,
+`/ai*comparison`, and any write (`POST`/`PUT`/`PATCH`/`DELETE`) against
+`pheno_comparison*` / `pheno_conclusion*` / `pheno_rank*` /
+`pheno_keeper*` / `action_queue`. Ordinary read-only fetches (hunt row,
+candidates, evidence, static assets) are allowed.
+
 
 ## Forbidden copy matrix
 

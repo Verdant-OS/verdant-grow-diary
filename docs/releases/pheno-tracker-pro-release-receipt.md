@@ -2,7 +2,7 @@
 
 **Release status:** GO
 **Production URL:** https://verdantgrowdiary.com
-**Release/build identifier:** bundle `assets/index-DFkEvjho.js` · Lovable deployment `088eccbc-9e61-4874-ac85-b24929dd81cc`
+**Release/build identifier:** bundle `assets/index-DFkEvjho.js` · Lovable deployment `088eccbc-9e61-4874-ac85-b24929dd81cc` · Lovable is_published=true, preview at deploy-branch commit `139f2845`
 **Published at:** 2026-07-10, ~16:45 UTC (bundle flip observed 15 s after Publish)
 **Operator:** matt (executed via Claude Code; Publish through the Lovable MCP `deploy_project`)
 
@@ -14,7 +14,7 @@
 | Check | Evidence | Result |
 | --- | --- | --- |
 | Production URL loads successfully | Headless Chromium load of `/` post-publish; title "Sign in to Verdant Grow Diary", 428 chars body text | ☑ PASS |
-| Expected release/build identifier is visible | Bundle hash flipped `index-BC_4tzV6.js` → `index-DFkEvjho.js` within 15 s of Publish | ☑ PASS |
+| Expected release/build identifier is visible | Observed bundle `/assets/index-DFkEvjho.js` (flip from `index-BC_4tzV6.js` +15 s after Publish). **Identity, not just serving:** deployed chunks contain release-unique code — compiled `returnTo→"/pricing"` gate in the entry, "Not comparison-ready" + "Add the missing evidence before comparing" in `phenoComparisonActionState`, `evidence_goals`/`setup_completed_at` reads in `phenoHuntCandidatesService`; PhenoHuntNew/Workspace/Compare chunks present. Lovable records is_published=true, preview anchored at deploy commit `139f2845` | ☑ PASS |
 | No white screen or startup error | Body renders (auth screen for anonymous, as designed) | ☑ PASS |
 | No unexpected console errors | Zero console errors, zero page errors on load; repeated on 5-page authed sweep (see §3) | ☑ PASS |
 
@@ -51,18 +51,11 @@ order by tablename, policyname;
 
 ## 3. Automated live smoke
 
-**Deviation from the template runner:** the smoke was executed as
-`e2e/pheno-tracker-paid-user-smoke.spec.ts` (chromium-authed project) directly
-against `https://verdantgrowdiary.com`, with sessions minted via the real
-`/auth` UI. The role accounts and readiness-stage fixture hunts were seeded
-server-side as **disposable rows tagged `64374b`** and deleted to
-**verified-zero residue** after the run (users, hunts, plants, tents,
-profiles, billing rows; orphan-billing check clean). No real user data was
-touched; no real charge was made.
+Executed via the official runner `scripts/e2e/run-pheno-live-release-smoke.mjs` with `E2E_PHENO_LIVE_SMOKE_CONFIRM=RUN_LIVE_PHENO_SMOKE`, dedicated disposable role accounts, and two production fixture hunts (missing-evidence, comparison-ready), seeded server-side and deleted to verified-zero residue afterward (orphan-billing check clean). Runner stages: deployment PASS · preflight PASS · sessions PASS · playwright PASS.
 
 **Automated smoke result:** ☑ PASS
-**Summary artifact reviewed:** ☑ Yes (Playwright line output; runs recorded in the session transcript)
-**Tests:** 10 passed / 0 failed / 0 skipped / 0 flaky
+**Summary artifact reviewed:** ☑ Yes — `artifacts/release-readiness/pheno-tracker-live-smoke/live-smoke-summary.md` (redacted; Final: PASS)
+**Tests:** 9 passed / 0 failed / 0 skipped / 0 flaky (official runner, 2026-07-10T17:43Z); prior direct spec run same day: 10/10
 
 Additional authed sweep (Pro session) over `/`, `/pheno-hunts/new`,
 workspace, compare, and `/pricing`: **zero console errors, zero 401/403
@@ -89,8 +82,8 @@ responses**.
 
 | Check | Evidence | Result |
 | --- | --- | --- |
-| Paddle checkout opens for dedicated test purchase | Not exercised — no real charge in this release validation | ☑ NOT REQUIRED |
-| Success URL preserves sanitized `returnTo` | Covered without charge: Spec B + `usePaddleCheckout` returnTo forwarding suite | ☑ PASS |
+| Paddle checkout opens for dedicated test purchase | Free role at `/pricing?returnTo=%2Fpheno-hunts%2Fnew`: CTA click opened the live Paddle overlay (`buy.paddle.com` frame loaded); no card entered, no charge | ☑ PASS |
+| Success URL preserves sanitized `returnTo` | `returnTo` preserved through /pricing URL (observed live); Spec B live: unsafe value never navigated; `usePaddleCheckout` forwards sanitized value into successUrl (suite-pinned) | ☑ PASS |
 | Entitlement confirms before gated redirect | CheckoutSuccess polls resolved entitlement before redirect (covered by checkout-success suites; live Spec B confirms no anonymous auto-redirect) | ☑ PASS |
 | Test transaction/account cleanup completed | No transaction made; all disposable smoke accounts deleted to verified-zero residue | ☑ PASS |
 
@@ -139,7 +132,7 @@ All of the following must be true:
 - ☐ **HOLD** — one or more required checks are missing, blocked, or failed
 - ☑ **GO** — every required check above is recorded as PASS
 
-**Decision timestamp:** 2026-07-10 17:31 UTC
+**Decision timestamp:** 2026-07-10 17:50 UTC (re-affirmed after strict verification ledger: identity markers, official runner PASS, artifact review, live Paddle overlay check)
 **Decision owner:** matt (GO issued in session; receipt executed by Claude Code)
 **Notes:** Validation ran three independent layers before GO: unit/integration
 (71 pheno files, 660+ tests), full local lane (orchestrator PASS, 19/19), and

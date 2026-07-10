@@ -60,8 +60,10 @@ describe("Pheno copy regression", () => {
     const expected = [
       "src/components/PhenoHuntSetupProgressCard.tsx",
       "src/components/PhenoComparisonReadyChecklist.tsx",
+      "src/components/PhenoCompareCandidatesAction.tsx",
       "src/constants/phenoOnboardingCopy.ts",
       "src/lib/phenoHuntOnboardingViewModel.ts",
+      "src/lib/phenoComparisonActionState.ts",
     ];
     for (const e of expected) {
       expect(PHENO_FILES.some((f) => f.endsWith(e))).toBe(true);

@@ -299,9 +299,17 @@ export async function updatePhenoHuntSetup(
     patch.setup_completed_at = null;
   }
   if (Object.keys(patch).length === 0) return;
-  const { error } = await client
+  // Read the row back: RLS (owner + RESTRICTIVE Pro entitlement) filters
+  // blocked updates SILENTLY — 0 rows matched, no error — so a bare update
+  // would fake success for a lapsed plan or a cross-user hunt id.
+  const { data, error } = await client
     .from("pheno_hunts")
     .update(patch as never)
-    .eq("id", input.huntId);
+    .eq("id", input.huntId)
+    .select("id")
+    .maybeSingle();
   if (error) throw new PhenoHuntError(`Could not update hunt setup: ${error.message}`, error);
+  if (!data) {
+    throw new PhenoHuntError("Hunt setup was not saved (hunt missing or write rejected).");
+  }
 }

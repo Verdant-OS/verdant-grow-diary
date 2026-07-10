@@ -39,7 +39,9 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const ALL_FILES = ROOTS.flatMap((r) => walk(r));
+// Normalize to posix separators so endsWith() path assertions hold on
+// Windows dev machines too (join() emits backslashes there).
+const ALL_FILES = ROOTS.flatMap((r) => walk(r)).map((p) => p.replace(/\\/g, "/"));
 
 const PHENO_FILES = ALL_FILES.filter((p) => {
   if (p.includes(SELF_PATH_SUBSTR)) return false;

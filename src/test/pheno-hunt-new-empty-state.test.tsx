@@ -99,9 +99,19 @@ describe("PhenoHuntNew empty state", () => {
     fromMock.mockReset();
   });
 
+  /** The guided stepper opens on the basics step — advance to candidates. */
+  async function goToCandidatesStep() {
+    await screen.findByTestId("pheno-step-basics");
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() =>
+      expect(screen.getByTestId("pheno-step-candidates")).toBeInTheDocument(),
+    );
+  }
+
   it("shows empty state CTA when the grow has no plants", async () => {
     mockData([]);
     renderPage();
+    await goToCandidatesStep();
     const cta = (await screen.findByTestId("ph-empty-cta")) as HTMLElement;
     const anchor = cta.querySelector("a") ?? cta;
     expect(anchor.getAttribute("href")).toBe("/grows/g1");
@@ -116,6 +126,7 @@ describe("PhenoHuntNew empty state", () => {
       { id: "p2", name: "Plant 2", strain: "S2", tent_id: null },
     ]);
     renderPage();
+    await goToCandidatesStep();
     await waitFor(() =>
       expect(screen.getByTestId("ph-plant-list")).toBeInTheDocument(),
     );

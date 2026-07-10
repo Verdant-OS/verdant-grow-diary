@@ -39,7 +39,11 @@ export async function loadPhenoHuntCandidates(
 
   const { data: huntRow, error: huntError } = await supabase
     .from("pheno_hunts")
-    .select("id, name, grow_id, tent_id, evidence_goals, notes, setup_completed_at")
+    // "*" (not an explicit column list) so the workspace keeps loading
+    // during a deploy window where the guided-setup migration has not been
+    // applied yet — missing columns simply arrive as undefined and the
+    // defensive mapping below turns them into safe defaults.
+    .select("*")
     .eq("id", id)
     .maybeSingle();
 

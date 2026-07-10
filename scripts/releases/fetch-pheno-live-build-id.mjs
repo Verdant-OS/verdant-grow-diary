@@ -13,8 +13,9 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
-const SITE_URL = "https://verdantgrowdiary.com";
+export const SITE_URL = "https://verdantgrowdiary.com";
 const OUT_PATH = path.resolve(
   "artifacts/release-readiness/pheno-tracker-live-smoke/deployed-build.json",
 );
@@ -24,12 +25,12 @@ function firstLine(value) {
   return String(value ?? "").split("\n")[0].slice(0, 220);
 }
 
-function extractTitle(html) {
+export function extractTitle(html) {
   const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   return match ? match[1].replace(/\s+/g, " ").trim() : null;
 }
 
-function extractMainBundle(html) {
+export function extractMainBundle(html) {
   const tags = html.match(/<script\b[^>]*\bsrc=["'][^"']+["'][^>]*>/gi) ?? [];
   const sources = tags
     .map((tag) => tag.match(/\bsrc=["']([^"']+)["']/i)?.[1])
@@ -44,12 +45,41 @@ function extractMainBundle(html) {
   );
 }
 
-function expectedMatches(expected, observed) {
+/**
+ * Resolve the bundle URL and enforce same-origin (protocol-relative and
+ * absolute URLs to other hosts are rejected — a fingerprint must never be
+ * taken from a foreign origin).
+ */
+export function resolveSameOriginBundleUrl(bundleSrc, siteUrl = SITE_URL) {
+  const resolved = new URL(bundleSrc, siteUrl);
+  if (resolved.origin !== new URL(siteUrl).origin) {
+    throw new Error("main bundle resolved to an unexpected origin");
+  }
+  return resolved.toString();
+}
+
+/**
+ * Expected identifier may be the EXACT bundle id, the EXACT bundle filename,
+ * or a PREFIX of the SHA-256 (>= 8 chars to avoid trivial matches). A prefix
+ * of the bundle id/filename deliberately does NOT match.
+ */
+export function expectedMatches(expected, observed) {
   if (!expected) return null;
-  const candidates = [observed.bundleId, observed.bundleFile, observed.bundleSha256]
-    .filter(Boolean)
-    .map(String);
-  return candidates.some((candidate) => candidate === expected || candidate.startsWith(expected));
+  if (observed.bundleId && observed.bundleId === expected) return true;
+  if (observed.bundleFile && observed.bundleFile === expected) return true;
+  if (
+    observed.bundleSha256 &&
+    expected.length >= 8 &&
+    /^[0-9a-f]+$/i.test(expected) &&
+    observed.bundleSha256.toLowerCase().startsWith(expected.toLowerCase())
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function sha256Hex(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
 async function fetchWithTimeout(url, responseType) {
@@ -82,17 +112,19 @@ async function main() {
   const bundleSrc = extractMainBundle(html);
   if (!bundleSrc) throw new Error("main JavaScript bundle was not found in production HTML");
 
-  const bundleUrl = new URL(bundleSrc, SITE_URL).toString();
-  if (new URL(bundleUrl).origin !== SITE_URL) {
-    throw new Error("main bundle resolved to an unexpected origin");
-  }
+  const bundleUrl = resolveSameOriginBundleUrl(bundleSrc, SITE_URL);
 
   const bundleResult = await fetchWithTimeout(bundleUrl, "arrayBuffer");
+  // Redirect-following could bounce off-origin after the request was made —
+  // verify where the bytes actually came from, not just where we asked.
+  if (new URL(bundleResult.response.url).origin !== new URL(SITE_URL).origin) {
+    throw new Error("main bundle response arrived from an unexpected origin");
+  }
   const bytes = Buffer.from(bundleResult.body);
   const bundlePath = new URL(bundleUrl).pathname;
   const bundleFile = path.posix.basename(bundlePath);
   const bundleId = bundleFile.replace(/\.m?js$/i, "");
-  const bundleSha256 = createHash("sha256").update(bytes).digest("hex");
+  const bundleSha256 = sha256Hex(bytes);
 
   const artifact = {
     status: "PASS",
@@ -136,7 +168,10 @@ async function main() {
   process.exit(artifact.status === "PASS" ? 0 : 1);
 }
 
-main().catch((error) => {
-  console.error(`FAIL: ${firstLine(error?.message ?? error)}`);
-  process.exit(1);
-});
+const invokedPath = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
+if (import.meta.url === invokedPath) {
+  main().catch((error) => {
+    console.error(`FAIL: ${firstLine(error?.message ?? error)}`);
+    process.exit(1);
+  });
+}

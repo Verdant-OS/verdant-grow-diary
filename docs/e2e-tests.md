@@ -243,3 +243,84 @@ Safety reminders:
 - Do NOT set `SUPABASE_SERVICE_ROLE_KEY` in any browser-visible env.
 - Cleanup: `rm -rf e2e/.auth e2e/.fixtures` between runs to force a
   fresh session mint.
+
+## Pheno Tracker live release smoke (production)
+
+The production release gate is a three-part sequence — local-only
+preflight → deployed-build fingerprint → live role smoke — followed by an
+automated release receipt. It runs against the fixed target
+`https://verdantgrowdiary.com` only, uses dedicated production test
+accounts and existing production-safe fixture hunts, and **never seeds
+production**. `service_role` is never used; if
+`SUPABASE_SERVICE_ROLE_KEY` is present the preflight warns.
+
+### Commands
+
+```bash
+bun run test:pheno-live-smoke:preflight   # local-only; prints variable NAMES, no network
+bun run release:pheno:build-id            # fetch + fingerprint the deployed bundle
+bun run test:pheno-live-smoke             # full runner: preflight → reachability → fingerprint → sessions → Playwright
+bun run release:pheno:receipt             # write the receipt; GO exits 0, HOLD exits 2
+bun run release:pheno:receipt:partial     # refresh a HOLD receipt before all evidence exists (never GO)
+```
+
+### Required local inputs (names only — never paste values)
+
+The confirmation gate plus four role credential pairs and two fixture
+hunt ids; the full list is printed by the preflight:
+
+```
+E2E_PHENO_LIVE_SMOKE_CONFIRM=RUN_LIVE_PHENO_SMOKE
+E2E_PHENO_{FREE,PRO,FOUNDER,CANCELED}_{EMAIL,PASSWORD}
+E2E_PHENO_HUNT_ID_MISSING_EVIDENCE
+E2E_PHENO_HUNT_ID_COMPARISON_READY
+```
+
+### Exit codes (preflight and runner)
+
+- **0 READY / PASS** — all inputs present and valid; smoke passed.
+- **1 FAIL** — invalid confirmation value, `E2E_BASE_URL` conflicting
+  with the fixed production target, deployment/fingerprint failure, or a
+  failed/skipped live test. Missing inputs are never treated as PASS.
+- **2 BLOCKED** — required local inputs missing. The runner exits before
+  any network request, session mint, or Playwright launch.
+
+### Build fingerprint
+
+`release:pheno:build-id` fetches production HTML, resolves the main Vite
+bundle **same-origin only**, and records timestamp, page title, HTTP
+status, bundle path/filename/id, byte length, SHA-256, ETag, and
+Last-Modified to
+`artifacts/release-readiness/pheno-tracker-live-smoke/deployed-build.json`.
+If `PHENO_EXPECTED_LIVE_BUILD_ID` is set it must EXACTLY match the bundle
+id or filename, or be a ≥8-char hex prefix of the SHA-256 — a mismatch is
+FAIL (exit 1). If unset the artifact records `NOT SET`; reachability
+alone never claims release identity.
+
+### Release receipt
+
+`release:pheno:receipt` reads four redacted artifacts (live smoke
+summary, schema spot-check, deployed build, manual release checks) and
+writes `docs/releases/pheno-tracker-pro-release-receipt.md` with a
+GO/HOLD decision. GO requires ALL of: production reachable, expected
+build identity match, no white screen, no console errors, schema
+spot-check PASS (3 onboarding columns, exactly 1 entitlement function,
+13/13 RESTRICTIVE Pro tables, owner SELECT verified), live smoke PASS
+with zero failed and zero skipped tests, all 12 checkpoints PASS,
+billing disposition resolved, and complete rollback readiness. Anything
+less is HOLD. Checkpoints auto-populate only when a matching Playwright
+test proves them; checkpoints 6 (hunt setup persistence) and 9
+(missing-evidence navigation) have no automated proof in the live smoke
+and stay PENDING unless `manual-release-checks.json` records manual
+evidence.
+
+### Safety
+
+- Artifacts under `artifacts/` and sessions under `e2e/.auth/` are
+  gitignored and contain redacted evidence only — no credentials,
+  cookies, tokens, emails, or fixture ids.
+- Playwright traces are disabled on real-auth runs (the runner sets the
+  sentinel automatically).
+- Tests for this tooling (`src/test/pheno-live-release-tooling.test.ts`)
+  never contact production — CLI tests only exercise paths that exit
+  before any network request.

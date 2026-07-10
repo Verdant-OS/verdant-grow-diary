@@ -4,6 +4,8 @@ import {
   type PhenoHuntCandidatePlantRow,
 } from "@/lib/phenoHuntCandidateAdapter";
 import { buildPhenoComparisonView } from "@/lib/phenoComparisonViewModel";
+import { derivePhenoCompareReadinessFromCandidates } from "@/lib/phenoComparisonActionState";
+
 
 function plant(overrides: Partial<PhenoHuntCandidatePlantRow> = {}): PhenoHuntCandidatePlantRow {
   return {

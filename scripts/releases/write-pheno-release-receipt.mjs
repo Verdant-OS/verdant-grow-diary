@@ -237,12 +237,12 @@ export function renderMigrationExceptionSection(postureCheck) {
     "",
     "### Recorded non-additive migration changes",
     "",
-    "| Migration | Change | Scope | Impact | Rollback procedure |",
-    "| --- | --- | --- | --- | --- |",
+    "| Migration | Change | Scope | Description | Impact | Rollback procedure |",
+    "| --- | --- | --- | --- | --- | --- |",
   ];
   for (const ex of postureCheck.exceptions) {
     lines.push(
-      `| ${esc(ex?.migration)} | ${esc(ex?.changeType)} | ${esc(ex?.scope)} | ${esc(ex?.impact)} | ${esc(ex?.rollbackProcedure)} |`,
+      `| ${esc(ex?.migration)} | ${esc(ex?.changeType)} | ${esc(ex?.scope)} | ${esc(ex?.description)} | ${esc(ex?.impact)} | ${esc(ex?.rollbackProcedure)} |`,
     );
   }
   return lines;

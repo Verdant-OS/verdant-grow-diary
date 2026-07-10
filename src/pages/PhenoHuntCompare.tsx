@@ -125,7 +125,12 @@ export default function PhenoHuntCompare() {
           </div>
         </section>
       ) : null}
-      <PhenoComparisonView inputs={candidates} mode="live" huntName={hunt?.name ?? null} />
+      <PhenoComparisonView
+        inputs={candidates}
+        mode="live"
+        huntName={hunt?.name ?? null}
+        allowConclusions={!notReady}
+      />
     </>
   );
 }

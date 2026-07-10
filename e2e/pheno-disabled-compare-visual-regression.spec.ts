@@ -66,6 +66,9 @@ async function assertDisabledCompareInert(page: Page, expectedReason: string) {
   const action = page.getByTestId("pheno-workspace-compare-action");
   await expect(action).toBeVisible();
 
+  // Exactly one Compare action rendered — no duplicate cards/panels.
+  expect(await page.getByTestId("pheno-workspace-compare-action").count()).toBe(1);
+
   // Enabled=false attribute confirms the pure state, not just the button.
   await expect(action).toHaveAttribute("data-enabled", "false");
 

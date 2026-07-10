@@ -60,8 +60,10 @@ describe("Pheno copy regression", () => {
     const expected = [
       "src/components/PhenoHuntSetupProgressCard.tsx",
       "src/components/PhenoComparisonReadyChecklist.tsx",
+      "src/components/PhenoCompareCandidatesAction.tsx",
       "src/constants/phenoOnboardingCopy.ts",
       "src/lib/phenoHuntOnboardingViewModel.ts",
+      "src/lib/phenoComparisonActionState.ts",
     ];
     for (const e of expected) {
       expect(PHENO_FILES.some((f) => f.endsWith(e))).toBe(true);
@@ -122,5 +124,34 @@ describe("Pheno copy regression", () => {
     const card = read("src/components/PhenoHuntSetupProgressCard.tsx");
     expect(card).toMatch(/PHENO_SETUP_COMPLETE_DEFINITION/);
     expect(card).toMatch(/PHENO_COMPARISON_READY_DEFINITION/);
+  });
+
+  it("compare action presenter renders the Not-comparison-ready label", () => {
+    const src = read("src/components/PhenoCompareCandidatesAction.tsx");
+    expect(src).toMatch(/notComparisonReadyYet/);
+    expect(src).toMatch(/PHENO_COMPARISON_HELP_COPY/);
+  });
+
+  it("forbidden marketing phrases are absent from comparison surfaces", () => {
+    const surfaces = [
+      "src/components/PhenoCompareCandidatesAction.tsx",
+      "src/components/PhenoHuntSetupProgressCard.tsx",
+      "src/components/PhenoComparisonReadyChecklist.tsx",
+      "src/pages/PhenoComparison.tsx",
+      "src/pages/PhenoHuntCompare.tsx",
+    ];
+    const forbidden = [
+      /guaranteed\s+keeper/i,
+      /guaranteed\s+yield/i,
+      /ai\s+picked/i,
+      /automated\s+breeding/i,
+      /best\s+candidate\s+is/i,
+    ];
+    for (const path of surfaces) {
+      const src = read(path);
+      for (const pat of forbidden) {
+        expect(pat.test(src), `${path} contains forbidden phrase ${pat}`).toBe(false);
+      }
+    }
   });
 });

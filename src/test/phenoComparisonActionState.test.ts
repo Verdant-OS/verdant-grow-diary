@@ -1,0 +1,86 @@
+/**
+ * buildPhenoComparisonActionState — pure helper unit tests.
+ */
+import { describe, it, expect } from "vitest";
+import {
+  buildPhenoComparisonActionState,
+  PHENO_COMPARISON_HELP_COPY,
+} from "@/lib/phenoComparisonActionState";
+
+const base = {
+  huntId: "h1",
+  candidateCount: 2,
+  goalsSelected: 2,
+  allCandidatesHavePhenotypeNote: true,
+  anyPostHarvestObservation: true,
+  anyPostCureObservation: true,
+};
+
+describe("buildPhenoComparisonActionState", () => {
+  it("fewer than 2 candidates → not_ready, disabled, no target", () => {
+    const s = buildPhenoComparisonActionState({ ...base, candidateCount: 1 });
+    expect(s.enabled).toBe(false);
+    expect(s.readiness).toBe("not_ready");
+    expect(s.nextStepTarget).toBeNull();
+    expect(s.missingEvidence).toContain("Add at least 2 candidates");
+    expect(s.reason).toBe(PHENO_COMPARISON_HELP_COPY);
+  });
+
+  it("no goals → not_ready", () => {
+    const s = buildPhenoComparisonActionState({ ...base, goalsSelected: 0 });
+    expect(s.enabled).toBe(false);
+    expect(s.missingEvidence).toContain("Select at least one evidence goal");
+  });
+
+  it("missing phenotype notes → missing_evidence", () => {
+    const s = buildPhenoComparisonActionState({
+      ...base,
+      allCandidatesHavePhenotypeNote: false,
+    });
+    expect(s.readiness).toBe("missing_evidence");
+    expect(s.reason).toBe("Missing evidence");
+    expect(s.enabled).toBe(false);
+  });
+
+  it("no post-harvest → pending_until_harvest", () => {
+    const s = buildPhenoComparisonActionState({
+      ...base,
+      anyPostHarvestObservation: false,
+    });
+    expect(s.readiness).toBe("pending_until_harvest");
+    expect(s.reason).toBe("Pending until harvest");
+  });
+
+  it("no post-cure → pending_until_cure", () => {
+    const s = buildPhenoComparisonActionState({
+      ...base,
+      anyPostCureObservation: false,
+    });
+    expect(s.readiness).toBe("pending_until_cure");
+    expect(s.reason).toBe("Pending until cure");
+  });
+
+  it("replication readiness explicitly false → not_ready", () => {
+    const s = buildPhenoComparisonActionState({
+      ...base,
+      replicationReadinessRecorded: false,
+    });
+    expect(s.readiness).toBe("not_ready");
+    expect(s.enabled).toBe(false);
+    expect(s.missingEvidence.join(" ")).toMatch(/replication readiness/i);
+  });
+
+  it("all evidence present → comparison_ready, enabled, correct route", () => {
+    const s = buildPhenoComparisonActionState(base);
+    expect(s.readiness).toBe("comparison_ready");
+    expect(s.enabled).toBe(true);
+    expect(s.nextStepTarget).toBe("/pheno-hunts/h1/compare");
+    expect(s.label).toBe("Compare candidates");
+  });
+
+  it("missing huntId → disabled even when otherwise ready", () => {
+    const s = buildPhenoComparisonActionState({ ...base, huntId: null });
+    expect(s.enabled).toBe(false);
+    expect(s.nextStepTarget).toBeNull();
+  });
+});

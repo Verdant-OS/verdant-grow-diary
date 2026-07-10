@@ -29,12 +29,17 @@ const CREDENTIAL_ENV_PAIRS = [
   ["Canceled/expired user", "E2E_PHENO_CANCELED_EMAIL", "E2E_PHENO_CANCELED_PASSWORD"],
 ];
 
+// note: `BLOCKED` markers reflect known product-code gaps (see
+// scripts/e2e/seed-pheno-paid-smoke-fixtures.mjs header). They are printed
+// as BLOCKED even when the env var is unset so users see the real reason.
 const FIXTURE_ENVS = [
-  ["Missing-evidence hunt (required)", "E2E_PHENO_HUNT_ID_MISSING_EVIDENCE", true],
-  ["Comparison-ready hunt (required)", "E2E_PHENO_HUNT_ID_COMPARISON_READY", true],
-  ["Pending harvest hunt (optional)", "E2E_PHENO_HUNT_ID_PENDING_HARVEST", false],
-  ["Pending cure hunt (optional)", "E2E_PHENO_HUNT_ID_PENDING_CURE", false],
-  ["Replication pending hunt (optional)", "E2E_PHENO_HUNT_ID_REPLICATION_PENDING", false],
+  ["Missing-evidence hunt (seedable)", "E2E_PHENO_HUNT_ID_MISSING_EVIDENCE", null],
+  ["Comparison-ready hunt", "E2E_PHENO_HUNT_ID_COMPARISON_READY",
+    "BLOCKED: compare read path does not hydrate candidate.expression"],
+  ["Pending harvest hunt (seedable)", "E2E_PHENO_HUNT_ID_PENDING_HARVEST", null],
+  ["Pending cure hunt (seedable)", "E2E_PHENO_HUNT_ID_PENDING_CURE", null],
+  ["Replication pending hunt", "E2E_PHENO_HUNT_ID_REPLICATION_PENDING",
+    "BLOCKED: signal not persisted anywhere"],
 ];
 
 function present(name) {
@@ -77,10 +82,15 @@ for (const envName of SESSION_FILE_ENVS) {
 
 lines.push("");
 lines.push("Hunt fixture ids:");
-for (const [label, envName /*, required*/] of FIXTURE_ENVS) {
+for (const [label, envName, blockedReason] of FIXTURE_ENVS) {
   const has = present(envName);
   if (has) anyPresent = true;
-  lines.push(`  ${has ? "PRESENT " : "SKIPPED "} ${label}`);
+  let status;
+  if (has) status = "PRESENT ";
+  else if (blockedReason) status = "BLOCKED ";
+  else status = "SKIPPED ";
+  const suffix = !has && blockedReason ? ` — ${blockedReason}` : "";
+  lines.push(`  ${status} ${label}${suffix}`);
 }
 
 lines.push("");

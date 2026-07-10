@@ -5,8 +5,8 @@
  * Comparison-ready, never by Setup complete.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { render, screen, cleanup, within, fireEvent } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { UsePhenoHuntWorkspaceState } from "@/hooks/usePhenoHuntWorkspace";
 import type { PhenoHuntSummary } from "@/lib/phenoHuntCandidatesService";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
@@ -103,10 +103,26 @@ function mountAt(input: ScenarioInput) {
   });
   return render(
     <MemoryRouter initialEntries={[`/pheno-hunts/${HUNT_ID}/workspace`]}>
+      <LocationProbe />
       <Routes>
         <Route path="/pheno-hunts/:id/workspace" element={<PhenoHuntWorkspace />} />
+        <Route
+          path="/pheno-hunts/:id/compare"
+          element={<div data-testid="stub-compare-page">stub compare</div>}
+        />
       </Routes>
     </MemoryRouter>,
+  );
+}
+
+function LocationProbe() {
+  const loc = useLocation();
+  return <div data-testid="current-location" data-pathname={loc.pathname} />;
+}
+
+function currentPath(): string {
+  return (
+    screen.getByTestId("current-location").getAttribute("data-pathname") ?? ""
   );
 }
 
@@ -234,5 +250,77 @@ describe("PhenoHuntWorkspace — Comparison-ready gating", () => {
     // label. They must not read as synonyms.
     expect(/comparison-ready/i.test(setup)).toBe(false);
     expect(/Setup complete:\s*Yes/i.test(comp)).toBe(false);
+  });
+
+  it("disabled Compare candidates cannot navigate to /compare on click", () => {
+    mountAt({
+      hunt: { setupCompletedAt: "2026-08-01T00:00:00Z" },
+      candidates: [candidate("p1"), candidate("p2")],
+    });
+    expect(currentPath()).toBe(`/pheno-hunts/${HUNT_ID}/workspace`);
+    const btn = screen.getByTestId("pheno-workspace-compare-action-disabled");
+    expect(btn).toBeDisabled();
+    // Explicitly no anchor to /compare on the disabled surface.
+    const compareAnchors = document.querySelectorAll(
+      `a[href="/pheno-hunts/${HUNT_ID}/compare"]`,
+    );
+    expect(compareAnchors.length).toBe(0);
+    fireEvent.click(btn);
+    fireEvent.keyDown(btn, { key: "Enter" });
+    fireEvent.keyDown(btn, { key: " " });
+    expect(currentPath()).toBe(`/pheno-hunts/${HUNT_ID}/workspace`);
+    expect(screen.queryByTestId("stub-compare-page")).toBeNull();
+  });
+
+  it("disabled Compare surface still renders workspace content + missing-evidence next steps to workspace (never to /compare)", () => {
+    mountAt({
+      hunt: { setupCompletedAt: "2026-08-01T00:00:00Z" },
+      candidates: [candidate("p1"), candidate("p2")],
+    });
+    // Workspace content still visible (compare progress card is workspace).
+    expect(
+      screen.getByTestId("pheno-workspace-setup-progress-comparison-status"),
+    ).toBeVisible();
+    const nextSteps = screen.getAllByTestId(
+      /^pheno-workspace-compare-action-next-step-/,
+    );
+    expect(nextSteps.length).toBeGreaterThan(0);
+    for (const link of nextSteps) {
+      const href = link.getAttribute("href") ?? "";
+      expect(href).toBe(`/pheno-hunts/${HUNT_ID}/workspace`);
+      expect(href.includes("/compare")).toBe(false);
+    }
+  });
+
+  it("enabled Compare candidates renders a real <a href=/compare> and navigates on click", () => {
+    mountAt({
+      hunt: { setupCompletedAt: "2026-08-01T00:00:00Z" },
+      candidates: [candidate("p1"), candidate("p2")],
+      scoresByPlant: {
+        p1: { plantId: "p1", traits: {}, note: "note 1" },
+        p2: { plantId: "p2", traits: {}, note: "note 2" },
+      },
+      decisionsByPlant: {
+        p1: { plantId: "p1", decision: "keep", note: null, decidedAt: null },
+      },
+      smokeByPlant: {
+        p1: {
+          plantId: "p1",
+          flavorDescriptors: ["gas"],
+          effectDescriptors: ["couchlock"],
+          smoothness: 4,
+          potencyImpression: 4,
+          verdict: "Solid",
+        },
+      },
+    });
+    const link = screen.getByTestId("pheno-workspace-compare-action-link");
+    const anchor = link.querySelector("a") ?? link;
+    expect(anchor.getAttribute("href")).toBe(
+      `/pheno-hunts/${HUNT_ID}/compare`,
+    );
+    fireEvent.click(anchor);
+    expect(currentPath()).toBe(`/pheno-hunts/${HUNT_ID}/compare`);
+    expect(screen.getByTestId("stub-compare-page")).toBeVisible();
   });
 });

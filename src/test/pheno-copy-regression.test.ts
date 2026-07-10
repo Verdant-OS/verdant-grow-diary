@@ -144,8 +144,11 @@ describe("Pheno copy regression", () => {
       /guaranteed\s+keeper/i,
       /guaranteed\s+yield/i,
       /ai\s+picked/i,
+      /ai\s+picks?\s+winners?/i,
       /automated\s+breeding/i,
       /best\s+candidate\s+is/i,
+      /the\s+winner\s+is/i,
+      /best\s+pheno\s+is/i,
     ];
     for (const path of surfaces) {
       const src = read(path);
@@ -153,5 +156,13 @@ describe("Pheno copy regression", () => {
         expect(pat.test(src), `${path} contains forbidden phrase ${pat}`).toBe(false);
       }
     }
+  });
+
+  it("PhenoHuntCompare renders an incomplete-evidence warning surface", () => {
+    const src = read("src/pages/PhenoHuntCompare.tsx");
+    expect(src).toMatch(/pheno-hunt-compare-readiness-warning/);
+    expect(src).toMatch(/notComparisonReadyYet/);
+    expect(src).toMatch(/missing evidence needed for an honest candidate comparison/i);
+    expect(src).toMatch(/PHENO_COMPARISON_READY_DEFINITION/);
   });
 });

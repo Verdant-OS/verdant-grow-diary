@@ -42,6 +42,10 @@ const FORBIDDEN_COPY = [
   "automated breeding",
 ];
 
+function sessionSnapshotPath(storageStatePath: string): string {
+  return storageStatePath.replace(/\.json$/, ".session-storage.json");
+}
+
 function resolveSession(envName: string): { path?: string; skipReason?: string } {
   const raw = process.env[envName];
   if (!raw || raw.trim() === "") {
@@ -50,6 +54,15 @@ function resolveSession(envName: string): { path?: string; skipReason?: string }
   if (!fs.existsSync(raw)) {
     return { skipReason: `SKIPPED: ${envName} points to unreadable file.` };
   }
+  // The app keeps its Supabase session in sessionStorage, which storageState
+  // cannot carry — without the generator's sibling snapshot the role would
+  // run ANONYMOUS and pass/fail vacuously. Treat a missing snapshot as an
+  // unusable session, never a silent no-op.
+  if (!fs.existsSync(sessionSnapshotPath(raw))) {
+    return {
+      skipReason: `SKIPPED: ${envName} has no sibling .session-storage.json — re-run test:pheno-paid-smoke:sessions.`,
+    };
+  }
   return { path: raw };
 }
 
@@ -57,6 +70,45 @@ const FREE_SESSION = resolveSession("E2E_PHENO_FREE_SESSION_FILE");
 const PRO_SESSION = resolveSession("E2E_PHENO_PRO_SESSION_FILE");
 const FOUNDER_SESSION = resolveSession("E2E_PHENO_FOUNDER_SESSION_FILE");
 const CANCELED_SESSION = resolveSession("E2E_PHENO_CANCELED_SESSION_FILE");
+
+/**
+ * Bind a role session to the current describe block.
+ *
+ * storageState restores only cookies + localStorage, but the app keeps its
+ * Supabase session in **sessionStorage** (see e2e/lib/authedTest.ts) — so
+ * test.use({ storageState }) alone leaves every page anonymous. The session
+ * generator writes a sibling `<name>.session-storage.json` snapshot for each
+ * role; inject it before any page script runs, scoped to the recorded origin.
+ */
+function bindRoleSession(session: { path?: string }) {
+  if (!session.path) return;
+  test.use({ storageState: session.path });
+  const snapPath = sessionSnapshotPath(session.path);
+  test.beforeEach(async ({ context }) => {
+    if (!fs.existsSync(snapPath)) {
+      // resolveSession already gates on the snapshot; if it vanished between
+      // resolution and run, fail LOUDLY — a silent return here would run the
+      // role anonymously and make every assertion vacuous.
+      throw new Error(
+        `role session snapshot disappeared: ${snapPath} — re-run test:pheno-paid-smoke:sessions.`,
+      );
+    }
+    const saved = JSON.parse(fs.readFileSync(snapPath, "utf-8")) as {
+      origin: string;
+      entries: Record<string, string>;
+    };
+    await context.addInitScript(
+      (arg: { entries: Record<string, string>; appOrigin: string }) => {
+        if (window.location.origin === arg.appOrigin) {
+          for (const [key, value] of Object.entries(arg.entries)) {
+            window.sessionStorage.setItem(key, value);
+          }
+        }
+      },
+      { entries: saved.entries, appOrigin: saved.origin },
+    );
+  });
+}
 
 const MISSING_EVIDENCE_HUNT = process.env.E2E_PHENO_HUNT_ID_MISSING_EVIDENCE;
 const COMPARISON_READY_HUNT = process.env.E2E_PHENO_HUNT_ID_COMPARISON_READY;
@@ -80,7 +132,7 @@ async function assertNoForbiddenCopy(page: Page) {
 
 // ─── A. Free user gate ────────────────────────────────────────────────────
 test.describe("A. Free user gate", () => {
-  if (FREE_SESSION.path) test.use({ storageState: FREE_SESSION.path });
+  bindRoleSession(FREE_SESSION);
 
   test("Free user cannot reach /pheno-hunts/new; upgrade CTA preserves returnTo", async ({ page }) => {
     await page.goto("/pheno-hunts/new");
@@ -107,7 +159,12 @@ test.describe("B. CheckoutSuccess sanitizer", () => {
     await page.goto("/checkout/success?returnTo=https://evil.example/pwn");
     await expect(page.getByTestId("checkout-success-page")).toBeVisible();
     await page.waitForTimeout(400);
-    expect(page.url()).not.toContain("evil.example");
+    // The malicious value stays inert in the query string; what matters is
+    // that the browser never NAVIGATES to it — assert on origin + path, not
+    // the full URL (which necessarily still contains the param we sent).
+    const after = new URL(page.url());
+    expect(after.hostname).not.toContain("evil.example");
+    expect(after.pathname).toBe("/checkout/success");
 
     await page.goto("/checkout/success?returnTo=/pheno-hunts/new");
     await expect(page.getByTestId("checkout-success-page")).toBeVisible();
@@ -119,7 +176,7 @@ test.describe("B. CheckoutSuccess sanitizer", () => {
 // ─── C. Pro Monthly can reach paid workspace ──────────────────────────────
 test.describe("C. Pro Monthly access", () => {
   test.skip(!PRO_SESSION.path, PRO_SESSION.skipReason ?? "SKIPPED: no Pro session.");
-  if (PRO_SESSION.path) test.use({ storageState: PRO_SESSION.path });
+  bindRoleSession(PRO_SESSION);
 
   test("Pro user can load /pheno-hunts/new without auth wall", async ({ page }) => {
     await page.goto("/pheno-hunts/new");
@@ -131,7 +188,7 @@ test.describe("C. Pro Monthly access", () => {
 // ─── C2. Founder Lifetime can reach paid workspace ────────────────────────
 test.describe("C2. Founder Lifetime access", () => {
   test.skip(!FOUNDER_SESSION.path, FOUNDER_SESSION.skipReason ?? "SKIPPED: no Founder session.");
-  if (FOUNDER_SESSION.path) test.use({ storageState: FOUNDER_SESSION.path });
+  bindRoleSession(FOUNDER_SESSION);
 
   test("Founder user can load /pheno-hunts/new without auth wall", async ({ page }) => {
     await page.goto("/pheno-hunts/new");
@@ -143,7 +200,7 @@ test.describe("C2. Founder Lifetime access", () => {
 // ─── C3. Canceled/expired user is blocked ─────────────────────────────────
 test.describe("C3. Canceled/expired blocked from paid pheno workspace", () => {
   test.skip(!CANCELED_SESSION.path, CANCELED_SESSION.skipReason ?? "SKIPPED: no Canceled session.");
-  if (CANCELED_SESSION.path) test.use({ storageState: CANCELED_SESSION.path });
+  bindRoleSession(CANCELED_SESSION);
 
   test("Canceled user hitting /pheno-hunts/new sees gate, not the create form", async ({ page }) => {
     await page.goto("/pheno-hunts/new");
@@ -159,7 +216,7 @@ test.describe("D–F. Missing-evidence hunt", () => {
     !MISSING_EVIDENCE_HUNT,
     "SKIPPED: E2E_PHENO_HUNT_ID_MISSING_EVIDENCE not set. See docs/e2e-tests.md.",
   );
-  if (PAID_SESSION.path) test.use({ storageState: PAID_SESSION.path });
+  bindRoleSession(PAID_SESSION);
 
   test("D+E. workspace shows disabled Compare and inert missing-evidence anchors", async ({ page }) => {
     await page.goto(`/pheno-hunts/${MISSING_EVIDENCE_HUNT}/workspace`);
@@ -194,7 +251,7 @@ test.describe("G. Comparison-ready hunt", () => {
     !COMPARISON_READY_HUNT,
     "SKIPPED: E2E_PHENO_HUNT_ID_COMPARISON_READY not set. See docs/e2e-tests.md.",
   );
-  if (PAID_SESSION.path) test.use({ storageState: PAID_SESSION.path });
+  bindRoleSession(PAID_SESSION);
 
   test("workspace enables Compare and /compare renders read-only comparison", async ({ page }) => {
     await page.goto(`/pheno-hunts/${COMPARISON_READY_HUNT}/workspace`);

@@ -116,17 +116,35 @@ Provide either session files (preferred) OR email+password pairs:
 
 ### Local fixture seeding
 
-Local Supabase / service_role required. This project does not currently
-ship a seeding script; create the fixture hunts against your local Supabase
-via the app UI while signed in as the corresponding test user, then export
-their ids into the env vars above. **Never** seed against production and
-**never** paste service_role, cookies, passwords, or hunt ids into chat.
+Local Supabase + `service_role` required. See
+[docs/pheno-paid-smoke-local-setup.md](./pheno-paid-smoke-local-setup.md)
+for the full local setup (Docker + `supabase start` + test accounts +
+`bun run test:pheno-paid-smoke:seed`). The seeder writes real evidence
+rows so `comparison-ready` is produced by the same code path the app uses
+— nothing is faked. **Never** seed against hosted Supabase and **never**
+paste `service_role`, cookies, passwords, or hunt ids into chat.
 
 ### Running
 
+Canonical one-command local run (Docker + local Supabase required):
+
 ```bash
-bun run test:pheno-paid-smoke:preflight   # PRESENT/SKIPPED report
-bun run test:pheno-paid-smoke             # preflight + Playwright smoke
+bun run test:pheno-paid-smoke:local
+```
+
+This runs preflight → seed → load fixture env → hydration verify →
+sessions → Playwright, and returns exit 0 on PASS, 1 on FAIL, and 2 on
+SKIPPED / BLOCKED (Playwright is never launched in that case).
+
+Individual commands for debugging:
+
+```bash
+bun run test:pheno-paid-smoke:preflight     # PRESENT / SEEDABLE / SKIPPED report
+bun run test:pheno-paid-smoke:seed          # seed local fixtures (local Supabase only)
+bun run test:pheno-paid-smoke:verify        # exercise adapter + readiness on the seeded fixture
+bun run test:pheno-paid-smoke:sessions      # mint Playwright storageState per role
+bun run test:pheno-paid-smoke                # preflight + Playwright smoke
+bun run test:pheno-paid-smoke:verify-tests  # unit + CLI tests for the verifier and orchestrator
 ```
 
 ### Automated vs manual steps
@@ -170,10 +188,12 @@ Scripts:
   - `e2e/.auth/pheno-pro.json` + `.session-storage.json`
   - `e2e/.auth/pheno-founder.json` + `.session-storage.json`
   - `e2e/.auth/pheno-canceled.json` + `.session-storage.json`
-- `bun run test:pheno-paid-smoke:seed` — **currently BLOCKED**. See the
-  header of `scripts/e2e/seed-pheno-paid-smoke-fixtures.mjs` for the
-  exact list of comparison-readiness source tables that still need
-  confirmation before this script can safely write fixtures.
+- `bun run test:pheno-paid-smoke:seed` — seeds pheno fixtures against a
+  **local** Supabase (refuses hosted hosts). Produces missing-evidence,
+  pending-harvest, pending-cure, and comparison-ready hunts by writing
+  real evidence into `pheno_candidate_scores`, `pheno_smoke_tests`, and
+  `pheno_lab_results`. Writes ids to `e2e/.fixtures/pheno-paid-smoke.env`
+  (gitignored). See `docs/pheno-paid-smoke-local-setup.md`.
 - `bun run test:pheno-paid-smoke` — runs preflight, then the paid-user
   Playwright smoke. Every scenario is env-gated; missing inputs skip
   cleanly with a reason.
@@ -202,8 +222,8 @@ Local workflow:
 2. Export the credential env vars locally (never commit them).
 3. `bun run test:pheno-paid-smoke:sessions` to mint storageState files.
 4. Export `E2E_PHENO_*_SESSION_FILE` pointing at the generated JSON.
-5. Seed hunt fixtures manually via the UI until the seed script is
-   unblocked, and export `E2E_PHENO_HUNT_ID_*` accordingly.
+5. `bun run test:pheno-paid-smoke:seed` to seed pheno hunt fixtures
+   locally, then `set -a; source e2e/.fixtures/pheno-paid-smoke.env; set +a`.
 6. `bun run test:pheno-paid-smoke`.
 
 Result taxonomy:

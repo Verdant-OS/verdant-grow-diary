@@ -1,0 +1,90 @@
+# Paid-user Pheno Tracker journey smoke — dispatch-only, runs against the
+# DEPLOYED app (vars.E2E_BASE_URL), authenticated as the disposable fixture.
+#
+# Two-phase operation (see e2e/pheno-paid-journey.spec.ts):
+#   phase=free : fixture must have NO Pro entitlement. Proves the gate blocks
+#                /pheno-hunts/new and the upgrade CTA carries returnTo to the
+#                live /pricing checkout.
+#   phase=paid : operator has seeded an active Pro billing row for the
+#                fixture (service role — no real purchase) and >=2 plants in
+#                the fixture grow. Proves gate-open → guided create →
+#                workspace progress → Compare disabled until the evidence
+#                ladder completes → Compare enabled only when ready.
+#
+# Uses the same secrets/vars as quicklog-smoke. Traces/videos stay disabled
+# on real-auth runs (bearer tokens must never land in CI artifacts).
+name: Pheno Paid Journey Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: "Journey phase (fixture entitlement state must match)"
+        type: choice
+        required: true
+        options:
+          - free
+          - paid
+
+jobs:
+  pheno-journey:
+    name: pheno-journey (${{ inputs.phase }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
+      E2E_GROW_1_PLANT_URL: ${{ vars.E2E_GROW_1_PLANT_URL }}
+      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+      E2E_FIXTURE_MODE: ${{ vars.E2E_FIXTURE_MODE }}
+      E2E_FIXTURE_EXPECTED_GROW_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_GROW_NAME }}
+      E2E_FIXTURE_EXPECTED_TENT_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_TENT_NAME }}
+      E2E_FIXTURE_EXPECTED_PLANT_NAME: ${{ vars.E2E_FIXTURE_EXPECTED_PLANT_NAME }}
+      E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: ${{ vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT }}
+      E2E_PHENO_PHASE: ${{ inputs.phase }}
+    steps:
+      - name: Require E2E configuration
+        run: |
+          missing=()
+          [ -n "$E2E_BASE_URL" ] || missing+=("vars.E2E_BASE_URL")
+          [ -n "$E2E_TEST_EMAIL" ] || missing+=("secrets.E2E_TEST_EMAIL")
+          [ -n "$E2E_TEST_PASSWORD" ] || missing+=("secrets.E2E_TEST_PASSWORD")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "Missing required configuration: ${missing[*]}" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock', 'bun.lockb', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright Chromium (with OS deps)
+        run: bun run e2e:install:ci
+
+      - name: Verify disposable E2E fixture
+        run: bun run e2e:verify-fixture
+
+      - name: Run Pheno paid-journey smoke (${{ inputs.phase }})
+        run: bun run e2e:pheno-journey

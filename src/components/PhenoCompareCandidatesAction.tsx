@@ -4,8 +4,11 @@
  * buildPhenoComparisonActionState. Never re-derives readiness in JSX.
  *
  * Setup complete ≠ Comparison-ready. The button is only enabled when the
- * hunt has enough recorded evidence to compare candidates honestly.
+ * hunt has enough recorded evidence to compare candidates honestly. When
+ * disabled, an inline, aria-describedby helper text is rendered so
+ * keyboard and screen-reader users understand why — never hover-only.
  */
+import { useId } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,11 +22,15 @@ export interface PhenoCompareCandidatesActionProps {
   "data-testid"?: string;
 }
 
+const DISABLED_INTRO =
+  "Compare candidates is disabled because this hunt is not comparison-ready yet.";
+
 export default function PhenoCompareCandidatesAction({
   state,
   ...rest
 }: PhenoCompareCandidatesActionProps) {
   const testId = rest["data-testid"] ?? "pheno-workspace-compare-action";
+  const helperId = useId();
   const heading = state.enabled
     ? "Compare candidates"
     : PHENO_STATUS_LABELS.notComparisonReadyYet;
@@ -39,7 +46,9 @@ export default function PhenoCompareCandidatesAction({
         <h2 className="text-sm font-semibold">{heading}</h2>
         {state.enabled && state.nextStepTarget ? (
           <Button asChild size="sm" data-testid={`${testId}-link`}>
-            <Link to={state.nextStepTarget}>Compare candidates</Link>
+            <Link to={state.nextStepTarget} aria-label="Compare candidates">
+              Compare candidates
+            </Link>
           </Button>
         ) : (
           <Button
@@ -47,6 +56,8 @@ export default function PhenoCompareCandidatesAction({
             size="sm"
             disabled
             aria-disabled="true"
+            aria-label="Compare candidates"
+            aria-describedby={helperId}
             data-testid={`${testId}-disabled`}
             onClick={(e) => e.preventDefault()}
           >
@@ -55,12 +66,16 @@ export default function PhenoCompareCandidatesAction({
         )}
       </div>
       {state.enabled ? null : (
-        <div className="space-y-1">
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid={`${testId}-reason`}
-          >
-            {state.reason || PHENO_COMPARISON_HELP_COPY}
+        <div
+          id={helperId}
+          data-testid={`${testId}-helper`}
+          className="space-y-1"
+        >
+          <p className="text-xs text-muted-foreground">
+            <span data-testid={`${testId}-disabled-intro`}>{DISABLED_INTRO}</span>{" "}
+            <span data-testid={`${testId}-reason`} className="font-medium">
+              {state.reason || PHENO_COMPARISON_HELP_COPY}
+            </span>
           </p>
           <p className="text-xs text-muted-foreground">
             {PHENO_COMPARISON_HELP_COPY}

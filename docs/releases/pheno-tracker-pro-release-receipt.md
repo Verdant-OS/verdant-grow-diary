@@ -68,9 +68,9 @@
 
 ### Recorded non-additive migration changes
 
-| Migration | Change | Scope | Impact | Rollback procedure |
-| --- | --- | --- | --- | --- |
-| 20260709180000_pheno_hunts_owner_only_and_stress_scale_index.sql | DROP_POLICY | public.pheno_hunts | Operator cross-tenant access removed via drop of "Operators view all pheno_hunts" and "Operators update all pheno_hunts"; owner SELECT access unchanged | Recreate the two operator policies from repository history only if operator access must be restored |
+| Migration | Change | Scope | Description | Impact | Rollback procedure |
+| --- | --- | --- | --- | --- | --- |
+| 20260709180000_pheno_hunts_owner_only_and_stress_scale_index.sql | DROP_POLICY | public.pheno_hunts | Removed the operator SELECT and UPDATE policies ("Operators view all pheno_hunts", "Operators update all pheno_hunts"). | Operator cross-tenant access removed; owner SELECT access unchanged | Recreate the two operator policies from repository history only if operator access must be restored |
 
 > Note: this canonical receipt was factually corrected in place to replace
 > the earlier unqualified "additive migrations" claim with the structured

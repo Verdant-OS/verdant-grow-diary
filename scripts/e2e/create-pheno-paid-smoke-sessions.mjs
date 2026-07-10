@@ -91,8 +91,11 @@ async function main() {
         );
         console.log(`  OK      ${r.key.padEnd(9)} -> e2e/.auth/${r.out}`);
       }
-    } catch {
+    } catch (e) {
       console.log(`  FAIL    ${r.key.padEnd(9)} (unexpected error)`);
+      // First line of the error only — locator/launch failures carry no
+      // secrets; never print URLs or credentials here.
+      console.log(`          ${String(e?.message ?? e).split("\n")[0].slice(0, 160)}`);
       anyFail = true;
     } finally {
       await browser.close();

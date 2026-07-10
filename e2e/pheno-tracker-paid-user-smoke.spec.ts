@@ -42,6 +42,10 @@ const FORBIDDEN_COPY = [
   "automated breeding",
 ];
 
+function sessionSnapshotPath(storageStatePath: string): string {
+  return storageStatePath.replace(/\.json$/, ".session-storage.json");
+}
+
 function resolveSession(envName: string): { path?: string; skipReason?: string } {
   const raw = process.env[envName];
   if (!raw || raw.trim() === "") {
@@ -49,6 +53,15 @@ function resolveSession(envName: string): { path?: string; skipReason?: string }
   }
   if (!fs.existsSync(raw)) {
     return { skipReason: `SKIPPED: ${envName} points to unreadable file.` };
+  }
+  // The app keeps its Supabase session in sessionStorage, which storageState
+  // cannot carry — without the generator's sibling snapshot the role would
+  // run ANONYMOUS and pass/fail vacuously. Treat a missing snapshot as an
+  // unusable session, never a silent no-op.
+  if (!fs.existsSync(sessionSnapshotPath(raw))) {
+    return {
+      skipReason: `SKIPPED: ${envName} has no sibling .session-storage.json — re-run test:pheno-paid-smoke:sessions.`,
+    };
   }
   return { path: raw };
 }
@@ -70,9 +83,16 @@ const CANCELED_SESSION = resolveSession("E2E_PHENO_CANCELED_SESSION_FILE");
 function bindRoleSession(session: { path?: string }) {
   if (!session.path) return;
   test.use({ storageState: session.path });
-  const snapPath = session.path.replace(/\.json$/, ".session-storage.json");
+  const snapPath = sessionSnapshotPath(session.path);
   test.beforeEach(async ({ context }) => {
-    if (!fs.existsSync(snapPath)) return;
+    if (!fs.existsSync(snapPath)) {
+      // resolveSession already gates on the snapshot; if it vanished between
+      // resolution and run, fail LOUDLY — a silent return here would run the
+      // role anonymously and make every assertion vacuous.
+      throw new Error(
+        `role session snapshot disappeared: ${snapPath} — re-run test:pheno-paid-smoke:sessions.`,
+      );
+    }
     const saved = JSON.parse(fs.readFileSync(snapPath, "utf-8")) as {
       origin: string;
       entries: Record<string, string>;

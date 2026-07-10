@@ -342,7 +342,7 @@ function SubscriptionTile() {
             size="sm"
             data-testid="settings-subscription-upgrade"
           >
-            <Link to="/upgrade">Upgrade to Pro</Link>
+            <Link to="/pricing">Upgrade to Pro</Link>
           </Button>
         )}
         {isPaid && (

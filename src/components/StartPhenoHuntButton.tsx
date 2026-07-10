@@ -29,7 +29,14 @@ export default function StartPhenoHuntButton({ growId, tentId, className }: Prop
 
   const params = new URLSearchParams({ growId });
   if (tentId) params.set("tentId", tentId);
-  const href = entitled ? `/pheno-hunts/new?${params.toString()}` : "/upgrade";
+  // This button is the only carrier of the grow/tent context, so the
+  // unentitled path forwards the FULL new-hunt target (path + query) as
+  // returnTo — post-checkout, /checkout/success round-trips the buyer to
+  // /pheno-hunts/new with growId/tentId intact.
+  const target = `/pheno-hunts/new?${params.toString()}`;
+  const href = entitled
+    ? target
+    : `/pricing?returnTo=${encodeURIComponent(target)}`;
   const label = entitled ? "Start Pheno Hunt" : "Start Pheno Hunt (Pro)";
 
   return (

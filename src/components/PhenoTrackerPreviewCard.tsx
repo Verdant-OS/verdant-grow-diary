@@ -84,7 +84,7 @@ export default function PhenoTrackerPreviewCard({
           </Link>
         ) : (
           <>
-            <Link to="/upgrade" data-testid={`${testId}-upgrade-link`}>
+            <Link to="/pricing" data-testid={`${testId}-upgrade-link`}>
               <Button size="sm">Upgrade to Pro</Button>
             </Link>
             <Link

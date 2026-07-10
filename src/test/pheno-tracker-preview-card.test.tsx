@@ -2,7 +2,7 @@
  * pheno-tracker-preview-card.test.tsx
  *
  * Free → highlights + "View Demo" (→ /pheno-comparison) + "Upgrade to Pro"
- * (→ /upgrade). Pro/Founder → "Start Pheno Hunt" (→ /pheno-hunts/new).
+ * (→ /pricing). Pro/Founder → "Start Pheno Hunt" (→ /pheno-hunts/new).
  * Forbidden marketing phrases stay absent.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -79,7 +79,7 @@ describe("PhenoTrackerPreviewCard", () => {
     expect(card.getAttribute("data-entitled")).toBe("false");
     expect(
       screen.getByTestId("pheno-tracker-preview-card-upgrade-link").getAttribute("href"),
-    ).toBe("/upgrade");
+    ).toBe("/pricing");
     expect(
       screen.getByTestId("pheno-tracker-preview-card-demo-link").getAttribute("href"),
     ).toBe("/pheno-comparison");

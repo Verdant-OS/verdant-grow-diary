@@ -84,6 +84,16 @@ for (const [label, envName /*, required*/] of FIXTURE_ENVS) {
 }
 
 lines.push("");
+lines.push("Local fixture env file (e2e/.fixtures/pheno-paid-smoke.env):");
+const fixtureEnvPath = "e2e/.fixtures/pheno-paid-smoke.env";
+if (fs.existsSync(fixtureEnvPath)) {
+  anyPresent = true;
+  lines.push(`  PRESENT  (source it before running the smoke; never commit it)`);
+} else {
+  lines.push(`  SKIPPED  (run scripts/e2e/seed-pheno-paid-smoke-fixtures.mjs to create)`);
+}
+
+lines.push("");
 if (hardFail) {
   lines.push("Result: FAIL — a session file env var is set but the file is missing/unreadable.");
   console.log(lines.join("\n"));

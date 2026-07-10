@@ -4,7 +4,7 @@
  *
  * Pure DOM/text helpers. No product code, no schema, no writes.
  */
-import { expect, type Page, type Locator } from "@playwright/test";
+import { expect, type Page, type Locator, type Request } from "@playwright/test";
 
 // Canonical reason copy — must match src/constants/phenoOnboardingCopy.ts
 // (PHENO_STATUS_LABELS). Kept as literals here so a copy drift is caught by

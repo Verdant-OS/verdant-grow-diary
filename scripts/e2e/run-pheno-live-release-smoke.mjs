@@ -219,6 +219,10 @@ async function main() {
       "e2e/pheno-tracker-paid-user-smoke.spec.ts",
       // Real minted sessions, no route mocking — this is the live smoke.
       "--project=chromium-authed",
+      // Skip the shared auth.setup dependency: every describe binds its own
+      // storage state (role sessions or explicit anonymous), and a skipped
+      // setup would otherwise count as a skipped test and fail the gate.
+      "--no-deps",
       "--reporter=list,json",
     ],
     {

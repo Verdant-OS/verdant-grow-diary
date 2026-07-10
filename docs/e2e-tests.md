@@ -265,12 +265,34 @@ production**. `service_role` is never used; if
 
 ### Commands
 
+One command runs the whole gate (stages 1–8):
+
+```bash
+bun run release:pheno:live-gate
+```
+
+It chains working-copy safety → credential-file verification (must exist,
+resolve inside the repo, and be gitignored; override the default
+`e2e/.fixtures/pheno-live-smoke.env` path with `PHENO_LIVE_SMOKE_ENV_FILE`)
+→ preflight → deployed-build fingerprint (expected identity must MATCH) →
+live role smoke → schema evidence → manual evidence → receipt write +
+validation → final repository safety. Credentials load into child-process
+environments only; `SUPABASE_SERVICE_ROLE_KEY` is stripped; values are
+never printed or persisted. **Run locally only** — credentials must never
+enter Lovable, chat, or CI logs. Exit codes: `0` validated GO · `1`
+failure/unsafe/malformed · `2` HOLD/BLOCKED (missing evidence — **exit 2
+is not a PASS**). It writes only redacted release evidence
+(`release-gate-summary.{json,md}` plus the per-stage artifacts below).
+
+Individual stages for debugging:
+
 ```bash
 bun run test:pheno-live-smoke:preflight   # local-only; prints variable NAMES, no network
 bun run release:pheno:build-id            # fetch + fingerprint the deployed bundle
 bun run test:pheno-live-smoke             # full runner: preflight → reachability → fingerprint → sessions → Playwright
 bun run release:pheno:receipt             # write the receipt; GO exits 0, HOLD exits 2
 bun run release:pheno:receipt:partial     # refresh a HOLD receipt before all evidence exists (never GO)
+bun run release:pheno:receipt:validate    # decide whether GO is allowed (policy gates above the writer)
 ```
 
 ### Required local inputs (names only — never paste values)
@@ -324,7 +346,10 @@ proof in the live smoke and stays PENDING unless
 (missing-evidence navigation) now has automated anchor click-through
 proof in the live smoke; under current release policy its separate
 manual evidence requirement still applies at receipt time unless a
-policy decision explicitly removes it. Checkpoints 1, 2, 8, and 11 map
+policy decision explicitly removes it — the receipt validator and the
+one-command gate both enforce it. Checkpoint 8 requires exact
+helper-copy proof (pinned per readiness from the view model), not
+helper presence. Checkpoints 1, 2, 8, and 11 map
 to affirmative live assertions (gate/CTA existence, exact returnTo
 round-trip, exact not-ready reason copy, substantive comparison
 content).

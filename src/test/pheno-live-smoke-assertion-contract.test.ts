@@ -110,6 +110,15 @@ describe("live smoke assertion contract — required assertions stay affirmative
     }
   });
 
+  it("an unknown/unmapped readiness value must fail loudly, never fall back", () => {
+    // The exact-reason test derives expected copy from data-readiness via the
+    // contract map and must reject anything unmapped (e.g. comparison_ready
+    // on a supposedly incomplete fixture, or a renamed readiness value).
+    expect(source).toContain("is not an incomplete state with pinned reason copy");
+    // No `specific || generic` fallback that would let wrong copy pass.
+    expect(source).not.toMatch(/expectedReason\s*\|\|/);
+  });
+
   it("the vacuous never-existing testid must not come back", () => {
     // "pheno-hunt-create-form" never existed in the product; asserting its
     // absence can never fail. The real onboarding root is

@@ -35,6 +35,7 @@
     "release:pheno:build-id": "node scripts/releases/fetch-pheno-live-build-id.mjs",
     "release:pheno:receipt": "node scripts/releases/write-pheno-release-receipt.mjs",
     "release:pheno:receipt:partial": "node scripts/releases/write-pheno-release-receipt.mjs --allow-partial",
+    "release:pheno:receipt:validate": "node scripts/releases/validate-pheno-release-receipt.mjs",
     "release:pheno:local-check": "powershell -ExecutionPolicy Bypass -File scripts/releases/check-pheno-live-smoke-local.ps1",
     "release:pheno:live-gate": "node scripts/releases/run-pheno-live-release-gate.mjs",
     "test:security-static": "node scripts/security/test-static-client-secret-scan.mjs && node scripts/security/static-client-secret-scan.mjs",

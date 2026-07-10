@@ -27,6 +27,7 @@ const FIXTURES = [
 const SPECS = [
   "e2e/pheno-disabled-compare-workspace-navigation.spec.ts",
   "e2e/pheno-disabled-compare-visual-regression.spec.ts",
+  "e2e/pheno-disabled-compare-direct-navigation.spec.ts",
 ];
 
 function classify(key) {

@@ -197,6 +197,21 @@ describe("credential file verification", () => {
     expect(log.join("\n")).toContain("final         BLOCKED");
   });
 
+  it("unfilled template (REPLACE_ME values) → BLOCKED exit 2 before any stage", async () => {
+    const template = CRED_FILE.split(SECRET_PASSWORD)
+      .join("REPLACE_ME")
+      .split(SECRET_EMAIL)
+      .join("REPLACE_ME");
+    const { deps, spawned } = makeDeps({ files: { [ENV_PATH]: template } });
+    const { exitCode, summary } = await runGate(deps);
+    expect(exitCode).toBe(2);
+    expect(summary.preflight).toBe("BLOCKED");
+    // Names listed, values never; no child process (no preflight, no network).
+    expect(summary.problems.join(" ")).toContain("placeholder values");
+    expect(summary.problems.join(" ")).toContain("E2E_PHENO_FREE_PASSWORD");
+    expect(spawned).toEqual([]);
+  });
+
   it("file outside the repository → FAIL exit 1", async () => {
     const outside = path.resolve("C:/other-place/creds.env");
     const { deps } = makeDeps({

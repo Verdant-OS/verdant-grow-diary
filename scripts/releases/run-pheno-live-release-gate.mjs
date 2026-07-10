@@ -244,6 +244,19 @@ export async function runGate(deps) {
     return finish(credential.exitCode, summary.preflight);
   }
   const loaded = parseEnvFile(d.readFile(credential.resolved));
+  // A template that was never filled must BLOCK here — otherwise preflight
+  // sees every variable as "present" and the smoke burns real production
+  // login attempts with placeholder credentials. Names only, never values.
+  const placeholderNames = Object.entries(loaded)
+    .filter(([, value]) => value.includes("REPLACE_ME"))
+    .map(([name]) => name);
+  if (placeholderNames.length > 0) {
+    summary.preflight = "BLOCKED";
+    summary.problems.push(
+      `credential file still contains placeholder values for: ${placeholderNames.join(", ")}`,
+    );
+    return finish(2, "BLOCKED");
+  }
   const childEnv = { ...d.env, ...loaded };
   delete childEnv.SUPABASE_SERVICE_ROLE_KEY;
 

@@ -13,6 +13,12 @@
  * them. Archived plants are excluded. Nothing is inferred or fabricated.
  */
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
+import type {
+  PhenoExpressionInput,
+  PhenoLabResultInput,
+  PhenoSmokeTestInput,
+  PhenoTraitValueInput,
+} from "@/lib/phenoExpressionRules";
 
 /** Minimal `plants` row shape this adapter needs (subset of the DB Row). */
 export interface PhenoHuntCandidatePlantRow {
@@ -27,13 +33,44 @@ export interface PhenoHuntCandidatePlantRow {
   is_archived: boolean;
 }
 
+/** Optional grower-recorded score card (pheno_candidate_scores). */
+export interface PhenoHuntCandidateScoreEvidence {
+  readonly traits: Record<string, number> | null;
+  readonly note: string | null;
+}
+
+/** Optional grower-recorded post-cure smoke test (pheno_smoke_tests). */
+export interface PhenoHuntCandidateSmokeEvidence {
+  readonly flavorDescriptors: readonly string[] | null;
+  readonly effectDescriptors: readonly string[] | null;
+  readonly smoothness: number | null;
+  readonly potencyImpression: number | null;
+  readonly verdict: string | null;
+}
+
+/** Optional lab (COA/estimate) evidence (pheno_lab_results). */
+export interface PhenoHuntCandidateLabEvidence {
+  readonly thcPct: number | null;
+  readonly cbdPct: number | null;
+  readonly totalCannabinoidsPct: number | null;
+  readonly dominantTerpenes: ReadonlyArray<{ name: string; pct: number | null }> | null;
+  readonly source: "coa" | "estimate" | "unspecified";
+}
+
 export interface AdaptPhenoHuntCandidatesInput {
   readonly plants: readonly PhenoHuntCandidatePlantRow[] | null | undefined;
   /** grow id → display name, for growLabel. */
   readonly growNameById?: Readonly<Record<string, string>> | null;
   /** tent id → display name, for tentLabel. */
   readonly tentNameById?: Readonly<Record<string, string>> | null;
+  /** plantId → grower-scored trait card. */
+  readonly scoreByPlantId?: Readonly<Record<string, PhenoHuntCandidateScoreEvidence>> | null;
+  /** plantId → post-cure smoke test row. */
+  readonly smokeTestByPlantId?: Readonly<Record<string, PhenoHuntCandidateSmokeEvidence>> | null;
+  /** plantId → best available lab result row (coa > estimate > unspecified). */
+  readonly labResultByPlantId?: Readonly<Record<string, PhenoHuntCandidateLabEvidence>> | null;
 }
+
 
 /** Flower is the stage where EC/pH/PPFD are treated as relevant metrics. */
 function stageRequiresFullMetrics(stage: string | null): boolean {

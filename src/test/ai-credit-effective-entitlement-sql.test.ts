@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, readdirSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 function readSource(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -9,6 +9,27 @@ function readSource(rel: string): string {
 const MIGRATION = readSource(
   "supabase/migrations/20260620231000_harden_ai_credit_effective_entitlement.sql",
 );
+
+/**
+ * FINAL-STATE guard. The 20260620231000 assertions below pin history, but a
+ * later CREATE OR REPLACE can (and once did — 20260709015647) silently undo
+ * the hardening while this file stays green. So also resolve the LATEST
+ * migration that REDEFINES ai_credit_spend and pin the invariants there.
+ * Mentions don't count — only a CREATE OR REPLACE of the function body.
+ */
+function latestMigrationDefining(fnSignature: string): string {
+  const dir = resolve(process.cwd(), "supabase", "migrations");
+  const files = readdirSync(dir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+  for (let i = files.length - 1; i >= 0; i -= 1) {
+    const body = readFileSync(join(dir, files[i]), "utf8");
+    if (body.includes(`CREATE OR REPLACE FUNCTION ${fnSignature}`)) return body;
+  }
+  throw new Error(`No migration defines ${fnSignature}`);
+}
+
+const FINAL = latestMigrationDefining("public.ai_credit_spend");
 
 describe("AI credit SQL effective entitlement hardening", () => {
   it("adds a deterministic SQL helper for effective credit plan resolution", () => {
@@ -68,5 +89,42 @@ describe("AI credit SQL effective entitlement hardening", () => {
     expect(MIGRATION).not.toMatch(/\.update\(/);
     expect(MIGRATION).not.toMatch(/\.delete\(/);
     expect(MIGRATION).not.toMatch(/fetch\(/);
+  });
+});
+
+describe("ai_credit_spend FINAL migration state (regression-proof)", () => {
+  it("reads BOTH billing sources — BYO billing_subscriptions AND Lovable subscriptions", () => {
+    expect(FINAL).toMatch(/FROM\s+public\.billing_subscriptions/i);
+    expect(FINAL).toMatch(/FROM\s+public\.subscriptions/i);
+    expect(FINAL).toContain("s.environment = 'live'");
+  });
+
+  it("keeps the status/period hardening on both sources (no raw plan_id trust)", () => {
+    // BYO row goes through the effective-plan helper…
+    expect(FINAL).toContain("public.ai_credit_effective_credit_plan_id");
+    // …and the Lovable row carries the same strictness inline.
+    expect(FINAL).toContain("s.status = 'active'");
+    expect(FINAL).toMatch(/current_period_end IS NULL OR s\.current_period_end > now\(\)/);
+    // The regression signature: a bare plan_id read feeding the allowance.
+    expect(FINAL).not.toMatch(/SELECT\s+plan_id\s+INTO\s+v_plan_id\s+FROM\s+public\.billing_subscriptions/i);
+  });
+
+  it("only known plan ids can be unlocked from the Lovable source", () => {
+    expect(FINAL).toContain("s.price_id IN ('pro_monthly','pro_annual','founder_lifetime')");
+  });
+
+  it("preserves the ledger contract: idempotent replay, advisory lock, append-only", () => {
+    expect(FINAL).toContain("WHERE user_id = v_uid AND idempotency_key = p_idempotency_key");
+    expect(FINAL).toContain("pg_advisory_xact_lock");
+    expect(FINAL).toContain("INSERT INTO public.ai_credit_spends");
+    expect(FINAL).not.toMatch(/UPDATE\s+public\.ai_credit_spends/i);
+    expect(FINAL).not.toMatch(/DELETE\s+FROM\s+public\.ai_credit_spends/i);
+  });
+
+  it("keeps staff metering capped and the grant posture tight", () => {
+    expect(FINAL).toContain("v_per_month := 10000");
+    expect(FINAL).toMatch(/REVOKE ALL ON FUNCTION public\.ai_credit_spend[^;]+FROM PUBLIC/);
+    expect(FINAL).toMatch(/REVOKE ALL ON FUNCTION public\.ai_credit_spend[^;]+FROM anon/);
+    expect(FINAL).toMatch(/GRANT EXECUTE ON FUNCTION public\.ai_credit_spend[^;]+TO authenticated/);
   });
 });

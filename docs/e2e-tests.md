@@ -207,8 +207,8 @@ Local workflow:
 2. Export the credential env vars locally (never commit them).
 3. `bun run test:pheno-paid-smoke:sessions` to mint storageState files.
 4. Export `E2E_PHENO_*_SESSION_FILE` pointing at the generated JSON.
-5. Seed hunt fixtures manually via the UI until the seed script is
-   unblocked, and export `E2E_PHENO_HUNT_ID_*` accordingly.
+5. `bun run test:pheno-paid-smoke:seed` to seed pheno hunt fixtures
+   locally, then `set -a; source e2e/.fixtures/pheno-paid-smoke.env; set +a`.
 6. `bun run test:pheno-paid-smoke`.
 
 Result taxonomy:

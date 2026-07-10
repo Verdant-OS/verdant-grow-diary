@@ -914,19 +914,47 @@ export default function PhenoHuntWorkspace() {
         </header>
 
         {ws.hunt ? (
-          <PhenoHuntSetupProgressCard
-            hunt={{
-              ...ws.hunt,
-              setupCompletedAt: setupCompletedLocal ?? ws.hunt.setupCompletedAt ?? null,
-            }}
-            candidateCount={candidates.length}
-            comparisonReadiness={comparisonState.readiness}
-            onMarkComplete={handleMarkSetupComplete}
-            saving={setupSaving}
-          />
+          <div id="evidence-goals" data-testid="workspace-anchor-evidence-goals">
+            <PhenoHuntSetupProgressCard
+              hunt={{
+                ...ws.hunt,
+                setupCompletedAt: setupCompletedLocal ?? ws.hunt.setupCompletedAt ?? null,
+              }}
+              candidateCount={candidates.length}
+              comparisonReadiness={comparisonState.readiness}
+              onMarkComplete={handleMarkSetupComplete}
+              saving={setupSaving}
+            />
+          </div>
         ) : null}
 
         {ws.hunt ? <PhenoCompareCandidatesAction state={comparisonState} /> : null}
+
+        {/* Stable anchor targets for missing-evidence next-step links. Each id
+            corresponds to a real in-workspace surface (scoring notes,
+            keeper-decision select, smoke-test details, candidate cards).
+            Keep in sync with PHENO_WORKSPACE_ANCHORS. */}
+        <div
+          id="candidate-labels"
+          data-testid="workspace-anchor-candidate-labels"
+          aria-hidden="true"
+        />
+        <div
+          id="phenotype-notes"
+          data-testid="workspace-anchor-phenotype-notes"
+          aria-hidden="true"
+        />
+        <div
+          id="post-harvest-notes"
+          data-testid="workspace-anchor-post-harvest-notes"
+          aria-hidden="true"
+        />
+        <div
+          id="post-cure-notes"
+          data-testid="workspace-anchor-post-cure-notes"
+          aria-hidden="true"
+        />
+
 
 
 

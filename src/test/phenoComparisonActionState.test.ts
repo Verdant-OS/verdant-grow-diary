@@ -84,7 +84,7 @@ describe("buildPhenoComparisonActionState", () => {
     expect(s.nextStepTarget).toBeNull();
   });
 
-  it("missing-evidence items carry safe workspace next-step targets (never /compare)", () => {
+  it("missing-evidence items carry safe workspace anchor targets (never /compare)", () => {
     const s = buildPhenoComparisonActionState({
       ...base,
       allCandidatesHavePhenotypeNote: false,
@@ -92,13 +92,52 @@ describe("buildPhenoComparisonActionState", () => {
     expect(s.missingEvidenceItems.length).toBeGreaterThan(0);
     for (const item of s.missingEvidenceItems) {
       if (item.nextStepTarget) {
-        expect(item.nextStepTarget).toBe("/pheno-hunts/h1/workspace");
+        expect(item.nextStepTarget.startsWith("/pheno-hunts/h1/workspace#")).toBe(true);
         expect(item.nextStepTarget.includes("/compare")).toBe(false);
         expect(typeof item.nextStepLabel).toBe("string");
       } else {
         expect(item.nextStepLabel).toBeNull();
       }
     }
+  });
+
+  it("phenotype_notes item points at #phenotype-notes anchor", () => {
+    const s = buildPhenoComparisonActionState({
+      ...base,
+      allCandidatesHavePhenotypeNote: false,
+    });
+    const item = s.missingEvidenceItems.find((i) => i.id === "phenotype_notes");
+    expect(item?.nextStepTarget).toBe("/pheno-hunts/h1/workspace#phenotype-notes");
+  });
+
+  it("post_harvest item points at #post-harvest-notes anchor", () => {
+    const s = buildPhenoComparisonActionState({
+      ...base,
+      anyPostHarvestObservation: false,
+    });
+    const item = s.missingEvidenceItems.find((i) => i.id === "post_harvest");
+    expect(item?.nextStepTarget).toBe("/pheno-hunts/h1/workspace#post-harvest-notes");
+  });
+
+  it("post_cure item points at #post-cure-notes anchor", () => {
+    const s = buildPhenoComparisonActionState({
+      ...base,
+      anyPostCureObservation: false,
+    });
+    const item = s.missingEvidenceItems.find((i) => i.id === "post_cure");
+    expect(item?.nextStepTarget).toBe("/pheno-hunts/h1/workspace#post-cure-notes");
+  });
+
+  it("replication_readiness item is inert (null target — no anchor section yet)", () => {
+    const s = buildPhenoComparisonActionState({
+      ...base,
+      replicationReadinessRecorded: false,
+    });
+    const item = s.missingEvidenceItems.find(
+      (i) => i.id === "replication_readiness",
+    );
+    expect(item?.nextStepTarget).toBeNull();
+    expect(item?.nextStepLabel).toBeNull();
   });
 
   it("missing huntId → all next-step targets are null (no fake links)", () => {
@@ -111,5 +150,17 @@ describe("buildPhenoComparisonActionState", () => {
       expect(item.nextStepTarget).toBeNull();
       expect(item.nextStepLabel).toBeNull();
     }
+  });
+
+  it("no duplicate anchor targets across items in a single state", () => {
+    const s = buildPhenoComparisonActionState({
+      ...base,
+      candidateCount: 1,
+      goalsSelected: 0,
+    });
+    const targets = s.missingEvidenceItems
+      .map((i) => i.nextStepTarget)
+      .filter((t): t is string => !!t);
+    expect(new Set(targets).size).toBe(targets.length);
   });
 });

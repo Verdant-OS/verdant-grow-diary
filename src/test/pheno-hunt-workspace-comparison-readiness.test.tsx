@@ -287,10 +287,87 @@ describe("PhenoHuntWorkspace — Comparison-ready gating", () => {
     expect(nextSteps.length).toBeGreaterThan(0);
     for (const link of nextSteps) {
       const href = link.getAttribute("href") ?? "";
-      expect(href).toBe(`/pheno-hunts/${HUNT_ID}/workspace`);
+      expect(
+        href.startsWith(`/pheno-hunts/${HUNT_ID}/workspace#`),
+        `expected workspace anchor href, got ${href}`,
+      ).toBe(true);
       expect(href.includes("/compare")).toBe(false);
+      // Every anchor target must resolve to a real element in the DOM.
+      const anchorId = href.split("#")[1];
+      expect(document.getElementById(anchorId)).not.toBeNull();
     }
   });
+
+  it("workspace exposes unique anchor IDs matching PHENO_WORKSPACE_ANCHORS", () => {
+    mountAt({
+      hunt: { setupCompletedAt: "2026-08-01T00:00:00Z" },
+      candidates: [candidate("p1"), candidate("p2")],
+    });
+    const anchors = [
+      "candidate-labels",
+      "phenotype-notes",
+      "post-harvest-notes",
+      "post-cure-notes",
+      "evidence-goals",
+    ];
+    for (const id of anchors) {
+      expect(document.querySelectorAll(`#${id}`).length).toBe(1);
+    }
+  });
+
+  it("disabled Compare has aria-describedby pointing at visible helper text with reason", () => {
+    mountAt({
+      hunt: { setupCompletedAt: "2026-08-01T00:00:00Z" },
+      candidates: [candidate("p1"), candidate("p2")],
+    });
+    const btn = screen.getByTestId("pheno-workspace-compare-action-disabled");
+    expect(btn).toHaveAttribute("aria-disabled", "true");
+    expect(btn).toHaveAttribute("aria-label", "Compare candidates");
+    const describedBy = btn.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    const helper = document.getElementById(describedBy!);
+    expect(helper).not.toBeNull();
+    expect(helper).toHaveTextContent(
+      /Compare candidates is disabled because this hunt is not comparison-ready yet/i,
+    );
+    expect(helper).toHaveTextContent(/Missing evidence/i);
+    // Clicking a next-step anchor MUST NOT flip the button to enabled.
+    const anySteps = screen.getAllByTestId(
+      /^pheno-workspace-compare-action-next-step-/,
+    );
+    fireEvent.click(anySteps[0]);
+    expect(
+      screen.getByTestId("pheno-workspace-compare-action-disabled"),
+    ).toBeDisabled();
+  });
+
+  it("enabled Compare does not render the disabled helper text", () => {
+    mountAt({
+      hunt: { setupCompletedAt: "2026-08-01T00:00:00Z" },
+      candidates: [candidate("p1"), candidate("p2")],
+      scoresByPlant: {
+        p1: { plantId: "p1", traits: {}, note: "n1" },
+        p2: { plantId: "p2", traits: {}, note: "n2" },
+      },
+      decisionsByPlant: {
+        p1: { plantId: "p1", decision: "keep", note: null, decidedAt: null },
+      },
+      smokeByPlant: {
+        p1: {
+          plantId: "p1",
+          flavorDescriptors: ["gas"],
+          effectDescriptors: ["couch"],
+          smoothness: 4,
+          potencyImpression: 4,
+          verdict: "solid",
+        },
+      },
+    });
+    expect(screen.queryByTestId("pheno-workspace-compare-action-helper")).toBeNull();
+    expect(screen.queryByTestId("pheno-workspace-compare-action-disabled-intro")).toBeNull();
+  });
+
+
 
   it("enabled Compare candidates renders a real <a href=/compare> and navigates on click", () => {
     mountAt({

@@ -149,6 +149,7 @@ describe("Pheno copy regression", () => {
       /best\s+candidate\s+is/i,
       /the\s+winner\s+is/i,
       /best\s+pheno\s+is/i,
+      /recommended\s+keeper/i,
     ];
     for (const path of surfaces) {
       const src = read(path);
@@ -157,6 +158,7 @@ describe("Pheno copy regression", () => {
       }
     }
   });
+
 
   it("PhenoHuntCompare renders an incomplete-evidence warning surface", () => {
     const src = read("src/pages/PhenoHuntCompare.tsx");

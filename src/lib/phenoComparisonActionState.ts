@@ -61,11 +61,31 @@ export interface PhenoComparisonActionState {
 export const PHENO_COMPARISON_HELP_COPY =
   "Add the missing evidence before comparing candidates.";
 
+/**
+ * Stable in-workspace anchor IDs for each missing-evidence id. Anchors that
+ * do NOT map to a real workspace section are `null` — presenters MUST render
+ * those items as plain helper text, never as a fake link.
+ *
+ * Keep in sync with the id attributes rendered in PhenoHuntWorkspace.
+ */
+export const PHENO_WORKSPACE_ANCHORS = {
+  add_candidates: "candidate-labels",
+  select_goals: "evidence-goals",
+  phenotype_notes: "phenotype-notes",
+  post_harvest: "post-harvest-notes",
+  post_cure: "post-cure-notes",
+  // No workspace section exists yet for replication readiness — keep null so
+  // presenters render plain helper text rather than a fake anchor link.
+  replication_readiness: null,
+} as const satisfies Record<PhenoMissingEvidenceItem["id"], string | null>;
+
 function workspaceTarget(
   huntId: string | null | undefined,
+  anchor: string | null,
 ): string | null {
   if (typeof huntId !== "string" || huntId.trim() === "") return null;
-  return `/pheno-hunts/${huntId}/workspace`;
+  const base = `/pheno-hunts/${huntId}/workspace`;
+  return anchor ? `${base}#${anchor}` : null;
 }
 
 export function buildPhenoComparisonActionState(
@@ -73,58 +93,48 @@ export function buildPhenoComparisonActionState(
 ): PhenoComparisonActionState {
   const items: PhenoMissingEvidenceItem[] = [];
   let readiness: PhenoWorkspaceComparisonReadiness = "not_ready";
-  const ws = workspaceTarget(input.huntId);
+  const hasHunt =
+    typeof input.huntId === "string" && input.huntId.trim() !== "";
+
+  const push = (
+    id: PhenoMissingEvidenceItem["id"],
+    message: string,
+    label: string,
+  ) => {
+    const anchor = PHENO_WORKSPACE_ANCHORS[id];
+    const target = workspaceTarget(input.huntId, anchor);
+    items.push({
+      id,
+      message,
+      nextStepLabel: hasHunt && target ? label : null,
+      nextStepTarget: target,
+    });
+  };
 
   if (input.candidateCount < 2) {
-    items.push({
-      id: "add_candidates",
-      message: "Add at least 2 candidates",
-      nextStepLabel: ws ? "Add candidates in workspace" : null,
-      nextStepTarget: ws,
-    });
+    push("add_candidates", "Add at least 2 candidates", "Add candidates in workspace");
   }
   if (input.goalsSelected <= 0) {
-    items.push({
-      id: "select_goals",
-      message: "Select at least one evidence goal",
-      nextStepLabel: ws ? "Set evidence goals" : null,
-      nextStepTarget: ws,
-    });
+    push("select_goals", "Select at least one evidence goal", "Set evidence goals");
   }
 
   if (input.candidateCount >= 2 && input.goalsSelected > 0) {
     if (!input.allCandidatesHavePhenotypeNote) {
       readiness = "missing_evidence";
-      items.push({
-        id: "phenotype_notes",
-        message: "Add a phenotype note for every candidate",
-        nextStepLabel: ws ? "Record phenotype notes" : null,
-        nextStepTarget: ws,
-      });
+      push("phenotype_notes", "Add a phenotype note for every candidate", "Record phenotype notes");
     } else if (!input.anyPostHarvestObservation) {
       readiness = "pending_until_harvest";
-      items.push({
-        id: "post_harvest",
-        message: "Record post-harvest observations",
-        nextStepLabel: ws ? "Log post-harvest observation" : null,
-        nextStepTarget: ws,
-      });
+      push("post_harvest", "Record post-harvest observations", "Log post-harvest observation");
     } else if (!input.anyPostCureObservation) {
       readiness = "pending_until_cure";
-      items.push({
-        id: "post_cure",
-        message: "Record a post-cure smoke test",
-        nextStepLabel: ws ? "Record post-cure smoke test" : null,
-        nextStepTarget: ws,
-      });
+      push("post_cure", "Record a post-cure smoke test", "Record post-cure smoke test");
     } else if (input.replicationReadinessRecorded === false) {
       readiness = "not_ready";
-      items.push({
-        id: "replication_readiness",
-        message: "Record replication readiness (clones / mother assignment)",
-        nextStepLabel: ws ? "Record replication readiness" : null,
-        nextStepTarget: ws,
-      });
+      push(
+        "replication_readiness",
+        "Record replication readiness (clones / mother assignment)",
+        "Record replication readiness",
+      );
     } else {
       readiness = "comparison_ready";
     }

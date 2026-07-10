@@ -36,7 +36,16 @@ export interface PhenoComparisonViewProps {
   readonly mode: "demo" | "live";
   /** Hunt name, shown in live mode. */
   readonly huntName?: string | null;
+  /**
+   * When false, any ranking / verdict / keeper-conclusion UI must remain
+   * hidden. Raw evidence review is allowed but MUST be clearly labeled
+   * incomplete by the parent surface. Defaults to true — the current
+   * presenter renders no conclusion cards, so this is a defense-in-depth
+   * signal (data-attr) for nested surfaces added later.
+   */
+  readonly allowConclusions?: boolean;
 }
+
 
 function toneClass(view: PhenoSensorSnapshotView): string {
   if (view.source === "live")
@@ -401,7 +410,12 @@ function CandidateColumn({
   );
 }
 
-export default function PhenoComparisonView({ inputs, mode, huntName }: PhenoComparisonViewProps) {
+export default function PhenoComparisonView({
+  inputs,
+  mode,
+  huntName,
+  allowConclusions = true,
+}: PhenoComparisonViewProps) {
   const view = useMemo(() => buildPhenoComparisonView(inputs ?? []), [inputs]);
 
   const expressionById = useMemo(() => {
@@ -430,9 +444,11 @@ export default function PhenoComparisonView({ inputs, mode, huntName }: PhenoCom
     <main
       data-testid="pheno-comparison-page"
       data-mode={mode}
+      data-allow-conclusions={allowConclusions ? "true" : "false"}
       aria-labelledby="pheno-comparison-heading"
       className="container mx-auto max-w-6xl px-4 py-6 space-y-4"
     >
+
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <h1 id="pheno-comparison-heading" className="text-2xl font-semibold">

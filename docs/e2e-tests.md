@@ -116,16 +116,19 @@ Provide either session files (preferred) OR email+password pairs:
 
 ### Local fixture seeding
 
-Local Supabase / service_role required. This project does not currently
-ship a seeding script; create the fixture hunts against your local Supabase
-via the app UI while signed in as the corresponding test user, then export
-their ids into the env vars above. **Never** seed against production and
-**never** paste service_role, cookies, passwords, or hunt ids into chat.
+Local Supabase + `service_role` required. See
+[docs/pheno-paid-smoke-local-setup.md](./pheno-paid-smoke-local-setup.md)
+for the full local setup (Docker + `supabase start` + test accounts +
+`bun run test:pheno-paid-smoke:seed`). The seeder writes real evidence
+rows so `comparison-ready` is produced by the same code path the app uses
+— nothing is faked. **Never** seed against hosted Supabase and **never**
+paste `service_role`, cookies, passwords, or hunt ids into chat.
 
 ### Running
 
 ```bash
-bun run test:pheno-paid-smoke:preflight   # PRESENT/SKIPPED report
+bun run test:pheno-paid-smoke:preflight   # PRESENT / SEEDABLE / SKIPPED report
+bun run test:pheno-paid-smoke:seed        # seed local fixtures (local Supabase only)
 bun run test:pheno-paid-smoke             # preflight + Playwright smoke
 ```
 

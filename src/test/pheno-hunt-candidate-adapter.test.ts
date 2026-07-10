@@ -121,4 +121,153 @@ describe("adaptPhenoHuntCandidates", () => {
     expect(codes).toContain("no_sensor_snapshot");
     expect(codes).toContain("no_diary");
   });
+
+  it("leaves expression undefined when no evidence rows are provided", () => {
+    const [c] = adaptPhenoHuntCandidates({ plants: [plant({ id: "p1" })] });
+    expect(c.expression).toBeUndefined();
+  });
+
+  it("hydrates traits + noseNote from a candidate score row", () => {
+    const [c] = adaptPhenoHuntCandidates({
+      plants: [plant({ id: "p1" })],
+      scoreByPlantId: {
+        p1: { traits: { nose_loudness: 8, vigor: 4 }, note: "  gassy funk  " },
+      },
+    });
+    expect(c.expression?.noseNote).toBe("gassy funk");
+    expect(c.expression?.traits).toEqual([
+      { key: "nose_loudness", value: 8 },
+      { key: "vigor", value: 4 },
+    ]);
+  });
+
+  it("hydrates smokeTest from a pheno_smoke_tests row (post-harvest + post-cure)", () => {
+    const [c] = adaptPhenoHuntCandidates({
+      plants: [plant({ id: "p1" })],
+      smokeTestByPlantId: {
+        p1: {
+          flavorDescriptors: ["gas", "citrus"],
+          effectDescriptors: ["heady"],
+          smoothness: 4,
+          potencyImpression: 5,
+          verdict: "Keeper",
+        },
+      },
+    });
+    expect(c.expression?.smokeTest).toEqual({
+      flavorDescriptors: ["gas", "citrus"],
+      effectDescriptors: ["heady"],
+      smoothness: 4,
+      potencyImpression: 5,
+      verdict: "Keeper",
+    });
+  });
+
+  it("hydrates labResult from a pheno_lab_results row", () => {
+    const [c] = adaptPhenoHuntCandidates({
+      plants: [plant({ id: "p1" })],
+      labResultByPlantId: {
+        p1: {
+          thcPct: 24.5,
+          cbdPct: 0.1,
+          totalCannabinoidsPct: null,
+          dominantTerpenes: [{ name: "limonene", pct: 1.2 }],
+          source: "coa",
+        },
+      },
+    });
+    expect(c.expression?.labResult).toEqual({
+      thcPct: 24.5,
+      cbdPct: 0.1,
+      totalCannabinoidsPct: null,
+      dominantTerpenes: [{ name: "limonene", pct: 1.2 }],
+      source: "coa",
+    });
+  });
+
+  it("skips smokeTest scaffolding when the row has no content", () => {
+    const [c] = adaptPhenoHuntCandidates({
+      plants: [plant({ id: "p1" })],
+      smokeTestByPlantId: {
+        p1: {
+          flavorDescriptors: [],
+          effectDescriptors: [],
+          smoothness: null,
+          potencyImpression: null,
+          verdict: null,
+        },
+      },
+    });
+    expect(c.expression).toBeUndefined();
+  });
+
+  it("is deterministic for identical inputs", () => {
+    const input = {
+      plants: [plant({ id: "p1" }), plant({ id: "p2", name: "Bravo" })],
+      scoreByPlantId: {
+        p1: { traits: { vigor: 4, nose_loudness: 7 }, note: "loud" },
+      },
+    };
+    expect(adaptPhenoHuntCandidates(input)).toEqual(adaptPhenoHuntCandidates(input));
+  });
+
+  it("hydration is enough to satisfy derivePhenoCompareReadinessFromCandidates → comparison_ready", () => {
+    const inputs = adaptPhenoHuntCandidates({
+      plants: [plant({ id: "a", name: "A" }), plant({ id: "b", name: "B" })],
+      scoreByPlantId: {
+        a: { traits: { nose_loudness: 8 }, note: "loud gas" },
+        b: { traits: { nose_loudness: 6 }, note: "sweet fruit" },
+      },
+      smokeTestByPlantId: {
+        a: {
+          flavorDescriptors: ["gas"],
+          effectDescriptors: ["heady"],
+          smoothness: 4,
+          potencyImpression: 4,
+          verdict: "Keeper",
+        },
+        b: {
+          flavorDescriptors: ["citrus"],
+          effectDescriptors: ["uplifting"],
+          smoothness: 3,
+          potencyImpression: 3,
+          verdict: "Runner up",
+        },
+      },
+    });
+    const state = derivePhenoCompareReadinessFromCandidates("hunt-1", inputs);
+    expect(state.readiness).toBe("comparison_ready");
+    expect(state.enabled).toBe(true);
+  });
+
+  it("candidates with no evidence still resolve to not comparison-ready", () => {
+    const inputs = adaptPhenoHuntCandidates({
+      plants: [plant({ id: "a", name: "A" }), plant({ id: "b", name: "B" })],
+    });
+    const state = derivePhenoCompareReadinessFromCandidates("hunt-1", inputs);
+    expect(state.readiness).not.toBe("comparison_ready");
+    expect(state.enabled).toBe(false);
+  });
+
+  it("replication readiness stays a non-blocking undefined signal (documented contract)", () => {
+    // Contract: replication readiness (clones / mother assignment) is not
+    // persisted today. `derivePhenoCompareReadinessFromCandidates` treats
+    // `undefined` as satisfied — post-cure is the deciding gate. If a table
+    // starts persisting it, wire it in explicitly rather than silently.
+    const inputs = adaptPhenoHuntCandidates({
+      plants: [plant({ id: "a" }), plant({ id: "b" })],
+      scoreByPlantId: {
+        a: { traits: { nose_loudness: 7 }, note: "loud" },
+        b: { traits: { nose_loudness: 6 }, note: "sweet" },
+      },
+      smokeTestByPlantId: {
+        a: { flavorDescriptors: ["gas"], effectDescriptors: [], smoothness: null, potencyImpression: null, verdict: "keep" },
+        b: { flavorDescriptors: ["citrus"], effectDescriptors: [], smoothness: null, potencyImpression: null, verdict: "keep" },
+      },
+    });
+    expect(derivePhenoCompareReadinessFromCandidates("h", inputs).readiness).toBe(
+      "comparison_ready",
+    );
+  });
 });
+

@@ -2980,6 +2980,15 @@ export type Database = {
           per_month: number
         }[]
       }
+      ai_credit_effective_credit_plan_id: {
+        Args: {
+          p_current_period_end: string
+          p_now: string
+          p_plan_id: string
+          p_status: string
+        }
+        Returns: string
+      }
       ai_credit_refund: {
         Args: {
           p_idempotency_key: string

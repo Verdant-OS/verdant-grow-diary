@@ -61,10 +61,12 @@ import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import PhenoTrackerPreviewCard from "@/components/PhenoTrackerPreviewCard";
 import { logsPath } from "@/lib/routes";
 import { resolvePaddleConfig, unavailableMessage, type PaddleConfig } from "@/lib/paddleConfig";
+import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 
 // --- Paddle overlay typing (loose — we only call a couple of methods). -------
 interface PaddleCheckoutOpenPayload {
   items: Array<{ priceId: string; quantity: number }>;
+  settings?: { successUrl?: string };
   successCallback?: () => void;
   closeCallback?: () => void;
 }
@@ -651,8 +653,19 @@ export default function Upgrade() {
       return;
     }
     try {
+      // Forward a same-origin returnTo (e.g. /upgrade?returnTo=/pheno-hunts/new)
+      // into Paddle's successUrl so CheckoutSuccess can round-trip the buyer
+      // back to the gated surface once entitlement is confirmed. Raw query
+      // value is sanitized first — unsafe values are dropped, never forwarded,
+      // and no customer/subscription IDs are ever placed in the URL.
+      const safeReturnTo = sanitizeCheckoutReturnTo(searchParams.get("returnTo"));
+      const successBase = `${window.location.origin}/checkout/success`;
+      const successUrl = safeReturnTo
+        ? `${successBase}?returnTo=${encodeURIComponent(safeReturnTo)}`
+        : successBase;
       paddle.Checkout.open({
         items: [{ priceId: tier.paddlePriceId, quantity: 1 }],
+        settings: { successUrl },
         successCallback: () => {
           toast.success("Checkout complete. Your plan will update once confirmed.");
         },

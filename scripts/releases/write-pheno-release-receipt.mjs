@@ -221,6 +221,30 @@ function smokeCheckpointMap(smoke, manual) {
   return map;
 }
 
+/**
+ * Render the "Recorded non-additive migration changes" table when the
+ * structured posture actually carries exceptions. Additive-only postures
+ * render nothing here (no misleading empty table).
+ */
+export function renderMigrationExceptionSection(postureCheck) {
+  if (!postureCheck || !Array.isArray(postureCheck.exceptions) || postureCheck.exceptions.length === 0) {
+    return [];
+  }
+  const lines = [
+    "",
+    "### Recorded non-additive migration changes",
+    "",
+    "| Migration | Change | Scope | Impact | Rollback procedure |",
+    "| --- | --- | --- | --- | --- |",
+  ];
+  for (const ex of postureCheck.exceptions) {
+    lines.push(
+      `| ${esc(ex?.migration)} | ${esc(ex?.changeType)} | ${esc(ex?.scope)} | ${esc(ex?.impact)} | ${esc(ex?.rollbackProcedure)} |`,
+    );
+  }
+  return lines;
+}
+
 export function renderReceipt({ smoke, schema, build, manual, allowPartial = false }) {
   const schemaCheck = schemaResult(schema);
   const buildMatch = expectedBuildMatches(build, manual);

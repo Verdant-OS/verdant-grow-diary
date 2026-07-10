@@ -112,6 +112,93 @@ export function schemaResult(schema) {
   };
 }
 
+// Supported classifications for migrationPosture.classification.
+export const MIGRATION_POSTURE_CLASSIFICATIONS = Object.freeze([
+  "ADDITIVE",
+  "NON_ADDITIVE_WITH_ROLLBACK_PLAN",
+]);
+
+const REQUIRED_EXCEPTION_FIELDS = [
+  "migration",
+  "changeType",
+  "scope",
+  "description",
+  "impact",
+  "rollbackProcedure",
+];
+
+/**
+ * Evaluate the structured migration-posture claim under manual.rollback.
+ *
+ * Returns { pass, status, classification, exceptions, problems }.
+ *   - pass is true ONLY when the structured contract is present, internally
+ *     consistent, and reports PASS.
+ *   - A legacy-only `rollback.additiveMigrations` field NEVER passes — the
+ *     validator surfaces a clear pending reason and callers must supply the
+ *     structured posture.
+ */
+export function evaluateMigrationPosture(rollback) {
+  const problems = [];
+  const posture = rollback?.migrationPosture;
+  const legacyOnly =
+    !posture &&
+    rollback &&
+    Object.prototype.hasOwnProperty.call(rollback, "additiveMigrations");
+
+  if (!posture) {
+    if (legacyOnly) {
+      problems.push(
+        "structured migration posture evidence required (legacy rollback.additiveMigrations cannot authorize GO)",
+      );
+    } else {
+      problems.push("rollback.migrationPosture missing");
+    }
+    return {
+      pass: false,
+      status: "PENDING",
+      classification: legacyOnly ? "LEGACY_ADDITIVE_FIELD" : "UNKNOWN",
+      exceptions: [],
+      problems,
+    };
+  }
+
+  const status = String(posture.status ?? "").toUpperCase();
+  const classification = String(posture.classification ?? "").toUpperCase();
+  const exceptions = Array.isArray(posture.exceptions) ? posture.exceptions : [];
+
+  if (status !== "PASS") problems.push(`migrationPosture.status must be PASS (got ${status || "empty"})`);
+  if (!MIGRATION_POSTURE_CLASSIFICATIONS.includes(classification)) {
+    problems.push(`migrationPosture.classification unsupported (got ${classification || "empty"})`);
+  }
+
+  if (classification === "ADDITIVE" && exceptions.length > 0) {
+    problems.push("ADDITIVE classification must not carry exceptions");
+  }
+  if (classification === "NON_ADDITIVE_WITH_ROLLBACK_PLAN" && exceptions.length === 0) {
+    problems.push("NON_ADDITIVE_WITH_ROLLBACK_PLAN requires at least one exception");
+  }
+
+  exceptions.forEach((ex, idx) => {
+    if (!ex || typeof ex !== "object") {
+      problems.push(`exception[${idx}] is not an object`);
+      return;
+    }
+    for (const field of REQUIRED_EXCEPTION_FIELDS) {
+      const value = ex[field];
+      if (typeof value !== "string" || value.trim().length === 0) {
+        problems.push(`exception[${idx}] missing ${field}`);
+      }
+    }
+  });
+
+  return {
+    pass: problems.length === 0,
+    status: status || "PENDING",
+    classification: classification || "UNKNOWN",
+    exceptions,
+    problems,
+  };
+
 function smokeCheckpointMap(smoke, manual) {
   const map = new Map();
   for (const item of Array.isArray(smoke?.checkpoints) ? smoke.checkpoints : []) {

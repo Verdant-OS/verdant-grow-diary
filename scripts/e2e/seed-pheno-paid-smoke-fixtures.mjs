@@ -114,21 +114,34 @@ if (productionMarkers.some((m) => host.endsWith(m))) {
 const { createClient } = await import("@supabase/supabase-js");
 const db = createClient(supabaseUrl, serviceRole, { auth: { persistSession: false } });
 
-// Resolve owner user_id via public.profiles (never expose auth.users to callers).
-const { data: profile, error: profileErr } = await db
-  .from("profiles")
-  .select("id")
-  .eq("email", ownerEmail)
-  .maybeSingle();
-if (profileErr || !profile?.id) {
+// Resolve owner user_id via the service-role admin API. (profiles has no
+// email or id column — its key is user_id — so the previous profiles-based
+// lookup could never resolve on any real schema.)
+let ownerId = null;
+{
+  const wanted = ownerEmail.trim().toLowerCase();
+  let page = 1;
+  while (page <= 10 && !ownerId) {
+    const { data, error: listErr } = await db.auth.admin.listUsers({
+      page,
+      perPage: 200,
+    });
+    if (listErr) break;
+    ownerId =
+      data?.users?.find((u) => (u.email ?? "").toLowerCase() === wanted)?.id ??
+      null;
+    if (!data?.users?.length || data.users.length < 200) break;
+    page += 1;
+  }
+}
+if (!ownerId) {
   lines.push(
-    "Result: FAIL — owner email did not resolve to a local profiles row.",
+    "Result: FAIL — owner email did not resolve to a local auth user.",
     "Create the local test account first, then re-run.",
   );
   console.log(lines.join("\n"));
   process.exit(1);
 }
-const ownerId = profile.id;
 
 const FIXTURE_PREFIX = process.env.E2E_PHENO_FIXTURE_PREFIX || "e2e_pheno_paid_smoke";
 
@@ -196,8 +209,9 @@ async function upsertSmokeTest(huntId, plantId, verdict) {
       verdict,
       flavor_descriptors: ["citrus", "pine"],
       effect_descriptors: ["uplifting"],
-      potency_impression: 7,
-      smoothness: 8,
+      // 1-5 CHECK ranges (pheno_smoke_tests_smoothness_range / _potency_range)
+      potency_impression: 4,
+      smoothness: 5,
       tested_at: new Date().toISOString(),
       note: "seeded post-cure smoke test",
     });
@@ -226,8 +240,8 @@ try {
   {
     const a = await upsertCandidate(growId, tentId, pendingHarvestId, "A");
     const b = await upsertCandidate(growId, tentId, pendingHarvestId, "B");
-    await upsertScore(pendingHarvestId, a, "resin-heavy structure", []);
-    await upsertScore(pendingHarvestId, b, "tight internodes", []);
+    await upsertScore(pendingHarvestId, a, "resin-heavy structure", {});
+    await upsertScore(pendingHarvestId, b, "tight internodes", {});
   }
 
   // 3. pending-cure — hunt + 2 candidates + phenotype notes + lab (harvest signal)
@@ -235,8 +249,8 @@ try {
   {
     const a = await upsertCandidate(growId, tentId, pendingCureId, "A");
     const b = await upsertCandidate(growId, tentId, pendingCureId, "B");
-    await upsertScore(pendingCureId, a, "dense colas", []);
-    await upsertScore(pendingCureId, b, "loose airy tops", []);
+    await upsertScore(pendingCureId, a, "dense colas", {});
+    await upsertScore(pendingCureId, b, "loose airy tops", {});
     await upsertLab(pendingCureId, a);
     await upsertLab(pendingCureId, b);
   }
@@ -246,8 +260,8 @@ try {
   {
     const a = await upsertCandidate(growId, tentId, comparisonReadyId, "A");
     const b = await upsertCandidate(growId, tentId, comparisonReadyId, "B");
-    await upsertScore(comparisonReadyId, a, "gassy citrus, dense", ["dense", "resinous"]);
-    await upsertScore(comparisonReadyId, b, "sweet pine, medium density", ["medium", "aromatic"]);
+    await upsertScore(comparisonReadyId, a, "gassy citrus, dense", { density: 5, resin: 5 });
+    await upsertScore(comparisonReadyId, b, "sweet pine, medium density", { density: 3, aroma: 4 });
     await upsertLab(comparisonReadyId, a);
     await upsertLab(comparisonReadyId, b);
     await upsertSmokeTest(comparisonReadyId, a, "keeper");

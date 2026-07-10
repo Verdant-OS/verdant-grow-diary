@@ -4,7 +4,7 @@
 
 The Pro anchor feature: *your grow is watched while you're away.* Today,
 environment alerts are computed client-side only while the app is open
-(; ingest functions deliberately
+(`src/hooks/usePersistEnvironmentAlerts.ts`; ingest functions deliberately
 never trigger alerts) — a tent can cook overnight unnoticed. Meanwhile a
 production-grade email pipeline (pgmq, DLQ, suppression, pg_cron worker)
 sits idle with auth emails as its only producer. This spec connects the two
@@ -22,8 +22,9 @@ run-counts), per-user storm collapse + fleet-offline circuit breaker,
 digest on its own pgmq queue, generic value-free email subjects
 (jurisdictional privacy), unsubscribe hardening, an external dead-man's
 switch as a Phase 0 exit criterion, and — structurally — the entitlement
-function copies 's union pattern with a
-guard test pinning the FINAL migration state (the landmine must be impossible here).
+function copies `has_pheno_tracker_entitlement`'s union pattern with a
+guard test pinning the FINAL migration state (the `ai_credit_spend`
+landmine must be structurally impossible here).
 
 **Phases:** 0 observability → 1 free opt-in daily digest → 2 Pro real-time
 alerts + reminders + recovery notices → 3 push/escalation. Each phase is

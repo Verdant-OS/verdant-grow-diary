@@ -5,8 +5,8 @@
  * Comparison-ready, never by Setup complete.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { render, screen, cleanup, within, fireEvent } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { UsePhenoHuntWorkspaceState } from "@/hooks/usePhenoHuntWorkspace";
 import type { PhenoHuntSummary } from "@/lib/phenoHuntCandidatesService";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";

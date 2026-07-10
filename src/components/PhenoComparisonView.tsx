@@ -36,7 +36,16 @@ export interface PhenoComparisonViewProps {
   readonly mode: "demo" | "live";
   /** Hunt name, shown in live mode. */
   readonly huntName?: string | null;
+  /**
+   * When false, any ranking / verdict / keeper-conclusion UI must remain
+   * hidden. Raw evidence review is allowed but MUST be clearly labeled
+   * incomplete by the parent surface. Defaults to true — the current
+   * presenter renders no conclusion cards, so this is a defense-in-depth
+   * signal (data-attr) for nested surfaces added later.
+   */
+  readonly allowConclusions?: boolean;
 }
+
 
 function toneClass(view: PhenoSensorSnapshotView): string {
   if (view.source === "live")

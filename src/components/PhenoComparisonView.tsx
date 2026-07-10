@@ -410,7 +410,12 @@ function CandidateColumn({
   );
 }
 
-export default function PhenoComparisonView({ inputs, mode, huntName }: PhenoComparisonViewProps) {
+export default function PhenoComparisonView({
+  inputs,
+  mode,
+  huntName,
+  allowConclusions = true,
+}: PhenoComparisonViewProps) {
   const view = useMemo(() => buildPhenoComparisonView(inputs ?? []), [inputs]);
 
   const expressionById = useMemo(() => {
@@ -439,9 +444,11 @@ export default function PhenoComparisonView({ inputs, mode, huntName }: PhenoCom
     <main
       data-testid="pheno-comparison-page"
       data-mode={mode}
+      data-allow-conclusions={allowConclusions ? "true" : "false"}
       aria-labelledby="pheno-comparison-heading"
       className="container mx-auto max-w-6xl px-4 py-6 space-y-4"
     >
+
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <h1 id="pheno-comparison-heading" className="text-2xl font-semibold">

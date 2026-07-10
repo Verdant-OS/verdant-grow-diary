@@ -65,14 +65,30 @@ export default function PhenoCompareCandidatesAction({
           <p className="text-xs text-muted-foreground">
             {PHENO_COMPARISON_HELP_COPY}
           </p>
-          {state.missingEvidence.length > 0 ? (
+          {state.missingEvidenceItems.length > 0 ? (
             <ul
-              className="text-xs text-muted-foreground list-disc pl-4"
+              className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5"
               data-testid={`${testId}-missing`}
             >
-              {state.missingEvidence.map((m) => (
-                <li key={m} data-testid={`${testId}-missing-item`}>
-                  {m}
+              {state.missingEvidenceItems.map((m) => (
+                <li
+                  key={m.id}
+                  data-testid={`${testId}-missing-item`}
+                  data-missing-id={m.id}
+                >
+                  <span>{m.message}</span>
+                  {m.nextStepTarget && m.nextStepLabel ? (
+                    <>
+                      {" — "}
+                      <Link
+                        to={m.nextStepTarget}
+                        className="underline underline-offset-2 hover:text-foreground"
+                        data-testid={`${testId}-next-step-${m.id}`}
+                      >
+                        {m.nextStepLabel}
+                      </Link>
+                    </>
+                  ) : null}
                 </li>
               ))}
             </ul>

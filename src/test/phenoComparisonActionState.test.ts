@@ -5,7 +5,9 @@ import { describe, it, expect } from "vitest";
 import {
   buildPhenoComparisonActionState,
   PHENO_COMPARISON_HELP_COPY,
+  PHENO_WORKSPACE_ANCHORS,
 } from "@/lib/phenoComparisonActionState";
+import { PHENO_STATUS_LABELS } from "@/constants/phenoOnboardingCopy";
 
 const base = {
   huntId: "h1",

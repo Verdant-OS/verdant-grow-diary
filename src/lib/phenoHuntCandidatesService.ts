@@ -10,9 +10,14 @@
 import { supabase } from "@/integrations/supabase/client";
 import {
   adaptPhenoHuntCandidates,
+  type PhenoHuntCandidateLabEvidence,
   type PhenoHuntCandidatePlantRow,
+  type PhenoHuntCandidateScoreEvidence,
+  type PhenoHuntCandidateSmokeEvidence,
 } from "@/lib/phenoHuntCandidateAdapter";
+import { phenoDb } from "@/integrations/supabase/phenoTables";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
+
 
 export interface PhenoHuntSummary {
   id: string;

@@ -150,8 +150,13 @@ a manual FAIL beats an automated PASS).
 5. Live smoke PASS with **zero failed and zero skipped** tests.
 6. All 12 checkpoints PASS (automated proof or recorded manual evidence).
 7. Billing disposition resolved.
-8. Rollback readiness complete (prior version identified, additive
-   migrations, entry-point disable path, owner read preserved).
+8. Rollback readiness complete: prior version identified, structured
+   migration rollback posture (`ADDITIVE` with no exceptions, or
+   `NON_ADDITIVE_WITH_ROLLBACK_PLAN` with a complete rollback procedure for
+   every exception), entry-point disable path, owner read preserved. The
+   legacy `additiveMigrations` boolean can no longer authorize GO — it
+   masked non-additive policy removals such as the intentional
+   `20260709180000` owner-only hardening.
 
 Anything less is HOLD. `--allow-partial` refreshes a HOLD receipt but can
 never mint GO — a full `release:pheno:receipt` run must confirm it.

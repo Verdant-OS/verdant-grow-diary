@@ -47,6 +47,8 @@ import PhenoStressObservationsList from "@/components/PhenoStressObservationsLis
 import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
 import { usePhenoStressObservations } from "@/hooks/usePhenoStressObservations";
 import PhenoHuntSetupProgressCard from "@/components/PhenoHuntSetupProgressCard";
+import PhenoCompareCandidatesAction from "@/components/PhenoCompareCandidatesAction";
+import { buildPhenoComparisonActionState } from "@/lib/phenoComparisonActionState";
 import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
 
 

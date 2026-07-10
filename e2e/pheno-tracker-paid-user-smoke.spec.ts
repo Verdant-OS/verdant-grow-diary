@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import fs from "node:fs";
 
 /**
  * Pheno Tracker paid-user smoke — end-to-end coverage of the Free → Pro →
@@ -7,16 +8,14 @@ import { test, expect } from "@playwright/test";
  * reason. Nothing is faked, no service_role is used, no passwords / cookies
  * / hunt ids are logged.
  *
+ * Session wiring:
+ *   Playwright requires storageState to be resolved at module load. We read
+ *   role env vars once here, validate that any file referenced actually
+ *   exists (unreadable → describe is skipped, never silently ignored), then
+ *   bind each describe block to its role's storageState via test.use().
+ *
  * See docs/e2e-tests.md — "Pheno Tracker paid-user smoke" section — for the
  * full contract and how to seed local fixtures.
- *
- * Safety:
- *   - Read-only against the app.
- *   - No schema, RLS, entitlement, scoring, AI, Action Queue, or
- *     device-control changes.
- *   - Direct-navigation and disabled-Compare assertions duplicate what the
- *     dedicated specs cover so this smoke can stand alone as a
- *     paid-user-journey signal.
  */
 
 const FORBIDDEN_COPY = [
@@ -36,41 +35,62 @@ const FORBIDDEN_COPY = [
   "keeper selected",
   "keeper confirmed",
   "selection winner",
-  "AI picked",
-  "AI picks winners",
+  "ai picked",
+  "ai picks winners",
   "guaranteed keeper",
   "guaranteed yield",
   "automated breeding",
 ];
 
+function resolveSession(envName: string): { path?: string; skipReason?: string } {
+  const raw = process.env[envName];
+  if (!raw || raw.trim() === "") {
+    return { skipReason: `SKIPPED: ${envName} not set. See docs/e2e-tests.md.` };
+  }
+  if (!fs.existsSync(raw)) {
+    return { skipReason: `SKIPPED: ${envName} points to unreadable file.` };
+  }
+  return { path: raw };
+}
+
+const FREE_SESSION = resolveSession("E2E_PHENO_FREE_SESSION_FILE");
+const PRO_SESSION = resolveSession("E2E_PHENO_PRO_SESSION_FILE");
+const FOUNDER_SESSION = resolveSession("E2E_PHENO_FOUNDER_SESSION_FILE");
+const CANCELED_SESSION = resolveSession("E2E_PHENO_CANCELED_SESSION_FILE");
+
 const MISSING_EVIDENCE_HUNT = process.env.E2E_PHENO_HUNT_ID_MISSING_EVIDENCE;
 const COMPARISON_READY_HUNT = process.env.E2E_PHENO_HUNT_ID_COMPARISON_READY;
 
-async function assertNoForbiddenCopy(page: import("@playwright/test").Page) {
+// Pick a Pro-capable session for the paid workspace scenarios: prefer Pro,
+// fall back to Founder. Missing → scenarios in that block skip cleanly.
+const PAID_SESSION = PRO_SESSION.path
+  ? PRO_SESSION
+  : FOUNDER_SESSION.path
+    ? FOUNDER_SESSION
+    : { skipReason: "SKIPPED: neither E2E_PHENO_PRO_SESSION_FILE nor E2E_PHENO_FOUNDER_SESSION_FILE is set." };
+
+async function assertNoForbiddenCopy(page: Page) {
   const body = (await page.locator("body").innerText()).toLowerCase();
   for (const phrase of FORBIDDEN_COPY) {
     expect(body, `disabled/incomplete Compare surface must not contain "${phrase}"`).not.toContain(
-      phrase.toLowerCase(),
+      phrase,
     );
   }
 }
 
-test.describe("Pheno Tracker paid-user smoke", () => {
-  test("A. Free user gate on /pheno-hunts/new carries safe returnTo", async ({ page }) => {
+// ─── A. Free user gate ────────────────────────────────────────────────────
+test.describe("A. Free user gate", () => {
+  if (FREE_SESSION.path) test.use({ storageState: FREE_SESSION.path });
+
+  test("Free user cannot reach /pheno-hunts/new; upgrade CTA preserves returnTo", async ({ page }) => {
     await page.goto("/pheno-hunts/new");
-    // Anonymous / free users may be redirected to /auth first, or land on the
-    // upgrade gate directly depending on session. Either way the create form
-    // must not render, and any upgrade CTA must carry ?returnTo=/pheno-hunts/new.
     const currentUrl = page.url();
     if (currentUrl.includes("/auth")) {
-      // Auth wall — a redirectTo param must round-trip the buyer back.
       expect(currentUrl).toContain("redirectTo=");
       expect(decodeURIComponent(currentUrl)).toContain("/pheno-hunts/new");
       return;
     }
-    // Otherwise, the upgrade gate should be visible.
-    const createHuntForm = page.getByTestId("pheno-hunt-create-form");
-    await expect(createHuntForm).toHaveCount(0);
+    await expect(page.getByTestId("pheno-hunt-create-form")).toHaveCount(0);
     const upgradeCtas = page.getByRole("link", { name: /upgrade|go pro|start pro/i });
     if (await upgradeCtas.count()) {
       const href = await upgradeCtas.first().getAttribute("href");
@@ -79,86 +99,120 @@ test.describe("Pheno Tracker paid-user smoke", () => {
       );
     }
   });
+});
 
-  test("B. CheckoutSuccess waits for entitlement and honors safe returnTo", async ({ page }) => {
-    // Paddle iframe payment cannot be automated (see docs/e2e-tests.md).
-    // We assert the CheckoutSuccess route contract: unconfirmed = does NOT
-    // navigate away; sanitizer must reject unsafe returnTo values.
+// ─── B. CheckoutSuccess sanitizer (anonymous is fine) ─────────────────────
+test.describe("B. CheckoutSuccess sanitizer", () => {
+  test("unsafe returnTo is rejected; safe returnTo does not auto-redirect anonymously", async ({ page }) => {
     await page.goto("/checkout/success?returnTo=https://evil.example/pwn");
     await expect(page.getByTestId("checkout-success-page")).toBeVisible();
-    // Unsafe returnTo → no redirect to external origin. Origin stays same.
-    await page.waitForTimeout(500);
-    expect(new URL(page.url()).origin).toBe(new URL(page.url()).origin);
+    await page.waitForTimeout(400);
     expect(page.url()).not.toContain("evil.example");
 
     await page.goto("/checkout/success?returnTo=/pheno-hunts/new");
     await expect(page.getByTestId("checkout-success-page")).toBeVisible();
-    // If entitlement is not confirmed the page stays on /checkout/success —
-    // it must NOT auto-redirect anonymously. This is the anti-open-redirect
-    // guarantee.
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(400);
     expect(page.url()).toContain("/checkout/success");
   });
+});
 
-  test.describe("Missing-evidence hunt (D–F)", () => {
-    test.skip(
-      !MISSING_EVIDENCE_HUNT,
-      "SKIPPED: E2E_PHENO_HUNT_ID_MISSING_EVIDENCE not set. See docs/e2e-tests.md.",
-    );
+// ─── C. Pro Monthly can reach paid workspace ──────────────────────────────
+test.describe("C. Pro Monthly access", () => {
+  test.skip(!PRO_SESSION.path, PRO_SESSION.skipReason ?? "SKIPPED: no Pro session.");
+  if (PRO_SESSION.path) test.use({ storageState: PRO_SESSION.path });
 
-    test("D+E. workspace shows disabled Compare and inert missing-evidence anchors", async ({
-      page,
-    }) => {
-      await page.goto(`/pheno-hunts/${MISSING_EVIDENCE_HUNT}/workspace`);
-      if (page.url().includes("/auth")) test.skip(true, "SKIPPED: no Pro session available.");
-      const compareBtn = page.getByRole("button", { name: /compare candidates/i });
-      if (await compareBtn.count()) {
-        await expect(compareBtn.first()).toBeDisabled();
-      }
-      await assertNoForbiddenCopy(page);
-    });
+  test("Pro user can load /pheno-hunts/new without auth wall", async ({ page }) => {
+    await page.goto("/pheno-hunts/new");
+    expect(page.url()).not.toContain("/auth");
+    await assertNoForbiddenCopy(page);
+  });
+});
 
-    test("F. direct /compare on incomplete hunt shows not-ready warning", async ({ page }) => {
-      const compareRequests: string[] = [];
-      page.on("request", (req) => {
-        const url = req.url();
-        if (/compare-candidates|pheno-rank|keeper-recommendation|comparison-verdict/i.test(url)) {
-          compareRequests.push(url);
-        }
-      });
-      await page.goto(`/pheno-hunts/${MISSING_EVIDENCE_HUNT}/compare`);
-      if (page.url().includes("/auth")) test.skip(true, "SKIPPED: no Pro session available.");
-      await expect(page.locator("body")).toContainText(/not comparison[- ]ready/i);
-      await assertNoForbiddenCopy(page);
-      expect(compareRequests, "no comparison-execution requests may fire on disabled state").toEqual(
-        [],
-      );
-    });
+// ─── C2. Founder Lifetime can reach paid workspace ────────────────────────
+test.describe("C2. Founder Lifetime access", () => {
+  test.skip(!FOUNDER_SESSION.path, FOUNDER_SESSION.skipReason ?? "SKIPPED: no Founder session.");
+  if (FOUNDER_SESSION.path) test.use({ storageState: FOUNDER_SESSION.path });
+
+  test("Founder user can load /pheno-hunts/new without auth wall", async ({ page }) => {
+    await page.goto("/pheno-hunts/new");
+    expect(page.url()).not.toContain("/auth");
+    await assertNoForbiddenCopy(page);
+  });
+});
+
+// ─── C3. Canceled/expired user is blocked ─────────────────────────────────
+test.describe("C3. Canceled/expired blocked from paid pheno workspace", () => {
+  test.skip(!CANCELED_SESSION.path, CANCELED_SESSION.skipReason ?? "SKIPPED: no Canceled session.");
+  if (CANCELED_SESSION.path) test.use({ storageState: CANCELED_SESSION.path });
+
+  test("Canceled user hitting /pheno-hunts/new sees gate, not the create form", async ({ page }) => {
+    await page.goto("/pheno-hunts/new");
+    await expect(page.getByTestId("pheno-hunt-create-form")).toHaveCount(0);
+    await assertNoForbiddenCopy(page);
+  });
+});
+
+// ─── D–F. Missing-evidence hunt (requires paid session) ───────────────────
+test.describe("D–F. Missing-evidence hunt", () => {
+  test.skip(!PAID_SESSION.path, PAID_SESSION.skipReason ?? "SKIPPED: no paid session.");
+  test.skip(
+    !MISSING_EVIDENCE_HUNT,
+    "SKIPPED: E2E_PHENO_HUNT_ID_MISSING_EVIDENCE not set. See docs/e2e-tests.md.",
+  );
+  if (PAID_SESSION.path) test.use({ storageState: PAID_SESSION.path });
+
+  test("D+E. workspace shows disabled Compare and inert missing-evidence anchors", async ({ page }) => {
+    await page.goto(`/pheno-hunts/${MISSING_EVIDENCE_HUNT}/workspace`);
+    expect(page.url(), "paid session should not bounce to /auth").not.toContain("/auth");
+    const compareBtn = page.getByRole("button", { name: /compare candidates/i });
+    if (await compareBtn.count()) {
+      await expect(compareBtn.first()).toBeDisabled();
+    }
+    await assertNoForbiddenCopy(page);
   });
 
-  test.describe("Comparison-ready hunt (G)", () => {
-    test.skip(
-      !COMPARISON_READY_HUNT,
-      "SKIPPED: E2E_PHENO_HUNT_ID_COMPARISON_READY not set. See docs/e2e-tests.md.",
-    );
-
-    test("G. workspace enables Compare and /compare renders read-only comparison", async ({
-      page,
-    }) => {
-      await page.goto(`/pheno-hunts/${COMPARISON_READY_HUNT}/workspace`);
-      if (page.url().includes("/auth")) test.skip(true, "SKIPPED: no Pro session available.");
-      const compareBtn = page.getByRole("button", { name: /compare candidates/i });
-      if (await compareBtn.count()) {
-        await expect(compareBtn.first()).toBeEnabled();
+  test("F. direct /compare on incomplete hunt shows not-ready warning and fires no compare requests", async ({ page }) => {
+    const compareRequests: string[] = [];
+    page.on("request", (req) => {
+      const url = req.url();
+      if (/compare-candidates|pheno-rank|keeper-recommendation|comparison-verdict/i.test(url)) {
+        compareRequests.push(url);
       }
-      await page.goto(`/pheno-hunts/${COMPARISON_READY_HUNT}/compare`);
-      await expect(page.locator("body")).not.toContainText(/not comparison[- ]ready/i);
     });
+    await page.goto(`/pheno-hunts/${MISSING_EVIDENCE_HUNT}/compare`);
+    expect(page.url()).not.toContain("/auth");
+    await expect(page.locator("body")).toContainText(/not comparison[- ]ready/i);
+    await assertNoForbiddenCopy(page);
+    expect(compareRequests, "no comparison-execution requests may fire on disabled state").toEqual([]);
   });
+});
 
-  test("I. Core one-tent regression: dashboard route still resolves", async ({ page }) => {
+// ─── G. Comparison-ready hunt ─────────────────────────────────────────────
+test.describe("G. Comparison-ready hunt", () => {
+  test.skip(!PAID_SESSION.path, PAID_SESSION.skipReason ?? "SKIPPED: no paid session.");
+  test.skip(
+    !COMPARISON_READY_HUNT,
+    "SKIPPED: E2E_PHENO_HUNT_ID_COMPARISON_READY not set. See docs/e2e-tests.md.",
+  );
+  if (PAID_SESSION.path) test.use({ storageState: PAID_SESSION.path });
+
+  test("workspace enables Compare and /compare renders read-only comparison", async ({ page }) => {
+    await page.goto(`/pheno-hunts/${COMPARISON_READY_HUNT}/workspace`);
+    expect(page.url()).not.toContain("/auth");
+    const compareBtn = page.getByRole("button", { name: /compare candidates/i });
+    if (await compareBtn.count()) {
+      await expect(compareBtn.first()).toBeEnabled();
+    }
+    await page.goto(`/pheno-hunts/${COMPARISON_READY_HUNT}/compare`);
+    await expect(page.locator("body")).not.toContainText(/not comparison[- ]ready/i);
+    await assertNoForbiddenCopy(page);
+  });
+});
+
+// ─── I. Regression: dashboard still resolves ──────────────────────────────
+test.describe("I. Core one-tent regression", () => {
+  test("dashboard route still resolves without a crash", async ({ page }) => {
     await page.goto("/dashboard");
-    // Either auth-wall (anonymous) or dashboard chrome — never a 500/crash.
     const bodyText = await page.locator("body").innerText();
     expect(bodyText.length).toBeGreaterThan(0);
     expect(bodyText).not.toMatch(/something went wrong/i);

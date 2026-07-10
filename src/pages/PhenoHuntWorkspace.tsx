@@ -920,10 +920,13 @@ export default function PhenoHuntWorkspace() {
               setupCompletedAt: setupCompletedLocal ?? ws.hunt.setupCompletedAt ?? null,
             }}
             candidateCount={candidates.length}
+            comparisonReadiness={comparisonState.readiness}
             onMarkComplete={handleMarkSetupComplete}
             saving={setupSaving}
           />
         ) : null}
+
+        {ws.hunt ? <PhenoCompareCandidatesAction state={comparisonState} /> : null}
 
 
 

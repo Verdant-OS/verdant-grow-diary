@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import {
   canUseFeature,
   canReadExistingFeatureData,
@@ -49,15 +50,18 @@ const FEATURE_BULLETS: ReadonlyArray<string> = [
   "Export your pheno report",
 ];
 
-function buildUpgradeHref(pathname: string): string {
-  // Only forward a same-origin, absolute app path. Never forward query, hash,
-  // or external URLs. This is defence in depth against redirect abuse.
+function buildUpgradeHref(pathname: string, search: string): string {
+  // Forward the full same-origin app path INCLUDING its query — a deep link
+  // to /pheno-hunts/new?growId=... must keep its context through checkout or
+  // the buyer lands on "Grow not found". The candidate goes through the
+  // canonical checkout sanitizer (defence in depth against redirect abuse).
   // Points at /pricing — the page with LIVE checkout. /upgrade is a dead end
   // (every paddlePriceId there is null, so all paid CTAs are disabled).
-  const safe =
-    typeof pathname === "string" && pathname.startsWith("/") && !pathname.startsWith("//")
-      ? pathname
-      : null;
+  const candidate =
+    typeof pathname === "string" && (typeof search === "string" ? search : "").startsWith("?")
+      ? `${pathname}${search}`
+      : pathname;
+  const safe = sanitizeCheckoutReturnTo(candidate);
   if (!safe) return "/pricing";
   const params = new URLSearchParams({ returnTo: safe });
   return `/pricing?${params.toString()}`;
@@ -73,8 +77,8 @@ export default function PhenoTrackerUpgradeGate({
   const { entitlement, loading } = useMyEntitlements();
   const location = useLocation();
   const upgradeHref = useMemo(
-    () => buildUpgradeHref(location.pathname),
-    [location.pathname],
+    () => buildUpgradeHref(location.pathname, location.search),
+    [location.pathname, location.search],
   );
 
   if (loading) {

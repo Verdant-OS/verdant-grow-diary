@@ -120,6 +120,17 @@ describe("PhenoTrackerUpgradeGate", () => {
     );
   });
 
+  it("returnTo preserves the query context of a deep-linked gated route", () => {
+    // A buyer arriving at /pheno-hunts/new?growId=... must keep growId/tentId
+    // through checkout, or the new-hunt page shows "Grow not found".
+    mode.current = "free";
+    renderGate({}, "/pheno-hunts/new?growId=g1&tentId=t1");
+    const upgrade = screen.getAllByRole("link", { name: /upgrade to pro/i })[0];
+    expect(upgrade.getAttribute("href")).toBe(
+      "/pricing?returnTo=%2Fpheno-hunts%2Fnew%3FgrowId%3Dg1%26tentId%3Dt1",
+    );
+  });
+
   it("Pro user sees children (no gate)", () => {
     mode.current = "pro";
     renderGate();

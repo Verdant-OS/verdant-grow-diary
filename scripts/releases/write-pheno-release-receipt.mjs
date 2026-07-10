@@ -198,6 +198,9 @@ export function evaluateMigrationPosture(rollback) {
     exceptions,
     problems,
   };
+}
+
+
 
 function smokeCheckpointMap(smoke, manual) {
   const map = new Map();

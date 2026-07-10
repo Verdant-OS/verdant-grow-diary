@@ -64,15 +64,31 @@ export async function loadPhenoHuntCandidates(
   if (plantsError) return { ok: false, error: "Could not load hunt candidates." };
 
   const plants = (plantRows ?? []) as PhenoHuntCandidatePlantRow[];
+  const plantIds = plants.map((p) => p.id).filter((v): v is string => typeof v === "string" && v.length > 0);
 
   // Independent lookups — one round trip instead of two serial hops on the
-  // workspace's critical loading path.
-  const [growNameById, tentNameById] = await Promise.all([
-    loadNameMap("grows", distinct([huntRow.grow_id, ...plants.map((p) => p.grow_id)])),
-    loadNameMap("tents", distinct([huntRow.tent_id, ...plants.map((p) => p.tent_id)])),
-  ]);
+  // workspace's critical loading path. Evidence tables are RLS-scoped by
+  // hunt_id (and the caller owns the hunt), so cross-hunt / cross-user data
+  // never reaches this map. Requests are scoped by hunt_id AND plant_id so
+  // stray orphan rows from a deleted candidate can't leak either.
+  const [growNameById, tentNameById, scoreByPlantId, smokeTestByPlantId, labResultByPlantId] =
+    await Promise.all([
+      loadNameMap("grows", distinct([huntRow.grow_id, ...plants.map((p) => p.grow_id)])),
+      loadNameMap("tents", distinct([huntRow.tent_id, ...plants.map((p) => p.tent_id)])),
+      loadCandidateScores(id, plantIds),
+      loadSmokeTests(id, plantIds),
+      loadLabResults(id, plantIds),
+    ]);
 
-  const candidates = adaptPhenoHuntCandidates({ plants, growNameById, tentNameById });
+  const candidates = adaptPhenoHuntCandidates({
+    plants,
+    growNameById,
+    tentNameById,
+    scoreByPlantId,
+    smokeTestByPlantId,
+    labResultByPlantId,
+  });
+
 
   const rawGoals = (huntRow as { evidence_goals?: unknown }).evidence_goals;
   const evidenceGoals = Array.isArray(rawGoals)

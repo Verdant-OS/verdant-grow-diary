@@ -206,3 +206,84 @@ export async function assertDisabledCompareInert(
 
   return { helperText: combined, helperLocator: helper };
 }
+
+/**
+ * Comparison-related network patterns that MUST NOT fire while a hunt is
+ * in a disabled Compare state. These target ranking / verdict / keeper
+ * recommendation / AI-comparison / Action Queue write endpoints. Read-only
+ * data fetches (pheno hunt row, candidates, evidence, static assets,
+ * telemetry) are intentionally NOT in this list.
+ */
+export const FORBIDDEN_COMPARISON_NETWORK: readonly RegExp[] = [
+  /\/compare-candidates\b/i,
+  /\/pheno-comparison-result\b/i,
+  /\/pheno[-_ ]?rank\b/i,
+  /\/keeper[-_ ]?recommendation\b/i,
+  /\/comparison[-_ ]?verdict\b/i,
+  /\/ai[^?#]*comparison\b/i,
+  /\/functions\/v1\/[^?#]*(compare|rank|verdict|keeper)/i,
+  /\/rest\/v1\/rpc\/[^?#]*(compare|rank|verdict|keeper)/i,
+  /\/rest\/v1\/action_queue\b/i,
+  /\/functions\/v1\/[^?#]*action[-_]queue/i,
+];
+
+/**
+ * Method-based write denylist: while disabled, no comparison surface may
+ * issue mutating requests against pheno_* / action_queue / conclusion
+ * tables via PostgREST.
+ */
+const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const WRITE_TABLE_DENY: readonly RegExp[] = [
+  /\/rest\/v1\/pheno_comparison/i,
+  /\/rest\/v1\/pheno_conclusion/i,
+  /\/rest\/v1\/pheno_rank/i,
+  /\/rest\/v1\/pheno_keeper/i,
+  /\/rest\/v1\/action_queue/i,
+];
+
+export interface RecordedRequest {
+  readonly url: string;
+  readonly method: string;
+}
+
+/**
+ * Attach a request listener that records every network request the page
+ * makes. Returns the mutable array — read it after navigation completes.
+ * Call BEFORE `page.goto(...)`.
+ */
+export function collectNetworkRequests(page: Page): RecordedRequest[] {
+  const requests: RecordedRequest[] = [];
+  page.on("request", (req: Request) => {
+    requests.push({ url: req.url(), method: req.method() });
+  });
+  return requests;
+}
+
+/**
+ * Fail if any recorded request matches a forbidden comparison-execution
+ * pattern OR is a write against a comparison/action_queue table.
+ */
+export function assertNoDisabledCompareNetworkSideEffects(
+  requests: readonly RecordedRequest[],
+  scope = "disabled Compare flow",
+): void {
+  const offenders: string[] = [];
+  for (const r of requests) {
+    for (const pat of FORBIDDEN_COMPARISON_NETWORK) {
+      if (pat.test(r.url)) {
+        offenders.push(`${r.method} ${r.url} matched ${pat}`);
+      }
+    }
+    if (WRITE_METHODS.has(r.method)) {
+      for (const pat of WRITE_TABLE_DENY) {
+        if (pat.test(r.url)) {
+          offenders.push(`${r.method} ${r.url} matched write-deny ${pat}`);
+        }
+      }
+    }
+  }
+  expect(
+    offenders,
+    `${scope} fired forbidden comparison network requests:\n${offenders.join("\n")}`,
+  ).toEqual([]);
+}

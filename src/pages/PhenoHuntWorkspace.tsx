@@ -760,6 +760,48 @@ export default function PhenoHuntWorkspace() {
 
   const candidates = useMemo(() => ws.candidates, [ws.candidates]);
 
+  // Comparison-ready is derived from RECORDED evidence, never from setup
+  // state. Setup complete ≠ Comparison-ready.
+  const comparisonState = useMemo(() => {
+    const goalsSelected = (ws.hunt?.evidenceGoals ?? []).length;
+    const allHaveNote =
+      candidates.length > 0 &&
+      candidates.every((c) => {
+        const note = ws.scoresByPlant[c.candidateId]?.note?.trim();
+        const decisionNote =
+          ws.decisionsByPlant[c.candidateId]?.note?.trim();
+        return !!(note || decisionNote);
+      });
+    const anyPostHarvest = candidates.some((c) => {
+      const d = ws.decisionsByPlant[c.candidateId]?.decision;
+      return !!d && d !== "undecided";
+    });
+    const anyPostCure = candidates.some((c) => {
+      const s = ws.smokeByPlant[c.candidateId];
+      if (!s) return false;
+      return (
+        !!s.verdict?.trim() ||
+        (s.flavorDescriptors?.length ?? 0) > 0 ||
+        (s.effectDescriptors?.length ?? 0) > 0
+      );
+    });
+    return buildPhenoComparisonActionState({
+      huntId: ws.hunt?.id ?? null,
+      candidateCount: candidates.length,
+      goalsSelected,
+      allCandidatesHavePhenotypeNote: allHaveNote,
+      anyPostHarvestObservation: anyPostHarvest,
+      anyPostCureObservation: anyPostCure,
+    });
+  }, [
+    candidates,
+    ws.hunt?.id,
+    ws.hunt?.evidenceGoals,
+    ws.scoresByPlant,
+    ws.decisionsByPlant,
+    ws.smokeByPlant,
+  ]);
+
   // Text + decision filters so a specific plant is findable among hundreds.
   // Filtering narrows the view only — it never orders by score or suggests
   // which candidate to keep.

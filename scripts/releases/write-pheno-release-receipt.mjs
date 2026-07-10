@@ -112,6 +112,96 @@ export function schemaResult(schema) {
   };
 }
 
+// Supported classifications for migrationPosture.classification.
+export const MIGRATION_POSTURE_CLASSIFICATIONS = Object.freeze([
+  "ADDITIVE",
+  "NON_ADDITIVE_WITH_ROLLBACK_PLAN",
+]);
+
+const REQUIRED_EXCEPTION_FIELDS = [
+  "migration",
+  "changeType",
+  "scope",
+  "description",
+  "impact",
+  "rollbackProcedure",
+];
+
+/**
+ * Evaluate the structured migration-posture claim under manual.rollback.
+ *
+ * Returns { pass, status, classification, exceptions, problems }.
+ *   - pass is true ONLY when the structured contract is present, internally
+ *     consistent, and reports PASS.
+ *   - A legacy-only `rollback.additiveMigrations` field NEVER passes — the
+ *     validator surfaces a clear pending reason and callers must supply the
+ *     structured posture.
+ */
+export function evaluateMigrationPosture(rollback) {
+  const problems = [];
+  const posture = rollback?.migrationPosture;
+  const legacyOnly =
+    !posture &&
+    rollback &&
+    Object.prototype.hasOwnProperty.call(rollback, "additiveMigrations");
+
+  if (!posture) {
+    if (legacyOnly) {
+      problems.push(
+        "structured migration posture evidence required (legacy rollback.additiveMigrations cannot authorize GO)",
+      );
+    } else {
+      problems.push("rollback.migrationPosture missing");
+    }
+    return {
+      pass: false,
+      status: "PENDING",
+      classification: legacyOnly ? "LEGACY_ADDITIVE_FIELD" : "UNKNOWN",
+      exceptions: [],
+      problems,
+    };
+  }
+
+  const status = String(posture.status ?? "").toUpperCase();
+  const classification = String(posture.classification ?? "").toUpperCase();
+  const exceptions = Array.isArray(posture.exceptions) ? posture.exceptions : [];
+
+  if (status !== "PASS") problems.push(`migrationPosture.status must be PASS (got ${status || "empty"})`);
+  if (!MIGRATION_POSTURE_CLASSIFICATIONS.includes(classification)) {
+    problems.push(`migrationPosture.classification unsupported (got ${classification || "empty"})`);
+  }
+
+  if (classification === "ADDITIVE" && exceptions.length > 0) {
+    problems.push("ADDITIVE classification must not carry exceptions");
+  }
+  if (classification === "NON_ADDITIVE_WITH_ROLLBACK_PLAN" && exceptions.length === 0) {
+    problems.push("NON_ADDITIVE_WITH_ROLLBACK_PLAN requires at least one exception");
+  }
+
+  exceptions.forEach((ex, idx) => {
+    if (!ex || typeof ex !== "object") {
+      problems.push(`exception[${idx}] is not an object`);
+      return;
+    }
+    for (const field of REQUIRED_EXCEPTION_FIELDS) {
+      const value = ex[field];
+      if (typeof value !== "string" || value.trim().length === 0) {
+        problems.push(`exception[${idx}] missing ${field}`);
+      }
+    }
+  });
+
+  return {
+    pass: problems.length === 0,
+    status: status || "PENDING",
+    classification: classification || "UNKNOWN",
+    exceptions,
+    problems,
+  };
+}
+
+
+
 function smokeCheckpointMap(smoke, manual) {
   const map = new Map();
   for (const item of Array.isArray(smoke?.checkpoints) ? smoke.checkpoints : []) {
@@ -132,6 +222,30 @@ function smokeCheckpointMap(smoke, manual) {
     });
   }
   return map;
+}
+
+/**
+ * Render the "Recorded non-additive migration changes" table when the
+ * structured posture actually carries exceptions. Additive-only postures
+ * render nothing here (no misleading empty table).
+ */
+export function renderMigrationExceptionSection(postureCheck) {
+  if (!postureCheck || !Array.isArray(postureCheck.exceptions) || postureCheck.exceptions.length === 0) {
+    return [];
+  }
+  const lines = [
+    "",
+    "### Recorded non-additive migration changes",
+    "",
+    "| Migration | Change | Scope | Description | Impact | Rollback procedure |",
+    "| --- | --- | --- | --- | --- | --- |",
+  ];
+  for (const ex of postureCheck.exceptions) {
+    lines.push(
+      `| ${esc(ex?.migration)} | ${esc(ex?.changeType)} | ${esc(ex?.scope)} | ${esc(ex?.description)} | ${esc(ex?.impact)} | ${esc(ex?.rollbackProcedure)} |`,
+    );
+  }
+  return lines;
 }
 
 export function renderReceipt({ smoke, schema, build, manual, allowPartial = false }) {
@@ -158,13 +272,17 @@ export function renderReceipt({ smoke, schema, build, manual, allowPartial = fal
     : billingStatus === "PASS";
 
   // GO also demands complete rollback readiness — a release without a
-  // verified rollback path is not shippable, only reachable.
-  const rollbackComplete = [
-    manual?.rollback?.priorVersionIdentified,
-    manual?.rollback?.additiveMigrations,
-    manual?.rollback?.entryPointDisable,
-    manual?.rollback?.ownerReadPreserved,
-  ].every((value) => yes(value));
+  // verified rollback path is not shippable, only reachable. The migration
+  // posture is a structured claim: additive is only valid without
+  // exceptions; non-additive is only valid when every exception carries a
+  // complete rollback procedure. The legacy boolean `additiveMigrations`
+  // never counts toward GO by itself.
+  const postureCheck = evaluateMigrationPosture(manual?.rollback);
+  const rollbackComplete =
+    yes(manual?.rollback?.priorVersionIdentified) &&
+    yes(manual?.rollback?.entryPointDisable) &&
+    yes(manual?.rollback?.ownerReadPreserved) &&
+    postureCheck.pass;
 
   const gatesPass =
     deploymentReachable &&
@@ -239,9 +357,11 @@ export function renderReceipt({ smoke, schema, build, manual, allowPartial = fal
     "## Rollback readiness",
     "",
     `- Prior Lovable version identified: ${status(manual?.rollback?.priorVersionIdentified)}`,
-    `- Additive migrations confirmed backward-compatible: ${status(manual?.rollback?.additiveMigrations)}`,
+    `- Migration rollback posture: ${postureCheck.pass ? "PASS" : postureCheck.status}`,
+    `- Migration classification: ${postureCheck.classification}`,
     `- Entry points can be disabled without deleting data: ${status(manual?.rollback?.entryPointDisable)}`,
     `- Owner read access preserved: ${status(manual?.rollback?.ownerReadPreserved)}`,
+    ...renderMigrationExceptionSection(postureCheck),
     "",
     "## Final decision",
     "",

@@ -111,7 +111,21 @@ evidence is recorded here:
   "billing": { "required": false, "status": "NOT_REQUIRED", "evidence": "no billing change in this release" },
   "rollback": {
     "priorVersionIdentified": "PASS",
-    "additiveMigrations": "PASS",
+    "migrationPosture": {
+      "status": "PASS",
+      "classification": "NON_ADDITIVE_WITH_ROLLBACK_PLAN",
+      "summary": "Owner-only Pheno hardening included a documented policy removal.",
+      "exceptions": [
+        {
+          "migration": "20260709180000_pheno_hunts_owner_only_and_stress_scale_index.sql",
+          "changeType": "DROP_POLICY",
+          "scope": "public.pheno_hunts",
+          "description": "Removed the operator SELECT and UPDATE policies (\"Operators view all pheno_hunts\", \"Operators update all pheno_hunts\").",
+          "impact": "Operator cross-tenant access removed; owner SELECT access unchanged.",
+          "rollbackProcedure": "Recreate the two operator policies from repository history only if operator access must be restored."
+        }
+      ]
+    },
     "entryPointDisable": "PASS",
     "ownerReadPreserved": "PASS"
   },
@@ -136,8 +150,13 @@ a manual FAIL beats an automated PASS).
 5. Live smoke PASS with **zero failed and zero skipped** tests.
 6. All 12 checkpoints PASS (automated proof or recorded manual evidence).
 7. Billing disposition resolved.
-8. Rollback readiness complete (prior version identified, additive
-   migrations, entry-point disable path, owner read preserved).
+8. Rollback readiness complete: prior version identified, structured
+   migration rollback posture (`ADDITIVE` with no exceptions, or
+   `NON_ADDITIVE_WITH_ROLLBACK_PLAN` with a complete rollback procedure for
+   every exception), entry-point disable path, owner read preserved. The
+   legacy `additiveMigrations` boolean can no longer authorize GO — it
+   masked non-additive policy removals such as the intentional
+   `20260709180000` owner-only hardening.
 
 Anything less is HOLD. `--allow-partial` refreshes a HOLD receipt but can
 never mint GO — a full `release:pheno:receipt` run must confirm it.

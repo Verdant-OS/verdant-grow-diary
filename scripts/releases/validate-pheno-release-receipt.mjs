@@ -23,7 +23,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { parseArgs, renderReceipt } from "./write-pheno-release-receipt.mjs";
+import {
+  evaluateMigrationPosture,
+  parseArgs,
+  renderReceipt,
+} from "./write-pheno-release-receipt.mjs";
 
 function readJson(file) {
   if (!fs.existsSync(file)) return null;
@@ -36,7 +40,12 @@ function isPass(value) {
 
 /**
  * Pure validation over the four artifacts plus the written receipt text.
- * Returns { decision: "GO"|"HOLD", exitCode, problems: string[] }.
+ * Returns { decision: "GO"|"HOLD"|"FAIL", exitCode, problems: string[] }.
+ *
+ * Exit codes:
+ *   0 = GO validated
+ *   1 = malformed, contradictory, or stale evidence
+ *   2 = HOLD — structured evidence missing or decision is not GO
  */
 export function validateReceipt({ smoke, schema, build, manual, receiptText }) {
   const problems = [];
@@ -53,6 +62,31 @@ export function validateReceipt({ smoke, schema, build, manual, receiptText }) {
   }
   if (problems.length > 0) return { decision: "HOLD", exitCode: 2, problems };
 
+  const posture = evaluateMigrationPosture(manual?.rollback);
+  const legacyOnly = posture.classification === "LEGACY_ADDITIVE_FIELD";
+
+  // Structured contract must exist before anything else. Legacy-only → HOLD (2).
+  if (legacyOnly) {
+    return {
+      decision: "HOLD",
+      exitCode: 2,
+      problems: [
+        "structured migration posture evidence required (legacy rollback.additiveMigrations cannot authorize GO)",
+      ],
+    };
+  }
+
+  // A malformed structured posture (contradictions, missing exception fields,
+  // unknown classification) is a hard FAIL, not a HOLD — the evidence is
+  // internally broken and must be corrected, not just waited on.
+  if (!posture.pass && posture.problems.length > 0 && manual?.rollback?.migrationPosture) {
+    return {
+      decision: "FAIL",
+      exitCode: 1,
+      problems: posture.problems.map((p) => `migrationPosture: ${p}`),
+    };
+  }
+
   const rendered = renderReceipt({ smoke, schema, build, manual });
 
   // The written receipt must reflect the same decision the evidence produces.
@@ -62,6 +96,32 @@ export function validateReceipt({ smoke, schema, build, manual, receiptText }) {
       exitCode: 1,
       problems: [
         `receipt file is stale: it does not record the evidence-derived decision (${rendered.decision}) — re-run the receipt writer`,
+      ],
+    };
+  }
+
+  // A written receipt must not carry the legacy unqualified additive claim
+  // once we've moved to structured posture — that wording is factually
+  // incorrect for non-additive releases.
+  if (receiptText.includes("Additive migrations confirmed backward-compatible")) {
+    return {
+      decision: "FAIL",
+      exitCode: 1,
+      problems: [
+        "receipt contains stale unqualified additive-migrations claim; re-run writer to render structured migration posture",
+      ],
+    };
+  }
+
+  // If the receipt claims a classification, it must match the artifact.
+  const artifactClassification = posture.classification;
+  const receiptClassificationMatch = receiptText.match(/Migration classification: ([A-Z_]+)/);
+  if (receiptClassificationMatch && receiptClassificationMatch[1] !== artifactClassification) {
+    return {
+      decision: "FAIL",
+      exitCode: 1,
+      problems: [
+        `receipt/evidence contradiction: receipt classification ${receiptClassificationMatch[1]} vs artifact ${artifactClassification}`,
       ],
     };
   }

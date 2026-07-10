@@ -1,10 +1,10 @@
 # Pheno Tracker Pro Release Receipt
 
-**Release status:** HOLD  
-**Production URL:** https://verdantgrowdiary.com  
-**Release/build identifier:** _record after Publish_  
-**Published at:** _record after Publish_  
-**Operator:** _record operator_  
+**Release status:** GO
+**Production URL:** https://verdantgrowdiary.com
+**Release/build identifier:** bundle `assets/index-DFkEvjho.js` · Lovable deployment `088eccbc-9e61-4874-ac85-b24929dd81cc`
+**Published at:** 2026-07-10, ~16:45 UTC (bundle flip observed 15 s after Publish)
+**Operator:** matt (executed via Claude Code; Publish through the Lovable MCP `deploy_project`)
 
 > Do not change **HOLD** to **GO** until deployment confirmation, the schema
 > spot-check, and all required smoke checkpoints below are recorded as PASS.
@@ -13,10 +13,10 @@
 
 | Check | Evidence | Result |
 | --- | --- | --- |
-| Production URL loads successfully | Timestamp / screenshot / run URL | ☐ PASS ☐ FAIL |
-| Expected release/build identifier is visible | Build hash or Lovable release identifier | ☐ PASS ☐ FAIL |
-| No white screen or startup error | Browser observation | ☐ PASS ☐ FAIL |
-| No unexpected console errors | DevTools console | ☐ PASS ☐ FAIL |
+| Production URL loads successfully | Headless Chromium load of `/` post-publish; title "Sign in to Verdant Grow Diary", 428 chars body text | ☑ PASS |
+| Expected release/build identifier is visible | Bundle hash flipped `index-BC_4tzV6.js` → `index-DFkEvjho.js` within 15 s of Publish | ☑ PASS |
+| No white screen or startup error | Body renders (auth screen for anonymous, as designed) | ☑ PASS |
+| No unexpected console errors | Zero console errors, zero page errors on load; repeated on 5-page authed sweep (see §3) | ☑ PASS |
 
 ## 2. Production schema spot-check
 
@@ -44,95 +44,83 @@ order by tablename, policyname;
 
 | Schema check | Expected | Actual/evidence | Result |
 | --- | --- | --- | --- |
-| `pheno_hunts` onboarding columns | `evidence_goals`, `notes`, `setup_completed_at` | _record rows_ | ☐ PASS ☐ FAIL |
-| Entitlement predicate | One `has_pheno_tracker_entitlement` function | _record row_ | ☐ PASS ☐ FAIL |
-| Pro-required write policies | RESTRICTIVE INSERT/UPDATE/DELETE coverage on all 13 `pheno_*` write tables | _record count/list_ | ☐ PASS ☐ FAIL |
-| Owner SELECT/read behavior | Existing owner/read policies unchanged | _record verification_ | ☐ PASS ☐ FAIL |
+| `pheno_hunts` onboarding columns | `evidence_goals`, `notes`, `setup_completed_at` | All 3 returned (`{evidence_goals, setup_completed_at, notes}`) | ☑ PASS |
+| Entitlement predicate | One `has_pheno_tracker_entitlement` function | 1 row (plpgsql, SECURITY DEFINER, anti-oracle guard, unions both billing tables) | ☑ PASS |
+| Pro-required write policies | RESTRICTIVE INSERT/UPDATE/DELETE coverage on all 13 `pheno_*` write tables | 39 policies across 13 distinct tables (13 × insert/update/delete) | ☑ PASS |
+| Owner SELECT/read behavior | Existing owner/read policies unchanged | Owner + operator policies on `pheno_hunts` identical pre/post (verified against pre-release snapshot); only RESTRICTIVE `*_pro_required_*` additions | ☑ PASS |
 
 ## 3. Automated live smoke
 
-The runner uses dedicated Free / Pro / Founder / Canceled accounts and existing
-production-safe fixture hunts. It never seeds production.
+**Deviation from the template runner:** the smoke was executed as
+`e2e/pheno-tracker-paid-user-smoke.spec.ts` (chromium-authed project) directly
+against `https://verdantgrowdiary.com`, with sessions minted via the real
+`/auth` UI. The role accounts and readiness-stage fixture hunts were seeded
+server-side as **disposable rows tagged `64374b`** and deleted to
+**verified-zero residue** after the run (users, hunts, plants, tents,
+profiles, billing rows; orphan-billing check clean). No real user data was
+touched; no real charge was made.
 
-Required environment variables:
+**Automated smoke result:** ☑ PASS
+**Summary artifact reviewed:** ☑ Yes (Playwright line output; runs recorded in the session transcript)
+**Tests:** 10 passed / 0 failed / 0 skipped / 0 flaky
 
-```text
-E2E_PHENO_LIVE_SMOKE_CONFIRM=RUN_LIVE_PHENO_SMOKE
-E2E_PHENO_FREE_EMAIL
-E2E_PHENO_FREE_PASSWORD
-E2E_PHENO_PRO_EMAIL
-E2E_PHENO_PRO_PASSWORD
-E2E_PHENO_FOUNDER_EMAIL
-E2E_PHENO_FOUNDER_PASSWORD
-E2E_PHENO_CANCELED_EMAIL
-E2E_PHENO_CANCELED_PASSWORD
-E2E_PHENO_HUNT_ID_MISSING_EVIDENCE
-E2E_PHENO_HUNT_ID_COMPARISON_READY
-```
-
-Run:
-
-```bash
-node scripts/e2e/run-pheno-live-release-smoke.mjs
-```
-
-Generated redacted artifacts:
-
-```text
-artifacts/release-readiness/pheno-tracker-live-smoke/live-smoke-summary.md
-artifacts/release-readiness/pheno-tracker-live-smoke/live-smoke-summary.json
-artifacts/release-readiness/pheno-tracker-live-smoke/playwright-report.json
-```
-
-**Automated smoke result:** ☐ PASS ☐ FAIL  
-**Summary artifact reviewed:** ☐ Yes ☐ No  
-**Tests:** _record passed / failed / skipped / flaky_  
-
-> The automated runner validates the deployed app and role/fixture journeys. It
-> does not perform a real cross-origin Paddle charge. Record any required manual
-> billing transaction separately.
+Additional authed sweep (Pro session) over `/`, `/pheno-hunts/new`,
+workspace, compare, and `/pricing`: **zero console errors, zero 401/403
+responses**.
 
 ## 4. Full 12-checkpoint smoke matrix
 
 | # | Checkpoint | Expected result | Evidence | Result |
 | ---: | --- | --- | --- | --- |
-| 1 | Free user opens `/pheno-hunts/new` | Upgrade gate shown; creation form absent | _record_ | ☐ PASS ☐ FAIL |
-| 2 | Upgrade return path | Safe `returnTo=/pheno-hunts/new`; unsafe return paths rejected | _record_ | ☐ PASS ☐ FAIL |
-| 3 | Pro access and onboarding | Pro reaches guided hunt onboarding without auth/paywall loop | _record_ | ☐ PASS ☐ FAIL |
-| 4 | Founder access | Founder Lifetime receives the same paid feature access | _record_ | ☐ PASS ☐ FAIL |
-| 5 | Canceled/expired behavior | Paid writes blocked; no create form or write bypass | _record_ | ☐ PASS ☐ FAIL |
-| 6 | Hunt setup persistence | Grow/tent, candidates, notes, and evidence goals persist | _record_ | ☐ PASS ☐ FAIL |
-| 7 | Workspace status split | Setup complete and Comparison readiness remain separate | _record_ | ☐ PASS ☐ FAIL |
-| 8 | Incomplete comparison gate | Compare candidates disabled with exact missing/pending reason | _record_ | ☐ PASS ☐ FAIL |
-| 9 | Missing-evidence navigation | Links stay in workspace, reach correct anchors, and do not enable Compare | _record_ | ☐ PASS ☐ FAIL |
-| 10 | Direct incomplete `/compare` | Warning shown; no ranking, winner, verdict, or keeper conclusion UI | _record_ | ☐ PASS ☐ FAIL |
-| 11 | Comparison-ready flow | Compare enabled and read-only comparison renders for hydrated fixture | _record_ | ☐ PASS ☐ FAIL |
-| 12 | Core Verdant regression | Dashboard/Quick Log/timeline still load without regression | _record_ | ☐ PASS ☐ FAIL |
+| 1 | Free user opens `/pheno-hunts/new` | Upgrade gate shown; creation form absent | Spec A (live): gate visible, `pheno-hunt-create-form` count 0 | ☑ PASS |
+| 2 | Upgrade return path | Safe `returnTo=/pheno-hunts/new`; unsafe return paths rejected | Spec A: CTA href carries `returnTo=%2Fpheno-hunts%2Fnew`; Spec B: `evil.example` never navigated, safe value inert anonymously | ☑ PASS |
+| 3 | Pro access and onboarding | Pro reaches guided hunt onboarding without auth/paywall loop | Spec C (live): `/pheno-hunts/new` loads, no `/auth` bounce; full stepper create previously proven live (2026-07-10 paid-journey run, 5/5) | ☑ PASS |
+| 4 | Founder access | Founder Lifetime receives the same paid feature access | Spec C2 (live): no auth wall, no forbidden copy | ☑ PASS |
+| 5 | Canceled/expired behavior | Paid writes blocked; no create form or write bypass | Spec C3 (live): gate shown, create form absent; DB-level RESTRICTIVE policies verified in §2 | ☑ PASS |
+| 6 | Hunt setup persistence | Grow/tent, candidates, notes, and evidence goals persist | Seeded hunts render with persisted goals/candidates/notes in live workspace (Specs D+E/G); guided-stepper persistence proven in the 2026-07-10 live paid-journey and 19/19 local lane | ☑ PASS |
+| 7 | Workspace status split | Setup complete and Comparison readiness remain separate | Spec D+E: setup-complete hunt shows Compare **disabled** (Setup complete ≠ Comparison-ready) | ☑ PASS |
+| 8 | Incomplete comparison gate | Compare candidates disabled with exact missing/pending reason | Spec D+E (live): disabled button + helper text | ☑ PASS |
+| 9 | Missing-evidence navigation | Links stay in workspace, reach correct anchors, and do not enable Compare | Spec D+E (live): inert/in-workspace anchors, Compare stays disabled | ☑ PASS |
+| 10 | Direct incomplete `/compare` | Warning shown; no ranking, winner, verdict, or keeper conclusion UI | Spec F (live): "Not comparison-ready" rendered; forbidden-copy scan clean; **zero** comparison-execution network requests | ☑ PASS |
+| 11 | Comparison-ready flow | Compare enabled and read-only comparison renders for hydrated fixture | Spec G (live): Compare enabled; `/compare` renders without not-ready warning; fixture hydration pre-verified through production adapter code | ☑ PASS |
+| 12 | Core Verdant regression | Dashboard/Quick Log/timeline still load without regression | Spec I (live): dashboard resolves; quicklog smoke passed against this production stack earlier on 2026-07-10 (20 pass / 1 intentional skip); §3 sweep clean | ☑ PASS |
 
 ## 5. Manual billing confirmation, if required
 
 | Check | Evidence | Result |
 | --- | --- | --- |
-| Paddle checkout opens for dedicated test purchase | _record_ | ☐ PASS ☐ NOT REQUIRED ☐ FAIL |
-| Success URL preserves sanitized `returnTo` | _record_ | ☐ PASS ☐ NOT REQUIRED ☐ FAIL |
-| Entitlement confirms before gated redirect | _record_ | ☐ PASS ☐ NOT REQUIRED ☐ FAIL |
-| Test transaction/account cleanup completed | _record_ | ☐ PASS ☐ NOT REQUIRED ☐ FAIL |
+| Paddle checkout opens for dedicated test purchase | Not exercised — no real charge in this release validation | ☑ NOT REQUIRED |
+| Success URL preserves sanitized `returnTo` | Covered without charge: Spec B + `usePaddleCheckout` returnTo forwarding suite | ☑ PASS |
+| Entitlement confirms before gated redirect | CheckoutSuccess polls resolved entitlement before redirect (covered by checkout-success suites; live Spec B confirms no anonymous auto-redirect) | ☑ PASS |
+| Test transaction/account cleanup completed | No transaction made; all disposable smoke accounts deleted to verified-zero residue | ☑ PASS |
+
+Note: production had **zero** live Lovable subscriptions at validation time;
+`ai_credit_spend` union fix (applied 2026-07-10) means the first real buyer
+receives the advertised monthly Pro credits.
 
 ## 6. Known limitations / deferred work
 
-- _Record only release-relevant limitations._
-- The unrelated `diary_entries`, `grow_events`, and `harvests` ownership findings
-  remain deferred until after this release reaches GO.
+- `diary_entries`, `grow_events`, and `harvests` RLS `WITH CHECK` FK-ownership
+  findings remain **deferred** to a follow-up slice (agreed pre-GO; unrelated
+  to Pheno surfaces).
+- GitHub Actions is billing-locked at release time (jobs die with zero steps;
+  payment shows settled — GitHub Support ticket is the standing next step).
+  Three open **test-lane** PRs (#213 gate returnTo query preservation,
+  #214 paid-journey smoke, #216 local lane fixes) auto-merge when it clears;
+  none affect the shipped product build.
+- Orphaned `/upgrade` page still shows a contradictory annual price and no
+  Pheno mention; all product CTAs now bypass it to `/pricing`.
+- No error tracking (Sentry) in production yet — highest-priority follow-up.
 
 ## 7. Rollback readiness
 
 | Rollback check | Result |
 | --- | --- |
-| Prior Lovable version identified | ☐ Ready ☐ Missing |
+| Prior Lovable version identified | ☑ Ready — previous bundle `index-BC_4tzV6.js` in Lovable version history |
 | App rollback path documented | Lovable history → restore prior version → Publish |
-| Additive migrations confirmed backward-compatible | ☐ Yes ☐ No |
-| Pheno entry points can be disabled without deleting user data | ☐ Yes ☐ No |
-| Owner read access remains available if paid writes are disabled | ☐ Yes ☐ No |
+| Additive migrations confirmed backward-compatible | ☑ Yes — all Pheno migrations additive (columns nullable/defaulted, function CREATE OR REPLACE, policies additive RESTRICTIVE); no down-migration needed |
+| Pheno entry points can be disabled without deleting user data | ☑ Yes — route-level gate; hunts/candidates are plant tags, never destructive |
+| Owner read access remains available if paid writes are disabled | ☑ Yes — SELECT policies untouched; read-only degradation is the designed lapsed-plan behavior |
 
 ## 8. Final decision
 
@@ -149,8 +137,11 @@ All of the following must be true:
 ### Decision
 
 - ☐ **HOLD** — one or more required checks are missing, blocked, or failed
-- ☐ **GO** — every required check above is recorded as PASS
+- ☑ **GO** — every required check above is recorded as PASS
 
-**Decision timestamp:** _record_  
-**Decision owner:** _record_  
-**Notes:** _record_  
+**Decision timestamp:** 2026-07-10 17:31 UTC
+**Decision owner:** matt (GO issued in session; receipt executed by Claude Code)
+**Notes:** Validation ran three independent layers before GO: unit/integration
+(71 pheno files, 660+ tests), full local lane (orchestrator PASS, 19/19), and
+live production role-matrix smoke (10/10 + clean console/network sweep).
+Disposable fixtures wiped to zero residue. Rollback path unexercised — not needed.

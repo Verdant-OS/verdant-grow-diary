@@ -173,10 +173,12 @@ Scripts:
   - `e2e/.auth/pheno-pro.json` + `.session-storage.json`
   - `e2e/.auth/pheno-founder.json` + `.session-storage.json`
   - `e2e/.auth/pheno-canceled.json` + `.session-storage.json`
-- `bun run test:pheno-paid-smoke:seed` — **currently BLOCKED**. See the
-  header of `scripts/e2e/seed-pheno-paid-smoke-fixtures.mjs` for the
-  exact list of comparison-readiness source tables that still need
-  confirmation before this script can safely write fixtures.
+- `bun run test:pheno-paid-smoke:seed` — seeds pheno fixtures against a
+  **local** Supabase (refuses hosted hosts). Produces missing-evidence,
+  pending-harvest, pending-cure, and comparison-ready hunts by writing
+  real evidence into `pheno_candidate_scores`, `pheno_smoke_tests`, and
+  `pheno_lab_results`. Writes ids to `e2e/.fixtures/pheno-paid-smoke.env`
+  (gitignored). See `docs/pheno-paid-smoke-local-setup.md`.
 - `bun run test:pheno-paid-smoke` — runs preflight, then the paid-user
   Playwright smoke. Every scenario is env-gated; missing inputs skip
   cleanly with a reason.

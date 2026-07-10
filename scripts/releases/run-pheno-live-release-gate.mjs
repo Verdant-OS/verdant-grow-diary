@@ -341,11 +341,40 @@ export async function runGate(deps) {
     if (!billingResolved) manualProblems.push("billing disposition unresolved");
     for (const [key, label] of [
       ["priorVersionIdentified", "rollback: prior version"],
-      ["additiveMigrations", "rollback: additive migrations"],
       ["entryPointDisable", "rollback: entry-point disable"],
       ["ownerReadPreserved", "rollback: owner read preserved"],
     ]) {
       if (!isPass(manual.rollback?.[key])) manualProblems.push(`${label} missing`);
+    }
+    // Structured migration posture replaces the legacy additiveMigrations
+    // boolean — legacy-only evidence can never authorize GO.
+    const posture = manual.rollback?.migrationPosture;
+    if (!posture) {
+      manualProblems.push(
+        "rollback.migrationPosture missing (structured migration posture required; legacy additiveMigrations cannot authorize GO)",
+      );
+    } else {
+      const pStatus = String(posture.status ?? "").toUpperCase();
+      const pClass = String(posture.classification ?? "").toUpperCase();
+      const exceptions = Array.isArray(posture.exceptions) ? posture.exceptions : [];
+      if (pStatus !== "PASS") manualProblems.push(`migrationPosture.status must be PASS (got ${pStatus || "empty"})`);
+      if (!["ADDITIVE", "NON_ADDITIVE_WITH_ROLLBACK_PLAN"].includes(pClass)) {
+        manualProblems.push(`migrationPosture.classification unsupported (${pClass || "empty"})`);
+      }
+      if (pClass === "ADDITIVE" && exceptions.length > 0) {
+        manualProblems.push("ADDITIVE migrationPosture must not carry exceptions");
+      }
+      if (pClass === "NON_ADDITIVE_WITH_ROLLBACK_PLAN" && exceptions.length === 0) {
+        manualProblems.push("NON_ADDITIVE_WITH_ROLLBACK_PLAN requires at least one exception");
+      }
+      for (const [idx, ex] of exceptions.entries()) {
+        for (const field of ["migration", "changeType", "scope", "description", "impact", "rollbackProcedure"]) {
+          const v = ex?.[field];
+          if (typeof v !== "string" || v.trim().length === 0) {
+            manualProblems.push(`migrationPosture.exceptions[${idx}] missing ${field}`);
+          }
+        }
+      }
     }
     if (!String(manual.operator ?? "").trim()) manualProblems.push("operator missing");
     if (!String(manual.publishedAt ?? "").trim()) manualProblems.push("publish timestamp missing");

@@ -61,10 +61,12 @@ import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import PhenoTrackerPreviewCard from "@/components/PhenoTrackerPreviewCard";
 import { logsPath } from "@/lib/routes";
 import { resolvePaddleConfig, unavailableMessage, type PaddleConfig } from "@/lib/paddleConfig";
+import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 
 // --- Paddle overlay typing (loose — we only call a couple of methods). -------
 interface PaddleCheckoutOpenPayload {
   items: Array<{ priceId: string; quantity: number }>;
+  settings?: { successUrl?: string };
   successCallback?: () => void;
   closeCallback?: () => void;
 }

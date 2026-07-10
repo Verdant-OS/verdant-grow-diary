@@ -103,10 +103,26 @@ function mountAt(input: ScenarioInput) {
   });
   return render(
     <MemoryRouter initialEntries={[`/pheno-hunts/${HUNT_ID}/workspace`]}>
+      <LocationProbe />
       <Routes>
         <Route path="/pheno-hunts/:id/workspace" element={<PhenoHuntWorkspace />} />
+        <Route
+          path="/pheno-hunts/:id/compare"
+          element={<div data-testid="stub-compare-page">stub compare</div>}
+        />
       </Routes>
     </MemoryRouter>,
+  );
+}
+
+function LocationProbe() {
+  const loc = useLocation();
+  return <div data-testid="current-location" data-pathname={loc.pathname} />;
+}
+
+function currentPath(): string {
+  return (
+    screen.getByTestId("current-location").getAttribute("data-pathname") ?? ""
   );
 }
 

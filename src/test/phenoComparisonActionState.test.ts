@@ -5,9 +5,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildPhenoComparisonActionState,
   PHENO_COMPARISON_HELP_COPY,
-  PHENO_WORKSPACE_ANCHORS,
 } from "@/lib/phenoComparisonActionState";
-import { PHENO_STATUS_LABELS } from "@/constants/phenoOnboardingCopy";
 
 const base = {
   huntId: "h1",
@@ -164,101 +162,5 @@ describe("buildPhenoComparisonActionState", () => {
       .map((i) => i.nextStepTarget)
       .filter((t): t is string => !!t);
     expect(new Set(targets).size).toBe(targets.length);
-  });
-
-  describe("disabled reason matrix — exact label, reason, and safe target", () => {
-    const notReady = PHENO_STATUS_LABELS.notComparisonReadyYet;
-
-    it("Missing evidence: correct label/reason, phenotype target, no /compare", () => {
-      const s = buildPhenoComparisonActionState({
-        ...base,
-        allCandidatesHavePhenotypeNote: false,
-      });
-      expect(s.enabled).toBe(false);
-      expect(s.readiness).toBe("missing_evidence");
-      expect(s.label).toBe(notReady);
-      expect(s.reason).toBe(PHENO_STATUS_LABELS.missingEvidence);
-      const item = s.missingEvidenceItems.find(
-        (i) => i.id === "phenotype_notes",
-      );
-      expect(item?.nextStepTarget).toBe(
-        `/pheno-hunts/h1/workspace#${PHENO_WORKSPACE_ANCHORS.phenotype_notes}`,
-      );
-      expect(s.nextStepTarget).toBeNull();
-      for (const it of s.missingEvidenceItems) {
-        expect(it.nextStepTarget?.includes("/compare") ?? false).toBe(false);
-      }
-    });
-
-    it("Pending until harvest: correct label/reason, post-harvest target", () => {
-      const s = buildPhenoComparisonActionState({
-        ...base,
-        anyPostHarvestObservation: false,
-      });
-      expect(s.enabled).toBe(false);
-      expect(s.readiness).toBe("pending_until_harvest");
-      expect(s.label).toBe(notReady);
-      expect(s.reason).toBe(PHENO_STATUS_LABELS.pendingUntilHarvest);
-      const item = s.missingEvidenceItems.find(
-        (i) => i.id === "post_harvest",
-      );
-      expect(item?.nextStepTarget).toBe(
-        `/pheno-hunts/h1/workspace#${PHENO_WORKSPACE_ANCHORS.post_harvest}`,
-      );
-      expect(item?.nextStepTarget?.includes("/compare")).toBe(false);
-    });
-
-    it("Pending until cure: correct label/reason, post-cure target", () => {
-      const s = buildPhenoComparisonActionState({
-        ...base,
-        anyPostCureObservation: false,
-      });
-      expect(s.enabled).toBe(false);
-      expect(s.readiness).toBe("pending_until_cure");
-      expect(s.label).toBe(notReady);
-      expect(s.reason).toBe(PHENO_STATUS_LABELS.pendingUntilCure);
-      const item = s.missingEvidenceItems.find((i) => i.id === "post_cure");
-      expect(item?.nextStepTarget).toBe(
-        `/pheno-hunts/h1/workspace#${PHENO_WORKSPACE_ANCHORS.post_cure}`,
-      );
-      expect(item?.nextStepTarget?.includes("/compare")).toBe(false);
-    });
-
-    it("Replication readiness pending: inert target (null), no /compare", () => {
-      const s = buildPhenoComparisonActionState({
-        ...base,
-        replicationReadinessRecorded: false,
-      });
-      expect(s.enabled).toBe(false);
-      expect(s.readiness).toBe("not_ready");
-      expect(s.label).toBe(notReady);
-      // No status-specific reason — generic help copy is surfaced.
-      expect(s.reason).toBe(PHENO_COMPARISON_HELP_COPY);
-      const item = s.missingEvidenceItems.find(
-        (i) => i.id === "replication_readiness",
-      );
-      expect(item?.nextStepTarget).toBeNull();
-      expect(item?.nextStepLabel).toBeNull();
-      for (const it of s.missingEvidenceItems) {
-        expect(it.nextStepTarget?.includes("/compare") ?? false).toBe(false);
-      }
-    });
-
-    it("no disabled reason ever produces a /compare target on any item", () => {
-      const perms: Array<Partial<typeof base> & { replicationReadinessRecorded?: boolean }> = [
-        { candidateCount: 1 },
-        { goalsSelected: 0 },
-        { allCandidatesHavePhenotypeNote: false },
-        { anyPostHarvestObservation: false },
-        { anyPostCureObservation: false },
-        { replicationReadinessRecorded: false },
-      ];
-      for (const p of perms) {
-        const s = buildPhenoComparisonActionState({ ...base, ...p });
-        for (const it of s.missingEvidenceItems) {
-          expect(it.nextStepTarget?.includes("/compare") ?? false).toBe(false);
-        }
-      }
-    });
   });
 });

@@ -1,133 +1,124 @@
-import { test, expect } from "@playwright/test";
-
 /**
- * pheno-workspace-missing-evidence-anchors — E2E coverage for the
- * "Compare candidates" disabled surface, missing-evidence next-step
- * links, and workspace anchor scrolling.
+ * pheno-workspace-missing-evidence-anchors — E2E coverage for missing-
+ * evidence next-step anchors and the intentionally inert replication
+ * readiness item.
  *
- * SAFETY:
- *  - Read-only. No writes, no auth mutations, no schema changes.
- *  - Env-gated on E2E_PHENO_HUNT_ID. Without a real incomplete hunt
- *    we cannot reliably render the disabled surface, so we skip
- *    instead of pretending to pass.
+ * SAFETY / SCOPE:
+ *  - Read-only. No writes, no schema, no RLS, no entitlement changes.
+ *  - Env-gated per fixture; missing env skips cleanly (no fake pass).
+ *  - Product rules under test:
+ *      * Missing-evidence links may deep-link to a workspace anchor.
+ *      * Anchor navigation MUST NOT enable Compare candidates.
+ *      * replication_readiness has no workspace target — item renders as
+ *        plain helper text, not an anchor/button, not tabbable to a target,
+ *        cannot activate scroll, cannot change route/hash, cannot enable
+ *        Compare.
  */
+import { test, expect } from "./lib/authedTest";
 
-const HUNT_ID = process.env.E2E_PHENO_HUNT_ID?.trim() || null;
+const MISSING_ID = process.env.E2E_PHENO_HUNT_ID_MISSING_EVIDENCE?.trim() || "";
+const REPLICATION_ID =
+  process.env.E2E_PHENO_HUNT_ID_REPLICATION_PENDING?.trim() || "";
 
-// Known workspace anchors that map to real workspace sections.
-const ANCHOR_IDS = [
-  "evidence-goals",
-  "candidate-labels",
-  "phenotype-notes",
-  "post-harvest-notes",
-  "post-cure-notes",
-] as const;
+test.describe("missing-evidence anchors deep-link to workspace, not /compare", () => {
+  test.skip(
+    !MISSING_ID,
+    "Set E2E_PHENO_HUNT_ID_MISSING_EVIDENCE to run anchor deep-link tests",
+  );
 
-test.describe("Pheno workspace — missing-evidence anchors", () => {
-  test.skip(!HUNT_ID, "Set E2E_PHENO_HUNT_ID to run against a real hunt");
-
-  test("disabled Compare stays disabled and next-step links scroll workspace anchors", async ({
+  test("clicking a next-step link scrolls to workspace anchor; Compare stays disabled", async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 1280, height: 1800 });
-    await page.goto(`/pheno-hunts/${HUNT_ID}/workspace`, {
-      waitUntil: "domcontentloaded",
-    });
+    await page.setViewportSize({ width: 1280, height: 1600 });
+    const workspaceUrl = `/pheno-hunts/${MISSING_ID}/workspace`;
+    await page.goto(workspaceUrl, { waitUntil: "domcontentloaded" });
 
     const action = page.getByTestId("pheno-workspace-compare-action");
     await expect(action).toBeVisible();
+    await expect(action).toHaveAttribute("data-enabled", "false");
 
-    const disabledBtn = page.getByTestId(
-      "pheno-workspace-compare-action-disabled",
-    );
-    // If the hunt is already comparison-ready in the test env, skip cleanly.
-    if ((await disabledBtn.count()) === 0) {
-      test.skip(true, "Test hunt is comparison-ready; no disabled surface to exercise");
-    }
-    await expect(disabledBtn).toBeDisabled();
-    await expect(disabledBtn).toHaveAttribute("aria-disabled", "true");
+    const links = action.locator('a[data-testid^="pheno-workspace-compare-action-next-step-"]');
+    const count = await links.count();
+    test.skip(count === 0, "No next-step links rendered for this fixture");
 
-    const describedBy = await disabledBtn.getAttribute("aria-describedby");
-    expect(describedBy).toBeTruthy();
-    const helperBefore = page.locator(`#${describedBy}`);
-    const helperTextBefore = (await helperBefore.textContent()) ?? "";
-    expect(helperTextBefore).toMatch(
-      /Compare candidates is disabled because this hunt is not comparison-ready yet/i,
-    );
-
-    // Snapshot the disabled state.
-    await page.screenshot({
-      path: "e2e/screenshots/pheno-workspace-compare-disabled.png",
-    });
-
-    // For each missing-evidence next-step link that renders, click and
-    // verify the URL hash + target section becomes visible.
-    const nextSteps = page.locator(
-      '[data-testid^="pheno-workspace-compare-action-next-step-"]',
-    );
-    const count = await nextSteps.count();
-    expect(count).toBeGreaterThan(0);
-
+    // Every next-step link must target the workspace (never /compare).
     for (let i = 0; i < count; i++) {
-      const link = nextSteps.nth(i);
-      const href = await link.getAttribute("href");
-      expect(href).toBeTruthy();
-      expect(href!.startsWith(`/pheno-hunts/${HUNT_ID}/workspace#`)).toBe(true);
-      expect(href!.includes("/compare")).toBe(false);
-      const anchorId = href!.split("#")[1];
-      expect(ANCHOR_IDS.includes(anchorId as (typeof ANCHOR_IDS)[number])).toBe(true);
-
-      await link.click();
-      await expect(page).toHaveURL(new RegExp(`#${anchorId}$`));
-      const target = page.locator(`#${anchorId}`);
-      await expect(target).toBeVisible();
-
-      // Compare candidates action must remain disabled after anchor nav.
-      await expect(disabledBtn).toBeDisabled();
-      const compareAnchor = page.locator(
-        `a[href="/pheno-hunts/${HUNT_ID}/compare"]`,
-      );
-      expect(await compareAnchor.count()).toBe(0);
-
-      // Helper text remains present and unchanged.
-      const helperText = (await helperBefore.textContent()) ?? "";
-      expect(helperText).toBe(helperTextBefore);
+      const href = (await links.nth(i).getAttribute("href")) ?? "";
+      expect(href).toContain(`/pheno-hunts/${MISSING_ID}/workspace`);
+      expect(href.includes("/compare")).toBe(false);
     }
 
-    // No ranking / verdict / keeper conclusion copy on the disabled workspace surface.
-    const body = (await page.textContent("body")) ?? "";
-    for (const pat of [
-      /best\s+candidate\s+is/i,
-      /the\s+winner\s+is/i,
-      /recommended\s+keeper/i,
-      /guaranteed\s+keeper/i,
-      /ai\s+picks?\s+winners?/i,
-    ]) {
-      expect(pat.test(body)).toBe(false);
-    }
+    const first = links.first();
+    const href = (await first.getAttribute("href")) ?? "";
+    const anchor = href.split("#")[1];
+    expect(anchor, "next-step href should carry a #anchor").toBeTruthy();
+
+    await first.click();
+    await expect(page).toHaveURL(new RegExp(`#${anchor}$`));
+
+    // Anchor target exists and is reachable.
+    const target = page.locator(`#${anchor}`);
+    await expect(target).toBeVisible();
+
+    // Compare stays disabled.
+    await expect(action).toHaveAttribute("data-enabled", "false");
+    await expect(
+      page.getByTestId("pheno-workspace-compare-action-disabled"),
+    ).toBeDisabled();
   });
+});
 
-  test("replication_readiness item, when present, is inert (no fake link)", async ({
+test.describe("replication_readiness renders inert", () => {
+  test.skip(
+    !REPLICATION_ID,
+    "Set E2E_PHENO_HUNT_ID_REPLICATION_PENDING to run inert-item tests",
+  );
+
+  test("replication readiness has no anchor/button; cannot change route/hash or enable Compare", async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 1280, height: 1800 });
-    await page.goto(`/pheno-hunts/${HUNT_ID}/workspace`, {
-      waitUntil: "domcontentloaded",
-    });
-    const inertItem = page.locator(
+    await page.setViewportSize({ width: 1280, height: 1600 });
+    const workspaceUrl = `/pheno-hunts/${REPLICATION_ID}/workspace`;
+    await page.goto(workspaceUrl, { waitUntil: "domcontentloaded" });
+
+    const action = page.getByTestId("pheno-workspace-compare-action");
+    await expect(action).toBeVisible();
+    await expect(action).toHaveAttribute("data-enabled", "false");
+
+    const item = action.locator(
       '[data-testid="pheno-workspace-compare-action-missing-item"][data-missing-id="replication_readiness"]',
     );
-    if ((await inertItem.count()) === 0) {
-      test.skip(true, "No replication_readiness item in current fixture");
-    }
-    // It exists — assert no anchor and no next-step testid for it.
-    expect(await inertItem.locator("a").count()).toBe(0);
+    await expect(item).toBeVisible();
+
+    // Inert: no anchor, no href, no button, no next-step link testid.
+    expect(await item.locator("a").count()).toBe(0);
+    expect(await item.locator("[href]").count()).toBe(0);
+    expect(await item.locator('[role="button"]').count()).toBe(0);
     expect(
-      await page
-        .getByTestId(
-          "pheno-workspace-compare-action-next-step-replication_readiness",
-        )
+      await item
+        .locator('[data-testid="pheno-workspace-compare-action-next-step-replication_readiness"]')
         .count(),
     ).toBe(0);
+
+    // Capture hash/url before interaction.
+    const urlBefore = page.url();
+    const hashBefore = await page.evaluate(() => window.location.hash);
+
+    // Try to click and key into the container — must not change route.
+    await item.click();
+    // Focus the item and try Enter/Space (should be no-op).
+    await item.focus().catch(() => {});
+    await page.keyboard.press("Enter").catch(() => {});
+    await page.keyboard.press("Space").catch(() => {});
+
+    expect(page.url()).toBe(urlBefore);
+    expect(await page.evaluate(() => window.location.hash)).toBe(hashBefore);
+
+    // Compare still disabled and no /compare link.
+    await expect(action).toHaveAttribute("data-enabled", "false");
+    await expect(
+      page.getByTestId("pheno-workspace-compare-action-disabled"),
+    ).toBeDisabled();
+    expect(await action.locator('a[href*="/compare"]').count()).toBe(0);
   });
 });

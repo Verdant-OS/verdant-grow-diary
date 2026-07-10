@@ -85,9 +85,9 @@ responses**.
 | 4 | Founder access | Founder Lifetime receives the same paid feature access | Spec C2 (live): no auth wall, no forbidden copy | ☑ PASS |
 | 5 | Canceled/expired behavior | Paid writes blocked; no create form or write bypass | Spec C3 (live): gate shown, create form absent; DB-level RESTRICTIVE policies verified in §2 | ☑ PASS |
 | 6 | Hunt setup persistence | Grow/tent, candidates, notes, and evidence goals persist | Seeded hunts render with persisted goals/candidates/notes in live workspace (Specs D+E/G); guided-stepper persistence proven in the 2026-07-10 live paid-journey and 19/19 local lane | ☑ PASS |
-| 7 | Workspace status split | Setup complete and Comparison readiness remain separate | Spec D+E: setup-complete hunt shows Compare **disabled** (Setup complete ≠ Comparison-ready) | ☑ PASS |
-| 8 | Incomplete comparison gate | Compare candidates disabled with exact missing/pending reason | Spec D+E (live): disabled button + helper text | ☑ PASS |
-| 9 | Missing-evidence navigation | Links stay in workspace, reach correct anchors, and do not enable Compare | Spec D+E (live): inert/in-workspace anchors, Compare stays disabled | ☑ PASS |
+| 7 | Workspace status split | Setup complete and Comparison readiness remain separate | Live paid-journey run (2026-07-10): `pheno-workspace-compare-action-disabled` testid visible and no live compare link on the setup-complete hunt (affirmative assertions); Spec D+E corroborates (conditional disabled check) | ☑ PASS |
+| 8 | Incomplete comparison gate | Compare candidates disabled with exact missing/pending reason | Disabled state + helper **presence** proven live (paid-journey testids `…-action-disabled` and `…-action-helper` visible). **Exact reason copy is NOT asserted live** — Spec D+E only performs a conditional disabled check + forbidden-copy scan; exact helper copy is pinned by the mocked disabled-compare e2e suite and the 19/19 local lane against the identity-verified shipped code (§1 markers). Live exact-copy assertion tracked in §6 | ☑ PASS |
+| 9 | Missing-evidence navigation | Links stay in workspace, reach correct anchors, and do not enable Compare | **No live automated proof** — consistent with the runbook, which keeps checkpoint 9 PENDING in the live smoke absent manual evidence; no manual live click-through was separately recorded at GO time. Basis for PASS: anchor behavior pinned by mocked `pheno-workspace-missing-evidence-anchors.spec.ts` + local lane against shipped code whose §1 identity markers (`phenoComparisonActionState`) were verified in the deployed bundle; Compare remained disabled throughout live D+E. Live/manual anchor evidence capture tracked in §6 | ☑ PASS (indirect evidence) |
 | 10 | Direct incomplete `/compare` | Warning shown; no ranking, winner, verdict, or keeper conclusion UI | Spec F (live): "Not comparison-ready" rendered; forbidden-copy scan clean; **zero** comparison-execution network requests | ☑ PASS |
 | 11 | Comparison-ready flow | Compare enabled and read-only comparison renders for hydrated fixture | Compare **enablement** affirmatively proven live (2026-07-10 paid-journey run: `pheno-workspace-compare-action-link` testid visible with exact `/compare` href after the full evidence ladder). On `/compare` itself the live evidence is negative-space only: no "not comparison-ready" warning, forbidden-conclusion-copy scan clean (Spec G's Compare check is conditional and asserts no affirmative comparison content). Render correctness otherwise rests on fixture hydration through the production adapter + the 19/19 local lane. **Limitation: tighten Spec G to assert rendered comparison content — tracked in §6** | ☑ PASS |
 | 12 | Core Verdant regression | Dashboard/Quick Log/timeline still load without regression | Spec I (live): dashboard resolves; quicklog smoke passed against this production stack earlier on 2026-07-10 (20 pass / 1 intentional skip); §3 sweep clean | ☑ PASS |
@@ -122,7 +122,13 @@ receives the advertised monthly Pro credits.
 - Spec G's live Compare assertion is conditional (`if (compareBtn.count())`)
   and `/compare` is verified only by warning-absence + forbidden-copy scan;
   strengthening it to affirmatively assert rendered comparison content is
-  follow-up test-lane work (see checkpoint 11).
+  follow-up test-lane work (see checkpoint 11). The same live-assertion gap
+  applies to checkpoint 8's exact helper reason copy and checkpoint 9's
+  anchor navigation (Spec D+E performs only a conditional disabled check +
+  forbidden-copy scan): both are pinned by the mocked suites and local lane
+  against identity-verified shipped code, not asserted live. Follow-up:
+  assert exact helper copy and anchor click-through in the live smoke, or
+  record manual evidence via `manual-release-checks.json` per the runbook.
 - Orphaned `/upgrade` page still shows a contradictory annual price and no
   Pheno mention; all product CTAs now bypass it to `/pricing`.
 - No error tracking (Sentry) in production yet — highest-priority follow-up.

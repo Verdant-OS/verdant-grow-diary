@@ -103,16 +103,40 @@ describe("phenoHuntService", () => {
         client,
       );
       expect(res).toEqual({ huntId: "h1", taggedPlantIds: ["p1", "p2"] });
-      expect(huntInsert).toHaveBeenCalledWith({
-        grow_id: "g1",
-        tent_id: "t1",
-        name: "Hunt",
-        goal: null,
-      });
+      expect(huntInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          grow_id: "g1",
+          tent_id: "t1",
+          name: "Hunt",
+          evidence_goals: [],
+          notes: null,
+        }),
+      );
+      // Setup should NOT be auto-marked complete unless markSetupComplete=true.
+      expect(huntInsert.mock.calls[0][0]).not.toHaveProperty("setup_completed_at");
       expect(plantUpdates).toEqual([
         { id: "p1", values: { pheno_hunt_id: "h1", candidate_label: "#1" } },
         { id: "p2", values: { pheno_hunt_id: "h1", candidate_label: "#2" } },
       ]);
+    });
+
+    it("persists sanitized evidence goals and notes on the insert", async () => {
+      const { client, huntInsert } = makeClient({ huntId: "h1" });
+      await createPhenoHunt(
+        {
+          growId: "g1",
+          name: "Hunt",
+          plantIds: ["p1"],
+          evidenceGoals: ["structure", "aroma", "not-a-real-goal", "structure"],
+          notes: "  keep this  ",
+          markSetupComplete: true,
+        },
+        client,
+      );
+      const row = huntInsert.mock.calls[0][0] as Record<string, unknown>;
+      expect(row.evidence_goals).toEqual(["structure", "aroma"]);
+      expect(row.notes).toBe("keep this");
+      expect(typeof row.setup_completed_at).toBe("string");
     });
 
     it("honors label overrides when provided", async () => {

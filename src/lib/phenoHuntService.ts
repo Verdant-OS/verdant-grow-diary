@@ -11,15 +11,20 @@ export interface CreatePhenoHuntInput {
   growId: string;
   tentId?: string | null;
   name: string;
-  /**
-   * Grower-stated hunt goal, persisted on the hunt row so "continue setup"
-   * and the workspace Evidence Packet Map can restore it. Blank -> NULL.
-   */
-  goal?: string | null;
   /** Plant IDs to tag as candidates. Order determines default labels. */
   plantIds: readonly string[];
   /** Optional per-plant label overrides. */
   labels?: Readonly<Record<string, string>>;
+  /** Selected evidence goal ids captured during onboarding. */
+  evidenceGoals?: readonly string[];
+  /** Optional hunt notes captured during onboarding basics step. */
+  notes?: string | null;
+  /**
+   * When true, records `setup_completed_at = now()` on the created hunt.
+   * When false/undefined the hunt is created with setup still pending so the
+   * workspace shows a "Continue setup" progress card.
+   */
+  markSetupComplete?: boolean;
 }
 
 export interface CreatePhenoHuntResult {
@@ -66,6 +71,43 @@ export function validatePhenoHuntDraft(
   return errs;
 }
 
+/** Known evidence goal ids — mirrors phenoEvidenceGoals to avoid an import
+ * cycle in tests that stub the goals module. Sanitizer only allows short
+ * text keys and dedupes. */
+const KNOWN_EVIDENCE_GOAL_IDS = new Set([
+  "structure",
+  "vigor",
+  "aroma",
+  "resin",
+  "stretch",
+  "stress_resistance",
+  "disease_resistance",
+  "yield",
+  "post_harvest",
+  "post_cure",
+  "replication_readiness",
+  "keeper_decision",
+]);
+
+export function sanitizeEvidenceGoals(
+  input: readonly string[] | null | undefined,
+): string[] {
+  if (!input || !Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of input) {
+    if (typeof raw !== "string") continue;
+    const v = raw.trim();
+    if (!v || v.length > 64) continue;
+    if (!KNOWN_EVIDENCE_GOAL_IDS.has(v)) continue;
+    if (seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+    if (out.length >= 32) break;
+  }
+  return out;
+}
+
 export async function createPhenoHunt(
   input: CreatePhenoHuntInput,
   client: SupabaseClient = defaultClient,
@@ -77,16 +119,29 @@ export async function createPhenoHunt(
     throw new PhenoHuntError("Select at least one candidate plant.");
   }
 
-  const goal = input.goal?.trim() || null;
+  // Sanitize evidence goals into a bounded list of short text keys — never
+  // leak arbitrary client-supplied JSON into the DB. The DB check constraint
+  // also enforces jsonb array type, but this is the app-layer guard.
+  const evidenceGoals = sanitizeEvidenceGoals(input.evidenceGoals);
+  const trimmedNotes =
+    typeof input.notes === "string" && input.notes.trim().length > 0
+      ? input.notes.trim().slice(0, 4000)
+      : null;
+
+  const insertRow: Record<string, unknown> = {
+    grow_id: input.growId,
+    tent_id: input.tentId ?? null,
+    name,
+    evidence_goals: evidenceGoals,
+    notes: trimmedNotes,
+  };
+  if (input.markSetupComplete) {
+    insertRow.setup_completed_at = new Date().toISOString();
+  }
 
   const { data: hunt, error: huntErr } = await client
     .from("pheno_hunts")
-    .insert({
-      grow_id: input.growId,
-      tent_id: input.tentId ?? null,
-      name,
-      goal,
-    } as never)
+    .insert(insertRow as never)
     .select("id")
     .single();
 
@@ -146,165 +201,6 @@ export async function createPhenoHunt(
   }
 
   return { huntId, taggedPlantIds: tagged };
-}
-
-export interface PhenoHuntSetupCandidate {
-  id: string;
-  name: string;
-  candidateLabel: string | null;
-}
-
-export interface PhenoHuntSetupState {
-  huntId: string;
-  name: string;
-  goal: string | null;
-  growId: string | null;
-  tentId: string | null;
-  /** NULL while setup is unconfirmed ("continue setup"). */
-  setupConfirmedAt: string | null;
-  candidates: PhenoHuntSetupCandidate[];
-}
-
-/**
- * Load the persisted setup state for a hunt (goal + confirmation stamp +
- * tagged candidates). RLS-scoped to the owner; SELECT only.
- */
-export async function loadPhenoHuntSetup(
-  huntId: string,
-  client: SupabaseClient = defaultClient,
-): Promise<PhenoHuntSetupState> {
-  const id = typeof huntId === "string" ? huntId.trim() : "";
-  if (!id) throw new PhenoHuntError("Hunt id is required.");
-
-  const { data: hunt, error: huntErr } = await client
-    .from("pheno_hunts")
-    .select("id, name, goal, grow_id, tent_id, setup_confirmed_at")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (huntErr) {
-    throw new PhenoHuntError(`Could not load hunt setup: ${huntErr.message}`, huntErr);
-  }
-  if (!hunt) throw new PhenoHuntError("Pheno hunt not found.");
-
-  const { data: plants, error: plantsErr } = await client
-    .from("plants")
-    .select("id, name, candidate_label")
-    .eq("pheno_hunt_id", id)
-    .eq("is_archived", false);
-
-  if (plantsErr) {
-    throw new PhenoHuntError(`Could not load hunt candidates: ${plantsErr.message}`, plantsErr);
-  }
-
-  const row = hunt as {
-    id: string;
-    name: string;
-    goal: string | null;
-    grow_id: string | null;
-    tent_id: string | null;
-    setup_confirmed_at: string | null;
-  };
-
-  return {
-    huntId: row.id,
-    name: row.name,
-    goal: row.goal ?? null,
-    growId: row.grow_id ?? null,
-    tentId: row.tent_id ?? null,
-    setupConfirmedAt: row.setup_confirmed_at ?? null,
-    candidates: ((plants ?? []) as Array<{
-      id: string;
-      name: string;
-      candidate_label: string | null;
-    }>).map((p) => ({
-      id: p.id,
-      name: p.name,
-      candidateLabel: p.candidate_label ?? null,
-    })),
-  };
-}
-
-export interface UpdatePhenoHuntGoalInput {
-  huntId: string;
-  goal: string;
-}
-
-/**
- * Update the persisted goal. RLS (owner row policies + RESTRICTIVE
- * pheno-entitlement policies) rejects Free/canceled/expired writers at the
- * database; a rejection OR a silently-filtered update (0 rows matched)
- * surfaces as a PhenoHuntError — never a fake success.
- */
-export async function updatePhenoHuntGoal(
-  input: UpdatePhenoHuntGoalInput,
-  client: SupabaseClient = defaultClient,
-): Promise<{ goal: string }> {
-  if (!input.huntId) throw new PhenoHuntError("Hunt id is required.");
-  const goal = input.goal.trim();
-  if (!goal) throw new PhenoHuntError("Hunt goal is required.");
-  if (goal.length > 500) throw new PhenoHuntError("Hunt goal is too long (max 500 characters).");
-
-  const { data, error } = await client
-    .from("pheno_hunts")
-    .update({ goal } as never)
-    .eq("id", input.huntId)
-    .select("goal")
-    .maybeSingle();
-
-  if (error) {
-    throw new PhenoHuntError(`Could not save hunt goal: ${error.message}`, error);
-  }
-  if (!data) {
-    throw new PhenoHuntError("Hunt goal was not saved (hunt missing or write rejected).");
-  }
-  return { goal: (data as { goal: string | null }).goal ?? goal };
-}
-
-export interface ConfirmPhenoHuntSetupInput {
-  huntId: string;
-  /** Injectable for tests; defaults to now. */
-  confirmedAtIso?: string;
-}
-
-/**
- * Stamp setup_confirmed_at. Idempotent: only a NULL stamp is written, and the
- * authoritative stamp is re-read afterwards, so re-confirming never moves an
- * existing timestamp. Entitlement-blocked writers surface a PhenoHuntError
- * (RLS rejection) — never a silent fake success.
- */
-export async function confirmPhenoHuntSetup(
-  input: ConfirmPhenoHuntSetupInput,
-  client: SupabaseClient = defaultClient,
-): Promise<{ setupConfirmedAt: string }> {
-  if (!input.huntId) throw new PhenoHuntError("Hunt id is required.");
-  const stamp = input.confirmedAtIso ?? new Date().toISOString();
-
-  const { error: updErr } = await client
-    .from("pheno_hunts")
-    .update({ setup_confirmed_at: stamp } as never)
-    .eq("id", input.huntId)
-    .is("setup_confirmed_at", null);
-
-  if (updErr) {
-    throw new PhenoHuntError(`Could not confirm hunt setup: ${updErr.message}`, updErr);
-  }
-
-  const { data, error: selErr } = await client
-    .from("pheno_hunts")
-    .select("setup_confirmed_at")
-    .eq("id", input.huntId)
-    .maybeSingle();
-
-  if (selErr) {
-    throw new PhenoHuntError(`Could not read setup confirmation: ${selErr.message}`, selErr);
-  }
-  const confirmedAt = (data as { setup_confirmed_at: string | null } | null)
-    ?.setup_confirmed_at;
-  if (!confirmedAt) {
-    throw new PhenoHuntError("Hunt setup was not confirmed (hunt missing or write rejected).");
-  }
-  return { setupConfirmedAt: confirmedAt };
 }
 
 export interface DeletePhenoHuntInput {
@@ -367,4 +263,53 @@ export async function deletePhenoHunt(
   }
 
   return { huntId, untaggedPlantIds: linkedIds };
+}
+
+export interface UpdatePhenoHuntSetupInput {
+  huntId: string;
+  /** New evidence-goal id list (sanitized before write). */
+  evidenceGoals?: readonly string[];
+  /** Freeform hunt notes (nullable to clear). */
+  notes?: string | null;
+  /** When true, stamps setup_completed_at=now(). When false, clears it. */
+  markSetupComplete?: boolean;
+}
+
+/**
+ * Update the onboarding-only fields on an existing hunt. Owner-only via RLS
+ * (Users update own pheno_hunts) plus the RESTRICTIVE Pro entitlement policy.
+ * Never touches candidate plants, keeper decisions, scores, or lab data.
+ */
+export async function updatePhenoHuntSetup(
+  input: UpdatePhenoHuntSetupInput,
+  client: SupabaseClient = defaultClient,
+): Promise<void> {
+  if (!input.huntId) throw new PhenoHuntError("Hunt id is required.");
+  const patch: Record<string, unknown> = {};
+  if (input.evidenceGoals !== undefined) {
+    patch.evidence_goals = sanitizeEvidenceGoals(input.evidenceGoals);
+  }
+  if (input.notes !== undefined) {
+    const t = typeof input.notes === "string" ? input.notes.trim() : "";
+    patch.notes = t.length > 0 ? t.slice(0, 4000) : null;
+  }
+  if (input.markSetupComplete === true) {
+    patch.setup_completed_at = new Date().toISOString();
+  } else if (input.markSetupComplete === false) {
+    patch.setup_completed_at = null;
+  }
+  if (Object.keys(patch).length === 0) return;
+  // Read the row back: RLS (owner + RESTRICTIVE Pro entitlement) filters
+  // blocked updates SILENTLY — 0 rows matched, no error — so a bare update
+  // would fake success for a lapsed plan or a cross-user hunt id.
+  const { data, error } = await client
+    .from("pheno_hunts")
+    .update(patch as never)
+    .eq("id", input.huntId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw new PhenoHuntError(`Could not update hunt setup: ${error.message}`, error);
+  if (!data) {
+    throw new PhenoHuntError("Hunt setup was not saved (hunt missing or write rejected).");
+  }
 }

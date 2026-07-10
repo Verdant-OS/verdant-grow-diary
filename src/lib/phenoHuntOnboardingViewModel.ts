@@ -1,156 +1,316 @@
 /**
- * phenoHuntOnboardingViewModel — pure guided-setup and readiness logic for
- * Pheno Hunts. No React, no Supabase, no fetch, no time reads.
+ * phenoHuntOnboardingViewModel — pure state machine + status derivation for
+ * the Pheno Tracker first-run onboarding flow.
  *
- * Key rule (honesty ladder — these are NOT the same thing):
- *   Setup complete    = hunt created with goals/candidates.
- *   Ready for tracking = enough to start logging evidence.
- *   Comparison-ready  = enough evidence exists to compare candidates honestly.
+ * Everything in this module is:
+ *   - Pure (no React, no Supabase, no time reads, no I/O).
+ *   - Deterministic (same input → same output).
+ *   - Null-safe.
  *
- * The ladder is DERIVED from what was actually recorded — it is never stored
- * as a claim, and setup completion alone can never yield "comparison-ready".
- * Keeper decisions are deliberately NOT evidence: deciding is a judgment
- * about evidence, not a recorded observation.
+ * The onboarding UI is a thin presenter over these outputs. Business rules
+ * (comparison readiness, missing-evidence labels, candidate count status)
+ * live here, not in JSX.
  */
 
-export const PHENO_GOAL_MAX_LENGTH = 500;
+import {
+  DEFAULT_SELECTED_EVIDENCE_GOALS,
+  PHENO_EVIDENCE_GOALS,
+  type PhenoEvidenceGoalId,
+} from "@/lib/phenoEvidenceGoals";
 
-export interface PhenoHuntOnboardingDraft {
-  name: string;
-  goal: string;
-  plantIds: readonly string[];
-}
+export type PhenoOnboardingStepId =
+  | "basics"
+  | "candidates"
+  | "goals"
+  | "packet_preview"
+  | "checklist"
+  | "confirmation";
 
-export type PhenoHuntOnboardingValidationError =
-  | "name_required"
-  | "grow_required"
-  | "no_candidates"
-  | "goal_required"
-  | "goal_too_long";
-
-export function validatePhenoHuntOnboardingDraft(
-  draft: PhenoHuntOnboardingDraft,
-  growId: string | null | undefined,
-): PhenoHuntOnboardingValidationError[] {
-  const errs: PhenoHuntOnboardingValidationError[] = [];
-  if (!draft.name.trim()) errs.push("name_required");
-  if (!growId) errs.push("grow_required");
-  if (draft.plantIds.length === 0) errs.push("no_candidates");
-  const goal = draft.goal.trim();
-  if (!goal) errs.push("goal_required");
-  else if (goal.length > PHENO_GOAL_MAX_LENGTH) errs.push("goal_too_long");
-  return errs;
-}
-
-/** Ordered from least to most ready. */
-export type HuntReadinessStage =
-  | "setup_incomplete"
-  | "setup_complete"
-  | "ready_for_tracking"
-  | "comparison_ready";
-
-export const HUNT_READINESS_ORDER: readonly HuntReadinessStage[] = [
-  "setup_incomplete",
-  "setup_complete",
-  "ready_for_tracking",
-  "comparison_ready",
+export const PHENO_ONBOARDING_STEP_ORDER: ReadonlyArray<PhenoOnboardingStepId> = [
+  "basics",
+  "candidates",
+  "goals",
+  "packet_preview",
+  "checklist",
+  "confirmation",
 ];
 
-export interface HuntReadinessInput {
-  /** Persisted, non-empty goal on the hunt row. */
-  hasGoal: boolean;
-  /** setup_confirmed_at is stamped (grower reviewed and confirmed setup). */
-  setupConfirmed: boolean;
-  candidateCount: number;
-  /** Candidates with at least one recorded evidence signal. */
-  candidatesWithEvidence: number;
+export type PhenoCandidateCountStatus =
+  | "none"
+  | "tracking_only"
+  | "comparison_eligible";
+
+export type PhenoChecklistItemStatus =
+  | "ok"
+  | "missing"
+  | "pending";
+
+export interface PhenoChecklistItem {
+  readonly id: string;
+  readonly label: string;
+  readonly status: PhenoChecklistItemStatus;
+  readonly detail: string;
+}
+
+export type PhenoOnboardingReadiness =
+  | "not_ready"
+  | "tracking_only"
+  | "comparison_ready";
+
+export interface PhenoOnboardingDraft {
+  readonly name: string;
+  readonly growId: string | null;
+  readonly tentId: string | null;
+  readonly notes: string;
+  readonly candidateIds: ReadonlyArray<string>;
+  readonly evidenceGoals: ReadonlyArray<PhenoEvidenceGoalId>;
+  /**
+   * True once the grower has explicitly confirmed setup is complete. Used
+   * by the confirmation step and by the workspace "Continue setup" card.
+   * Never inferred — grower must click.
+   */
+  readonly setupCompleted?: boolean;
+  /**
+   * Optional per-candidate data the grower has already recorded (e.g. an
+   * initial phenotype note or a photo). Passed in from the workspace once
+   * the hunt exists; during first-run onboarding this is usually empty.
+   */
+  readonly candidateEvidence?: ReadonlyArray<{
+    readonly candidateId: string;
+    readonly hasPhenotypeNote?: boolean;
+    readonly hasPhotoOrObservation?: boolean;
+    readonly hasLabel?: boolean;
+  }>;
+}
+
+export interface PhenoOnboardingStep {
+  readonly id: PhenoOnboardingStepId;
+  readonly label: string;
+  readonly complete: boolean;
+  readonly reason?: string;
+}
+
+export interface PhenoOnboardingViewModel {
+  readonly steps: ReadonlyArray<PhenoOnboardingStep>;
+  readonly candidateStatus: PhenoCandidateCountStatus;
+  readonly candidateStatusLabel: string;
+  readonly readiness: PhenoOnboardingReadiness;
+  readonly readinessLabel: string;
+  readonly checklist: ReadonlyArray<PhenoChecklistItem>;
+  readonly evidenceGoalSummary: ReadonlyArray<{
+    readonly id: PhenoEvidenceGoalId;
+    readonly label: string;
+    readonly selected: boolean;
+    readonly pending: boolean;
+  }>;
+  /** True iff the draft is safe to submit to createPhenoHunt. */
+  readonly canCreate: boolean;
+  /** Human-readable reasons the draft cannot be created yet. */
+  readonly blockingReasons: ReadonlyArray<string>;
+}
+
+const STEP_LABEL: Record<PhenoOnboardingStepId, string> = {
+  basics: "Hunt basics",
+  candidates: "Candidate plants",
+  goals: "Evidence goals",
+  packet_preview: "Evidence packet map",
+  checklist: "Comparison-ready checklist",
+  confirmation: "Setup complete",
+};
+
+function candidateStatus(count: number): PhenoCandidateCountStatus {
+  if (count <= 0) return "none";
+  if (count === 1) return "tracking_only";
+  return "comparison_eligible";
+}
+
+function candidateStatusLabel(status: PhenoCandidateCountStatus): string {
+  switch (status) {
+    case "none":
+      return "No candidates selected yet";
+    case "tracking_only":
+      return "Tracking only, not comparison-ready";
+    case "comparison_eligible":
+      return "Comparison-eligible";
+  }
+}
+
+function readinessLabel(r: PhenoOnboardingReadiness): string {
+  switch (r) {
+    case "not_ready":
+      return "Not comparison-ready yet";
+    case "tracking_only":
+      return "Ready for tracking";
+    case "comparison_ready":
+      return "Comparison-ready";
+  }
 }
 
 /**
- * Derive the honest readiness stage:
- *   - setup_incomplete: no candidates, or neither a goal nor a confirmation
- *     (nothing meaningful was set up yet).
- *   - setup_complete: created with goals/candidates — but not yet reviewed.
- *     Legacy hunts (pre-guided-setup, goal NULL) are backfilled as confirmed
- *     and therefore never regress below this stage.
- *   - ready_for_tracking: setup confirmed — enough to start logging evidence.
- *   - comparison_ready: at least two candidates each have recorded evidence.
- *     Never granted on setup state alone.
+ * Build the deterministic onboarding view model. Callers should memoize on
+ * the draft input; the function itself does no memoization.
  */
-export function deriveHuntReadiness(input: HuntReadinessInput): HuntReadinessStage {
-  const setupComplete =
-    input.candidateCount >= 1 && (input.hasGoal || input.setupConfirmed);
-  if (!setupComplete) return "setup_incomplete";
-  if (!input.setupConfirmed) return "setup_complete";
-  if (input.candidateCount >= 2 && input.candidatesWithEvidence >= 2) {
-    return "comparison_ready";
+export function computePhenoHuntOnboardingViewModel(
+  draft: PhenoOnboardingDraft,
+): PhenoOnboardingViewModel {
+  const nameOk = draft.name.trim().length > 0;
+  const growOk = !!draft.growId;
+  const candidateCount = draft.candidateIds.length;
+  const status = candidateStatus(candidateCount);
+  const goalsOk = draft.evidenceGoals.length > 0;
+
+  const steps: PhenoOnboardingStep[] = [
+    {
+      id: "basics",
+      label: STEP_LABEL.basics,
+      complete: nameOk && growOk,
+      reason: !nameOk
+        ? "Hunt name is required"
+        : !growOk
+          ? "Linked grow is required"
+          : undefined,
+    },
+    {
+      id: "candidates",
+      label: STEP_LABEL.candidates,
+      complete: candidateCount >= 1,
+      reason: candidateCount === 0 ? "Select at least one candidate plant" : undefined,
+    },
+    {
+      id: "goals",
+      label: STEP_LABEL.goals,
+      complete: goalsOk,
+      reason: !goalsOk ? "Select at least one evidence goal" : undefined,
+    },
+    {
+      id: "packet_preview",
+      // Preview is informational; completes as soon as candidates exist.
+      label: STEP_LABEL.packet_preview,
+      complete: candidateCount >= 1,
+      reason:
+        candidateCount === 0 ? "Add candidates to see the evidence packet map" : undefined,
+    },
+    {
+      id: "checklist",
+      label: STEP_LABEL.checklist,
+      complete: nameOk && growOk && candidateCount >= 1 && goalsOk,
+    },
+    {
+      id: "confirmation",
+      label: STEP_LABEL.confirmation,
+      complete: !!draft.setupCompleted && nameOk && growOk && candidateCount >= 1 && goalsOk,
+      reason: draft.setupCompleted
+        ? undefined
+        : "Confirm setup to enter the workspace",
+    },
+  ];
+
+  const evidenceMap = new Map<string, NonNullable<PhenoOnboardingDraft["candidateEvidence"]>[number]>();
+  for (const e of draft.candidateEvidence ?? []) {
+    evidenceMap.set(e.candidateId, e);
   }
-  return "ready_for_tracking";
+
+  const anyPhenotypeNote = draft.candidateIds.some(
+    (id) => evidenceMap.get(id)?.hasPhenotypeNote,
+  );
+  const allHavePhenotypeNote =
+    candidateCount > 0 &&
+    draft.candidateIds.every((id) => evidenceMap.get(id)?.hasPhenotypeNote);
+  const anyPhoto = draft.candidateIds.some(
+    (id) => evidenceMap.get(id)?.hasPhotoOrObservation,
+  );
+  const anyLabel = draft.candidateIds.some((id) => evidenceMap.get(id)?.hasLabel);
+
+  const checklist: PhenoChecklistItem[] = [
+    {
+      id: "candidate_count",
+      label: "2+ candidates selected",
+      status: candidateCount >= 2 ? "ok" : candidateCount === 1 ? "missing" : "missing",
+      detail:
+        candidateCount >= 2
+          ? `${candidateCount} candidates`
+          : candidateCount === 1
+            ? "1 candidate — tracking only, not comparison-ready"
+            : "No candidates selected",
+    },
+    {
+      id: "phenotype_notes",
+      label: "Phenotype note per candidate",
+      status: allHavePhenotypeNote ? "ok" : anyPhenotypeNote ? "missing" : "missing",
+      detail: allHavePhenotypeNote
+        ? "Every candidate has a phenotype note"
+        : anyPhenotypeNote
+          ? "Some candidates are missing a phenotype note"
+          : "No phenotype notes yet",
+    },
+    {
+      id: "photo_or_observation",
+      label: "Photo or observation per candidate",
+      status: anyPhoto ? "ok" : "missing",
+      detail: anyPhoto
+        ? "At least one candidate has a photo or observation"
+        : "No photos or observations yet",
+    },
+    {
+      id: "labels",
+      label: "Candidate labels / status",
+      status: anyLabel ? "ok" : "missing",
+      detail: anyLabel ? "Labels captured" : "No labels captured yet",
+    },
+    {
+      id: "post_harvest",
+      label: "Post-harvest notes",
+      status: "pending",
+      detail: "Pending until harvest",
+    },
+    {
+      id: "post_cure",
+      label: "Post-cure notes",
+      status: "pending",
+      detail: "Pending until cure — post-cure follow-up pending",
+    },
+    {
+      id: "replication_readiness",
+      label: "Replication readiness",
+      status: "pending",
+      detail: "Pending until clones / mother assignment are recorded",
+    },
+  ];
+
+  let readiness: PhenoOnboardingReadiness = "not_ready";
+  if (status === "comparison_eligible" && goalsOk && nameOk && growOk) {
+    readiness = "comparison_ready";
+  } else if (status === "tracking_only" && goalsOk && nameOk && growOk) {
+    readiness = "tracking_only";
+  }
+
+  const evidenceGoalSummary = PHENO_EVIDENCE_GOALS.map((g) => ({
+    id: g.id,
+    label: g.label,
+    selected: draft.evidenceGoals.includes(g.id),
+    pending: g.startsPending ?? false,
+  }));
+
+  const blockingReasons: string[] = [];
+  if (!nameOk) blockingReasons.push("Hunt name is required");
+  if (!growOk) blockingReasons.push("Linked grow is required");
+  if (candidateCount === 0) blockingReasons.push("Select at least one candidate plant");
+  if (!goalsOk) blockingReasons.push("Select at least one evidence goal");
+
+  return {
+    steps,
+    candidateStatus: status,
+    candidateStatusLabel: candidateStatusLabel(status),
+    readiness,
+    readinessLabel: readinessLabel(readiness),
+    checklist,
+    evidenceGoalSummary,
+    canCreate: blockingReasons.length === 0,
+    blockingReasons,
+  };
 }
 
-export interface CandidateEvidenceSignals {
-  /** Overall trait scores keyed by plant id. */
-  scoresByPlant?: Readonly<Record<string, unknown>>;
-  /** Latest sex observation keyed by plant id. */
-  sexByPlant?: Readonly<Record<string, unknown>>;
-  /** Post-cure smoke test keyed by plant id. */
-  smokeByPlant?: Readonly<Record<string, unknown>>;
-  /** Lab results keyed "plantId:source". */
-  labByKey?: Readonly<Record<string, unknown>>;
-  /** Per-round score cards keyed "plantId:round". */
-  roundsByKey?: Readonly<Record<string, unknown>>;
+/** Convenience: default evidence goal selection for a new hunt. */
+export function defaultEvidenceGoalSelection(): PhenoEvidenceGoalId[] {
+  return [...DEFAULT_SELECTED_EVIDENCE_GOALS];
 }
-
-/** Evidence = a recorded observation. Keeper decisions are NOT evidence. */
-export function candidateHasEvidence(
-  plantId: string,
-  signals: CandidateEvidenceSignals,
-): boolean {
-  if (signals.scoresByPlant?.[plantId] != null) return true;
-  if (signals.sexByPlant?.[plantId] != null) return true;
-  if (signals.smokeByPlant?.[plantId] != null) return true;
-  const prefix = `${plantId}:`;
-  for (const key of Object.keys(signals.labByKey ?? {})) {
-    if (key.startsWith(prefix)) return true;
-  }
-  for (const key of Object.keys(signals.roundsByKey ?? {})) {
-    if (key.startsWith(prefix)) return true;
-  }
-  return false;
-}
-
-export function countCandidatesWithEvidence(
-  plantIds: readonly string[],
-  signals: CandidateEvidenceSignals,
-): number {
-  let count = 0;
-  for (const id of plantIds) {
-    if (candidateHasEvidence(id, signals)) count += 1;
-  }
-  return count;
-}
-
-export const HUNT_READINESS_COPY: Readonly<
-  Record<HuntReadinessStage, { label: string; description: string }>
-> = {
-  setup_incomplete: {
-    label: "Setup in progress",
-    description:
-      "Add a goal and at least one candidate plant, then confirm your setup.",
-  },
-  setup_complete: {
-    label: "Setup complete",
-    description:
-      "Hunt created with goals and candidates. Confirm your setup to start tracking.",
-  },
-  ready_for_tracking: {
-    label: "Ready for tracking",
-    description:
-      "Enough to start logging evidence. Not comparison-ready until at least two candidates have recorded evidence.",
-  },
-  comparison_ready: {
-    label: "Comparison-ready",
-    description:
-      "At least two candidates have recorded evidence — an honest side-by-side comparison is possible.",
-  },
-};

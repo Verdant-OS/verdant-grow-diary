@@ -43,10 +43,14 @@ import PhenoProductSamplingSection from "@/components/PhenoProductSamplingSectio
 import PhenoStressTestingSection from "@/components/PhenoStressTestingSection";
 import PhenoSamplingWorkspaceTools from "@/components/PhenoSamplingWorkspaceTools";
 import PhenoDocumentationSections from "@/components/PhenoDocumentationSections";
-import PhenoHuntProgressPanel from "@/components/PhenoHuntProgressPanel";
 import PhenoStressObservationsList from "@/components/PhenoStressObservationsList";
 import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
 import { usePhenoStressObservations } from "@/hooks/usePhenoStressObservations";
+import PhenoHuntSetupProgressCard from "@/components/PhenoHuntSetupProgressCard";
+import PhenoCompareCandidatesAction from "@/components/PhenoCompareCandidatesAction";
+import { buildPhenoComparisonActionState } from "@/lib/phenoComparisonActionState";
+import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
+
 
 function toIntOrNull(raw: string): number | null {
   const t = raw.trim();
@@ -728,6 +732,25 @@ export default function PhenoHuntWorkspace() {
     "all",
   );
   const [visibleCount, setVisibleCount] = useState(CANDIDATE_PAGE_SIZE);
+  const [setupSaving, setSetupSaving] = useState(false);
+  // Optimistic override so the card flips to "setup complete" instantly
+  // after the grower confirms — the persisted hunt row is still authoritative.
+  const [setupCompletedLocal, setSetupCompletedLocal] = useState<string | null>(null);
+
+  const handleMarkSetupComplete = async () => {
+    if (!ws.hunt?.id || setupSaving) return;
+    setSetupSaving(true);
+    try {
+      await updatePhenoHuntSetup({ huntId: ws.hunt.id, markSetupComplete: true });
+      setSetupCompletedLocal(new Date().toISOString());
+    } catch {
+      // Silent — no toast dependency here; workspace already surfaces
+      // network errors elsewhere. Grower can retry.
+    } finally {
+      setSetupSaving(false);
+    }
+  };
+
 
   // Round cards are fetched per selected round, not all five upfront.
   useEffect(() => {
@@ -736,6 +759,48 @@ export default function PhenoHuntWorkspace() {
   }, [round, ws.loadRound]);
 
   const candidates = useMemo(() => ws.candidates, [ws.candidates]);
+
+  // Comparison-ready is derived from RECORDED evidence, never from setup
+  // state. Setup complete ≠ Comparison-ready.
+  const comparisonState = useMemo(() => {
+    const goalsSelected = (ws.hunt?.evidenceGoals ?? []).length;
+    const allHaveNote =
+      candidates.length > 0 &&
+      candidates.every((c) => {
+        const note = ws.scoresByPlant[c.candidateId]?.note?.trim();
+        const decisionNote =
+          ws.decisionsByPlant[c.candidateId]?.note?.trim();
+        return !!(note || decisionNote);
+      });
+    const anyPostHarvest = candidates.some((c) => {
+      const d = ws.decisionsByPlant[c.candidateId]?.decision;
+      return !!d && d !== "undecided";
+    });
+    const anyPostCure = candidates.some((c) => {
+      const s = ws.smokeByPlant[c.candidateId];
+      if (!s) return false;
+      return (
+        !!s.verdict?.trim() ||
+        (s.flavorDescriptors?.length ?? 0) > 0 ||
+        (s.effectDescriptors?.length ?? 0) > 0
+      );
+    });
+    return buildPhenoComparisonActionState({
+      huntId: ws.hunt?.id ?? null,
+      candidateCount: candidates.length,
+      goalsSelected,
+      allCandidatesHavePhenotypeNote: allHaveNote,
+      anyPostHarvestObservation: anyPostHarvest,
+      anyPostCureObservation: anyPostCure,
+    });
+  }, [
+    candidates,
+    ws.hunt?.id,
+    ws.hunt?.evidenceGoals,
+    ws.scoresByPlant,
+    ws.decisionsByPlant,
+    ws.smokeByPlant,
+  ]);
 
   // Text + decision filters so a specific plant is findable among hundreds.
   // Filtering narrows the view only — it never orders by score or suggests
@@ -849,20 +914,21 @@ export default function PhenoHuntWorkspace() {
         </header>
 
         {ws.hunt ? (
-          <PhenoHuntProgressPanel
-            huntId={ws.hunt.id}
-            goal={ws.hunt.goal ?? null}
-            setupConfirmedAt={ws.hunt.setupConfirmedAt ?? null}
-            candidates={candidates}
-            signals={{
-              scoresByPlant: ws.scoresByPlant,
-              roundsByKey: ws.roundsByKey,
-              sexByPlant: ws.sexByPlant,
-              smokeByPlant: ws.smokeByPlant,
-              labByKey: ws.labByKey,
+          <PhenoHuntSetupProgressCard
+            hunt={{
+              ...ws.hunt,
+              setupCompletedAt: setupCompletedLocal ?? ws.hunt.setupCompletedAt ?? null,
             }}
+            candidateCount={candidates.length}
+            comparisonReadiness={comparisonState.readiness}
+            onMarkComplete={handleMarkSetupComplete}
+            saving={setupSaving}
           />
         ) : null}
+
+        {ws.hunt ? <PhenoCompareCandidatesAction state={comparisonState} /> : null}
+
+
 
         {candidates.length === 0 ? (
           <p data-testid="pheno-workspace-empty" className="text-sm text-muted-foreground">

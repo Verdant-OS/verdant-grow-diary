@@ -58,6 +58,7 @@ import {
   type PricingTier,
 } from "@/config/pricing";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import PhenoTrackerPreviewCard from "@/components/PhenoTrackerPreviewCard";
 import { logsPath } from "@/lib/routes";
 import { resolvePaddleConfig, unavailableMessage, type PaddleConfig } from "@/lib/paddleConfig";
 
@@ -719,7 +720,12 @@ export default function Upgrade() {
 
       <PlanComparisonTable />
 
+      <section aria-label="Pheno Tracker preview" className="mt-10">
+        <PhenoTrackerPreviewCard />
+      </section>
+
       <UpgradeFaq />
+
 
       <p className="mt-12 text-center text-xs text-muted-foreground">
         New to Verdant?{" "}

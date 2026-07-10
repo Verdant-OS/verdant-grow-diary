@@ -1,28 +1,22 @@
 /**
- * pheno-hunt-onboarding-persistence — service-level persistence contract.
+ * pheno-hunt-onboarding-persistence — service-level persistence contract for
+ * guided hunt setup on the pheno_hunts row (evidence_goals, notes,
+ * setup_completed_at).
  *
- * Persistence strategy under test: setup state lives on the pheno_hunts row
- * (goal, setup_confirmed_at) + candidate tags on plants — no localStorage, so
- * "continue setup" works across devices and RLS (owner rows + RESTRICTIVE
- * has_pheno_tracker_entitlement) governs every write. A canceled/expired
- * user's write is rejected by the database; these tests pin that the client
- * surfaces that rejection as a PhenoHuntError instead of faking success.
+ * Focus: what the shipped flow relies on but the UI tests can't see —
+ * payload shapes actually written, sanitization at the write boundary, and
+ * the RLS honesty rule: a blocked or silently-filtered write (0 rows — a
+ * lapsed plan or a cross-user hunt id) must surface as PhenoHuntError,
+ * never as fake success.
  */
 import { describe, it, expect } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  confirmPhenoHuntSetup,
   createPhenoHunt,
-  loadPhenoHuntSetup,
   PhenoHuntError,
-  updatePhenoHuntGoal,
+  updatePhenoHuntSetup,
 } from "@/lib/phenoHuntService";
 
-/**
- * Minimal chainable fake PostgREST client. Each `from(table)` returns a
- * builder that records the operation + payload and resolves with the queued
- * response for (table, op).
- */
 interface Call {
   table: string;
   op: "insert" | "update" | "select" | "delete";
@@ -49,7 +43,6 @@ function makeFakeClient(
     chain.update = setOp("update");
     chain.delete = setOp("delete");
     chain.select = (cols?: string) => {
-      if (call.op === "select") call.payload = cols;
       call.filters.push({ kind: "select", args: [cols] });
       return chain;
     };
@@ -75,8 +68,8 @@ const RLS_DENIAL = {
   message: 'new row violates row-level security policy for table "pheno_hunts"',
 };
 
-describe("createPhenoHunt persists the goal", () => {
-  it("stores the trimmed goal on the hunt row", async () => {
+describe("createPhenoHunt setup persistence", () => {
+  it("persists sanitized evidence goals, trimmed notes, and no premature completion stamp", async () => {
     const { client, calls } = makeFakeClient((call) => {
       if (call.table === "pheno_hunts" && call.op === "insert") {
         return { data: { id: "h1" }, error: null };
@@ -84,162 +77,70 @@ describe("createPhenoHunt persists the goal", () => {
       return { data: null, error: null };
     });
     await createPhenoHunt(
-      { growId: "g1", name: "Hunt", goal: "  Find the keeper  ", plantIds: ["p1"] },
+      {
+        growId: "g1",
+        name: "Hunt",
+        plantIds: ["p1"],
+        evidenceGoals: ["structure", "bogus-goal", "structure"],
+        notes: "  keep this  ",
+      },
       client,
     );
-    const insert = calls.find((c) => c.table === "pheno_hunts" && c.op === "insert");
-    expect(insert?.payload).toMatchObject({ goal: "Find the keeper" });
+    const row = calls.find((c) => c.op === "insert")?.payload as Record<string, unknown>;
+    expect(row.evidence_goals).toEqual(["structure"]);
+    expect(row.notes).toBe("keep this");
+    expect(row).not.toHaveProperty("setup_completed_at");
   });
 
-  it("stores NULL when the goal is blank (never an empty string)", async () => {
+  it("markSetupComplete stamps setup_completed_at on the insert", async () => {
     const { client, calls } = makeFakeClient((call) => {
       if (call.table === "pheno_hunts" && call.op === "insert") {
         return { data: { id: "h1" }, error: null };
       }
       return { data: null, error: null };
     });
-    await createPhenoHunt({ growId: "g1", name: "Hunt", goal: "   ", plantIds: ["p1"] }, client);
-    const insert = calls.find((c) => c.table === "pheno_hunts" && c.op === "insert");
-    expect((insert?.payload as { goal: unknown }).goal).toBeNull();
-  });
-});
-
-describe("loadPhenoHuntSetup", () => {
-  it("maps the persisted row + candidates", async () => {
-    const { client } = makeFakeClient((call) => {
-      if (call.table === "pheno_hunts") {
-        return {
-          data: {
-            id: "h1",
-            name: "Hunt",
-            goal: "Find the keeper",
-            grow_id: "g1",
-            tent_id: null,
-            setup_confirmed_at: null,
-          },
-          error: null,
-        };
-      }
-      return {
-        data: [
-          { id: "p1", name: "Plant 1", candidate_label: "#1" },
-          { id: "p2", name: "Plant 2", candidate_label: null },
-        ],
-        error: null,
-      };
-    });
-    const state = await loadPhenoHuntSetup("h1", client);
-    expect(state).toEqual({
-      huntId: "h1",
-      name: "Hunt",
-      goal: "Find the keeper",
-      growId: "g1",
-      tentId: null,
-      setupConfirmedAt: null,
-      candidates: [
-        { id: "p1", name: "Plant 1", candidateLabel: "#1" },
-        { id: "p2", name: "Plant 2", candidateLabel: null },
-      ],
-    });
-  });
-
-  it("throws PhenoHuntError when the hunt is missing (RLS-filtered or deleted)", async () => {
-    const { client } = makeFakeClient(() => ({ data: null, error: null }));
-    await expect(loadPhenoHuntSetup("h404", client)).rejects.toBeInstanceOf(PhenoHuntError);
-  });
-});
-
-describe("updatePhenoHuntGoal", () => {
-  it("persists the trimmed goal", async () => {
-    const { client, calls } = makeFakeClient(() => ({
-      data: { goal: "New goal" },
-      error: null,
-    }));
-    const res = await updatePhenoHuntGoal({ huntId: "h1", goal: "  New goal  " }, client);
-    expect(res.goal).toBe("New goal");
-    const upd = calls.find((c) => c.op === "update");
-    expect(upd?.payload).toEqual({ goal: "New goal" });
-  });
-
-  it("a silently-filtered update (0 rows: cross-user or RLS-blocked) is NOT a success", async () => {
-    const { client } = makeFakeClient(() => ({ data: null, error: null }));
-    await expect(
-      updatePhenoHuntGoal({ huntId: "someone-elses-hunt", goal: "Goal" }, client),
-    ).rejects.toBeInstanceOf(PhenoHuntError);
-  });
-
-  it("rejects an empty goal without touching the database", async () => {
-    const { client, calls } = makeFakeClient(() => ({ data: null, error: null }));
-    await expect(updatePhenoHuntGoal({ huntId: "h1", goal: "  " }, client)).rejects.toBeInstanceOf(
-      PhenoHuntError,
+    await createPhenoHunt(
+      { growId: "g1", name: "Hunt", plantIds: ["p1"], markSetupComplete: true },
+      client,
     );
-    expect(calls).toHaveLength(0);
+    const row = calls.find((c) => c.op === "insert")?.payload as Record<string, unknown>;
+    expect(typeof row.setup_completed_at).toBe("string");
+  });
+});
+
+describe("updatePhenoHuntSetup persistence honesty", () => {
+  it("persists the patch and succeeds when the row is returned", async () => {
+    const { client, calls } = makeFakeClient(() => ({ data: { id: "h1" }, error: null }));
+    await updatePhenoHuntSetup(
+      { huntId: "h1", notes: "  new notes  ", markSetupComplete: true },
+      client,
+    );
+    const upd = calls.find((c) => c.op === "update");
+    const patch = upd?.payload as Record<string, unknown>;
+    expect(patch.notes).toBe("new notes");
+    expect(typeof patch.setup_completed_at).toBe("string");
   });
 
-  it("rejects goals over 500 chars without touching the database", async () => {
+  it("an empty patch never touches the database", async () => {
     const { client, calls } = makeFakeClient(() => ({ data: null, error: null }));
-    await expect(
-      updatePhenoHuntGoal({ huntId: "h1", goal: "x".repeat(501) }, client),
-    ).rejects.toBeInstanceOf(PhenoHuntError);
+    await updatePhenoHuntSetup({ huntId: "h1" }, client);
     expect(calls).toHaveLength(0);
   });
 
-  it("surfaces an RLS write denial (canceled/expired plan) as PhenoHuntError", async () => {
+  it("a silently-filtered update (0 rows: lapsed plan or cross-user id) is NOT a success", async () => {
+    const { client } = makeFakeClient(() => ({ data: null, error: null }));
+    await expect(
+      updatePhenoHuntSetup(
+        { huntId: "someone-elses-hunt", markSetupComplete: true },
+        client,
+      ),
+    ).rejects.toBeInstanceOf(PhenoHuntError);
+  });
+
+  it("an explicit RLS rejection surfaces as PhenoHuntError", async () => {
     const { client } = makeFakeClient(() => ({ data: null, error: RLS_DENIAL }));
     await expect(
-      updatePhenoHuntGoal({ huntId: "h1", goal: "Goal" }, client),
+      updatePhenoHuntSetup({ huntId: "h1", notes: "x" }, client),
     ).rejects.toBeInstanceOf(PhenoHuntError);
-  });
-});
-
-describe("confirmPhenoHuntSetup", () => {
-  it("stamps only a NULL setup_confirmed_at and returns the stored stamp", async () => {
-    const stored = "2026-07-09T12:00:00.000Z";
-    const { client, calls } = makeFakeClient((call) => {
-      if (call.op === "update") return { data: null, error: null };
-      return { data: { setup_confirmed_at: stored }, error: null };
-    });
-    const res = await confirmPhenoHuntSetup(
-      { huntId: "h1", confirmedAtIso: stored },
-      client,
-    );
-    expect(res.setupConfirmedAt).toBe(stored);
-    const upd = calls.find((c) => c.op === "update");
-    expect(upd?.payload).toEqual({ setup_confirmed_at: stored });
-    // Idempotency guard: the update is filtered to unconfirmed rows only.
-    expect(upd?.filters).toContainEqual({ kind: "is", args: ["setup_confirmed_at", null] });
-  });
-
-  it("is idempotent: re-confirming returns the ORIGINAL stamp", async () => {
-    const original = "2026-07-01T00:00:00.000Z";
-    const { client } = makeFakeClient((call) => {
-      if (call.op === "update") return { data: null, error: null }; // matched 0 rows
-      return { data: { setup_confirmed_at: original }, error: null };
-    });
-    const res = await confirmPhenoHuntSetup(
-      { huntId: "h1", confirmedAtIso: "2026-07-09T12:00:00.000Z" },
-      client,
-    );
-    expect(res.setupConfirmedAt).toBe(original);
-  });
-
-  it("surfaces an RLS write denial (canceled/expired plan) as PhenoHuntError", async () => {
-    const { client } = makeFakeClient((call) => {
-      if (call.op === "update") return { data: null, error: RLS_DENIAL };
-      return { data: null, error: null };
-    });
-    await expect(confirmPhenoHuntSetup({ huntId: "h1" }, client)).rejects.toBeInstanceOf(
-      PhenoHuntError,
-    );
-  });
-
-  it("never fakes success when the row stayed unconfirmed", async () => {
-    const { client } = makeFakeClient((call) => {
-      if (call.op === "update") return { data: null, error: null };
-      return { data: { setup_confirmed_at: null }, error: null };
-    });
-    await expect(confirmPhenoHuntSetup({ huntId: "h1" }, client)).rejects.toBeInstanceOf(
-      PhenoHuntError,
-    );
   });
 });

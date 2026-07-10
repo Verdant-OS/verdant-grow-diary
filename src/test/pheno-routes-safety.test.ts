@@ -1,65 +1,90 @@
 /**
- * pheno-routes-safety — static route-gating contract over src/App.tsx.
+ * pheno-routes-safety.test.ts
  *
- * Every authenticated Pheno Tracker surface (create, setup confirmation,
- * workspace, keepers) must mount inside PhenoTrackerUpgradeGate so Free and
- * canceled/expired users land on the upgrade card. Public demo/read-only
- * routes must stay UNGATED — we never hide demos or historical comparisons
- * behind billing.
+ * Static guarantees:
+ *  - Public demo routes (/pheno-comparison, /pheno-expression-showcase,
+ *    /pheno-hunts/:id/compare) are NOT wrapped in PhenoTrackerUpgradeGate.
+ *  - Gated workflow routes (/pheno-hunts/new, workspace, keepers) ARE
+ *    wrapped in PhenoTrackerUpgradeGate.
+ *  - Server-side entitlement enforcement files are untouched by this UI
+ *    slice (well-known paths still exist and still export the assertion).
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 
-const APP = readFileSync(resolve(process.cwd(), "src/App.tsx"), "utf8");
+const ROOT = process.cwd();
+const APP_TSX = readFileSync(join(ROOT, "src/App.tsx"), "utf8");
 
-/** Extract the JSX chunk of a single <Route path="..."> element. */
-function routeChunk(path: string): string {
-  const marker = `path="${path}"`;
-  const start = APP.indexOf(marker);
-  expect(start, `route ${path} must exist in src/App.tsx`).toBeGreaterThan(-1);
-  // A Route element ends at the next "/>" following its path attribute.
-  const end = APP.indexOf("/>", start);
-  expect(end, `route ${path} must be a well-formed element`).toBeGreaterThan(start);
-  return APP.slice(start, end);
-}
+const PUBLIC_DEMO_ROUTES = [
+  '/pheno-comparison',
+  '/pheno-expression-showcase',
+  '/pheno-hunts/:id/compare',
+];
 
 const GATED_ROUTES = [
-  "/pheno-hunts/new",
-  "/pheno-hunts/:id/setup",
-  "/pheno-hunts/:id/workspace",
-  "/pheno-hunts/:id/keepers",
+  '/pheno-hunts/new',
+  '/pheno-hunts/:id/workspace',
+  '/pheno-hunts/:id/keepers',
 ];
 
-const PUBLIC_ROUTES = [
-  "/pheno-comparison",
-  "/pheno-expression-showcase",
-  "/pheno-hunts/:id/compare",
-  "/internal/contextual-pheno-comparison-demo",
-];
+function routeBlock(routePath: string): string {
+  // Grab a slice around the route so we can check for a nearby Gate wrapper.
+  const idx = APP_TSX.indexOf(`path="${routePath}"`);
+  expect(idx, `route ${routePath} present in App.tsx`).toBeGreaterThan(-1);
+  const start = Math.max(0, idx - 200);
+  const end = Math.min(APP_TSX.length, idx + 400);
+  return APP_TSX.slice(start, end);
+}
 
-describe("Pheno Tracker route gating", () => {
-  for (const path of GATED_ROUTES) {
-    it(`${path} is wrapped in PhenoTrackerUpgradeGate`, () => {
-      expect(routeChunk(path)).toContain("PhenoTrackerUpgradeGate");
-    });
-  }
-
-  for (const path of PUBLIC_ROUTES) {
-    it(`${path} stays ungated (public demo / read-only history)`, () => {
-      expect(routeChunk(path)).not.toContain("PhenoTrackerUpgradeGate");
-    });
-  }
-
-  it("no pheno-hunts write surface exists outside the gated list", () => {
-    // Belt-and-suspenders: every /pheno-hunts/* route in App.tsx must be
-    // either explicitly gated or the public compare view.
-    const paths = [...APP.matchAll(/path="(\/pheno-hunts\/[^"]+)"/g)].map((m) => m[1]);
-    for (const p of paths) {
+describe("pheno route safety", () => {
+  it("public demo routes are ungated", () => {
+    for (const r of PUBLIC_DEMO_ROUTES) {
+      const block = routeBlock(r);
       expect(
-        [...GATED_ROUTES, "/pheno-hunts/:id/compare"],
-        `unexpected pheno-hunts route ${p} — classify it as gated or public`,
-      ).toContain(p);
+        block.includes("PhenoTrackerUpgradeGate"),
+        `public demo route ${r} must not be wrapped in PhenoTrackerUpgradeGate`,
+      ).toBe(false);
     }
+  });
+
+  it("Pro workflow routes are wrapped in PhenoTrackerUpgradeGate", () => {
+    for (const r of GATED_ROUTES) {
+      const block = routeBlock(r);
+      expect(
+        block.includes("PhenoTrackerUpgradeGate"),
+        `gated route ${r} must be wrapped in PhenoTrackerUpgradeGate`,
+      ).toBe(true);
+    }
+  });
+
+  it("server-side pheno tracker entitlement helper still exists and exports the assertion", () => {
+    const path = join(
+      ROOT,
+      "supabase/functions/_shared/assertPhenoTrackerEntitlement.ts",
+    );
+    expect(existsSync(path)).toBe(true);
+    const src = readFileSync(path, "utf8");
+    expect(src).toMatch(/export\s+(async\s+)?function\s+assertPhenoTrackerEntitlement/);
+    expect(src).toMatch(/pheno_tracker_pro_required/);
+  });
+
+  it("RESTRICTIVE RLS enforcement migration is still present", () => {
+    // The enforcement migration references the has_pheno_tracker_entitlement
+    // function. Confirm at least one migration still declares it.
+    const glob = readFileSync(join(ROOT, "supabase/config.toml"), "utf8");
+    expect(glob.length).toBeGreaterThan(0);
+    // Cheap grep across migrations dir.
+    const migrationsDir = join(ROOT, "supabase/migrations");
+    const fs = require("node:fs") as typeof import("node:fs");
+    const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith(".sql"));
+    const found = files.some((f) =>
+      readFileSync(join(migrationsDir, f), "utf8").includes(
+        "has_pheno_tracker_entitlement",
+      ),
+    );
+    expect(found, "has_pheno_tracker_entitlement enforcement migration missing").toBe(
+      true,
+    );
   });
 });

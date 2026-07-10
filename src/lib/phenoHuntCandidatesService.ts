@@ -19,10 +19,11 @@ export interface PhenoHuntSummary {
   name: string;
   growId: string | null;
   tentId: string | null;
-  /** Persisted guided-setup goal. Optional: legacy call sites/mocks omit it. */
-  goal?: string | null;
-  /** NULL/undefined = setup unconfirmed ("continue setup"). */
-  setupConfirmedAt?: string | null;
+  /** Selected evidence goal ids persisted at onboarding. Optional so older
+   * test stubs and callers stay compatible. */
+  evidenceGoals?: string[];
+  notes?: string | null;
+  setupCompletedAt?: string | null;
 }
 
 export type LoadPhenoHuntCandidatesResult =
@@ -40,7 +41,8 @@ export async function loadPhenoHuntCandidates(
     .from("pheno_hunts")
     // "*" (not an explicit column list) so the workspace keeps loading
     // during a deploy window where the guided-setup migration has not been
-    // applied yet — missing columns simply arrive as undefined.
+    // applied yet — missing columns simply arrive as undefined and the
+    // defensive mapping below turns them into safe defaults.
     .select("*")
     .eq("id", id)
     .maybeSingle();
@@ -67,6 +69,15 @@ export async function loadPhenoHuntCandidates(
 
   const candidates = adaptPhenoHuntCandidates({ plants, growNameById, tentNameById });
 
+  const rawGoals = (huntRow as { evidence_goals?: unknown }).evidence_goals;
+  const evidenceGoals = Array.isArray(rawGoals)
+    ? rawGoals.filter((v): v is string => typeof v === "string")
+    : [];
+  const rawNotes = (huntRow as { notes?: unknown }).notes;
+  const notes = typeof rawNotes === "string" ? rawNotes : null;
+  const rawSetup = (huntRow as { setup_completed_at?: unknown }).setup_completed_at;
+  const setupCompletedAt = typeof rawSetup === "string" ? rawSetup : null;
+
   return {
     ok: true,
     hunt: {
@@ -74,9 +85,9 @@ export async function loadPhenoHuntCandidates(
       name: huntRow.name,
       growId: huntRow.grow_id ?? null,
       tentId: huntRow.tent_id ?? null,
-      goal: (huntRow as { goal?: string | null }).goal ?? null,
-      setupConfirmedAt:
-        (huntRow as { setup_confirmed_at?: string | null }).setup_confirmed_at ?? null,
+      evidenceGoals,
+      notes,
+      setupCompletedAt,
     },
     candidates,
   };

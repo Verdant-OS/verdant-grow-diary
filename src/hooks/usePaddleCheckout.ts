@@ -47,8 +47,10 @@ export function usePaddleCheckout() {
     if (!user) {
       // Preserve the full current path (including any returnTo) through the
       // auth detour so the round-trip back to a gated surface survives.
+      // NOTE: /auth reads `redirectTo` (sanitized via sanitizeAuthRedirect) —
+      // the previous `redirect` param was silently ignored.
       const back = `${window.location.pathname}${window.location.search}` || "/pricing";
-      navigate(`/auth?redirect=${encodeURIComponent(back)}`);
+      navigate(`/auth?redirectTo=${encodeURIComponent(back)}`);
       return;
     }
     setLoading(true);

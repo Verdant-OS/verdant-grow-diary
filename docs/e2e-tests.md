@@ -126,10 +126,25 @@ paste `service_role`, cookies, passwords, or hunt ids into chat.
 
 ### Running
 
+Canonical one-command local run (Docker + local Supabase required):
+
 ```bash
-bun run test:pheno-paid-smoke:preflight   # PRESENT / SEEDABLE / SKIPPED report
-bun run test:pheno-paid-smoke:seed        # seed local fixtures (local Supabase only)
-bun run test:pheno-paid-smoke             # preflight + Playwright smoke
+bun run test:pheno-paid-smoke:local
+```
+
+This runs preflight → seed → load fixture env → hydration verify →
+sessions → Playwright, and returns exit 0 on PASS, 1 on FAIL, and 2 on
+SKIPPED / BLOCKED (Playwright is never launched in that case).
+
+Individual commands for debugging:
+
+```bash
+bun run test:pheno-paid-smoke:preflight     # PRESENT / SEEDABLE / SKIPPED report
+bun run test:pheno-paid-smoke:seed          # seed local fixtures (local Supabase only)
+bun run test:pheno-paid-smoke:verify        # exercise adapter + readiness on the seeded fixture
+bun run test:pheno-paid-smoke:sessions      # mint Playwright storageState per role
+bun run test:pheno-paid-smoke                # preflight + Playwright smoke
+bun run test:pheno-paid-smoke:verify-tests  # unit + CLI tests for the verifier and orchestrator
 ```
 
 ### Automated vs manual steps

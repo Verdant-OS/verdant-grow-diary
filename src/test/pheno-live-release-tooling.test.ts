@@ -293,8 +293,10 @@ describe("live-smoke report module (pheno-live-smoke-report.mjs)", () => {
     const checkpoints = deriveCheckpoints(passingReport);
     expect(checkpoints).toHaveLength(12);
     for (const checkpoint of checkpoints) {
-      if (checkpoint.id === 6 || checkpoint.id === 9) {
-        // No automated proof exists for these — they must stay PENDING.
+      if (checkpoint.id === 6) {
+        // No automated proof exists for hunt-setup persistence — it must
+        // stay PENDING. (Checkpoint 9 gained automated anchor proof; its
+        // separate manual release requirement is receipt policy, not mapping.)
         expect(checkpoint.status).toBe("PENDING");
       } else {
         expect(checkpoint.status).toBe("PASS");
@@ -307,7 +309,11 @@ describe("live-smoke report module (pheno-live-smoke-report.mjs)", () => {
       suites: [
         {
           specs: [
-            { title: "Free user cannot reach /pheno-hunts/new", tests: [{ status: "unexpected" }] },
+            {
+              title:
+                "Free user sees the upgrade gate on /pheno-hunts/new and the CTA returnTo round-trips to /pricing",
+              tests: [{ status: "unexpected" }],
+            },
             { title: "Pro user can load /pheno-hunts/new", tests: [{ status: "skipped" }] },
           ],
         },
@@ -333,7 +339,7 @@ describe("live-smoke report module (pheno-live-smoke-report.mjs)", () => {
           specs: [
             {
               title:
-                "Free user cannot reach /pheno-hunts/new as leak@example.com id 12345678-abcd-4bcd-8bcd-1234567890ab ?token=oops",
+                "Free user sees the upgrade gate on /pheno-hunts/new as leak@example.com id 12345678-abcd-4bcd-8bcd-1234567890ab ?token=oops",
               tests: [{ status: "expected" }],
             },
           ],

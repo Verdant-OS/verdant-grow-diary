@@ -158,13 +158,17 @@ export function renderReceipt({ smoke, schema, build, manual, allowPartial = fal
     : billingStatus === "PASS";
 
   // GO also demands complete rollback readiness — a release without a
-  // verified rollback path is not shippable, only reachable.
-  const rollbackComplete = [
-    manual?.rollback?.priorVersionIdentified,
-    manual?.rollback?.additiveMigrations,
-    manual?.rollback?.entryPointDisable,
-    manual?.rollback?.ownerReadPreserved,
-  ].every((value) => yes(value));
+  // verified rollback path is not shippable, only reachable. The migration
+  // posture is a structured claim: additive is only valid without
+  // exceptions; non-additive is only valid when every exception carries a
+  // complete rollback procedure. The legacy boolean `additiveMigrations`
+  // never counts toward GO by itself.
+  const postureCheck = evaluateMigrationPosture(manual?.rollback);
+  const rollbackComplete =
+    yes(manual?.rollback?.priorVersionIdentified) &&
+    yes(manual?.rollback?.entryPointDisable) &&
+    yes(manual?.rollback?.ownerReadPreserved) &&
+    postureCheck.pass;
 
   const gatesPass =
     deploymentReachable &&

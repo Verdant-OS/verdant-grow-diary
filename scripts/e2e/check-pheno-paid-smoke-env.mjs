@@ -82,10 +82,15 @@ for (const envName of SESSION_FILE_ENVS) {
 
 lines.push("");
 lines.push("Hunt fixture ids:");
-for (const [label, envName /*, required*/] of FIXTURE_ENVS) {
+for (const [label, envName, blockedReason] of FIXTURE_ENVS) {
   const has = present(envName);
   if (has) anyPresent = true;
-  lines.push(`  ${has ? "PRESENT " : "SKIPPED "} ${label}`);
+  let status;
+  if (has) status = "PRESENT ";
+  else if (blockedReason) status = "BLOCKED ";
+  else status = "SKIPPED ";
+  const suffix = !has && blockedReason ? ` — ${blockedReason}` : "";
+  lines.push(`  ${status} ${label}${suffix}`);
 }
 
 lines.push("");

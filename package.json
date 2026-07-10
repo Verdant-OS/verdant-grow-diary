@@ -21,7 +21,7 @@
     "test": "vitest run",
     "test:legal-seo": "vitest run src/test/legal-pages-structured-data.test.tsx",
     "test:legal-seo:e2e": "playwright test --project=chromium-mocked e2e/legal-seo-metadata.spec.ts --reporter=list,html",
-    "test:pheno-disabled-compare-e2e": "bunx playwright test e2e/pheno-disabled-compare-visual-regression.spec.ts e2e/pheno-workspace-missing-evidence-anchors.spec.ts",
+    "test:pheno-disabled-compare-e2e": "node scripts/e2e/run-pheno-disabled-compare-e2e.mjs",
     "test:security-static": "node scripts/security/test-static-client-secret-scan.mjs && node scripts/security/static-client-secret-scan.mjs",
     "test:payments-security": "vitest run src/test/lovable-paddle-webhook-orchestrator.test.ts src/test/lovable-paddle-webhook-event-processor.test.ts src/test/lovable-paddle-webhook-no-frontend-secrets.test.ts src/test/lovable-paddle-client-no-secrets.test.ts src/test/paddle-webhook-processing-static.test.ts src/test/paddle-signature-test-helper.test.ts",
     "test:paddle-webhook-edge-security": "deno test --allow-env supabase/functions/paddle-webhook/security.test.ts",

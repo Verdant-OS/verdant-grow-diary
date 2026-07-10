@@ -55,7 +55,10 @@ jobs:
         if: env.ENABLED == 'true'
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v1
         with:
-          version: latest
+          # Pinned: "latest" resolves through an unauthenticated GitHub API
+          # call that rate-limits on shared runners (two fast lane failures
+          # on 2026-07-09). Bump deliberately when a newer CLI is needed.
+          version: 2.109.1
 
       - name: Start local Supabase
         if: env.ENABLED == 'true'

@@ -79,8 +79,8 @@ responses**.
 
 | # | Checkpoint | Expected result | Evidence | Result |
 | ---: | --- | --- | --- | --- |
-| 1 | Free user opens `/pheno-hunts/new` | Upgrade gate shown; creation form absent | Spec A (live): gate visible, `pheno-hunt-create-form` count 0 | ☑ PASS |
-| 2 | Upgrade return path | Safe `returnTo=/pheno-hunts/new`; unsafe return paths rejected | Spec A: CTA href carries `returnTo=%2Fpheno-hunts%2Fnew`; Spec B: `evil.example` never navigated, safe value inert anonymously | ☑ PASS |
+| 1 | Free user opens `/pheno-hunts/new` | Upgrade gate shown; creation form absent | Live paid-journey Phase FREE (2026-07-10): `pheno-tracker-upgrade-gate` testid asserted **visible** and stepper absent. Spec A (live) corroborates `pheno-hunt-create-form` count 0 — Spec A itself never asserts the gate | ☑ PASS |
+| 2 | Upgrade return path | Safe `returnTo=/pheno-hunts/new`; unsafe return paths rejected | Live paid-journey Phase FREE (2026-07-10): upgrade CTA **existence asserted affirmatively** (`pheno-tracker-upgrade-gate-upgrade-link` visible), href matched `/pricing?returnTo=%2Fpheno-hunts%2Fnew`, and click-through landed on `/pricing` with plan content rendered. Spec B (live): `evil.example` never navigated, safe value inert anonymously. Spec A's returnTo check is conditional (`if (upgradeCtas.count())`, early-return on `/auth`) and is corroboration only — tightening tracked in §6 | ☑ PASS |
 | 3 | Pro access and onboarding | Pro reaches guided hunt onboarding without auth/paywall loop | Spec C (live): `/pheno-hunts/new` loads, no `/auth` bounce; full stepper create previously proven live (2026-07-10 paid-journey run, 5/5) | ☑ PASS |
 | 4 | Founder access | Founder Lifetime receives the same paid feature access | Spec C2 (live): no auth wall, no forbidden copy | ☑ PASS |
 | 5 | Canceled/expired behavior | Paid writes blocked; no create form or write bypass | Spec C3 (live): gate shown, create form absent; DB-level RESTRICTIVE policies verified in §2 | ☑ PASS |
@@ -129,6 +129,10 @@ receives the advertised monthly Pro credits.
   against identity-verified shipped code, not asserted live. Follow-up:
   assert exact helper copy and anchor click-through in the live smoke, or
   record manual evidence via `manual-release-checks.json` per the runbook.
+  Spec A has the same shape: its returnTo check runs only when an upgrade
+  CTA happens to exist and it early-returns on an `/auth` redirect —
+  tighten it to require the gate + CTA affirmatively (the paid-journey
+  Phase FREE assertions are the model).
 - Orphaned `/upgrade` page still shows a contradictory annual price and no
   Pheno mention; all product CTAs now bypass it to `/pricing`.
 - No error tracking (Sentry) in production yet — highest-priority follow-up.

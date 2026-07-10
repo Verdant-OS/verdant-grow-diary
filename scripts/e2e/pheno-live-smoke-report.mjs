@@ -14,16 +14,21 @@
  * checkpoint is PASS only when every mapped test exists and passed;
  * FAIL if any mapped test failed; SKIPPED if any was skipped; PENDING when
  * no mapped test exists in the report (or the checkpoint has no automated
- * proof — 6 and 9 stay PENDING for the live runner unless manual evidence
- * overrides them in the receipt inputs).
+ * proof — 6 stays PENDING for the live runner unless manual evidence
+ * overrides it in the receipt inputs; checkpoint 9's separate manual release
+ * requirement is a receipt policy and is unchanged by this mapping).
  */
 export const CHECKPOINT_TEST_MAP = [
-  { id: 1, label: "Free user gate", titles: ["Free user cannot reach /pheno-hunts/new"] },
+  {
+    id: 1,
+    label: "Free user gate",
+    titles: ["Free user sees the upgrade gate on /pheno-hunts/new"],
+  },
   {
     id: 2,
     label: "Upgrade return path",
     titles: [
-      "Free user cannot reach /pheno-hunts/new",
+      "the CTA returnTo round-trips to /pricing",
       "unsafe returnTo is rejected",
     ],
   },
@@ -32,10 +37,22 @@ export const CHECKPOINT_TEST_MAP = [
   { id: 5, label: "Canceled/expired behavior", titles: ["Canceled user hitting /pheno-hunts/new sees gate"] },
   { id: 6, label: "Hunt setup persistence", titles: [] },
   { id: 7, label: "Workspace status split", titles: ["workspace shows disabled Compare"] },
-  { id: 8, label: "Incomplete comparison gate", titles: ["workspace shows disabled Compare"] },
-  { id: 9, label: "Missing-evidence navigation", titles: [] },
+  {
+    id: 8,
+    label: "Incomplete comparison gate",
+    titles: ["workspace shows disabled Compare with the exact not-ready reason"],
+  },
+  {
+    id: 9,
+    label: "Missing-evidence navigation",
+    titles: ["missing-evidence next-step anchor navigates within the workspace"],
+  },
   { id: 10, label: "Direct incomplete /compare", titles: ["direct /compare on incomplete hunt shows not-ready warning"] },
-  { id: 11, label: "Comparison-ready flow", titles: ["workspace enables Compare and /compare renders read-only comparison"] },
+  {
+    id: 11,
+    label: "Comparison-ready flow",
+    titles: ["workspace enables Compare and /compare renders substantive read-only comparison"],
+  },
   { id: 12, label: "Core Verdant regression", titles: ["dashboard route still resolves without a crash"] },
 ];
 

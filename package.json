@@ -31,6 +31,7 @@
     "test:pheno-paid-smoke:local": "node scripts/e2e/run-pheno-paid-smoke-local.mjs",
     "test:pheno-live-smoke:preflight": "node scripts/e2e/check-pheno-live-smoke-env.mjs",
     "test:pheno-live-smoke": "node scripts/e2e/run-pheno-live-release-smoke.mjs",
+    "test:pheno-live-smoke:contract": "bunx vitest run src/test/pheno-live-smoke-assertion-contract.test.ts src/test/pheno-live-release-tooling.test.ts",
     "release:pheno:build-id": "node scripts/releases/fetch-pheno-live-build-id.mjs",
     "release:pheno:receipt": "node scripts/releases/write-pheno-release-receipt.mjs",
     "release:pheno:receipt:partial": "node scripts/releases/write-pheno-release-receipt.mjs --allow-partial",

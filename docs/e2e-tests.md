@@ -151,14 +151,23 @@ bun run test:pheno-paid-smoke:verify-tests  # unit + CLI tests for the verifier 
 
 | Step | Automation |
 | ---- | ---------- |
-| A. Free gate + returnTo on Upgrade CTA | Automated |
+| A. Free gate + returnTo on Upgrade CTA | Automated — gate and CTA asserted affirmatively (visible testids, exact `/pricing?returnTo=%2Fpheno-hunts%2Fnew` href, click-through renders plan content); an `/auth` bounce or absent gate/CTA FAILS |
 | B. CheckoutSuccess sanitization + entitlement wait | Automated (route contract only) |
-| B. Paddle iframe payment | **MANUAL** — iframe is cross-origin |
+| B. Paddle iframe payment | **MANUAL** — iframe is cross-origin; no real charge is ever performed |
 | C. Pro hunt creation flow | Requires Pro session + fixture; automated when inputs present |
-| D–F. Disabled Compare / direct incomplete /compare | Automated with `E2E_PHENO_HUNT_ID_MISSING_EVIDENCE` |
-| G. Comparison-ready enable + read-only render | Automated with `E2E_PHENO_HUNT_ID_COMPARISON_READY` |
-| H. Canceled/expired write attempt | Automated when canceled session present |
+| D–F. Disabled Compare / direct incomplete /compare | Automated with `E2E_PHENO_HUNT_ID_MISSING_EVIDENCE` — required assertions: disabled state, EXACT not-ready reason copy (pinned per `data-readiness` from the readiness view model), and missing-evidence anchor click-through (same-workspace hash navigation, target attached, Compare stays disabled) |
+| G. Comparison-ready enable + read-only render | Automated with `E2E_PHENO_HUNT_ID_COMPARISON_READY` — enabled Compare link with exact hunt route, then substantive content: live mode, ≥2 candidate surfaces with non-empty labels, ≥1 hydrated expression/evidence field, read-only badge, zero action controls inside the surface |
+| H. Canceled/expired write attempt | Automated when canceled session present — gate asserted affirmatively |
 | I. Core one-tent regression | Automated (smoke asserts dashboard resolves) |
+
+A static contract suite
+(`src/test/pheno-live-smoke-assertion-contract.test.ts`, run via
+`bun run test:pheno-live-smoke:contract`) prevents these required
+assertions from regressing to conditional `if (count())` patterns or
+silent early returns, and pins the checkpoint mapping to the spec's
+actual test titles. The live smoke never performs a real Paddle charge,
+never seeds production fixtures, and never produces a keeper/winner
+recommendation.
 
 ### Interpreting results
 
@@ -309,10 +318,16 @@ spot-check PASS (3 onboarding columns, exactly 1 entitlement function,
 with zero failed and zero skipped tests, all 12 checkpoints PASS,
 billing disposition resolved, and complete rollback readiness. Anything
 less is HOLD. Checkpoints auto-populate only when a matching Playwright
-test proves them; checkpoints 6 (hunt setup persistence) and 9
-(missing-evidence navigation) have no automated proof in the live smoke
-and stay PENDING unless `manual-release-checks.json` records manual
-evidence.
+test proves them; checkpoint 6 (hunt setup persistence) has no automated
+proof in the live smoke and stays PENDING unless
+`manual-release-checks.json` records manual evidence. Checkpoint 9
+(missing-evidence navigation) now has automated anchor click-through
+proof in the live smoke; under current release policy its separate
+manual evidence requirement still applies at receipt time unless a
+policy decision explicitly removes it. Checkpoints 1, 2, 8, and 11 map
+to affirmative live assertions (gate/CTA existence, exact returnTo
+round-trip, exact not-ready reason copy, substantive comparison
+content).
 
 ### Safety
 

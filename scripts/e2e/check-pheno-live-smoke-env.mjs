@@ -8,9 +8,10 @@
  * Exit codes:
  *   0 = READY
  *   1 = invalid/conflicting configuration
- *   2 = required local inputs are missing
+ *   2 = required local inputs are missing OR contain placeholder values
  */
 import { pathToFileURL } from "node:url";
+import { classifyValue } from "./pheno-live-smoke-placeholders.mjs";
 
 export const PHENO_LIVE_URL = "https://verdantgrowdiary.com";
 export const PHENO_LIVE_CONFIRM_VALUE = "RUN_LIVE_PHENO_SMOKE";
@@ -29,24 +30,42 @@ export const PHENO_LIVE_REQUIRED_ENV = [
   "E2E_PHENO_HUNT_ID_COMPARISON_READY",
 ];
 
-function present(env, name) {
-  const value = env[name];
-  return typeof value === "string" && value.trim().length > 0;
+function classify(env, name) {
+  return classifyValue(env[name]);
 }
 
 export function evaluatePhenoLiveSmokeEnv(env = process.env) {
-  const missing = PHENO_LIVE_REQUIRED_ENV.filter((name) => !present(env, name));
+  const missing = [];
+  const placeholders = [];
+  const variables = [];
+  for (const name of PHENO_LIVE_REQUIRED_ENV) {
+    const cls = classify(env, name);
+    let status;
+    if (cls === "BLANK") {
+      status = "MISSING";
+      missing.push(name);
+    } else if (cls === "PLACEHOLDER") {
+      status = "PLACEHOLDER";
+      placeholders.push(name);
+    } else {
+      status = "PRESENT";
+    }
+    variables.push({ name, status });
+  }
+
   const errors = [];
   const warnings = [];
 
+  // Only enforce the confirmation value when it is a real (non-placeholder,
+  // non-blank) string — otherwise it's already reported as MISSING/PLACEHOLDER.
   if (
-    present(env, "E2E_PHENO_LIVE_SMOKE_CONFIRM") &&
+    classify(env, "E2E_PHENO_LIVE_SMOKE_CONFIRM") === "OK" &&
     env.E2E_PHENO_LIVE_SMOKE_CONFIRM !== PHENO_LIVE_CONFIRM_VALUE
   ) {
     errors.push("E2E_PHENO_LIVE_SMOKE_CONFIRM does not contain the required confirmation value");
   }
 
-  if (present(env, "E2E_BASE_URL")) {
+  if (typeof env.E2E_BASE_URL === "string" && env.E2E_BASE_URL.trim().length > 0) {
     let configured;
     try {
       configured = new URL(env.E2E_BASE_URL.trim()).origin;
@@ -58,13 +77,14 @@ export function evaluatePhenoLiveSmokeEnv(env = process.env) {
     }
   }
 
-  if (present(env, "SUPABASE_SERVICE_ROLE_KEY")) {
+  if (typeof env.SUPABASE_SERVICE_ROLE_KEY === "string" && env.SUPABASE_SERVICE_ROLE_KEY.trim().length > 0) {
     warnings.push(
       "SUPABASE_SERVICE_ROLE_KEY is present but is not used by the live smoke; keep it out of browser-visible environments",
     );
   }
 
-  const status = errors.length > 0 ? "FAIL" : missing.length > 0 ? "BLOCKED" : "READY";
+  const blocked = missing.length > 0 || placeholders.length > 0;
+  const status = errors.length > 0 ? "FAIL" : blocked ? "BLOCKED" : "READY";
   const exitCode = status === "READY" ? 0 : status === "BLOCKED" ? 2 : 1;
 
   return {
@@ -72,12 +92,10 @@ export function evaluatePhenoLiveSmokeEnv(env = process.env) {
     status,
     exitCode,
     missing,
+    placeholders,
     errors,
     warnings,
-    variables: PHENO_LIVE_REQUIRED_ENV.map((name) => ({
-      name,
-      status: present(env, name) ? "PRESENT" : "MISSING",
-    })),
+    variables,
   };
 }
 
@@ -88,7 +106,7 @@ export function printPhenoLiveSmokeChecklist(result, log = console.log) {
   log("");
   log("Required local environment variables (names only):");
   for (const variable of result.variables) {
-    log(`  ${variable.status.padEnd(7)} ${variable.name}`);
+    log(`  ${variable.status.padEnd(11)} ${variable.name}`);
   }
 
   log("");
@@ -104,6 +122,10 @@ export function printPhenoLiveSmokeChecklist(result, log = console.log) {
   if (result.missing.length > 0) {
     log("");
     log(`Missing variable names: ${result.missing.join(", ")}`);
+  }
+  if (result.placeholders && result.placeholders.length > 0) {
+    log(`Placeholder variable names: ${result.placeholders.join(", ")}`);
+    log("Replace the placeholder values with real test-account credentials before rerunning.");
   }
   for (const warning of result.warnings) log(`WARNING: ${warning}`);
   for (const error of result.errors) log(`FAIL: ${error}`);

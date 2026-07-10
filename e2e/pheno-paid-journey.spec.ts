@@ -204,15 +204,17 @@ test.describe("Phase PAID — entitled fixture runs create → evidence → comp
     await page.getByTestId(`workspace-save-smoke-${decided}`).click();
 
     // Now — and only now — the compare action flips to the live link.
+    // Button asChild merges the testid onto the <a> itself — target it
+    // directly (no descendant anchor exists).
     const compareLink = page.getByTestId("pheno-workspace-compare-action-link");
     await expect(compareLink, "full evidence ladder must enable Compare").toBeVisible({
       timeout: 15_000,
     });
-    const compareHref = await compareLink.locator("a").getAttribute("href");
+    const compareHref = await compareLink.getAttribute("href");
     expect(compareHref).toBe(`/pheno-hunts/${huntId}/compare`);
 
     // 4) Compare page opens with real content (not the disabled state).
-    await compareLink.locator("a").click();
+    await compareLink.click();
     await page.waitForURL(new RegExp(`/pheno-hunts/${huntId}/compare`), {
       timeout: 20_000,
     });

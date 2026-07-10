@@ -10,9 +10,14 @@
 import { supabase } from "@/integrations/supabase/client";
 import {
   adaptPhenoHuntCandidates,
+  type PhenoHuntCandidateLabEvidence,
   type PhenoHuntCandidatePlantRow,
+  type PhenoHuntCandidateScoreEvidence,
+  type PhenoHuntCandidateSmokeEvidence,
 } from "@/lib/phenoHuntCandidateAdapter";
+import { phenoDb } from "@/integrations/supabase/phenoTables";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
+
 
 export interface PhenoHuntSummary {
   id: string;
@@ -59,15 +64,31 @@ export async function loadPhenoHuntCandidates(
   if (plantsError) return { ok: false, error: "Could not load hunt candidates." };
 
   const plants = (plantRows ?? []) as PhenoHuntCandidatePlantRow[];
+  const plantIds = plants.map((p) => p.id).filter((v): v is string => typeof v === "string" && v.length > 0);
 
   // Independent lookups — one round trip instead of two serial hops on the
-  // workspace's critical loading path.
-  const [growNameById, tentNameById] = await Promise.all([
-    loadNameMap("grows", distinct([huntRow.grow_id, ...plants.map((p) => p.grow_id)])),
-    loadNameMap("tents", distinct([huntRow.tent_id, ...plants.map((p) => p.tent_id)])),
-  ]);
+  // workspace's critical loading path. Evidence tables are RLS-scoped by
+  // hunt_id (and the caller owns the hunt), so cross-hunt / cross-user data
+  // never reaches this map. Requests are scoped by hunt_id AND plant_id so
+  // stray orphan rows from a deleted candidate can't leak either.
+  const [growNameById, tentNameById, scoreByPlantId, smokeTestByPlantId, labResultByPlantId] =
+    await Promise.all([
+      loadNameMap("grows", distinct([huntRow.grow_id, ...plants.map((p) => p.grow_id)])),
+      loadNameMap("tents", distinct([huntRow.tent_id, ...plants.map((p) => p.tent_id)])),
+      loadCandidateScores(id, plantIds),
+      loadSmokeTests(id, plantIds),
+      loadLabResults(id, plantIds),
+    ]);
 
-  const candidates = adaptPhenoHuntCandidates({ plants, growNameById, tentNameById });
+  const candidates = adaptPhenoHuntCandidates({
+    plants,
+    growNameById,
+    tentNameById,
+    scoreByPlantId,
+    smokeTestByPlantId,
+    labResultByPlantId,
+  });
+
 
   const rawGoals = (huntRow as { evidence_goals?: unknown }).evidence_goals;
   const evidenceGoals = Array.isArray(rawGoals)
@@ -113,3 +134,113 @@ async function loadNameMap(
   }
   return map;
 }
+
+// ---------------------------------------------------------------------------
+// Evidence loaders — RLS-scoped SELECT only, always filtered by hunt_id AND
+// plant_id. Best-effort: any failure returns an empty map and readiness
+// engines simply see "no evidence" (never fake-complete).
+// ---------------------------------------------------------------------------
+
+async function loadCandidateScores(
+  huntId: string,
+  plantIds: string[],
+): Promise<Record<string, PhenoHuntCandidateScoreEvidence>> {
+  if (plantIds.length === 0) return {};
+  const { data, error } = await phenoDb
+    .from("pheno_candidate_scores")
+    .select("plant_id, traits, note")
+    .eq("hunt_id", huntId)
+    .in("plant_id", plantIds);
+  if (error || !data) return {};
+  const map: Record<string, PhenoHuntCandidateScoreEvidence> = {};
+  for (const row of data) {
+    if (!row.plant_id || map[row.plant_id]) continue;
+    const traits =
+      row.traits && typeof row.traits === "object" && !Array.isArray(row.traits)
+        ? (row.traits as Record<string, number>)
+        : null;
+    map[row.plant_id] = { traits, note: typeof row.note === "string" ? row.note : null };
+  }
+  return map;
+}
+
+async function loadSmokeTests(
+  huntId: string,
+  plantIds: string[],
+): Promise<Record<string, PhenoHuntCandidateSmokeEvidence>> {
+  if (plantIds.length === 0) return {};
+  const { data, error } = await phenoDb
+    .from("pheno_smoke_tests")
+    .select(
+      "plant_id, flavor_descriptors, effect_descriptors, smoothness, potency_impression, verdict",
+    )
+    .eq("hunt_id", huntId)
+    .in("plant_id", plantIds);
+  if (error || !data) return {};
+  const map: Record<string, PhenoHuntCandidateSmokeEvidence> = {};
+  for (const row of data) {
+    if (!row.plant_id || map[row.plant_id]) continue;
+    map[row.plant_id] = {
+      flavorDescriptors: Array.isArray(row.flavor_descriptors)
+        ? (row.flavor_descriptors.filter((v) => typeof v === "string") as string[])
+        : null,
+      effectDescriptors: Array.isArray(row.effect_descriptors)
+        ? (row.effect_descriptors.filter((v) => typeof v === "string") as string[])
+        : null,
+      smoothness: typeof row.smoothness === "number" ? row.smoothness : null,
+      potencyImpression: typeof row.potency_impression === "number" ? row.potency_impression : null,
+      verdict: typeof row.verdict === "string" ? row.verdict : null,
+    };
+  }
+  return map;
+}
+
+/** Prefer COA > estimate > unspecified when multiple lab rows exist per plant. */
+const LAB_SOURCE_RANK: Record<string, number> = { coa: 3, estimate: 2, unspecified: 1 };
+function normalizeLabSource(v: unknown): "coa" | "estimate" | "unspecified" {
+  return v === "coa" || v === "estimate" ? v : "unspecified";
+}
+
+async function loadLabResults(
+  huntId: string,
+  plantIds: string[],
+): Promise<Record<string, PhenoHuntCandidateLabEvidence>> {
+  if (plantIds.length === 0) return {};
+  const { data, error } = await phenoDb
+    .from("pheno_lab_results")
+    .select("plant_id, source, thc_pct, cbd_pct, total_cannabinoids_pct, dominant_terpenes")
+    .eq("hunt_id", huntId)
+    .in("plant_id", plantIds);
+  if (error || !data) return {};
+  const map: Record<string, PhenoHuntCandidateLabEvidence> = {};
+  for (const row of data) {
+    if (!row.plant_id) continue;
+    const source = normalizeLabSource(row.source);
+    const existing = map[row.plant_id];
+    if (existing && LAB_SOURCE_RANK[existing.source] >= LAB_SOURCE_RANK[source]) continue;
+    const terps = Array.isArray(row.dominant_terpenes)
+      ? (row.dominant_terpenes
+          .filter(
+            (t): t is { name: string; pct?: number | null } =>
+              !!t && typeof t === "object" && typeof (t as { name?: unknown }).name === "string",
+          )
+          .map((t) => ({
+            name: (t as { name: string }).name,
+            pct:
+              typeof (t as { pct?: unknown }).pct === "number"
+                ? ((t as { pct: number }).pct as number)
+                : null,
+          })) as ReadonlyArray<{ name: string; pct: number | null }>)
+      : null;
+    map[row.plant_id] = {
+      thcPct: typeof row.thc_pct === "number" ? row.thc_pct : null,
+      cbdPct: typeof row.cbd_pct === "number" ? row.cbd_pct : null,
+      totalCannabinoidsPct:
+        typeof row.total_cannabinoids_pct === "number" ? row.total_cannabinoids_pct : null,
+      dominantTerpenes: terps,
+      source,
+    };
+  }
+  return map;
+}
+

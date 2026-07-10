@@ -46,6 +46,38 @@ jobs:
           E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
         run: bun run scripts/e2e/run-pheno-disabled-compare-e2e.mjs
 
+      # Summarize screenshot inventory before upload. Never prints fixture
+      # IDs or env values — only relative filenames under e2e/screenshots/.
+      - name: Summarize Pheno disabled-Compare screenshots
+        if: always()
+        shell: bash
+        run: |
+          if [ -d e2e/screenshots ]; then
+            count=$(find e2e/screenshots -type f | wc -l | tr -d ' ')
+            {
+              echo "### Pheno disabled-Compare screenshots"
+              echo ""
+              echo "Found ${count} screenshot file(s). Artifact \`pheno-disabled-compare-screenshots\` will be uploaded."
+              echo ""
+              if [ "${count}" -gt 0 ]; then
+                echo "Files:"
+                echo ""
+                find e2e/screenshots -type f -printf '- %P\n' 2>/dev/null \
+                  || find e2e/screenshots -type f | sed 's#^e2e/screenshots/#- #'
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "Screenshot inventory (${count} file(s)):"
+            find e2e/screenshots -type f -printf '  %P\n' 2>/dev/null \
+              || find e2e/screenshots -type f | sed 's#^e2e/screenshots/#  #'
+          else
+            {
+              echo "### Pheno disabled-Compare screenshots"
+              echo ""
+              echo "No \`e2e/screenshots/\` directory found — all scenarios skipped or no screenshots were produced. Screenshot artifact upload will no-op."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "No e2e/screenshots directory found; upload step will no-op."
+          fi
+
       # Preserve rendered screenshots as artifact even when scenarios
       # partially skip due to missing fixture env vars. `if: always()`
       # ensures the artifact uploads on success, failure, and cancellation;

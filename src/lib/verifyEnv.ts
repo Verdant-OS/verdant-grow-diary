@@ -26,9 +26,14 @@ function buildChecks(env: EnvOverrides, shadowAll: boolean): EnvCheck[] {
       name: "VITE_SUPABASE_URL",
       value: get("VITE_SUPABASE_URL"),
       required: true,
+      // Hosted project URL, or a LOCAL loopback stack (supabase start) —
+      // the local E2E lanes run the app against http://127.0.0.1:54321.
       validate: (val) =>
-        val.startsWith("https://") && val.includes(".supabase.co"),
-      hint: "Must be a valid Supabase project URL (https://<ref>.supabase.co)",
+        (val.startsWith("https://") && val.includes(".supabase.co")) ||
+        /^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(
+          val.replace(/\/$/, ""),
+        ),
+      hint: "Must be a Supabase project URL (https://<ref>.supabase.co) or a local loopback stack (http://127.0.0.1:54321)",
     },
     {
       name: "VITE_SUPABASE_PUBLISHABLE_KEY",

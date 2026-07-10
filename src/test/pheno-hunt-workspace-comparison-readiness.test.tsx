@@ -25,11 +25,15 @@ vi.mock("@/hooks/usePhenoHermCullSuggestion", () => ({
 }));
 vi.mock("@/hooks/usePhenoStressObservations", () => ({
   usePhenoStressObservations: () => ({
-    observations: [],
-    status: "ok",
+    rows: [],
+    summariesByPlant: {},
+    diaryOptions: [],
+    save: vi.fn().mockResolvedValue(true),
+    update: vi.fn().mockResolvedValue(true),
+    remove: vi.fn().mockResolvedValue(true),
+    refresh: vi.fn().mockResolvedValue(undefined),
+    loading: false,
     error: null,
-    save: vi.fn(),
-    remove: vi.fn(),
   }),
 }));
 

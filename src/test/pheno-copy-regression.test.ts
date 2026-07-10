@@ -169,4 +169,53 @@ describe("Pheno copy regression", () => {
     expect(src).toMatch(/missing evidence needed for an honest candidate comparison/i);
     expect(src).toMatch(/PHENO_COMPARISON_READY_DEFINITION/);
   });
+
+  it("expanded forbidden matrix is absent from comparison surfaces", () => {
+    const surfaces = [
+      "src/components/PhenoCompareCandidatesAction.tsx",
+      "src/components/PhenoHuntSetupProgressCard.tsx",
+      "src/components/PhenoComparisonReadyChecklist.tsx",
+      "src/pages/PhenoComparison.tsx",
+      "src/pages/PhenoHuntCompare.tsx",
+    ];
+    const forbidden: RegExp[] = [
+      /\bwinner\b/i,
+      /winner\s+is/i,
+      /winning\s+candidate/i,
+      /best\s+candidate/i,
+      /best\s+pheno/i,
+      /best\s+pheno\s+is/i,
+      /top\s+candidate/i,
+      /ranked\s+candidate/i,
+      /candidate\s+ranking/i,
+      /final\s+ranking/i,
+      /final\s+verdict/i,
+      /comparison\s+verdict/i,
+      /recommended\s+keeper/i,
+      /keeper\s+recommendation/i,
+      /keeper\s+selected/i,
+      /keeper\s+confirmed/i,
+      /selection\s+winner/i,
+      /selection[- ]?ready/i,
+      /ready\s+to\s+select/i,
+      /ai\s+picked/i,
+      /ai\s+picks?\s+winners?/i,
+      /guaranteed\s+keeper/i,
+      /guaranteed\s+yield/i,
+      /automated\s+breeding/i,
+    ];
+    for (const path of surfaces) {
+      const src = read(path);
+      for (const pat of forbidden) {
+        expect(pat.test(src), `${path} contains forbidden phrase ${pat}`).toBe(false);
+      }
+    }
+  });
+
+  it("warning-safe framings remain allowed on the compare page", () => {
+    // "comparison-ready" is allowed when clearly framed as not-ready or ready.
+    const src = read("src/pages/PhenoHuntCompare.tsx");
+    expect(/Not\s+comparison-ready\s+yet|notComparisonReadyYet/i.test(src)).toBe(true);
+    expect(/missing\s+evidence\s+needed\s+for\s+an\s+honest\s+candidate\s+comparison/i.test(src)).toBe(true);
+  });
 });

@@ -83,4 +83,33 @@ describe("buildPhenoComparisonActionState", () => {
     expect(s.enabled).toBe(false);
     expect(s.nextStepTarget).toBeNull();
   });
+
+  it("missing-evidence items carry safe workspace next-step targets (never /compare)", () => {
+    const s = buildPhenoComparisonActionState({
+      ...base,
+      allCandidatesHavePhenotypeNote: false,
+    });
+    expect(s.missingEvidenceItems.length).toBeGreaterThan(0);
+    for (const item of s.missingEvidenceItems) {
+      if (item.nextStepTarget) {
+        expect(item.nextStepTarget).toBe("/pheno-hunts/h1/workspace");
+        expect(item.nextStepTarget.includes("/compare")).toBe(false);
+        expect(typeof item.nextStepLabel).toBe("string");
+      } else {
+        expect(item.nextStepLabel).toBeNull();
+      }
+    }
+  });
+
+  it("missing huntId → all next-step targets are null (no fake links)", () => {
+    const s = buildPhenoComparisonActionState({
+      ...base,
+      huntId: null,
+      allCandidatesHavePhenotypeNote: false,
+    });
+    for (const item of s.missingEvidenceItems) {
+      expect(item.nextStepTarget).toBeNull();
+      expect(item.nextStepLabel).toBeNull();
+    }
+  });
 });

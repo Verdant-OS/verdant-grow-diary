@@ -365,6 +365,9 @@ describe("PhenoHuntWorkspace — Comparison-ready gating", () => {
     });
     expect(screen.queryByTestId("pheno-workspace-compare-action-helper")).toBeNull();
     expect(screen.queryByTestId("pheno-workspace-compare-action-disabled-intro")).toBeNull();
+  });
+
+
 
   it("enabled Compare candidates renders a real <a href=/compare> and navigates on click", () => {
     mountAt({

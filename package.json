@@ -35,6 +35,8 @@
     "release:pheno:build-id": "node scripts/releases/fetch-pheno-live-build-id.mjs",
     "release:pheno:receipt": "node scripts/releases/write-pheno-release-receipt.mjs",
     "release:pheno:receipt:partial": "node scripts/releases/write-pheno-release-receipt.mjs --allow-partial",
+    "release:pheno:receipt:validate": "node scripts/releases/validate-pheno-release-receipt.mjs",
+    "release:pheno:live-gate": "node scripts/releases/run-pheno-live-release-gate.mjs",
     "test:security-static": "node scripts/security/test-static-client-secret-scan.mjs && node scripts/security/static-client-secret-scan.mjs",
     "test:payments-security": "vitest run src/test/lovable-paddle-webhook-orchestrator.test.ts src/test/lovable-paddle-webhook-event-processor.test.ts src/test/lovable-paddle-webhook-no-frontend-secrets.test.ts src/test/lovable-paddle-client-no-secrets.test.ts src/test/paddle-webhook-processing-static.test.ts src/test/paddle-signature-test-helper.test.ts",
     "test:paddle-webhook-edge-security": "deno test --allow-env supabase/functions/paddle-webhook/security.test.ts",

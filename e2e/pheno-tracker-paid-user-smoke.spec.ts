@@ -286,6 +286,9 @@ test.describe("D–F. Missing-evidence hunt", () => {
     await expect(page).not.toHaveURL(/\/auth/);
     const action = page.getByTestId("pheno-workspace-compare-action");
     await expect(action).toBeVisible({ timeout: 20_000 });
+    // Pre-click state: Compare must exist disabled with no live link.
+    await expect(page.getByTestId("pheno-workspace-compare-action-disabled")).toBeDisabled();
+    await expect(page.getByTestId("pheno-workspace-compare-action-link")).toHaveCount(0);
     const reasonBefore = await page
       .getByTestId("pheno-workspace-compare-action-reason")
       .innerText();

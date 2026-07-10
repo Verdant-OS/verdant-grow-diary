@@ -91,3 +91,67 @@ surface:
 Read-only. No schema, RLS, entitlement, scoring, AI, Action Queue, or
 device-control changes. Only real evidence changes may flip a hunt to
 comparison-ready — navigation, focus, or clicking inert items cannot.
+
+
+## Pheno Tracker paid-user smoke
+
+`e2e/pheno-tracker-paid-user-smoke.spec.ts` covers the Free → Pro →
+Pheno Hunt journey end-to-end. Every scenario is env-gated: missing
+inputs skip cleanly with a printed reason. Nothing is faked.
+
+### Required accounts / sessions
+
+Provide either session files (preferred) OR email+password pairs:
+
+- `E2E_PHENO_FREE_SESSION_FILE` OR `E2E_PHENO_FREE_EMAIL` + `E2E_PHENO_FREE_PASSWORD`
+- `E2E_PHENO_PRO_SESSION_FILE` OR `E2E_PHENO_PRO_EMAIL` + `E2E_PHENO_PRO_PASSWORD`
+- `E2E_PHENO_FOUNDER_SESSION_FILE` OR `E2E_PHENO_FOUNDER_EMAIL` + `E2E_PHENO_FOUNDER_PASSWORD` (optional)
+- `E2E_PHENO_CANCELED_SESSION_FILE` OR `E2E_PHENO_CANCELED_EMAIL` + `E2E_PHENO_CANCELED_PASSWORD` (optional)
+
+### Required fixture ids
+
+- `E2E_PHENO_HUNT_ID_MISSING_EVIDENCE` (required for D–F)
+- `E2E_PHENO_HUNT_ID_COMPARISON_READY` (required for G)
+- `E2E_PHENO_HUNT_ID_PENDING_HARVEST`, `_PENDING_CURE`, `_REPLICATION_PENDING` (optional)
+
+### Local fixture seeding
+
+Local Supabase / service_role required. This project does not currently
+ship a seeding script; create the fixture hunts against your local Supabase
+via the app UI while signed in as the corresponding test user, then export
+their ids into the env vars above. **Never** seed against production and
+**never** paste service_role, cookies, passwords, or hunt ids into chat.
+
+### Running
+
+```bash
+bun run test:pheno-paid-smoke:preflight   # PRESENT/SKIPPED report
+bun run test:pheno-paid-smoke             # preflight + Playwright smoke
+```
+
+### Automated vs manual steps
+
+| Step | Automation |
+| ---- | ---------- |
+| A. Free gate + returnTo on Upgrade CTA | Automated |
+| B. CheckoutSuccess sanitization + entitlement wait | Automated (route contract only) |
+| B. Paddle iframe payment | **MANUAL** — iframe is cross-origin |
+| C. Pro hunt creation flow | Requires Pro session + fixture; automated when inputs present |
+| D–F. Disabled Compare / direct incomplete /compare | Automated with `E2E_PHENO_HUNT_ID_MISSING_EVIDENCE` |
+| G. Comparison-ready enable + read-only render | Automated with `E2E_PHENO_HUNT_ID_COMPARISON_READY` |
+| H. Canceled/expired write attempt | Automated when canceled session present |
+| I. Core one-tent regression | Automated (smoke asserts dashboard resolves) |
+
+### Interpreting results
+
+- **PASS** — scenario ran and assertions held.
+- **SKIPPED** — required env/fixture missing. Not a failure.
+- **BLOCKED** — env claims a session file but the file is unreadable, or
+  Paddle iframe payment must be exercised manually.
+- **FAIL** — real regression. Investigate before publishing.
+
+### Safety
+
+Never paste passwords, cookies, session tokens, `service_role`, or hunt
+ids into chat, PR descriptions, or CI logs. The preflight script prints
+only `PRESENT` / `SKIPPED` — never the value.

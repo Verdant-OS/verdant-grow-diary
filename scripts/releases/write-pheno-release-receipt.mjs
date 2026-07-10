@@ -14,6 +14,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const ROOT = process.cwd();
 const ARTIFACT_DIR = path.resolve("artifacts/release-readiness/pheno-tracker-live-smoke");
@@ -40,7 +41,7 @@ const CHECKPOINTS = [
   [12, "Core Verdant regression"],
 ];
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const args = { ...DEFAULTS, allowPartial: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -73,16 +74,27 @@ function esc(value) {
   return String(value ?? "").replaceAll("|", "\\|").replaceAll("\n", " ").trim();
 }
 
-function expectedBuildMatches(build, manual) {
+// Same semantics as scripts/releases/fetch-pheno-live-build-id.mjs: the
+// expected identifier must EXACTLY equal the bundle id or filename, or be a
+// >=8-char hex prefix of the SHA-256. Prefixes of the id/filename never match.
+export function expectedBuildMatches(build, manual) {
   const expected = String(manual?.expectedBuildId ?? "").trim();
   if (!expected) return null;
-  const observed = [build?.bundleId, build?.bundleSha256, build?.bundleFile]
-    .filter(Boolean)
-    .map((value) => String(value));
-  return observed.some((value) => value === expected || value.startsWith(expected));
+  if (build?.bundleId && String(build.bundleId) === expected) return true;
+  if (build?.bundleFile && String(build.bundleFile) === expected) return true;
+  const sha = build?.bundleSha256 ? String(build.bundleSha256).toLowerCase() : "";
+  if (
+    sha &&
+    expected.length >= 8 &&
+    /^[0-9a-f]+$/i.test(expected) &&
+    sha.startsWith(expected.toLowerCase())
+  ) {
+    return true;
+  }
+  return false;
 }
 
-function schemaResult(schema) {
+export function schemaResult(schema) {
   const required = ["evidence_goals", "notes", "setup_completed_at"];
   const columns = Array.isArray(schema?.columns) ? schema.columns : [];
   const columnsPass = required.every((name) => columns.includes(name));
@@ -122,7 +134,7 @@ function smokeCheckpointMap(smoke, manual) {
   return map;
 }
 
-function renderReceipt({ smoke, schema, build, manual }) {
+export function renderReceipt({ smoke, schema, build, manual, allowPartial = false }) {
   const schemaCheck = schemaResult(schema);
   const buildMatch = expectedBuildMatches(build, manual);
   const deploymentReachable = status(smoke?.deployment) === "PASS" && status(build?.status) === "PASS";
@@ -145,16 +157,27 @@ function renderReceipt({ smoke, schema, build, manual }) {
     ? billingStatus === "NOT_REQUIRED" || billingStatus === "PASS"
     : billingStatus === "PASS";
 
-  const decision =
+  // GO also demands complete rollback readiness — a release without a
+  // verified rollback path is not shippable, only reachable.
+  const rollbackComplete = [
+    manual?.rollback?.priorVersionIdentified,
+    manual?.rollback?.additiveMigrations,
+    manual?.rollback?.entryPointDisable,
+    manual?.rollback?.ownerReadPreserved,
+  ].every((value) => yes(value));
+
+  const gatesPass =
     deploymentReachable &&
     deploymentManualPass &&
     buildIdentityPass &&
     schemaCheck.pass &&
     smokePass &&
     allCheckpointsPass &&
-    billingResolved
-      ? "GO"
-      : "HOLD";
+    billingResolved &&
+    rollbackComplete;
+  // --allow-partial exists to refresh a receipt before all evidence is in.
+  // It can never mint a GO — a full run without the flag must confirm it.
+  const decision = gatesPass && !allowPartial ? "GO" : "HOLD";
 
   const lines = [
     "# Pheno Tracker Pro Release Receipt",
@@ -257,7 +280,13 @@ function main() {
     process.exit(2);
   }
 
-  const result = renderReceipt({ smoke: smoke ?? {}, schema: schema ?? {}, build: build ?? {}, manual });
+  const result = renderReceipt({
+    smoke: smoke ?? {},
+    schema: schema ?? {},
+    build: build ?? {},
+    manual,
+    allowPartial: args.allowPartial,
+  });
   fs.mkdirSync(path.dirname(args.out), { recursive: true });
   fs.writeFileSync(args.out, `${result.markdown}\n`);
   console.log(`receipt     ${path.relative(ROOT, args.out)}`);
@@ -265,9 +294,12 @@ function main() {
   process.exit(result.decision === "GO" ? 0 : 2);
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(`FAIL: ${String(error?.message ?? error).split("\n")[0]}`);
-  process.exit(1);
+const invokedPath = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
+if (import.meta.url === invokedPath) {
+  try {
+    main();
+  } catch (error) {
+    console.error(`FAIL: ${String(error?.message ?? error).split("\n")[0]}`);
+    process.exit(1);
+  }
 }

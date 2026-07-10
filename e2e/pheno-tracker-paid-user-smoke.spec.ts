@@ -178,6 +178,10 @@ test.describe("A. Free user gate", () => {
 
 // ─── B. CheckoutSuccess sanitizer (anonymous is fine) ─────────────────────
 test.describe("B. CheckoutSuccess sanitizer", () => {
+  // Anonymous by design: explicit empty storage state so this describe never
+  // depends on the chromium-authed project's default user.json file.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test("unsafe returnTo is rejected; safe returnTo does not auto-redirect anonymously", async ({ page }) => {
     await page.goto("/checkout/success?returnTo=https://evil.example/pwn");
     await expect(page.getByTestId("checkout-success-page")).toBeVisible();
@@ -443,6 +447,9 @@ test.describe("G. Comparison-ready hunt", () => {
 
 // ─── I. Regression: dashboard still resolves ──────────────────────────────
 test.describe("I. Core one-tent regression", () => {
+  // Anonymous by design (route-resolution check only).
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test("dashboard route still resolves without a crash", async ({ page }) => {
     await page.goto("/dashboard");
     const bodyText = await page.locator("body").innerText();

@@ -52,13 +52,15 @@ const FEATURE_BULLETS: ReadonlyArray<string> = [
 function buildUpgradeHref(pathname: string): string {
   // Only forward a same-origin, absolute app path. Never forward query, hash,
   // or external URLs. This is defence in depth against redirect abuse.
+  // Points at /pricing — the page with LIVE checkout. /upgrade is a dead end
+  // (every paddlePriceId there is null, so all paid CTAs are disabled).
   const safe =
     typeof pathname === "string" && pathname.startsWith("/") && !pathname.startsWith("//")
       ? pathname
       : null;
-  if (!safe) return "/upgrade";
+  if (!safe) return "/pricing";
   const params = new URLSearchParams({ returnTo: safe });
-  return `/upgrade?${params.toString()}`;
+  return `/pricing?${params.toString()}`;
 }
 
 export default function PhenoTrackerUpgradeGate({

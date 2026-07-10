@@ -3,11 +3,27 @@ import { initializePaddle, getPaddlePriceId } from "@/lib/paddle";
 import { useAuth } from "@/store/auth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
+import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 
 export interface OpenCheckoutOptions {
   priceId: string;
   quantity?: number;
   successUrl?: string;
+}
+
+/**
+ * Default post-checkout landing. When the current page carries a sanitized
+ * `returnTo` (e.g. the Pheno upgrade gate links to /pricing?returnTo=...),
+ * forward it to /checkout/success so the buyer lands back on the gated
+ * surface they came from once entitlement is confirmed. Raw query values
+ * never reach the URL un-sanitized.
+ */
+function defaultSuccessUrl(): string {
+  const returnTo = sanitizeCheckoutReturnTo(
+    new URLSearchParams(window.location.search).get("returnTo"),
+  );
+  const base = `${window.location.origin}/checkout/success`;
+  return returnTo ? `${base}?returnTo=${encodeURIComponent(returnTo)}` : base;
 }
 
 /**
@@ -29,7 +45,10 @@ export function usePaddleCheckout() {
 
   const openCheckout = async (options: OpenCheckoutOptions) => {
     if (!user) {
-      navigate(`/auth?redirect=${encodeURIComponent("/pricing")}`);
+      // Preserve the full current path (including any returnTo) through the
+      // auth detour so the round-trip back to a gated surface survives.
+      const back = `${window.location.pathname}${window.location.search}` || "/pricing";
+      navigate(`/auth?redirect=${encodeURIComponent(back)}`);
       return;
     }
     setLoading(true);
@@ -45,9 +64,7 @@ export function usePaddleCheckout() {
         customData: { userId: user.id },
         settings: {
           displayMode: "overlay",
-          successUrl:
-            options.successUrl ||
-            `${window.location.origin}/checkout/success`,
+          successUrl: options.successUrl || defaultSuccessUrl(),
           allowLogout: false,
           variant: "one-page",
         },

@@ -96,8 +96,10 @@ describe("PhenoTrackerUpgradeGate", () => {
     const upgradeLinks = screen.getAllByRole("link", { name: /upgrade to pro/i });
     expect(upgradeLinks.length).toBe(1);
     // returnTo carried into the upgrade href for the gated Pheno route.
+    // Destination is /pricing — the page with LIVE checkout (/upgrade is a
+    // dead end: every paddlePriceId there is null).
     expect(upgradeLinks[0].getAttribute("href")).toBe(
-      "/upgrade?returnTo=%2Fpheno-hunts%2Fnew",
+      "/pricing?returnTo=%2Fpheno-hunts%2Fnew",
     );
 
     const demo = screen.getByTestId("pheno-tracker-upgrade-gate-demo-link");
@@ -114,7 +116,7 @@ describe("PhenoTrackerUpgradeGate", () => {
     renderGate({}, "/pheno-hunts/abc/workspace");
     const upgrade = screen.getAllByRole("link", { name: /upgrade to pro/i })[0];
     expect(upgrade.getAttribute("href")).toBe(
-      "/upgrade?returnTo=%2Fpheno-hunts%2Fabc%2Fworkspace",
+      "/pricing?returnTo=%2Fpheno-hunts%2Fabc%2Fworkspace",
     );
   });
 

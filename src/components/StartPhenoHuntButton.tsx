@@ -29,7 +29,7 @@ export default function StartPhenoHuntButton({ growId, tentId, className }: Prop
 
   const params = new URLSearchParams({ growId });
   if (tentId) params.set("tentId", tentId);
-  const href = entitled ? `/pheno-hunts/new?${params.toString()}` : "/upgrade";
+  const href = entitled ? `/pheno-hunts/new?${params.toString()}` : "/pricing";
   const label = entitled ? "Start Pheno Hunt" : "Start Pheno Hunt (Pro)";
 
   return (

@@ -1,7 +1,8 @@
-# Pheno Tracker paid-user smoke test local setup
+# Pheno Tracker paid-user smoke test — local setup
 
-This guide gets `bun run test:pheno-paid-smoke` running end-to-end against a
-**local** Supabase stack — never production, never Lovable Cloud.
+This guide gets the full paid-user Pheno Tracker smoke test running
+end-to-end against a **local** Supabase stack — never production, never
+Lovable Cloud.
 
 The smoke test covers:
 
@@ -17,6 +18,28 @@ reason. Nothing is faked.
 
 ---
 
+## Status vocabulary
+
+| Status     | Meaning                                                        |
+| ---------- | -------------------------------------------------------------- |
+| `PASS`     | Full paid-user smoke completed successfully.                   |
+| `FAIL`     | A stage failed (test, product, or configuration).              |
+| `BLOCKED`  | Fixture present but adapter/readiness cannot confirm hydration.|
+| `SKIPPED`  | Required local dependencies missing. Nothing was faked.        |
+| `SEEDABLE` | Local env present, fixture not seeded yet.                     |
+| `HYDRATED` | Comparison-ready fixture verified through real adapter code.   |
+
+## Safety rules
+
+- Runs only against a local Supabase stack. Hosted hosts
+  (`supabase.co`, `supabase.in`, `lovable.app`, `lovable.dev`) are refused.
+- **Never** paste `SUPABASE_SERVICE_ROLE_KEY`, passwords, session JSON,
+  cookies, or JWTs into chat, PRs, or CI logs.
+- Fixture env file `e2e/.fixtures/pheno-paid-smoke.env` and session files
+  under `e2e/.auth/` are gitignored and must never be committed.
+
+---
+
 ## A. Prerequisites
 
 - Docker Desktop (or another compatible container runtime) installed and
@@ -24,165 +47,167 @@ reason. Nothing is faked.
 - Supabase CLI installed (`brew install supabase/tap/supabase`,
   `scoop install supabase`, or `npm i -g supabase`).
 - Repo dependencies installed with `bun install`.
-- **Do not** run this seeder or smoke test against the hosted Lovable Cloud
-  Supabase project. The seeder refuses to run against any host ending in
-  `supabase.co`, `supabase.in`, `lovable.app`, or `lovable.dev`.
 
-Supabase local development requires a Docker-compatible container runtime.
+## B. Create local test accounts
+
+Sign up (via the app's `/auth` page, pointed at the local stack) four
+grower accounts. The seeder resolves the owner via
+`public.profiles.email`, so the address used to sign up must match.
+
+| Role     | Suggested email               | Entitlement                     |
+| -------- | ----------------------------- | ------------------------------- |
+| Free     | `pheno-free@example.test`     | none                            |
+| Pro      | `pheno-pro@example.test`      | active Pro subscription         |
+| Founder  | `pheno-founder@example.test`  | Founder Lifetime (optional)     |
+| Canceled | `pheno-canceled@example.test` | canceled/expired billing record |
+
+Give the Pro / Founder accounts the appropriate `billing_subscriptions`
+rows in your local DB (see `docs/e2e-tests.md` for the shape).
 
 ---
 
-## B. Start local Supabase
+## C. One-command local run (recommended)
+
+### Bash / macOS / Linux
 
 ```bash
+# From the Verdant repo root
 supabase start
+supabase db reset
 supabase status
-```
 
-Note the printed **API URL** (usually `http://127.0.0.1:54321`), **anon
-key**, and **service_role key**. These come from the local stack and are
-safe on your machine — never paste them into chat, PRs, or CI logs.
+mkdir -p e2e/.fixtures
+rm -f e2e/.fixtures/pheno-paid-smoke.env
 
-Apply the project's migrations against the local stack (this project's
-migrations live in `supabase/migrations/`):
-
-```bash
-supabase db reset       # applies migrations + seed to the local DB
-```
-
----
-
-## C. Export local env vars
-
-Create a `.env.pheno-paid-smoke.local` (gitignored — never commit) and
-source it before running the seeder / smoke:
-
-```bash
-# Local Supabase (never a hosted host)
 export SUPABASE_URL="http://127.0.0.1:54321"
 export SUPABASE_ANON_KEY="<local anon key from supabase status>"
-export SUPABASE_SERVICE_ROLE_KEY="<local service_role from supabase status>"
+export SUPABASE_SERVICE_ROLE_KEY="<local service-role key from supabase status>"
 
-# Test account credentials (create these accounts locally — see step D)
-export E2E_PHENO_FREE_EMAIL="free@pheno.local"
-export E2E_PHENO_FREE_PASSWORD="<local-only password>"
-export E2E_PHENO_PRO_EMAIL="pro@pheno.local"
-export E2E_PHENO_PRO_PASSWORD="<local-only password>"
-export E2E_PHENO_FOUNDER_EMAIL="founder@pheno.local"
-export E2E_PHENO_FOUNDER_PASSWORD="<local-only password>"
-export E2E_PHENO_CANCELED_EMAIL="canceled@pheno.local"
-export E2E_PHENO_CANCELED_PASSWORD="<local-only password>"
+export E2E_PHENO_OWNER_EMAIL="pheno-owner@example.test"
 
-# App under test
-export E2E_BASE_URL="http://localhost:8080"
+export E2E_PHENO_FREE_EMAIL="pheno-free@example.test"
+export E2E_PHENO_FREE_PASSWORD="<local test password>"
+
+export E2E_PHENO_PRO_EMAIL="pheno-pro@example.test"
+export E2E_PHENO_PRO_PASSWORD="<local test password>"
+
+export E2E_PHENO_FOUNDER_EMAIL="pheno-founder@example.test"
+export E2E_PHENO_FOUNDER_PASSWORD="<local test password>"
+
+export E2E_PHENO_CANCELED_EMAIL="pheno-canceled@example.test"
+export E2E_PHENO_CANCELED_PASSWORD="<local test password>"
+
+bun run test:pheno-paid-smoke:local
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` must **never** be exposed to browser code. It
-is only read by the local seeder.
+### Windows PowerShell
 
----
+```powershell
+# From the Verdant repo root
+supabase start
+supabase db reset
+supabase status
 
-## D. Create the four test accounts (local)
+New-Item -ItemType Directory -Force "e2e/.fixtures" | Out-Null
+Remove-Item "e2e/.fixtures/pheno-paid-smoke.env" -ErrorAction SilentlyContinue
 
-Sign up through the running app (`/auth`) as:
+$env:SUPABASE_URL="http://127.0.0.1:54321"
+$env:SUPABASE_ANON_KEY="<local anon key from supabase status>"
+$env:SUPABASE_SERVICE_ROLE_KEY="<local service-role key from supabase status>"
 
-| Role                      | Entitlement                      |
-| ------------------------- | -------------------------------- |
-| Free user                 | none                             |
-| Pro user                  | active Pro subscription          |
-| Founder Lifetime user     | founder lifetime                 |
-| Canceled/expired user     | previously Pro, now canceled     |
+$env:E2E_PHENO_OWNER_EMAIL="pheno-owner@example.test"
 
-Assign entitlements the same way you would in production — never by pasting
-`service_role` in the browser. The Pro / Founder / Canceled accounts need
-to land in `public.billing_subscriptions` with the appropriate state.
+$env:E2E_PHENO_FREE_EMAIL="pheno-free@example.test"
+$env:E2E_PHENO_FREE_PASSWORD="<local test password>"
 
----
+$env:E2E_PHENO_PRO_EMAIL="pheno-pro@example.test"
+$env:E2E_PHENO_PRO_PASSWORD="<local test password>"
 
-## E. Preflight
+$env:E2E_PHENO_FOUNDER_EMAIL="pheno-founder@example.test"
+$env:E2E_PHENO_FOUNDER_PASSWORD="<local test password>"
 
-```bash
-bun run test:pheno-paid-smoke:preflight
+$env:E2E_PHENO_CANCELED_EMAIL="pheno-canceled@example.test"
+$env:E2E_PHENO_CANCELED_PASSWORD="<local test password>"
+
+bun run test:pheno-paid-smoke:local
 ```
 
-Every input is reported as `PRESENT`, `SEEDABLE`, `SKIPPED`, or `BLOCKED`.
-Missing env vars are listed by **name only** — never by value. If the
-Supabase URL points at a hosted host, preflight fails with a clear error.
+The orchestrator runs seven stages: initial preflight → seed → load
+generated fixture env → post-seed hydration verify → session creation →
+Playwright smoke → final summary. Exit codes: **0** = PASS, **1** =
+FAIL, **2** = SKIPPED / BLOCKED (Playwright is not launched).
 
 ---
 
-## F. Mint auth sessions
+## D. Manual expanded form (debugging)
+
+If a stage fails, reproduce it step-by-step:
+
+### Bash / macOS / Linux
 
 ```bash
+node scripts/e2e/check-pheno-paid-smoke-env.mjs
+
+node scripts/e2e/seed-pheno-paid-smoke-fixtures.mjs
+
+test -f e2e/.fixtures/pheno-paid-smoke.env
+
+set -a
+source e2e/.fixtures/pheno-paid-smoke.env
+set +a
+
+node scripts/e2e/check-pheno-paid-smoke-env.mjs
+bun run test:pheno-paid-smoke:verify
+
 bun run test:pheno-paid-smoke:sessions
+
+bunx playwright test e2e/pheno-tracker-paid-user-smoke.spec.ts
 ```
 
-For each role whose email + password are set, this signs in through `/auth`
-in a headless browser and writes `e2e/.auth/pheno-<role>.json` (gitignored).
-Then export the session file paths:
+### Windows PowerShell
 
-```bash
-export E2E_PHENO_FREE_SESSION_FILE="e2e/.auth/pheno-free.json"
-export E2E_PHENO_PRO_SESSION_FILE="e2e/.auth/pheno-pro.json"
-export E2E_PHENO_FOUNDER_SESSION_FILE="e2e/.auth/pheno-founder.json"
-export E2E_PHENO_CANCELED_SESSION_FILE="e2e/.auth/pheno-canceled.json"
+```powershell
+Get-Content "e2e/.fixtures/pheno-paid-smoke.env" | ForEach-Object {
+  $line = $_.Trim()
+  if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+    $name, $value = $line -split "=", 2
+    [Environment]::SetEnvironmentVariable(
+      $name.Trim(),
+      $value.Trim().Trim('"'),
+      "Process"
+    )
+  }
+}
+
+node scripts/e2e/check-pheno-paid-smoke-env.mjs
+bun run test:pheno-paid-smoke:verify
+bun run test:pheno-paid-smoke:sessions
+bunx playwright test e2e/pheno-tracker-paid-user-smoke.spec.ts
 ```
 
 ---
 
-## G. Seed pheno fixtures
+## E. What the seeder creates
 
-```bash
-bun run test:pheno-paid-smoke:seed
-```
+The seeder writes to `e2e/.fixtures/pheno-paid-smoke.env` (gitignored):
 
-Seeds against the local Supabase, using the owner resolved from
-`E2E_PHENO_PRO_EMAIL` (falls back to `E2E_PHENO_FOUNDER_EMAIL`):
+- `E2E_PHENO_HUNT_ID_MISSING_EVIDENCE` — hunt with no candidates.
+- `E2E_PHENO_HUNT_ID_PENDING_HARVEST` — candidates with phenotype notes only.
+- `E2E_PHENO_HUNT_ID_PENDING_CURE` — candidates + lab, no smoke tests.
+- `E2E_PHENO_HUNT_ID_COMPARISON_READY` — phenotype notes + smoke tests + lab.
 
-| Fixture                                     | Status    |
-| ------------------------------------------- | --------- |
-| `E2E_PHENO_HUNT_ID_MISSING_EVIDENCE`        | seeded    |
-| `E2E_PHENO_HUNT_ID_PENDING_HARVEST`         | seeded    |
-| `E2E_PHENO_HUNT_ID_PENDING_CURE`            | seeded    |
-| `E2E_PHENO_HUNT_ID_COMPARISON_READY`        | seeded    |
-| `E2E_PHENO_HUNT_ID_REPLICATION_PENDING`     | n/a — signal not persisted; engine treats as satisfied |
-
-The comparison-ready fixture writes real evidence rows into
-`pheno_candidate_scores`, `pheno_smoke_tests`, and `pheno_lab_results` so
-the compare route's readiness engine actually resolves to
+Comparison readiness is produced only by writing real evidence rows that
+the app's `phenoHuntCandidateAdapter` + `derivePhenoCompareReadinessFromCandidates`
+consume. The `test:pheno-paid-smoke:verify` step exercises those exact
+functions and refuses to advance if the fixture cannot resolve to
 `comparison_ready`.
 
-The seeder writes `e2e/.fixtures/pheno-paid-smoke.env` (gitignored). Source
-it before running the smoke:
+## F. Troubleshooting
 
-```bash
-set -a; source e2e/.fixtures/pheno-paid-smoke.env; set +a
-```
-
----
-
-## H. Run the smoke
-
-```bash
-bun run test:pheno-paid-smoke
-```
-
-Interpretation:
-
-- **PASS** — scenario ran and assertions held.
-- **SKIPPED** — required env / fixture / session missing. Not a failure.
-- **BLOCKED** — a hard prerequisite is missing (e.g. a session file path
-  points at an unreadable file, or the Paddle iframe step needs manual
-  exercise).
-- **FAIL** — real regression. Investigate before publishing.
-
----
-
-## Safety reminders
-
-- Never paste emails, passwords, cookies, session tokens, `service_role`,
-  or hunt ids into chat, PRs, or CI logs.
-- Never commit `e2e/.auth/*` or `e2e/.fixtures/*` (both gitignored).
-- Never set `SUPABASE_SERVICE_ROLE_KEY` in any browser-visible env
-  (`VITE_*`, HTML, client bundle).
-- Cleanup between runs: `rm -rf e2e/.auth e2e/.fixtures`.
+| Symptom                              | Fix                                               |
+| ------------------------------------ | ------------------------------------------------- |
+| Preflight prints `SKIPPED`           | Export the listed env vars.                       |
+| Seeder prints `REFUSED`              | You pointed at a hosted host. Use `127.0.0.1`.    |
+| Hydration verify prints `BLOCKED`    | Re-run the seeder; check owner email resolves.    |
+| Session generator prints `FAIL`      | Verify the account exists and can sign in via `/auth`. |
+| Playwright can't reach `/pheno-hunts`| Confirm `bun run dev` is serving `localhost:8080`.|

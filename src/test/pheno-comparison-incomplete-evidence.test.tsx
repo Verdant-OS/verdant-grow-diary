@@ -72,14 +72,34 @@ describe("PhenoHuntCompare — incomplete evidence hides conclusions", () => {
   it("no ranking / verdict / keeper conclusion language rendered when not ready", () => {
     mount({ candidates: [baseCandidate("p1"), baseCandidate("p2")] });
     const body = document.body.textContent ?? "";
-    expect(/best candidate is/i.test(body)).toBe(false);
-    expect(/best pheno is/i.test(body)).toBe(false);
-    expect(/the winner is/i.test(body)).toBe(false);
-    expect(/recommended keeper/i.test(body)).toBe(false);
-    expect(/guaranteed keeper/i.test(body)).toBe(false);
-    expect(/guaranteed yield/i.test(body)).toBe(false);
-    expect(/ai picks winners?/i.test(body)).toBe(false);
-    expect(/automated breeding/i.test(body)).toBe(false);
+    const forbidden: RegExp[] = [
+      /\bwinner\b/i,
+      /winner\s+is/i,
+      /winning\s+candidate/i,
+      /best\s+candidate/i,
+      /best\s+pheno/i,
+      /top\s+candidate/i,
+      /ranked\s+candidate/i,
+      /candidate\s+ranking/i,
+      /final\s+ranking/i,
+      /final\s+verdict/i,
+      /comparison\s+verdict/i,
+      /recommended\s+keeper/i,
+      /keeper\s+recommendation/i,
+      /keeper\s+selected/i,
+      /keeper\s+confirmed/i,
+      /selection\s+winner/i,
+      /selection[- ]?ready/i,
+      /ready\s+to\s+select/i,
+      /ai\s+picked/i,
+      /ai\s+picks?\s+winners?/i,
+      /guaranteed\s+keeper/i,
+      /guaranteed\s+yield/i,
+      /automated\s+breeding/i,
+    ];
+    for (const pat of forbidden) {
+      expect(pat.test(body), `unexpected copy: ${pat}`).toBe(false);
+    }
   });
 
   it("comparison-ready hunt allows conclusions and hides warning banner", () => {

@@ -139,7 +139,10 @@ summary.fixtureEnv = "OK";
 
 // ── Stage 4: post-seed hydration verify ───────────────────────────────────
 header("Stage 4 — post-seed hydration verify");
-const verifyCode = run("bunx", ["tsx", "scripts/e2e/verify-pheno-paid-smoke-fixtures.ts"]);
+// Plain bun (native TS + tsconfig paths): both bunx-tsx and node+tsx crash
+// at exit on Windows with a libuv async-handle assertion from the esbuild
+// service, turning a passing verify into FAIL.
+const verifyCode = run("bun", ["scripts/e2e/verify-pheno-paid-smoke-fixtures.ts"]);
 if (verifyCode === 2) {
   summary.hydration = "BLOCKED";
   finish(2, "BLOCKED");

@@ -111,7 +111,21 @@ evidence is recorded here:
   "billing": { "required": false, "status": "NOT_REQUIRED", "evidence": "no billing change in this release" },
   "rollback": {
     "priorVersionIdentified": "PASS",
-    "additiveMigrations": "PASS",
+    "migrationPosture": {
+      "status": "PASS",
+      "classification": "NON_ADDITIVE_WITH_ROLLBACK_PLAN",
+      "summary": "Owner-only Pheno hardening included a documented policy removal.",
+      "exceptions": [
+        {
+          "migration": "20260709180000_pheno_hunts_owner_only_and_stress_scale_index.sql",
+          "changeType": "DROP_POLICY",
+          "scope": "public.pheno_hunts",
+          "description": "Removed the operator SELECT and UPDATE policies (\"Operators view all pheno_hunts\", \"Operators update all pheno_hunts\").",
+          "impact": "Operator cross-tenant access removed; owner SELECT access unchanged.",
+          "rollbackProcedure": "Recreate the two operator policies from repository history only if operator access must be restored."
+        }
+      ]
+    },
     "entryPointDisable": "PASS",
     "ownerReadPreserved": "PASS"
   },

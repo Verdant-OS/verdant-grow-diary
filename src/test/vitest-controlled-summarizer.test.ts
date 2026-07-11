@@ -271,12 +271,7 @@ describe("summarizer — shard-local completeness contract", () => {
   it("a shard passing exactly its two assigned files is complete, ignoring other-shard files", () => {
     const dir = mkShardRun({
       shardFiles: ["src/a.test.ts", "src/b.test.ts"],
-      manifestFiles: [
-        "src/a.test.ts",
-        "src/b.test.ts",
-        "src/c.test.ts",
-        "src/d.test.ts",
-      ],
+      manifestFiles: ["src/a.test.ts", "src/b.test.ts", "src/c.test.ts", "src/d.test.ts"],
       progress: [
         { file: "src/a.test.ts", status: "passed" },
         { file: "src/b.test.ts", status: "passed" },
@@ -378,4 +373,3 @@ describe("summarizer — shard-local completeness contract", () => {
     expect(agg.duplicates).toEqual([]);
   });
 });
-

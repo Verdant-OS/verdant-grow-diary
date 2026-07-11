@@ -160,12 +160,7 @@ export function summarizeRun(runDir, { authoritativeManifest, expectedFiles } = 
   })();
 
   let status;
-  if (
-    conflicts.length ||
-    corruptLines.length ||
-    duplicatesInManifest.length ||
-    extraneous.length
-  ) {
+  if (conflicts.length || corruptLines.length || duplicatesInManifest.length || extraneous.length) {
     status = "invalid";
   } else if (!completedMarker) {
     status = "interrupted";

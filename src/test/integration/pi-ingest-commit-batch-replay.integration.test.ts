@@ -196,7 +196,10 @@ d("pi_ingest_commit_batch replay + boundary proof (local DB)", () => {
       p_user_id: owner.id,
       p_bridge_id: BRIDGE_ID,
       p_tent_id: tentId,
-      p_rows: [makeRow("batch1-key1"), makeRow("batch1-key2", { metric: "humidity_pct", value: 55 })],
+      p_rows: [
+        makeRow("batch1-key1"),
+        makeRow("batch1-key2", { metric: "humidity_pct", value: 55 }),
+      ],
     });
     expect(error).toBeNull();
     expect(counts(data)).toEqual({ inserted: 2, rejected: 0 });

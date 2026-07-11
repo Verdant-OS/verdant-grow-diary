@@ -43,7 +43,8 @@ describe("integration suites must gate Supabase client construction", () => {
       // the hasLocalSupabase ternary. We approximate "top-level" as any
       // line where the assignment ends with the ternary sentinel or is
       // immediately preceded by an explicit ternary condition.
-      const guardedTernary = /hasLocalSupabase\s*\n?\s*\?\s*createClient|hasLocalSupabase\s*\?\s*createClient/;
+      const guardedTernary =
+        /hasLocalSupabase\s*\n?\s*\?\s*createClient|hasLocalSupabase\s*\?\s*createClient/;
       expect(
         src,
         `${rel} must construct its admin client via the hasLocalSupabase ternary`,

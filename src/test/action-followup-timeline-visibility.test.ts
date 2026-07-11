@@ -20,14 +20,14 @@ describe("action_followup timeline visibility", () => {
     it("includes action_followup as a distinct entry", () => {
       const entry = EVENT_TYPES.find((e) => e.value === "action_followup");
       expect(entry).toBeDefined();
-      expect(entry!.label).toBe("Follow-up");
+      expect(entry!.label).toBe("Follow-up check");
       expect(entry!.tone).toBe("bg-orange-500/15 text-orange-300 border-orange-500/30");
     });
 
-    it("getEventType('action_followup') returns Follow-up, not observation fallback", () => {
+    it("getEventType('action_followup') returns Follow-up check, not observation fallback", () => {
       const result = getEventType("action_followup");
       expect(result.value).toBe("action_followup");
-      expect(result.label).toBe("Follow-up");
+      expect(result.label).toBe("Follow-up check");
       expect(result).not.toBe(EVENT_TYPE_MAP.observation);
     });
 
@@ -42,8 +42,8 @@ describe("action_followup timeline visibility", () => {
       expect(BADGES_SRC).toContain('"action_followup"');
     });
 
-    it("TAG_LABELS maps action_followup to 'Follow-up'", () => {
-      expect(BADGES_SRC).toMatch(/action_followup:\s*"Follow-up"/);
+    it("TAG_LABELS maps action_followup to 'Follow-up check'", () => {
+      expect(BADGES_SRC).toMatch(/action_followup:\s*"Follow-up check"/);
     });
   });
 });

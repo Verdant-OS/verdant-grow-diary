@@ -157,9 +157,11 @@ export function diaryTimelineActionLabel(kind: string | null | undefined): strin
     case "harvest":
       return "Harvest";
     case "action_followup":
-      return "Follow-up";
+      return "Follow-up check";
     case "action_outcome":
-      return "Outcome";
+      return "Grower-recorded outcome";
+    case "run_learning_decision":
+      return "Next-run learning decision";
     default:
       return "Entry";
   }

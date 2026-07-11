@@ -21,7 +21,7 @@ describe("DiaryEntryBadges — follow-up caption", () => {
     expect(BADGES).toMatch(/diary-entry-followup-caption/);
   });
   it("preserves existing action_outcome tag mapping", () => {
-    expect(BADGES).toMatch(/action_outcome:\s*"Outcome"/);
+    expect(BADGES).toMatch(/action_outcome:\s*"Grower-recorded outcome"/);
     expect(BADGES).toContain('"action_outcome"');
   });
   it("does not claim causation/resolution", () => {

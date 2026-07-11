@@ -71,6 +71,10 @@ export const HARVEST_EVENT_TYPES: ReadonlySet<string> = new Set([
 export const REMINDER_EVENT_TYPES: ReadonlySet<string> = new Set([
   "reminder",
   "action_followup",
+  // Learning-loop rows keep the follow-up/outcome/decision trio together in
+  // one filter bucket rather than scattering into generic notes.
+  "action_outcome",
+  "run_learning_decision",
 ]);
 
 /**

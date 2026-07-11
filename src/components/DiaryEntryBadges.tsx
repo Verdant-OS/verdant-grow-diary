@@ -24,8 +24,9 @@ const TAG_LABELS: Record<string, string> = {
   "sensor-snapshot": "Manual snapshot",
   nutrient: "Nutrient",
   symptoms: "Symptoms",
-  action_followup: "Follow-up",
-  action_outcome: "Outcome",
+  action_followup: "Follow-up check",
+  action_outcome: "Grower-recorded outcome",
+  run_learning_decision: "Next-run learning decision",
 };
 
 const PRIMARY_TAGS = [
@@ -39,6 +40,7 @@ const PRIMARY_TAGS = [
   "symptoms",
   "action_followup",
   "action_outcome",
+  "run_learning_decision",
 ];
 
 export interface DiaryEntryBadgesProps {

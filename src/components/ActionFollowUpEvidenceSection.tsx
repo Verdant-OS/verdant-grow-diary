@@ -188,7 +188,6 @@ export default function ActionFollowUpEvidenceSection({
           toast.success("Follow-up recorded.");
           setQuery({ status: "ready", existing: result.followUp });
           setShowForm(false);
-          setReloadNonce((n) => n + 1);
         } else if (result.status === "existing") {
           toast.message("A follow-up is already linked to this action.");
           setQuery({ status: "ready", existing: result.followUp });

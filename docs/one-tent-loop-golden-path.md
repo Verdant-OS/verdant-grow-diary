@@ -133,3 +133,56 @@ The loop is green only when **all** of the following hold in one run:
 
 No duplicate writes. No fake-live data. No blind automation. No
 device control.
+
+---
+
+## Browser-proof status (authenticated UI walk)
+
+- Contract suite: **PASS** (`src/test/one-tent-loop-golden-path.test.ts`, `src/test/one-tent-loop-safety-regression.test.ts`)
+- Authenticated UI proof: **READY TO RUN when managed session is injected**, otherwise **BLOCKED_BY_MANAGED_SESSION_INJECTOR**
+
+### Required injected environment variables
+
+Variable names only — never document values.
+
+- `LOVABLE_BROWSER_AUTH_STATUS` (must be `signed_in` or `injected`)
+- `LOVABLE_BROWSER_SUPABASE_SESSION_JSON`
+- `LOVABLE_BROWSER_SUPABASE_STORAGE_KEY`
+- `LOVABLE_BROWSER_SUPABASE_COOKIES_JSON` (optional)
+
+### Run order
+
+```bash
+bun run e2e:one-tent:preflight   # exits 0 = ready, 2 = blocked, 1 = error
+bun run e2e:one-tent:seed        # idempotent, reconciles golden fixture rows
+bun run e2e:one-tent:ui          # authenticated Playwright walk
+```
+
+The preflight performs no Supabase call and never prints tokens,
+cookies, session JSON, or authorization headers.
+
+### Evidence receipt (per-stage, filled by the browser walk)
+
+| # | Stage | Outcome |
+|---|---|---|
+| 1 | Auth restored | PASS / BLOCKED_BY_MANAGED_SESSION_INJECTOR |
+| 2 | Grow resolved | PASS |
+| 3 | Tent resolved | PASS |
+| 4 | Plant resolved | PASS |
+| 5 | Quick Log persisted | PASS |
+| 6 | Timeline row visible (single, refresh-stable) | PASS |
+| 7 | Manual sensor provenance visible (never Live) | PASS |
+| 8 | AI Doctor network boundary verified (Edge Function stub, no paid model) | PASS |
+| 9 | Alert verified (VPD > target, single) | PASS |
+| 10 | Action Queue suggestion verified (approval-required, no device command) | PASS |
+| 11 | Grower decision verified (user-initiated approve/complete) | PASS |
+| 12 | Follow-up marker verified (survives refresh, single) | PASS |
+| 13 | Auto-diary follow-up | **HONESTLY UNSUPPORTED** — marker-level only |
+
+### Production-fix rule for this proof
+
+If the scaffolding and pure preflight tests expose no application
+defect: **zero production changes** are made in the same PR. When the
+managed browser run later exposes a broken handoff, fix ONLY the first
+broken UI/application seam and add a matching browser regression
+assertion — do not broaden the PR into unrelated stages.

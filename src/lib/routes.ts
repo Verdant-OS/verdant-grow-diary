@@ -38,6 +38,10 @@ export const actionDetailOutcomePath = (actionId: string): string =>
 export const growDetailOutcomesPath = (growId: string): string =>
   `${growDetailPath(growId)}#outcomes`;
 
+/** Grow-level Learning Review page (One-Tent Learning Loop V1). */
+export const growLearningPath = (growId: string): string =>
+  `${growDetailPath(growId)}/learning`;
+
 /**
  * Action Queue scoped to a single alert's linked actions via the URL-driven
  * "Filtered by alert" context chip. Presenter affordance — the page itself

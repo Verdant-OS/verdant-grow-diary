@@ -14,6 +14,7 @@ import {
   Bell,
   SlidersHorizontal,
   FileDown,
+  GraduationCap,
 } from "lucide-react";
 import { exportGrowDiaryReportAsPdf } from "@/lib/growDiaryPdfExport";
 
@@ -30,6 +31,7 @@ import {
   alertDetailPath,
   alertsPath,
   dashboardPath,
+  growLearningPath,
   logsPath,
   plantsPath,
   postGrowLearningReportPath,
@@ -248,6 +250,14 @@ export default function GrowDetail() {
             countLabel="records"
           />
         )}
+        <HubLink
+          to={growLearningPath(grow.id)}
+          icon={<GraduationCap className="h-4 w-4" />}
+          title="Learning review"
+          description="Completed actions, grower-recorded outcomes, and next-run decisions."
+          count="unavailable"
+          countLabel="learning review"
+        />
       </section>
 
       <section className="glass rounded-2xl p-4 mt-4" aria-label="Recent activity">

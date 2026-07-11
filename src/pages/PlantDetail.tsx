@@ -75,6 +75,7 @@ import {
   type PlantDetailBlockedStateView,
 } from "@/lib/plantDetailBlockedStateViewModel";
 import { useSearchParams } from "react-router-dom";
+import { PlantMemoryEpisodesSection } from "@/components/PlantMemoryEpisodesSection";
 
 function BlockedStateBackLink({
   action,
@@ -222,6 +223,7 @@ function ArchivedTimelineReadOnlyView({
             tentId={plant.tentId}
           />
           <TimelineMemorySection scope="plant" plantId={plant.id} />
+          <PlantMemoryEpisodesSection growId={plant.growId} plantId={plant.id} />
         </div>
       </div>
     </div>

@@ -39,6 +39,7 @@ const AgentIntegrations = lazy(() => import("./pages/AgentIntegrations"));
 const Timeline = lazy(() => import("./pages/Timeline"));
 const Grows = lazy(() => import("./pages/Grows"));
 const GrowDetail = lazy(() => import("./pages/GrowDetail"));
+const GrowLearning = lazy(() => import("./pages/GrowLearning"));
 const PhenoHuntNew = lazy(() => import("./pages/PhenoHuntNew"));
 const PhenoHuntCompare = lazy(() => import("./pages/PhenoHuntCompare"));
 const PhenoHuntWorkspace = lazy(() => import("./pages/PhenoHuntWorkspace"));
@@ -263,6 +264,7 @@ const App = () => (
                     <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                     <Route path="/grows" element={<Grows />} />
                     <Route path="/grows/:growId" element={<GrowDetail />} />
+                    <Route path="/grows/:growId/learning" element={<GrowLearning />} />
                     {/* Pheno Tracker is a Verdant Pro feature. Free and
                         canceled/expired users see an upgrade card. Public
                         read-only /pheno-comparison and /pheno-hunts/:id/compare

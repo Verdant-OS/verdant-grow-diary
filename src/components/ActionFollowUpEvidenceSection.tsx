@@ -123,14 +123,20 @@ function pickPrimary(
 export default function ActionFollowUpEvidenceSection({
   action,
   save,
+  loadPhotoCandidates,
 }: ActionFollowUpEvidenceSectionProps) {
+  const { user } = useAuth();
+  const authenticatedUserId = user?.id ?? null;
   const [query, setQuery] = useState<QueryState>({ status: "loading" });
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
+  const [photoState, setPhotoState] = useState<ExistingPhotoLoadState>({ status: "loading" });
+  const [selectedPhotoReference, setSelectedPhotoReference] = useState<string | null>(null);
 
   const saveFn = save ?? saveActionFollowUpEvidence;
+  const loadPhotosFn = loadPhotoCandidates ?? loadActionFollowUpExistingPhotoCandidates;
 
   useEffect(() => {
     let cancelled = false;

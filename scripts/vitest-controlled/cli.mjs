@@ -293,7 +293,10 @@ export async function commandResume(opts, deps = {}) {
       { code: EXIT.CONFIG_ERROR },
     );
   }
-  if (!runRecord.workspaceFingerprint || runRecord.workspaceFingerprint.schema !== FINGERPRINT_SCHEMA_VERSION) {
+  if (
+    !runRecord.workspaceFingerprint ||
+    runRecord.workspaceFingerprint.schema !== FINGERPRINT_SCHEMA_VERSION
+  ) {
     throw Object.assign(
       new Error(
         `Refusing to resume: workspace fingerprint schema mismatch (expected v${FINGERPRINT_SCHEMA_VERSION})`,
@@ -308,10 +311,9 @@ export async function commandResume(opts, deps = {}) {
     currentWorkspace.digest,
   );
   if (wsMismatch) {
-    throw Object.assign(
-      new Error(`Refusing to resume: workspace ${wsMismatch}`),
-      { code: EXIT.CONFIG_ERROR },
-    );
+    throw Object.assign(new Error(`Refusing to resume: workspace ${wsMismatch}`), {
+      code: EXIT.CONFIG_ERROR,
+    });
   }
   // 3. Re-validate the run-configuration fingerprint (shard/worker/pool).
   const currentSource = computeSourceFingerprint(repoRoot, {
@@ -379,7 +381,10 @@ export async function commandRerunFailed(opts, deps = {}) {
       { code: EXIT.CONFIG_ERROR },
     );
   }
-  if (!runRecord.workspaceFingerprint || runRecord.workspaceFingerprint.schema !== FINGERPRINT_SCHEMA_VERSION) {
+  if (
+    !runRecord.workspaceFingerprint ||
+    runRecord.workspaceFingerprint.schema !== FINGERPRINT_SCHEMA_VERSION
+  ) {
     throw Object.assign(
       new Error(
         `Refusing to rerun-failed: workspace fingerprint schema mismatch (expected v${FINGERPRINT_SCHEMA_VERSION})`,
@@ -393,10 +398,9 @@ export async function commandRerunFailed(opts, deps = {}) {
     currentWorkspace.digest,
   );
   if (wsMismatch) {
-    throw Object.assign(
-      new Error(`Refusing to rerun-failed: workspace ${wsMismatch}`),
-      { code: EXIT.CONFIG_ERROR },
-    );
+    throw Object.assign(new Error(`Refusing to rerun-failed: workspace ${wsMismatch}`), {
+      code: EXIT.CONFIG_ERROR,
+    });
   }
   const { files: doneMap } = readProgress(path.join(runDir, "progress.jsonl"));
   const failed = [...doneMap.values()].filter((e) => e.status === "failed").map((e) => e.file);

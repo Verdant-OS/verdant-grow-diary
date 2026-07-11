@@ -49,10 +49,7 @@ function initFixtureRepo(): string {
   fs.writeFileSync(path.join(root, "src/app.ts"), "export const x = 1;\n");
   fs.writeFileSync(path.join(root, "src/app.test.ts"), "// test\n");
   fs.writeFileSync(path.join(root, "scripts/build.mjs"), "// build\n");
-  fs.writeFileSync(
-    path.join(root, "supabase/migrations/2026_init.sql"),
-    "-- migration\n",
-  );
+  fs.writeFileSync(path.join(root, "supabase/migrations/2026_init.sql"), "-- migration\n");
   fs.writeFileSync(path.join(root, "supabase/functions/hello/index.ts"), "// edge\n");
   fs.writeFileSync(path.join(root, "docs/README.md"), "# doc\n");
   fs.writeFileSync(path.join(root, ".github/workflows/ci.yml"), "name: ci\n");
@@ -89,19 +86,13 @@ describe("workspace fingerprint — determinism & coverage", () => {
 
   it("changing a Supabase migration invalidates the digest", () => {
     const before = computeWorkspaceFingerprint(root).digest;
-    fs.writeFileSync(
-      path.join(root, "supabase/migrations/2026_init.sql"),
-      "-- migration v2\n",
-    );
+    fs.writeFileSync(path.join(root, "supabase/migrations/2026_init.sql"), "-- migration v2\n");
     expect(computeWorkspaceFingerprint(root).digest).not.toBe(before);
   });
 
   it("changing an edge function invalidates the digest", () => {
     const before = computeWorkspaceFingerprint(root).digest;
-    fs.writeFileSync(
-      path.join(root, "supabase/functions/hello/index.ts"),
-      "// edge v2\n",
-    );
+    fs.writeFileSync(path.join(root, "supabase/functions/hello/index.ts"), "// edge v2\n");
     expect(computeWorkspaceFingerprint(root).digest).not.toBe(before);
   });
 
@@ -187,7 +178,7 @@ describe("workspace fingerprint — determinism & coverage", () => {
 // ---- Resume-enforcement integration -------------------------------------
 
 function makePassingSpawnStub() {
-  return (_bin: string, args: string[], opts: {env: Record<string,string>}) => {
+  return (_bin: string, args: string[], opts: { env: Record<string, string> }) => {
     const progressFile = opts.env.VERDANT_CTRL_PROGRESS_FILE;
     const runId = opts.env.VERDANT_CTRL_RUN_ID;
     const shardIndex = Number(opts.env.VERDANT_CTRL_SHARD_INDEX);

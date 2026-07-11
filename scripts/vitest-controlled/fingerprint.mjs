@@ -65,12 +65,7 @@ function splitNul(buf) {
  */
 export function listWorkspaceFiles(repoRoot) {
   const tracked = runGit(repoRoot, ["ls-files", "-z", "--cached"]);
-  const untracked = runGit(repoRoot, [
-    "ls-files",
-    "-z",
-    "--others",
-    "--exclude-standard",
-  ]);
+  const untracked = runGit(repoRoot, ["ls-files", "-z", "--others", "--exclude-standard"]);
   const set = new Set();
   for (const p of splitNul(tracked)) set.add(toPosixRel(p));
   for (const p of splitNul(untracked)) set.add(toPosixRel(p));

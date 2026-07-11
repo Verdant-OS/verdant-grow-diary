@@ -75,7 +75,7 @@ describe("retirePreviousPlantProfilePhoto", () => {
 
   it("passes only the parsed object path (no bucket, no scheme)", async () => {
     const { remove } = await run({ currentPhoto: NEW_REF, refRows: [] });
-    const arg = remove.mock.calls[0][0] as string;
+    const arg = (remove.mock.calls[0] as unknown as [string])[0];
     expect(arg.startsWith("storage://")).toBe(false);
     expect(arg.startsWith("diary-photos/")).toBe(false);
   });

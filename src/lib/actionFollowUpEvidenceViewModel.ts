@@ -43,6 +43,34 @@ export function isActionFollowUpOutcome(v: unknown): v is ActionFollowUpOutcome 
   return typeof v === "string" && (ACTION_FOLLOWUP_OUTCOMES as readonly string[]).includes(v);
 }
 
+/**
+ * Shared outcome-label helper. Returns the display label for a
+ * grower-selected follow-up outcome, or `null` for missing/invalid
+ * outcomes. Callers that need the legacy marker-only label
+ * ("Follow-up") should fall back to `ACTION_FOLLOWUP_LEGACY_LABEL`.
+ *
+ * Single source of truth for diary, timeline, evidence card, and
+ * report/export follow-up outcome labels. Never AI-generated. Never
+ * inferred from sensor values. Grower selection only.
+ */
+export function actionFollowUpOutcomeLabel(outcome: unknown): string | null {
+  if (!isActionFollowUpOutcome(outcome)) return null;
+  return OUTCOME_META[outcome].label;
+}
+
+/**
+ * Compose the diary/timeline title suffix for an `action_followup`
+ * entry. Returns "Follow-up · <Outcome>" when a valid outcome is
+ * present; otherwise the legacy marker-only "Follow-up". Backward
+ * compatible with rows that pre-date the outcome capture.
+ */
+export function composeActionFollowUpTitle(outcome: unknown): string {
+  const label = actionFollowUpOutcomeLabel(outcome);
+  return label
+    ? `${ACTION_FOLLOWUP_LEGACY_LABEL} · ${label}`
+    : ACTION_FOLLOWUP_LEGACY_LABEL;
+}
+
 export function actionFollowUpOutcomeMeta(
   outcome: ActionFollowUpOutcome | null | undefined,
 ): OutcomeMeta {
@@ -114,7 +142,5 @@ export function buildActionFollowUpEvidenceViewModel(
 export function actionFollowupTimelineLabel(
   details: { outcome?: unknown } | null | undefined,
 ): string {
-  const raw = details?.outcome;
-  if (!isActionFollowUpOutcome(raw)) return ACTION_FOLLOWUP_LEGACY_LABEL;
-  return `${ACTION_FOLLOWUP_LEGACY_LABEL} · ${OUTCOME_META[raw].label}`;
+  return composeActionFollowUpTitle(details?.outcome);
 }

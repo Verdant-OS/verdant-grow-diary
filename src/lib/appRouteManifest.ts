@@ -79,7 +79,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/alerts", access: "auth" },
   { path: "/alerts/:alertId", access: "auth" },
   { path: "/auth", access: "public" },
-  { path: "/billing/:plan", access: "redirect", description: "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout)." },
+  {
+    path: "/billing/:plan",
+    access: "redirect",
+    description: "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout).",
+  },
   { path: "/breeder-beta", access: "public", description: "Breeder beta landing page." },
   { path: "/breeding", access: "auth", description: "Breeding programs index." },
   { path: "/breeding/:programId", access: "auth", description: "Breeding program detail." },
@@ -132,7 +136,8 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/grows/:growId/learning",
     access: "auth",
-    description: "Grow-level learning review — completed actions, grower-recorded outcomes, and next-run decisions.",
+    description:
+      "Grow-level learning review — completed actions, grower-recorded outcomes, and next-run decisions.",
   },
   {
     path: "/guides",

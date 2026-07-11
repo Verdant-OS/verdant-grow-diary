@@ -282,8 +282,39 @@ export async function commandResume(opts, deps = {}) {
     spawnImpl,
   } = opts;
   const { runRecord, manifest, shardFiles } = loadRun(runDir);
-  // Re-validate fingerprint.
-  const currentFingerprint = computeSourceFingerprint(repoRoot, {
+  // 1. Refuse older run/fingerprint schema outright — legacy dirty-tree
+  //    hashes did not cover production, migrations, edge functions, or
+  //    scripts and cannot be silently promoted to workspace semantics.
+  if ((runRecord.schema ?? 1) < RUN_SCHEMA_VERSION) {
+    throw Object.assign(
+      new Error(
+        `Refusing to resume: run.json schema v${runRecord.schema ?? 1} predates workspace fingerprint v${RUN_SCHEMA_VERSION}`,
+      ),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  if (!runRecord.workspaceFingerprint || runRecord.workspaceFingerprint.schema !== FINGERPRINT_SCHEMA_VERSION) {
+    throw Object.assign(
+      new Error(
+        `Refusing to resume: workspace fingerprint schema mismatch (expected v${FINGERPRINT_SCHEMA_VERSION})`,
+      ),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  // 2. Recompute the workspace fingerprint BEFORE consulting progress.
+  const currentWorkspace = computeWorkspaceFingerprint(repoRoot);
+  const wsMismatch = fingerprintMismatch(
+    runRecord.workspaceFingerprint.digest,
+    currentWorkspace.digest,
+  );
+  if (wsMismatch) {
+    throw Object.assign(
+      new Error(`Refusing to resume: workspace ${wsMismatch}`),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  // 3. Re-validate the run-configuration fingerprint (shard/worker/pool).
+  const currentSource = computeSourceFingerprint(repoRoot, {
     manifestHash: manifest.hash,
     shardIndex: runRecord.shardIndex,
     shardTotal: runRecord.shardTotal,
@@ -293,16 +324,11 @@ export async function commandResume(opts, deps = {}) {
     pool: runRecord.pool,
     reporterSchemaVersion: REPORTER_SCHEMA_VERSION,
   });
-  const mismatch = fingerprintMismatch(runRecord.sourceFingerprint, currentFingerprint);
-  if (mismatch) {
-    throw Object.assign(new Error(`Refusing to resume: ${mismatch}`), { code: EXIT.CONFIG_ERROR });
-  }
-  const currentDirty = computeDirtyTreeHash(repoRoot, manifest.files);
-  if (currentDirty !== runRecord.dirtyTreeHash) {
-    throw Object.assign(
-      new Error("Refusing to resume: test-source dirty-tree hash differs from initial run"),
-      { code: EXIT.CONFIG_ERROR },
-    );
+  const srcMismatch = fingerprintMismatch(runRecord.sourceFingerprint, currentSource);
+  if (srcMismatch) {
+    throw Object.assign(new Error(`Refusing to resume: config ${srcMismatch}`), {
+      code: EXIT.CONFIG_ERROR,
+    });
   }
   const batches = splitIntoBatches(shardFiles, runRecord.batchSize);
   const {

@@ -119,6 +119,7 @@ const ContextualPhenoComparisonDemo = lazy(() => import("./pages/ContextualPheno
 const PhenoComparison = lazy(() => import("./pages/PhenoComparison"));
 const PhenoExpressionShowcase = lazy(() => import("./pages/PhenoExpressionShowcase"));
 const ReleaseReadiness = lazy(() => import("./pages/ReleaseReadiness"));
+const HealthCheck = lazy(() => import("./pages/HealthCheck"));
 
 const queryClient = new QueryClient();
 

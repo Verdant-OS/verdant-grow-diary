@@ -108,7 +108,7 @@ describe("evaluateManagedSession", () => {
     const r = evaluateManagedSession(bad);
     const diag = buildSafeDiagnostics(bad, r);
     expect(diag.status).toBe("blocked");
-    expect(JSON.stringify(diag)).not.toContain("{");
+    expect(JSON.stringify(diag)).not.toContain("REDACTED");
     expect(diag.hasUserId).toBe(false);
     expect(diag.hasAccessToken).toBe(false);
   });

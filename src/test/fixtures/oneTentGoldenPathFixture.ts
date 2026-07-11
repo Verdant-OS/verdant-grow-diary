@@ -139,7 +139,7 @@ export const ONE_TENT_GOLDEN_SNAPSHOT: GoldenSensorSnapshot = Object.freeze({
   air_temp_f: 82,
   humidity_pct: 48,
   vpd_kpa: 1.65,
-  raw_payload: { entered_by: "grower", unit_system: "imperial" },
+  raw_payload: { entered_by: "grower" as const, unit_system: "imperial" as const },
 });
 
 /**
@@ -168,5 +168,5 @@ export const ONE_TENT_OTHER_USER_SNAPSHOT: GoldenSensorSnapshot = Object.freeze(
   air_temp_f: 999,
   humidity_pct: 99,
   vpd_kpa: 9.99,
-  raw_payload: { entered_by: "grower", unit_system: "imperial" },
+  raw_payload: { entered_by: "grower" as const, unit_system: "imperial" as const },
 });

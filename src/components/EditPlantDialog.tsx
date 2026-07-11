@@ -358,8 +358,6 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
                       variant="ghost"
                       className="h-7 px-2 gap-1"
                       onClick={() => {
-                        if (selected)
-                          URL.revokeObjectURL(selected.previewUrl);
                         setSelected(null);
                         if (cameraInputRef.current)
                           cameraInputRef.current.value = "";

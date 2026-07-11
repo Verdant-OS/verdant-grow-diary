@@ -15,6 +15,7 @@ import {
   getDiaryTimelineActionStyle,
   type DiaryTimelineActionStyle,
 } from "@/constants/diaryTimelineActionStyles";
+import { composeActionFollowUpTitle } from "@/lib/actionFollowUpEvidenceViewModel";
 
 export const DIARY_TIMELINE_EMPTY_TITLE = "No plant history yet.";
 export const DIARY_TIMELINE_EMPTY_HINT =

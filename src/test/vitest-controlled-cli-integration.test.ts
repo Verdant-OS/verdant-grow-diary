@@ -25,8 +25,9 @@ function fakeRepo(fileCount: number) {
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "fake" }));
   // Initialize as a git repo so the workspace fingerprint can enumerate
   // tracked + non-ignored untracked files (mirrors real Verdant layout).
+  const realGit = process.env.__LOVABLE_REAL_GIT || "git";
   const git = (...args: string[]) => {
-    const r = require("node:child_process").spawnSync("git", ["-C", root, ...args]);
+    const r = require("node:child_process").spawnSync(realGit, ["-C", root, ...args]);
     if (r.status !== 0) throw new Error(`git ${args.join(" ")} failed`);
   };
   git("init", "-q");

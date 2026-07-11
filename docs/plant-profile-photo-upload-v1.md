@@ -125,3 +125,56 @@ text input:
 - `src/lib/plantProfilePhotoUploadService.ts`
 
 No storage, schema, or RLS rollback is required.
+
+## Previous-object cleanup (Replacement Cleanup V1)
+
+When a grower successfully replaces a plant profile photo, Verdant
+attempts to retire the previous private storage object. The plant
+update is the primary operation; cleanup is a strictly secondary,
+user-initiated step attached only to a successful Edit Plant
+replacement.
+
+Order of operations (see
+`src/lib/plantProfilePhotoReplacementCleanupService.ts`):
+
+1. Validate the selected file and upload the new private object.
+2. Update `plants.photo_url` to the new durable `storage://`
+   reference. If the update fails, only the *newly uploaded* object
+   is removed; the previous photo is left untouched.
+3. **Confirm** the plant's current `photo_url` equals the new
+   durable reference via the authenticated (RLS-safe) Supabase
+   client.
+4. **Reference-count check** — query current `plants.photo_url`
+   rows equal to the previous durable reference. Only when zero
+   remaining references exist may the old object be removed.
+5. Removal calls `removeUploadedPlantProfilePhoto` with the
+   *parsed object path only* — never the full `storage://` URI,
+   never a signed URL, never provider text.
+6. Existing React Query invalidations run regardless of cleanup
+   outcome.
+
+Protected cases (old object is **not** deleted):
+
+- Previous value is `null`, blank, `http`, `https`, `data:image`,
+  or `blob:` (legacy references are the admin CLI's job).
+- Previous reference targets another bucket, another owner, or a
+  different plant.
+- Persistence confirmation returns anything other than the new
+  reference.
+- Reference-count query fails or is uncertain.
+- Another plant still references the previous object.
+
+Failure never rolls back a successful photo update. Grower-facing
+copy is sanitized:
+
+| Outcome                              | Toast                                                                        |
+| ------------------------------------ | ---------------------------------------------------------------------------- |
+| Removed / not needed                 | `Plant photo updated.`                                                       |
+| Protected / skipped for safety       | `Plant photo updated. The previous file was left in storage for safety.`     |
+| Remove failed                        | `Plant photo updated. The previous file could not be removed.`               |
+
+No scheduled cleanup, cron, background worker, queue, trigger,
+schema change, RLS change, migration, or Edge Function is
+introduced. The admin `plant-photos:cleanup` CLI remains the
+repair path for historical or conservatively retained objects and
+is **not** modified by this feature.

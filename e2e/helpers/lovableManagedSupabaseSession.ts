@@ -127,11 +127,16 @@ export interface ManagedSessionEnvSnapshot {
   targetProjectRef?: string | null;
 }
 
+// sameSite aliases. Playwright/RFC values are strict/lax/none; Chrome and
+// DevTools exports use "no_restriction" (== None) and "unspecified" (no
+// explicit policy). Unknown values are still rejected, never guessed.
 const VALID_SAME_SITE: Record<string, "Strict" | "Lax" | "None"> = {
   strict: "Strict",
   lax: "Lax",
   none: "None",
+  no_restriction: "None",
 };
+const UNSET_SAME_SITE = "unspecified";
 
 function normalizeOneCookie(raw: unknown): NormalizedManagedCookie | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
@@ -159,15 +164,24 @@ function normalizeOneCookie(raw: unknown): NormalizedManagedCookie | null {
   }
   if (c.sameSite !== undefined) {
     if (typeof c.sameSite !== "string") return null;
-    const normalized = VALID_SAME_SITE[c.sameSite.toLowerCase()];
-    if (!normalized) return null;
-    out.sameSite = normalized;
+    const key = c.sameSite.toLowerCase();
+    if (key !== UNSET_SAME_SITE) {
+      const normalized = VALID_SAME_SITE[key];
+      if (!normalized) return null;
+      out.sameSite = normalized;
+    }
   }
   if (c.expires !== undefined) {
-    if (typeof c.expires !== "number" || !Number.isFinite(c.expires) || c.expires <= 0) {
+    // A non-number / non-finite expires is still malformed (fail closed).
+    if (typeof c.expires !== "number" || !Number.isFinite(c.expires)) {
       return null;
     }
-    out.expires = c.expires;
+    // A non-positive expires marks a SESSION cookie (Playwright's
+    // storageState emits expires:-1; some exports use 0). Keep the cookie;
+    // omit the expiry so Playwright treats it as a session cookie.
+    if (c.expires > 0) {
+      out.expires = c.expires;
+    }
   }
   return out;
 }

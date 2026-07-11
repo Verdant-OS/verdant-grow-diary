@@ -194,6 +194,16 @@ byte by `src/test/one-tent-preflight-receipt.test.ts`.
 - Each cookie needs `name`, `value` (string), and `domain` or `url`.
   `sameSite` normalizes case-insensitively to Strict/Lax/None; missing
   `path` becomes `/`; boolean/expiry fields must be well-typed.
+- **Real-world cookie formats are tolerated** (injector-compat fix):
+  a non-positive `expires` (Playwright `storageState()` emits `-1` for
+  session cookies; some exports use `0`) marks a **session cookie** —
+  the cookie is kept and the expiry field is omitted, rather than
+  rejecting the whole payload. Chrome/DevTools `sameSite`
+  `"no_restriction"` maps to `None` and `"unspecified"` is treated as
+  unset. Genuinely-malformed values (unknown `sameSite`, a non-number
+  `expires`, missing `domain`/`url`) still fail closed. This is what
+  cleared the historical `invalid_cookies_json` block: a real
+  Playwright/browser cookie export now normalizes instead of blocking.
 - **All-or-nothing**: any malformed cookie blocks restoration of the
   whole set (`invalid_cookies_json`) — even when a complete valid
   storage session exists. This is the documented conservative rule:
@@ -201,9 +211,29 @@ byte by `src/test/one-tent-preflight-receipt.test.ts`.
   state differ from what the operator believes was restored.
 - Restoration order: validated cookies are added to the browser
   context **before** the first navigation, then the Supabase
-  local-storage session is written, then the app loads.
+  session is written, then the app loads.
+- **Verbatim session injection** (auth-restore fix): the walk writes the
+  exact validated `LOVABLE_BROWSER_SUPABASE_SESSION_JSON` value into
+  storage under the storage key, not a narrowed reconstruction.
+  supabase-js `_isValidSession` requires `access_token` **and**
+  `refresh_token` **and** `expires_at`; storing the verbatim session
+  supabase-js itself would have written keeps all three (plus
+  `token_type` / `expires_in` / user metadata), so the restored shell
+  authenticates instead of bouncing to `/auth`. The storage key must be
+  the app's real supabase-js v2 key `sb-<project-ref>-auth-token`.
 - Diagnostics print counts only — never cookie names, values, raw
   JSON, or storage state.
+
+**Materializing the managed session (operator tooling).**
+`node scripts/e2e/materialize-managed-session.mjs` turns a REAL session —
+an existing `e2e/.auth/session-storage.json` snapshot (written by a real
+`/auth` login via `e2e/auth.setup.ts`), or a live `E2E_TEST_EMAIL` /
+`E2E_TEST_PASSWORD` fixture login — into the `LOVABLE_BROWSER_*` env,
+deriving the correct `sb-<ref>-auth-token` storage key and emitting the
+FULL session verbatim. It writes the gitignored `e2e/.auth/managed-session.env`
+(mode 600, token never echoed to stdout) and refuses to fabricate: with
+no snapshot and no credentials it exits `2` (BLOCKED). This is the
+supported way to run the walk locally once fixture credentials exist.
 
 **Cookie-only limitation.** Cookie restoration may permit browser-shell
 authentication (`restore_strategy: "cookies_only"`,
@@ -425,12 +455,88 @@ Slice 4e — Quick Log handoff for capturing a new follow-up photo.
   External, protocol-relative, schema-relative, malformed, unrelated
   and control-char paths are rejected by
   `isSafeActionFollowUpReturnPath`.
-- Authenticated One-Tent Playwright proof for Slice 4e remains
-  `BLOCKED` — inherited from `BLOCKED_BY_MANAGED_SESSION_INJECTOR`
-  (`invalid_cookies_json`, missing
-  `LOVABLE_BROWSER_SUPABASE_COOKIES_JSON`). Will be re-run when the
-  managed session becomes available. No fabricated authenticated
-  proof was recorded.
+- **Injector-compatibility fix (this change):** the two blockers that
+  made the managed session unusable are resolved. (1) The cookie
+  validator no longer rejects real Playwright/browser cookie exports —
+  session cookies (`expires` ≤ 0) and Chrome `sameSite`
+  `no_restriction`/`unspecified` normalize instead of tripping
+  `invalid_cookies_json`. (2) The walk now injects the **verbatim**
+  validated session JSON, so supabase-js keeps `refresh_token` +
+  `expires_at` and the shell stays authenticated instead of bouncing to
+  `/auth`. `scripts/e2e/materialize-managed-session.mjs` produces the
+  correct env (incl. the `sb-<ref>-auth-token` key) from a real login or
+  auth snapshot. Verified by `src/test/one-tent-managed-cookie-formats.test.ts`
+  and the existing parity/receipt suites; no `production` app changes.
+- Running the walk end to end still requires a **real fixture session**
+  (fixture-account credentials or a pre-generated `e2e/.auth` snapshot).
+  With neither present locally the preflight/materialize step exits
+  `BLOCKED` by design — the remaining gate is operational (credentials),
+  not the injection code. No login is ever fabricated; no authenticated
+  browser pass is claimed without a real session.
 - No schema, RLS, migration, Edge, auth, storage-policy, AI, device,
   or Action Queue write-path changes in this slice.
 
+
+## Action Response Memory V1 — Milestone 5 status
+
+Milestone 5 turns the completed Action Queue lifecycle into durable,
+read-only plant memory: completed action → grower records the follow-up
+outcome (optional note, optional existing photo, optional sensor snapshot)
+→ one canonical Action Response Memory presented consistently on Action
+Detail, Timeline, and Plant Detail.
+
+Status matrix (browser-agnostic; verified via Vitest suites):
+
+- Canonical response model (`actionResponseMemoryRules`): PASS
+  (`action-response-memory-rules`; explicit-`action_queue_id` join only,
+  scope-mismatch rejection, deterministic dedup, fail-closed timestamps)
+- Read-only owner-scoped service (SELECT-only, batched, no N+1): PASS
+  (`action-response-memory-service`)
+- Shared presenter card + label parity across surfaces: PASS
+  (`action-response-memory-card`)
+- Action Detail evidence card consumes the canonical model: PASS
+  (writer, save service, idempotency, and Action Queue transitions
+  untouched; legacy marker rows keep their original rendering)
+- Timeline compact "Action response" event + "Action responses" filter:
+  PASS (rendered inside the evidence row itself — one response, one event;
+  legacy "Follow-up" entries preserved)
+- Plant Detail "Recent action response" card (exact-plant only): PASS
+  (tent-level `plant_id = null` and grow-level actions never appear on a
+  plant; wrong-plant/ambiguous records excluded)
+- Cross-surface regression + forbidden-surface static safety: PASS
+  (`action-response-memory-surfaces`)
+- Authenticated browser proof: **BLOCKED_BY_MANAGED_SESSION_INJECTOR**
+  (inherited; no login fabricated, no browser pass claimed)
+
+Contract notes for Milestone 5:
+
+- The canonical response row is the Slice 4c evidence row
+  (`diary_entries.details.event_type = "action_followup"`) **with an
+  explicit grower-selected `details.outcome`** (`improved | unchanged |
+  declined | too_soon | unclear`). Auto reminder markers (same event type,
+  no outcome) are legacy rows and never become canonical memories.
+- The authoritative relationship is `details.action_queue_id`, written by
+  the evidence service from the RLS-reverified action row. Cross-surface
+  memory is never created by matching note text, timestamps,
+  suggested-change copy, photo references, or sensor ids.
+- Grower-recorded outcome only — never inferred; duplicate rows are
+  selected deterministically (earliest row id) and flagged internally;
+  contradictory duplicates are never silently merged.
+- Photo evidence renders through the existing durable-reference parser,
+  viewer-owner validation, and signed-display hook; signed URLs are never
+  persisted; unavailable photos fall back safely and never hide the
+  outcome, note, or sensor evidence.
+- Sensor evidence is historical only. Sources keep their provenance
+  (manual stays manual, csv stays csv, demo stays demo); stale stays
+  stale; invalid stays invalid; unknown provenance is never trusted,
+  live, or healthy. Payload blobs are never selected or rendered.
+- All three surfaces carry "Grower-recorded follow-up" and "Historical
+  evidence — not current room conditions." — no causal claims anywhere.
+- Sibling engines are distinct and untouched: `actionOutcome*` (the
+  deterministic post-action sensor-window analysis engine) and
+  `actionResponsePairingRules` (the note-keyword V0 pairing chip) remain
+  independent read paths.
+- No schema, RLS, migration, Edge, auth, storage-policy, AI, device, or
+  Action Queue write-path changes in this milestone. Rollback = remove the
+  five new modules + the narrow Action Detail / Timeline / Plant Detail /
+  drawer-allowlist integrations.

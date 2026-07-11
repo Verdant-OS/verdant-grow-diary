@@ -335,8 +335,7 @@ describe("ActionFollowUpEvidenceSection", () => {
   });
 
   it("saves through the injected service and renders the returned card", async () => {
-    const save = vi
-      .fn<[ActionFollowUpDraft], Promise<ActionFollowUpEvidenceSaveResult>>()
+    const save = vi.fn<(draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>>()
       .mockResolvedValue({ status: "created", followUp: recordFixture() });
     render(<ActionFollowUpEvidenceSection action={BASE_ACTION} save={save} />);
     await waitFor(() => screen.getByTestId("action-followup-add-btn"));
@@ -358,8 +357,7 @@ describe("ActionFollowUpEvidenceSection", () => {
   });
 
   it("renders existing card when the service returns status=existing", async () => {
-    const save = vi
-      .fn<[ActionFollowUpDraft], Promise<ActionFollowUpEvidenceSaveResult>>()
+    const save = vi.fn<(draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>>()
       .mockResolvedValue({
         status: "existing",
         followUp: recordFixture({ outcome: "unclear" }),
@@ -377,8 +375,7 @@ describe("ActionFollowUpEvidenceSection", () => {
   });
 
   it("shows sanitized copy on blocked results", async () => {
-    const save = vi
-      .fn<[ActionFollowUpDraft], Promise<ActionFollowUpEvidenceSaveResult>>()
+    const save = vi.fn<(draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>>()
       .mockResolvedValue({ status: "blocked", reason: "action_not_completed" });
     render(<ActionFollowUpEvidenceSection action={BASE_ACTION} save={save} />);
     await waitFor(() => screen.getByTestId("action-followup-add-btn"));
@@ -393,8 +390,7 @@ describe("ActionFollowUpEvidenceSection", () => {
   });
 
   it("shows sanitized copy on failed results (no raw provider text)", async () => {
-    const save = vi
-      .fn<[ActionFollowUpDraft], Promise<ActionFollowUpEvidenceSaveResult>>()
+    const save = vi.fn<(draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>>()
       .mockResolvedValue({ status: "failed", reason: "insert_failed" });
     render(<ActionFollowUpEvidenceSection action={BASE_ACTION} save={save} />);
     await waitFor(() => screen.getByTestId("action-followup-add-btn"));

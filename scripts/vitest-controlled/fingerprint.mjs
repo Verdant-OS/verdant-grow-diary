@@ -24,6 +24,11 @@ import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 
 export const FINGERPRINT_SCHEMA_VERSION = 2;
+// Configuration fingerprint schema is versioned separately from the
+// workspace fingerprint. v3 folds the enforced toolchain identity
+// (Node, Bun, Vitest) into the config hash so any runtime drift
+// invalidates resume before completed-file reuse.
+export const CONFIG_FINGERPRINT_SCHEMA_VERSION = 3;
 export const FINGERPRINT_ALGORITHM = "sha256";
 
 /** Normalize any repo-relative path to POSIX form for stable hashing. */

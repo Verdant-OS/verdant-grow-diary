@@ -319,7 +319,11 @@ describe("One-Tent Loop Golden Path — stitched regression", () => {
 
     // -- Stage 1: Grow → Tent → Plant ownership --------------------------
     const grows = scopeGrowGraph(
-      [ONE_TENT_GOLDEN_GROW, { ...ONE_TENT_GOLDEN_GROW, id: "unrelated" }],
+      [
+        ONE_TENT_GOLDEN_GROW,
+        // Cross-user grow must never leak into the scope.
+        { ...ONE_TENT_GOLDEN_GROW, id: "other-grow", user_id: ONE_TENT_OTHER_USER_ID },
+      ],
       ONE_TENT_GOLDEN_USER_ID,
       ONE_TENT_GOLDEN_GROW.id,
     );

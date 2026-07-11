@@ -309,6 +309,7 @@ const App = () => (
 
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/settings/agent-integrations" element={<AgentIntegrations />} />
+                    <Route path="/health" element={<HealthCheck />} />
                     {/* Operator-only routes. Authenticated via AppShell's useRequireAuth,
                         then gated by server-side has_role('operator') via RequireOperatorRole.
                         Non-operator users see a calm access-restricted state. */}

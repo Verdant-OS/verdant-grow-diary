@@ -212,3 +212,39 @@ Contract notes:
 - Plant improvement is never inferred; `improved` is a grower-selected label only.
 - No signed / blob / data URLs are persisted through the UI flow.
 - No service role, AI, or device-control imports in the follow-up UI.
+
+## Action Follow-Up Evidence V1 — Slice 4a status
+
+Slice 4a — Shared outcome-label helper + diary/timeline summary integration.
+
+Status matrix (browser-agnostic; verified via Vitest suites):
+
+- Shared outcome-label helper (`actionFollowUpOutcomeLabel`): PASS
+- Shared title composer (`composeActionFollowUpTitle`): PASS
+- Diary timeline summary renders `Follow-up · <Outcome>`: PASS
+  (`growDiaryTimelineRules.toTimelineItem`)
+- Diary action-label helper renders shared outcome label: PASS
+  (`diaryTimelineActionLabel`)
+- Legacy marker-only rows continue to render `Follow-up`: PASS
+- Invalid/missing outcome falls back to legacy label: PASS
+- Outcome never labeled as AI or device execution: PASS
+- Diary/report summary status: PASS (report/PDF surface not
+  currently branching on `action_followup` — no changes required)
+- Optional Manual sensor association: DEFERRED (Slice 4b)
+- Optional existing-photo evidence: DEFERRED (Slice 4c)
+- Photo upload infrastructure: NOT ADDED
+- Sensor creation infrastructure: NOT ADDED
+- Automatic follow-up creation: INTENTIONALLY UNSUPPORTED
+- Authenticated browser proof: **BLOCKED_BY_MANAGED_SESSION_INJECTOR**
+  (`LOVABLE_BROWSER_AUTH_STATUS=signed_out`; preflight ran cleanly and
+  reported the expected deterministic BLOCKED receipt — no login
+  fabricated, no seed writes, no paid AI call)
+
+Contract notes for Slice 4a:
+
+- One shared helper (`composeActionFollowUpTitle`) is the single
+  source of truth for diary, timeline, evidence card, and any future
+  report/export outcome labels. No JSX-embedded lookup table.
+- Backward-compatible: rows without `details.outcome` are unchanged.
+- Pure, deterministic, null-safe. No schema, RLS, migration, or Edge
+  Function changes. No AI, device, or Action Queue writes.

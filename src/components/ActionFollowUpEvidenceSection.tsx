@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { CircleCheckBig } from "lucide-react";
+import { useAuth } from "@/store/auth";
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,
   followupMatchesAction,
@@ -32,6 +33,14 @@ import ActionFollowUpEvidenceForm, {
   type ActionFollowUpFormSubmit,
 } from "@/components/ActionFollowUpEvidenceForm";
 import ActionFollowUpEvidenceCard from "@/components/ActionFollowUpEvidenceCard";
+import ActionFollowUpExistingPhotoSelector, {
+  type ExistingPhotoLoadState,
+} from "@/components/ActionFollowUpExistingPhotoSelector";
+import ActionFollowUpExistingPhotoEvidence from "@/components/ActionFollowUpExistingPhotoEvidence";
+import {
+  loadActionFollowUpExistingPhotoCandidates,
+  type ExistingPhotoCandidateLoadResult,
+} from "@/lib/actionFollowUpExistingPhotoService";
 
 export interface ActionFollowUpEvidenceSectionAction {
   id: string;

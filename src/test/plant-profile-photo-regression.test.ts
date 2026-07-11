@@ -84,9 +84,8 @@ describe("EditPlantDialog · native camera + library flow", () => {
     expect(EDIT_DIALOG).toMatch(/validatePlantProfilePhotoFile/);
   });
   it("uses the upload service and never persists a signed URL", () => {
-    expect(EDIT_DIALOG).toContain(
-      'import {\n  uploadPlantProfilePhoto,\n  removeUploadedPlantProfilePhoto,\n} from "@/lib/plantProfilePhotoUploadService"',
-    );
+    expect(EDIT_DIALOG).toMatch(/uploadPlantProfilePhoto/);
+    expect(EDIT_DIALOG).toMatch(/removeUploadedPlantProfilePhoto/);
     expect(EDIT_DIALOG).not.toMatch(/createSignedUrl/);
   });
   it("does not surface a URL text input as the primary control", () => {

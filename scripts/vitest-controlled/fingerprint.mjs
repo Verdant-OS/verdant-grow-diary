@@ -108,10 +108,10 @@ function hashFileStreaming(absPath, sizeHint) {
   const fd = fs.openSync(absPath, "r");
   try {
     const buf = Buffer.allocUnsafe(64 * 1024);
-    let bytes;
-    // eslint-disable-next-line no-constant-condition
-    while ((bytes = fs.readSync(fd, buf, 0, buf.length, null)) > 0) {
+    let bytes = fs.readSync(fd, buf, 0, buf.length, null);
+    while (bytes > 0) {
       h.update(buf.subarray(0, bytes));
+      bytes = fs.readSync(fd, buf, 0, buf.length, null);
     }
   } finally {
     fs.closeSync(fd);

@@ -2,13 +2,13 @@
  * Pricing / Proof Polish v1 — copy + safety regressions.
  *
  * Asserts the polish copy renders and that forbidden / unsafe phrases
- * do NOT appear anywhere on the Pricing page or BillingPlaceholder.
+ * do NOT appear anywhere on the Pricing page. (The retired
+ * `BillingPlaceholder` describe block was removed in Slice F.)
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 import Pricing from "@/pages/Pricing";
-import BillingPlaceholder from "@/pages/BillingPlaceholder";
 
 vi.mock("@/lib/pricingAnalytics", () => ({
   trackPricingEvent: vi.fn(),
@@ -34,16 +34,6 @@ function renderPricing() {
   return render(
     <MemoryRouter>
       <Pricing />
-    </MemoryRouter>,
-  );
-}
-
-function renderBilling(plan: string) {
-  return render(
-    <MemoryRouter initialEntries={[`/billing/${plan}`]}>
-      <Routes>
-        <Route path="/billing/:plan" element={<BillingPlaceholder />} />
-      </Routes>
     </MemoryRouter>,
   );
 }

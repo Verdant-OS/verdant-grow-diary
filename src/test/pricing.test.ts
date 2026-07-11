@@ -28,7 +28,7 @@ describe("/pricing route", () => {
     expect(APP).toMatch(/path="\/pricing"\s+element=\{<Pricing\s*\/>\}/);
   });
 
-  it("redirects legacy /billing/:plan to canonical /upgrade (Slice E)", () => {
+  it("redirects legacy /billing/:plan to canonical /pricing via LegacyBillingRedirect", () => {
     expect(APP).toMatch(/import\(\s*["']\.\/pages\/LegacyBillingRedirect["']\s*\)/);
     expect(APP).toMatch(/path="\/billing\/:plan"\s+element=\{<LegacyBillingRedirect\s*\/>\}/);
   });

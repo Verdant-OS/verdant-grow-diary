@@ -37,6 +37,7 @@ import ActionFollowUpExistingPhotoSelector, {
   type ExistingPhotoLoadState,
 } from "@/components/ActionFollowUpExistingPhotoSelector";
 import ActionFollowUpExistingPhotoEvidence from "@/components/ActionFollowUpExistingPhotoEvidence";
+import ActionFollowUpQuickLogHandoffButton from "@/components/ActionFollowUpQuickLogHandoffButton";
 import {
   loadActionFollowUpExistingPhotoCandidates,
   type ExistingPhotoCandidateLoadResult,

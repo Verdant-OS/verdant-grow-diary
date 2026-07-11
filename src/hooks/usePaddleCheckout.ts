@@ -1,5 +1,11 @@
-import { useState } from "react";
-import { initializePaddle, getPaddlePriceId } from "@/lib/paddle";
+import { useCallback, useMemo, useState } from "react";
+import {
+  initializePaddle,
+  getPaddlePriceId,
+  resolvePaddleCheckout,
+  getCheckoutUnavailableMessage,
+  PaddleCheckoutUnavailableError,
+} from "@/lib/paddle";
 import { useAuth } from "@/store/auth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
@@ -9,6 +15,30 @@ export interface OpenCheckoutOptions {
   priceId: string;
   quantity?: number;
   successUrl?: string;
+}
+
+export interface UsePaddleCheckoutResult {
+  openCheckout: (options: OpenCheckoutOptions) => Promise<void>;
+  loading: boolean;
+  /**
+   * True when the client-side environment gate has blocked checkout
+   * (missing/malformed token, or live token on a loopback host). Derived
+   * from the same helper the banner uses, so UI stays consistent.
+   */
+  unavailable: boolean;
+  /**
+   * Human-readable blocking copy for the current unavailable case, or
+   * `null` when checkout is available. Never contains token values.
+   */
+  unavailableMessage: string | null;
+  /**
+   * Set when `openCheckout` was called against an unavailable environment
+   * (or when Paddle initialization threw `PaddleCheckoutUnavailableError`).
+   * Callers can render an inline calm state instead of crashing. Cleared
+   * by `dismissBlocked()`.
+   */
+  blockedReason: string | null;
+  dismissBlocked: () => void;
 }
 
 /**
@@ -30,6 +60,9 @@ function defaultSuccessUrl(): string {
  * Opens the Lovable built-in Paddle overlay checkout.
  *
  * SAFETY:
+ *  - Fails closed via `resolvePaddleCheckout()` before any Paddle call
+ *    when the environment is `"unavailable"` (Slice A). The caller sees a
+ *    calm `blockedReason` string; no navigation, no toast, no crash.
  *  - If the user is not signed in, redirects to /auth with a return-to
  *    parameter so we never open a checkout that cannot be attributed
  *    to a user via `customData.userId`.
@@ -38,52 +71,91 @@ function defaultSuccessUrl(): string {
  *  - This hook does NOT grant entitlements. Backend webhook + Phase 2
  *    entitlement bridge do that.
  */
-export function usePaddleCheckout() {
+export function usePaddleCheckout(): UsePaddleCheckoutResult {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [blockedReason, setBlockedReason] = useState<string | null>(null);
 
-  const openCheckout = async (options: OpenCheckoutOptions) => {
-    if (!user) {
-      // Preserve the full current path (including any returnTo) through the
-      // auth detour so the round-trip back to a gated surface survives.
-      // NOTE: /auth reads `redirectTo` (sanitized via sanitizeAuthRedirect) —
-      // the previous `redirect` param was silently ignored.
-      const back = `${window.location.pathname}${window.location.search}` || "/pricing";
-      navigate(`/auth?redirectTo=${encodeURIComponent(back)}`);
-      return;
-    }
-    setLoading(true);
-    try {
-      await initializePaddle();
-      const paddlePriceId = await getPaddlePriceId(options.priceId);
+  // Derived at every render so a hot-reload / rerender after the token
+  // becomes available flips `unavailable` back to false without needing
+  // to remount. Cheap — pure string/hostname checks.
+  const unavailable = useMemo(
+    () => resolvePaddleCheckout() === "unavailable",
+    // resolvePaddleCheckout reads module-scope + window.location.hostname;
+    // both are stable across renders in production. This memo is a
+    // per-render read, not a subscription — that is intentional.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const unavailableMessage = useMemo(
+    () => (unavailable ? getCheckoutUnavailableMessage() : null),
+    [unavailable],
+  );
 
-      (window as any).Paddle.Checkout.open({
-        items: [
-          { priceId: paddlePriceId, quantity: options.quantity ?? 1 },
-        ],
-        customer: user.email ? { email: user.email } : undefined,
-        customData: { userId: user.id },
-        settings: {
-          displayMode: "overlay",
-          successUrl: options.successUrl || defaultSuccessUrl(),
-          allowLogout: false,
-          variant: "one-page",
-        },
-      });
-    } catch (err) {
-      toast({
-        title: "Checkout unavailable",
-        description:
-          err instanceof Error
-            ? err.message
-            : "Please try again in a moment.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+  const dismissBlocked = useCallback(() => setBlockedReason(null), []);
+
+  const openCheckout = useCallback(
+    async (options: OpenCheckoutOptions) => {
+      // Fail-closed gate BEFORE any auth redirect: if checkout cannot run
+      // here, we must not detour the user to /auth and then dead-end.
+      const env = resolvePaddleCheckout();
+      if (env === "unavailable") {
+        setBlockedReason(getCheckoutUnavailableMessage());
+        return;
+      }
+
+      if (!user) {
+        const back =
+          `${window.location.pathname}${window.location.search}` || "/pricing";
+        navigate(`/auth?redirectTo=${encodeURIComponent(back)}`);
+        return;
+      }
+
+      setLoading(true);
+      setBlockedReason(null);
+      try {
+        await initializePaddle();
+        const paddlePriceId = await getPaddlePriceId(options.priceId);
+
+        (window as any).Paddle.Checkout.open({
+          items: [{ priceId: paddlePriceId, quantity: options.quantity ?? 1 }],
+          customer: user.email ? { email: user.email } : undefined,
+          customData: { userId: user.id },
+          settings: {
+            displayMode: "overlay",
+            successUrl: options.successUrl || defaultSuccessUrl(),
+            allowLogout: false,
+            variant: "one-page",
+          },
+        });
+      } catch (err) {
+        // The dedicated fail-closed error surfaces as an inline calm state,
+        // never a destructive toast. Everything else keeps the existing
+        // destructive toast so real Paddle/network failures stay visible.
+        if (err instanceof PaddleCheckoutUnavailableError) {
+          setBlockedReason(err.message);
+        } else {
+          toast({
+            title: "Checkout unavailable",
+            description:
+              err instanceof Error ? err.message : "Please try again in a moment.",
+            variant: "destructive",
+          });
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [navigate, user],
+  );
+
+  return {
+    openCheckout,
+    loading,
+    unavailable,
+    unavailableMessage,
+    blockedReason,
+    dismissBlocked,
   };
-
-  return { openCheckout, loading };
 }

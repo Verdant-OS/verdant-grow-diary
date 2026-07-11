@@ -88,6 +88,7 @@ export interface ActionFollowUpEvidenceViewModel {
   observedAtLabel: string;
   actionLabel: string;
   photoReference: string | null;
+  hasPhotoEvidence: boolean;
   sensorSnapshotId: string | null;
 }
 

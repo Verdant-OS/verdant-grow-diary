@@ -35,6 +35,7 @@ const TENT_ACTIONS = read("src/components/TentCardActionsMenu.tsx");
 const PLANT_ACTIONS = read("src/components/PlantCardActionsMenu.tsx");
 const MERGE_DIALOG = read("src/components/PlantMergeDialog.tsx");
 const PLANT_PHOTO = read("src/components/PlantPhoto.tsx");
+const PLANT_PHOTO_VIEW = read("src/components/PlantPhotoView.tsx");
 const MERGE_RULES = read("src/lib/plantMergeRules.ts");
 const TENT_RULES = read("src/lib/tentManagementRules.ts");
 const DISCLOSURE = read("src/components/GrowDataSourceDisclosure.tsx");
@@ -264,8 +265,8 @@ describe("Plant Merge UI wiring", () => {
 
 describe("Plant photo placeholder", () => {
   it("PlantPhoto renders themed placeholder on missing src / error", () => {
-    expect(PLANT_PHOTO).toContain("${testId}-placeholder");
-    expect(PLANT_PHOTO).toContain("onError");
+    expect(PLANT_PHOTO_VIEW).toContain("${testId}-placeholder");
+    expect(PLANT_PHOTO_VIEW).toContain("onError");
   });
   it("Plants page, Plant Detail, Tent Detail use PlantPhoto", () => {
     expect(PLANTS_PAGE).toContain("PlantPhoto");

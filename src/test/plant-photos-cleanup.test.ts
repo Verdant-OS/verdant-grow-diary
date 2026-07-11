@@ -6,6 +6,7 @@
  * spied fake that MUST NOT be called for any blocked condition.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import * as childProcess from "node:child_process";
 import {
   parseCleanupArgs,
   isDestructiveMode,
@@ -43,17 +44,13 @@ import {
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 
-
-
 const NOW = Date.parse("2026-08-01T00:00:00Z");
-const daysAgo = (d: number) =>
-  new Date(NOW - d * 24 * 60 * 60 * 1000).toISOString();
+const daysAgo = (d: number) => new Date(NOW - d * 24 * 60 * 60 * 1000).toISOString();
 
 const owner = "11111111-1111-1111-1111-111111111111";
 const grow = "22222222-2222-2222-2222-222222222222";
 const plant = "33333333-3333-3333-3333-333333333333";
-const validPath = (name = "a.jpg") =>
-  `${owner}/${grow}/plant-profiles/${plant}/${name}`;
+const validPath = (name = "a.jpg") => `${owner}/${grow}/plant-profiles/${plant}/${name}`;
 
 // -------- arg parsing --------
 
@@ -121,9 +118,7 @@ describe("parsePlantProfileObjectPath — strict scope", () => {
     });
     // 'unassigned' grow is also valid.
     expect(
-      parsePlantProfileObjectPath(
-        `${owner}/unassigned/plant-profiles/${plant}/b.heic`,
-      ),
+      parsePlantProfileObjectPath(`${owner}/unassigned/plant-profiles/${plant}/b.heic`),
     ).not.toBeNull();
   });
   it("rejects non-plant-profile paths", () => {
@@ -281,9 +276,7 @@ describe("planCleanup + executeCleanup — fail-closed behavior", () => {
     const deleter = vi.fn();
     const { report, candidateBatch } = await planCleanup({
       listReferences: refsOk([]),
-      listObjects: objectsOk([
-        { path: validPath("orphan.jpg"), created_at: daysAgo(60) },
-      ]),
+      listObjects: objectsOk([{ path: validPath("orphan.jpg"), created_at: daysAgo(60) }]),
       options: {
         dryRun: true,
         execute: false,
@@ -317,9 +310,7 @@ describe("planCleanup + executeCleanup — fail-closed behavior", () => {
     const opts = { ...okOpts, confirmDeleteOrphans: false };
     const { report, candidateBatch } = await planCleanup({
       listReferences: refsOk([]),
-      listObjects: objectsOk([
-        { path: validPath("orphan.jpg"), created_at: daysAgo(60) },
-      ]),
+      listObjects: objectsOk([{ path: validPath("orphan.jpg"), created_at: daysAgo(60) }]),
       options: opts,
       nowMs: NOW,
     });
@@ -338,9 +329,7 @@ describe("planCleanup + executeCleanup — fail-closed behavior", () => {
     const opts = { ...okOpts, execute: false, dryRun: true };
     const { report, candidateBatch } = await planCleanup({
       listReferences: refsOk([]),
-      listObjects: objectsOk([
-        { path: validPath("orphan.jpg"), created_at: daysAgo(60) },
-      ]),
+      listObjects: objectsOk([{ path: validPath("orphan.jpg"), created_at: daysAgo(60) }]),
       options: opts,
       nowMs: NOW,
     });
@@ -447,7 +436,10 @@ describe("planCleanup + executeCleanup — fail-closed behavior", () => {
       listObjects: objectsOk([
         { path: `${owner}/${grow}/diary/entry-1/photo.jpg`, created_at: daysAgo(400) },
         { path: `${owner}/${grow}/ai-doctor/session-1/photo.jpg`, created_at: daysAgo(400) },
-        { path: `${owner}/${grow}/plant-profiles/${plant}/.emptyFolderPlaceholder`, created_at: daysAgo(400) },
+        {
+          path: `${owner}/${grow}/plant-profiles/${plant}/.emptyFolderPlaceholder`,
+          created_at: daysAgo(400),
+        },
       ]),
       options: okOpts,
       nowMs: NOW,
@@ -486,9 +478,7 @@ describe("planCleanup + executeCleanup — fail-closed behavior", () => {
     await executeCleanup({
       report,
       candidateBatch,
-      listReferencesForRecheck: refsOk([
-        { photo_url: `storage://diary-photos/${orphan1}` },
-      ]),
+      listReferencesForRecheck: refsOk([{ photo_url: `storage://diary-photos/${orphan1}` }]),
       deleteObjects: deleter,
       options: okOpts,
     });
@@ -552,23 +542,15 @@ describe("planCleanup + executeCleanup — fail-closed behavior", () => {
 // -------- CLI + repo-shape static safety --------
 
 const ROOT = resolve(__dirname, "../..");
-const CLI = readFileSync(
-  resolve(ROOT, "scripts/admin/plant-photos-cleanup.mjs"),
-  "utf8",
-);
-const LIB = readFileSync(
-  resolve(ROOT, "scripts/admin/plant-photos-cleanup-lib.mjs"),
-  "utf8",
-);
-const PKG = JSON.parse(
-  readFileSync(resolve(ROOT, "package.json"), "utf8"),
-) as { scripts: Record<string, string> };
+const CLI = readFileSync(resolve(ROOT, "scripts/admin/plant-photos-cleanup.mjs"), "utf8");
+const LIB = readFileSync(resolve(ROOT, "scripts/admin/plant-photos-cleanup-lib.mjs"), "utf8");
+const PKG = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8")) as {
+  scripts: Record<string, string>;
+};
 
 describe("cleanup tool — no UI, no scheduler, npm script wiring", () => {
   it("package.json exposes the manual command", () => {
-    expect(PKG.scripts["plant-photos:cleanup"]).toContain(
-      "scripts/admin/plant-photos-cleanup.mjs",
-    );
+    expect(PKG.scripts["plant-photos:cleanup"]).toContain("scripts/admin/plant-photos-cleanup.mjs");
   });
   it("no scheduled workflow, cron, or trigger for this script", () => {
     for (const [name, cmd] of Object.entries(PKG.scripts)) {
@@ -580,7 +562,7 @@ describe("cleanup tool — no UI, no scheduler, npm script wiring", () => {
     expect(LIB).not.toMatch(/\bsetInterval\s*\(|\bsetTimeout\s*\(|node-cron|cronjob\.schedule/);
   });
   it("no UI surface — script is not imported by any src/ non-test file", () => {
-    const { execSync } = require("node:child_process") as typeof import("node:child_process");
+    const { execSync } = childProcess;
     const out = execSync(
       "grep -rEl \"plant-photos-cleanup\" src --include='*.ts' --include='*.tsx' | grep -v '/test/' || true",
       { cwd: ROOT, encoding: "utf8" },
@@ -600,8 +582,6 @@ describe("cleanup tool — no UI, no scheduler, npm script wiring", () => {
     expect(CLI).not.toMatch(/console\.\w+\([^)]*process\.env\.SUPABASE_SERVICE_ROLE_KEY/);
   });
 });
-
-
 
 // ==============================================================
 // Report contract, console summary, owner-filter regression suite
@@ -658,9 +638,7 @@ function assertCanonicalShape(rep: any) {
   expect(json.includes("undefined")).toBe(false);
   expect(() => JSON.parse(json)).not.toThrow();
   // Array/count invariants.
-  expect(rep.counts.protected_by_final_recheck).toBe(
-    rep.protected_by_final_recheck.length,
-  );
+  expect(rep.counts.protected_by_final_recheck).toBe(rep.protected_by_final_recheck.length);
   expect(rep.counts.deleted).toBe(rep.deleted_paths.length);
   expect(rep.counts.failed).toBe(rep.failed_paths.length);
   // Deterministic sort.
@@ -679,25 +657,19 @@ function assertCanonicalShape(rep: any) {
 
 const ownerA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const ownerB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
-const pathA = (name = "a.jpg") =>
-  `${ownerA}/${grow}/plant-profiles/${plant}/${name}`;
-const pathB = (name = "b.jpg") =>
-  `${ownerB}/${grow}/plant-profiles/${plant}/${name}`;
+const pathA = (name = "a.jpg") => `${ownerA}/${grow}/plant-profiles/${plant}/${name}`;
+const pathB = (name = "b.jpg") => `${ownerB}/${grow}/plant-profiles/${plant}/${name}`;
 
 describe("classifyPhotoUrlValue + classifyPhotoUrlReferences", () => {
   it("classifies each value shape", () => {
-    expect(
-      classifyPhotoUrlValue(`storage://diary-photos/${validPath("k.jpg")}`),
-    ).toBe("valid_storage");
-    expect(classifyPhotoUrlValue("https://example.com/legacy.jpg")).toBe(
-      "legacy",
+    expect(classifyPhotoUrlValue(`storage://diary-photos/${validPath("k.jpg")}`)).toBe(
+      "valid_storage",
     );
+    expect(classifyPhotoUrlValue("https://example.com/legacy.jpg")).toBe("legacy");
     expect(classifyPhotoUrlValue("data:image/png;base64,AAAA")).toBe("legacy");
     expect(classifyPhotoUrlValue(null)).toBe("null");
     expect(classifyPhotoUrlValue("")).toBe("null");
-    expect(classifyPhotoUrlValue("storage://other-bucket/x/y.jpg")).toBe(
-      "malformed",
-    );
+    expect(classifyPhotoUrlValue("storage://other-bucket/x/y.jpg")).toBe("malformed");
     expect(classifyPhotoUrlValue("not-a-url-at-all")).toBe("malformed");
   });
   it("aggregates row stats", () => {
@@ -718,20 +690,16 @@ describe("classifyPhotoUrlValue + classifyPhotoUrlReferences", () => {
 describe("classifyRawStoragePath + splitPathBuckets", () => {
   it("splits invalid_path vs non_profile_photo vs plant_profile", () => {
     expect(classifyRawStoragePath(validPath())).toBe("plant_profile");
-    expect(
-      classifyRawStoragePath(`${owner}/${grow}/diary-entries/e1/x.jpg`),
-    ).toBe("non_profile_photo");
-    expect(classifyRawStoragePath(`${owner}/${grow}/gallery/x.jpg`)).toBe(
+    expect(classifyRawStoragePath(`${owner}/${grow}/diary-entries/e1/x.jpg`)).toBe(
       "non_profile_photo",
     );
+    expect(classifyRawStoragePath(`${owner}/${grow}/gallery/x.jpg`)).toBe("non_profile_photo");
     expect(classifyRawStoragePath(`../${owner}/x.jpg`)).toBe("invalid_path");
     expect(classifyRawStoragePath(`/abs/x.jpg`)).toBe("invalid_path");
     expect(classifyRawStoragePath(`a\\b\\c`)).toBe("invalid_path");
     expect(classifyRawStoragePath(``)).toBe("invalid_path");
     expect(
-      classifyRawStoragePath(
-        `${owner}/${grow}/plant-profiles/${plant}/.emptyFolderPlaceholder`,
-      ),
+      classifyRawStoragePath(`${owner}/${grow}/plant-profiles/${plant}/.emptyFolderPlaceholder`),
     ).toBe("invalid_path");
   });
   it("splitPathBuckets aggregates non-profile vs invalid", () => {
@@ -822,9 +790,7 @@ describe("toCanonicalCleanupReport — schema contract", () => {
     await executeCleanup({
       report,
       candidateBatch,
-      listReferencesForRecheck: refsOk([
-        { photo_url: `storage://diary-photos/${orphan1}` },
-      ]),
+      listReferencesForRecheck: refsOk([{ photo_url: `storage://diary-photos/${orphan1}` }]),
       deleteObjects: async (paths) => ({ deleted: paths, errors: [] }),
       options: okOpts,
     });
@@ -876,9 +842,7 @@ describe("toCanonicalCleanupReport — schema contract", () => {
     const SERVICE_KEY = "eyJ.SECRET.SERVICE.ROLE.KEY";
     const { report } = await planCleanup({
       listReferences: refsOk([]),
-      listObjects: objectsOk([
-        { path: validPath("orphan.jpg"), created_at: daysAgo(60) },
-      ]),
+      listObjects: objectsOk([{ path: validPath("orphan.jpg"), created_at: daysAgo(60) }]),
       options: {
         dryRun: true,
         execute: false,
@@ -1060,9 +1024,7 @@ describe("owner filter — initial scan and final recheck scoping", () => {
       options: optsA,
     });
     expect(report.protected_by_final_recheck_paths).toEqual([orphanA1]);
-    expect(report.protected_by_final_recheck_paths.every((p) =>
-      p.startsWith(ownerA),
-    )).toBe(true);
+    expect(report.protected_by_final_recheck_paths.every((p) => p.startsWith(ownerA))).toBe(true);
     expect(deleter).toHaveBeenCalledWith([orphanA2]);
   });
 
@@ -1074,9 +1036,7 @@ describe("owner filter — initial scan and final recheck scoping", () => {
     const orphanA1 = pathA("o1.jpg");
     const { report, candidateBatch } = await planCleanup({
       listReferences: refsOk([]),
-      listObjects: objectsOk([
-        { path: orphanA1, created_at: daysAgo(60) },
-      ]),
+      listObjects: objectsOk([{ path: orphanA1, created_at: daysAgo(60) }]),
       options: optsA,
       nowMs: NOW,
     });
@@ -1129,9 +1089,7 @@ describe("cleanup reporting — static boundaries", () => {
       resolve(ROOT, "scripts/admin/plant-photos-cleanup-report.mjs"),
       "utf8",
     );
-    expect(REPORT).not.toMatch(
-      /\bsetInterval\s*\(|\bsetTimeout\s*\(|node-cron|cronjob\.schedule/,
-    );
+    expect(REPORT).not.toMatch(/\bsetInterval\s*\(|\bsetTimeout\s*\(|node-cron|cronjob\.schedule/);
     // Pure module — no Supabase / fs / network.
     expect(REPORT).not.toContain("@supabase/supabase-js");
     expect(REPORT).not.toContain("node:fs");
@@ -1170,9 +1128,6 @@ describe("cleanup reporting — static boundaries", () => {
 // Report persistence + determinism hardening
 // ==============================================================
 
-
-
-
 // -------- --report-file arg parsing --------
 
 describe("parseCleanupArgs — --report-file", () => {
@@ -1195,12 +1150,7 @@ describe("parseCleanupArgs — --report-file", () => {
     expect(r.ok).toBe(false);
   });
   it("rejects repeated --report-file", () => {
-    const r = parseCleanupArgs([
-      "--report-file",
-      "a.json",
-      "--report-file",
-      "b.json",
-    ]);
+    const r = parseCleanupArgs(["--report-file", "a.json", "--report-file", "b.json"]);
     expect(r.ok).toBe(false);
   });
   it("accepts --owner-id as the documented spelling", () => {
@@ -1281,15 +1231,11 @@ describe("writeCanonicalReportFile — atomic, deterministic", () => {
   it("refuses to overwrite a directory that already occupies the path", () => {
     const dir = join(tmp, "collide");
     mkdirSync(dir);
-    expect(() =>
-      writeCanonicalReportFile(makeCanonical() as any, dir),
-    ).toThrow(/directory/);
+    expect(() => writeCanonicalReportFile(makeCanonical() as any, dir)).toThrow(/directory/);
   });
 
   it("rejects an empty path", () => {
-    expect(() =>
-      writeCanonicalReportFile(makeCanonical() as any, "   "),
-    ).toThrow();
+    expect(() => writeCanonicalReportFile(makeCanonical() as any, "   ")).toThrow();
   });
 
   it("overwrites an existing report atomically (previous file survives crash-simulated failure)", () => {
@@ -1297,10 +1243,7 @@ describe("writeCanonicalReportFile — atomic, deterministic", () => {
     writeCanonicalReportFile(makeCanonical() as any, target);
     const before = statSync(target).mtimeMs;
     // Second write with different contents.
-    writeCanonicalReportFile(
-      makeCanonical({ mode: "execute" }) as any,
-      target,
-    );
+    writeCanonicalReportFile(makeCanonical({ mode: "execute" }) as any, target);
     const after = _readFile(target, "utf8");
     expect(JSON.parse(after).mode).toBe("execute");
     // Sanity: same file identity, not a stale temp file.
@@ -1341,7 +1284,9 @@ describe("serializeCanonicalReport + comparePathCodePoints — determinism", () 
 describe("canonical report path arrays — sorted, unique, order-invariant", () => {
   const opts = { ...okOpts, ownerFilter: null };
 
-  async function buildCanonicalFromObjects(objects: Array<{ path: string; created_at: string | null }>) {
+  async function buildCanonicalFromObjects(
+    objects: Array<{ path: string; created_at: string | null }>,
+  ) {
     const { report, candidateBatch } = await planCleanup({
       listReferences: refsOk([]),
       listObjects: objectsOk(objects),
@@ -1367,9 +1312,7 @@ describe("canonical report path arrays — sorted, unique, order-invariant", () 
       options: opts,
     });
 
-    const failedPaths = candidateBatch.filter(
-      (p) => !report.deleted_paths.includes(p),
-    );
+    const failedPaths = candidateBatch.filter((p) => !report.deleted_paths.includes(p));
     return toCanonicalCleanupReport({
       internal: report,
       referenceStats: classifyPhotoUrlReferences([
@@ -1671,4 +1614,3 @@ describe("README — persistence + machine summary docs", () => {
     }
   });
 });
-

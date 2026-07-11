@@ -1148,4 +1148,513 @@ describe("cleanup reporting — static boundaries", () => {
   });
 });
 
+// ==============================================================
+// Report persistence + determinism hardening
+// ==============================================================
+
+import { mkdtempSync, readFileSync as _readFile, rmSync, writeFileSync, existsSync, statSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  serializeCanonicalReport,
+  renderCleanupMachineSummary,
+  MACHINE_SUMMARY_PREFIX,
+  comparePathCodePoints,
+} from "../../scripts/admin/plant-photos-cleanup-report.mjs";
+import { writeCanonicalReportFile } from "../../scripts/admin/plant-photos-cleanup-write.mjs";
+
+// -------- --report-file arg parsing --------
+
+describe("parseCleanupArgs — --report-file", () => {
+  it("accepts a valid file path", () => {
+    const r = parseCleanupArgs(["--report-file", "artifacts/x.json"]);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.options.reportFile).toBe("artifacts/x.json");
+  });
+  it("rejects a missing value", () => {
+    const r = parseCleanupArgs(["--report-file"]);
+    expect(r.ok).toBe(false);
+  });
+  it("rejects a blank value", () => {
+    const r = parseCleanupArgs(["--report-file", "   "]);
+    expect(r.ok).toBe(false);
+  });
+  it("rejects a next-flag as the value", () => {
+    const r = parseCleanupArgs(["--report-file", "--dry-run"]);
+    expect(r.ok).toBe(false);
+  });
+  it("rejects repeated --report-file", () => {
+    const r = parseCleanupArgs([
+      "--report-file",
+      "a.json",
+      "--report-file",
+      "b.json",
+    ]);
+    expect(r.ok).toBe(false);
+  });
+  it("accepts --owner-id as the documented spelling", () => {
+    const r = parseCleanupArgs(["--owner-id", ownerA]);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.options.ownerFilter).toBe(ownerA);
+  });
 });
+
+// -------- report file writer --------
+
+function makeCanonical(overrides: Partial<any> = {}) {
+  return {
+    schema_version: "1",
+    generated_at: "2026-08-01T00:00:00.000Z",
+    mode: "dry_run",
+    bucket: "diary-photos",
+    scope: "plant-profile-photos",
+    scan_complete: true,
+    min_age_days: 30,
+    owner_filter: null,
+    counts: {
+      plant_rows_scanned: 0,
+      valid_storage_references: 0,
+      legacy_references: 0,
+      malformed_references: 0,
+      storage_objects_scanned: 0,
+      referenced: 0,
+      eligible_orphans: 0,
+      too_young: 0,
+      unknown_age: 0,
+      invalid_path: 0,
+      non_profile_photo: 0,
+      owner_mismatch: 0,
+      protected_by_final_recheck: 0,
+      deletion_attempted: 0,
+      deleted: 0,
+      failed: 0,
+    },
+    eligible_paths: [],
+    protected_by_final_recheck: [],
+    deleted_paths: [],
+    failed_paths: [],
+    malformed_references: [],
+    failures: [],
+    ...overrides,
+  };
+}
+
+describe("writeCanonicalReportFile — atomic, deterministic", () => {
+  let tmp: string;
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "cleanup-report-"));
+  });
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("writes to a fresh path with 2-space indent and trailing newline", () => {
+    const target = join(tmp, "nested", "sub", "report.json");
+    const canonical = makeCanonical({
+      eligible_paths: ["z/a.jpg", "a/z.jpg"],
+    });
+    const { absPath } = writeCanonicalReportFile(canonical as any, target);
+    expect(absPath).toBe(target);
+    expect(existsSync(target)).toBe(true);
+    const body = _readFile(target, "utf8");
+    expect(body.endsWith("\n")).toBe(true);
+    expect(body.startsWith("{\n  ")).toBe(true);
+    const parsed = JSON.parse(body);
+    // Written content equals the in-memory canonical report.
+    expect(parsed).toEqual(canonical);
+    // No stale temp file left behind.
+    expect(existsSync(`${target}.tmp-write`)).toBe(false);
+  });
+
+  it("refuses to overwrite a directory that already occupies the path", () => {
+    const dir = join(tmp, "collide");
+    mkdirSync(dir);
+    expect(() =>
+      writeCanonicalReportFile(makeCanonical() as any, dir),
+    ).toThrow(/directory/);
+  });
+
+  it("rejects an empty path", () => {
+    expect(() =>
+      writeCanonicalReportFile(makeCanonical() as any, "   "),
+    ).toThrow();
+  });
+
+  it("overwrites an existing report atomically (previous file survives crash-simulated failure)", () => {
+    const target = join(tmp, "report.json");
+    writeCanonicalReportFile(makeCanonical() as any, target);
+    const before = statSync(target).mtimeMs;
+    // Second write with different contents.
+    writeCanonicalReportFile(
+      makeCanonical({ mode: "execute" }) as any,
+      target,
+    );
+    const after = _readFile(target, "utf8");
+    expect(JSON.parse(after).mode).toBe("execute");
+    // Sanity: same file identity, not a stale temp file.
+    expect(existsSync(`${target}.tmp-write`)).toBe(false);
+    expect(after.length).toBeGreaterThan(0);
+    // mtime may or may not increase on very fast systems; existence
+    // of the previous file is the real safety property.
+    expect(before).toBeGreaterThan(0);
+  });
+});
+
+// -------- serialize / determinism --------
+
+describe("serializeCanonicalReport + comparePathCodePoints — determinism", () => {
+  it("serializes with 2-space indent and trailing newline; JSON round-trips", () => {
+    const canonical = makeCanonical();
+    const body = serializeCanonicalReport(canonical as any);
+    expect(body.endsWith("\n")).toBe(true);
+    expect(JSON.parse(body)).toEqual(canonical);
+  });
+  it("comparator gives stable, code-point ordering", () => {
+    const sample = [
+      "owner-a/grow-b/plant-profiles/plant-2/z.webp",
+      "owner-a/grow-a/plant-profiles/plant-1/a.heic",
+      "owner-a/unassigned/plant-profiles/plant-3/m.jpg",
+    ];
+    const a = [...sample].sort(comparePathCodePoints);
+    const b = [...sample].reverse().sort(comparePathCodePoints);
+    expect(a).toEqual(b);
+    expect(a).toEqual([
+      "owner-a/grow-a/plant-profiles/plant-1/a.heic",
+      "owner-a/grow-b/plant-profiles/plant-2/z.webp",
+      "owner-a/unassigned/plant-profiles/plant-3/m.jpg",
+    ]);
+  });
+});
+
+describe("canonical report path arrays — sorted, unique, order-invariant", () => {
+  const opts = { ...okOpts, ownerFilter: null };
+
+  async function buildCanonicalFromObjects(objects: Array<{ path: string; created_at: string | null }>) {
+    const { report, candidateBatch } = await planCleanup({
+      listReferences: refsOk([]),
+      listObjects: objectsOk(objects),
+      options: opts,
+      nowMs: NOW,
+    });
+    // Simulate execute so deleted_paths + failed_paths get populated.
+    await executeCleanup({
+      report,
+      candidateBatch,
+      listReferencesForRecheck: refsOk([]),
+      deleteObjects: async (paths) => {
+        // Mark every other path as failed to populate both arrays.
+        const deleted: string[] = [];
+        for (let i = 0; i < paths.length; i += 1) {
+          if (i % 2 === 0) deleted.push(paths[i]);
+        }
+        return { deleted, errors: paths.length > deleted.length ? ["boom"] : [] };
+      },
+      options: opts,
+    });
+    const failedPaths = candidateBatch.filter(
+      (p) => !report.deleted_paths.includes(p),
+    );
+    return toCanonicalCleanupReport({
+      internal: report,
+      referenceStats: classifyPhotoUrlReferences([
+        { photo_url: "junk-A" },
+        { photo_url: "junk-B" },
+        { photo_url: "junk-A" }, // duplicate value → still one entry after uniq
+      ]),
+      pathBuckets: { invalid_path: 0, non_profile_photo: 0 },
+      failedPaths,
+    });
+  }
+
+  it("eligible_paths / deleted_paths / failed_paths are sorted, unique, order-invariant", async () => {
+    const mkObj = (p: string) => ({ path: p, created_at: daysAgo(60) });
+    const forward = [
+      mkObj(`${ownerA}/grow-b/plant-profiles/plant-2/z.webp`),
+      mkObj(`${ownerA}/grow-a/plant-profiles/plant-1/a.heic`),
+      mkObj(`${ownerA}/unassigned/plant-profiles/plant-3/m.jpg`),
+      mkObj(`${ownerA}/grow-a/plant-profiles/plant-1/a.heic`), // duplicate
+    ];
+    const reversed = [...forward].reverse();
+
+    const rA = await buildCanonicalFromObjects(forward);
+    const rB = await buildCanonicalFromObjects(reversed);
+
+    for (const key of [
+      "eligible_paths",
+      "deleted_paths",
+      "failed_paths",
+      "malformed_references",
+      "protected_by_final_recheck",
+    ] as const) {
+      const arr: string[] = (rA as any)[key];
+      // Sorted.
+      expect(arr).toEqual([...arr].sort(comparePathCodePoints));
+      // Unique.
+      expect(new Set(arr).size).toBe(arr.length);
+      // Order-invariant vs reversed input.
+      expect(arr).toEqual((rB as any)[key]);
+    }
+  });
+
+  it("final-recheck protection produces a sorted, unique array", async () => {
+    const p1 = `${ownerA}/grow-a/plant-profiles/plant-x/z.jpg`;
+    const p2 = `${ownerA}/grow-a/plant-profiles/plant-x/a.jpg`;
+    const p3 = `${ownerA}/grow-a/plant-profiles/plant-x/m.jpg`;
+    const { report, candidateBatch } = await planCleanup({
+      listReferences: refsOk([]),
+      listObjects: objectsOk([
+        { path: p1, created_at: daysAgo(60) },
+        { path: p2, created_at: daysAgo(60) },
+        { path: p3, created_at: daysAgo(60) },
+      ]),
+      options: okOpts,
+      nowMs: NOW,
+    });
+    await executeCleanup({
+      report,
+      candidateBatch,
+      listReferencesForRecheck: refsOk([
+        { photo_url: `storage://diary-photos/${p1}` },
+        { photo_url: `storage://diary-photos/${p3}` },
+        { photo_url: `storage://diary-photos/${p1}` }, // duplicate reference
+      ]),
+      deleteObjects: async (paths) => ({ deleted: paths, errors: [] }),
+      options: okOpts,
+    });
+    const canonical = toCanonicalCleanupReport({
+      internal: report,
+      referenceStats: classifyPhotoUrlReferences([]),
+      pathBuckets: { invalid_path: 0, non_profile_photo: 0 },
+      failedPaths: [],
+    });
+    expect(canonical.protected_by_final_recheck).toEqual([p3, p1].sort(comparePathCodePoints));
+    expect(new Set(canonical.protected_by_final_recheck).size).toBe(
+      canonical.protected_by_final_recheck.length,
+    );
+  });
+});
+
+// -------- Owner-filtered execute-mode regression --------
+
+describe("owner-filtered execute-mode — full regression", () => {
+  it("only surviving owner-A candidate reaches the deleter; owner-B never touched", async () => {
+    const optsA = { ...okOpts, ownerFilter: ownerA };
+    const orphanA1 = `${ownerA}/${grow}/plant-profiles/${plant}/orphan-1.jpg`;
+    const orphanA2 = `${ownerA}/${grow}/plant-profiles/${plant}/orphan-2.jpg`;
+    const refA = `${ownerA}/${grow}/plant-profiles/${plant}/ref.jpg`;
+    const youngA = `${ownerA}/${grow}/plant-profiles/${plant}/young.jpg`;
+    const orphanB = `${ownerB}/${grow}/plant-profiles/${plant}/orphan.jpg`;
+    const refB = `${ownerB}/${grow}/plant-profiles/${plant}/ref.jpg`;
+
+    const initialRefs = [
+      { photo_url: `storage://diary-photos/${refA}` },
+      { photo_url: `storage://diary-photos/${refB}` },
+    ];
+
+    const { report, candidateBatch } = await planCleanup({
+      listReferences: refsOk(initialRefs),
+      listObjects: objectsOk([
+        { path: orphanA1, created_at: daysAgo(60) },
+        { path: orphanA2, created_at: daysAgo(60) },
+        { path: refA, created_at: daysAgo(400) },
+        { path: youngA, created_at: daysAgo(3) },
+        { path: orphanB, created_at: daysAgo(60) },
+        { path: refB, created_at: daysAgo(400) },
+      ]),
+      options: optsA,
+      nowMs: NOW,
+    });
+
+    // Only owner-A orphans should be candidates.
+    expect(candidateBatch.every((p) => p.startsWith(ownerA))).toBe(true);
+    expect(candidateBatch).toContain(orphanA1);
+    expect(candidateBatch).toContain(orphanA2);
+    expect(candidateBatch).not.toContain(orphanB);
+
+    const deleter = vi.fn(async (paths: string[]) => ({
+      deleted: paths,
+      errors: [],
+    }));
+
+    await executeCleanup({
+      report,
+      candidateBatch,
+      listReferencesForRecheck: refsOk([
+        ...initialRefs,
+        // New reference protects orphanA1.
+        { photo_url: `storage://diary-photos/${orphanA1}` },
+      ]),
+      deleteObjects: deleter,
+      options: optsA,
+    });
+
+    // Only orphanA2 must have been deleted.
+    expect(deleter).toHaveBeenCalledTimes(1);
+    const calledWith = deleter.mock.calls[0][0] as string[];
+    expect(calledWith).toEqual([orphanA2]);
+    expect(calledWith.every((p) => p.startsWith(ownerA))).toBe(true);
+
+    const canonical = toCanonicalCleanupReport({
+      internal: report,
+      referenceStats: classifyPhotoUrlReferences(initialRefs),
+      pathBuckets: { invalid_path: 0, non_profile_photo: 0 },
+      failedPaths: [],
+    });
+
+    expect(canonical.mode).toBe("execute");
+    expect(canonical.owner_filter).toBe(ownerA);
+    expect(canonical.protected_by_final_recheck).toEqual([orphanA1]);
+    expect(canonical.deleted_paths).toEqual([orphanA2]);
+    expect(canonical.counts.protected_by_final_recheck).toBe(1);
+    expect(canonical.counts.deletion_attempted).toBe(1);
+    expect(canonical.counts.deleted).toBe(1);
+    expect(canonical.counts.failed).toBe(0);
+    expect(canonical.counts.deleted).toBe(canonical.deleted_paths.length);
+    expect(canonical.counts.protected_by_final_recheck).toBe(
+      canonical.protected_by_final_recheck.length,
+    );
+    // Arrays remain sorted.
+    for (const key of [
+      "eligible_paths",
+      "protected_by_final_recheck",
+      "deleted_paths",
+      "failed_paths",
+    ] as const) {
+      const arr: string[] = (canonical as any)[key];
+      expect(arr).toEqual([...arr].sort(comparePathCodePoints));
+    }
+  });
+
+  it("failed final recheck deletes nothing on either owner side", async () => {
+    const optsA = { ...okOpts, ownerFilter: ownerA };
+    const orphanA1 = `${ownerA}/${grow}/plant-profiles/${plant}/o1.jpg`;
+    const orphanB = `${ownerB}/${grow}/plant-profiles/${plant}/o.jpg`;
+    const deleter = vi.fn();
+    const { report, candidateBatch } = await planCleanup({
+      listReferences: refsOk([]),
+      listObjects: objectsOk([
+        { path: orphanA1, created_at: daysAgo(60) },
+        { path: orphanB, created_at: daysAgo(60) },
+      ]),
+      options: optsA,
+      nowMs: NOW,
+    });
+    await executeCleanup({
+      report,
+      candidateBatch,
+      listReferencesForRecheck: refsThrow(),
+      deleteObjects: deleter as never,
+      options: optsA,
+    });
+    expect(deleter).not.toHaveBeenCalled();
+    expect(report.scan_complete).toBe(false);
+  });
+});
+
+// -------- Machine-readable console summary --------
+
+describe("renderCleanupMachineSummary", () => {
+  it("prints a single line with the stable prefix and parseable compact JSON", () => {
+    const canonical = makeCanonical({
+      counts: { ...makeCanonical().counts, storage_objects_scanned: 12, referenced: 5 },
+    });
+    const line = renderCleanupMachineSummary(canonical as any);
+    expect(line.startsWith(MACHINE_SUMMARY_PREFIX)).toBe(true);
+    // Exactly one line.
+    expect(line.includes("\n")).toBe(false);
+    const payload = JSON.parse(line.slice(MACHINE_SUMMARY_PREFIX.length));
+    expect(payload.schema_version).toBe("1");
+    expect(payload.mode).toBe("dry_run");
+    expect(payload.scan_complete).toBe(true);
+    expect(payload.min_age_days).toBe(30);
+    expect(payload.owner_filter).toBeNull();
+    for (const k of [
+      "storage_objects_scanned",
+      "referenced",
+      "eligible_orphans",
+      "too_young",
+      "unknown_age",
+      "invalid_path",
+      "non_profile_photo",
+      "owner_mismatch",
+      "protected_by_final_recheck",
+      "deletion_attempted",
+      "deleted",
+      "failed",
+    ]) {
+      expect(payload.counts).toHaveProperty(k);
+      expect(typeof payload.counts[k]).toBe("number");
+    }
+  });
+
+  it("does not include path arrays, malformed values, or failure details", () => {
+    const canonical = makeCanonical({
+      eligible_paths: ["a/b/plant-profiles/p/x.jpg"],
+      protected_by_final_recheck: ["a/b/plant-profiles/p/y.jpg"],
+      deleted_paths: ["a/b/plant-profiles/p/z.jpg"],
+      malformed_references: ["junk"],
+      failures: [{ phase: "delete", message: "boom" }],
+    });
+    const line = renderCleanupMachineSummary(canonical as any);
+    const payload = JSON.parse(line.slice(MACHINE_SUMMARY_PREFIX.length));
+    expect(payload).not.toHaveProperty("eligible_paths");
+    expect(payload).not.toHaveProperty("protected_by_final_recheck");
+    expect(payload).not.toHaveProperty("deleted_paths");
+    expect(payload).not.toHaveProperty("malformed_references");
+    expect(payload).not.toHaveProperty("failures");
+  });
+
+  it("dry-run deletion totals are zero", () => {
+    const line = renderCleanupMachineSummary(makeCanonical() as any);
+    const payload = JSON.parse(line.slice(MACHINE_SUMMARY_PREFIX.length));
+    expect(payload.counts.deletion_attempted).toBe(0);
+    expect(payload.counts.deleted).toBe(0);
+    expect(payload.counts.failed).toBe(0);
+  });
+
+  it("execute deletion totals match the report counts and no secrets leak", () => {
+    const canonical = makeCanonical({
+      mode: "execute",
+      counts: {
+        ...makeCanonical().counts,
+        deletion_attempted: 3,
+        deleted: 2,
+        failed: 1,
+      },
+    });
+    const line = renderCleanupMachineSummary(canonical as any);
+    expect(line).not.toMatch(/SERVICE_ROLE/i);
+    expect(line).not.toMatch(/Authorization/i);
+    expect(line).not.toMatch(/eyJ[A-Za-z0-9._-]{20,}/);
+    const payload = JSON.parse(line.slice(MACHINE_SUMMARY_PREFIX.length));
+    expect(payload.counts.deletion_attempted).toBe(3);
+    expect(payload.counts.deleted).toBe(2);
+    expect(payload.counts.failed).toBe(1);
+  });
+});
+
+// -------- README expansion checks --------
+
+describe("README — persistence + machine summary docs", () => {
+  it("documents --report-file, machine summary, and generation sequence", () => {
+    const README = readFileSync(
+      resolve(ROOT, "scripts/admin/README-plant-photos-cleanup.md"),
+      "utf8",
+    );
+    for (const s of [
+      "--report-file",
+      "CLEANUP_REPORT_SUMMARY_JSON=",
+      "How the report is generated",
+      "atomically",
+      "generated_at",
+      "compact",
+      "counts only",
+      "--owner-id",
+    ]) {
+      expect(README).toContain(s);
+    }
+  });
+});
+

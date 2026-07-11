@@ -165,16 +165,13 @@ async function deleteBatch(supabase, paths) {
   return { deleted, errors };
 }
 
-function writeReport(canonical) {
-  const outPath = resolve(
+function defaultTimestampedReportPath(canonical) {
+  return resolve(
     process.cwd(),
     `artifacts/admin/plant-photos-cleanup-${new Date(canonical.generated_at)
       .toISOString()
       .replace(/[:.]/g, "-")}.json`,
   );
-  mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(outPath, JSON.stringify(canonical, null, 2));
-  return outPath;
 }
 
 async function main() {
@@ -255,9 +252,37 @@ async function main() {
     failedPaths,
   });
 
-  const outPath = writeReport(canonical);
+  // 1. Human-readable summary.
   console.log(renderCleanupSummary(canonical));
-  console.log(`\nReport written: ${outPath}`);
+  // 2. Machine-readable single-line JSON summary.
+  console.log(renderCleanupMachineSummary(canonical));
+
+  // 3. Persist the canonical report. Behavior:
+  //    - With --report-file: write exactly there. Failure to write
+  //      is a nonzero exit AFTER cleanup already ran.
+  //    - Without --report-file: keep the pre-existing timestamped
+  //      artifact behavior so operators are never left without a
+  //      receipt for an execute run.
+  let reportWriteError = null;
+  let writtenPath = null;
+  const targetReportPath = options.reportFile ?? defaultTimestampedReportPath(canonical);
+  try {
+    const { absPath } = writeCanonicalReportFile(canonical, targetReportPath);
+    writtenPath = absPath;
+    console.log(`Report written: ${writtenPath}`);
+  } catch (err) {
+    reportWriteError = err;
+    const safe = err?.message ? String(err.message) : "error";
+    if (destructive) {
+      console.error(
+        `plant-photos-cleanup: cleanup execution completed, but the report file could not be written to ${targetReportPath}: ${safe}`,
+      );
+    } else {
+      console.error(
+        `plant-photos-cleanup: report file could not be written to ${targetReportPath}: ${safe}`,
+      );
+    }
+  }
 
   // Fail closed on incomplete scan under execute mode.
   if (destructive && !canonical.scan_complete) {
@@ -266,8 +291,10 @@ async function main() {
     );
     process.exit(1);
   }
+  if (reportWriteError) process.exit(1);
   process.exit(0);
 }
+
 
 
 main().catch((err) => {

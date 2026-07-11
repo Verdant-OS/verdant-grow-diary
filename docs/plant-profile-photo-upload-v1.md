@@ -101,9 +101,15 @@ preview. The primary UX no longer offers a URL text input.
 - No background/queued upload — upload runs during Save.
 - No client-side image resizing.
 - Old storage objects are not garbage-collected in V1.
-- HEIC/HEIF preview relies on browser support; unsupported browsers
-  still upload the file but show the placeholder in-dialog until
-  saved.
+- HEIC/HEIF remain accepted upload formats. Browser preview support
+  for HEIC/HEIF varies. Verdant attempts a local decode probe (never
+  an upload) via `HTMLImageElement.decode()` and, when the browser
+  cannot render the file, shows an accessible "Photo selected"
+  fallback card (with a HEIC / HEIF format badge) instead of a
+  broken image. Preview failure is display-only — it is NOT an
+  upload-validation failure, does not disable Save, and the original
+  File is uploaded unchanged. No client-side HEIC → JPEG conversion
+  is performed.
 
 ## Rollback
 

@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Pencil, Camera, ImagePlus, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import PlantPhotoView from "@/components/PlantPhotoView";
+
 import PlantPhoto from "@/components/PlantPhoto";
 import {
   validatePlantProfilePhotoFile,
@@ -34,6 +34,8 @@ import {
   uploadPlantProfilePhoto,
   removeUploadedPlantProfilePhoto,
 } from "@/lib/plantProfilePhotoUploadService";
+import { usePlantProfilePhotoPreview } from "@/hooks/usePlantProfilePhotoPreview";
+import PlantProfilePhotoPreview from "@/components/PlantProfilePhotoPreview";
 
 /**
  * Edits an existing plant's user-facing fields. Profile photo is now
@@ -83,7 +85,6 @@ interface Props {
 interface SelectedPhoto {
   file: File;
   mime: PlantProfilePhotoMime;
-  previewUrl: string;
 }
 
 export default function EditPlantDialog({ plant, trigger }: Props) {
@@ -114,7 +115,6 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
   });
 
   function resetLocalPhotoState() {
-    if (selected) URL.revokeObjectURL(selected.previewUrl);
     setSelected(null);
     setClearPhoto(false);
     setPhotoErr(null);
@@ -141,13 +141,13 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, plant.id]);
 
-  // Cleanup any lingering object URL on unmount.
-  useEffect(() => {
-    return () => {
-      if (selected) URL.revokeObjectURL(selected.previewUrl);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Object-URL lifecycle (create + decode-probe + revoke) is owned by
+  // the preview hook so unsupported HEIC/HEIF browsers see the
+  // accessible "photo selected" fallback instead of a broken image.
+  const { preview } = usePlantProfilePhotoPreview({
+    file: selected?.file ?? null,
+    mimeType: selected?.mime ?? null,
+  });
 
   function onFileChosen(fileList: FileList | null) {
     const file = fileList?.[0];
@@ -157,12 +157,11 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       setPhotoErr(v.message);
       return;
     }
-    if (selected) URL.revokeObjectURL(selected.previewUrl);
-    const previewUrl = URL.createObjectURL(file);
-    setSelected({ file, mime: v.mime, previewUrl });
+    setSelected({ file, mime: v.mime });
     setPhotoErr(null);
     setClearPhoto(false);
   }
+
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -236,7 +235,6 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     setOpen(false);
   }
 
-  const previewSrc = selected?.previewUrl ?? (clearPhoto ? null : plant.photo);
   const previewName = form.name || plant.name;
 
   return (
@@ -266,13 +264,17 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             <div className="flex items-start gap-3 mt-1">
               <div className="h-20 w-20 rounded-lg overflow-hidden border border-border/60 flex-shrink-0">
                 {selected ? (
-                  <PlantPhotoView
-                    src={selected.previewUrl}
-                    alt={`Preview of new profile photo for ${previewName}`}
-                    className="h-full w-full"
-                    iconClassName="h-4 w-4"
-                    caption=""
-                    ctaLabel={null}
+                  <PlantProfilePhotoPreview
+                    state={preview}
+                    altName={previewName}
+                    onReplace={() => libraryInputRef.current?.click()}
+                    onRemove={() => {
+                      setSelected(null);
+                      if (cameraInputRef.current)
+                        cameraInputRef.current.value = "";
+                      if (libraryInputRef.current)
+                        libraryInputRef.current.value = "";
+                    }}
                     testId="edit-plant-photo-preview"
                   />
                 ) : (
@@ -356,8 +358,6 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
                       variant="ghost"
                       className="h-7 px-2 gap-1"
                       onClick={() => {
-                        if (selected)
-                          URL.revokeObjectURL(selected.previewUrl);
                         setSelected(null);
                         if (cameraInputRef.current)
                           cameraInputRef.current.value = "";

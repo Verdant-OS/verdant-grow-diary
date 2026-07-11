@@ -242,6 +242,9 @@ export default function ActionFollowUpEvidenceForm({
         )}
       </div>
 
+      {photoSelectorSlot}
+      {sensorSelectorSlot}
+
       {errorMessage && (
         <p
           id="action-followup-form-error"

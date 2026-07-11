@@ -241,9 +241,23 @@ export function aggregateShards(shardSummaries, { manifest } = {}) {
   const incompleteFiles = [];
   const shardFingerprints = new Set();
   const shardManifestHashes = new Set();
+  const shardWorkspaceDigests = new Set();
+  const shardRunSchemas = new Set();
+  const shardReporterSchemas = new Set();
+  const shardNodeVersions = new Set();
+  const shardBunVersions = new Set();
+  const shardVitestVersions = new Set();
+  const toolchainMismatches = [];
   for (const s of shardSummaries) {
     shardFingerprints.add(s.sourceFingerprint || "");
     shardManifestHashes.add(s.manifestHash || "");
+    if (s.workspaceFingerprintDigest) shardWorkspaceDigests.add(s.workspaceFingerprintDigest);
+    if (s.runSchema != null) shardRunSchemas.add(s.runSchema);
+    if (s.reporterSchema != null) shardReporterSchemas.add(s.reporterSchema);
+    const tv = s.toolVersions || {};
+    shardNodeVersions.add(tv.node || "");
+    shardBunVersions.add(tv.bun || "");
+    shardVitestVersions.add(tv.vitest || "");
     for (const r of s.perFile) {
       if (seen.has(r.file)) {
         duplicates.push({ file: r.file, shards: [seen.get(r.file), s.shardIndex] });
@@ -268,8 +282,23 @@ export function aggregateShards(shardSummaries, { manifest } = {}) {
     }
   }
   const missingFiles = manifest ? manifest.files.filter((f) => !seen.has(f)) : [];
+  if (shardNodeVersions.size > 1) {
+    toolchainMismatches.push({ tool: "node", values: [...shardNodeVersions] });
+  }
+  if (shardBunVersions.size > 1) {
+    toolchainMismatches.push({ tool: "bun", values: [...shardBunVersions] });
+  }
+  if (shardVitestVersions.size > 1) {
+    toolchainMismatches.push({ tool: "vitest", values: [...shardVitestVersions] });
+  }
+  const schemasAgree = shardRunSchemas.size <= 1 && shardReporterSchemas.size <= 1;
+  const workspacesAgree = shardWorkspaceDigests.size <= 1;
   const shardsAgree =
-    shardManifestHashes.size <= 1 && (shardFingerprints.size === 0 || shardFingerprints.size === 1);
+    shardManifestHashes.size <= 1 &&
+    (shardFingerprints.size === 0 || shardFingerprints.size === 1) &&
+    workspacesAgree &&
+    schemasAgree &&
+    toolchainMismatches.length === 0;
   let status;
   if (
     duplicates.length ||
@@ -298,5 +327,12 @@ export function aggregateShards(shardSummaries, { manifest } = {}) {
     missingFiles,
     shardManifestHashes: [...shardManifestHashes],
     shardFingerprints: [...shardFingerprints],
+    shardWorkspaceDigests: [...shardWorkspaceDigests],
+    shardRunSchemas: [...shardRunSchemas],
+    shardReporterSchemas: [...shardReporterSchemas],
+    shardNodeVersions: [...shardNodeVersions],
+    shardBunVersions: [...shardBunVersions],
+    shardVitestVersions: [...shardVitestVersions],
+    toolchainMismatches,
   };
 }

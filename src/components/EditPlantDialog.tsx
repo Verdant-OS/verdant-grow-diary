@@ -153,7 +153,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     const file = fileList?.[0];
     if (!file) return;
     const v = validatePlantProfilePhotoFile(file);
-    if (!v.ok) {
+    if (v.ok === false) {
       setPhotoErr(v.message);
       return;
     }

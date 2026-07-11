@@ -231,6 +231,13 @@ export default function ActionFollowUpEvidenceSection({
     [query, action.actionLabel],
   );
 
+  const ineligibleCopy = useMemo(() => {
+    if (eligibility.eligible) return "";
+    if (eligibility.reason === "action_not_completed")
+      return "Complete this action to record a follow-up.";
+    return "Follow-up isn't available for this action.";
+  }, [eligibility]);
+
   return (
     <section
       data-testid="action-followup-section"

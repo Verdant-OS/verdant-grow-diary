@@ -2,12 +2,12 @@
  * Paddle sandbox configuration reader — BYO (bring-your-own-key) PATH.
  *
  * @deprecated Phase 1 payments wiring moved to Lovable built-in Paddle
- * (`src/lib/paddle.ts` + `src/hooks/usePaddleCheckout.ts`). The
- * `/billing/:plan` route is no longer the user-facing checkout entry;
- * `Pricing.tsx` CTAs open the built-in Paddle overlay directly, and
- * `Upgrade.tsx` is the sole canonical checkout entry. Slice F retired
- * the `BillingPlaceholder` presenter and replaced `/billing/:plan` with
- * `LegacyBillingRedirect` (see `src/pages/LegacyBillingRedirect.tsx`).
+ * (`src/lib/paddle.ts` + `src/hooks/usePaddleCheckout.ts`). Canonical
+ * checkout entry is `/pricing` (Pricing.tsx CTAs open the built-in Paddle
+ * overlay directly via `usePaddleCheckout`). `/upgrade` is presenter-only
+ * and NOT a checkout entry. The `/billing/:plan` route is a compatibility
+ * redirect only — see `src/pages/LegacyBillingRedirect.tsx` and
+ * `src/lib/legacyCheckoutRedirect.ts`, which target `/pricing`.
  *
  * This file is kept only because:
  *  - `Upgrade.tsx` still resolves sandbox readiness through it

@@ -263,6 +263,15 @@ describe("fixture scope protection", () => {
     );
     expect(cliSrc).toMatch(/\.eq\("grow_id", growId\)/);
     expect(cliSrc).toMatch(/\.in\("tent_id", tentIds\)/);
+    // Tents/plants additionally require the EXACT fixture marker name —
+    // grow_id linkage alone would put user rows re-pointed at the fixture
+    // grow inside the blast radius.
+    expect(cliSrc).toMatch(/\.eq\("name", FIXTURE_NAMES\.tent\)/);
+    expect(cliSrc).toMatch(/\.eq\("name", FIXTURE_NAMES\.plant\)/);
+    expect((cliSrc.match(/\.eq\("name", FIXTURE_NAMES\.tent\)/g) ?? []).length).toBe(2);
+    expect((cliSrc.match(/\.eq\("name", FIXTURE_NAMES\.plant\)/g) ?? []).length).toBe(2);
+    // The survivors gate must fail CLOSED on a missing count.
+    expect(cliSrc).toMatch(/typeof res\.count !== "number"\) throw/);
     // Follow-ups additionally require the marker event_type.
     expect(cliSrc).toContain('contains("details", { event_type: ACTION_FOLLOWUP_EVENT_TYPE })');
     expect(ACTION_FOLLOWUP_EVENT_TYPE).toBe("action_followup");
@@ -362,7 +371,34 @@ describe("idempotency", () => {
     expect(first.status).toBe("completed");
     const second = await executeTeardown(ops, await discoverFixture(ops), { dryRun: false });
     expect(second.status).toBe("completed");
-    expect(second.counts.total_deleted ?? 0).toBe(0);
+    expect(second.counts.total_deleted).toBe(0);
+  });
+
+  it("executor return counts carry a correct total_deleted (not just the receipt)", async () => {
+    const state = seededState();
+    const ops = makeOps(state);
+    const result = await executeTeardown(ops, await discoverFixture(ops), { dryRun: false });
+    expect(result.status).toBe("completed");
+    // 1 follow-up + 1 AQ + 1 alert + 1 quick log + 0 sensor + 1 target
+    // + 1 plant + 1 tent + 1 grow = 8
+    expect(result.counts.total_deleted).toBe(8);
+    const dry = await executeTeardown(
+      makeOps(seededState()),
+      await discoverFixture(makeOps(seededState())),
+      { dryRun: true },
+    );
+    expect(dry.counts.total_deleted).toBe(8);
+  });
+
+  it("executor fails closed on an ownership/marker violation (does not rely on the CLI check)", async () => {
+    const result = await executeTeardown(
+      makeOps(seededState()),
+      { found: false, ownershipViolation: true },
+      { dryRun: false },
+    );
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("fixture_marker_verification_failed");
+    expect(result.counts.total_deleted).toBe(0);
   });
 
   it("dry-run discovers and counts but deletes nothing", async () => {
@@ -558,7 +594,7 @@ describe("static hygiene", () => {
     const spec = readFileSync(join(ROOT, "e2e/one-tent-loop-golden-path-ui.spec.ts"), "utf8");
     // Opt-in env var + pass-only guard, both present.
     expect(spec).toContain("LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS");
-    expect(spec).toMatch(/receipt\.status === "pass" &&[\s\S]{0,120}TEARDOWN_AFTER_SUCCESS/);
+    expect(spec).toMatch(/proofReceiptStatus === "pass" &&[\s\S]{0,120}TEARDOWN_AFTER_SUCCESS/);
   });
 
   it("package.json wires the teardown script", () => {

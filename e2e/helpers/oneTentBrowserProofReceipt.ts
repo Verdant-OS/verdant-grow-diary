@@ -70,6 +70,12 @@ export interface OneTentProofStagedResult {
   /** Sanitized reason code — never a raw error message. */
   blockerReason?: string | null;
   /**
+   * Sanitized safety-violation code (e.g. "password_auth_request_observed").
+   * Setting this — or any observed safety boolean — forces the receipt
+   * out of "pass" even when all stages passed.
+   */
+  safetyViolationReason?: string | null;
+  /**
    * Outcome per stage. Stages omitted are treated as "not_run".
    * When status resolves to "blocked", every stage must be blocked or
    * not_run — buildOneTentBrowserProofReceipt enforces this.
@@ -115,7 +121,18 @@ export function buildOneTentBrowserProofReceipt(
     if (rawStages[key] === "fail") failed = true;
   }
 
-  const status = deriveStatus(staged, rawStages);
+  let status = deriveStatus(staged, rawStages);
+
+  // An observed safety violation (paid model call, device-control
+  // request, service_role in the browser, password-grant auth) can
+  // never coexist with a PASS receipt — even when every stage passed.
+  const safetyFlags = staged.safety ?? {};
+  const safetyViolated =
+    Boolean(staged.safetyViolationReason) ||
+    safetyFlags.paid_ai_request_observed === true ||
+    safetyFlags.device_control_request_observed === true ||
+    safetyFlags.service_role_in_browser_observed === true;
+  if (safetyViolated && status === "pass") status = "fail";
 
   // A blocked proof must not report any stage as pass or fail.
   if (status === "blocked") {
@@ -133,7 +150,8 @@ export function buildOneTentBrowserProofReceipt(
     schema_version: "1",
     proof: "one-tent-loop-authenticated-ui",
     status,
-    blocker_reason: status === "pass" ? null : (staged.blockerReason ?? null),
+    blocker_reason:
+      status === "pass" ? null : (staged.safetyViolationReason ?? staged.blockerReason ?? null),
     restore_strategy: staged.restoreStrategy,
     seed_status: staged.seedStatus,
     stages: {

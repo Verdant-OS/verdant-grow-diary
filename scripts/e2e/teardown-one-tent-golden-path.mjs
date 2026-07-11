@@ -70,7 +70,10 @@ function buildOps(supabase, userId) {
   };
   const exactCount = (res, label) => {
     if (res.error) throw new Error(`${label}_error`);
-    return res.count ?? 0;
+    // Fail CLOSED on a missing count: these counts gate parent deletion
+    // (survivors check) — an unknown must never read as "zero survivors".
+    if (typeof res.count !== "number") throw new Error(`${label}_unavailable`);
+    return res.count;
   };
   return {
     async findGrowByExactName(name) {
@@ -83,12 +86,18 @@ function buildOps(supabase, userId) {
       if (error) throw new Error("grow_lookup_error");
       return data ?? null;
     },
+    // Tents/plants require the EXACT fixture marker name, not just grow
+    // linkage: tents.grow_id / plants.grow_id are user-updatable soft refs,
+    // so a real (non-fixture) tent or plant could legitimately point at the
+    // fixture grow. Such rows must never enter the deletion scope — the
+    // final grow delete safely orphans them via ON DELETE SET NULL.
     async listTentIds(growId) {
       const { data, error } = await supabase
         .from("tents")
         .select("id")
         .eq("user_id", userId)
-        .eq("grow_id", growId);
+        .eq("grow_id", growId)
+        .eq("name", FIXTURE_NAMES.tent);
       if (error) throw new Error("tent_lookup_error");
       return (data ?? []).map((r) => r.id);
     },
@@ -97,7 +106,8 @@ function buildOps(supabase, userId) {
         .from("plants")
         .select("id")
         .eq("user_id", userId)
-        .eq("grow_id", growId);
+        .eq("grow_id", growId)
+        .eq("name", FIXTURE_NAMES.plant);
       if (error) throw new Error("plant_lookup_error");
       return (data ?? []).map((r) => r.id);
     },
@@ -211,6 +221,7 @@ function buildOps(supabase, userId) {
         .delete()
         .eq("user_id", userId)
         .eq("grow_id", growId)
+        .eq("name", FIXTURE_NAMES.plant)
         .select("id");
       return deletedCount(res, "plants_delete");
     },
@@ -220,6 +231,7 @@ function buildOps(supabase, userId) {
         .delete()
         .eq("user_id", userId)
         .eq("grow_id", growId)
+        .eq("name", FIXTURE_NAMES.tent)
         .select("id");
       return deletedCount(res, "tents_delete");
     },

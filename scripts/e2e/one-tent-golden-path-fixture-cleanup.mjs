@@ -226,7 +226,30 @@ export async function discoverFixture(ops) {
 // Execution — child before parent; stop at the first failed stage.
 // ---------------------------------------------------------------------------
 
+function withTotal(counts) {
+  counts.total_deleted =
+    counts.follow_ups_deleted +
+    counts.action_queue_deleted +
+    counts.alerts_deleted +
+    counts.quick_logs_deleted +
+    counts.sensor_rows_deleted +
+    counts.grow_targets_deleted +
+    counts.plants_deleted +
+    counts.tents_deleted +
+    counts.grows_deleted;
+  return counts;
+}
+
 export async function executeTeardown(ops, discovery, { dryRun }) {
+  if (discovery.ownershipViolation) {
+    // A grow came back that failed exact-marker verification. The pure
+    // executor must fail closed itself — not rely on the CLI's check.
+    return {
+      status: "failed",
+      reason: "fixture_marker_verification_failed",
+      counts: zeroCounts(),
+    };
+  }
   if (!discovery.found) {
     // Idempotent: already clean is success, not failure.
     return {
@@ -252,7 +275,7 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
     counts.tents_deleted = discovery.counts.tents;
     counts.grows_deleted = discovery.counts.grows;
     // NO ops.delete* call is EVER made on this path.
-    return { status: "completed", reason: "dry_run", counts };
+    return { status: "completed", reason: "dry_run", counts: withTotal(counts) };
   }
 
   const { growId, tentIds } = discovery;
@@ -286,7 +309,7 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
       return {
         status: "failed",
         reason: `${key}_delete_failed`,
-        counts,
+        counts: withTotal(counts),
       };
     }
     setCount(key, typeof deleted === "number" ? deleted : 0);
@@ -294,16 +317,16 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
     try {
       remaining = await survivors();
     } catch {
-      return { status: "failed", reason: `${key}_verify_failed`, counts };
+      return { status: "failed", reason: `${key}_verify_failed`, counts: withTotal(counts) };
     }
     if (remaining > 0) {
       // Surviving children (e.g. sensor_readings without an owner DELETE
       // policy) — STOP before parent stages so nothing gets obscured.
       const reason =
         key === "sensor_rows" ? "sensor_rows_delete_blocked_by_rls" : `${key}_rows_survived_delete`;
-      return { status: "failed", reason, counts };
+      return { status: "failed", reason, counts: withTotal(counts) };
     }
   }
 
-  return { status: "completed", reason: null, counts };
+  return { status: "completed", reason: null, counts: withTotal(counts) };
 }

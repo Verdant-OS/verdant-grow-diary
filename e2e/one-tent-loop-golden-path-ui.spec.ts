@@ -37,6 +37,7 @@
  */
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { execFileSync } from "node:child_process";
+import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   evaluateManagedSession,
@@ -149,7 +150,12 @@ const preflight = evaluateManagedSession(env);
 // Single-project pin: the config matches this spec in more than one
 // project; running the proof (and its receipt) once per project would
 // duplicate fixture writes and violate the one-receipt-line contract.
-const PROOF_PROJECT = "chromium-authed";
+// chromium-mocked is the CLEAN-context project (no storageState, no setup
+// dependency). chromium-authed must NOT be used here: it preloads
+// e2e/.auth/user.json (a different login flow's state) — absent in the
+// managed-injection environment (context creation would fail before the
+// receipt), and contaminating when present.
+const PROOF_PROJECT = "chromium-mocked";
 
 if (preflight.status !== "ready") {
   test("One-Tent proof blocked — emits receipt (no walk, no writes)", () => {
@@ -197,6 +203,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
     let sawPaidModel = false;
     let sawDeviceControl = false;
     let sawServiceRole = false;
+    let proofReceiptStatus: "pass" | "blocked" | "fail" = "fail";
 
     async function stage<T>(name: OneTentProofStage, fn: () => Promise<T>): Promise<T> {
       try {
@@ -217,7 +224,30 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
       }
       if (/mqtt|device-command|actuator/i.test(url)) sawDeviceControl = true;
       const headers = req.headers();
-      if (/service_role/i.test(String(headers["authorization"] ?? ""))) sawServiceRole = true;
+      // A service_role credential never contains the literal string in its
+      // encoded form: legacy keys are JWTs (role claim is base64url-encoded)
+      // and new-format secret keys use the sb_secret_ prefix. Check both
+      // the authorization and apikey headers, decoding JWT role claims.
+      for (const headerName of ["authorization", "apikey"]) {
+        const value = String(headers[headerName] ?? "");
+        if (!value) continue;
+        if (/sb_secret_/i.test(value) || /service_role/i.test(value)) {
+          sawServiceRole = true;
+          continue;
+        }
+        const token = value.replace(/^Bearer\s+/i, "");
+        const segments = token.split(".");
+        if (segments.length === 3) {
+          try {
+            const payload = JSON.parse(Buffer.from(segments[1], "base64url").toString("utf8")) as {
+              role?: string;
+            };
+            if (payload.role === "service_role") sawServiceRole = true;
+          } catch {
+            /* not a JWT — nothing to decode */
+          }
+        }
+      }
     });
 
     try {
@@ -229,19 +259,32 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
         await expect(page).not.toHaveURL(/\/auth(\?|$)/);
       });
 
-      // Stage 2 — Grow → Tent → Plant navigation
+      // Stage 2 — Grow → Tent → Plant navigation. The clicks are
+      // tolerant (flat layouts may not render a grow/tent tile) but MUST
+      // be time-bounded: an unbounded click auto-waits to the full test
+      // timeout, defeating the tolerance. The DB assertion is what makes
+      // the stage meaningful.
+      let fixtureGrowId = "";
       await stage("grow_resolved", async () => {
+        const { data: growRow } = await authedDb
+          .from("grows")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("name", GROW_NAME)
+          .maybeSingle();
+        expect(growRow?.id, "fixture grow row must exist (run the seed)").toBeTruthy();
+        fixtureGrowId = String(growRow!.id);
         await page
           .getByText(GROW_NAME, { exact: false })
           .first()
-          .click()
+          .click({ timeout: 2_000 })
           .catch(() => {});
       });
       await stage("tent_resolved", async () => {
         await page
           .getByText(TENT_NAME, { exact: false })
           .first()
-          .click()
+          .click({ timeout: 2_000 })
           .catch(() => {});
       });
       await stage("plant_resolved", async () => {
@@ -318,12 +361,19 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
       await stage("alert_verified", async () => {
         const alertEntry = page.getByText(/vpd/i).first();
         await expect(alertEntry).toBeVisible();
-        await alertEntry.click().catch(() => {});
+        await alertEntry.click({ timeout: 2_000 }).catch(() => {});
+        // The row assertion is what verifies the alert — the /vpd/i text
+        // alone also matches the snapshot region, so it proves nothing.
         const { data: alertRows } = await authedDb
           .from("alerts")
           .select("id")
           .eq("user_id", userId)
+          .eq("grow_id", fixtureGrowId)
           .eq("status", "open");
+        expect(
+          (alertRows ?? []).length,
+          "an open alert must exist on the fixture grow (VPD 1.65 > 1.60)",
+        ).toBeGreaterThanOrEqual(1);
         fences.alert_count = (alertRows ?? []).length;
       });
 
@@ -334,19 +384,25 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
           .getByRole("button", { name: /add to action queue|queue action/i })
           .first();
         await addToQueue.click();
-        // Rapid second click must not duplicate.
-        await addToQueue.click({ trial: true }).catch(() => {});
+        // Rapid REAL second click must not duplicate (a trial click never
+        // dispatches, so it cannot exercise the dedupe). The button may
+        // legitimately disappear/disable after the first click — that IS
+        // dedupe — so the second click is tolerant and time-bounded.
+        await addToQueue.click({ timeout: 2_000 }).catch(() => {});
 
+        // Scoped to the fixture grow so pre-existing suggestions elsewhere
+        // can't mask a duplicate; exactly ONE suggested row must exist.
         const { data: queueRowsAfterInsert } = await authedDb
           .from("action_queue")
           .select("id,status,target_device")
           .eq("user_id", userId)
+          .eq("grow_id", fixtureGrowId)
           .order("created_at", { ascending: false })
           .limit(5);
         const suggested = (queueRowsAfterInsert ?? []).filter((r) =>
           ["pending_approval", "suggested"].includes(String(r.status)),
         );
-        expect(suggested.length).toBeGreaterThanOrEqual(1);
+        expect(suggested.length, "double-click must not create a duplicate").toBe(1);
         // No executable device command on any suggested item.
         for (const r of suggested) {
           expect(r.target_device ?? null).toBeNull();
@@ -401,12 +457,27 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
         description: "Auto-diary follow-up: HONESTLY UNSUPPORTED. Marker-level follow-up: PASS.",
       });
     } finally {
-      // Exactly one machine-readable proof line, pass or fail.
+      // Exactly one machine-readable proof line, pass or fail. Any tripped
+      // safety fence forces the receipt out of "pass" (the builder enforces
+      // this), so a safety violation can never print PASS or trigger the
+      // optional post-pass teardown.
+      const safetyViolationReason = sawPasswordAuth
+        ? "password_auth_request_observed"
+        : sawPaidModel
+          ? "paid_ai_request_observed"
+          : sawDeviceControl
+            ? "device_control_request_observed"
+            : sawServiceRole
+              ? "service_role_in_browser_observed"
+              : null;
       const receipt = buildOneTentBrowserProofReceipt({
         restoreStrategy: ready.restoreStrategy,
-        // Fixture visibility implies the out-of-band seed reconciled.
+        // "completed" is inferable (the marker-named plant can only come
+        // from the seed); anything else is reported as not_started because
+        // this run did NOT verify the seed either way.
         seedStatus: stageOutcomes.plant_resolved === "pass" ? "completed" : "not_started",
         blockerReason: null,
+        safetyViolationReason,
         stages: stageOutcomes,
         duplicateFences: fences,
         safety: {
@@ -417,21 +488,37 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
       });
       console.log(`Authenticated One-Tent Loop Playwright Proof: ${receipt.status.toUpperCase()}`);
       console.log(renderOneTentBrowserProofReceipt(receipt));
+      proofReceiptStatus = receipt.status;
+    }
 
-      // Optional cleanup — ONLY after a fully passing proof, only when
-      // explicitly opted in, and never silently: the teardown's own
-      // receipt is emitted and a failure fails the run.
-      if (receipt.status === "pass" && process.env.LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS === "true") {
+    // Optional cleanup — deliberately OUTSIDE the finally (throwing there
+    // would swallow the original test error): this line is only reached
+    // when the walk threw nothing, and the receipt-status gate keeps it
+    // to fully passing proofs. Never after BLOCKED or FAIL; never silent.
+    if (
+      proofReceiptStatus === "pass" &&
+      process.env.LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS === "true"
+    ) {
+      // Repo-rooted path: the worker's cwd is wherever playwright was
+      // invoked from, so a cwd-relative script path would ENOENT.
+      const teardownScript = resolve(
+        __dirname,
+        "..",
+        "scripts/e2e/teardown-one-tent-golden-path.mjs",
+      );
+      try {
         const out = execFileSync(
           process.execPath,
-          [
-            "scripts/e2e/teardown-one-tent-golden-path.mjs",
-            "--execute",
-            "--confirm-fixture-teardown",
-          ],
+          [teardownScript, "--execute", "--confirm-fixture-teardown"],
           { encoding: "utf8" },
         );
         console.log(out);
+      } catch (err) {
+        // Surface the child's ONE_TENT_TEARDOWN_JSON receipt before
+        // failing — a hidden teardown failure is worse than a loud one.
+        const failed = err as { stdout?: string };
+        if (failed.stdout) console.log(String(failed.stdout));
+        throw err;
       }
     }
   });

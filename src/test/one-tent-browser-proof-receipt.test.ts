@@ -120,6 +120,31 @@ describe("fail receipt", () => {
   });
 });
 
+describe("safety violations force fail", () => {
+  it("an observed safety boolean forbids a pass receipt even with all stages passing", () => {
+    const r = buildOneTentBrowserProofReceipt({
+      restoreStrategy: "storage_session",
+      seedStatus: "completed",
+      stages: allPassStages(),
+      safety: { paid_ai_request_observed: true },
+    });
+    expect(r.status).toBe("fail");
+    expect(r.safety.paid_ai_request_observed).toBe(true);
+    expect(r.stages.auto_diary_follow_up).toBe("not_run");
+  });
+
+  it("safetyViolationReason (e.g. password auth observed) forces fail and lands in blocker_reason", () => {
+    const r = buildOneTentBrowserProofReceipt({
+      restoreStrategy: "storage_session",
+      seedStatus: "completed",
+      stages: allPassStages(),
+      safetyViolationReason: "password_auth_request_observed",
+    });
+    expect(r.status).toBe("fail");
+    expect(r.blocker_reason).toBe("password_auth_request_observed");
+  });
+});
+
 describe("determinism + hygiene", () => {
   it("the same staged result serializes byte-identically", () => {
     const staged = {

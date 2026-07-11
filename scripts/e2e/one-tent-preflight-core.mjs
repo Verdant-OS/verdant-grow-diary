@@ -271,7 +271,7 @@ export function renderManagedSessionPreflightReceipt(receipt) {
   return `${ONE_TENT_PREFLIGHT_JSON_PREFIX}${JSON.stringify(receipt)}`;
 }
 
-export function readManagedSessionEnv(source = {}) {
+export function readManagedSessionEnv(source = globalThis.process?.env ?? {}) {
   return {
     authStatus: source[MANAGED_SESSION_ENV.status] ?? null,
     sessionJson: source[MANAGED_SESSION_ENV.sessionJson] ?? null,

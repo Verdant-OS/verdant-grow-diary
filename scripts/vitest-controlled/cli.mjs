@@ -368,6 +368,36 @@ export async function commandRerunFailed(opts, deps = {}) {
     spawnImpl,
   } = opts;
   const { runRecord, manifest, shardFiles } = loadRun(runDir);
+  // Enforce the same schema + workspace fingerprint contract as `resume`
+  // BEFORE reusing the prior failed-files list, which is itself an
+  // outcome derived from the previous workspace state.
+  if ((runRecord.schema ?? 1) < RUN_SCHEMA_VERSION) {
+    throw Object.assign(
+      new Error(
+        `Refusing to rerun-failed: run.json schema v${runRecord.schema ?? 1} predates workspace fingerprint v${RUN_SCHEMA_VERSION}`,
+      ),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  if (!runRecord.workspaceFingerprint || runRecord.workspaceFingerprint.schema !== FINGERPRINT_SCHEMA_VERSION) {
+    throw Object.assign(
+      new Error(
+        `Refusing to rerun-failed: workspace fingerprint schema mismatch (expected v${FINGERPRINT_SCHEMA_VERSION})`,
+      ),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  const currentWorkspace = computeWorkspaceFingerprint(repoRoot);
+  const wsMismatch = fingerprintMismatch(
+    runRecord.workspaceFingerprint.digest,
+    currentWorkspace.digest,
+  );
+  if (wsMismatch) {
+    throw Object.assign(
+      new Error(`Refusing to rerun-failed: workspace ${wsMismatch}`),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
   const { files: doneMap } = readProgress(path.join(runDir, "progress.jsonl"));
   const failed = [...doneMap.values()].filter((e) => e.status === "failed").map((e) => e.file);
   if (!failed.length) {

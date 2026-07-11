@@ -16,7 +16,7 @@ const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 const APP = readSrc("App.tsx");
 const PAGE = readSrc("pages/Pricing.tsx");
 const CONSTANTS = readSrc("constants/pricing.ts");
-const BILLING = readSrc("pages/BillingPlaceholder.tsx");
+
 const LANDING = readSrc("pages/Landing.tsx");
 const ANALYTICS = readSrc("lib/pricingAnalytics.ts");
 const SITEMAP = read("public/sitemap.xml");

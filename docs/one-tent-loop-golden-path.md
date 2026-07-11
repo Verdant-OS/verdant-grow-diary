@@ -304,6 +304,11 @@ Status matrix (browser-agnostic; verified via Vitest suites):
 - Automatic diary follow-up: INTENTIONALLY UNSUPPORTED
 - Optional photo attachment: DEFERRED (no safe existing selector)
 - Optional sensor association: DEFERRED (no safe existing selector)
+- Grower-entered follow-up: PASS
+- Post-action deterministic analysis engine: PASS (`action-outcome-*` suites; see `docs/action-outcome-analysis-v1.md`)
+- Grower/system outcome agreement: PASS (flagged, never adjudicated)
+- Automatic action execution: INTENTIONALLY UNSUPPORTED
+- Causal proof from one run: INTENTIONALLY NOT CLAIMED
 
 Contract notes:
 

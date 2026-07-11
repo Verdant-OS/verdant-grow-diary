@@ -165,7 +165,19 @@ export function initRun({
   minWorkers,
   files,
   manifest,
+  toolVersions: discoveredToolVersions,
 }) {
+  if (
+    !discoveredToolVersions ||
+    !discoveredToolVersions.node ||
+    !discoveredToolVersions.bun ||
+    !discoveredToolVersions.vitest
+  ) {
+    throw Object.assign(
+      new Error("initRun requires discovered {node,bun,vitest} toolVersions — refusing null identity"),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
   const runId = makeRunId(shardIndex, shardTotal);
   const runDir = path.resolve(runsRoot, runId);
   fs.mkdirSync(path.join(runDir, "raw"), { recursive: true });
@@ -181,6 +193,7 @@ export function initRun({
     minWorkers,
     pool,
     reporterSchemaVersion: REPORTER_SCHEMA_VERSION,
+    toolVersions: discoveredToolVersions,
   });
   const workspaceFingerprint = computeWorkspaceFingerprint(repoRoot);
 
@@ -201,7 +214,7 @@ export function initRun({
     sourceFingerprint,
     workspaceFingerprint,
     reporterSchema: REPORTER_SCHEMA_VERSION,
-    toolVersions: toolVersions(),
+    toolVersions: toolVersions(discoveredToolVersions),
   };
   fs.writeFileSync(path.join(runDir, "run.json"), JSON.stringify(runRecord, null, 2));
   fs.writeFileSync(path.join(runDir, "manifest.json"), JSON.stringify(manifest, null, 2));
@@ -211,6 +224,7 @@ export function initRun({
   fs.writeFileSync(path.join(runDir, "progress.jsonl"), "");
   return { runId, runDir, runRecord, shardFiles, batches };
 }
+
 
 function loadRun(runDir) {
   const runRecord = JSON.parse(fs.readFileSync(path.join(runDir, "run.json"), "utf8"));

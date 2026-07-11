@@ -198,7 +198,9 @@ export function computeCommonConfigFingerprint({
   h.update(`batch:${batchSize}\n`);
   h.update(`workers:${minWorkers}-${maxWorkers}\n`);
   h.update(`pool:${pool}\n`);
-  h.update(`schemas:run=${runSchema};reporter=${reporterSchema};manifest=${manifestSchema};workspace=${workspaceFingerprintSchema};config=${configFingerprintSchema}\n`);
+  h.update(
+    `schemas:run=${runSchema};reporter=${reporterSchema};manifest=${manifestSchema};workspace=${workspaceFingerprintSchema};config=${configFingerprintSchema}\n`,
+  );
   h.update(`node:${toolVersions.node}\n`);
   h.update(`bun:${toolVersions.bun}\n`);
   h.update(`vitest:${toolVersions.vitest}\n`);

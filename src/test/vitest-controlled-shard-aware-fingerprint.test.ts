@@ -241,7 +241,9 @@ describe("v4 — aggregate reason codes", () => {
   it("shard-total disagreement fails", () => {
     const a = makeShard(1, ["src/a.test.ts"]);
     const b = { ...makeShard(2, ["src/b.test.ts"]), shardTotal: 32 };
-    const agg = aggregateShards([a, b], { manifest: { files: ["src/a.test.ts", "src/b.test.ts"] } });
+    const agg = aggregateShards([a, b], {
+      manifest: { files: ["src/a.test.ts", "src/b.test.ts"] },
+    });
     expect(agg.status).toBe("invalid");
     expect(
       agg.reasons.some((r) => r.code === "incompatible_schema" && r.field === "shardTotal"),
@@ -282,14 +284,18 @@ describe("v4 — aggregate reason codes", () => {
   it("manifest-hash drift fails", () => {
     const a = makeShard(1, ["src/a.test.ts"]);
     const b = { ...makeShard(2, ["src/b.test.ts"]), manifestHash: "different".padEnd(64, "x") };
-    const agg = aggregateShards([a, b], { manifest: { files: ["src/a.test.ts", "src/b.test.ts"] } });
+    const agg = aggregateShards([a, b], {
+      manifest: { files: ["src/a.test.ts", "src/b.test.ts"] },
+    });
     expect(agg.reasons.some((r) => r.code === "manifest_mismatch")).toBe(true);
   });
 
   it("workspace drift fails", () => {
     const a = makeShard(1, ["src/a.test.ts"]);
     const b = { ...makeShard(2, ["src/b.test.ts"]), workspaceFingerprintDigest: "z".repeat(64) };
-    const agg = aggregateShards([a, b], { manifest: { files: ["src/a.test.ts", "src/b.test.ts"] } });
+    const agg = aggregateShards([a, b], {
+      manifest: { files: ["src/a.test.ts", "src/b.test.ts"] },
+    });
     expect(agg.reasons.some((r) => r.code === "workspace_mismatch")).toBe(true);
   });
 

@@ -8,10 +8,7 @@
 //        shardFingerprint; aggregate emits structured `reasons[]`.
 import fs from "node:fs";
 import path from "node:path";
-import {
-  computeAssignmentFingerprint,
-  computeShardFingerprint,
-} from "./fingerprint.mjs";
+import { computeAssignmentFingerprint, computeShardFingerprint } from "./fingerprint.mjs";
 
 export const SUMMARY_SCHEMA_VERSION = 2;
 
@@ -208,12 +205,8 @@ export function renderMarkdown(summary) {
   lines.push(`- **Status:** \`${summary.status}\``);
   lines.push(`- **Run ID:** \`${summary.runId ?? "?"}\``);
   lines.push(`- **Manifest hash:** \`${(summary.manifestHash || "").slice(0, 12)}…\``);
-  lines.push(
-    `- **Common config:** \`${(summary.commonConfigFingerprint || "").slice(0, 12)}…\``,
-  );
-  lines.push(
-    `- **Assignment:** \`${(summary.assignmentFingerprint || "").slice(0, 12)}…\``,
-  );
+  lines.push(`- **Common config:** \`${(summary.commonConfigFingerprint || "").slice(0, 12)}…\``);
+  lines.push(`- **Assignment:** \`${(summary.assignmentFingerprint || "").slice(0, 12)}…\``);
   lines.push(`- **Exit code:** ${summary.exitCode ?? "(none)"}`);
   lines.push("");
   lines.push(`## File totals`);
@@ -279,11 +272,8 @@ export function aggregateShards(shardSummaries, { manifest } = {}) {
   const reasons = [];
   const addReason = (code, detail) => reasons.push({ code, ...detail });
 
-  const declaredTotals = new Set(
-    shardSummaries.map((s) => s.shardTotal).filter((n) => n != null),
-  );
-  const declaredTotal =
-    declaredTotals.size === 1 ? [...declaredTotals][0] : shardSummaries.length;
+  const declaredTotals = new Set(shardSummaries.map((s) => s.shardTotal).filter((n) => n != null));
+  const declaredTotal = declaredTotals.size === 1 ? [...declaredTotals][0] : shardSummaries.length;
 
   // --- Shard-index integrity ---------------------------------------------
   const indexCounts = new Map();
@@ -312,15 +302,11 @@ export function aggregateShards(shardSummaries, { manifest } = {}) {
     shardSummaries.map((s) => s.workspaceFingerprintDigest ?? "").filter((v) => v),
   );
   const manifestSet = new Set(shardSummaries.map((s) => s.manifestHash ?? ""));
-  const runSchemaSet = new Set(
-    shardSummaries.map((s) => s.runSchema).filter((v) => v != null),
-  );
+  const runSchemaSet = new Set(shardSummaries.map((s) => s.runSchema).filter((v) => v != null));
   const reporterSchemaSet = new Set(
     shardSummaries.map((s) => s.reporterSchema).filter((v) => v != null),
   );
-  const summarySchemaSet = new Set(
-    shardSummaries.map((s) => s.schema).filter((v) => v != null),
-  );
+  const summarySchemaSet = new Set(shardSummaries.map((s) => s.schema).filter((v) => v != null));
 
   if (commonSet.size > 1) {
     addReason("common_config_mismatch", { values: [...commonSet] });

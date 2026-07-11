@@ -129,7 +129,21 @@ export function splitPathBuckets(objects) {
 // Canonical report
 // ---------------------------------------------------------------
 
-const uniqSort = (arr) => Array.from(new Set(arr ?? [])).sort();
+/**
+ * Explicit code-point comparator used for every path/reference
+ * array in the canonical report. Kept in one place so tests can
+ * assert determinism against a single ordering rule.
+ * @param {string} a
+ * @param {string} b
+ */
+export function comparePathCodePoints(a, b) {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
+const uniqSort = (arr) =>
+  Array.from(new Set(arr ?? [])).sort(comparePathCodePoints);
+
 
 /**
  * @typedef {Object} CanonicalCleanupReport

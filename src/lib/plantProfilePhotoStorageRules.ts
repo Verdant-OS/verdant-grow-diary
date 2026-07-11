@@ -47,7 +47,7 @@ function hasControlChars(input: string): boolean {
 function isValidPathSegment(seg: string): boolean {
   if (!seg) return false;
   if (seg === "." || seg === "..") return false;
-  if (seg.includes("\\")) return false;
+  if (seg.includes("\\") || seg.includes("/")) return false;
   if (hasControlChars(seg)) return false;
   return true;
 }

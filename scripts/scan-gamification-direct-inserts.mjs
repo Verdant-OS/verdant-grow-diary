@@ -38,9 +38,7 @@ export const GAMIFICATION_INSERT_PATTERN = new RegExp(
 
 // Files we never scan, even if reachable via --extra:
 //   - the scanner's own self-test (intentionally contains forbidden strings).
-export const EXCLUDE_BASENAMES = new Set([
-  "scan-gamification-direct-inserts.test.ts",
-]);
+export const EXCLUDE_BASENAMES = new Set(["scan-gamification-direct-inserts.test.ts"]);
 
 const SCANNABLE_EXT = /\.(ts|tsx|js|mjs|cjs|jsx)$/;
 
@@ -145,15 +143,12 @@ export function parseArgs(argv) {
 }
 
 // CLI wrapper — only runs when executed directly (not on import).
-const invokedDirectly =
-  process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+const invokedDirectly = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (invokedDirectly) {
   const { roots } = parseArgs(process.argv.slice(2));
   const hits = scanRoots(roots);
   if (hits.length === 0) {
-    console.log(
-      "✓ no direct client inserts into nug_events / unlocks / user_quests",
-    );
+    console.log("✓ no direct client inserts into nug_events / unlocks / user_quests");
     process.exit(0);
   }
   console.error("✗ forbidden direct inserts into gamification tables found:");

@@ -42,9 +42,7 @@ function runScan(extra: string): { code: number; out: string } {
   const srcHits = scanFiles([...SRC_FILES]);
   const extraHits = scanFiles(extraFiles);
   const hits = [...srcHits, ...extraHits];
-  const out = hits
-    .map((h) => `${h.file}:${h.line}: ${h.snippet}  [${h.table}]`)
-    .join("\n");
+  const out = hits.map((h) => `${h.file}:${h.line}: ${h.snippet}  [${h.table}]`).join("\n");
   return { code: hits.length === 0 ? 0 : 1, out };
 }
 
@@ -71,7 +69,7 @@ describe("scan-gamification-direct-inserts", () => {
     }
   });
 
-  it("flags .from(\"unlocks\").insert across whitespace/newlines", () => {
+  it('flags .from("unlocks").insert across whitespace/newlines', () => {
     const dir = mkdtempSync(join(tmpdir(), "gam-scan-"));
     try {
       writeFileSync(
@@ -125,8 +123,6 @@ describe("scan-gamification-direct-inserts", () => {
     expect(scripts["check:gamification-rls"]).toBeTruthy();
     expect(scripts["scan:gamification-direct-inserts"]).toBeTruthy();
     expect(scripts["smoke:award-nugs"]).toBeTruthy();
-    expect(scripts["test:security-gamification"]).toContain(
-      "scan-gamification-direct-inserts",
-    );
+    expect(scripts["test:security-gamification"]).toContain("scan-gamification-direct-inserts");
   });
 });

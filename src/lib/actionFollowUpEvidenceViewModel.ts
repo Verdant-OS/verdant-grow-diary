@@ -142,7 +142,5 @@ export function buildActionFollowUpEvidenceViewModel(
 export function actionFollowupTimelineLabel(
   details: { outcome?: unknown } | null | undefined,
 ): string {
-  const raw = details?.outcome;
-  if (!isActionFollowUpOutcome(raw)) return ACTION_FOLLOWUP_LEGACY_LABEL;
-  return `${ACTION_FOLLOWUP_LEGACY_LABEL} · ${OUTCOME_META[raw].label}`;
+  return composeActionFollowUpTitle(details?.outcome);
 }

@@ -57,12 +57,18 @@ function fileStateFromTests(tests, fileResultState) {
 export default class VerdantControlledReporter {
   constructor(options = {}) {
     this.options = options;
-    this.progressFile = process.env.VERDANT_CTRL_PROGRESS_FILE || options.progressFile;
-    this.runId = process.env.VERDANT_CTRL_RUN_ID || options.runId || "unknown";
-    this.shardIndex = Number(process.env.VERDANT_CTRL_SHARD_INDEX || options.shardIndex || 1);
-    this.shardTotal = Number(process.env.VERDANT_CTRL_SHARD_TOTAL || options.shardTotal || 1);
-    this.batchIndex = Number(process.env.VERDANT_CTRL_BATCH_INDEX || options.batchIndex || 0);
-    this.repoRoot = process.env.VERDANT_CTRL_REPO_ROOT || options.repoRoot || process.cwd();
+    // Explicit constructor options take precedence over environment
+    // variables. When both are provided (e.g. a focused unit test passes
+    // repoRoot="/repo" but CI has already exported VERDANT_CTRL_REPO_ROOT
+    // for the child vitest run), the caller's intent must win — otherwise
+    // path normalization silently produces "../.." repo-relative strings
+    // that break every downstream shard summary lookup.
+    this.progressFile = options.progressFile ?? process.env.VERDANT_CTRL_PROGRESS_FILE;
+    this.runId = options.runId ?? process.env.VERDANT_CTRL_RUN_ID ?? "unknown";
+    this.shardIndex = Number(options.shardIndex ?? process.env.VERDANT_CTRL_SHARD_INDEX ?? 1);
+    this.shardTotal = Number(options.shardTotal ?? process.env.VERDANT_CTRL_SHARD_TOTAL ?? 1);
+    this.batchIndex = Number(options.batchIndex ?? process.env.VERDANT_CTRL_BATCH_INDEX ?? 0);
+    this.repoRoot = options.repoRoot ?? process.env.VERDANT_CTRL_REPO_ROOT ?? process.cwd();
     this._flushed = new Set();
     if (!this.progressFile) {
       throw new Error("VerdantControlledReporter: progress file path required");

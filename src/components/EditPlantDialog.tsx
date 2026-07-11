@@ -235,7 +235,6 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     setOpen(false);
   }
 
-  const previewSrc = selected?.previewUrl ?? (clearPhoto ? null : plant.photo);
   const previewName = form.name || plant.name;
 
   return (

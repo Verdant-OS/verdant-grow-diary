@@ -21,6 +21,7 @@ import {
   isLoopbackHostname,
   type PaddleCheckoutEnvironment,
 } from "@/lib/paddleEnvironment";
+import { handlePaddleCheckoutEvent } from "@/lib/checkoutOverlaySession";
 
 const clientToken = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN as
   | string

@@ -17,6 +17,10 @@ import type {
   MetricAggregateView,
   PostGrowLearningReportViewModel,
 } from "./postGrowLearningReportRules";
+import {
+  renderLearningLoopSectionHtml,
+  type PostGrowLearningLoopSummary,
+} from "./postGrowLearningLoopSummaryRules";
 
 export const PRINT_HELPER_COPY = "Use your browser print dialog to save this report as PDF.";
 export const PRINT_UNAVAILABLE_COPY = "Print export is unavailable in this environment.";
@@ -72,6 +76,9 @@ function metricRow(metric: MetricAggregateView): string {
 export interface BuildPrintHtmlOptions {
   /** ISO timestamp injected for tests; defaults to runtime now() at call time. */
   generatedAt?: string;
+  /** Optional bounded learning-loop summary. When absent, no learning
+   *  section renders (existing callers/tests are unaffected). */
+  learningSummary?: PostGrowLearningLoopSummary;
 }
 
 export function buildPostGrowReportPrintHtml(
@@ -80,6 +87,9 @@ export function buildPostGrowReportPrintHtml(
 ): string {
   const generatedAt = opts.generatedAt ?? new Date().toISOString();
   const title = `Post-Grow Learning Report — ${vm.header.growName}`;
+  const learningLoopSection = opts.learningSummary
+    ? renderLearningLoopSectionHtml(opts.learningSummary, escapeHtml)
+    : "";
   const summary = vm.executiveSummary.length
     ? `<ul>${vm.executiveSummary.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`
     : `<p class="muted">${PRINT_EMPTY_SECTION_COPY}</p>`;
@@ -161,6 +171,7 @@ export function buildPostGrowReportPrintHtml(
   <section><h2>Alerts &amp; issues</h2><p class="muted">${PRINT_SECTION_LABELS.alertsReviewed}</p><p class="muted">${PRINT_EMPTY_SECTION_COPY}</p></section>
   <section><h2>Action Queue summary</h2><p class="muted">${PRINT_SECTION_LABELS.actionsReviewed}</p>${actionQueueSummary}</section>
   <section><h2>Lessons · repeat &amp; avoid</h2><p class="muted">${PRINT_SECTION_LABELS.repeatNextRun} · ${PRINT_SECTION_LABELS.avoidNextRun}</p>${lessons}</section>
+  ${learningLoopSection}
 
   <p class="safety" data-testid="post-grow-print-safety-note">${PRINT_SAFETY_NOTE}</p>
   <p class="no-print muted">${PRINT_HELPER_COPY}</p>
@@ -178,6 +189,7 @@ export type OpenPrintResult = "printed" | "unavailable";
 export function openPostGrowReportPrintWindow(
   vm: PostGrowLearningReportViewModel,
   win: Window | null = typeof window !== "undefined" ? window : null,
+  opts: BuildPrintHtmlOptions = {},
 ): OpenPrintResult {
   if (!win || typeof win.open !== "function") return "unavailable";
   let popup: Window | null = null;
@@ -192,7 +204,7 @@ export function openPostGrowReportPrintWindow(
   }
   if (!popup) return "unavailable";
   try {
-    popup.document.write(buildPostGrowReportPrintHtml(vm));
+    popup.document.write(buildPostGrowReportPrintHtml(vm, opts));
     popup.document.close();
     popup.focus();
     popup.print();

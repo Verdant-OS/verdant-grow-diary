@@ -357,3 +357,43 @@ Contract notes for Slice 4a:
 - Backward-compatible: rows without `details.outcome` are unchanged.
 - Pure, deterministic, null-safe. No schema, RLS, migration, or Edge
   Function changes. No AI, device, or Action Queue writes.
+
+## Action Follow-Up Evidence V1 — Slice 4c status
+
+Slice 4c — Optional existing-photo evidence.
+
+Status matrix (browser-agnostic; verified via Vitest suites):
+
+- Slice 4a — Diary/timeline outcome summaries: PASS
+- Slice 4b — Optional Manual sensor association: PASS (rules layer
+  in place via `ActionFollowUpDraft.sensorSnapshotId`; no UI in 4b)
+- Slice 4c — Optional existing-photo evidence: PASS
+  (`action-follow-up-existing-photo.test.tsx`, 32 tests)
+- New photo upload infrastructure: NOT ADDED
+- Signed URL persistence: NOT ADDED
+- Photo object creation: NOT ADDED
+- Authenticated browser proof: **BLOCKED_BY_MANAGED_SESSION_INJECTOR**
+
+Contract notes for Slice 4c:
+
+- Existing photos only. The grower selects from owned diary photos
+  already stored in the private `diary-photos` bucket.
+- Selection is optional. Default is "No photo".
+- Only the durable `storage://diary-photos/<owner>/…` reference is
+  persisted in `diary_entries.details.photo_reference`.
+- Signed URLs are display-only. They never enter the draft, the
+  service, the diary row, console logs, or grower-visible copy.
+- No upload path, no file input, no camera capture, no new storage
+  object, no new bucket, no signed URL persistence.
+- Photo evidence does NOT prove that the action worked; the outcome
+  label remains grower-selected.
+- Missing / invalid / unavailable photo reference fails safely —
+  the follow-up card renders "Associated photo evidence is
+  unavailable." without hiding outcome or note.
+- Manual sensor association (Slice 4b field) remains independent:
+  a photo query failure never blocks sensor association, and vice
+  versa.
+- Cross-user rows returned by a loose mock are re-filtered client-
+  side through the pure candidate rules. RLS remains authoritative.
+- No schema, RLS, migration, Edge Function, AI, or device-control
+  changes in this slice.

@@ -22,6 +22,8 @@ export interface ActionFollowUpFormSubmit {
   outcome: ActionFollowUpOutcome;
   note: string;
   observedAt: string; // ISO
+  photoReference: string | null;
+  sensorSnapshotId: string | null;
 }
 
 export interface ActionFollowUpEvidenceFormProps {
@@ -30,6 +32,14 @@ export interface ActionFollowUpEvidenceFormProps {
   initialObservedAt?: string; // ISO
   onSubmit: (values: ActionFollowUpFormSubmit) => void;
   onCancel?: () => void;
+  /** Controlled durable photo reference. `null` = "No photo". */
+  photoReference?: string | null;
+  /** Controlled manual sensor snapshot id. `null` = "No snapshot". */
+  sensorSnapshotId?: string | null;
+  /** Optional slot for the existing-photo selector (Slice 4c). */
+  photoSelectorSlot?: React.ReactNode;
+  /** Optional slot for the manual sensor selector (Slice 4b). */
+  sensorSelectorSlot?: React.ReactNode;
 }
 
 const OUTCOME_LABEL: Record<ActionFollowUpOutcome, string> = {
@@ -66,6 +76,10 @@ export default function ActionFollowUpEvidenceForm({
   initialObservedAt,
   onSubmit,
   onCancel,
+  photoReference = null,
+  sensorSnapshotId = null,
+  photoSelectorSlot,
+  sensorSelectorSlot,
 }: ActionFollowUpEvidenceFormProps) {
   const defaultObservedAt = useMemo(
     () => isoToLocalInput(initialObservedAt ?? new Date().toISOString()),
@@ -109,7 +123,7 @@ export default function ActionFollowUpEvidenceForm({
       return;
     }
     setFieldError(null);
-    onSubmit({ outcome, note: trimmed, observedAt: iso });
+    onSubmit({ outcome, note: trimmed, observedAt: iso, photoReference, sensorSnapshotId });
   }
 
   const showNoteRequired = outcome && actionFollowUpRequiresNote(outcome);
@@ -227,6 +241,9 @@ export default function ActionFollowUpEvidenceForm({
           </p>
         )}
       </div>
+
+      {photoSelectorSlot}
+      {sensorSelectorSlot}
 
       {errorMessage && (
         <p

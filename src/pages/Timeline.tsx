@@ -38,7 +38,12 @@ import {
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
-import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
+import { actionDetailPath, alertDetailPath, growLearningPath, logsPath, timelinePath } from "@/lib/routes";
+import {
+  DECISION_LABELS,
+  RUN_LEARNING_DECISION_EVENT_TYPE,
+  isNextRunDecision,
+} from "@/lib/plantMemoryEpisodeRules";
 
 import {
   buildEnvironmentSummaryReportUrl,
@@ -174,7 +179,15 @@ function entryKinds(e: Entry): EventFilter[] {
     e.details && typeof (e.details as Record<string, unknown>).event_type === "string"
       ? ((e.details as Record<string, unknown>).event_type as string)
       : null;
-  if (eventType === "action_followup") kinds.push("followup");
+  // Follow-up / outcome / next-run-decision rows all live under the
+  // "Follow-ups" filter so the learning-loop trio stays together.
+  if (
+    eventType === "action_followup" ||
+    eventType === "action_outcome" ||
+    eventType === "run_learning_decision"
+  ) {
+    kinds.push("followup");
+  }
   return kinds;
 }
 
@@ -1045,8 +1058,40 @@ export default function Timeline() {
                             | { ts?: string; temp?: number; rh?: number; vpd?: number; co2?: number; soil?: number }
                             | undefined;
                           const remindAt = e.details?.remind_at as string | undefined;
+                          const eventTypeValue = (e.details?.event_type as string | undefined) ?? null;
+                          // Learning-loop rows (follow-up / outcome / decision) carry join
+                          // ids (action_queue_id, *_entry_id, source_alert_id) that must
+                          // never render as raw chips. Skip the denylist chip loop for them
+                          // entirely and surface only friendly, id-free rows + back-links.
+                          const isLearningLoopEvent =
+                            eventTypeValue === "action_followup" ||
+                            eventTypeValue === "action_outcome" ||
+                            eventTypeValue === RUN_LEARNING_DECISION_EVENT_TYPE;
                           const HIDDEN = ["event_type","plant_id","plant_name","tent_id","sensor","sensor_snapshot","remind_at"];
-                          const extra = Object.entries(e.details || {}).filter(([k]) => !HIDDEN.includes(k));
+                          const extra = isLearningLoopEvent
+                            ? []
+                            : Object.entries(e.details || {}).filter(([k]) => !HIDDEN.includes(k));
+                          const loopActionId =
+                            isLearningLoopEvent && typeof e.details?.action_queue_id === "string"
+                              ? (e.details.action_queue_id as string)
+                              : null;
+                          const loopOutcomeStatus =
+                            eventTypeValue === "action_outcome" &&
+                            typeof e.details?.outcome_status === "string"
+                              ? (e.details.outcome_status as string)
+                              : null;
+                          const loopDecisionRaw =
+                            eventTypeValue === RUN_LEARNING_DECISION_EVENT_TYPE
+                              ? e.details?.decision
+                              : null;
+                          const loopDecisionLabel = isNextRunDecision(loopDecisionRaw)
+                            ? DECISION_LABELS[loopDecisionRaw]
+                            : null;
+                          const loopEntryGrowId = (e as { grow_id?: unknown }).grow_id;
+                          const loopGrowId =
+                            (typeof loopEntryGrowId === "string" && loopEntryGrowId) ||
+                            activeGrowId ||
+                            null;
                           return (
                             <>
                               <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground flex-wrap">
@@ -1083,6 +1128,45 @@ export default function Timeline() {
 
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>
+                              {isLearningLoopEvent && (loopOutcomeStatus || loopDecisionLabel) && (
+                                <div className="mt-1 flex flex-wrap gap-1.5">
+                                  {loopOutcomeStatus && (
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300">
+                                      Grower response: {loopOutcomeStatus.replace(/_/g, " ")}
+                                    </span>
+                                  )}
+                                  {loopDecisionLabel && (
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300">
+                                      {loopDecisionLabel}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {isLearningLoopEvent && (loopActionId || loopGrowId) && (
+                                <div className="mt-2 flex flex-wrap items-center gap-3">
+                                  {loopActionId && (
+                                    <Link
+                                      to={actionDetailPath(loopActionId)}
+                                      data-testid="timeline-view-original-action"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                      onClick={(ev) => ev.stopPropagation()}
+                                    >
+                                      <ListChecks className="h-3 w-3" aria-hidden />
+                                      View original action
+                                    </Link>
+                                  )}
+                                  {loopGrowId && (
+                                    <Link
+                                      to={growLearningPath(loopGrowId)}
+                                      data-testid="timeline-view-learning-episode"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                      onClick={(ev) => ev.stopPropagation()}
+                                    >
+                                      View full learning episode
+                                    </Link>
+                                  )}
+                                </div>
+                              )}
                               {(() => {
                                 const actionsReturn = backToActions.wasProvided
                                   ? backToActions.href

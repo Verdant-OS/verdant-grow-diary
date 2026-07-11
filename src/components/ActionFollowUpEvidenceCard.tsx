@@ -20,11 +20,14 @@ const TONE_CLASS: Record<ActionFollowUpEvidenceViewModel["outcomeTone"], string>
 export interface ActionFollowUpEvidenceCardProps {
   viewModel: ActionFollowUpEvidenceViewModel;
   className?: string;
+  /** Optional slot for read-only associated photo evidence (Slice 4c). */
+  photoEvidenceSlot?: React.ReactNode;
 }
 
 export default function ActionFollowUpEvidenceCard({
   viewModel,
   className,
+  photoEvidenceSlot,
 }: ActionFollowUpEvidenceCardProps) {
   return (
     <div
@@ -65,6 +68,8 @@ export default function ActionFollowUpEvidenceCard({
           <SensorSourceBadge source="manual" testId="action-followup-sensor-source" />
         </div>
       )}
+
+      {photoEvidenceSlot}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { CircleCheckBig } from "lucide-react";
+import { useAuth } from "@/store/auth";
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,
   followupMatchesAction,
@@ -32,6 +33,14 @@ import ActionFollowUpEvidenceForm, {
   type ActionFollowUpFormSubmit,
 } from "@/components/ActionFollowUpEvidenceForm";
 import ActionFollowUpEvidenceCard from "@/components/ActionFollowUpEvidenceCard";
+import ActionFollowUpExistingPhotoSelector, {
+  type ExistingPhotoLoadState,
+} from "@/components/ActionFollowUpExistingPhotoSelector";
+import ActionFollowUpExistingPhotoEvidence from "@/components/ActionFollowUpExistingPhotoEvidence";
+import {
+  loadActionFollowUpExistingPhotoCandidates,
+  type ExistingPhotoCandidateLoadResult,
+} from "@/lib/actionFollowUpExistingPhotoService";
 
 export interface ActionFollowUpEvidenceSectionAction {
   id: string;
@@ -46,6 +55,13 @@ export interface ActionFollowUpEvidenceSectionProps {
   action: ActionFollowUpEvidenceSectionAction;
   /** Optional service injection for tests. */
   save?: (draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>;
+  /** Optional photo-candidate loader injection for tests. */
+  loadPhotoCandidates?: (ctx: {
+    authenticatedUserId: string;
+    growId: string;
+    tentId: string | null;
+    plantId: string | null;
+  }) => Promise<ExistingPhotoCandidateLoadResult>;
 }
 
 type QueryState =
@@ -107,14 +123,20 @@ function pickPrimary(
 export default function ActionFollowUpEvidenceSection({
   action,
   save,
+  loadPhotoCandidates,
 }: ActionFollowUpEvidenceSectionProps) {
+  const { user } = useAuth();
+  const authenticatedUserId = user?.id ?? null;
   const [query, setQuery] = useState<QueryState>({ status: "loading" });
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
+  const [photoState, setPhotoState] = useState<ExistingPhotoLoadState>({ status: "loading" });
+  const [selectedPhotoReference, setSelectedPhotoReference] = useState<string | null>(null);
 
   const saveFn = save ?? saveActionFollowUpEvidence;
+  const loadPhotosFn = loadPhotoCandidates ?? loadActionFollowUpExistingPhotoCandidates;
 
   useEffect(() => {
     let cancelled = false;
@@ -154,6 +176,46 @@ export default function ActionFollowUpEvidenceSection({
     };
   }, [action.id, action.growId, reloadNonce]);
 
+  // Load existing owned photo candidates (Slice 4c). Failure is silent —
+  // the selector shows the safe "unavailable" copy and the form remains
+  // usable with `photoReference: null`.
+  useEffect(() => {
+    let cancelled = false;
+    if (!authenticatedUserId) {
+      setPhotoState({ status: "failed" });
+      return;
+    }
+    setPhotoState({ status: "loading" });
+    (async () => {
+      try {
+        const res = await loadPhotosFn({
+          authenticatedUserId,
+          growId: action.growId,
+          tentId: action.tentId,
+          plantId: action.plantId,
+        });
+        if (cancelled) return;
+        if (res.status === "loaded") {
+          setPhotoState({ status: "loaded", candidates: res.candidates });
+        } else {
+          setPhotoState({ status: "failed" });
+        }
+      } catch {
+        if (!cancelled) setPhotoState({ status: "failed" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authenticatedUserId,
+    action.growId,
+    action.tentId,
+    action.plantId,
+    loadPhotosFn,
+    reloadNonce,
+  ]);
+
   const eligibility = useMemo(
     () =>
       evaluateActionFollowUpEligibility({
@@ -181,6 +243,8 @@ export default function ActionFollowUpEvidenceSection({
         outcome: values.outcome,
         note: values.note,
         observedAt: values.observedAt,
+        photoReference: values.photoReference,
+        sensorSnapshotId: values.sensorSnapshotId,
       };
       try {
         const result = await saveFn(draft);
@@ -275,7 +339,14 @@ export default function ActionFollowUpEvidenceSection({
       )}
 
       {query.status === "ready" && viewModel && (
-        <ActionFollowUpEvidenceCard viewModel={viewModel} />
+        <ActionFollowUpEvidenceCard
+          viewModel={viewModel}
+          photoEvidenceSlot={
+            viewModel.hasPhotoEvidence ? (
+              <ActionFollowUpExistingPhotoEvidence reference={viewModel.photoReference} />
+            ) : null
+          }
+        />
       )}
 
       {query.status === "ready" && !viewModel && (
@@ -290,6 +361,15 @@ export default function ActionFollowUpEvidenceSection({
                   setShowForm(false);
                   setErrorMessage(null);
                 }}
+                photoReference={selectedPhotoReference}
+                photoSelectorSlot={
+                  <ActionFollowUpExistingPhotoSelector
+                    state={photoState}
+                    value={selectedPhotoReference}
+                    onChange={setSelectedPhotoReference}
+                    disabled={saving}
+                  />
+                }
               />
             ) : (
             <Button

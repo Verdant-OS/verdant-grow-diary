@@ -37,39 +37,39 @@ describe("resolveLegacyPlanSlug", () => {
 });
 
 describe("buildLegacyBillingRedirect", () => {
-  it("builds /upgrade?plan=<canonical> for a known legacy slug", () => {
+  it("builds /pricing?plan=<canonical> for a known legacy slug", () => {
     expect(buildLegacyBillingRedirect({ planSlug: "pro-monthly" })).toBe(
-      "/upgrade?plan=pro_monthly",
+      "/pricing?plan=pro_monthly",
     );
     expect(buildLegacyBillingRedirect({ planSlug: "pro-annual" })).toBe(
-      "/upgrade?plan=pro_annual",
+      "/pricing?plan=pro_annual",
     );
     expect(buildLegacyBillingRedirect({ planSlug: "founder-lifetime" })).toBe(
-      "/upgrade?plan=founder_lifetime",
+      "/pricing?plan=founder_lifetime",
     );
   });
 
-  it("returns bare /upgrade when the slug is unknown or missing", () => {
-    expect(buildLegacyBillingRedirect({ planSlug: undefined })).toBe("/upgrade");
-    expect(buildLegacyBillingRedirect({ planSlug: "" })).toBe("/upgrade");
-    expect(buildLegacyBillingRedirect({ planSlug: "enterprise" })).toBe("/upgrade");
-    expect(buildLegacyBillingRedirect({ planSlug: "free" })).toBe("/upgrade");
+  it("returns bare /pricing when the slug is unknown or missing", () => {
+    expect(buildLegacyBillingRedirect({ planSlug: undefined })).toBe("/pricing");
+    expect(buildLegacyBillingRedirect({ planSlug: "" })).toBe("/pricing");
+    expect(buildLegacyBillingRedirect({ planSlug: "enterprise" })).toBe("/pricing");
+    expect(buildLegacyBillingRedirect({ planSlug: "free" })).toBe("/pricing");
   });
 
   it("preserves a safe same-origin returnTo (URLSearchParams input)", () => {
     const search = new URLSearchParams("returnTo=/pheno-hunts/new");
     expect(
       buildLegacyBillingRedirect({ planSlug: "pro-monthly", search }),
-    ).toBe("/upgrade?plan=pro_monthly&returnTo=%2Fpheno-hunts%2Fnew");
+    ).toBe("/pricing?plan=pro_monthly&returnTo=%2Fpheno-hunts%2Fnew");
   });
 
-  it("preserves returnTo when planSlug is missing (bare /upgrade + returnTo)", () => {
+  it("preserves returnTo when planSlug is missing (bare /pricing + returnTo)", () => {
     expect(
       buildLegacyBillingRedirect({
         planSlug: null,
         search: "returnTo=/dashboard",
       }),
-    ).toBe("/upgrade?returnTo=%2Fdashboard");
+    ).toBe("/pricing?returnTo=%2Fdashboard");
   });
 
   it("drops unsafe returnTo values silently", () => {
@@ -81,7 +81,7 @@ describe("buildLegacyBillingRedirect", () => {
     ]) {
       expect(
         buildLegacyBillingRedirect({ planSlug: "pro-monthly", search: bad }),
-      ).toBe("/upgrade?plan=pro_monthly");
+      ).toBe("/pricing?plan=pro_monthly");
     }
   });
 
@@ -91,10 +91,10 @@ describe("buildLegacyBillingRedirect", () => {
         planSlug: "pro-monthly",
         search: "utm_source=x&plan=founder-lifetime&returnTo=/logs",
       }),
-    ).toBe("/upgrade?plan=pro_monthly&returnTo=%2Flogs");
+    ).toBe("/pricing?plan=pro_monthly&returnTo=%2Flogs");
   });
 
-  it("never grants entitlement — output is always a same-origin /upgrade path", () => {
+  it("never grants entitlement — output is always a same-origin /pricing path", () => {
     for (const slug of [
       "pro-monthly",
       "pro-annual",
@@ -105,7 +105,7 @@ describe("buildLegacyBillingRedirect", () => {
       undefined,
     ] as const) {
       const out = buildLegacyBillingRedirect({ planSlug: slug });
-      expect(out.startsWith("/upgrade")).toBe(true);
+      expect(out.startsWith("/pricing")).toBe(true);
       expect(out.includes("://")).toBe(false);
     }
   });

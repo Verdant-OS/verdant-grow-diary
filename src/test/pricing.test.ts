@@ -16,7 +16,7 @@ const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 const APP = readSrc("App.tsx");
 const PAGE = readSrc("pages/Pricing.tsx");
 const CONSTANTS = readSrc("constants/pricing.ts");
-const BILLING = readSrc("pages/BillingPlaceholder.tsx");
+
 const LANDING = readSrc("pages/Landing.tsx");
 const ANALYTICS = readSrc("lib/pricingAnalytics.ts");
 const SITEMAP = read("public/sitemap.xml");
@@ -338,24 +338,10 @@ describe("Safety: no private data on public page", () => {
   });
 });
 
-describe("Billing placeholder", () => {
-  it("does not collect payment or claim to charge the user", () => {
-    expect(BILLING).toMatch(/No payment is being collected/i);
-    expect(BILLING).not.toMatch(/\bcharge\(/i);
-    expect(BILLING).not.toMatch(/stripe/i);
-  });
-
-  it("supports the three plan slugs", () => {
-    expect(BILLING).toMatch(/pro-monthly/);
-    expect(BILLING).toMatch(/pro-annual/);
-    expect(BILLING).toMatch(/founder-lifetime/);
-  });
-
-  it("includes a software-only compliance note", () => {
-    expect(BILLING).toMatch(/sells software only/i);
-    expect(BILLING).toMatch(/does not sell cannabis/i);
-  });
-});
+// Slice F: the /billing/:plan placeholder was retired. The legacy route
+// now redirects to /upgrade via `LegacyBillingRedirect` — see the
+// `legacy-checkout-redirect.test.ts` and `legacy-billing-redirect-router.test.tsx`
+// suites for the replacement coverage.
 
 describe("Landing links to /pricing", () => {
   it("Landing page links to the public pricing route", () => {

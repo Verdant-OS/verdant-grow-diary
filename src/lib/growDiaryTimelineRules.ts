@@ -10,6 +10,7 @@
 
 import { normalizeDiaryEntry, type NormalizedDiaryEntry } from "./diaryEntryRules";
 import { normalizeDiaryNoteText } from "./diaryNoteFormatting";
+import { composeActionFollowUpTitle } from "./actionFollowUpEvidenceViewModel";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -222,8 +223,14 @@ function isNormalizedEntry(v: unknown): v is NormalizedDiaryEntry {
   );
 }
 
-function titleForEventType(eventType: string): string {
+function titleForEventType(
+  eventType: string,
+  extras?: Record<string, unknown> | null,
+): string {
   const key = (eventType || "").toLowerCase().trim();
+  if (key === "action_followup") {
+    return composeActionFollowUpTitle(extras?.outcome);
+  }
   if (key && EVENT_TYPE_TITLES[key]) return EVENT_TYPE_TITLES[key];
   if (!key) return "Diary entry";
   // Safe fallback for unknown event types — capitalize the first character
@@ -314,7 +321,7 @@ export function toTimelineItem(
   const timestamp = entry.createdAt ? Date.parse(entry.createdAt) : null;
   return {
     id: entry.id,
-    title: titleForEventType(entry.eventType),
+    title: titleForEventType(entry.eventType, entry.details.extras ?? null),
     subtitle: buildSubtitle(entry),
     timestamp: Number.isFinite(timestamp as number) ? (timestamp as number) : null,
     timestampLabel: entry.createdAtLabel,

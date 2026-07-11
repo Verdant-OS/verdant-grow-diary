@@ -1,73 +1,69 @@
 
-# One-Tent Loop Golden Path — Audit Findings + Scoped Plan
+# Slice 4 — Reality Check + Proposed Sub-Slice Order
 
-Per the task's "Audit before changes" directive, I inventoried existing coverage before proposing new files. The repo already has extensive per-stage coverage; the missing piece is a single end-to-end **stitched** regression that walks the entire loop with one deterministic fixture and asserts every handoff. Everything below is additive — no schema, no RLS, no production rewrites unless a handoff actually breaks.
+Slice 4 as written is 5+ product features plus a Playwright execution stage. Shipping all of it in a single turn would either produce a broken UI (untested selectors wired into ActionDetail) or a dishonest "PASS" claim. I want to break it into safe additive sub-slices you approve one at a time, matching the additive slice discipline you've been enforcing.
 
-## Audit findings — existing coverage per stage
+## Audit findings (already on disk)
 
-| Loop stage | Already covered by |
-|---|---|
-| Grow / Tent / Plant | `fixtures/demo-grow-one-tent.json` (192 lines), `src/fixtures/operatorDiaryDataset.ts`, `plant-detail-*` tests |
-| Quick Log | `plant-quick-log*.test.ts` (7 files), `legacy-quicklog-unified-save.test.ts`, `plant-detail-quicklog-handoff.test.ts` |
-| Timeline | `DiaryTimelineCategorySections.test.tsx`, `diary-calendar-*`, `plant-timeline-quick-log-ui-accessibility.test.tsx` |
-| Sensor Snapshot | `ManualSensorTrendChart.test.tsx`, `OneTentSensorProofSection.test.tsx`, `one-tent-loop-proof-*` |
-| AI Doctor context/output | 40+ `ai-doctor-*` files, deterministic golden cases in `src/fixtures/aiDoctorGoldenCases.ts` |
-| Alert → Action Queue | `action-queue-*` (60+ files) incl. `action-queue-landing-one-tent-loop.test.tsx`, `action-queue-one-tent-loop-tail-integrated.test.tsx` |
-| Follow-up | `action-followup-timeline-visibility.test.ts`, `action-completion-followup.test.ts`, `action-followup-visibility-*` (3 files) |
-| Browser proof | `e2e/one-tent-loop-proof-never-healthy.spec.ts` (read-only never-healthy) |
-| Docs | `docs/one-tent-loop.md`, `docs/one-tent-loop-evidence-handoff-audit-v1.md`, `docs/one-tent-loop-smoke-test.md`, `docs/one-tent-loop-rc-smoke-test.md` |
+- `src/lib/actionFollowUpEvidenceViewModel.ts` already exports `actionFollowupTimelineLabel(details)` — this is the shared outcome-label helper Slice 4 wants. It just isn't imported everywhere yet.
+- Diary/timeline surfaces that currently render `action_followup`:
+  - `src/lib/diaryTimelineViewModel.ts`
+  - `src/lib/growDiaryTimelineRules.ts`
+  - `src/lib/timelineEntryClassification.ts`
+  - `src/lib/timelineEvidenceDetailViewModel.ts`
+  - `src/lib/quickLogHistoryRules.ts`
+  - `src/components/DiaryEntryBadges.tsx`
+  - `src/pages/Timeline.tsx`
+  - `src/hooks/useOneTentLiveProofTimelineFollowup.ts`
+- No report/PDF builder currently branches on `action_followup` outcome — the "report/export" section of the spec is speculative until we confirm a surface exists.
+- `ActionFollowUpEvidenceForm` currently exposes outcome/note/observedAt only. `photoReference` and `sensorSnapshotId` are already in the draft type and service payload — the persistence path accepts them, the UI does not emit them yet.
+- `ActionFollowUpEvidenceCard` renders a Manual sensor badge only when `sensorSnapshotId` is present, but does not resolve the snapshot or render a photo.
 
-**Gap:** no single deterministic fixture is walked stage-by-stage with explicit handoff assertions between neighbors. Individual stages are proven; the *seams* between them are only proven pairwise.
+## Proposed sub-slices
 
-## First broken handoff
+**Slice 4a — Shared outcome-label helper + diary/timeline summary integration**
+- Promote `actionFollowupTimelineLabel` to a named exported helper (`actionFollowUpOutcomeLabel`) plus keep the legacy alias.
+- Wire it into the diary/timeline surfaces listed above so `Follow-up · <Outcome>` renders everywhere the marker currently renders.
+- Legacy marker-only rows continue to render `Follow-up`.
+- Tests: extend `action-followup-timeline-visibility` + `diary-timeline-polish` with outcome-label cases.
+- No new UI selectors, no photo/sensor changes, no schema changes.
 
-Unknown until the stitched test runs. I will not claim a defect exists before the assertion actually fails. If the stitched run is green, this is a tests-only PR.
+**Slice 4b — Optional manual sensor snapshot association**
+- Read-only candidate query (authenticated client, `source = manual`, scoped to grow/tent/plant).
+- Extend form + view model + card to associate an existing manual snapshot ID.
+- Failure of the candidate query never blocks the core save (passes `sensorSnapshotId: null`).
+- Tests: candidate scope, exclusions (live/csv/demo/stale/invalid/cross-user), card renders Manual, unavailable copy.
 
-## Proposed scope (minimal, additive)
+**Slice 4c — Optional existing-photo association**
+- Reuse existing durable-reference validator + signed-URL resolver.
+- Candidate query scoped to grow/plant; no uploader, no bucket, no new object.
+- Card renders through the approved resolver; raw `storage://` never shown; unavailable copy on resolution failure.
+- Tests: durable-reference-only, cross-user/wrong-bucket rejection, no upload path invoked.
 
-### New files
-1. `src/test/fixtures/oneTentGoldenPathFixture.ts` — one deterministic fixture (grow → tent → plant → note → manual snapshot @ fixed timestamp, 82°F / 48% RH, medium confidence, source=`manual`). Re-exports slices already present in `demo-grow-one-tent.json` / `operatorDiaryDataset.ts` rather than duplicating them.
-2. `src/test/one-tent-loop-golden-path.test.ts` — integration test that stitches the 10 handoffs through **existing** pure helpers / view-models / rule modules (Quick Log save → timeline view model → sensor snapshot presenter → AI Doctor context compiler → alert rule → action-queue suggestion rule → approval transition → follow-up linkage). Deterministic AI stub, no network.
-3. `src/test/one-tent-loop-safety-regression.test.ts` — 11 safety fences: manual never renders live, stale never healthy, AI cannot auto-approve actions, alerts cannot auto-create AQ items, AQ has no device payload, duplicate handoff produces one row, cross-user isolation (static + rule-level), no service_role import in loop modules, no device-control import, no paid AI call.
-4. `docs/one-tent-loop-golden-path.md` — receipt template listing which stages are proven at rule/view-model level vs. browser level, and which handoffs (if any) are documented as **honestly unsupported**.
+**Slice 4d — Managed-session preflight + authenticated Playwright execution**
+- Run `bun run e2e:one-tent:preflight`.
+- If READY → seed + UI walk + capture receipts.
+- If BLOCKED → emit the deterministic BLOCKED receipt exactly as specified; do not fabricate login.
+- Update `docs/one-tent-loop-golden-path.md` with the honest matrix at the end.
 
-### Files I will NOT create
-- New Playwright spec — existing `e2e/one-tent-loop-proof-never-healthy.spec.ts` + `e2e/quicklog-smoke.spec.ts` already cover the browser surface; adding another authenticated E2E risks duplicating harness. I'll extend the existing spec **only** if the Vitest stitched test uncovers a browser-only handoff gap.
-- New fixture JSON — reuse `fixtures/demo-grow-one-tent.json` and `src/fixtures/operatorDiaryDataset.ts`.
+## What I would explicitly NOT do inside any sub-slice
 
-### Production code
-Untouched unless the stitched test fails. If a narrow handoff defect surfaces, I will fix that one seam only, add a regression test, and document it in the receipt. No refactors, no schema, no RLS, no new statuses.
+- No new photo upload controls, buckets, or signed-URL persistence.
+- No sensor creation/ingest/CSV path from the form.
+- No schema, RLS, migration, or Edge Function changes.
+- No automatic follow-up creation, AI-generated outcomes, or device commands.
+- No broad ActionDetail or timeline redesign.
+- No fabricated Playwright login; BLOCKED is a legitimate outcome.
+- No "report/export" edits until we confirm a real report surface renders `action_followup` — otherwise Slice 4a alone covers "diary/report summary" honestly.
 
-## Loop-stage coverage matrix (what the new stitched test asserts)
+## Ask
 
-| # | Handoff | Assertion source |
-|---|---|---|
-| 1 | Grow→Tent→Plant ownership | fixture + `useScopedGrow` rules |
-| 2 | Quick Log save value fidelity + idempotency | `quicklog` save rule + `quicklog_idempotency` contract |
-| 3 | Timeline shows event once, linked to plant | timeline view-model with double-mount |
-| 4 | Sensor snapshot preserves source/captured_at/tent/plant/confidence/raw_payload; never live | sensor presenter + `sensorConfidence` rules |
-| 5 | AI Doctor context compiler receives stage/note/snapshot/targets | existing context compiler |
-| 6 | AI Doctor output contract (12 required fields, cautious, cites evidence, no device cmd) | deterministic stub matching `aiDoctorGoldenCases` |
-| 7 | Alert derived only if rules support (test tweaks a **test-owned** grow target to force deterministic breach; restores after) | alert rule |
-| 8 | Alert→AQ user-initiated, one suggestion per click, approval-required, no device payload | AQ suggestion rule |
-| 9 | Approval transitions grower-initiated, no auto-approve | AQ lifecycle rule |
-| 10 | Follow-up linked to action + visible in timeline, no duplicate on remount | follow-up rule + timeline view-model |
+Which sub-slice should I ship in the next turn?
 
-## Safety regression coverage
-Every fence from the task's "Safety regression tests" list gets one explicit assertion. Cross-user isolation uses the existing RLS scope helpers plus a static-import scan (no runtime DB call).
+1. Slice 4a only (shared label + diary/timeline summaries) — smallest, safest, unblocks the summary tests.
+2. Slice 4a + 4d (label + preflight/Playwright) — proves the summary end-to-end when managed auth is ready.
+3. Slice 4b (manual sensor association) — additive UI + candidate query.
+4. Slice 4c (existing-photo association) — additive UI + resolver reuse.
+5. All four, sequentially, one turn per slice, with an honest matrix update at each step.
 
-## Validation I will run
-- `bunx vitest run` on the three new files + the adjacent suites listed in the task (Quick Log, Timeline, sensor, AI Doctor, alerts, AQ, follow-up, one-tent-live-proof)
-- `bunx tsgo --noEmit`
-- Full-suite vitest **only if** targeted + adjacent are green and time permits; otherwise reported as "not run" (per the workspace rule against overclaiming green)
-- Existing Playwright spec re-run only if a browser-only handoff surfaces
-- Exact pass/fail/skip counts reported
-
-## What I need from you before writing code
-
-1. **Confirm scope** — three new Vitest files + one doc, no new Playwright spec, no fixture duplication. OK?
-2. **AI Doctor stub source** — reuse `src/fixtures/aiDoctorGoldenCases.ts` for the deterministic cautious result, or generate a fresh minimal 12-field stub inline? (Reuse is smaller and stays in sync with existing golden cases.)
-3. **Alert threshold breach** — OK to nudge a test-owned `grow_targets` value in-memory (not DB) rather than fabricating an unrealistic sensor value, as the task suggests?
-4. **Follow-up handoff** — if the existing contract does not auto-create a diary event on action completion, I will document it as "honestly unsupported" in the receipt rather than inventing one. Confirm that's the desired posture.
-
-I'll proceed as soon as you say go (or adjust). No files will be written until then.
+Default recommendation: **option 5**, starting with 4a next turn.

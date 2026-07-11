@@ -129,8 +129,16 @@ export function selectDiaryTimelineEmptyState(
 /**
  * Resolve a display label for a timeline entry kind. Stable, friendly,
  * and never "Live" unless the source is actually live.
+ *
+ * For `action_followup`, accepts an optional `details` object carrying
+ * the grower-selected `outcome` so callers can render
+ * "Follow-up · <Outcome>" through the shared outcome-label helper.
+ * Legacy marker-only rows continue to render "Follow-up".
  */
-export function diaryTimelineActionLabel(kind: string | null | undefined): string {
+export function diaryTimelineActionLabel(
+  kind: string | null | undefined,
+  details?: { outcome?: unknown } | null,
+): string {
   switch (kind) {
     case "observation":
     case "diary_note":
@@ -158,7 +166,7 @@ export function diaryTimelineActionLabel(kind: string | null | undefined): strin
     case "harvest":
       return "Harvest";
     case "action_followup":
-      return "Follow-up";
+      return composeActionFollowUpTitle(details?.outcome);
     case "action_outcome":
       return "Outcome";
     default:

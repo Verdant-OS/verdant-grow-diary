@@ -176,6 +176,46 @@ export default function ActionFollowUpEvidenceSection({
     };
   }, [action.id, action.growId, reloadNonce]);
 
+  // Load existing owned photo candidates (Slice 4c). Failure is silent —
+  // the selector shows the safe "unavailable" copy and the form remains
+  // usable with `photoReference: null`.
+  useEffect(() => {
+    let cancelled = false;
+    if (!authenticatedUserId) {
+      setPhotoState({ status: "failed" });
+      return;
+    }
+    setPhotoState({ status: "loading" });
+    (async () => {
+      try {
+        const res = await loadPhotosFn({
+          authenticatedUserId,
+          growId: action.growId,
+          tentId: action.tentId,
+          plantId: action.plantId,
+        });
+        if (cancelled) return;
+        if (res.status === "loaded") {
+          setPhotoState({ status: "loaded", candidates: res.candidates });
+        } else {
+          setPhotoState({ status: "failed" });
+        }
+      } catch {
+        if (!cancelled) setPhotoState({ status: "failed" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authenticatedUserId,
+    action.growId,
+    action.tentId,
+    action.plantId,
+    loadPhotosFn,
+    reloadNonce,
+  ]);
+
   const eligibility = useMemo(
     () =>
       evaluateActionFollowUpEligibility({

@@ -83,6 +83,17 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
   const [loading, setLoading] = useState(false);
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
 
+  // Track mount state so the Paddle `checkout.closed` cancel handler (which
+  // fires asynchronously from Paddle.js after the modal actually closes)
+  // does not navigate a component that has already unmounted. StrictMode-safe.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   // Derived at every render so a hot-reload / rerender after the token
   // becomes available flips `unavailable` back to false without needing
   // to remount. Cheap — pure string/hostname checks.

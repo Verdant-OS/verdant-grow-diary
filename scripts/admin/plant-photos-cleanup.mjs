@@ -53,7 +53,11 @@ Flags:
   --confirm-delete-orphans     Required together with --execute.
   --min-age-days <int>         Object age threshold in days. Default ${DEFAULT_MIN_AGE_DAYS}.
                                Values below ${ABSOLUTE_MIN_AGE_DAYS} are rejected. There is no override.
-  --owner <uuid>               Optional: only consider objects whose owner segment matches.
+  --owner-id <uuid>            Optional: only consider objects whose owner segment matches.
+                               ('--owner' is retained as a backward-compatible spelling.)
+  --report-file <path>         Optional: write the canonical JSON report to this path.
+                               Missing parent directories are created. Works in both modes.
+
   -h, --help                   Show this help.
 
 Safety:

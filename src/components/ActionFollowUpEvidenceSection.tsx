@@ -299,7 +299,7 @@ export default function ActionFollowUpEvidenceSection({
               className="text-xs text-muted-foreground"
               data-testid="action-followup-ineligible"
             >
-              {eligibility.reason === "action_not_completed"
+              {!eligibility.eligible && eligibility.reason === "action_not_completed"
                 ? "Complete this action to record a follow-up."
                 : "Follow-up isn't available for this action."}
             </p>

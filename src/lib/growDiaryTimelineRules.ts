@@ -223,8 +223,14 @@ function isNormalizedEntry(v: unknown): v is NormalizedDiaryEntry {
   );
 }
 
-function titleForEventType(eventType: string): string {
+function titleForEventType(
+  eventType: string,
+  extras?: Record<string, unknown> | null,
+): string {
   const key = (eventType || "").toLowerCase().trim();
+  if (key === "action_followup") {
+    return composeActionFollowUpTitle(extras?.outcome);
+  }
   if (key && EVENT_TYPE_TITLES[key]) return EVENT_TYPE_TITLES[key];
   if (!key) return "Diary entry";
   // Safe fallback for unknown event types — capitalize the first character

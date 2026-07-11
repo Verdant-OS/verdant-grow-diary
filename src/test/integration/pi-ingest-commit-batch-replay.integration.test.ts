@@ -109,7 +109,14 @@ function counts(data: unknown): { inserted: number; rejected: number } {
 }
 
 d("pi_ingest_commit_batch replay + boundary proof (local DB)", () => {
-  const admin = createClient(URL, SERVICE, { auth: { persistSession: false } });
+  // Lazily construct the service-role admin client — describe.skip still
+  // evaluates the callback body to enumerate tests, so a top-level
+  // createClient() call would throw "supabaseUrl is required" during test
+  // collection whenever the local integration env is absent (i.e. every
+  // sandbox and PR CI run). Only construct when hasLocalSupabase is true.
+  const admin: SupabaseClient = hasLocalSupabase
+    ? createClient(URL, SERVICE, { auth: { persistSession: false } })
+    : (undefined as unknown as SupabaseClient);
   let owner: TestUser;
   let intruder: TestUser;
   let tentId: string;

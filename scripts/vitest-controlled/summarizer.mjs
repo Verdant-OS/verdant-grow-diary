@@ -152,6 +152,17 @@ export function summarizeRun(runDir, { authoritativeManifest } = {}) {
     shardTotal: runJson?.shardTotal ?? null,
     manifestHash: manifest?.hash ?? null,
     sourceFingerprint: runJson?.sourceFingerprint ?? null,
+    workspaceFingerprintDigest: runJson?.workspaceFingerprint?.digest ?? null,
+    workspaceFingerprintSchema: runJson?.workspaceFingerprint?.schema ?? null,
+    runSchema: runJson?.schema ?? null,
+    reporterSchema: runJson?.reporterSchema ?? null,
+    toolVersions: runJson?.toolVersions
+      ? {
+          node: runJson.toolVersions.node ?? null,
+          bun: runJson.toolVersions.bun ?? null,
+          vitest: runJson.toolVersions.vitest ?? null,
+        }
+      : null,
     status,
     exitCode,
     completed: completedMarker,

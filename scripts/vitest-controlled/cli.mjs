@@ -363,15 +363,17 @@ export async function commandResume(opts, deps = {}) {
     batchDeadlineMs = DEFAULTS.batchDeadlineMs,
     vitestBin,
     spawnImpl,
+    toolVersions: injectedToolVersions,
+    discoverToolVersionsImpl = discoverToolVersions,
   } = opts;
   const { runRecord, manifest, shardFiles } = loadRun(runDir);
-  // 1. Refuse older run/fingerprint schema outright — legacy dirty-tree
-  //    hashes did not cover production, migrations, edge functions, or
-  //    scripts and cannot be silently promoted to workspace semantics.
+  // 1. Refuse older run schema outright — legacy dirty-tree hashes and
+  //    v2 runs (no enforced toolchain identity) cannot be silently
+  //    promoted to the current workspace + toolchain contract.
   if ((runRecord.schema ?? 1) < RUN_SCHEMA_VERSION) {
     throw Object.assign(
       new Error(
-        `Refusing to resume: run.json schema v${runRecord.schema ?? 1} predates workspace fingerprint v${RUN_SCHEMA_VERSION}`,
+        `Refusing to resume: run.json schema v${runRecord.schema ?? 1} predates toolchain-locked contract v${RUN_SCHEMA_VERSION}`,
       ),
       { code: EXIT.CONFIG_ERROR },
     );
@@ -398,7 +400,16 @@ export async function commandResume(opts, deps = {}) {
       code: EXIT.CONFIG_ERROR,
     });
   }
-  // 3. Re-validate the run-configuration fingerprint (shard/worker/pool).
+  // 3. Discover current runtime toolchain and refuse drift BEFORE
+  //    inspecting completed-file events.
+  const currentToolVersions = injectedToolVersions ?? discoverToolVersionsImpl();
+  const tcMismatch = toolchainMismatch(runRecord.toolVersions, currentToolVersions);
+  if (tcMismatch) {
+    throw Object.assign(new Error(`Refusing to resume: ${tcMismatch}`), {
+      code: EXIT.CONFIG_ERROR,
+    });
+  }
+  // 4. Re-validate the run-configuration fingerprint (shard/worker/pool/toolchain).
   const currentSource = computeSourceFingerprint(repoRoot, {
     manifestHash: manifest.hash,
     shardIndex: runRecord.shardIndex,
@@ -408,6 +419,7 @@ export async function commandResume(opts, deps = {}) {
     minWorkers: runRecord.minWorkers,
     pool: runRecord.pool,
     reporterSchemaVersion: REPORTER_SCHEMA_VERSION,
+    toolVersions: currentToolVersions,
   });
   const srcMismatch = fingerprintMismatch(runRecord.sourceFingerprint, currentSource);
   if (srcMismatch) {
@@ -451,8 +463,11 @@ export async function commandRerunFailed(opts, deps = {}) {
     batchDeadlineMs = DEFAULTS.batchDeadlineMs,
     vitestBin,
     spawnImpl,
+    toolVersions: injectedToolVersions,
+    discoverToolVersionsImpl = discoverToolVersions,
   } = opts;
   const { runRecord, manifest, shardFiles } = loadRun(runDir);
+
   // Enforce the same schema + workspace fingerprint contract as `resume`
   // BEFORE reusing the prior failed-files list, which is itself an
   // outcome derived from the previous workspace state.

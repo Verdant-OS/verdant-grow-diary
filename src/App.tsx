@@ -186,7 +186,12 @@ const App = () => (
                   <Route path="/guides/:slug" element={<GuidePage />} />
                   <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
-                  <Route path="/billing/:plan" element={<BillingPlaceholder />} />
+                  {/* Legacy `/billing/:plan` entry — Slice E: redirect to
+                      canonical `/upgrade` with plan preselect + safe returnTo.
+                      BillingPlaceholder remains a safety fallback if the
+                      redirect is ever bypassed. */}
+                  <Route path="/billing/:plan" element={<LegacyBillingRedirect />} />
+                  <Route path="/billing/:plan/legacy" element={<BillingPlaceholder />} />
                   <Route path="/checkout/success" element={<CheckoutSuccess />} />
                   <Route path="/checkout/cancel" element={<CheckoutCancel />} />
                   <Route path="/terms" element={<Terms />} />

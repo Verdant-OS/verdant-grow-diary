@@ -14,6 +14,10 @@ on:
         description: "Total shards (matrix size)"
         required: false
         default: "16"
+      reporter_debug:
+        description: "Enable structured reporter debug JSONL (diagnostic)"
+        required: false
+        default: "true"
 
 permissions:
   contents: read
@@ -48,6 +52,8 @@ jobs:
           echo "bun:  $(bun --version)"
           echo "vitest: $(node -e "process.stdout.write(require('vitest/package.json').version)")"
       - name: Run controlled shard ${{ matrix.shard }}/16
+        env:
+          VERDANT_CTRL_REPORTER_DEBUG: ${{ inputs.reporter_debug }}
         run: |
           node scripts/vitest-controlled/cli.mjs run \
             --shard ${{ matrix.shard }}/16 \
@@ -80,6 +86,7 @@ jobs:
             ${{ steps.locate.outputs.run_dir }}/completed
             ${{ steps.locate.outputs.run_dir }}/run-meta
             ${{ steps.locate.outputs.run_dir }}/raw/**
+            ${{ steps.locate.outputs.run_dir }}/reporter-debug.jsonl
 
   controlled-aggregate:
     name: Aggregate controlled shards

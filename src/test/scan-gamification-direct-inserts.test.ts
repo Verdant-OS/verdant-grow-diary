@@ -18,9 +18,9 @@ import { tmpdir } from "node:os";
 import pkg from "../../package.json";
 import {
   scanFiles,
-  scanRoots,
   walkScanRoot,
 } from "../../scripts/scan-gamification-direct-inserts.mjs";
+
 
 // Cache the immutable src/ inventory and its findings once at module
 // scope (before any test executes) so every scenario — including tests

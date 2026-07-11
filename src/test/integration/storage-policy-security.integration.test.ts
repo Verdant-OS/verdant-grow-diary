@@ -85,7 +85,12 @@ interface TestUser {
 }
 
 d("diary-photos storage policy boundaries (local DB)", () => {
-  const admin = createClient(URL, SERVICE, { auth: { persistSession: false } });
+  // See pi-ingest sibling suite: describe.skip still runs the callback
+  // body to enumerate tests, so eager createClient() throws when the
+  // local integration env is absent. Construct lazily.
+  const admin: SupabaseClient = hasLocalSupabase
+    ? createClient(URL, SERVICE, { auth: { persistSession: false } })
+    : (undefined as unknown as SupabaseClient);
   let alice: TestUser;
   let bob: TestUser;
   let alicePath: string;
@@ -117,9 +122,7 @@ d("diary-photos storage policy boundaries (local DB)", () => {
     for (const u of [alice, bob].filter(Boolean)) {
       const { data: objs } = await admin.storage.from(BUCKET).list(u.id);
       if (objs?.length) {
-        await admin.storage
-          .from(BUCKET)
-          .remove(objs.map((o) => `${u.id}/${o.name}`));
+        await admin.storage.from(BUCKET).remove(objs.map((o) => `${u.id}/${o.name}`));
       }
       await admin.auth.admin.deleteUser(u.id).catch(() => {});
     }
@@ -132,12 +135,10 @@ d("diary-photos storage policy boundaries (local DB)", () => {
   });
 
   it("a user can upload into their own folder", async () => {
-    const { error } = await alice.client.storage
-      .from(BUCKET)
-      .upload(alicePath, "alice-owns-this", {
-        contentType: "text/plain",
-        upsert: false,
-      });
+    const { error } = await alice.client.storage.from(BUCKET).upload(alicePath, "alice-owns-this", {
+      contentType: "text/plain",
+      upsert: false,
+    });
     expect(error).toBeNull();
   });
 
@@ -189,9 +190,7 @@ d("diary-photos storage policy boundaries (local DB)", () => {
     await bob.client.storage.from(BUCKET).remove([alicePath]);
     const { data, error } = await admin.storage.from(BUCKET).download(alicePath);
     expect(error).toBeNull();
-    expect(await data!.text(), "object must survive cross-user delete").toBe(
-      "alice-owns-this",
-    );
+    expect(await data!.text(), "object must survive cross-user delete").toBe("alice-owns-this");
   });
 
   it("a user can delete their own object", async () => {

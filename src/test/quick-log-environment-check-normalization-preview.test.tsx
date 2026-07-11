@@ -57,9 +57,7 @@ vi.mock("@/store/grows", () => ({
 }));
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [
-      { id: "plant-1", name: "Verdant Test Plant", tent_id: "tent-1", grow_id: "grow-1" },
-    ],
+    data: [{ id: "plant-1", name: "Verdant Test Plant", tent_id: "tent-1", grow_id: "grow-1" }],
   }),
 }));
 vi.mock("sonner", () => ({
@@ -123,10 +121,7 @@ describe("Quick Log Environment Check — normalization preview", () => {
   });
 
   it("static safety: no write helpers / no normalization rows persisted in QuickLog", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../components/QuickLog.tsx"),
-      "utf8",
-    );
+    const src = readFileSync(resolve(__dirname, "../components/QuickLog.tsx"), "utf8");
     expect(src).not.toMatch(/normalizedReadingToLongFormRows\s*\(/);
     expect(src).not.toMatch(/insertSensorReading/);
     expect(src).not.toMatch(/useInsertSensorReading\(/);
@@ -175,13 +170,21 @@ describe("Quick Log Environment Check — selector accessibility", () => {
     expect(combobox).toBeInTheDocument();
   });
 
+  // Radix Select under jsdom serializes several async pointer/animation
+  // frames before findByRole("option") resolves. On loaded CI runners
+  // this chain can exceed Vitest's 5s default without any product-side
+  // regression; scope a bounded budget to just this test.
   it("selecting Environment Check via the real combobox flow renders the section", async () => {
     // Radix Select calls Element.scrollIntoView when opened; jsdom lacks it.
-    const originalScrollIntoView = (Element.prototype as unknown as { scrollIntoView?: () => void }).scrollIntoView;
-    (Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView = () => undefined;
+    const originalScrollIntoView = (Element.prototype as unknown as { scrollIntoView?: () => void })
+      .scrollIntoView;
+    (Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView = () =>
+      undefined;
     // Also stub hasPointerCapture for Radix.
-    const originalHasPC = (Element.prototype as unknown as { hasPointerCapture?: () => boolean }).hasPointerCapture;
-    (Element.prototype as unknown as { hasPointerCapture: () => boolean }).hasPointerCapture = () => false;
+    const originalHasPC = (Element.prototype as unknown as { hasPointerCapture?: () => boolean })
+      .hasPointerCapture;
+    (Element.prototype as unknown as { hasPointerCapture: () => boolean }).hasPointerCapture = () =>
+      false;
     try {
       renderWithClient(
         <QuickLog
@@ -201,11 +204,15 @@ describe("Quick Log Environment Check — selector accessibility", () => {
       ).toBeInTheDocument();
     } finally {
       if (originalScrollIntoView) {
-        (Element.prototype as unknown as { scrollIntoView: typeof originalScrollIntoView }).scrollIntoView = originalScrollIntoView;
+        (
+          Element.prototype as unknown as { scrollIntoView: typeof originalScrollIntoView }
+        ).scrollIntoView = originalScrollIntoView;
       }
       if (originalHasPC) {
-        (Element.prototype as unknown as { hasPointerCapture: typeof originalHasPC }).hasPointerCapture = originalHasPC;
+        (
+          Element.prototype as unknown as { hasPointerCapture: typeof originalHasPC }
+        ).hasPointerCapture = originalHasPC;
       }
     }
-  });
+  }, 15_000);
 });

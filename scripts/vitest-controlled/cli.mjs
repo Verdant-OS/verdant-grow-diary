@@ -586,7 +586,8 @@ async function executeBatches(
   const invalid =
     pre.conflicts.length > 0 ||
     pre.corruptLines.length > 0 ||
-    pre.duplicateManifestFiles.length > 0;
+    pre.duplicateManifestFiles.length > 0 ||
+    (pre.extraneousFiles && pre.extraneousFiles.length > 0);
   const cleanCompletion =
     !interrupted && pre.totals.failedFiles === 0 && pre.totals.incompleteFiles === 0 && !invalid;
   const exit = interrupted

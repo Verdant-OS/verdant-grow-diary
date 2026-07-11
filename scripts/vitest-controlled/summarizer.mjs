@@ -66,10 +66,24 @@ function loadJson(p) {
   }
 }
 
-/** Build a shard-level summary from a run directory. */
-export function summarizeRun(runDir, { authoritativeManifest } = {}) {
+/** Build a shard-level summary from a run directory.
+ *
+ *  Completeness contract: at the shard level we compare progress against
+ *  THIS shard's `shard-files.json` — the set of files this shard was
+ *  actually assigned. The full manifest (manifest.json) is retained only
+ *  as identity (manifestHash) so the aggregate step can prove exact
+ *  union across every shard. Comparing shard progress against the full
+ *  manifest is a category error: it would flag every other shard's
+ *  assignments as "incomplete" for this shard.
+ *
+ *  Callers may still pass an explicit `authoritativeManifest` for the
+ *  rare case that a summary is regenerated against a specific external
+ *  file list (e.g. focused tests); when supplied it wins.
+ */
+export function summarizeRun(runDir, { authoritativeManifest, expectedFiles } = {}) {
   const runJson = loadJson(path.join(runDir, "run.json"));
   const manifestJson = loadJson(path.join(runDir, "manifest.json"));
+  const shardFilesJson = loadJson(path.join(runDir, "shard-files.json"));
   const manifest = authoritativeManifest ?? manifestJson;
   const progressFile = path.join(runDir, "progress.jsonl");
   const { files, batches, conflicts, corruptLines } = readProgress(progressFile);
@@ -82,7 +96,19 @@ export function summarizeRun(runDir, { authoritativeManifest } = {}) {
     }
   })();
 
-  const expected = manifest?.files ?? [...files.keys()].sort();
+  // Shard-local expected set: prefer explicit override, then shard-files.json,
+  // then the authoritative manifest, and finally the observed progress as a
+  // last resort (legacy runs without shard-files.json).
+  const expected =
+    expectedFiles ??
+    (Array.isArray(shardFilesJson) ? shardFilesJson : null) ??
+    manifest?.files ??
+    [...files.keys()].sort();
+  const expectedSet = new Set(expected);
+  // Any progress event for a file NOT in this shard's assignment is a
+  // reporter/manifest bug — surface it as invalid rather than silently
+  // absorbing another shard's results.
+  const extraneous = [...files.keys()].filter((f) => !expectedSet.has(f));
   const perFile = expected.map((rel) => {
     const ev = files.get(rel);
     if (!ev) return { file: rel, status: "incomplete", counts: null, failedTests: [] };
@@ -134,7 +160,7 @@ export function summarizeRun(runDir, { authoritativeManifest } = {}) {
   })();
 
   let status;
-  if (conflicts.length || corruptLines.length || duplicatesInManifest.length) {
+  if (conflicts.length || corruptLines.length || duplicatesInManifest.length || extraneous.length) {
     status = "invalid";
   } else if (!completedMarker) {
     status = "interrupted";
@@ -166,10 +192,12 @@ export function summarizeRun(runDir, { authoritativeManifest } = {}) {
     status,
     exitCode,
     completed: completedMarker,
+    shardFileCount: expected.length,
     totals,
     perFile,
     incompleteFiles,
     failedFilesList,
+    extraneousFiles: extraneous,
     conflicts,
     corruptLines,
     duplicateManifestFiles: duplicatesInManifest,

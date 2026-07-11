@@ -83,7 +83,11 @@ function goodManual() {
     billing: { required: false, status: "NOT_REQUIRED", evidence: "no billing change" },
     rollback: {
       priorVersionIdentified: "PASS",
-      additiveMigrations: "PASS",
+      migrationPosture: {
+        status: "PASS",
+        classification: "ADDITIVE",
+        exceptions: [],
+      },
       entryPointDisable: "PASS",
       ownerReadPreserved: "PASS",
     },

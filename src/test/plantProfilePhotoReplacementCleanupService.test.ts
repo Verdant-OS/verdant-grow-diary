@@ -582,9 +582,9 @@ describe("retirePreviousPlantProfilePhoto · shared previous reference", () => {
       const client = makeStatefulClient({ plants: state, calls });
       const r = await retirePreviousPlantProfilePhoto({
         previousPhotoUrl: sharedPhoto,
-        newPhotoUrl: photoB2,
+        newPhotoUrl: photoA2,
         authenticatedUserId: USER,
-        plantId: plantB,
+        plantId: plantA,
         client,
         remove,
       });

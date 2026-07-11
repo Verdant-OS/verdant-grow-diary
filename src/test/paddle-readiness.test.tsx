@@ -89,91 +89,18 @@ describe("resolvePaddleConfig", () => {
   });
 });
 
-function renderBilling(plan: string) {
-  return render(
-    <MemoryRouter initialEntries={[`/billing/${plan}`]}>
-      <Routes>
-        <Route path="/billing/:plan" element={<BillingPlaceholder />} />
-      </Routes>
-    </MemoryRouter>,
-  );
-}
+// Slice F: `BillingPlaceholder` was retired. Its rendering + source-safety
+// describes were removed with the file. Copy-safety scans now cover
+// `paddleConfig.ts` and `docs/billing.md` only; the canonical `/upgrade`
+// page has its own dedicated test suite.
 
-describe("BillingPlaceholder rendering", () => {
-  beforeEach(() => {
-    _paddleTestEnv = {};
-  });
-
-  afterEach(() => {
-    _paddleTestEnv = null;
-    vi.restoreAllMocks();
-  });
-
-  it("renders the unavailable state when sandbox config is missing", () => {
-    renderBilling("pro-monthly");
-    expect(screen.getByTestId("paddle-unavailable")).toBeInTheDocument();
-    expect(screen.queryByTestId("paddle-sandbox-checkout-button")).toBeNull();
-    expect(screen.getByText(/No payment is being collected/i)).toBeInTheDocument();
-  });
-
-  it("refuses to render checkout when env is live", () => {
-    _paddleTestEnv = { ...SANDBOX_ENV, VITE_PADDLE_ENVIRONMENT: "live" };
-    renderBilling("pro-monthly");
-    expect(screen.getByTestId("paddle-unavailable")).toBeInTheDocument();
-    expect(screen.queryByTestId("paddle-sandbox-checkout-button")).toBeNull();
-  });
-
-  it("renders the sandbox checkout button when sandbox config is present", () => {
-    _paddleTestEnv = { ...SANDBOX_ENV };
-    renderBilling("pro-monthly");
-    expect(screen.getByTestId("paddle-sandbox-ready")).toBeInTheDocument();
-    const btn = screen.getByTestId("paddle-sandbox-checkout-button");
-    expect(btn).toBeInTheDocument();
-    expect(screen.getByText(/Sandbox \/ test mode/i)).toBeInTheDocument();
-    expect(screen.getByText(/Pro access is/i)).toBeInTheDocument();
-  });
-
-  it("renders the compliance note on every variant", () => {
-    renderBilling("pro-monthly");
-    const note = screen.getByTestId("billing-compliance-note");
-    expect(note).toBeInTheDocument();
-    expect(note.textContent ?? "").toMatch(/sells software only/i);
-    expect(note.textContent ?? "").toMatch(/does not sell cannabis/i);
-  });
-
-  it("does not grant Pro entitlement from clicking the sandbox button", () => {
-    _paddleTestEnv = { ...SANDBOX_ENV };
-    renderBilling("pro-monthly");
-    const btn = screen.getByTestId("paddle-sandbox-checkout-button");
-    btn.click();
-    // No flag is set in localStorage / sessionStorage by the click handler.
-    const ls = JSON.stringify({ ...localStorage });
-    const ss = JSON.stringify({ ...sessionStorage });
-    expect(ls).not.toMatch(/pro|entitlement|subscriber/i);
-    expect(ss).not.toMatch(/pro|entitlement|subscriber/i);
-  });
-});
-
-describe("BillingPlaceholder source safety", () => {
-  it("never grants Pro from client checkout success", () => {
-    // Defensive: scan the file for any direct entitlement writes.
-    expect(BILLING_SRC).not.toMatch(/setPro|grantPro|isPro\s*=\s*true/i);
-    expect(BILLING_SRC).not.toMatch(/\.from\(["']profiles["']\)\s*\.update/);
-    expect(BILLING_SRC).not.toMatch(/\.from\(["']subscriptions["']\)/);
-    expect(BILLING_SRC).not.toMatch(/\.from\(["']entitlements["']\)/);
-  });
-
-  it("does not import the supabase client", () => {
-    expect(BILLING_SRC).not.toMatch(/@\/integrations\/supabase\/client/);
-  });
-
+describe("paddleConfig / billing doc source safety", () => {
   it("does not include service_role anywhere", () => {
-    expect(BILLING_SRC).not.toMatch(/service_role/i);
     expect(CONFIG_SRC).not.toMatch(/service_role/i);
   });
 
   it("contains no autopilot / guaranteed yield / cannabis sales / equipment control copy", () => {
-    const sources = [BILLING_SRC, CONFIG_SRC, BILLING_DOC];
+    const sources = [CONFIG_SRC, BILLING_DOC];
     const forbidden: RegExp[] = [
       /autopilot(?! )/i,
       /guaranteed yield/i,
@@ -184,17 +111,12 @@ describe("BillingPlaceholder source safety", () => {
     ];
     for (const src of sources) {
       for (const p of forbidden) {
-        // Allow the words to appear only inside an explicit *refutation*
-        // (e.g. "never grows for you on autopilot"). The patterns above
-        // are written to match marketing claims, not refutations.
         if (p.source.includes("autopilot")) {
-          // Special-case: allow "on autopilot" only when preceded by "never".
           const positive = /(?<!never (grows for you )?on )autopilot/i;
           expect(src).not.toMatch(positive);
           continue;
         }
         if (p.source.includes("sell cannabis")) {
-          // Special-case: allow "does not sell cannabis" / "never sell cannabis".
           const positive = /(?<!does not )(?<!never )sell cannabis/i;
           expect(src).not.toMatch(positive);
           continue;

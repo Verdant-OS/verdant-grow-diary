@@ -38,7 +38,7 @@ import {
 /**
  * Edits an existing plant's user-facing fields. Profile photo is now
  * a native camera / library upload — the grower never has to find or
- * paste an image URL. See docs/plant-profile-photo-upload-v1.md.
+ * enter a link. See docs/plant-profile-photo-upload-v1.md.
  *
  * RLS enforces ownership; user_id and grow_id are never touched here.
  * This dialog writes only to `plants` and only uploads to the

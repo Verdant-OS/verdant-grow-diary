@@ -105,7 +105,7 @@ describe("diaryTimelineActionLabel", () => {
     expect(diaryTimelineActionLabel("watering")).toBe("Watering");
     expect(diaryTimelineActionLabel("environment")).toBe("Environment check");
     expect(diaryTimelineActionLabel("harvest")).toBe("Harvest");
-    expect(diaryTimelineActionLabel("action_followup")).toBe("Follow-up check");
+    expect(diaryTimelineActionLabel("action_followup")).toBe("Follow-up");
   });
   it("falls back safely on unknown kind", () => {
     expect(diaryTimelineActionLabel(null)).toBe("Entry");

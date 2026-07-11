@@ -113,10 +113,14 @@ describe("V0 operating loop — CI / PR guardrails", () => {
       expect(existsSync(WORKFLOW)).toBe(true);
     });
 
-    it("runs on pull_request and push to main", () => {
+    it("runs on pull_request and push to main AND the default branch", () => {
       expect(w).toMatch(/pull_request:/);
       expect(w).toMatch(/push:/);
-      expect(w).toMatch(/branches:\s*\[\s*main\s*\]/);
+      // `verdant-grow-diary` is the repository default branch. A filter of
+      // `[main]` alone leaves this workflow dormant on every real PR/push —
+      // require BOTH branches so the pin can't regress to main-only.
+      expect(w).toMatch(/branches:\s*\[\s*main\s*,\s*verdant-grow-diary\s*\]/);
+      expect(w).not.toMatch(/branches:\s*\[\s*main\s*\]/);
     });
 
     it("invokes the V0 contract test explicitly", () => {

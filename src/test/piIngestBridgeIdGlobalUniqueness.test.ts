@@ -172,6 +172,10 @@ describe("Edge Function ingestion remains fail-closed", () => {
     for (const p of files) {
       if (!/\.(ts|tsx)$/.test(p)) continue;
       if (/\.test\.(ts|tsx)$/.test(p)) continue;
+      // Skip the whole src/test/ subtree — test helpers/fixtures (e.g.
+      // integration/_helpers/sanitizedDbError.ts) legitimately name the env
+      // var in denylists/assertions; none of it is shipped runtime code.
+      if (/[\\/]src[\\/]test[\\/]/.test(p)) continue;
       // Scoped allow-list (EXACT FILE PATH ONLY): the proof-report redaction
       // helper lists `SUPABASE_SERVICE_ROLE_KEY` as a SECRET_KEYWORDS denylist
       // literal so it can STRIP the token from human-readable copy/print

@@ -27,8 +27,7 @@ const WORKFLOW_PATH = resolve(
 
 const yaml = readFileSync(WORKFLOW_PATH, "utf8");
 
-const EXPECTED_FAILURE_ARTIFACT_NAME =
-  "one-tent-loop-proof-never-healthy-failure-artifacts";
+const EXPECTED_FAILURE_ARTIFACT_NAME = "one-tent-loop-proof-never-healthy-failure-artifacts";
 
 const EXPECTED_FAILURE_PATHS: readonly string[] = [
   "artifacts/one-tent-loop-proof/never-healthy-proof-report.txt",
@@ -53,9 +52,7 @@ const FORBIDDEN_ARTIFACT_FRAGMENTS: readonly RegExp[] = [
 
 describe("one-tent-loop-proof-never-healthy.yml — failure artifact safeguard", () => {
   it("declares the expected failure-artifact upload step", () => {
-    expect(yaml).toMatch(
-      new RegExp(`name:\\s*${EXPECTED_FAILURE_ARTIFACT_NAME}`),
-    );
+    expect(yaml).toMatch(new RegExp(`name:\\s*${EXPECTED_FAILURE_ARTIFACT_NAME}`));
   });
 
   it("gates failure-artifact upload on `if: failure()`", () => {
@@ -88,13 +85,9 @@ describe("one-tent-loop-proof-never-healthy.yml — failure artifact safeguard",
   it("also uploads the sanitized proof artifact separately on always()", () => {
     // The sanitized proof upload is a separate always()-gated step so
     // successful runs still leave a copyable safety snapshot behind.
-    expect(yaml).toMatch(
-      /name:\s*one-tent-loop-proof-never-healthy-sanitized-proof/,
-    );
+    expect(yaml).toMatch(/name:\s*one-tent-loop-proof-never-healthy-sanitized-proof/);
     // Find its step body and assert always() + the exact single-file path.
-    const idx = yaml.indexOf(
-      "one-tent-loop-proof-never-healthy-sanitized-proof",
-    );
+    const idx = yaml.indexOf("one-tent-loop-proof-never-healthy-sanitized-proof");
     const stepBlock = yaml.slice(Math.max(0, idx - 400), idx + 800);
     expect(stepBlock).toMatch(/if:\s*\$\{\{\s*always\(\)\s*\}\}/);
     expect(stepBlock).toMatch(
@@ -108,9 +101,9 @@ describe("one-tent-loop-proof-never-healthy.yml — failure artifact safeguard",
     // `upload-artifact` up to the next step boundary, and strip YAML
     // comments (lines starting with `#` or trailing `# ...`) so safety
     // notes that mention `.env`/`service_role`/etc. don't false-fail.
-    const uploadBlocks = yaml.match(
-      /upload-artifact[\s\S]*?(?=(?:\n\s{6}-\s|\Z))/g,
-    ) ?? [];
+    // NOTE: `$` (not `\Z`) — JS regexes have no \Z, so the old escape
+    // matched a literal "Z" and could truncate a block early.
+    const uploadBlocks = yaml.match(/upload-artifact[\s\S]*?(?=\n\s{6}-\s|$)/g) ?? [];
     expect(uploadBlocks.length, "no upload-artifact steps found").toBeGreaterThan(0);
     for (const rawBlock of uploadBlocks) {
       const block = rawBlock

@@ -3,16 +3,22 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    # `verdant-grow-diary` is the repository default branch — `main` alone
+    # left this entire job dormant on the branch PRs actually target.
+    branches: [main, verdant-grow-diary]
   pull_request:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
   merge_group:
 
 jobs:
   test:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # This job runs the entire src/test vitest suite in one process (see the
+    # monolithic full-suite step below); 20 minutes was sized before the
+    # suite grew. 45 gives honest headroom so a timeout means "stuck", not
+    # "suite got bigger".
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -219,7 +225,15 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: bun run test:db:quicklog-rpc-runtime
 
+      # Monolithic full-suite run kept per the QuickLog CI-wiring guard
+      # ("CI still runs the full suite after the targeted slice"). The
+      # 16-way batched gate (vitest-full-suite-pr-gate.yml) is the primary
+      # memory-safe full-suite check; this single-process run gets the same
+      # old-space headroom the batched runner uses so it fails on real
+      # regressions, not heap exhaustion.
       - name: Full test suite
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: bunx vitest run
 
       # Scanner guardrail timeout sentinel — re-runs only the filesystem-
@@ -333,4 +347,3 @@ jobs:
             e2e/screenshots/
           if-no-files-found: ignore
           retention-days: 14
-

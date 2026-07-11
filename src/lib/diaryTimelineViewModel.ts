@@ -15,6 +15,7 @@ import {
   getDiaryTimelineActionStyle,
   type DiaryTimelineActionStyle,
 } from "@/constants/diaryTimelineActionStyles";
+import { composeActionFollowUpTitle } from "@/lib/actionFollowUpEvidenceViewModel";
 
 export const DIARY_TIMELINE_EMPTY_TITLE = "No plant history yet.";
 export const DIARY_TIMELINE_EMPTY_HINT =
@@ -128,8 +129,16 @@ export function selectDiaryTimelineEmptyState(
 /**
  * Resolve a display label for a timeline entry kind. Stable, friendly,
  * and never "Live" unless the source is actually live.
+ *
+ * For `action_followup`, accepts an optional `details` object carrying
+ * the grower-selected `outcome` so callers can render
+ * "Follow-up · <Outcome>" through the shared outcome-label helper.
+ * Legacy marker-only rows continue to render "Follow-up".
  */
-export function diaryTimelineActionLabel(kind: string | null | undefined): string {
+export function diaryTimelineActionLabel(
+  kind: string | null | undefined,
+  details?: { outcome?: unknown } | null,
+): string {
   switch (kind) {
     case "observation":
     case "diary_note":
@@ -157,7 +166,9 @@ export function diaryTimelineActionLabel(kind: string | null | undefined): strin
     case "harvest":
       return "Harvest";
     case "action_followup":
-      return "Follow-up check";
+      // Deploy branch composes "Follow-up · <Outcome>" here; the primary
+      // rendered timeline pill (diary.ts getEventType) shows "Follow-up check".
+      return composeActionFollowUpTitle(details?.outcome);
     case "action_outcome":
       return "Grower-recorded outcome";
     case "run_learning_decision":

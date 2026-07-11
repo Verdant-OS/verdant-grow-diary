@@ -32,9 +32,7 @@ export const PHENO_TRACKER_RETURN_TO_ALLOWLIST: ReadonlyArray<RegExp> = [
 
 const FORBIDDEN_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
-export function sanitizeCheckoutReturnTo(
-  value: string | null | undefined,
-): string | null {
+export function sanitizeCheckoutReturnTo(value: string | null | undefined): string | null {
   if (typeof value !== "string") return null;
   if (value.length === 0) return null;
   // A safe app path must start with exactly one "/" — reject protocol-relative
@@ -61,6 +59,7 @@ export function sanitizeCheckoutReturnTo(
   if (lowered.startsWith("vbscript:")) return null;
   if (lowered.startsWith("file:")) return null;
   // Reject control chars / newlines that can smuggle headers or trick routers.
+  // eslint-disable-next-line no-control-regex -- matching control characters IS the security check here
   if (/[\u0000-\u001f\u007f]/.test(value)) return null;
   // Final origin check: URL parsed against a synthetic base must stay on the
   // synthetic origin. If it doesn't, the value was not a same-origin path.

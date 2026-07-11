@@ -1,103 +1,69 @@
-# Verdant Payments Wiring — Scope Decision + Phased Plan
 
-## Situation
+# Slice 4 — Reality Check + Proposed Sub-Slice Order
 
-Two Paddle systems now exist in this project:
+Slice 4 as written is 5+ product features plus a Playwright execution stage. Shipping all of it in a single turn would either produce a broken UI (untested selectors wired into ActionDetail) or a dishonest "PASS" claim. I want to break it into safe additive sub-slices you approve one at a time, matching the additive slice discipline you've been enforcing.
 
-**A. Existing BYO Paddle stack** (production-grade, already reviewed):
-- `public.billing_subscriptions` + RLS + subscription update RPCs + audit tables
-- `supabase/functions/paddle-webhook/` (raw-body signature verify, idempotent `paddle_events`)
-- Operator audit pages: `/operator/paddle-processing`, `/operator/billing-subscription-updates`, `/operator/billing-entitlement-resolution`
-- `src/lib/entitlements/` resolver, `useMyEntitlements`, server-side gates (`premium-export-entitlement`, `live-sensor-entitlement`, `environment-summary-report-entitlement`)
-- `src/pages/Pricing.tsx`, `src/pages/Upgrade.tsx`, `PaywallCta`, `PricingCard`, `src/constants/pricing.ts`
-- `docs/billing-level-two-launch-gate.md` — explicit gate: **sandbox only, no live**
+## Audit findings (already on disk)
 
-**B. Lovable built-in Paddle** (enabled last turn):
-- Would create its own `public.subscriptions` table (different schema)
-- Its own `payments-webhook` edge function
-- Its own product catalog managed via `create_product`/`create_price`
-- Client token in `.env.development` / `.env.production`
+- `src/lib/actionFollowUpEvidenceViewModel.ts` already exports `actionFollowupTimelineLabel(details)` — this is the shared outcome-label helper Slice 4 wants. It just isn't imported everywhere yet.
+- Diary/timeline surfaces that currently render `action_followup`:
+  - `src/lib/diaryTimelineViewModel.ts`
+  - `src/lib/growDiaryTimelineRules.ts`
+  - `src/lib/timelineEntryClassification.ts`
+  - `src/lib/timelineEvidenceDetailViewModel.ts`
+  - `src/lib/quickLogHistoryRules.ts`
+  - `src/components/DiaryEntryBadges.tsx`
+  - `src/pages/Timeline.tsx`
+  - `src/hooks/useOneTentLiveProofTimelineFollowup.ts`
+- No report/PDF builder currently branches on `action_followup` outcome — the "report/export" section of the spec is speculative until we confirm a surface exists.
+- `ActionFollowUpEvidenceForm` currently exposes outcome/note/observedAt only. `photoReference` and `sensorSnapshotId` are already in the draft type and service payload — the persistence path accepts them, the UI does not emit them yet.
+- `ActionFollowUpEvidenceCard` renders a Manual sensor badge only when `sensorSnapshotId` is present, but does not resolve the snapshot or render a photo.
 
-**Ripping out (A) or running both in parallel are both dangerous** and both violate your workspace rules (no schema/RLS/Edge changes not requested, no silent expansion, sensor-truth-style safety over velocity).
+## Proposed sub-slices
 
----
+**Slice 4a — Shared outcome-label helper + diary/timeline summary integration**
+- Promote `actionFollowupTimelineLabel` to a named exported helper (`actionFollowUpOutcomeLabel`) plus keep the legacy alias.
+- Wire it into the diary/timeline surfaces listed above so `Follow-up · <Outcome>` renders everywhere the marker currently renders.
+- Legacy marker-only rows continue to render `Follow-up`.
+- Tests: extend `action-followup-timeline-visibility` + `diary-timeline-polish` with outcome-label cases.
+- No new UI selectors, no photo/sensor changes, no schema changes.
 
-## Recommended path — three explicit phases
+**Slice 4b — Optional manual sensor snapshot association**
+- Read-only candidate query (authenticated client, `source = manual`, scoped to grow/tent/plant).
+- Extend form + view model + card to associate an existing manual snapshot ID.
+- Failure of the candidate query never blocks the core save (passes `sensorSnapshotId: null`).
+- Tests: candidate scope, exclusions (live/csv/demo/stale/invalid/cross-user), card renders Manual, unavailable copy.
 
-### Phase 1 (this slice, SAFE, no backend writes)
-Ship the customer-facing surface using Lovable built-in Paddle in **test mode only**, without touching the existing billing DB layer.
+**Slice 4c — Optional existing-photo association**
+- Reuse existing durable-reference validator + signed-URL resolver.
+- Candidate query scoped to grow/plant; no uploader, no bucket, no new object.
+- Card renders through the approved resolver; raw `storage://` never shown; unavailable copy on resolution failure.
+- Tests: durable-reference-only, cross-user/wrong-bucket rejection, no upload path invoked.
 
-1. **Create test products** via `create_product` / `batch_create_product`:
-   - `pro_monthly` — $12/month recurring
-   - `pro_annual` — $99/year recurring
-   - `founder_lifetime` — $129 one-time (Paddle has no built-in "first 75" cap; add manual-cutoff copy + document manual process)
-2. **Add Paddle.js client helpers**: `src/lib/paddle.ts`, `usePaddleCheckout` hook, `PaymentTestModeBanner` at the top of `App.tsx` (renders nothing in production build).
-3. **Add `get-paddle-price` edge function** to resolve human-readable IDs → Paddle internal IDs (uses `_shared/paddle.ts`; safe, read-only, no DB writes).
-4. **Update `Pricing.tsx`** with the requested hero/support/tagline copy + wire the three CTAs to `usePaddleCheckout({ priceId, customData: { userId } })`. Preserve existing tier structure and safety copy from `src/constants/pricing.ts`.
-5. **Add `/checkout/success` and `/checkout/cancel` routes** with the requested copy.
-6. **Deprecate the old BYO checkout UI paths** by making the new built-in Paddle path the only visible one. Do NOT remove the BYO webhook, `billing_subscriptions`, or operator audit pages — they stay as-is behind the operator-only routes. Add TODO comments where duplicate paths exist.
-7. **Tests** (13/14 from your list, deferring #11 entitlement bridging to Phase 2):
-   - Pricing page renders 4 tiers with correct prices/copy
-   - Forbidden-marketing-claim scan (autopilot / AI grows for you / guaranteed yield / device control / cannabis-sales language)
-   - No client-exposed service_role / Paddle secret keys / webhook secrets scan
-   - No competing BYO checkout CTA visible
-   - Success/cancel copy renders
+**Slice 4d — Managed-session preflight + authenticated Playwright execution**
+- Run `bun run e2e:one-tent:preflight`.
+- If READY → seed + UI walk + capture receipts.
+- If BLOCKED → emit the deterministic BLOCKED receipt exactly as specified; do not fabricate login.
+- Update `docs/one-tent-loop-golden-path.md` with the honest matrix at the end.
 
-**Explicit stop-ship in Phase 1**: The new Lovable `subscriptions` table WILL be created by the webhook when the first test checkout completes. That is unavoidable — it's how the built-in integration works. But it will exist **alongside** `billing_subscriptions`, not replace it. Nothing in the existing entitlements resolver reads from it yet, so no user gains or loses access in Phase 1.
+## What I would explicitly NOT do inside any sub-slice
 
-### Phase 2 (separate slice — requires your explicit approval)
-Bridge Lovable's `subscriptions` table into `src/lib/entitlements/resolveEntitlements.ts` so Pro / Pro Annual / Founder Lifetime unlock the same premium surfaces (server gates + client hooks). This needs:
-- Decision on whether Lovable `subscriptions` becomes the new source of truth OR is merged into `billing_subscriptions` via a sync trigger
-- Migration to bridge the two tables safely
-- RLS review + runtime harness (per your billing rules)
-- Server-side gate updates in the 3 existing entitlement edge functions
+- No new photo upload controls, buckets, or signed-URL persistence.
+- No sensor creation/ingest/CSV path from the form.
+- No schema, RLS, migration, or Edge Function changes.
+- No automatic follow-up creation, AI-generated outcomes, or device commands.
+- No broad ActionDetail or timeline redesign.
+- No fabricated Playwright login; BLOCKED is a legitimate outcome.
+- No "report/export" edits until we confirm a real report surface renders `action_followup` — otherwise Slice 4a alone covers "diary/report summary" honestly.
 
-### Phase 3 (separate slice — requires Level Two launch gate sign-off)
-Live-mode go-live. Blocked today per `docs/billing-level-two-launch-gate.md`. Requires Paddle identity verification, seller-policy pages review (Terms, Refund Policy, Privacy — must include Paddle MoR disclosure per `paddle-seller-policies`), and full sandbox E2E verification against both Pro Monthly and Pro Annual.
+## Ask
 
----
+Which sub-slice should I ship in the next turn?
 
-## What I will NOT do in Phase 1 (safety fences)
+1. Slice 4a only (shared label + diary/timeline summaries) — smallest, safest, unblocks the summary tests.
+2. Slice 4a + 4d (label + preflight/Playwright) — proves the summary end-to-end when managed auth is ready.
+3. Slice 4b (manual sensor association) — additive UI + candidate query.
+4. Slice 4c (existing-photo association) — additive UI + resolver reuse.
+5. All four, sequentially, one turn per slice, with an honest matrix update at each step.
 
-- No changes to `billing_subscriptions`, `paddle_events`, `paddle_event_processing`, `billing_customer_links`, `billing_subscription_update_audit`, or any existing migration.
-- No changes to the existing `paddle-webhook` edge function.
-- No changes to `src/lib/entitlements/resolveEntitlements.ts` or the 3 server entitlement edge functions.
-- No changes to operator audit pages or the Level Two launch gate doc.
-- No delete of `src/lib/paddleConfig.ts` or `.env` VITE_PADDLE_* vars — mark deprecated with TODO only.
-- No live-mode work.
-- No claim that entitlements are wired end-to-end — they will not be until Phase 2.
-
----
-
-## Files changed (Phase 1 estimate)
-
-**New**:
-- `src/lib/paddle.ts`
-- `src/hooks/usePaddleCheckout.ts`
-- `src/components/PaymentTestModeBanner.tsx`
-- `src/pages/CheckoutSuccess.tsx`, `src/pages/CheckoutCancel.tsx`
-- `supabase/functions/_shared/paddle.ts`
-- `supabase/functions/get-paddle-price/index.ts`
-- Tests: `src/test/pricing-page-lovable-paddle-cta-wiring.test.tsx`, `src/test/pricing-page-forbidden-marketing-claims.test.ts`, `src/test/pricing-page-no-client-secrets.test.ts`, `src/test/checkout-success-cancel-copy.test.tsx`
-
-**Edited**:
-- `src/pages/Pricing.tsx` — new hero/support/tagline + wire 3 CTAs
-- `src/App.tsx` — mount `PaymentTestModeBanner`, add 2 routes
-- `src/constants/pricing.ts` — align copy with requested hero/tagline (additive; keep existing feature bullets)
-- `.lovable/plan.md` — record phase decision
-
-**Not touched** (explicit): everything under `supabase/migrations/`, `supabase/functions/paddle-webhook/`, `src/lib/entitlements/`, `src/lib/billing*`, `src/pages/Operator*`, `src/lib/paddleConfig.ts` (marked deprecated only).
-
----
-
-## Decision I need from you
-
-Pick one before I write code:
-
-**Option A — Phase 1 only (recommended).** Ship the customer-facing checkout surface in test mode; leave the existing entitlements/webhook/DB stack untouched; open Phase 2 as its own reviewed slice. Safest, matches your workspace rules.
-
-**Option B — Phase 1 + Phase 2 in one slice.** I proceed with Phase 1 AND bridge Lovable subscriptions into the existing entitlements resolver in this turn. Requires schema/edge/entitlements changes your rules normally forbid without explicit approval — say so explicitly if you want this.
-
-**Option C — Roll back the built-in Paddle enable and stay on the existing BYO stack.** You would disconnect built-in Paddle from the Payments dashboard, and I would instead finish the existing BYO Paddle path (checkout initialization against `paddleConfig.ts`, wire CTAs to existing `billing_subscriptions`). No parallel systems.
-
-Reply with A, B, or C and I'll implement immediately.
+Default recommendation: **option 5**, starting with 4a next turn.

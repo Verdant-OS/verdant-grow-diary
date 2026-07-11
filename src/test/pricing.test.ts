@@ -28,7 +28,7 @@ describe("/pricing route", () => {
     expect(APP).toMatch(/path="\/pricing"\s+element=\{<Pricing\s*\/>\}/);
   });
 
-  it("redirects legacy /billing/:plan to canonical /upgrade (Slice E)", () => {
+  it("redirects legacy /billing/:plan to canonical /pricing via LegacyBillingRedirect", () => {
     expect(APP).toMatch(/import\(\s*["']\.\/pages\/LegacyBillingRedirect["']\s*\)/);
     expect(APP).toMatch(/path="\/billing\/:plan"\s+element=\{<LegacyBillingRedirect\s*\/>\}/);
   });
@@ -142,8 +142,8 @@ describe("Monthly/Annual billing toggle", () => {
     expect(PAGE).toMatch(/data-testid="billing-toggle"/);
   });
 
-  it("defaults to annual billing state", () => {
-    expect(PAGE).toMatch(/useState<BillingPeriod>\("annual"\)/);
+  it("defaults to annual billing state (unless overridden by ?plan preselect)", () => {
+    expect(PAGE).toMatch(/preselect\.billing\s*\?\?\s*"annual"/);
   });
 
   it("shows annual Pro price $99/year and monthly $12/month", () => {
@@ -338,10 +338,10 @@ describe("Safety: no private data on public page", () => {
   });
 });
 
-// Slice F: the /billing/:plan placeholder was retired. The legacy route
-// now redirects to /upgrade via `LegacyBillingRedirect` — see the
+// The /billing/:plan placeholder was retired. The legacy route now
+// redirects to canonical /pricing via `LegacyBillingRedirect` — see
 // `legacy-checkout-redirect.test.ts` and `legacy-billing-redirect-router.test.tsx`
-// suites for the replacement coverage.
+// for the replacement coverage.
 
 describe("Landing links to /pricing", () => {
   it("Landing page links to the public pricing route", () => {
@@ -399,7 +399,7 @@ describe("Pricing manifest snapshot (narrow)", () => {
     // Intentionally narrow: only pricing / public billing-relevant routes so
     // unrelated route changes do not create noisy snapshot diffs here.
     expect(getPricingManifestSnapshot()).toEqual([
-      { path: "/billing/:plan", access: "redirect", description: "→ /upgrade?plan=<canonical> (legacy billing entry, Slice E)." },
+      { path: "/billing/:plan", access: "redirect", description: "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout)." },
       { path: "/hardware-integrations", access: "public" },
       { path: "/pricing", access: "public" },
       { path: "/welcome", access: "public" },

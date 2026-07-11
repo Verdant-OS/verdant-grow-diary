@@ -28,6 +28,13 @@ import {
   DEFAULT_MIN_AGE_DAYS,
   ABSOLUTE_MIN_AGE_DAYS,
 } from "./plant-photos-cleanup-lib.mjs";
+import {
+  classifyPhotoUrlReferences,
+  splitPathBuckets,
+  toCanonicalCleanupReport,
+  renderCleanupSummary,
+} from "./plant-photos-cleanup-report.mjs";
+
 
 const HELP = `
 Plant Profile Photo orphan cleanup (admin, manual, dry-run by default)

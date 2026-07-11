@@ -172,10 +172,17 @@ describe("summarizer", () => {
     expect(agg.missingFiles).toEqual(["src/b.test.ts"]);
   });
 
-  it("aggregate flags shard fingerprint disagreement", () => {
-    const base = (fp) => ({
+  it("aggregate flags commonConfigFingerprint disagreement (v4)", () => {
+    // Distinct assignment/shard fingerprints across shards are EXPECTED
+    // under v4 and must not invalidate. Only commonConfigFingerprint
+    // must be identical run-wide.
+    const base = (common: string) => ({
+      schema: 2,
       shardIndex: 1,
-      sourceFingerprint: fp,
+      shardTotal: 2,
+      commonConfigFingerprint: common,
+      assignmentFingerprint: "a1",
+      shardFingerprint: "s1",
       manifestHash: "same",
       status: "complete",
       perFile: [
@@ -188,10 +195,12 @@ describe("summarizer", () => {
     });
     const agg = aggregateShards(
       [
-        base("f1"),
+        base("common-A"),
         {
-          ...base("f2"),
+          ...base("common-B"),
           shardIndex: 2,
+          assignmentFingerprint: "a2",
+          shardFingerprint: "s2",
           perFile: [
             {
               file: "src/b.test.ts",
@@ -206,6 +215,7 @@ describe("summarizer", () => {
       },
     );
     expect(agg.status).toBe("invalid");
+    expect(agg.reasons.some((r) => r.code === "common_config_mismatch")).toBe(true);
   });
 });
 

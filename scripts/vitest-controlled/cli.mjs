@@ -18,9 +18,11 @@ import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { buildManifest, discoverTestFiles, MANIFEST_SCHEMA_VERSION } from "./manifest.mjs";
-import { parseShardSpec, assignShard, splitIntoBatches, shardFingerprint } from "./sharding.mjs";
+import { parseShardSpec, assignShard, splitIntoBatches } from "./sharding.mjs";
 import {
-  computeSourceFingerprint,
+  computeCommonConfigFingerprint,
+  computeAssignmentFingerprint,
+  computeShardFingerprint,
   computeWorkspaceFingerprint,
   fingerprintMismatch,
   FINGERPRINT_SCHEMA_VERSION,
@@ -29,10 +31,15 @@ import {
 import { REPORTER_SCHEMA_VERSION } from "./reporter.mjs";
 import { summarizeRun, renderMarkdown, aggregateShards, readProgress } from "./summarizer.mjs";
 
-// Run-record schema. v3 folds enforced toolchain identity (Node, Bun,
-// Vitest) into the resume/aggregate contract. Legacy v1/v2 runs are
-// refused rather than silently promoted.
-export const RUN_SCHEMA_VERSION = 3;
+// Run-record schema history:
+//   v1..v2 — legacy pre-workspace-fingerprint runs.
+//   v3     — folded toolchain identity into a single ambiguous
+//            `sourceFingerprint` that also included shardIndex; caused
+//            the 16-distinct-fingerprint aggregate defect.
+//   v4     — split fingerprint model: commonConfigFingerprint (one per
+//            run), assignmentFingerprint (one per shard), shardFingerprint
+//            (composite). Pre-v4 runs are refused at resume/rerun-failed.
+export const RUN_SCHEMA_VERSION = 4;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -187,16 +194,31 @@ export function initRun({
 
   const shardFiles = assignShard(files, shardIndex, shardTotal);
   const batches = splitIntoBatches(shardFiles, batchSize);
-  const sourceFingerprint = computeSourceFingerprint(repoRoot, {
+
+  const commonConfigFingerprint = computeCommonConfigFingerprint({
     manifestHash: manifest.hash,
-    shardIndex,
     shardTotal,
     batchSize,
-    maxWorkers,
-    minWorkers,
     pool,
-    reporterSchemaVersion: REPORTER_SCHEMA_VERSION,
+    minWorkers,
+    maxWorkers,
+    runSchema: RUN_SCHEMA_VERSION,
+    reporterSchema: REPORTER_SCHEMA_VERSION,
+    manifestSchema: MANIFEST_SCHEMA_VERSION,
+    workspaceFingerprintSchema: FINGERPRINT_SCHEMA_VERSION,
+    configFingerprintSchema: CONFIG_FINGERPRINT_SCHEMA_VERSION,
     toolVersions: discoveredToolVersions,
+  });
+  const assignmentFingerprint = computeAssignmentFingerprint({
+    shardIndex,
+    shardTotal,
+    assignedFiles: shardFiles,
+  });
+  const shardFp = computeShardFingerprint({
+    commonConfigFingerprint,
+    assignmentFingerprint,
+    shardIndex,
+    shardTotal,
   });
   const workspaceFingerprint = computeWorkspaceFingerprint(repoRoot);
 
@@ -206,7 +228,6 @@ export function initRun({
     createdAt: new Date().toISOString(),
     shardIndex,
     shardTotal,
-    shardFingerprint: shardFingerprint(shardIndex, shardTotal, manifest.hash),
     batchSize,
     batches: batches.map((b, i) => ({ index: i, count: b.length })),
     shardFileCount: shardFiles.length,
@@ -214,7 +235,10 @@ export function initRun({
     maxWorkers,
     minWorkers,
     manifestHash: manifest.hash,
-    sourceFingerprint,
+    // v4 split identity model — see fingerprint.mjs.
+    commonConfigFingerprint,
+    assignmentFingerprint,
+    shardFingerprint: shardFp,
     workspaceFingerprint,
     reporterSchema: REPORTER_SCHEMA_VERSION,
     toolVersions: toolVersions(discoveredToolVersions),
@@ -223,7 +247,6 @@ export function initRun({
   fs.writeFileSync(path.join(runDir, "manifest.json"), JSON.stringify(manifest, null, 2));
   fs.writeFileSync(path.join(runDir, "shard-files.json"), JSON.stringify(shardFiles, null, 2));
   fs.writeFileSync(path.join(runDir, "start-time"), new Date().toISOString());
-  // create progress.jsonl empty
   fs.writeFileSync(path.join(runDir, "progress.jsonl"), "");
   return { runId, runDir, runRecord, shardFiles, batches };
 }
@@ -410,21 +433,50 @@ export async function commandResume(opts, deps = {}) {
       code: EXIT.CONFIG_ERROR,
     });
   }
-  // 4. Re-validate the run-configuration fingerprint (shard/worker/pool/toolchain).
-  const currentSource = computeSourceFingerprint(repoRoot, {
+  // 4. Re-validate the v4 split identities. commonConfig must be
+  //    identical (no shard-index component); the recomputed assignment
+  //    must match the stored one; and the composite shardFingerprint
+  //    must match. Any drift is rejected BEFORE completed-file reuse.
+  const currentCommon = computeCommonConfigFingerprint({
     manifestHash: manifest.hash,
-    shardIndex: runRecord.shardIndex,
     shardTotal: runRecord.shardTotal,
     batchSize: runRecord.batchSize,
-    maxWorkers: runRecord.maxWorkers,
-    minWorkers: runRecord.minWorkers,
     pool: runRecord.pool,
-    reporterSchemaVersion: REPORTER_SCHEMA_VERSION,
+    minWorkers: runRecord.minWorkers,
+    maxWorkers: runRecord.maxWorkers,
+    runSchema: RUN_SCHEMA_VERSION,
+    reporterSchema: REPORTER_SCHEMA_VERSION,
+    manifestSchema: MANIFEST_SCHEMA_VERSION,
+    workspaceFingerprintSchema: FINGERPRINT_SCHEMA_VERSION,
+    configFingerprintSchema: CONFIG_FINGERPRINT_SCHEMA_VERSION,
     toolVersions: currentToolVersions,
   });
-  const srcMismatch = fingerprintMismatch(runRecord.sourceFingerprint, currentSource);
-  if (srcMismatch) {
-    throw Object.assign(new Error(`Refusing to resume: config ${srcMismatch}`), {
+  const commonMismatch = fingerprintMismatch(runRecord.commonConfigFingerprint, currentCommon);
+  if (commonMismatch) {
+    throw Object.assign(new Error(`Refusing to resume: commonConfig ${commonMismatch}`), {
+      code: EXIT.CONFIG_ERROR,
+    });
+  }
+  const currentAssignment = computeAssignmentFingerprint({
+    shardIndex: runRecord.shardIndex,
+    shardTotal: runRecord.shardTotal,
+    assignedFiles: shardFiles,
+  });
+  const assignMismatch = fingerprintMismatch(runRecord.assignmentFingerprint, currentAssignment);
+  if (assignMismatch) {
+    throw Object.assign(new Error(`Refusing to resume: assignment ${assignMismatch}`), {
+      code: EXIT.CONFIG_ERROR,
+    });
+  }
+  const currentShardFp = computeShardFingerprint({
+    commonConfigFingerprint: currentCommon,
+    assignmentFingerprint: currentAssignment,
+    shardIndex: runRecord.shardIndex,
+    shardTotal: runRecord.shardTotal,
+  });
+  const shardMismatch = fingerprintMismatch(runRecord.shardFingerprint, currentShardFp);
+  if (shardMismatch) {
+    throw Object.assign(new Error(`Refusing to resume: shard ${shardMismatch}`), {
       code: EXIT.CONFIG_ERROR,
     });
   }

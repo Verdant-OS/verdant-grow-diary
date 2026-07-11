@@ -100,15 +100,21 @@ describe("One-Tent Loop · cross-user isolation", () => {
 });
 
 describe("One-Tent Loop · static safety scans", () => {
-  it("loop fixture, golden-path test, and this file import no service role", () => {
+  it("loop fixture and golden-path test import no service-role key", () => {
+    // Scan fixture + stitched test only. This safety file intentionally
+    // contains the forbidden tokens as regex literals to guard against
+    // them appearing in the golden-path artifacts.
+    const patterns = [
+      new RegExp("service" + "_role", "i"),
+      new RegExp("SUPABASE" + "_" + "SERVICE", "i"),
+    ];
     for (const f of [
       readFixture("oneTentGoldenPathFixture.ts"),
       readSelf("one-tent-loop-golden-path.test.ts"),
-      readSelf("one-tent-loop-safety-regression.test.ts"),
     ]) {
-      expect(f).not.toMatch(/service_role/i);
-      expect(f).not.toMatch(/SERVICE_ROLE/);
-      expect(f).not.toMatch(/SUPABASE_SERVICE/i);
+      for (const rx of patterns) {
+        expect(f).not.toMatch(rx);
+      }
     }
   });
 

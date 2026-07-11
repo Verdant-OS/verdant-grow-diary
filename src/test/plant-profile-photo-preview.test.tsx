@@ -251,39 +251,42 @@ describe("usePlantProfilePhotoPreview — lifecycle + stale-result protection", 
   });
 
   it("stale HEIC decode result cannot overwrite a newer selection", async () => {
-    // File A: deferred probe (will resolve LATE with true).
-    // File B: HEIC that decodes false (fallback).
-    // The late "A resolves true" must NOT flip B back to image.
-    const deferredA = deferredProbe();
+    // Per-call deferred probe: each invocation gets its own resolver.
+    const resolvers: Array<(v: boolean) => void> = [];
+    const perCallProbe: PlantProfilePhotoDecodeProbe = () =>
+      new Promise<boolean>((r) => resolvers.push(r));
+
     let setter: ((f: File | null, m: string | null) => void) | null = null;
     render(
       <Harness
         initialFile={fakeFile("a.heic", "image/heic")}
         initialMime="image/heic"
-        probe={deferredA.probe}
+        probe={perCallProbe}
         register={(s) => {
           setter = s;
         }}
       />,
     );
     expect(screen.getByTestId("preview-status").textContent).toBe("loading");
+    expect(resolvers.length).toBe(1);
 
-    // Now B — but we need a different probe. Re-render trick:
-    // switch to a new file; because we cannot swap probe injection at
-    // runtime cleanly, verify only that resolving A's stale result
-    // AFTER moving to B leaves the status not-image (i.e., ignored).
+    // Swap to a new HEIC file — kicks off a second probe.
     await act(async () => {
       setter?.(fakeFile("b.heic", "image/heic"), "image/heic");
     });
-    // B kicks off a new deferred probe using the same injected probe
-    // factory (also deferred, never resolves). Status: loading.
-    expect(screen.getByTestId("preview-status").textContent).toBe("loading");
+    expect(resolvers.length).toBe(2);
 
-    // Resolve A late; must be ignored by the generation guard.
+    // Resolve A (the stale one) LATE with true; must be ignored.
     await act(async () => {
-      deferredA.resolveWith(true);
+      resolvers[0](true);
     });
     expect(screen.getByTestId("preview-status").textContent).toBe("loading");
+
+    // Now resolve B with false → fallback wins.
+    await act(async () => {
+      resolvers[1](false);
+    });
+    expect(screen.getByTestId("preview-status").textContent).toBe("fallback");
   });
 });
 

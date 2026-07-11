@@ -22,6 +22,8 @@ export interface ActionFollowUpFormSubmit {
   outcome: ActionFollowUpOutcome;
   note: string;
   observedAt: string; // ISO
+  /** Optional Manual sensor snapshot ID (Slice 4b). Never persisted as anything else. */
+  sensorSnapshotId: string | null;
 }
 
 export interface ActionFollowUpEvidenceFormProps {
@@ -30,6 +32,14 @@ export interface ActionFollowUpEvidenceFormProps {
   initialObservedAt?: string; // ISO
   onSubmit: (values: ActionFollowUpFormSubmit) => void;
   onCancel?: () => void;
+  /**
+   * Slice 4b: optional slot for an existing-Manual-sensor-snapshot
+   * selector. Rendered inside the form so the association travels
+   * with the same submit action.
+   */
+  sensorSelector?: React.ReactNode;
+  /** Currently selected snapshot ID (mirrored back into submit). */
+  sensorSnapshotId?: string | null;
 }
 
 const OUTCOME_LABEL: Record<ActionFollowUpOutcome, string> = {

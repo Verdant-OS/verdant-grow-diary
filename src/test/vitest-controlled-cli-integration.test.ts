@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { EventEmitter } from "node:events";
+import { spawnSync } from "node:child_process";
 import { commandRun, commandResume, DEFAULTS, EXIT } from "../../scripts/vitest-controlled/cli.mjs";
 import { readProgress } from "../../scripts/vitest-controlled/summarizer.mjs";
 

@@ -14,8 +14,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
 import { buildManifest, discoverTestFiles, MANIFEST_SCHEMA_VERSION } from "./manifest.mjs";
 import { parseShardSpec, assignShard, splitIntoBatches, shardFingerprint } from "./sharding.mjs";
 import {
@@ -23,11 +24,15 @@ import {
   computeWorkspaceFingerprint,
   fingerprintMismatch,
   FINGERPRINT_SCHEMA_VERSION,
+  CONFIG_FINGERPRINT_SCHEMA_VERSION,
 } from "./fingerprint.mjs";
 import { REPORTER_SCHEMA_VERSION } from "./reporter.mjs";
 import { summarizeRun, renderMarkdown, aggregateShards, readProgress } from "./summarizer.mjs";
 
-export const RUN_SCHEMA_VERSION = 2;
+// Run-record schema. v3 folds enforced toolchain identity (Node, Bun,
+// Vitest) into the resume/aggregate contract. Legacy v1/v2 runs are
+// refused rather than silently promoted.
+export const RUN_SCHEMA_VERSION = 3;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

@@ -112,23 +112,36 @@ describe("One-Tent Loop · static safety scans", () => {
     }
   });
 
-  it("no device-control or paid-model imports appear in loop test files", () => {
-    for (const f of [
+  it("no device-control or paid-model imports appear in the stitched golden-path test", () => {
+    // Scans the golden-path test + fixture only — this safety file
+    // intentionally mentions the forbidden patterns as regex literals.
+    const targets = [
       readSelf("one-tent-loop-golden-path.test.ts"),
-      readSelf("one-tent-loop-safety-regression.test.ts"),
-    ]) {
-      expect(f).not.toMatch(/openai\.com/i);
-      expect(f).not.toMatch(/anthropic\.com/i);
-      expect(f).not.toMatch(/device[_-]?control/i);
-      expect(f).not.toMatch(/executeCommand/);
-      expect(f).not.toMatch(/deviceCommand/);
+      readFixture("oneTentGoldenPathFixture.ts"),
+    ];
+    // Build forbidden patterns at runtime so the literal tokens do
+    // not appear in this file itself.
+    const forbidden: RegExp[] = [
+      new RegExp("openai" + "\\.com", "i"),
+      new RegExp("anthropic" + "\\.com", "i"),
+      new RegExp("device" + "[_-]?" + "control", "i"),
+      new RegExp("execute" + "Command"),
+      new RegExp("device" + "Command"),
+    ];
+    for (const f of targets) {
+      for (const rx of forbidden) {
+        expect(f).not.toMatch(rx);
+      }
     }
   });
 
-  it("golden-path test uses no live network client", () => {
+  it("golden-path test uses no live Supabase client or fetch call", () => {
     const g = readSelf("one-tent-loop-golden-path.test.ts");
-    expect(g).not.toMatch(/from\s+["']@\/integrations\/supabase\/client["']/);
-    expect(g).not.toMatch(/fetch\(/);
+    const supabaseImport = new RegExp(
+      "from" + "\\s+" + "[\"']" + "@/integrations/supabase/client" + "[\"']",
+    );
+    expect(g).not.toMatch(supabaseImport);
+    expect(g).not.toMatch(new RegExp("fetch" + "\\("));
   });
 
   it("golden fixture confirms grow ownership by expected user", () => {

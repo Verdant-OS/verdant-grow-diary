@@ -323,11 +323,14 @@ export async function commandRun(opts, deps = {}) {
     files: injectedFiles,
     vitestBin,
     spawnImpl,
+    toolVersions: injectedToolVersions,
+    discoverToolVersionsImpl = discoverToolVersions,
   } = opts;
   const { index, total } = parseShardSpec(shardSpec);
   const manifest = injectedFiles
     ? buildManifest(repoRoot, { files: injectedFiles })
     : buildManifest(repoRoot);
+  const discoveredToolVersions = injectedToolVersions ?? discoverToolVersionsImpl();
   const initialized = initRun({
     repoRoot,
     runsRoot,
@@ -339,6 +342,7 @@ export async function commandRun(opts, deps = {}) {
     minWorkers: DEFAULTS.minWorkers,
     files: manifest.files,
     manifest,
+    toolVersions: discoveredToolVersions,
   });
   return executeBatches(initialized, {
     repoRoot,
@@ -349,6 +353,7 @@ export async function commandRun(opts, deps = {}) {
     resumeMode: "fresh",
   });
 }
+
 
 /** Public: resume a run (subcommand `resume`). */
 export async function commandResume(opts, deps = {}) {

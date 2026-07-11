@@ -9,7 +9,6 @@ import {
   paywallCtaViewModelText,
 } from "@/lib/paywallCtaViewModel";
 import PaywallCta from "@/components/PaywallCta";
-import BillingPlaceholder from "@/pages/BillingPlaceholder";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 
 describe("paywallCtaViewModel — calm defaults", () => {

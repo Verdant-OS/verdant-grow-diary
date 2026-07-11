@@ -208,3 +208,174 @@ describe("summarizer", () => {
     expect(agg.status).toBe("invalid");
   });
 });
+
+// Shard-local completeness contract regressions — repairs the first CI
+// run's finding that shard summaries compared their progress against the
+// full 1,974-file manifest, marking every other shard's assignments as
+// "incomplete" for this shard and flipping otherwise-clean shards to a
+// spurious exit code 1.
+function mkShardRun({
+  shardFiles,
+  manifestFiles,
+  progress,
+  completed = true,
+  exitCode = 0,
+}: {
+  shardFiles: string[] | null;
+  manifestFiles: string[];
+  progress: Array<{
+    file: string;
+    status: "passed" | "failed" | "skipped";
+    counts?: { passed: number; failed: number; skipped: number; todo: number };
+  }>;
+  completed?: boolean;
+  exitCode?: number;
+}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vc-shard-"));
+  fs.mkdirSync(path.join(dir, "raw"), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, "manifest.json"),
+    JSON.stringify({
+      schema: 1,
+      hash: "m".repeat(64),
+      count: manifestFiles.length,
+      files: manifestFiles,
+    }),
+  );
+  if (shardFiles) {
+    fs.writeFileSync(path.join(dir, "shard-files.json"), JSON.stringify(shardFiles));
+  }
+  fs.writeFileSync(
+    path.join(dir, "run.json"),
+    JSON.stringify({ runId: "r1", shardIndex: 1, shardTotal: 2, sourceFingerprint: "f1" }),
+  );
+  const lines = progress
+    .map((p) =>
+      JSON.stringify({
+        event: "file",
+        schema: 1,
+        file: p.file,
+        status: p.status,
+        counts: p.counts ?? { passed: 1, failed: 0, skipped: 0, todo: 0 },
+        failedTests: [],
+      }),
+    )
+    .concat([JSON.stringify({ event: "batch-end", schema: 1 })]);
+  fs.writeFileSync(path.join(dir, "progress.jsonl"), lines.join("\n") + "\n");
+  if (completed) fs.writeFileSync(path.join(dir, "completed"), "now");
+  fs.writeFileSync(path.join(dir, "exit-code"), String(exitCode));
+  return dir;
+}
+
+describe("summarizer — shard-local completeness contract", () => {
+  it("a shard passing exactly its two assigned files is complete, ignoring other-shard files", () => {
+    const dir = mkShardRun({
+      shardFiles: ["src/a.test.ts", "src/b.test.ts"],
+      manifestFiles: [
+        "src/a.test.ts",
+        "src/b.test.ts",
+        "src/c.test.ts",
+        "src/d.test.ts",
+      ],
+      progress: [
+        { file: "src/a.test.ts", status: "passed" },
+        { file: "src/b.test.ts", status: "passed" },
+      ],
+    });
+    const s = summarizeRun(dir);
+    expect(s.status).toBe("complete");
+    expect(s.shardFileCount).toBe(2);
+    expect(s.totals.passedFiles).toBe(2);
+    expect(s.totals.incompleteFiles).toBe(0);
+    expect(s.incompleteFiles).toEqual([]);
+    expect(s.perFile.map((r) => r.file)).toEqual(["src/a.test.ts", "src/b.test.ts"]);
+  });
+
+  it("other-shard files never appear in shard-local perFile output", () => {
+    const dir = mkShardRun({
+      shardFiles: ["src/a.test.ts"],
+      manifestFiles: ["src/a.test.ts", "src/other.test.ts"],
+      progress: [{ file: "src/a.test.ts", status: "passed" }],
+    });
+    const s = summarizeRun(dir);
+    expect(s.perFile.map((r) => r.file)).not.toContain("src/other.test.ts");
+  });
+
+  it("a missing assigned file remains incomplete and fails the shard", () => {
+    const dir = mkShardRun({
+      shardFiles: ["src/a.test.ts", "src/b.test.ts"],
+      manifestFiles: ["src/a.test.ts", "src/b.test.ts"],
+      progress: [{ file: "src/a.test.ts", status: "passed" }],
+    });
+    const s = summarizeRun(dir);
+    expect(s.status).toBe("failed");
+    expect(s.incompleteFiles).toEqual(["src/b.test.ts"]);
+  });
+
+  it("a failed assigned file produces a failing shard", () => {
+    const dir = mkShardRun({
+      shardFiles: ["src/a.test.ts"],
+      manifestFiles: ["src/a.test.ts", "src/other.test.ts"],
+      progress: [
+        {
+          file: "src/a.test.ts",
+          status: "failed",
+          counts: { passed: 0, failed: 1, skipped: 0, todo: 0 },
+        },
+      ],
+    });
+    const s = summarizeRun(dir);
+    expect(s.status).toBe("failed");
+    expect(s.failedFilesList).toEqual(["src/a.test.ts"]);
+  });
+
+  it("progress that references a non-assigned file is treated as invalid (extraneous)", () => {
+    const dir = mkShardRun({
+      shardFiles: ["src/a.test.ts"],
+      manifestFiles: ["src/a.test.ts", "src/other.test.ts"],
+      progress: [
+        { file: "src/a.test.ts", status: "passed" },
+        { file: "src/other.test.ts", status: "passed" },
+      ],
+    });
+    const s = summarizeRun(dir);
+    expect(s.status).toBe("invalid");
+    expect(s.extraneousFiles).toEqual(["src/other.test.ts"]);
+  });
+
+  it("aggregate across shards still enforces exact full-manifest union", () => {
+    const shardA = {
+      shardIndex: 1,
+      sourceFingerprint: "f",
+      manifestHash: "m",
+      status: "complete",
+      perFile: [
+        {
+          file: "src/a.test.ts",
+          status: "passed",
+          counts: { passed: 1, failed: 0, skipped: 0, todo: 0 },
+        },
+      ],
+    };
+    const shardB = {
+      shardIndex: 2,
+      sourceFingerprint: "f",
+      manifestHash: "m",
+      status: "complete",
+      perFile: [
+        {
+          file: "src/b.test.ts",
+          status: "passed",
+          counts: { passed: 1, failed: 0, skipped: 0, todo: 0 },
+        },
+      ],
+    };
+    const agg = aggregateShards([shardA, shardB], {
+      manifest: { files: ["src/a.test.ts", "src/b.test.ts"] },
+    });
+    expect(agg.status).toBe("complete");
+    expect(agg.missingFiles).toEqual([]);
+    expect(agg.duplicates).toEqual([]);
+  });
+});
+

@@ -160,7 +160,12 @@ export function summarizeRun(runDir, { authoritativeManifest, expectedFiles } = 
   })();
 
   let status;
-  if (conflicts.length || corruptLines.length || duplicatesInManifest.length) {
+  if (
+    conflicts.length ||
+    corruptLines.length ||
+    duplicatesInManifest.length ||
+    extraneous.length
+  ) {
     status = "invalid";
   } else if (!completedMarker) {
     status = "interrupted";
@@ -192,10 +197,12 @@ export function summarizeRun(runDir, { authoritativeManifest, expectedFiles } = 
     status,
     exitCode,
     completed: completedMarker,
+    shardFileCount: expected.length,
     totals,
     perFile,
     incompleteFiles,
     failedFilesList,
+    extraneousFiles: extraneous,
     conflicts,
     corruptLines,
     duplicateManifestFiles: duplicatesInManifest,

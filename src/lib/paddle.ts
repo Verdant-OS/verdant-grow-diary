@@ -86,12 +86,24 @@ export function getCheckoutUnavailableMessage(): string | null {
 let paddleInitialized = false;
 let paddleInitPromise: Promise<void> | null = null;
 
+export class PaddleCheckoutUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PaddleCheckoutUnavailableError";
+  }
+}
+
 export async function initializePaddle(): Promise<void> {
   if (paddleInitialized) return;
   if (paddleInitPromise) return paddleInitPromise;
 
-  if (!clientToken) {
-    throw new Error("VITE_PAYMENTS_CLIENT_TOKEN is not set");
+  // Fail closed BEFORE loading Paddle.js. Covers: missing/malformed token,
+  // and live token on a loopback host (Slice A).
+  const env = resolvePaddleCheckout();
+  if (env === "unavailable") {
+    throw new PaddleCheckoutUnavailableError(
+      getCheckoutUnavailableMessage() ?? CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE,
+    );
   }
 
   paddleInitPromise = new Promise<void>((resolve, reject) => {
@@ -100,8 +112,7 @@ export async function initializePaddle(): Promise<void> {
     );
     const onLoad = () => {
       try {
-        const paddleJsEnv =
-          getPaddleEnvironment() === "sandbox" ? "sandbox" : "production";
+        const paddleJsEnv = env === "sandbox" ? "sandbox" : "production";
         (window as any).Paddle.Environment.set(paddleJsEnv);
         (window as any).Paddle.Initialize({ token: clientToken });
         paddleInitialized = true;
@@ -127,12 +138,19 @@ export async function initializePaddle(): Promise<void> {
 }
 
 export async function getPaddlePriceId(priceId: string): Promise<string> {
-  const environment = getPaddleEnvironment();
+  // Slice A — never resolve prices when checkout is unavailable.
+  const env = resolvePaddleCheckout();
+  if (env === "unavailable") {
+    throw new PaddleCheckoutUnavailableError(
+      getCheckoutUnavailableMessage() ?? CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE,
+    );
+  }
   const { data, error } = await supabase.functions.invoke("get-paddle-price", {
-    body: { priceId, environment },
+    body: { priceId, environment: env },
   });
   if (error || !data?.paddleId) {
     throw new Error(`Failed to resolve price: ${priceId}`);
   }
   return data.paddleId as string;
 }
+

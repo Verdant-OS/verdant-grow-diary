@@ -399,7 +399,7 @@ describe("Pricing manifest snapshot (narrow)", () => {
     // Intentionally narrow: only pricing / public billing-relevant routes so
     // unrelated route changes do not create noisy snapshot diffs here.
     expect(getPricingManifestSnapshot()).toEqual([
-      { path: "/billing/:plan", access: "redirect", description: "→ /upgrade?plan=<canonical> (legacy billing entry, Slice E)." },
+      { path: "/billing/:plan", access: "redirect", description: "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout)." },
       { path: "/hardware-integrations", access: "public" },
       { path: "/pricing", access: "public" },
       { path: "/welcome", access: "public" },

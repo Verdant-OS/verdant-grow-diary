@@ -15,8 +15,8 @@
  * Requires (execute mode) the SUPABASE_SERVICE_ROLE_KEY and
  * SUPABASE_URL env vars. The service-role key is NEVER logged.
  */
-import { writeFileSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
+
 import { createClient } from "@supabase/supabase-js";
 import {
   parseCleanupArgs,

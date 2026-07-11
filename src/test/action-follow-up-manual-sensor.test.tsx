@@ -255,7 +255,10 @@ describe("filterManualSensorSnapshotCandidates", () => {
 function makeClient(
   data: unknown,
   error: unknown = null,
-): { from: (t: string) => unknown; _lastTent?: string } {
+): {
+  client: { from: (t: string) => unknown };
+  state: { lastTent: string | null };
+} {
   const state = { lastTent: null as string | null };
   const chain: Record<string, unknown> = {
     select: () => chain,
@@ -266,12 +269,8 @@ function makeClient(
       return chain;
     },
   };
-  return {
-    from: () => chain,
-    get _lastTent() {
-      return state.lastTent;
-    },
-  } as { from: (t: string) => unknown; _lastTent?: string };
+  const client = { from: (_: string) => chain };
+  return { client, state };
 }
 
 describe("loadManualSensorCandidates", () => {

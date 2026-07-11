@@ -147,6 +147,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   { path: "/hardware-integrations", access: "public" },
   {
+    path: "/health",
+    access: "auth",
+    description: "In-app read-only health check (auth, data reads, diary timeline).",
+  },
+  {
     path: "/how-ai-doctor-works",
     access: "public",
     label: "How AI Doctor Works",

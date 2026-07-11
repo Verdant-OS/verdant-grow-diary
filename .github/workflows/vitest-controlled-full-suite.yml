@@ -42,6 +42,11 @@ jobs:
           bun-version: 1.3.3
       - name: Install (frozen lockfile)
         run: bun install --frozen-lockfile
+      - name: Runtime proof (node/bun/vitest)
+        run: |
+          echo "node: $(node --version)"
+          echo "bun:  $(bun --version)"
+          echo "vitest: $(node -e "process.stdout.write(require('vitest/package.json').version)")"
       - name: Run controlled shard ${{ matrix.shard }}/16
         run: |
           node scripts/vitest-controlled/cli.mjs run \

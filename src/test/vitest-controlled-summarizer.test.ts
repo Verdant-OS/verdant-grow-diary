@@ -8,7 +8,17 @@ import {
   aggregateShards,
 } from "../../scripts/vitest-controlled/summarizer.mjs";
 
-function mkRun({ files, completed = true, exitCode = 0 } = {}) {
+type MkFile = {
+  file: string;
+  status: "passed" | "failed" | "skipped" | "incomplete";
+  counts?: { passed: number; failed: number; skipped: number; todo: number };
+  failedTests?: string[];
+};
+function mkRun({
+  files,
+  completed = true,
+  exitCode = 0,
+}: { files: MkFile[]; completed?: boolean; exitCode?: number }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vc-sum-"));
   fs.mkdirSync(path.join(dir, "raw"), { recursive: true });
   const manifest = { schema: 1, hash: "h".repeat(64), count: files.length, files: files.map((f) => f.file) };

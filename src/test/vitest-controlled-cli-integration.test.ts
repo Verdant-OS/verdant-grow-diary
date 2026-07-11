@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { EventEmitter } from "node:events";
+import { spawnSync } from "node:child_process";
 import { commandRun, commandResume, DEFAULTS, EXIT } from "../../scripts/vitest-controlled/cli.mjs";
 import { readProgress } from "../../scripts/vitest-controlled/summarizer.mjs";
 
@@ -13,16 +14,30 @@ import { readProgress } from "../../scripts/vitest-controlled/summarizer.mjs";
 function fakeRepo(fileCount: number) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vc-cli-"));
   fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  // Ignore the runner artifact directory (mirrors real repo .gitignore) so
+  // writing progress/summary files does not invalidate the workspace
+  // fingerprint that resume enforces.
+  fs.writeFileSync(path.join(root, ".gitignore"), ".vitest-runs/\n");
   const files: string[] = [];
   for (let i = 0; i < fileCount; i++) {
     const rel = `src/f${String(i).padStart(2, "0")}.test.ts`;
     fs.writeFileSync(path.join(root, rel), `// ${i}\n`);
     files.push(rel);
   }
-  // Also write minimal vitest.config.ts + package.json so the fingerprint
-  // has real bytes to hash.
   fs.writeFileSync(path.join(root, "vitest.config.ts"), "export default {}\n");
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "fake" }));
+  // Initialize as a git repo so the workspace fingerprint can enumerate
+  // tracked + non-ignored untracked files (mirrors real Verdant layout).
+  const realGit = process.env.__LOVABLE_REAL_GIT || "git";
+  const git = (...args: string[]) => {
+    const r = spawnSync(realGit, ["-C", root, ...args]);
+    if (r.status !== 0) throw new Error(`git ${args.join(" ")} failed`);
+  };
+  git("init", "-q");
+  git("config", "user.email", "test@example.invalid");
+  git("config", "user.name", "test");
+  git("add", "-A");
+  git("commit", "-q", "-m", "init");
   return { root, files };
 }
 

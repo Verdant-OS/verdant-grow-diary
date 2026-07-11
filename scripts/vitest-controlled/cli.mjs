@@ -20,12 +20,14 @@ import { buildManifest, discoverTestFiles, MANIFEST_SCHEMA_VERSION } from "./man
 import { parseShardSpec, assignShard, splitIntoBatches, shardFingerprint } from "./sharding.mjs";
 import {
   computeSourceFingerprint,
-  computeDirtyTreeHash,
+  computeWorkspaceFingerprint,
   fingerprintMismatch,
   FINGERPRINT_SCHEMA_VERSION,
 } from "./fingerprint.mjs";
 import { REPORTER_SCHEMA_VERSION } from "./reporter.mjs";
 import { summarizeRun, renderMarkdown, aggregateShards, readProgress } from "./summarizer.mjs";
+
+export const RUN_SCHEMA_VERSION = 2;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -116,10 +118,10 @@ export function initRun({
     pool,
     reporterSchemaVersion: REPORTER_SCHEMA_VERSION,
   });
-  const dirtyTreeHash = computeDirtyTreeHash(repoRoot, manifest.files);
+  const workspaceFingerprint = computeWorkspaceFingerprint(repoRoot);
 
   const runRecord = {
-    schema: 1,
+    schema: RUN_SCHEMA_VERSION,
     runId,
     createdAt: new Date().toISOString(),
     shardIndex,
@@ -133,7 +135,7 @@ export function initRun({
     minWorkers,
     manifestHash: manifest.hash,
     sourceFingerprint,
-    dirtyTreeHash,
+    workspaceFingerprint,
     reporterSchema: REPORTER_SCHEMA_VERSION,
     toolVersions: toolVersions(),
   };
@@ -280,8 +282,41 @@ export async function commandResume(opts, deps = {}) {
     spawnImpl,
   } = opts;
   const { runRecord, manifest, shardFiles } = loadRun(runDir);
-  // Re-validate fingerprint.
-  const currentFingerprint = computeSourceFingerprint(repoRoot, {
+  // 1. Refuse older run/fingerprint schema outright — legacy dirty-tree
+  //    hashes did not cover production, migrations, edge functions, or
+  //    scripts and cannot be silently promoted to workspace semantics.
+  if ((runRecord.schema ?? 1) < RUN_SCHEMA_VERSION) {
+    throw Object.assign(
+      new Error(
+        `Refusing to resume: run.json schema v${runRecord.schema ?? 1} predates workspace fingerprint v${RUN_SCHEMA_VERSION}`,
+      ),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  if (
+    !runRecord.workspaceFingerprint ||
+    runRecord.workspaceFingerprint.schema !== FINGERPRINT_SCHEMA_VERSION
+  ) {
+    throw Object.assign(
+      new Error(
+        `Refusing to resume: workspace fingerprint schema mismatch (expected v${FINGERPRINT_SCHEMA_VERSION})`,
+      ),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  // 2. Recompute the workspace fingerprint BEFORE consulting progress.
+  const currentWorkspace = computeWorkspaceFingerprint(repoRoot);
+  const wsMismatch = fingerprintMismatch(
+    runRecord.workspaceFingerprint.digest,
+    currentWorkspace.digest,
+  );
+  if (wsMismatch) {
+    throw Object.assign(new Error(`Refusing to resume: workspace ${wsMismatch}`), {
+      code: EXIT.CONFIG_ERROR,
+    });
+  }
+  // 3. Re-validate the run-configuration fingerprint (shard/worker/pool).
+  const currentSource = computeSourceFingerprint(repoRoot, {
     manifestHash: manifest.hash,
     shardIndex: runRecord.shardIndex,
     shardTotal: runRecord.shardTotal,
@@ -291,16 +326,11 @@ export async function commandResume(opts, deps = {}) {
     pool: runRecord.pool,
     reporterSchemaVersion: REPORTER_SCHEMA_VERSION,
   });
-  const mismatch = fingerprintMismatch(runRecord.sourceFingerprint, currentFingerprint);
-  if (mismatch) {
-    throw Object.assign(new Error(`Refusing to resume: ${mismatch}`), { code: EXIT.CONFIG_ERROR });
-  }
-  const currentDirty = computeDirtyTreeHash(repoRoot, manifest.files);
-  if (currentDirty !== runRecord.dirtyTreeHash) {
-    throw Object.assign(
-      new Error("Refusing to resume: test-source dirty-tree hash differs from initial run"),
-      { code: EXIT.CONFIG_ERROR },
-    );
+  const srcMismatch = fingerprintMismatch(runRecord.sourceFingerprint, currentSource);
+  if (srcMismatch) {
+    throw Object.assign(new Error(`Refusing to resume: config ${srcMismatch}`), {
+      code: EXIT.CONFIG_ERROR,
+    });
   }
   const batches = splitIntoBatches(shardFiles, runRecord.batchSize);
   const {
@@ -340,6 +370,38 @@ export async function commandRerunFailed(opts, deps = {}) {
     spawnImpl,
   } = opts;
   const { runRecord, manifest, shardFiles } = loadRun(runDir);
+  // Enforce the same schema + workspace fingerprint contract as `resume`
+  // BEFORE reusing the prior failed-files list, which is itself an
+  // outcome derived from the previous workspace state.
+  if ((runRecord.schema ?? 1) < RUN_SCHEMA_VERSION) {
+    throw Object.assign(
+      new Error(
+        `Refusing to rerun-failed: run.json schema v${runRecord.schema ?? 1} predates workspace fingerprint v${RUN_SCHEMA_VERSION}`,
+      ),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  if (
+    !runRecord.workspaceFingerprint ||
+    runRecord.workspaceFingerprint.schema !== FINGERPRINT_SCHEMA_VERSION
+  ) {
+    throw Object.assign(
+      new Error(
+        `Refusing to rerun-failed: workspace fingerprint schema mismatch (expected v${FINGERPRINT_SCHEMA_VERSION})`,
+      ),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  const currentWorkspace = computeWorkspaceFingerprint(repoRoot);
+  const wsMismatch = fingerprintMismatch(
+    runRecord.workspaceFingerprint.digest,
+    currentWorkspace.digest,
+  );
+  if (wsMismatch) {
+    throw Object.assign(new Error(`Refusing to rerun-failed: workspace ${wsMismatch}`), {
+      code: EXIT.CONFIG_ERROR,
+    });
+  }
   const { files: doneMap } = readProgress(path.join(runDir, "progress.jsonl"));
   const failed = [...doneMap.values()].filter((e) => e.status === "failed").map((e) => e.file);
   if (!failed.length) {

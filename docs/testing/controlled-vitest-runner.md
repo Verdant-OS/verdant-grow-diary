@@ -17,8 +17,11 @@ additional controlled command used for the full suite and the manual
 - **Structured per-file progress** (`progress.jsonl`, append-only,
   fsync per write) via a custom reporter.
 - **Resume-safe** — completed files are never re-run; completed
-  failures stay failed; resume refuses if the source fingerprint,
-  manifest, package/lock, or reporter schema drifts.
+  failures stay failed; resume refuses if the **workspace fingerprint**
+  (every tracked + non-ignored untracked file in the repository),
+  manifest, package/lock, reporter schema, or run schema drifts.
+  Runner artifacts under `.vitest-runs/` and `test-results/` are
+  excluded via `.gitignore` and never self-invalidate a resume.
 - **Sharded** — union of shards equals manifest, pairwise
   intersection is empty; aggregate job proves exact coverage.
 - **No config changes** — the 5-second `testTimeout`, retry count,
@@ -124,3 +127,28 @@ The `controlled-aggregate` job:
 
 A green shard matrix without a green aggregate is **not** a green
 full suite.
+
+## Workspace fingerprint (schema v2)
+
+`fingerprint.mjs` derives a single SHA-256 digest over every file that
+Git reports as tracked or non-ignored-untracked (`git ls-files --cached`
+
+- `git ls-files --others --exclude-standard`). Each file contributes
+  its POSIX-normalized path plus one of:
+
+* `F\0<sha256>` — regular file contents (streamed, never persisted)
+* `S\0<target>` — symlink target (POSIX-normalized)
+* `M` — tracked but missing on disk
+* `D` — tracked directory entry (e.g. submodule)
+
+The stored artifact in `run.json` contains only the final digest,
+algorithm, schema version, file count, `clean`/`dirty` mode, and
+coarse per-area counts. **No file contents, secrets, or absolute
+user paths are persisted.**
+
+`resume` and `rerun-failed` recompute this fingerprint **before**
+consulting completed-file progress, and refuse with exit code `2`
+on any mismatch — so a production `.ts`, Supabase migration, edge
+function, script, doc, or workflow change all invalidate reuse.
+`run.json` with `schema < 2` (legacy test-only fingerprint) is
+refused outright; old artifacts are preserved for inspection.

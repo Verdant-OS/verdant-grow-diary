@@ -397,3 +397,40 @@ Contract notes for Slice 4c:
   side through the pure candidate rules. RLS remains authoritative.
 - No schema, RLS, migration, Edge Function, AI, or device-control
   changes in this slice.
+
+## Action Follow-Up Evidence V1 — Slice 4e status
+
+Slice 4e — Quick Log handoff for capturing a new follow-up photo.
+
+- The follow-up form exposes an "Add a new photo in Quick Log" CTA
+  next to the existing-photo selector. Help copy reads: "Save the
+  photo in Quick Log, then return here to select it."
+- The CTA dispatches only the existing `verdant:open-quicklog`
+  event with a grow/tent/plant-scoped prefill. Action Queue does not
+  own any uploader, file input, camera capture, storage object, or
+  signed-URL persistence — Quick Log remains the sole owner of the
+  new diary-photo write.
+- On successful Quick Log save, `verdant:entry-created` refreshes the
+  eligible existing-photo candidates through the existing
+  deterministic candidate ordering. The newest eligible photo appears
+  as a selectable radio option.
+- The grower must still explicitly select the new photo and save the
+  follow-up. The handoff never auto-selects, auto-associates, auto-
+  submits, or auto-completes the action.
+- Cancelling Quick Log emits no `verdant:entry-created`, so the
+  follow-up evidence is left unchanged.
+- Photo and sensor evidence remain optional and independent. A
+  candidate-refresh failure does not block the core outcome save.
+- Safe return-path helper: `/actions/:actionId` allowlist only.
+  External, protocol-relative, schema-relative, malformed, unrelated
+  and control-char paths are rejected by
+  `isSafeActionFollowUpReturnPath`.
+- Authenticated One-Tent Playwright proof for Slice 4e remains
+  `BLOCKED` — inherited from `BLOCKED_BY_MANAGED_SESSION_INJECTOR`
+  (`invalid_cookies_json`, missing
+  `LOVABLE_BROWSER_SUPABASE_COOKIES_JSON`). Will be re-run when the
+  managed session becomes available. No fabricated authenticated
+  proof was recorded.
+- No schema, RLS, migration, Edge, auth, storage-policy, AI, device,
+  or Action Queue write-path changes in this slice.
+

@@ -148,4 +148,53 @@ describe("controlled reporter", () => {
     expect(r.corruptLines).toHaveLength(1);
     expect(r.batches).toHaveLength(1);
   });
+
+  it("constructor options take precedence over VERDANT_CTRL_* env vars", () => {
+    // Regression: on Linux CI, the child vitest process has
+    // VERDANT_CTRL_REPO_ROOT exported to the runner cwd. If env wins over
+    // an explicit `repoRoot` option, path.relative() produces "../.."
+    // strings and every downstream lookup for "src/*.test.ts" returns
+    // undefined.
+    const prev = {
+      repo: process.env.VERDANT_CTRL_REPO_ROOT,
+      run: process.env.VERDANT_CTRL_RUN_ID,
+      idx: process.env.VERDANT_CTRL_SHARD_INDEX,
+    };
+    process.env.VERDANT_CTRL_REPO_ROOT = "/some/other/root";
+    process.env.VERDANT_CTRL_RUN_ID = "env-run";
+    process.env.VERDANT_CTRL_SHARD_INDEX = "9";
+    try {
+      const dir = scratch();
+      const progress = path.join(dir, "progress.jsonl");
+      const r = new Reporter({
+        progressFile: progress,
+        runId: "opt-run",
+        shardIndex: 1,
+        shardTotal: 2,
+        batchIndex: 0,
+        repoRoot: "/repo",
+      });
+      r.onTestModuleEnd(
+        fileTask({
+          filepath: "/repo/src/a.test.ts",
+          state: "pass",
+          tests: [{ name: "ok", state: "pass" }],
+        }),
+      );
+      r.onFinished([], []);
+      const { files } = readProgress(progress);
+      // Path is normalized against the option, not the env.
+      expect(files.get("src/a.test.ts")?.status).toBe("passed");
+      // Ids also come from the options.
+      expect(files.get("src/a.test.ts")?.runId).toBe("opt-run");
+      expect(files.get("src/a.test.ts")?.shardIndex).toBe(1);
+    } finally {
+      if (prev.repo === undefined) delete process.env.VERDANT_CTRL_REPO_ROOT;
+      else process.env.VERDANT_CTRL_REPO_ROOT = prev.repo;
+      if (prev.run === undefined) delete process.env.VERDANT_CTRL_RUN_ID;
+      else process.env.VERDANT_CTRL_RUN_ID = prev.run;
+      if (prev.idx === undefined) delete process.env.VERDANT_CTRL_SHARD_INDEX;
+      else process.env.VERDANT_CTRL_SHARD_INDEX = prev.idx;
+    }
+  });
 });

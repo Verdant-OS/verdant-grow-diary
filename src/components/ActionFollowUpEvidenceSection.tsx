@@ -56,6 +56,14 @@ export interface ActionFollowUpEvidenceSectionProps {
   action: ActionFollowUpEvidenceSectionAction;
   /** Optional service injection for tests. */
   save?: (draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>;
+  /** Slice 4b: injectable Manual snapshot candidate loader (tests). */
+  loadCandidates?: (ctx: {
+    growId: string;
+    tentId: string | null;
+    plantId: string | null;
+  }) => Promise<ManualSensorCandidateLoadResult>;
+  /** Slice 4b: injectable single-snapshot loader for existing evidence (tests). */
+  loadSnapshotById?: (id: string) => Promise<ManualSnapshotTimelineCard | null>;
 }
 
 type QueryState =

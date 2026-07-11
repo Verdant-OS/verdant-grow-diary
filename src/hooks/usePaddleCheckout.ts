@@ -160,6 +160,22 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
     [navigate, user],
   );
 
+  // Slice C: auto-resume a pending plan intent EXACTLY ONCE after auth.
+  // Guarded with a ref so React StrictMode's double-invoke, rerenders, and
+  // rapid re-mounts cannot re-open the overlay. `consumePlanIntent` is
+  // itself destructive (read + delete), so the storage-side guarantee is
+  // one-shot even if the ref were bypassed.
+  const resumeAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (resumeAttemptedRef.current) return;
+    if (!user) return;
+    if (unavailable) return;
+    const pending = consumePlanIntent();
+    if (!pending) return;
+    resumeAttemptedRef.current = true;
+    void openCheckout({ priceId: pending });
+  }, [user, unavailable, openCheckout]);
+
   return {
     openCheckout,
     loading,

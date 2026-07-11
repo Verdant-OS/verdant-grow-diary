@@ -20,10 +20,17 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import InfoPopover, { HELP_COPY } from "@/components/InfoPopover";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import PlantPhoto from "@/components/PlantPhoto";
 import type { GrowDataSourceMeta } from "@/hooks/useGrowData";
+
+function renderWithQC(node: ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>);
+}
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -194,14 +201,14 @@ describe("Plants page wiring", () => {
 
 describe("PlantPhoto placeholder copy", () => {
   it("renders 'No plant photo yet' caption", () => {
-    render(<PlantPhoto src={null} caption="No plant photo yet" />);
+    renderWithQC(<PlantPhoto src={null} caption="No plant photo yet" />);
     expect(screen.getByTestId("plant-photo-placeholder-caption")).toHaveTextContent(
       /no plant photo yet/i,
     );
   });
 
   it("renders 'Add photo' CTA copy", () => {
-    render(<PlantPhoto src={null} caption="No plant photo yet" />);
+    renderWithQC(<PlantPhoto src={null} caption="No plant photo yet" />);
     expect(screen.getByTestId("plant-photo-placeholder-cta")).toHaveTextContent(
       /add photo/i,
     );

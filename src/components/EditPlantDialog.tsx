@@ -34,6 +34,8 @@ import {
   uploadPlantProfilePhoto,
   removeUploadedPlantProfilePhoto,
 } from "@/lib/plantProfilePhotoUploadService";
+import { usePlantProfilePhotoPreview } from "@/hooks/usePlantProfilePhotoPreview";
+import PlantProfilePhotoPreview from "@/components/PlantProfilePhotoPreview";
 
 /**
  * Edits an existing plant's user-facing fields. Profile photo is now

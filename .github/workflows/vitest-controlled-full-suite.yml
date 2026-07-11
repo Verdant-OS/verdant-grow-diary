@@ -1,0 +1,135 @@
+name: Vitest Controlled Full Suite (manual)
+
+# Manual, matrix-sharded, resumable full-suite runner.
+# Every shard runs identically to the Slice G.1j controlled command:
+#   bunx vitest run --pool=forks --maxWorkers=8 --minWorkers=2
+# Sharding + per-file progress + strict aggregate coverage are enforced
+# by scripts/vitest-controlled/cli.mjs. This workflow does NOT replace
+# ci.yml PR gates.
+
+on:
+  workflow_dispatch:
+    inputs:
+      shard_total:
+        description: "Total shards (matrix size)"
+        required: false
+        default: "16"
+
+permissions:
+  contents: read
+
+jobs:
+  controlled-shard:
+    name: Controlled shard ${{ matrix.shard }}/16
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    steps:
+      - name: Guard — shard_total must equal 16
+        run: |
+          if [ "${{ inputs.shard_total }}" != "16" ]; then
+            echo "::error::This workflow's matrix runs exactly 16 shards; set shard_total=16."
+            exit 1
+          fi
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+      - name: Install (frozen lockfile)
+        run: bun install --frozen-lockfile
+      - name: Run controlled shard ${{ matrix.shard }}/16
+        run: |
+          node scripts/vitest-controlled/cli.mjs run \
+            --shard ${{ matrix.shard }}/16 \
+            --batch-size 30 \
+            --runs-root .vitest-runs
+      - name: Locate shard run directory
+        if: always()
+        id: locate
+        run: |
+          set -euo pipefail
+          RUN_DIR=$(ls -1dt .vitest-runs/*-s${{ matrix.shard }}of16-* | head -n1)
+          echo "run_dir=$RUN_DIR" >> "$GITHUB_OUTPUT"
+          echo "Located: $RUN_DIR"
+      - name: Regenerate summary
+        if: always()
+        run: node scripts/vitest-controlled/cli.mjs summarize --run-dir "${{ steps.locate.outputs.run_dir }}" --json > "${{ steps.locate.outputs.run_dir }}/summary.stdout.json" || true
+      - name: Upload shard artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: vitest-controlled-shard-${{ matrix.shard }}
+          path: |
+            ${{ steps.locate.outputs.run_dir }}/run.json
+            ${{ steps.locate.outputs.run_dir }}/manifest.json
+            ${{ steps.locate.outputs.run_dir }}/shard-files.json
+            ${{ steps.locate.outputs.run_dir }}/progress.jsonl
+            ${{ steps.locate.outputs.run_dir }}/summary.json
+            ${{ steps.locate.outputs.run_dir }}/summary.md
+            ${{ steps.locate.outputs.run_dir }}/exit-code
+            ${{ steps.locate.outputs.run_dir }}/completed
+            ${{ steps.locate.outputs.run_dir }}/run-meta
+            ${{ steps.locate.outputs.run_dir }}/raw/**
+
+  controlled-aggregate:
+    name: Aggregate controlled shards
+    runs-on: ubuntu-latest
+    needs: controlled-shard
+    if: always()
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+      - name: Install (frozen lockfile)
+        run: bun install --frozen-lockfile
+      - name: Download all shard artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: shard-artifacts
+      - name: Rebuild expected manifest
+        run: node scripts/vitest-controlled/cli.mjs manifest > expected-manifest.json
+      - name: Aggregate
+        id: aggregate
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          DIRS=(shard-artifacts/vitest-controlled-shard-*)
+          echo "Aggregating ${#DIRS[@]} shard directories"
+          node scripts/vitest-controlled/cli.mjs aggregate \
+            --manifest expected-manifest.json \
+            "${DIRS[@]}" > aggregate.json
+          STATUS=$(node -e "console.log(JSON.parse(require('fs').readFileSync('aggregate.json','utf8')).status)")
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          {
+            echo "# Vitest controlled full suite — aggregate"
+            echo ""
+            echo "**Status:** \`$STATUS\`"
+            echo ""
+            echo '```json'
+            cat aggregate.json
+            echo ''
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload aggregate report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: vitest-controlled-aggregate
+          path: |
+            aggregate.json
+            expected-manifest.json
+      - name: Fail unless aggregate status is complete
+        run: |
+          if [ "${{ steps.aggregate.outputs.status }}" != "complete" ]; then
+            echo "::error::Aggregate status is ${{ steps.aggregate.outputs.status }}"
+            exit 1
+          fi

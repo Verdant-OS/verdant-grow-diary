@@ -295,3 +295,39 @@ describe("static safety — recovery-loop surface", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// F. Prefocus wiring — the recovery CTA lands the grower on the status chips
+// ---------------------------------------------------------------------------
+
+describe("prefocus — status-check CTA opens Quick Log focused on Better/Same/Worse", () => {
+  const QUICK_LOG = read("src/components/PlantQuickLog.tsx");
+  const PLANT_DETAIL = read("src/pages/PlantDetail.tsx");
+
+  it("PlantQuickLog exposes an opt-in focus flag and focuses the response section on open", () => {
+    expect(QUICK_LOG).toMatch(/focusResponseCheckOnOpen\?:\s*boolean/);
+    // The effect keys on (open, focusResponseCheckOnOpen) and focuses the
+    // response section ref — focus only, never a chip selection.
+    expect(QUICK_LOG).toMatch(/responseSectionRef/);
+    expect(QUICK_LOG).toMatch(/\[open,\s*focusResponseCheckOnOpen\]/);
+    expect(QUICK_LOG).toMatch(/responseSectionRef\.current/);
+    // The response section is the focus target and is programmatically focusable.
+    const sectionIdx = QUICK_LOG.indexOf('data-testid="plant-quick-log-response-section"');
+    const refBlock = QUICK_LOG.slice(sectionIdx - 400, sectionIdx);
+    expect(refBlock).toMatch(/ref=\{responseSectionRef\}/);
+    expect(refBlock).toMatch(/tabIndex=\{-1\}/);
+    // Focus, not selection: no chip is pre-clicked.
+    expect(QUICK_LOG).not.toMatch(/handleResponseCheck\((["'])(Better|Same|Worse)\1\).*onOpen/);
+  });
+
+  it("PlantDetail wires the flag ONLY through the status-check CTA and resets it on close", () => {
+    // The missed-log recovery / follow-up CTA sets the focus intent.
+    expect(PLANT_DETAIL).toMatch(/onAddQuickCheck=\{[\s\S]*setQuickLogFocusResponse\(true\)[\s\S]*setQuickLogOpen\(true\)/);
+    // The sheet receives the flag and clears it on close (so unrelated opens
+    // — photo upload, sensor update — never hijack focus to the chips).
+    expect(PLANT_DETAIL).toMatch(/focusResponseCheckOnOpen=\{quickLogFocusResponse\}/);
+    expect(PLANT_DETAIL).toMatch(/if \(!o\) setQuickLogFocusResponse\(false\)/);
+    // The non-status open triggers do NOT set the focus flag.
+    expect(PLANT_DETAIL).toMatch(/onUploadPhoto=\{\(\) => setQuickLogOpen\(true\)\}/);
+  });
+});

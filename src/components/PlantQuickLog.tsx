@@ -60,6 +60,12 @@ interface Props {
   growId: string | null;
   tentId?: string | null;
   onSaved?: () => void;
+  /**
+   * When true and the sheet opens, scroll to and focus the Better/Same/Worse
+   * response section — used by the missed-log recovery / follow-up prompts so
+   * a tired grower lands on the status chips. Focus only, never a selection.
+   */
+  focusResponseCheckOnOpen?: boolean;
 }
 
 const EMPTY_SENSORS: QuickLogSensorInput = { temp: "", humidity: "", ph: "", ec: "" };
@@ -87,9 +93,11 @@ export default function PlantQuickLog({
   growId,
   tentId,
   onSaved,
+  focusResponseCheckOnOpen,
 }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const responseSectionRef = useRef<HTMLElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const libraryFileRef = useRef<HTMLInputElement | null>(null);
   const { data: logs } = usePlantManualSensorLogs(open ? plantId : null);
@@ -101,6 +109,28 @@ export default function PlantQuickLog({
   const [sensors, setSensors] = useState<QuickLogSensorInput>(EMPTY_SENSORS);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Missed-log recovery / follow-up prompts open this sheet with the intent
+  // to record a status. Land the tired grower on the Better/Same/Worse
+  // section (scroll + focus). Focus only — never pre-selects a chip.
+  useEffect(() => {
+    if (!open || !focusResponseCheckOnOpen) return;
+    const el = responseSectionRef.current;
+    if (!el || typeof window === "undefined") return;
+    const raf = window.requestAnimationFrame(() => {
+      try {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch {
+        /* noop */
+      }
+      try {
+        el.focus({ preventScroll: true });
+      } catch {
+        /* noop */
+      }
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [open, focusResponseCheckOnOpen]);
 
   const currentCapturedAt = useMemo(() => new Date().toISOString(), [open, logs]);
 
@@ -383,7 +413,9 @@ export default function PlantQuickLog({
           </section>
 
           <section
-            className="grid gap-3 rounded-xl border border-border/50 bg-secondary/10 p-3"
+            ref={responseSectionRef}
+            tabIndex={-1}
+            className="grid gap-3 rounded-xl border border-border/50 bg-secondary/10 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-labelledby="plant-quick-log-response-heading"
             data-testid="plant-quick-log-response-section"
           >

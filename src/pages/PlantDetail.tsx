@@ -233,6 +233,9 @@ function ArchivedTimelineReadOnlyView({
 
 export default function PlantDetail() {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
+  // Set only by the status-check CTAs (missed-log recovery / follow-up) so
+  // Quick Log opens focused on the Better/Same/Worse chips. Reset on close.
+  const [quickLogFocusResponse, setQuickLogFocusResponse] = useState(false);
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const contextTentId = searchParams.get("tentId");
@@ -446,7 +449,10 @@ export default function PlantDetail() {
       />
       <PlantDetailRecentActivityRecap
         plantId={plant.id}
-        onAddQuickCheck={() => setQuickLogOpen(true)}
+        onAddQuickCheck={() => {
+          setQuickLogFocusResponse(true);
+          setQuickLogOpen(true);
+        }}
       />
       <PlantDetailHarvestWatchCard
         plantId={plant.id}
@@ -661,11 +667,15 @@ export default function PlantDetail() {
           </div>
           <PlantQuickLog
             open={quickLogOpen}
-            onOpenChange={setQuickLogOpen}
+            onOpenChange={(o) => {
+              setQuickLogOpen(o);
+              if (!o) setQuickLogFocusResponse(false);
+            }}
             plantId={plant.id}
             plantName={plant.name}
             growId={plant.growId ?? null}
             tentId={plant.tentId ?? null}
+            focusResponseCheckOnOpen={quickLogFocusResponse}
           />
           <PlantManualSensorFreshnessCard
             plantId={plant.id}

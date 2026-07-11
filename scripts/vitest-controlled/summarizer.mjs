@@ -256,12 +256,9 @@ export function aggregateShards(shardSummaries, { manifest } = {}) {
       }
     }
   }
-  const missingFiles = manifest
-    ? manifest.files.filter((f) => !seen.has(f))
-    : [];
+  const missingFiles = manifest ? manifest.files.filter((f) => !seen.has(f)) : [];
   const shardsAgree =
-    shardManifestHashes.size <= 1 &&
-    (shardFingerprints.size === 0 || shardFingerprints.size === 1);
+    shardManifestHashes.size <= 1 && (shardFingerprints.size === 0 || shardFingerprints.size === 1);
   let status;
   if (
     duplicates.length ||

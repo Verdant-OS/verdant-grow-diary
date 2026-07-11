@@ -27,15 +27,15 @@ additional controlled command used for the full suite and the manual
 
 ## Files
 
-| Path | Purpose |
-|---|---|
-| `scripts/vitest-controlled/manifest.mjs` | Deterministic file discovery + hashing |
-| `scripts/vitest-controlled/sharding.mjs` | Shard math + batch splitting |
-| `scripts/vitest-controlled/fingerprint.mjs` | Source-fingerprint helpers |
-| `scripts/vitest-controlled/reporter.mjs` | Vitest reporter emitting JSONL events |
-| `scripts/vitest-controlled/summarizer.mjs` | Structured summary + aggregate helpers |
-| `scripts/vitest-controlled/cli.mjs` | CLI dispatcher |
-| `.github/workflows/vitest-controlled-full-suite.yml` | Manual matrix runner |
+| Path                                                 | Purpose                                |
+| ---------------------------------------------------- | -------------------------------------- |
+| `scripts/vitest-controlled/manifest.mjs`             | Deterministic file discovery + hashing |
+| `scripts/vitest-controlled/sharding.mjs`             | Shard math + batch splitting           |
+| `scripts/vitest-controlled/fingerprint.mjs`          | Source-fingerprint helpers             |
+| `scripts/vitest-controlled/reporter.mjs`             | Vitest reporter emitting JSONL events  |
+| `scripts/vitest-controlled/summarizer.mjs`           | Structured summary + aggregate helpers |
+| `scripts/vitest-controlled/cli.mjs`                  | CLI dispatcher                         |
+| `.github/workflows/vitest-controlled-full-suite.yml` | Manual matrix runner                   |
 
 ## Commands
 

@@ -108,7 +108,7 @@ export default class VerdantControlledReporter {
       duration: fileTask.result?.duration ?? null,
       failedTests: failedNames,
       firstError: failedNames.length
-        ? tests.find((t) => t.state === "fail")?.error ?? null
+        ? (tests.find((t) => t.state === "fail")?.error ?? null)
         : null,
       completedAt: nowIso(),
     });

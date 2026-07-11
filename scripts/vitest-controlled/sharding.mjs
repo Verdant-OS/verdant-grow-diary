@@ -18,7 +18,13 @@ export function parseShardSpec(spec) {
   if (!match) throw new Error(`Invalid shard spec: "${spec}" (expected "N/M")`);
   const index = Number(match[1]);
   const total = Number(match[2]);
-  if (!Number.isInteger(index) || !Number.isInteger(total) || total < 1 || index < 1 || index > total) {
+  if (
+    !Number.isInteger(index) ||
+    !Number.isInteger(total) ||
+    total < 1 ||
+    index < 1 ||
+    index > total
+  ) {
     throw new Error(`Invalid shard spec: "${spec}" (index=${index}, total=${total})`);
   }
   return { index, total };
@@ -73,7 +79,8 @@ export function assertShardCoverage(manifestFiles, shards) {
   }
   const missing = [...expected].filter((f) => !seen.has(f));
   const extra = [...seen].filter((f) => !expected.has(f));
-  if (missing.length) throw new Error(`Shard coverage missing files: ${missing.slice(0, 5).join(", ")}`);
+  if (missing.length)
+    throw new Error(`Shard coverage missing files: ${missing.slice(0, 5).join(", ")}`);
   if (extra.length) throw new Error(`Shard coverage extra files: ${extra.slice(0, 5).join(", ")}`);
   return true;
 }

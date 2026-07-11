@@ -18,10 +18,19 @@ function mkRun({
   files,
   completed = true,
   exitCode = 0,
-}: { files: MkFile[]; completed?: boolean; exitCode?: number }) {
+}: {
+  files: MkFile[];
+  completed?: boolean;
+  exitCode?: number;
+}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vc-sum-"));
   fs.mkdirSync(path.join(dir, "raw"), { recursive: true });
-  const manifest = { schema: 1, hash: "h".repeat(64), count: files.length, files: files.map((f) => f.file) };
+  const manifest = {
+    schema: 1,
+    hash: "h".repeat(64),
+    count: files.length,
+    files: files.map((f) => f.file),
+  };
   fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify(manifest));
   fs.writeFileSync(
     path.join(dir, "run.json"),
@@ -111,22 +120,54 @@ describe("summarizer", () => {
   });
 
   it("aggregate detects duplicate file across shards", () => {
-    const shardA = { shardIndex: 1, sourceFingerprint: "f", manifestHash: "m", status: "complete", perFile: [
-      { file: "src/a.test.ts", status: "passed", counts: { passed: 1, failed: 0, skipped: 0, todo: 0 } },
-    ]};
-    const shardB = { shardIndex: 2, sourceFingerprint: "f", manifestHash: "m", status: "complete", perFile: [
-      { file: "src/a.test.ts", status: "passed", counts: { passed: 1, failed: 0, skipped: 0, todo: 0 } },
-    ]};
+    const shardA = {
+      shardIndex: 1,
+      sourceFingerprint: "f",
+      manifestHash: "m",
+      status: "complete",
+      perFile: [
+        {
+          file: "src/a.test.ts",
+          status: "passed",
+          counts: { passed: 1, failed: 0, skipped: 0, todo: 0 },
+        },
+      ],
+    };
+    const shardB = {
+      shardIndex: 2,
+      sourceFingerprint: "f",
+      manifestHash: "m",
+      status: "complete",
+      perFile: [
+        {
+          file: "src/a.test.ts",
+          status: "passed",
+          counts: { passed: 1, failed: 0, skipped: 0, todo: 0 },
+        },
+      ],
+    };
     const agg = aggregateShards([shardA, shardB], { manifest: { files: ["src/a.test.ts"] } });
     expect(agg.status).toBe("invalid");
     expect(agg.duplicates).toHaveLength(1);
   });
 
   it("aggregate detects missing files vs manifest", () => {
-    const shardA = { shardIndex: 1, sourceFingerprint: "f", manifestHash: "m", status: "complete", perFile: [
-      { file: "src/a.test.ts", status: "passed", counts: { passed: 1, failed: 0, skipped: 0, todo: 0 } },
-    ]};
-    const agg = aggregateShards([shardA], { manifest: { files: ["src/a.test.ts", "src/b.test.ts"] } });
+    const shardA = {
+      shardIndex: 1,
+      sourceFingerprint: "f",
+      manifestHash: "m",
+      status: "complete",
+      perFile: [
+        {
+          file: "src/a.test.ts",
+          status: "passed",
+          counts: { passed: 1, failed: 0, skipped: 0, todo: 0 },
+        },
+      ],
+    };
+    const agg = aggregateShards([shardA], {
+      manifest: { files: ["src/a.test.ts", "src/b.test.ts"] },
+    });
     expect(agg.status).toBe("invalid");
     expect(agg.missingFiles).toEqual(["src/b.test.ts"]);
   });
@@ -137,11 +178,33 @@ describe("summarizer", () => {
       sourceFingerprint: fp,
       manifestHash: "same",
       status: "complete",
-      perFile: [{ file: "src/a.test.ts", status: "passed", counts: { passed: 1, failed: 0, skipped: 0, todo: 0 } }],
+      perFile: [
+        {
+          file: "src/a.test.ts",
+          status: "passed",
+          counts: { passed: 1, failed: 0, skipped: 0, todo: 0 },
+        },
+      ],
     });
-    const agg = aggregateShards([base("f1"), { ...base("f2"), shardIndex: 2, perFile: [{ file: "src/b.test.ts", status: "passed", counts: { passed: 1, failed: 0, skipped: 0, todo: 0 } }] }], {
-      manifest: { files: ["src/a.test.ts", "src/b.test.ts"] },
-    });
+    const agg = aggregateShards(
+      [
+        base("f1"),
+        {
+          ...base("f2"),
+          shardIndex: 2,
+          perFile: [
+            {
+              file: "src/b.test.ts",
+              status: "passed",
+              counts: { passed: 1, failed: 0, skipped: 0, todo: 0 },
+            },
+          ],
+        },
+      ],
+      {
+        manifest: { files: ["src/a.test.ts", "src/b.test.ts"] },
+      },
+    );
     expect(agg.status).toBe("invalid");
   });
 });

@@ -122,15 +122,16 @@ describe("controlled reporter", () => {
       firstError: null,
       completedAt: "now",
     };
-    fs.writeFileSync(
-      progress,
-      JSON.stringify(base) + "\n" + JSON.stringify(base) + "\n",
-    );
+    fs.writeFileSync(progress, JSON.stringify(base) + "\n" + JSON.stringify(base) + "\n");
     let r = readProgress(progress);
     expect(r.conflicts).toHaveLength(0);
     expect(r.files.size).toBe(1);
 
-    const conflict = { ...base, status: "failed", counts: { passed: 0, failed: 1, skipped: 0, todo: 0 } };
+    const conflict = {
+      ...base,
+      status: "failed",
+      counts: { passed: 0, failed: 1, skipped: 0, todo: 0 },
+    };
     fs.appendFileSync(progress, JSON.stringify(conflict) + "\n");
     r = readProgress(progress);
     expect(r.conflicts).toHaveLength(1);
@@ -139,7 +140,10 @@ describe("controlled reporter", () => {
   it("reports corrupt JSONL lines without crashing", () => {
     const dir = scratch();
     const progress = path.join(dir, "progress.jsonl");
-    fs.writeFileSync(progress, "not-json\n" + JSON.stringify({ event: "batch-end", schema: 1 }) + "\n");
+    fs.writeFileSync(
+      progress,
+      "not-json\n" + JSON.stringify({ event: "batch-end", schema: 1 }) + "\n",
+    );
     const r = readProgress(progress);
     expect(r.corruptLines).toHaveLength(1);
     expect(r.batches).toHaveLength(1);

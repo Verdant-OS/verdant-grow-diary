@@ -28,11 +28,7 @@ describe("vitest-controlled manifest", () => {
   it("discovers only include-pattern matches and sorts deterministically", () => {
     const root = scratchRepo();
     const files = discoverTestFiles(root);
-    expect(files).toEqual([
-      "src/a/deep/three.test.tsx",
-      "src/a/one.test.ts",
-      "src/a/two.spec.tsx",
-    ]);
+    expect(files).toEqual(["src/a/deep/three.test.tsx", "src/a/one.test.ts", "src/a/two.spec.tsx"]);
   });
 
   it("normalizes Windows-style separators", () => {
@@ -65,8 +61,8 @@ describe("vitest-controlled manifest", () => {
   });
 
   it("assertManifestIncludeParity rejects entries outside include root", () => {
-    expect(() =>
-      assertManifestIncludeParity({ files: ["scripts/other.test.ts"] }),
-    ).toThrow(/outside include root/);
+    expect(() => assertManifestIncludeParity({ files: ["scripts/other.test.ts"] })).toThrow(
+      /outside include root/,
+    );
   });
 });

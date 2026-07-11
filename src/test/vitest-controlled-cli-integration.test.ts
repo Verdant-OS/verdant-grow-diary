@@ -4,12 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { EventEmitter } from "node:events";
-import {
-  commandRun,
-  commandResume,
-  DEFAULTS,
-  EXIT,
-} from "../../scripts/vitest-controlled/cli.mjs";
+import { commandRun, commandResume, DEFAULTS, EXIT } from "../../scripts/vitest-controlled/cli.mjs";
 import { readProgress } from "../../scripts/vitest-controlled/summarizer.mjs";
 
 // Build a fake repo containing test files that will never actually be
@@ -55,7 +50,10 @@ function makeSpawnStub({
     setImmediate(() => {
       try {
         for (const rel of fileArgs) {
-          const relFromRoot = path.relative(repoRoot, path.resolve(repoRoot, rel)).split(path.sep).join("/");
+          const relFromRoot = path
+            .relative(repoRoot, path.resolve(repoRoot, rel))
+            .split(path.sep)
+            .join("/");
           const status = writeStatus(relFromRoot);
           fs.appendFileSync(
             progressFile,
@@ -68,7 +66,12 @@ function makeSpawnStub({
               batchIndex,
               file: relFromRoot,
               status,
-              counts: { passed: status === "passed" ? 1 : 0, failed: status === "failed" ? 1 : 0, skipped: 0, todo: 0 },
+              counts: {
+                passed: status === "passed" ? 1 : 0,
+                failed: status === "failed" ? 1 : 0,
+                skipped: 0,
+                todo: 0,
+              },
               failedTests: status === "failed" ? ["broken"] : [],
               firstError: status === "failed" ? "boom" : null,
               completedAt: new Date().toISOString(),
@@ -77,7 +80,16 @@ function makeSpawnStub({
         }
         fs.appendFileSync(
           progressFile,
-          JSON.stringify({ event: "batch-end", schema: 1, runId, shardIndex, shardTotal, batchIndex, errorCount: 0, completedAt: "now" }) + "\n",
+          JSON.stringify({
+            event: "batch-end",
+            schema: 1,
+            runId,
+            shardIndex,
+            shardTotal,
+            batchIndex,
+            errorCount: 0,
+            completedAt: "now",
+          }) + "\n",
         );
         // Simulate crash by never emitting exit if crashAfter reached
         if (crashAfter !== undefined && thisBatch >= crashAfter) {
@@ -117,7 +129,9 @@ describe("controlled runner CLI (stubbed vitest)", () => {
   it("failed file: exit 1 and summary.status=failed", async () => {
     const { root, files } = fakeRepo(4);
     const runsRoot = path.join(root, ".vitest-runs");
-    const { stub } = makeSpawnStub({ writeStatus: (f) => (f.endsWith("f02.test.ts") ? "failed" : "passed") });
+    const { stub } = makeSpawnStub({
+      writeStatus: (f) => (f.endsWith("f02.test.ts") ? "failed" : "passed"),
+    });
     const res = await commandRun({
       repoRoot: root,
       shardSpec: "1/1",

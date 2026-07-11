@@ -17,12 +17,7 @@ import crypto from "node:crypto";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildManifest, discoverTestFiles, MANIFEST_SCHEMA_VERSION } from "./manifest.mjs";
-import {
-  parseShardSpec,
-  assignShard,
-  splitIntoBatches,
-  shardFingerprint,
-} from "./sharding.mjs";
+import { parseShardSpec, assignShard, splitIntoBatches, shardFingerprint } from "./sharding.mjs";
 import {
   computeSourceFingerprint,
   computeDirtyTreeHash,
@@ -30,12 +25,7 @@ import {
   FINGERPRINT_SCHEMA_VERSION,
 } from "./fingerprint.mjs";
 import { REPORTER_SCHEMA_VERSION } from "./reporter.mjs";
-import {
-  summarizeRun,
-  renderMarkdown,
-  aggregateShards,
-  readProgress,
-} from "./summarizer.mjs";
+import { summarizeRun, renderMarkdown, aggregateShards, readProgress } from "./summarizer.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -282,7 +272,13 @@ export async function commandRun(opts, deps = {}) {
 
 /** Public: resume a run (subcommand `resume`). */
 export async function commandResume(opts, deps = {}) {
-  const { repoRoot, runDir, batchDeadlineMs = DEFAULTS.batchDeadlineMs, vitestBin, spawnImpl } = opts;
+  const {
+    repoRoot,
+    runDir,
+    batchDeadlineMs = DEFAULTS.batchDeadlineMs,
+    vitestBin,
+    spawnImpl,
+  } = opts;
   const { runRecord, manifest, shardFiles } = loadRun(runDir);
   // Re-validate fingerprint.
   const currentFingerprint = computeSourceFingerprint(repoRoot, {
@@ -307,9 +303,11 @@ export async function commandResume(opts, deps = {}) {
     );
   }
   const batches = splitIntoBatches(shardFiles, runRecord.batchSize);
-  const { files: doneMap, conflicts, corruptLines } = readProgress(
-    path.join(runDir, "progress.jsonl"),
-  );
+  const {
+    files: doneMap,
+    conflicts,
+    corruptLines,
+  } = readProgress(path.join(runDir, "progress.jsonl"));
   if (conflicts.length || corruptLines.length) {
     throw Object.assign(
       new Error(
@@ -321,13 +319,26 @@ export async function commandResume(opts, deps = {}) {
   const incompleteFilter = (file) => !doneMap.has(file);
   return executeBatches(
     { runId: runRecord.runId, runDir, runRecord, shardFiles, batches },
-    { repoRoot, batchDeadlineMs, vitestBin, spawnImpl, filesFilter: incompleteFilter, resumeMode: "resume" },
+    {
+      repoRoot,
+      batchDeadlineMs,
+      vitestBin,
+      spawnImpl,
+      filesFilter: incompleteFilter,
+      resumeMode: "resume",
+    },
   );
 }
 
 /** Public: rerun only failed files. Preserves prior progress separately. */
 export async function commandRerunFailed(opts, deps = {}) {
-  const { repoRoot, runDir, batchDeadlineMs = DEFAULTS.batchDeadlineMs, vitestBin, spawnImpl } = opts;
+  const {
+    repoRoot,
+    runDir,
+    batchDeadlineMs = DEFAULTS.batchDeadlineMs,
+    vitestBin,
+    spawnImpl,
+  } = opts;
   const { runRecord, manifest, shardFiles } = loadRun(runDir);
   const { files: doneMap } = readProgress(path.join(runDir, "progress.jsonl"));
   const failed = [...doneMap.values()].filter((e) => e.status === "failed").map((e) => e.file);
@@ -349,7 +360,10 @@ export async function commandRerunFailed(opts, deps = {}) {
     manifest,
   });
   // Overwrite shard files to just the failed set for this rerun.
-  fs.writeFileSync(path.join(initialized.runDir, "shard-files.json"), JSON.stringify(failed, null, 2));
+  fs.writeFileSync(
+    path.join(initialized.runDir, "shard-files.json"),
+    JSON.stringify(failed, null, 2),
+  );
   initialized.shardFiles = failed;
   initialized.batches = splitIntoBatches(failed, runRecord.batchSize);
   return executeBatches(initialized, {
@@ -362,7 +376,10 @@ export async function commandRerunFailed(opts, deps = {}) {
   });
 }
 
-async function executeBatches(state, { repoRoot, batchDeadlineMs, vitestBin, spawnImpl, filesFilter, resumeMode }) {
+async function executeBatches(
+  state,
+  { repoRoot, batchDeadlineMs, vitestBin, spawnImpl, filesFilter, resumeMode },
+) {
   const { runDir, runRecord, batches } = state;
   let interrupted = false;
   const onSig = () => {
@@ -453,7 +470,9 @@ async function main(argv, { repoRoot = process.cwd() } = {}) {
   if (sub === "run") {
     const shardSpec = args.flags.shard || "1/1";
     const batchSize = Number(args.flags["batch-size"] ?? DEFAULTS.batchSize);
-    const runsRoot = args.flags["runs-root"] ? path.resolve(args.flags["runs-root"]) : path.resolve(repoRoot, DEFAULTS.runsRoot);
+    const runsRoot = args.flags["runs-root"]
+      ? path.resolve(args.flags["runs-root"])
+      : path.resolve(repoRoot, DEFAULTS.runsRoot);
     const batchDeadlineMs = Number(args.flags["batch-deadline-ms"] ?? DEFAULTS.batchDeadlineMs);
     const { exit, runDir, summary } = await commandRun({
       repoRoot,
@@ -501,8 +520,7 @@ async function main(argv, { repoRoot = process.cwd() } = {}) {
   return EXIT.CONFIG_ERROR;
 }
 
-const invokedDirectly =
-  process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+const invokedDirectly = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
 if (invokedDirectly) {
   main(process.argv.slice(2)).then(
     (code) => process.exit(code),

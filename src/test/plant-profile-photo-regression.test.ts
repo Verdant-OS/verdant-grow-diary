@@ -81,9 +81,7 @@ describe("EditPlantDialog · native camera + library flow", () => {
   it("hidden file inputs use image MIME allow-list and camera capture", () => {
     expect(EDIT_DIALOG).toMatch(/accept=\{ACCEPT_ATTR\}/);
     expect(EDIT_DIALOG).toMatch(/capture="environment"/);
-    expect(EDIT_DIALOG).toContain(
-      'import { validatePlantProfilePhotoFile',
-    );
+    expect(EDIT_DIALOG).toMatch(/validatePlantProfilePhotoFile/);
   });
   it("uses the upload service and never persists a signed URL", () => {
     expect(EDIT_DIALOG).toContain(

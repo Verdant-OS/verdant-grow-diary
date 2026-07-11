@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "check:lockfile": "node scripts/check-bun-lockfile-policy.mjs",
+    "plant-photos:cleanup": "node scripts/admin/plant-photos-cleanup.mjs",
     "check:deps": "node scripts/check-dependency-security.mjs",
     "check:supabase-security": "node scripts/check-supabase-migration-safety.mjs",
     "check:supabase-security:update-baseline": "node scripts/check-supabase-migration-safety.mjs --update-baseline",

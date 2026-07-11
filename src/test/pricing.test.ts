@@ -338,10 +338,10 @@ describe("Safety: no private data on public page", () => {
   });
 });
 
-// Slice F: the /billing/:plan placeholder was retired. The legacy route
-// now redirects to /upgrade via `LegacyBillingRedirect` — see the
+// The /billing/:plan placeholder was retired. The legacy route now
+// redirects to canonical /pricing via `LegacyBillingRedirect` — see
 // `legacy-checkout-redirect.test.ts` and `legacy-billing-redirect-router.test.tsx`
-// suites for the replacement coverage.
+// for the replacement coverage.
 
 describe("Landing links to /pricing", () => {
   it("Landing page links to the public pricing route", () => {

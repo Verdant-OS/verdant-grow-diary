@@ -84,14 +84,73 @@ function makeRunId(shardIndex, shardTotal) {
   return `${utcTimestamp()}-s${shardIndex}of${shardTotal}-${crypto.randomBytes(3).toString("hex")}`;
 }
 
-function toolVersions() {
+const runnerRequire = createRequire(import.meta.url);
+
+/**
+ * Discover the actual Node, Bun, and Vitest runtime versions from the
+ * installed executables and package metadata — never from optional
+ * environment variables (which the workflow may leave unset) and never
+ * by invoking a command that could download a different Vitest.
+ *
+ * Fails closed: a missing Bun executable or missing local Vitest package
+ * throws with EXIT.CONFIG_ERROR so the run cannot proceed with a null
+ * toolchain identity that would silently be reusable.
+ *
+ * Injectable for focused tests via `spawnSyncImpl` and `resolveVitestPkg`.
+ */
+export function discoverToolVersions({ spawnSyncImpl = spawnSync, resolveVitestPkg } = {}) {
+  const node = process.version;
+  let bun;
+  try {
+    const r = spawnSyncImpl("bun", ["--version"], { encoding: "utf8" });
+    if (!r || r.error) throw r?.error ?? new Error("no spawn result");
+    if (r.status !== 0) throw new Error(`bun --version exited ${r.status}`);
+    bun = String(r.stdout ?? "").trim();
+    if (!bun) throw new Error("empty bun --version output");
+  } catch (err) {
+    throw Object.assign(
+      new Error(`Cannot discover Bun version from installed executable: ${err?.message ?? err}`),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  let vitest;
+  try {
+    const pkgPath = resolveVitestPkg
+      ? resolveVitestPkg()
+      : runnerRequire.resolve("vitest/package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+    vitest = pkg.version;
+    if (!vitest || typeof vitest !== "string") throw new Error("missing version field");
+  } catch (err) {
+    throw Object.assign(
+      new Error(`Cannot discover Vitest version from installed package: ${err?.message ?? err}`),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  return { node, bun, vitest };
+}
+
+function toolVersions(discovered) {
   return {
-    node: process.version,
-    bun: process.env.BUN_VERSION || null,
+    node: discovered.node,
+    bun: discovered.bun,
+    vitest: discovered.vitest,
     reporterSchema: REPORTER_SCHEMA_VERSION,
     manifestSchema: MANIFEST_SCHEMA_VERSION,
     fingerprintSchema: FINGERPRINT_SCHEMA_VERSION,
+    configFingerprintSchema: CONFIG_FINGERPRINT_SCHEMA_VERSION,
   };
+}
+
+/** Compare persisted vs current toolchain; return null when identical, else a diff string. */
+export function toolchainMismatch(previous, current) {
+  if (!previous) return "toolchain absent from prior run";
+  const keys = ["node", "bun", "vitest"];
+  const diffs = [];
+  for (const k of keys) {
+    if (previous[k] !== current[k]) diffs.push(`${k}: ${previous[k] ?? "<absent>"} → ${current[k]}`);
+  }
+  return diffs.length ? `toolchain drift: ${diffs.join("; ")}` : null;
 }
 
 /** Prepare a fresh run directory with run.json + manifest.json. */

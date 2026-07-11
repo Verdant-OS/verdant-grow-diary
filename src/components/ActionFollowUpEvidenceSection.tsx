@@ -243,6 +243,8 @@ export default function ActionFollowUpEvidenceSection({
         outcome: values.outcome,
         note: values.note,
         observedAt: values.observedAt,
+        photoReference: values.photoReference,
+        sensorSnapshotId: values.sensorSnapshotId,
       };
       try {
         const result = await saveFn(draft);

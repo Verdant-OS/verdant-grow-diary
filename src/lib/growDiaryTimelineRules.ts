@@ -10,6 +10,7 @@
 
 import { normalizeDiaryEntry, type NormalizedDiaryEntry } from "./diaryEntryRules";
 import { normalizeDiaryNoteText } from "./diaryNoteFormatting";
+import { composeActionFollowUpTitle } from "./actionFollowUpEvidenceViewModel";
 
 // ---------------------------------------------------------------------------
 // Types

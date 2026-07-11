@@ -339,11 +339,6 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/sensors/ingest-normalizer", access: "operator" },
   { path: "/settings", access: "auth" },
   {
-    path: "/health",
-    access: "auth",
-    description: "In-app read-only health check (auth, data reads, diary timeline).",
-  },
-  {
     path: "/settings/agent-integrations",
     access: "auth",
     description: "Agent integrations (MCP) settings.",

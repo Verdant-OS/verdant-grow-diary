@@ -119,14 +119,18 @@ describe("scan-gamification-direct-inserts", () => {
           "supabase.from('nug_events').select('amount').eq('user_id', u);",
         ].join("\n"),
       );
-      // scenario-scoped: only scan the fixture dir so we prove SELECTs
-      // are ignored regardless of the (already-clean) src tree.
-      const hits = scanRoots([dir]);
-      expect(hits).toEqual([]);
+      // Scenario parity with the CLI: `scanRoots(["src", fixtureDir])`.
+      // Cached src findings (∅ on a clean tree; propagated verbatim if
+      // src ever regresses) are merged with the fresh fixture scan so
+      // this test surfaces any src regression the same way the CLI
+      // would — independently of test execution order.
+      const { code } = runScan(dir);
+      expect(code).toBe(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
 
   it("package.json wires the CI script", () => {
     const scripts = (pkg as { scripts: Record<string, string> }).scripts;

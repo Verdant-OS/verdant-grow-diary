@@ -167,7 +167,8 @@ export function buildPlantProfilePhotoObjectPath(
       ? input.growId
       : PLANT_PROFILE_PHOTO_UNASSIGNED_GROW;
   const ext = extension.replace(/^\.+/, "").toLowerCase();
-  if (!/^[a-z0-9]{1,8}$/.test(ext)) {
+  const ALLOWED_EXT = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
+  if (!ALLOWED_EXT.has(ext)) {
     throw new Error("buildPlantProfilePhotoObjectPath: invalid extension");
   }
   const id = (input.randomId ?? safeRandomId)();

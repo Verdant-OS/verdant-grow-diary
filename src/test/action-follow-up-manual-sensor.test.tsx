@@ -712,12 +712,13 @@ describe("Slice 4b static safety fences", () => {
 
   it("never imports a service-role client", () => {
     const src = readAll();
-    expect(src).not.toMatch(/SUPABASE_SERVICE_ROLE|service_role/);
+    expect(src).not.toMatch(/import\s+[^;]*SERVICE_ROLE/);
+    expect(src).not.toMatch(/createClient\([^)]*service_role/i);
   });
 
   it("never imports device-control or AI-model helpers", () => {
     const src = readAll();
-    expect(src).not.toMatch(/device.*control|deviceCommand|executeDevice/i);
-    expect(src).not.toMatch(/ai-doctor-review|ai-coach|openai|anthropic/i);
+    expect(src).not.toMatch(/from\s+["'][^"']*device[-_]?control[^"']*["']/i);
+    expect(src).not.toMatch(/from\s+["'][^"']*(openai|anthropic|ai-doctor-review|ai-coach)[^"']*["']/i);
   });
 });

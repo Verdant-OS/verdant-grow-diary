@@ -226,7 +226,7 @@ export async function saveActionFollowUpEvidence(
     return {
       status: "blocked",
       reason: "invalid_draft",
-      fieldErrors: { form: validation.reason },
+      fieldErrors: { form: (validation as { ok: false; reason: string }).reason },
     };
   }
   const validDraft = validation.draft;

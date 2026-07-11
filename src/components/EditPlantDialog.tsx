@@ -264,13 +264,17 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             <div className="flex items-start gap-3 mt-1">
               <div className="h-20 w-20 rounded-lg overflow-hidden border border-border/60 flex-shrink-0">
                 {selected ? (
-                  <PlantPhotoView
-                    src={selected.previewUrl}
-                    alt={`Preview of new profile photo for ${previewName}`}
-                    className="h-full w-full"
-                    iconClassName="h-4 w-4"
-                    caption=""
-                    ctaLabel={null}
+                  <PlantProfilePhotoPreview
+                    state={preview}
+                    altName={previewName}
+                    onReplace={() => libraryInputRef.current?.click()}
+                    onRemove={() => {
+                      setSelected(null);
+                      if (cameraInputRef.current)
+                        cameraInputRef.current.value = "";
+                      if (libraryInputRef.current)
+                        libraryInputRef.current.value = "";
+                    }}
                     testId="edit-plant-photo-preview"
                   />
                 ) : (

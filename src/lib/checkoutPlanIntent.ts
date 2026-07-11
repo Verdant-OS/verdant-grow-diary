@@ -115,7 +115,8 @@ export function consumePlanIntent(opts?: {
   now?: number;
   maxAgeMs?: number;
 }): PlanIntentId | null {
-  const storage = opts?.storage ?? safeStorage();
+  const storage =
+    opts && "storage" in opts ? opts.storage : safeStorage();
   if (!storage) return null;
   let raw: string | null;
   try {

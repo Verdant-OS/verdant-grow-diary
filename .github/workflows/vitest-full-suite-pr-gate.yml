@@ -1,0 +1,67 @@
+name: Full Vitest Suite (PR gate)
+
+# Runs the ENTIRE src/test Vitest suite on every pull request, on the merge
+# queue, and on direct pushes to the default branch — so guard-suite
+# regressions can no longer land invisibly.
+#
+# Why this exists: the repo's targeted CI steps (ci.yml + specialized
+# workflows) only run a subset of tests, so full-suite failures (e.g. static
+# guard scans, RLS-shape checks, unhandled-rejection leaks) were only ever
+# caught by a human running `vitest run` locally. This wires the existing,
+# memory-tuned batched runner (scripts/run-vitest-batches.mjs) — the same one
+# behind the manual vitest-batched-full-suite.yml — into the PR gate. The
+# 16-way matrix + per-file chunking + worker isolation keep the full suite
+# inside CI memory/time limits.
+#
+# The `push` trigger on the default branch is deliberate: it does not BLOCK a
+# direct push (branch protection would), but it surfaces a red suite quickly
+# when changes land outside the PR flow (e.g. bot direct-pushes).
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [verdant-grow-diary, main]
+
+concurrency:
+  group: full-suite-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  full-suite:
+    name: Full suite — batch ${{ matrix.batch }}/16
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Batching + per-worker isolation releases memory between chunks, but
+      # keep a margin above Node's 2 GB default old-space ceiling.
+      NODE_OPTIONS: --max-old-space-size=4096
+    strategy:
+      fail-fast: false
+      matrix:
+        batch: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Deterministic 1/16 partition of src/test, run one file per vitest
+      # invocation with worker isolation so memory is released between files.
+      - name: Run batch ${{ matrix.batch }} of 16 (round-robin, chunked, isolated)
+        run: |
+          node scripts/run-vitest-batches.mjs \
+            --batches=16 \
+            --batch=${{ matrix.batch }} \
+            --strategy=round-robin \
+            --reporter=dot \
+            --chunk-size=1 \
+            --isolate \
+            --pool=forks

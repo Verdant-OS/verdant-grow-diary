@@ -23,11 +23,16 @@ function latestMigrationBodyMentioning(fn: string): string {
   const files = readdirSync(MIGRATIONS_DIR)
     .filter((f) => f.endsWith(".sql"))
     .sort();
+  // Select the newest migration that DEFINES the function, not merely one that
+  // mentions its name in a comment/string. A later, unrelated migration (e.g.
+  // ai_credit_spend_union_hardening) references has_pheno_tracker_entitlement
+  // in a comment and would otherwise be picked, hiding the real guarded body.
+  const defines = new RegExp(`FUNCTION\\s+public\\.${fn}\\b`, "i");
   for (let i = files.length - 1; i >= 0; i -= 1) {
     const body = readFileSync(join(MIGRATIONS_DIR, files[i]), "utf8");
-    if (body.includes(fn)) return body;
+    if (defines.test(body)) return body;
   }
-  throw new Error(`No migration references ${fn}`);
+  throw new Error(`No migration defines FUNCTION public.${fn}`);
 }
 
 describe("has_pheno_tracker_entitlement anti-oracle guard", () => {

@@ -10,23 +10,19 @@
  *    slice (well-known paths still exist and still export the assertion).
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = process.cwd();
 const APP_TSX = readFileSync(join(ROOT, "src/App.tsx"), "utf8");
 
 const PUBLIC_DEMO_ROUTES = [
-  '/pheno-comparison',
-  '/pheno-expression-showcase',
-  '/pheno-hunts/:id/compare',
+  "/pheno-comparison",
+  "/pheno-expression-showcase",
+  "/pheno-hunts/:id/compare",
 ];
 
-const GATED_ROUTES = [
-  '/pheno-hunts/new',
-  '/pheno-hunts/:id/workspace',
-  '/pheno-hunts/:id/keepers',
-];
+const GATED_ROUTES = ["/pheno-hunts/new", "/pheno-hunts/:id/workspace", "/pheno-hunts/:id/keepers"];
 
 function routeBlock(routePath: string): string {
   // Grab a slice around the route so we can check for a nearby Gate wrapper.
@@ -59,10 +55,7 @@ describe("pheno route safety", () => {
   });
 
   it("server-side pheno tracker entitlement helper still exists and exports the assertion", () => {
-    const path = join(
-      ROOT,
-      "supabase/functions/_shared/assertPhenoTrackerEntitlement.ts",
-    );
+    const path = join(ROOT, "supabase/functions/_shared/assertPhenoTrackerEntitlement.ts");
     expect(existsSync(path)).toBe(true);
     const src = readFileSync(path, "utf8");
     expect(src).toMatch(/export\s+(async\s+)?function\s+assertPhenoTrackerEntitlement/);
@@ -76,15 +69,10 @@ describe("pheno route safety", () => {
     expect(glob.length).toBeGreaterThan(0);
     // Cheap grep across migrations dir.
     const migrationsDir = join(ROOT, "supabase/migrations");
-    const fs = require("node:fs") as typeof import("node:fs");
-    const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith(".sql"));
+    const files = readdirSync(migrationsDir).filter((f) => f.endsWith(".sql"));
     const found = files.some((f) =>
-      readFileSync(join(migrationsDir, f), "utf8").includes(
-        "has_pheno_tracker_entitlement",
-      ),
+      readFileSync(join(migrationsDir, f), "utf8").includes("has_pheno_tracker_entitlement"),
     );
-    expect(found, "has_pheno_tracker_entitlement enforcement migration missing").toBe(
-      true,
-    );
+    expect(found, "has_pheno_tracker_entitlement enforcement migration missing").toBe(true);
   });
 });

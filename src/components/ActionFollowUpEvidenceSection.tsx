@@ -32,6 +32,16 @@ import ActionFollowUpEvidenceForm, {
   type ActionFollowUpFormSubmit,
 } from "@/components/ActionFollowUpEvidenceForm";
 import ActionFollowUpEvidenceCard from "@/components/ActionFollowUpEvidenceCard";
+import ActionFollowUpManualSensorSelector from "@/components/ActionFollowUpManualSensorSelector";
+import ActionFollowUpManualSensorEvidence, {
+  type ActionFollowUpManualSensorEvidenceState,
+} from "@/components/ActionFollowUpManualSensorEvidence";
+import {
+  loadManualSensorCandidates,
+  loadManualSensorSnapshotById,
+  type ManualSensorCandidateLoadResult,
+} from "@/lib/actionFollowUpManualSensorService";
+import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
 
 export interface ActionFollowUpEvidenceSectionAction {
   id: string;

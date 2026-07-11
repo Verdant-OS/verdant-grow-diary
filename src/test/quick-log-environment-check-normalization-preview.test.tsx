@@ -175,6 +175,10 @@ describe("Quick Log Environment Check — selector accessibility", () => {
     expect(combobox).toBeInTheDocument();
   });
 
+  // Radix Select under jsdom serializes several async pointer/animation
+  // frames before findByRole("option") resolves. On loaded CI runners
+  // this chain can exceed Vitest's 5s default without any product-side
+  // regression; scope a bounded budget to just this test.
   it("selecting Environment Check via the real combobox flow renders the section", async () => {
     // Radix Select calls Element.scrollIntoView when opened; jsdom lacks it.
     const originalScrollIntoView = (Element.prototype as unknown as { scrollIntoView?: () => void }).scrollIntoView;

@@ -4,37 +4,19 @@
  * Verifies:
  *  - paddleConfig refuses live/production env
  *  - paddleConfig returns "unavailable" when required values are missing
- *  - billing page renders unavailable state without config
- *  - billing page renders sandbox checkout button when config is present
- *  - billing page compliance copy is present (software-only, no cannabis sales)
- *  - billing page does not grant Pro from client checkout success
  *  - webhook scaffolding verifies signature on raw body and stores
  *    events idempotently before any entitlement change
  *  - copy safety: no autopilot, no guaranteed yield, no cannabis sales,
  *    no equipment-control promises
+ *
+ * Slice F: the `BillingPlaceholder` rendering + source-safety describes
+ * were removed alongside the retired presenter. `resolvePaddleConfig`,
+ * webhook, and env/doc assertions remain.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
-import BillingPlaceholder from "@/pages/BillingPlaceholder";
 import { resolvePaddleConfig, unavailableMessage, PADDLE_SANDBOX_ENV } from "@/lib/paddleConfig";
-
-// Module-level env override for render tests. import.meta.env does not cross
-// ESM module boundaries, so we proxy the no-args call from BillingPlaceholder.
-let _paddleTestEnv: Record<string, string> | null = null;
-
-vi.mock("@/lib/paddleConfig", async (importOriginal) => {
-  const mod = await importOriginal<typeof import("@/lib/paddleConfig")>();
-  return {
-    ...mod,
-    resolvePaddleConfig: (source?: any) => {
-      if (source) return mod.resolvePaddleConfig(source);
-      return mod.resolvePaddleConfig(_paddleTestEnv ?? {});
-    },
-  };
-});
 
 const SANDBOX_ENV = {
   VITE_PADDLE_ENVIRONMENT: "sandbox",
@@ -45,11 +27,9 @@ const SANDBOX_ENV = {
 };
 
 const root = resolve(__dirname, "..", "..");
-const readSrc = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 const readRoot = (p: string) => readFileSync(resolve(root, p), "utf8");
 
-const BILLING_SRC = readSrc("pages/BillingPlaceholder.tsx");
-const CONFIG_SRC = readSrc("lib/paddleConfig.ts");
+const CONFIG_SRC = readFileSync(resolve(__dirname, "..", "lib/paddleConfig.ts"), "utf8");
 const WEBHOOK_SRC = readRoot("supabase/functions/paddle-webhook/index.ts");
 // The signature-verification primitives were extracted into a shared module
 // that index.ts imports; the crypto assertions below scan the receiver +

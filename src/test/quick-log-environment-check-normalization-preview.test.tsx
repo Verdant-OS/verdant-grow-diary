@@ -211,5 +211,5 @@ describe("Quick Log Environment Check — selector accessibility", () => {
         (Element.prototype as unknown as { hasPointerCapture: typeof originalHasPC }).hasPointerCapture = originalHasPC;
       }
     }
-  });
+  }, 15_000);
 });

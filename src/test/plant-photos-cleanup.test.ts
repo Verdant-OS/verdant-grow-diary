@@ -17,6 +17,16 @@ import {
   DEFAULT_MIN_AGE_DAYS,
   ABSOLUTE_MIN_AGE_DAYS,
 } from "../../scripts/admin/plant-photos-cleanup-lib.mjs";
+import {
+  classifyPhotoUrlValue,
+  classifyPhotoUrlReferences,
+  classifyRawStoragePath,
+  splitPathBuckets,
+  toCanonicalCleanupReport,
+  renderCleanupSummary,
+  CLEANUP_REPORT_SCHEMA_VERSION,
+} from "../../scripts/admin/plant-photos-cleanup-report.mjs";
+
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 

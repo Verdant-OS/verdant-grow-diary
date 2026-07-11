@@ -117,7 +117,7 @@ describe("discoverToolVersions", () => {
     };
     const tv = discoverToolVersions({
       spawnSyncImpl,
-      resolveVitestPkg: () => require.resolve("vitest/package.json"),
+      resolveVitestPkg: () => resolveVitestPkg(),
     });
     expect(seen[0]).toEqual(["bun", "--version"]);
     expect(tv.bun).toBe("1.3.3");
@@ -136,7 +136,7 @@ describe("discoverToolVersions", () => {
     expect(() =>
       discoverToolVersions({
         spawnSyncImpl,
-        resolveVitestPkg: () => require.resolve("vitest/package.json"),
+        resolveVitestPkg: () => resolveVitestPkg(),
       }),
     ).toThrow(/Cannot discover Bun version/);
   });
@@ -155,7 +155,7 @@ describe("discoverToolVersions", () => {
   it("persists Node version verbatim from process.version", () => {
     const tv = discoverToolVersions({
       spawnSyncImpl: (() => ({ status: 0, stdout: "1.3.3\n" })) as any,
-      resolveVitestPkg: () => require.resolve("vitest/package.json"),
+      resolveVitestPkg: () => resolveVitestPkg(),
     });
     expect(tv.node).toBe(process.version);
     expect(tv.node.startsWith("v")).toBe(true);

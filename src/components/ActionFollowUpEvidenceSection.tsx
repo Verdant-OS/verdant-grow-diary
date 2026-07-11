@@ -37,6 +37,7 @@ import ActionFollowUpExistingPhotoSelector, {
   type ExistingPhotoLoadState,
 } from "@/components/ActionFollowUpExistingPhotoSelector";
 import ActionFollowUpExistingPhotoEvidence from "@/components/ActionFollowUpExistingPhotoEvidence";
+import ActionFollowUpQuickLogHandoffButton from "@/components/ActionFollowUpQuickLogHandoffButton";
 import {
   loadActionFollowUpExistingPhotoCandidates,
   type ExistingPhotoCandidateLoadResult,
@@ -363,12 +364,24 @@ export default function ActionFollowUpEvidenceSection({
                 }}
                 photoReference={selectedPhotoReference}
                 photoSelectorSlot={
-                  <ActionFollowUpExistingPhotoSelector
-                    state={photoState}
-                    value={selectedPhotoReference}
-                    onChange={setSelectedPhotoReference}
-                    disabled={saving}
-                  />
+                  <div className="space-y-3">
+                    <ActionFollowUpExistingPhotoSelector
+                      state={photoState}
+                      value={selectedPhotoReference}
+                      onChange={setSelectedPhotoReference}
+                      disabled={saving}
+                    />
+                    <ActionFollowUpQuickLogHandoffButton
+                      action={{
+                        actionId: action.id,
+                        growId: action.growId,
+                        tentId: action.tentId,
+                        plantId: action.plantId,
+                      }}
+                      disabled={saving}
+                      onPhotoCreated={() => setReloadNonce((n) => n + 1)}
+                    />
+                  </div>
                 }
               />
             ) : (

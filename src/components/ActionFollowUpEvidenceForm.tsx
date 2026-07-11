@@ -121,7 +121,12 @@ export default function ActionFollowUpEvidenceForm({
       return;
     }
     setFieldError(null);
-    onSubmit({ outcome, note: trimmed, observedAt: iso });
+    onSubmit({
+      outcome,
+      note: trimmed,
+      observedAt: iso,
+      sensorSnapshotId: sensorSnapshotId ?? null,
+    });
   }
 
   const showNoteRequired = outcome && actionFollowUpRequiresNote(outcome);

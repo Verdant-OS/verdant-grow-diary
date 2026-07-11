@@ -243,11 +243,9 @@ describe("retirePreviousPlantProfilePhoto", () => {
 describe("plantProfilePhotoReplacementCleanupService · static safety", () => {
   it("does not import a service-role client or the admin cleanup CLI", async () => {
     const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
     const src = readFileSync(
-      new URL(
-        "../lib/plantProfilePhotoReplacementCleanupService.ts",
-        import.meta.url,
-      ),
+      resolve(__dirname, "../lib/plantProfilePhotoReplacementCleanupService.ts"),
       "utf8",
     );
     expect(src).not.toMatch(/service_role/i);

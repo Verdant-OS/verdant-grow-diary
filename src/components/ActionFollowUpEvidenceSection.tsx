@@ -339,7 +339,14 @@ export default function ActionFollowUpEvidenceSection({
       )}
 
       {query.status === "ready" && viewModel && (
-        <ActionFollowUpEvidenceCard viewModel={viewModel} />
+        <ActionFollowUpEvidenceCard
+          viewModel={viewModel}
+          photoEvidenceSlot={
+            viewModel.hasPhotoEvidence ? (
+              <ActionFollowUpExistingPhotoEvidence reference={viewModel.photoReference} />
+            ) : null
+          }
+        />
       )}
 
       {query.status === "ready" && !viewModel && (
@@ -354,6 +361,15 @@ export default function ActionFollowUpEvidenceSection({
                   setShowForm(false);
                   setErrorMessage(null);
                 }}
+                photoReference={selectedPhotoReference}
+                photoSelectorSlot={
+                  <ActionFollowUpExistingPhotoSelector
+                    state={photoState}
+                    value={selectedPhotoReference}
+                    onChange={setSelectedPhotoReference}
+                    disabled={saving}
+                  />
+                }
               />
             ) : (
             <Button

@@ -159,24 +159,7 @@ describe("Pricing — proof polish copy", () => {
   });
 });
 
-describe("BillingPlaceholder — sandbox disclosure polish", () => {
-  it("renders above-the-fold sandbox banner with honest copy", () => {
-    renderBilling("pro-monthly");
-    const banner = screen.getByTestId("billing-sandbox-banner");
-    expect(banner.textContent).toContain("sandbox preview");
-    expect(banner.textContent).toContain("No live charge");
-  });
-
-  it("renders for founder-lifetime plan too", () => {
-    renderBilling("founder-lifetime");
-    expect(screen.getByTestId("billing-sandbox-banner")).toBeInTheDocument();
-  });
-
-  it("forbidden marketing/automation phrases never appear on BillingPlaceholder", () => {
-    renderBilling("pro-annual");
-    const body = document.body.textContent?.toLowerCase() ?? "";
-    for (const term of FORBIDDEN) {
-      expect(body, `forbidden phrase leaked: ${term}`).not.toContain(term);
-    }
-  });
-});
+// Slice F: the "BillingPlaceholder — sandbox disclosure polish" block was
+// removed alongside the retired presenter. Sandbox honesty copy is now
+// covered by the Pricing FAQ tests above and by the canonical `/upgrade`
+// checkout tests.

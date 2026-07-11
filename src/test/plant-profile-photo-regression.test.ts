@@ -118,8 +118,11 @@ describe("EditPlantDialog · native camera + library flow", () => {
       /previous file was left in storage for safety/,
     );
     expect(EDIT_DIALOG).toMatch(/previous file could not be removed/);
-    expect(EDIT_DIALOG).not.toMatch(/storage:\/\//);
-    expect(EDIT_DIALOG).not.toMatch(/diary-photos/);
+    // Toast strings must not contain durable storage refs or bucket
+    // ids. Scoped to the two grower-facing copy lines.
+    const copy = (EDIT_DIALOG.match(/"Plant photo updated\.[^"]*"/g) ?? []).join("\n");
+    expect(copy).not.toMatch(/storage:\/\//);
+    expect(copy).not.toMatch(/diary-photos/);
   });
 });
 

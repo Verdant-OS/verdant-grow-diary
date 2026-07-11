@@ -478,9 +478,18 @@ describe("retirePreviousPlantProfilePhoto · shared previous reference", () => {
     expect(state[plantB]).toBe(sharedPhoto);
   });
 
-  it("Plant B replacement removes shared object only after count reaches zero", async () => {
+  it("shared object is removed only after the reference count reaches zero", async () => {
+    // Continuation: Plant B has since moved off `sharedPhoto` (e.g. by
+    // its own edit flow, which under strict path-scope would itself
+    // skip removal). Re-evaluating cleanup from the owning plant (A)
+    // with a fresh state where nobody else references `sharedPhoto`
+    // must now permit removal.
+    //
+    // NOTE: the cleaner MUST be plantA — `sharedPhoto` is scoped to
+    // plantA in its object path, and the service's strict plant-path
+    // guard (see plantProfilePhotoReplacementCleanupRules) correctly
+    // refuses to delete another plant's path.
     const calls = { idQueries: [] as string[], refQueries: [] as string[] };
-    // Plant A already moved to photoA2; Plant B now moves to photoB2.
     const state: Record<string, string | null> = {
       [plantA]: photoA2,
       [plantB]: photoB2,
@@ -490,9 +499,9 @@ describe("retirePreviousPlantProfilePhoto · shared previous reference", () => {
 
     const result = await retirePreviousPlantProfilePhoto({
       previousPhotoUrl: sharedPhoto,
-      newPhotoUrl: photoB2,
+      newPhotoUrl: photoA2,
       authenticatedUserId: USER,
-      plantId: plantB,
+      plantId: plantA,
       client,
       remove,
     });
@@ -503,11 +512,42 @@ describe("retirePreviousPlantProfilePhoto · shared previous reference", () => {
     expect(remove).toHaveBeenCalledWith(sharedPath);
     const arg = (remove.mock.calls[0] as unknown as [string])[0];
     expect(arg.startsWith("storage://")).toBe(false);
+    expect(arg.startsWith("diary-photos/")).toBe(false);
     expect(arg.includes(photoA2)).toBe(false);
     expect(arg.includes(photoB2)).toBe(false);
     // Neither replacement's new reference was disturbed.
     expect(state[plantA]).toBe(photoA2);
     expect(state[plantB]).toBe(photoB2);
+  });
+
+  it("cross-plant cleanup is refused even when count would be zero", async () => {
+    // Strict plant-path scope guard: Plant B cannot delete a storage
+    // object whose path is scoped to Plant A, regardless of reference
+    // count. This is the intentional safety fence.
+    const calls = { idQueries: [] as string[], refQueries: [] as string[] };
+    const state: Record<string, string | null> = {
+      [plantA]: photoA2,
+      [plantB]: photoB2,
+    };
+    const remove = vi.fn(async () => ({ ok: true }));
+    const client = makeStatefulClient({ plants: state, calls });
+
+    const result = await retirePreviousPlantProfilePhoto({
+      previousPhotoUrl: sharedPhoto, // scoped to plantA
+      newPhotoUrl: photoB2,
+      authenticatedUserId: USER,
+      plantId: plantB,
+      client,
+      remove,
+    });
+
+    expect(result).toEqual({
+      status: "skipped_for_safety",
+      reason: "ineligible_reference",
+    });
+    expect(calls.idQueries).toEqual([]);
+    expect(calls.refQueries).toEqual([]);
+    expect(remove).not.toHaveBeenCalled();
   });
 
   it("shared-reference invariant: count>0 protects, count=0 permits", async () => {

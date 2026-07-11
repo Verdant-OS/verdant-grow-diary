@@ -276,6 +276,10 @@ export default function ActionFollowUpEvidenceSection({
         outcome: values.outcome,
         note: values.note,
         observedAt: values.observedAt,
+        // Slice 4b — only the exact selected ID travels; UI never mints
+        // or transforms it. `null` when the grower didn't select one or
+        // when the candidate query failed.
+        sensorSnapshotId: values.sensorSnapshotId,
       };
       try {
         const result = await saveFn(draft);

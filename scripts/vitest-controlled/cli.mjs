@@ -395,15 +395,22 @@ async function executeBatches(state, { repoRoot, batchDeadlineMs, vitestBin, spa
   }
   process.off("SIGINT", onSig);
   process.off("SIGTERM", onSig);
-  const summary = summarizeRun(runDir);
+  // Compute the pre-marker summary to determine exit code + marker eligibility.
+  const pre = summarizeRun(runDir);
+  const invalid =
+    pre.conflicts.length > 0 ||
+    pre.corruptLines.length > 0 ||
+    pre.duplicateManifestFiles.length > 0;
+  const cleanCompletion =
+    !interrupted && pre.totals.failedFiles === 0 && pre.totals.incompleteFiles === 0 && !invalid;
   const exit = interrupted
     ? EXIT.INTERRUPTED
-    : summary.status === "complete"
-      ? EXIT.GREEN
-      : summary.status === "invalid"
-        ? EXIT.CONFIG_ERROR
-        : EXIT.TEST_FAILURES;
-  if (!interrupted && summary.totals.incompleteFiles === 0) {
+    : invalid
+      ? EXIT.CONFIG_ERROR
+      : pre.totals.failedFiles > 0 || pre.totals.incompleteFiles > 0
+        ? EXIT.TEST_FAILURES
+        : EXIT.GREEN;
+  if (cleanCompletion) {
     fs.writeFileSync(path.join(runDir, "completed"), new Date().toISOString());
   }
   fs.writeFileSync(path.join(runDir, "exit-code"), String(exit));
@@ -411,6 +418,8 @@ async function executeBatches(state, { repoRoot, batchDeadlineMs, vitestBin, spa
     path.join(runDir, "run-meta"),
     JSON.stringify({ resumeMode, batchResults, interrupted, exit }, null, 2),
   );
+  // Regenerate summary now that the marker (if any) exists so status is authoritative.
+  const summary = writeSummaryArtifacts(runDir);
   return { runDir, exit, summary, interrupted, batchResults };
 }
 

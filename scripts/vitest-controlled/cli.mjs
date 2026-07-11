@@ -118,10 +118,10 @@ export function initRun({
     pool,
     reporterSchemaVersion: REPORTER_SCHEMA_VERSION,
   });
-  const dirtyTreeHash = computeDirtyTreeHash(repoRoot, manifest.files);
+  const workspaceFingerprint = computeWorkspaceFingerprint(repoRoot);
 
   const runRecord = {
-    schema: 1,
+    schema: RUN_SCHEMA_VERSION,
     runId,
     createdAt: new Date().toISOString(),
     shardIndex,
@@ -135,7 +135,7 @@ export function initRun({
     minWorkers,
     manifestHash: manifest.hash,
     sourceFingerprint,
-    dirtyTreeHash,
+    workspaceFingerprint,
     reporterSchema: REPORTER_SCHEMA_VERSION,
     toolVersions: toolVersions(),
   };

@@ -12,6 +12,7 @@
  *    sensor query per distinct tent (one-tent grows → one query).
  */
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { ACTION_FOLLOWUP_EVENT_TYPE } from "@/lib/actionFollowupRules";
 import { ACTION_OUTCOME_EVENT_TYPE } from "@/lib/actionOutcomeRules";
 import {
@@ -162,7 +163,7 @@ export async function saveRunLearningDecision(
     if ((existing ?? []).length === 1) {
       const { error: updateError } = await supabase
         .from("diary_entries")
-        .update({ note: draft.note, details: draft.details })
+        .update({ note: draft.note, details: draft.details as unknown as Json })
         .eq("id", existing![0].id);
       if (updateError) return { ok: false, reason: "save_failed" };
       return { ok: true, updatedExisting: true };
@@ -173,7 +174,7 @@ export async function saveRunLearningDecision(
       tent_id: draft.tent_id,
       plant_id: draft.plant_id,
       note: draft.note,
-      details: draft.details,
+      details: draft.details as unknown as Json,
       // user_id deliberately omitted — DB default remains authoritative.
     });
     if (insertError) return { ok: false, reason: "save_failed" };

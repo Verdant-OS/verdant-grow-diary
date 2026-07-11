@@ -28,9 +28,9 @@ describe("/pricing route", () => {
     expect(APP).toMatch(/path="\/pricing"\s+element=\{<Pricing\s*\/>\}/);
   });
 
-  it("registers a /billing/:plan placeholder route", () => {
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/BillingPlaceholder["']\s*\)/);
-    expect(APP).toMatch(/path="\/billing\/:plan"\s+element=\{<BillingPlaceholder\s*\/>\}/);
+  it("redirects legacy /billing/:plan to canonical /upgrade (Slice E)", () => {
+    expect(APP).toMatch(/import\(\s*["']\.\/pages\/LegacyBillingRedirect["']\s*\)/);
+    expect(APP).toMatch(/path="\/billing\/:plan"\s+element=\{<LegacyBillingRedirect\s*\/>\}/);
   });
 });
 
@@ -413,7 +413,7 @@ describe("Pricing manifest snapshot (narrow)", () => {
     // Intentionally narrow: only pricing / public billing-relevant routes so
     // unrelated route changes do not create noisy snapshot diffs here.
     expect(getPricingManifestSnapshot()).toEqual([
-      { path: "/billing/:plan", access: "public", description: "Billing placeholder." },
+      { path: "/billing/:plan", access: "redirect", description: "→ /upgrade?plan=<canonical> (legacy billing entry, Slice E)." },
       { path: "/hardware-integrations", access: "public" },
       { path: "/pricing", access: "public" },
       { path: "/welcome", access: "public" },

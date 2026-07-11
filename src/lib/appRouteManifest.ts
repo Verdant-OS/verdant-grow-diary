@@ -79,7 +79,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/alerts", access: "auth" },
   { path: "/alerts/:alertId", access: "auth" },
   { path: "/auth", access: "public" },
-  { path: "/billing/:plan", access: "public", description: "Billing placeholder." },
+  { path: "/billing/:plan", access: "redirect", description: "→ /upgrade?plan=<canonical> (legacy billing entry, Slice E)." },
   { path: "/breeder-beta", access: "public", description: "Breeder beta landing page." },
   { path: "/breeding", access: "auth", description: "Breeding programs index." },
   { path: "/breeding/:programId", access: "auth", description: "Breeding program detail." },

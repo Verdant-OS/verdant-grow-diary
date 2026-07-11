@@ -10,7 +10,7 @@ function makeStorage(uploadImpl?: (path: string, body: unknown, opts: unknown) =
         upload: (path: string, body: unknown, opts: unknown) =>
           upload(path, body, opts),
       }),
-    } as unknown as import("@/integrations/supabase/client").supabase["storage"],
+    } as any,
     upload,
   };
 }

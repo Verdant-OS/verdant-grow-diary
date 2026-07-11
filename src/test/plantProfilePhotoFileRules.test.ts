@@ -45,7 +45,7 @@ describe("validatePlantProfilePhotoFile", () => {
   it("rejects empty files", () => {
     const r = validatePlantProfilePhotoFile(f("image/jpeg", 0));
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("empty");
+    if (r.ok === false) expect(r.reason).toBe("empty");
   });
 
   it("accepts exactly 25 MB and rejects above", () => {
@@ -57,12 +57,12 @@ describe("validatePlantProfilePhotoFile", () => {
       f("image/jpeg", PLANT_PROFILE_PHOTO_MAX_BYTES + 1),
     );
     expect(over.ok).toBe(false);
-    if (!over.ok) expect(over.reason).toBe("too-large");
+    if (over.ok === false) expect(over.reason).toBe("too-large");
   });
 
   it("never surfaces raw provider errors", () => {
     const bad = validatePlantProfilePhotoFile(f("image/svg+xml", 100));
-    if (!bad.ok) {
+    if (bad.ok === false) {
       expect(bad.message).toBe("That file type is not supported.");
     }
   });

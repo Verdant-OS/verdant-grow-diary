@@ -313,8 +313,7 @@ describe("workflow static assertions", () => {
     expect(pins.length).toBe(2);
   });
   it("has runtime-proof steps and they do not print env or secrets", () => {
-    const runtimeStepRegex =
-      /Runtime proof \(node\/bun\/vitest\)[\s\S]*?(?=- name:|\Z)/g;
+    const runtimeStepRegex = /Runtime proof \(node\/bun\/vitest\)[\s\S]*?(?=- name:|$)/g;
     const blocks = yaml.match(runtimeStepRegex) ?? [];
     expect(blocks.length).toBe(2);
     for (const b of blocks) {

@@ -148,7 +148,8 @@ export function toolchainMismatch(previous, current) {
   const keys = ["node", "bun", "vitest"];
   const diffs = [];
   for (const k of keys) {
-    if (previous[k] !== current[k]) diffs.push(`${k}: ${previous[k] ?? "<absent>"} → ${current[k]}`);
+    if (previous[k] !== current[k])
+      diffs.push(`${k}: ${previous[k] ?? "<absent>"} → ${current[k]}`);
   }
   return diffs.length ? `toolchain drift: ${diffs.join("; ")}` : null;
 }
@@ -174,7 +175,9 @@ export function initRun({
     !discoveredToolVersions.vitest
   ) {
     throw Object.assign(
-      new Error("initRun requires discovered {node,bun,vitest} toolVersions — refusing null identity"),
+      new Error(
+        "initRun requires discovered {node,bun,vitest} toolVersions — refusing null identity",
+      ),
       { code: EXIT.CONFIG_ERROR },
     );
   }
@@ -224,7 +227,6 @@ export function initRun({
   fs.writeFileSync(path.join(runDir, "progress.jsonl"), "");
   return { runId, runDir, runRecord, shardFiles, batches };
 }
-
 
 function loadRun(runDir) {
   const runRecord = JSON.parse(fs.readFileSync(path.join(runDir, "run.json"), "utf8"));
@@ -353,7 +355,6 @@ export async function commandRun(opts, deps = {}) {
     resumeMode: "fresh",
   });
 }
-
 
 /** Public: resume a run (subcommand `resume`). */
 export async function commandResume(opts, deps = {}) {

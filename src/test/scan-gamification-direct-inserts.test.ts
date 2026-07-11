@@ -16,11 +16,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import pkg from "../../package.json";
-import {
-  scanFiles,
-  walkScanRoot,
-} from "../../scripts/scan-gamification-direct-inserts.mjs";
-
+import { scanFiles, walkScanRoot } from "../../scripts/scan-gamification-direct-inserts.mjs";
 
 // Cache the immutable src/ inventory and its findings once at module
 // scope (before any test executes) so every scenario — including tests
@@ -61,7 +57,6 @@ describe("scan-gamification-direct-inserts", () => {
     // isolated execution of this test does not re-read src/ either.
     expect(SRC_HITS).toEqual([]);
   });
-
 
   it("flags .from('nug_events').insert(...)", () => {
     const dir = mkdtempSync(join(tmpdir(), "gam-scan-"));
@@ -130,7 +125,6 @@ describe("scan-gamification-direct-inserts", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
-
 
   it("package.json wires the CI script", () => {
     const scripts = (pkg as { scripts: Record<string, string> }).scripts;

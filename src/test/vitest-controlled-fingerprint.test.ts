@@ -266,7 +266,7 @@ describe("resume enforcement", () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         spawnImpl: makePassingSpawnStub() as any,
       }),
-    ).rejects.toThrow(/schema v1 predates workspace fingerprint/);
+    ).rejects.toThrow(/schema v1 predates toolchain-locked contract/);
   });
 
   it("run.json never persists source contents or absolute user paths", async () => {

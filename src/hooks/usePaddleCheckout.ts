@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   initializePaddle,
   getPaddlePriceId,
@@ -10,6 +10,11 @@ import { useAuth } from "@/store/auth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
+import {
+  consumePlanIntent,
+  isKnownPlanIntent,
+  savePlanIntent,
+} from "@/lib/checkoutPlanIntent";
 
 export interface OpenCheckoutOptions {
   priceId: string;

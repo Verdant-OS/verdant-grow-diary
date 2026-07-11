@@ -140,6 +140,15 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         await initializePaddle();
         const paddlePriceId = await getPaddlePriceId(options.priceId);
 
+        // Slice D: register overlay session BEFORE calling
+        // Paddle.Checkout.open so the module-level eventCallback (set at
+        // Initialize) always has a target when checkout.completed /
+        // checkout.closed fire.
+        beginCheckoutSession(() => {
+          if (!mountedRef.current) return;
+          navigate("/checkout/cancel");
+        });
+
         (window as any).Paddle.Checkout.open({
           items: [{ priceId: paddlePriceId, quantity: options.quantity ?? 1 }],
           customer: user.email ? { email: user.email } : undefined,

@@ -34,6 +34,7 @@ import {
   uploadPlantProfilePhoto,
   removeUploadedPlantProfilePhoto,
 } from "@/lib/plantProfilePhotoUploadService";
+import { retirePreviousPlantProfilePhoto } from "@/lib/plantProfilePhotoReplacementCleanupService";
 import { usePlantProfilePhotoPreview } from "@/hooks/usePlantProfilePhotoPreview";
 import PlantProfilePhotoPreview from "@/components/PlantProfilePhotoPreview";
 

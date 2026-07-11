@@ -28,7 +28,9 @@ export const FINGERPRINT_ALGORITHM = "sha256";
 
 /** Normalize any repo-relative path to POSIX form for stable hashing. */
 export function toPosixRel(rel) {
-  return rel.split(path.sep).join("/");
+  // Always convert backslashes so Windows and POSIX runs agree regardless
+  // of the current platform's path.sep.
+  return rel.split(/[\\/]/).join("/");
 }
 
 function runGit(repoRoot, args) {

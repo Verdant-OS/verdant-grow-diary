@@ -85,7 +85,12 @@ interface TestUser {
 }
 
 d("diary-photos storage policy boundaries (local DB)", () => {
-  const admin = createClient(URL, SERVICE, { auth: { persistSession: false } });
+  // See pi-ingest sibling suite: describe.skip still runs the callback
+  // body to enumerate tests, so eager createClient() throws when the
+  // local integration env is absent. Construct lazily.
+  const admin: SupabaseClient = hasLocalSupabase
+    ? createClient(URL, SERVICE, { auth: { persistSession: false } })
+    : (undefined as unknown as SupabaseClient);
   let alice: TestUser;
   let bob: TestUser;
   let alicePath: string;

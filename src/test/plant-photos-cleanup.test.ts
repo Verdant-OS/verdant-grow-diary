@@ -5,7 +5,7 @@
  * tool. NO real Supabase, NO fs, NO network. The deleter is a
  * spied fake that MUST NOT be called for any blocked condition.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   parseCleanupArgs,
   isDestructiveMode,
@@ -24,11 +24,26 @@ import {
   splitPathBuckets,
   toCanonicalCleanupReport,
   renderCleanupSummary,
+  renderCleanupMachineSummary,
+  serializeCanonicalReport,
+  comparePathCodePoints,
   CLEANUP_REPORT_SCHEMA_VERSION,
+  MACHINE_SUMMARY_PREFIX,
 } from "../../scripts/admin/plant-photos-cleanup-report.mjs";
+import { writeCanonicalReportFile } from "../../scripts/admin/plant-photos-cleanup-write.mjs";
+import {
+  readFileSync,
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  statSync,
+  mkdirSync,
+  readFileSync as _readFile,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve, join } from "node:path";
 
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+
 
 const NOW = Date.parse("2026-08-01T00:00:00Z");
 const daysAgo = (d: number) =>

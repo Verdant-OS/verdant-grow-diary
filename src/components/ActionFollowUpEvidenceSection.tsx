@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { CircleCheckBig } from "lucide-react";
+import { useAuth } from "@/store/auth";
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,
   followupMatchesAction,
@@ -32,16 +33,14 @@ import ActionFollowUpEvidenceForm, {
   type ActionFollowUpFormSubmit,
 } from "@/components/ActionFollowUpEvidenceForm";
 import ActionFollowUpEvidenceCard from "@/components/ActionFollowUpEvidenceCard";
-import ActionFollowUpManualSensorSelector from "@/components/ActionFollowUpManualSensorSelector";
-import ActionFollowUpManualSensorEvidence, {
-  type ActionFollowUpManualSensorEvidenceState,
-} from "@/components/ActionFollowUpManualSensorEvidence";
+import ActionFollowUpExistingPhotoSelector, {
+  type ExistingPhotoLoadState,
+} from "@/components/ActionFollowUpExistingPhotoSelector";
+import ActionFollowUpExistingPhotoEvidence from "@/components/ActionFollowUpExistingPhotoEvidence";
 import {
-  loadManualSensorCandidates,
-  loadManualSensorSnapshotById,
-  type ManualSensorCandidateLoadResult,
-} from "@/lib/actionFollowUpManualSensorService";
-import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
+  loadActionFollowUpExistingPhotoCandidates,
+  type ExistingPhotoCandidateLoadResult,
+} from "@/lib/actionFollowUpExistingPhotoService";
 
 export interface ActionFollowUpEvidenceSectionAction {
   id: string;
@@ -56,14 +55,13 @@ export interface ActionFollowUpEvidenceSectionProps {
   action: ActionFollowUpEvidenceSectionAction;
   /** Optional service injection for tests. */
   save?: (draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>;
-  /** Slice 4b: injectable Manual snapshot candidate loader (tests). */
-  loadCandidates?: (ctx: {
+  /** Optional photo-candidate loader injection for tests. */
+  loadPhotoCandidates?: (ctx: {
+    authenticatedUserId: string;
     growId: string;
     tentId: string | null;
     plantId: string | null;
-  }) => Promise<ManualSensorCandidateLoadResult>;
-  /** Slice 4b: injectable single-snapshot loader for existing evidence (tests). */
-  loadSnapshotById?: (id: string) => Promise<ManualSnapshotTimelineCard | null>;
+  }) => Promise<ExistingPhotoCandidateLoadResult>;
 }
 
 type QueryState =
@@ -125,32 +123,20 @@ function pickPrimary(
 export default function ActionFollowUpEvidenceSection({
   action,
   save,
-  loadCandidates,
-  loadSnapshotById,
+  loadPhotoCandidates,
 }: ActionFollowUpEvidenceSectionProps) {
+  const { user } = useAuth();
+  const authenticatedUserId = user?.id ?? null;
   const [query, setQuery] = useState<QueryState>({ status: "loading" });
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
-
-  // Slice 4b — Manual sensor candidate state.
-  const [sensorStatus, setSensorStatus] = useState<
-    "loading" | "loaded" | "error"
-  >("loading");
-  const [sensorCandidates, setSensorCandidates] = useState<
-    ManualSnapshotTimelineCard[]
-  >([]);
-  const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(
-    null,
-  );
-  const [associatedEvidence, setAssociatedEvidence] =
-    useState<ActionFollowUpManualSensorEvidenceState>({ status: "loading" });
+  const [photoState, setPhotoState] = useState<ExistingPhotoLoadState>({ status: "loading" });
+  const [selectedPhotoReference, setSelectedPhotoReference] = useState<string | null>(null);
 
   const saveFn = save ?? saveActionFollowUpEvidence;
-  const loadCandidatesFn = loadCandidates ?? ((ctx) =>
-    loadManualSensorCandidates({ context: ctx }));
-  const loadSnapshotByIdFn = loadSnapshotById ?? loadManualSensorSnapshotById;
+  const loadPhotosFn = loadPhotoCandidates ?? loadActionFollowUpExistingPhotoCandidates;
 
   useEffect(() => {
     let cancelled = false;
@@ -190,64 +176,45 @@ export default function ActionFollowUpEvidenceSection({
     };
   }, [action.id, action.growId, reloadNonce]);
 
-  // Slice 4b — load Manual snapshot candidates for the selector.
+  // Load existing owned photo candidates (Slice 4c). Failure is silent —
+  // the selector shows the safe "unavailable" copy and the form remains
+  // usable with `photoReference: null`.
   useEffect(() => {
     let cancelled = false;
-    setSensorStatus("loading");
-    setSensorCandidates([]);
+    if (!authenticatedUserId) {
+      setPhotoState({ status: "failed" });
+      return;
+    }
+    setPhotoState({ status: "loading" });
     (async () => {
       try {
-        const result = await loadCandidatesFn({
+        const res = await loadPhotosFn({
+          authenticatedUserId,
           growId: action.growId,
           tentId: action.tentId,
           plantId: action.plantId,
         });
         if (cancelled) return;
-        if (result.status === "loaded") {
-          setSensorCandidates(result.candidates);
-          setSensorStatus("loaded");
+        if (res.status === "loaded") {
+          setPhotoState({ status: "loaded", candidates: res.candidates });
         } else {
-          setSensorStatus("error");
+          setPhotoState({ status: "failed" });
         }
       } catch {
-        if (!cancelled) setSensorStatus("error");
+        if (!cancelled) setPhotoState({ status: "failed" });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [action.growId, action.tentId, action.plantId, loadCandidatesFn]);
-
-  // Slice 4b — resolve the associated snapshot for an existing follow-up.
-  useEffect(() => {
-    let cancelled = false;
-    const existingSnapshotId =
-      query.status === "ready" && query.existing?.sensorSnapshotId
-        ? query.existing.sensorSnapshotId
-        : null;
-    if (!existingSnapshotId) {
-      setAssociatedEvidence({ status: "unavailable" });
-      return;
-    }
-    setAssociatedEvidence({ status: "loading" });
-    (async () => {
-      try {
-        const card = await loadSnapshotByIdFn(existingSnapshotId);
-        if (cancelled) return;
-        if (!card) {
-          setAssociatedEvidence({ status: "unavailable" });
-          return;
-        }
-        setAssociatedEvidence({ status: "ready", card });
-      } catch {
-        if (!cancelled) setAssociatedEvidence({ status: "unavailable" });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [query, loadSnapshotByIdFn]);
-
+  }, [
+    authenticatedUserId,
+    action.growId,
+    action.tentId,
+    action.plantId,
+    loadPhotosFn,
+    reloadNonce,
+  ]);
 
   const eligibility = useMemo(
     () =>
@@ -276,9 +243,7 @@ export default function ActionFollowUpEvidenceSection({
         outcome: values.outcome,
         note: values.note,
         observedAt: values.observedAt,
-        // Slice 4b — only the exact selected ID travels; UI never mints
-        // or transforms it. `null` when the grower didn't select one or
-        // when the candidate query failed.
+        photoReference: values.photoReference,
         sensorSnapshotId: values.sensorSnapshotId,
       };
       try {
@@ -374,12 +339,14 @@ export default function ActionFollowUpEvidenceSection({
       )}
 
       {query.status === "ready" && viewModel && (
-        <>
-          <ActionFollowUpEvidenceCard viewModel={viewModel} />
-          {viewModel.sensorSnapshotId && (
-            <ActionFollowUpManualSensorEvidence state={associatedEvidence} />
-          )}
-        </>
+        <ActionFollowUpEvidenceCard
+          viewModel={viewModel}
+          photoEvidenceSlot={
+            viewModel.hasPhotoEvidence ? (
+              <ActionFollowUpExistingPhotoEvidence reference={viewModel.photoReference} />
+            ) : null
+          }
+        />
       )}
 
       {query.status === "ready" && !viewModel && (
@@ -393,15 +360,13 @@ export default function ActionFollowUpEvidenceSection({
                 onCancel={() => {
                   setShowForm(false);
                   setErrorMessage(null);
-                  setSelectedSnapshotId(null);
                 }}
-                sensorSnapshotId={selectedSnapshotId}
-                sensorSelector={
-                  <ActionFollowUpManualSensorSelector
-                    status={sensorStatus}
-                    candidates={sensorCandidates}
-                    value={selectedSnapshotId}
-                    onChange={setSelectedSnapshotId}
+                photoReference={selectedPhotoReference}
+                photoSelectorSlot={
+                  <ActionFollowUpExistingPhotoSelector
+                    state={photoState}
+                    value={selectedPhotoReference}
+                    onChange={setSelectedPhotoReference}
                     disabled={saving}
                   />
                 }

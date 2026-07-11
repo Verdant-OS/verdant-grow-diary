@@ -22,7 +22,7 @@ export interface ActionFollowUpFormSubmit {
   outcome: ActionFollowUpOutcome;
   note: string;
   observedAt: string; // ISO
-  /** Optional Manual sensor snapshot ID (Slice 4b). Never persisted as anything else. */
+  photoReference: string | null;
   sensorSnapshotId: string | null;
 }
 
@@ -32,14 +32,14 @@ export interface ActionFollowUpEvidenceFormProps {
   initialObservedAt?: string; // ISO
   onSubmit: (values: ActionFollowUpFormSubmit) => void;
   onCancel?: () => void;
-  /**
-   * Slice 4b: optional slot for an existing-Manual-sensor-snapshot
-   * selector. Rendered inside the form so the association travels
-   * with the same submit action.
-   */
-  sensorSelector?: React.ReactNode;
-  /** Currently selected snapshot ID (mirrored back into submit). */
+  /** Controlled durable photo reference. `null` = "No photo". */
+  photoReference?: string | null;
+  /** Controlled manual sensor snapshot id. `null` = "No snapshot". */
   sensorSnapshotId?: string | null;
+  /** Optional slot for the existing-photo selector (Slice 4c). */
+  photoSelectorSlot?: React.ReactNode;
+  /** Optional slot for the manual sensor selector (Slice 4b). */
+  sensorSelectorSlot?: React.ReactNode;
 }
 
 const OUTCOME_LABEL: Record<ActionFollowUpOutcome, string> = {
@@ -76,8 +76,10 @@ export default function ActionFollowUpEvidenceForm({
   initialObservedAt,
   onSubmit,
   onCancel,
-  sensorSelector,
-  sensorSnapshotId,
+  photoReference = null,
+  sensorSnapshotId = null,
+  photoSelectorSlot,
+  sensorSelectorSlot,
 }: ActionFollowUpEvidenceFormProps) {
   const defaultObservedAt = useMemo(
     () => isoToLocalInput(initialObservedAt ?? new Date().toISOString()),
@@ -121,12 +123,7 @@ export default function ActionFollowUpEvidenceForm({
       return;
     }
     setFieldError(null);
-    onSubmit({
-      outcome,
-      note: trimmed,
-      observedAt: iso,
-      sensorSnapshotId: sensorSnapshotId ?? null,
-    });
+    onSubmit({ outcome, note: trimmed, observedAt: iso, photoReference, sensorSnapshotId });
   }
 
   const showNoteRequired = outcome && actionFollowUpRequiresNote(outcome);
@@ -245,7 +242,8 @@ export default function ActionFollowUpEvidenceForm({
         )}
       </div>
 
-      {sensorSelector}
+      {photoSelectorSlot}
+      {sensorSelectorSlot}
 
       {errorMessage && (
         <p

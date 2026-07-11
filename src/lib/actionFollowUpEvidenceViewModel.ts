@@ -88,6 +88,7 @@ export interface ActionFollowUpEvidenceViewModel {
   observedAtLabel: string;
   actionLabel: string;
   photoReference: string | null;
+  hasPhotoEvidence: boolean;
   sensorSnapshotId: string | null;
 }
 
@@ -127,6 +128,8 @@ export function buildActionFollowUpEvidenceViewModel(
       typeof record.photoReference === "string" && record.photoReference.length > 0
         ? record.photoReference
         : null,
+    hasPhotoEvidence:
+      typeof record.photoReference === "string" && record.photoReference.length > 0,
     sensorSnapshotId:
       typeof record.sensorSnapshotId === "string" && record.sensorSnapshotId.length > 0
         ? record.sensorSnapshotId

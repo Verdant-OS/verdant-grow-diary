@@ -374,7 +374,12 @@ export default function ActionFollowUpEvidenceSection({
       )}
 
       {query.status === "ready" && viewModel && (
-        <ActionFollowUpEvidenceCard viewModel={viewModel} />
+        <>
+          <ActionFollowUpEvidenceCard viewModel={viewModel} />
+          {viewModel.sensorSnapshotId && (
+            <ActionFollowUpManualSensorEvidence state={associatedEvidence} />
+          )}
+        </>
       )}
 
       {query.status === "ready" && !viewModel && (
@@ -388,7 +393,18 @@ export default function ActionFollowUpEvidenceSection({
                 onCancel={() => {
                   setShowForm(false);
                   setErrorMessage(null);
+                  setSelectedSnapshotId(null);
                 }}
+                sensorSnapshotId={selectedSnapshotId}
+                sensorSelector={
+                  <ActionFollowUpManualSensorSelector
+                    status={sensorStatus}
+                    candidates={sensorCandidates}
+                    value={selectedSnapshotId}
+                    onChange={setSelectedSnapshotId}
+                    disabled={saving}
+                  />
+                }
               />
             ) : (
             <Button

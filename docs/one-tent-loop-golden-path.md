@@ -352,3 +352,37 @@ Contract notes for Slice 4a:
 - Backward-compatible: rows without `details.outcome` are unchanged.
 - Pure, deterministic, null-safe. No schema, RLS, migration, or Edge
   Function changes. No AI, device, or Action Queue writes.
+
+## Action Follow-Up Evidence V1 — Slice 4b status
+
+Slice 4b — Optional Manual sensor snapshot association.
+
+- Manual-only snapshot candidate rules (`filterManualSensorSnapshotCandidates`): PASS
+- Authenticated candidate query (`loadManualSensorCandidates`): PASS
+- Snapshot resolver for existing evidence (`loadManualSensorSnapshotById`): PASS
+- Optional selector in follow-up form: PASS (default = "No sensor snapshot")
+- Selected snapshot ID passes exactly through the shipped service: PASS
+- No selection or query failure passes `sensorSnapshotId: null`: PASS
+- Evidence card renders Manual badge, captured time, key metrics: PASS
+- Missing/unresolvable snapshot shows unavailable copy without hiding
+  the outcome card: PASS
+- Manual provenance remains Manual — never rendered as Live: PASS
+- Manual snapshot creation: NOT ADDED
+- Sensor mutation (insert/update/delete): NOT ADDED
+- Live / CSV / demo / stale / invalid association:
+  INTENTIONALLY UNSUPPORTED
+- Slice 4c — Existing-photo evidence: DEFERRED
+- Authenticated browser proof: BLOCKED_BY_MANAGED_SESSION_INJECTOR
+
+Contract notes for Slice 4b:
+
+- Sensor association is optional and evidence-only. Sensor values do
+  not prove the selected outcome.
+- Only existing Manual snapshots owned by the grower and in the same
+  grow/tent/plant scope may be selected.
+- The follow-up stores only `sensor_snapshot_id`. Metrics are read
+  back through the authenticated resolver, never copied into
+  `diary_entries.details`.
+- Cross-user protection is enforced by RLS on `diary_entries`; the
+  pure candidate filter reapplies scope as defense-in-depth.
+- No schema, RLS, migration, or Edge Function changes.

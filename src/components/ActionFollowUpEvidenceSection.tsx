@@ -190,6 +190,65 @@ export default function ActionFollowUpEvidenceSection({
     };
   }, [action.id, action.growId, reloadNonce]);
 
+  // Slice 4b — load Manual snapshot candidates for the selector.
+  useEffect(() => {
+    let cancelled = false;
+    setSensorStatus("loading");
+    setSensorCandidates([]);
+    (async () => {
+      try {
+        const result = await loadCandidatesFn({
+          growId: action.growId,
+          tentId: action.tentId,
+          plantId: action.plantId,
+        });
+        if (cancelled) return;
+        if (result.status === "loaded") {
+          setSensorCandidates(result.candidates);
+          setSensorStatus("loaded");
+        } else {
+          setSensorStatus("error");
+        }
+      } catch {
+        if (!cancelled) setSensorStatus("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [action.growId, action.tentId, action.plantId, loadCandidatesFn]);
+
+  // Slice 4b — resolve the associated snapshot for an existing follow-up.
+  useEffect(() => {
+    let cancelled = false;
+    const existingSnapshotId =
+      query.status === "ready" && query.existing?.sensorSnapshotId
+        ? query.existing.sensorSnapshotId
+        : null;
+    if (!existingSnapshotId) {
+      setAssociatedEvidence({ status: "unavailable" });
+      return;
+    }
+    setAssociatedEvidence({ status: "loading" });
+    (async () => {
+      try {
+        const card = await loadSnapshotByIdFn(existingSnapshotId);
+        if (cancelled) return;
+        if (!card) {
+          setAssociatedEvidence({ status: "unavailable" });
+          return;
+        }
+        setAssociatedEvidence({ status: "ready", card });
+      } catch {
+        if (!cancelled) setAssociatedEvidence({ status: "unavailable" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [query, loadSnapshotByIdFn]);
+
+
   const eligibility = useMemo(
     () =>
       evaluateActionFollowUpEligibility({

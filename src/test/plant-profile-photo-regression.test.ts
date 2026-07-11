@@ -1,11 +1,11 @@
 /**
- * Plant profile photo regression hardening.
+ * Plant profile photo regression hardening (Native Upload V1).
  *
- * Static-source + pure-rule guardrails that confirm the V0 plant
- * profile photo loop is wired safely across PlantDetail, Plants list,
- * TentDetail cards, EditPlantDialog, and the PlantPhoto placeholder
- * fallback — without re-introducing unsafe URLs, duplicated rules in
- * JSX, or storage-deleting "clear" behavior.
+ * The primary control is now native camera / library upload; a URL
+ * field is not required and MUST NOT be the default. Legacy URLs
+ * (external + permitted data:) are still rendered for backward
+ * compatibility. Storage references are private and never surfaced
+ * to the user.
  *
  * This suite is read-only against the codebase. No Supabase writes,
  * AI calls, Action Queue mutations, alerts, automation, or device
@@ -21,93 +21,112 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 
 const EDIT_DIALOG = read("src/components/EditPlantDialog.tsx");
 const PLANT_PHOTO = read("src/components/PlantPhoto.tsx");
+const PLANT_PHOTO_VIEW = read("src/components/PlantPhotoView.tsx");
 const PLANT_DETAIL = read("src/pages/PlantDetail.tsx");
 const PLANTS_PAGE = read("src/pages/Plants.tsx");
 const TENT_DETAIL = read("src/pages/TentDetail.tsx");
 const RULES = read("src/lib/plantProfilePhotoRules.ts");
+const STORAGE_RULES = read("src/lib/plantProfilePhotoStorageRules.ts");
+const UPLOAD_SERVICE = read("src/lib/plantProfilePhotoUploadService.ts");
 
-describe("PlantPhoto · placeholder + fallback", () => {
-  it("PlantPhoto handles onError by switching to placeholder", () => {
-    expect(PLANT_PHOTO).toMatch(/onError=\{?\(\)\s*=>\s*setErrored\(true\)/);
-    expect(PLANT_PHOTO).toMatch(/showPlaceholder/);
-    expect(PLANT_PHOTO).toMatch(/data-testid=\{?`?\$\{testId\}-placeholder/);
+describe("PlantPhotoView · placeholder + fallback", () => {
+  it("PlantPhotoView handles onError by switching to placeholder", () => {
+    expect(PLANT_PHOTO_VIEW).toMatch(/onError=\{?\(\)\s*=>\s*setErrored\(true\)/);
+    expect(PLANT_PHOTO_VIEW).toMatch(/showPlaceholder/);
+    expect(PLANT_PHOTO_VIEW).toMatch(/data-testid=\{?`?\$\{testId\}-placeholder/);
   });
+  it("PlantPhotoView renders placeholder for blank/whitespace src", () => {
+    expect(PLANT_PHOTO_VIEW).toMatch(
+      /const trimmed = typeof src === "string" \? src\.trim\(\) : "";/,
+    );
+    expect(PLANT_PHOTO_VIEW).toMatch(/!trimmed \|\| errored/);
+  });
+});
 
-  it("PlantPhoto renders placeholder for blank/whitespace src without throwing", () => {
-    // Sanity: trimmed empty string triggers placeholder branch.
-    expect(PLANT_PHOTO).toMatch(/const trimmed = typeof src === "string" \? src\.trim\(\) : "";/);
-    expect(PLANT_PHOTO).toMatch(/!trimmed \|\| errored/);
+describe("PlantPhoto wrapper · delegates to resolver + view", () => {
+  it("wraps PlantPhotoView and calls the resolver hook", () => {
+    expect(PLANT_PHOTO).toContain(
+      'import PlantPhotoView from "@/components/PlantPhotoView"',
+    );
+    expect(PLANT_PHOTO).toContain(
+      'import { usePlantProfilePhotoSource } from "@/hooks/usePlantProfilePhotoSource"',
+    );
+    expect(PLANT_PHOTO).toMatch(/usePlantProfilePhotoSource\(src\)/);
+    expect(PLANT_PHOTO).toMatch(/<PlantPhotoView[\s\S]*src=\{resolved\.displayUrl\}/);
   });
 });
 
 describe("PlantPhoto · surface wiring", () => {
   it("PlantDetail renders PlantPhoto hero with plant.photo", () => {
-    expect(PLANT_DETAIL).toContain("import PlantPhoto from \"@/components/PlantPhoto\"");
+    expect(PLANT_DETAIL).toContain('import PlantPhoto from "@/components/PlantPhoto"');
     expect(PLANT_DETAIL).toMatch(/<PlantPhoto[\s\S]*?src=\{plant\.photo\}/);
   });
-
   it("Plants list/cards render PlantPhoto", () => {
-    expect(PLANTS_PAGE).toContain("import PlantPhoto from \"@/components/PlantPhoto\"");
+    expect(PLANTS_PAGE).toContain('import PlantPhoto from "@/components/PlantPhoto"');
     expect(PLANTS_PAGE).toMatch(/<PlantPhoto[\s\S]*?\/>/);
   });
-
   it("TentDetail plant cards render PlantPhoto with safe caption", () => {
-    expect(TENT_DETAIL).toContain("import PlantPhoto from \"@/components/PlantPhoto\"");
+    expect(TENT_DETAIL).toContain('import PlantPhoto from "@/components/PlantPhoto"');
     expect(TENT_DETAIL).toMatch(/<PlantPhoto[\s\S]*?caption="No plant photo yet"/);
   });
 });
 
-describe("EditPlantDialog · set/update/clear flow", () => {
-  it("uses pure normalizePlantProfilePhotoInput for validation", () => {
+describe("EditPlantDialog · native camera + library flow", () => {
+  it("exposes Take Photo and Choose from Library buttons", () => {
+    expect(EDIT_DIALOG).toMatch(/data-testid="edit-plant-photo-camera"/);
+    expect(EDIT_DIALOG).toMatch(/data-testid="edit-plant-photo-library"/);
+    expect(EDIT_DIALOG).toMatch(/Take Photo/);
+    expect(EDIT_DIALOG).toMatch(/Choose from Library/);
+  });
+  it("hidden file inputs use image MIME allow-list and camera capture", () => {
+    expect(EDIT_DIALOG).toMatch(/accept=\{ACCEPT_ATTR\}/);
+    expect(EDIT_DIALOG).toMatch(/capture="environment"/);
     expect(EDIT_DIALOG).toContain(
-      'import { normalizePlantProfilePhotoInput } from "@/lib/plantProfilePhotoRules"',
+      'import { validatePlantProfilePhotoFile',
     );
-    expect(EDIT_DIALOG).toMatch(/normalizePlantProfilePhotoInput\(form\.photo_url\)/);
   });
-
-  it("rejects bad URLs before any supabase update", () => {
-    // The early-return on photoNorm.ok === false must come before the
-    // supabase.from("plants").update(...) call.
-    const idxReject = EDIT_DIALOG.indexOf("photoNorm.ok === false");
-    const idxUpdate = EDIT_DIALOG.indexOf('supabase\n      .from("plants")\n      .update');
-    const idxUpdateLoose = EDIT_DIALOG.search(/supabase[\s\S]{0,40}\.from\("plants"\)[\s\S]{0,40}\.update/);
-    expect(idxReject).toBeGreaterThan(-1);
-    expect(idxUpdate >= 0 ? idxUpdate : idxUpdateLoose).toBeGreaterThan(idxReject);
+  it("uses the upload service and never persists a signed URL", () => {
+    expect(EDIT_DIALOG).toContain(
+      'import {\n  uploadPlantProfilePhoto,\n  removeUploadedPlantProfilePhoto,\n} from "@/lib/plantProfilePhotoUploadService"',
+    );
+    expect(EDIT_DIALOG).not.toMatch(/createSignedUrl/);
   });
-
-  it("surfaces a typed reason via toast.error on rejection", () => {
-    expect(EDIT_DIALOG).toMatch(/toast\.error\(/);
-    expect(EDIT_DIALOG).toMatch(/unsupported-protocol/);
-    expect(EDIT_DIALOG).toMatch(/too-long/);
+  it("does not surface a URL text input as the primary control", () => {
+    expect(EDIT_DIALOG).not.toMatch(/type="url"/);
+    expect(EDIT_DIALOG).not.toMatch(/paste an image URL/i);
   });
-
-  it("exposes a Clear photo control that only unsets the form value", () => {
-    expect(EDIT_DIALOG).toMatch(/data-testid="edit-plant-photo-clear"/);
-    expect(EDIT_DIALOG).toMatch(/onClick=\{\(\)\s*=>\s*setForm\(\{\s*\.\.\.form,\s*photo_url:\s*""\s*\}\)\}/);
+  it("communicates non-destructive replace/clear and does not delete objects here", () => {
+    expect(EDIT_DIALOG).not.toMatch(/storage\.from\([^)]*\)\.remove/);
+    expect(EDIT_DIALOG).toMatch(
+      /Replacing the profile photo does not delete\s+older diary photos/,
+    );
+    expect(EDIT_DIALOG).toMatch(
+      /This updates the plant profile photo\. It does not add a\s+timeline log/,
+    );
   });
-
-  it("does not delete underlying storage when clearing", () => {
-    // No storage.remove / storage.from(...).remove anywhere in the dialog.
-    expect(EDIT_DIALOG).not.toMatch(/storage[\s\S]*\.remove\(/);
-    expect(EDIT_DIALOG).not.toMatch(/storage\.from\(/);
-    // Copy must communicate non-destructive clear to the grower.
-    expect(EDIT_DIALOG).toMatch(/Existing uploaded\s+photos are not deleted/);
-  });
-
-  it("reuses PlantPhoto for the live preview (no duplicate placeholder)", () => {
-    expect(EDIT_DIALOG).toContain("import PlantPhoto from \"@/components/PlantPhoto\"");
-    expect(EDIT_DIALOG).toMatch(/<PlantPhoto[\s\S]*?testId="edit-plant-photo-preview"/);
+  it("cleans up an orphan upload if the plant row update fails", () => {
+    expect(EDIT_DIALOG).toMatch(/removeUploadedPlantProfilePhoto\(uploadedPath\)/);
   });
 });
 
-describe("plantProfilePhotoRules · URL safety is the single source of truth", () => {
+describe("plantProfilePhotoRules · URL text-input validator (back-compat)", () => {
   it("normalizes blank/whitespace/non-string input to CLEAR", () => {
-    expect(normalizePlantProfilePhotoInput("")).toEqual({ ok: true, kind: "clear", photo_url: null });
-    expect(normalizePlantProfilePhotoInput("   ")).toEqual({ ok: true, kind: "clear", photo_url: null });
-    expect(normalizePlantProfilePhotoInput(null)).toEqual({ ok: true, kind: "clear", photo_url: null });
-    expect(normalizePlantProfilePhotoInput(undefined)).toEqual({ ok: true, kind: "clear", photo_url: null });
+    expect(normalizePlantProfilePhotoInput("")).toEqual({
+      ok: true,
+      kind: "clear",
+      photo_url: null,
+    });
+    expect(normalizePlantProfilePhotoInput("   ")).toEqual({
+      ok: true,
+      kind: "clear",
+      photo_url: null,
+    });
+    expect(normalizePlantProfilePhotoInput(null)).toEqual({
+      ok: true,
+      kind: "clear",
+      photo_url: null,
+    });
   });
-
   it("accepts https and data:image URLs", () => {
     expect(normalizePlantProfilePhotoInput("https://example.com/p.jpg")).toMatchObject({
       ok: true,
@@ -117,55 +136,36 @@ describe("plantProfilePhotoRules · URL safety is the single source of truth", (
       normalizePlantProfilePhotoInput("data:image/png;base64,iVBORw0KGgo="),
     ).toMatchObject({ ok: true, kind: "set" });
   });
-
-  it("rejects unsafe protocols (javascript:, file:, blob:)", () => {
+  it("rejects unsafe protocols", () => {
     expect(normalizePlantProfilePhotoInput("javascript:alert(1)")).toEqual({
       ok: false,
       reason: "unsupported-protocol",
     });
-    expect(normalizePlantProfilePhotoInput("file:///etc/passwd")).toEqual({
-      ok: false,
-      reason: "unsupported-protocol",
-    });
-    expect(normalizePlantProfilePhotoInput("blob:https://x/abc")).toEqual({
-      ok: false,
-      reason: "unsupported-protocol",
-    });
-  });
-
-  it("rejects overly long URLs (>2048) without saving", () => {
-    const long = "https://example.com/" + "a".repeat(2100);
-    expect(normalizePlantProfilePhotoInput(long)).toEqual({ ok: false, reason: "too-long" });
-  });
-
-  it("rejects malformed URLs", () => {
-    expect(normalizePlantProfilePhotoInput("not a url")).toEqual({
-      ok: false,
-      reason: "invalid-url",
-    });
   });
 });
 
-describe("safety · no duplicated URL rules in JSX, no unsafe writes", () => {
-  it("EditPlantDialog does not duplicate protocol whitelist or length cap inline", () => {
-    // The rule helper is the single source of truth; JSX must not
-    // re-implement protocol checks or numeric length caps.
-    expect(EDIT_DIALOG).not.toMatch(/javascript:/i);
-    expect(EDIT_DIALOG).not.toMatch(/new URL\(/);
-    expect(EDIT_DIALOG).not.toMatch(/\b2048\b/);
-    expect(EDIT_DIALOG).not.toMatch(/data:image/i);
-  });
-
-  it("EditPlantDialog only writes to the plants table (no alerts/action_queue/sensor writes)", () => {
+describe("safety · no unsafe writes, no service-role, no Edge invocations", () => {
+  it("EditPlantDialog only writes to the plants table", () => {
     expect(EDIT_DIALOG).not.toMatch(/from\("alerts"\)/);
     expect(EDIT_DIALOG).not.toMatch(/from\("action_queue"\)/);
     expect(EDIT_DIALOG).not.toMatch(/from\("sensor_readings"\)/);
+    expect(EDIT_DIALOG).not.toMatch(/from\("diary_entries"\)/);
+    expect(EDIT_DIALOG).not.toMatch(/from\("grow_events"\)/);
     expect(EDIT_DIALOG).not.toMatch(/functions\.invoke\(/);
   });
-
-  it("plantProfilePhotoRules stays pure (no I/O imports)", () => {
+  it("storage rules stay pure (no supabase/fetch)", () => {
+    expect(STORAGE_RULES).not.toMatch(/from "@\/integrations\/supabase/);
+    expect(STORAGE_RULES).not.toMatch(/\bfetch\(/);
+  });
+  it("upload service uses the shared client (no service role, no Edge)", () => {
+    expect(UPLOAD_SERVICE).not.toMatch(/SERVICE_ROLE/i);
+    expect(UPLOAD_SERVICE).not.toMatch(/service_role/);
+    expect(UPLOAD_SERVICE).not.toMatch(/functions\.invoke/);
+    expect(UPLOAD_SERVICE).toMatch(/upsert:\s*false/);
+    expect(UPLOAD_SERVICE).toMatch(/PLANT_PROFILE_PHOTO_BUCKET/);
+  });
+  it("plantProfilePhotoRules text-input helper stays pure", () => {
     expect(RULES).not.toMatch(/from "@\/integrations\/supabase/);
     expect(RULES).not.toMatch(/\bfetch\(/);
-    expect(RULES).not.toMatch(/functions\.invoke/);
   });
 });

@@ -25,7 +25,16 @@ export const MANAGED_SESSION_ENV = {
 
 export const ONE_TENT_PREFLIGHT_JSON_PREFIX = "ONE_TENT_PREFLIGHT_JSON=";
 
-const VALID_SAME_SITE = { strict: "Strict", lax: "Lax", none: "None" };
+// sameSite aliases. Playwright/RFC values are strict/lax/none; Chrome and
+// DevTools exports use "no_restriction" (== None) and "unspecified" (no
+// explicit policy). Unknown values are still rejected, never guessed.
+const VALID_SAME_SITE = {
+  strict: "Strict",
+  lax: "Lax",
+  none: "None",
+  no_restriction: "None",
+};
+const UNSET_SAME_SITE = "unspecified";
 
 function normalizeOneCookie(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
@@ -51,15 +60,24 @@ function normalizeOneCookie(raw) {
   }
   if (raw.sameSite !== undefined) {
     if (typeof raw.sameSite !== "string") return null;
-    const normalized = VALID_SAME_SITE[raw.sameSite.toLowerCase()];
-    if (!normalized) return null;
-    out.sameSite = normalized;
+    const key = raw.sameSite.toLowerCase();
+    if (key !== UNSET_SAME_SITE) {
+      const normalized = VALID_SAME_SITE[key];
+      if (!normalized) return null;
+      out.sameSite = normalized;
+    }
   }
   if (raw.expires !== undefined) {
-    if (typeof raw.expires !== "number" || !Number.isFinite(raw.expires) || raw.expires <= 0) {
+    // A non-number / non-finite expires is still malformed (fail closed).
+    if (typeof raw.expires !== "number" || !Number.isFinite(raw.expires)) {
       return null;
     }
-    out.expires = raw.expires;
+    // A non-positive expires marks a SESSION cookie (Playwright's
+    // storageState emits expires:-1; some exports use 0). Keep the cookie;
+    // omit the expiry so Playwright treats it as a session cookie.
+    if (raw.expires > 0) {
+      out.expires = raw.expires;
+    }
   }
   return out;
 }

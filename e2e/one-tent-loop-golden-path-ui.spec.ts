@@ -100,22 +100,36 @@ function newSupabaseTestClient(session: ManagedSessionReady["session"]): Supabas
   });
 }
 
-async function restoreManagedSession(page: Page, ready: ManagedSessionReady) {
+async function restoreManagedSession(
+  page: Page,
+  ready: ManagedSessionReady,
+  rawSessionJson: string,
+) {
   const context = page.context();
   // Validated cookies FIRST, before any navigation (cookie order rule).
   await restoreManagedCookiesBeforeNavigation(context, page, ready.cookies, "/");
+  // Inject the VERBATIM validated session JSON (not the narrowed preflight
+  // view). supabase-js `_isValidSession` requires access_token AND
+  // refresh_token AND expires_at all present; the narrowed shape can drop
+  // refresh_token/expires_at/token_type/expires_in, which makes the app
+  // discard the stored session and bounce to /auth. Storing the exact value
+  // supabase-js itself would have written restores auth faithfully.
+  const value =
+    typeof rawSessionJson === "string" && rawSessionJson.trim()
+      ? rawSessionJson.trim()
+      : JSON.stringify(ready.session);
   await page.evaluate(
-    ({ key, value }) => {
+    ({ key, value: v }) => {
       try {
-        window.localStorage.setItem(key, value);
-        window.sessionStorage.setItem(key, value);
+        window.localStorage.setItem(key, v);
+        window.sessionStorage.setItem(key, v);
       } catch {
         /* storage may be locked in some contexts */
       }
     },
     {
       key: ready.storageKey,
-      value: JSON.stringify(ready.session),
+      value,
     },
   );
   await page.goto("/");
@@ -255,7 +269,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
 
       // Stage 1 — Authenticated shell (cookies before navigation).
       await stage("auth_restored", async () => {
-        await restoreManagedSession(page, ready);
+        await restoreManagedSession(page, ready, env.sessionJson ?? "");
         await expect(page).not.toHaveURL(/\/auth(\?|$)/);
       });
 

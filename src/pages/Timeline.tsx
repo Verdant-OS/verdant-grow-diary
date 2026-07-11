@@ -5,7 +5,11 @@ import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { STAGES, stageLabel } from "@/lib/grow";
 import { format, formatDistanceToNow } from "date-fns";
-import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks } from "lucide-react";
+import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks, ClipboardCheck } from "lucide-react";
+import { isActionResponseCandidateDetails } from "@/lib/actionResponseMemoryRules";
+import { buildActionResponseMemoryCardViewModel } from "@/lib/actionResponseMemoryViewModel";
+import { useActionResponseMemory } from "@/hooks/useActionResponseMemory";
+import ActionResponseMemoryCard from "@/components/ActionResponseMemoryCard";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
@@ -164,7 +168,7 @@ interface AlertEventRow {
   } | null;
 }
 
-type EventFilter = "all" | "photo" | "note" | "measurement" | "followup";
+type EventFilter = "all" | "photo" | "note" | "measurement" | "followup" | "actionresponse";
 
 function entryKinds(e: Entry): EventFilter[] {
   const kinds: EventFilter[] = ["note"];
@@ -187,6 +191,12 @@ function entryKinds(e: Entry): EventFilter[] {
     eventType === "run_learning_decision"
   ) {
     kinds.push("followup");
+  }
+  // Grower-recorded responses (Slice 4c evidence rows with an explicit
+  // outcome) additionally surface under the "Action responses" filter.
+  // The predicate is the canonical rules module's — no rule tables in JSX.
+  if (isActionResponseCandidateDetails(e.details as Record<string, unknown> | null)) {
+    kinds.push("actionresponse");
   }
   return kinds;
 }
@@ -404,10 +414,27 @@ export default function Timeline() {
   }, [entries]);
 
   const eventCounts = useMemo(() => {
-    const m = { all: entries.length, photo: 0, note: 0, measurement: 0, followup: 0 };
+    const m = { all: entries.length, photo: 0, note: 0, measurement: 0, followup: 0, actionresponse: 0 };
     entries.forEach((e) => entryKinds(e).forEach((k) => { m[k] = (m[k] || 0) + 1; }));
     return m;
   }, [entries]);
+
+  // Canonical Action Response Memory (read-only). One grower response renders
+  // as ONE compact card inside its own evidence row — never an extra event.
+  // A failed load renders nothing and never disturbs the rest of the page.
+  const { state: actionResponseState } = useActionResponseMemory({ growId: activeGrowId });
+  const actionResponseCardByRowId = useMemo(() => {
+    const map = new Map<
+      string,
+      NonNullable<ReturnType<typeof buildActionResponseMemoryCardViewModel>>
+    >();
+    if (actionResponseState.status !== "ok") return map;
+    for (const memory of actionResponseState.memories) {
+      const vm = buildActionResponseMemoryCardViewModel({ memory });
+      if (vm) map.set(memory.response.rowId, vm);
+    }
+    return map;
+  }, [actionResponseState]);
 
   const plantOptions = useMemo(() => deriveTimelinePlantOptions(entries), [entries]);
   const tentOptions = useMemo(() => deriveTimelineTentOptions(entries), [entries]);
@@ -877,6 +904,7 @@ export default function Timeline() {
           <FilterChip active={eventFilter === "note"} onClick={() => setEventFilter("note")} label="Notes" icon={<FileText className="h-3 w-3" />} count={eventCounts.note} />
           <FilterChip active={eventFilter === "measurement"} onClick={() => setEventFilter("measurement")} label="Measurements" icon={<FlaskConical className="h-3 w-3" />} count={eventCounts.measurement} />
           <FilterChip active={eventFilter === "followup"} onClick={() => setEventFilter("followup")} label="Follow-ups" icon={<Check className="h-3 w-3" />} count={eventCounts.followup} />
+          <FilterChip active={eventFilter === "actionresponse"} onClick={() => setEventFilter("actionresponse")} label="Action responses" icon={<ClipboardCheck className="h-3 w-3" />} count={eventCounts.actionresponse} />
         </div>
       </div>
 
@@ -1128,6 +1156,24 @@ export default function Timeline() {
 
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>
+                              {(() => {
+                                // Compact canonical "Action response" card for
+                                // grower-recorded evidence rows. Rendered inside
+                                // the row itself — the raw row never duplicates
+                                // into a second event. The existing pinned
+                                // "View original action" link below serves as
+                                // the card's action link on this surface.
+                                const responseVm = actionResponseCardByRowId.get(e.id);
+                                return responseVm ? (
+                                  <div className="mt-2">
+                                    <ActionResponseMemoryCard
+                                      viewModel={responseVm}
+                                      variant="compact"
+                                      showActionLink={false}
+                                    />
+                                  </div>
+                                ) : null;
+                              })()}
                               {isLearningLoopEvent && (loopOutcomeStatus || loopDecisionLabel) && (
                                 <div className="mt-1 flex flex-wrap gap-1.5">
                                   {loopOutcomeStatus && (

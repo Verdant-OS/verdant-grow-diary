@@ -73,6 +73,8 @@ const SAFE_DETAIL_KEYS: ReadonlySet<string> = new Set([
   // Learning-loop friendly fields (values are safe enums, never ids/tokens).
   "outcome_status",
   "decision",
+  // Grower-recorded follow-up response outcome (Slice 4c evidence rows).
+  "outcome",
 ]);
 
 const TIMELINE_DETAIL_STALE_MS = 30 * 60 * 1000;

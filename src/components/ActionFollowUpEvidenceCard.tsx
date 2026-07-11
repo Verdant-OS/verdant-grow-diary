@@ -22,12 +22,18 @@ export interface ActionFollowUpEvidenceCardProps {
   className?: string;
   /** Optional slot for read-only associated photo evidence (Slice 4c). */
   photoEvidenceSlot?: React.ReactNode;
+  /**
+   * Optional historical-evidence line (Milestone 5). Rendered only when the
+   * row is a canonical grower-recorded response; legacy marker rows omit it.
+   */
+  historicalNote?: string | null;
 }
 
 export default function ActionFollowUpEvidenceCard({
   viewModel,
   className,
   photoEvidenceSlot,
+  historicalNote,
 }: ActionFollowUpEvidenceCardProps) {
   return (
     <div
@@ -70,6 +76,16 @@ export default function ActionFollowUpEvidenceCard({
       )}
 
       {photoEvidenceSlot}
+
+      {historicalNote && (
+        <p
+          role="note"
+          data-testid="action-followup-historical-note"
+          className="text-[11px] text-amber-300/90"
+        >
+          {historicalNote}
+        </p>
+      )}
     </div>
   );
 }

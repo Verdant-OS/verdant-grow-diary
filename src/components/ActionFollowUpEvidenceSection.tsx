@@ -29,6 +29,12 @@ import {
   type ActionFollowUpEvidenceSaveResult,
 } from "@/lib/actionFollowUpEvidenceService";
 import { buildActionFollowUpEvidenceViewModel } from "@/lib/actionFollowUpEvidenceViewModel";
+import {
+  ACTION_RESPONSE_MEMORY_HISTORICAL_COPY,
+  buildActionResponseMemories,
+  type ActionResponseMemory,
+} from "@/lib/actionResponseMemoryRules";
+import { toActionFollowUpEvidenceViewModel } from "@/lib/actionResponseMemoryViewModel";
 import ActionFollowUpEvidenceForm, {
   type ActionFollowUpFormSubmit,
 } from "@/components/ActionFollowUpEvidenceForm";
@@ -68,7 +74,61 @@ export interface ActionFollowUpEvidenceSectionProps {
 type QueryState =
   | { status: "loading" }
   | { status: "error" }
-  | { status: "ready"; existing: ActionFollowUpEvidenceRecord | null };
+  | {
+      status: "ready";
+      existing: ActionFollowUpEvidenceRecord | null;
+      /**
+       * Canonical Action Response Memory (Milestone 5) when the row is an
+       * explicit grower-recorded response. Null for legacy marker rows,
+       * which keep their established rendering.
+       */
+      canonicalMemory?: ActionResponseMemory | null;
+    };
+
+/**
+ * Build the canonical memory for one already-verified evidence record.
+ * Pure composition over the canonical rules — no extra queries. The action
+ * context comes from the same prop ActionDetail already passes.
+ */
+function canonicalMemoryFromRecord(
+  record: ActionFollowUpEvidenceRecord,
+  action: ActionFollowUpEvidenceSectionAction,
+): ActionResponseMemory | null {
+  const memories = buildActionResponseMemories({
+    responseRows: [
+      {
+        id: record.diaryEntryId,
+        grow_id: record.growId,
+        tent_id: record.tentId,
+        plant_id: record.plantId,
+        details: {
+          event_type: ACTION_FOLLOWUP_EVENT_TYPE,
+          action_queue_id: record.actionQueueId,
+          outcome: record.outcome,
+          observed_at: record.observedAt,
+          note: record.note,
+          photo_reference: record.photoReference,
+          sensor_snapshot_id: record.sensorSnapshotId,
+        },
+      },
+    ],
+    actions: [
+      {
+        id: action.id,
+        grow_id: action.growId,
+        tent_id: action.tentId,
+        plant_id: action.plantId,
+        status: action.status,
+        suggested_change: action.actionLabel,
+        completed_at: null,
+      },
+    ],
+    // Sensor rows are not loaded on this surface; the established card
+    // renders its own attached-snapshot line from the record instead.
+    sensorRows: [],
+  });
+  return memories[0] ?? null;
+}
 
 function projectRow(row: {
   id: string | null;
@@ -170,7 +230,11 @@ export default function ActionFollowUpEvidenceSection({
             },
           )
         : null;
-      setQuery({ status: "ready", existing });
+      // Canonical memory builds only for explicit grower responses (valid
+      // outcome + valid observed time). Legacy marker rows fail closed to
+      // null and keep their established rendering.
+      const canonicalMemory = existing ? canonicalMemoryFromRecord(existing, action) : null;
+      setQuery({ status: "ready", existing, canonicalMemory });
     })();
     return () => {
       cancelled = true;
@@ -251,11 +315,19 @@ export default function ActionFollowUpEvidenceSection({
         const result = await saveFn(draft);
         if (result.status === "created") {
           toast.success("Follow-up recorded.");
-          setQuery({ status: "ready", existing: result.followUp });
+          setQuery({
+            status: "ready",
+            existing: result.followUp,
+            canonicalMemory: canonicalMemoryFromRecord(result.followUp, action),
+          });
           setShowForm(false);
         } else if (result.status === "existing") {
           toast.message("A follow-up is already linked to this action.");
-          setQuery({ status: "ready", existing: result.followUp });
+          setQuery({
+            status: "ready",
+            existing: result.followUp,
+            canonicalMemory: canonicalMemoryFromRecord(result.followUp, action),
+          });
           setShowForm(false);
         } else if (result.status === "blocked") {
           let msg = "This action is not ready for follow-up.";
@@ -284,16 +356,23 @@ export default function ActionFollowUpEvidenceSection({
     [action, saveFn],
   );
 
-  const viewModel = useMemo(
-    () =>
-      query.status === "ready" && query.existing
-        ? buildActionFollowUpEvidenceViewModel({
-            record: query.existing,
-            actionLabel: action.actionLabel,
-          })
-        : null,
-    [query, action.actionLabel],
-  );
+  const viewModel = useMemo(() => {
+    if (query.status !== "ready" || !query.existing) return null;
+    // Canonical grower responses flow through the shared Milestone 5 model
+    // (single outcome-label mapping); legacy marker rows keep the original
+    // record-based view model unchanged.
+    if (query.canonicalMemory) {
+      return toActionFollowUpEvidenceViewModel({
+        memory: query.canonicalMemory,
+        fallbackActionLabel: action.actionLabel,
+      });
+    }
+    return buildActionFollowUpEvidenceViewModel({
+      record: query.existing,
+      actionLabel: action.actionLabel,
+    });
+  }, [query, action.actionLabel]);
+  const isCanonicalResponse = query.status === "ready" && !!query.canonicalMemory;
 
   const ineligibleCopy = useMemo(() => {
     if (eligibility.eligible === true) return "";
@@ -346,6 +425,9 @@ export default function ActionFollowUpEvidenceSection({
             viewModel.hasPhotoEvidence ? (
               <ActionFollowUpExistingPhotoEvidence reference={viewModel.photoReference} />
             ) : null
+          }
+          historicalNote={
+            isCanonicalResponse ? ACTION_RESPONSE_MEMORY_HISTORICAL_COPY : null
           }
         />
       )}

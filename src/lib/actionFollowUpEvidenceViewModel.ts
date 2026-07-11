@@ -128,6 +128,8 @@ export function buildActionFollowUpEvidenceViewModel(
       typeof record.photoReference === "string" && record.photoReference.length > 0
         ? record.photoReference
         : null,
+    hasPhotoEvidence:
+      typeof record.photoReference === "string" && record.photoReference.length > 0,
     sensorSnapshotId:
       typeof record.sensorSnapshotId === "string" && record.sensorSnapshotId.length > 0
         ? record.sensorSnapshotId

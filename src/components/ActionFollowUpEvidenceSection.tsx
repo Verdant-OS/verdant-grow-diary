@@ -55,6 +55,13 @@ export interface ActionFollowUpEvidenceSectionProps {
   action: ActionFollowUpEvidenceSectionAction;
   /** Optional service injection for tests. */
   save?: (draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>;
+  /** Optional photo-candidate loader injection for tests. */
+  loadPhotoCandidates?: (ctx: {
+    authenticatedUserId: string;
+    growId: string;
+    tentId: string | null;
+    plantId: string | null;
+  }) => Promise<ExistingPhotoCandidateLoadResult>;
 }
 
 type QueryState =

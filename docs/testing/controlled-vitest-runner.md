@@ -19,9 +19,17 @@ additional controlled command used for the full suite and the manual
 - **Resume-safe** — completed files are never re-run; completed
   failures stay failed; resume refuses if the **workspace fingerprint**
   (every tracked + non-ignored untracked file in the repository),
-  manifest, package/lock, reporter schema, or run schema drifts.
+  manifest, package/lock, reporter schema, run schema, or the
+  **enforced runtime toolchain identity (Node, Bun, Vitest)** drifts.
   Runner artifacts under `.vitest-runs/` and `test-results/` are
   excluded via `.gitignore` and never self-invalidate a resume.
+- **Toolchain-locked** — `RUN_SCHEMA_VERSION = 3` folds Node
+  (`process.version`), Bun (`bun --version` from the installed
+  executable), and Vitest (installed local package metadata) into
+  the run record and the configuration fingerprint. Legacy v1/v2
+  runs are refused, never silently upgraded. The controlled CI
+  workflow pins `bun-version: 1.3.3` in both jobs and prints only
+  the discovered node/bun/vitest versions — no environment dumps.
 - **Sharded** — union of shards equals manifest, pairwise
   intersection is empty; aggregate job proves exact coverage.
 - **No config changes** — the 5-second `testTimeout`, retry count,

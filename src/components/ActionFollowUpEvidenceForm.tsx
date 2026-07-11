@@ -245,6 +245,8 @@ export default function ActionFollowUpEvidenceForm({
         )}
       </div>
 
+      {sensorSelector}
+
       {errorMessage && (
         <p
           id="action-followup-form-error"

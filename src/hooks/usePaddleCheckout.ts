@@ -111,6 +111,11 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
       }
 
       if (!user) {
+        // Persist plan intent so we can auto-resume post-auth ONCE.
+        // Allowlist-checked inside savePlanIntent — unknown ids are dropped.
+        if (isKnownPlanIntent(options.priceId)) {
+          savePlanIntent(options.priceId);
+        }
         const back =
           `${window.location.pathname}${window.location.search}` || "/pricing";
         navigate(`/auth?redirectTo=${encodeURIComponent(back)}`);

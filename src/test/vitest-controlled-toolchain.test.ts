@@ -19,6 +19,9 @@ import path from "node:path";
 import os from "node:os";
 import { EventEmitter } from "node:events";
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+const requireFn = createRequire(import.meta.url);
+const resolveVitestPkg = () => requireFn.resolve("vitest/package.json");
 import {
   discoverToolVersions,
   toolchainMismatch,

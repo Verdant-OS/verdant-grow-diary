@@ -26,14 +26,8 @@ import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivi
 import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 
 const ROOT = resolve(__dirname, "../..");
-const HELPER = readFileSync(
-  resolve(ROOT, "src/lib/plantRecentActivityRecap.ts"),
-  "utf8",
-);
-const RECOVERY_HELPER = readFileSync(
-  resolve(ROOT, "src/lib/noRecentLogRecoveryRules.ts"),
-  "utf8",
-);
+const HELPER = readFileSync(resolve(ROOT, "src/lib/plantRecentActivityRecap.ts"), "utf8");
+const RECOVERY_HELPER = readFileSync(resolve(ROOT, "src/lib/noRecentLogRecoveryRules.ts"), "utf8");
 const COMPONENT = readFileSync(
   resolve(ROOT, "src/components/PlantDetailRecentActivityRecap.tsx"),
   "utf8",
@@ -97,23 +91,15 @@ describe("buildPlantRecentActivityRecap", () => {
       ],
     });
     expect(items).toHaveLength(PLANT_RECENT_ACTIVITY_RECAP_DEFAULT_LIMIT);
-    expect(items.map((i) => i.category)).toEqual([
-      "watering",
-      "feeding",
-      "photos",
-    ]);
+    expect(items.map((i) => i.category)).toEqual(["watering", "feeding", "photos"]);
   });
 
   it("clamps limit to [1, max]", () => {
-    const rows = Array.from({ length: 10 }).map((_, i) =>
-      row({ id: `r${i}` }),
+    const rows = Array.from({ length: 10 }).map((_, i) => row({ id: `r${i}` }));
+    expect(buildPlantRecentActivityRecap({ rows, limit: 0 })).toHaveLength(1);
+    expect(buildPlantRecentActivityRecap({ rows, limit: 999 })).toHaveLength(
+      PLANT_RECENT_ACTIVITY_RECAP_MAX_LIMIT,
     );
-    expect(
-      buildPlantRecentActivityRecap({ rows, limit: 0 }),
-    ).toHaveLength(1);
-    expect(
-      buildPlantRecentActivityRecap({ rows, limit: 999 }),
-    ).toHaveLength(PLANT_RECENT_ACTIVITY_RECAP_MAX_LIMIT);
   });
 
   it("derives category labels from classifyTimelineEntry buckets", () => {
@@ -215,17 +201,13 @@ describe("PlantDetailRecentActivityRecap render", () => {
   it("renders loading state", () => {
     useRecentMock.mockReturnValue({ data: undefined, isLoading: true });
     render(<PlantDetailRecentActivityRecap plantId="p1" />);
-    expect(
-      screen.getByTestId("plant-detail-recent-activity-recap-loading"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("plant-detail-recent-activity-recap-loading")).toBeInTheDocument();
   });
 
   it("renders empty state with helper copy when no recovery callback is supplied", () => {
     useRecentMock.mockReturnValue({ data: [], isLoading: false });
     render(<PlantDetailRecentActivityRecap plantId="p1" />);
-    expect(
-      screen.getByText(/No recent activity yet\./),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No recent activity yet\./)).toBeInTheDocument();
     expect(
       screen.getByText(
         /Use Quick Log, manual sensor snapshots, or photos to start building plant memory\./,
@@ -321,9 +303,7 @@ describe("PlantDetailRecentActivityRecap render", () => {
     ];
     useRecentMock.mockReturnValue({ data: raw, isLoading: false });
     render(<PlantDetailRecentActivityRecap plantId="p1" />);
-    const items = screen.getAllByTestId(
-      "plant-detail-recent-activity-recap-item",
-    );
+    const items = screen.getAllByTestId("plant-detail-recent-activity-recap-item");
     expect(items).toHaveLength(3);
     expect(items.map((el) => el.getAttribute("data-category"))).toEqual([
       "photos",
@@ -343,9 +323,7 @@ describe("PlantDetailRecentActivityRecap render", () => {
     (anchor as HTMLElement).scrollIntoView = scrollSpy as never;
     (anchor as HTMLElement).focus = focusSpy as never;
     render(<PlantDetailRecentActivityRecap plantId="p1" />);
-    fireEvent.click(
-      screen.getByTestId("plant-detail-recent-activity-recap-view-timeline"),
-    );
+    fireEvent.click(screen.getByTestId("plant-detail-recent-activity-recap-view-timeline"));
     expect(scrollSpy).toHaveBeenCalledTimes(1);
     expect(focusSpy).toHaveBeenCalledTimes(1);
     document.body.removeChild(anchor);
@@ -367,9 +345,7 @@ describe("PlantDetailRecentActivityRecap render", () => {
       },
     ];
     useRecentMock.mockReturnValue({ data: raw, isLoading: false });
-    const { container } = render(
-      <PlantDetailRecentActivityRecap plantId="p1" />,
-    );
+    const { container } = render(<PlantDetailRecentActivityRecap plantId="p1" />);
     const text = container.textContent ?? "";
     expect(text).not.toContain("diary-uuid-1234");
     expect(text).not.toContain("user-uuid-5678");
@@ -399,7 +375,18 @@ describe("Plant Detail recent activity recap — static safety", () => {
 
   it("page wires the recap to the existing Quick Log opener", () => {
     expect(PAGE).toMatch(/PlantDetailRecentActivityRecap/);
-    expect(PAGE).toMatch(/onAddQuickCheck=\{\(\) => setQuickLogOpen\(true\)\}/);
+    // Syntax-independent proof that the recap's onAddQuickCheck prop is
+    // wired to the existing Quick Log opener (setQuickLogOpen(true)),
+    // regardless of whether the handler is a single-expression arrow, a
+    // multi-statement arrow block, a named handler, or a useCallback.
+    const recapMatch = PAGE.match(/<PlantDetailRecentActivityRecap\b[\s\S]*?\/>/);
+    expect(recapMatch, "PlantDetailRecentActivityRecap element not found").not.toBeNull();
+    const recapJsx = recapMatch![0];
+    expect(recapJsx).toMatch(/onAddQuickCheck\s*=/);
+    expect(recapJsx).toMatch(/setQuickLogOpen\(\s*true\s*\)/);
     expect(PAGE).toMatch(/<PlantQuickLog/);
+    // Guard against a duplicate Quick Log modal being introduced.
+    const quickLogOpenings = PAGE.match(/<PlantQuickLog\b/g) ?? [];
+    expect(quickLogOpenings.length).toBe(1);
   });
 });

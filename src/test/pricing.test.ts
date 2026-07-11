@@ -142,8 +142,8 @@ describe("Monthly/Annual billing toggle", () => {
     expect(PAGE).toMatch(/data-testid="billing-toggle"/);
   });
 
-  it("defaults to annual billing state", () => {
-    expect(PAGE).toMatch(/useState<BillingPeriod>\("annual"\)/);
+  it("defaults to annual billing state (unless overridden by ?plan preselect)", () => {
+    expect(PAGE).toMatch(/preselect\.billing\s*\?\?\s*"annual"/);
   });
 
   it("shows annual Pro price $99/year and monthly $12/month", () => {

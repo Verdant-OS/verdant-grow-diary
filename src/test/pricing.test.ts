@@ -28,9 +28,9 @@ describe("/pricing route", () => {
     expect(APP).toMatch(/path="\/pricing"\s+element=\{<Pricing\s*\/>\}/);
   });
 
-  it("registers a /billing/:plan placeholder route", () => {
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/BillingPlaceholder["']\s*\)/);
-    expect(APP).toMatch(/path="\/billing\/:plan"\s+element=\{<BillingPlaceholder\s*\/>\}/);
+  it("redirects legacy /billing/:plan to canonical /upgrade (Slice E)", () => {
+    expect(APP).toMatch(/import\(\s*["']\.\/pages\/LegacyBillingRedirect["']\s*\)/);
+    expect(APP).toMatch(/path="\/billing\/:plan"\s+element=\{<LegacyBillingRedirect\s*\/>\}/);
   });
 });
 

@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Pencil, Camera, ImagePlus, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import PlantPhotoView from "@/components/PlantPhotoView";
+
 import PlantPhoto from "@/components/PlantPhoto";
 import {
   validatePlantProfilePhotoFile,

@@ -474,7 +474,7 @@ export async function commandRerunFailed(opts, deps = {}) {
   if ((runRecord.schema ?? 1) < RUN_SCHEMA_VERSION) {
     throw Object.assign(
       new Error(
-        `Refusing to rerun-failed: run.json schema v${runRecord.schema ?? 1} predates workspace fingerprint v${RUN_SCHEMA_VERSION}`,
+        `Refusing to rerun-failed: run.json schema v${runRecord.schema ?? 1} predates toolchain-locked contract v${RUN_SCHEMA_VERSION}`,
       ),
       { code: EXIT.CONFIG_ERROR },
     );
@@ -500,6 +500,13 @@ export async function commandRerunFailed(opts, deps = {}) {
       code: EXIT.CONFIG_ERROR,
     });
   }
+  const currentToolVersions = injectedToolVersions ?? discoverToolVersionsImpl();
+  const tcMismatch = toolchainMismatch(runRecord.toolVersions, currentToolVersions);
+  if (tcMismatch) {
+    throw Object.assign(new Error(`Refusing to rerun-failed: ${tcMismatch}`), {
+      code: EXIT.CONFIG_ERROR,
+    });
+  }
   const { files: doneMap } = readProgress(path.join(runDir, "progress.jsonl"));
   const failed = [...doneMap.values()].filter((e) => e.status === "failed").map((e) => e.file);
   if (!failed.length) {
@@ -518,6 +525,7 @@ export async function commandRerunFailed(opts, deps = {}) {
     minWorkers: runRecord.minWorkers,
     files: manifest.files, // full manifest so shard math matches
     manifest,
+    toolVersions: currentToolVersions,
   });
   // Overwrite shard files to just the failed set for this rerun.
   fs.writeFileSync(

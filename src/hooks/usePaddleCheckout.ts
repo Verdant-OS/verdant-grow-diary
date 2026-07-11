@@ -15,6 +15,7 @@ import {
   isKnownPlanIntent,
   savePlanIntent,
 } from "@/lib/checkoutPlanIntent";
+import { beginCheckoutSession } from "@/lib/checkoutOverlaySession";
 
 export interface OpenCheckoutOptions {
   priceId: string;

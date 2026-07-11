@@ -26,8 +26,12 @@ import {
   RUN_SCHEMA_VERSION,
 } from "../../scripts/vitest-controlled/cli.mjs";
 
+// The sandbox wraps `git` to block stateful commands like `git add` and
+// `git commit`. Fixture repos are entirely local/temp — bypass the
+// wrapper by invoking the real git binary directly when available.
+const REAL_GIT = process.env.__LOVABLE_REAL_GIT || "git";
 function git(root: string, ...args: string[]) {
-  const r = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  const r = spawnSync(REAL_GIT, ["-C", root, ...args], { encoding: "utf8" });
   if (r.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${r.stderr}`);
   return r.stdout;
 }

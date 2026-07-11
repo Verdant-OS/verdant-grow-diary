@@ -50,7 +50,9 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   environment_check: "Environment check",
   pest_disease: "Pest / disease",
   training: "Training",
-  action_followup: "Action follow-up",
+  action_followup: "Follow-up check",
+  action_outcome: "Grower-recorded outcome",
+  run_learning_decision: "Next-run learning decision",
   [ASSISTANT_CHECK_IN_EVENT_KEY]: ASSISTANT_CHECK_IN_EVENT_LABEL,
 };
 
@@ -68,6 +70,9 @@ const SAFE_DETAIL_KEYS: ReadonlySet<string> = new Set([
   "feeding_ec",
   "feeding_ph",
   "maturity_evidence",
+  // Learning-loop friendly fields (values are safe enums, never ids/tokens).
+  "outcome_status",
+  "decision",
 ]);
 
 const TIMELINE_DETAIL_STALE_MS = 30 * 60 * 1000;

@@ -166,9 +166,13 @@ export function diaryTimelineActionLabel(
     case "harvest":
       return "Harvest";
     case "action_followup":
+      // Deploy branch composes "Follow-up · <Outcome>" here; the primary
+      // rendered timeline pill (diary.ts getEventType) shows "Follow-up check".
       return composeActionFollowUpTitle(details?.outcome);
     case "action_outcome":
-      return "Outcome";
+      return "Grower-recorded outcome";
+    case "run_learning_decision":
+      return "Next-run learning decision";
     default:
       return "Entry";
   }

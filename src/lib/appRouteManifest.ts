@@ -130,6 +130,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/grows", access: "auth" },
   { path: "/grows/:growId", access: "auth" },
   {
+    path: "/grows/:growId/learning",
+    access: "auth",
+    description: "Grow-level learning review — completed actions, grower-recorded outcomes, and next-run decisions.",
+  },
+  {
     path: "/guides",
     access: "public",
     label: "Grower Guides",

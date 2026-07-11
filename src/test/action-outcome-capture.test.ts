@@ -260,23 +260,23 @@ describe("actionOutcomeRules — no device/control strings", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 11. action_outcome is registered in EVENT_TYPES as "Outcome"
+// 11. action_outcome is registered in EVENT_TYPES as "Grower-recorded outcome"
 // ---------------------------------------------------------------------------
 describe("diary.ts — action_outcome registration", () => {
-  it("EVENT_TYPES includes action_outcome with label Outcome", () => {
+  it("EVENT_TYPES includes action_outcome with label Grower-recorded outcome", () => {
     const entry = EVENT_TYPES.find((e) => e.value === "action_outcome");
     expect(entry).toBeDefined();
-    expect(entry!.label).toBe("Outcome");
+    expect(entry!.label).toBe("Grower-recorded outcome");
   });
 });
 
 // ---------------------------------------------------------------------------
-// 12. getEventType("action_outcome") returns Outcome, not Observation
+// 12. getEventType("action_outcome") returns Grower-recorded outcome, not Observation
 // ---------------------------------------------------------------------------
 describe("diary.ts — getEventType", () => {
-  it("returns Outcome for action_outcome", () => {
+  it("returns Grower-recorded outcome for action_outcome", () => {
     const result = getEventType("action_outcome");
-    expect(result.label).toBe("Outcome");
+    expect(result.label).toBe("Grower-recorded outcome");
     expect(result.label).not.toBe("Observation");
   });
 });
@@ -287,7 +287,7 @@ describe("diary.ts — getEventType", () => {
 describe("DiaryEntryBadges — action_outcome", () => {
   it("TAG_LABELS includes action_outcome", () => {
     expect(BADGES).toContain("action_outcome");
-    expect(BADGES).toMatch(/action_outcome.*Outcome/s);
+    expect(BADGES).toMatch(/action_outcome.*Grower-recorded outcome/s);
   });
   it("PRIMARY_TAGS includes action_outcome", () => {
     expect(BADGES).toMatch(/PRIMARY_TAGS[\s\S]*action_outcome/);

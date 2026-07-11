@@ -15,6 +15,7 @@ import type {
   MetricAggregateView,
   PostGrowLearningReportViewModel,
 } from "@/lib/postGrowLearningReportRules";
+import type { PostGrowLearningLoopSummary } from "@/lib/postGrowLearningLoopSummaryRules";
 import type { TimelineSensorSourceKind } from "@/lib/timelineSensorSourceBadgeRules";
 import {
   PDF_EMPTY_SECTION_COPY,
@@ -64,6 +65,9 @@ export interface PostGrowReportPdfModel {
   avoidText: string;
   provenanceLegend: string;
   safetyFooter: string;
+  /** Optional bounded learning-loop summary (id-free, export-safe). When
+   *  absent, the PDF renders no learning section. */
+  learningSummary?: PostGrowLearningLoopSummary;
 }
 
 export interface BuildPostGrowReportPdfModelOptions {
@@ -75,6 +79,8 @@ export interface BuildPostGrowReportPdfModelOptions {
    * payloads are placed into the PDF.
    */
   sensorReadingSources?: ReadonlyArray<{ source?: string | null }>;
+  /** Optional bounded learning-loop summary threaded into the model. */
+  learningSummary?: PostGrowLearningLoopSummary;
 }
 
 function fmtNumber(value: number | null, digits: number): string {
@@ -248,5 +254,6 @@ export function buildPostGrowReportPdfModel(
     avoidText: avoid,
     provenanceLegend: PDF_PROVENANCE_LEGEND_COPY,
     safetyFooter: PDF_READ_ONLY_FOOTER,
+    learningSummary: opts.learningSummary,
   };
 }

@@ -55,6 +55,7 @@ import {
   aiDoctorSessionDetailPath,
   alertDetailPath,
   growDetailPath,
+  growLearningPath,
   logsPath,
   plantDetailPath,
   tentDetailPath,
@@ -985,6 +986,15 @@ export default function ActionDetail() {
                 {existingOutcome.status.replace(/_/g, " ")}
               </Badge>
               <span className="text-muted-foreground">Outcome recorded</span>
+              {row.grow_id && (
+                <Link
+                  to={growLearningPath(row.grow_id)}
+                  className="ml-2 text-primary hover:underline"
+                  data-testid="view-learning-episode-link"
+                >
+                  View full learning episode →
+                </Link>
+              )}
             </div>
           ) : (
             <Button

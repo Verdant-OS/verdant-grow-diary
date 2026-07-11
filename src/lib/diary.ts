@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   ClipboardCheck,
   CircleCheckBig,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -100,15 +101,21 @@ export const EVENT_TYPES: EventTypeDef[] = [
   },
   {
     value: "action_followup",
-    label: "Follow-up",
+    label: "Follow-up check",
     icon: ClipboardCheck,
     tone: "bg-orange-500/15 text-orange-300 border-orange-500/30",
   },
   {
     value: "action_outcome",
-    label: "Outcome",
+    label: "Grower-recorded outcome",
     icon: CircleCheckBig,
     tone: "bg-teal-500/15 text-teal-300 border-teal-500/30",
+  },
+  {
+    value: "run_learning_decision",
+    label: "Next-run learning decision",
+    icon: Sparkles,
+    tone: "bg-purple-500/15 text-purple-300 border-purple-500/30",
   },
   {
     value: "reminder",

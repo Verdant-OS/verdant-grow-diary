@@ -29,6 +29,7 @@ import {
   type BuildPostGrowReportPdfModelOptions,
   type PostGrowReportPdfModel,
 } from "@/lib/postGrowReportViewModel";
+import { renderLearningLoopSectionHtml } from "@/lib/postGrowLearningLoopSummaryRules";
 
 function escapeHtml(value: string): string {
   return value
@@ -125,6 +126,7 @@ export function buildPostGrowReportPdfHtml(model: PostGrowReportPdfModel): strin
   <section><h2>What improved · what declined</h2><p><strong>Improved:</strong> ${escapeHtml(model.improvedText)}</p><p><strong>Declined:</strong> ${escapeHtml(model.declinedText)}</p></section>
 
   <section><h2>What to repeat · what to avoid next run</h2><p><strong>Repeat:</strong> ${escapeHtml(model.repeatText)}</p><p><strong>Avoid:</strong> ${escapeHtml(model.avoidText)}</p></section>
+  ${model.learningSummary ? renderLearningLoopSectionHtml(model.learningSummary, escapeHtml) : ""}
 
   <section id="sensor-provenance-legend" data-testid="post-grow-pdf-provenance-legend" aria-labelledby="post-grow-pdf-provenance-legend-heading"><h2 id="post-grow-pdf-provenance-legend-heading">${escapeHtml(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)}</h2><table aria-label="${escapeHtml(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)}"><caption class="muted">${escapeHtml(POST_GROW_SENSOR_PROVENANCE_LEGEND_TITLE)}</caption><thead><tr><th scope="col">Label</th><th scope="col">Meaning</th></tr></thead><tbody>${POST_GROW_SENSOR_PROVENANCE_LEGEND.map(
     (row) =>
@@ -163,6 +165,7 @@ export function exportPostGrowReportAsPdf(
     // Default to the view model's own reading sources so the PDF's
     // provenance summary is populated without every caller re-plumbing it.
     sensorReadingSources: opts.sensorReadingSources ?? vm.sensorReadingSources,
+    learningSummary: opts.learningSummary,
   });
   const html = buildPostGrowReportPdfHtml(model);
   const filenameTitle = buildPdfExportTitle(vm.header.growName, now);

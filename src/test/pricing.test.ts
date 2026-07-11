@@ -16,7 +16,7 @@ const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 const APP = readSrc("App.tsx");
 const PAGE = readSrc("pages/Pricing.tsx");
 const CONSTANTS = readSrc("constants/pricing.ts");
-const BILLING = readSrc("pages/BillingPlaceholder.tsx");
+
 const LANDING = readSrc("pages/Landing.tsx");
 const ANALYTICS = readSrc("lib/pricingAnalytics.ts");
 const SITEMAP = read("public/sitemap.xml");
@@ -28,9 +28,9 @@ describe("/pricing route", () => {
     expect(APP).toMatch(/path="\/pricing"\s+element=\{<Pricing\s*\/>\}/);
   });
 
-  it("registers a /billing/:plan placeholder route", () => {
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/BillingPlaceholder["']\s*\)/);
-    expect(APP).toMatch(/path="\/billing\/:plan"\s+element=\{<BillingPlaceholder\s*\/>\}/);
+  it("redirects legacy /billing/:plan to canonical /pricing via LegacyBillingRedirect", () => {
+    expect(APP).toMatch(/import\(\s*["']\.\/pages\/LegacyBillingRedirect["']\s*\)/);
+    expect(APP).toMatch(/path="\/billing\/:plan"\s+element=\{<LegacyBillingRedirect\s*\/>\}/);
   });
 });
 
@@ -142,8 +142,8 @@ describe("Monthly/Annual billing toggle", () => {
     expect(PAGE).toMatch(/data-testid="billing-toggle"/);
   });
 
-  it("defaults to annual billing state", () => {
-    expect(PAGE).toMatch(/useState<BillingPeriod>\("annual"\)/);
+  it("defaults to annual billing state (unless overridden by ?plan preselect)", () => {
+    expect(PAGE).toMatch(/preselect\.billing\s*\?\?\s*"annual"/);
   });
 
   it("shows annual Pro price $99/year and monthly $12/month", () => {
@@ -338,24 +338,10 @@ describe("Safety: no private data on public page", () => {
   });
 });
 
-describe("Billing placeholder", () => {
-  it("does not collect payment or claim to charge the user", () => {
-    expect(BILLING).toMatch(/No payment is being collected/i);
-    expect(BILLING).not.toMatch(/\bcharge\(/i);
-    expect(BILLING).not.toMatch(/stripe/i);
-  });
-
-  it("supports the three plan slugs", () => {
-    expect(BILLING).toMatch(/pro-monthly/);
-    expect(BILLING).toMatch(/pro-annual/);
-    expect(BILLING).toMatch(/founder-lifetime/);
-  });
-
-  it("includes a software-only compliance note", () => {
-    expect(BILLING).toMatch(/sells software only/i);
-    expect(BILLING).toMatch(/does not sell cannabis/i);
-  });
-});
+// The /billing/:plan placeholder was retired. The legacy route now
+// redirects to canonical /pricing via `LegacyBillingRedirect` — see
+// `legacy-checkout-redirect.test.ts` and `legacy-billing-redirect-router.test.tsx`
+// for the replacement coverage.
 
 describe("Landing links to /pricing", () => {
   it("Landing page links to the public pricing route", () => {
@@ -413,7 +399,7 @@ describe("Pricing manifest snapshot (narrow)", () => {
     // Intentionally narrow: only pricing / public billing-relevant routes so
     // unrelated route changes do not create noisy snapshot diffs here.
     expect(getPricingManifestSnapshot()).toEqual([
-      { path: "/billing/:plan", access: "public", description: "Billing placeholder." },
+      { path: "/billing/:plan", access: "redirect", description: "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout)." },
       { path: "/hardware-integrations", access: "public" },
       { path: "/pricing", access: "public" },
       { path: "/welcome", access: "public" },

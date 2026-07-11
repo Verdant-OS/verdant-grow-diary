@@ -13,8 +13,8 @@
  *
  * It is copy + structure only. Mount it inside an existing presenter
  * component (`<PaywallCta />`) on surfaces that are already billing- or
- * upgrade-shaped (e.g. `/billing/:plan` placeholder). It must NOT be
- * used to gate access to a route.
+ * upgrade-shaped (e.g. paywall panels linking to `/pricing`). It must NOT
+ * be used to gate access to a route.
  *
  * Banned strings (must not appear in any human-facing CTA output):
  *   confirmed, certain, synced, connected, imported, guaranteed,

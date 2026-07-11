@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { resolvePricingPlanPreselect } from "@/lib/pricingPlanPreselect";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   Check,
@@ -68,7 +69,14 @@ const COMPARISON_ROWS: Row[] = [
 ];
 
 export default function Pricing() {
-  const [billing, setBilling] = useState<BillingPeriod>("annual");
+  const [searchParams] = useSearchParams();
+  // Canonical `?plan=` preselect (see resolvePricingPlanPreselect).
+  // Legacy `/billing/:plan` redirects here with this exact contract.
+  // NEVER auto-opens Paddle — the grower must click a Pricing CTA.
+  const preselect = resolvePricingPlanPreselect(searchParams.get("plan"));
+  const [billing, setBilling] = useState<BillingPeriod>(
+    preselect.billing ?? "annual",
+  );
   const { openCheckout, loading: checkoutLoading } = usePaddleCheckout();
 
 
@@ -157,7 +165,11 @@ export default function Pricing() {
       : `Or $${PRO_ANNUAL_PRICE_USD}/year — save ~${PRICING.pro.annualSavingsPercent}%`;
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main
+      className="min-h-screen bg-background text-foreground"
+      data-preselected-plan={preselect.plan ?? ""}
+      data-preselected-billing={preselect.billing ?? ""}
+    >
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
         <Link to="/welcome" className="flex items-center gap-2">
           <BrandLogo size="md" showText />

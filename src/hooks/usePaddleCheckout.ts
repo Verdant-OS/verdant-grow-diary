@@ -15,6 +15,7 @@ import {
   isKnownPlanIntent,
   savePlanIntent,
 } from "@/lib/checkoutPlanIntent";
+import { beginCheckoutSession } from "@/lib/checkoutOverlaySession";
 
 export interface OpenCheckoutOptions {
   priceId: string;
@@ -82,6 +83,17 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
   const [loading, setLoading] = useState(false);
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
 
+  // Track mount state so the Paddle `checkout.closed` cancel handler (which
+  // fires asynchronously from Paddle.js after the modal actually closes)
+  // does not navigate a component that has already unmounted. StrictMode-safe.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   // Derived at every render so a hot-reload / rerender after the token
   // becomes available flips `unavailable` back to false without needing
   // to remount. Cheap — pure string/hostname checks.
@@ -127,6 +139,15 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
       try {
         await initializePaddle();
         const paddlePriceId = await getPaddlePriceId(options.priceId);
+
+        // Slice D: register overlay session BEFORE calling
+        // Paddle.Checkout.open so the module-level eventCallback (set at
+        // Initialize) always has a target when checkout.completed /
+        // checkout.closed fire.
+        beginCheckoutSession(() => {
+          if (!mountedRef.current) return;
+          navigate("/checkout/cancel");
+        });
 
         (window as any).Paddle.Checkout.open({
           items: [{ priceId: paddlePriceId, quantity: options.quantity ?? 1 }],

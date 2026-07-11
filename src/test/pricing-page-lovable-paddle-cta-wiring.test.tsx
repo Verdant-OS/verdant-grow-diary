@@ -130,8 +130,8 @@ describe("Pricing page — built-in Paddle wiring", () => {
 
   it("does not render competing user-facing /billing/pro-monthly or /billing/founder-lifetime CTAs", () => {
     renderPricing();
-    // The BillingPlaceholder route (`/billing/:plan`) is still MOUNTED for
-    // safety fallback but no visible pricing-page CTA should point at it.
+    // Slice F: `/billing/:plan` is now a compatibility redirect to
+    // `/upgrade`; no visible pricing-page CTA should point at it.
     expect(document.querySelector('a[href="/billing/pro-monthly"]')).toBeNull();
     expect(document.querySelector('a[href="/billing/pro-annual"]')).toBeNull();
     expect(document.querySelector('a[href="/billing/founder-lifetime"]')).toBeNull();

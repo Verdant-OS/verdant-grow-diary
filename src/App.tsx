@@ -83,7 +83,7 @@ const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
 const Glossary = lazy(() => import("./pages/Glossary"));
 const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
-const BillingPlaceholder = lazy(() => import("./pages/BillingPlaceholder"));
+const LegacyBillingRedirect = lazy(() => import("./pages/LegacyBillingRedirect"));
 const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
 const CheckoutCancel = lazy(() => import("./pages/CheckoutCancel"));
 const Terms = lazy(() => import("./pages/TermsOfService"));
@@ -185,7 +185,9 @@ const App = () => (
                   <Route path="/guides/:slug" element={<GuidePage />} />
                   <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
-                  <Route path="/billing/:plan" element={<BillingPlaceholder />} />
+                  {/* Legacy `/billing/:plan` entry — Slice E: redirect to
+                      canonical `/upgrade` with plan preselect + safe returnTo. */}
+                  <Route path="/billing/:plan" element={<LegacyBillingRedirect />} />
                   <Route path="/checkout/success" element={<CheckoutSuccess />} />
                   <Route path="/checkout/cancel" element={<CheckoutCancel />} />
                   <Route path="/terms" element={<Terms />} />

@@ -1014,6 +1014,21 @@ export default function ActionDetail() {
         </section>
       )}
 
+      {row.status === "completed" && (
+        <ActionFollowUpEvidenceSection
+          action={{
+            id: row.id,
+            status: row.status,
+            growId: row.grow_id,
+            tentId: row.tent_id,
+            plantId: row.plant_id,
+            actionLabel: sanitizeActionCopy(row.suggested_change) || "Completed action",
+          }}
+        />
+      )}
+
+
+
       <section className="glass rounded-2xl p-4" aria-label="Audit history">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1">
           <History className="h-4 w-4" /> Audit History ({events.length})

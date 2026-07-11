@@ -399,7 +399,20 @@ describe("Plant Detail recent activity recap — static safety", () => {
 
   it("page wires the recap to the existing Quick Log opener", () => {
     expect(PAGE).toMatch(/PlantDetailRecentActivityRecap/);
-    expect(PAGE).toMatch(/onAddQuickCheck=\{\(\) => setQuickLogOpen\(true\)\}/);
+    // Syntax-independent proof that the recap's onAddQuickCheck prop is
+    // wired to the existing Quick Log opener (setQuickLogOpen(true)),
+    // regardless of whether the handler is a single-expression arrow, a
+    // multi-statement arrow block, a named handler, or a useCallback.
+    const recapMatch = PAGE.match(
+      /<PlantDetailRecentActivityRecap\b[\s\S]*?\/>/,
+    );
+    expect(recapMatch, "PlantDetailRecentActivityRecap element not found").not.toBeNull();
+    const recapJsx = recapMatch![0];
+    expect(recapJsx).toMatch(/onAddQuickCheck\s*=/);
+    expect(recapJsx).toMatch(/setQuickLogOpen\(\s*true\s*\)/);
     expect(PAGE).toMatch(/<PlantQuickLog/);
+    // Guard against a duplicate Quick Log modal being introduced.
+    const quickLogOpenings = PAGE.match(/<PlantQuickLog\b/g) ?? [];
+    expect(quickLogOpenings.length).toBe(1);
   });
 });

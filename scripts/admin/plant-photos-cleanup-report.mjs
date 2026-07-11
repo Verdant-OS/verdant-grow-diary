@@ -129,7 +129,21 @@ export function splitPathBuckets(objects) {
 // Canonical report
 // ---------------------------------------------------------------
 
-const uniqSort = (arr) => Array.from(new Set(arr ?? [])).sort();
+/**
+ * Explicit code-point comparator used for every path/reference
+ * array in the canonical report. Kept in one place so tests can
+ * assert determinism against a single ordering rule.
+ * @param {string} a
+ * @param {string} b
+ */
+export function comparePathCodePoints(a, b) {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
+const uniqSort = (arr) =>
+  Array.from(new Set(arr ?? [])).sort(comparePathCodePoints);
+
 
 /**
  * @typedef {Object} CanonicalCleanupReport
@@ -312,3 +326,58 @@ export function renderCleanupSummary(report) {
 
   return lines.join("\n");
 }
+
+// ---------------------------------------------------------------
+// Machine-readable console summary
+// ---------------------------------------------------------------
+
+export const MACHINE_SUMMARY_PREFIX = "CLEANUP_REPORT_SUMMARY_JSON=";
+
+/**
+ * Compact single-line summary for scripts. Contains counts only —
+ * NO path arrays, NO malformed reference values, NO failure
+ * details. The prefix is stable and can be grepped from stdout.
+ *
+ * @param {CanonicalCleanupReport} report
+ * @returns {string}
+ */
+export function renderCleanupMachineSummary(report) {
+  const c = report.counts;
+  const payload = {
+    schema_version: report.schema_version,
+    mode: report.mode,
+    scan_complete: report.scan_complete,
+    min_age_days: report.min_age_days,
+    owner_filter: report.owner_filter ?? null,
+    counts: {
+      storage_objects_scanned: c.storage_objects_scanned,
+      referenced: c.referenced,
+      eligible_orphans: c.eligible_orphans,
+      too_young: c.too_young,
+      unknown_age: c.unknown_age,
+      invalid_path: c.invalid_path,
+      non_profile_photo: c.non_profile_photo,
+      owner_mismatch: c.owner_mismatch,
+      protected_by_final_recheck: c.protected_by_final_recheck,
+      deletion_attempted: c.deletion_attempted,
+      deleted: c.deleted,
+      failed: c.failed,
+    },
+  };
+  return `${MACHINE_SUMMARY_PREFIX}${JSON.stringify(payload)}`;
+}
+
+// ---------------------------------------------------------------
+// Serialization (pure)
+// ---------------------------------------------------------------
+
+/**
+ * Serialize a canonical report to the on-disk format: UTF-8, two-
+ * space indent, trailing newline. Deterministic modulo `generated_at`.
+ * @param {CanonicalCleanupReport} report
+ * @returns {string}
+ */
+export function serializeCanonicalReport(report) {
+  return `${JSON.stringify(report, null, 2)}\n`;
+}
+

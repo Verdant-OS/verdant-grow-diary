@@ -59,7 +59,10 @@ export function parseCleanupArgs(argv) {
     confirmDeleteOrphans: false,
     minAgeDays: DEFAULT_MIN_AGE_DAYS,
     ownerFilter: null,
+    reportFile: null,
     _minAgeExplicit: false,
+    _ownerSeen: false,
+    _reportFileSeen: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -74,13 +77,35 @@ export function parseCleanupArgs(argv) {
       }
       opts.minAgeDays = v;
       opts._minAgeExplicit = true;
-    } else if (a === "--owner") {
+    } else if (a === "--owner" || a === "--owner-id") {
+      // `--owner-id` is the documented spelling; `--owner` is
+      // retained for backward compatibility with the initial CLI.
       const v = argv[i + 1];
       i += 1;
-      if (!v || typeof v !== "string") {
-        return { ok: false, error: "--owner requires a value" };
+      if (typeof v !== "string" || v === "" || v.startsWith("--")) {
+        return { ok: false, error: `${a} requires a value` };
+      }
+      if (opts._ownerSeen) {
+        return { ok: false, error: "owner filter may only be specified once" };
       }
       opts.ownerFilter = v;
+      opts._ownerSeen = true;
+    } else if (a === "--report-file") {
+      const v = argv[i + 1];
+      i += 1;
+      if (
+        typeof v !== "string" ||
+        v === "" ||
+        v.trim() === "" ||
+        v.startsWith("--")
+      ) {
+        return { ok: false, error: "--report-file requires a nonblank path" };
+      }
+      if (opts._reportFileSeen) {
+        return { ok: false, error: "--report-file may only be specified once" };
+      }
+      opts.reportFile = v;
+      opts._reportFileSeen = true;
     } else if (a === "--help" || a === "-h") {
       return { ok: false, error: "help" };
     } else {
@@ -107,9 +132,11 @@ export function parseCleanupArgs(argv) {
       confirmDeleteOrphans: opts.confirmDeleteOrphans,
       minAgeDays: opts.minAgeDays,
       ownerFilter: opts.ownerFilter,
+      reportFile: opts.reportFile,
     },
   };
 }
+
 
 /**
  * True iff both destructive flags are present AND dry-run is not set.

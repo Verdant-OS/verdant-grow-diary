@@ -15,8 +15,8 @@
  * Requires (execute mode) the SUPABASE_SERVICE_ROLE_KEY and
  * SUPABASE_URL env vars. The service-role key is NEVER logged.
  */
-import { writeFileSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
+
 import { createClient } from "@supabase/supabase-js";
 import {
   parseCleanupArgs,
@@ -33,7 +33,10 @@ import {
   splitPathBuckets,
   toCanonicalCleanupReport,
   renderCleanupSummary,
+  renderCleanupMachineSummary,
 } from "./plant-photos-cleanup-report.mjs";
+import { writeCanonicalReportFile } from "./plant-photos-cleanup-write.mjs";
+
 
 
 const HELP = `
@@ -50,7 +53,11 @@ Flags:
   --confirm-delete-orphans     Required together with --execute.
   --min-age-days <int>         Object age threshold in days. Default ${DEFAULT_MIN_AGE_DAYS}.
                                Values below ${ABSOLUTE_MIN_AGE_DAYS} are rejected. There is no override.
-  --owner <uuid>               Optional: only consider objects whose owner segment matches.
+  --owner-id <uuid>            Optional: only consider objects whose owner segment matches.
+                               ('--owner' is retained as a backward-compatible spelling.)
+  --report-file <path>         Optional: write the canonical JSON report to this path.
+                               Missing parent directories are created. Works in both modes.
+
   -h, --help                   Show this help.
 
 Safety:
@@ -158,16 +165,13 @@ async function deleteBatch(supabase, paths) {
   return { deleted, errors };
 }
 
-function writeReport(canonical) {
-  const outPath = resolve(
+function defaultTimestampedReportPath(canonical) {
+  return resolve(
     process.cwd(),
     `artifacts/admin/plant-photos-cleanup-${new Date(canonical.generated_at)
       .toISOString()
       .replace(/[:.]/g, "-")}.json`,
   );
-  mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(outPath, JSON.stringify(canonical, null, 2));
-  return outPath;
 }
 
 async function main() {
@@ -248,9 +252,37 @@ async function main() {
     failedPaths,
   });
 
-  const outPath = writeReport(canonical);
+  // 1. Human-readable summary.
   console.log(renderCleanupSummary(canonical));
-  console.log(`\nReport written: ${outPath}`);
+  // 2. Machine-readable single-line JSON summary.
+  console.log(renderCleanupMachineSummary(canonical));
+
+  // 3. Persist the canonical report. Behavior:
+  //    - With --report-file: write exactly there. Failure to write
+  //      is a nonzero exit AFTER cleanup already ran.
+  //    - Without --report-file: keep the pre-existing timestamped
+  //      artifact behavior so operators are never left without a
+  //      receipt for an execute run.
+  let reportWriteError = null;
+  let writtenPath = null;
+  const targetReportPath = options.reportFile ?? defaultTimestampedReportPath(canonical);
+  try {
+    const { absPath } = writeCanonicalReportFile(canonical, targetReportPath);
+    writtenPath = absPath;
+    console.log(`Report written: ${writtenPath}`);
+  } catch (err) {
+    reportWriteError = err;
+    const safe = err?.message ? String(err.message) : "error";
+    if (destructive) {
+      console.error(
+        `plant-photos-cleanup: cleanup execution completed, but the report file could not be written to ${targetReportPath}: ${safe}`,
+      );
+    } else {
+      console.error(
+        `plant-photos-cleanup: report file could not be written to ${targetReportPath}: ${safe}`,
+      );
+    }
+  }
 
   // Fail closed on incomplete scan under execute mode.
   if (destructive && !canonical.scan_complete) {
@@ -259,8 +291,10 @@ async function main() {
     );
     process.exit(1);
   }
+  if (reportWriteError) process.exit(1);
   process.exit(0);
 }
+
 
 
 main().catch((err) => {

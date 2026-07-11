@@ -193,6 +193,10 @@ describe("pi-ingest edge skeleton audit — service_role confinement", () => {
           // Skip test files — they may mention the env name in
           // guardrail assertions without ever reading its value.
           if (/\.(test|spec)\.(ts|tsx)$/.test(name)) continue;
+          // Skip the whole src/test/ subtree — test helpers/fixtures (e.g.
+          // integration/_helpers/sanitizedDbError.ts) legitimately name the
+          // env var; none of it is shipped runtime code.
+          if (/[\\/]src[\\/]test[\\/]/.test(p)) continue;
           // Scoped allow-list (EXACT FILE PATH ONLY): proof-report redaction
           // helper lists the env name as a denylist literal so it can STRIP
           // accidental occurrences from printed/copied output. It does not

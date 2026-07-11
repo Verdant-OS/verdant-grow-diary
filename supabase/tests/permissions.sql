@@ -89,4 +89,47 @@ BEGIN
   END;
 END $$;
 
+-- ────────────────────────────────────────────────────────────────────────────
+-- 5. Trust-boundary: server-only revenue / cost / email control-plane RPCs
+--    must NOT be executable by anon or authenticated — only service_role.
+--    A stray client grant here is a privilege-escalation / cost-leak
+--    regression (e.g. self-refunding AI credits, or injecting/reading email).
+-- ────────────────────────────────────────────────────────────────────────────
+DO $$
+DECLARE
+  server_only TEXT[] := ARRAY[
+    'ai_credit_refund',       -- self-refund -> unlimited free AI at full COGS
+    'enqueue_email',          -- inject arbitrary mail (spam/phishing)
+    'read_email_batch',       -- read queued PII + unsubscribe/verify tokens
+    'delete_email',           -- drop queued mail
+    'move_to_dlq',            -- divert queued mail
+    'email_queue_dispatch',   -- drive the mail pump
+    'allocate_founder_slot'   -- mint Founder Lifetime slots
+  ];
+  fn TEXT; role_name TEXT; leaked BOOLEAN; svc BOOLEAN; n_defs INT;
+BEGIN
+  FOREACH fn IN ARRAY server_only LOOP
+    SELECT count(*) INTO n_defs
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.proname = fn;
+    ASSERT n_defs >= 1, format('expected function public.%I to exist', fn);
+
+    FOR role_name IN SELECT unnest(ARRAY['anon','authenticated']) LOOP
+      SELECT bool_or(has_function_privilege(role_name, p.oid, 'EXECUTE'))
+        INTO leaked
+        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public' AND p.proname = fn;
+      ASSERT leaked IS NOT TRUE,
+        format('trust-boundary regression: %I is EXECUTE-able by %I (must be service_role only)', fn, role_name);
+    END LOOP;
+
+    SELECT bool_or(has_function_privilege('service_role', p.oid, 'EXECUTE'))
+      INTO svc
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' AND p.proname = fn;
+    ASSERT svc, format('trust-boundary regression: service_role lacks EXECUTE on %I', fn);
+  END LOOP;
+  RAISE NOTICE '✓ server-only revenue/cost/email RPCs are not client-executable';
+END $$;
+
 ROLLBACK;

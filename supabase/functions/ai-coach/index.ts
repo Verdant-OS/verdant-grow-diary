@@ -60,6 +60,15 @@ Deno.serve(async (req) => {
     );
     const { data: u } = await supabase.auth.getUser();
     if (!u?.user) return json({ error: "unauthorized" }, 401);
+    const userId = u.user.id;
+    // Privileged client for the server-only refund path. ai_credit_refund is
+    // executable by service_role only (a client could otherwise self-refund a
+    // successful spend for unlimited free AI). The authenticated caller id is
+    // passed explicitly as p_user_id so the ownership check still applies.
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
 
     const body = (await req.json()) as Body;
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
@@ -93,9 +102,10 @@ Deno.serve(async (req) => {
     const refund = async (reason: string) => {
       if (!spendId) return;
       try {
-        await supabase.rpc("ai_credit_refund", {
+        await supabaseAdmin.rpc("ai_credit_refund", {
           p_spend_id: spendId,
           p_idempotency_key: refundKey,
+          p_user_id: userId,
           p_reason: reason,
         });
       } catch {

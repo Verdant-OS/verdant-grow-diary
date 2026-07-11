@@ -42,7 +42,7 @@ describe("ai-coach edge — 200-envelope credit transport", () => {
     expect(src).toMatch(/ai-coach status=upstream_credit_exhausted http=200/);
   });
 
-  it("does not introduce new RPCs, action_queue writes, device control, or service_role", () => {
+  it("does not introduce new RPCs, action_queue writes, or device control; service_role is scoped to the server-only refund RPC", () => {
     const rpcCalls = [
       ...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g),
     ].map((m) => m[1]);
@@ -50,8 +50,23 @@ describe("ai-coach edge — 200-envelope credit transport", () => {
       expect(["ai_credit_spend", "ai_credit_refund"]).toContain(name);
     }
     expect(src).not.toMatch(/\baction_queue\b/);
-    expect(src).not.toMatch(/\bservice_role\b/);
     expect(src).not.toMatch(/\b(turn on|switch off|toggle the|power the)\b/i);
+
+    // ai_credit_refund is server-only: a client could otherwise self-refund a
+    // successful spend (ai_credit_spend meters SUM(weight), so a -weight refund
+    // row resets usage) for unlimited free AI. It is therefore invoked through a
+    // service_role admin client — allowed ONLY for that refund call, never for
+    // data reads or ai_credit_spend, which stay on the user-JWT client (RLS).
+    const adminMembers = [
+      ...src.matchAll(/\bsupabaseAdmin\s*\.\s*([a-zA-Z_]+)/g),
+    ].map((m) => m[1]);
+    expect(adminMembers.length).toBeGreaterThan(0);
+    expect(adminMembers.every((m) => m === "rpc")).toBe(true);
+    const adminRpcs = [
+      ...src.matchAll(/\bsupabaseAdmin\s*\.\s*rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g),
+    ].map((m) => m[1]);
+    expect(adminRpcs.every((n) => n === "ai_credit_refund")).toBe(true);
+    expect(src).not.toMatch(/supabaseAdmin\s*\.\s*from\s*\(/);
   });
 });
 

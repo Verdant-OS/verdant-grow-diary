@@ -33,7 +33,10 @@ import {
   splitPathBuckets,
   toCanonicalCleanupReport,
   renderCleanupSummary,
+  renderCleanupMachineSummary,
 } from "./plant-photos-cleanup-report.mjs";
+import { writeCanonicalReportFile } from "./plant-photos-cleanup-write.mjs";
+
 
 
 const HELP = `

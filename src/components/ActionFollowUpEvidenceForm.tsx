@@ -76,6 +76,8 @@ export default function ActionFollowUpEvidenceForm({
   initialObservedAt,
   onSubmit,
   onCancel,
+  sensorSelector,
+  sensorSnapshotId,
 }: ActionFollowUpEvidenceFormProps) {
   const defaultObservedAt = useMemo(
     () => isoToLocalInput(initialObservedAt ?? new Date().toISOString()),

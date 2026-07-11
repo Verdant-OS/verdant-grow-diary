@@ -17,8 +17,11 @@ additional controlled command used for the full suite and the manual
 - **Structured per-file progress** (`progress.jsonl`, append-only,
   fsync per write) via a custom reporter.
 - **Resume-safe** — completed files are never re-run; completed
-  failures stay failed; resume refuses if the source fingerprint,
-  manifest, package/lock, or reporter schema drifts.
+  failures stay failed; resume refuses if the **workspace fingerprint**
+  (every tracked + non-ignored untracked file in the repository),
+  manifest, package/lock, reporter schema, or run schema drifts.
+  Runner artifacts under `.vitest-runs/` and `test-results/` are
+  excluded via `.gitignore` and never self-invalidate a resume.
 - **Sharded** — union of shards equals manifest, pairwise
   intersection is empty; aggregate job proves exact coverage.
 - **No config changes** — the 5-second `testTimeout`, retry count,

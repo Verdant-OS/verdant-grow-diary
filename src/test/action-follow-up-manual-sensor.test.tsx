@@ -691,6 +691,7 @@ describe("ActionFollowUpEvidenceSection — Slice 4b integration", () => {
 // =============================================================================
 
 describe("Slice 4b static safety fences", () => {
+  const ROOT = resolve(__dirname, "../..");
   const files = [
     "src/lib/actionFollowUpManualSensorRules.ts",
     "src/lib/actionFollowUpManualSensorService.ts",
@@ -700,7 +701,7 @@ describe("Slice 4b static safety fences", () => {
 
   function readAll(): string {
     return files
-      .map((f) => readFileSync(new URL(`../../${f}`, import.meta.url)))
+      .map((f) => readFileSync(resolve(ROOT, f), "utf8"))
       .join("\n");
   }
 
@@ -719,10 +720,5 @@ describe("Slice 4b static safety fences", () => {
     const src = readAll();
     expect(src).not.toMatch(/device.*control|deviceCommand|executeDevice/i);
     expect(src).not.toMatch(/ai-doctor-review|ai-coach|openai|anthropic/i);
-  });
-
-  // Silence unused-import lint by exercising the helper.
-  it("fileURLToPath import used", () => {
-    expect(typeof fileURLToPath).toBe("function");
   });
 });

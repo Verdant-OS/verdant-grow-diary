@@ -158,39 +158,16 @@ async function deleteBatch(supabase, paths) {
   return { deleted, errors };
 }
 
-function writeReport(report) {
+function writeReport(canonical) {
   const outPath = resolve(
     process.cwd(),
-    `artifacts/admin/plant-photos-cleanup-${new Date(report.generated_at)
+    `artifacts/admin/plant-photos-cleanup-${new Date(canonical.generated_at)
       .toISOString()
       .replace(/[:.]/g, "-")}.json`,
   );
   mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(outPath, JSON.stringify(report, null, 2));
+  writeFileSync(outPath, JSON.stringify(canonical, null, 2));
   return outPath;
-}
-
-function printSummary(report, mode) {
-  const lines = [
-    `Plant Profile Photo cleanup — mode: ${mode}`,
-    `  min_age_days:               ${report.min_age_days} (absolute floor ${ABSOLUTE_MIN_AGE_DAYS})`,
-    `  owner_filter:               ${report.owner_filter ?? "(none)"}`,
-    `  scan_complete:              ${report.scan_complete}`,
-    `  total_objects_scanned:      ${report.total_objects_scanned}`,
-    `  referenced (protected):     ${report.referenced}`,
-    `  unknown_age (protected):    ${report.unknown_age}`,
-    `  too_young (protected):      ${report.too_young}`,
-    `  invalid_path (skipped):     ${report.invalid_path}`,
-    `  owner_filter_skip:          ${report.owner_filter_skip}`,
-    `  candidates:                 ${report.candidates}`,
-    `  protected_by_final_recheck: ${report.protected_by_final_recheck}`,
-    `  deleted:                    ${report.deleted}`,
-  ];
-  for (const l of lines) console.log(l);
-  if (report.scan_errors.length) {
-    console.log("  scan_errors:");
-    for (const e of report.scan_errors) console.log(`    - ${e}`);
-  }
 }
 
 async function main() {
@@ -220,29 +197,63 @@ async function main() {
   });
 
   const nowMs = Date.now();
+
+  // Capture the initial reference rows so we can classify them for
+  // the canonical report (plant_rows_scanned / legacy / malformed).
+  let capturedRows = [];
+  const listReferencesCapturing = async () => {
+    const r = await listAllPlantReferences(supabase);
+    capturedRows = r.rows ?? [];
+    return r;
+  };
+
+  // Capture the raw storage objects listed so we can split
+  // invalid_path vs non_profile_photo for the canonical report.
+  let capturedObjects = [];
+  const listObjectsCapturing = async () => {
+    const r = await listAllPlantProfileObjects(supabase, options.ownerFilter);
+    capturedObjects = r.objects ?? [];
+    return r;
+  };
+
   const { report, candidateBatch } = await planCleanup({
-    listReferences: () => listAllPlantReferences(supabase),
-    listObjects: () => listAllPlantProfileObjects(supabase, options.ownerFilter),
+    listReferences: listReferencesCapturing,
+    listObjects: listObjectsCapturing,
     options,
     nowMs,
   });
 
+  const failedPaths = [];
   if (destructive) {
     await executeCleanup({
       report,
       candidateBatch,
       listReferencesForRecheck: () => listAllPlantReferences(supabase),
-      deleteObjects: (paths) => deleteBatch(supabase, paths),
+      deleteObjects: async (paths) => {
+        const r = await deleteBatch(supabase, paths);
+        const deletedSet = new Set(r.deleted);
+        for (const p of paths) if (!deletedSet.has(p)) failedPaths.push(p);
+        return r;
+      },
       options,
     });
   }
 
-  const outPath = writeReport(report);
-  printSummary(report, destructive ? "execute" : "dry-run");
-  console.log(`Report written: ${outPath}`);
+  const referenceStats = classifyPhotoUrlReferences(capturedRows);
+  const pathBuckets = splitPathBuckets(capturedObjects);
+  const canonical = toCanonicalCleanupReport({
+    internal: report,
+    referenceStats,
+    pathBuckets,
+    failedPaths,
+  });
+
+  const outPath = writeReport(canonical);
+  console.log(renderCleanupSummary(canonical));
+  console.log(`\nReport written: ${outPath}`);
 
   // Fail closed on incomplete scan under execute mode.
-  if (destructive && !report.scan_complete) {
+  if (destructive && !canonical.scan_complete) {
     console.error(
       "plant-photos-cleanup: execute aborted — scan was not complete.",
     );
@@ -250,6 +261,7 @@ async function main() {
   }
   process.exit(0);
 }
+
 
 main().catch((err) => {
   // Never leak service-role key material.

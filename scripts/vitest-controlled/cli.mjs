@@ -20,12 +20,14 @@ import { buildManifest, discoverTestFiles, MANIFEST_SCHEMA_VERSION } from "./man
 import { parseShardSpec, assignShard, splitIntoBatches, shardFingerprint } from "./sharding.mjs";
 import {
   computeSourceFingerprint,
-  computeDirtyTreeHash,
+  computeWorkspaceFingerprint,
   fingerprintMismatch,
   FINGERPRINT_SCHEMA_VERSION,
 } from "./fingerprint.mjs";
 import { REPORTER_SCHEMA_VERSION } from "./reporter.mjs";
 import { summarizeRun, renderMarkdown, aggregateShards, readProgress } from "./summarizer.mjs";
+
+export const RUN_SCHEMA_VERSION = 2;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

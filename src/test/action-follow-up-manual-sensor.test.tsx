@@ -275,7 +275,7 @@ function makeClient(
 
 describe("loadManualSensorCandidates", () => {
   it("returns loaded=empty when growId missing", async () => {
-    const client = makeClient([]);
+    const { client } = makeClient([]);
     const r = await loadManualSensorCandidates({
       context: { growId: "", tentId: null, plantId: null },
       client: client as never,
@@ -285,7 +285,7 @@ describe("loadManualSensorCandidates", () => {
   });
 
   it("sanitizes raw provider errors into query_failed", async () => {
-    const client = makeClient(null, { message: "postgres exploded", code: "42501" });
+    const { client } = makeClient(null, { message: "postgres exploded", code: "42501" });
     const r = await loadManualSensorCandidates({
       context: { growId: "g-1", tentId: "t-1", plantId: null },
       client: client as never,
@@ -295,12 +295,12 @@ describe("loadManualSensorCandidates", () => {
   });
 
   it("scopes the query to tent_id when the action has a tent", async () => {
-    const client = makeClient([]);
+    const { client, state } = makeClient([]);
     await loadManualSensorCandidates({
       context: { growId: "g-1", tentId: "t-42", plantId: null },
       client: client as never,
     });
-    expect((client as { _lastTent?: string })._lastTent).toBe("t-42");
+    expect(state.lastTent).toBe("t-42");
   });
 });
 
@@ -310,14 +310,14 @@ describe("loadManualSensorSnapshotById", () => {
   });
 
   it("returns null when the row is missing", async () => {
-    const client = makeClient([]);
+    const { client } = makeClient([]);
     expect(
       await loadManualSensorSnapshotById("missing", client as never),
     ).toBeNull();
   });
 
   it("returns null on provider error", async () => {
-    const client = makeClient(null, { message: "boom" });
+    const { client } = makeClient(null, { message: "boom" });
     expect(
       await loadManualSensorSnapshotById("sn-1", client as never),
     ).toBeNull();

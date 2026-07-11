@@ -598,7 +598,10 @@ describe("cleanup tool — no UI, no scheduler, npm script wiring", () => {
     expect(CLI).not.toMatch(/console\.\w+\([^)]*\$\{key\}/);
     expect(CLI).not.toMatch(/console\.\w+\([^)]*\+\s*key\b/);
     expect(CLI).not.toMatch(/console\.\w+\([^)]*process\.env\.SUPABASE_SERVICE_ROLE_KEY/);
+  });
 });
+
+
 
 // ==============================================================
 // Report contract, console summary, owner-filter regression suite

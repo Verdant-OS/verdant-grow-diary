@@ -24,6 +24,7 @@ import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
+import PlantDetailRecentActionResponse from "@/components/PlantDetailRecentActionResponse";
 import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
 import { usePlantGalleryPhotoCount } from "@/hooks/usePlantGalleryPhotoCount";
 import PlantDetailHarvestEvidenceReportMount from "@/components/PlantDetailHarvestEvidenceReportMount";
@@ -454,6 +455,7 @@ export default function PlantDetail() {
           setQuickLogOpen(true);
         }}
       />
+      <PlantDetailRecentActionResponse growId={plant.growId ?? null} plantId={plant.id} />
       <PlantDetailHarvestWatchCard
         plantId={plant.id}
         hasPlantPhoto={!!plant.photo}

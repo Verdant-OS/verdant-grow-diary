@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- controlled-runner spawn stubs use loose types for the child_process contract */
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";

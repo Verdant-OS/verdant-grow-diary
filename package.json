@@ -31,6 +31,7 @@
     "test:vitest:summarize": "node scripts/vitest-controlled/cli.mjs summarize",
     "test:vitest:aggregate": "node scripts/vitest-controlled/cli.mjs aggregate",
     "test:vitest:manifest": "node scripts/vitest-controlled/cli.mjs manifest",
+    "test:vitest:analyze-progress": "node scripts/vitest-controlled/analyze-progress.mjs",
     "test:legal-seo": "vitest run src/test/legal-pages-structured-data.test.tsx",
     "test:legal-seo:e2e": "playwright test --project=chromium-mocked e2e/legal-seo-metadata.spec.ts --reporter=list,html",
     "test:pheno-disabled-compare-e2e": "node scripts/e2e/run-pheno-disabled-compare-e2e.mjs",

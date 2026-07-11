@@ -73,12 +73,11 @@ export async function loadManualSensorCandidates(
     // only ever see the grower's own rows.
     let q = client
       .from("diary_entries")
-      .select("id, plant_id, tent_id, entry_at, note, details")
-      .order("entry_at", { ascending: false })
-      .limit(limit);
+      .select("id, plant_id, tent_id, entry_at, note, details");
     if (context.tentId) {
       q = q.eq("tent_id", context.tentId);
     }
+    q = q.order("entry_at", { ascending: false }).limit(limit);
     const { data, error } = await q;
     if (error) {
       return { status: "failed", reason: "query_failed" };

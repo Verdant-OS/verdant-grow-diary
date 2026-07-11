@@ -115,7 +115,6 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
   });
 
   function resetLocalPhotoState() {
-    if (selected) URL.revokeObjectURL(selected.previewUrl);
     setSelected(null);
     setClearPhoto(false);
     setPhotoErr(null);
@@ -142,13 +141,13 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, plant.id]);
 
-  // Cleanup any lingering object URL on unmount.
-  useEffect(() => {
-    return () => {
-      if (selected) URL.revokeObjectURL(selected.previewUrl);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Object-URL lifecycle (create + decode-probe + revoke) is owned by
+  // the preview hook so unsupported HEIC/HEIF browsers see the
+  // accessible "photo selected" fallback instead of a broken image.
+  const { preview } = usePlantProfilePhotoPreview({
+    file: selected?.file ?? null,
+    mimeType: selected?.mime ?? null,
+  });
 
   function onFileChosen(fileList: FileList | null) {
     const file = fileList?.[0];
@@ -158,12 +157,11 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       setPhotoErr(v.message);
       return;
     }
-    if (selected) URL.revokeObjectURL(selected.previewUrl);
-    const previewUrl = URL.createObjectURL(file);
-    setSelected({ file, mime: v.mime, previewUrl });
+    setSelected({ file, mime: v.mime });
     setPhotoErr(null);
     setClearPhoto(false);
   }
+
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

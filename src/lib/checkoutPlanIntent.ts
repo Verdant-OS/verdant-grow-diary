@@ -86,7 +86,8 @@ export function savePlanIntent(
   opts?: { storage?: PlanIntentStorage | null; now?: number },
 ): boolean {
   if (!isKnownPlanIntent(plan)) return false;
-  const storage = opts?.storage ?? safeStorage();
+  const storage =
+    opts && "storage" in opts ? opts.storage : safeStorage();
   if (!storage) return false;
   const record: PlanIntentRecord = {
     plan,

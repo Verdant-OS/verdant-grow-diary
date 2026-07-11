@@ -40,6 +40,7 @@ import ActionOutcomeLearningReport from "@/components/ActionOutcomeLearningRepor
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
+import { GrowFollowUpReviewSection } from "@/components/GrowFollowUpReviewSection";
 
 
 /**
@@ -299,6 +300,8 @@ export default function GrowDetail() {
       </section>
 
       <RecentOutcomesCard outcomes={outcomes} />
+
+      <GrowFollowUpReviewSection growId={grow.id} />
 
       <ActionOutcomeLearningReport
         report={outcomes.learning}

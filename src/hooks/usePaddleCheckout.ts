@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   initializePaddle,
   getPaddlePriceId,
@@ -10,6 +10,11 @@ import { useAuth } from "@/store/auth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
+import {
+  consumePlanIntent,
+  isKnownPlanIntent,
+  savePlanIntent,
+} from "@/lib/checkoutPlanIntent";
 
 export interface OpenCheckoutOptions {
   priceId: string;
@@ -106,6 +111,11 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
       }
 
       if (!user) {
+        // Persist plan intent so we can auto-resume post-auth ONCE.
+        // Allowlist-checked inside savePlanIntent — unknown ids are dropped.
+        if (isKnownPlanIntent(options.priceId)) {
+          savePlanIntent(options.priceId);
+        }
         const back =
           `${window.location.pathname}${window.location.search}` || "/pricing";
         navigate(`/auth?redirectTo=${encodeURIComponent(back)}`);
@@ -149,6 +159,22 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
     },
     [navigate, user],
   );
+
+  // Slice C: auto-resume a pending plan intent EXACTLY ONCE after auth.
+  // Guarded with a ref so React StrictMode's double-invoke, rerenders, and
+  // rapid re-mounts cannot re-open the overlay. `consumePlanIntent` is
+  // itself destructive (read + delete), so the storage-side guarantee is
+  // one-shot even if the ref were bypassed.
+  const resumeAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (resumeAttemptedRef.current) return;
+    if (!user) return;
+    if (unavailable) return;
+    const pending = consumePlanIntent();
+    if (!pending) return;
+    resumeAttemptedRef.current = true;
+    void openCheckout({ priceId: pending });
+  }, [user, unavailable, openCheckout]);
 
   return {
     openCheckout,

@@ -34,6 +34,7 @@ import {
   uploadPlantProfilePhoto,
   removeUploadedPlantProfilePhoto,
 } from "@/lib/plantProfilePhotoUploadService";
+import { retirePreviousPlantProfilePhoto } from "@/lib/plantProfilePhotoReplacementCleanupService";
 import { usePlantProfilePhotoPreview } from "@/hooks/usePlantProfilePhotoPreview";
 import PlantProfilePhotoPreview from "@/components/PlantProfilePhotoPreview";
 
@@ -225,8 +226,42 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       return;
     }
 
+    // Attempt to retire the previous private storage object. The
+    // plant update above is the source of truth; cleanup is
+    // secondary and must never roll back a successful save.
+    let cleanupToast: { kind: "success" | "info"; msg: string } | null = null;
+    if (newReference) {
+      const cleanup = await retirePreviousPlantProfilePhoto({
+        previousPhotoUrl: plant.photo ?? null,
+        newPhotoUrl: newReference,
+        authenticatedUserId: user.id,
+        plantId: plant.id,
+      });
+      if (cleanup.status === "removed" || cleanup.status === "not_needed") {
+        cleanupToast = { kind: "success", msg: "Plant photo updated." };
+      } else if (
+        cleanup.status === "protected" ||
+        cleanup.status === "skipped_for_safety"
+      ) {
+        cleanupToast = {
+          kind: "info",
+          msg: "Plant photo updated. The previous file was left in storage for safety.",
+        };
+      } else {
+        cleanupToast = {
+          kind: "info",
+          msg: "Plant photo updated. The previous file could not be removed.",
+        };
+      }
+    }
+
     setBusy(false);
-    toast.success(newReference ? "Plant photo updated." : "Plant updated");
+    if (newReference && cleanupToast) {
+      if (cleanupToast.kind === "success") toast.success(cleanupToast.msg);
+      else toast.message(cleanupToast.msg);
+    } else if (!newReference) {
+      toast.success("Plant updated");
+    }
     qc.invalidateQueries({ queryKey: ["plants"] });
     qc.invalidateQueries({ queryKey: ["grow", "plants"] });
     qc.invalidateQueries({ queryKey: ["grow", "plant", plant.id] });

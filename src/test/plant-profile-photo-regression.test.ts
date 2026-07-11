@@ -104,6 +104,26 @@ describe("EditPlantDialog · native camera + library flow", () => {
   it("cleans up an orphan upload if the plant row update fails", () => {
     expect(EDIT_DIALOG).toMatch(/removeUploadedPlantProfilePhoto\(uploadedPath\)/);
   });
+  it("retires the previous private storage object only after a successful update", () => {
+    expect(EDIT_DIALOG).toMatch(/retirePreviousPlantProfilePhoto/);
+    // Retire call must live after the update-error early-return, i.e.
+    // AFTER the plant update succeeded. Enforce structural ordering.
+    const errIdx = EDIT_DIALOG.indexOf('toast.error("Could not save changes');
+    const retireIdx = EDIT_DIALOG.indexOf("retirePreviousPlantProfilePhoto(");
+    expect(errIdx).toBeGreaterThan(-1);
+    expect(retireIdx).toBeGreaterThan(errIdx);
+  });
+  it("uses sanitized partial-success copy that never leaks paths or provider text", () => {
+    expect(EDIT_DIALOG).toMatch(
+      /previous file was left in storage for safety/,
+    );
+    expect(EDIT_DIALOG).toMatch(/previous file could not be removed/);
+    // Toast strings must not contain durable storage refs or bucket
+    // ids. Scoped to the two grower-facing copy lines.
+    const copy = (EDIT_DIALOG.match(/"Plant photo updated\.[^"]*"/g) ?? []).join("\n");
+    expect(copy).not.toMatch(/storage:\/\//);
+    expect(copy).not.toMatch(/diary-photos/);
+  });
 });
 
 describe("plantProfilePhotoRules · URL text-input validator (back-compat)", () => {

@@ -84,10 +84,86 @@ bun run plant-photos:cleanup -- \
 - **No UI.** The script is not imported by any client bundle.
 - **No scheduler.** No cron, no workflow trigger, no timers.
 
+## How the report is generated
+
+Every run follows the same deterministic sequence:
+
+```text
+Parse and validate CLI options
+→ query current plants.photo_url references
+→ enumerate in-scope storage objects
+→ classify objects using the pure cleanup rules
+→ in execute mode, rerun the final reference recheck
+→ execute deletion for surviving candidates only
+→ build one canonical versioned report
+→ print human-readable and machine-readable summaries
+→ optionally persist the canonical JSON with --report-file
+```
+
+- **Dry-run generates the same canonical report structure as execute.**
+  Only the `mode`, `deleted_paths`, `failed_paths`, and deletion
+  counts differ.
+- Dry-run **never** calls the deleter.
+- Execute reports reflect final-recheck protection and the actual
+  deletion outcomes.
+- `generated_at` is the report's creation timestamp — it is **not**
+  the age or upload time of any storage object.
+- The report is built **after** the cleanup result is known, so its
+  counts describe what actually happened, not what was planned.
+
+## Persisting the report with `--report-file`
+
+`--report-file <path>` writes the full canonical JSON report exactly
+to the supplied path. Missing parent directories are created. The
+option works in both dry-run and execute mode.
+
+```bash
+bun run plant-photos:cleanup -- \
+  --dry-run \
+  --report-file artifacts/admin/plant-photo-cleanup-dry-run.json
+
+bun run plant-photos:cleanup -- \
+  --execute \
+  --confirm-delete-orphans \
+  --owner-id <owner-uuid> \
+  --report-file artifacts/admin/plant-photo-cleanup-execute.json
+```
+
+- The written file contains the full canonical report — the compact
+  `CLEANUP_REPORT_SUMMARY_JSON=…` console line is **not** a
+  replacement for the file.
+- The file is written atomically: content is staged to a temp file
+  in the same directory and then renamed into place. A crashed
+  write leaves the previous file intact.
+- Reports may contain private storage object paths and should be
+  stored securely. **Do not commit reports that contain production
+  identifiers.**
+- Report-write failures exit nonzero. In execute mode a write
+  failure **does not** restore already-deleted objects; the CLI
+  clearly labels this state.
+- When `--report-file` is omitted, the CLI still writes a
+  timestamped receipt under `artifacts/admin/plant-photos-cleanup-<timestamp>.json`.
+- The operator is responsible for selecting a secure path. The tool
+  does not restrict writes to the repository root.
+
+## Machine-readable console summary
+
+After the human-readable summary, the CLI always prints one compact
+JSON line prefixed with `CLEANUP_REPORT_SUMMARY_JSON=`. Scripts can
+grep for this prefix and `JSON.parse` the value after `=`.
+
+Example:
+
+```text
+CLEANUP_REPORT_SUMMARY_JSON={"schema_version":"1","mode":"dry_run","scan_complete":true,"min_age_days":30,"owner_filter":null,"counts":{"storage_objects_scanned":12,"referenced":5,"eligible_orphans":2,"too_young":1,"unknown_age":1,"invalid_path":1,"non_profile_photo":2,"owner_mismatch":0,"protected_by_final_recheck":0,"deletion_attempted":0,"deleted":0,"failed":0}}
+```
+
+The compact summary contains counts only — no path arrays, no
+malformed reference values, no failure details, no secrets.
+
 ## JSON report fields
 
-Every successful run writes a JSON report under
-`artifacts/admin/plant-photos-cleanup-<timestamp>.json`.
+
 
 | Field                        | Meaning                                                              |
 | ---------------------------- | -------------------------------------------------------------------- |

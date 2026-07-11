@@ -186,3 +186,29 @@ defect: **zero production changes** are made in the same PR. When the
 managed browser run later exposes a broken handoff, fix ONLY the first
 broken UI/application seam and add a matching browser regression
 assertion — do not broaden the PR into unrelated stages.
+
+## Action Follow-Up Evidence V1 — Slice 3 status
+
+Status matrix (browser-agnostic; verified via Vitest suites):
+
+- Grower-entered follow-up rules: PASS (`action-follow-up-evidence-rules.test.ts`)
+- Grower-entered follow-up persistence: PASS (`action-follow-up-evidence-service.test.ts`)
+- Action Detail follow-up form: PASS (`action-follow-up-evidence-ui.test.tsx`)
+- Action Detail follow-up card: PASS
+- Timeline outcome rendering: PASS (`actionFollowupTimelineLabel`)
+- Marker-level relationship: PASS (backward-compatible)
+- Automatic diary follow-up: INTENTIONALLY UNSUPPORTED
+- Optional photo attachment: DEFERRED (no safe existing selector)
+- Optional sensor association: DEFERRED (no safe existing selector)
+
+Contract notes:
+
+- Outcome is always selected by the grower — never inferred.
+- Follow-up is never created automatically. The grower must submit.
+- `diary_entries` remains the persistence model; no schema change.
+- Existing marker-only rows continue to render as "Follow-up".
+- Rows with `details.outcome` render as "Follow-up · <label>".
+- No device execution is implied by any outcome.
+- Plant improvement is never inferred; `improved` is a grower-selected label only.
+- No signed / blob / data URLs are persisted through the UI flow.
+- No service role, AI, or device-control imports in the follow-up UI.

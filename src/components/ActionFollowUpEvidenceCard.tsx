@@ -68,6 +68,8 @@ export default function ActionFollowUpEvidenceCard({
           <SensorSourceBadge source="manual" testId="action-followup-sensor-source" />
         </div>
       )}
+
+      {photoEvidenceSlot}
     </div>
   );
 }

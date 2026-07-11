@@ -1167,16 +1167,8 @@ describe("cleanup reporting — static boundaries", () => {
 // Report persistence + determinism hardening
 // ==============================================================
 
-import { mkdtempSync, readFileSync as _readFile, rmSync, writeFileSync, existsSync, statSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import {
-  serializeCanonicalReport,
-  renderCleanupMachineSummary,
-  MACHINE_SUMMARY_PREFIX,
-  comparePathCodePoints,
-} from "../../scripts/admin/plant-photos-cleanup-report.mjs";
-import { writeCanonicalReportFile } from "../../scripts/admin/plant-photos-cleanup-write.mjs";
+
+
 
 // -------- --report-file arg parsing --------
 

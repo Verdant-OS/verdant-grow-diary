@@ -414,10 +414,7 @@ describe("ActionFollowUpEvidenceSection", () => {
 
   it("guards against rapid double submit while saving", async () => {
     let resolveFn: (r: ActionFollowUpEvidenceSaveResult) => void = () => {};
-    const save = vi.fn<
-      [ActionFollowUpDraft],
-      Promise<ActionFollowUpEvidenceSaveResult>
-    >(
+    const save = vi.fn<(draft: ActionFollowUpDraft) => Promise<ActionFollowUpEvidenceSaveResult>>(
       () =>
         new Promise<ActionFollowUpEvidenceSaveResult>((res) => {
           resolveFn = res;

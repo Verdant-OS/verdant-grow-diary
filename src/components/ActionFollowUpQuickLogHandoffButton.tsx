@@ -5,7 +5,8 @@
  * candidates once Quick Log reports a save.
  *
  * SAFETY:
- *  - No <input type="file">, no `capture=`, no uploader, no signed URL.
+ *  - No file-input element, no camera capture attribute, no uploader,
+ *    and no signed URL are introduced here.
  *  - Dispatches ONLY the existing `verdant:open-quicklog` event that
  *    AppShell already listens for. Never navigates.
  *  - Listens for the existing `verdant:entry-created` event to know

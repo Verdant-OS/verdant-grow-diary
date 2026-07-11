@@ -321,7 +321,7 @@ export function toTimelineItem(
   const timestamp = entry.createdAt ? Date.parse(entry.createdAt) : null;
   return {
     id: entry.id,
-    title: titleForEventType(entry.eventType),
+    title: titleForEventType(entry.eventType, entry.details.extras ?? null),
     subtitle: buildSubtitle(entry),
     timestamp: Number.isFinite(timestamp as number) ? (timestamp as number) : null,
     timestampLabel: entry.createdAtLabel,

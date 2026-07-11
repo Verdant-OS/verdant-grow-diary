@@ -23,6 +23,17 @@ function fakeRepo(fileCount: number) {
   // has real bytes to hash.
   fs.writeFileSync(path.join(root, "vitest.config.ts"), "export default {}\n");
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "fake" }));
+  // Initialize as a git repo so the workspace fingerprint can enumerate
+  // tracked + non-ignored untracked files (mirrors real Verdant layout).
+  const git = (...args: string[]) => {
+    const r = require("node:child_process").spawnSync("git", ["-C", root, ...args]);
+    if (r.status !== 0) throw new Error(`git ${args.join(" ")} failed`);
+  };
+  git("init", "-q");
+  git("config", "user.email", "test@example.invalid");
+  git("config", "user.name", "test");
+  git("add", "-A");
+  git("commit", "-q", "-m", "init");
   return { root, files };
 }
 

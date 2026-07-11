@@ -24,6 +24,11 @@ import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 
 export const FINGERPRINT_SCHEMA_VERSION = 2;
+// Configuration fingerprint schema is versioned separately from the
+// workspace fingerprint. v3 folds the enforced toolchain identity
+// (Node, Bun, Vitest) into the config hash so any runtime drift
+// invalidates resume before completed-file reuse.
+export const CONFIG_FINGERPRINT_SCHEMA_VERSION = 3;
 export const FINGERPRINT_ALGORITHM = "sha256";
 
 /** Normalize any repo-relative path to POSIX form for stable hashing. */
@@ -199,15 +204,27 @@ export function computeSourceFingerprint(repoRoot, params) {
     minWorkers,
     pool,
     reporterSchemaVersion,
+    toolVersions,
   } = params;
+  if (!toolVersions || !toolVersions.node || !toolVersions.bun || !toolVersions.vitest) {
+    throw Object.assign(
+      new Error(
+        "computeSourceFingerprint requires toolVersions {node,bun,vitest} — refusing to hash a null toolchain identity",
+      ),
+      { code: "TOOLCHAIN_UNKNOWN" },
+    );
+  }
   const h = crypto.createHash(FINGERPRINT_ALGORITHM);
-  h.update(`config:v${FINGERPRINT_SCHEMA_VERSION}\n`);
+  h.update(`config:v${CONFIG_FINGERPRINT_SCHEMA_VERSION}\n`);
   h.update(`manifest:${manifestHash}\n`);
   h.update(`shard:${shardIndex}/${shardTotal}\n`);
   h.update(`batch:${batchSize}\n`);
   h.update(`workers:${minWorkers}-${maxWorkers}\n`);
   h.update(`pool:${pool}\n`);
   h.update(`reporterSchema:${reporterSchemaVersion}\n`);
+  h.update(`node:${toolVersions.node}\n`);
+  h.update(`bun:${toolVersions.bun}\n`);
+  h.update(`vitest:${toolVersions.vitest}\n`);
   return h.digest("hex");
 }
 

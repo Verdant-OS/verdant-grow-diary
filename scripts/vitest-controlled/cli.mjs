@@ -14,8 +14,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
 import { buildManifest, discoverTestFiles, MANIFEST_SCHEMA_VERSION } from "./manifest.mjs";
 import { parseShardSpec, assignShard, splitIntoBatches, shardFingerprint } from "./sharding.mjs";
 import {
@@ -23,11 +24,15 @@ import {
   computeWorkspaceFingerprint,
   fingerprintMismatch,
   FINGERPRINT_SCHEMA_VERSION,
+  CONFIG_FINGERPRINT_SCHEMA_VERSION,
 } from "./fingerprint.mjs";
 import { REPORTER_SCHEMA_VERSION } from "./reporter.mjs";
 import { summarizeRun, renderMarkdown, aggregateShards, readProgress } from "./summarizer.mjs";
 
-export const RUN_SCHEMA_VERSION = 2;
+// Run-record schema. v3 folds enforced toolchain identity (Node, Bun,
+// Vitest) into the resume/aggregate contract. Legacy v1/v2 runs are
+// refused rather than silently promoted.
+export const RUN_SCHEMA_VERSION = 3;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -79,14 +84,74 @@ function makeRunId(shardIndex, shardTotal) {
   return `${utcTimestamp()}-s${shardIndex}of${shardTotal}-${crypto.randomBytes(3).toString("hex")}`;
 }
 
-function toolVersions() {
+const runnerRequire = createRequire(import.meta.url);
+
+/**
+ * Discover the actual Node, Bun, and Vitest runtime versions from the
+ * installed executables and package metadata — never from optional
+ * environment variables (which the workflow may leave unset) and never
+ * by invoking a command that could download a different Vitest.
+ *
+ * Fails closed: a missing Bun executable or missing local Vitest package
+ * throws with EXIT.CONFIG_ERROR so the run cannot proceed with a null
+ * toolchain identity that would silently be reusable.
+ *
+ * Injectable for focused tests via `spawnSyncImpl` and `resolveVitestPkg`.
+ */
+export function discoverToolVersions({ spawnSyncImpl = spawnSync, resolveVitestPkg } = {}) {
+  const node = process.version;
+  let bun;
+  try {
+    const r = spawnSyncImpl("bun", ["--version"], { encoding: "utf8" });
+    if (!r || r.error) throw r?.error ?? new Error("no spawn result");
+    if (r.status !== 0) throw new Error(`bun --version exited ${r.status}`);
+    bun = String(r.stdout ?? "").trim();
+    if (!bun) throw new Error("empty bun --version output");
+  } catch (err) {
+    throw Object.assign(
+      new Error(`Cannot discover Bun version from installed executable: ${err?.message ?? err}`),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  let vitest;
+  try {
+    const pkgPath = resolveVitestPkg
+      ? resolveVitestPkg()
+      : runnerRequire.resolve("vitest/package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+    vitest = pkg.version;
+    if (!vitest || typeof vitest !== "string") throw new Error("missing version field");
+  } catch (err) {
+    throw Object.assign(
+      new Error(`Cannot discover Vitest version from installed package: ${err?.message ?? err}`),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
+  return { node, bun, vitest };
+}
+
+function toolVersions(discovered) {
   return {
-    node: process.version,
-    bun: process.env.BUN_VERSION || null,
+    node: discovered.node,
+    bun: discovered.bun,
+    vitest: discovered.vitest,
     reporterSchema: REPORTER_SCHEMA_VERSION,
     manifestSchema: MANIFEST_SCHEMA_VERSION,
     fingerprintSchema: FINGERPRINT_SCHEMA_VERSION,
+    configFingerprintSchema: CONFIG_FINGERPRINT_SCHEMA_VERSION,
   };
+}
+
+/** Compare persisted vs current toolchain; return null when identical, else a diff string. */
+export function toolchainMismatch(previous, current) {
+  if (!previous) return "toolchain absent from prior run";
+  const keys = ["node", "bun", "vitest"];
+  const diffs = [];
+  for (const k of keys) {
+    if (previous[k] !== current[k])
+      diffs.push(`${k}: ${previous[k] ?? "<absent>"} → ${current[k]}`);
+  }
+  return diffs.length ? `toolchain drift: ${diffs.join("; ")}` : null;
 }
 
 /** Prepare a fresh run directory with run.json + manifest.json. */
@@ -101,7 +166,21 @@ export function initRun({
   minWorkers,
   files,
   manifest,
+  toolVersions: discoveredToolVersions,
 }) {
+  if (
+    !discoveredToolVersions ||
+    !discoveredToolVersions.node ||
+    !discoveredToolVersions.bun ||
+    !discoveredToolVersions.vitest
+  ) {
+    throw Object.assign(
+      new Error(
+        "initRun requires discovered {node,bun,vitest} toolVersions — refusing null identity",
+      ),
+      { code: EXIT.CONFIG_ERROR },
+    );
+  }
   const runId = makeRunId(shardIndex, shardTotal);
   const runDir = path.resolve(runsRoot, runId);
   fs.mkdirSync(path.join(runDir, "raw"), { recursive: true });
@@ -117,6 +196,7 @@ export function initRun({
     minWorkers,
     pool,
     reporterSchemaVersion: REPORTER_SCHEMA_VERSION,
+    toolVersions: discoveredToolVersions,
   });
   const workspaceFingerprint = computeWorkspaceFingerprint(repoRoot);
 
@@ -137,7 +217,7 @@ export function initRun({
     sourceFingerprint,
     workspaceFingerprint,
     reporterSchema: REPORTER_SCHEMA_VERSION,
-    toolVersions: toolVersions(),
+    toolVersions: toolVersions(discoveredToolVersions),
   };
   fs.writeFileSync(path.join(runDir, "run.json"), JSON.stringify(runRecord, null, 2));
   fs.writeFileSync(path.join(runDir, "manifest.json"), JSON.stringify(manifest, null, 2));
@@ -245,11 +325,14 @@ export async function commandRun(opts, deps = {}) {
     files: injectedFiles,
     vitestBin,
     spawnImpl,
+    toolVersions: injectedToolVersions,
+    discoverToolVersionsImpl = discoverToolVersions,
   } = opts;
   const { index, total } = parseShardSpec(shardSpec);
   const manifest = injectedFiles
     ? buildManifest(repoRoot, { files: injectedFiles })
     : buildManifest(repoRoot);
+  const discoveredToolVersions = injectedToolVersions ?? discoverToolVersionsImpl();
   const initialized = initRun({
     repoRoot,
     runsRoot,
@@ -261,6 +344,7 @@ export async function commandRun(opts, deps = {}) {
     minWorkers: DEFAULTS.minWorkers,
     files: manifest.files,
     manifest,
+    toolVersions: discoveredToolVersions,
   });
   return executeBatches(initialized, {
     repoRoot,
@@ -280,15 +364,17 @@ export async function commandResume(opts, deps = {}) {
     batchDeadlineMs = DEFAULTS.batchDeadlineMs,
     vitestBin,
     spawnImpl,
+    toolVersions: injectedToolVersions,
+    discoverToolVersionsImpl = discoverToolVersions,
   } = opts;
   const { runRecord, manifest, shardFiles } = loadRun(runDir);
-  // 1. Refuse older run/fingerprint schema outright — legacy dirty-tree
-  //    hashes did not cover production, migrations, edge functions, or
-  //    scripts and cannot be silently promoted to workspace semantics.
+  // 1. Refuse older run schema outright — legacy dirty-tree hashes and
+  //    v2 runs (no enforced toolchain identity) cannot be silently
+  //    promoted to the current workspace + toolchain contract.
   if ((runRecord.schema ?? 1) < RUN_SCHEMA_VERSION) {
     throw Object.assign(
       new Error(
-        `Refusing to resume: run.json schema v${runRecord.schema ?? 1} predates workspace fingerprint v${RUN_SCHEMA_VERSION}`,
+        `Refusing to resume: run.json schema v${runRecord.schema ?? 1} predates toolchain-locked contract v${RUN_SCHEMA_VERSION}`,
       ),
       { code: EXIT.CONFIG_ERROR },
     );
@@ -315,7 +401,16 @@ export async function commandResume(opts, deps = {}) {
       code: EXIT.CONFIG_ERROR,
     });
   }
-  // 3. Re-validate the run-configuration fingerprint (shard/worker/pool).
+  // 3. Discover current runtime toolchain and refuse drift BEFORE
+  //    inspecting completed-file events.
+  const currentToolVersions = injectedToolVersions ?? discoverToolVersionsImpl();
+  const tcMismatch = toolchainMismatch(runRecord.toolVersions, currentToolVersions);
+  if (tcMismatch) {
+    throw Object.assign(new Error(`Refusing to resume: ${tcMismatch}`), {
+      code: EXIT.CONFIG_ERROR,
+    });
+  }
+  // 4. Re-validate the run-configuration fingerprint (shard/worker/pool/toolchain).
   const currentSource = computeSourceFingerprint(repoRoot, {
     manifestHash: manifest.hash,
     shardIndex: runRecord.shardIndex,
@@ -325,6 +420,7 @@ export async function commandResume(opts, deps = {}) {
     minWorkers: runRecord.minWorkers,
     pool: runRecord.pool,
     reporterSchemaVersion: REPORTER_SCHEMA_VERSION,
+    toolVersions: currentToolVersions,
   });
   const srcMismatch = fingerprintMismatch(runRecord.sourceFingerprint, currentSource);
   if (srcMismatch) {
@@ -368,15 +464,18 @@ export async function commandRerunFailed(opts, deps = {}) {
     batchDeadlineMs = DEFAULTS.batchDeadlineMs,
     vitestBin,
     spawnImpl,
+    toolVersions: injectedToolVersions,
+    discoverToolVersionsImpl = discoverToolVersions,
   } = opts;
   const { runRecord, manifest, shardFiles } = loadRun(runDir);
+
   // Enforce the same schema + workspace fingerprint contract as `resume`
   // BEFORE reusing the prior failed-files list, which is itself an
   // outcome derived from the previous workspace state.
   if ((runRecord.schema ?? 1) < RUN_SCHEMA_VERSION) {
     throw Object.assign(
       new Error(
-        `Refusing to rerun-failed: run.json schema v${runRecord.schema ?? 1} predates workspace fingerprint v${RUN_SCHEMA_VERSION}`,
+        `Refusing to rerun-failed: run.json schema v${runRecord.schema ?? 1} predates toolchain-locked contract v${RUN_SCHEMA_VERSION}`,
       ),
       { code: EXIT.CONFIG_ERROR },
     );
@@ -402,6 +501,13 @@ export async function commandRerunFailed(opts, deps = {}) {
       code: EXIT.CONFIG_ERROR,
     });
   }
+  const currentToolVersions = injectedToolVersions ?? discoverToolVersionsImpl();
+  const tcMismatch = toolchainMismatch(runRecord.toolVersions, currentToolVersions);
+  if (tcMismatch) {
+    throw Object.assign(new Error(`Refusing to rerun-failed: ${tcMismatch}`), {
+      code: EXIT.CONFIG_ERROR,
+    });
+  }
   const { files: doneMap } = readProgress(path.join(runDir, "progress.jsonl"));
   const failed = [...doneMap.values()].filter((e) => e.status === "failed").map((e) => e.file);
   if (!failed.length) {
@@ -420,6 +526,7 @@ export async function commandRerunFailed(opts, deps = {}) {
     minWorkers: runRecord.minWorkers,
     files: manifest.files, // full manifest so shard math matches
     manifest,
+    toolVersions: currentToolVersions,
   });
   // Overwrite shard files to just the failed set for this rerun.
   fs.writeFileSync(

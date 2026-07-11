@@ -125,6 +125,8 @@ function pickPrimary(
 export default function ActionFollowUpEvidenceSection({
   action,
   save,
+  loadCandidates,
+  loadSnapshotById,
 }: ActionFollowUpEvidenceSectionProps) {
   const [query, setQuery] = useState<QueryState>({ status: "loading" });
   const [showForm, setShowForm] = useState(false);
@@ -132,7 +134,23 @@ export default function ActionFollowUpEvidenceSection({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
 
+  // Slice 4b — Manual sensor candidate state.
+  const [sensorStatus, setSensorStatus] = useState<
+    "loading" | "loaded" | "error"
+  >("loading");
+  const [sensorCandidates, setSensorCandidates] = useState<
+    ManualSnapshotTimelineCard[]
+  >([]);
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(
+    null,
+  );
+  const [associatedEvidence, setAssociatedEvidence] =
+    useState<ActionFollowUpManualSensorEvidenceState>({ status: "loading" });
+
   const saveFn = save ?? saveActionFollowUpEvidence;
+  const loadCandidatesFn = loadCandidates ?? ((ctx) =>
+    loadManualSensorCandidates({ context: ctx }));
+  const loadSnapshotByIdFn = loadSnapshotById ?? loadManualSensorSnapshotById;
 
   useEffect(() => {
     let cancelled = false;

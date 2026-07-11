@@ -115,7 +115,13 @@ export async function initializePaddle(): Promise<void> {
       try {
         const paddleJsEnv = env === "sandbox" ? "sandbox" : "production";
         (window as any).Paddle.Environment.set(paddleJsEnv);
-        (window as any).Paddle.Initialize({ token: clientToken });
+        // Slice D: single module-level event router. Registered exactly
+        // once at Initialize time — StrictMode-safe because
+        // `paddleInitialized` guards re-entry.
+        (window as any).Paddle.Initialize({
+          token: clientToken,
+          eventCallback: handlePaddleCheckoutEvent,
+        });
         paddleInitialized = true;
         resolve();
       } catch (err) {

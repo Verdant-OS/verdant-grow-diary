@@ -123,19 +123,20 @@ export async function retirePreviousPlantProfilePhoto(
     authenticatedUserId: input.authenticatedUserId,
     plantId: input.plantId,
   });
-  if (!decision.eligible) {
+  if (decision.eligible === false) {
+    const r = decision.reason;
     if (
-      decision.reason === "wrong_owner" ||
-      decision.reason === "wrong_bucket" ||
-      decision.reason === "wrong_plant_path" ||
-      decision.reason === "malformed_reference"
+      r === "wrong_owner" ||
+      r === "wrong_bucket" ||
+      r === "wrong_plant_path" ||
+      r === "malformed_reference"
     ) {
       return {
         status: "skipped_for_safety",
         reason: "ineligible_reference",
       };
     }
-    return { status: "not_needed", reason: decision.reason };
+    return { status: "not_needed", reason: r };
   }
 
   const client = (input.client ?? supabase) as any;

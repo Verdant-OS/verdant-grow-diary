@@ -85,7 +85,6 @@ interface Props {
 interface SelectedPhoto {
   file: File;
   mime: PlantProfilePhotoMime;
-  previewUrl: string;
 }
 
 export default function EditPlantDialog({ plant, trigger }: Props) {

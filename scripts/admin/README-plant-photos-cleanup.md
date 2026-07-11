@@ -40,14 +40,22 @@ bun run plant-photos:cleanup -- \
 # Owner-filtered dry-run (recommended first step in prod)
 bun run plant-photos:cleanup -- \
   --dry-run \
-  --owner <owner-uuid> \
+  --owner-id <owner-uuid> \
   --min-age-days 30
 
-# Confirmed execute mode — both destructive flags required
+# Dry-run writing the canonical JSON report to a chosen path
+bun run plant-photos:cleanup -- \
+  --dry-run \
+  --report-file artifacts/admin/plant-photo-cleanup-dry-run.json
+
+# Confirmed execute mode with a persisted receipt
 bun run plant-photos:cleanup -- \
   --execute \
   --confirm-delete-orphans \
+  --owner-id <owner-uuid> \
+  --report-file artifacts/admin/plant-photo-cleanup-execute.json \
   --min-age-days 30
+
 ```
 
 > **Never run execute mode before reviewing a successful dry-run from

@@ -1348,21 +1348,25 @@ describe("canonical report path arrays — sorted, unique, order-invariant", () 
       options: opts,
       nowMs: NOW,
     });
-    // Simulate execute so deleted_paths + failed_paths get populated.
+    // Simulate execute so deleted_paths gets populated. Use a
+    // path-content-based failure rule so the split is deterministic
+    // regardless of input iteration order.
     await executeCleanup({
       report,
       candidateBatch,
       listReferencesForRecheck: refsOk([]),
       deleteObjects: async (paths) => {
-        // Mark every other path as failed to populate both arrays.
         const deleted: string[] = [];
-        for (let i = 0; i < paths.length; i += 1) {
-          if (i % 2 === 0) deleted.push(paths[i]);
+        const errors: string[] = [];
+        for (const p of paths) {
+          if (p.endsWith("z.webp")) errors.push(`fail:${p}`);
+          else deleted.push(p);
         }
-        return { deleted, errors: paths.length > deleted.length ? ["boom"] : [] };
+        return { deleted, errors };
       },
       options: opts,
     });
+
     const failedPaths = candidateBatch.filter(
       (p) => !report.deleted_paths.includes(p),
     );

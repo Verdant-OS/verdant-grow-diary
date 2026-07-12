@@ -7,7 +7,7 @@
  * added/removed tracked file — must invalidate resume, while ignored
  * runner artifacts (e.g. .vitest-runs/) must not.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -36,9 +36,44 @@ function git(root: string, ...args: string[]) {
   return r.stdout;
 }
 
-function initFixtureRepo(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vc-fp-"));
-  // Ignore the runner artifacts directory the same way the real repo does.
+// ---- Fixture-template optimization --------------------------------------
+//
+// Previously every test called initFixtureRepo() which ran a fresh
+// git init/config/add/commit cycle (~17 per module). Under matrix load
+// this synchronous fork-storm starves Vitest's worker RPC and can produce
+// "Timeout calling onTaskUpdate" runner errors that fail the process
+// even when every assertion passes.
+//
+// Instead: lazily build ONE committed template repo, then per test copy
+// it (including its .git metadata) to a fresh independent working dir.
+// Every case dir is still fully independent — mutations in one test
+// cannot leak into another — but the git plumbing runs exactly once.
+
+const CASE_PREFIX = "vc-fp-case-";
+const TEMPLATE_PREFIX = "vc-fp-template-";
+
+let templateRoot: string | null = null;
+const activeCaseDirs = new Set<string>();
+
+function isSafeCleanupTarget(target: string, expectedPrefix: string): boolean {
+  const abs = path.resolve(target);
+  const tmp = path.resolve(os.tmpdir());
+  if (abs === tmp) return false;
+  const parent = path.dirname(abs);
+  if (parent !== tmp) return false;
+  const base = path.basename(abs);
+  return base.startsWith(expectedPrefix);
+}
+
+function safeRemoveDir(target: string, expectedPrefix: string): void {
+  if (!isSafeCleanupTarget(target, expectedPrefix)) {
+    throw new Error(`refusing unsafe fixture cleanup: ${target}`);
+  }
+  fs.rmSync(target, { recursive: true, force: true });
+}
+
+function buildTemplate(): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), TEMPLATE_PREFIX));
   fs.writeFileSync(path.join(root, ".gitignore"), ".vitest-runs/\ntest-results/\n");
   fs.mkdirSync(path.join(root, "src"), { recursive: true });
   fs.mkdirSync(path.join(root, "scripts"), { recursive: true });
@@ -58,10 +93,50 @@ function initFixtureRepo(): string {
   git(root, "init", "-q");
   git(root, "config", "user.email", "t@example.invalid");
   git(root, "config", "user.name", "t");
+  git(root, "config", "commit.gpgsign", "false");
   git(root, "add", "-A");
   git(root, "commit", "-q", "-m", "init");
   return root;
 }
+
+function getTemplate(): string {
+  if (templateRoot === null) {
+    templateRoot = buildTemplate();
+  }
+  return templateRoot;
+}
+
+function initFixtureRepo(): string {
+  const template = getTemplate();
+  const caseRoot = fs.mkdtempSync(path.join(os.tmpdir(), CASE_PREFIX));
+  // Node 16.7+ supports recursive fs.cpSync — copies the working tree and
+  // .git metadata verbatim, producing a fully independent repository.
+  fs.cpSync(template, caseRoot, { recursive: true });
+  activeCaseDirs.add(caseRoot);
+  return caseRoot;
+}
+
+afterEach(() => {
+  for (const dir of activeCaseDirs) {
+    try {
+      safeRemoveDir(dir, CASE_PREFIX);
+    } catch {
+      // Best-effort cleanup; a stray fixture never affects assertions.
+    }
+  }
+  activeCaseDirs.clear();
+});
+
+afterAll(() => {
+  if (templateRoot !== null) {
+    try {
+      safeRemoveDir(templateRoot, TEMPLATE_PREFIX);
+    } catch {
+      // Best-effort cleanup.
+    }
+    templateRoot = null;
+  }
+});
 
 describe("workspace fingerprint — determinism & coverage", () => {
   let root: string;

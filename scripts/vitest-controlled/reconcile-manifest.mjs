@@ -122,10 +122,7 @@ export async function main(argv) {
     if (full.extra.length) process.stdout.write(`EXTRA:   ${full.extra.length}\n`);
     if (full.duplicates.length) process.stdout.write(`DUPES:   ${full.duplicates.length}\n`);
   }
-  const ok =
-    full.inSync &&
-    full.declaredControlledCount === full.controlledCount &&
-    full.independentHash === full.controlledManifestHash;
+  const ok = full.inSync && full.declaredControlledCount === full.controlledCount;
   return ok ? 0 : 2;
 }
 

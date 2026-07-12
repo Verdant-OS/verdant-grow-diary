@@ -118,7 +118,9 @@ describe("manifest reconciliation", () => {
 
 // ---- Synthetic v4 shard fixture builder ---------------------------------
 
-function buildSyntheticFixture({ shardTotal = 2, filesByShard } = {}) {
+function buildSyntheticFixture(opts: { shardTotal?: number; filesByShard: string[][] }) {
+  const shardTotal = opts.shardTotal ?? 2;
+  const filesByShard = opts.filesByShard;
   const allFiles = filesByShard.flat().slice().sort();
   const manifest = {
     schema: MANIFEST_SCHEMA_VERSION,

@@ -348,7 +348,7 @@ describe("resume enforcement", () => {
     const root = initFixtureRepo();
     // Insert a distinctive secret-like literal into a tracked file — the
     // fingerprint hashes contents but MUST NOT round-trip them to disk.
-    const canary = "CANARY_TOKEN_" + Math.random().toString(36).slice(2);
+    const canary = "CANARY_TOKEN_vc_fp_fixed_distinctive_marker_2f8a1c";
     fs.writeFileSync(path.join(root, "src/app.ts"), `export const s = "${canary}";\n`);
     git(root, "add", "-A");
     git(root, "commit", "-q", "-m", "canary");

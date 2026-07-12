@@ -83,11 +83,14 @@ export function fingerprintCardinality(shardSummaries, expectedTotal) {
   const reasons = [];
   if (common.size !== 1) reasons.push({ code: "common_config_cardinality", size: common.size });
   if (assignment.size !== expectedTotal)
-    reasons.push({ code: "assignment_cardinality", size: assignment.size, expected: expectedTotal });
+    reasons.push({
+      code: "assignment_cardinality",
+      size: assignment.size,
+      expected: expectedTotal,
+    });
   if (composite.size !== expectedTotal)
     reasons.push({ code: "composite_cardinality", size: composite.size, expected: expectedTotal });
-  if (workspace.size !== 1)
-    reasons.push({ code: "workspace_cardinality", size: workspace.size });
+  if (workspace.size !== 1) reasons.push({ code: "workspace_cardinality", size: workspace.size });
   if (manifestHashes.size !== 1)
     reasons.push({ code: "manifest_cardinality", size: manifestHashes.size });
   return { ok: reasons.length === 0, reasons };
@@ -135,7 +138,8 @@ export function coverageReport(shardSummaries, expectedManifest) {
   const missing = [...expected].filter((f) => !observed.has(f)).sort();
   const extra = [...observed].filter((f) => !expected.has(f)).sort();
   const multiplyOwned = [];
-  for (const [f, list] of owners) if (list.length > 1) multiplyOwned.push({ file: f, shards: list });
+  for (const [f, list] of owners)
+    if (list.length > 1) multiplyOwned.push({ file: f, shards: list });
   return {
     ok: missing.length === 0 && extra.length === 0 && multiplyOwned.length === 0,
     missing,

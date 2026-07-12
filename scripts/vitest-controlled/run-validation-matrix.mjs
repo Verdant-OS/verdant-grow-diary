@@ -94,13 +94,7 @@ function runOne(file, { spawnImpl = spawnSync } = {}) {
   const started = Date.now();
   const res = spawnImpl(
     "bunx",
-    [
-      "vitest",
-      "run",
-      file,
-      "--reporter=json",
-      `--outputFile=${outPath}`,
-    ],
+    ["vitest", "run", file, "--reporter=json", `--outputFile=${outPath}`],
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
   );
   const durationMs = Date.now() - started;
@@ -170,9 +164,7 @@ export async function main(argv) {
   const args = parseArgv(argv);
   const result = await runMatrix({ dryRun: args.dryRun, outputPath: args.outputPath });
   if (args.dryRun) {
-    process.stdout.write(
-      `PLAN: ${result.totalRuns} runs across ${result.uniqueFileCount} files\n`,
-    );
+    process.stdout.write(`PLAN: ${result.totalRuns} runs across ${result.uniqueFileCount} files\n`);
     return 0;
   }
   process.stdout.write(

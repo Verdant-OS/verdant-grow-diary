@@ -6,17 +6,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import {
-  evaluateDispatchReadiness,
-} from "../../scripts/vitest-controlled/assert-dispatch-ready.mjs";
+import { evaluateDispatchReadiness } from "../../scripts/vitest-controlled/assert-dispatch-ready.mjs";
 import {
   walkIndependentManifest,
   reconcile,
   hashPaths,
 } from "../../scripts/vitest-controlled/reconcile-manifest.mjs";
-import {
-  verifyShardInputs,
-} from "../../scripts/vitest-controlled/verify-artifacts.mjs";
+import { verifyShardInputs } from "../../scripts/vitest-controlled/verify-artifacts.mjs";
 import {
   buildReport,
   enumerateShardDirs,

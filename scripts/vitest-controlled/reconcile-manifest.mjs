@@ -73,10 +73,7 @@ export function reconcile(independent, controlled) {
 }
 
 /** Invoke `node scripts/vitest-controlled/cli.mjs manifest` and parse it. */
-export function loadControlledManifest({
-  repoRoot = process.cwd(),
-  spawnImpl = spawnSync,
-} = {}) {
+export function loadControlledManifest({ repoRoot = process.cwd(), spawnImpl = spawnSync } = {}) {
   const cli = path.join(repoRoot, "scripts/vitest-controlled/cli.mjs");
   const res = spawnImpl("node", [cli, "manifest"], {
     cwd: repoRoot,

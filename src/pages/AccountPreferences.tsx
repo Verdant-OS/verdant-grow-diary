@@ -28,6 +28,10 @@ export default function AccountPreferences() {
   }[]>([]);
   const [agreementsLoading, setAgreementsLoading] = useState(true);
   const [agreementsError, setAgreementsError] = useState<string | null>(null);
+  const [gaps, setGaps] = useState<AgreementGap[]>([]);
+  const [accepting, setAccepting] = useState(false);
+  const [reconsentStatus, setReconsentStatus] = useState<string | null>(null);
+  const [reconsentError, setReconsentError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;

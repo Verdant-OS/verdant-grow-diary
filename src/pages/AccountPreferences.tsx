@@ -201,6 +201,83 @@ export default function AccountPreferences() {
 
         <Card className="glass rounded-2xl border-0 shadow-none">
           <CardHeader className="p-5 pb-0">
+            <CardTitle className="font-display font-semibold text-base">Terms & Privacy status</CardTitle>
+            <CardDescription className="text-sm text-muted-foreground">
+              Your acceptance status for the current agreement versions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-5">
+            {agreementsLoading ? (
+              <Skeleton className="h-8 w-full" />
+            ) : (
+              <ul className="space-y-2">
+                {CURRENT_AGREEMENT_LIST.map((a) => {
+                  const isGap = gaps.some((g) => g.agreement.type === a.type);
+                  return (
+                    <li
+                      key={a.type}
+                      className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-muted/20 p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">
+                          <Link to={a.href} className="hover:underline">
+                            {a.label}
+                          </Link>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Current version {a.version} · effective {a.effectiveDate}
+                        </p>
+                      </div>
+                      {isGap ? (
+                        <span className="flex items-center gap-1 text-xs font-medium text-destructive">
+                          <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+                          Needs re-accept
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs font-medium text-primary">
+                          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                          Up to date
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            {!agreementsLoading && gaps.length > 0 && (
+              <div className="mt-4 flex flex-col gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Accepting will record your consent to the current version of every listed agreement.
+                </p>
+                <Button
+                  onClick={() => void handleAcceptAgreements()}
+                  disabled={accepting}
+                  className="self-start"
+                  size="sm"
+                >
+                  {accepting ? "Saving…" : "Accept current versions"}
+                </Button>
+              </div>
+            )}
+
+            {reconsentStatus && (
+              <p role="status" aria-live="polite" className="text-xs text-muted-foreground mt-3">
+                {reconsentStatus}
+              </p>
+            )}
+            {reconsentError && (
+              <p role="alert" className="text-xs text-destructive mt-3">
+                {reconsentError}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+
+
+        <Card className="glass rounded-2xl border-0 shadow-none">
+          <CardHeader className="p-5 pb-0">
             <CardTitle className="font-display font-semibold text-base">Agreement history</CardTitle>
             <CardDescription className="text-sm text-muted-foreground">
               Versions you have accepted and when you accepted them.

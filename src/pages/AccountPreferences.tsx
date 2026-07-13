@@ -7,8 +7,11 @@ import PageHeader from "@/components/PageHeader";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CURRENT_AGREEMENTS, type AgreementType } from "@/constants/agreements";
+import { Button } from "@/components/ui/button";
+import { CURRENT_AGREEMENTS, CURRENT_AGREEMENT_LIST, type AgreementType } from "@/constants/agreements";
+import { buildAcceptanceRows, computeAgreementGaps, type AcceptanceRow, type AgreementGap } from "@/lib/agreementConsent";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import { CheckCircle2, AlertTriangle } from "lucide-react";
 
 export default function AccountPreferences() {
   const { user } = useAuth();

@@ -64,19 +64,12 @@ AS $$
 DECLARE
   v_is_service   boolean := current_setting('role', true) = 'service_role';
   v_hunt_changed boolean := (TG_OP = 'UPDATE' AND NEW.pheno_hunt_id IS DISTINCT FROM OLD.pheno_hunt_id);
+  -- The plant's CURRENT owner (OLD on UPDATE, NEW on INSERT). Number authorization
+  -- is checked against this, so an operator cannot bypass it by reassigning user_id
+  -- to themselves in the same statement.
+  v_current_owner uuid := (CASE WHEN TG_OP = 'UPDATE' THEN OLD.user_id ELSE NEW.user_id END);
   v_num_changed  boolean;
-  -- Lineage only needs (re)checking when the tag, grow, or owner actually changes
-  -- (or on INSERT). Gating on this keeps ordinary edits — e.g. an operator touching
-  -- an unrelated column on a tagged plant — from running the SECURITY INVOKER
-  -- pheno_hunts lookup at all, so enforcement never depends on the writer's RLS
-  -- visibility of pheno_hunts.
-  v_lineage_relevant boolean := (TG_OP = 'INSERT') OR (
-    TG_OP = 'UPDATE' AND (
-      NEW.pheno_hunt_id IS DISTINCT FROM OLD.pheno_hunt_id
-      OR NEW.grow_id IS DISTINCT FROM OLD.grow_id
-      OR NEW.user_id IS DISTINCT FROM OLD.user_id
-    )
-  );
+  v_lineage_relevant boolean;
 BEGIN
   -- 1. A hunt change (including detach to NULL) never carries a number across
   --    hunts: clear it. Clearing is an allowed guard action.
@@ -86,6 +79,20 @@ BEGIN
 
   v_num_changed := (TG_OP = 'INSERT' AND NEW.candidate_number IS NOT NULL)
                 OR (TG_OP = 'UPDATE' AND NEW.candidate_number IS DISTINCT FROM OLD.candidate_number);
+
+  -- Lineage is (re)validated when the tag, grow, or owner changes, on INSERT, and
+  -- when the number is (re)assigned — the last so a pre-existing inconsistent tag
+  -- cannot be given a number. An unrelated edit to an already-consistent tagged
+  -- plant skips the SECURITY INVOKER pheno_hunts lookup entirely, so enforcement
+  -- never depends on the writer's RLS visibility of pheno_hunts.
+  v_lineage_relevant := (TG_OP = 'INSERT') OR (
+    TG_OP = 'UPDATE' AND (
+      NEW.pheno_hunt_id IS DISTINCT FROM OLD.pheno_hunt_id
+      OR NEW.grow_id IS DISTINCT FROM OLD.grow_id
+      OR NEW.user_id IS DISTINCT FROM OLD.user_id
+      OR v_num_changed
+    )
+  );
 
   -- 2. A tagged plant cannot move to a different grow; untag first.
   IF TG_OP = 'UPDATE'
@@ -101,9 +108,26 @@ BEGIN
       USING ERRCODE = 'check_violation';
   END IF;
 
-  -- 4. Lineage: when tagged, the hunt must share the plant's grow and owner.
-  --    Only (re)validated when the tag/grow/owner changes (or on INSERT); an
-  --    unrelated edit to an already-consistent tagged plant is left untouched.
+  -- 4. Authorization + immutability for number changes (non-service). Runs BEFORE
+  --    the RLS-dependent lineage lookup, and is checked against the CURRENT owner,
+  --    so an operator always receives the explicit insufficient_privilege — even
+  --    when trying to clear a number by detaching and reassigning user_id in one
+  --    statement. service_role bypasses.
+  IF NOT v_is_service AND v_num_changed THEN
+    IF auth.uid() IS NULL OR auth.uid() <> v_current_owner THEN
+      RAISE EXCEPTION 'only the owning grower may set or clear the pheno candidate number'
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+
+    -- Immutability within the same hunt: a set number cannot be changed or cleared
+    -- in place (untag to clear). Initial NULL->positive is allowed.
+    IF TG_OP = 'UPDATE' AND NOT v_hunt_changed AND OLD.candidate_number IS NOT NULL THEN
+      RAISE EXCEPTION 'the pheno candidate number is immutable within a hunt; untag to clear it'
+        USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+
+  -- 5. Lineage: when tagged, the hunt must share the plant's grow and owner.
   IF v_lineage_relevant AND NEW.pheno_hunt_id IS NOT NULL THEN
     IF NOT EXISTS (
       SELECT 1 FROM public.pheno_hunts h
@@ -112,23 +136,6 @@ BEGIN
          AND h.user_id = NEW.user_id
     ) THEN
       RAISE EXCEPTION 'pheno hunt % must belong to the same grow and owner as the plant', NEW.pheno_hunt_id
-        USING ERRCODE = 'check_violation';
-    END IF;
-  END IF;
-
-  -- 5. Authorization: only the owning grower may set OR clear the number (this
-  --    includes the auto-clear from a hunt change, so an operator cannot clear a
-  --    number by re-tagging). service_role bypasses.
-  IF NOT v_is_service AND v_num_changed THEN
-    IF auth.uid() IS NULL OR auth.uid() <> NEW.user_id THEN
-      RAISE EXCEPTION 'only the owning grower may set or clear the pheno candidate number'
-        USING ERRCODE = 'insufficient_privilege';
-    END IF;
-
-    -- 6. Immutability within the same hunt: a set number cannot be changed or
-    --    cleared in place (untag to clear). Initial NULL->positive is allowed.
-    IF TG_OP = 'UPDATE' AND NOT v_hunt_changed AND OLD.candidate_number IS NOT NULL THEN
-      RAISE EXCEPTION 'the pheno candidate number is immutable within a hunt; untag to clear it'
         USING ERRCODE = 'check_violation';
     END IF;
   END IF;

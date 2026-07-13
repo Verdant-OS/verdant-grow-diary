@@ -76,9 +76,15 @@ async function signIn(email: string, password: string): Promise<SupabaseClient> 
   return client;
 }
 
-async function seedId(table: string, row: Record<string, unknown>): Promise<string> {
+async function seedId(
+  table: string,
+  row: Record<string, unknown>,
+  track: string[],
+): Promise<string> {
   const { data, error } = await admin.from(table).insert(row).select("id").single();
   if (error || !data?.id) throw new Error(`seed ${table}: ${error?.message}`);
+  // Track the id the instant it exists, so a later seed failure still tears it down.
+  track.push(data.id as string);
   return data.id as string;
 }
 
@@ -110,6 +116,7 @@ async function main() {
   const grows: string[] = [];
   const hunts: string[] = [];
   const plantIds: string[] = [];
+  const cleanupErrors: string[] = [];
 
   try {
     const owner = await createUser("owner");
@@ -129,45 +136,45 @@ async function main() {
     const strangerC = await signIn(stranger.email, stranger.password);
 
     // Seed two grows, hunts, and tagged plants (service_role bypasses guards).
-    const gA = await seedId("grows", { user_id: owner.id, name: `PCN gA ${runId}` });
-    const gB = await seedId("grows", { user_id: owner.id, name: `PCN gB ${runId}` });
-    grows.push(gA, gB);
-    const hA = await seedId("pheno_hunts", {
-      user_id: owner.id,
-      grow_id: gA,
-      name: `hunt A ${runId}`,
-    });
-    const hA2 = await seedId("pheno_hunts", {
-      user_id: owner.id,
-      grow_id: gA,
-      name: `hunt A2 ${runId}`,
-    });
-    const hB = await seedId("pheno_hunts", {
-      user_id: owner.id,
-      grow_id: gB,
-      name: `hunt B ${runId}`,
-    });
-    const p1 = await seedId("plants", {
-      user_id: owner.id,
-      grow_id: gA,
-      pheno_hunt_id: hA,
-      name: `p1 ${runId}`,
-    });
-    const p2 = await seedId("plants", {
-      user_id: owner.id,
-      grow_id: gA,
-      pheno_hunt_id: hA,
-      name: `p2 ${runId}`,
-    });
-    const pB = await seedId("plants", {
-      user_id: owner.id,
-      grow_id: gB,
-      pheno_hunt_id: hB,
-      name: `pB ${runId}`,
-    });
-    const pUn = await seedId("plants", { user_id: owner.id, grow_id: gA, name: `pUn ${runId}` });
-    hunts.push(hA, hA2, hB);
-    plantIds.push(p1, p2, pB, pUn);
+    // seedId() tracks each id the moment it is created, so a mid-seed failure
+    // still leaves every already-created row queued for teardown.
+    const gA = await seedId("grows", { user_id: owner.id, name: `PCN gA ${runId}` }, grows);
+    const gB = await seedId("grows", { user_id: owner.id, name: `PCN gB ${runId}` }, grows);
+    const hA = await seedId(
+      "pheno_hunts",
+      { user_id: owner.id, grow_id: gA, name: `hunt A ${runId}` },
+      hunts,
+    );
+    const hA2 = await seedId(
+      "pheno_hunts",
+      { user_id: owner.id, grow_id: gA, name: `hunt A2 ${runId}` },
+      hunts,
+    );
+    const hB = await seedId(
+      "pheno_hunts",
+      { user_id: owner.id, grow_id: gB, name: `hunt B ${runId}` },
+      hunts,
+    );
+    const p1 = await seedId(
+      "plants",
+      { user_id: owner.id, grow_id: gA, pheno_hunt_id: hA, name: `p1 ${runId}` },
+      plantIds,
+    );
+    const p2 = await seedId(
+      "plants",
+      { user_id: owner.id, grow_id: gA, pheno_hunt_id: hA, name: `p2 ${runId}` },
+      plantIds,
+    );
+    const pB = await seedId(
+      "plants",
+      { user_id: owner.id, grow_id: gB, pheno_hunt_id: hB, name: `pB ${runId}` },
+      plantIds,
+    );
+    const pUn = await seedId(
+      "plants",
+      { user_id: owner.id, grow_id: gA, name: `pUn ${runId}` },
+      plantIds,
+    );
 
     // 1) NULL accepted
     check("seeded plant has NULL candidate_number", (await readNumber(p1)) === null);
@@ -271,30 +278,77 @@ async function main() {
     // Grow deletion does NOT cascade to plants (plants.grow_id is ON DELETE SET
     // NULL), and a hunt-tagged plant blocks grow changes — so remove plants first
     // (DELETE is not guarded by the trigger), then hunts, grows, roles, and users.
-    if (plantIds.length) await admin.from("plants").delete().in("id", plantIds);
-    if (hunts.length) await admin.from("pheno_hunts").delete().in("id", hunts);
-    if (grows.length) await admin.from("grows").delete().in("id", grows);
+    // Every step is attempted even if an earlier one fails; each delete error is
+    // recorded and fails the run (never silently swallowed).
+    const step = async (label: string, fn: () => Promise<{ error: unknown }>) => {
+      try {
+        const { error } = await fn();
+        if (error) {
+          const msg = (error as { message?: string }).message ?? String(error);
+          cleanupErrors.push(`${label}: ${msg}`);
+        }
+      } catch (e) {
+        cleanupErrors.push(`${label}: ${(e as Error).message}`);
+      }
+    };
+    if (plantIds.length)
+      await step("delete plants", async () => admin.from("plants").delete().in("id", plantIds));
+    if (hunts.length)
+      await step("delete pheno_hunts", async () =>
+        admin.from("pheno_hunts").delete().in("id", hunts),
+      );
+    if (grows.length)
+      await step("delete grows", async () => admin.from("grows").delete().in("id", grows));
     for (const id of users) {
-      await admin.from("user_roles").delete().eq("user_id", id);
-      await admin.auth.admin.deleteUser(id);
+      await step(`delete user_roles ${id}`, async () =>
+        admin.from("user_roles").delete().eq("user_id", id),
+      );
+      await step(`delete auth user ${id}`, async () => {
+        const { error } = await admin.auth.admin.deleteUser(id);
+        return { error };
+      });
     }
   }
 
-  // Verify zero leftover test rows (every seeded row carries runId in its name).
-  const leftover = await Promise.all(
-    (["plants", "grows", "pheno_hunts"] as const).map(async (t) => {
-      const { count } = await admin
-        .from(t)
-        .select("id", { count: "exact", head: true })
-        .like("name", `%${runId}%`);
-      return { table: t, count: count ?? 0 };
-    }),
-  );
-  const totalLeftover = leftover.reduce((n, r) => n + r.count, 0);
+  // Zero-leftover verification. A failed count query is itself a failure — it is
+  // never coerced into "0 leftovers". Covers seeded rows, user_roles, and the
+  // created auth users.
+  const problems: string[] = [...cleanupErrors];
+
+  for (const t of ["plants", "grows", "pheno_hunts"] as const) {
+    const { count, error } = await admin
+      .from(t)
+      .select("id", { count: "exact", head: true })
+      .like("name", `%${runId}%`);
+    if (error) problems.push(`leftover query ${t}: ${error.message}`);
+    else if (count === null) problems.push(`leftover query ${t}: null count`);
+    else if (count > 0) problems.push(`${t} leftover=${count}`);
+  }
+
+  if (users.length) {
+    const { count, error } = await admin
+      .from("user_roles")
+      .select("user_id", { count: "exact", head: true })
+      .in("user_id", users);
+    if (error) problems.push(`leftover query user_roles: ${error.message}`);
+    else if (count === null) problems.push(`leftover query user_roles: null count`);
+    else if (count > 0) problems.push(`user_roles leftover=${count}`);
+  }
+
+  for (const id of users) {
+    const { data, error } = await admin.auth.admin.getUserById(id);
+    if (error) {
+      if (!/not.*found|404/i.test(error.message))
+        problems.push(`auth getUser ${id}: ${error.message}`);
+    } else if (data?.user) {
+      problems.push(`auth user ${id} still exists`);
+    }
+  }
+
   check(
-    "no leftover test rows after teardown",
-    totalLeftover === 0,
-    leftover.map((r) => `${r.table}=${r.count}`).join(" "),
+    "cleanup complete: no leftover rows, user_roles, or auth users",
+    problems.length === 0,
+    problems.join("; "),
   );
 
   console.log(`pheno candidate_number RLS harness: ${pass} passed, ${fail} failed`);

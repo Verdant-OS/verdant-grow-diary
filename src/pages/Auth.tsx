@@ -20,6 +20,17 @@ import {
   MIN_PASSWORD_LENGTH,
 } from "@/lib/passwordResetRules";
 import {
+  DEFAULT_RESET_EMAIL_COOLDOWN_MS,
+  RESET_RESEND_COOLDOWN_HINT,
+  RESET_RESEND_FAILURE_MESSAGE,
+  RESET_RESEND_SUCCESS_MESSAGE,
+  buildResetResendLabel,
+  canResendResetEmail,
+  resetEmailCooldownRemainingMs,
+} from "@/lib/passwordResetResendRules";
+
+
+import {
   sanitizeAuthError,
   classifyAuthError,
   EMAIL_VERIFICATION_REQUIRED_MESSAGE,
@@ -81,7 +92,13 @@ export default function Auth() {
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [forgotSent, setForgotSent] = useState(false);
 
+  const [resetResendBusy, setResetResendBusy] = useState(false);
+  const [resetResendNotice, setResetResendNotice] = useState<string | null>(null);
+  const [resetResendLastAttemptAt, setResetResendLastAttemptAt] = useState<number | null>(null);
+  const [resetResendNowTick, setResetResendNowTick] = useState<number>(() => Date.now());
+
   const signInEmailRef = useRef<HTMLInputElement>(null);
+
   const signUpEmailRef = useRef<HTMLInputElement>(null);
   const forgotEmailRef = useRef<HTMLInputElement>(null);
 
@@ -108,7 +125,20 @@ export default function Auth() {
     return () => window.clearInterval(id);
   }, [resendLastAttemptAt, resendNowTick]);
 
+  // Same one-second tick for the "Resend reset email" cooldown.
+  useEffect(() => {
+    if (resetResendLastAttemptAt == null) return;
+    if (canResendResetEmail(Date.now(), resetResendLastAttemptAt, DEFAULT_RESET_EMAIL_COOLDOWN_MS)) {
+      return;
+    }
+    const id = window.setInterval(() => {
+      setResetResendNowTick(Date.now());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [resetResendLastAttemptAt, resetResendNowTick]);
+
   if (loading) return null;
+
   if (user) return <Navigate to={postSignInTarget()} replace />;
 
   const resendCooldownActive = !canResendVerification(
@@ -128,7 +158,25 @@ export default function Auth() {
       ? formatVerificationCooldown(resendCooldownRemainingMs)
       : "Resend verification email";
 
+  const resetResendCooldownActive = !canResendResetEmail(
+    resetResendNowTick,
+    resetResendLastAttemptAt,
+    DEFAULT_RESET_EMAIL_COOLDOWN_MS,
+  );
+  const resetResendCooldownRemainingMs = resetEmailCooldownRemainingMs(
+    resetResendNowTick,
+    resetResendLastAttemptAt,
+    DEFAULT_RESET_EMAIL_COOLDOWN_MS,
+  );
+  const resetResendDisabled =
+    resetResendBusy || resetResendCooldownActive || forgotEmail.trim().length === 0;
+  const resetResendLabel = buildResetResendLabel(
+    resetResendBusy,
+    resetResendCooldownRemainingMs,
+  );
+
   async function resendVerification() {
+
     if (resendBusy) return;
     if (!canResendVerification(Date.now(), resendLastAttemptAt, DEFAULT_VERIFICATION_COOLDOWN_MS)) {
       return;
@@ -239,6 +287,16 @@ export default function Auth() {
     }
   }
 
+  async function sendResetEmailTo(email: string): Promise<{ error: unknown }> {
+    // Best-effort send. We do NOT branch on the success/failure shape in a
+    // way that reveals account existence. Network/rate-limit errors get a
+    // generic retry copy; success path uses GENERIC_RESET_REQUEST_SUCCESS.
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: buildResetRedirectUrl(window.location.origin),
+    });
+    return { error };
+  }
+
   async function requestReset(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
@@ -250,12 +308,7 @@ export default function Auth() {
       return;
     }
     setBusy(true);
-    // Best-effort send. We do NOT branch on the success/failure shape in a
-    // way that reveals account existence. Network/rate-limit errors get a
-    // generic retry copy; success path uses GENERIC_RESET_REQUEST_SUCCESS.
-    const { error } = await supabase.auth.resetPasswordForEmail(v.email, {
-      redirectTo: buildResetRedirectUrl(window.location.origin),
-    });
+    const { error } = await sendResetEmailTo(v.email);
     setBusy(false);
     if (error) {
       setForgotError(sanitizeAuthError("forgotPassword", error));
@@ -263,7 +316,37 @@ export default function Auth() {
       return;
     }
     setForgotSent(true);
+    setResetResendNotice(null);
+    setResetResendLastAttemptAt(null);
+    setResetResendNowTick(Date.now());
   }
+
+  async function resendResetEmail() {
+    if (resetResendBusy) return;
+    if (!canResendResetEmail(Date.now(), resetResendLastAttemptAt, DEFAULT_RESET_EMAIL_COOLDOWN_MS)) {
+      return;
+    }
+    setResetResendBusy(true);
+    setResetResendNotice(null);
+    try {
+      const v = validateResetEmail(forgotEmail);
+      if ("message" in v) {
+        setResetResendNotice(RESET_RESEND_FAILURE_MESSAGE);
+        return;
+      }
+      const { error } = await sendResetEmailTo(v.email);
+      setResetResendNotice(error ? RESET_RESEND_FAILURE_MESSAGE : RESET_RESEND_SUCCESS_MESSAGE);
+    } catch {
+      setResetResendNotice(RESET_RESEND_FAILURE_MESSAGE);
+    } finally {
+      // Apply cooldown on both success and failure to discourage hammering.
+      setResetResendBusy(false);
+      const stamp = Date.now();
+      setResetResendLastAttemptAt(stamp);
+      setResetResendNowTick(stamp);
+    }
+  }
+
 
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
@@ -301,7 +384,9 @@ export default function Auth() {
               setSignUpError(null);
               setForgotError(null);
               setForgotSent(false);
+              setResetResendNotice(null);
             }}
+
           >
             <TabsList className={AUTH_TAB_LIST_CLASSNAME}>
               {AUTH_MODE_TABS.map((tab) => (
@@ -504,14 +589,35 @@ export default function Auth() {
                 Forgot your password? We'll email you a secure reset link.
               </p>
               {forgotSent ? (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className="text-sm text-muted-foreground"
-                >
-                  {GENERIC_RESET_REQUEST_SUCCESS}
+                <div className="grid gap-3" role="status" aria-live="polite">
+                  <p className="text-sm text-muted-foreground">
+                    {GENERIC_RESET_REQUEST_SUCCESS}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={resetResendDisabled}
+                    aria-busy={resetResendBusy}
+                    onClick={resendResetEmail}
+                  >
+                    {resetResendLabel}
+                  </Button>
+                  {resetResendCooldownActive && !resetResendBusy ? (
+                    <p
+                      role="status"
+                      aria-live="polite"
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      {RESET_RESEND_COOLDOWN_HINT}
+                    </p>
+                  ) : null}
+                  {resetResendNotice ? (
+                    <AuthInlineMessage>{resetResendNotice}</AuthInlineMessage>
+                  ) : null}
                 </div>
               ) : (
+
                 <form onSubmit={requestReset} noValidate className="grid gap-3" aria-label="Forgot password">
                   <AuthTextField
                     id="forgot-email"

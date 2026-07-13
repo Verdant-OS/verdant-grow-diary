@@ -4,7 +4,9 @@ import {
   type PhenoCandidateLabelInput,
 } from "@/lib/phenoCandidateLabel";
 
-const base = (overrides: Partial<PhenoCandidateLabelInput> = {}): PhenoCandidateLabelInput => ({
+const base = (
+  overrides: Partial<PhenoCandidateLabelInput> = {},
+): PhenoCandidateLabelInput => ({
   candidateNumber: null,
   candidateLabel: null,
   plantName: null,
@@ -16,36 +18,50 @@ describe("formatPhenoCandidateLabel", () => {
   it("prefers candidate label with a valid number", () => {
     expect(
       formatPhenoCandidateLabel(
-        base({ candidateNumber: 3, candidateLabel: "Sour Zebra", plantName: "Plant A" }),
+        base({
+          candidateNumber: 3,
+          candidateLabel: "Sour Zebra",
+          plantName: "Plant A",
+        }),
       ),
     ).toBe("#3 · Sour Zebra");
   });
 
   it("falls back to plant name with a valid number and no label", () => {
     expect(
-      formatPhenoCandidateLabel(base({ candidateNumber: 7, plantName: "Plant A" })),
+      formatPhenoCandidateLabel(
+        base({ candidateNumber: 7, plantName: "Plant A" }),
+      ),
     ).toBe("#7 · Plant A");
   });
 
   it("renders bare number when neither label nor name present", () => {
-    expect(formatPhenoCandidateLabel(base({ candidateNumber: 42 }))).toBe("#42");
+    expect(formatPhenoCandidateLabel(base({ candidateNumber: 42 }))).toBe(
+      "#42",
+    );
   });
 
   it("accepts boundary value 1", () => {
     expect(
-      formatPhenoCandidateLabel(base({ candidateNumber: 1, candidateLabel: "First" })),
+      formatPhenoCandidateLabel(
+        base({ candidateNumber: 1, candidateLabel: "First" }),
+      ),
     ).toBe("#1 · First");
   });
 
-  it("treats null candidate number as absent and falls back", () => {
+  it("treats null candidate number as absent and falls back to label", () => {
     expect(
-      formatPhenoCandidateLabel(base({ candidateNumber: null, candidateLabel: "Legacy" })),
+      formatPhenoCandidateLabel(
+        base({ candidateNumber: null, candidateLabel: "Legacy" }),
+      ),
     ).toBe("Legacy");
   });
 
-  it("treats undefined candidate number as absent and falls back", () => {
+  it("treats undefined candidate number as absent and falls back to name", () => {
     expect(
-      formatPhenoCandidateLabel(base({ candidateNumber: undefined, plantName: "OnlyName" })),
+      formatPhenoCandidateLabel(
+        base({ candidateNumber: undefined, plantName: "OnlyName" }),
+      ),
     ).toBe("OnlyName");
   });
 
@@ -56,7 +72,7 @@ describe("formatPhenoCandidateLabel", () => {
     ["NaN", Number.NaN],
     ["Infinity", Number.POSITIVE_INFINITY],
     ["-Infinity", Number.NEGATIVE_INFINITY],
-  ])("rejects %s and falls back", (_label, n) => {
+  ])("rejects %s candidate number and falls back", (_label, n) => {
     const out = formatPhenoCandidateLabel(
       base({ candidateNumber: n as number, candidateLabel: "Fallback" }),
     );
@@ -66,26 +82,24 @@ describe("formatPhenoCandidateLabel", () => {
     expect(out).not.toContain("Infinity");
   });
 
-  it("falls back to candidate label when number invalid", () => {
-    expect(
-      formatPhenoCandidateLabel(base({ candidateNumber: 0, candidateLabel: "Alpha" })),
-    ).toBe("Alpha");
-  });
-
   it("falls back to plant name when no label and number invalid", () => {
     expect(
-      formatPheno_CandidateLabel_workaround(base({ candidateNumber: null, plantName: "Beta" })),
+      formatPhenoCandidateLabel(
+        base({ candidateNumber: 0, plantName: "Beta" }),
+      ),
     ).toBe("Beta");
   });
 
   it("falls back to short id prefix when nothing else present", () => {
-    expect(
-      formatPhenoCandidateLabel(base({ plantId: "abcdef1234567890" })),
-    ).toBe("#abcdef12");
+    expect(formatPhenoCandidateLabel(base({ plantId: "abcdef1234567890" }))).toBe(
+      "#abcdef12",
+    );
   });
 
   it("returns #unknown when plant id is blank", () => {
-    expect(formatPhenoCandidateLabel(base({ plantId: "   " }))).toBe("#unknown");
+    expect(formatPhenoCandidateLabel(base({ plantId: "   " }))).toBe(
+      "#unknown",
+    );
   });
 
   it("trims whitespace on label, name, and id", () => {
@@ -94,9 +108,9 @@ describe("formatPhenoCandidateLabel", () => {
         base({ candidateNumber: 5, candidateLabel: "   Trimmed   " }),
       ),
     ).toBe("#5 · Trimmed");
-    expect(
-      formatPhenoCandidateLabel(base({ plantName: "  Named  " })),
-    ).toBe("Named");
+    expect(formatPhenoCandidateLabel(base({ plantName: "  Named  " }))).toBe(
+      "Named",
+    );
     expect(
       formatPhenoCandidateLabel(base({ plantId: "   xyz12345extra   " })),
     ).toBe("#xyz12345");
@@ -131,12 +145,3 @@ describe("formatPhenoCandidateLabel", () => {
     expect(input).toEqual(snapshot);
   });
 });
-
-// Alias to catch typo protection at compile time — not exported.
-// (Left intentionally undefined; used only within a single test above.)
-declare const formatPhenoCandidateLabel_alias: never;
-function formatPheno_CandidateLabel_workaround(
-  input: PhenoCandidateLabelInput,
-): string {
-  return formatPhenoCandidateLabel(input);
-}

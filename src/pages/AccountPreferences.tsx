@@ -16,6 +16,14 @@ export default function AccountPreferences() {
   const [optIn, setOptIn] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [agreements, setAgreements] = useState<{
+    agreement_type: AgreementType;
+    version: string;
+    effective_date: string;
+    accepted_at: string;
+  }[]>([]);
+  const [agreementsLoading, setAgreementsLoading] = useState(true);
+  const [agreementsError, setAgreementsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;

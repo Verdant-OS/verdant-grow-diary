@@ -44,6 +44,7 @@ Build ONE thing: a pure display helper + minimal wiring.
 
 ## 4. Exact file-level plan
 
+**Allowed now (Step 1 only):**
 - **Create** `src/lib/phenoCandidateLabel.ts`
   - Export `interface PhenoCandidateLabelInput { candidateNumber: number | null | undefined; candidateLabel: string | null | undefined; plantName?: string | null; plantId: string; }`
   - Export `function formatPhenoCandidateLabel(input): string`
@@ -52,21 +53,23 @@ Build ONE thing: a pure display helper + minimal wiring.
     - Rejects: non-finite, negative, zero, non-integer, NaN, Infinity → treated as missing.
   - Export `function comparePhenoCandidatesByNumberThenLabel(a, b)` for deterministic sort: numbered candidates first (ascending numeric), then unnumbered alphabetical, tie-break by id.
 
-- **Edit** `src/lib/phenoHuntCandidateAdapter.ts`
+- **New test file** `src/test/phenoCandidateLabel.test.ts` (see §6).
+
+**Blocked until the data contract is confirmed (§5):**
+- **Edit** `src/lib/phenoHuntCandidateAdapter.ts` — gated: needs confirmed `candidate_number` field name/type.
   - Add `candidate_number?: number | null` to `PhenoHuntCandidatePlantRow`.
   - Replace inline `cleanLabel(p.candidate_label) ?? cleanLabel(p.name)` with `formatPhenoCandidateLabel(...)`.
   - Replace the final `candidates.sort(...)` with `comparePhenoCandidatesByNumberThenLabel`.
 
-- **Edit** `src/lib/phenoHuntCandidatesService.ts`
-  - Add the new column to the `plants` select list (single identifier — see §5).
+- **Edit** `src/lib/phenoHuntCandidatesService.ts` — gated: needs the exact SELECT column identifier.
+  - Add the new column to the `plants` select list.
 
-- **Edit** `src/components/PhenoHuntTimelineSection.tsx`
+- **Edit** `src/components/PhenoHuntTimelineSection.tsx` — gated: needs the exact column identifier and confirmed row type.
   - Add the column to its local SELECT.
   - Replace the two `candidate_label`-only render expressions with `formatPhenoCandidateLabel(...)`.
   - Extend the local row type to include the number.
 
-- **New test file** `src/test/phenoCandidateLabel.test.ts` (see §6).
-- **Extend** `src/lib/phenoHuntCandidateAdapter.test.ts` (if present) or add a small adapter test covering: legacy row (no number), numbered row, mixed sort order, invalid number rejection.
+- **Extend** `src/lib/phenoHuntCandidateAdapter.test.ts` (if present) — gated: cannot run adapter-level wiring tests against a confirmed column until the field name is known.
 
 No other files change.
 

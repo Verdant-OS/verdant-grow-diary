@@ -70,6 +70,12 @@ export function AgreementReconsentGate() {
 
   async function onAccept() {
     if (!user || submitting) return;
+    if (!accept) {
+      setError("Please tick the box to confirm you've read and agree to the current agreements.");
+      // Move focus to the checkbox so keyboard users land on the control they must interact with.
+      requestAnimationFrame(() => checkboxRef.current?.focus());
+      return;
+    }
     setError(null);
     setSubmitting(true);
     const rows = buildAcceptanceRows(user.id).map((r) => ({

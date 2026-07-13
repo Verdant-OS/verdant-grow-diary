@@ -119,3 +119,233 @@ describe("formatPhenoCandidateLabel", () => {
     expect(input).toEqual(snapshot);
   });
 });
+
+describe("comparePhenoCandidatesByNumberThenLabel", () => {
+  const mk = (n: number, id = "id-x"): PhenoCandidateLabelInput => ({
+    candidateNumber: n,
+    candidateLabel: null,
+    plantName: null,
+    plantId: id,
+  });
+
+  it("orders valid numbers ascending (1, 2, 10)", () => {
+    const arr = [mk(10, "a"), mk(1, "b"), mk(2, "c")];
+    const sorted = [...arr].sort(comparePhenoCandidatesByNumberThenLabel);
+    expect(sorted.map((x) => x.candidateNumber)).toEqual([1, 2, 10]);
+  });
+
+  it("places numbered candidates before unnumbered ones", () => {
+    const numbered = mk(9, "num");
+    const unnumbered: PhenoCandidateLabelInput = {
+      candidateNumber: null,
+      candidateLabel: "AAA",
+      plantName: null,
+      plantId: "u",
+    };
+    expect(comparePhenoCandidatesByNumberThenLabel(numbered, unnumbered)).toBeLessThan(0);
+    expect(comparePhenoCandidatesByNumberThenLabel(unnumbered, numbered)).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ["null", null],
+    ["undefined", undefined],
+    ["zero", 0],
+    ["negative", -3],
+    ["fractional", 2.5],
+    ["NaN", Number.NaN],
+    ["Infinity", Number.POSITIVE_INFINITY],
+    ["-Infinity", Number.NEGATIVE_INFINITY],
+  ])("treats %s as unnumbered", (_label, n) => {
+    const invalid: PhenoCandidateLabelInput = {
+      candidateNumber: n as number | null | undefined,
+      candidateLabel: "Zzz",
+      plantName: null,
+      plantId: "i",
+    };
+    const numbered = mk(100, "n");
+    expect(comparePhenoCandidatesByNumberThenLabel(numbered, invalid)).toBeLessThan(0);
+  });
+
+  it("prefers candidate label over plant name for unnumbered text", () => {
+    const a: PhenoCandidateLabelInput = {
+      candidateNumber: null,
+      candidateLabel: "Apple",
+      plantName: "Zebra",
+      plantId: "a",
+    };
+    const b: PhenoCandidateLabelInput = {
+      candidateNumber: null,
+      candidateLabel: null,
+      plantName: "Banana",
+      plantId: "b",
+    };
+    // "apple" < "banana"
+    expect(comparePhenoCandidatesByNumberThenLabel(a, b)).toBeLessThan(0);
+  });
+
+  it("sorts unnumbered alphabetically case-insensitively", () => {
+    const arr: PhenoCandidateLabelInput[] = [
+      { candidateNumber: null, candidateLabel: "cherry", plantName: null, plantId: "1" },
+      { candidateNumber: null, candidateLabel: "Apple", plantName: null, plantId: "2" },
+      { candidateNumber: null, candidateLabel: "banana", plantName: null, plantId: "3" },
+    ];
+    const sorted = [...arr].sort(comparePhenoCandidatesByNumberThenLabel);
+    expect(sorted.map((x) => x.candidateLabel)).toEqual(["Apple", "banana", "cherry"]);
+  });
+
+  it("treats blank/whitespace label as missing", () => {
+    const blank: PhenoCandidateLabelInput = {
+      candidateNumber: null,
+      candidateLabel: "   ",
+      plantName: null,
+      plantId: "blank-id",
+    };
+    const withText: PhenoCandidateLabelInput = {
+      candidateNumber: null,
+      candidateLabel: "Text",
+      plantName: null,
+      plantId: "text-id",
+    };
+    // blank -> category 2, withText -> category 1
+    expect(comparePhenoCandidatesByNumberThenLabel(withText, blank)).toBeLessThan(0);
+  });
+
+  it("sorts id-only / unknown fallbacks last, by trimmed plant id", () => {
+    const numbered = mk(1, "num");
+    const named: PhenoCandidateLabelInput = {
+      candidateNumber: null,
+      candidateLabel: "Named",
+      plantName: null,
+      plantId: "z",
+    };
+    const idOnlyA: PhenoCandidateLabelInput = {
+      candidateNumber: null,
+      candidateLabel: null,
+      plantName: null,
+      plantId: "  aaa  ",
+    };
+    const idOnlyB: PhenoCandidateLabelInput = {
+      candidateNumber: null,
+      candidateLabel: null,
+      plantName: null,
+      plantId: "bbb",
+    };
+    const sorted = [idOnlyB, named, idOnlyA, numbered].sort(
+      comparePhenoCandidatesByNumberThenLabel,
+    );
+    expect(sorted).toEqual([numbered, named, idOnlyA, idOnlyB]);
+  });
+
+  it("breaks duplicate-number ties by label, then name, then id", () => {
+    const a: PhenoCandidateLabelInput = {
+      candidateNumber: 5,
+      candidateLabel: "Beta",
+      plantName: null,
+      plantId: "z",
+    };
+    const b: PhenoCandidateLabelInput = {
+      candidateNumber: 5,
+      candidateLabel: "Alpha",
+      plantName: null,
+      plantId: "a",
+    };
+    expect(comparePhenoCandidatesByNumberThenLabel(a, b)).toBeGreaterThan(0);
+
+    const c: PhenoCandidateLabelInput = {
+      candidateNumber: 5,
+      candidateLabel: null,
+      plantName: "Same",
+      plantId: "y",
+    };
+    const d: PhenoCandidateLabelInput = {
+      candidateNumber: 5,
+      candidateLabel: null,
+      plantName: "Same",
+      plantId: "x",
+    };
+    expect(comparePhenoCandidatesByNumberThenLabel(c, d)).toBeGreaterThan(0);
+  });
+
+  it("returns 0 when every normalized key is equal", () => {
+    const a: PhenoCandidateLabelInput = {
+      candidateNumber: 3,
+      candidateLabel: "  Same  ",
+      plantName: "  Name  ",
+      plantId: "  pid  ",
+    };
+    const b: PhenoCandidateLabelInput = {
+      candidateNumber: 3,
+      candidateLabel: "Same",
+      plantName: "Name",
+      plantId: "pid",
+    };
+    expect(comparePhenoCandidatesByNumberThenLabel(a, b)).toBe(0);
+  });
+
+  it("is antisymmetric", () => {
+    const samples: PhenoCandidateLabelInput[] = [
+      { candidateNumber: 1, candidateLabel: "A", plantName: null, plantId: "1" },
+      { candidateNumber: 2, candidateLabel: null, plantName: "B", plantId: "2" },
+      { candidateNumber: null, candidateLabel: "cherry", plantName: null, plantId: "3" },
+      { candidateNumber: null, candidateLabel: null, plantName: "Zed", plantId: "4" },
+      { candidateNumber: null, candidateLabel: null, plantName: null, plantId: "5" },
+      { candidateNumber: Number.NaN, candidateLabel: "x", plantName: null, plantId: "6" },
+    ];
+    for (const a of samples) {
+      for (const b of samples) {
+        const ab = comparePhenoCandidatesByNumberThenLabel(a, b);
+        const ba = comparePhenoCandidatesByNumberThenLabel(b, a);
+        expect(Math.sign(ab)).toBe(-Math.sign(ba));
+      }
+    }
+  });
+
+  it("is deterministic across repeated sorts", () => {
+    const arr: PhenoCandidateLabelInput[] = [
+      { candidateNumber: 3, candidateLabel: "c", plantName: null, plantId: "3" },
+      { candidateNumber: 1, candidateLabel: "a", plantName: null, plantId: "1" },
+      { candidateNumber: null, candidateLabel: "beta", plantName: null, plantId: "b" },
+      { candidateNumber: null, candidateLabel: null, plantName: null, plantId: "zzz" },
+      { candidateNumber: 2, candidateLabel: "b", plantName: null, plantId: "2" },
+      { candidateNumber: null, candidateLabel: "alpha", plantName: null, plantId: "a" },
+    ];
+    const first = [...arr].sort(comparePhenoCandidatesByNumberThenLabel);
+    for (let i = 0; i < 25; i++) {
+      const next = [...arr].sort(comparePhenoCandidatesByNumberThenLabel);
+      expect(next).toEqual(first);
+    }
+  });
+
+  it("does not mutate frozen inputs", () => {
+    const a: PhenoCandidateLabelInput = Object.freeze({
+      candidateNumber: 1,
+      candidateLabel: "A",
+      plantName: null,
+      plantId: "a",
+    });
+    const b: PhenoCandidateLabelInput = Object.freeze({
+      candidateNumber: 2,
+      candidateLabel: "B",
+      plantName: null,
+      plantId: "b",
+    });
+    const snapA = { ...a };
+    const snapB = { ...b };
+    comparePhenoCandidatesByNumberThenLabel(a, b);
+    comparePhenoCandidatesByNumberThenLabel(b, a);
+    expect(a).toEqual(snapA);
+    expect(b).toEqual(snapB);
+  });
+
+  it("sorting a copied array does not mutate the original", () => {
+    const arr: PhenoCandidateLabelInput[] = [
+      { candidateNumber: 3, candidateLabel: null, plantName: null, plantId: "3" },
+      { candidateNumber: 1, candidateLabel: null, plantName: null, plantId: "1" },
+      { candidateNumber: 2, candidateLabel: null, plantName: null, plantId: "2" },
+    ];
+    const snapshot = arr.map((x) => ({ ...x }));
+    const copy = [...arr];
+    copy.sort(comparePhenoCandidatesByNumberThenLabel);
+    expect(arr).toEqual(snapshot);
+  });
+});

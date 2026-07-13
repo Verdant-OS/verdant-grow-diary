@@ -42,16 +42,25 @@ export default function ResetPassword() {
   const confirmMismatch =
     password.length > 0 && confirm.length > 0 && password !== confirm;
 
+  const [diagnosis, setDiagnosis] = useState<ResetLinkDiagnosis | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
-      setStatus(data.session ? "ready" : "no_session");
+      const d = diagnoseResetLink({
+        hash: typeof window !== "undefined" ? window.location.hash : "",
+        search: typeof window !== "undefined" ? window.location.search : "",
+        hasSession: !!data.session,
+      });
+      setDiagnosis(d);
+      setStatus(d.status === "ready" ? "ready" : "link_problem");
     });
     return () => {
       cancelled = true;
     };
   }, []);
+
 
   useEffect(() => {
     headingRef.current?.focus();

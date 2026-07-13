@@ -69,7 +69,13 @@ export default function Auth() {
     return raw ? sanitizeAuthRedirect(raw) : null;
   }, [search]);
   const redirectTo = explicitRedirect ?? "/";
-  const [mode, setMode] = useState<AuthMode>("signin");
+  const initialMode: AuthMode = (() => {
+    const raw = search.get("mode");
+    if (raw === "signup" || raw === "forgot" || raw === "signin") return raw;
+    return "signin";
+  })();
+  const [mode, setMode] = useState<AuthMode>(initialMode);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);

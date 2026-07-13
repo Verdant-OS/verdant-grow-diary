@@ -274,6 +274,21 @@ async function main() {
     await setHunt(ownerC, p2, null); // untag (clears number)
     const afterMove = await ownerC.from("plants").update({ grow_id: gB }).eq("id", p2).select("id");
     check("untagging before moving succeeds", !afterMove.error);
+
+    // 14) pheno_hunts-side guard: a hunt with numbered plants cannot change grow.
+    //     pB still holds #3 in hB (check 9), so moving hB's grow must be blocked.
+    {
+      const moveHunt = await ownerC
+        .from("pheno_hunts")
+        .update({ grow_id: gA })
+        .eq("id", hB)
+        .select("id");
+      check(
+        "hunt with numbered plants cannot change grow",
+        !!moveHunt.error && (await readNumber(pB)) === 3,
+        moveHunt.error?.message,
+      );
+    }
   } finally {
     // Grow deletion does NOT cascade to plants (plants.grow_id is ON DELETE SET
     // NULL), and a hunt-tagged plant blocks grow changes — so remove plants first

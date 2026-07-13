@@ -16,7 +16,9 @@
 --     in different hunts.
 --   * A number requires the plant to be tagged to a pheno hunt.
 --   * When tagged, the hunt must share the plant's grow and owner (lineage).
---   * A tagged plant cannot be moved to a different grow (untag first).
+--   * A tagged plant cannot be moved to a different grow (untag first), and,
+--     symmetrically, a hunt with numbered candidate plants cannot change its
+--     grow/owner (a separate pheno_hunts guard; clear those numbers first).
 --   * Changing or detaching the hunt clears the number (never carries across
 --     hunts; retagging requires a fresh manual assignment).
 --   * Authorization: only the owning grower (auth.uid() = plants.user_id) may set
@@ -148,3 +150,39 @@ DROP TRIGGER IF EXISTS trg_plants_candidate_number_guard ON public.plants;
 CREATE TRIGGER trg_plants_candidate_number_guard
   BEFORE INSERT OR UPDATE ON public.plants
   FOR EACH ROW EXECUTE FUNCTION public.plants_candidate_number_guard();
+
+-- =============================================================================
+-- pheno_hunts_numbered_move_guard
+--
+-- The plants trigger only fires on plant writes, so moving a hunt to a different
+-- grow/owner via a pheno_hunts UPDATE would strand candidate_number on plants
+-- whose hunt no longer shares their grow/owner. Mirror the plant-side cross-grow
+-- rule from the hunt side: a hunt that already has numbered candidate plants
+-- cannot change grow or owner — the grower must clear those numbers (untag the
+-- plants) first. Enforcement only; never allocates or clears a number itself.
+-- =============================================================================
+CREATE OR REPLACE FUNCTION public.pheno_hunts_numbered_move_guard()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF (NEW.grow_id IS DISTINCT FROM OLD.grow_id
+      OR NEW.user_id IS DISTINCT FROM OLD.user_id)
+     AND EXISTS (
+       SELECT 1 FROM public.plants p
+        WHERE p.pheno_hunt_id = OLD.id
+          AND p.candidate_number IS NOT NULL
+     ) THEN
+    RAISE EXCEPTION 'cannot change the grow or owner of a pheno hunt with numbered candidate plants; clear their candidate numbers first'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_pheno_hunts_numbered_move_guard ON public.pheno_hunts;
+CREATE TRIGGER trg_pheno_hunts_numbered_move_guard
+  BEFORE UPDATE ON public.pheno_hunts
+  FOR EACH ROW EXECUTE FUNCTION public.pheno_hunts_numbered_move_guard();

@@ -277,6 +277,17 @@ BEGIN
   EXCEPTION WHEN check_violation THEN pass := pass + 1;
            WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL number-inconsistent-tag: %', SQLERRM; END;
 
+  -- 19) a hunt with numbered candidate plants cannot change grow/owner
+  --     (pheno_hunts-side guard). p3 currently holds a number in hA2 (check 15),
+  --     so moving hA2 to gB must be blocked; the plant-side move is unaffected.
+  PERFORM set_config('role', 'authenticated', true);
+  PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
+  BEGIN
+    UPDATE public.pheno_hunts SET grow_id = gB WHERE id = hA2;  -- hA2 has numbered p3
+    RAISE EXCEPTION 'PCN_SENTINEL moved a hunt with numbered plants';
+  EXCEPTION WHEN check_violation THEN pass := pass + 1;
+           WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL hunt-move-blocked: %', SQLERRM; END;
+
   PERFORM set_config('role', 'authenticated', false);
   RAISE NOTICE 'pheno_candidate_number contract: % passed, % failed', pass, fail;
   IF fail > 0 THEN

@@ -1,8 +1,9 @@
 /**
- * Account Preferences page — marketing opt-in toggle.
+ * Account Preferences page — marketing opt-in toggle and agreement history.
  *
  * Confirms: current value loads, toggle calls profiles.upsert with the
- * correct flag and timestamp, and errors surface calmly.
+ * correct flag and timestamp, agreement history renders, and errors surface
+ * calmly.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -12,7 +13,22 @@ import AccountPreferences from "@/pages/AccountPreferences";
 
 const upsertSpy = vi.fn();
 
-const makeChain = (initialData: { marketing_opt_in: boolean } | null = null) => {
+const defaultAgreements = [
+  {
+    agreement_type: "terms",
+    version: "2026-07-13",
+    effective_date: "2026-07-13",
+    accepted_at: "2026-07-13T10:00:00Z",
+  },
+  {
+    agreement_type: "privacy",
+    version: "2026-07-13",
+    effective_date: "2026-07-13",
+    accepted_at: "2026-07-13T10:05:00Z",
+  },
+];
+
+const makeProfileChain = (initialData: { marketing_opt_in: boolean } | null = null) => {
   const result = { data: initialData, error: null };
   const chain: Record<string, unknown> = {
     select: () => chain,
@@ -26,13 +42,29 @@ const makeChain = (initialData: { marketing_opt_in: boolean } | null = null) => 
   return chain;
 };
 
+function makeAgreementChain(data: typeof defaultAgreements) {
+  const result = { data, error: null };
+  const chain: Record<string, unknown> = {
+    select: () => chain,
+    eq: () => chain,
+    order: () => chain,
+    then: (resolve: (r: typeof result) => unknown) => resolve(result),
+  };
+  return chain;
+}
+
+let agreementData = defaultAgreements;
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => {
       if (table === "profiles") {
-        return makeChain({ marketing_opt_in: false });
+        return makeProfileChain({ marketing_opt_in: false });
       }
-      return makeChain(null);
+      if (table === "user_agreement_acceptances") {
+        return makeAgreementChain(agreementData);
+      }
+      return makeProfileChain(null);
     },
   },
 }));
@@ -43,6 +75,7 @@ vi.mock("@/store/auth", () => ({
 
 beforeEach(() => {
   upsertSpy.mockClear();
+  agreementData = defaultAgreements;
 });
 
 function renderPage() {
@@ -63,6 +96,29 @@ describe("Account Preferences", () => {
     expect(
       await screen.findByText("Send me occasional product updates and grow tips"),
     ).toBeInTheDocument();
+  });
+
+  it("renders the agreement history section with accepted versions", async () => {
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "Agreement history" })).toBeInTheDocument();
+    expect(await screen.findByText("Terms of Service")).toBeInTheDocument();
+    expect(await screen.findByText("Privacy Policy")).toBeInTheDocument();
+    const versions = await screen.findAllByText(/Version 2026-07-13/);
+    expect(versions.length).toBe(2);
+  });
+
+  it("links each agreement to its canonical page", async () => {
+    renderPage();
+    const termsLink = await screen.findByRole("link", { name: "Terms of Service" });
+    const privacyLink = await screen.findByRole("link", { name: "Privacy Policy" });
+    expect(termsLink).toHaveAttribute("href", "/terms");
+    expect(privacyLink).toHaveAttribute("href", "/privacy");
+  });
+
+  it("shows an empty state when no agreements are on record", async () => {
+    agreementData = [];
+    renderPage();
+    expect(await screen.findByText("No accepted agreements on record.")).toBeInTheDocument();
   });
 
   it("loads the current opt-in value", async () => {

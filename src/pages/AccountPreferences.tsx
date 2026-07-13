@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CURRENT_AGREEMENTS, type AgreementType } from "@/constants/agreements";
+import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 
 export default function AccountPreferences() {
   const { user } = useAuth();

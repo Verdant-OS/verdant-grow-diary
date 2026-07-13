@@ -72,15 +72,26 @@ No other files change.
 
 ## 5. Data-contract assumptions and hard blockers
 
-Confirmed:
-- The P.2 migration `20260712010343_pheno_candidate_number_foundation.sql` will add a stable, server-assigned per-hunt candidate number to `plants` (or a joinable view). No client assignment path exists or is planned in this slice.
+**Contract status: UNVERIFIED.**
 
-Hard blocker — must be resolved by the user before the file-level plan can be finalized:
-- **Exact column identifier** on `plants` (assumed `candidate_number: integer | null`, but not verifiable from current code — the migration file is protected and not-yet-present in this sandbox).
-- **Whether the column lives on `plants` directly** or on a joined table/view. If it's a join, the SELECT column list and the row type differ.
-- **Type**: `int`, `smallint`, or `bigint` — affects the JS type guard (all fit `number`, but confirm to keep the guard honest).
+The `candidate_number` column does not exist on `public.plants` in the current sandbox. The P.2 migration file `supabase/migrations/20260712010343_pheno_candidate_number_foundation.sql` is protected and not present in this environment, so its exact column identifier, type, null/legacy behavior, and location (direct column vs. joined table/view) cannot be confirmed from source.
 
-If any of the three is not `candidate_number: integer on public.plants`, do NOT invent a column name, RPC, view name, or generated type. Stop the build after Step 1 (the pure helper + tests) and report the exact mismatch. The helper alone is safe and useful; wiring waits.
+What has been confirmed locally:
+- Current `plants` columns include `candidate_label` (text, nullable) and `pheno_hunt_id` (uuid, nullable).
+- No `candidate_number` column is present at this revision.
+- No client code assigns, increments, or writes a candidate number.
+
+What must be confirmed by the user before any implementation beyond Step 1:
+- **Exact column identifier** on `plants` (assumed `candidate_number`, but unverified).
+- **Exact type**: `integer`, `smallint`, `bigint`, or another type.
+- **Null/legacy behavior**: whether null means "pre-P.2 legacy" and whether zero/negative/non-integer values are possible.
+- **Location**: whether the column lives directly on `public.plants` or on a joinable table/view. If it is a join, the SELECT column list and row type differ.
+
+Hard stop rule: If the confirmed contract differs from `candidate_number: integer on public.plants`, do NOT invent a column name, RPC, view name, or generated type. Implement only the pure helper (Step 1) and report the exact mismatch. All data-layer wiring waits until the contract is confirmed.
+
+Explicit non-assumptions:
+- No assumption about backfill of legacy rows — helper treats null/missing as legacy.
+- No assumption about uniqueness enforcement — pure display only, so duplicates would render honestly.
 
 Explicit non-assumptions:
 - No assumption about backfill of legacy rows — helper treats null/missing as legacy.

@@ -34,6 +34,7 @@ export function AgreementReconsentGate() {
   const [accept, setAccept] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const checkboxRef = useRef<HTMLButtonElement | null>(null);
 
   const suppressed = SUPPRESSED_PREFIXES.some((p) => location.pathname.startsWith(p));
 

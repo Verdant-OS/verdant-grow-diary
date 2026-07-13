@@ -384,7 +384,9 @@ export default function Auth() {
               setSignUpError(null);
               setForgotError(null);
               setForgotSent(false);
+              setResetResendNotice(null);
             }}
+
           >
             <TabsList className={AUTH_TAB_LIST_CLASSNAME}>
               {AUTH_MODE_TABS.map((tab) => (

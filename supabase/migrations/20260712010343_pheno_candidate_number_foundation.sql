@@ -25,6 +25,10 @@
 --     or clear the number. Operators — who can otherwise UPDATE plants — may read
 --     it but may not assign, change, or clear it. service_role bypasses these
 --     write guards for exceptional repair / migrations / test setup only.
+--   * Pro gate: SETTING a candidate number additionally requires the owner to hold
+--     an active Pheno Tracker entitlement (public.has_pheno_tracker_entitlement),
+--     matching the restrictive pheno_* write policies. Clearing/detach stays
+--     allowed even if the plan lapsed.
 --   * Immutability: within the same hunt, a non-null number cannot be changed or
 --     cleared (the grower must untag to clear).
 -- =============================================================================
@@ -122,6 +126,17 @@ BEGIN
   IF NOT v_is_service AND v_num_changed THEN
     IF auth.uid() IS NULL OR auth.uid() <> v_current_owner THEN
       RAISE EXCEPTION 'only the owning grower may set or clear the pheno candidate number'
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+
+    -- Pheno candidate numbering is a Pro feature: SETTING a number additionally
+    -- requires the owner to hold an active entitlement, matching the restrictive
+    -- has_pheno_tracker_entitlement policies on the pheno_* tables (candidate_number
+    -- lives on plants, which those policies don't cover). Clearing a number
+    -- (untag / detach) stays allowed for a lapsed owner winding down.
+    IF NEW.candidate_number IS NOT NULL
+       AND NOT public.has_pheno_tracker_entitlement(v_current_owner) THEN
+      RAISE EXCEPTION 'assigning a pheno candidate number requires an active Pro (Pheno Tracker) subscription'
         USING ERRCODE = 'insufficient_privilege';
     END IF;
 

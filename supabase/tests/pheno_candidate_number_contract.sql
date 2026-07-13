@@ -79,7 +79,7 @@ DECLARE
   v_op       uuid := nullif(current_setting('pcn.operator_id', true), '')::uuid;
   v_stranger uuid := gen_random_uuid();  -- random: only used as a JWT sub, never an FK
   gA uuid; gB uuid; gDel uuid; hA uuid; hA2 uuid; hB uuid; hInc uuid; hDel uuid;
-  p1 uuid; p2 uuid; p3 uuid; pUn uuid; pInc uuid; pDel uuid; pDel2 uuid;
+  p1 uuid; p2 uuid; p3 uuid; pUn uuid; pInc uuid; pDel uuid; pDel2 uuid; pFree uuid;
   v_num integer;
   v_rowcount int;
 BEGIN
@@ -104,6 +104,10 @@ BEGIN
 
   -- seed grows / hunts / plants as service_role (bypasses guards + RLS)
   PERFORM set_config('role', 'service_role', true);
+  -- The owner holds an active Pro entitlement: assigning candidate numbers AND
+  -- updating pheno_hunts are Pro-gated. founder_lifetime has no expiry.
+  INSERT INTO public.billing_subscriptions (user_id, plan_id, status)
+    VALUES (v_owner, 'founder_lifetime', 'active') ON CONFLICT (user_id) DO NOTHING;
   INSERT INTO public.grows (user_id, name) VALUES (v_owner, 'PCN gA') RETURNING id INTO gA;
   INSERT INTO public.grows (user_id, name) VALUES (v_owner, 'PCN gB') RETURNING id INTO gB;
   INSERT INTO public.pheno_hunts (user_id, grow_id, name) VALUES (v_owner, gA, 'hunt A')   RETURNING id INTO hA;
@@ -122,6 +126,8 @@ BEGIN
     VALUES (v_owner, gDel, hDel, 1, 'pDel') RETURNING id INTO pDel;    -- tagged + NUMBERED
   INSERT INTO public.plants (user_id, grow_id, pheno_hunt_id, name)
     VALUES (v_owner, gDel, hDel, 'pDel2') RETURNING id INTO pDel2;     -- tagged, UNnumbered
+  INSERT INTO public.plants (user_id, grow_id, pheno_hunt_id, name)
+    VALUES (v_owner, gA, hA, 'pFree') RETURNING id INTO pFree;         -- tagged, for the Pro-gate test
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
 
@@ -333,6 +339,18 @@ BEGIN
     END IF;
     pass := pass + 1;
   EXCEPTION WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL owner-grow-delete-retain: %', SQLERRM; END;
+
+  -- 23) a NON-entitled owner cannot ASSIGN a candidate number (Pro gate). Revoke
+  --     the owner's entitlement, then attempt an assignment on a tagged plant.
+  PERFORM set_config('role', 'service_role', true);
+  DELETE FROM public.billing_subscriptions WHERE user_id = v_owner;
+  PERFORM set_config('role', 'authenticated', true);
+  PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
+  BEGIN
+    UPDATE public.plants SET candidate_number = 1 WHERE id = pFree;  -- owner, now non-entitled
+    RAISE EXCEPTION 'PCN_SENTINEL non-entitled owner assigned a candidate number';
+  EXCEPTION WHEN insufficient_privilege THEN pass := pass + 1;
+           WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL non-entitled-blocked: %', SQLERRM; END;
 
   PERFORM set_config('role', 'authenticated', false);
   RAISE NOTICE 'pheno_candidate_number contract: % passed, % failed', pass, fail;

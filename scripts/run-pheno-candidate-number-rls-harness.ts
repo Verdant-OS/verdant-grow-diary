@@ -131,6 +131,13 @@ async function main() {
       .insert({ user_id: op.id, role: "operator" });
     if (roleErr) throw new Error(`grant operator: ${roleErr.message}`);
 
+    // Owner holds an active Pro entitlement (candidate numbering + pheno_hunts
+    // writes are Pro-gated). founder_lifetime has no expiry.
+    const { error: entErr } = await admin
+      .from("billing_subscriptions")
+      .insert({ user_id: owner.id, plan_id: "founder_lifetime", status: "active" });
+    if (entErr) throw new Error(`grant entitlement: ${entErr.message}`);
+
     const ownerC = await signIn(owner.email, owner.password);
     const opC = await signIn(op.email, op.password);
     const strangerC = await signIn(stranger.email, stranger.password);
@@ -353,6 +360,19 @@ async function main() {
         `err=${del.error?.message} retained=${retained?.length ?? 0}`,
       );
     }
+
+    // 17) a non-entitled owner cannot ASSIGN a candidate number (Pro gate). Revoke
+    //     the owner's entitlement, then try to number a tagged plant.
+    {
+      const pFree = await seedId(
+        "plants",
+        { user_id: owner.id, grow_id: gA, pheno_hunt_id: hA, name: `pFree ${runId}` },
+        plantIds,
+      );
+      await admin.from("billing_subscriptions").delete().eq("user_id", owner.id);
+      const res = await setNumber(ownerC, pFree, 1);
+      check("non-entitled owner cannot assign a candidate number", !!res.error, res.error ?? "");
+    }
   } finally {
     // Grow deletion does NOT cascade to plants (plants.grow_id is ON DELETE SET
     // NULL), and a hunt-tagged plant blocks grow changes — so remove plants first
@@ -381,6 +401,9 @@ async function main() {
     for (const id of users) {
       await step(`delete user_roles ${id}`, async () =>
         admin.from("user_roles").delete().eq("user_id", id),
+      );
+      await step(`delete billing_subscriptions ${id}`, async () =>
+        admin.from("billing_subscriptions").delete().eq("user_id", id),
       );
       await step(`delete auth user ${id}`, async () => {
         const { error } = await admin.auth.admin.deleteUser(id);

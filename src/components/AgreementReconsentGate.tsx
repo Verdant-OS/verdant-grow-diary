@@ -175,12 +175,19 @@ export function AgreementReconsentGate() {
           ))}
         </p>
 
-        <label className="flex items-start gap-2 text-sm">
+        <label htmlFor="reconsent-accept" className="flex items-start gap-2 text-sm">
           <Checkbox
             id="reconsent-accept"
+            ref={checkboxRef}
             checked={accept}
-            onCheckedChange={(v) => setAccept(v === true)}
+            onCheckedChange={(v) => {
+              const next = v === true;
+              setAccept(next);
+              if (next && error) setError(null);
+            }}
             aria-describedby={error ? "reconsent-error" : undefined}
+            aria-invalid={error ? true : undefined}
+            aria-required
           />
           <span className="leading-snug text-muted-foreground">
             I have read and agree to the {CURRENT_AGREEMENT_LIST.map((a, i) => (
@@ -200,17 +207,24 @@ export function AgreementReconsentGate() {
           </span>
         </label>
 
-        {error ? (
-          <p id="reconsent-error" role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
+        <p
+          id="reconsent-error"
+          role="alert"
+          aria-live="assertive"
+          className={`text-sm text-destructive min-h-5 ${error ? "" : "sr-only"}`}
+        >
+          {error ?? ""}
+        </p>
 
         <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="ghost" onClick={() => void signOut()} disabled={submitting}>
             Sign out
           </Button>
-          <Button onClick={() => void onAccept()} disabled={!accept || submitting}>
+          <Button
+            onClick={() => void onAccept()}
+            disabled={submitting}
+            aria-disabled={!accept || submitting}
+          >
             {submitting ? "Saving…" : "Accept and continue"}
           </Button>
         </DialogFooter>

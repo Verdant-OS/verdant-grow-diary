@@ -76,31 +76,37 @@ No other files change.
 
 ## 5. Data-contract assumptions and hard blockers
 
-**Contract status: UNVERIFIED.**
+**Contract status: CONFIRMED.**
 
-The `candidate_number` column does not exist on `public.plants` in the current sandbox. The P.2 migration file `supabase/migrations/20260712010343_pheno_candidate_number_foundation.sql` is protected and not present in this environment, so its exact column identifier, type, null/legacy behavior, and location (direct column vs. joined table/view) cannot be confirmed from source.
+The following contract was explicitly confirmed by Verdant and supersedes any earlier assumptions or PR #228's rejected architecture.
 
-What has been confirmed locally:
-- Current `plants` columns include `candidate_label` (text, nullable) and `pheno_hunt_id` (uuid, nullable).
-- No `candidate_number` column is present at this revision.
-- No client code assigns, increments, or writes a candidate number.
+- **Architecture**: direct nullable column on `public.plants`; no separate candidate-number table, no RPC allocator.
+- **Identifier / type**: `candidate_number integer NULL`.
+- **Uniqueness**: unique within `pheno_hunt_id` via a partial unique index where both `candidate_number` and `pheno_hunt_id` are non-null.
+- **Valid value**: positive integer only.
+- **Legacy behavior**: `NULL` means legacy/unassigned. Do not backfill existing plants.
+- **Assignment**: an authenticated owner may assign the number once through the existing plants write path. P.2 adds no allocator RPC.
+- **Immutability**: once non-null, the number cannot change or be cleared while the plant remains attached to the same hunt.
+- **Exceptional repair**: `service_role` only; never exposed in client code.
+- **Operator access**: operators may view the number through their existing plants access but cannot assign, clear, or renumber it.
+- **Lineage**: a tagged plant's `user_id` and `grow_id` must match its `pheno_hunts` row.
+- **Hunt/grow changes**:
+  - Detaching or changing `pheno_hunt_id` clears `candidate_number`.
+  - A plant cannot move to a grow inconsistent with its current hunt.
+  - After detaching and moving, a future hunt assignment receives a new number.
+- **Sequence semantics**: numbers must be positive and unique within a hunt; they do not need to be gap-free.
+- **No automatic backfill, device automation, AI, alerts, or Action Queue behavior.**
 
-What must be confirmed by the user before any implementation beyond Step 1:
-- **Exact column identifier** on `plants` (assumed `candidate_number`, but unverified).
-- **Exact type**: `integer`, `smallint`, `bigint`, or another type.
-- **Null/legacy behavior**: whether null means "pre-P.2 legacy" and whether zero/negative/non-integer values are possible.
-- **Location**: whether the column lives directly on `public.plants` or on a joinable table/view. If it is a join, the SELECT column list and row type differ.
+**PR #228 decision**: PR #228's separate `pheno_candidate_numbers` table and `allocate_pheno_candidate_number()` RPC architecture is rejected. It must be discarded wholesale rather than partially reused. PR #228 must not merge in its current form.
 
-Hard stop rule: If the confirmed contract differs from `candidate_number: integer on public.plants`, do NOT invent a column name, RPC, view name, or generated type. Implement only the pure helper (Step 1) and report the exact mismatch. All data-layer wiring waits until the contract is confirmed.
+**Implementation authorization**: The database-layer, RLS, and contract enforcement for this confirmed contract are authorized only inside the three protected P.2/P.3 files owned by Claude. Lovable may not touch those files or create substitutes.
+
+**Lovable wiring remains blocked until**: the corrected P.2 migration is merged, generated types are refreshed, and the `candidate_number` field is visible in the sandbox. Until then, the adapter row type, SELECT lists, comparator, and timeline section remain untouched. The pure helper already implemented (Step 1) is safe because it has no data-layer dependency.
 
 Explicit non-assumptions:
 - No assumption about backfill of legacy rows — helper treats null/missing as legacy.
-- No assumption about uniqueness enforcement — pure display only, so duplicates would render honestly.
-
-Explicit non-assumptions:
-- No assumption about backfill of legacy rows — helper treats null/missing as legacy.
-- No assumption about uniqueness enforcement — pure display only, so duplicates would render honestly.
-- No assumption about generated-types regeneration timing — the adapter row type is a local subset that already tolerates missing fields.
+- No assumption about uniqueness enforcement at the display layer — duplicates render honestly; enforcement lives in the database index.
+- No assumption about generated-types regeneration timing — the adapter row type is a local subset that already tolerates missing fields, but it must not be extended until the field exists in the database.
 
 ## 6. Targeted test plan and validation commands
 

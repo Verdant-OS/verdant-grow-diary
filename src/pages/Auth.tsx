@@ -276,6 +276,21 @@ export default function Auth() {
       } catch {
         // Non-fatal — re-consent gate will catch missing acceptance later.
       }
+      // Persist the marketing opt-in choice. Explicit user action only —
+      // default remains false server-side, so a failure here means the
+      // user simply stays opted out.
+      try {
+        await supabase.from("profiles").upsert(
+          {
+            user_id: data.user.id,
+            marketing_opt_in: marketingOptIn,
+            marketing_opt_in_at: marketingOptIn ? new Date().toISOString() : null,
+          },
+          { onConflict: "user_id" },
+        );
+      } catch {
+        // Non-fatal.
+      }
     }
     setBusy(false);
     setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");

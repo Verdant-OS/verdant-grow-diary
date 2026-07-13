@@ -94,6 +94,14 @@ export default function AccountPreferences() {
     setStatus(next ? "Marketing opt-in enabled." : "Marketing opt-in disabled.");
   }
 
+  function labelForAgreementType(type: AgreementType): { label: string; href: string } {
+    const agreement = CURRENT_AGREEMENTS[type];
+    return {
+      label: agreement?.label ?? type,
+      href: agreement?.href ?? "#",
+    };
+  }
+
   return (
     <div>
       <PageHeader

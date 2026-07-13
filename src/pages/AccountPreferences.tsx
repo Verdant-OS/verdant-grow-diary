@@ -7,8 +7,11 @@ import PageHeader from "@/components/PageHeader";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CURRENT_AGREEMENTS, type AgreementType } from "@/constants/agreements";
+import { Button } from "@/components/ui/button";
+import { CURRENT_AGREEMENTS, CURRENT_AGREEMENT_LIST, type AgreementType } from "@/constants/agreements";
+import { buildAcceptanceRows, computeAgreementGaps, type AcceptanceRow, type AgreementGap } from "@/lib/agreementConsent";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
+import { CheckCircle2, AlertTriangle } from "lucide-react";
 
 export default function AccountPreferences() {
   const { user } = useAuth();
@@ -25,6 +28,10 @@ export default function AccountPreferences() {
   }[]>([]);
   const [agreementsLoading, setAgreementsLoading] = useState(true);
   const [agreementsError, setAgreementsError] = useState<string | null>(null);
+  const [gaps, setGaps] = useState<AgreementGap[]>([]);
+  const [accepting, setAccepting] = useState(false);
+  const [reconsentStatus, setReconsentStatus] = useState<string | null>(null);
+  const [reconsentError, setReconsentError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -63,7 +70,9 @@ export default function AccountPreferences() {
         if (error) {
           setAgreementsError("Could not load agreement history.");
         } else {
-          setAgreements((data as typeof agreements) ?? []);
+          const rows = (data as typeof agreements) ?? [];
+          setAgreements(rows);
+          setGaps(computeAgreementGaps(rows as unknown as AcceptanceRow[]));
         }
         setAgreementsLoading(false);
       });
@@ -92,6 +101,40 @@ export default function AccountPreferences() {
     }
     setOptIn(next);
     setStatus(next ? "Marketing opt-in enabled." : "Marketing opt-in disabled.");
+  }
+
+  async function handleAcceptAgreements() {
+    if (!user?.id || accepting || gaps.length === 0) return;
+    setAccepting(true);
+    setReconsentError(null);
+    setReconsentStatus(null);
+    const rows = buildAcceptanceRows(user.id).map((r) => ({
+      ...r,
+      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+    }));
+    const { error: err } = await supabase
+      .from("user_agreement_acceptances")
+      .upsert(rows, { onConflict: "user_id,agreement_type,version" });
+    if (err) {
+      setAccepting(false);
+      setReconsentError("Couldn't record your acceptance. Please try again.");
+      return;
+    }
+    // Reload history + gaps
+    const { data, error: readErr } = await supabase
+      .from("user_agreement_acceptances")
+      .select("agreement_type, version, effective_date, accepted_at")
+      .eq("user_id", user.id)
+      .order("accepted_at", { ascending: false });
+    setAccepting(false);
+    if (readErr) {
+      setReconsentError("Accepted, but couldn't refresh the list. Reload to see updates.");
+      return;
+    }
+    const rowsRead = (data as typeof agreements) ?? [];
+    setAgreements(rowsRead);
+    setGaps(computeAgreementGaps(rowsRead as unknown as AcceptanceRow[]));
+    setReconsentStatus("You're up to date on all current agreements.");
   }
 
   function labelForAgreementType(type: AgreementType): { label: string; href: string } {
@@ -155,6 +198,83 @@ export default function AccountPreferences() {
             )}
           </CardContent>
         </Card>
+
+        <Card className="glass rounded-2xl border-0 shadow-none">
+          <CardHeader className="p-5 pb-0">
+            <CardTitle className="font-display font-semibold text-base">Terms & Privacy status</CardTitle>
+            <CardDescription className="text-sm text-muted-foreground">
+              Your acceptance status for the current agreement versions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-5">
+            {agreementsLoading ? (
+              <Skeleton className="h-8 w-full" />
+            ) : (
+              <ul className="space-y-2">
+                {CURRENT_AGREEMENT_LIST.map((a) => {
+                  const isGap = gaps.some((g) => g.agreement.type === a.type);
+                  return (
+                    <li
+                      key={a.type}
+                      className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-muted/20 p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">
+                          <Link to={a.href} className="hover:underline">
+                            {a.label}
+                          </Link>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Current version {a.version} · effective {a.effectiveDate}
+                        </p>
+                      </div>
+                      {isGap ? (
+                        <span className="flex items-center gap-1 text-xs font-medium text-destructive">
+                          <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+                          Needs re-accept
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs font-medium text-primary">
+                          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                          Up to date
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            {!agreementsLoading && gaps.length > 0 && (
+              <div className="mt-4 flex flex-col gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Accepting will record your consent to the current version of every listed agreement.
+                </p>
+                <Button
+                  onClick={() => void handleAcceptAgreements()}
+                  disabled={accepting}
+                  className="self-start"
+                  size="sm"
+                >
+                  {accepting ? "Saving…" : "Accept current versions"}
+                </Button>
+              </div>
+            )}
+
+            {reconsentStatus && (
+              <p role="status" aria-live="polite" className="text-xs text-muted-foreground mt-3">
+                {reconsentStatus}
+              </p>
+            )}
+            {reconsentError && (
+              <p role="alert" className="text-xs text-destructive mt-3">
+                {reconsentError}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+
 
         <Card className="glass rounded-2xl border-0 shadow-none">
           <CardHeader className="p-5 pb-0">

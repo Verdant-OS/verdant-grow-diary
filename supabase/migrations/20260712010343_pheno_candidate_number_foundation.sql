@@ -65,6 +65,18 @@ DECLARE
   v_is_service   boolean := current_setting('role', true) = 'service_role';
   v_hunt_changed boolean := (TG_OP = 'UPDATE' AND NEW.pheno_hunt_id IS DISTINCT FROM OLD.pheno_hunt_id);
   v_num_changed  boolean;
+  -- Lineage only needs (re)checking when the tag, grow, or owner actually changes
+  -- (or on INSERT). Gating on this keeps ordinary edits — e.g. an operator touching
+  -- an unrelated column on a tagged plant — from running the SECURITY INVOKER
+  -- pheno_hunts lookup at all, so enforcement never depends on the writer's RLS
+  -- visibility of pheno_hunts.
+  v_lineage_relevant boolean := (TG_OP = 'INSERT') OR (
+    TG_OP = 'UPDATE' AND (
+      NEW.pheno_hunt_id IS DISTINCT FROM OLD.pheno_hunt_id
+      OR NEW.grow_id IS DISTINCT FROM OLD.grow_id
+      OR NEW.user_id IS DISTINCT FROM OLD.user_id
+    )
+  );
 BEGIN
   -- 1. A hunt change (including detach to NULL) never carries a number across
   --    hunts: clear it. Clearing is an allowed guard action.
@@ -90,7 +102,9 @@ BEGIN
   END IF;
 
   -- 4. Lineage: when tagged, the hunt must share the plant's grow and owner.
-  IF NEW.pheno_hunt_id IS NOT NULL THEN
+  --    Only (re)validated when the tag/grow/owner changes (or on INSERT); an
+  --    unrelated edit to an already-consistent tagged plant is left untouched.
+  IF v_lineage_relevant AND NEW.pheno_hunt_id IS NOT NULL THEN
     IF NOT EXISTS (
       SELECT 1 FROM public.pheno_hunts h
        WHERE h.id = NEW.pheno_hunt_id

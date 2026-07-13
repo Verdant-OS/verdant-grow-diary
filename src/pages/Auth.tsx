@@ -459,6 +459,35 @@ export default function Auth() {
                 {signUpSuccess ? (
                   <AuthInlineMessage>{signUpSuccess}</AuthInlineMessage>
                 ) : null}
+                <div className="flex items-start gap-2 pt-1">
+                  <Checkbox
+                    id="signup-consent"
+                    checked={consentAccepted}
+                    onCheckedChange={(v) => {
+                      setConsentAccepted(v === true);
+                      if (v === true) setConsentError(null);
+                    }}
+                    aria-invalid={!!consentError}
+                    aria-describedby={consentError ? "signup-consent-error" : undefined}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="signup-consent" className="text-xs text-muted-foreground leading-snug">
+                    I agree to the{" "}
+                    <Link to="/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
+                      Terms of Service
+                    </Link>{" "}
+                    and{" "}
+                    <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
+                      Privacy Policy
+                    </Link>
+                    .
+                  </label>
+                </div>
+                {consentError ? (
+                  <AuthInlineMessage id="signup-consent-error" role="alert" tone="error">
+                    {consentError}
+                  </AuthInlineMessage>
+                ) : null}
                 <Button
                   type="submit"
                   disabled={busy}

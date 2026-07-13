@@ -110,32 +110,34 @@ Explicit non-assumptions:
 
 ## 6. Targeted test plan and validation commands
 
-Allowed now (Step 1 only):
+Allowed now (Step 1 only) — both already implemented:
 - `src/test/phenoCandidateLabel.test.ts` (Vitest, pure — no Supabase, no React)
   - Happy path: `{ candidateNumber: 3, candidateLabel: "Alpha", plantId: "p1" }` → `#3 · Alpha`.
   - Number only, no label, no name: → `#7`.
   - Legacy: `{ candidateNumber: null, candidateLabel: "Alpha", ... }` → `Alpha`.
-  - Legacy fallback chain: label null, name "Plant A" → `Plant A`; both null → returns `plantId`.
+  - Legacy fallback chain: label null, name "Plant A" → `Plant A`; both null → `#<first 8 plant-id chars>`.
+  - Final fallback: blank `plantId` → `#unknown`.
   - Invalid numbers rejected (fall through to legacy): `0`, `-1`, `1.5`, `NaN`, `Infinity`, `"3"` (string).
   - Whitespace-only label/name treated as missing.
-  - Determinism: same input twice → identical output; no randomness, no `Date.now`.
-  - Sort comparator: `[#10, #2, #1, "Zeta", "Alpha", { no label }]` → `[#1, #2, #10, Alpha, Zeta, id-fallback]` deterministically; stable on ties.
+  - Determinism: same input repeated → identical output; no randomness, no `Date.now`.
+  - Immutability: frozen input object is not mutated.
 
-Blocked until contract confirmation:
-- Adapter regression tests against `src/lib/phenoHuntCandidateAdapter.ts` — cannot run without the confirmed column name on the row type.
-- Timeline section tests against `src/components/PhenoHuntTimelineSection.tsx` — cannot run without the confirmed SELECT column.
+Blocked until Claude's corrected P.2 migration is merged and the field is visible:
+- Adapter regression tests against `src/lib/phenoHuntCandidateAdapter.ts`.
+- Timeline section tests against `src/components/PhenoHuntTimelineSection.tsx`.
+- Comparator tests for `comparePhenoCandidatesByNumberThenLabel`.
 
 Validation commands (Step 1 only):
 ```
-bun run lint
-bunx tsc --noEmit
+bun run type-check
 bunx vitest run src/test/phenoCandidateLabel.test.ts
+bunx prettier --check src/lib/phenoCandidateLabel.ts src/test/phenoCandidateLabel.test.ts
+git diff --check
 ```
 
-Full validation commands (after contract confirmation):
+Full validation commands (after P.2 merge and type refresh):
 ```
-bun run lint
-bunx tsc --noEmit
+bun run type-check
 bunx vitest run src/test/phenoCandidateLabel.test.ts src/lib/phenoHuntCandidateAdapter.test.ts
 bunx vitest run
 ```

@@ -295,7 +295,7 @@ describe("comparePhenoCandidatesByNumberThenLabel", () => {
       for (const b of samples) {
         const ab = comparePhenoCandidatesByNumberThenLabel(a, b);
         const ba = comparePhenoCandidatesByNumberThenLabel(b, a);
-        expect(Math.sign(ab)).toBe(-Math.sign(ba));
+        expect(Math.sign(ab) + Math.sign(ba)).toBe(0);
       }
     }
   });

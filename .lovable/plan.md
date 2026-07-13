@@ -26,21 +26,22 @@ No client code today assigns, increments, or writes a candidate number. Good bas
 Build ONE thing: a pure display helper + minimal wiring.
 
 **In scope**
-1. New pure helper `src/lib/phenoCandidateLabel.ts` — `formatPhenoCandidateLabel({ candidateNumber, candidateLabel, plantName, plantId })` → string; deterministic; null-safe; legacy fallback identical to today.
-2. Extend `PhenoHuntCandidatePlantRow` with `candidate_number: number | null` (optional field; adapter treats missing as null so pre-migration builds stay safe).
-3. Extend the `plants` SELECT column list in `phenoHuntCandidatesService.ts` to include the new column name (see §5 for the hard blocker on the exact identifier).
-4. Adapter uses the helper for `candidateLabel`; adds a numeric secondary sort key so `#2` precedes `#10`.
-5. Timeline section (`PhenoHuntTimelineSection.tsx`) — add the column to its independent SELECT and use the same helper for the two labels it renders. Keep the SQL ORDER BY unchanged (stable enough; final display order comes from the helper output + client sort where it already sorts).
+1. ✅ New pure helper `src/lib/phenoCandidateLabel.ts` — already implemented. `formatPhenoCandidateLabel({ candidateNumber, candidateLabel, plantName, plantId })` → string; deterministic; null-safe; legacy fallback chain: `candidateLabel → plantName → #<first 8 plant-id characters> → #unknown`.
+2. ⛔ Extend `PhenoHuntCandidatePlantRow` with `candidate_number: number | null` — BLOCKED until Claude's corrected P.2 migration lands and the column is visible in the sandbox. Do not approximate the type or add a fallback alias.
+3. ⛔ Extend the `plants` SELECT column list in `phenoHuntCandidatesService.ts` — BLOCKED until the corrected P.2 migration is merged and the generated types are refreshed.
+4. ⛔ Adapter uses the helper for `candidateLabel` and adds a numeric secondary sort key — BLOCKED until the corrected P.2 migration is merged.
+5. ⛔ Timeline section (`PhenoHuntTimelineSection.tsx`) — add the column to its independent SELECT and use the helper — BLOCKED until the corrected P.2 migration is merged.
 
 **Out of scope (do not touch this slice)**
 - Any INSERT/UPDATE/DELETE, RPC, or Edge Function.
 - Assigning, reserving, or defaulting a candidate number client-side.
 - Schema, migration, RLS, grants, generated types regeneration.
-- The three protected P.2/P.3 files (see §9).
+- The three protected P.2/P.3 files (see §9). Claude owns them; Lovable must not touch, reformat, or approximate them.
 - Keepers/Stress/Sampling/ScoreRounds/AI/Action Queue behavior — they inherit the label through the adapter; no per-surface edits.
 - Navigation, copy rewrites, empty-state changes, upgrade gates, billing, auth.
 - Sort/order changes anywhere except the adapter's existing sort comparator.
 - Editing `PhenoHuntNew.tsx` or any create/assignment path.
+- PR #228 in its current form — it must not merge. Its separate `pheno_candidate_numbers` table and `allocate_pheno_candidate_number()` RPC are rejected.
 
 ## 4. Exact file-level plan
 

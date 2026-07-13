@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +34,7 @@ export function AgreementReconsentGate() {
   const [accept, setAccept] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const checkboxRef = useRef<HTMLButtonElement | null>(null);
 
   const suppressed = SUPPRESSED_PREFIXES.some((p) => location.pathname.startsWith(p));
 
@@ -69,6 +70,12 @@ export function AgreementReconsentGate() {
 
   async function onAccept() {
     if (!user || submitting) return;
+    if (!accept) {
+      setError("Please tick the box to confirm you've read and agree to the current agreements.");
+      // Move focus to the checkbox so keyboard users land on the control they must interact with.
+      requestAnimationFrame(() => checkboxRef.current?.focus());
+      return;
+    }
     setError(null);
     setSubmitting(true);
     const rows = buildAcceptanceRows(user.id).map((r) => ({
@@ -98,13 +105,16 @@ export function AgreementReconsentGate() {
         onEscapeKeyDown={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
+        aria-labelledby="reconsent-title"
+        aria-describedby="reconsent-description"
+        data-testid="agreement-reconsent-gate"
       >
         <DialogHeader>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-primary" aria-hidden />
-            <DialogTitle>{anyPrior ? "Updated agreements" : "Accept our agreements"}</DialogTitle>
+            <DialogTitle id="reconsent-title">{anyPrior ? "Updated agreements" : "Accept our agreements"}</DialogTitle>
           </div>
-          <DialogDescription>
+          <DialogDescription id="reconsent-description">
             {anyPrior
               ? "We've updated the agreements that govern your use of Verdant. Review what changed below, then accept the current versions to continue."
               : "Please review and accept the following to continue using Verdant."}
@@ -165,12 +175,19 @@ export function AgreementReconsentGate() {
           ))}
         </p>
 
-        <label className="flex items-start gap-2 text-sm">
+        <label htmlFor="reconsent-accept" className="flex items-start gap-2 text-sm">
           <Checkbox
             id="reconsent-accept"
+            ref={checkboxRef}
             checked={accept}
-            onCheckedChange={(v) => setAccept(v === true)}
+            onCheckedChange={(v) => {
+              const next = v === true;
+              setAccept(next);
+              if (next && error) setError(null);
+            }}
             aria-describedby={error ? "reconsent-error" : undefined}
+            aria-invalid={error ? true : undefined}
+            aria-required
           />
           <span className="leading-snug text-muted-foreground">
             I have read and agree to the {CURRENT_AGREEMENT_LIST.map((a, i) => (
@@ -190,17 +207,24 @@ export function AgreementReconsentGate() {
           </span>
         </label>
 
-        {error ? (
-          <p id="reconsent-error" role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
+        <p
+          id="reconsent-error"
+          role="alert"
+          aria-live="assertive"
+          className={`text-sm text-destructive min-h-5 ${error ? "" : "sr-only"}`}
+        >
+          {error ?? ""}
+        </p>
 
         <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="ghost" onClick={() => void signOut()} disabled={submitting}>
             Sign out
           </Button>
-          <Button onClick={() => void onAccept()} disabled={!accept || submitting}>
+          <Button
+            onClick={() => void onAccept()}
+            disabled={submitting}
+            aria-disabled={!accept || submitting}
+          >
             {submitting ? "Saving…" : "Accept and continue"}
           </Button>
         </DialogFooter>

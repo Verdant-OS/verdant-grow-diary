@@ -4,6 +4,7 @@ import { ArrowLeft, Leaf, Gauge, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
@@ -73,6 +74,8 @@ export default function Auth() {
   const [signUpSuccess, setSignUpSuccess] = useState<string | null>(null);
   const [magicBusy, setMagicBusy] = useState(false);
   const [magicNotice, setMagicNotice] = useState<string | null>(null);
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotError, setForgotError] = useState<string | null>(null);
@@ -179,6 +182,11 @@ export default function Auth() {
     if (busy) return;
     setSignUpError(null);
     setSignUpSuccess(null);
+    setConsentError(null);
+    if (!consentAccepted) {
+      setConsentError("Please accept the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
     if (password.length < MIN_PASSWORD_LENGTH) {
       setSignUpError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
       return;
@@ -451,6 +459,35 @@ export default function Auth() {
                 {signUpSuccess ? (
                   <AuthInlineMessage>{signUpSuccess}</AuthInlineMessage>
                 ) : null}
+                <div className="flex items-start gap-2 pt-1">
+                  <Checkbox
+                    id="signup-consent"
+                    checked={consentAccepted}
+                    onCheckedChange={(v) => {
+                      setConsentAccepted(v === true);
+                      if (v === true) setConsentError(null);
+                    }}
+                    aria-invalid={!!consentError}
+                    aria-describedby={consentError ? "signup-consent-error" : undefined}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="signup-consent" className="text-xs text-muted-foreground leading-snug">
+                    I agree to the{" "}
+                    <Link to="/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
+                      Terms of Service
+                    </Link>{" "}
+                    and{" "}
+                    <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
+                      Privacy Policy
+                    </Link>
+                    .
+                  </label>
+                </div>
+                {consentError ? (
+                  <AuthInlineMessage id="signup-consent-error" role="alert" tone="error">
+                    {consentError}
+                  </AuthInlineMessage>
+                ) : null}
                 <Button
                   type="submit"
                   disabled={busy}
@@ -524,6 +561,18 @@ export default function Auth() {
             <span>Grower-approved action</span>
           </li>
         </ul>
+
+        <p className="mt-4 text-center text-[11px] text-muted-foreground">
+          By continuing, you agree to Verdant's{" "}
+          <Link to="/terms" className="underline underline-offset-2 hover:text-foreground">
+            Terms of Service
+          </Link>{" "}
+          &amp;{" "}
+          <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );

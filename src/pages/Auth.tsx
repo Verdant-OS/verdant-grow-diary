@@ -407,7 +407,7 @@ export default function Auth() {
           <div>
             <h1 className="text-3xl font-display font-bold">&nbsp;Verdant Grow Diary</h1>
             <p className="text-sm text-muted-foreground">
-              Plant memory. Sensor truth. Better decisions.
+              {"\n"}
             </p>
           </div>
         </div>

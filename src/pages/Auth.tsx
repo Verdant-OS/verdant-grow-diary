@@ -94,6 +94,7 @@ export default function Auth() {
   const [magicNotice, setMagicNotice] = useState<string | null>(null);
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotError, setForgotError] = useState<string | null>(null);
@@ -274,6 +275,21 @@ export default function Auth() {
           .upsert(rows, { onConflict: "user_id,agreement_type,version" });
       } catch {
         // Non-fatal — re-consent gate will catch missing acceptance later.
+      }
+      // Persist the marketing opt-in choice. Explicit user action only —
+      // default remains false server-side, so a failure here means the
+      // user simply stays opted out.
+      try {
+        await supabase.from("profiles").upsert(
+          {
+            user_id: data.user.id,
+            marketing_opt_in: marketingOptIn,
+            marketing_opt_in_at: marketingOptIn ? new Date().toISOString() : null,
+          },
+          { onConflict: "user_id" },
+        );
+      } catch {
+        // Non-fatal.
       }
     }
     setBusy(false);
@@ -592,6 +608,17 @@ export default function Auth() {
                       Privacy Policy
                     </Link>
                     .
+                  </label>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="signup-marketing"
+                    checked={marketingOptIn}
+                    onCheckedChange={(v) => setMarketingOptIn(v === true)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="signup-marketing" className="text-xs text-muted-foreground leading-snug">
+                    Send me occasional product updates and grow tips from Verdant. Optional — you can change this any time in settings.
                   </label>
                 </div>
                 {consentError ? (

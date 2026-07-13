@@ -39,6 +39,7 @@ import {
 } from "@/lib/authErrorRules";
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
+import { buildAcceptanceRows } from "@/lib/agreementConsent";
 import {
   DEFAULT_VERIFICATION_COOLDOWN_MS,
   VERIFICATION_COOLDOWN_HINT,

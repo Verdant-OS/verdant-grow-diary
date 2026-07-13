@@ -587,14 +587,35 @@ export default function Auth() {
                 Forgot your password? We'll email you a secure reset link.
               </p>
               {forgotSent ? (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className="text-sm text-muted-foreground"
-                >
-                  {GENERIC_RESET_REQUEST_SUCCESS}
+                <div className="grid gap-3" role="status" aria-live="polite">
+                  <p className="text-sm text-muted-foreground">
+                    {GENERIC_RESET_REQUEST_SUCCESS}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={resetResendDisabled}
+                    aria-busy={resetResendBusy}
+                    onClick={resendResetEmail}
+                  >
+                    {resetResendLabel}
+                  </Button>
+                  {resetResendCooldownActive && !resetResendBusy ? (
+                    <p
+                      role="status"
+                      aria-live="polite"
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      {RESET_RESEND_COOLDOWN_HINT}
+                    </p>
+                  ) : null}
+                  {resetResendNotice ? (
+                    <AuthInlineMessage>{resetResendNotice}</AuthInlineMessage>
+                  ) : null}
                 </div>
               ) : (
+
                 <form onSubmit={requestReset} noValidate className="grid gap-3" aria-label="Forgot password">
                   <AuthTextField
                     id="forgot-email"

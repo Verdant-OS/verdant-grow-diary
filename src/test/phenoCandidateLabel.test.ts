@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  comparePhenoCandidatesByNumberThenLabel,
   formatPhenoCandidateLabel,
   type PhenoCandidateLabelInput,
 } from "@/lib/phenoCandidateLabel";
+
 
 const base = (overrides: Partial<PhenoCandidateLabelInput> = {}): PhenoCandidateLabelInput => ({
   candidateNumber: null,

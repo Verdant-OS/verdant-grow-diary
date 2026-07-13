@@ -246,17 +246,36 @@ export default function Auth() {
       return;
     }
     setBusy(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: window.location.origin },
     });
-    setBusy(false);
     if (error) {
+      setBusy(false);
       setSignUpError(sanitizeAuthError("signUp", error));
       signUpEmailRef.current?.focus();
       return;
     }
+    // Record acceptance of the current agreement versions. Runs best-effort:
+    // if the user must confirm their email first there may be no active
+    // session yet, in which case the insert is skipped and the re-consent
+    // gate will prompt on first authenticated load. Signup itself must not
+    // fail on a consent-log write error.
+    if (data.user?.id) {
+      try {
+        const rows = buildAcceptanceRows(data.user.id).map((r) => ({
+          ...r,
+          user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+        }));
+        await supabase
+          .from("user_agreement_acceptances")
+          .upsert(rows, { onConflict: "user_id,agreement_type,version" });
+      } catch {
+        // Non-fatal — re-consent gate will catch missing acceptance later.
+      }
+    }
+    setBusy(false);
     setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
     nav(postSignInTarget(), { replace: true });
   }

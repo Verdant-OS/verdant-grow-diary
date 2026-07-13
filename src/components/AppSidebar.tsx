@@ -9,6 +9,7 @@ import {
   Bell,
   Stethoscope,
   Settings,
+  UserCog,
   ShieldCheck,
   Wrench,
   LineChart,
@@ -83,7 +84,10 @@ const growerGroups: { label: string; items: NavItem[] }[] = [
       { to: "/grow-lineage", label: "Lineage Repair", icon: Wrench },
     ],
   },
-  { label: "Account", items: [{ to: "/settings", label: "Settings", icon: Settings }] },
+  { label: "Account", items: [
+    { to: "/settings", label: "Settings", icon: Settings },
+    { to: "/account/preferences", label: "Preferences", icon: UserCog },
+  ] },
 ];
 
 /**

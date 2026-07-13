@@ -423,6 +423,15 @@ export default function Settings() {
           </Button>
         </Tile>
 
+        <Tile name="Preferences" state="available">
+          <p className="text-sm text-muted-foreground mb-3">
+            Communication choices, including marketing opt-in.
+          </p>
+          <Button asChild size="sm" data-testid="account-preferences-link">
+            <Link to="/account/preferences">Open preferences</Link>
+          </Button>
+        </Tile>
+
         {user?.id ? <StartScreenTile userId={user.id} /> : null}
 
         <SubscriptionTile />

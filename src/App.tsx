@@ -11,6 +11,7 @@ import RootErrorBoundary from "@/components/RootErrorBoundary";
 import PhenoTrackerUpgradeGate from "@/components/PhenoTrackerUpgradeGate";
 import RequireOperatorRole from "./components/RequireOperatorRole";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
+import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 
 // Route pages and the authenticated AppShell are code-split so the public
 // marketing / auth entry paths (/welcome, /pricing, /hardware-integrations,
@@ -157,6 +158,7 @@ const App = () => (
           <AuthProvider>
             <GrowsProvider>
               <PaymentTestModeBanner />
+              <AgreementReconsentGate />
 
               <Suspense fallback={<PageLoader />}>
                 <Routes>

@@ -96,9 +96,13 @@ BEGIN
     )
   );
 
-  -- 2. A tagged plant cannot move to a different grow; untag first.
+  -- 2. A tagged plant cannot move to a DIFFERENT grow; untag first. Only a move to
+  --    another actual grow counts — clearing grow_id (NEW.grow_id IS NULL), e.g. the
+  --    ON DELETE SET NULL cleanup when the plant's grow is deleted, is not a
+  --    cross-grow move and must not abort that deletion.
   IF TG_OP = 'UPDATE'
      AND NEW.grow_id IS DISTINCT FROM OLD.grow_id
+     AND NEW.grow_id IS NOT NULL
      AND NEW.pheno_hunt_id IS NOT NULL THEN
     RAISE EXCEPTION 'cannot move a hunt-tagged plant to a different grow; untag it first'
       USING ERRCODE = 'check_violation';
@@ -129,8 +133,10 @@ BEGIN
     END IF;
   END IF;
 
-  -- 5. Lineage: when tagged, the hunt must share the plant's grow and owner.
-  IF v_lineage_relevant AND NEW.pheno_hunt_id IS NOT NULL THEN
+  -- 5. Lineage: when tagged AND the plant still has a grow, the hunt must share
+  --    that grow and owner. A NULL grow_id (e.g. the ON DELETE SET NULL cleanup
+  --    during grow deletion) is a transient cleanup state, not a lineage check.
+  IF v_lineage_relevant AND NEW.pheno_hunt_id IS NOT NULL AND NEW.grow_id IS NOT NULL THEN
     IF NOT EXISTS (
       SELECT 1 FROM public.pheno_hunts h
        WHERE h.id = NEW.pheno_hunt_id

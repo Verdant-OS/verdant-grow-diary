@@ -78,8 +78,8 @@ DECLARE
   v_owner    uuid := nullif(current_setting('pcn.owner_id', true), '')::uuid;
   v_op       uuid := nullif(current_setting('pcn.operator_id', true), '')::uuid;
   v_stranger uuid := gen_random_uuid();  -- random: only used as a JWT sub, never an FK
-  gA uuid; gB uuid; hA uuid; hA2 uuid; hB uuid; hInc uuid;
-  p1 uuid; p2 uuid; p3 uuid; pUn uuid; pInc uuid;
+  gA uuid; gB uuid; gDel uuid; hA uuid; hA2 uuid; hB uuid; hInc uuid; hDel uuid;
+  p1 uuid; p2 uuid; p3 uuid; pUn uuid; pInc uuid; pDel uuid;
   v_num integer;
   v_rowcount int;
 BEGIN
@@ -115,6 +115,11 @@ BEGIN
   INSERT INTO public.plants (user_id, grow_id, pheno_hunt_id, name) VALUES (v_owner, gA, hA, 'p3') RETURNING id INTO p3;
   INSERT INTO public.plants (user_id, grow_id, name)                 VALUES (v_owner, gA, 'pUntagged') RETURNING id INTO pUn;
   INSERT INTO public.plants (user_id, grow_id, pheno_hunt_id, name) VALUES (v_owner, gA, hInc, 'pInc') RETURNING id INTO pInc;
+  -- a self-contained grow with a hunt-tagged, NUMBERED plant, to prove grow delete works
+  INSERT INTO public.grows (user_id, name) VALUES (v_owner, 'PCN gDel') RETURNING id INTO gDel;
+  INSERT INTO public.pheno_hunts (user_id, grow_id, name) VALUES (v_owner, gDel, 'hunt Del') RETURNING id INTO hDel;
+  INSERT INTO public.plants (user_id, grow_id, pheno_hunt_id, candidate_number, name)
+    VALUES (v_owner, gDel, hDel, 1, 'pDel') RETURNING id INTO pDel;
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
 
@@ -287,6 +292,15 @@ BEGIN
     RAISE EXCEPTION 'PCN_SENTINEL moved a hunt with numbered plants';
   EXCEPTION WHEN check_violation THEN pass := pass + 1;
            WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL hunt-move-blocked: %', SQLERRM; END;
+
+  -- 20) deleting a grow that still has a hunt-tagged, NUMBERED plant must SUCCEED.
+  --     The FK ON DELETE SET NULL on plants.grow_id is cleanup, not a cross-grow
+  --     move, so the guard must not abort it. Runs as service_role, like a cascade.
+  PERFORM set_config('role', 'service_role', true);
+  BEGIN
+    DELETE FROM public.grows WHERE id = gDel;
+    pass := pass + 1;
+  EXCEPTION WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL grow-delete-with-tagged-plants: %', SQLERRM; END;
 
   PERFORM set_config('role', 'authenticated', false);
   RAISE NOTICE 'pheno_candidate_number contract: % passed, % failed', pass, fail;

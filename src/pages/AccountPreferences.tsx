@@ -103,6 +103,40 @@ export default function AccountPreferences() {
     setStatus(next ? "Marketing opt-in enabled." : "Marketing opt-in disabled.");
   }
 
+  async function handleAcceptAgreements() {
+    if (!user?.id || accepting || gaps.length === 0) return;
+    setAccepting(true);
+    setReconsentError(null);
+    setReconsentStatus(null);
+    const rows = buildAcceptanceRows(user.id).map((r) => ({
+      ...r,
+      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+    }));
+    const { error: err } = await supabase
+      .from("user_agreement_acceptances")
+      .upsert(rows, { onConflict: "user_id,agreement_type,version" });
+    if (err) {
+      setAccepting(false);
+      setReconsentError("Couldn't record your acceptance. Please try again.");
+      return;
+    }
+    // Reload history + gaps
+    const { data, error: readErr } = await supabase
+      .from("user_agreement_acceptances")
+      .select("agreement_type, version, effective_date, accepted_at")
+      .eq("user_id", user.id)
+      .order("accepted_at", { ascending: false });
+    setAccepting(false);
+    if (readErr) {
+      setReconsentError("Accepted, but couldn't refresh the list. Reload to see updates.");
+      return;
+    }
+    const rowsRead = (data as typeof agreements) ?? [];
+    setAgreements(rowsRead);
+    setGaps(computeAgreementGaps(rowsRead as unknown as AcceptanceRow[]));
+    setReconsentStatus("You're up to date on all current agreements.");
+  }
+
   function labelForAgreementType(type: AgreementType): { label: string; href: string } {
     const agreement = CURRENT_AGREEMENTS[type];
     return {

@@ -561,6 +561,18 @@ export default function Auth() {
             <span>Grower-approved action</span>
           </li>
         </ul>
+
+        <p className="mt-4 text-center text-[11px] text-muted-foreground">
+          By continuing, you agree to Verdant's{" "}
+          <Link to="/terms" className="underline underline-offset-2 hover:text-foreground">
+            Terms of Service
+          </Link>{" "}
+          &amp;{" "}
+          <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );

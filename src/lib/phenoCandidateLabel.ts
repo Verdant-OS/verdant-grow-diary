@@ -114,4 +114,3 @@ export function comparePhenoCandidatesByNumberThenLabel(
   // ra === 2 — id-only / #unknown fallbacks
   return cmpStr(aId, bId);
 }
-

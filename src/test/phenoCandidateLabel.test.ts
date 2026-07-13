@@ -5,7 +5,6 @@ import {
   type PhenoCandidateLabelInput,
 } from "@/lib/phenoCandidateLabel";
 
-
 const base = (overrides: Partial<PhenoCandidateLabelInput> = {}): PhenoCandidateLabelInput => ({
   candidateNumber: null,
   candidateLabel: null,

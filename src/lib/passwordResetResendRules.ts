@@ -26,9 +26,9 @@ export const RESET_RESEND_SUCCESS_MESSAGE =
 export const RESET_RESEND_FAILURE_MESSAGE =
   "We couldn't resend the reset email right now. Try again in a few minutes.";
 
-export { canResendVerification as canResendResetEmail };
-export { verificationCooldownRemainingMs as resetEmailCooldownRemainingMs };
-export { formatVerificationCooldown as formatResetEmailCooldown };
+export const canResendResetEmail = canResendVerification;
+export const resetEmailCooldownRemainingMs = verificationCooldownRemainingMs;
+export const formatResetEmailCooldown = formatVerificationCooldown;
 
 export function buildResetResendLabel(
   isBusy: boolean,

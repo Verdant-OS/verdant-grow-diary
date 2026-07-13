@@ -92,7 +92,13 @@ export default function Auth() {
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [forgotSent, setForgotSent] = useState(false);
 
+  const [resetResendBusy, setResetResendBusy] = useState(false);
+  const [resetResendNotice, setResetResendNotice] = useState<string | null>(null);
+  const [resetResendLastAttemptAt, setResetResendLastAttemptAt] = useState<number | null>(null);
+  const [resetResendNowTick, setResetResendNowTick] = useState<number>(() => Date.now());
+
   const signInEmailRef = useRef<HTMLInputElement>(null);
+
   const signUpEmailRef = useRef<HTMLInputElement>(null);
   const forgotEmailRef = useRef<HTMLInputElement>(null);
 

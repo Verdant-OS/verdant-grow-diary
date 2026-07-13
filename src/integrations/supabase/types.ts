@@ -2823,6 +2823,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_agreement_acceptances: {
+        Row: {
+          accepted_at: string
+          agreement_type: Database["public"]["Enums"]["agreement_type"]
+          created_at: string
+          effective_date: string
+          id: string
+          user_agent: string | null
+          user_id: string
+          version: string
+        }
+        Insert: {
+          accepted_at?: string
+          agreement_type: Database["public"]["Enums"]["agreement_type"]
+          created_at?: string
+          effective_date: string
+          id?: string
+          user_agent?: string | null
+          user_id: string
+          version: string
+        }
+        Update: {
+          accepted_at?: string
+          agreement_type?: Database["public"]["Enums"]["agreement_type"]
+          created_at?: string
+          effective_date?: string
+          id?: string
+          user_agent?: string | null
+          user_id?: string
+          version?: string
+        }
+        Relationships: []
+      }
       user_quests: {
         Row: {
           completed_at: string
@@ -3180,6 +3213,7 @@ export type Database = {
       }
     }
     Enums: {
+      agreement_type: "terms" | "privacy"
       app_role: "operator" | "customer" | "staff"
     }
     CompositeTypes: {
@@ -3308,6 +3342,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      agreement_type: ["terms", "privacy"],
       app_role: ["operator", "customer", "staff"],
     },
   },

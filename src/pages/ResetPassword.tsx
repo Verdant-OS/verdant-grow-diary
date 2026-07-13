@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Check, Eye, EyeOff, Minus } from "lucide-react";
+import { AlertTriangle, Check, Eye, EyeOff, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,14 @@ import {
   getPasswordRequirementStatus,
 } from "@/lib/passwordResetRules";
 import { sanitizeAuthError } from "@/lib/authErrorRules";
+import {
+  diagnoseResetLink,
+  RESTART_FLOW_HREF,
+  type ResetLinkDiagnosis,
+} from "@/lib/resetPasswordLinkRules";
 
-type Status = "checking" | "ready" | "no_session" | "saving" | "done";
+type Status = "checking" | "ready" | "link_problem" | "saving" | "done";
+
 
 export default function ResetPassword() {
   const nav = useNavigate();

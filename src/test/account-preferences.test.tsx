@@ -75,6 +75,7 @@ vi.mock("@/store/auth", () => ({
 
 beforeEach(() => {
   upsertSpy.mockClear();
+  agreementData = defaultAgreements;
 });
 
 function renderPage() {
@@ -95,6 +96,28 @@ describe("Account Preferences", () => {
     expect(
       await screen.findByText("Send me occasional product updates and grow tips"),
     ).toBeInTheDocument();
+  });
+
+  it("renders the agreement history section with accepted versions", async () => {
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "Agreement history" })).toBeInTheDocument();
+    expect(await screen.findByText("Terms of Service")).toBeInTheDocument();
+    expect(await screen.findByText("Privacy Policy")).toBeInTheDocument();
+    expect(await screen.findByText(/Version 2026-07-13/)).toBeInTheDocument();
+  });
+
+  it("links each agreement to its canonical page", async () => {
+    renderPage();
+    const termsLink = await screen.findByRole("link", { name: "Terms of Service" });
+    const privacyLink = await screen.findByRole("link", { name: "Privacy Policy" });
+    expect(termsLink).toHaveAttribute("href", "/terms");
+    expect(privacyLink).toHaveAttribute("href", "/privacy");
+  });
+
+  it("shows an empty state when no agreements are on record", async () => {
+    agreementData = [];
+    renderPage();
+    expect(await screen.findByText("No accepted agreements on record.")).toBeInTheDocument();
   });
 
   it("loads the current opt-in value", async () => {

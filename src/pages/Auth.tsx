@@ -407,15 +407,11 @@ export default function Auth() {
           <div>
             <h1 className="text-3xl font-display font-bold">&nbsp;Verdant Grow Diary</h1>
             <p className="text-sm text-muted-foreground">
-              {"\n"}
+              Your grow-room operating system for logs, sensor truth, cautious AI, and
+              grower-approved actions.
             </p>
           </div>
         </div>
-
-        <p className="text-sm text-muted-foreground mb-4">
-          Your grow-room operating system for logs, sensor truth, cautious AI, and
-          grower-approved actions.
-        </p>
 
         <div className="glass rounded-2xl p-6">
           <Tabs

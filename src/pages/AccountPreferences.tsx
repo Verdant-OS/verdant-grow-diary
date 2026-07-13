@@ -70,7 +70,9 @@ export default function AccountPreferences() {
         if (error) {
           setAgreementsError("Could not load agreement history.");
         } else {
-          setAgreements((data as typeof agreements) ?? []);
+          const rows = (data as typeof agreements) ?? [];
+          setAgreements(rows);
+          setGaps(computeAgreementGaps(rows as unknown as AcceptanceRow[]));
         }
         setAgreementsLoading(false);
       });

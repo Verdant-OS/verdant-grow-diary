@@ -287,6 +287,16 @@ export default function Auth() {
     }
   }
 
+  async function sendResetEmailTo(email: string): Promise<{ error: unknown }> {
+    // Best-effort send. We do NOT branch on the success/failure shape in a
+    // way that reveals account existence. Network/rate-limit errors get a
+    // generic retry copy; success path uses GENERIC_RESET_REQUEST_SUCCESS.
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: buildResetRedirectUrl(window.location.origin),
+    });
+    return { error };
+  }
+
   async function requestReset(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
@@ -298,12 +308,7 @@ export default function Auth() {
       return;
     }
     setBusy(true);
-    // Best-effort send. We do NOT branch on the success/failure shape in a
-    // way that reveals account existence. Network/rate-limit errors get a
-    // generic retry copy; success path uses GENERIC_RESET_REQUEST_SUCCESS.
-    const { error } = await supabase.auth.resetPasswordForEmail(v.email, {
-      redirectTo: buildResetRedirectUrl(window.location.origin),
-    });
+    const { error } = await sendResetEmailTo(v.email);
     setBusy(false);
     if (error) {
       setForgotError(sanitizeAuthError("forgotPassword", error));
@@ -311,7 +316,37 @@ export default function Auth() {
       return;
     }
     setForgotSent(true);
+    setResetResendNotice(null);
+    setResetResendLastAttemptAt(null);
+    setResetResendNowTick(Date.now());
   }
+
+  async function resendResetEmail() {
+    if (resetResendBusy) return;
+    if (!canResendResetEmail(Date.now(), resetResendLastAttemptAt, DEFAULT_RESET_EMAIL_COOLDOWN_MS)) {
+      return;
+    }
+    setResetResendBusy(true);
+    setResetResendNotice(null);
+    try {
+      const v = validateResetEmail(forgotEmail);
+      if ("message" in v) {
+        setResetResendNotice(RESET_RESEND_FAILURE_MESSAGE);
+        return;
+      }
+      const { error } = await sendResetEmailTo(v.email);
+      setResetResendNotice(error ? RESET_RESEND_FAILURE_MESSAGE : RESET_RESEND_SUCCESS_MESSAGE);
+    } catch {
+      setResetResendNotice(RESET_RESEND_FAILURE_MESSAGE);
+    } finally {
+      // Apply cooldown on both success and failure to discourage hammering.
+      setResetResendBusy(false);
+      const stamp = Date.now();
+      setResetResendLastAttemptAt(stamp);
+      setResetResendNowTick(stamp);
+    }
+  }
+
 
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">

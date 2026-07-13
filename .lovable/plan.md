@@ -154,17 +154,17 @@ No CSS changes planned; if a real overflow shows up, it's a follow-up slice, not
 
 ## 8. Safety verdict and rollback boundary
 
-Safety verdict: safe for Step 1 only. The pure helper is read-only, deterministic, and has no data-layer dependency.
+Safety verdict: safe. The contract is confirmed and the pure helper is read-only, deterministic, and has no data-layer dependency. The helper is already implemented and preserved.
 
-Gated status: adapter/service/timeline wiring cannot be judged safe until the exact `candidate_number` contract is confirmed. Until then, no `plants` SELECT list, row type, comparator, or generated type is changed.
+Gated status: adapter/service/timeline wiring remains blocked until Claude's corrected P.2 migration is merged and the `candidate_number` field is visible in the sandbox. The contract is known, so no further contract confirmation is needed; the remaining gate is the protected P.2 landing. Until then, no `plants` SELECT list, row type, comparator, generated type, or timeline section is changed.
 
-Rollback: for Step 1, delete `src/lib/phenoCandidateLabel.ts` and `src/test/phenoCandidateLabel.test.ts`. After the contract is confirmed and the gated files are edited, rollback extends to reverting those four edited files. Zero data migration in all cases; pre-P.2 builds remain untouched because the adapter currently has no `candidate_number` field to break.
+Rollback: for the already-landed Step 1, delete `src/lib/phenoCandidateLabel.ts` and `src/test/phenoCandidateLabel.test.ts`. After the corrected P.2 migration lands and the gated files are edited, rollback extends to reverting those four edited files. Zero data migration in all cases; pre-P.2 builds remain untouched because the adapter currently has no `candidate_number` field to break.
 
 ## 9. Protected P.2/P.3 files — untouched confirmation
 
-Explicitly NOT created, edited, renamed, reformatted, or approximated by this slice:
+Explicitly NOT created, edited, renamed, reformatted, or approximated by this Lovable slice:
 - `supabase/migrations/20260712010343_pheno_candidate_number_foundation.sql`
 - `scripts/run-pheno-candidate-number-rls-harness.ts`
 - `supabase/tests/pheno_candidate_number_contract.sql`
 
-This slice does not add, remove, or reference those paths, and does not add its own migration, RLS harness, or SQL contract file. Claude's P.3 preservation work is not overlapped.
+This slice does not add, remove, or reference those paths, and does not add its own migration, RLS harness, or SQL contract file. Claude's P.3 preservation work is not overlapped. Lovable's only allowed changes are the `.lovable/plan.md` update and the already-landed two-file helper.

@@ -106,35 +106,64 @@ export function AgreementReconsentGate() {
           </div>
           <DialogDescription>
             {anyPrior
-              ? "We've updated the agreements that govern your use of Verdant. Please review and accept the current versions to continue."
+              ? "We've updated the agreements that govern your use of Verdant. Review what changed below, then accept the current versions to continue."
               : "Please review and accept the following to continue using Verdant."}
           </DialogDescription>
         </DialogHeader>
 
-        <ul className="space-y-2 text-sm">
+        <ul className="space-y-3 text-sm">
           {gaps.map(({ agreement, previouslyAcceptedVersion }) => (
             <li key={agreement.type} className="rounded-md border border-border bg-muted/30 p-3">
               <div className="flex items-center justify-between gap-2">
+                <p className="font-medium">{agreement.label}</p>
                 <Link
                   to={agreement.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-medium underline underline-offset-2 hover:text-primary"
+                  className="text-xs underline underline-offset-2 hover:text-primary"
                 >
-                  {agreement.label}
+                  Review {agreement.label}
                 </Link>
-                <span className="text-xs text-muted-foreground">
-                  Effective {agreement.effectiveDate}
-                </span>
               </div>
-              {previouslyAcceptedVersion ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  You previously accepted version {previouslyAcceptedVersion}.
-                </p>
-              ) : null}
+              <dl className="mt-2 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-xs">
+                {previouslyAcceptedVersion ? (
+                  <>
+                    <dt className="text-muted-foreground">Your accepted version</dt>
+                    <dd className="text-muted-foreground line-through">
+                      {previouslyAcceptedVersion}
+                    </dd>
+                  </>
+                ) : (
+                  <>
+                    <dt className="text-muted-foreground">Your accepted version</dt>
+                    <dd className="text-muted-foreground">None on file</dd>
+                  </>
+                )}
+                <dt className="text-muted-foreground">New version</dt>
+                <dd className="font-medium text-foreground">{agreement.version}</dd>
+                <dt className="text-muted-foreground">Effective</dt>
+                <dd className="text-foreground">{agreement.effectiveDate}</dd>
+              </dl>
             </li>
           ))}
         </ul>
+
+        <p className="text-xs text-muted-foreground">
+          Full text:{" "}
+          {CURRENT_AGREEMENT_LIST.map((a, i) => (
+            <span key={a.type}>
+              {i > 0 ? " · " : ""}
+              <Link
+                to={a.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                {a.label}
+              </Link>
+            </span>
+          ))}
+        </p>
 
         <label className="flex items-start gap-2 text-sm">
           <Checkbox

@@ -145,9 +145,11 @@ No CSS changes planned; if a real overflow shows up, it's a follow-up slice, not
 
 ## 8. Safety verdict and rollback boundary
 
-Safety verdict: safe. Read-only, pure helper, additive adapter field, one extra column in two existing SELECTs. No schema, no RLS, no grants, no Edge Function, no auth, no billing, no AI, no Action Queue, no automation, no device control, no navigation, no copy churn, no fake live data.
+Safety verdict: safe for Step 1 only. The pure helper is read-only, deterministic, and has no data-layer dependency.
 
-Rollback: revert the four edited files + delete the two new test/helper files. Zero data migration, zero state to unwind. Pre-P.2 builds keep working because the adapter treats a missing `candidate_number` as null (legacy fallback).
+Gated status: adapter/service/timeline wiring cannot be judged safe until the exact `candidate_number` contract is confirmed. Until then, no `plants` SELECT list, row type, comparator, or generated type is changed.
+
+Rollback: for Step 1, delete `src/lib/phenoCandidateLabel.ts` and `src/test/phenoCandidateLabel.test.ts`. After the contract is confirmed and the gated files are edited, rollback extends to reverting those four edited files. Zero data migration in all cases; pre-P.2 builds remain untouched because the adapter currently has no `candidate_number` field to break.
 
 ## 9. Protected P.2/P.3 files — untouched confirmation
 

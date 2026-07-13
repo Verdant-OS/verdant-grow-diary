@@ -158,7 +158,25 @@ export default function Auth() {
       ? formatVerificationCooldown(resendCooldownRemainingMs)
       : "Resend verification email";
 
+  const resetResendCooldownActive = !canResendResetEmail(
+    resetResendNowTick,
+    resetResendLastAttemptAt,
+    DEFAULT_RESET_EMAIL_COOLDOWN_MS,
+  );
+  const resetResendCooldownRemainingMs = resetEmailCooldownRemainingMs(
+    resetResendNowTick,
+    resetResendLastAttemptAt,
+    DEFAULT_RESET_EMAIL_COOLDOWN_MS,
+  );
+  const resetResendDisabled =
+    resetResendBusy || resetResendCooldownActive || forgotEmail.trim().length === 0;
+  const resetResendLabel = buildResetResendLabel(
+    resetResendBusy,
+    resetResendCooldownRemainingMs,
+  );
+
   async function resendVerification() {
+
     if (resendBusy) return;
     if (!canResendVerification(Date.now(), resendLastAttemptAt, DEFAULT_VERIFICATION_COOLDOWN_MS)) {
       return;

@@ -20,6 +20,17 @@ import {
   MIN_PASSWORD_LENGTH,
 } from "@/lib/passwordResetRules";
 import {
+  DEFAULT_RESET_EMAIL_COOLDOWN_MS,
+  RESET_RESEND_COOLDOWN_HINT,
+  RESET_RESEND_FAILURE_MESSAGE,
+  RESET_RESEND_SUCCESS_MESSAGE,
+  buildResetResendLabel,
+  canResendResetEmail,
+  formatResetEmailCooldown,
+  resetEmailCooldownRemainingMs,
+} from "@/lib/passwordResetResendRules";
+
+import {
   sanitizeAuthError,
   classifyAuthError,
   EMAIL_VERIFICATION_REQUIRED_MESSAGE,

@@ -594,6 +594,17 @@ export default function Auth() {
                     .
                   </label>
                 </div>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="signup-marketing"
+                    checked={marketingOptIn}
+                    onCheckedChange={(v) => setMarketingOptIn(v === true)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="signup-marketing" className="text-xs text-muted-foreground leading-snug">
+                    Send me occasional product updates and grow tips from Verdant. Optional — you can change this any time in settings.
+                  </label>
+                </div>
                 {consentError ? (
                   <AuthInlineMessage id="signup-consent-error" role="alert" tone="error">
                     {consentError}

@@ -155,6 +155,53 @@ export default function AccountPreferences() {
             )}
           </CardContent>
         </Card>
+
+        <Card className="glass rounded-2xl border-0 shadow-none">
+          <CardHeader className="p-5 pb-0">
+            <CardTitle className="font-display font-semibold text-base">Agreement history</CardTitle>
+            <CardDescription className="text-sm text-muted-foreground">
+              Versions you have accepted and when you accepted them.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-5">
+            {agreementsLoading ? (
+              <Skeleton className="h-8 w-full" />
+            ) : agreementsError ? (
+              <p role="alert" className="text-xs text-destructive">
+                {agreementsError}
+              </p>
+            ) : agreements.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No accepted agreements on record.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border/50">
+                {agreements.map((a) => {
+                  const { label, href } = labelForAgreementType(a.agreement_type);
+                  return (
+                    <li key={`${a.agreement_type}-${a.version}`} className="py-3 first:pt-0 last:pb-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                        <div>
+                          <p className="text-sm font-medium">
+                            <Link to={href} className="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+                              {label}
+                            </Link>
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Version {a.version} · effective {a.effective_date}
+                          </p>
+                        </div>
+                        <p className="text-xs text-muted-foreground sm:text-right">
+                          Accepted {formatSnapshotTimestamp(a.accepted_at)}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

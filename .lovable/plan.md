@@ -1,5 +1,7 @@
-
 # Slice — Read-Only Candidate-Number Display Helper
+
+> **STATUS: CONTRACT UNVERIFIED — IMPLEMENTATION BLOCKED PENDING CONFIRMATION.**  
+> The `candidate_number` column identifier, type, and location on `public.plants` have not been confirmed in the current sandbox. No helper, adapter, service, generated type, select list, or comparator changes may proceed until the user explicitly confirms the exact contract. Only Step 1 (pure helper + tests, no data-layer wiring) can be implemented before that confirmation.
 
 ## 1. Executive summary
 
@@ -42,6 +44,7 @@ Build ONE thing: a pure display helper + minimal wiring.
 
 ## 4. Exact file-level plan
 
+**Allowed now (Step 1 only):**
 - **Create** `src/lib/phenoCandidateLabel.ts`
   - Export `interface PhenoCandidateLabelInput { candidateNumber: number | null | undefined; candidateLabel: string | null | undefined; plantName?: string | null; plantId: string; }`
   - Export `function formatPhenoCandidateLabel(input): string`
@@ -50,35 +53,48 @@ Build ONE thing: a pure display helper + minimal wiring.
     - Rejects: non-finite, negative, zero, non-integer, NaN, Infinity → treated as missing.
   - Export `function comparePhenoCandidatesByNumberThenLabel(a, b)` for deterministic sort: numbered candidates first (ascending numeric), then unnumbered alphabetical, tie-break by id.
 
-- **Edit** `src/lib/phenoHuntCandidateAdapter.ts`
+- **New test file** `src/test/phenoCandidateLabel.test.ts` (see §6).
+
+**Blocked until the data contract is confirmed (§5):**
+- **Edit** `src/lib/phenoHuntCandidateAdapter.ts` — gated: needs confirmed `candidate_number` field name/type.
   - Add `candidate_number?: number | null` to `PhenoHuntCandidatePlantRow`.
   - Replace inline `cleanLabel(p.candidate_label) ?? cleanLabel(p.name)` with `formatPhenoCandidateLabel(...)`.
   - Replace the final `candidates.sort(...)` with `comparePhenoCandidatesByNumberThenLabel`.
 
-- **Edit** `src/lib/phenoHuntCandidatesService.ts`
-  - Add the new column to the `plants` select list (single identifier — see §5).
+- **Edit** `src/lib/phenoHuntCandidatesService.ts` — gated: needs the exact SELECT column identifier.
+  - Add the new column to the `plants` select list.
 
-- **Edit** `src/components/PhenoHuntTimelineSection.tsx`
+- **Edit** `src/components/PhenoHuntTimelineSection.tsx` — gated: needs the exact column identifier and confirmed row type.
   - Add the column to its local SELECT.
   - Replace the two `candidate_label`-only render expressions with `formatPhenoCandidateLabel(...)`.
   - Extend the local row type to include the number.
 
-- **New test file** `src/test/phenoCandidateLabel.test.ts` (see §6).
-- **Extend** `src/lib/phenoHuntCandidateAdapter.test.ts` (if present) or add a small adapter test covering: legacy row (no number), numbered row, mixed sort order, invalid number rejection.
+- **Extend** `src/lib/phenoHuntCandidateAdapter.test.ts` (if present) — gated: cannot run adapter-level wiring tests against a confirmed column until the field name is known.
 
 No other files change.
 
 ## 5. Data-contract assumptions and hard blockers
 
-Confirmed:
-- The P.2 migration `20260712010343_pheno_candidate_number_foundation.sql` will add a stable, server-assigned per-hunt candidate number to `plants` (or a joinable view). No client assignment path exists or is planned in this slice.
+**Contract status: UNVERIFIED.**
 
-Hard blocker — must be resolved by the user before the file-level plan can be finalized:
-- **Exact column identifier** on `plants` (assumed `candidate_number: integer | null`, but not verifiable from current code — the migration file is protected and not-yet-present in this sandbox).
-- **Whether the column lives on `plants` directly** or on a joined table/view. If it's a join, the SELECT column list and the row type differ.
-- **Type**: `int`, `smallint`, or `bigint` — affects the JS type guard (all fit `number`, but confirm to keep the guard honest).
+The `candidate_number` column does not exist on `public.plants` in the current sandbox. The P.2 migration file `supabase/migrations/20260712010343_pheno_candidate_number_foundation.sql` is protected and not present in this environment, so its exact column identifier, type, null/legacy behavior, and location (direct column vs. joined table/view) cannot be confirmed from source.
 
-If any of the three is not `candidate_number: integer on public.plants`, do NOT invent a column name, RPC, view name, or generated type. Stop the build after Step 1 (the pure helper + tests) and report the exact mismatch. The helper alone is safe and useful; wiring waits.
+What has been confirmed locally:
+- Current `plants` columns include `candidate_label` (text, nullable) and `pheno_hunt_id` (uuid, nullable).
+- No `candidate_number` column is present at this revision.
+- No client code assigns, increments, or writes a candidate number.
+
+What must be confirmed by the user before any implementation beyond Step 1:
+- **Exact column identifier** on `plants` (assumed `candidate_number`, but unverified).
+- **Exact type**: `integer`, `smallint`, `bigint`, or another type.
+- **Null/legacy behavior**: whether null means "pre-P.2 legacy" and whether zero/negative/non-integer values are possible.
+- **Location**: whether the column lives directly on `public.plants` or on a joinable table/view. If it is a join, the SELECT column list and row type differ.
+
+Hard stop rule: If the confirmed contract differs from `candidate_number: integer on public.plants`, do NOT invent a column name, RPC, view name, or generated type. Implement only the pure helper (Step 1) and report the exact mismatch. All data-layer wiring waits until the contract is confirmed.
+
+Explicit non-assumptions:
+- No assumption about backfill of legacy rows — helper treats null/missing as legacy.
+- No assumption about uniqueness enforcement — pure display only, so duplicates would render honestly.
 
 Explicit non-assumptions:
 - No assumption about backfill of legacy rows — helper treats null/missing as legacy.
@@ -87,9 +103,8 @@ Explicit non-assumptions:
 
 ## 6. Targeted test plan and validation commands
 
-New/updated tests (Vitest, pure — no Supabase, no React):
-
-- `src/test/phenoCandidateLabel.test.ts`
+Allowed now (Step 1 only):
+- `src/test/phenoCandidateLabel.test.ts` (Vitest, pure — no Supabase, no React)
   - Happy path: `{ candidateNumber: 3, candidateLabel: "Alpha", plantId: "p1" }` → `#3 · Alpha`.
   - Number only, no label, no name: → `#7`.
   - Legacy: `{ candidateNumber: null, candidateLabel: "Alpha", ... }` → `Alpha`.
@@ -98,11 +113,19 @@ New/updated tests (Vitest, pure — no Supabase, no React):
   - Whitespace-only label/name treated as missing.
   - Determinism: same input twice → identical output; no randomness, no `Date.now`.
   - Sort comparator: `[#10, #2, #1, "Zeta", "Alpha", { no label }]` → `[#1, #2, #10, Alpha, Zeta, id-fallback]` deterministically; stable on ties.
-- Adapter regression:
-  - Row missing `candidate_number` field entirely → produces today's label byte-for-byte.
-  - Mixed hunt (some numbered, some legacy) → correct sort, no crash, no fabrication.
 
-Validation commands (report exact counts):
+Blocked until contract confirmation:
+- Adapter regression tests against `src/lib/phenoHuntCandidateAdapter.ts` — cannot run without the confirmed column name on the row type.
+- Timeline section tests against `src/components/PhenoHuntTimelineSection.tsx` — cannot run without the confirmed SELECT column.
+
+Validation commands (Step 1 only):
+```
+bun run lint
+bunx tsc --noEmit
+bunx vitest run src/test/phenoCandidateLabel.test.ts
+```
+
+Full validation commands (after contract confirmation):
 ```
 bun run lint
 bunx tsc --noEmit
@@ -122,9 +145,11 @@ No CSS changes planned; if a real overflow shows up, it's a follow-up slice, not
 
 ## 8. Safety verdict and rollback boundary
 
-Safety verdict: safe. Read-only, pure helper, additive adapter field, one extra column in two existing SELECTs. No schema, no RLS, no grants, no Edge Function, no auth, no billing, no AI, no Action Queue, no automation, no device control, no navigation, no copy churn, no fake live data.
+Safety verdict: safe for Step 1 only. The pure helper is read-only, deterministic, and has no data-layer dependency.
 
-Rollback: revert the four edited files + delete the two new test/helper files. Zero data migration, zero state to unwind. Pre-P.2 builds keep working because the adapter treats a missing `candidate_number` as null (legacy fallback).
+Gated status: adapter/service/timeline wiring cannot be judged safe until the exact `candidate_number` contract is confirmed. Until then, no `plants` SELECT list, row type, comparator, or generated type is changed.
+
+Rollback: for Step 1, delete `src/lib/phenoCandidateLabel.ts` and `src/test/phenoCandidateLabel.test.ts`. After the contract is confirmed and the gated files are edited, rollback extends to reverting those four edited files. Zero data migration in all cases; pre-P.2 builds remain untouched because the adapter currently has no `candidate_number` field to break.
 
 ## 9. Protected P.2/P.3 files — untouched confirmation
 

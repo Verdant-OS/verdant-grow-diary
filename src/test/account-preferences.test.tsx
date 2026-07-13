@@ -103,7 +103,8 @@ describe("Account Preferences", () => {
     expect(await screen.findByRole("heading", { name: "Agreement history" })).toBeInTheDocument();
     expect(await screen.findByText("Terms of Service")).toBeInTheDocument();
     expect(await screen.findByText("Privacy Policy")).toBeInTheDocument();
-    expect(await screen.findByText(/Version 2026-07-13/)).toBeInTheDocument();
+    const versions = await screen.findAllByText(/Version 2026-07-13/);
+    expect(versions.length).toBe(2);
   });
 
   it("links each agreement to its canonical page", async () => {

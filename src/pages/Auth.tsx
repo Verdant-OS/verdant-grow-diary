@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Navigate, useNavigate, useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Leaf, Gauge, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
@@ -488,6 +488,24 @@ export default function Auth() {
             </TabsContent>
           </Tabs>
         </div>
+
+        <ul
+          aria-label="What Verdant stands for"
+          className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-muted-foreground"
+        >
+          <li className="flex items-center gap-2 rounded-lg border border-border/40 bg-secondary/20 px-3 py-2">
+            <Leaf className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden />
+            <span>Plant memory</span>
+          </li>
+          <li className="flex items-center gap-2 rounded-lg border border-border/40 bg-secondary/20 px-3 py-2">
+            <Gauge className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden />
+            <span>Sensor truth</span>
+          </li>
+          <li className="flex items-center gap-2 rounded-lg border border-border/40 bg-secondary/20 px-3 py-2">
+            <ShieldCheck className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden />
+            <span>Grower-approved action</span>
+          </li>
+        </ul>
       </div>
     </div>
   );

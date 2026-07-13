@@ -334,6 +334,24 @@ export default function Auth() {
                   ariaDescribedBy={signInError ? "signin-error" : undefined}
                   required
                 />
+                <div className="flex justify-end -mt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("forgot");
+                      setForgotEmail(email);
+                      setSignInError(null);
+                      setVerifyRequired(false);
+                      setForgotError(null);
+                      setForgotSent(false);
+                      // focus handled on next paint
+                      window.setTimeout(() => forgotEmailRef.current?.focus(), 0);
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
                 {signInError ? (
                   <AuthInlineMessage id="signin-error" role="alert" tone="error">
                     {signInError}

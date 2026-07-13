@@ -2471,6 +2471,8 @@ export type Database = {
           current_badge: string | null
           display_name: string | null
           level: number
+          marketing_opt_in: boolean
+          marketing_opt_in_at: string | null
           nugs_total: number
           tier: string
           updated_at: string
@@ -2481,6 +2483,8 @@ export type Database = {
           current_badge?: string | null
           display_name?: string | null
           level?: number
+          marketing_opt_in?: boolean
+          marketing_opt_in_at?: string | null
           nugs_total?: number
           tier?: string
           updated_at?: string
@@ -2491,6 +2495,8 @@ export type Database = {
           current_badge?: string | null
           display_name?: string | null
           level?: number
+          marketing_opt_in?: boolean
+          marketing_opt_in_at?: string | null
           nugs_total?: number
           tier?: string
           updated_at?: string

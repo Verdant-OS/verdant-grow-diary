@@ -4,9 +4,7 @@ import {
   type PhenoCandidateLabelInput,
 } from "@/lib/phenoCandidateLabel";
 
-const base = (
-  overrides: Partial<PhenoCandidateLabelInput> = {},
-): PhenoCandidateLabelInput => ({
+const base = (overrides: Partial<PhenoCandidateLabelInput> = {}): PhenoCandidateLabelInput => ({
   candidateNumber: null,
   candidateLabel: null,
   plantName: null,
@@ -28,40 +26,30 @@ describe("formatPhenoCandidateLabel", () => {
   });
 
   it("falls back to plant name with a valid number and no label", () => {
-    expect(
-      formatPhenoCandidateLabel(
-        base({ candidateNumber: 7, plantName: "Plant A" }),
-      ),
-    ).toBe("#7 · Plant A");
-  });
-
-  it("renders bare number when neither label nor name present", () => {
-    expect(formatPhenoCandidateLabel(base({ candidateNumber: 42 }))).toBe(
-      "#42",
+    expect(formatPhenoCandidateLabel(base({ candidateNumber: 7, plantName: "Plant A" }))).toBe(
+      "#7 · Plant A",
     );
   });
 
+  it("renders bare number when neither label nor name present", () => {
+    expect(formatPhenoCandidateLabel(base({ candidateNumber: 42 }))).toBe("#42");
+  });
+
   it("accepts boundary value 1", () => {
-    expect(
-      formatPhenoCandidateLabel(
-        base({ candidateNumber: 1, candidateLabel: "First" }),
-      ),
-    ).toBe("#1 · First");
+    expect(formatPhenoCandidateLabel(base({ candidateNumber: 1, candidateLabel: "First" }))).toBe(
+      "#1 · First",
+    );
   });
 
   it("treats null candidate number as absent and falls back to label", () => {
     expect(
-      formatPhenoCandidateLabel(
-        base({ candidateNumber: null, candidateLabel: "Legacy" }),
-      ),
+      formatPhenoCandidateLabel(base({ candidateNumber: null, candidateLabel: "Legacy" })),
     ).toBe("Legacy");
   });
 
   it("treats undefined candidate number as absent and falls back to name", () => {
     expect(
-      formatPhenoCandidateLabel(
-        base({ candidateNumber: undefined, plantName: "OnlyName" }),
-      ),
+      formatPhenoCandidateLabel(base({ candidateNumber: undefined, plantName: "OnlyName" })),
     ).toBe("OnlyName");
   });
 
@@ -83,44 +71,28 @@ describe("formatPhenoCandidateLabel", () => {
   });
 
   it("falls back to plant name when no label and number invalid", () => {
-    expect(
-      formatPhenoCandidateLabel(
-        base({ candidateNumber: 0, plantName: "Beta" }),
-      ),
-    ).toBe("Beta");
+    expect(formatPhenoCandidateLabel(base({ candidateNumber: 0, plantName: "Beta" }))).toBe("Beta");
   });
 
   it("falls back to short id prefix when nothing else present", () => {
-    expect(formatPhenoCandidateLabel(base({ plantId: "abcdef1234567890" }))).toBe(
-      "#abcdef12",
-    );
+    expect(formatPhenoCandidateLabel(base({ plantId: "abcdef1234567890" }))).toBe("#abcdef12");
   });
 
   it("returns #unknown when plant id is blank", () => {
-    expect(formatPhenoCandidateLabel(base({ plantId: "   " }))).toBe(
-      "#unknown",
-    );
+    expect(formatPhenoCandidateLabel(base({ plantId: "   " }))).toBe("#unknown");
   });
 
   it("trims whitespace on label, name, and id", () => {
     expect(
-      formatPhenoCandidateLabel(
-        base({ candidateNumber: 5, candidateLabel: "   Trimmed   " }),
-      ),
+      formatPhenoCandidateLabel(base({ candidateNumber: 5, candidateLabel: "   Trimmed   " })),
     ).toBe("#5 · Trimmed");
-    expect(formatPhenoCandidateLabel(base({ plantName: "  Named  " }))).toBe(
-      "Named",
-    );
-    expect(
-      formatPhenoCandidateLabel(base({ plantId: "   xyz12345extra   " })),
-    ).toBe("#xyz12345");
+    expect(formatPhenoCandidateLabel(base({ plantName: "  Named  " }))).toBe("Named");
+    expect(formatPhenoCandidateLabel(base({ plantId: "   xyz12345extra   " }))).toBe("#xyz12345");
   });
 
   it("treats blank strings as missing", () => {
     expect(
-      formatPhenoCandidateLabel(
-        base({ candidateNumber: 4, candidateLabel: "   ", plantName: "" }),
-      ),
+      formatPhenoCandidateLabel(base({ candidateNumber: 4, candidateLabel: "   ", plantName: "" })),
     ).toBe("#4");
   });
 

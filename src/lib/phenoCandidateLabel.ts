@@ -21,10 +21,7 @@ function trimOrNull(value: string | null | undefined): string | null {
 
 function isValidCandidateNumber(value: number | null | undefined): value is number {
   return (
-    typeof value === "number" &&
-    Number.isFinite(value) &&
-    Number.isInteger(value) &&
-    value > 0
+    typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value > 0
   );
 }
 

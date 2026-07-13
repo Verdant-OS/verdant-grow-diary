@@ -4,6 +4,7 @@ import { ArrowLeft, Leaf, Gauge, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
@@ -73,6 +74,8 @@ export default function Auth() {
   const [signUpSuccess, setSignUpSuccess] = useState<string | null>(null);
   const [magicBusy, setMagicBusy] = useState(false);
   const [magicNotice, setMagicNotice] = useState<string | null>(null);
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotError, setForgotError] = useState<string | null>(null);
@@ -179,6 +182,11 @@ export default function Auth() {
     if (busy) return;
     setSignUpError(null);
     setSignUpSuccess(null);
+    setConsentError(null);
+    if (!consentAccepted) {
+      setConsentError("Please accept the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
     if (password.length < MIN_PASSWORD_LENGTH) {
       setSignUpError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
       return;

@@ -46,31 +46,31 @@ Build ONE thing: a pure display helper + minimal wiring.
 ## 4. Exact file-level plan
 
 **Allowed now (Step 1 only):**
-- **Create** `src/lib/phenoCandidateLabel.ts`
-  - Export `interface PhenoCandidateLabelInput { candidateNumber: number | null | undefined; candidateLabel: string | null | undefined; plantName?: string | null; plantId: string; }`
-  - Export `function formatPhenoCandidateLabel(input): string`
-    - If `candidateNumber` is a finite positive integer: return `#${n}` when no textual label, else `#${n} · ${label}` where `label = trimmed candidateLabel || trimmed plantName`.
-    - Else: exact current behavior — `trimmed candidateLabel || trimmed plantName || plantId`.
-    - Rejects: non-finite, negative, zero, non-integer, NaN, Infinity → treated as missing.
-  - Export `function comparePhenoCandidatesByNumberThenLabel(a, b)` for deterministic sort: numbered candidates first (ascending numeric), then unnumbered alphabetical, tie-break by id.
+- **Create** `src/lib/phenoCandidateLabel.ts` ✅ Done.
+- **New test file** `src/test/phenoCandidateLabel.test.ts` ✅ Done.
 
-- **New test file** `src/test/phenoCandidateLabel.test.ts` (see §6).
+Both files are preserved. The helper exports:
+- `type PhenoCandidateLabelInput = { candidateNumber: number | null | undefined; candidateLabel: string | null; plantName: string | null; plantId: string; }`
+- `function formatPhenoCandidateLabel(input): string`
+  - If `candidateNumber` is a finite positive integer: return `#${n}` when no textual label, else `#${n} · ${label}` where `label = trimmed candidateLabel || trimmed plantName`.
+  - Else: exact legacy fallback chain: `trimmed candidateLabel || trimmed plantName || #<first 8 chars of plantId> || #unknown`.
+  - Rejects: non-finite, negative, zero, non-integer, NaN, Infinity → treated as missing.
 
-**Blocked until the data contract is confirmed (§5):**
-- **Edit** `src/lib/phenoHuntCandidateAdapter.ts` — gated: needs confirmed `candidate_number` field name/type.
+**Blocked until Claude's corrected P.2 migration is merged and the column is visible in the sandbox:**
+- **Edit** `src/lib/phenoHuntCandidateAdapter.ts` — gated: needs `candidate_number` on `PhenoHuntCandidatePlantRow`.
   - Add `candidate_number?: number | null` to `PhenoHuntCandidatePlantRow`.
   - Replace inline `cleanLabel(p.candidate_label) ?? cleanLabel(p.name)` with `formatPhenoCandidateLabel(...)`.
-  - Replace the final `candidates.sort(...)` with `comparePhenoCandidatesByNumberThenLabel`.
+  - Replace the final `candidates.sort(...)` with `comparePhenoCandidatesByNumberThenLabel` (to be added to the helper).
 
-- **Edit** `src/lib/phenoHuntCandidatesService.ts` — gated: needs the exact SELECT column identifier.
-  - Add the new column to the `plants` select list.
+- **Edit** `src/lib/phenoHuntCandidatesService.ts` — gated: needs the corrected migration merged.
+  - Add `candidate_number` to the `plants` select list.
 
-- **Edit** `src/components/PhenoHuntTimelineSection.tsx` — gated: needs the exact column identifier and confirmed row type.
-  - Add the column to its local SELECT.
+- **Edit** `src/components/PhenoHuntTimelineSection.tsx` — gated: needs the corrected migration merged.
+  - Add `candidate_number` to its local SELECT.
   - Replace the two `candidate_label`-only render expressions with `formatPhenoCandidateLabel(...)`.
   - Extend the local row type to include the number.
 
-- **Extend** `src/lib/phenoHuntCandidateAdapter.test.ts` (if present) — gated: cannot run adapter-level wiring tests against a confirmed column until the field name is known.
+- **Extend** `src/lib/phenoHuntCandidateAdapter.test.ts` (if present) — gated: cannot run adapter-level wiring tests against a confirmed column until the field is present in generated types.
 
 No other files change.
 

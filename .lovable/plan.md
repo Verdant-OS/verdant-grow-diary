@@ -103,9 +103,8 @@ Explicit non-assumptions:
 
 ## 6. Targeted test plan and validation commands
 
-New/updated tests (Vitest, pure — no Supabase, no React):
-
-- `src/test/phenoCandidateLabel.test.ts`
+Allowed now (Step 1 only):
+- `src/test/phenoCandidateLabel.test.ts` (Vitest, pure — no Supabase, no React)
   - Happy path: `{ candidateNumber: 3, candidateLabel: "Alpha", plantId: "p1" }` → `#3 · Alpha`.
   - Number only, no label, no name: → `#7`.
   - Legacy: `{ candidateNumber: null, candidateLabel: "Alpha", ... }` → `Alpha`.
@@ -114,11 +113,19 @@ New/updated tests (Vitest, pure — no Supabase, no React):
   - Whitespace-only label/name treated as missing.
   - Determinism: same input twice → identical output; no randomness, no `Date.now`.
   - Sort comparator: `[#10, #2, #1, "Zeta", "Alpha", { no label }]` → `[#1, #2, #10, Alpha, Zeta, id-fallback]` deterministically; stable on ties.
-- Adapter regression:
-  - Row missing `candidate_number` field entirely → produces today's label byte-for-byte.
-  - Mixed hunt (some numbered, some legacy) → correct sort, no crash, no fabrication.
 
-Validation commands (report exact counts):
+Blocked until contract confirmation:
+- Adapter regression tests against `src/lib/phenoHuntCandidateAdapter.ts` — cannot run without the confirmed column name on the row type.
+- Timeline section tests against `src/components/PhenoHuntTimelineSection.tsx` — cannot run without the confirmed SELECT column.
+
+Validation commands (Step 1 only):
+```
+bun run lint
+bunx tsc --noEmit
+bunx vitest run src/test/phenoCandidateLabel.test.ts
+```
+
+Full validation commands (after contract confirmation):
 ```
 bun run lint
 bunx tsc --noEmit

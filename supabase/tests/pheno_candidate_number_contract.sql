@@ -59,6 +59,7 @@ DECLARE
   gA uuid; gB uuid; hA uuid; hA2 uuid; hB uuid;
   p1 uuid; p2 uuid; p3 uuid; pUn uuid;
   v_num integer;
+  v_rowcount int;
 BEGIN
   SELECT id INTO v_owner FROM auth.users LIMIT 1;
   IF v_owner IS NULL THEN
@@ -146,12 +147,24 @@ BEGIN
     ELSE fail := fail + 1; RAISE NOTICE 'FAIL operator-read: got %', v_num; END IF;
   EXCEPTION WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL operator-read: %', SQLERRM; END;
 
-  -- 10) stranger cannot mutate (no RLS update access -> zero rows, number unchanged)
+  -- 9b) operator retains ordinary (non-number) edit ability on a tagged plant: the
+  --     guard must not over-block writes that leave candidate_number untouched.
+  BEGIN
+    UPDATE public.plants SET candidate_label = 'op-edit' WHERE id = p1;  -- p1 tagged hA
+    GET DIAGNOSTICS v_rowcount = ROW_COUNT;
+    IF v_rowcount = 1 THEN pass := pass + 1;
+    ELSE fail := fail + 1; RAISE NOTICE 'FAIL operator-ordinary-edit affected % row(s)', v_rowcount; END IF;
+  EXCEPTION WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL operator-ordinary-edit: %', SQLERRM; END;
+
+  -- 10) stranger cannot mutate: under RLS the UPDATE must match ZERO rows. Do NOT
+  --     read the number back under the stranger subject — RLS hides the row, so the
+  --     readback would return no row and look like a spurious mutation/failure.
   PERFORM set_config('request.jwt.claim.sub', v_stranger::text, true);
   BEGIN
     UPDATE public.plants SET candidate_number = 7 WHERE id = p1;
-    IF (SELECT candidate_number FROM public.plants WHERE id = p1) = 1 THEN pass := pass + 1;
-    ELSE fail := fail + 1; RAISE NOTICE 'FAIL stranger-mutated the number'; END IF;
+    GET DIAGNOSTICS v_rowcount = ROW_COUNT;
+    IF v_rowcount = 0 THEN pass := pass + 1;
+    ELSE fail := fail + 1; RAISE NOTICE 'FAIL stranger updated % row(s)', v_rowcount; END IF;
   EXCEPTION WHEN insufficient_privilege THEN pass := pass + 1;  -- also acceptable
            WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL stranger-cannot-mutate: %', SQLERRM; END;
 
@@ -164,11 +177,14 @@ BEGIN
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
 
-  -- 12) same number allowed in a DIFFERENT hunt (assign 3 to a plant in hunt hB)
+  -- 12) same number allowed in a DIFFERENT hunt (assign 3 to a plant in hunt hB).
+  --     Relocate the UNTAGGED pUn to gB first, THEN tag it to hB. Combining the
+  --     grow move and the tag in one UPDATE would (correctly) trip the cross-grow
+  --     guard, so the two steps must be separate.
   BEGIN
-    -- move pUn into gB/hB legitimately first (untagged plant, no number)
     PERFORM set_config('role', 'service_role', true);
-    UPDATE public.plants SET grow_id = gB, pheno_hunt_id = hB WHERE id = pUn;
+    UPDATE public.plants SET grow_id = gB WHERE id = pUn;        -- untagged move: allowed
+    UPDATE public.plants SET pheno_hunt_id = hB WHERE id = pUn;  -- tag in new grow: lineage ok
     PERFORM set_config('role', 'authenticated', true);
     UPDATE public.plants SET candidate_number = 3 WHERE id = pUn;  -- 3 also used in hA -> ok, different hunt
     pass := pass + 1;

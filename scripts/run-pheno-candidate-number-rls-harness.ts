@@ -108,6 +108,8 @@ async function readNumber(plantId: string): Promise<number | null> {
 async function main() {
   const users: string[] = [];
   const grows: string[] = [];
+  const hunts: string[] = [];
+  const plantIds: string[] = [];
 
   try {
     const owner = await createUser("owner");
@@ -164,6 +166,8 @@ async function main() {
       name: `pB ${runId}`,
     });
     const pUn = await seedId("plants", { user_id: owner.id, grow_id: gA, name: `pUn ${runId}` });
+    hunts.push(hA, hA2, hB);
+    plantIds.push(p1, p2, pB, pUn);
 
     // 1) NULL accepted
     check("seeded plant has NULL candidate_number", (await readNumber(p1)) === null);
@@ -193,14 +197,32 @@ async function main() {
     // 5) duplicate within one hunt rejected (p2 also 1 in hunt hA)
     check("duplicate number in the same hunt rejected", !!(await setNumber(ownerC, p2, 1)).error);
 
-    // 6) operator cannot mutate, but can read
+    // 6) operator cannot mutate the number — and must fail for the AUTHORIZATION
+    //    reason (the "owning grower" guard), not incidentally via immutability or
+    //    the unique index. Asserting only "some error" would hide a wrong reason.
+    const opMutate = await setNumber(opC, p1, 9);
     check(
-      "operator cannot mutate the number",
-      !!(await setNumber(opC, p1, 9)).error && (await readNumber(p1)) === 1,
+      "operator cannot mutate the number (blocked by authorization)",
+      (opMutate.error?.includes("owning grower") ?? false) && (await readNumber(p1)) === 1,
+      `err=${opMutate.error}`,
     );
     {
       const { data } = await opC.from("plants").select("candidate_number").eq("id", p1).single();
       check("operator can read the number", (data?.candidate_number ?? null) === 1);
+    }
+    // 6b) operators retain ordinary edit ability on a tagged plant: the guard must
+    //     not over-block writes that leave candidate_number untouched (edits label).
+    {
+      const opEdit = await opC
+        .from("plants")
+        .update({ candidate_label: `op-edit ${runId}` })
+        .eq("id", p1)
+        .select("id");
+      check(
+        "operator can make an ordinary edit on a tagged plant",
+        !opEdit.error && (opEdit.data?.length ?? 0) === 1,
+        opEdit.error?.message,
+      );
     }
 
     // 7) stranger cannot mutate (no RLS access -> unchanged)
@@ -246,13 +268,34 @@ async function main() {
     const afterMove = await ownerC.from("plants").update({ grow_id: gB }).eq("id", p2).select("id");
     check("untagging before moving succeeds", !afterMove.error);
   } finally {
-    // Deleting grows cascades to hunts/plants; then roles and users.
+    // Grow deletion does NOT cascade to plants (plants.grow_id is ON DELETE SET
+    // NULL), and a hunt-tagged plant blocks grow changes — so remove plants first
+    // (DELETE is not guarded by the trigger), then hunts, grows, roles, and users.
+    if (plantIds.length) await admin.from("plants").delete().in("id", plantIds);
+    if (hunts.length) await admin.from("pheno_hunts").delete().in("id", hunts);
     if (grows.length) await admin.from("grows").delete().in("id", grows);
     for (const id of users) {
       await admin.from("user_roles").delete().eq("user_id", id);
       await admin.auth.admin.deleteUser(id);
     }
   }
+
+  // Verify zero leftover test rows (every seeded row carries runId in its name).
+  const leftover = await Promise.all(
+    (["plants", "grows", "pheno_hunts"] as const).map(async (t) => {
+      const { count } = await admin
+        .from(t)
+        .select("id", { count: "exact", head: true })
+        .like("name", `%${runId}%`);
+      return { table: t, count: count ?? 0 };
+    }),
+  );
+  const totalLeftover = leftover.reduce((n, r) => n + r.count, 0);
+  check(
+    "no leftover test rows after teardown",
+    totalLeftover === 0,
+    leftover.map((r) => `${r.table}=${r.count}`).join(" "),
+  );
 
   console.log(`pheno candidate_number RLS harness: ${pass} passed, ${fail} failed`);
   if (fail > 0) process.exit(1);

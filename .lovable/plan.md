@@ -1,7 +1,7 @@
 # Slice — Read-Only Candidate-Number Display Helper
 
-> **STATUS: CONTRACT UNVERIFIED — IMPLEMENTATION BLOCKED PENDING CONFIRMATION.**  
-> The `candidate_number` column identifier, type, and location on `public.plants` have not been confirmed in the current sandbox. No helper, adapter, service, generated type, select list, or comparator changes may proceed until the user explicitly confirms the exact contract. Only Step 1 (pure helper + tests, no data-layer wiring) can be implemented before that confirmation.
+> **STATUS: CONTRACT CONFIRMED — P.2 IMPLEMENTATION AUTHORIZED IN PROTECTED FILES ONLY.**  
+> The `candidate_number` data contract has been explicitly confirmed: a direct nullable integer column on `public.plants`, unique within `pheno_hunt_id`, positive-integer values, `NULL` for legacy/unassigned rows, assignment only through the existing authenticated plants write path, immutability while attached to the same hunt, and `service_role` only for exceptional repair. PR #228's separate table + RPC architecture is rejected and must be discarded wholesale. Lovable's production scope remains read-only (helper + adapter/service/timeline consumer wiring) and only after Claude's corrected P.2 files land.
 
 ## 1. Executive summary
 
@@ -26,109 +26,118 @@ No client code today assigns, increments, or writes a candidate number. Good bas
 Build ONE thing: a pure display helper + minimal wiring.
 
 **In scope**
-1. New pure helper `src/lib/phenoCandidateLabel.ts` — `formatPhenoCandidateLabel({ candidateNumber, candidateLabel, plantName, plantId })` → string; deterministic; null-safe; legacy fallback identical to today.
-2. Extend `PhenoHuntCandidatePlantRow` with `candidate_number: number | null` (optional field; adapter treats missing as null so pre-migration builds stay safe).
-3. Extend the `plants` SELECT column list in `phenoHuntCandidatesService.ts` to include the new column name (see §5 for the hard blocker on the exact identifier).
-4. Adapter uses the helper for `candidateLabel`; adds a numeric secondary sort key so `#2` precedes `#10`.
-5. Timeline section (`PhenoHuntTimelineSection.tsx`) — add the column to its independent SELECT and use the same helper for the two labels it renders. Keep the SQL ORDER BY unchanged (stable enough; final display order comes from the helper output + client sort where it already sorts).
+1. ✅ New pure helper `src/lib/phenoCandidateLabel.ts` — already implemented. `formatPhenoCandidateLabel({ candidateNumber, candidateLabel, plantName, plantId })` → string; deterministic; null-safe; legacy fallback chain: `candidateLabel → plantName → #<first 8 plant-id characters> → #unknown`.
+2. ⛔ Extend `PhenoHuntCandidatePlantRow` with `candidate_number: number | null` — BLOCKED until Claude's corrected P.2 migration lands and the column is visible in the sandbox. Do not approximate the type or add a fallback alias.
+3. ⛔ Extend the `plants` SELECT column list in `phenoHuntCandidatesService.ts` — BLOCKED until the corrected P.2 migration is merged and the generated types are refreshed.
+4. ⛔ Adapter uses the helper for `candidateLabel` and adds a numeric secondary sort key — BLOCKED until the corrected P.2 migration is merged.
+5. ⛔ Timeline section (`PhenoHuntTimelineSection.tsx`) — add the column to its independent SELECT and use the helper — BLOCKED until the corrected P.2 migration is merged.
 
 **Out of scope (do not touch this slice)**
 - Any INSERT/UPDATE/DELETE, RPC, or Edge Function.
 - Assigning, reserving, or defaulting a candidate number client-side.
 - Schema, migration, RLS, grants, generated types regeneration.
-- The three protected P.2/P.3 files (see §9).
+- The three protected P.2/P.3 files (see §9). Claude owns them; Lovable must not touch, reformat, or approximate them.
 - Keepers/Stress/Sampling/ScoreRounds/AI/Action Queue behavior — they inherit the label through the adapter; no per-surface edits.
 - Navigation, copy rewrites, empty-state changes, upgrade gates, billing, auth.
 - Sort/order changes anywhere except the adapter's existing sort comparator.
 - Editing `PhenoHuntNew.tsx` or any create/assignment path.
+- PR #228 in its current form — it must not merge. Its separate `pheno_candidate_numbers` table and `allocate_pheno_candidate_number()` RPC are rejected.
 
 ## 4. Exact file-level plan
 
 **Allowed now (Step 1 only):**
-- **Create** `src/lib/phenoCandidateLabel.ts`
-  - Export `interface PhenoCandidateLabelInput { candidateNumber: number | null | undefined; candidateLabel: string | null | undefined; plantName?: string | null; plantId: string; }`
-  - Export `function formatPhenoCandidateLabel(input): string`
-    - If `candidateNumber` is a finite positive integer: return `#${n}` when no textual label, else `#${n} · ${label}` where `label = trimmed candidateLabel || trimmed plantName`.
-    - Else: exact current behavior — `trimmed candidateLabel || trimmed plantName || plantId`.
-    - Rejects: non-finite, negative, zero, non-integer, NaN, Infinity → treated as missing.
-  - Export `function comparePhenoCandidatesByNumberThenLabel(a, b)` for deterministic sort: numbered candidates first (ascending numeric), then unnumbered alphabetical, tie-break by id.
+- **Create** `src/lib/phenoCandidateLabel.ts` ✅ Done.
+- **New test file** `src/test/phenoCandidateLabel.test.ts` ✅ Done.
 
-- **New test file** `src/test/phenoCandidateLabel.test.ts` (see §6).
+Both files are preserved. The helper exports:
+- `type PhenoCandidateLabelInput = { candidateNumber: number | null | undefined; candidateLabel: string | null; plantName: string | null; plantId: string; }`
+- `function formatPhenoCandidateLabel(input): string`
+  - If `candidateNumber` is a finite positive integer: return `#${n}` when no textual label, else `#${n} · ${label}` where `label = trimmed candidateLabel || trimmed plantName`.
+  - Else: exact legacy fallback chain: `trimmed candidateLabel || trimmed plantName || #<first 8 chars of plantId> || #unknown`.
+  - Rejects: non-finite, negative, zero, non-integer, NaN, Infinity → treated as missing.
 
-**Blocked until the data contract is confirmed (§5):**
-- **Edit** `src/lib/phenoHuntCandidateAdapter.ts` — gated: needs confirmed `candidate_number` field name/type.
+**Blocked until Claude's corrected P.2 migration is merged and the column is visible in the sandbox:**
+- **Edit** `src/lib/phenoHuntCandidateAdapter.ts` — gated: needs `candidate_number` on `PhenoHuntCandidatePlantRow`.
   - Add `candidate_number?: number | null` to `PhenoHuntCandidatePlantRow`.
   - Replace inline `cleanLabel(p.candidate_label) ?? cleanLabel(p.name)` with `formatPhenoCandidateLabel(...)`.
-  - Replace the final `candidates.sort(...)` with `comparePhenoCandidatesByNumberThenLabel`.
+  - Replace the final `candidates.sort(...)` with `comparePhenoCandidatesByNumberThenLabel` (to be added to the helper).
 
-- **Edit** `src/lib/phenoHuntCandidatesService.ts` — gated: needs the exact SELECT column identifier.
-  - Add the new column to the `plants` select list.
+- **Edit** `src/lib/phenoHuntCandidatesService.ts` — gated: needs the corrected migration merged.
+  - Add `candidate_number` to the `plants` select list.
 
-- **Edit** `src/components/PhenoHuntTimelineSection.tsx` — gated: needs the exact column identifier and confirmed row type.
-  - Add the column to its local SELECT.
+- **Edit** `src/components/PhenoHuntTimelineSection.tsx` — gated: needs the corrected migration merged.
+  - Add `candidate_number` to its local SELECT.
   - Replace the two `candidate_label`-only render expressions with `formatPhenoCandidateLabel(...)`.
   - Extend the local row type to include the number.
 
-- **Extend** `src/lib/phenoHuntCandidateAdapter.test.ts` (if present) — gated: cannot run adapter-level wiring tests against a confirmed column until the field name is known.
+- **Extend** `src/lib/phenoHuntCandidateAdapter.test.ts` (if present) — gated: cannot run adapter-level wiring tests against a confirmed column until the field is present in generated types.
 
 No other files change.
 
 ## 5. Data-contract assumptions and hard blockers
 
-**Contract status: UNVERIFIED.**
+**Contract status: CONFIRMED.**
 
-The `candidate_number` column does not exist on `public.plants` in the current sandbox. The P.2 migration file `supabase/migrations/20260712010343_pheno_candidate_number_foundation.sql` is protected and not present in this environment, so its exact column identifier, type, null/legacy behavior, and location (direct column vs. joined table/view) cannot be confirmed from source.
+The following contract was explicitly confirmed by Verdant and supersedes any earlier assumptions or PR #228's rejected architecture.
 
-What has been confirmed locally:
-- Current `plants` columns include `candidate_label` (text, nullable) and `pheno_hunt_id` (uuid, nullable).
-- No `candidate_number` column is present at this revision.
-- No client code assigns, increments, or writes a candidate number.
+- **Architecture**: direct nullable column on `public.plants`; no separate candidate-number table, no RPC allocator.
+- **Identifier / type**: `candidate_number integer NULL`.
+- **Uniqueness**: unique within `pheno_hunt_id` via a partial unique index where both `candidate_number` and `pheno_hunt_id` are non-null.
+- **Valid value**: positive integer only.
+- **Legacy behavior**: `NULL` means legacy/unassigned. Do not backfill existing plants.
+- **Assignment**: an authenticated owner may assign the number once through the existing plants write path. P.2 adds no allocator RPC.
+- **Immutability**: once non-null, the number cannot change or be cleared while the plant remains attached to the same hunt.
+- **Exceptional repair**: `service_role` only; never exposed in client code.
+- **Operator access**: operators may view the number through their existing plants access but cannot assign, clear, or renumber it.
+- **Lineage**: a tagged plant's `user_id` and `grow_id` must match its `pheno_hunts` row.
+- **Hunt/grow changes**:
+  - Detaching or changing `pheno_hunt_id` clears `candidate_number`.
+  - A plant cannot move to a grow inconsistent with its current hunt.
+  - After detaching and moving, a future hunt assignment receives a new number.
+- **Sequence semantics**: numbers must be positive and unique within a hunt; they do not need to be gap-free.
+- **No automatic backfill, device automation, AI, alerts, or Action Queue behavior.**
 
-What must be confirmed by the user before any implementation beyond Step 1:
-- **Exact column identifier** on `plants` (assumed `candidate_number`, but unverified).
-- **Exact type**: `integer`, `smallint`, `bigint`, or another type.
-- **Null/legacy behavior**: whether null means "pre-P.2 legacy" and whether zero/negative/non-integer values are possible.
-- **Location**: whether the column lives directly on `public.plants` or on a joinable table/view. If it is a join, the SELECT column list and row type differ.
+**PR #228 decision**: PR #228's separate `pheno_candidate_numbers` table and `allocate_pheno_candidate_number()` RPC architecture is rejected. It must be discarded wholesale rather than partially reused. PR #228 must not merge in its current form.
 
-Hard stop rule: If the confirmed contract differs from `candidate_number: integer on public.plants`, do NOT invent a column name, RPC, view name, or generated type. Implement only the pure helper (Step 1) and report the exact mismatch. All data-layer wiring waits until the contract is confirmed.
+**Implementation authorization**: The database-layer, RLS, and contract enforcement for this confirmed contract are authorized only inside the three protected P.2/P.3 files owned by Claude. Lovable may not touch those files or create substitutes.
+
+**Lovable wiring remains blocked until**: the corrected P.2 migration is merged, generated types are refreshed, and the `candidate_number` field is visible in the sandbox. Until then, the adapter row type, SELECT lists, comparator, and timeline section remain untouched. The pure helper already implemented (Step 1) is safe because it has no data-layer dependency.
 
 Explicit non-assumptions:
 - No assumption about backfill of legacy rows — helper treats null/missing as legacy.
-- No assumption about uniqueness enforcement — pure display only, so duplicates would render honestly.
-
-Explicit non-assumptions:
-- No assumption about backfill of legacy rows — helper treats null/missing as legacy.
-- No assumption about uniqueness enforcement — pure display only, so duplicates would render honestly.
-- No assumption about generated-types regeneration timing — the adapter row type is a local subset that already tolerates missing fields.
+- No assumption about uniqueness enforcement at the display layer — duplicates render honestly; enforcement lives in the database index.
+- No assumption about generated-types regeneration timing — the adapter row type is a local subset that already tolerates missing fields, but it must not be extended until the field exists in the database.
 
 ## 6. Targeted test plan and validation commands
 
-Allowed now (Step 1 only):
+Allowed now (Step 1 only) — both already implemented:
 - `src/test/phenoCandidateLabel.test.ts` (Vitest, pure — no Supabase, no React)
   - Happy path: `{ candidateNumber: 3, candidateLabel: "Alpha", plantId: "p1" }` → `#3 · Alpha`.
   - Number only, no label, no name: → `#7`.
   - Legacy: `{ candidateNumber: null, candidateLabel: "Alpha", ... }` → `Alpha`.
-  - Legacy fallback chain: label null, name "Plant A" → `Plant A`; both null → returns `plantId`.
+  - Legacy fallback chain: label null, name "Plant A" → `Plant A`; both null → `#<first 8 plant-id chars>`.
+  - Final fallback: blank `plantId` → `#unknown`.
   - Invalid numbers rejected (fall through to legacy): `0`, `-1`, `1.5`, `NaN`, `Infinity`, `"3"` (string).
   - Whitespace-only label/name treated as missing.
-  - Determinism: same input twice → identical output; no randomness, no `Date.now`.
-  - Sort comparator: `[#10, #2, #1, "Zeta", "Alpha", { no label }]` → `[#1, #2, #10, Alpha, Zeta, id-fallback]` deterministically; stable on ties.
+  - Determinism: same input repeated → identical output; no randomness, no `Date.now`.
+  - Immutability: frozen input object is not mutated.
 
-Blocked until contract confirmation:
-- Adapter regression tests against `src/lib/phenoHuntCandidateAdapter.ts` — cannot run without the confirmed column name on the row type.
-- Timeline section tests against `src/components/PhenoHuntTimelineSection.tsx` — cannot run without the confirmed SELECT column.
+Blocked until Claude's corrected P.2 migration is merged and the field is visible:
+- Adapter regression tests against `src/lib/phenoHuntCandidateAdapter.ts`.
+- Timeline section tests against `src/components/PhenoHuntTimelineSection.tsx`.
+- Comparator tests for `comparePhenoCandidatesByNumberThenLabel`.
 
 Validation commands (Step 1 only):
 ```
-bun run lint
-bunx tsc --noEmit
+bun run type-check
 bunx vitest run src/test/phenoCandidateLabel.test.ts
+bunx prettier --check src/lib/phenoCandidateLabel.ts src/test/phenoCandidateLabel.test.ts
+git diff --check
 ```
 
-Full validation commands (after contract confirmation):
+Full validation commands (after P.2 merge and type refresh):
 ```
-bun run lint
-bunx tsc --noEmit
+bun run type-check
 bunx vitest run src/test/phenoCandidateLabel.test.ts src/lib/phenoHuntCandidateAdapter.test.ts
 bunx vitest run
 ```
@@ -145,17 +154,17 @@ No CSS changes planned; if a real overflow shows up, it's a follow-up slice, not
 
 ## 8. Safety verdict and rollback boundary
 
-Safety verdict: safe for Step 1 only. The pure helper is read-only, deterministic, and has no data-layer dependency.
+Safety verdict: safe. The contract is confirmed and the pure helper is read-only, deterministic, and has no data-layer dependency. The helper is already implemented and preserved.
 
-Gated status: adapter/service/timeline wiring cannot be judged safe until the exact `candidate_number` contract is confirmed. Until then, no `plants` SELECT list, row type, comparator, or generated type is changed.
+Gated status: adapter/service/timeline wiring remains blocked until Claude's corrected P.2 migration is merged and the `candidate_number` field is visible in the sandbox. The contract is known, so no further contract confirmation is needed; the remaining gate is the protected P.2 landing. Until then, no `plants` SELECT list, row type, comparator, generated type, or timeline section is changed.
 
-Rollback: for Step 1, delete `src/lib/phenoCandidateLabel.ts` and `src/test/phenoCandidateLabel.test.ts`. After the contract is confirmed and the gated files are edited, rollback extends to reverting those four edited files. Zero data migration in all cases; pre-P.2 builds remain untouched because the adapter currently has no `candidate_number` field to break.
+Rollback: for the already-landed Step 1, delete `src/lib/phenoCandidateLabel.ts` and `src/test/phenoCandidateLabel.test.ts`. After the corrected P.2 migration lands and the gated files are edited, rollback extends to reverting those four edited files. Zero data migration in all cases; pre-P.2 builds remain untouched because the adapter currently has no `candidate_number` field to break.
 
 ## 9. Protected P.2/P.3 files — untouched confirmation
 
-Explicitly NOT created, edited, renamed, reformatted, or approximated by this slice:
+Explicitly NOT created, edited, renamed, reformatted, or approximated by this Lovable slice:
 - `supabase/migrations/20260712010343_pheno_candidate_number_foundation.sql`
 - `scripts/run-pheno-candidate-number-rls-harness.ts`
 - `supabase/tests/pheno_candidate_number_contract.sql`
 
-This slice does not add, remove, or reference those paths, and does not add its own migration, RLS harness, or SQL contract file. Claude's P.3 preservation work is not overlapped.
+This slice does not add, remove, or reference those paths, and does not add its own migration, RLS harness, or SQL contract file. Claude's P.3 preservation work is not overlapped. Lovable's only allowed changes are the `.lovable/plan.md` update and the already-landed two-file helper.

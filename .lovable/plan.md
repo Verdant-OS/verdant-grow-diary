@@ -1,7 +1,7 @@
 # Slice — Read-Only Candidate-Number Display Helper
 
-> **STATUS: CONTRACT UNVERIFIED — IMPLEMENTATION BLOCKED PENDING CONFIRMATION.**  
-> The `candidate_number` column identifier, type, and location on `public.plants` have not been confirmed in the current sandbox. No helper, adapter, service, generated type, select list, or comparator changes may proceed until the user explicitly confirms the exact contract. Only Step 1 (pure helper + tests, no data-layer wiring) can be implemented before that confirmation.
+> **STATUS: CONTRACT CONFIRMED — P.2 IMPLEMENTATION AUTHORIZED IN PROTECTED FILES ONLY.**  
+> The `candidate_number` data contract has been explicitly confirmed: a direct nullable integer column on `public.plants`, unique within `pheno_hunt_id`, positive-integer values, `NULL` for legacy/unassigned rows, assignment only through the existing authenticated plants write path, immutability while attached to the same hunt, and `service_role` only for exceptional repair. PR #228's separate table + RPC architecture is rejected and must be discarded wholesale. Lovable's production scope remains read-only (helper + adapter/service/timeline consumer wiring) and only after Claude's corrected P.2 files land.
 
 ## 1. Executive summary
 

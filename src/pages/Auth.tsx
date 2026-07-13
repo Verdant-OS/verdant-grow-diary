@@ -580,7 +580,34 @@ export default function Auth() {
                   </AuthInlineMessage>
                 ) : null}
                 {signUpSuccess ? (
-                  <AuthInlineMessage>{signUpSuccess}</AuthInlineMessage>
+                  <div className="grid gap-2 rounded-md border border-border/50 p-3 bg-secondary/30">
+                    <AuthInlineMessage>{signUpSuccess}</AuthInlineMessage>
+                    <p className="text-[11px] text-muted-foreground">
+                      Didn't get the email? Check your spam folder, or resend it.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={resendDisabled || email.trim().length === 0}
+                      aria-busy={resendBusy}
+                      onClick={resendVerification}
+                    >
+                      {resendLabel}
+                    </Button>
+                    {resendCooldownActive && !resendBusy ? (
+                      <p
+                        role="status"
+                        aria-live="polite"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        {VERIFICATION_COOLDOWN_HINT}
+                      </p>
+                    ) : null}
+                    {resendNotice ? (
+                      <AuthInlineMessage>{resendNotice}</AuthInlineMessage>
+                    ) : null}
+                  </div>
                 ) : null}
                 <div className="flex items-start gap-2 pt-1">
                   <Checkbox

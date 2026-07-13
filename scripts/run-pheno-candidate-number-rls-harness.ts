@@ -289,6 +289,70 @@ async function main() {
         moveHunt.error?.message,
       );
     }
+
+    // 15) a direct grow_id -> NULL on a tagged plant is rejected for owner AND
+    //     operator (untag first). pB is tagged hB with #3.
+    {
+      const ownerNull = await ownerC
+        .from("plants")
+        .update({ grow_id: null })
+        .eq("id", pB)
+        .select("id");
+      check(
+        "owner cannot null grow_id on a tagged plant",
+        !!ownerNull.error,
+        ownerNull.error?.message,
+      );
+      const opNull = await opC.from("plants").update({ grow_id: null }).eq("id", pB).select("id");
+      check(
+        "operator cannot null grow_id on a tagged plant",
+        !!opNull.error,
+        opNull.error?.message,
+      );
+    }
+
+    // 16) owner grow deletion detaches + RETAINS tagged plants (numbered AND
+    //     unnumbered): the plants survive with grow_id / pheno_hunt_id /
+    //     candidate_number all NULL (existing SET-NULL retention preserved).
+    {
+      const gDel = await seedId("grows", { user_id: owner.id, name: `PCN gDel ${runId}` }, grows);
+      const hDel = await seedId(
+        "pheno_hunts",
+        { user_id: owner.id, grow_id: gDel, name: `hunt Del ${runId}` },
+        hunts,
+      );
+      const pDelN = await seedId(
+        "plants",
+        {
+          user_id: owner.id,
+          grow_id: gDel,
+          pheno_hunt_id: hDel,
+          candidate_number: 1,
+          name: `pDelN ${runId}`,
+        },
+        plantIds,
+      );
+      const pDelU = await seedId(
+        "plants",
+        { user_id: owner.id, grow_id: gDel, pheno_hunt_id: hDel, name: `pDelU ${runId}` },
+        plantIds,
+      );
+      const del = await ownerC.from("grows").delete().eq("id", gDel).select("id");
+      const { data: retained } = await admin
+        .from("plants")
+        .select("id, grow_id, pheno_hunt_id, candidate_number")
+        .in("id", [pDelN, pDelU]);
+      const allNulled =
+        (retained?.length ?? 0) === 2 &&
+        (retained ?? []).every(
+          (r) => r.grow_id === null && r.pheno_hunt_id === null && r.candidate_number === null,
+        );
+      check(
+        "owner grow delete detaches + retains tagged plants (all NULL)",
+        !del.error && allNulled,
+        `err=${del.error?.message} retained=${retained?.length ?? 0}`,
+      );
+    }
   } finally {
     // Grow deletion does NOT cascade to plants (plants.grow_id is ON DELETE SET
     // NULL), and a hunt-tagged plant blocks grow changes — so remove plants first

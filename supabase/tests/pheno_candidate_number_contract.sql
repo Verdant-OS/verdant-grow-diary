@@ -79,7 +79,7 @@ DECLARE
   v_op       uuid := nullif(current_setting('pcn.operator_id', true), '')::uuid;
   v_stranger uuid := gen_random_uuid();  -- random: only used as a JWT sub, never an FK
   gA uuid; gB uuid; gDel uuid; hA uuid; hA2 uuid; hB uuid; hInc uuid; hDel uuid;
-  p1 uuid; p2 uuid; p3 uuid; pUn uuid; pInc uuid; pDel uuid;
+  p1 uuid; p2 uuid; p3 uuid; pUn uuid; pInc uuid; pDel uuid; pDel2 uuid;
   v_num integer;
   v_rowcount int;
 BEGIN
@@ -119,7 +119,9 @@ BEGIN
   INSERT INTO public.grows (user_id, name) VALUES (v_owner, 'PCN gDel') RETURNING id INTO gDel;
   INSERT INTO public.pheno_hunts (user_id, grow_id, name) VALUES (v_owner, gDel, 'hunt Del') RETURNING id INTO hDel;
   INSERT INTO public.plants (user_id, grow_id, pheno_hunt_id, candidate_number, name)
-    VALUES (v_owner, gDel, hDel, 1, 'pDel') RETURNING id INTO pDel;
+    VALUES (v_owner, gDel, hDel, 1, 'pDel') RETURNING id INTO pDel;    -- tagged + NUMBERED
+  INSERT INTO public.plants (user_id, grow_id, pheno_hunt_id, name)
+    VALUES (v_owner, gDel, hDel, 'pDel2') RETURNING id INTO pDel2;     -- tagged, UNnumbered
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
 
@@ -293,14 +295,44 @@ BEGIN
   EXCEPTION WHEN check_violation THEN pass := pass + 1;
            WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL hunt-move-blocked: %', SQLERRM; END;
 
-  -- 20) deleting a grow that still has a hunt-tagged, NUMBERED plant must SUCCEED.
-  --     The FK ON DELETE SET NULL on plants.grow_id is cleanup, not a cross-grow
-  --     move, so the guard must not abort it. Runs as service_role, like a cascade.
-  PERFORM set_config('role', 'service_role', true);
+  -- 20) owner direct grow_id -> NULL on a hunt-tagged plant is REJECTED (untag
+  --     first). p3 is tagged hA2 with a number.
+  PERFORM set_config('role', 'authenticated', true);
+  PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
+  BEGIN
+    UPDATE public.plants SET grow_id = NULL WHERE id = p3;
+    RAISE EXCEPTION 'PCN_SENTINEL owner nulled grow on a tagged plant';
+  EXCEPTION WHEN check_violation THEN pass := pass + 1;
+           WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL owner-null-grow-tagged: %', SQLERRM; END;
+
+  -- 21) operator direct grow_id -> NULL on a hunt-tagged plant is REJECTED too.
+  PERFORM set_config('request.jwt.claim.sub', v_op::text, true);
+  BEGIN
+    UPDATE public.plants SET grow_id = NULL WHERE id = p3;
+    RAISE EXCEPTION 'PCN_SENTINEL operator nulled grow on a tagged plant';
+  EXCEPTION WHEN check_violation THEN pass := pass + 1;
+           WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL operator-null-grow-tagged: %', SQLERRM; END;
+
+  -- 22) owner grow deletion succeeds with numbered AND unnumbered tagged plants:
+  --     the BEFORE DELETE detach untags them (clearing candidate_number), then the
+  --     grow_id SET NULL retains them. Retained plants finish with grow_id,
+  --     pheno_hunt_id, and candidate_number all NULL (SET-NULL retention preserved).
+  PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
   BEGIN
     DELETE FROM public.grows WHERE id = gDel;
+    IF (SELECT count(*) FROM public.plants WHERE id IN (pDel, pDel2)) <> 2 THEN
+      RAISE EXCEPTION 'PCN_SENTINEL retained plants not preserved (% of 2)',
+        (SELECT count(*) FROM public.plants WHERE id IN (pDel, pDel2));
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM public.plants
+       WHERE id IN (pDel, pDel2)
+         AND (grow_id IS NOT NULL OR pheno_hunt_id IS NOT NULL OR candidate_number IS NOT NULL)
+    ) THEN
+      RAISE EXCEPTION 'PCN_SENTINEL retained plant not fully nulled';
+    END IF;
     pass := pass + 1;
-  EXCEPTION WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL grow-delete-with-tagged-plants: %', SQLERRM; END;
+  EXCEPTION WHEN OTHERS THEN fail := fail + 1; RAISE NOTICE 'FAIL owner-grow-delete-retain: %', SQLERRM; END;
 
   PERFORM set_config('role', 'authenticated', false);
   RAISE NOTICE 'pheno_candidate_number contract: % passed, % failed', pass, fail;

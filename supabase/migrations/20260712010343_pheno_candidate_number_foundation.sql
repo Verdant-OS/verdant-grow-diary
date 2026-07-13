@@ -96,15 +96,15 @@ BEGIN
     )
   );
 
-  -- 2. A tagged plant cannot move to a DIFFERENT grow; untag first. Only a move to
-  --    another actual grow counts — clearing grow_id (NEW.grow_id IS NULL), e.g. the
-  --    ON DELETE SET NULL cleanup when the plant's grow is deleted, is not a
-  --    cross-grow move and must not abort that deletion.
+  -- 2. A hunt-tagged plant cannot have its grow changed AT ALL while tagged —
+  --    neither moved to another grow nor cleared to NULL; untag it first. (Grow
+  --    DELETION is handled up front by trg_grows_detach_pheno_plants below, which
+  --    untags affected plants before the ON DELETE SET NULL runs, so a legitimate
+  --    grow delete never trips this.)
   IF TG_OP = 'UPDATE'
      AND NEW.grow_id IS DISTINCT FROM OLD.grow_id
-     AND NEW.grow_id IS NOT NULL
      AND NEW.pheno_hunt_id IS NOT NULL THEN
-    RAISE EXCEPTION 'cannot move a hunt-tagged plant to a different grow; untag it first'
+    RAISE EXCEPTION 'cannot change the grow of a hunt-tagged plant; untag it first'
       USING ERRCODE = 'check_violation';
   END IF;
 
@@ -133,10 +133,12 @@ BEGIN
     END IF;
   END IF;
 
-  -- 5. Lineage: when tagged AND the plant still has a grow, the hunt must share
-  --    that grow and owner. A NULL grow_id (e.g. the ON DELETE SET NULL cleanup
-  --    during grow deletion) is a transient cleanup state, not a lineage check.
-  IF v_lineage_relevant AND NEW.pheno_hunt_id IS NOT NULL AND NEW.grow_id IS NOT NULL THEN
+  -- 5. Lineage: when tagged, the hunt must share the plant's grow AND owner. Grow
+  --    changes on tagged plants are already rejected in step 2, and grow deletion
+  --    detaches plants first (trg_grows_detach_pheno_plants), so NEW.grow_id here
+  --    is always the plant's real grow — a strict equality is correct and also
+  --    keeps a plant from ever referencing another owner's hunt.
+  IF v_lineage_relevant AND NEW.pheno_hunt_id IS NOT NULL THEN
     IF NOT EXISTS (
       SELECT 1 FROM public.pheno_hunts h
        WHERE h.id = NEW.pheno_hunt_id
@@ -192,3 +194,32 @@ DROP TRIGGER IF EXISTS trg_pheno_hunts_numbered_move_guard ON public.pheno_hunts
 CREATE TRIGGER trg_pheno_hunts_numbered_move_guard
   BEFORE UPDATE ON public.pheno_hunts
   FOR EACH ROW EXECUTE FUNCTION public.pheno_hunts_numbered_move_guard();
+
+-- =============================================================================
+-- grows_detach_pheno_plants
+--
+-- Grow deletion nulls plants.grow_id via ON DELETE SET NULL, which would trip the
+-- (strict) cross-grow guard on any still-tagged plant. Detach those plants up
+-- front so the plant guard clears their candidate_number (hunt change), and the
+-- later SET NULL then runs cleanly. This keeps the grow-change guard strict for
+-- direct writes while letting ordinary grow deletion succeed and retain plants.
+-- =============================================================================
+CREATE OR REPLACE FUNCTION public.grows_detach_pheno_plants()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  UPDATE public.plants
+     SET pheno_hunt_id = NULL
+   WHERE grow_id = OLD.id
+     AND pheno_hunt_id IS NOT NULL;
+  RETURN OLD;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_grows_detach_pheno_plants ON public.grows;
+CREATE TRIGGER trg_grows_detach_pheno_plants
+  BEFORE DELETE ON public.grows
+  FOR EACH ROW EXECUTE FUNCTION public.grows_detach_pheno_plants();

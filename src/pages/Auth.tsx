@@ -125,7 +125,20 @@ export default function Auth() {
     return () => window.clearInterval(id);
   }, [resendLastAttemptAt, resendNowTick]);
 
+  // Same one-second tick for the "Resend reset email" cooldown.
+  useEffect(() => {
+    if (resetResendLastAttemptAt == null) return;
+    if (canResendResetEmail(Date.now(), resetResendLastAttemptAt, DEFAULT_RESET_EMAIL_COOLDOWN_MS)) {
+      return;
+    }
+    const id = window.setInterval(() => {
+      setResetResendNowTick(Date.now());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [resetResendLastAttemptAt, resetResendNowTick]);
+
   if (loading) return null;
+
   if (user) return <Navigate to={postSignInTarget()} replace />;
 
   const resendCooldownActive = !canResendVerification(

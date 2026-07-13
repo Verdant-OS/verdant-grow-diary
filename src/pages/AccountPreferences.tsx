@@ -48,6 +48,29 @@ export default function AccountPreferences() {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    setAgreementsLoading(true);
+    supabase
+      .from("user_agreement_acceptances")
+      .select("agreement_type, version, effective_date, accepted_at")
+      .eq("user_id", user.id)
+      .order("accepted_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          setAgreementsError("Could not load agreement history.");
+        } else {
+          setAgreements((data as typeof agreements) ?? []);
+        }
+        setAgreementsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
   async function handleToggle(next: boolean) {
     if (!user?.id || saving) return;
     setSaving(true);

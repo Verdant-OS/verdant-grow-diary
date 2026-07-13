@@ -1,5 +1,7 @@
-
 # Slice — Read-Only Candidate-Number Display Helper
+
+> **STATUS: CONTRACT UNVERIFIED — IMPLEMENTATION BLOCKED PENDING CONFIRMATION.**  
+> The `candidate_number` column identifier, type, and location on `public.plants` have not been confirmed in the current sandbox. No helper, adapter, service, generated type, select list, or comparator changes may proceed until the user explicitly confirms the exact contract. Only Step 1 (pure helper + tests, no data-layer wiring) can be implemented before that confirmation.
 
 ## 1. Executive summary
 

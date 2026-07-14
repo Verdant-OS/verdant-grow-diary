@@ -139,7 +139,7 @@ export interface AiDoctorDraft {
   action_queue_suggestion: AiDoctorActionQueueSuggestion | null;
 }
 
-export const DEVICE_COMMAND_PATTERNS: readonly RegExp[] = [
+const DEVICE_COMMAND_PATTERNS: readonly RegExp[] = [
   /\bturn (on|off)\b/i,
   /\bpower (on|off)\b/i,
   /\bactivate\b/i,
@@ -147,6 +147,21 @@ export const DEVICE_COMMAND_PATTERNS: readonly RegExp[] = [
   /\bautomat(e|ion)\b/i,
   /\bexecute\b/i,
   /\brun (the )?(pump|fan|light|heater|dehumidifier|humidifier)\b/i,
+];
+
+/**
+ * Extended device-control DETECTION patterns: the engine command patterns plus
+ * setpoint/switch/relay/actuate wording. Exported for read-only reuse by the
+ * AI Doctor output evaluator (`aiDoctorOutputEvaluation`). Detection only —
+ * these BLOCK/flag device wording; they are never an execution surface.
+ */
+export const DEVICE_CONTROL_DETECTION_PATTERNS: readonly RegExp[] = [
+  ...DEVICE_COMMAND_PATTERNS,
+  /\bset (the )?(fan|light|lights|humidifier|dehumidifier|heater|temp|temperature|humidity)\b/i,
+  /\bset ?point\b/i,
+  /\bswitch (on|off)\b/i,
+  /\brelay\b/i,
+  /\bactuate\b/i,
 ];
 
 function stripDeviceCommands(items: readonly string[]): string[] {

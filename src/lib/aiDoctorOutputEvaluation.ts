@@ -33,7 +33,7 @@
 import type { Phase1DiagnosisResult, Phase1PlantContextPayload } from "@/lib/aiDoctorEngine";
 import type { AiDoctorContextResult, AiDoctorContextReadiness } from "@/lib/aiDoctorContextRules";
 import type { AiDoctorConfidenceResult } from "@/lib/aiDoctorConfidenceAdapter";
-import { bandForConfidence, DEVICE_COMMAND_PATTERNS } from "@/lib/aiDoctorSafetyRules";
+import { bandForConfidence, DEVICE_CONTROL_DETECTION_PATTERNS } from "@/lib/aiDoctorSafetyRules";
 
 // ---------------------------------------------------------------------------
 // Contract version
@@ -819,17 +819,11 @@ function validateConfidenceCalibration(
 // ---------------------------------------------------------------------------
 
 /**
- * Device-control vocabulary — reuses the engine's `DEVICE_COMMAND_PATTERNS`
- * plus evaluator-specific patterns mirroring the golden-case device vocabulary.
+ * Device-control detection vocabulary — reused verbatim from the engine's
+ * `DEVICE_CONTROL_DETECTION_PATTERNS` (which co-locates the command patterns +
+ * setpoint/switch/relay/actuate wording in the allow-listed safety module).
  */
-const DEVICE_CONTROL_PATTERNS: readonly RegExp[] = [
-  ...DEVICE_COMMAND_PATTERNS,
-  /\bset (the )?(fan|light|lights|humidifier|dehumidifier|heater|temp|temperature|humidity)\b/i,
-  /\bset ?point\b/i,
-  /\bswitch (on|off)\b/i,
-  /\brelay\b/i,
-  /\bactuate\b/i,
-];
+const DEVICE_CONTROL_PATTERNS: readonly RegExp[] = DEVICE_CONTROL_DETECTION_PATTERNS;
 
 const AUTOMATIC_AQ_PATTERNS: readonly RegExp[] = [
   /\bautomatically\b/,

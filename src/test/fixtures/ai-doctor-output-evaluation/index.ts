@@ -8,7 +8,7 @@
  *
  * Hard constraints:
  *  - Pure data. No I/O, no Supabase, no React, no model calls.
- *  - No secrets, tokens, service_role, real user IDs, or raw sensor payloads.
+ *  - No secrets, tokens, privileged keys, real user IDs, or raw sensor payloads.
  *  - Every fixture pins `now` so context compilation is reproducible.
  *  - Real repository types only.
  */

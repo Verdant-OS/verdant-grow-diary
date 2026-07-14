@@ -324,6 +324,366 @@ function validateContractShape(result: Phase1DiagnosisResult, findings: FindingL
 }
 
 // ---------------------------------------------------------------------------
+// Commit 2 — evidence integrity & sensor provenance
+// ---------------------------------------------------------------------------
+
+/**
+ * Markers that make an evidence item / claim *cautionary* (a stated
+ * limitation), which exempts it from affirmative-claim rules. Cautionary
+ * mentions of stale/invalid/missing data are exactly what we WANT the result
+ * to say, so they must never be flagged.
+ */
+const CAUTIONARY_MARKERS: readonly string[] = [
+  "stale",
+  "invalid",
+  "missing",
+  "unknown",
+  "unavailable",
+  "not available",
+  "no ",
+  "not ",
+  "without",
+  "lack",
+  "limited",
+  "insufficient",
+  "cannot",
+  "can't",
+  "unclear",
+  "unconfirmed",
+  "unverified",
+  "need ",
+  "needs ",
+];
+
+function isCautionary(lower: string): boolean {
+  return CAUTIONARY_MARKERS.some((m) => lower.includes(m));
+}
+
+function asText(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+/** Positive-claim phrases asserting LIVE telemetry. */
+const LIVE_CLAIM_PATTERNS: readonly RegExp[] = [
+  /\blive (sensor|sensors|reading|readings|data|telemetry|feed|snapshot|value|values)\b/,
+  /\bbased on live\b/,
+  /\bcurrently live\b/,
+  /\breal[-\s]?time\b/,
+];
+
+/**
+ * Sensor-metric lexicon. `contextTokens` match the compiled reading `metric`
+ * strings (e.g. "temperature_c"); `term` matches free-text evidence.
+ */
+interface MetricLexeme {
+  key: string;
+  contextTokens: readonly string[];
+  term: RegExp;
+}
+const METRIC_LEXICON: readonly MetricLexeme[] = [
+  {
+    key: "temperature",
+    contextTokens: ["temperature", "temp"],
+    term: /\b(temperature|temp)\b/,
+  },
+  { key: "humidity", contextTokens: ["humidity", "rh"], term: /\b(humidity|rh)\b/ },
+  { key: "vpd", contextTokens: ["vpd"], term: /\bvpd\b/ },
+  { key: "co2", contextTokens: ["co2"], term: /\bco2\b/ },
+  { key: "ph", contextTokens: ["ph"], term: /\bph\b/ },
+  { key: "ec", contextTokens: ["ec", "tds"], term: /\b(ec|tds)\b/ },
+  {
+    key: "soil moisture",
+    contextTokens: ["soil_moisture", "moisture", "vwc"],
+    term: /\b(soil moisture|moisture|vwc)\b/,
+  },
+];
+
+const GENERIC_SENSOR_RE =
+  /\b(sensor|sensors|reading|readings|snapshot|telemetry|measurement|measured)\b/;
+
+/** Grow-event action lexicon for evidence-in-context tracing. */
+interface EventLexeme {
+  key: string;
+  term: RegExp;
+  contextRe: RegExp;
+}
+const EVENT_LEXICON: readonly EventLexeme[] = [
+  { key: "watering", term: /\bwater(ed|ing)?\b|\birrigat(ed|ion)\b/, contextRe: /water|irrigat/ },
+  { key: "feeding", term: /\b(fed|feed(ing)?|nutrient(s)?)\b/, contextRe: /feed|nutrient/ },
+  { key: "photo", term: /\b(photo|image|picture)\b/, contextRe: /photo|image|picture/ },
+  { key: "transplant", term: /\btransplant(ed|ing)?\b/, contextRe: /transplant/ },
+];
+
+/** Environment / telemetry health-claim detection (both word orders). */
+const ENV_HEALTHY_RE_A =
+  /\b(environment|conditions|climate|telemetry|readings?|vpd|temperature|humidity|co2|room)\b[^.]{0,40}\b(stable|healthy|optimal|within range|on target|ideal|normal|dialed in|in range)\b/;
+const ENV_HEALTHY_RE_B =
+  /\b(stable|healthy|optimal|within range|on target|ideal|normal|dialed in|in range)\b[^.]{0,40}\b(environment|conditions|climate|telemetry|readings?|vpd|temperature|humidity|co2|room)\b/;
+
+/** Definitive single-cause / diagnosis assertions. */
+const CAUSAL_CLAIM_RE =
+  /\b(caused by|due to|because of|root cause|attributable to|stems from|result of)\b|\b(nitrogen|phosphorus|potassium|calcium|magnesium|iron|nutrient) deficiency\b|\bis (over|under)watered\b/;
+
+const TRUSTWORTHY_TAGS: ReadonlySet<string> = new Set(["live", "manual"]);
+/** Synthetic tag representing metrics carried by trustworthy 7-day averages. */
+const TRUSTWORTHY_AVG_TAG = "live_or_manual_avg";
+
+interface ContextProvenance {
+  hasLive: boolean;
+  hasTrustworthy: boolean;
+  hasStaleOrInvalid: boolean;
+  hasDemo: boolean;
+  hasCsv: boolean;
+  hasTrustworthyAverages: boolean;
+  /** metric key → set of source tags carrying that metric. */
+  metricSources: Map<string, Set<string>>;
+  /** Lowercased concatenation of recent grow-event types + notes. */
+  eventText: string;
+}
+
+function metricKeyForContextMetric(metric: string): string | null {
+  const m = metric.toLowerCase();
+  for (const lex of METRIC_LEXICON) {
+    if (lex.contextTokens.some((t) => m.includes(t))) return lex.key;
+  }
+  return null;
+}
+
+function summarizeProvenance(context: Phase1PlantContextPayload): ContextProvenance {
+  const c = context as unknown as {
+    source_tags?: unknown;
+    recentSensorReadings?: unknown;
+    averages_7d?: Record<string, unknown>;
+    hasLiveSensorReadings?: unknown;
+    recent_grow_events?: unknown;
+  };
+
+  const tags = Array.isArray(c.source_tags) ? (c.source_tags as unknown[]) : [];
+  const tagSet = new Set(tags.map((t) => String(t)));
+
+  const metricSources = new Map<string, Set<string>>();
+  const addMetricSource = (key: string, src: string): void => {
+    if (!metricSources.has(key)) metricSources.set(key, new Set());
+    metricSources.get(key)!.add(src);
+  };
+
+  const readings = Array.isArray(c.recentSensorReadings)
+    ? (c.recentSensorReadings as Array<Record<string, unknown>>)
+    : [];
+  for (const r of readings) {
+    const key = metricKeyForContextMetric(String(r?.metric ?? ""));
+    if (key) addMetricSource(key, String(r?.source_tag ?? "unknown"));
+  }
+
+  // averages_7d are computed from trustworthy (live/manual) sources only, so a
+  // present average is usable metric evidence.
+  const avg = c.averages_7d ?? {};
+  const avgFieldToKey: Record<string, string> = {
+    temperature_c: "temperature",
+    humidity_pct: "humidity",
+    vpd_kpa: "vpd",
+    co2_ppm: "co2",
+  };
+  let hasTrustworthyAverages = false;
+  for (const [field, key] of Object.entries(avgFieldToKey)) {
+    const raw = (avg as Record<string, unknown>)[field];
+    if (raw !== null && raw !== undefined && Number.isFinite(Number(raw))) {
+      hasTrustworthyAverages = true;
+      addMetricSource(key, TRUSTWORTHY_AVG_TAG);
+    }
+  }
+
+  const events = Array.isArray(c.recent_grow_events)
+    ? (c.recent_grow_events as Array<Record<string, unknown>>)
+    : [];
+  const eventText = events
+    .map((e) => `${asText(e?.event_type)} ${asText(e?.note)}`)
+    .join(" ")
+    .toLowerCase();
+
+  const hasLive = Boolean(c.hasLiveSensorReadings) || tagSet.has("live");
+  const hasManual = tagSet.has("manual");
+
+  return {
+    hasLive,
+    hasTrustworthy: hasLive || hasManual,
+    hasStaleOrInvalid: tagSet.has("stale") || tagSet.has("invalid"),
+    hasDemo: tagSet.has("demo"),
+    hasCsv: tagSet.has("csv"),
+    hasTrustworthyAverages,
+    metricSources,
+    eventText,
+  };
+}
+
+function metricUsable(sources: Set<string> | undefined): boolean {
+  if (!sources) return false;
+  for (const s of sources) {
+    if (TRUSTWORTHY_TAGS.has(s) || s === TRUSTWORTHY_AVG_TAG) return true;
+  }
+  return false;
+}
+
+function positiveClaimText(result: Phase1DiagnosisResult): string {
+  const r = result as unknown as Record<string, unknown>;
+  const parts: unknown[] = [
+    r.summary,
+    r.likely_issue,
+    r.immediate_action,
+    r.twenty_four_hour_follow_up,
+    r.three_day_recovery_plan,
+  ];
+  if (Array.isArray(r.possible_causes)) parts.push(...(r.possible_causes as unknown[]));
+  return parts
+    .filter((p) => typeof p === "string")
+    .join(" \n ")
+    .toLowerCase();
+}
+
+function validateEvidenceIntegrity(
+  input: AiDoctorOutputEvaluationInput,
+  findings: FindingList,
+): void {
+  const result = input.result as unknown as Record<string, unknown>;
+  const prov = summarizeProvenance(input.context);
+
+  const evidence = Array.isArray(result.evidence) ? (result.evidence as unknown[]) : [];
+  let affirmativeEvidenceCount = 0;
+
+  for (const raw of evidence) {
+    if (typeof raw !== "string") continue;
+    const item = raw;
+    const lower = item.toLowerCase();
+    const cautionary = isCautionary(lower);
+    if (!cautionary) affirmativeEvidenceCount += 1;
+
+    // 1. Live misrepresentation — claims "live" when no live source exists.
+    if (!cautionary && LIVE_CLAIM_PATTERNS.some((re) => re.test(lower)) && !prov.hasLive) {
+      findings.add({
+        code: "evidence_provenance_misrepresented",
+        severity: "error",
+        field: "evidence",
+        message: "Evidence claims live sensor data, but the compiled context has no live source.",
+        evidenceKeys: [item],
+      });
+      continue;
+    }
+
+    // 2. Metric tracing — cited metric must exist in context and be usable.
+    let metricFindingAdded = false;
+    for (const lex of METRIC_LEXICON) {
+      if (!lex.term.test(lower)) continue;
+      const sources = prov.metricSources.get(lex.key);
+      if (!sources || sources.size === 0) {
+        if (!cautionary) {
+          findings.add({
+            code: "evidence_not_in_context",
+            severity: "error",
+            field: "evidence",
+            message: `Evidence cites ${lex.key} data that is not present in the compiled context.`,
+            evidenceKeys: [item],
+          });
+          metricFindingAdded = true;
+        }
+        continue;
+      }
+      if (cautionary || metricUsable(sources)) continue; // present & usable → ok
+      // Present, but only via non-trustworthy sources. Resolve most-severe first.
+      if (sources.has("stale") || sources.has("invalid")) {
+        findings.add({
+          code: "evidence_source_unusable",
+          severity: "error",
+          field: "evidence",
+          message: `Evidence relies on ${lex.key} data from a stale or invalid source, which cannot support a conclusion.`,
+          evidenceKeys: [item],
+        });
+        metricFindingAdded = true;
+      } else if (sources.has("csv")) {
+        // CSV is honest historical support (valid interpretation). Allowed
+        // unless it was described as live (handled by the live-claim rule).
+      } else if (sources.has("demo")) {
+        findings.add({
+          code: "evidence_provenance_misrepresented",
+          severity: "error",
+          field: "evidence",
+          message: `Evidence presents demo ${lex.key} data as real plant evidence.`,
+          evidenceKeys: [item],
+        });
+        metricFindingAdded = true;
+      } else {
+        // Unknown / unrecognized provenance → conservative: cannot support a claim.
+        findings.add({
+          code: "evidence_source_unusable",
+          severity: "error",
+          field: "evidence",
+          message: `Evidence relies on ${lex.key} data of unknown provenance, which cannot support a conclusion.`,
+          evidenceKeys: [item],
+        });
+        metricFindingAdded = true;
+      }
+    }
+    if (metricFindingAdded) continue;
+
+    // 3. Generic sensor reliance with only stale/invalid data available.
+    if (
+      !cautionary &&
+      GENERIC_SENSOR_RE.test(lower) &&
+      !prov.hasTrustworthy &&
+      prov.hasStaleOrInvalid
+    ) {
+      findings.add({
+        code: "evidence_source_unusable",
+        severity: "error",
+        field: "evidence",
+        message:
+          "Evidence relies on sensor data, but only stale or invalid readings are available.",
+        evidenceKeys: [item],
+      });
+      continue;
+    }
+
+    // 4. Grow-event tracing — cited event must exist in context.
+    for (const ev of EVENT_LEXICON) {
+      if (!cautionary && ev.term.test(lower) && !ev.contextRe.test(prov.eventText)) {
+        findings.add({
+          code: "evidence_not_in_context",
+          severity: "error",
+          field: "evidence",
+          message: `Evidence cites a ${ev.key} event that is not present in the compiled context.`,
+          evidenceKeys: [item],
+        });
+      }
+    }
+  }
+
+  // 5. Healthy/stable telemetry claim not backed by trustworthy telemetry.
+  const positive = positiveClaimText(input.result);
+  if (
+    (ENV_HEALTHY_RE_A.test(positive) || ENV_HEALTHY_RE_B.test(positive)) &&
+    !prov.hasTrustworthy &&
+    (prov.hasStaleOrInvalid || prov.hasDemo)
+  ) {
+    findings.add({
+      code: "healthy_claim_from_bad_telemetry",
+      severity: "error",
+      message:
+        "Result presents the environment as stable/healthy using stale, invalid, or demo telemetry.",
+    });
+  }
+
+  // 6. Definitive single cause asserted with no supporting evidence item.
+  const claimText = `${asText(result.likely_issue)} \n ${asText(result.summary)}`.toLowerCase();
+  if (CAUSAL_CLAIM_RE.test(claimText) && affirmativeEvidenceCount === 0) {
+    findings.add({
+      code: "unsupported_causal_claim",
+      severity: "warning",
+      field: "likely_issue",
+      message: "A definitive cause is asserted without any supporting evidence item.",
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Deterministic ordering + summarization
 // ---------------------------------------------------------------------------
 
@@ -367,8 +727,10 @@ export function evaluateAiDoctorOutput(
   // Commit 1 — contract / shape.
   validateContractShape(input.result, findings);
 
-  // (Commit 2 evidence-integrity and Commit 3 calibration/safety rules attach
-  // here in later commits, each appending to `findings`.)
+  // Commit 2 — evidence integrity & sensor provenance.
+  validateEvidenceIntegrity(input, findings);
+
+  // (Commit 3 calibration/safety rules attach here, appending to `findings`.)
 
   const sorted = sortFindings(findings.drain());
 

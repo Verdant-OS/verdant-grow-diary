@@ -23,6 +23,16 @@ import type { Phase1DiagnosisResult } from "@/lib/aiDoctorEngine";
 // Builders — real context via the compiler; readiness as a typed literal.
 // ---------------------------------------------------------------------------
 
+const NOW = new Date("2026-06-04T12:00:00Z");
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const isoAgo = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
+
+/**
+ * Baseline context that BACKS the baseline valid result's evidence: a recent
+ * watering event and a usable manual humidity snapshot. This keeps the "valid
+ * passes" contract intact once evidence-integrity rules run.
+ */
 function makeContext(): PlantContextPayload {
   return compilePlantContextFromRows({
     plant: {
@@ -33,9 +43,61 @@ function makeContext(): PlantContextPayload {
       strain: "Northern Lights Auto",
       stage: "veg",
     },
+    growEvents: [
+      {
+        occurred_at: isoAgo(2 * DAY_MS),
+        event_type: "watering",
+        source: "manual",
+        note: "watered lightly",
+      },
+    ],
+    sensorReadings: [
+      {
+        metric: "humidity_pct",
+        value: 58,
+        captured_at: isoAgo(3 * HOUR_MS),
+        source: "manual",
+      },
+    ],
+    now: NOW,
+  });
+}
+
+/** Context with only stale/invalid telemetry (no trustworthy sources). */
+function makeStaleInvalidContext(): PlantContextPayload {
+  return compilePlantContextFromRows({
+    plant: { id: "p", tent_id: "t", grow_id: "g", name: "P", strain: "Auto", stage: "veg" },
     growEvents: [],
-    sensorReadings: [],
-    now: new Date("2026-06-04T12:00:00Z"),
+    sensorReadings: [
+      {
+        metric: "temperature_c",
+        value: 99,
+        captured_at: isoAgo(2 * HOUR_MS),
+        source: "ecowitt",
+        state: "stale",
+      },
+      {
+        metric: "humidity_pct",
+        value: -5,
+        captured_at: isoAgo(3 * HOUR_MS),
+        source: "ecowitt",
+        state: "invalid",
+      },
+    ],
+    now: NOW,
+  });
+}
+
+/** Context with only demo + csv telemetry (never live, never trustworthy). */
+function makeDemoCsvContext(): PlantContextPayload {
+  return compilePlantContextFromRows({
+    plant: { id: "p", tent_id: "t", grow_id: "g", name: "P", strain: "Auto", stage: "veg" },
+    growEvents: [],
+    sensorReadings: [
+      { metric: "temperature_c", value: 24, captured_at: isoAgo(30 * 60 * 1000), source: "demo" },
+      { metric: "vpd_kpa", value: 1.1, captured_at: isoAgo(2 * DAY_MS), source: "csv" },
+    ],
+    now: NOW,
   });
 }
 
@@ -329,5 +391,182 @@ describe("evaluateAiDoctorOutput — determinism & ordering", () => {
     expect(evaluation.errorCount + evaluation.warningCount + evaluation.infoCount).toBe(
       evaluation.findings.length,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Commit 2 — evidence integrity & provenance
+// ---------------------------------------------------------------------------
+
+/** Context with a usable LIVE humidity reading (ecowitt, no state ⇒ live). */
+function makeLiveContext(): PlantContextPayload {
+  return compilePlantContextFromRows({
+    plant: { id: "p", tent_id: "t", grow_id: "g", name: "P", strain: "Auto", stage: "veg" },
+    growEvents: [],
+    sensorReadings: [
+      { metric: "humidity_pct", value: 58, captured_at: isoAgo(HOUR_MS), source: "ecowitt" },
+    ],
+    now: NOW,
+  });
+}
+
+/** Hand-built context carrying a metric of UNKNOWN provenance (bypasses the
+ *  compiler, which would otherwise default unknown sources to "live"). */
+function makeUnknownProvenanceContext(): PlantContextPayload {
+  return {
+    grow_id: null,
+    tent_id: null,
+    plant_id: null,
+    plant_name: null,
+    strain: null,
+    stage: null,
+    medium: null,
+    pot_size: null,
+    recent_grow_events: [],
+    recentSensorReadings: [
+      { captured_at: isoAgo(HOUR_MS), metric: "ph", value: 6, unit: null, source_tag: "mystery" },
+    ],
+    sensor_groups: [],
+    averages_7d: { temperature_c: null, humidity_pct: null, vpd_kpa: null, co2_ppm: null },
+    notable_deviations: [],
+    source_tags: ["mystery"],
+    imported_sensor_history: null,
+    hasLiveSensorReadings: false,
+    missingLiveSensorReadings: true,
+    early_stage_memory: null,
+  } as unknown as PlantContextPayload;
+}
+
+function inputWith(
+  result: Phase1DiagnosisResult,
+  context: PlantContextPayload,
+): AiDoctorOutputEvaluationInput {
+  return { result, context, readiness: makeReadiness("strong") };
+}
+
+function resultWithEvidence(evidence: string[]): Phase1DiagnosisResult {
+  const r = makeValidResult();
+  r.evidence = evidence;
+  return r;
+}
+
+function hasCode(
+  evaluation: { findings: readonly { code: AiDoctorEvaluationCode }[] },
+  code: AiDoctorEvaluationCode,
+): boolean {
+  return evaluation.findings.some((f) => f.code === code);
+}
+
+describe("evaluateAiDoctorOutput — evidence acceptance", () => {
+  it("accepts live-sourced sensor evidence when live data exists", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(resultWithEvidence(["Live sensor humidity reads 58%."]), makeLiveContext()),
+    );
+    expect(e.status).toBe("pass");
+    expect(e.findings).toEqual([]);
+  });
+
+  it("accepts manual-sourced sensor evidence (provenance stays manual)", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(resultWithEvidence(["Manual humidity snapshot reads 58%."]), makeContext()),
+    );
+    expect(e.status).toBe("pass");
+  });
+
+  it("accepts honest CSV/imported evidence not described as live", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(
+        resultWithEvidence(["Imported CSV history shows VPD near 1.1."]),
+        makeDemoCsvContext(),
+      ),
+    );
+    expect(hasCode(e, "evidence_provenance_misrepresented")).toBe(false);
+    expect(hasCode(e, "evidence_source_unusable")).toBe(false);
+  });
+
+  it("does not flag cautionary mentions of stale/invalid data", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(
+        resultWithEvidence(["Humidity data is stale and cannot be trusted yet."]),
+        makeStaleInvalidContext(),
+      ),
+    );
+    expect(hasCode(e, "evidence_source_unusable")).toBe(false);
+    expect(hasCode(e, "evidence_not_in_context")).toBe(false);
+  });
+});
+
+describe("evaluateAiDoctorOutput — evidence violations", () => {
+  it("flags a cited metric absent from context (evidence_not_in_context)", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(resultWithEvidence(["EC of 1.8 mS/cm is on target."]), makeContext()),
+    );
+    expect(hasCode(e, "evidence_not_in_context")).toBe(true);
+  });
+
+  it("flags a cited grow event absent from context (evidence_not_in_context)", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(
+        resultWithEvidence(["Transplanted the plant yesterday, explaining the droop."]),
+        makeContext(),
+      ),
+    );
+    expect(hasCode(e, "evidence_not_in_context")).toBe(true);
+  });
+
+  it("flags CSV data described as live (evidence_provenance_misrepresented)", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(
+        resultWithEvidence(["Live sensor data shows temperature is 24C."]),
+        makeDemoCsvContext(),
+      ),
+    );
+    expect(hasCode(e, "evidence_provenance_misrepresented")).toBe(true);
+  });
+
+  it("flags stale telemetry used as proof (evidence_source_unusable)", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(
+        resultWithEvidence(["Temperature of 24C confirms the setup is fine."]),
+        makeStaleInvalidContext(),
+      ),
+    );
+    expect(hasCode(e, "evidence_source_unusable")).toBe(true);
+  });
+
+  it("flags demo data described as real evidence (evidence_provenance_misrepresented)", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(
+        resultWithEvidence(["Temperature of 24C shows the plant is comfortable."]),
+        makeDemoCsvContext(),
+      ),
+    );
+    expect(hasCode(e, "evidence_provenance_misrepresented")).toBe(true);
+  });
+
+  it("treats unknown provenance conservatively (evidence_source_unusable)", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(
+        resultWithEvidence(["pH reading of 6.0 looks on target."]),
+        makeUnknownProvenanceContext(),
+      ),
+    );
+    expect(hasCode(e, "evidence_source_unusable")).toBe(true);
+  });
+
+  it("flags a healthy telemetry claim backed only by bad telemetry", () => {
+    const r = makeValidResult();
+    r.summary = "The room environment is stable and conditions look healthy.";
+    r.evidence = ["Only stale and invalid readings are available."];
+    const e = evaluateAiDoctorOutput(inputWith(r, makeStaleInvalidContext()));
+    expect(hasCode(e, "healthy_claim_from_bad_telemetry")).toBe(true);
+  });
+
+  it("flags a definitive cause with no supporting evidence (unsupported_causal_claim)", () => {
+    const r = makeValidResult();
+    r.likely_issue = "This is caused by a nitrogen deficiency.";
+    r.evidence = [];
+    const e = evaluateAiDoctorOutput(inputWith(r, makeContext()));
+    expect(hasCode(e, "unsupported_causal_claim")).toBe(true);
   });
 });

@@ -18,8 +18,7 @@ import type {
   AiDoctorManualSaveDraftDetails,
 } from "./aiDoctorManualSaveDraft";
 
-export interface AiDoctorQuickLogDetails
-  extends AiDoctorManualSaveDraftDetails {
+export interface AiDoctorQuickLogDetails extends AiDoctorManualSaveDraftDetails {
   source: string;
   event_type_intent: "observation";
   tent_id: string;
@@ -56,5 +55,6 @@ export function buildAiDoctorQuickLogSavePayload(
     p_vpd_kpa: null,
     p_occurred_at: d.occurred_at,
     p_details: details as unknown as Record<string, unknown>,
+    p_idempotency_key: draft.idempotency_key,
   };
 }

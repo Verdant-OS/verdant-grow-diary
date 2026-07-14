@@ -2,7 +2,8 @@ import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { decodeManualCorrectionHash } from "@/lib/manualSensorCorrectionContext";
 import { Activity } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import SensorChart from "@/components/SensorChart";
@@ -64,6 +65,13 @@ export default function Sensors() {
   const { data: realTents = [] } = useTentRows();
   const [tentId, setTentId] = useState<string>(tents[0]?.id ?? "t1");
   const [searchParams, setSearchParams] = useSearchParams();
+  const correctionCtx = useMemo(
+    () => (typeof window !== "undefined" ? decodeManualCorrectionHash(window.location.hash) : null),
+    // Re-parse whenever the search string changes so nav updates flow through.
+    // Hash changes still require a route change to re-render; that's fine for
+    // the deep-link flow (external navigation from Timeline).
+    [searchParams],
+  );
   const urlSensorSources = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
   const filtered = readings.filter((r) => r.tentId === tentId);
   const latest = filtered.length > 0 ? filtered[filtered.length - 1] : null;
@@ -381,7 +389,11 @@ export default function Sensors() {
         {manualTents.length === 0 ? (
           <FirstTentSetupEmptyState surface="sensor_pairing" testId="sensors-first-tent-setup" />
         ) : (
-          <ManualSensorReadingCard tents={manualTents} defaultTentId={defaultManualTentId} />
+          <ManualSensorReadingCard
+            tents={manualTents}
+            defaultTentId={defaultManualTentId}
+            correction={correctionCtx}
+          />
         )}
       </div>
       {manualTents.length > 0 && defaultManualTentId && (

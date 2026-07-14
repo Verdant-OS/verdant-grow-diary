@@ -11,7 +11,8 @@
  *  - No reads, no writes, no Supabase, no automation.
  */
 import { useMemo } from "react";
-import { Gauge, AlertTriangle, XCircle } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Gauge, AlertTriangle, XCircle, History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,11 @@ import {
   type ManualSensorSnapshotInput,
 } from "@/lib/manualSensorSnapshotQualityRules";
 import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
+import {
+  encodeManualCorrectionHash,
+  hasCorrectableOriginalIds,
+  type ManualCorrectionMetric,
+} from "@/lib/manualSensorCorrectionContext";
 
 /**
  * Map view-model reading fields to the sanitized quality-helper field names.
@@ -44,8 +50,34 @@ const FIELD_MAP: Readonly<Record<string, keyof ManualSensorSnapshotInput>> = {
   reservoir_ph: "ph",
 };
 
+/** Map view-model reading fields to the correction metric namespace. */
+const CORRECTION_FIELD_MAP: Readonly<Record<string, ManualCorrectionMetric>> = {
+  air_temp_c: "temperature_c",
+  humidity_pct: "humidity_pct",
+  vpd_kpa: "vpd_kpa",
+  co2_ppm: "co2_ppm",
+  soil_moisture_pct: "soil_moisture_pct",
+  ppfd: "ppfd",
+};
+
+interface EditSummary {
+  count: number;
+  lastChangedAt: string | null;
+}
+
 interface Props {
   card: ManualSnapshotTimelineCardModel;
+  /** Optional summary of edit history for this snapshot. Presenter-only. */
+  editSummary?: EditSummary;
+  /**
+   * Per-metric ORIGINAL sensor_readings row IDs, keyed by the same
+   * `field` used in `card.readings`. When at least one real uuid is
+   * present AND the card source is manual, a "Correct manual reading"
+   * link is rendered that deep-links to /sensors#manual-reading with
+   * the correction context. Never inferred from timestamp/metric — the
+   * caller must supply real IDs.
+   */
+  originalReadingIds?: Partial<Record<string, string>>;
 }
 
 function severityIcon(severity: ManualSnapshotTimelineCardModel["severity"]) {
@@ -54,7 +86,30 @@ function severityIcon(severity: ManualSnapshotTimelineCardModel["severity"]) {
   return null;
 }
 
-export default function ManualSnapshotTimelineCard({ card }: Props) {
+export default function ManualSnapshotTimelineCard({ card, editSummary, originalReadingIds }: Props) {
+  // Build correction context ONLY from real caller-supplied UUIDs and
+  // real captured numeric values. Never infer IDs from timestamp/metric.
+  const correctionHash = useMemo(() => {
+    if (card.source !== "manual") return null;
+    if (!originalReadingIds) return null;
+    const ids: Partial<Record<ManualCorrectionMetric, string>> = {};
+    const vals: Partial<Record<ManualCorrectionMetric, number>> = {};
+    for (const r of card.readings) {
+      const cm = CORRECTION_FIELD_MAP[r.field];
+      if (!cm) continue;
+      const id = originalReadingIds[r.field];
+      if (typeof id === "string" && id.length > 0) ids[cm] = id;
+      if (typeof r.value === "number" && Number.isFinite(r.value)) vals[cm] = r.value;
+    }
+    if (!hasCorrectableOriginalIds(ids)) return null;
+    return encodeManualCorrectionHash({
+      tentId: card.tentId,
+      originalCapturedAt: card.capturedAt,
+      originalReadingIds: ids,
+      originalValues: vals,
+    });
+  }, [card.source, card.readings, card.capturedAt, card.tentId, originalReadingIds]);
+
   const quality = useMemo(() => {
     const fields: Record<string, number> = {};
     for (const r of card.readings) {
@@ -105,9 +160,43 @@ export default function ManualSnapshotTimelineCard({ card }: Props) {
         <p
           className="text-xs text-muted-foreground"
           data-testid="manual-snapshot-timeline-card-captured-at"
+          title={card.capturedAt ?? undefined}
+          aria-label={
+            card.capturedAt
+              ? `Captured: ${formatSnapshotTimestamp(card.capturedAt)} (${card.capturedAt})`
+              : undefined
+          }
         >
-          {formatSnapshotTimestamp(card.capturedAt)}
+          {`Captured: ${formatSnapshotTimestamp(card.capturedAt)}`}
         </p>
+        {editSummary && editSummary.count > 0 && (
+          <p
+            className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+            data-testid="manual-snapshot-timeline-card-edited-chip"
+            data-edit-count={editSummary.count}
+            title={editSummary.lastChangedAt ?? undefined}
+          >
+            <span className="rounded-full border border-border/50 bg-secondary/40 px-1.5 py-0.5">
+              Edited{" "}
+              {editSummary.lastChangedAt
+                ? formatSnapshotTimestamp(editSummary.lastChangedAt)
+                : "—"}{" "}
+              · {editSummary.count} field{editSummary.count === 1 ? "" : "s"}
+            </span>
+          </p>
+        )}
+        {correctionHash && (
+          <p className="mt-1">
+            <Link
+              to={`/sensors${correctionHash}`}
+              data-testid="manual-snapshot-timeline-card-correct-action"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+            >
+              <History className="h-3 w-3" aria-hidden />
+              Correct manual reading
+            </Link>
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-2 pt-0">
         <section
@@ -128,18 +217,14 @@ export default function ManualSnapshotTimelineCard({ card }: Props) {
               "Confidence: unknown",
             ].map((label) => (
               <li key={label}>
-                <Badge
-                  variant="outline"
-                  className="h-5 px-1.5 text-[10px] font-normal"
-                >
+                <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-normal">
                   {label}
                 </Badge>
               </li>
             ))}
           </ul>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Historical reading — quality reflects captured values; not
-            current-room guidance.
+            Historical reading — quality reflects captured values; not current-room guidance.
           </p>
           {(quality.quality === "invalid" || quality.quality === "needs_review") && (
             <p
@@ -198,10 +283,7 @@ export default function ManualSnapshotTimelineCard({ card }: Props) {
           </p>
         )}
         {(card.errors.length > 0 || card.warnings.length > 0) && (
-          <ul
-            className="space-y-1 text-xs"
-            data-testid="manual-snapshot-timeline-card-validation"
-          >
+          <ul className="space-y-1 text-xs" data-testid="manual-snapshot-timeline-card-validation">
             {card.errors.map((m, i) => (
               <li
                 key={`err-${i}`}

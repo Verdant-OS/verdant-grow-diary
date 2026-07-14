@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Navigate, useNavigate, useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Leaf, Gauge, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
@@ -19,6 +20,17 @@ import {
   MIN_PASSWORD_LENGTH,
 } from "@/lib/passwordResetRules";
 import {
+  DEFAULT_RESET_EMAIL_COOLDOWN_MS,
+  RESET_RESEND_COOLDOWN_HINT,
+  RESET_RESEND_FAILURE_MESSAGE,
+  RESET_RESEND_SUCCESS_MESSAGE,
+  buildResetResendLabel,
+  canResendResetEmail,
+  resetEmailCooldownRemainingMs,
+} from "@/lib/passwordResetResendRules";
+
+
+import {
   sanitizeAuthError,
   classifyAuthError,
   EMAIL_VERIFICATION_REQUIRED_MESSAGE,
@@ -27,6 +39,7 @@ import {
 } from "@/lib/authErrorRules";
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
+import { buildAcceptanceRows } from "@/lib/agreementConsent";
 import {
   DEFAULT_VERIFICATION_COOLDOWN_MS,
   VERIFICATION_COOLDOWN_HINT,
@@ -57,7 +70,13 @@ export default function Auth() {
     return raw ? sanitizeAuthRedirect(raw) : null;
   }, [search]);
   const redirectTo = explicitRedirect ?? "/";
-  const [mode, setMode] = useState<AuthMode>("signin");
+  const initialMode: AuthMode = (() => {
+    const raw = search.get("mode");
+    if (raw === "signup" || raw === "forgot" || raw === "signin") return raw;
+    return "signin";
+  })();
+  const [mode, setMode] = useState<AuthMode>(initialMode);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -71,12 +90,23 @@ export default function Auth() {
   const [resendNowTick, setResendNowTick] = useState<number>(() => Date.now());
   const [signUpError, setSignUpError] = useState<string | null>(null);
   const [signUpSuccess, setSignUpSuccess] = useState<string | null>(null);
+  const [magicBusy, setMagicBusy] = useState(false);
+  const [magicNotice, setMagicNotice] = useState<string | null>(null);
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [forgotSent, setForgotSent] = useState(false);
 
+  const [resetResendBusy, setResetResendBusy] = useState(false);
+  const [resetResendNotice, setResetResendNotice] = useState<string | null>(null);
+  const [resetResendLastAttemptAt, setResetResendLastAttemptAt] = useState<number | null>(null);
+  const [resetResendNowTick, setResetResendNowTick] = useState<number>(() => Date.now());
+
   const signInEmailRef = useRef<HTMLInputElement>(null);
+
   const signUpEmailRef = useRef<HTMLInputElement>(null);
   const forgotEmailRef = useRef<HTMLInputElement>(null);
 
@@ -103,7 +133,20 @@ export default function Auth() {
     return () => window.clearInterval(id);
   }, [resendLastAttemptAt, resendNowTick]);
 
+  // Same one-second tick for the "Resend reset email" cooldown.
+  useEffect(() => {
+    if (resetResendLastAttemptAt == null) return;
+    if (canResendResetEmail(Date.now(), resetResendLastAttemptAt, DEFAULT_RESET_EMAIL_COOLDOWN_MS)) {
+      return;
+    }
+    const id = window.setInterval(() => {
+      setResetResendNowTick(Date.now());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [resetResendLastAttemptAt, resetResendNowTick]);
+
   if (loading) return null;
+
   if (user) return <Navigate to={postSignInTarget()} replace />;
 
   const resendCooldownActive = !canResendVerification(
@@ -123,7 +166,25 @@ export default function Auth() {
       ? formatVerificationCooldown(resendCooldownRemainingMs)
       : "Resend verification email";
 
+  const resetResendCooldownActive = !canResendResetEmail(
+    resetResendNowTick,
+    resetResendLastAttemptAt,
+    DEFAULT_RESET_EMAIL_COOLDOWN_MS,
+  );
+  const resetResendCooldownRemainingMs = resetEmailCooldownRemainingMs(
+    resetResendNowTick,
+    resetResendLastAttemptAt,
+    DEFAULT_RESET_EMAIL_COOLDOWN_MS,
+  );
+  const resetResendDisabled =
+    resetResendBusy || resetResendCooldownActive || forgotEmail.trim().length === 0;
+  const resetResendLabel = buildResetResendLabel(
+    resetResendBusy,
+    resetResendCooldownRemainingMs,
+  );
+
   async function resendVerification() {
+
     if (resendBusy) return;
     if (!canResendVerification(Date.now(), resendLastAttemptAt, DEFAULT_VERIFICATION_COOLDOWN_MS)) {
       return;
@@ -177,24 +238,105 @@ export default function Auth() {
     if (busy) return;
     setSignUpError(null);
     setSignUpSuccess(null);
+    setConsentError(null);
+    if (!consentAccepted) {
+      setConsentError("Please accept the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
     if (password.length < MIN_PASSWORD_LENGTH) {
       setSignUpError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
       return;
     }
     setBusy(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: window.location.origin },
     });
-    setBusy(false);
     if (error) {
+      setBusy(false);
       setSignUpError(sanitizeAuthError("signUp", error));
       signUpEmailRef.current?.focus();
       return;
     }
+    // Record acceptance of the current agreement versions. Runs best-effort:
+    // if the user must confirm their email first there may be no active
+    // session yet, in which case the insert is skipped and the re-consent
+    // gate will prompt on first authenticated load. Signup itself must not
+    // fail on a consent-log write error.
+    if (data.user?.id) {
+      try {
+        const rows = buildAcceptanceRows(data.user.id).map((r) => ({
+          ...r,
+          user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+        }));
+        await supabase
+          .from("user_agreement_acceptances")
+          .upsert(rows, { onConflict: "user_id,agreement_type,version" });
+      } catch {
+        // Non-fatal — re-consent gate will catch missing acceptance later.
+      }
+      // Persist the marketing opt-in choice. Explicit user action only —
+      // default remains false server-side, so a failure here means the
+      // user simply stays opted out.
+      try {
+        await supabase.from("profiles").upsert(
+          {
+            user_id: data.user.id,
+            marketing_opt_in: marketingOptIn,
+            marketing_opt_in_at: marketingOptIn ? new Date().toISOString() : null,
+          },
+          { onConflict: "user_id" },
+        );
+      } catch {
+        // Non-fatal.
+      }
+    }
+    setBusy(false);
     setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
     nav(postSignInTarget(), { replace: true });
+  }
+
+  async function sendMagicLink() {
+    if (magicBusy) return;
+    setMagicNotice(null);
+    setSignInError(null);
+    const trimmed = email.trim();
+    if (!trimmed || !trimmed.includes("@")) {
+      setSignInError("Enter your email address to receive a sign-in link.");
+      signInEmailRef.current?.focus();
+      return;
+    }
+    setMagicBusy(true);
+    try {
+      // Generic response regardless of account existence — do not leak
+      // whether the address is registered. `shouldCreateUser: false` keeps
+      // magic link a sign-in mechanism, not a covert signup.
+      await supabase.auth.signInWithOtp({
+        email: trimmed,
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo: `${window.location.origin}${redirectTo}`,
+        },
+      });
+    } catch {
+      /* swallow — generic notice below */
+    } finally {
+      setMagicBusy(false);
+      setMagicNotice(
+        "If an account exists for that email, we've sent a sign-in link. Check your inbox.",
+      );
+    }
+  }
+
+  async function sendResetEmailTo(email: string): Promise<{ error: unknown }> {
+    // Best-effort send. We do NOT branch on the success/failure shape in a
+    // way that reveals account existence. Network/rate-limit errors get a
+    // generic retry copy; success path uses GENERIC_RESET_REQUEST_SUCCESS.
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: buildResetRedirectUrl(window.location.origin),
+    });
+    return { error };
   }
 
   async function requestReset(e: React.FormEvent) {
@@ -208,12 +350,7 @@ export default function Auth() {
       return;
     }
     setBusy(true);
-    // Best-effort send. We do NOT branch on the success/failure shape in a
-    // way that reveals account existence. Network/rate-limit errors get a
-    // generic retry copy; success path uses GENERIC_RESET_REQUEST_SUCCESS.
-    const { error } = await supabase.auth.resetPasswordForEmail(v.email, {
-      redirectTo: buildResetRedirectUrl(window.location.origin),
-    });
+    const { error } = await sendResetEmailTo(v.email);
     setBusy(false);
     if (error) {
       setForgotError(sanitizeAuthError("forgotPassword", error));
@@ -221,7 +358,37 @@ export default function Auth() {
       return;
     }
     setForgotSent(true);
+    setResetResendNotice(null);
+    setResetResendLastAttemptAt(null);
+    setResetResendNowTick(Date.now());
   }
+
+  async function resendResetEmail() {
+    if (resetResendBusy) return;
+    if (!canResendResetEmail(Date.now(), resetResendLastAttemptAt, DEFAULT_RESET_EMAIL_COOLDOWN_MS)) {
+      return;
+    }
+    setResetResendBusy(true);
+    setResetResendNotice(null);
+    try {
+      const v = validateResetEmail(forgotEmail);
+      if ("message" in v) {
+        setResetResendNotice(RESET_RESEND_FAILURE_MESSAGE);
+        return;
+      }
+      const { error } = await sendResetEmailTo(v.email);
+      setResetResendNotice(error ? RESET_RESEND_FAILURE_MESSAGE : RESET_RESEND_SUCCESS_MESSAGE);
+    } catch {
+      setResetResendNotice(RESET_RESEND_FAILURE_MESSAGE);
+    } finally {
+      // Apply cooldown on both success and failure to discourage hammering.
+      setResetResendBusy(false);
+      const stamp = Date.now();
+      setResetResendLastAttemptAt(stamp);
+      setResetResendNowTick(stamp);
+    }
+  }
+
 
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
@@ -238,17 +405,13 @@ export default function Auth() {
         <div className="flex items-center gap-3 mb-6">
           <BrandLogo size="lg" />
           <div>
-            <h1 className="text-3xl font-display font-bold">Sign in to Verdant Grow Diary</h1>
+            <h1 className="text-3xl font-display font-bold">&nbsp;Verdant Grow Diary</h1>
             <p className="text-sm text-muted-foreground">
-              Plant memory. Sensor truth. Better decisions.
+              Your grow-room operating system for logs, sensor truth, cautious AI, and
+              grower-approved actions.
             </p>
           </div>
         </div>
-
-        <p className="text-sm text-muted-foreground mb-4">
-          Your grow-room operating system for logs, sensor truth, cautious AI, and
-          grower-approved actions.
-        </p>
 
         <div className="glass rounded-2xl p-6">
           <Tabs
@@ -259,7 +422,9 @@ export default function Auth() {
               setSignUpError(null);
               setForgotError(null);
               setForgotSent(false);
+              setResetResendNotice(null);
             }}
+
           >
             <TabsList className={AUTH_TAB_LIST_CLASSNAME}>
               {AUTH_MODE_TABS.map((tab) => (
@@ -300,6 +465,24 @@ export default function Auth() {
                   ariaDescribedBy={signInError ? "signin-error" : undefined}
                   required
                 />
+                <div className="flex justify-end -mt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("forgot");
+                      setForgotEmail(email);
+                      setSignInError(null);
+                      setVerifyRequired(false);
+                      setForgotError(null);
+                      setForgotSent(false);
+                      // focus handled on next paint
+                      window.setTimeout(() => forgotEmailRef.current?.focus(), 0);
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
                 {signInError ? (
                   <AuthInlineMessage id="signin-error" role="alert" tone="error">
                     {signInError}
@@ -342,6 +525,25 @@ export default function Auth() {
                 >
                   {busy ? "Signing in…" : "Sign in"}
                 </Button>
+                <div className="grid gap-2 pt-2 border-t border-border/40 mt-1">
+                  <p className="text-[11px] text-muted-foreground">
+                    Prefer not to type a password? We can email you a one-time
+                    sign-in link instead.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={magicBusy}
+                    aria-busy={magicBusy}
+                    onClick={sendMagicLink}
+                  >
+                    {magicBusy ? "Sending sign-in link…" : "Email me a sign-in link"}
+                  </Button>
+                  {magicNotice ? (
+                    <AuthInlineMessage role="status">{magicNotice}</AuthInlineMessage>
+                  ) : null}
+                </div>
               </form>
             </TabsContent>
 
@@ -378,7 +580,74 @@ export default function Auth() {
                   </AuthInlineMessage>
                 ) : null}
                 {signUpSuccess ? (
-                  <AuthInlineMessage>{signUpSuccess}</AuthInlineMessage>
+                  <div className="grid gap-2 rounded-md border border-border/50 p-3 bg-secondary/30">
+                    <AuthInlineMessage>{signUpSuccess}</AuthInlineMessage>
+                    <p className="text-[11px] text-muted-foreground">
+                      Didn't get the email? Check your spam folder, or resend it.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={resendDisabled || email.trim().length === 0}
+                      aria-busy={resendBusy}
+                      onClick={resendVerification}
+                    >
+                      {resendLabel}
+                    </Button>
+                    {resendCooldownActive && !resendBusy ? (
+                      <p
+                        role="status"
+                        aria-live="polite"
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        {VERIFICATION_COOLDOWN_HINT}
+                      </p>
+                    ) : null}
+                    {resendNotice ? (
+                      <AuthInlineMessage>{resendNotice}</AuthInlineMessage>
+                    ) : null}
+                  </div>
+                ) : null}
+                <div className="flex items-start gap-2 pt-1">
+                  <Checkbox
+                    id="signup-consent"
+                    checked={consentAccepted}
+                    onCheckedChange={(v) => {
+                      setConsentAccepted(v === true);
+                      if (v === true) setConsentError(null);
+                    }}
+                    aria-invalid={!!consentError}
+                    aria-describedby={consentError ? "signup-consent-error" : undefined}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="signup-consent" className="text-xs text-muted-foreground leading-snug">
+                    I agree to the{" "}
+                    <Link to="/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
+                      Terms of Service
+                    </Link>{" "}
+                    and{" "}
+                    <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
+                      Privacy Policy
+                    </Link>
+                    .
+                  </label>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="signup-marketing"
+                    checked={marketingOptIn}
+                    onCheckedChange={(v) => setMarketingOptIn(v === true)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="signup-marketing" className="text-xs text-muted-foreground leading-snug">
+                    Send me occasional product updates and grow tips from Verdant. Optional — you can change this any time in settings.
+                  </label>
+                </div>
+                {consentError ? (
+                  <AuthInlineMessage id="signup-consent-error" role="alert" tone="error">
+                    {consentError}
+                  </AuthInlineMessage>
                 ) : null}
                 <Button
                   type="submit"
@@ -396,14 +665,35 @@ export default function Auth() {
                 Forgot your password? We'll email you a secure reset link.
               </p>
               {forgotSent ? (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className="text-sm text-muted-foreground"
-                >
-                  {GENERIC_RESET_REQUEST_SUCCESS}
+                <div className="grid gap-3" role="status" aria-live="polite">
+                  <p className="text-sm text-muted-foreground">
+                    {GENERIC_RESET_REQUEST_SUCCESS}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={resetResendDisabled}
+                    aria-busy={resetResendBusy}
+                    onClick={resendResetEmail}
+                  >
+                    {resetResendLabel}
+                  </Button>
+                  {resetResendCooldownActive && !resetResendBusy ? (
+                    <p
+                      role="status"
+                      aria-live="polite"
+                      className="text-[11px] text-muted-foreground"
+                    >
+                      {RESET_RESEND_COOLDOWN_HINT}
+                    </p>
+                  ) : null}
+                  {resetResendNotice ? (
+                    <AuthInlineMessage>{resetResendNotice}</AuthInlineMessage>
+                  ) : null}
                 </div>
               ) : (
+
                 <form onSubmit={requestReset} noValidate className="grid gap-3" aria-label="Forgot password">
                   <AuthTextField
                     id="forgot-email"
@@ -435,6 +725,36 @@ export default function Auth() {
             </TabsContent>
           </Tabs>
         </div>
+
+        <ul
+          aria-label="What Verdant stands for"
+          className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-muted-foreground"
+        >
+          <li className="flex items-center gap-2 rounded-lg border border-border/40 bg-secondary/20 px-3 py-2">
+            <Leaf className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden />
+            <span>Plant memory</span>
+          </li>
+          <li className="flex items-center gap-2 rounded-lg border border-border/40 bg-secondary/20 px-3 py-2">
+            <Gauge className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden />
+            <span>Sensor truth</span>
+          </li>
+          <li className="flex items-center gap-2 rounded-lg border border-border/40 bg-secondary/20 px-3 py-2">
+            <ShieldCheck className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden />
+            <span>Grower-approved action</span>
+          </li>
+        </ul>
+
+        <p className="mt-4 text-center text-[11px] text-muted-foreground">
+          By continuing, you agree to Verdant's{" "}
+          <Link to="/terms" className="underline underline-offset-2 hover:text-foreground">
+            Terms of Service
+          </Link>{" "}
+          &amp;{" "}
+          <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );

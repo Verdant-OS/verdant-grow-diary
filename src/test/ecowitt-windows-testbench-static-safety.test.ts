@@ -1106,31 +1106,50 @@ describe("ecowitt windows testbench — preflight PowerShell invocation smoke", 
     expect(out).not.toMatch(/SUPABASE_SERVICE_ROLE/);
   }
 
-  maybeIt("invokes successfully from repo root", () => {
-    const r = runPreflight(repoRoot, []);
-    const out = (r.stdout || "") + (r.stderr || "");
-    assertSafeOutput(out);
-    expect(r.status, out).toBe(0);
-    expect(out).toMatch(/\[preflight\]/);
-    expect(out.toLowerCase()).toMatch(/repo root/);
-  });
+  // These smoke tests shell out to PowerShell (spawnSync with a 30s
+  // internal timeout). On busy CI runners PowerShell startup + preflight
+  // routinely exceeds Vitest's 5s default per-test budget without any
+  // real defect, so scope a matching bounded budget to just these three
+  // tests. We do NOT raise the global Vitest timeout.
+  const PWSH_INVOKE_BUDGET_MS = 30_000;
 
-  maybeIt("invokes successfully from tools/ecowitt-testbench", () => {
-    const r = runPreflight(tbDir, []);
-    const out = (r.stdout || "") + (r.stderr || "");
-    assertSafeOutput(out);
-    expect(r.status, out).toBe(0);
-    expect(out).toMatch(/\[preflight\]/);
-  });
+  maybeIt(
+    "invokes successfully from repo root",
+    () => {
+      const r = runPreflight(repoRoot, []);
+      const out = (r.stdout || "") + (r.stderr || "");
+      assertSafeOutput(out);
+      expect(r.status, out).toBe(0);
+      expect(out).toMatch(/\[preflight\]/);
+      expect(out.toLowerCase()).toMatch(/repo root/);
+    },
+    PWSH_INVOKE_BUDGET_MS,
+  );
 
-  maybeIt("invokes successfully by direct script path from repo root with -Diagnostics", () => {
-    const r = runPreflight(repoRoot, ["-Diagnostics"]);
-    const out = (r.stdout || "") + (r.stderr || "");
-    assertSafeOutput(out);
-    expect(r.status, out).toBe(0);
-    expect(out).toMatch(/Diagnostics \(safe paths only\)/);
-    expect(out.toLowerCase()).toMatch(/detected repo root/);
-  });
+  maybeIt(
+    "invokes successfully from tools/ecowitt-testbench",
+    () => {
+      const r = runPreflight(tbDir, []);
+      const out = (r.stdout || "") + (r.stderr || "");
+      assertSafeOutput(out);
+      expect(r.status, out).toBe(0);
+      expect(out).toMatch(/\[preflight\]/);
+    },
+    PWSH_INVOKE_BUDGET_MS,
+  );
+
+  maybeIt(
+    "invokes successfully by direct script path from repo root with -Diagnostics",
+    () => {
+      const r = runPreflight(repoRoot, ["-Diagnostics"]);
+      const out = (r.stdout || "") + (r.stderr || "");
+      assertSafeOutput(out);
+      expect(r.status, out).toBe(0);
+      expect(out).toMatch(/Diagnostics \(safe paths only\)/);
+      expect(out.toLowerCase()).toMatch(/detected repo root/);
+    },
+    PWSH_INVOKE_BUDGET_MS,
+  );
 });
 
 describe("ecowitt windows testbench — forwarding tent-context safety", () => {

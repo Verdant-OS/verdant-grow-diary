@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Check, Eye, EyeOff, Minus } from "lucide-react";
+import { AlertTriangle, Check, Eye, EyeOff, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,14 @@ import {
   getPasswordRequirementStatus,
 } from "@/lib/passwordResetRules";
 import { sanitizeAuthError } from "@/lib/authErrorRules";
+import {
+  diagnoseResetLink,
+  RESTART_FLOW_HREF,
+  type ResetLinkDiagnosis,
+} from "@/lib/resetPasswordLinkRules";
 
-type Status = "checking" | "ready" | "no_session" | "saving" | "done";
+type Status = "checking" | "ready" | "link_problem" | "saving" | "done";
+
 
 export default function ResetPassword() {
   const nav = useNavigate();
@@ -36,16 +42,25 @@ export default function ResetPassword() {
   const confirmMismatch =
     password.length > 0 && confirm.length > 0 && password !== confirm;
 
+  const [diagnosis, setDiagnosis] = useState<ResetLinkDiagnosis | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
-      setStatus(data.session ? "ready" : "no_session");
+      const d = diagnoseResetLink({
+        hash: typeof window !== "undefined" ? window.location.hash : "",
+        search: typeof window !== "undefined" ? window.location.search : "",
+        hasSession: !!data.session,
+      });
+      setDiagnosis(d);
+      setStatus(d.status === "ready" ? "ready" : "link_problem");
     });
     return () => {
       cancelled = true;
     };
   }, []);
+
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -110,18 +125,42 @@ export default function ResetPassword() {
             <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
               Checking reset link…
             </p>
-          ) : status === "no_session" ? (
-            <div className="grid gap-3" role="alert">
-              <p className="text-sm">
-                This reset link is missing or expired. Request a new one from the sign-in page.
-              </p>
-              <Link
-                to="/auth"
-                className="text-sm text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-              >
-                Back to sign in
-              </Link>
+          ) : status === "link_problem" ? (
+            <div
+              className="grid gap-3"
+              role="alert"
+              data-testid={`reset-link-${diagnosis?.status ?? "missing"}`}
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangle
+                  className="h-5 w-5 text-destructive shrink-0 mt-0.5"
+                  aria-hidden
+                />
+                <div className="grid gap-1">
+                  <p className="text-sm font-medium">
+                    {diagnosis?.title ?? "This reset link is not valid"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {diagnosis?.message ??
+                      "Request a new reset email from the sign-in page."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <Button asChild className="gradient-leaf text-primary-foreground">
+                  <Link to={RESTART_FLOW_HREF}>
+                    {diagnosis?.ctaLabel ?? "Send a new reset email"}
+                  </Link>
+                </Button>
+                <Link
+                  to="/auth"
+                  className="text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                >
+                  Back to sign in
+                </Link>
+              </div>
             </div>
+
           ) : status === "done" ? (
             <div className="grid gap-3" role="status" aria-live="polite">
               <p className="text-sm">Password updated. Redirecting to sign in…</p>

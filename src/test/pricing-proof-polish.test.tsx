@@ -2,13 +2,13 @@
  * Pricing / Proof Polish v1 — copy + safety regressions.
  *
  * Asserts the polish copy renders and that forbidden / unsafe phrases
- * do NOT appear anywhere on the Pricing page or BillingPlaceholder.
+ * do NOT appear anywhere on the Pricing page. (The retired
+ * `BillingPlaceholder` describe block was removed in Slice F.)
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 import Pricing from "@/pages/Pricing";
-import BillingPlaceholder from "@/pages/BillingPlaceholder";
 
 vi.mock("@/lib/pricingAnalytics", () => ({
   trackPricingEvent: vi.fn(),
@@ -34,16 +34,6 @@ function renderPricing() {
   return render(
     <MemoryRouter>
       <Pricing />
-    </MemoryRouter>,
-  );
-}
-
-function renderBilling(plan: string) {
-  return render(
-    <MemoryRouter initialEntries={[`/billing/${plan}`]}>
-      <Routes>
-        <Route path="/billing/:plan" element={<BillingPlaceholder />} />
-      </Routes>
     </MemoryRouter>,
   );
 }
@@ -169,24 +159,7 @@ describe("Pricing — proof polish copy", () => {
   });
 });
 
-describe("BillingPlaceholder — sandbox disclosure polish", () => {
-  it("renders above-the-fold sandbox banner with honest copy", () => {
-    renderBilling("pro-monthly");
-    const banner = screen.getByTestId("billing-sandbox-banner");
-    expect(banner.textContent).toContain("sandbox preview");
-    expect(banner.textContent).toContain("No live charge");
-  });
-
-  it("renders for founder-lifetime plan too", () => {
-    renderBilling("founder-lifetime");
-    expect(screen.getByTestId("billing-sandbox-banner")).toBeInTheDocument();
-  });
-
-  it("forbidden marketing/automation phrases never appear on BillingPlaceholder", () => {
-    renderBilling("pro-annual");
-    const body = document.body.textContent?.toLowerCase() ?? "";
-    for (const term of FORBIDDEN) {
-      expect(body, `forbidden phrase leaked: ${term}`).not.toContain(term);
-    }
-  });
-});
+// Slice F: the "BillingPlaceholder — sandbox disclosure polish" block was
+// removed alongside the retired presenter. Sandbox honesty copy is now
+// covered by the Pricing FAQ tests above and by the canonical `/upgrade`
+// checkout tests.

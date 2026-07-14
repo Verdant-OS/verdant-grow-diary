@@ -1,6 +1,17 @@
 import { useMemo, type ReactNode } from "react";
-import { AlertTriangle, FlaskConical, Image as ImageIcon } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Activity,
+  AlertTriangle,
+  Bug,
+  FileDown,
+  FlaskConical,
+  Gauge,
+  Image as ImageIcon,
+  Scissors,
+} from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import {
   normalizeDiaryEntries,
   type NormalizeDiaryInput,
@@ -14,9 +25,11 @@ import {
   type QuickLogHistoryRow,
 } from "@/lib/quickLogHistoryRules";
 import { getEventType } from "@/lib/diary";
+import {
+  exportGrowDiaryReportAsPdf,
+  type BuildGrowDiaryReportInput,
+} from "@/lib/growDiaryPdfExport";
 import { cn } from "@/lib/utils";
-
-import { Activity, Bug, Scissors, Gauge } from "lucide-react";
 
 type Builder = (entries: ReturnType<typeof normalizeDiaryEntries>) => QuickLogHistoryRow[];
 
@@ -31,6 +44,7 @@ interface QuickLogHistorySectionProps {
   emptyHelp: string;
   limit?: number;
   className?: string;
+  headerAction?: ReactNode;
 }
 
 function fmtDate(iso: string | null, fallback: string): string {
@@ -61,6 +75,50 @@ function liftEntries(rawEntries: NormalizeDiaryInput["rawEntries"]) {
       ? { ...r, entry_type: lifted }
       : r;
   });
+}
+
+function countRows(
+  rows: readonly QuickLogHistoryRow[],
+  predicate: (row: QuickLogHistoryRow) => boolean,
+): number {
+  return rows.reduce((total, row) => total + (predicate(row) ? 1 : 0), 0);
+}
+
+function buildRecentDiaryPdfInput(
+  rawEntries: NormalizeDiaryInput["rawEntries"],
+  limit: number,
+): BuildGrowDiaryReportInput {
+  const lifted = liftEntries(rawEntries);
+  const normalized = normalizeDiaryEntries({ rawEntries: lifted });
+  const allRows = buildRecentQuickLogActivity(normalized, Number.MAX_SAFE_INTEGER);
+  const recentRows = allRows.slice(0, Math.max(0, limit));
+
+  return {
+    grow: { name: "Diary Summary" },
+    counts: {
+      diary: allRows.length,
+      watering: countRows(allRows, (row) => row.eventType === "watering"),
+      feeding: countRows(allRows, (row) => row.eventType === "feeding"),
+      photo: countRows(allRows, (row) => !!row.photoUrl),
+    },
+    recent: recentRows.map((row) => {
+      const et = getEventType(row.eventType);
+      const details = [
+        row.noteBody,
+        row.photoUrl ? "Photo attached" : null,
+        row.manualHandheld ? "Manual handheld readings included" : null,
+      ].filter((v): v is string => !!v && v.length > 0);
+      return {
+        id: `diary-${row.id}`,
+        kind: "diary",
+        ts: row.occurredAt ?? row.occurredAtLabel,
+        title: et.label,
+        detail: details.join(" · ") || null,
+      };
+    }),
+    chartsUnavailableReason:
+      "Charts are not embedded from the diary summary list. This export includes the available counts and recent entries instead.",
+  };
 }
 
 function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
@@ -183,6 +241,7 @@ function QuickLogHistorySection({
   emptyHelp,
   limit = 20,
   className,
+  headerAction,
 }: QuickLogHistorySectionProps) {
   const rows = useMemo(() => {
     const lifted = liftEntries(rawEntries);
@@ -196,18 +255,21 @@ function QuickLogHistorySection({
       aria-label={title}
       data-testid={`quicklog-history-section-${laneKey}`}
     >
-      <header className="flex items-center justify-between mb-3">
+      <header className="flex items-start justify-between gap-3 mb-3">
         <h2 className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {icon}
           {title}
         </h2>
-        <span className="text-xs text-muted-foreground">
-          {rows.length === 0
-            ? "0"
-            : rows.length === 1
-              ? "1 entry"
-              : `${rows.length} entries`}
-        </span>
+        <div className="flex items-center gap-2">
+          {headerAction}
+          <span className="text-xs text-muted-foreground">
+            {rows.length === 0
+              ? "0"
+              : rows.length === 1
+                ? "1 entry"
+                : `${rows.length} entries`}
+          </span>
+        </div>
       </header>
       {rows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-4 text-center">
@@ -234,6 +296,19 @@ export function RecentQuickLogActivityPanel({
   rawEntries: NormalizeDiaryInput["rawEntries"];
   limit?: number;
 }) {
+  const handleExport = () => {
+    const result = exportGrowDiaryReportAsPdf(
+      buildRecentDiaryPdfInput(rawEntries, limit),
+    );
+    if (result === "unavailable") {
+      toast.error(
+        "Couldn't open the diary PDF export window. Check popup blockers and try again.",
+      );
+    } else {
+      toast.success("Diary PDF export opened. Choose 'Save as PDF' to save.");
+    }
+  };
+
   return (
     <QuickLogHistorySection
       rawEntries={rawEntries}
@@ -244,6 +319,18 @@ export function RecentQuickLogActivityPanel({
       emptyTitle="No Quick Log entries yet"
       emptyHelp="Open Quick Log to capture a note, watering, photo, or manual reading."
       limit={limit}
+      headerAction={
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          data-testid="quicklog-history-export-diary-pdf"
+        >
+          <FileDown className="h-3.5 w-3.5" aria-hidden="true" />
+          Export diary PDF
+        </Button>
+      }
     />
   );
 }

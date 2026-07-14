@@ -15,6 +15,16 @@ export interface CreatePhenoHuntInput {
   plantIds: readonly string[];
   /** Optional per-plant label overrides. */
   labels?: Readonly<Record<string, string>>;
+  /** Selected evidence goal ids captured during onboarding. */
+  evidenceGoals?: readonly string[];
+  /** Optional hunt notes captured during onboarding basics step. */
+  notes?: string | null;
+  /**
+   * When true, records `setup_completed_at = now()` on the created hunt.
+   * When false/undefined the hunt is created with setup still pending so the
+   * workspace shows a "Continue setup" progress card.
+   */
+  markSetupComplete?: boolean;
 }
 
 export interface CreatePhenoHuntResult {
@@ -23,7 +33,10 @@ export interface CreatePhenoHuntResult {
 }
 
 export class PhenoHuntError extends Error {
-  constructor(message: string, public cause?: unknown) {
+  constructor(
+    message: string,
+    public cause?: unknown,
+  ) {
     super(message);
     this.name = "PhenoHuntError";
   }
@@ -45,10 +58,7 @@ export interface PhenoHuntDraft {
   plantIds: readonly string[];
 }
 
-export type PhenoHuntValidationError =
-  | "name_required"
-  | "grow_required"
-  | "no_candidates";
+export type PhenoHuntValidationError = "name_required" | "grow_required" | "no_candidates";
 
 export function validatePhenoHuntDraft(
   draft: PhenoHuntDraft,
@@ -59,6 +69,43 @@ export function validatePhenoHuntDraft(
   if (!growId) errs.push("grow_required");
   if (draft.plantIds.length === 0) errs.push("no_candidates");
   return errs;
+}
+
+/** Known evidence goal ids — mirrors phenoEvidenceGoals to avoid an import
+ * cycle in tests that stub the goals module. Sanitizer only allows short
+ * text keys and dedupes. */
+const KNOWN_EVIDENCE_GOAL_IDS = new Set([
+  "structure",
+  "vigor",
+  "aroma",
+  "resin",
+  "stretch",
+  "stress_resistance",
+  "disease_resistance",
+  "yield",
+  "post_harvest",
+  "post_cure",
+  "replication_readiness",
+  "keeper_decision",
+]);
+
+export function sanitizeEvidenceGoals(
+  input: readonly string[] | null | undefined,
+): string[] {
+  if (!input || !Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of input) {
+    if (typeof raw !== "string") continue;
+    const v = raw.trim();
+    if (!v || v.length > 64) continue;
+    if (!KNOWN_EVIDENCE_GOAL_IDS.has(v)) continue;
+    if (seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+    if (out.length >= 32) break;
+  }
+  return out;
 }
 
 export async function createPhenoHunt(
@@ -72,52 +119,85 @@ export async function createPhenoHunt(
     throw new PhenoHuntError("Select at least one candidate plant.");
   }
 
+  // Sanitize evidence goals into a bounded list of short text keys — never
+  // leak arbitrary client-supplied JSON into the DB. The DB check constraint
+  // also enforces jsonb array type, but this is the app-layer guard.
+  const evidenceGoals = sanitizeEvidenceGoals(input.evidenceGoals);
+  const trimmedNotes =
+    typeof input.notes === "string" && input.notes.trim().length > 0
+      ? input.notes.trim().slice(0, 4000)
+      : null;
+
+  const insertRow: Record<string, unknown> = {
+    grow_id: input.growId,
+    tent_id: input.tentId ?? null,
+    name,
+    evidence_goals: evidenceGoals,
+    notes: trimmedNotes,
+  };
+  if (input.markSetupComplete) {
+    insertRow.setup_completed_at = new Date().toISOString();
+  }
+
   const { data: hunt, error: huntErr } = await client
     .from("pheno_hunts")
-    .insert({
-      grow_id: input.growId,
-      tent_id: input.tentId ?? null,
-      name,
-    } as never)
+    .insert(insertRow as never)
     .select("id")
     .single();
 
   if (huntErr || !hunt) {
-    throw new PhenoHuntError(
-      huntErr?.message ?? "Could not create pheno hunt.",
-      huntErr,
-    );
+    throw new PhenoHuntError(huntErr?.message ?? "Could not create pheno hunt.", huntErr);
   }
 
   const huntId = (hunt as { id: string }).id;
   const tagged: string[] = [];
 
-  // Tag each candidate plant. Per-plant update keeps each label correct and
-  // RLS-scoped without smuggling other plants' rows into a bulk update.
-  for (let i = 0; i < input.plantIds.length; i++) {
-    const plantId = input.plantIds[i];
-    const override = input.labels?.[plantId]?.trim();
-    const label = override && override.length > 0
-      ? override
-      : defaultCandidateLabel(i);
-
-    const { error: updErr } = await client
-      .from("plants")
-      .update({
-        pheno_hunt_id: huntId,
-        candidate_label: label,
-      } as never)
-      .eq("id", plantId);
-
-    if (updErr) {
-      // Best-effort rollback of the hunt row (RLS allows the owner to delete).
+  // Tag each candidate plant. Per-plant updates keep each label correct and
+  // RLS-scoped without smuggling other plants' rows into a bulk update, but
+  // run in bounded-concurrency chunks so a 100-candidate hunt is ~10 round
+  // trips of wall clock, not 100 serial ones (scale audit M1).
+  const TAG_CHUNK_SIZE = 10;
+  for (let start = 0; start < input.plantIds.length; start += TAG_CHUNK_SIZE) {
+    const chunk = input.plantIds.slice(start, start + TAG_CHUNK_SIZE);
+    const results = await Promise.all(
+      chunk.map(async (plantId, offset) => {
+        const override = input.labels?.[plantId]?.trim();
+        const label =
+          override && override.length > 0 ? override : defaultCandidateLabel(start + offset);
+        const { error: updErr } = await client
+          .from("plants")
+          .update({
+            pheno_hunt_id: huntId,
+            candidate_label: label,
+          } as never)
+          .eq("id", plantId);
+        return { plantId, updErr };
+      }),
+    );
+    const failed = results.find((r) => r.updErr);
+    for (const r of results) {
+      if (!r.updErr) tagged.push(r.plantId);
+    }
+    if (failed?.updErr) {
+      // Best-effort rollback: untag anything already tagged, then remove the
+      // hunt row (RLS allows the owner to delete/update own rows). Rollback
+      // failures are swallowed — they must never mask the original error.
+      if (tagged.length > 0) {
+        try {
+          await client
+            .from("plants")
+            .update({ pheno_hunt_id: null, candidate_label: null } as never)
+            .in("id", tagged);
+        } catch {
+          // best-effort only
+        }
+      }
       await client.from("pheno_hunts").delete().eq("id", huntId);
       throw new PhenoHuntError(
-        `Could not tag candidate plant: ${updErr.message}`,
-        updErr,
+        `Could not tag candidate plant: ${failed.updErr.message}`,
+        failed.updErr,
       );
     }
-    tagged.push(plantId);
   }
 
   return { huntId, taggedPlantIds: tagged };
@@ -157,10 +237,7 @@ export async function deletePhenoHunt(
     .eq("pheno_hunt_id", huntId);
 
   if (selErr) {
-    throw new PhenoHuntError(
-      `Could not read linked plants: ${selErr.message}`,
-      selErr,
-    );
+    throw new PhenoHuntError(`Could not read linked plants: ${selErr.message}`, selErr);
   }
 
   const linkedIds = (linked ?? []).map((r) => (r as { id: string }).id);
@@ -175,24 +252,64 @@ export async function deletePhenoHunt(
       .eq("pheno_hunt_id", huntId);
 
     if (untagErr) {
-      throw new PhenoHuntError(
-        `Could not untag linked plants: ${untagErr.message}`,
-        untagErr,
-      );
+      throw new PhenoHuntError(`Could not untag linked plants: ${untagErr.message}`, untagErr);
     }
   }
 
-  const { error: delErr } = await client
-    .from("pheno_hunts")
-    .delete()
-    .eq("id", huntId);
+  const { error: delErr } = await client.from("pheno_hunts").delete().eq("id", huntId);
 
   if (delErr) {
-    throw new PhenoHuntError(
-      `Could not delete pheno hunt: ${delErr.message}`,
-      delErr,
-    );
+    throw new PhenoHuntError(`Could not delete pheno hunt: ${delErr.message}`, delErr);
   }
 
   return { huntId, untaggedPlantIds: linkedIds };
+}
+
+export interface UpdatePhenoHuntSetupInput {
+  huntId: string;
+  /** New evidence-goal id list (sanitized before write). */
+  evidenceGoals?: readonly string[];
+  /** Freeform hunt notes (nullable to clear). */
+  notes?: string | null;
+  /** When true, stamps setup_completed_at=now(). When false, clears it. */
+  markSetupComplete?: boolean;
+}
+
+/**
+ * Update the onboarding-only fields on an existing hunt. Owner-only via RLS
+ * (Users update own pheno_hunts) plus the RESTRICTIVE Pro entitlement policy.
+ * Never touches candidate plants, keeper decisions, scores, or lab data.
+ */
+export async function updatePhenoHuntSetup(
+  input: UpdatePhenoHuntSetupInput,
+  client: SupabaseClient = defaultClient,
+): Promise<void> {
+  if (!input.huntId) throw new PhenoHuntError("Hunt id is required.");
+  const patch: Record<string, unknown> = {};
+  if (input.evidenceGoals !== undefined) {
+    patch.evidence_goals = sanitizeEvidenceGoals(input.evidenceGoals);
+  }
+  if (input.notes !== undefined) {
+    const t = typeof input.notes === "string" ? input.notes.trim() : "";
+    patch.notes = t.length > 0 ? t.slice(0, 4000) : null;
+  }
+  if (input.markSetupComplete === true) {
+    patch.setup_completed_at = new Date().toISOString();
+  } else if (input.markSetupComplete === false) {
+    patch.setup_completed_at = null;
+  }
+  if (Object.keys(patch).length === 0) return;
+  // Read the row back: RLS (owner + RESTRICTIVE Pro entitlement) filters
+  // blocked updates SILENTLY — 0 rows matched, no error — so a bare update
+  // would fake success for a lapsed plan or a cross-user hunt id.
+  const { data, error } = await client
+    .from("pheno_hunts")
+    .update(patch as never)
+    .eq("id", input.huntId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw new PhenoHuntError(`Could not update hunt setup: ${error.message}`, error);
+  if (!data) {
+    throw new PhenoHuntError("Hunt setup was not saved (hunt missing or write rejected).");
+  }
 }

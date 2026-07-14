@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { resolvePricingPlanPreselect } from "@/lib/pricingPlanPreselect";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   Check,
@@ -35,6 +36,8 @@ import {
 } from "@/components/ui/accordion";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
+import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
+
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -66,7 +69,16 @@ const COMPARISON_ROWS: Row[] = [
 ];
 
 export default function Pricing() {
-  const [billing, setBilling] = useState<BillingPeriod>("annual");
+  const [searchParams] = useSearchParams();
+  // Canonical `?plan=` preselect (see resolvePricingPlanPreselect).
+  // Legacy `/billing/:plan` redirects here with this exact contract.
+  // NEVER auto-opens Paddle — the grower must click a Pricing CTA.
+  const preselect = resolvePricingPlanPreselect(searchParams.get("plan"));
+  const [billing, setBilling] = useState<BillingPeriod>(
+    preselect.billing ?? "annual",
+  );
+  const { openCheckout, loading: checkoutLoading } = usePaddleCheckout();
+
 
   usePageSeo({
     title: "Pricing — Free, Pro & Founder Lifetime | Verdant Grow Diary",
@@ -153,7 +165,11 @@ export default function Pricing() {
       : `Or $${PRO_ANNUAL_PRICE_USD}/year — save ~${PRICING.pro.annualSavingsPercent}%`;
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main
+      className="min-h-screen bg-background text-foreground"
+      data-preselected-plan={preselect.plan ?? ""}
+      data-preselected-billing={preselect.billing ?? ""}
+    >
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
         <Link to="/welcome" className="flex items-center gap-2">
           <BrandLogo size="md" showText />
@@ -263,25 +279,29 @@ export default function Pricing() {
           badge={PRICING.pro.badge}
           footnote={proFootnote}
           cta={
-            <Link
-              to={billing === "annual" ? "/billing/pro-annual" : "/billing/pro-monthly"}
-              className="block"
+            <Button
+              size="lg"
+              className="w-full"
+              disabled={checkoutLoading}
+              data-testid={
+                billing === "annual"
+                  ? "pricing-cta-pro-annual"
+                  : "pricing-cta-pro-monthly"
+              }
+              onClick={() => {
+                const priceId =
+                  billing === "annual" ? "pro_annual" : "pro_monthly";
+                trackPricingEvent(
+                  billing === "annual"
+                    ? "pricing_cta_pro_annual_clicked"
+                    : "pricing_cta_pro_monthly_clicked",
+                );
+                void openCheckout({ priceId });
+              }}
             >
-              <Button
-                size="lg"
-                className="w-full"
-                onClick={() =>
-                  trackPricingEvent(
-                    billing === "annual"
-                      ? "pricing_cta_pro_annual_clicked"
-                      : "pricing_cta_pro_monthly_clicked",
-                  )
-                }
-              >
-                Upgrade to Pro — {proPrice}
-                {proCadence}
-              </Button>
-            </Link>
+              Upgrade to Pro — {proPrice}
+              {proCadence}
+            </Button>
           }
         />
 
@@ -295,19 +315,23 @@ export default function Pricing() {
           description={PRICING.founder.description}
           features={PRICING.founder.features}
           badge={PRICING.founder.badge}
-          footnote={`Limited to the first ${PRICING.founder.limit} early supporters. When they're claimed, this offer ends.`}
+          footnote={`Founder Lifetime is limited; availability may close manually when the first ${PRICING.founder.limit} are claimed.`}
           cta={
-            <Link to="/billing/founder-lifetime" className="block">
-              <Button
-                size="lg"
-                className="w-full"
-                onClick={() => trackPricingEvent("pricing_cta_founder_lifetime_clicked")}
-              >
-                Claim Founder Lifetime — ${PRICING.founder.price}
-              </Button>
-            </Link>
+            <Button
+              size="lg"
+              className="w-full"
+              disabled={checkoutLoading}
+              data-testid="pricing-cta-founder-lifetime"
+              onClick={() => {
+                trackPricingEvent("pricing_cta_founder_lifetime_clicked");
+                void openCheckout({ priceId: "founder_lifetime" });
+              }}
+            >
+              Claim Founder Lifetime — ${PRICING.founder.price}
+            </Button>
           }
         />
+
       </section>
 
       {/* AI Credit explainer */}
@@ -399,18 +423,20 @@ export default function Pricing() {
               ends.
             </p>
           </div>
-          <Link to="/billing/founder-lifetime" className="shrink-0">
-            <Button
-              size="lg"
-              onClick={() =>
-                trackPricingEvent("pricing_cta_founder_lifetime_clicked", {
-                  source: "highlight_band",
-                })
-              }
-            >
-              Claim Founder Lifetime
-            </Button>
-          </Link>
+          <Button
+            size="lg"
+            className="shrink-0"
+            disabled={checkoutLoading}
+            onClick={() => {
+              trackPricingEvent("pricing_cta_founder_lifetime_clicked", {
+                source: "highlight_band",
+              });
+              void openCheckout({ priceId: "founder_lifetime" });
+            }}
+          >
+            Claim Founder Lifetime
+          </Button>
+
         </div>
       </section>
 
@@ -634,28 +660,40 @@ export default function Pricing() {
               Start Free
             </Button>
           </Link>
-          <Link to="/billing/pro-monthly">
-            <Button
-              size="lg"
-              onClick={() =>
-                trackPricingEvent("pricing_cta_pro_monthly_clicked", { source: "footer" })
-              }
-            >
-              Upgrade to Pro
-            </Button>
-          </Link>
+          <Button
+            size="lg"
+            disabled={checkoutLoading}
+            onClick={() => {
+              trackPricingEvent("pricing_cta_pro_monthly_clicked", {
+                source: "footer",
+              });
+              void openCheckout({ priceId: "pro_monthly" });
+            }}
+          >
+            Upgrade to Pro
+          </Button>
+
         </div>
       </section>
 
-      <footer className="px-6 py-10 border-t border-border/40 text-sm text-muted-foreground text-center">
+      <footer className="px-6 py-10 border-t border-border/40 text-sm text-muted-foreground text-center space-y-2">
         <p>
           Verdant Grow Diary ·{" "}
           <a className="hover:text-foreground" href="https://verdantgrowdiary.com">
             verdantgrowdiary.com
           </a>
         </p>
-        <p className="mt-1">
+        <p>
           Software only. We do not sell cannabis, seeds, or cultivation equipment.
+        </p>
+        <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+          <Link to="/terms" className="hover:text-foreground">Terms of Service</Link>
+          <Link to="/privacy" className="hover:text-foreground">Privacy Policy</Link>
+          <Link to="/refund" className="hover:text-foreground">Refund Policy</Link>
+        </nav>
+        <p className="text-xs">
+          Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as
+          Merchant of Record. 30-day money-back guarantee.
         </p>
       </footer>
     </main>

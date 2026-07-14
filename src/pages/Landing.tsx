@@ -294,7 +294,7 @@ export default function Landing() {
           </Link>
           <a href="#features">
             <Button size="sm" variant="ghost">
-              Learn more
+              Explore Verdant features
             </Button>
           </a>
         </div>
@@ -315,12 +315,21 @@ export default function Landing() {
         <LeadCaptureForm />
       </section>
 
-      <footer className="px-6 py-10 border-t border-border/40 text-sm text-muted-foreground text-center">
+      <footer className="px-6 py-10 border-t border-border/40 text-sm text-muted-foreground text-center space-y-2">
         <p>
           Verdant Grow Diary ·{" "}
           <a className="hover:text-foreground" href="https://verdantgrowdiary.com">
             verdantgrowdiary.com
           </a>
+        </p>
+        <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+          <Link to="/terms" className="hover:text-foreground">Terms of Service</Link>
+          <Link to="/privacy" className="hover:text-foreground">Privacy Policy</Link>
+          <Link to="/refund" className="hover:text-foreground">Refund Policy</Link>
+        </nav>
+        <p className="text-xs">
+          Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as
+          Merchant of Record.
         </p>
       </footer>
     </main>

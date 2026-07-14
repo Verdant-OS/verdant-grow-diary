@@ -9,6 +9,8 @@
  */
 
 import { normalizeDiaryEntry, type NormalizedDiaryEntry } from "./diaryEntryRules";
+import { normalizeDiaryNoteText } from "./diaryNoteFormatting";
+import { composeActionFollowUpTitle } from "./actionFollowUpEvidenceViewModel";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -221,8 +223,14 @@ function isNormalizedEntry(v: unknown): v is NormalizedDiaryEntry {
   );
 }
 
-function titleForEventType(eventType: string): string {
+function titleForEventType(
+  eventType: string,
+  extras?: Record<string, unknown> | null,
+): string {
   const key = (eventType || "").toLowerCase().trim();
+  if (key === "action_followup") {
+    return composeActionFollowUpTitle(extras?.outcome);
+  }
   if (key && EVENT_TYPE_TITLES[key]) return EVENT_TYPE_TITLES[key];
   if (!key) return "Diary entry";
   // Safe fallback for unknown event types — capitalize the first character
@@ -238,8 +246,10 @@ function titleForEventType(eventType: string): string {
 
 function clipNotePreview(note: string, maxLen: number): string {
   if (!note) return "";
-  // Collapse whitespace so previews don't surface formatting artifacts.
-  const flat = note.replace(/\s+/g, " ").trim();
+  // Normalize repeated section labels + missing-space concat artifacts
+  // BEFORE clipping so the preview reads cleanly. Collapse whitespace so
+  // previews don't surface formatting artifacts.
+  const flat = normalizeDiaryNoteText(note).replace(/\s+/g, " ").trim();
   if (flat.length <= maxLen) return flat;
   return flat.slice(0, Math.max(0, maxLen - 1)).trimEnd() + "…";
 }
@@ -311,7 +321,7 @@ export function toTimelineItem(
   const timestamp = entry.createdAt ? Date.parse(entry.createdAt) : null;
   return {
     id: entry.id,
-    title: titleForEventType(entry.eventType),
+    title: titleForEventType(entry.eventType, entry.details.extras ?? null),
     subtitle: buildSubtitle(entry),
     timestamp: Number.isFinite(timestamp as number) ? (timestamp as number) : null,
     timestampLabel: entry.createdAtLabel,

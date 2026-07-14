@@ -479,6 +479,8 @@ describe("Action Queue safety — current posture (suggest-only by construction)
       /\bmqtt\.connect\b/i,
       /\bmqtt:\/\//i,
       /supabase\s*\.\s*from\(/i,
+      /\bfetch\(/i,
+      /device_command/i,
       /raw_payload/i,
     ]) {
       expect(src, `PDF export file must not contain: ${re}`).not.toMatch(re);

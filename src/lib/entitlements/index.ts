@@ -15,3 +15,16 @@ export type {
 export { FREE_CAPABILITIES } from "./capabilities";
 export { PLAN_CATALOG, KNOWN_PLAN_IDS, isKnownPlanId } from "./planCatalog";
 export { resolveEntitlements } from "./resolveEntitlements";
+export {
+  mapLovableSubscriptionRow,
+  type LovableSubscriptionRow,
+  type LovableBillingEnvironment,
+  type MapLovableOptions,
+} from "./lovablePaddleAdapter";
+export {
+  pickStrongestBilling,
+  resolveUnionEntitlements,
+  type EntitlementSource,
+  type PickStrongestResult,
+  type ResolveUnionInput,
+} from "./unionEntitlements";

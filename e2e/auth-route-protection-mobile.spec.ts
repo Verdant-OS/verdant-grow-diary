@@ -61,16 +61,33 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/actions",
   "/sensors",
   "/settings",
+  // write-capable pheno hunt surfaces — moved behind the auth gate
+  "/pheno-hunts/:id/workspace",
+  "/pheno-hunts/:id/keepers",
 ];
 
 const PUBLIC_MOBILE_ROUTES: string[] = [
   "/welcome",
   "/pricing",
   "/hardware-integrations",
+  "/guides",
+  "/guides/:slug",
+  "/how-ai-doctor-works",
   "/partners/csv-preview",
   "/customer/:shareId",
   "/pheno-comparison",
   "/pheno-hunts/:id/compare",
+  "/.lovable/oauth/consent",
+  "/breeder-beta",
+  "/creator-beta",
+  "/glossary",
+  "/pheno-expression-showcase",
+  "/upgrade",
+  "/checkout/success",
+  "/checkout/cancel",
+  "/terms",
+  "/privacy",
+  "/refund",
 ];
 
 // Internal fixture-only demo surfaces DELIBERATELY mounted OUTSIDE AppShell

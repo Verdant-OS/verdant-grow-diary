@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +13,11 @@ import {
   Sparkles,
   Bell,
   SlidersHorizontal,
+  FileDown,
+  GraduationCap,
 } from "lucide-react";
+import { exportGrowDiaryReportAsPdf } from "@/lib/growDiaryPdfExport";
+
 import { useGrowDetailData, type GrowOutcomesState } from "@/hooks/useGrowDetailData";
 import {
   type CountValue,
@@ -26,6 +31,7 @@ import {
   alertDetailPath,
   alertsPath,
   dashboardPath,
+  growLearningPath,
   logsPath,
   plantsPath,
   postGrowLearningReportPath,
@@ -36,6 +42,7 @@ import ActionOutcomeLearningReport from "@/components/ActionOutcomeLearningRepor
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
+import { GrowFollowUpReviewSection } from "@/components/GrowFollowUpReviewSection";
 
 
 /**
@@ -137,8 +144,39 @@ export default function GrowDetail() {
             <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
             Edit targets
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="grow-detail-export-pdf"
+            onClick={() => {
+              const result = exportGrowDiaryReportAsPdf({
+                grow: {
+                  name: grow.name,
+                  startedAt: grow.started_at,
+                  stage: grow.stage,
+                },
+                counts: {
+                  diary: counts.diary,
+                  alerts: counts.alertsOpen,
+                },
+                recent: recent.status === "ok" ? recent.items : [],
+              });
+              if (result === "unavailable") {
+                toast.error(
+                  "Couldn't open the export window. Check popup blockers and try again.",
+                );
+              } else {
+                toast.success("Grow diary export opened. Choose 'Save as PDF' to save.");
+              }
+            }}
+          >
+            <FileDown className="h-4 w-4" aria-hidden="true" />
+            Export PDF
+          </Button>
         </div>
       </header>
+
 
 
       {/* One-Tent Loop continuity card. No specific tent is "selected"
@@ -212,6 +250,14 @@ export default function GrowDetail() {
             countLabel="records"
           />
         )}
+        <HubLink
+          to={growLearningPath(grow.id)}
+          icon={<GraduationCap className="h-4 w-4" />}
+          title="Learning review"
+          description="Completed actions, grower-recorded outcomes, and next-run decisions."
+          count="unavailable"
+          countLabel="learning review"
+        />
       </section>
 
       <section className="glass rounded-2xl p-4 mt-4" aria-label="Recent activity">
@@ -264,6 +310,8 @@ export default function GrowDetail() {
       </section>
 
       <RecentOutcomesCard outcomes={outcomes} />
+
+      <GrowFollowUpReviewSection growId={grow.id} />
 
       <ActionOutcomeLearningReport
         report={outcomes.learning}

@@ -1,0 +1,108 @@
+name: Pheno disabled Compare E2E
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "e2e/pheno-disabled-compare-*.spec.ts"
+      - "e2e/pheno-workspace-missing-evidence-anchors.spec.ts"
+      - "e2e/lib/phenoDisabledCompareHelpers.ts"
+      - "scripts/e2e/run-pheno-disabled-compare-e2e.mjs"
+      - ".github/workflows/pheno-disabled-compare-e2e.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pheno-disabled-compare-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright browsers (Chromium only)
+        run: bunx playwright install --with-deps chromium
+
+      # Env-aware runner: prints a fixture presence table and skips cleanly
+      # (exit 0) if no E2E_PHENO_HUNT_ID_* fixture env vars are set.
+      # Scenarios whose fixture var is missing skip inside Playwright.
+      - name: Run Pheno disabled-Compare E2E
+        env:
+          E2E_PHENO_HUNT_ID_MISSING_EVIDENCE: ${{ vars.E2E_PHENO_HUNT_ID_MISSING_EVIDENCE }}
+          E2E_PHENO_HUNT_ID_PENDING_HARVEST: ${{ vars.E2E_PHENO_HUNT_ID_PENDING_HARVEST }}
+          E2E_PHENO_HUNT_ID_PENDING_CURE: ${{ vars.E2E_PHENO_HUNT_ID_PENDING_CURE }}
+          E2E_PHENO_HUNT_ID_REPLICATION_PENDING: ${{ vars.E2E_PHENO_HUNT_ID_REPLICATION_PENDING }}
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
+        run: bun run scripts/e2e/run-pheno-disabled-compare-e2e.mjs
+
+      # Summarize screenshot inventory before upload. Never prints fixture
+      # IDs or env values — only relative filenames under e2e/screenshots/.
+      - name: Summarize Pheno disabled-Compare screenshots
+        if: always()
+        shell: bash
+        run: |
+          if [ -d e2e/screenshots ]; then
+            count=$(find e2e/screenshots -type f | wc -l | tr -d ' ')
+            {
+              echo "### Pheno disabled-Compare screenshots"
+              echo ""
+              echo "Found ${count} screenshot file(s). Artifact \`pheno-disabled-compare-screenshots\` will be uploaded."
+              echo ""
+              if [ "${count}" -gt 0 ]; then
+                echo "Files:"
+                echo ""
+                find e2e/screenshots -type f -printf '- %P\n' 2>/dev/null \
+                  || find e2e/screenshots -type f | sed 's#^e2e/screenshots/#- #'
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "Screenshot inventory (${count} file(s)):"
+            find e2e/screenshots -type f -printf '  %P\n' 2>/dev/null \
+              || find e2e/screenshots -type f | sed 's#^e2e/screenshots/#  #'
+          else
+            {
+              echo "### Pheno disabled-Compare screenshots"
+              echo ""
+              echo "No \`e2e/screenshots/\` directory found — all scenarios skipped or no screenshots were produced. Screenshot artifact upload will no-op."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "No e2e/screenshots directory found; upload step will no-op."
+          fi
+
+      # Preserve rendered screenshots as artifact even when scenarios
+      # partially skip due to missing fixture env vars. `if: always()`
+      # ensures the artifact uploads on success, failure, and cancellation;
+      # `if-no-files-found: ignore` prevents a hard fail on a fully-skipped
+      # run (empty directory) — no screenshot upload does not mean the E2E
+      # step passed. Read the step above for the authoritative status.
+      - name: Upload disabled-Compare screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pheno-disabled-compare-screenshots
+          if-no-files-found: ignore
+          retention-days: 14
+          path: e2e/screenshots/
+
+      # Trace / video / html report only when a test actually failed.
+      # SAFETY: never uploads e2e/ wholesale (which can hold auth state),
+      # .env, tokens, or storageState artifacts.
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pheno-disabled-compare-playwright-artifacts
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            playwright-report/
+            test-results/

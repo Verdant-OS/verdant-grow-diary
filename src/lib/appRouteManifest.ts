@@ -66,6 +66,11 @@ export interface AppRouteEntry {
 export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "*", access: "public", description: "NotFound catch-all." },
   { path: "/", access: "auth", description: "Dashboard." },
+  {
+    path: "/.lovable/oauth/consent",
+    access: "public",
+    description: "Lovable MCP OAuth consent page (public by protocol requirement).",
+  },
   { path: "/action-queue", access: "redirect", description: "→ /actions" },
   { path: "/actions", access: "auth" },
   { path: "/actions/:actionId", access: "auth" },
@@ -74,7 +79,26 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/alerts", access: "auth" },
   { path: "/alerts/:alertId", access: "auth" },
   { path: "/auth", access: "public" },
-  { path: "/billing/:plan", access: "public", description: "Billing placeholder." },
+  {
+    path: "/billing/:plan",
+    access: "redirect",
+    description: "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout).",
+  },
+  { path: "/breeder-beta", access: "public", description: "Breeder beta landing page." },
+  { path: "/breeding", access: "auth", description: "Breeding programs index." },
+  { path: "/breeding/:programId", access: "auth", description: "Breeding program detail." },
+  { path: "/breeding/new", access: "auth", description: "New breeding program." },
+  {
+    path: "/checkout/cancel",
+    access: "public",
+    description: "Paddle checkout cancel return page (public by checkout-flow requirement).",
+  },
+  {
+    path: "/checkout/success",
+    access: "public",
+    description: "Paddle checkout success return page (public by checkout-flow requirement).",
+  },
+  { path: "/creator-beta", access: "public", description: "Creator beta landing page." },
   {
     path: "/customer/:shareId",
     access: "public",
@@ -98,6 +122,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },
   { path: "/features", access: "redirect", description: "→ /welcome" },
+  { path: "/glossary", access: "public", description: "Public grower glossary (SEO)." },
   {
     path: "/grow-lineage",
     access: "auth",
@@ -108,6 +133,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/grow-room", access: "redirect", description: "→ /" },
   { path: "/grows", access: "auth" },
   { path: "/grows/:growId", access: "auth" },
+  {
+    path: "/grows/:growId/learning",
+    access: "auth",
+    description:
+      "Grow-level learning review — completed actions, grower-recorded outcomes, and next-run decisions.",
+  },
   {
     path: "/guides",
     access: "public",
@@ -120,6 +151,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Public SEO guide detail page.",
   },
   { path: "/hardware-integrations", access: "public" },
+  {
+    path: "/health",
+    access: "auth",
+    description: "In-app read-only health check (auth, data reads, diary timeline).",
+  },
   {
     path: "/how-ai-doctor-works",
     access: "public",
@@ -258,16 +294,46 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Read-only Pheno Comparison preview surface (demo-labeled fixtures, no writes).",
   },
   {
+    path: "/pheno-expression-showcase",
+    access: "public",
+    description: "Mix-and-match pheno showcase (demo-labeled fixtures, network-free, no writes).",
+  },
+  {
     path: "/pheno-hunts/:id/compare",
     access: "public",
     description:
       "Read-only Pheno Comparison preview surface, per-hunt route alias (demo-labeled fixtures, no writes).",
+  },
+  {
+    path: "/pheno-hunts/:id/keepers",
+    access: "auth",
+    description:
+      "Keepers / clone lineage / crosses. Write-capable (RLS-scoped own data) — mounted behind the auth gate inside AppShell.",
+  },
+  {
+    path: "/pheno-hunts/:id/workspace",
+    access: "auth",
+    description:
+      "Hunt workspace (scores + keeper decisions). Write-capable (RLS-scoped own data) — mounted behind the auth gate inside AppShell.",
   },
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
   { path: "/pi-ingest-status", access: "operator" },
   { path: "/plants", access: "auth" },
   { path: "/plants/:id", access: "auth" },
   { path: "/pricing", access: "public" },
+  {
+    path: "/privacy",
+    access: "public",
+    description: "Privacy Policy (public legal page; Paddle named as payment processor / MoR).",
+  },
+  { path: "/privacy-policy", access: "redirect", description: "→ /privacy (legal alias)" },
+  {
+    path: "/refund",
+    access: "public",
+    description: "Refund Policy (public legal page; 30-day money-back guarantee, Paddle MoR).",
+  },
+  { path: "/refund-policy", access: "redirect", description: "→ /refund (legal alias)" },
+  { path: "/refunds", access: "redirect", description: "→ /refund (legal alias)" },
   { path: "/register", access: "redirect", description: "→ /auth" },
   { path: "/reports", access: "auth" },
   { path: "/reports/post-grow/:growId", access: "auth", description: "Post-grow learning report." },
@@ -277,11 +343,27 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/sensors/ecowitt-audit", access: "operator" },
   { path: "/sensors/ingest-normalizer", access: "operator" },
   { path: "/settings", access: "auth" },
+  {
+    path: "/settings/agent-integrations",
+    access: "auth",
+    description: "Agent integrations (MCP) settings.",
+  },
   { path: "/signup", access: "redirect", description: "→ /auth" },
   { path: "/tasks", access: "auth" },
   { path: "/tents", access: "auth" },
   { path: "/tents/:id", access: "auth" },
+  {
+    path: "/terms",
+    access: "public",
+    description: "Terms of Service (public legal page; seller + Paddle MoR disclosure).",
+  },
+  { path: "/terms-of-service", access: "redirect", description: "→ /terms (legal alias)" },
   { path: "/timeline", access: "auth" },
+  {
+    path: "/upgrade",
+    access: "public",
+    description: "Upgrade / pricing page with Paddle sandbox checkout.",
+  },
   { path: "/welcome", access: "public" },
 ];
 

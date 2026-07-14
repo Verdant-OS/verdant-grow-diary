@@ -8,7 +8,10 @@ import { AuthProvider } from "@/store/auth";
 import { GrowsProvider } from "@/store/grows";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
 import RootErrorBoundary from "@/components/RootErrorBoundary";
+import PhenoTrackerUpgradeGate from "@/components/PhenoTrackerUpgradeGate";
 import RequireOperatorRole from "./components/RequireOperatorRole";
+import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
+import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 
 // Route pages and the authenticated AppShell are code-split so the public
 // marketing / auth entry paths (/welcome, /pricing, /hardware-integrations,
@@ -33,11 +36,19 @@ const Tasks = lazy(() => import("./pages/Tasks"));
 const Alerts = lazy(() => import("./pages/Alerts"));
 const AlertDetail = lazy(() => import("./pages/AlertDetail"));
 const Settings = lazy(() => import("./pages/Settings"));
+const AccountPreferences = lazy(() => import("./pages/AccountPreferences"));
 const AgentIntegrations = lazy(() => import("./pages/AgentIntegrations"));
 const Timeline = lazy(() => import("./pages/Timeline"));
 const Grows = lazy(() => import("./pages/Grows"));
 const GrowDetail = lazy(() => import("./pages/GrowDetail"));
+const GrowLearning = lazy(() => import("./pages/GrowLearning"));
 const PhenoHuntNew = lazy(() => import("./pages/PhenoHuntNew"));
+const PhenoHuntCompare = lazy(() => import("./pages/PhenoHuntCompare"));
+const PhenoHuntWorkspace = lazy(() => import("./pages/PhenoHuntWorkspace"));
+const PhenoKeepersPage = lazy(() => import("./pages/PhenoKeepersPage"));
+const BreedingProgramsIndex = lazy(() => import("./pages/BreedingProgramsIndex"));
+const BreedingProgramNew = lazy(() => import("./pages/BreedingProgramNew"));
+const BreedingProgramDetail = lazy(() => import("./pages/BreedingProgramDetail"));
 const Reports = lazy(() => import("./pages/Reports"));
 const PostGrowLearningReport = lazy(() => import("./pages/PostGrowLearningReport"));
 
@@ -66,11 +77,21 @@ const DailyCheck = lazy(() => import("./pages/DailyCheck"));
 const Landing = lazy(() => import("./pages/Landing"));
 // Demo page removed — Verdant is positioned around real grow data only.
 const HardwareIntegrations = lazy(() => import("./pages/HardwareIntegrations"));
+const CreatorBeta = lazy(() => import("./pages/CreatorBeta"));
+const BreederBeta = lazy(() => import("./pages/BreederBeta"));
 const Pricing = lazy(() => import("./pages/Pricing"));
+const Upgrade = lazy(() => import("./pages/Upgrade"));
 const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
+const Glossary = lazy(() => import("./pages/Glossary"));
 const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
-const BillingPlaceholder = lazy(() => import("./pages/BillingPlaceholder"));
+const LegacyBillingRedirect = lazy(() => import("./pages/LegacyBillingRedirect"));
+const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
+const CheckoutCancel = lazy(() => import("./pages/CheckoutCancel"));
+const Terms = lazy(() => import("./pages/TermsOfService"));
+const Privacy = lazy(() => import("./pages/PrivacyPolicy"));
+const Refund = lazy(() => import("./pages/RefundPolicy"));
+
 const Leads = lazy(() => import("./pages/Leads"));
 const PiIngestStatus = lazy(() => import("./pages/PiIngestStatus"));
 const IngestInspector = lazy(() => import("./pages/IngestInspector"));
@@ -98,7 +119,9 @@ const OneTentLiveProof = lazy(() => import("./pages/OneTentLiveProof"));
 const DemoProofWalkthrough = lazy(() => import("./pages/DemoProofWalkthrough"));
 const ContextualPhenoComparisonDemo = lazy(() => import("./pages/ContextualPhenoComparisonDemo"));
 const PhenoComparison = lazy(() => import("./pages/PhenoComparison"));
+const PhenoExpressionShowcase = lazy(() => import("./pages/PhenoExpressionShowcase"));
 const ReleaseReadiness = lazy(() => import("./pages/ReleaseReadiness"));
+const HealthCheck = lazy(() => import("./pages/HealthCheck"));
 
 const queryClient = new QueryClient();
 
@@ -135,6 +158,9 @@ const App = () => (
           <AnalyticsShell />
           <AuthProvider>
             <GrowsProvider>
+              <PaymentTestModeBanner />
+              <AgreementReconsentGate />
+
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
@@ -154,11 +180,28 @@ const App = () => (
                       Old bookmarks redirect to the landing page. */}
                   <Route path="/demo" element={<Navigate to="/welcome" replace />} />
                   <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
+                  <Route path="/creator-beta" element={<CreatorBeta />} />
+                  <Route path="/breeder-beta" element={<BreederBeta />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/upgrade" element={<Upgrade />} />
                   <Route path="/guides" element={<GuidesIndex />} />
                   <Route path="/guides/:slug" element={<GuidePage />} />
+                  <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
-                  <Route path="/billing/:plan" element={<BillingPlaceholder />} />
+                  {/* Legacy `/billing/:plan` entry — Slice E: redirect to
+                      canonical `/upgrade` with plan preselect + safe returnTo. */}
+                  <Route path="/billing/:plan" element={<LegacyBillingRedirect />} />
+                  <Route path="/checkout/success" element={<CheckoutSuccess />} />
+                  <Route path="/checkout/cancel" element={<CheckoutCancel />} />
+                  <Route path="/terms" element={<Terms />} />
+                  <Route path="/privacy" element={<Privacy />} />
+                  <Route path="/refund" element={<Refund />} />
+                  <Route path="/refunds" element={<Navigate to="/refund" replace />} />
+                  <Route path="/refund-policy" element={<Navigate to="/refund" replace />} />
+                  <Route path="/terms-of-service" element={<Navigate to="/terms" replace />} />
+                  <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
+
+
                   {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
                       no operator chrome (header, Quick Log) renders. */}
                   <Route path="/customer/:shareId" element={<CustomerModeGuide />} />
@@ -181,11 +224,17 @@ const App = () => (
                     element={<ContextualPhenoComparisonDemo />}
                   />
 
-                  {/* Read-only Pheno Comparison preview surface. Fixture-only,
+                  {/* Read-only Pheno Comparison PREVIEW surface. Fixture-only,
                       no fetch/Supabase/AI/writes. Mounted outside AppShell so
                       the read-only surface renders without operator chrome. */}
                   <Route path="/pheno-comparison" element={<PhenoComparison />} />
-                  <Route path="/pheno-hunts/:id/compare" element={<PhenoComparison />} />
+                  {/* Mix-and-match showcase of ten example phenos (demo,
+                      fixture-only, network-free). Read-only. */}
+                  <Route path="/pheno-expression-showcase" element={<PhenoExpressionShowcase />} />
+                  {/* LIVE per-hunt comparison. Reads the grower's own hunt via
+                      RLS-scoped SELECT (empty/graceful without a session);
+                      still read-only — no writes/AI/automation. */}
+                  <Route path="/pheno-hunts/:id/compare" element={<PhenoHuntCompare />} />
 
                   <Route element={<AppShell />}>
                     <Route path="/" element={<Dashboard />} />
@@ -221,7 +270,41 @@ const App = () => (
                     <Route path="/grow-lineage" element={<GrowLineageRepair />} />
                     <Route path="/grows" element={<Grows />} />
                     <Route path="/grows/:growId" element={<GrowDetail />} />
-                    <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
+                    <Route path="/grows/:growId/learning" element={<GrowLearning />} />
+                    {/* Pheno Tracker is a Verdant Pro feature. Free and
+                        canceled/expired users see an upgrade card. Public
+                        read-only /pheno-comparison and /pheno-hunts/:id/compare
+                        remain ungated above so historical records stay
+                        viewable — we never hide diary history as a billing
+                        punishment. Server-side entitlement enforcement is a
+                        follow-up slice; this PR is UI/route gating only. */}
+                    <Route
+                      path="/pheno-hunts/new"
+                      element={
+                        <PhenoTrackerUpgradeGate>
+                          <PhenoHuntNew />
+                        </PhenoTrackerUpgradeGate>
+                      }
+                    />
+                    <Route
+                      path="/pheno-hunts/:id/workspace"
+                      element={
+                        <PhenoTrackerUpgradeGate>
+                          <PhenoHuntWorkspace />
+                        </PhenoTrackerUpgradeGate>
+                      }
+                    />
+                    <Route
+                      path="/pheno-hunts/:id/keepers"
+                      element={
+                        <PhenoTrackerUpgradeGate>
+                          <PhenoKeepersPage />
+                        </PhenoTrackerUpgradeGate>
+                      }
+                    />
+                    <Route path="/breeding" element={<BreedingProgramsIndex />} />
+                    <Route path="/breeding/new" element={<BreedingProgramNew />} />
+                    <Route path="/breeding/:programId" element={<BreedingProgramDetail />} />
                     <Route path="/reports" element={<Reports />} />
                     <Route path="/reports/post-grow/:growId" element={<PostGrowLearningReport />} />
                     <Route
@@ -231,6 +314,8 @@ const App = () => (
 
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/settings/agent-integrations" element={<AgentIntegrations />} />
+                    <Route path="/account/preferences" element={<AccountPreferences />} />
+                    <Route path="/health" element={<HealthCheck />} />
                     {/* Operator-only routes. Authenticated via AppShell's useRequireAuth,
                         then gated by server-side has_role('operator') via RequireOperatorRole.
                         Non-operator users see a calm access-restricted state. */}

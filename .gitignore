@@ -45,3 +45,6 @@ test-results/
 playwright-report/
 e2e/screenshots/
 e2e/.auth/
+
+# Controlled Vitest runner artifacts (never committed; uploaded by CI)
+.vitest-runs/

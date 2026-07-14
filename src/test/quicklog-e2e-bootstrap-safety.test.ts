@@ -255,6 +255,9 @@ describe("Workflow: bootstrap step + media expansion + summary", () => {
     expect(wf).not.toMatch(/service_role/i);
     expect(wf).not.toMatch(/password\s*:\s*["'][^"'$]+["']/i);
     expect(fs.existsSync(path.join(ROOT, "e2e/.auth/user.json"))).toBe(false);
+    expect(
+      fs.existsSync(path.join(ROOT, "e2e/.auth/session-storage.json")),
+    ).toBe(false);
   });
 });
 

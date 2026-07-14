@@ -50,6 +50,11 @@ function makeClient(opts: {
               const fail = opts.plantUpdateErrorAt === at;
               return { error: fail ? { message: "rls" } : null };
             },
+            // Rollback untag path: .update({...}).in("id", [ids])
+            in: async (_col: string, ids: string[]) => {
+              for (const id of ids) plantUpdates.push({ id, values });
+              return { error: null };
+            },
           }),
         };
       }
@@ -98,15 +103,40 @@ describe("phenoHuntService", () => {
         client,
       );
       expect(res).toEqual({ huntId: "h1", taggedPlantIds: ["p1", "p2"] });
-      expect(huntInsert).toHaveBeenCalledWith({
-        grow_id: "g1",
-        tent_id: "t1",
-        name: "Hunt",
-      });
+      expect(huntInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          grow_id: "g1",
+          tent_id: "t1",
+          name: "Hunt",
+          evidence_goals: [],
+          notes: null,
+        }),
+      );
+      // Setup should NOT be auto-marked complete unless markSetupComplete=true.
+      expect(huntInsert.mock.calls[0][0]).not.toHaveProperty("setup_completed_at");
       expect(plantUpdates).toEqual([
         { id: "p1", values: { pheno_hunt_id: "h1", candidate_label: "#1" } },
         { id: "p2", values: { pheno_hunt_id: "h1", candidate_label: "#2" } },
       ]);
+    });
+
+    it("persists sanitized evidence goals and notes on the insert", async () => {
+      const { client, huntInsert } = makeClient({ huntId: "h1" });
+      await createPhenoHunt(
+        {
+          growId: "g1",
+          name: "Hunt",
+          plantIds: ["p1"],
+          evidenceGoals: ["structure", "aroma", "not-a-real-goal", "structure"],
+          notes: "  keep this  ",
+          markSetupComplete: true,
+        },
+        client,
+      );
+      const row = huntInsert.mock.calls[0][0] as Record<string, unknown>;
+      expect(row.evidence_goals).toEqual(["structure", "aroma"]);
+      expect(row.notes).toBe("keep this");
+      expect(typeof row.setup_completed_at).toBe("string");
     });
 
     it("honors label overrides when provided", async () => {
@@ -127,10 +157,7 @@ describe("phenoHuntService", () => {
 
     it("does not send client-supplied user_id (trigger fills it)", async () => {
       const { client, huntInsert } = makeClient({});
-      await createPhenoHunt(
-        { growId: "g1", name: "Hunt", plantIds: ["p1"] },
-        client,
-      );
+      await createPhenoHunt({ growId: "g1", name: "Hunt", plantIds: ["p1"] }, client);
       expect(Object.keys(huntInsert.mock.calls[0][0])).not.toContain("user_id");
     });
 
@@ -150,10 +177,7 @@ describe("phenoHuntService", () => {
         plantUpdateErrorAt: 1,
       });
       await expect(
-        createPhenoHunt(
-          { growId: "g1", name: "Hunt", plantIds: ["p1", "p2"] },
-          client,
-        ),
+        createPhenoHunt({ growId: "g1", name: "Hunt", plantIds: ["p1", "p2"] }, client),
       ).rejects.toThrow(/Could not tag candidate plant/);
       expect(huntDelete).toHaveBeenCalledWith({ col: "id", val: "h1" });
     });
@@ -188,9 +212,7 @@ function makeDeleteClient(opts: {
             eq: async (_c: string, _v: string) => {
               calls.push({ op: "plants.select" });
               return {
-                data: opts.selectError
-                  ? null
-                  : (opts.linkedIds ?? []).map((id) => ({ id })),
+                data: opts.selectError ? null : (opts.linkedIds ?? []).map((id) => ({ id })),
                 error: opts.selectError ?? null,
               };
             },
@@ -244,10 +266,7 @@ describe("deletePhenoHunt", () => {
   it("skips the untag step when no plants are linked", async () => {
     const { client, calls } = makeDeleteClient({ linkedIds: [] });
     await deletePhenoHunt({ huntId: "h1" }, client);
-    expect(calls.map((c) => c.op)).toEqual([
-      "plants.select",
-      "pheno_hunts.delete",
-    ]);
+    expect(calls.map((c) => c.op)).toEqual(["plants.select", "pheno_hunts.delete"]);
   });
 
   it("does not delete the hunt when untag fails", async () => {
@@ -255,9 +274,7 @@ describe("deletePhenoHunt", () => {
       linkedIds: ["p1"],
       untagError: { message: "rls" },
     });
-    await expect(deletePhenoHunt({ huntId: "h1" }, client)).rejects.toThrow(
-      /untag/,
-    );
+    await expect(deletePhenoHunt({ huntId: "h1" }, client)).rejects.toThrow(/untag/);
     expect(calls.map((c) => c.op)).not.toContain("pheno_hunts.delete");
   });
 
@@ -266,9 +283,7 @@ describe("deletePhenoHunt", () => {
       linkedIds: ["p1"],
       deleteError: { message: "denied" },
     });
-    await expect(
-      deletePhenoHunt({ huntId: "h1" }, client),
-    ).rejects.toBeInstanceOf(PhenoHuntError);
+    await expect(deletePhenoHunt({ huntId: "h1" }, client)).rejects.toBeInstanceOf(PhenoHuntError);
   });
 
   it("never issues a plants delete operation", async () => {
@@ -279,8 +294,6 @@ describe("deletePhenoHunt", () => {
 
   it("rejects when huntId is missing", async () => {
     const { client } = makeDeleteClient({});
-    await expect(deletePhenoHunt({ huntId: "" }, client)).rejects.toThrow(
-      /Hunt id/,
-    );
+    await expect(deletePhenoHunt({ huntId: "" }, client)).rejects.toThrow(/Hunt id/);
   });
 });

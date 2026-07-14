@@ -31,6 +31,7 @@ import { toast } from "sonner";
 
 const baseVm: PostGrowLearningReportViewModel = {
   eligible: true,
+  sensorReadingSources: [{ source: "manual" }],
   ineligibleReason: null,
   header: {
     growId: "g1",
@@ -44,17 +45,58 @@ const baseVm: PostGrowLearningReportViewModel = {
   executiveSummary: ["Northern Lights had a useful post-grow record."],
   dataCompleteness: { score: 80, label: "Strong", present: ["Harvest record"], missing: [] },
   environment: [
-    { key: "temperature_c", label: "Temperature", unit: "°C", count: 10, avg: 24, min: 22, max: 26, stablePct: 80, sparkline: [] },
-    { key: "humidity_pct", label: "Humidity", unit: "%", count: 0, avg: null, min: null, max: null, stablePct: null, sparkline: [] },
-    { key: "vpd_kpa", label: "VPD", unit: "kPa", count: 8, avg: 1.1, min: 0.9, max: 1.3, stablePct: 88, sparkline: [] },
+    {
+      key: "temperature_c",
+      label: "Temperature",
+      unit: "°C",
+      count: 10,
+      avg: 24,
+      min: 22,
+      max: 26,
+      stablePct: 80,
+      sparkline: [],
+    },
+    {
+      key: "humidity_pct",
+      label: "Humidity",
+      unit: "%",
+      count: 0,
+      avg: null,
+      min: null,
+      max: null,
+      stablePct: null,
+      sparkline: [],
+    },
+    {
+      key: "vpd_kpa",
+      label: "VPD",
+      unit: "kPa",
+      count: 8,
+      avg: 1.1,
+      min: 0.9,
+      max: 1.3,
+      stablePct: 88,
+      sparkline: [],
+    },
   ],
   postHarvest: {
     yieldGrams: 112.5,
-    points: [{ label: "Checkpoint 1", capturedAt: "2026-04-02T00:00:00.000Z", weightGrams: 160, rhPct: 64 }],
+    points: [
+      {
+        label: "Checkpoint 1",
+        capturedAt: "2026-04-02T00:00:00.000Z",
+        weightGrams: 160,
+        rhPct: 64,
+      },
+    ],
     weightLossPct: 12.3,
     rhStabilized: true,
   },
-  actionEffectiveness: { completedActions: 2, outcomeNotes: 1, observations: ["Two completed actions reviewed."] },
+  actionEffectiveness: {
+    completedActions: 2,
+    outcomeNotes: 1,
+    observations: ["Two completed actions reviewed."],
+  },
   lesson: { entryId: "d1", text: "Watered less in late flower." },
   photos: [{ id: "p1", url: "x.jpg", capturedAt: "2026-03-01T00:00:00.000Z", alt: "photo" }],
 };
@@ -63,7 +105,14 @@ const emptyVm: PostGrowLearningReportViewModel = {
   ...baseVm,
   executiveSummary: [],
   dataCompleteness: { score: 0, label: "Thin", present: [], missing: ["Harvest record", "Photos"] },
-  environment: baseVm.environment.map((m) => ({ ...m, count: 0, avg: null, min: null, max: null, stablePct: null })),
+  environment: baseVm.environment.map((m) => ({
+    ...m,
+    count: 0,
+    avg: null,
+    min: null,
+    max: null,
+    stablePct: null,
+  })),
   postHarvest: { yieldGrams: null, points: [], weightLossPct: null, rhStabilized: null },
   actionEffectiveness: { completedActions: 0, outcomeNotes: 0, observations: [] },
   lesson: { entryId: null, text: "" },
@@ -100,11 +149,14 @@ describe("buildPostGrowReportPrintHtml", () => {
   });
 
   it("renders calm empty-state copy when sections lack evidence", () => {
-    const empty = buildPostGrowReportPrintHtml(emptyVm, { generatedAt: "2026-04-10T12:00:00.000Z" });
+    const empty = buildPostGrowReportPrintHtml(emptyVm, {
+      generatedAt: "2026-04-10T12:00:00.000Z",
+    });
     expect(empty).toContain(PRINT_EMPTY_SECTION_COPY);
     expect(empty).toContain(PRINT_NO_DATA_COPY);
     // Healthy/issue claims, if present, must always be negated guardrail copy.
-    const unsafe = /\b(?<!not treated as )(?<!never )(?<!not )healthy\b|\ball good\b|\bno issues\b/i;
+    const unsafe =
+      /\b(?<!not treated as )(?<!never )(?<!not )healthy\b|\ball good\b|\bno issues\b/i;
     expect(empty).not.toMatch(unsafe);
   });
 
@@ -113,7 +165,9 @@ describe("buildPostGrowReportPrintHtml", () => {
     expect(probe).not.toMatch(/raw_payload|service_role|api_key|bridge_token/i);
     // Allow guardrail copy like "does not include device commands" / "does not auto-execute".
     // Only fail on positive automation claims.
-    expect(probe).not.toMatch(/\bwill auto-?execute\b|\bsending device command\b|\bset fan to\b|\bset light to\b|\bset irrigation to\b|\bdose nutrients now\b/i);
+    expect(probe).not.toMatch(
+      /\bwill auto-?execute\b|\bsending device command\b|\bset fan to\b|\bset light to\b|\bset irrigation to\b|\bdose nutrients now\b/i,
+    );
   });
 });
 
@@ -153,7 +207,9 @@ describe("ExportSummaryButtons presenter", () => {
     cleanup();
     (toast.error as ReturnType<typeof vi.fn>).mockClear();
     const originalOpen = window.open;
-    (window as unknown as { open: typeof window.open }).open = vi.fn(() => null) as unknown as typeof window.open;
+    (window as unknown as { open: typeof window.open }).open = vi.fn(
+      () => null,
+    ) as unknown as typeof window.open;
     try {
       render(<ExportSummaryButtons vm={baseVm} />);
       fireEvent.click(screen.getByTestId("post-grow-export-print"));
@@ -178,7 +234,9 @@ describe("Post-Grow print export static safety", () => {
 
   it("contains no Supabase writes, AI calls, secret tokens, or automation hooks", () => {
     expect(codeCorpus).not.toMatch(/functions\.invoke|\.insert\(|\.update\(|\.delete\(|\bupsert\(/);
-    expect(codeCorpus).not.toMatch(/service_role|SUPABASE_SERVICE_ROLE_KEY|bridge_token|raw_payload/i);
+    expect(codeCorpus).not.toMatch(
+      /service_role|SUPABASE_SERVICE_ROLE_KEY|bridge_token|raw_payload/i,
+    );
     expect(codeCorpus).not.toMatch(/dispatchCommand|device_control|relay\.|actuator/i);
     expect(codeCorpus).not.toMatch(/\b(guaranteed|definitely|diagnosed from photo)\b/i);
   });

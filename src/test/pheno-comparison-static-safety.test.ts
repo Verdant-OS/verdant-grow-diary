@@ -7,11 +7,23 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+// The read-only, network-free surface. Live siblings that legitimately read
+// Supabase (phenoHuntCandidatesService, usePhenoHuntCandidates, PhenoHuntCompare)
+// are intentionally excluded — their RLS-scoped reads are covered elsewhere.
 const FILES = [
   "src/pages/PhenoComparison.tsx",
+  "src/components/PhenoComparisonView.tsx",
   "src/lib/phenoComparisonViewModel.ts",
   "src/lib/phenoComparisonRules.ts",
   "src/lib/phenoComparisonFixtures.ts",
+  "src/lib/phenoHuntCandidateAdapter.ts",
+  "src/lib/phenoCandidatePostCureViewModel.ts",
+  "src/lib/phenoTraitScoringRules.ts",
+  "src/lib/phenoKeeperDecisionModel.ts",
+  "src/lib/phenoKeeperLineageViewModel.ts",
+  "src/lib/phenoSexObservationModel.ts",
+  "src/lib/phenoExpressionRules.ts",
+  "src/lib/phenoExampleStrains.ts",
 ];
 
 function read(p: string): string {

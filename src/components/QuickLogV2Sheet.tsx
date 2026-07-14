@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
+import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,16 @@ import {
 } from "@/lib/quickLogV2Rules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
+import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
+import { createQuickLogVideoDiaryEntry } from "@/lib/quickLogVideoDiaryEntry";
+import {
+  ALLOWED_VIDEO_MIME_TYPES,
+  createBrowserVideoDurationProber,
+  validateVideoAttachment,
+} from "@/lib/videoAttachmentRules";
+import { buildQuickLogTargetPanel } from "@/lib/quickLogTargetPanelViewModel";
+import QuickLogTargetPanel from "@/components/QuickLogTargetPanel";
+import { useGrows } from "@/store/grows";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { buildQuickLogPhotoGateState } from "@/lib/quickLogPhotoGateRules";
 import {
@@ -62,6 +73,20 @@ import {
   type QuickLogMaturityEvidenceFormState,
 } from "@/lib/quickLogMaturityEvidenceRules";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
+import {
+  QUICK_LOG_POST_SAVE_VIEW_LABEL,
+  QUICK_LOG_POST_SAVE_ANOTHER_LABEL,
+  QUICK_LOG_POST_SAVE_CLOSE_LABEL,
+  QUICK_LOG_POST_SAVE_TITLE,
+  QUICK_LOG_SAVE_FAILED_MESSAGE,
+  QUICK_LOG_CLOSE_BLOCKED_HINT,
+  buildQuickLogPostSaveMessage,
+  buildQuickLogPostSaveDescription,
+  rotateQuickLogIdempotencyKey,
+  shouldAllowQuickLogSave,
+  shouldBlockQuickLogClose,
+  type QuickLogPostSaveSuccess,
+} from "@/lib/quickLogSaveGuardRules";
 
 interface Props {
   open: boolean;
@@ -71,14 +96,12 @@ interface Props {
 
 const NOTE_LIMIT = 500;
 
-export default function QuickLogV2Sheet({
-  open,
-  onOpenChange,
-  defaultTargetKey,
-}: Props) {
+export default function QuickLogV2Sheet({ open, onOpenChange, defaultTargetKey }: Props) {
   const { user } = useAuth();
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
+  const videoDiaryInFlightRef = useRef(false);
   const plantsQ = usePlants() as {
     data?: unknown[];
     isLoading?: boolean;
@@ -108,8 +131,7 @@ export default function QuickLogV2Sheet({
       { path, hash, href },
       {
         navigate: navigate ?? null,
-        currentPath:
-          typeof window !== "undefined" ? window.location?.pathname ?? null : null,
+        currentPath: typeof window !== "undefined" ? (window.location?.pathname ?? null) : null,
       },
     );
   }
@@ -140,24 +162,57 @@ export default function QuickLogV2Sheet({
   const [feedingForm, setFeedingForm] = useState<QuickLogFeedingFormState>(
     EMPTY_QUICKLOG_FEEDING_FORM,
   );
-  const [maturityEvidenceForm, setMaturityEvidenceForm] = useState<QuickLogMaturityEvidenceFormState>(
-    EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM,
-  );
+  const [maturityEvidenceForm, setMaturityEvidenceForm] =
+    useState<QuickLogMaturityEvidenceFormState>(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
   const [feedingSaving, setFeedingSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string>("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoMeta, setVideoMeta] = useState<{
+    mime: string;
+    sizeBytes: number;
+    durationS: number;
+  } | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
+  const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
+  // Synchronous in-flight guard. `saving`/`feedingSaving` are React
+  // state and don't flip until the next paint, so rapid double-clicks
+  // can slip a second save through. This ref locks the entry point
+  // during the same tick.
+  const saveInFlightRef = useRef(false);
+  // Rotates on "Log another" so a fresh save cycle can't reuse the
+  // previous saved-summary state. Bumped whenever the grower starts
+  // a new logical submission from the same open sheet.
+  const idempotencyKeyRef = useRef(1);
+  // Server-side idempotency key for quicklog_save_manual. One key per
+  // LOGICAL submission: it stays stable across retries (so the RPC
+  // dedupes instead of double-writing the diary) and rotates only when
+  // a new submission starts ("Log another" / full success).
+  const saveIdempotencyKeyRef = useRef<string>(newQuickLogSaveKey());
+  // Dedicated synchronous guard for the photo-diary insert path so
+  // rapid re-taps during photo capture/upload cannot enqueue a second
+  // insert before the first resolves. Reset in try/finally.
+  const photoDiaryInFlightRef = useRef(false);
 
-  const options = useMemo(
-    () => buildQuickLogV2TargetOptions(tents, plants),
-    [tents, plants],
-  );
+  const options = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
 
   const resolvedTarget = useMemo(
     () => resolveQuickLogV2Target(options, form.selectedKey),
     [options, form.selectedKey],
+  );
+  const { grows } = useGrows();
+  const targetPanel = useMemo(
+    () =>
+      buildQuickLogTargetPanel({
+        resolved: resolvedTarget,
+        plants: plants as Parameters<typeof buildQuickLogTargetPanel>[0]["plants"],
+        tents: tents as Parameters<typeof buildQuickLogTargetPanel>[0]["tents"],
+        grows,
+      }),
+    [resolvedTarget, plants, tents, grows],
   );
   const resolvedContext = resolvedTarget.ok
     ? {
@@ -180,18 +235,12 @@ export default function QuickLogV2Sheet({
         tentId: resolvedContext.tentId,
         growId: resolvedContext.growId,
       }),
-    [
-      recentFeedingsQ.data,
-      resolvedContext.plantId,
-      resolvedContext.tentId,
-      resolvedContext.growId,
-    ],
+    [recentFeedingsQ.data, resolvedContext.plantId, resolvedContext.tentId, resolvedContext.growId],
   );
 
   const isLoadingContext = Boolean(plantsQ.isLoading || tentsQ.isLoading);
   const hasFetchError = Boolean(plantsQ.isError || tentsQ.isError);
-  const hasNoTargets =
-    !isLoadingContext && !hasFetchError && options.length === 0;
+  const hasNoTargets = !isLoadingContext && !hasFetchError && options.length === 0;
   const contextBlocked = isLoadingContext || hasFetchError || hasNoTargets;
 
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
@@ -216,6 +265,20 @@ export default function QuickLogV2Sheet({
     if (libraryInputRef.current) libraryInputRef.current.value = "";
   }
 
+  function resetVideoSelection() {
+    setVideoFile(null);
+    setVideoMeta(null);
+    if (videoPreview) {
+      try {
+        URL.revokeObjectURL(videoPreview);
+      } catch {
+        /* noop */
+      }
+    }
+    setVideoPreview(null);
+    if (videoInputRef.current) videoInputRef.current.value = "";
+  }
+
   useEffect(() => {
     if (open) {
       setForm({
@@ -227,7 +290,11 @@ export default function QuickLogV2Sheet({
       setFeedingDefaultsApplied(false);
       setLocalError(null);
       setSaveStatus("");
+      setPostSave(null);
+      saveInFlightRef.current = false;
+      idempotencyKeyRef.current = 1;
       resetPhotoSelection();
+      resetVideoSelection();
     }
   }, [open, defaultTargetKey]);
 
@@ -257,16 +324,31 @@ export default function QuickLogV2Sheet({
     feedingForm.products,
   ]);
 
-
-  const setField = <K extends keyof QuickLogV2FormState>(
-    k: K,
-    v: QuickLogV2FormState[K],
-  ) => setForm((prev) => ({ ...prev, [k]: v }));
+  // Idempotent: the note field receives value updates from multiple event
+  // paths (onChange + onInput + onCompositionEnd + onBlur), which often
+  // fire for the same user action. Returning the SAME object when the
+  // value is unchanged lets React bail out of the re-render, so duplicate
+  // event paths cost nothing and IME composition stays smooth.
+  const setField = <K extends keyof QuickLogV2FormState>(k: K, v: QuickLogV2FormState[K]) =>
+    setForm((prev) => (prev[k] === v ? prev : { ...prev, [k]: v }));
 
   const handleAction = (a: QuickLogV2Action) => {
+    const prev = form.action;
     setField("action", a);
     setLocalError(null);
     setSaveStatus("");
+    if (prev === a) return;
+    // Leaving feed → clear feeding-only draft + defaults-applied flag so
+    // a stale line/products list can't ride along into a note/water save.
+    if (prev === "feed") {
+      setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+      setFeedingDefaultsApplied(false);
+    }
+    // Entering feed → maturity evidence surface hides; clear its draft
+    // so stale plant-maturity notes don't get retained under the hood.
+    if (a === "feed") {
+      setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
+    }
   };
 
   const photoGate = useMemo(() => buildQuickLogPhotoGateState(), []);
@@ -285,17 +367,80 @@ export default function QuickLogV2Sheet({
     e.currentTarget.value = "";
   }
 
-  async function uploadQuickLogPhoto(growId: string): Promise<{ ok: true; path: string } | { ok: false; message: string }> {
+  async function handleVideoInputChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.currentTarget.files?.[0] ?? null;
+    e.currentTarget.value = "";
+    if (!file) return;
+    setSaveStatus("Checking video…");
+    const meta = await validateVideoAttachment(file, createBrowserVideoDurationProber());
+    if (meta.ok !== true) {
+      setLocalError(meta.message);
+      setSaveStatus("");
+      return;
+    }
+    setVideoFile(file);
+    setVideoMeta({ mime: meta.mime, sizeBytes: meta.sizeBytes, durationS: meta.durationS });
+    setVideoPreview(URL.createObjectURL(file));
+    setLocalError(null);
+    setSaveStatus("Video selected. Add a note if helpful, then save.");
+  }
+
+  async function uploadQuickLogVideo(
+    growId: string,
+  ): Promise<{ ok: true; path: string } | { ok: false; message: string }> {
+    if (!videoFile) return { ok: false, message: "No video selected." };
+    if (!user) return { ok: false, message: "Sign in to attach videos." };
+    const ext = (videoFile.name.split(".").pop() || "mp4").toLowerCase();
+    const path = `${user.id}/${growId}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("diary-videos").upload(path, videoFile, {
+      contentType: videoFile.type,
+      upsert: false,
+    });
+    if (error) return { ok: false, message: `Video upload failed: ${error.message}` };
+    return { ok: true, path };
+  }
+
+  async function createVideoDiaryEntry(input: {
+    growId: string;
+    tentId: string | null;
+    plantId: string | null;
+    videoPath: string;
+    mime: string;
+    sizeBytes: number;
+    durationS: number;
+  }): Promise<{ ok: true } | { ok: false; message: string }> {
+    if (videoDiaryInFlightRef.current) {
+      return { ok: false, message: "Video diary entry already in progress." };
+    }
+    videoDiaryInFlightRef.current = true;
+    try {
+      return await createQuickLogVideoDiaryEntry({
+        growId: input.growId,
+        tentId: input.tentId,
+        plantId: input.plantId,
+        videoPath: input.videoPath,
+        mime: input.mime,
+        sizeBytes: input.sizeBytes,
+        durationS: input.durationS,
+        noteRaw: form.note,
+        action: form.action,
+      });
+    } finally {
+      videoDiaryInFlightRef.current = false;
+    }
+  }
+
+  async function uploadQuickLogPhoto(
+    growId: string,
+  ): Promise<{ ok: true; path: string } | { ok: false; message: string }> {
     if (!photoFile) return { ok: false, message: "No photo selected." };
     if (!user) return { ok: false, message: "Sign in to attach photos." };
     const ext = (photoFile.name.split(".").pop() || "jpg").toLowerCase();
     const path = `${user.id}/${growId}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage
-      .from("diary-photos")
-      .upload(path, photoFile, {
-        contentType: photoFile.type,
-        upsert: false,
-      });
+    const { error } = await supabase.storage.from("diary-photos").upload(path, photoFile, {
+      contentType: photoFile.type,
+      upsert: false,
+    });
     if (error) return { ok: false, message: `Photo upload failed: ${error.message}` };
     return { ok: true, path };
   }
@@ -306,27 +451,52 @@ export default function QuickLogV2Sheet({
     plantId: string | null;
     photoPath: string;
   }): Promise<{ ok: true } | { ok: false; message: string }> {
-    const note = form.note.trim() || "Photo attached from Quick Log.";
-    const { error } = await supabase
-      .from("diary_entries")
-      .insert({
-        grow_id: input.growId,
-        tent_id: input.tentId,
-        plant_id: input.plantId,
-        note,
-        photo_url: input.photoPath,
-        entry_at: new Date().toISOString(),
-        details: {
-          event_type: "quicklog_photo_attachment",
-          source: "manual",
-          attached_to_action: form.action,
-        },
-      } as never);
-    if (error) return { ok: false, message: `Photo diary entry failed: ${error.message}` };
-    return { ok: true };
+    // Sync re-entry guard: if a photo-diary insert is already in
+    // flight, drop the second call rather than creating a duplicate
+    // entry. The outer handleSave guard covers the main save path,
+    // but this local ref protects the smallest surface so any future
+    // caller inherits the same guarantee without broadening the write
+    // helper. The actual insert lives in `createQuickLogPhotoDiaryEntry`
+    // so this presenter stays free of direct `supabase.from(...)` writes.
+    if (photoDiaryInFlightRef.current) {
+      return { ok: false, message: "Photo diary entry already in progress." };
+    }
+    photoDiaryInFlightRef.current = true;
+    try {
+      return await createQuickLogPhotoDiaryEntry({
+        growId: input.growId,
+        tentId: input.tentId,
+        plantId: input.plantId,
+        photoPath: input.photoPath,
+        noteRaw: form.note,
+        action: form.action,
+      });
+    } finally {
+      photoDiaryInFlightRef.current = false;
+    }
   }
 
   const handleSave = async () => {
+    // Synchronous re-entry guard: prevents a rapid double-click from
+    // scheduling two RPC saves before React flips `saving` state.
+    if (
+      !shouldAllowQuickLogSave({
+        saving,
+        inFlight: saveInFlightRef.current,
+        postSaveShown: postSave !== null,
+      })
+    ) {
+      return;
+    }
+    saveInFlightRef.current = true;
+    try {
+      await runHandleSave();
+    } finally {
+      saveInFlightRef.current = false;
+    }
+  };
+
+  const runHandleSave = async () => {
     setLocalError(null);
     setSaveStatus("");
     const resolved = resolveQuickLogV2Target(options, form.selectedKey);
@@ -377,11 +547,18 @@ export default function QuickLogV2Sheet({
       // succeeded (no early/duplicate dispatch on the failure paths above).
       dispatchQuickLogV2EntryCreated({
         createdAt: new Date().toISOString(),
-        growEventId:
-          (result as { growEventId?: string | null }).growEventId ?? null,
+        growEventId: (result as { growEventId?: string | null }).growEventId ?? null,
         source: "quick_log_v2_feed",
       });
-      onOpenChange(false);
+      setPostSave({
+        growEventId: (result as { growEventId?: string | null }).growEventId ?? null,
+        targetType: resolved.targetType as "plant" | "tent",
+        targetId: resolved.targetId as string,
+        tentId: resolved.tentId ?? null,
+        action: form.action,
+        message: FEEDING_SAVE_SUCCESS_MESSAGE,
+        savedAt: new Date().toISOString(),
+      });
       return;
     }
 
@@ -421,10 +598,14 @@ export default function QuickLogV2Sheet({
       humidityPct: form.humidityPct,
       vpdKpa: form.vpdKpa,
       details: maturityEvidence.details,
+      idempotencyKey: saveIdempotencyKeyRef.current,
     });
     if (built.ok !== true) {
       if (uploadedPath) {
-        await supabase.storage.from("diary-photos").remove([uploadedPath]).catch(() => {});
+        await supabase.storage
+          .from("diary-photos")
+          .remove([uploadedPath])
+          .catch(() => {});
       }
       setLocalError(reasonToMessage(built.reason));
       setSaveStatus("");
@@ -435,12 +616,27 @@ export default function QuickLogV2Sheet({
     const res = await save(built.payload);
     if (!res.ok) {
       if (uploadedPath) {
-        await supabase.storage.from("diary-photos").remove([uploadedPath]).catch(() => {});
+        await supabase.storage
+          .from("diary-photos")
+          .remove([uploadedPath])
+          .catch(() => {});
       }
-      setLocalError(reasonToMessage(res.reason || "save_failed"));
+      const reason = res.reason || "save_failed";
+      setLocalError(
+        reason === "save_failed" ? QUICK_LOG_SAVE_FAILED_MESSAGE : reasonToMessage(reason),
+      );
       setSaveStatus("");
       return;
     }
+
+    // The log row is committed from here on. Companion-media failures are
+    // PARTIAL SUCCESS: the grower's entry is saved and must be presented as
+    // saved (returning early here used to show a failure and invite a Retry
+    // that re-ran the whole save — the duplication the idempotency key now
+    // also guards against server-side).
+    let mediaFailure: string | null = null;
+    let photoAttached = false;
+    let videoAttached = false;
 
     if (uploadedPath && resolved.growId) {
       const photoEntry = await createPhotoDiaryEntry({
@@ -449,15 +645,61 @@ export default function QuickLogV2Sheet({
         plantId: resolved.plantId ?? null,
         photoPath: uploadedPath,
       });
-      if (!photoEntry.ok) {
-        setLocalError((photoEntry as { message: string }).message);
-        setSaveStatus("");
-        return;
+      if (photoEntry.ok) {
+        photoAttached = true;
+      } else {
+        mediaFailure = (photoEntry as { message: string }).message;
+        await supabase.storage
+          .from("diary-photos")
+          .remove([uploadedPath])
+          .catch(() => {});
       }
     }
 
-    const successMessage = photoFile ? "Log and photo saved" : "Log saved";
+    if (videoFile && videoMeta && resolved.growId) {
+      setSaveStatus("Uploading video…");
+      const upload = await uploadQuickLogVideo(resolved.growId);
+      if (!upload.ok) {
+        mediaFailure = (upload as { message: string }).message;
+      } else {
+        const videoEntry = await createVideoDiaryEntry({
+          growId: resolved.growId,
+          tentId: resolved.tentId ?? null,
+          plantId: resolved.plantId ?? null,
+          videoPath: upload.path,
+          mime: videoMeta.mime,
+          sizeBytes: videoMeta.sizeBytes,
+          durationS: videoMeta.durationS,
+        });
+        if (videoEntry.ok) {
+          videoAttached = true;
+        } else {
+          await supabase.storage
+            .from("diary-videos")
+            .remove([upload.path])
+            .catch(() => {});
+          mediaFailure = (videoEntry as { message: string }).message;
+        }
+      }
+    }
+
+    // This logical submission is complete (log row committed) — rotate the
+    // server idempotency key so the NEXT submission gets a fresh key, while
+    // any accidental resubmission of this one still dedupes server-side.
+    saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+
+    const successMessage = photoAttached
+      ? videoAttached
+        ? "Log, photo, and video saved"
+        : "Log and photo saved"
+      : videoAttached
+        ? "Log and video saved"
+        : "Log saved";
     setSaveStatus(successMessage);
+    if (mediaFailure) {
+      // Non-blocking notice: the entry is saved; only the attachment failed.
+      setLocalError(`Log saved — attachment failed: ${mediaFailure}`);
+    }
     showTimelineConfirmation(successMessage, {
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,
@@ -475,16 +717,80 @@ export default function QuickLogV2Sheet({
     // has resolved.
     dispatchQuickLogV2EntryCreated({
       createdAt: new Date().toISOString(),
-      growEventId:
-        (res as { growEventId?: string | null }).growEventId ?? null,
+      growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
       source: "quick_log_v2",
     });
     resetPhotoSelection();
-    onOpenChange(false);
+    resetVideoSelection();
+    setPostSave({
+      growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
+      targetType: resolved.targetType as "plant" | "tent",
+      targetId: resolved.targetId as string,
+      tentId: resolved.tentId ?? null,
+      action: form.action,
+      message: buildQuickLogPostSaveMessage(form.action, photoAttached),
+      savedAt: new Date().toISOString(),
+    });
   };
 
+  /**
+   * Post-save "Log another" — rotates the client idempotency key and
+   * clears the just-saved summary + event-specific draft so a fresh
+   * save cycle can proceed. Preserves the selected target so the
+   * grower doesn't lose their place.
+   */
+  function handleLogAnother() {
+    idempotencyKeyRef.current = rotateQuickLogIdempotencyKey(idempotencyKeyRef.current);
+    saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+    setPostSave(null);
+    setLocalError(null);
+    setSaveStatus("");
+    setForm((prev) => ({
+      ...EMPTY_QUICKLOG_V2_FORM,
+      selectedKey: prev.selectedKey,
+    }));
+    setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
+    setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
+    setFeedingDefaultsApplied(false);
+    resetPhotoSelection();
+    resetVideoSelection();
+  }
+
+  function handleViewTimeline() {
+    if (!postSave) return;
+    const nav = buildQuickLogTimelineNavTarget({
+      targetType: postSave.targetType,
+      targetId: postSave.targetId,
+      growEventId: postSave.growEventId,
+    });
+    onOpenChange(false);
+    navigateToTimeline(nav.href, nav.hash, nav.path);
+  }
+
+  /**
+   * Intercept Sheet open-state changes so backdrop / escape / swipe
+   * dismissals cannot close the sheet mid-save. Opening is always
+   * allowed. Closing is blocked while `saving`, `feedingSaving`, or
+   * either sync in-flight ref is claimed; in that case we surface a
+   * short, non-blocking toast so the grower knows why the dismissal
+   * was refused.
+   */
+  function handleSheetOpenChange(next: boolean) {
+    if (!next) {
+      const blocked = shouldBlockQuickLogClose({
+        saving: saving || feedingSaving,
+        inFlight: saveInFlightRef.current || photoDiaryInFlightRef.current,
+      });
+      if (blocked) {
+        toast.message(QUICK_LOG_CLOSE_BLOCKED_HINT);
+        return;
+      }
+    }
+    onOpenChange(next);
+  }
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleSheetOpenChange}>
       <SheetContent
         side="bottom"
         className="max-h-[92vh] overflow-y-auto text-base"
@@ -536,9 +842,7 @@ export default function QuickLogV2Sheet({
               data-testid="qlv2-context-empty"
               className="rounded-md border border-border bg-muted/30 p-3 text-sm space-y-2"
             >
-              <p className="text-foreground">
-                No plants or tents are available for this log.
-              </p>
+              <p className="text-foreground">No plants or tents are available for this log.</p>
               <p className="text-muted-foreground">
                 Add a plant or tent first, then come back to Quick Log.
               </p>
@@ -602,15 +906,23 @@ export default function QuickLogV2Sheet({
               Choose where this log belongs.
             </p>
             {selectedTargetMissing && (
-              <p className="mt-2 rounded-md border border-border/60 bg-secondary/20 p-2 text-sm text-muted-foreground" data-testid="qlv2-missing-target-help">
+              <p
+                className="mt-2 rounded-md border border-border/60 bg-secondary/20 p-2 text-sm text-muted-foreground"
+                data-testid="qlv2-missing-target-help"
+              >
                 Start by choosing a plant or tent above.
               </p>
             )}
+            <QuickLogTargetPanel panel={targetPanel} />
           </div>
 
           <div>
             <Label>Action</Label>
-            <div className="mt-1 grid grid-cols-3 gap-2" role="group" aria-label="Quick Log action type">
+            <div
+              className="mt-1 grid grid-cols-3 gap-2"
+              role="group"
+              aria-label="Quick Log action type"
+            >
               <Button
                 type="button"
                 variant={form.action === "water" ? "default" : "outline"}
@@ -658,7 +970,6 @@ export default function QuickLogV2Sheet({
             </div>
           )}
 
-
           {shouldShowVolumeField(form.action) && (
             <div>
               <Label htmlFor="qlv2-volume">Volume (ml)</Label>
@@ -677,7 +988,10 @@ export default function QuickLogV2Sheet({
                 Required for watering logs. Use milliliters.
               </p>
               {volumeMissing && (
-                <p className="mt-2 rounded-md border border-border/60 bg-secondary/20 p-2 text-sm text-muted-foreground" data-testid="qlv2-missing-volume-help">
+                <p
+                  className="mt-2 rounded-md border border-border/60 bg-secondary/20 p-2 text-sm text-muted-foreground"
+                  data-testid="qlv2-missing-volume-help"
+                >
                   Enter the amount watered before saving.
                 </p>
               )}
@@ -685,91 +999,169 @@ export default function QuickLogV2Sheet({
           )}
 
           {form.action !== "feed" && (
-          <div className="rounded-md border border-border p-3" data-testid="qlv2-photo-attachment">
-            <Label>Photo attachment</Label>
-            {photoPreview ? (
-              <div className="mt-2 space-y-2">
-                <img
-                  src={photoPreview}
-                  alt="Selected Quick Log photo preview"
-                  className="aspect-[4/3] w-full rounded-md object-cover"
-                  data-testid="qlv2-photo-preview"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={resetPhotoSelection}
-                  data-testid="qlv2-photo-remove"
-                  aria-label="Remove selected Quick Log photo"
-                >
-                  Remove photo
-                </Button>
-              </div>
-            ) : (
-              <div className="mt-2 space-y-2">
-                <div className="grid grid-cols-2 gap-2">
+            <div
+              className="rounded-md border border-border p-3"
+              data-testid="qlv2-photo-attachment"
+            >
+              <Label>Photo attachment</Label>
+              {photoPreview ? (
+                <div className="mt-2 space-y-2">
+                  <img
+                    src={photoPreview}
+                    alt="Selected Quick Log photo preview"
+                    className="aspect-[4/3] w-full rounded-md object-cover"
+                    data-testid="qlv2-photo-preview"
+                  />
                   <Button
                     type="button"
                     variant="outline"
-                    aria-controls="qlv2-photo-camera-input"
-                    onClick={() => cameraInputRef.current?.click()}
+                    onClick={resetPhotoSelection}
+                    data-testid="qlv2-photo-remove"
+                    aria-label="Remove selected Quick Log photo"
                   >
-                    {photoGate.takePhotoLabel}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    aria-controls="qlv2-photo-library-input"
-                    onClick={() => libraryInputRef.current?.click()}
-                  >
-                    {photoGate.chooseLibraryLabel}
+                    Remove photo
                   </Button>
                 </div>
-                <p className="text-sm text-muted-foreground">{photoGate.pickerHelperText}</p>
-              </div>
-            )}
-            <input
-              ref={cameraInputRef}
-              id="qlv2-photo-camera-input"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="sr-only"
-              aria-label={photoGate.cameraInputAriaLabel}
-              tabIndex={-1}
-              onChange={handlePhotoInputChange}
-              data-testid="qlv2-photo-camera-input"
-            />
-            <input
-              ref={libraryInputRef}
-              id="qlv2-photo-library-input"
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              aria-label={photoGate.libraryInputAriaLabel}
-              tabIndex={-1}
-              onChange={handlePhotoInputChange}
-              data-testid="qlv2-photo-library-input"
-            />
-          </div>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-controls="qlv2-photo-camera-input"
+                      onClick={() => cameraInputRef.current?.click()}
+                    >
+                      {photoGate.takePhotoLabel}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-controls="qlv2-photo-library-input"
+                      onClick={() => libraryInputRef.current?.click()}
+                    >
+                      {photoGate.chooseLibraryLabel}
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{photoGate.pickerHelperText}</p>
+                </div>
+              )}
+              <input
+                ref={cameraInputRef}
+                id="qlv2-photo-camera-input"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="sr-only"
+                aria-label={photoGate.cameraInputAriaLabel}
+                tabIndex={-1}
+                onChange={handlePhotoInputChange}
+                data-testid="qlv2-photo-camera-input"
+              />
+              <input
+                ref={libraryInputRef}
+                id="qlv2-photo-library-input"
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                aria-label={photoGate.libraryInputAriaLabel}
+                tabIndex={-1}
+                onChange={handlePhotoInputChange}
+                data-testid="qlv2-photo-library-input"
+              />
+            </div>
           )}
 
           {form.action !== "feed" && (
-          <div>
-            <Label htmlFor="qlv2-note">Note (optional)</Label>
-            <Textarea
-              id="qlv2-note"
-              value={form.note}
-              maxLength={NOTE_LIMIT}
-              aria-describedby="qlv2-note-helper qlv2-note-count"
-              onChange={(e) => setField("note", e.target.value)}
-              placeholder="What did you observe?"
-            />
-            <div className="mt-1 flex items-center justify-between gap-2 text-sm text-muted-foreground">
-              <p id="qlv2-note-helper">Keep it short. Add more detail later from the timeline.</p>
-              <p id="qlv2-note-count" aria-live="polite">{noteLength}/{NOTE_LIMIT}</p>
+            <div
+              className="rounded-md border border-border p-3"
+              data-testid="qlv2-video-attachment"
+            >
+              <Label>Video attachment</Label>
+              {videoPreview ? (
+                <div className="mt-2 space-y-2">
+                  <video
+                    src={videoPreview}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="aspect-video w-full rounded-md bg-black"
+                    data-testid="qlv2-video-preview"
+                    aria-label="Selected Quick Log video preview"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={resetVideoSelection}
+                    data-testid="qlv2-video-remove"
+                    aria-label="Remove selected Quick Log video"
+                  >
+                    Remove video
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    aria-controls="qlv2-video-input"
+                    onClick={() => videoInputRef.current?.click()}
+                  >
+                    Choose video
+                  </Button>
+                  <p className="text-sm text-muted-foreground">
+                    MP4, MOV, or WebM. Max 60 seconds and 100 MB. Optional.
+                  </p>
+                </div>
+              )}
+              <input
+                ref={videoInputRef}
+                id="qlv2-video-input"
+                type="file"
+                accept={ALLOWED_VIDEO_MIME_TYPES.join(",")}
+                className="sr-only"
+                aria-label="Choose a video from your library"
+                tabIndex={-1}
+                onChange={handleVideoInputChange}
+                data-testid="qlv2-video-input"
+              />
             </div>
-          </div>
+          )}
+
+          {form.action !== "feed" && (
+            <div>
+              <Label htmlFor="qlv2-note">Note (optional)</Label>
+              <Textarea
+                id="qlv2-note"
+                value={form.note}
+                maxLength={NOTE_LIMIT}
+                aria-describedby="qlv2-note-helper qlv2-note-count"
+                onChange={(e) => setField("note", e.target.value)}
+                onInput={(e) => {
+                  // Native input events (paste, dictation, programmatic
+                  // dispatchEvent) can bypass React's synthetic onChange in
+                  // some environments. Mirror the DOM value into state so the
+                  // save payload always receives exactly what the grower
+                  // visibly typed. Same A1 sync pattern as the legacy QuickLog
+                  // note. Synchronization only — the note stays optional.
+                  setField("note", (e.currentTarget as HTMLTextAreaElement).value);
+                }}
+                onCompositionEnd={(e) => {
+                  // IME / dictation finalization: commit the composed value.
+                  setField("note", (e.currentTarget as HTMLTextAreaElement).value);
+                }}
+                onBlur={(e) => {
+                  // Last-chance sync before the grower taps Save.
+                  setField("note", e.currentTarget.value);
+                }}
+                placeholder="What did you observe?"
+              />
+              <div className="mt-1 flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                <p id="qlv2-note-helper">Keep it short. Add more detail later from the timeline.</p>
+                <p id="qlv2-note-count" aria-live="polite">
+                  {noteLength}/{NOTE_LIMIT}
+                </p>
+              </div>
+            </div>
           )}
 
           <QuickLogMaturityEvidenceFields
@@ -783,43 +1175,43 @@ export default function QuickLogV2Sheet({
           />
 
           {form.action !== "feed" && (
-          <details className="rounded-md border border-border p-3">
-            <summary className="cursor-pointer text-sm font-medium">
-              Manual sensor snapshot (optional)
-            </summary>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              <div>
-                <Label htmlFor="qlv2-temp">Temp (°C)</Label>
-                <Input
-                  id="qlv2-temp"
-                  inputMode="decimal"
-                  value={form.temperatureC}
-                  onChange={(e) => setField("temperatureC", e.target.value)}
-                />
+            <details className="rounded-md border border-border p-3">
+              <summary className="cursor-pointer text-sm font-medium">
+                Manual sensor snapshot (optional)
+              </summary>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <div>
+                  <Label htmlFor="qlv2-temp">Temp (°C)</Label>
+                  <Input
+                    id="qlv2-temp"
+                    inputMode="decimal"
+                    value={form.temperatureC}
+                    onChange={(e) => setField("temperatureC", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="qlv2-rh">RH (%)</Label>
+                  <Input
+                    id="qlv2-rh"
+                    inputMode="decimal"
+                    value={form.humidityPct}
+                    onChange={(e) => setField("humidityPct", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="qlv2-vpd">VPD (kPa)</Label>
+                  <Input
+                    id="qlv2-vpd"
+                    inputMode="decimal"
+                    value={form.vpdKpa}
+                    onChange={(e) => setField("vpdKpa", e.target.value)}
+                  />
+                </div>
               </div>
-              <div>
-                <Label htmlFor="qlv2-rh">RH (%)</Label>
-                <Input
-                  id="qlv2-rh"
-                  inputMode="decimal"
-                  value={form.humidityPct}
-                  onChange={(e) => setField("humidityPct", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="qlv2-vpd">VPD (kPa)</Label>
-                <Input
-                  id="qlv2-vpd"
-                  inputMode="decimal"
-                  value={form.vpdKpa}
-                  onChange={(e) => setField("vpdKpa", e.target.value)}
-                />
-              </div>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Source: manual. Leave blank to skip.
-            </p>
-          </details>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Source: manual. Leave blank to skip.
+              </p>
+            </details>
           )}
 
           {localError && (
@@ -849,30 +1241,95 @@ export default function QuickLogV2Sheet({
           </div>
 
           <div className="space-y-2 pt-2">
-            <p id="qlv2-save-helper" className="text-sm text-muted-foreground" data-testid="qlv2-save-helper">
-              {saveHelper}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={() => onOpenChange(false)}
-                disabled={saving}
+            {postSave ? (
+              <div
+                role="status"
+                aria-live="polite"
+                data-testid="qlv2-post-save"
+                className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2"
               >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                className="flex-1"
-                onClick={handleSave}
-                disabled={saving || feedingSaving || contextBlocked}
-                aria-describedby="qlv2-save-helper"
-                data-testid="qlv2-save"
-              >
-                {saving || feedingSaving ? "Saving…" : "Save"}
-              </Button>
-            </div>
+                <p
+                  className="text-sm font-semibold text-foreground"
+                  data-testid="quick-log-post-save-title"
+                >
+                  {QUICK_LOG_POST_SAVE_TITLE}
+                </p>
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid="quick-log-post-save-description"
+                >
+                  {buildQuickLogPostSaveDescription({
+                    targetName: resolvedTarget.ok
+                      ? (options.find((o) => `${o.type}:${o.id}` === form.selectedKey)?.label ??
+                        null)
+                      : null,
+                    tentName: null,
+                    growName: null,
+                    action: postSave.action,
+                    photoAttached: /photo/i.test(postSave.message),
+                  })}
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    onClick={handleViewTimeline}
+                    data-testid="quick-log-post-save-view"
+                  >
+                    {QUICK_LOG_POST_SAVE_VIEW_LABEL}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleLogAnother}
+                    data-testid="quick-log-post-save-another"
+                  >
+                    {QUICK_LOG_POST_SAVE_ANOTHER_LABEL}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="flex-1"
+                    onClick={() => onOpenChange(false)}
+                    data-testid="quick-log-post-save-close"
+                  >
+                    {QUICK_LOG_POST_SAVE_CLOSE_LABEL}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p
+                  id="qlv2-save-helper"
+                  className="text-sm text-muted-foreground"
+                  data-testid="qlv2-save-helper"
+                >
+                  {saveHelper}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => onOpenChange(false)}
+                    disabled={saving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    onClick={handleSave}
+                    disabled={saving || feedingSaving || contextBlocked}
+                    aria-describedby="qlv2-save-helper"
+                    data-testid="qlv2-save"
+                  >
+                    {saving || feedingSaving ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </SheetContent>

@@ -24,7 +24,9 @@ import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
+import PlantDetailRecentActionResponse from "@/components/PlantDetailRecentActionResponse";
 import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
+import { usePlantGalleryPhotoCount } from "@/hooks/usePlantGalleryPhotoCount";
 import PlantDetailHarvestEvidenceReportMount from "@/components/PlantDetailHarvestEvidenceReportMount";
 import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
 import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadiness";
@@ -74,6 +76,7 @@ import {
   type PlantDetailBlockedStateView,
 } from "@/lib/plantDetailBlockedStateViewModel";
 import { useSearchParams } from "react-router-dom";
+import { PlantMemoryEpisodesSection } from "@/components/PlantMemoryEpisodesSection";
 
 function BlockedStateBackLink({
   action,
@@ -221,6 +224,7 @@ function ArchivedTimelineReadOnlyView({
             tentId={plant.tentId}
           />
           <TimelineMemorySection scope="plant" plantId={plant.id} />
+          <PlantMemoryEpisodesSection growId={plant.growId} plantId={plant.id} />
         </div>
       </div>
     </div>
@@ -230,11 +234,15 @@ function ArchivedTimelineReadOnlyView({
 
 export default function PlantDetail() {
   const [quickLogOpen, setQuickLogOpen] = useState(false);
+  // Set only by the status-check CTAs (missed-log recovery / follow-up) so
+  // Quick Log opens focused on the Better/Same/Worse chips. Reset on close.
+  const [quickLogFocusResponse, setQuickLogFocusResponse] = useState(false);
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const contextTentId = searchParams.get("tentId");
   const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
   const { data: tent } = useGrowTent(plant?.tentId);
+  const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null);
   const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null]);
   const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null]);
 
@@ -442,11 +450,16 @@ export default function PlantDetail() {
       />
       <PlantDetailRecentActivityRecap
         plantId={plant.id}
-        onAddQuickCheck={() => setQuickLogOpen(true)}
+        onAddQuickCheck={() => {
+          setQuickLogFocusResponse(true);
+          setQuickLogOpen(true);
+        }}
       />
+      <PlantDetailRecentActionResponse growId={plant.growId ?? null} plantId={plant.id} />
       <PlantDetailHarvestWatchCard
         plantId={plant.id}
         hasPlantPhoto={!!plant.photo}
+        galleryPhotoCount={plantGalleryPhotoCount}
       />
       <PlantDetailHarvestEvidenceReportMount plantId={plant.id} />
       <PlantDetailAiDoctorReadiness
@@ -656,11 +669,15 @@ export default function PlantDetail() {
           </div>
           <PlantQuickLog
             open={quickLogOpen}
-            onOpenChange={setQuickLogOpen}
+            onOpenChange={(o) => {
+              setQuickLogOpen(o);
+              if (!o) setQuickLogFocusResponse(false);
+            }}
             plantId={plant.id}
             plantName={plant.name}
             growId={plant.growId ?? null}
             tentId={plant.tentId ?? null}
+            focusResponseCheckOnOpen={quickLogFocusResponse}
           />
           <PlantManualSensorFreshnessCard
             plantId={plant.id}

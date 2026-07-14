@@ -25,6 +25,7 @@ function makeVm(
 ): PostGrowLearningReportViewModel {
   return {
     eligible: true,
+    sensorReadingSources: [{ source: "manual" }],
     ineligibleReason: null,
     header: {
       growId: "g1",
@@ -38,12 +39,46 @@ function makeVm(
     executiveSummary: ["VPD held in band 78% of the run."],
     dataCompleteness: { score: 60, label: "Useful", present: [], missing: [] },
     environment: [
-      { key: "temperature_c", label: "Temperature", unit: "°C", count: 10, avg: 24, min: 22, max: 26, stablePct: 80, sparkline: [] },
-      { key: "humidity_pct", label: "Humidity", unit: "%", count: 9, avg: 55, min: 50, max: 60, stablePct: 70, sparkline: [] },
-      { key: "vpd_kpa", label: "VPD", unit: "kPa", count: 0, avg: null, min: null, max: null, stablePct: null, sparkline: [] },
+      {
+        key: "temperature_c",
+        label: "Temperature",
+        unit: "°C",
+        count: 10,
+        avg: 24,
+        min: 22,
+        max: 26,
+        stablePct: 80,
+        sparkline: [],
+      },
+      {
+        key: "humidity_pct",
+        label: "Humidity",
+        unit: "%",
+        count: 9,
+        avg: 55,
+        min: 50,
+        max: 60,
+        stablePct: 70,
+        sparkline: [],
+      },
+      {
+        key: "vpd_kpa",
+        label: "VPD",
+        unit: "kPa",
+        count: 0,
+        avg: null,
+        min: null,
+        max: null,
+        stablePct: null,
+        sparkline: [],
+      },
     ],
     postHarvest: { yieldGrams: 120, points: [], weightLossPct: null, rhStabilized: null },
-    actionEffectiveness: { completedActions: 3, outcomeNotes: 1, observations: ["Topped on day 21"] },
+    actionEffectiveness: {
+      completedActions: 3,
+      outcomeNotes: 1,
+      observations: ["Topped on day 21"],
+    },
     lesson: { entryId: null, text: "Smaller pots next time" },
     photos: [{ id: "p1", url: "x.jpg", capturedAt: "2026-03-01T00:00:00.000Z", alt: "photo" }],
     ...over,
@@ -146,10 +181,9 @@ describe("Post-Grow print HTML — forbidden content", () => {
   });
 
   it("missing-section copy stays factual, not 'no issues'", () => {
-    const empty = buildPostGrowReportPrintHtml(
-      makeVm({ executiveSummary: [], environment: [] }),
-      { generatedAt: "2026-04-05T00:00:00.000Z" },
-    );
+    const empty = buildPostGrowReportPrintHtml(makeVm({ executiveSummary: [], environment: [] }), {
+      generatedAt: "2026-04-05T00:00:00.000Z",
+    });
     expect(empty).toContain("Not enough evidence");
     const lower = empty.toLowerCase();
     expect(lower).not.toContain("no issues");

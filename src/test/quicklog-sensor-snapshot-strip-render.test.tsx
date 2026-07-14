@@ -196,7 +196,7 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
 
     const action = screen.getByTestId("quicklog-sensor-snapshot-action");
     expect(action).toHaveAttribute("data-action-kind", "add");
-    expect(action).toHaveAttribute("href", "/sensors");
+    expect(action).toHaveAttribute("href", "/sensors#manual-reading");
     expect(action).toHaveTextContent("Add snapshot");
   });
 

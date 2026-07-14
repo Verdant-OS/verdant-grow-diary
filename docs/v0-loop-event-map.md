@@ -133,13 +133,28 @@ This event connects the closed loop:
 It is the bridge from the Action Queue back into plant memory and
 post-grow learning.
 
+> **Implemented as (One-Tent Learning Loop V1):** the grower flow is split
+> into two grower-recorded steps persisted as `diary_entries.details`
+> application events (no schema change), then derived into Plant Memory
+> Episodes. See [one-tent-learning-loop-v1.md](./one-tent-learning-loop-v1.md).
+>
+> - The **plant response** is the existing `action_outcome` event. Its
+>   `outcome_status` enum is `improved | unchanged | worsened |
+>   more_data_needed` (the shipped vocabulary; the analytics `response`
+>   values `improved | declined | no_change | too_soon` above are the
+>   original V0 analytics contract, not the persisted enum).
+> - The **next-run decision** (`follow_up_type` above) is the separate
+>   `run_learning_decision` event: `decision` enum `repeat | avoid | adjust |
+>   monitor`, chosen explicitly by the grower after an outcome exists.
+>   Verdant never promotes improved→repeat or worsened→avoid automatically.
+
 | Property | Type | Notes |
 |---|---|---|
 | `plant_id` | string | Internal only. |
 | `tent_id` | string | Internal only. |
-| `action_queue_item_id` | string | Links to the original action. |
-| `response` | enum | `improved` \| `declined` \| `no_change` \| `too_soon` |
-| `follow_up_type` | enum | `repeat` \| `avoid` \| `adjust` \| `monitor` |
+| `action_queue_item_id` | string | Links to the original action (`action_queue_id` in the persisted events). |
+| `response` | enum | Analytics contract: `improved` \| `declined` \| `no_change` \| `too_soon`. Persisted `action_outcome.outcome_status`: `improved` \| `unchanged` \| `worsened` \| `more_data_needed`. |
+| `follow_up_type` | enum | `repeat` \| `avoid` \| `adjust` \| `monitor` — persisted as `run_learning_decision.decision`, grower-chosen, never auto-derived. |
 | `has_photo` | boolean | Did the grower attach a visual reference? |
 | `loop_step` | const | `"action_queue"` |
 

@@ -32,6 +32,7 @@ import FirstRunChecklist from "@/components/FirstRunChecklist";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
 import OperatorModeCallout from "@/components/OperatorModeCallout";
+import { usePageSeo } from "@/hooks/usePageSeo";
 import ReleaseReadinessOperatorCard from "@/components/ReleaseReadinessOperatorCard";
 import LineageRepairCta from "@/components/LineageRepairCta";
 
@@ -152,6 +153,12 @@ function groupReadings(rows: SensorReadingRow[]): DashReading[] {
 }
 
 export default function Dashboard() {
+  usePageSeo({
+    title: "Grow Room Dashboard | Verdant Grow Diary",
+    description:
+      "Track tents, plants, sensor snapshots, environment stability, and grow activity in one grower-controlled dashboard.",
+    path: "/",
+  });
   // Shared URL `?growId=` resolution against RLS-loaded grows. When growId is
   // absent or invalid, hooks fetch the user's full set (legacy behavior).
   const { urlGrowId, scopedGrow, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
@@ -246,7 +253,7 @@ export default function Dashboard() {
   const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
 
   return (
-    <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
+    <main className="space-y-4 md:space-y-6" data-testid="dashboard-root" aria-labelledby="dashboard-page-header">
       <QuickLogV2Fab />
       <GrowBreadcrumbs
         growId={urlGrowId}
@@ -1521,7 +1528,7 @@ export default function Dashboard() {
           Select a grow to see scoped activity.
         </p>
       )}
-    </div>
+    </main>
   );
 }
 

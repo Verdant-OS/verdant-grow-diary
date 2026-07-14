@@ -76,4 +76,23 @@ export interface ResolvedEntitlement {
     | "canceled"
     | "past_due"
     | "paused";
+  /**
+   * True when the caller holds the server-granted `staff` role
+   * (verified allow-list, server-side trigger). Staff receive
+   * Pro-tier capabilities for UX display, but AI credits stay
+   * enforced server-side at the Pro monthly cap. Never authoritative
+   * for cost/security gates.
+   */
+  isStaff: boolean;
+  /**
+   * Provenance of the resolved entitlement. Added Phase 2b so the union
+   * resolver can tell UI / operator surfaces where access came from without
+   * leaking raw provider IDs. Optional for back-compat with existing
+   * single-row callers of resolveEntitlements().
+   */
+  source?:
+    | "free"
+    | "byo_paddle"
+    | "lovable_paddle_subscription"
+    | "lovable_paddle_lifetime";
 }

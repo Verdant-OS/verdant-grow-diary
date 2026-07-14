@@ -14,7 +14,7 @@
  * only the strict resolver's `fresh_live` status counts as Live.
  */
 
-import { Gauge } from "lucide-react";
+import { Gauge, History } from "lucide-react";
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import {
   buildQuickLogStripFromTentState,
@@ -23,6 +23,11 @@ import {
 import SnapshotTrustBadge from "@/components/SnapshotTrustBadge";
 import { buildQuickLogSensorSnapshotViewModel } from "@/lib/quickLogSensorSnapshotViewModel";
 import { adaptQuickLogSensorContextInput } from "@/lib/quickLogSensorSnapshotViewModelAdapter";
+import {
+  encodeManualCorrectionHash,
+  hasCorrectableOriginalIds,
+  type ManualCorrectionMetric,
+} from "@/lib/manualSensorCorrectionContext";
 
 
 interface Props {
@@ -33,6 +38,19 @@ interface Props {
    * omitted, defaults to true so legacy callers/tests keep their behavior.
    */
   attached?: boolean;
+  /**
+   * Per-metric ORIGINAL sensor_readings row IDs for the currently-shown
+   * MANUAL snapshot. When supplied AND at least one is a real uuid AND
+   * the resolved source is manual, the strip renders a "Correct manual
+   * reading" link that deep-links to /sensors#manual-reading with the
+   * correction context. Never inferred from timestamp/metric — callers
+   * must pass real IDs. When absent, the affordance is hidden.
+   */
+  manualReadingIds?: Partial<Record<ManualCorrectionMetric, string>>;
+  /** Captured_at of the currently-shown manual snapshot (for the banner). */
+  manualCapturedAt?: string | null;
+  /** Optional numeric values for prefill; safe subset only. */
+  manualValues?: Partial<Record<ManualCorrectionMetric, number>>;
 }
 
 const TONE: Record<QuickLogSnapshotStripStatus, string> = {
@@ -84,7 +102,14 @@ function isPillRedundantWithBadge(
   return trustLabel.trim().toLowerCase() === PILL_LABEL[status].toLowerCase();
 }
 
-export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, attached = true }: Props) {
+export default function QuickLogSensorSnapshotStrip({
+  growId: _growId,
+  tentId,
+  attached = true,
+  manualReadingIds,
+  manualCapturedAt,
+  manualValues,
+}: Props) {
   const state = useLatestTentSensorSnapshot(tentId ?? null);
   const view = buildQuickLogStripFromTentState({
     status: state.status,
@@ -112,6 +137,26 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
       : null;
   const showTrustBadge = shouldRenderTrustBadge(view.status, view.trustBadge.label);
   const pillIsRedundant = isPillRedundantWithBadge(view.status, view.trustBadge.label);
+
+  // "Correct manual reading" affordance — only when the caller supplied
+  // real original reading IDs for a manual snapshot. The caller is the
+  // gate: they only pass `manualReadingIds` + `manualCapturedAt` for a
+  // MANUAL snapshot. Never inferred from timestamp/metric. Hidden when
+  // tentId is missing, when IDs contain no real UUIDs, or when no
+  // capturedAt is supplied.
+  const correctionHref =
+    tentId &&
+    manualCapturedAt &&
+    hasCorrectableOriginalIds(manualReadingIds)
+      ? `/sensors${encodeManualCorrectionHash({
+          tentId,
+          originalCapturedAt: manualCapturedAt,
+          originalReadingIds: manualReadingIds ?? {},
+          originalValues: manualValues ?? {},
+        })}`
+      : null;
+
+
 
   return (
     <section
@@ -176,10 +221,18 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
         </p>
       )}
 
-      {(view.ageLabel || view.metrics.length > 0) && (
+      {(view.ageLabel || view.capturedAtLabel || view.metrics.length > 0) && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
           {view.ageLabel && (
             <span data-testid="quicklog-sensor-snapshot-age">Captured {view.ageLabel}</span>
+          )}
+          {view.capturedAtLabel && (
+            <span
+              data-testid="quicklog-sensor-snapshot-captured-at"
+              title={view.capturedAt ?? undefined}
+            >
+              Captured: {view.capturedAtLabel}
+            </span>
           )}
           {view.metrics.map((m) => (
             <span key={m.label} data-testid={`quicklog-sensor-snapshot-metric-${m.label.toLowerCase()}`}>
@@ -200,6 +253,17 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
           className="inline-flex items-center text-[12px] font-medium text-primary hover:underline rounded-sm focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           {view.action.label}
+        </a>
+      )}
+      {correctionHref && (
+        <a
+          href={correctionHref}
+          data-testid="quicklog-sensor-snapshot-correct-action"
+          aria-label="Correct manual reading — opens sensors page"
+          className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline rounded-sm focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <History className="h-3 w-3" aria-hidden />
+          Correct manual reading
         </a>
       )}
     </section>

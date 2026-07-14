@@ -24,7 +24,8 @@ export type SnapshotTrustBadge =
   | "invalid"
   | "manual"
   | "demo"
-  | "csv";
+  | "csv"
+  | "none";
 
 export interface SnapshotTrustBadgeView {
   badge: SnapshotTrustBadge;
@@ -55,6 +56,7 @@ const HELPER: Record<SnapshotTrustBadge, string> = {
   manual: "Entered by grower",
   demo: "Sample data, not real sensor telemetry",
   csv: "Imported reading",
+  none: "Manual log only — no sensor snapshot attached",
 };
 
 const LABEL: Record<SnapshotTrustBadge, string> = {
@@ -64,6 +66,7 @@ const LABEL: Record<SnapshotTrustBadge, string> = {
   manual: "Manual",
   demo: "Demo",
   csv: "CSV",
+  none: "No snapshot",
 };
 
 const SEVERITY: Record<SnapshotTrustBadge, SnapshotTrustBadgeView["severity"]> = {
@@ -73,6 +76,7 @@ const SEVERITY: Record<SnapshotTrustBadge, SnapshotTrustBadgeView["severity"]> =
   manual: "info",
   demo: "info",
   csv: "info",
+  none: "info",
 };
 
 const ATTACHABLE: Record<SnapshotTrustBadge, boolean> = {
@@ -82,7 +86,9 @@ const ATTACHABLE: Record<SnapshotTrustBadge, boolean> = {
   manual: true,
   demo: false,
   csv: true,
+  none: false,
 };
+
 
 /**
  * Classify a snapshot's trust badge. Resolver status (when present)
@@ -109,11 +115,13 @@ export function classifySnapshotTrustBadge(
         return view("invalid", providerLabel);
       case "empty":
       default:
-        return view("invalid", providerLabel);
+        // Absence is NOT invalid telemetry. Growers logging manually
+        // without a snapshot must see "No snapshot", never "Invalid".
+        return view("none", providerLabel);
     }
   }
 
-  if (input.empty) return view("invalid", providerLabel);
+  if (input.empty) return view("none", providerLabel);
 
   // No resolver status — fall back to source heuristics, defensively.
   switch (src) {
@@ -128,9 +136,11 @@ export function classifySnapshotTrustBadge(
     case "stale":
       return view("stale", providerLabel);
     case "invalid":
+      return view("invalid", providerLabel);
     case "unavailable":
     case "":
-      return view("invalid", providerLabel);
+      // No reading present is absence, not invalid telemetry.
+      return view("none", providerLabel);
     case "live":
       // We refuse to promote "live" without a resolver verdict.
       return view("invalid", providerLabel);
@@ -140,6 +150,8 @@ export function classifySnapshotTrustBadge(
       return view("invalid", providerLabel);
   }
 }
+
+
 
 function mapNonLiveSource(src: string): SnapshotTrustBadge {
   switch (src) {

@@ -55,6 +55,7 @@ import {
   aiDoctorSessionDetailPath,
   alertDetailPath,
   growDetailPath,
+  growLearningPath,
   logsPath,
   plantDetailPath,
   tentDetailPath,
@@ -104,6 +105,7 @@ import {
 
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import EvidenceLinkageBadges from "@/components/EvidenceLinkageBadges";
+import ActionFollowUpEvidenceSection from "@/components/ActionFollowUpEvidenceSection";
 import {
   ACTION_QUEUE_ALERT_DERIVED_EVIDENCE_NOT_LINKED_COPY,
   ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY,
@@ -984,6 +986,15 @@ export default function ActionDetail() {
                 {existingOutcome.status.replace(/_/g, " ")}
               </Badge>
               <span className="text-muted-foreground">Outcome recorded</span>
+              {row.grow_id && (
+                <Link
+                  to={growLearningPath(row.grow_id)}
+                  className="ml-2 text-primary hover:underline"
+                  data-testid="view-learning-episode-link"
+                >
+                  View full learning episode →
+                </Link>
+              )}
             </div>
           ) : (
             <Button
@@ -1012,6 +1023,21 @@ export default function ActionDetail() {
           )}
         </section>
       )}
+
+      {row.status === "completed" && (
+        <ActionFollowUpEvidenceSection
+          action={{
+            id: row.id,
+            status: row.status,
+            growId: row.grow_id,
+            tentId: row.tent_id,
+            plantId: row.plant_id,
+            actionLabel: sanitizeActionCopy(row.suggested_change) || "Completed action",
+          }}
+        />
+      )}
+
+
 
       <section className="glass rounded-2xl p-4" aria-label="Audit history">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1">

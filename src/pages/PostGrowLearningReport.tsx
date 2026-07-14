@@ -5,7 +5,7 @@
  * access is in usePostGrowLearningReportData. No AI generation, no automation,
  * no device control, and no schema changes.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Leaf, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -28,6 +28,8 @@ import {
   PostHarvestPerformanceCard,
 } from "@/components/PostGrowLearningReportCards";
 import { usePostGrowLearningReportData } from "@/hooks/usePostGrowLearningReportData";
+import { usePlantMemoryEpisodes } from "@/hooks/usePlantMemoryEpisodes";
+import { buildPostGrowLearningLoopSummary } from "@/lib/postGrowLearningLoopSummaryRules";
 import { growDetailPath } from "@/lib/routes";
 
 function resultMessage(result: unknown, fallback: string): string {
@@ -40,6 +42,17 @@ export default function PostGrowLearningReport() {
   const { growId } = useParams<{ growId: string }>();
   const { status, report, error, saveLesson, applyLessonToNextGrow } =
     usePostGrowLearningReportData(growId);
+  const { state: episodesState } = usePlantMemoryEpisodes({
+    growId: growId ?? null,
+    includeSensorEvidence: true,
+  });
+  const learningSummary = useMemo(
+    () =>
+      episodesState.status === "ok"
+        ? buildPostGrowLearningLoopSummary(episodesState.episodes)
+        : undefined,
+    [episodesState],
+  );
   const [lesson, setLesson] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -98,7 +111,9 @@ export default function PostGrowLearningReport() {
         <EmptyState
           icon={<Leaf className="h-6 w-6" />}
           title="Post-grow report not ready"
-          description={report.ineligibleReason ?? "Archive or complete this grow before generating a report."}
+          description={
+            report.ineligibleReason ?? "Archive or complete this grow before generating a report."
+          }
         />
       </div>
     );
@@ -119,7 +134,7 @@ export default function PostGrowLearningReport() {
             description="Plant memory, sensor truth, and lessons for the next run."
             icon={<Leaf className="h-5 w-5" />}
           />
-          <ExportSummaryButtons vm={report} />
+          <ExportSummaryButtons vm={report} learningSummary={learningSummary} />
         </div>
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
           <Badge variant="outline">{report.header.growName}</Badge>
@@ -144,7 +159,10 @@ export default function PostGrowLearningReport() {
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        <EnvironmentStabilityCard metrics={report.environment} />
+        <EnvironmentStabilityCard
+          metrics={report.environment}
+          sensorSourceKinds={report.sensorReadingSources.map((r) => r.source)}
+        />
         <PostHarvestPerformanceCard vm={report} />
         <ActionEffectivenessCard vm={report} />
         <LessonsCard

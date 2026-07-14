@@ -5,7 +5,11 @@ import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { STAGES, stageLabel } from "@/lib/grow";
 import { format, formatDistanceToNow } from "date-fns";
-import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks } from "lucide-react";
+import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks, ClipboardCheck } from "lucide-react";
+import { isActionResponseCandidateDetails } from "@/lib/actionResponseMemoryRules";
+import { buildActionResponseMemoryCardViewModel } from "@/lib/actionResponseMemoryViewModel";
+import { useActionResponseMemory } from "@/hooks/useActionResponseMemory";
+import ActionResponseMemoryCard from "@/components/ActionResponseMemoryCard";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
@@ -38,7 +42,12 @@ import {
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
-import { actionDetailPath, alertDetailPath, logsPath, timelinePath } from "@/lib/routes";
+import { actionDetailPath, alertDetailPath, growLearningPath, logsPath, timelinePath } from "@/lib/routes";
+import {
+  DECISION_LABELS,
+  RUN_LEARNING_DECISION_EVENT_TYPE,
+  isNextRunDecision,
+} from "@/lib/plantMemoryEpisodeRules";
 
 import {
   buildEnvironmentSummaryReportUrl,
@@ -159,7 +168,7 @@ interface AlertEventRow {
   } | null;
 }
 
-type EventFilter = "all" | "photo" | "note" | "measurement" | "followup";
+type EventFilter = "all" | "photo" | "note" | "measurement" | "followup" | "actionresponse";
 
 function entryKinds(e: Entry): EventFilter[] {
   const kinds: EventFilter[] = ["note"];
@@ -174,7 +183,21 @@ function entryKinds(e: Entry): EventFilter[] {
     e.details && typeof (e.details as Record<string, unknown>).event_type === "string"
       ? ((e.details as Record<string, unknown>).event_type as string)
       : null;
-  if (eventType === "action_followup") kinds.push("followup");
+  // Follow-up / outcome / next-run-decision rows all live under the
+  // "Follow-ups" filter so the learning-loop trio stays together.
+  if (
+    eventType === "action_followup" ||
+    eventType === "action_outcome" ||
+    eventType === "run_learning_decision"
+  ) {
+    kinds.push("followup");
+  }
+  // Grower-recorded responses (Slice 4c evidence rows with an explicit
+  // outcome) additionally surface under the "Action responses" filter.
+  // The predicate is the canonical rules module's — no rule tables in JSX.
+  if (isActionResponseCandidateDetails(e.details as Record<string, unknown> | null)) {
+    kinds.push("actionresponse");
+  }
   return kinds;
 }
 
@@ -200,6 +223,10 @@ export default function Timeline() {
     if (urlGrowId !== storeGrowId) setActiveGrowId(urlGrowId);
   }, [urlGrowId, grows, storeGrowId, setActiveGrowId]);
   const [entries, setEntries] = useState<Entry[]>([]);
+  // Keyset pagination (audit M1): the diary is unbounded but the page used
+  // to silently cap at the newest 100 rows and report "Showing 100 of 100".
+  const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [alertEvents, setAlertEvents] = useState<AlertEventRow[]>([]);
@@ -283,9 +310,10 @@ export default function Timeline() {
     }
 
     setLoading(true);
-    const { data } = await supabase.from("diary_entries")
-      .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+    const { data, count } = await supabase.from("diary_entries")
+      .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", { count: "exact" })
       .eq("grow_id", activeGrowId).order("entry_at", { ascending: false }).limit(100);
+    setEntriesTotal(typeof count === "number" ? count : null);
     const rows = (data as Entry[]) || [];
     const paths = rows.map((r) => r.photo_url).filter((p): p is string => !!p && !p.startsWith("http"));
     if (paths.length) {
@@ -330,6 +358,47 @@ export default function Timeline() {
     setLoading(false);
   }
 
+  /**
+   * Keyset "Load older" — fetches the next page strictly before the oldest
+   * loaded entry_at. Read-only, owner-scoped by RLS, same signing pass as
+   * the initial page for storage photo paths.
+   */
+  async function loadOlder() {
+    if (!activeGrowId || loadingOlder || entries.length === 0) return;
+    const cursor = entries[entries.length - 1]?.entry_at;
+    if (!cursor) return;
+    setLoadingOlder(true);
+    try {
+      const { data } = await supabase.from("diary_entries")
+        .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+        .eq("grow_id", activeGrowId)
+        .lt("entry_at", cursor)
+        .order("entry_at", { ascending: false })
+        .limit(100);
+      const older = (data as Entry[]) || [];
+      const paths = older
+        .map((r) => r.photo_url)
+        .filter((p): p is string => !!p && !p.startsWith("http"));
+      if (paths.length) {
+        const { data: signed } = await supabase.storage
+          .from("diary-photos")
+          .createSignedUrls(paths, 3600);
+        const map = new Map((signed || []).map((s2) => [s2.path as string, s2.signedUrl]));
+        older.forEach((r) => {
+          if (r.photo_url && map.has(r.photo_url)) r.photo_url = map.get(r.photo_url)!;
+        });
+      }
+      if (older.length) {
+        setEntries((prev) => {
+          const seen = new Set(prev.map((e) => e.id));
+          return [...prev, ...older.filter((e) => !seen.has(e.id))];
+        });
+      }
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [activeGrowId, user]);
   useEffect(() => {
@@ -345,10 +414,27 @@ export default function Timeline() {
   }, [entries]);
 
   const eventCounts = useMemo(() => {
-    const m = { all: entries.length, photo: 0, note: 0, measurement: 0, followup: 0 };
+    const m = { all: entries.length, photo: 0, note: 0, measurement: 0, followup: 0, actionresponse: 0 };
     entries.forEach((e) => entryKinds(e).forEach((k) => { m[k] = (m[k] || 0) + 1; }));
     return m;
   }, [entries]);
+
+  // Canonical Action Response Memory (read-only). One grower response renders
+  // as ONE compact card inside its own evidence row — never an extra event.
+  // A failed load renders nothing and never disturbs the rest of the page.
+  const { state: actionResponseState } = useActionResponseMemory({ growId: activeGrowId });
+  const actionResponseCardByRowId = useMemo(() => {
+    const map = new Map<
+      string,
+      NonNullable<ReturnType<typeof buildActionResponseMemoryCardViewModel>>
+    >();
+    if (actionResponseState.status !== "ok") return map;
+    for (const memory of actionResponseState.memories) {
+      const vm = buildActionResponseMemoryCardViewModel({ memory });
+      if (vm) map.set(memory.response.rowId, vm);
+    }
+    return map;
+  }, [actionResponseState]);
 
   const plantOptions = useMemo(() => deriveTimelinePlantOptions(entries), [entries]);
   const tentOptions = useMemo(() => deriveTimelineTentOptions(entries), [entries]);
@@ -701,9 +787,25 @@ export default function Timeline() {
           data-testid="timeline-results-count"
           aria-live="polite"
         >
-          Showing {filtered.length} of {entries.length}{" "}
-          {entries.length === 1 ? "entry" : "entries"}
+          Showing {filtered.length} of {entriesTotal ?? entries.length}{" "}
+          {(entriesTotal ?? entries.length) === 1 ? "entry" : "entries"}
+          {entriesTotal !== null && entriesTotal > entries.length
+            ? ` (${entries.length} loaded)`
+            : ""}
         </p>
+        {entriesTotal !== null && entriesTotal > entries.length && (
+          <button
+            type="button"
+            data-testid="timeline-load-older"
+            className="text-xs underline text-muted-foreground hover:text-foreground disabled:opacity-50"
+            onClick={() => void loadOlder()}
+            disabled={loadingOlder}
+          >
+            {loadingOlder
+              ? "Loading older entries…"
+              : `Load older entries (${entriesTotal - entries.length} more)`}
+          </button>
+        )}
         {highlight && highlightIsMissingFromList(filtered, highlight) && (() => {
           const blockers = detectTimelineHighlightBlockers({
             searchQuery,
@@ -802,6 +904,7 @@ export default function Timeline() {
           <FilterChip active={eventFilter === "note"} onClick={() => setEventFilter("note")} label="Notes" icon={<FileText className="h-3 w-3" />} count={eventCounts.note} />
           <FilterChip active={eventFilter === "measurement"} onClick={() => setEventFilter("measurement")} label="Measurements" icon={<FlaskConical className="h-3 w-3" />} count={eventCounts.measurement} />
           <FilterChip active={eventFilter === "followup"} onClick={() => setEventFilter("followup")} label="Follow-ups" icon={<Check className="h-3 w-3" />} count={eventCounts.followup} />
+          <FilterChip active={eventFilter === "actionresponse"} onClick={() => setEventFilter("actionresponse")} label="Action responses" icon={<ClipboardCheck className="h-3 w-3" />} count={eventCounts.actionresponse} />
         </div>
       </div>
 
@@ -983,8 +1086,40 @@ export default function Timeline() {
                             | { ts?: string; temp?: number; rh?: number; vpd?: number; co2?: number; soil?: number }
                             | undefined;
                           const remindAt = e.details?.remind_at as string | undefined;
+                          const eventTypeValue = (e.details?.event_type as string | undefined) ?? null;
+                          // Learning-loop rows (follow-up / outcome / decision) carry join
+                          // ids (action_queue_id, *_entry_id, source_alert_id) that must
+                          // never render as raw chips. Skip the denylist chip loop for them
+                          // entirely and surface only friendly, id-free rows + back-links.
+                          const isLearningLoopEvent =
+                            eventTypeValue === "action_followup" ||
+                            eventTypeValue === "action_outcome" ||
+                            eventTypeValue === RUN_LEARNING_DECISION_EVENT_TYPE;
                           const HIDDEN = ["event_type","plant_id","plant_name","tent_id","sensor","sensor_snapshot","remind_at"];
-                          const extra = Object.entries(e.details || {}).filter(([k]) => !HIDDEN.includes(k));
+                          const extra = isLearningLoopEvent
+                            ? []
+                            : Object.entries(e.details || {}).filter(([k]) => !HIDDEN.includes(k));
+                          const loopActionId =
+                            isLearningLoopEvent && typeof e.details?.action_queue_id === "string"
+                              ? (e.details.action_queue_id as string)
+                              : null;
+                          const loopOutcomeStatus =
+                            eventTypeValue === "action_outcome" &&
+                            typeof e.details?.outcome_status === "string"
+                              ? (e.details.outcome_status as string)
+                              : null;
+                          const loopDecisionRaw =
+                            eventTypeValue === RUN_LEARNING_DECISION_EVENT_TYPE
+                              ? e.details?.decision
+                              : null;
+                          const loopDecisionLabel = isNextRunDecision(loopDecisionRaw)
+                            ? DECISION_LABELS[loopDecisionRaw]
+                            : null;
+                          const loopEntryGrowId = (e as { grow_id?: unknown }).grow_id;
+                          const loopGrowId =
+                            (typeof loopEntryGrowId === "string" && loopEntryGrowId) ||
+                            activeGrowId ||
+                            null;
                           return (
                             <>
                               <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground flex-wrap">
@@ -1021,6 +1156,63 @@ export default function Timeline() {
 
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>
+                              {(() => {
+                                // Compact canonical "Action response" card for
+                                // grower-recorded evidence rows. Rendered inside
+                                // the row itself — the raw row never duplicates
+                                // into a second event. The existing pinned
+                                // "View original action" link below serves as
+                                // the card's action link on this surface.
+                                const responseVm = actionResponseCardByRowId.get(e.id);
+                                return responseVm ? (
+                                  <div className="mt-2">
+                                    <ActionResponseMemoryCard
+                                      viewModel={responseVm}
+                                      variant="compact"
+                                      showActionLink={false}
+                                    />
+                                  </div>
+                                ) : null;
+                              })()}
+                              {isLearningLoopEvent && (loopOutcomeStatus || loopDecisionLabel) && (
+                                <div className="mt-1 flex flex-wrap gap-1.5">
+                                  {loopOutcomeStatus && (
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300">
+                                      Grower response: {loopOutcomeStatus.replace(/_/g, " ")}
+                                    </span>
+                                  )}
+                                  {loopDecisionLabel && (
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300">
+                                      {loopDecisionLabel}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {isLearningLoopEvent && (loopActionId || loopGrowId) && (
+                                <div className="mt-2 flex flex-wrap items-center gap-3">
+                                  {loopActionId && (
+                                    <Link
+                                      to={actionDetailPath(loopActionId)}
+                                      data-testid="timeline-view-original-action"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                      onClick={(ev) => ev.stopPropagation()}
+                                    >
+                                      <ListChecks className="h-3 w-3" aria-hidden />
+                                      View original action
+                                    </Link>
+                                  )}
+                                  {loopGrowId && (
+                                    <Link
+                                      to={growLearningPath(loopGrowId)}
+                                      data-testid="timeline-view-learning-episode"
+                                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                      onClick={(ev) => ev.stopPropagation()}
+                                    >
+                                      View full learning episode
+                                    </Link>
+                                  )}
+                                </div>
+                              )}
                               {(() => {
                                 const actionsReturn = backToActions.wasProvided
                                   ? backToActions.href

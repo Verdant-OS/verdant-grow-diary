@@ -1,0 +1,162 @@
+# Controlled resumable Vitest runner
+
+A crash-safe, sharded, resumable runner for Verdant's Vitest suite.
+
+Lives under `scripts/vitest-controlled/`. It does **not** replace
+`scripts/run-vitest-batches.mjs` or any PR-default gate — it is an
+additional controlled command used for the full suite and the manual
+`vitest-controlled-full-suite.yml` matrix workflow.
+
+## Guarantees
+
+- **`pool=forks`, `maxWorkers=8`, `minWorkers=2`** — matches the
+  Slice G.1j controlled command that ran the full suite green.
+- **Deterministic manifest** — same `src/**/*.{test,spec}.{ts,tsx}`
+  include as `vitest.config.ts`, normalized to POSIX paths, sorted,
+  duplicate-rejected, hashed.
+- **Structured per-file progress** (`progress.jsonl`, append-only,
+  fsync per write) via a custom reporter.
+- **Resume-safe** — completed files are never re-run; completed
+  failures stay failed; resume refuses if the **workspace fingerprint**
+  (every tracked + non-ignored untracked file in the repository),
+  manifest, package/lock, reporter schema, run schema, or the
+  **enforced runtime toolchain identity (Node, Bun, Vitest)** drifts.
+  Runner artifacts under `.vitest-runs/` and `test-results/` are
+  excluded via `.gitignore` and never self-invalidate a resume.
+- **Toolchain-locked** — `RUN_SCHEMA_VERSION = 3` folds Node
+  (`process.version`), Bun (`bun --version` from the installed
+  executable), and Vitest (installed local package metadata) into
+  the run record and the configuration fingerprint. Legacy v1/v2
+  runs are refused, never silently upgraded. The controlled CI
+  workflow pins `bun-version: 1.3.3` in both jobs and prints only
+  the discovered node/bun/vitest versions — no environment dumps.
+- **Sharded** — union of shards equals manifest, pairwise
+  intersection is empty; aggregate job proves exact coverage.
+- **No config changes** — the 5-second `testTimeout`, retry count,
+  jsdom environment, isolation, and `fileParallelism` all remain at
+  the values in `vitest.config.ts`.
+
+## Files
+
+| Path                                                 | Purpose                                |
+| ---------------------------------------------------- | -------------------------------------- |
+| `scripts/vitest-controlled/manifest.mjs`             | Deterministic file discovery + hashing |
+| `scripts/vitest-controlled/sharding.mjs`             | Shard math + batch splitting           |
+| `scripts/vitest-controlled/fingerprint.mjs`          | Source-fingerprint helpers             |
+| `scripts/vitest-controlled/reporter.mjs`             | Vitest reporter emitting JSONL events  |
+| `scripts/vitest-controlled/summarizer.mjs`           | Structured summary + aggregate helpers |
+| `scripts/vitest-controlled/cli.mjs`                  | CLI dispatcher                         |
+| `.github/workflows/vitest-controlled-full-suite.yml` | Manual matrix runner                   |
+
+## Commands
+
+```bash
+# One shard (default: 30 files/batch, deadline 480s).
+bun run test:vitest:controlled -- --shard 1/16
+
+# Resume an interrupted run (only files without a terminal event).
+bun run test:vitest:resume -- --run-dir .vitest-runs/<runId>
+
+# Rerun only failed files into a sibling directory.
+bun run test:vitest:rerun-failed -- --run-dir .vitest-runs/<runId>
+
+# Regenerate/inspect a summary.
+bun run test:vitest:summarize -- --run-dir .vitest-runs/<runId> --json
+
+# Aggregate multiple shard directories against the current manifest.
+bun run test:vitest:aggregate -- .vitest-runs/<runId-1> .vitest-runs/<runId-2>
+```
+
+## Run directory layout
+
+```
+.vitest-runs/<runId>/
+  run.json           run configuration + fingerprint + schema versions
+  manifest.json      full deterministic file list + hash
+  shard-files.json   this shard's assigned files
+  progress.jsonl     append-only file-completion events
+  raw/               per-batch raw vitest logs (diagnostics only)
+  summary.json       structured summary (authoritative)
+  summary.md         human-readable Markdown summary
+  exit-code          orchestrator exit code
+  run-meta           per-batch orchestrator metadata
+  completed          written last, only when every file has terminal result
+```
+
+`run.json` never records source contents, environment values,
+secrets, or tokens — only aggregate hashes.
+
+## Exit codes
+
+- `0` — complete, all files passed
+- `1` — complete with test failures (or incomplete files after deadlines)
+- `2` — configuration / manifest / fingerprint / artifact integrity error
+- `130` — interrupted (SIGINT/SIGTERM); `completed` marker is not written
+
+## Resume semantics
+
+A file is complete only when the reporter records a terminal
+`event: "file"` line for it. On `resume`:
+
+- Passed files are not rerun.
+- Failed files remain failed and are not rerun (use `rerun-failed`).
+- Skipped files remain skipped.
+- Files that never received a terminal event are rerun.
+- Conflicting duplicate events (same file, different result) or
+  corrupt JSONL lines cause resume to **refuse** with exit `2` —
+  the run is invalid, not silently green.
+
+Resume additionally recomputes the source fingerprint and the
+manifest dirty-tree hash. Any drift refuses the resume — that
+guarantees CI cannot resume progress produced against a different
+commit or working tree.
+
+## Batch-deadline behavior
+
+Each batch child process is bounded by `--batch-deadline-ms`
+(default 480s, below the 600s sandbox shell window). Deadline
+expiration terminates the child and leaves any files without a
+terminal event marked `incomplete` — a subsequent `resume` picks
+them up. Deadlines never convert an incomplete file to `failed`.
+
+## CI aggregate contract
+
+The `controlled-aggregate` job:
+
+1. Downloads every shard artifact.
+2. Rebuilds the expected manifest from the checked-out code.
+3. Passes it to `cli.mjs aggregate` which proves:
+   - every expected file has exactly one terminal result,
+   - no file appears in multiple shards,
+   - all shards share the same manifest hash,
+   - all shards used the same source fingerprint,
+   - final file/test totals reconcile.
+4. Fails the job unless aggregate status is `complete`.
+
+A green shard matrix without a green aggregate is **not** a green
+full suite.
+
+## Workspace fingerprint (schema v2)
+
+`fingerprint.mjs` derives a single SHA-256 digest over every file that
+Git reports as tracked or non-ignored-untracked (`git ls-files --cached`
+
+- `git ls-files --others --exclude-standard`). Each file contributes
+  its POSIX-normalized path plus one of:
+
+* `F\0<sha256>` — regular file contents (streamed, never persisted)
+* `S\0<target>` — symlink target (POSIX-normalized)
+* `M` — tracked but missing on disk
+* `D` — tracked directory entry (e.g. submodule)
+
+The stored artifact in `run.json` contains only the final digest,
+algorithm, schema version, file count, `clean`/`dirty` mode, and
+coarse per-area counts. **No file contents, secrets, or absolute
+user paths are persisted.**
+
+`resume` and `rerun-failed` recompute this fingerprint **before**
+consulting completed-file progress, and refuse with exit code `2`
+on any mismatch — so a production `.ts`, Supabase migration, edge
+function, script, doc, or workflow change all invalidate reuse.
+`run.json` with `schema < 2` (legacy test-only fingerprint) is
+refused outright; old artifacts are preserved for inspection.

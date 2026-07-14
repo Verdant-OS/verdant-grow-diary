@@ -6,6 +6,7 @@ import {
   actionDetailPath,
   actionsPath,
   growDetailPath,
+  growLearningPath,
   logsPath,
   plantsPath,
   tentsPath,
@@ -18,6 +19,9 @@ describe("route builders — base paths", () => {
   });
   it("actionDetailPath builds /actions/:id", () => {
     expect(actionDetailPath("xyz")).toBe("/actions/xyz");
+  });
+  it("growLearningPath builds /grows/:id/learning", () => {
+    expect(growLearningPath("abc")).toBe("/grows/abc/learning");
   });
   it("scoped list paths return the bare route when no growId is provided", () => {
     expect(logsPath()).toBe("/logs");

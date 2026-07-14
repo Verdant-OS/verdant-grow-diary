@@ -11,15 +11,14 @@ const TENT_ID = "22222222-2222-2222-2222-222222222222";
 
 const baseInput = {
   eventType: "observation",
+  idempotencyKey: "quicklog-v2-test-key-legacy",
   noteWithHardware: "Leaves curling slightly",
   plantId: PLANT_ID,
   plantTentId: TENT_ID,
   details: { ph: "", ec: "", runoff: "", nutrients: "", training: "", watering: "" },
 };
 
-function assertFail(
-  r: LegacyUnifiedBuildResult,
-): { ok: false; reason: string; message: string } {
+function assertFail(r: LegacyUnifiedBuildResult): { ok: false; reason: string; message: string } {
   expect(r.ok).toBe(false);
   return r as { ok: false; reason: string; message: string };
 }
@@ -75,6 +74,79 @@ describe("legacyQuickLogUnifiedSave", () => {
       expect(r.payload.p_note).toBe("Leaves curling slightly");
       expect(r.payload.p_volume_ml).toBeNull();
     }
+  });
+
+  it("merges a validated Pheno receipt with the existing details envelope", () => {
+    const r = buildLegacyQuickLogUnifiedPayload({
+      ...baseInput,
+      sensorAttachPayload: {
+        sensor_snapshot_id: "sensor-1",
+        tent_id: TENT_ID,
+        captured_at: "2026-07-14T12:00:00Z",
+        age_minutes: 2,
+        source: "live",
+        confidence: 0.9,
+        freshness: "fresh",
+        status: "fresh_live",
+        badge_label: "Live",
+        metrics: {
+          temp_f: 76,
+          humidity_pct: 55,
+          vpd_kpa: 1.2,
+          soil_moisture_pct: null,
+          co2_ppm: null,
+        },
+        warnings: [],
+      },
+      phenoEvidenceReceipt: {
+        kind: "pheno_evidence_receipt",
+        receipt_version: 1,
+        source: "manual",
+        evidence_only: true,
+        hunt_id: "hunt-1",
+        plant_id: PLANT_ID,
+        evidence_goal: "structure",
+        stage: "flower",
+        automatic_selection: false,
+        action_queue_created: false,
+        device_control: false,
+      },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.p_details).toMatchObject({
+      kind: "pheno_evidence_receipt",
+      hunt_id: "hunt-1",
+      plant_id: PLANT_ID,
+      evidence_goal: "structure",
+      automatic_selection: false,
+      action_queue_created: false,
+      device_control: false,
+      sensor: { sensor_snapshot_id: "sensor-1", freshness: "fresh" },
+    });
+  });
+
+  it("fails closed for a mismatched candidate receipt without blocking the ordinary note", () => {
+    const r = buildLegacyQuickLogUnifiedPayload({
+      ...baseInput,
+      phenoEvidenceReceipt: {
+        kind: "pheno_evidence_receipt",
+        receipt_version: 1,
+        source: "manual",
+        evidence_only: true,
+        hunt_id: "hunt-1",
+        plant_id: "another-plant",
+        evidence_goal: "structure",
+        stage: null,
+        automatic_selection: false,
+        action_queue_created: false,
+        device_control: false,
+      },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.p_note).toBe("Leaves curling slightly");
+    expect(r.payload.p_details).toBeNull();
   });
 
   it("requires a note for the note action", () => {

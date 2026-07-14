@@ -24,6 +24,7 @@
 import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+
 export type PremiumExportFeature =
   | "ai_doctor_report"
   | "ai_doctor_evidence_csv"
@@ -75,6 +76,9 @@ export async function checkPremiumExportEntitlement(
     if (scope.plantId) body.plant_id = scope.plantId;
     if (scope.startDate) body.start_date = scope.startDate;
     if (scope.endDate) body.end_date = scope.endDate;
+    // Phase 2b: pass the client-derived billing environment so the server
+    // union resolver ignores mismatched Lovable Paddle rows.
+    // billing_env is derived server-side; never sent from the client.
 
     const { data, error } = await supabase.functions.invoke(
       "premium-export-entitlement",

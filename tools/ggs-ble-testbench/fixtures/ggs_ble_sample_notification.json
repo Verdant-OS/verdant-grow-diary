@@ -1,0 +1,5 @@
+{
+  "sensor": { "temp": 23.3, "humi": 37.7, "vpd": 1.78 },
+  "fan": { "on": 1, "level": 5 },
+  "light": { "level": 26 }
+}

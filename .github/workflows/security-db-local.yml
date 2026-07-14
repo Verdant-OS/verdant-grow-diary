@@ -1,0 +1,181 @@
+name: Security DB Local
+
+# OPTIONAL job — DB-backed security harnesses. Not a required check.
+# Required PR gate remains `test:security-regression`. Do not mark this
+# job required until it has been stable across multiple PRs.
+#
+# OPT-IN ONLY. Runs only when explicitly enabled via either:
+#   - workflow_dispatch input `run_db_security: true`, or
+#   - repository variable ENABLE_DB_SECURITY_LANE == 'true'
+# Otherwise all steps are skipped and a summary is written.
+
+on:
+  pull_request:
+    branches: [main, verdant-grow-diary]
+  push:
+    branches: [main, verdant-grow-diary]
+  workflow_dispatch:
+    inputs:
+      run_db_security:
+        description: "Boot local Supabase and run DB security lane"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  test-security-db-local:
+    name: test:security-db-local
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Optional: never blocks the merge queue.
+    continue-on-error: true
+    env:
+      ENABLED: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_db_security == true) || vars.ENABLE_DB_SECURITY_LANE == 'true' }}
+    steps:
+      - name: Skip notice (lane disabled)
+        if: env.ENABLED != 'true'
+        run: |
+          echo "DB security lane is disabled for this run." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Enable via workflow_dispatch input run_db_security=true," | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "or set repository variable ENABLE_DB_SECURITY_LANE=true."   | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        if: env.ENABLED == 'true'
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: env.ENABLED == 'true'
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        if: env.ENABLED == 'true'
+        run: bun install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        if: env.ENABLED == 'true'
+        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v1
+        with:
+          # Pinned: "latest" resolves through an unauthenticated GitHub API
+          # call that rate-limits on shared runners (two fast lane failures
+          # on 2026-07-09). Bump deliberately when a newer CLI is needed.
+          version: 2.109.1
+
+      - name: Start local Supabase
+        if: env.ENABLED == 'true'
+        id: supabase-start
+        run: |
+          set -e
+          supabase start --workdir . 2>&1 | tee supabase-start.log
+          echo "started=true" >> "$GITHUB_OUTPUT"
+
+      - name: Export local Supabase env
+        if: env.ENABLED == 'true'
+        id: supabase-env
+        run: |
+          set -e
+          STATUS_JSON="$(supabase status -o json)"
+          SUPABASE_URL="$(echo "$STATUS_JSON" | jq -r '.API_URL // .api_url // empty')"
+          SUPABASE_ANON_KEY="$(echo "$STATUS_JSON" | jq -r '.ANON_KEY // .anon_key // empty')"
+          SUPABASE_SERVICE_ROLE_KEY="$(echo "$STATUS_JSON" | jq -r '.SERVICE_ROLE_KEY // .service_role_key // empty')"
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "BLOCKED: local Supabase did not expose required keys."
+            exit 2
+          fi
+          # Local-only keys. Do NOT echo values.
+          echo "SUPABASE_URL=$SUPABASE_URL" >> "$GITHUB_ENV"
+          echo "::add-mask::$SUPABASE_ANON_KEY"
+          echo "::add-mask::$SUPABASE_SERVICE_ROLE_KEY"
+          echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+
+      - name: Apply migrations (db reset with grant-parity seed)
+        if: env.ENABLED == 'true'
+        # NOT --no-seed: supabase/seed.sql restores the production GRANT
+        # baseline that fresh local stacks (hardened default ACL) omit.
+        # Without it the harnesses' authenticated setup (tents/profiles
+        # inserts) fails with 42501 before any assertion runs. The seed is
+        # local-only and never touches the hosted project. See
+        # docs/security-regression-tests.md.
+        run: supabase db reset 2>&1 | tee supabase-db-reset.log
+
+      - name: Profiles DB security
+        if: env.ENABLED == 'true'
+        id: profiles-db
+        run: bun run test:profiles-db-security 2>&1 | tee profiles-db.log
+
+      - name: Customer Mode isolation
+        if: env.ENABLED == 'true'
+        id: customer-mode-db
+        run: bun run test:customer-mode-db-security 2>&1 | tee customer-mode-db.log
+
+      - name: Aggregate DB security lane
+        if: env.ENABLED == 'true'
+        id: aggregate
+        run: bun run test:security-db-local 2>&1 | tee security-db-local.log
+
+      - name: Upload failure artifacts
+        if: failure() && env.ENABLED == 'true'
+        id: upload-artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: security-db-local-artifacts
+          path: |
+            supabase-start.log
+            supabase-db-reset.log
+            profiles-db.log
+            customer-mode-db.log
+            security-db-local.log
+            test-results/**
+            artifacts/security-db/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Write job summary
+        if: always()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set +e
+          {
+            echo "## Security DB Local"
+            echo ""
+            if [ "${ENABLED:-false}" != "true" ]; then
+              echo "**Status:** disabled"
+              echo ""
+              echo "Lane is opt-in. Enable via workflow_dispatch input"
+              echo "\`run_db_security=true\` or repo variable"
+              echo "\`ENABLE_DB_SECURITY_LANE=true\`."
+            else
+              case "$JOB_STATUS" in
+                success) echo "**Status:** passed" ;;
+                failure) echo "**Status:** failed" ;;
+                cancelled) echo "**Status:** cancelled" ;;
+                *) echo "**Status:** $JOB_STATUS" ;;
+              esac
+              echo ""
+              echo "**Tests requested:**"
+              echo "- profiles DB security (\`test:profiles-db-security\`)"
+              echo "- customer mode isolation (\`test:customer-mode-db-security\`)"
+              echo "- aggregate lane (\`test:security-db-local\`)"
+              echo ""
+              echo "**Artifact:** \`security-db-local-artifacts\` (uploaded on failure only, 14-day retention)"
+              echo ""
+              echo "Artifact paths (when uploaded):"
+              echo "- \`profiles-db.log\`, \`customer-mode-db.log\`, \`security-db-local.log\`"
+              echo "- \`supabase-start.log\`, \`supabase-db-reset.log\` (sanitized)"
+              echo "- \`test-results/\`, \`artifacts/security-db/\` (if produced)"
+              echo ""
+              if [ "$JOB_STATUS" != "failure" ]; then
+                echo "_No failure artifacts uploaded for this run._"
+              fi
+            fi
+            echo ""
+            echo "**Run:** ${RUN_URL}"
+            echo ""
+            echo "_Summary contains no secrets, service-role values, JWTs, or DB URLs._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop local Supabase
+        if: always() && env.ENABLED == 'true'
+        run: supabase stop --no-backup || true

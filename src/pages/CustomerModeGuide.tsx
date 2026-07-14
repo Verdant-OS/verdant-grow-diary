@@ -14,6 +14,7 @@
  *     share-token publishing backend exists.
  */
 import { useEffect, useMemo } from "react";
+import LegalFooterLinks from "@/components/LegalFooterLinks";
 import { useParams } from "react-router-dom";
 import CustomerGuideSectionView from "@/components/customer/CustomerGuideSection";
 import CustomerGuideTimeline from "@/components/customer/CustomerGuideTimeline";
@@ -125,6 +126,7 @@ export default function CustomerModeGuide() {
           className="pt-4 text-center text-xs text-muted-foreground"
         >
           Powered by Verdant — private grow data stays with the grower.
+          <LegalFooterLinks className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground" />
         </footer>
       </div>
     </main>

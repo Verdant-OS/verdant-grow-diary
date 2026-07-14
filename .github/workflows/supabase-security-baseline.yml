@@ -1,0 +1,37 @@
+name: Supabase Security Baseline
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Read-only workflow: no secrets used, no artifacts uploaded.
+# Fails the build when NEW high-risk patterns appear in
+# supabase/migrations/*.sql that are not present in
+# config/supabase-migration-safety-baseline.json.
+permissions:
+  contents: read
+
+jobs:
+  supabase-security-baseline:
+    name: Supabase migration safety baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4
+        with:
+          node-version: 20
+
+      # Static, dependency-free scan. High-risk categories:
+      #   1. SECURITY DEFINER function without SET search_path.
+      #   2. Permissive USING/WITH CHECK (true) on INSERT/UPDATE/DELETE policies.
+      #   3. public.<table> created without ENABLE ROW LEVEL SECURITY anywhere.
+      # New findings vs the baseline JSON fail the build.
+      - name: Supabase migration safety scan
+        run: node scripts/check-supabase-migration-safety.mjs

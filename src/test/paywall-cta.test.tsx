@@ -9,7 +9,6 @@ import {
   paywallCtaViewModelText,
 } from "@/lib/paywallCtaViewModel";
 import PaywallCta from "@/components/PaywallCta";
-import BillingPlaceholder from "@/pages/BillingPlaceholder";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 
 describe("paywallCtaViewModel — calm defaults", () => {
@@ -97,20 +96,10 @@ describe("PaywallCta presenter", () => {
   });
 });
 
-describe("BillingPlaceholder mounts PaywallCta", () => {
-  it("renders the paywall CTA panel on the billing route", () => {
-    render(
-      <MemoryRouter initialEntries={["/billing/pro-monthly"]}>
-        <BillingPlaceholder />
-      </MemoryRouter>,
-    );
-    const panel = screen.getByTestId("billing-paywall-cta");
-    expect(panel).toBeTruthy();
-    const link = within(panel).getByTestId("billing-paywall-cta-link");
-    expect(link.getAttribute("href")).toBe("/pricing");
-    expect(paywallCtaFindBannedWords(panel.textContent ?? "")).toEqual([]);
-  });
-});
+// Slice F: `BillingPlaceholder` was retired; `/billing/:plan` now redirects
+// via `LegacyBillingRedirect`. The PaywallCta remains a shared presenter
+// used by paywall surfaces in the app, and its `/pricing` link is covered
+// by the PaywallCta presenter test above.
 
 describe("PaywallCta source — no payment/checkout imports", () => {
   it("PaywallCta.tsx imports no payment or checkout modules", () => {

@@ -1,0 +1,180 @@
+# Plant Profile Photo Upload — V1
+
+Native, private-storage upload for the plant profile photo. The
+grower can take a photo or choose from their device library from
+Edit Plant; no URL is ever required.
+
+## Scope
+
+- Edits the plant's `photo_url` only.
+- Uses the existing private `diary-photos` bucket.
+- Does not create diary/timeline events, alerts, Action Queue items,
+  sensor readings, or trigger AI / Edge Functions / device control.
+- No schema, RLS, migration, or storage-policy changes.
+
+## Reference contract
+
+`plants.photo_url` may hold any of the following, in priority order:
+
+| Format                                            | Kind       | Rendering                            | Origin              |
+| ------------------------------------------------- | ---------- | ------------------------------------ | ------------------- |
+| `storage://diary-photos/<owner>/…`                | `storage`  | Signed URL from private bucket       | V1 native upload    |
+| `https://…` / `http://…`                          | `external` | Pass-through                         | Legacy plants       |
+| `data:image/(png\|jpeg\|webp\|gif\|avif);…`       | `data`     | Pass-through                         | Legacy plants       |
+| _empty / null / whitespace_                       | `clear`    | Placeholder                          | Cleared plants      |
+
+`blob:` URLs are treated as ephemeral previews and are never
+persisted.
+
+Validation rejects unknown buckets, empty paths, leading slashes,
+`..` traversal, backslashes, query strings, fragments, control
+characters, and any path whose first folder does not match the
+authenticated user id.
+
+Storage object paths are not surfaced in visible UI or grower-facing
+error copy.
+
+## File limits
+
+- Allowed MIME: `image/jpeg`, `image/png`, `image/webp`, `image/heic`,
+  `image/heif`.
+- Max size: 25 MB (matches the server-side bucket contract in
+  `docs/diary-storage-bucket-server-side-limits.md`).
+- SVG, GIF, AVIF, video, blank/unsupported types, and empty files are
+  rejected with sanitized grower-safe copy.
+- Stored file extension is derived from the validated MIME, never
+  from the (untrusted) filename.
+
+## Upload path
+
+```
+<user-id>/<grow-id|unassigned>/plant-profiles/<plant-id>/<random-id>.<ext>
+```
+
+- First segment is always the authenticated user id (aligns with the
+  owner-scoped RLS policies on `storage.objects`).
+- Random id from `crypto.randomUUID()` when available.
+- `upsert: false` — never overwrites an existing object.
+
+## Signed display URL behavior
+
+`PlantPhoto` delegates to `usePlantProfilePhotoSource`, which:
+
+- Passes legacy http(s)/data:/blob: values through unchanged.
+- Exchanges storage references for a bounded (30-minute) signed URL
+  scoped to the authenticated viewer.
+- Caches via React Query and refreshes before expiry.
+- Falls back to the standard placeholder on resolver failure or
+  invalid/wrong-owner references.
+- Never persists or logs the signed URL.
+
+## Non-destructive replace / clear
+
+Replacing the profile photo writes a new reference to
+`plants.photo_url`. The previous storage object is intentionally not
+deleted in V1:
+
+- Legacy URLs may not be owned by Verdant.
+- Older storage references may be shared or not safely attributable.
+- Destructive cleanup requires a separate ownership + retention
+  policy.
+
+Clearing sets `plants.photo_url = null` and does not remove any
+storage object.
+
+## Failure and cleanup
+
+| Failure                        | Behavior                                                                            |
+| ------------------------------ | ----------------------------------------------------------------------------------- |
+| File validation                | Dialog stays open, inline `role="alert"` error, no upload attempted                 |
+| Storage upload                 | Plant row is not updated; selection retained; sanitized retry copy                   |
+| Plant row update after upload  | Uploaded object is removed; previous profile photo is unchanged; sanitized retry     |
+
+## Legacy URL compatibility
+
+Legacy external and data:image URLs continue to render on Plant
+Detail, Plants list, Tent Detail plant cards, and the Edit Plant
+preview. The primary UX no longer offers a URL text input.
+
+## Limitations
+
+- No background/queued upload — upload runs during Save.
+- No client-side image resizing.
+- Old storage objects are not garbage-collected in V1.
+- HEIC/HEIF remain accepted upload formats. Browser preview support
+  for HEIC/HEIF varies. Verdant attempts a local decode probe (never
+  an upload) via `HTMLImageElement.decode()` and, when the browser
+  cannot render the file, shows an accessible "Photo selected"
+  fallback card (with a HEIC / HEIF format badge) instead of a
+  broken image. Preview failure is display-only — it is NOT an
+  upload-validation failure, does not disable Save, and the original
+  File is uploaded unchanged. No client-side HEIC → JPEG conversion
+  is performed.
+
+## Rollback
+
+Revert the following files to their pre-V1 state to restore the URL
+text input:
+
+- `src/components/EditPlantDialog.tsx`
+- `src/components/PlantPhoto.tsx`
+- `src/components/PlantPhotoView.tsx`
+- `src/hooks/usePlantProfilePhotoSource.ts`
+- `src/lib/plantProfilePhotoStorageRules.ts`
+- `src/lib/plantProfilePhotoFileRules.ts`
+- `src/lib/plantProfilePhotoUploadService.ts`
+
+No storage, schema, or RLS rollback is required.
+
+## Previous-object cleanup (Replacement Cleanup V1)
+
+When a grower successfully replaces a plant profile photo, Verdant
+attempts to retire the previous private storage object. The plant
+update is the primary operation; cleanup is a strictly secondary,
+user-initiated step attached only to a successful Edit Plant
+replacement.
+
+Order of operations (see
+`src/lib/plantProfilePhotoReplacementCleanupService.ts`):
+
+1. Validate the selected file and upload the new private object.
+2. Update `plants.photo_url` to the new durable `storage://`
+   reference. If the update fails, only the *newly uploaded* object
+   is removed; the previous photo is left untouched.
+3. **Confirm** the plant's current `photo_url` equals the new
+   durable reference via the authenticated (RLS-safe) Supabase
+   client.
+4. **Reference-count check** — query current `plants.photo_url`
+   rows equal to the previous durable reference. Only when zero
+   remaining references exist may the old object be removed.
+5. Removal calls `removeUploadedPlantProfilePhoto` with the
+   *parsed object path only* — never the full `storage://` URI,
+   never a signed URL, never provider text.
+6. Existing React Query invalidations run regardless of cleanup
+   outcome.
+
+Protected cases (old object is **not** deleted):
+
+- Previous value is `null`, blank, `http`, `https`, `data:image`,
+  or `blob:` (legacy references are the admin CLI's job).
+- Previous reference targets another bucket, another owner, or a
+  different plant.
+- Persistence confirmation returns anything other than the new
+  reference.
+- Reference-count query fails or is uncertain.
+- Another plant still references the previous object.
+
+Failure never rolls back a successful photo update. Grower-facing
+copy is sanitized:
+
+| Outcome                              | Toast                                                                        |
+| ------------------------------------ | ---------------------------------------------------------------------------- |
+| Removed / not needed                 | `Plant photo updated.`                                                       |
+| Protected / skipped for safety       | `Plant photo updated. The previous file was left in storage for safety.`     |
+| Remove failed                        | `Plant photo updated. The previous file could not be removed.`               |
+
+No scheduled cleanup, cron, background worker, queue, trigger,
+schema change, RLS change, migration, or Edge Function is
+introduced. The admin `plant-photos:cleanup` CLI remains the
+repair path for historical or conservatively retained objects and
+is **not** modified by this feature.

@@ -24,6 +24,7 @@
 
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
 import type { buildSensorSnapshotSavePayload } from "./latestSensorSnapshotRules";
+import type { PhenoEvidenceReceiptDetails } from "./phenoEvidenceCaptureRules";
 
 /**
  * Redacted sensor envelope produced by `buildSensorSnapshotSavePayload`.
@@ -38,8 +39,7 @@ export const SUPPORTED_LEGACY_EVENT_TYPES = [
   "note",
   "environment",
 ] as const;
-export type SupportedLegacyEventType =
-  (typeof SUPPORTED_LEGACY_EVENT_TYPES)[number];
+export type SupportedLegacyEventType = (typeof SUPPORTED_LEGACY_EVENT_TYPES)[number];
 
 export function isSupportedLegacyEventType(value: string): value is SupportedLegacyEventType {
   return (SUPPORTED_LEGACY_EVENT_TYPES as readonly string[]).includes(value);
@@ -63,6 +63,12 @@ export interface LegacyQuickLogDetails {
 
 export interface LegacyQuickLogFormInput {
   eventType: string;
+  /**
+   * Server-side idempotency key for quicklog_save_manual (8..200 chars).
+   * One key per logical submission; retries must reuse it so the RPC
+   * dedupes instead of double-writing.
+   */
+  idempotencyKey: string;
   /** Note after hardware readings have been appended via existing helper. */
   noteWithHardware: string;
   plantId: string | null;
@@ -90,6 +96,12 @@ export interface LegacyQuickLogFormInput {
    * does not invent, normalize, or convert units.
    */
   environmentCheck?: Record<string, unknown> | null;
+  /**
+   * Optional, already-validated manual Pheno evidence receipt. Its discriminator
+   * stays at the top of `p_details` so a bounded read-only timeline query can
+   * find it without scanning unrelated diary entries.
+   */
+  phenoEvidenceReceipt?: PhenoEvidenceReceiptDetails | null;
   /**
    * Optional human-readable suffix (e.g. milestone + vigor summary)
    * appended to the diary note so timelines that read the note column
@@ -154,7 +166,12 @@ export function buildLegacyQuickLogUnifiedPayload(
   // sensor payload and/or an early-stage milestone envelope. We never
   // invent details, never persist raw_payload, and never re-key the
   // sensor envelope as `sensor_snapshot`.
-  const envelopeFields: Record<string, unknown> = {};
+  const canAttachPhenoReceipt =
+    (input.eventType === "observation" || input.eventType === "note") &&
+    input.phenoEvidenceReceipt?.plant_id === input.plantId;
+  const envelopeFields: Record<string, unknown> = canAttachPhenoReceipt
+    ? { ...input.phenoEvidenceReceipt }
+    : {};
   if (input.sensorAttachPayload != null) {
     envelopeFields.sensor = input.sensorAttachPayload;
   }
@@ -190,6 +207,7 @@ export function buildLegacyQuickLogUnifiedPayload(
         p_vpd_kpa: null,
         p_occurred_at: null,
         p_details: detailsEnvelope,
+        p_idempotency_key: input.idempotencyKey,
       },
     };
   }
@@ -215,6 +233,7 @@ export function buildLegacyQuickLogUnifiedPayload(
       p_vpd_kpa: null,
       p_occurred_at: null,
       p_details: detailsEnvelope,
+      p_idempotency_key: input.idempotencyKey,
     },
   };
 }

@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+
 export type LiveSensorSurface =
   | "live_sensor_stream"
   | "live_sensor_dashboard_widget";
@@ -68,6 +69,7 @@ export async function checkLiveSensorEntitlement(
     if (scope.growId) body.grow_id = scope.growId;
     if (scope.tentId) body.tent_id = scope.tentId;
     if (scope.plantId) body.plant_id = scope.plantId;
+    // billing_env is derived server-side; never sent from the client.
 
     const { data, error } = await supabase.functions.invoke(
       "live-sensor-entitlement",

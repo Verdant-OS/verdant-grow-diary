@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "generated_at": "2026-07-07T16:20:07.623Z",
+  "_notes": "Fingerprints of accepted historical Supabase migration safety findings. Do not edit by hand except to remove an item after the underlying SQL is truly fixed. Never add a NEW finding to this file to silence CI — fix the migration instead.",
+  "accepted": [
+    {
+      "fingerprint": "03d58eb8130c1687",
+      "scanner": "SEARCH_PATH_MUTABLE",
+      "migration": "20260707153206_email_infra.sql",
+      "subject": "public.delete_email"
+    },
+    {
+      "fingerprint": "3657d976aef7da29",
+      "scanner": "SEARCH_PATH_MUTABLE",
+      "migration": "20260707153206_email_infra.sql",
+      "subject": "public.move_to_dlq"
+    },
+    {
+      "fingerprint": "83920e5968fdc456",
+      "scanner": "PERMISSIVE_POLICY",
+      "migration": "20260521010057_9485a78a-71d2-4d93-a4a2-df2b398cfd87.sql",
+      "subject": "Anyone FOR INSERT"
+    },
+    {
+      "fingerprint": "ca43ac1460dff130",
+      "scanner": "SEARCH_PATH_MUTABLE",
+      "migration": "20260707153206_email_infra.sql",
+      "subject": "public.read_email_batch"
+    },
+    {
+      "fingerprint": "f613b27872a87fb7",
+      "scanner": "SEARCH_PATH_MUTABLE",
+      "migration": "20260707153206_email_infra.sql",
+      "subject": "public.enqueue_email"
+    }
+  ]
+}

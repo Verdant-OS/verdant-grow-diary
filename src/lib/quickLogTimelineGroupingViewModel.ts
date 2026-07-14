@@ -34,6 +34,7 @@ import {
   buildManualSnapshotTimelineCard,
   type ManualSnapshotTimelineCard,
 } from "@/lib/manualSensorSnapshotViewModel";
+import type { ParsedPhenoEvidenceReceipt } from "@/lib/phenoEvidenceCaptureRules";
 
 export type QuickLogActionKind = "water" | "note";
 
@@ -66,8 +67,9 @@ export interface QuickLogActionEvent {
     /** Raw `details` from diary_entries — passed only through the safe view-model. */
     details: unknown;
   } | null;
+  /** Read-only, evidence-only Pheno receipt from the matching diary row. */
+  phenoEvidenceReceipt?: ParsedPhenoEvidenceReceipt | null;
 }
-
 
 export type QuickLogTimelineEntry =
   | {
@@ -104,26 +106,19 @@ export interface GroupQuickLogTimelineArgs {
   windowMs?: number;
 }
 
-const ACTION_KINDS: ReadonlySet<QuickLogActionKind> = new Set([
-  "water",
-  "note",
-]);
+const ACTION_KINDS: ReadonlySet<QuickLogActionKind> = new Set(["water", "note"]);
 
 function isEligibleAction(a: QuickLogActionEvent): boolean {
   if (!a || typeof a !== "object") return false;
   if (!ACTION_KINDS.has(a.kind)) return false;
   if (a.source !== "manual") return false;
   if (typeof a.tentId !== "string" || a.tentId.length === 0) return false;
-  if (typeof a.occurredAt !== "string" || a.occurredAt.length === 0)
-    return false;
+  if (typeof a.occurredAt !== "string" || a.occurredAt.length === 0) return false;
   if (Number.isNaN(Date.parse(a.occurredAt))) return false;
   return true;
 }
 
-function actionMatchesScope(
-  a: QuickLogActionEvent,
-  scope: QuickLogV2SnapshotScope,
-): boolean {
+function actionMatchesScope(a: QuickLogActionEvent, scope: QuickLogV2SnapshotScope): boolean {
   if (scope.kind === "plant") {
     return a.plantId === scope.plantId;
   }
@@ -167,10 +162,7 @@ export function groupQuickLogTimelineEntries(
     .filter(isEligibleAction)
     .filter((a) => actionMatchesScope(a, args.scope));
 
-  const envRows = filterQuickLogV2EnvironmentRowsByScope(
-    args.environmentRows ?? [],
-    args.scope,
-  );
+  const envRows = filterQuickLogV2EnvironmentRowsByScope(args.environmentRows ?? [], args.scope);
 
   // Build candidate pair list (within window AND scope-compatible per action).
   const candidates: Candidate[] = [];

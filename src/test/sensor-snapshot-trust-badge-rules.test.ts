@@ -68,11 +68,25 @@ describe("classifySnapshotTrustBadge", () => {
     expect(v.badge).not.toBe("live");
   });
 
-  it("empty snapshot resolves to invalid (not attachable)", () => {
+  it("empty snapshot resolves to none (absence, not invalid telemetry)", () => {
     const v = classifySnapshotTrustBadge({ empty: true });
-    expect(v.badge).toBe("invalid");
+    expect(v.badge).toBe("none");
+    expect(v.label).toBe("No snapshot");
     expect(v.attachable).toBe(false);
   });
+
+  it("resolverStatus empty resolves to none (absence, not invalid)", () => {
+    const v = classifySnapshotTrustBadge({ resolverStatus: "empty", source: null });
+    expect(v.badge).toBe("none");
+    expect(v.attachable).toBe(false);
+  });
+
+  it("source 'unavailable' resolves to none (no reading, not invalid)", () => {
+    const v = classifySnapshotTrustBadge({ source: "unavailable" });
+    expect(v.badge).toBe("none");
+    expect(v.attachable).toBe(false);
+  });
+
 
   it("fresh_non_live preserves source identity (manual/csv/demo)", () => {
     expect(

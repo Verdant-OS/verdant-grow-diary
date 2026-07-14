@@ -97,7 +97,9 @@ describe("QuickLog plant/context accessibility", () => {
   it("snapshot attach switch is disabled when no plant is selected (payload-safe)", () => {
     renderQL();
     const sw = screen.getByRole("switch", { name: /attach sensor snapshot/i });
-    expect(sw.getAttribute("data-disabled") !== null || (sw as HTMLButtonElement).disabled).toBe(true);
+    expect(sw.getAttribute("data-disabled") !== null || (sw as HTMLButtonElement).disabled).toBe(
+      true,
+    );
   });
 
   it("does not introduce fake live/sensor copy in the dialog", () => {
@@ -123,11 +125,10 @@ describe("QuickLog plant/context accessibility", () => {
 
 describe("QuickLog grow-level save (parked)", () => {
   it("characterization: payload builder rejects missing plantId so grow-level save is not supported", async () => {
-    const { buildLegacyQuickLogUnifiedPayload } = await import(
-      "@/lib/legacyQuickLogUnifiedSave"
-    );
+    const { buildLegacyQuickLogUnifiedPayload } = await import("@/lib/legacyQuickLogUnifiedSave");
     const result = buildLegacyQuickLogUnifiedPayload({
       eventType: "observation",
+      idempotencyKey: "quicklog-v2-test-key-fix",
       noteWithHardware: "grow-level note",
       plantId: null,
       plantTentId: null,

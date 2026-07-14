@@ -163,7 +163,10 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     expect(payload.products).toEqual([
       { name: "Base A", amount: 2, unit: "ml_per_l" },
     ]);
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+    // Post-save hardening: sheet stays open on success so the grower can
+    // review, log another, or close explicitly.
+    expect(await screen.findByTestId("qlv2-post-save")).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(rpcMock).not.toHaveBeenCalled();
     expect(tableMethods.insert).not.toHaveBeenCalled();
   });

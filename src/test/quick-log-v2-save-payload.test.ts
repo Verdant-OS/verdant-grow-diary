@@ -25,11 +25,25 @@ function base(overrides = {}) {
     temperatureC: "",
     humidityPct: "",
     vpdKpa: "",
+    idempotencyKey: "quicklog-v2-test-key-0001",
     ...overrides,
   };
 }
 
 describe("quickLogV2SavePayload", () => {
+  it("threads the idempotency key into p_idempotency_key", () => {
+    const r = buildQuickLogV2SavePayload(base());
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.payload.p_idempotency_key).toBe("quicklog-v2-test-key-0001");
+  });
+
+  it("rejects a missing or too-short idempotency key (server requires 8..200)", () => {
+    for (const idempotencyKey of ["", "short", "  a  "]) {
+      const r = buildQuickLogV2SavePayload(base({ idempotencyKey }));
+      expect(r).toEqual({ ok: false, reason: "invalid_idempotency_key" });
+    }
+  });
+
   it("builds note payload with all sensors null", () => {
     const r = buildQuickLogV2SavePayload(base({ note: "hello" }));
     expect(r.ok).toBe(true);

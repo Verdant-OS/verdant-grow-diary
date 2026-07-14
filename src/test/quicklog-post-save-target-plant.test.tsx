@@ -117,7 +117,7 @@ describe("QuickLog post-save target plant action", () => {
     expect(link.getAttribute("data-target-plant-id")).toBe("p2");
     // Does NOT point at the original prefill page plant.
     expect(link.getAttribute("href")).not.toContain("p-other");
-    expect(link.textContent ?? "").toMatch(/View 505 Headbanger/);
+    expect(link.textContent ?? "").toMatch(/View timeline/);
   });
 
   it("View target plant button is keyboard reachable and focusable", async () => {

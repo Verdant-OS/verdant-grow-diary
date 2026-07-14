@@ -24,6 +24,7 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 const VM: PostGrowLearningReportViewModel = {
   eligible: true,
+  sensorReadingSources: [{ source: "manual" }],
   ineligibleReason: null,
   header: {
     growId: "g-print-cap",
@@ -198,10 +199,8 @@ describe("Post-Grow Print HTML Capture v2 — via real CTA click", () => {
     render(<ExportSummaryButtons vm={VM} />);
     fireEvent.click(screen.getByTestId("post-grow-export-print"));
     const lower = captured.html.toLowerCase();
-    const forward =
-      /(csv|stale|invalid|demo|unknown|imported|untrusted)[^.\n]{0,60}\bhealthy\b/;
-    const backward =
-      /\bhealthy\b[^.\n]{0,60}(csv|stale|invalid|demo|unknown|imported|untrusted)/;
+    const forward = /(csv|stale|invalid|demo|unknown|imported|untrusted)[^.\n]{0,60}\bhealthy\b/;
+    const backward = /\bhealthy\b[^.\n]{0,60}(csv|stale|invalid|demo|unknown|imported|untrusted)/;
     expect(lower).not.toMatch(forward);
     expect(lower).not.toMatch(backward);
     // Positive blanket "healthy" claims also banned.

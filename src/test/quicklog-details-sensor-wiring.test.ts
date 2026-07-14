@@ -148,6 +148,7 @@ describe("Quick Log details.sensor wiring", () => {
     });
     const r = buildLegacyQuickLogUnifiedPayload({
       eventType: "observation",
+      idempotencyKey: "quicklog-v2-test-key-fix",
       noteWithHardware: "checked plant",
       plantId: "p1",
       plantTentId: "t1",
@@ -159,13 +160,15 @@ describe("Quick Log details.sensor wiring", () => {
     expect(r.payload.p_details).toBeTruthy();
     expect(r.payload.p_details).toHaveProperty("sensor");
     expect(r.payload.p_details).not.toHaveProperty("sensor_snapshot");
-    expect((r.payload.p_details as { sensor: { status: string } }).sensor.status)
-      .toBe("fresh_live");
+    expect((r.payload.p_details as { sensor: { status: string } }).sensor.status).toBe(
+      "fresh_live",
+    );
   });
 
   it("builder emits null p_details when no sensor payload", () => {
     const r = buildLegacyQuickLogUnifiedPayload({
       eventType: "observation",
+      idempotencyKey: "quicklog-v2-test-key-fix",
       noteWithHardware: "no sensor",
       plantId: "p1",
       plantTentId: null,

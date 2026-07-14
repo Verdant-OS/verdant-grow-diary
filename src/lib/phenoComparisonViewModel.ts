@@ -57,6 +57,12 @@ export interface PhenoSensorSnapshotInput {
 
 export interface PhenoCandidateInput {
   readonly candidateId: string;
+  /**
+   * Owner-assigned pheno candidate number (plants.candidate_number). Unique per
+   * hunt, positive integer, immutable within a hunt. NULL/absent = legacy or
+   * unnumbered candidate. Never fabricated — carried through honestly.
+   */
+  readonly candidateNumber?: number | null;
   readonly candidateLabel?: string | null;
   readonly growLabel?: string | null;
   readonly tentLabel?: string | null;
@@ -70,6 +76,12 @@ export interface PhenoCandidateInput {
   /** Whether the caller wants EC/pH/PPFD tracked as "relevant" (e.g. flower). */
   readonly requireEcPh?: boolean;
   readonly requirePpfd?: boolean;
+  /**
+   * Optional keeper-hunt phenotype expression (loud trait axes, aroma, smoke
+   * test, sex/herm, COA). Consumed by phenoExpressionRules and rendered
+   * additively; the core comparison view-model ignores it.
+   */
+  readonly expression?: import("@/lib/phenoExpressionRules").PhenoExpressionInput | null;
 }
 
 export interface PhenoSensorSnapshotView {
@@ -89,6 +101,8 @@ export interface PhenoSensorSnapshotView {
 
 export interface PhenoCandidateView {
   candidateId: string;
+  /** Validated positive-integer candidate number, or null when unnumbered. */
+  candidateNumber: number | null;
   candidateLabel: string;
   growLabel: string | null;
   tentLabel: string | null;
@@ -123,6 +137,11 @@ function cleanString(value: unknown): string | null {
 
 function finiteOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** A valid candidate number is a finite positive integer; else null. */
+function validCandidateNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 }
 
 function flag(code: PhenoMissingFlag["code"]): PhenoMissingFlag {
@@ -192,8 +211,8 @@ function buildCandidateView(input: PhenoCandidateInput): PhenoCandidateView {
 
   return {
     candidateId: input.candidateId,
-    candidateLabel:
-      cleanString(input.candidateLabel) ?? input.candidateId,
+    candidateNumber: validCandidateNumber(input.candidateNumber),
+    candidateLabel: cleanString(input.candidateLabel) ?? input.candidateId,
     growLabel: cleanString(input.growLabel),
     tentLabel: cleanString(input.tentLabel),
     plantLabel: cleanString(input.plantLabel),

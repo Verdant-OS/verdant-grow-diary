@@ -50,7 +50,12 @@ describe("Plant Detail Action → Response pairing card", () => {
     expect(inCard.getByText(/What changed:/)).toBeInTheDocument();
     expect(inCard.getByText(/Watered\./)).toBeInTheDocument();
     expect(inCard.getByText(/Response:/)).toBeInTheDocument();
-    expect(inCard.getByText(/Response check: Better\./)).toBeInTheDocument();
+    // formatDiaryNoteForLabeledContainer strips the redundant leading
+    // "Response check:" label inside the "Response" container, so the note
+    // renders as "Response: Better." — assert the deduplicated form and
+    // that the doubled label never renders.
+    expect(inCard.getByText(/Better\./)).toBeInTheDocument();
+    expect(inCard.queryByText(/Response check: Better\./)).not.toBeInTheDocument();
     expect(inCard.getByText(/plant memory/i)).toBeInTheDocument();
   });
 
@@ -118,6 +123,8 @@ describe("Plant Detail Action → Response pairing card", () => {
     );
     const text = container.textContent ?? "";
     expect(screen.getByTestId("plant-detail-action-response-pair")).toBeInTheDocument();
-    expect(text).not.toMatch(/must|required|alert|action queue|automate|turn on|turn off|guaranteed/i);
+    expect(text).not.toMatch(
+      /must|required|alert|action queue|automate|turn on|turn off|guaranteed/i,
+    );
   });
 });

@@ -21,6 +21,7 @@ import {
   openPostGrowReportPrintWindow,
 } from "@/lib/postGrowReportPrintRules";
 import { exportPostGrowReportAsPdf } from "@/lib/postGrowPdfExport";
+import type { PostGrowLearningLoopSummary } from "@/lib/postGrowLearningLoopSummaryRules";
 import {
   buildProvenanceBadgeRows,
   PDF_EXPORT_UNAVAILABLE_COPY,
@@ -43,8 +44,11 @@ function downloadText(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function handlePrint(vm: PostGrowLearningReportViewModel) {
-  const result = openPostGrowReportPrintWindow(vm);
+function handlePrint(
+  vm: PostGrowLearningReportViewModel,
+  learningSummary?: PostGrowLearningLoopSummary,
+) {
+  const result = openPostGrowReportPrintWindow(vm, undefined, { learningSummary });
   if (result === "unavailable") {
     toast.error(PRINT_UNAVAILABLE_COPY);
   }
@@ -497,7 +501,13 @@ export function PhotoGridCard({ vm }: { vm: PostGrowLearningReportViewModel }) {
   );
 }
 
-export function ExportSummaryButtons({ vm }: { vm: PostGrowLearningReportViewModel }) {
+export function ExportSummaryButtons({
+  vm,
+  learningSummary,
+}: {
+  vm: PostGrowLearningReportViewModel;
+  learningSummary?: PostGrowLearningLoopSummary;
+}) {
   return (
     <div className="flex flex-col items-end gap-1" data-testid="post-grow-export-actions">
       <div className="flex flex-wrap gap-2">
@@ -505,7 +515,7 @@ export function ExportSummaryButtons({ vm }: { vm: PostGrowLearningReportViewMod
           variant="default"
           size="sm"
           onClick={() => {
-            const result = exportPostGrowReportAsPdf(vm);
+            const result = exportPostGrowReportAsPdf(vm, { learningSummary });
             if (result === "unavailable") toast.error(PDF_EXPORT_UNAVAILABLE_COPY);
           }}
           data-testid="post-grow-export-pdf"
@@ -515,7 +525,7 @@ export function ExportSummaryButtons({ vm }: { vm: PostGrowLearningReportViewMod
         <Button
           variant="outline"
           size="sm"
-          onClick={() => handlePrint(vm)}
+          onClick={() => handlePrint(vm, learningSummary)}
           data-testid="post-grow-export-print"
         >
           <Printer className="h-4 w-4 mr-1" /> Print / Save PDF

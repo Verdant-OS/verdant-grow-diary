@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import LegalFooterLinks from "@/components/LegalFooterLinks";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
@@ -66,6 +67,12 @@ export default function HardwareIntegrations() {
             </Button>
           </Link>
         </div>
+      </section>
+
+      <section className="px-6 pt-2 max-w-5xl mx-auto text-center">
+        <h2 className="font-display text-2xl md:text-3xl font-semibold">
+          Integration benefits
+        </h2>
       </section>
 
       <section className="px-6 py-10 max-w-5xl mx-auto grid gap-6 md:grid-cols-2">
@@ -180,6 +187,7 @@ export default function HardwareIntegrations() {
             verdantgrowdiary.com
           </a>
         </p>
+        <LegalFooterLinks className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground" />
       </footer>
     </main>
   );

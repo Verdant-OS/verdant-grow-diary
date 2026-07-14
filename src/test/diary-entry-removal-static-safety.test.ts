@@ -58,7 +58,9 @@ describe("diary removal slice — static safety", () => {
 
   it("does not import AI / model helpers", () => {
     for (const f of FILES) {
-      expect(f.src, f.name).not.toMatch(/aiDoctor|ai-coach|ai_coach|aiCoach|callModel|openai|anthropic/i);
+      expect(f.src, f.name).not.toMatch(
+        /aiDoctor|ai-coach|ai_coach|aiCoach|callModel|openai|anthropic/i,
+      );
     }
   });
 
@@ -89,8 +91,17 @@ describe("diary removal slice — static safety", () => {
     expect(HOOK).not.toMatch(/\.delete\(\)\s*\.neq\(/);
   });
 
-  it("hook does not touch storage buckets", () => {
-    expect(HOOK).not.toMatch(/supabase\.storage/);
+  it("hook storage access is confined to best-effort diary-videos cleanup of the entry's own video", () => {
+    // Exactly one storage touch: removing the deleted entry's own video
+    // object from the diary-videos bucket. No uploads, listing, signing,
+    // or any other bucket.
+    expect(HOOK.match(/supabase\.storage/g) ?? []).toHaveLength(1);
+    expect(HOOK).toMatch(
+      /supabase\.storage\s*\.from\(["']diary-videos["']\)\s*\.remove\(\[videoPath\]\)/,
+    );
+    expect(HOOK).not.toMatch(/\.upload\(|\.createSignedUrl\(|\.getPublicUrl\(|\.list\(/);
+    // Best-effort: storage failure must never block the entry removal.
+    expect(HOOK).toMatch(/\.remove\(\[videoPath\]\)\s*\.catch\(/);
   });
 
   it("component refuses customer/public/report views via rules", () => {

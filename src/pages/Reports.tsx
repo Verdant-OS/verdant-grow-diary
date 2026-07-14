@@ -32,7 +32,8 @@ import { LEARNING_GROUP_SAMPLE_THRESHOLD } from "@/lib/actionOutcomeLearningRule
 import ReportsReviewQueueSection from "@/components/ReportsReviewQueueSection";
 import { buildReportsHubOnboarding } from "@/lib/reportsHubOnboarding";
 import ReportsHubOnboardingSection from "@/components/ReportsHubOnboardingSection";
-import { growDetailPath } from "@/lib/routes";
+import { GrowFollowUpReviewSection } from "@/components/GrowFollowUpReviewSection";
+import { growDetailPath, growLearningPath } from "@/lib/routes";
 
 export default function Reports() {
   const { scopedGrow } = useScopedGrow();
@@ -136,6 +137,23 @@ export default function Reports() {
           items={reviewQueue.items}
           showEmptyState={reviewQueue.empty}
         />
+      )}
+
+      {grow?.id && !showEmptyState && !showOnboarding && (
+        <div className="mt-4 space-y-2">
+          <GrowFollowUpReviewSection
+            growId={grow.id}
+            heading="Unresolved learning work"
+          />
+          <p className="text-xs text-muted-foreground">
+            <Link
+              to={growLearningPath(grow.id)}
+              className="text-primary underline underline-offset-2"
+            >
+              Open the full learning review →
+            </Link>
+          </p>
+        </div>
       )}
 
       {showEmptyState ? (

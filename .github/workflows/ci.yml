@@ -3,15 +3,22 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    # `verdant-grow-diary` is the repository default branch — `main` alone
+    # left this entire job dormant on the branch PRs actually target.
+    branches: [main, verdant-grow-diary]
   pull_request:
-    branches: [main]
+    branches: [main, verdant-grow-diary]
+  merge_group:
 
 jobs:
   test:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # This job runs the entire src/test vitest suite in one process (see the
+    # monolithic full-suite step below); 20 minutes was sized before the
+    # suite grew. 45 gives honest headroom so a timeout means "stuck", not
+    # "suite got bigger".
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -43,6 +50,17 @@ jobs:
 
       - name: Typecheck
         run: bun run typecheck
+
+      # Stop-ship: the blocking Agreement Reconsent Gate must preserve its
+      # accessibility contract (dialog naming, focus trap, assertive
+      # validation alert, aria-invalid/aria-required wiring, error clearing,
+      # Escape/outside-interaction suppression, single-submission, and
+      # absence of the Radix "DialogContent requires a DialogTitle" warning).
+      # 10 targeted contracts in src/test/agreement-reconsent-gate-a11y.test.tsx.
+      # Fail-fast: runs only after typecheck passes; no continue-on-error,
+      # no shell fallbacks.
+      - name: Agreement reconsent accessibility contract
+        run: bun run test:reconsent-a11y
 
       # Stop-ship: the V0 operating loop contract test must pass.
       # See docs/v0-operating-loop-demo.md ("V0 contract test").
@@ -180,6 +198,11 @@ jobs:
       - name: Route manifest + Alerts quick-link drift
         run: bunx vitest run src/test/route-manifest-sync.test.ts src/test/alerts-route-quick-link-contract.test.tsx
 
+      # Legal pages must emit canonical, OpenGraph, Twitter, and WebPage JSON-LD
+      # metadata on /privacy, /terms, and /refund. Runs on every build.
+      - name: Legal page SEO structured data
+        run: bun run test:legal-seo
+
       # Stop-ship: QuickLog RPC static trust-boundary guardrails. Always runs.
       - name: QuickLog RPC static trust-boundary
         run: bun run test:db:quicklog-rpc-static
@@ -213,7 +236,15 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: bun run test:db:quicklog-rpc-runtime
 
+      # Monolithic full-suite run kept per the QuickLog CI-wiring guard
+      # ("CI still runs the full suite after the targeted slice"). The
+      # 16-way batched gate (vitest-full-suite-pr-gate.yml) is the primary
+      # memory-safe full-suite check; this single-process run gets the same
+      # old-space headroom the batched runner uses so it fails on real
+      # regressions, not heap exhaustion.
       - name: Full test suite
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: bunx vitest run
 
       # Scanner guardrail timeout sentinel — re-runs only the filesystem-
@@ -266,3 +297,64 @@ jobs:
 
       - name: Build
         run: bun run build
+
+  # Dedicated legal SEO regression gate.
+  #
+  # Stable job id `legal-seo` and stable step name `test:legal-seo` — this is
+  # the required status check name to configure in GitHub branch protection /
+  # rulesets for `main` after this workflow lands and runs once.
+  #
+  # Runs on every pull request (no path filters) so a required check never
+  # stays pending due to path skipping. `merge_group` is included so the
+  # merge queue also gates on this job when enabled.
+  #
+  # Covers both the jsdom vitest suite (canonical/OG/Twitter/JSON-LD DOM
+  # assertions) AND the Playwright runtime spec against the live dev server.
+  # Playwright artifacts (report/results/screenshots) upload only on failure.
+  legal-seo:
+    name: test:legal-seo
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun install
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Legal page SEO structured data (vitest)
+        run: bun run test:legal-seo
+
+      - name: Install Playwright browsers (chromium + deps)
+        run: bunx playwright install --with-deps chromium
+
+      - name: Legal page SEO metadata (Playwright)
+        run: bun run test:legal-seo:e2e
+
+      - name: Upload Playwright artifacts (failure only)
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: legal-seo-playwright-artifacts
+          path: |
+            playwright-report/
+            test-results/
+            e2e/screenshots/
+          if-no-files-found: ignore
+          retention-days: 14

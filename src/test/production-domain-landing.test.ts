@@ -58,10 +58,13 @@ describe("public landing page", () => {
     expect(LANDING).toMatch(/safer insight/i);
   });
 
-  it("landing page exposes Sign in / Open dashboard / Learn more CTAs", () => {
+  it("landing page exposes Sign in / Open dashboard / feature-discovery CTAs", () => {
     expect(LANDING).toMatch(/Sign in/);
     expect(LANDING).toMatch(/Open dashboard/);
-    expect(LANDING).toMatch(/Learn more/);
+    // A soft discovery CTA must exist alongside auth CTAs. The copy evolved
+    // from "Learn more" to "Explore Verdant features"; accept either so the
+    // guard tracks intent (a discovery link exists), not one exact phrase.
+    expect(LANDING).toMatch(/Learn more|Explore Verdant features/);
     // The "Open dashboard" CTA must be gated on an authenticated user.
     expect(LANDING).toMatch(/user\s*\?/);
   });

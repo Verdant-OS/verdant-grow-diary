@@ -1,131 +1,176 @@
 ---
 name: run-verdant-grow-diary
-description: Run, build, screenshot, or test the verdant-grow-diary Grow OS web app. Use when asked to start the dev server, view the app, run Playwright, run the test suite, or take a screenshot.
+description: Run, build, screenshot, or test the verdant-grow-diary Grow OS web app. Use when asked to start the dev server, view or screenshot the app, drive a browser flow, run the Playwright e2e suite, or run the Vitest suite.
 ---
 
 # run-verdant-grow-diary
 
-Verdant Grow Diary is a React + Vite + TypeScript SPA backed by Supabase. It runs on port **8080** (via `bun run dev`). The driver for agents is Playwright (already installed) for headless screenshots and mocked e2e flows. The full Vitest suite is the unit/integration test path.
+Verdant Grow Diary is a **React + Vite + TypeScript SPA** backed by Supabase.
+The dev server runs on port **8080**. There is no off-the-shelf `chromium-cli`,
+so the agent handle for screenshots and browser navigation is the committed
+driver **`.claude/skills/run-verdant-grow-diary/driver.mjs`** (a thin Playwright
+wrapper). The repo's mocked **Playwright e2e** suite drives real UI flows without
+credentials; **Vitest** is the unit/internals path.
 
-All paths below are relative to the project root.
+All paths below are relative to the project root. Everything here was run in a
+headless Linux container against pre-installed `node_modules`.
 
 ---
 
 ## Prerequisites
 
-**Critical on Windows: OneDrive reparse points cause `bun install` to fail.** Always work from the local clone:
+- **bun** and **node** on PATH (both present here). Install bun if absent:
+  `curl -fsSL https://bun.sh/install | bash`
+- **ripgrep** — some static-scan tests shell out to `rg`. Already installed here
+  (`rg --version` → 14.1.0); on a bare runner: `sudo apt-get install -y ripgrep`.
+- **Chromium** — the container ships Playwright browsers under
+  `/opt/pw-browsers` (`chromium-1194`, `chromium-1228`). Both the driver and
+  `bunx playwright test` launch headless out of the box; no manual setup.
 
-```
-C:\dev\verdant-grow-diary   # Windows only
-```
-
-On Linux/CI: clone normally — `bun install --frozen-lockfile` works fine there.
-
-Install bun if absent:
-```bash
-curl -fsSL https://bun.sh/install | bash
-```
-
-Install ripgrep (required by gamification static-scan tests):
-```bash
-sudo apt-get install -y ripgrep   # Linux/CI only
-```
+> **`node_modules` is pre-provisioned in this environment** — build/dev/test all
+> work as-is. A clean `bun install --frozen-lockfile` **fails here** with a
+> `403` from the private registry mirror (see Troubleshooting); you do not need
+> to reinstall.
 
 ---
 
 ## Build
 
 ```bash
-bun install --frozen-lockfile
-bun run build
-```
-
-Typecheck only (no emit):
-```bash
-bun run typecheck
+bun run typecheck     # tsc -p tsconfig.app.json --noEmit   → exit 0
+bun run build         # vite build                          → "✓ built in ~31s"
 ```
 
 ---
 
-## Run (agent path) — Playwright headless screenshots
+## Run (agent path) — driver.mjs for screenshots / navigation
 
-Playwright is installed in the repo. Use it for headless screenshots and mocked flows; no real credentials needed for `chromium-mocked`.
+**1. Start the dev server** (bind IPv4 explicitly — see Gotchas):
 
-**One-shot screenshot script (no credentials required):**
-```javascript
-// save as screenshot.mjs, run with: node screenshot.mjs
-import { chromium } from '@playwright/test';
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-await page.goto('http://localhost:8080/', { waitUntil: 'networkidle' });
-await page.screenshot({ path: 'screenshot.png' });
-console.log('title:', await page.title()); // "Verdant Grow Diary"
-await browser.close();
-```
-
-Run with the dev server already up:
 ```bash
-bun run dev &            # starts on port 8080
-node screenshot.mjs
+bun run dev -- --host 127.0.0.1 --port 8080
+# → VITE ready, Local: http://127.0.0.1:8080/
 ```
 
-**Mocked Playwright suite (no credentials — intercepts all Supabase traffic):**
+Confirm it is up:
+
 ```bash
-E2E_BASE_URL=http://localhost:8080 bunx playwright test --project=chromium-mocked
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/   # → 200
 ```
 
-Tests in `e2e/` that don't use `auth.setup.ts` run here. They use `page.route()` to stub `/auth/v1/**` and `/rest/v1/**`.
+**2. Drive it with the committed driver** (dev server must already be running):
 
-Expected output: ~65 passed, 6 pre-existing failures (`fixture-bootstrap.spec.ts` and `fixture-safety.spec.ts` need real DB credentials; 4 `auth-route-protection-mobile` failures are for routes not yet registered in `App.tsx`). These failures are pre-existing — treat a new failure as a regression.
-
-**Authenticated Playwright suite (needs real credentials):**
 ```bash
-E2E_TEST_EMAIL=you@example.com \
-E2E_TEST_PASSWORD=yourpass \
-E2E_BASE_URL=http://localhost:8080 \
-bunx playwright test --project=chromium-authed
+# node driver.mjs [path] [outfile]
+node .claude/skills/run-verdant-grow-diary/driver.mjs / home.png
+node .claude/skills/run-verdant-grow-diary/driver.mjs /auth auth.png
 ```
 
-Screenshots and traces on failure land in `test-results/`.
+The driver prints JSON and writes the PNG, e.g.:
 
----
+```json
+{
+  "requested": "http://127.0.0.1:8080/",
+  "finalUrl": "http://127.0.0.1:8080/auth",
+  "httpStatus": 200,
+  "title": "Sign in to Verdant Grow Diary",
+  "screenshot": "home.png",
+  "chromium": "/opt/pw-browsers/chromium-1228/chrome-linux/chrome"
+}
+```
+
+Unauthenticated `/` client-side-redirects to `/auth` (`finalUrl` shows it): the
+rendered page is the sign-in screen — email/password, Sign in / Create account /
+Forgot password tabs, "Email me a sign-in link", and a "Payments are in **test
+mode** in this preview" banner. Override the origin with `BASE_URL=...`.
+
+## Run (agent path) — mocked Playwright e2e for real UI flows
+
+The `chromium-mocked` project stubs all Supabase traffic with `page.route()`, so
+flows run **without credentials**. Point it at the already-running dev server:
+
+```bash
+E2E_BASE_URL=http://127.0.0.1:8080 bunx playwright test --project=chromium-mocked auth-loading
+```
+
+Chromium launches, mocked routes intercept, specs execute; failure screenshots/
+videos/traces land in `test-results/`. (Observed on `auth-loading`: 3 passed,
+4 skipped, 1 failed — a timing-sensitive double-submit assertion. Individual
+mocked specs can flake; treat a *new* failure in specs you touched as the signal,
+not the absolute count.) Drop the trailing `auth-loading` to run every mocked
+spec. Specs needing real login use `--project=chromium-authed` with
+`E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD`/`E2E_BASE_URL`.
+
+## Run (internals path) — Vitest
+
+Most PRs here touch a lib/hook/component; import-and-assert via Vitest is the
+fastest handle:
+
+```bash
+bunx vitest run src/test/pheno-evidence-receipt-service.test.ts   # → Tests 8 passed
+```
 
 ## Run (human path) — dev server
 
 ```bash
-bun run dev
-# → http://localhost:8080/
+bun run dev            # → http://localhost:8080/  (opens nothing headless)
 ```
 
-The app starts in ~400 ms. Root URL redirects unauthenticated users to `/auth`. The auth page shows "Sign in / Create account / Forgot password" tabs backed by Supabase Auth.
+Useless headless on its own; use the driver above to observe it.
 
 ---
 
 ## Test
 
 ```bash
-# Lint + typecheck (fast stop-ship gates):
-bun run lint && bun run typecheck
-
-# Full Vitest suite (~21 k tests — runs in ~24 min locally):
-bunx vitest run
-
-# Key sub-suites:
-bun run test:sensor-safety
-bun run test:static-safety
-bun run test:quicklog-rpc-ownership
-bun run test:security-gamification
+bun run lint           # eslint .
+bun run typecheck      # tsc -p tsconfig.app.json --noEmit
+bunx vitest run        # full suite — large; runs as parallel shards in CI
 ```
 
-In CI the full suite runs as 36 parallel shards; see `docs/testing/ci-full-suite-shards.md`.
+Targeted sub-suites exist (`bun run test:payments-security`,
+`bun run test:sensor-safety`, `bun run test:static-safety`, …) — see
+`package.json` scripts.
 
 ---
 
 ## Gotchas
 
-- **OneDrive `bun install` fails** — only on Windows. Use `C:\dev\verdant-grow-diary`, never the OneDrive path.
-- **Port 8080, not 5173** — `vite.config.ts` hardcodes port 8080. Playwright's default web-server command uses 5173; set `E2E_BASE_URL=http://localhost:8080` to reuse an already-running dev server.
-- **SPA 404s on direct deep links** — `/dashboard` without auth renders the app's own 404 page (client-side redirect). The mocked Playwright tests use `page.route()` to stub auth; navigate to `/auth` first for a reliable unauthed starting point.
-- **No local Supabase stack** — the app points to the hosted project (`knkwiiywfkbqznbxwqfh`). The mocked Playwright project intercepts all Supabase traffic so tests work without staging credentials.
-- **ripgrep missing on clean Linux** — static-scan tests shell out to `rg`. Install before running the full suite on a fresh runner.
-- **Playwright auto-starts a second dev server** — if `E2E_BASE_URL` is unset, Playwright tries to start `bunx vite --port 5173`. If a server is already up on 8080, set the env var to avoid the extra process.
+- **Use `127.0.0.1`, not `localhost`.** Vite binds IPv4; `localhost` can resolve
+  to `::1` and the connection hangs. The driver defaults to `http://127.0.0.1:8080`.
+- **Port 8080, not 5173.** `vite.config.ts` hardcodes `port: 8080`. When reusing
+  a running server for Playwright, set `E2E_BASE_URL=http://127.0.0.1:8080` so it
+  doesn't spawn its own server on 5173.
+- **`/` redirects to `/auth` when unauthenticated.** The redirect is client-side
+  (SPA), so the HTTP status is 200 and only `page.url()` reveals it. Deep links
+  like `/dashboard` render the app's own 404/redirect without a session.
+- **No local Supabase stack.** The app points at the hosted project; the mocked
+  Playwright project intercepts all Supabase traffic so e2e works without
+  staging credentials.
+- **Root `<title>` vs rendered title.** The static HTML `<title>` is "Verdant
+  Grow Diary", but after the SPA boots and redirects, the auth page title is
+  "Sign in to Verdant Grow Diary" — assert on the latter for a rendered page.
+- **Driver Chromium fallback.** Plain `chromium.launch()` works here, but the
+  driver also probes `/opt/pw-browsers` and pins an explicit `executablePath`
+  (defensive for containers whose pinned Playwright revision is absent). Override
+  with `CHROMIUM=/path/to/chrome`.
+
+---
+
+## Troubleshooting
+
+- **`bun install --frozen-lockfile` → `403` from `*.pkg.dev/lovable-core-prod`.**
+  The lockfile pins a private Google Artifact Registry mirror that 403s from this
+  sandbox (hit firsthand on `playwright-core`, `hono`). `node_modules` is already
+  present, so you normally skip install entirely. If you must reinstall, override
+  to the public registry for the run:
+  ```bash
+  printf 'registry=https://registry.npmjs.org/\n' > .npmrc.tmp
+  npm_config_userconfig=$PWD/.npmrc.tmp bun install   # then: rm .npmrc.tmp
+  ```
+- **Playwright can't find a browser / revision mismatch.** Set
+  `CHROMIUM=/opt/pw-browsers/chromium-1228/chrome-linux/chrome` (the driver reads
+  it) or `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` for `bunx playwright test`.
+- **Driver connects but the screenshot is the sign-in page.** Expected without a
+  session — `/` redirects to `/auth`. Use the mocked e2e project (or real creds)
+  to reach authenticated screens.

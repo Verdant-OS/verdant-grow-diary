@@ -95,9 +95,10 @@ received) → 0 verified live paid users.**
 ## Rollback
 
 - App/functions: revert this PR's commits; redeploy previous functions.
-- Migration 7 rollback: `DROP FUNCTION public.allocate_founder_lifetime(_with_audit)`,
-  restore the previous `apply_paddle_subscription_update` from
-  `20260621015000`, `DROP TRIGGER trg_billing_subscription_update_audit_deny_update`,
+- Migration 7 rollback: `DROP FUNCTION public.allocate_founder_lifetime(uuid);`,
+  `DROP FUNCTION public.allocate_founder_lifetime_with_audit(uuid);`, restore the
+  previous `apply_paddle_subscription_update` from `20260621015000`, and run
+  `DROP TRIGGER trg_billing_subscription_update_audit_deny_update ON public.billing_subscription_update_audit;`,
   and (optional, non-destructive to keep) the two added nullable columns.
 - Entitlements already granted are never deleted — billing history is
   append-only; corrections happen via new audited writes.

@@ -52,6 +52,7 @@ export interface AiDoctorConfidenceResult {
 const BASE_SCORE = 20;
 const MAX_SCORE = 100;
 const MIN_SCORE = 0;
+const KNOWN_POT_SIZE_SCORE = 5;
 
 function clamp(n: number): number {
   if (!Number.isFinite(n)) return MIN_SCORE;
@@ -128,6 +129,8 @@ export function calculateAiDoctorConfidence(
   const has_recent_trustworthy_sensor_data =
     live_count > 0 || manual_count > 0;
   const has_recent_grow_events = context.recent_grow_events.length > 0;
+  const has_known_pot_size =
+    typeof context.pot_size === "string" && context.pot_size.trim().length > 0;
   const { has_visual_context, poor_quality: visual_poor } =
     evaluateVisualContext(input.vision ?? null);
 
@@ -161,6 +164,14 @@ export function calculateAiDoctorConfidence(
   if (has_visual_context) {
     score += 15;
     positive.push("useful_visual_context");
+  }
+  if (has_known_pot_size) {
+    score += KNOWN_POT_SIZE_SCORE;
+    positive.push("known_pot_size");
+  } else {
+    // Missing profile metadata is useful uncertainty, but is not by itself a
+    // safety failure or reason to block an otherwise well-supported review.
+    limiting.push("unknown_pot_size");
   }
 
   const missingCount = diagnosis.missing_information.length;
@@ -282,6 +293,7 @@ export function calculateAiDoctorConfidence(
     level,
     source_quality,
     missingCount,
+    has_known_pot_size,
   );
 
   return Object.freeze({
@@ -300,6 +312,7 @@ function buildExplanation(
   level: AiDoctorConfidenceLevel,
   sq: AiDoctorConfidenceSourceQuality,
   missingCount: number,
+  hasKnownPotSize: boolean,
 ): string {
   const parts: string[] = [];
   parts.push(`Confidence ${level} (score ${score}/100).`);
@@ -310,6 +323,7 @@ function buildExplanation(
     `Recent grow events: ${sq.has_recent_grow_events ? "yes" : "no"}.`,
   );
   parts.push(`Useful visual context: ${sq.has_visual_context ? "yes" : "no"}.`);
+  parts.push(`Pot size: ${hasKnownPotSize ? "known" : "unknown"}.`);
   parts.push(`Missing information items: ${missingCount}.`);
   return parts.join(" ");
 }

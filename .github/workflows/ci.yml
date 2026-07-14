@@ -74,6 +74,31 @@ jobs:
       - name: AI Doctor preview safety
         run: bun run ai-doctor:preview-safety
 
+      # Stop-ship: the deterministic AI Doctor OUTPUT evaluator (contract,
+      # evidence/provenance integrity, confidence calibration against the
+      # readiness gate, recommendation safety) + its adversarial golden
+      # fixtures + static-safety scanner. Runs AFTER typecheck and the AI
+      # Doctor readiness/preview checks, and before the broad/full suites.
+      # Pure: no network, no model provider, no Supabase, no secrets. See
+      # docs/ai-doctor-output-evaluation.md.
+      - name: AI Doctor output safety and golden cases
+        run: bun run test:ai-doctor-output-evaluation
+
+      # Optional machine-readable report (informational, never a hard gate;
+      # the step above is the gate). Contains no plant/user data, raw
+      # payloads, or secrets.
+      - name: Generate AI Doctor evaluation report
+        if: always()
+        run: bun run report:ai-doctor-output-evaluation
+
+      - name: Upload AI Doctor evaluation report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ai-doctor-evaluation-report
+          path: artifacts/ai-doctor-evaluation/
+          if-no-files-found: ignore
+
       # Stop-ship: Action Queue device-control surface scanner + allow-list
       # guard tests. Locks the narrow safety-file allow-list (e.g.
       # `blocked_device_command_risk`, `DEVICE_COMMAND_PATTERNS`) so it can

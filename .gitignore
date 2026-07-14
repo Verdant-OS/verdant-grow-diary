@@ -31,6 +31,7 @@ tools/ecowitt-testbench/.venv/
 tools/ecowitt-testbench/ecowitt_raw_log.jsonl
 tools/ecowitt-testbench/__pycache__/
 .artifacts/
+artifacts/
 
 # Playwright generated artifacts (uploaded by CI on failure; never committed)
 test-results/

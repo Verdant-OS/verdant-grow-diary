@@ -92,13 +92,19 @@ export async function upsertLabResult(input: {
 }
 
 /** Load lab results for a hunt, keyed "plantId:source". RLS-scoped read. */
-export async function listLabResultsForHunt(huntId: string): Promise<Record<string, LabResultRow>> {
+export async function listLabResultsForHunt(
+  huntId: string,
+  plantIds?: readonly string[],
+): Promise<Record<string, LabResultRow>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
-  const { data, error } = await phenoDb
+  let query = phenoDb
     .from("pheno_lab_results")
     .select("plant_id, source, thc_pct, cbd_pct, total_cannabinoids_pct, dominant_terpenes")
-    .eq("hunt_id", id)
+    .eq("hunt_id", id);
+  // Page-scoped read: fetch only the visible candidates' lab results at scale.
+  if (plantIds && plantIds.length > 0) query = query.in("plant_id", plantIds as string[]);
+  const { data, error } = await query
     // Up to 3 rows per candidate (coa/estimate/unspecified); explicit bound
     // keeps large hunts from hitting the server's silent row ceiling.
     .limit(1500);

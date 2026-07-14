@@ -65,15 +65,21 @@ export async function upsertSmokeTest(input: {
 }
 
 /** Load smoke tests for a hunt, keyed by plant id. RLS-scoped read. */
-export async function listSmokeTestsForHunt(huntId: string): Promise<Record<string, SmokeTestRow>> {
+export async function listSmokeTestsForHunt(
+  huntId: string,
+  plantIds?: readonly string[],
+): Promise<Record<string, SmokeTestRow>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
-  const { data, error } = await phenoDb
+  let query = phenoDb
     .from("pheno_smoke_tests")
     .select(
       "plant_id, flavor_descriptors, effect_descriptors, smoothness, potency_impression, verdict",
     )
     .eq("hunt_id", id);
+  // Page-scoped read: fetch only the visible candidates' smoke tests at scale.
+  if (plantIds && plantIds.length > 0) query = query.in("plant_id", plantIds as string[]);
+  const { data, error } = await query;
   if (error || !data) return {};
   const map: Record<string, SmokeTestRow> = {};
   for (const row of data) {

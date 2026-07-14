@@ -82,6 +82,17 @@ function mountAt(input: ScenarioInput) {
     status: "ok",
     hunt,
     candidates: input.candidates ?? [],
+    // No comparisonSummary is injected: the page falls back to deriving the
+    // gate from the loaded candidates + evidence maps, which is exactly what
+    // these scenarios exercise.
+    totalCandidateCount: (input.candidates ?? []).length,
+    loadingMore: false,
+    hasMore: false,
+    loadNextPage: vi.fn(),
+    filters: {},
+    setFilter: vi.fn(),
+    resetFilters: vi.fn(),
+    comparisonSummary: null,
     scoresByPlant: input.scoresByPlant ?? {},
     decisionsByPlant: input.decisionsByPlant ?? {},
     roundsByKey: {},
@@ -92,6 +103,7 @@ function mountAt(input: ScenarioInput) {
     labByKey: {},
     error: null,
     saving: null,
+    assignCandidateNumber: vi.fn().mockResolvedValue({ ok: true, candidateNumber: 1 }),
     loadDecisionHistory: vi.fn().mockResolvedValue(undefined),
     loadRound: vi.fn().mockResolvedValue(undefined),
     saveScore: vi.fn().mockResolvedValue(true),
@@ -121,9 +133,7 @@ function LocationProbe() {
 }
 
 function currentPath(): string {
-  return (
-    screen.getByTestId("current-location").getAttribute("data-pathname") ?? ""
-  );
+  return screen.getByTestId("current-location").getAttribute("data-pathname") ?? "";
 }
 
 function assertOneStatusLine(kind: "setup-status" | "comparison-status") {
@@ -261,9 +271,7 @@ describe("PhenoHuntWorkspace — Comparison-ready gating", () => {
     const btn = screen.getByTestId("pheno-workspace-compare-action-disabled");
     expect(btn).toBeDisabled();
     // Explicitly no anchor to /compare on the disabled surface.
-    const compareAnchors = document.querySelectorAll(
-      `a[href="/pheno-hunts/${HUNT_ID}/compare"]`,
-    );
+    const compareAnchors = document.querySelectorAll(`a[href="/pheno-hunts/${HUNT_ID}/compare"]`);
     expect(compareAnchors.length).toBe(0);
     fireEvent.click(btn);
     fireEvent.keyDown(btn, { key: "Enter" });
@@ -278,12 +286,8 @@ describe("PhenoHuntWorkspace — Comparison-ready gating", () => {
       candidates: [candidate("p1"), candidate("p2")],
     });
     // Workspace content still visible (compare progress card is workspace).
-    expect(
-      screen.getByTestId("pheno-workspace-setup-progress-comparison-status"),
-    ).toBeVisible();
-    const nextSteps = screen.getAllByTestId(
-      /^pheno-workspace-compare-action-next-step-/,
-    );
+    expect(screen.getByTestId("pheno-workspace-setup-progress-comparison-status")).toBeVisible();
+    const nextSteps = screen.getAllByTestId(/^pheno-workspace-compare-action-next-step-/);
     expect(nextSteps.length).toBeGreaterThan(0);
     for (const link of nextSteps) {
       const href = link.getAttribute("href") ?? "";
@@ -332,13 +336,9 @@ describe("PhenoHuntWorkspace — Comparison-ready gating", () => {
     );
     expect(helper).toHaveTextContent(/Missing evidence/i);
     // Clicking a next-step anchor MUST NOT flip the button to enabled.
-    const anySteps = screen.getAllByTestId(
-      /^pheno-workspace-compare-action-next-step-/,
-    );
+    const anySteps = screen.getAllByTestId(/^pheno-workspace-compare-action-next-step-/);
     fireEvent.click(anySteps[0]);
-    expect(
-      screen.getByTestId("pheno-workspace-compare-action-disabled"),
-    ).toBeDisabled();
+    expect(screen.getByTestId("pheno-workspace-compare-action-disabled")).toBeDisabled();
   });
 
   it("enabled Compare does not render the disabled helper text", () => {
@@ -367,8 +367,6 @@ describe("PhenoHuntWorkspace — Comparison-ready gating", () => {
     expect(screen.queryByTestId("pheno-workspace-compare-action-disabled-intro")).toBeNull();
   });
 
-
-
   it("enabled Compare candidates renders a real <a href=/compare> and navigates on click", () => {
     mountAt({
       hunt: { setupCompletedAt: "2026-08-01T00:00:00Z" },
@@ -393,9 +391,7 @@ describe("PhenoHuntWorkspace — Comparison-ready gating", () => {
     });
     const link = screen.getByTestId("pheno-workspace-compare-action-link");
     const anchor = link.querySelector("a") ?? link;
-    expect(anchor.getAttribute("href")).toBe(
-      `/pheno-hunts/${HUNT_ID}/compare`,
-    );
+    expect(anchor.getAttribute("href")).toBe(`/pheno-hunts/${HUNT_ID}/compare`);
     fireEvent.click(anchor);
     expect(currentPath()).toBe(`/pheno-hunts/${HUNT_ID}/compare`);
     expect(screen.getByTestId("stub-compare-page")).toBeVisible();

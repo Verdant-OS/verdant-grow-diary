@@ -11,7 +11,14 @@ import {
 import { CURRENT_AGREEMENT_LIST } from "@/constants/agreements";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AlertTriangle } from "lucide-react";
 
 /**
@@ -31,16 +38,24 @@ export function AgreementReconsentGate() {
   const location = useLocation();
   const [gaps, setGaps] = useState<AgreementGap[] | null>(null);
   const [checking, setChecking] = useState(false);
+  const [verifyError, setVerifyError] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
   const [accept, setAccept] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const checkboxRef = useRef<HTMLButtonElement | null>(null);
 
   const suppressed = SUPPRESSED_PREFIXES.some((p) => location.pathname.startsWith(p));
+  // Key the check on the user ID, not the user object. The query depends only on
+  // user.id; keying on the object would re-run the effect whenever the auth
+  // context hands back a new object identity (a real risk that produces an
+  // unbounded render/re-query loop — the same class of failure fixed in #188/#189).
+  const userId = user?.id ?? null;
 
   useEffect(() => {
-    if (loading || !user || suppressed) {
+    if (loading || !userId || suppressed) {
       setGaps(null);
+      setVerifyError(false);
       return;
     }
     let cancelled = false;
@@ -49,24 +64,33 @@ export function AgreementReconsentGate() {
       const { data, error: err } = await supabase
         .from("user_agreement_acceptances")
         .select("agreement_type, version")
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
       if (cancelled) return;
       if (err) {
-        // Fail-open on read errors: don't lock the user out due to a
-        // transient network blip. A next successful read will re-enforce.
-        setGaps([]);
+        // Fail CLOSED for consent: a read error must never grant access as if
+        // the user were current. Block with a retry / sign-out state instead of
+        // treating an unverified user as consented.
+        setVerifyError(true);
+        setGaps(null);
         setChecking(false);
         return;
       }
+      setVerifyError(false);
       setGaps(computeAgreementGaps((data ?? []) as AcceptanceRow[]));
       setChecking(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [user, loading, suppressed, location.pathname]);
+    // Intentionally NOT keyed on location.pathname: gap status does not change
+    // on in-app navigation, and re-running per route caused the modal to flash
+    // and re-query on every nav. `suppressed` already captures the only
+    // pathname-derived value that matters. retryToken lets the error state retry.
+    // Keyed on userId (a primitive), not the user object — see note above.
+  }, [userId, loading, suppressed, retryToken]);
 
-  const open = !!user && !loading && !suppressed && !checking && (gaps?.length ?? 0) > 0;
+  const open =
+    !!user && !loading && !suppressed && !checking && (verifyError || (gaps?.length ?? 0) > 0);
 
   async function onAccept() {
     if (!user || submitting) return;
@@ -84,7 +108,11 @@ export function AgreementReconsentGate() {
     }));
     const { error: err } = await supabase
       .from("user_agreement_acceptances")
-      .upsert(rows, { onConflict: "user_id,agreement_type,version" });
+      // Append-only write: ON CONFLICT DO NOTHING (ignoreDuplicates) so recording
+      // acceptance needs only the INSERT privilege. There is intentionally no
+      // UPDATE policy on this table; an already-present row must never drive the
+      // (RLS-denied) DO UPDATE branch, which previously locked users in this modal.
+      .upsert(rows, { onConflict: "user_id,agreement_type,version", ignoreDuplicates: true });
     setSubmitting(false);
     if (err) {
       setError("Couldn't record your acceptance. Please try again.");
@@ -94,7 +122,46 @@ export function AgreementReconsentGate() {
     setAccept(false);
   }
 
-  if (!open || !gaps) return null;
+  if (!open) return null;
+
+  if (verifyError) {
+    // Fail-closed block: we could not read acceptance status, so we neither
+    // grant access nor claim specific pending agreements. Retry or sign out.
+    return (
+      <Dialog open={open}>
+        <DialogContent
+          className="sm:max-w-lg"
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          aria-labelledby="reconsent-verify-title"
+          aria-describedby="reconsent-verify-description"
+          data-testid="agreement-reconsent-verify-error"
+        >
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-primary" aria-hidden />
+              <DialogTitle id="reconsent-verify-title">
+                Couldn&apos;t verify your agreements
+              </DialogTitle>
+            </div>
+            <DialogDescription id="reconsent-verify-description">
+              We couldn&apos;t confirm which agreements you&apos;ve accepted. Please retry, or sign
+              out and back in.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="ghost" onClick={() => void signOut()}>
+              Sign out
+            </Button>
+            <Button onClick={() => setRetryToken((t) => t + 1)}>Retry</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (!gaps) return null;
 
   const anyPrior = gaps.some((g) => g.previouslyAcceptedVersion !== null);
 
@@ -112,7 +179,9 @@ export function AgreementReconsentGate() {
         <DialogHeader>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-primary" aria-hidden />
-            <DialogTitle id="reconsent-title">{anyPrior ? "Updated agreements" : "Accept our agreements"}</DialogTitle>
+            <DialogTitle id="reconsent-title">
+              {anyPrior ? "Updated agreements" : "Accept our agreements"}
+            </DialogTitle>
           </div>
           <DialogDescription id="reconsent-description">
             {anyPrior
@@ -190,7 +259,8 @@ export function AgreementReconsentGate() {
             aria-required
           />
           <span className="leading-snug text-muted-foreground">
-            I have read and agree to the {CURRENT_AGREEMENT_LIST.map((a, i) => (
+            I have read and agree to the{" "}
+            {CURRENT_AGREEMENT_LIST.map((a, i) => (
               <span key={a.type}>
                 {i > 0 ? " and " : ""}
                 <Link

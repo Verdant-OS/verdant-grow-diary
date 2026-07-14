@@ -8,8 +8,17 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { CURRENT_AGREEMENTS, CURRENT_AGREEMENT_LIST, type AgreementType } from "@/constants/agreements";
-import { buildAcceptanceRows, computeAgreementGaps, type AcceptanceRow, type AgreementGap } from "@/lib/agreementConsent";
+import {
+  CURRENT_AGREEMENTS,
+  CURRENT_AGREEMENT_LIST,
+  type AgreementType,
+} from "@/constants/agreements";
+import {
+  buildAcceptanceRows,
+  computeAgreementGaps,
+  type AcceptanceRow,
+  type AgreementGap,
+} from "@/lib/agreementConsent";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 
@@ -20,12 +29,14 @@ export default function AccountPreferences() {
   const [optIn, setOptIn] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [agreements, setAgreements] = useState<{
-    agreement_type: AgreementType;
-    version: string;
-    effective_date: string;
-    accepted_at: string;
-  }[]>([]);
+  const [agreements, setAgreements] = useState<
+    {
+      agreement_type: AgreementType;
+      version: string;
+      effective_date: string;
+      accepted_at: string;
+    }[]
+  >([]);
   const [agreementsLoading, setAgreementsLoading] = useState(true);
   const [agreementsError, setAgreementsError] = useState<string | null>(null);
   const [gaps, setGaps] = useState<AgreementGap[]>([]);
@@ -114,7 +125,9 @@ export default function AccountPreferences() {
     }));
     const { error: err } = await supabase
       .from("user_agreement_acceptances")
-      .upsert(rows, { onConflict: "user_id,agreement_type,version" });
+      // Append-only: ON CONFLICT DO NOTHING so only INSERT is needed (there is
+      // no UPDATE policy); an existing row must not drive the RLS-denied UPDATE.
+      .upsert(rows, { onConflict: "user_id,agreement_type,version", ignoreDuplicates: true });
     if (err) {
       setAccepting(false);
       setReconsentError("Couldn't record your acceptance. Please try again.");
@@ -156,7 +169,9 @@ export default function AccountPreferences() {
       <div className="grid lg:grid-cols-2 gap-4">
         <Card className="glass rounded-2xl border-0 shadow-none">
           <CardHeader className="p-5 pb-0">
-            <CardTitle className="font-display font-semibold text-base">Marketing updates</CardTitle>
+            <CardTitle className="font-display font-semibold text-base">
+              Marketing updates
+            </CardTitle>
             <CardDescription className="text-sm text-muted-foreground">
               Product news, grow tips, and feature announcements from Verdant.
             </CardDescription>
@@ -167,7 +182,9 @@ export default function AccountPreferences() {
             ) : (
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium">Send me occasional product updates and grow tips</p>
+                  <p className="text-sm font-medium">
+                    Send me occasional product updates and grow tips
+                  </p>
                   <p className="text-xs text-muted-foreground">You can change this any time.</p>
                 </div>
                 <Switch
@@ -180,19 +197,12 @@ export default function AccountPreferences() {
             )}
 
             {status && (
-              <p
-                role="status"
-                aria-live="polite"
-                className="text-xs text-muted-foreground mt-3"
-              >
+              <p role="status" aria-live="polite" className="text-xs text-muted-foreground mt-3">
                 {status}
               </p>
             )}
             {error && (
-              <p
-                role="alert"
-                className="text-xs text-destructive mt-3"
-              >
+              <p role="alert" className="text-xs text-destructive mt-3">
                 {error}
               </p>
             )}
@@ -201,7 +211,9 @@ export default function AccountPreferences() {
 
         <Card className="glass rounded-2xl border-0 shadow-none">
           <CardHeader className="p-5 pb-0">
-            <CardTitle className="font-display font-semibold text-base">Terms & Privacy status</CardTitle>
+            <CardTitle className="font-display font-semibold text-base">
+              Terms & Privacy status
+            </CardTitle>
             <CardDescription className="text-sm text-muted-foreground">
               Your acceptance status for the current agreement versions.
             </CardDescription>
@@ -248,7 +260,8 @@ export default function AccountPreferences() {
             {!agreementsLoading && gaps.length > 0 && (
               <div className="mt-4 flex flex-col gap-2">
                 <p className="text-xs text-muted-foreground">
-                  Accepting will record your consent to the current version of every listed agreement.
+                  Accepting will record your consent to the current version of every listed
+                  agreement.
                 </p>
                 <Button
                   onClick={() => void handleAcceptAgreements()}
@@ -274,11 +287,11 @@ export default function AccountPreferences() {
           </CardContent>
         </Card>
 
-
-
         <Card className="glass rounded-2xl border-0 shadow-none">
           <CardHeader className="p-5 pb-0">
-            <CardTitle className="font-display font-semibold text-base">Agreement history</CardTitle>
+            <CardTitle className="font-display font-semibold text-base">
+              Agreement history
+            </CardTitle>
             <CardDescription className="text-sm text-muted-foreground">
               Versions you have accepted and when you accepted them.
             </CardDescription>
@@ -291,19 +304,23 @@ export default function AccountPreferences() {
                 {agreementsError}
               </p>
             ) : agreements.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No accepted agreements on record.
-              </p>
+              <p className="text-sm text-muted-foreground">No accepted agreements on record.</p>
             ) : (
               <ul className="divide-y divide-border/50">
                 {agreements.map((a) => {
                   const { label, href } = labelForAgreementType(a.agreement_type);
                   return (
-                    <li key={`${a.agreement_type}-${a.version}`} className="py-3 first:pt-0 last:pb-0">
+                    <li
+                      key={`${a.agreement_type}-${a.version}`}
+                      className="py-3 first:pt-0 last:pb-0"
+                    >
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                         <div>
                           <p className="text-sm font-medium">
-                            <Link to={href} className="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+                            <Link
+                              to={href}
+                              className="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                            >
                               {label}
                             </Link>
                           </p>

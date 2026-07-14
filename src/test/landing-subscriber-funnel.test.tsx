@@ -50,6 +50,12 @@ describe("landing subscriber funnel", () => {
       );
     }
     expect(screen.getAllByText("See Pro & Founder plans")).toHaveLength(2);
+    for (const testId of ["landing-signup-cta-hero", "landing-signup-cta-final"]) {
+      expect(screen.getByTestId(testId)).toHaveAttribute(
+        "href",
+        "/auth?mode=signup&utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch",
+      );
+    }
   });
 
   it("measures paid-intent and signup clicks without user data", async () => {

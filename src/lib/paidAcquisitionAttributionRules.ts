@@ -2,6 +2,7 @@ import { isPreselectPlanId, type PricingPreselectPlan } from "@/lib/pricingPlanP
 
 export type PaidAcquisitionSource =
   | "landing_page"
+  | "pricing_page"
   | "founder_page"
   | "founder_share"
   | "pricing_interest_share"
@@ -11,6 +12,7 @@ export type PaidAcquisitionSource =
 export type PaidInterestLeadSource =
   | "pricing_interest"
   | "pricing_interest_landing"
+  | "pricing_interest_pricing_page"
   | "pricing_interest_founder_page"
   | "pricing_interest_founder_share"
   | "pricing_interest_referral"
@@ -32,6 +34,12 @@ export const PAID_ACQUISITION_ATTRIBUTIONS: Readonly<
     medium: "owned",
     campaign: "paid_launch",
     leadSource: "pricing_interest_landing",
+  }),
+  pricing_page: Object.freeze({
+    source: "pricing_page",
+    medium: "owned",
+    campaign: "paid_launch",
+    leadSource: "pricing_interest_pricing_page",
   }),
   founder_page: Object.freeze({
     source: "founder_page",
@@ -68,6 +76,7 @@ export const PAID_ACQUISITION_ATTRIBUTIONS: Readonly<
 const PAID_INTEREST_LEAD_SOURCE_SET = new Set<PaidInterestLeadSource>([
   "pricing_interest",
   "pricing_interest_landing",
+  "pricing_interest_pricing_page",
   "pricing_interest_founder_page",
   "pricing_interest_founder_share",
   "pricing_interest_referral",

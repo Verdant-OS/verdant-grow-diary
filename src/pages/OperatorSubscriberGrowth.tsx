@@ -12,10 +12,14 @@ import {
   SUBSCRIBER_GROWTH_GOAL_LABEL,
   type SubscriberGrowthSnapshot,
 } from "@/lib/subscriberGrowthSnapshotRules";
+import {
+  parseSignupAcquisitionSnapshot,
+  type SignupAcquisitionSnapshot,
+} from "@/lib/signupAcquisitionSnapshotRules";
 
 type SubscriberGrowthRpcClient = {
   rpc(
-    fn: "subscriber_growth_operator_snapshot",
+    fn: "subscriber_growth_operator_snapshot" | "signup_acquisition_operator_snapshot",
   ): Promise<{ data: unknown; error: { message?: string } | null }>;
 };
 
@@ -27,6 +31,16 @@ async function fetchSubscriberGrowth(): Promise<SubscriberGrowthSnapshot> {
     throw new Error(error.message ?? "subscriber_growth_snapshot_failed");
   }
   return parseSubscriberGrowthSnapshot(data);
+}
+
+async function fetchSignupAcquisition(): Promise<SignupAcquisitionSnapshot> {
+  const { data, error } = await (supabase as unknown as SubscriberGrowthRpcClient).rpc(
+    "signup_acquisition_operator_snapshot",
+  );
+  if (error) {
+    throw new Error(error.message ?? "signup_acquisition_snapshot_failed");
+  }
+  return parseSignupAcquisitionSnapshot(data);
 }
 
 function MetricCard({
@@ -59,8 +73,16 @@ export default function OperatorSubscriberGrowth() {
     enabled: role.granted,
     staleTime: 30_000,
   });
+  const acquisitionQuery = useQuery({
+    queryKey: ["operator", "signup-acquisition"],
+    queryFn: fetchSignupAcquisition,
+    enabled: role.granted,
+    staleTime: 30_000,
+  });
 
   const snapshot = snapshotQuery.data;
+  const acquisition = acquisitionQuery.data;
+  const refreshing = snapshotQuery.isFetching || acquisitionQuery.isFetching;
   const progress = useMemo(
     () => buildSubscriberGrowthProgress(snapshot?.counts.activePaid ?? 0, Date.now()),
     [snapshot?.counts.activePaid],
@@ -90,10 +112,13 @@ export default function OperatorSubscriberGrowth() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => snapshotQuery.refetch()}
-              disabled={!role.granted || snapshotQuery.isFetching}
+              onClick={() => {
+                void snapshotQuery.refetch();
+                void acquisitionQuery.refetch();
+              }}
+              disabled={!role.granted || refreshing}
             >
-              {snapshotQuery.isFetching ? "Refreshing…" : "Refresh"}
+              {refreshing ? "Refreshing…" : "Refresh"}
             </Button>
           </div>
         </div>
@@ -129,6 +154,29 @@ export default function OperatorSubscriberGrowth() {
         </Card>
       )}
 
+      {role.granted && acquisitionQuery.isError && (
+        <Card data-testid="signup-acquisition-error">
+          <CardHeader>
+            <CardTitle>Account acquisition snapshot unavailable.</CardTitle>
+            <CardDescription>
+              Subscriber totals remain available. The read-only source report failed and no account,
+              billing, or lead data was changed.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
+      {role.granted && acquisition && !acquisition.ok && (
+        <Card data-testid="signup-acquisition-denied">
+          <CardHeader>
+            <CardTitle>Account acquisition snapshot unavailable.</CardTitle>
+            <CardDescription>
+              {acquisition.reasonLabel ?? "Account acquisition data is not available."}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
       {role.granted && snapshot?.ok && (
         <>
           <section
@@ -138,7 +186,7 @@ export default function OperatorSubscriberGrowth() {
             <MetricCard
               label="Active paid subscribers"
               value={progress.activePaid}
-              description="Verified active paid entitlements only"
+              description="Authoritative active paid entitlements only"
             />
             <MetricCard label="Goal" value={progress.target} />
             <MetricCard label="Still needed" value={progress.remaining} />
@@ -156,7 +204,7 @@ export default function OperatorSubscriberGrowth() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Verified paid mix</CardTitle>
+              <CardTitle>Authoritative paid entitlement mix</CardTitle>
               <CardDescription>
                 Each person is counted once. Free rows, expired access, leads, and profile tiers are
                 excluded.
@@ -182,6 +230,41 @@ export default function OperatorSubscriberGrowth() {
               value={snapshot.counts.scheduledCancellation}
             />
           </section>
+
+          {acquisition?.ok && (
+            <Card data-testid="signup-acquisition-snapshot">
+              <CardHeader>
+                <CardTitle>Account starts — not subscribers</CardTitle>
+                <CardDescription>
+                  Profile counts show signup volume. Campaign sources are allowlisted,
+                  analytics-only first touch; they never grant billing, roles, credits, or Founder
+                  access.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <MetricCard label="Accounts — all time" value={acquisition.counts.accountsTotal} />
+                <MetricCard label="Accounts — 7 days" value={acquisition.counts.accounts7d} />
+                <MetricCard label="Attributed — 7 days" value={acquisition.counts.attributed7d} />
+                <MetricCard
+                  label="Source unavailable"
+                  value={acquisition.counts.unattributedTotal}
+                  description="Includes accounts created before attribution launched"
+                />
+              </CardContent>
+              <CardContent className="grid gap-3 border-t border-border/60 pt-6 sm:grid-cols-2 lg:grid-cols-7">
+                <MetricCard label="Landing signup" value={acquisition.counts.landingPage} />
+                <MetricCard label="Pricing signup" value={acquisition.counts.pricingPage} />
+                <MetricCard label="Founder page signup" value={acquisition.counts.founderPage} />
+                <MetricCard label="Founder share signup" value={acquisition.counts.founderShare} />
+                <MetricCard
+                  label="Interest share signup"
+                  value={acquisition.counts.pricingInterestShare}
+                />
+                <MetricCard label="Grower invite signup" value={acquisition.counts.growerInvite} />
+                <MetricCard label="Context check signup" value={acquisition.counts.contextCheck} />
+              </CardContent>
+            </Card>
+          )}
 
           <Card data-testid="subscriber-growth-interest">
             <CardHeader>
@@ -215,9 +298,10 @@ export default function OperatorSubscriberGrowth() {
               />
               <MetricCard label="All leads — 7 days" value={snapshot.counts.allLeads7d} />
             </CardContent>
-            <CardContent className="grid gap-3 border-t border-border/60 pt-6 sm:grid-cols-2 lg:grid-cols-7">
+            <CardContent className="grid gap-3 border-t border-border/60 pt-6 sm:grid-cols-2 lg:grid-cols-8">
               <MetricCard label="Direct pricing" value={snapshot.counts.pricingInterestDirect} />
               <MetricCard label="Landing page" value={snapshot.counts.pricingInterestLanding} />
+              <MetricCard label="Pricing page" value={snapshot.counts.pricingInterestPricingPage} />
               <MetricCard label="Founder page" value={snapshot.counts.pricingInterestFounderPage} />
               <MetricCard
                 label="Founder shares"

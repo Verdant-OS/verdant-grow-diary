@@ -36,45 +36,79 @@ beforeEach(() => {
 describe("OperatorSubscriberGrowth", () => {
   it("renders authoritative paid progress and labels interest separately", async () => {
     vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-07-14T05:00:00.000Z"));
-    rpcMock.mockResolvedValueOnce({
-      data: {
-        ok: true,
-        generated_at: "2026-07-14T05:00:00Z",
-        counts: {
-          active_paid: 10,
-          pro_monthly: 4,
-          pro_annual: 3,
-          founder_lifetime: 3,
-          at_risk: 1,
-          scheduled_cancellation: 2,
-          new_active_7d: 4,
-          new_active_30d: 10,
-          pricing_interest_total: 18,
-          pricing_interest_7d: 7,
-          pricing_interest_needs_contact: 6,
-          pricing_interest_follow_up_due: 2,
-          pricing_interest_contacted_7d: 5,
-          pricing_interest_direct: 2,
-          pricing_interest_landing: 4,
-          pricing_interest_founder_page: 5,
-          pricing_interest_founder_share: 3,
-          pricing_interest_referral: 4,
-          pricing_interest_grower_invite: 6,
-          pricing_interest_context_check: 8,
-          all_leads_7d: 9,
+    rpcMock.mockImplementation((fn: string) => {
+      if (fn === "signup_acquisition_operator_snapshot") {
+        return Promise.resolve({
+          data: {
+            ok: true,
+            generated_at: "2026-07-14T05:00:00Z",
+            counts: {
+              accounts_total: 20,
+              accounts_7d: 8,
+              attributed_total: 12,
+              attributed_7d: 7,
+              unattributed_total: 8,
+              landing_page: 3,
+              pricing_page: 2,
+              founder_page: 1,
+              founder_share: 2,
+              pricing_interest_share: 1,
+              grower_invite: 2,
+              context_check: 1,
+            },
+          },
+          error: null,
+        });
+      }
+      return Promise.resolve({
+        data: {
+          ok: true,
+          generated_at: "2026-07-14T05:00:00Z",
+          counts: {
+            active_paid: 10,
+            pro_monthly: 4,
+            pro_annual: 3,
+            founder_lifetime: 3,
+            at_risk: 1,
+            scheduled_cancellation: 2,
+            new_active_7d: 4,
+            new_active_30d: 10,
+            pricing_interest_total: 18,
+            pricing_interest_7d: 7,
+            pricing_interest_needs_contact: 6,
+            pricing_interest_follow_up_due: 2,
+            pricing_interest_contacted_7d: 5,
+            pricing_interest_direct: 2,
+            pricing_interest_landing: 4,
+            pricing_interest_pricing_page: 3,
+            pricing_interest_founder_page: 5,
+            pricing_interest_founder_share: 3,
+            pricing_interest_referral: 4,
+            pricing_interest_grower_invite: 6,
+            pricing_interest_context_check: 8,
+            all_leads_7d: 9,
+          },
         },
-      },
-      error: null,
+        error: null,
+      });
     });
 
     renderPage();
 
     expect(await screen.findByText("91")).toBeInTheDocument();
     expect(screen.getByText("Subscriber Growth")).toBeInTheDocument();
+    expect(screen.getByText("Authoritative active paid entitlements only")).toBeInTheDocument();
+    expect(screen.getByText("Authoritative paid entitlement mix")).toBeInTheDocument();
+    expect(screen.queryByText(/verified paid/i)).not.toBeInTheDocument();
     expect(rpcMock).toHaveBeenCalledWith("subscriber_growth_operator_snapshot");
+    expect(rpcMock).toHaveBeenCalledWith("signup_acquisition_operator_snapshot");
     expect(screen.getByText("49")).toBeInTheDocument();
     expect(screen.getByText("1.9/day")).toBeInTheDocument();
     expect(screen.getByText("Interest signals — not subscribers")).toBeInTheDocument();
+    expect(screen.getByText("Account starts — not subscribers")).toBeInTheDocument();
+    expect(screen.getByText("Accounts — all time")).toBeInTheDocument();
+    expect(screen.getByText("Pricing signup")).toBeInTheDocument();
+    expect(screen.getByText("Source unavailable")).toBeInTheDocument();
     expect(screen.getByText("Founder shares")).toBeInTheDocument();
     expect(screen.getByText("Paid-interest shares")).toBeInTheDocument();
     expect(screen.getByText("Grower invites")).toBeInTheDocument();
@@ -90,12 +124,30 @@ describe("OperatorSubscriberGrowth", () => {
   });
 
   it("shows a calm read-only error when the RPC fails", async () => {
-    rpcMock.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
+    rpcMock.mockResolvedValue({ data: null, error: { message: "boom" } });
     renderPage();
 
     await waitFor(() => {
       expect(screen.getByText("Subscriber growth snapshot unavailable.")).toBeInTheDocument();
     });
     expect(screen.getByText(/No billing or lead data was changed/)).toBeInTheDocument();
+  });
+
+  it("keeps paid progress visible when account attribution fails closed", async () => {
+    rpcMock.mockImplementation((fn: string) =>
+      Promise.resolve(
+        fn === "signup_acquisition_operator_snapshot"
+          ? { data: { ok: false, reason: "operator_required" }, error: null }
+          : { data: { ok: true, counts: { active_paid: 0 } }, error: null },
+      ),
+    );
+
+    renderPage();
+
+    expect(await screen.findByTestId("signup-acquisition-denied")).toHaveTextContent(
+      "Operator role is required to view account acquisition.",
+    );
+    expect(screen.getByText("Active paid subscribers")).toBeInTheDocument();
+    expect(screen.queryByTestId("signup-acquisition-snapshot")).not.toBeInTheDocument();
   });
 });

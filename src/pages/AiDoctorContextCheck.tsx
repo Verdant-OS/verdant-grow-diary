@@ -26,9 +26,11 @@ import {
   type AiDoctorContextReadiness,
 } from "@/lib/aiDoctorContextCheckRules";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
+import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import { cn } from "@/lib/utils";
 
 const PRICING_PATH = buildAiDoctorContextPricingPath();
+const SIGNUP_PATH = buildAttributedSignupPath({ source: "context_check" });
 
 const READINESS_LABELS: Readonly<Record<AiDoctorContextReadiness, string>> = Object.freeze({
   insufficient: "More context needed",
@@ -288,7 +290,7 @@ export default function AiDoctorContextCheck() {
 
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Link
-                    to="/auth"
+                    to={SIGNUP_PATH}
                     onClick={() =>
                       trackPricingEvent("context_check_signup_clicked", {
                         item: result.readiness,

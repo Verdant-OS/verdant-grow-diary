@@ -84,6 +84,10 @@ describe("Founder acquisition page", () => {
         "/pricing?plan=founder_lifetime&utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch",
       );
     }
+    expect(screen.getByTestId("founder-start-free-hero")).toHaveAttribute(
+      "href",
+      "/auth?mode=signup&utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch",
+    );
   });
 
   it("emits PII-free page-view and CTA events", () => {

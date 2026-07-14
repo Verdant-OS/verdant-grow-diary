@@ -6,7 +6,7 @@
  *  - Pro Monthly / Pro Annual / Founder Lifetime CTAs invoke the new
  *    `usePaddleCheckout.openCheckout` with the correct human-readable
  *    price IDs (`pro_monthly`, `pro_annual`, `founder_lifetime`)
- *  - Free CTA still routes to `/auth` (signup/onboarding)
+ *  - Free CTA opens the signup tab with fixed first-party attribution
  *  - the deprecated `/billing/...` CTA path is no longer visible as a
  *    competing user-facing checkout path
  *  - founder copy uses the "may close manually" language and does not
@@ -65,7 +65,6 @@ describe("Pricing page — built-in Paddle wiring", () => {
     expect(proCard.textContent).toMatch(/\$99/);
     const founderCard = screen.getByTestId("pricing-card-founder");
     expect(founderCard.textContent).toMatch(/\$129/);
-
   });
 
   it("Pro Annual CTA opens checkout with priceId=pro_annual", async () => {
@@ -87,7 +86,6 @@ describe("Pricing page — built-in Paddle wiring", () => {
     expect(proCard.textContent).toMatch(/\$12/);
   });
 
-
   it("Founder Lifetime CTA opens checkout with priceId=founder_lifetime", async () => {
     const user = userEvent.setup();
     renderPricing();
@@ -95,10 +93,12 @@ describe("Pricing page — built-in Paddle wiring", () => {
     expect(openCheckoutMock).toHaveBeenCalledWith({ priceId: "founder_lifetime" });
   });
 
-  it("Free CTA still routes to /auth (signup/onboarding)", () => {
+  it("Free CTA opens signup with fixed pricing-page attribution", () => {
     renderPricing();
     const freeCard = screen.getByTestId("pricing-card-free");
-    const freeLink = freeCard.querySelector('a[href="/auth"]');
+    const freeLink = freeCard.querySelector(
+      'a[href="/auth?mode=signup&utm_source=pricing_page&utm_medium=owned&utm_campaign=paid_launch"]',
+    );
     expect(freeLink).toBeTruthy();
   });
 

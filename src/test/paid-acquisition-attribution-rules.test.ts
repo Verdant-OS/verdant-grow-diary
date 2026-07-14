@@ -10,6 +10,7 @@ import {
 describe("paid acquisition attribution rules", () => {
   it.each([
     ["landing_page", "owned", "paid_launch", "pricing_interest_landing"],
+    ["pricing_page", "owned", "paid_launch", "pricing_interest_pricing_page"],
     ["founder_page", "owned", "founder_launch", "pricing_interest_founder_page"],
     ["founder_share", "referral", "founder_launch", "pricing_interest_founder_share"],
     ["pricing_interest_share", "referral", "paid_launch", "pricing_interest_referral"],

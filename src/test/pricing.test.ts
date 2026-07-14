@@ -215,13 +215,14 @@ describe("CTAs", () => {
     expect(PAGE).toMatch(/Claim Founder Lifetime/);
   });
 
-  it("wires CTAs to /auth and Paddle checkout price keys", () => {
-    // Free CTA stays a plain /auth link; paid CTAs open the Paddle overlay
+  it("wires CTAs to attributed signup and Paddle checkout price keys", () => {
+    // Free CTA opens signup with a fixed source; paid CTAs open the Paddle overlay
     // via usePaddleCheckout (which itself bounces signed-out users to
     // /auth). The old /billing/:plan placeholder links are retired from
     // this page — the placeholder route itself stays mounted for legacy
     // deep links.
-    expect(PAGE).toMatch(/to="\/auth"/);
+    expect(PAGE).toMatch(/to=\{freeSignupPath\}/);
+    expect(PAGE).toMatch(/buildAttributedSignupPath/);
     expect(PAGE).toMatch(/usePaddleCheckout/);
     expect(PAGE).toMatch(/openCheckout\(/);
     expect(PAGE).toMatch(/pro_monthly/);

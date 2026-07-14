@@ -39,7 +39,11 @@ import { trackPricingEvent, type PricingAnalyticsName } from "@/lib/pricingAnaly
 import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
 import type { SubscriberInterestPlanId } from "@/lib/subscriberInterestRules";
-import { resolvePaidInterestLeadSource } from "@/lib/paidAcquisitionAttributionRules";
+import {
+  resolvePaidAcquisitionSource,
+  resolvePaidInterestLeadSource,
+} from "@/lib/paidAcquisitionAttributionRules";
+import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -77,6 +81,9 @@ export default function Pricing() {
   // NEVER auto-opens Paddle — the grower must click a Pricing CTA.
   const preselect = resolvePricingPlanPreselect(searchParams.get("plan"));
   const paidInterestLeadSource = resolvePaidInterestLeadSource(searchParams);
+  const freeSignupPath = buildAttributedSignupPath({
+    source: resolvePaidAcquisitionSource(searchParams) ?? "pricing_page",
+  });
   const [billing, setBilling] = useState<BillingPeriod>(preselect.billing ?? "annual");
   const [interestPlan, setInterestPlan] = useState<SubscriberInterestPlanId>(
     preselect.plan ?? (preselect.billing === "monthly" ? "pro_monthly" : "pro_annual"),
@@ -333,7 +340,7 @@ export default function Pricing() {
           description={PRICING.free.description}
           features={PRICING.free.features}
           cta={
-            <Link to="/auth" className="block">
+            <Link to={freeSignupPath} className="block">
               <Button
                 size="lg"
                 variant="outline"
@@ -772,7 +779,7 @@ export default function Pricing() {
           history backed up, synced, and easy to revisit.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Link to="/auth">
+          <Link to={freeSignupPath}>
             <Button
               size="lg"
               variant="outline"

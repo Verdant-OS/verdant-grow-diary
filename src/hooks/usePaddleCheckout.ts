@@ -12,6 +12,8 @@ import { toast } from "@/hooks/use-toast";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import { consumePlanIntent, isKnownPlanIntent, savePlanIntent } from "@/lib/checkoutPlanIntent";
 import { beginCheckoutSession } from "@/lib/checkoutOverlaySession";
+import { resolvePaidAcquisitionSource } from "@/lib/paidAcquisitionAttributionRules";
+import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 
 export interface OpenCheckoutOptions {
   priceId: string;
@@ -128,7 +130,12 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
           savePlanIntent(options.priceId);
         }
         const back = `${window.location.pathname}${window.location.search}` || "/pricing";
-        navigate(`/auth?redirectTo=${encodeURIComponent(back)}`);
+        navigate(
+          buildAttributedSignupPath({
+            source: resolvePaidAcquisitionSource(window.location.search) ?? "pricing_page",
+            redirectTo: back,
+          }),
+        );
         return;
       }
 

@@ -27,6 +27,7 @@ import {
   buildFounderPricingPath,
   resolvePaidAcquisitionSource,
 } from "@/lib/paidAcquisitionAttributionRules";
+import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import {
   buildBreadcrumbListJsonLd,
   buildFaqPageJsonLd,
@@ -59,6 +60,9 @@ export default function Founder() {
   const [searchParams] = useSearchParams();
   const acquisitionSource = resolvePaidAcquisitionSource(searchParams);
   const pricingPath = buildFounderPricingPath(searchParams);
+  const signupPath = buildAttributedSignupPath({
+    source: acquisitionSource === "founder_share" ? "founder_share" : "founder_page",
+  });
   usePageSeo({
     title: FOUNDER_SOCIAL_META.title,
     description: FOUNDER_SOCIAL_META.description,
@@ -140,7 +144,7 @@ export default function Founder() {
           />
           <Button asChild size="lg" variant="outline">
             <Link
-              to="/auth"
+              to={signupPath}
               data-testid="founder-start-free-hero"
               onClick={() => trackPricingEvent("founder_start_free_clicked", { source: "hero" })}
             >

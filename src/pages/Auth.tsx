@@ -33,6 +33,12 @@ import {
   RESEND_VERIFICATION_GENERIC_FAILURE,
 } from "@/lib/authErrorRules";
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
+import {
+  buildSignupEmailRedirectUrl,
+  buildSignupUserMetadata,
+  resolveSignupAcquisitionSource,
+} from "@/lib/signupAcquisitionRules";
+import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
 import { buildAcceptanceRows } from "@/lib/agreementConsent";
 import {
@@ -65,6 +71,8 @@ export default function Auth() {
     return raw ? sanitizeAuthRedirect(raw) : null;
   }, [search]);
   const redirectTo = explicitRedirect ?? "/";
+  const signupSource = useMemo(() => resolveSignupAcquisitionSource(search), [search]);
+  const signupUserMetadata = useMemo(() => buildSignupUserMetadata(search), [search]);
   const initialMode: AuthMode = (() => {
     const raw = search.get("mode");
     if (raw === "signup" || raw === "forgot" || raw === "signin") return raw;
@@ -116,6 +124,11 @@ export default function Auth() {
     if (user) nav(postSignInTarget(), { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, nav]);
+
+  useEffect(() => {
+    if (mode !== "signup") return;
+    trackPricingEvent("signup_page_view", { source: signupSource ?? "direct" });
+  }, [mode, signupSource]);
 
   // While a verification-resend cooldown is active, tick once a second so
   // the countdown label updates and the button re-enables on its own.
@@ -241,13 +254,23 @@ export default function Auth() {
       return;
     }
     setBusy(true);
+    trackPricingEvent("signup_started", { source: signupSource ?? "direct" });
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: window.location.origin },
+      options: {
+        emailRedirectTo: buildSignupEmailRedirectUrl(window.location.origin, explicitRedirect),
+        // Analytics-only first touch. raw_user_meta_data is user-editable and
+        // must never be used for roles, billing, credits, or entitlements.
+        data: signupUserMetadata,
+      },
     });
     if (error) {
       setBusy(false);
+      trackPricingEvent("signup_failed", {
+        source: signupSource ?? "direct",
+        reason: "auth_rejected",
+      });
       setSignUpError(sanitizeAuthError("signUp", error));
       signUpEmailRef.current?.focus();
       return;
@@ -288,6 +311,7 @@ export default function Auth() {
       }
     }
     setBusy(false);
+    trackPricingEvent("signup_completed", { source: signupSource ?? "direct" });
     setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
     nav(postSignInTarget(), { replace: true });
   }

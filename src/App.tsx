@@ -195,8 +195,8 @@ const App = () => (
                   <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
                   <Route path="/ai-doctor-readiness-check" element={<AiDoctorContextCheck />} />
-                  {/* Legacy `/billing/:plan` entry — Slice E: redirect to
-                      canonical `/upgrade` with plan preselect + safe returnTo. */}
+                  {/* Legacy `/billing/:plan` entry — redirect to canonical
+                      `/pricing` with plan preselect + safe returnTo. */}
                   <Route path="/billing/:plan" element={<LegacyBillingRedirect />} />
                   <Route path="/checkout/success" element={<CheckoutSuccess />} />
                   <Route path="/checkout/cancel" element={<CheckoutCancel />} />

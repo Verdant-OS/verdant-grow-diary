@@ -63,6 +63,7 @@ BEGIN
         WHERE l.source IN (
           'pricing_interest',
           'pricing_interest_landing',
+          'pricing_interest_pricing_page',
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
           'pricing_interest_referral',
@@ -74,6 +75,7 @@ BEGIN
         WHERE l.source IN (
           'pricing_interest',
           'pricing_interest_landing',
+          'pricing_interest_pricing_page',
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
           'pricing_interest_referral',
@@ -86,6 +88,7 @@ BEGIN
         WHERE l.source IN (
           'pricing_interest',
           'pricing_interest_landing',
+          'pricing_interest_pricing_page',
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
           'pricing_interest_referral',
@@ -99,6 +102,7 @@ BEGIN
         WHERE l.source IN (
           'pricing_interest',
           'pricing_interest_landing',
+          'pricing_interest_pricing_page',
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
           'pricing_interest_referral',
@@ -113,6 +117,7 @@ BEGIN
         WHERE l.source IN (
           'pricing_interest',
           'pricing_interest_landing',
+          'pricing_interest_pricing_page',
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
           'pricing_interest_referral',
@@ -127,6 +132,9 @@ BEGIN
       count(DISTINCT lower(btrim(l.email))) FILTER (
         WHERE l.source = 'pricing_interest_landing'
       ) AS pricing_interest_landing,
+      count(DISTINCT lower(btrim(l.email))) FILTER (
+        WHERE l.source = 'pricing_interest_pricing_page'
+      ) AS pricing_interest_pricing_page,
       count(DISTINCT lower(btrim(l.email))) FILTER (
         WHERE l.source = 'pricing_interest_founder_page'
       ) AS pricing_interest_founder_page,
@@ -163,6 +171,7 @@ BEGIN
     'pricing_interest_contacted_7d', lc.pricing_interest_contacted_7d,
     'pricing_interest_direct', lc.pricing_interest_direct,
     'pricing_interest_landing', lc.pricing_interest_landing,
+    'pricing_interest_pricing_page', lc.pricing_interest_pricing_page,
     'pricing_interest_founder_page', lc.pricing_interest_founder_page,
     'pricing_interest_founder_share', lc.pricing_interest_founder_share,
     'pricing_interest_referral', lc.pricing_interest_referral,
@@ -194,6 +203,7 @@ BEGIN
       'pricing_interest_contacted_7d', 0,
       'pricing_interest_direct', 0,
       'pricing_interest_landing', 0,
+      'pricing_interest_pricing_page', 0,
       'pricing_interest_founder_page', 0,
       'pricing_interest_founder_share', 0,
       'pricing_interest_referral', 0,

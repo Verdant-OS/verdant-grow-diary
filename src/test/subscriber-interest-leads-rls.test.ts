@@ -19,6 +19,7 @@ describe("subscriber-interest lead RLS recovery", () => {
       "landing",
       "pricing_interest",
       "pricing_interest_landing",
+      "pricing_interest_pricing_page",
       "pricing_interest_founder_page",
       "pricing_interest_founder_share",
       "pricing_interest_referral",

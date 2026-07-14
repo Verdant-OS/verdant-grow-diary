@@ -22,8 +22,10 @@ import { VERDANT_SEO_LANDING_SECTIONS, VERDANT_LANDING_FAQ } from "@/constants/v
 import { buildFaqPageJsonLd, safeJsonLdStringify } from "@/lib/seoStructuredData";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import { buildAttributedPricingPath } from "@/lib/paidAcquisitionAttributionRules";
+import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 
 const LANDING_PRICING_PATH = buildAttributedPricingPath({ source: "landing_page" });
+const LANDING_SIGNUP_PATH = buildAttributedSignupPath({ source: "landing_page" });
 
 /**
  * Public landing page for https://verdantgrowdiary.com.
@@ -122,7 +124,7 @@ export default function Landing() {
             </Link>
           ) : (
             <Link
-              to="/auth"
+              to={LANDING_SIGNUP_PATH}
               data-testid="landing-signup-cta-hero"
               onClick={() => trackPricingEvent("landing_signup_cta_clicked", { source: "hero" })}
             >
@@ -302,7 +304,7 @@ export default function Landing() {
             </Link>
           ) : (
             <Link
-              to="/auth"
+              to={LANDING_SIGNUP_PATH}
               data-testid="landing-signup-cta-final"
               onClick={() =>
                 trackPricingEvent("landing_signup_cta_clicked", { source: "final_cta" })

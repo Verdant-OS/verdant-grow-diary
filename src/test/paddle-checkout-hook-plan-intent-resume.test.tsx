@@ -16,9 +16,7 @@ import type { ReactNode } from "react";
 
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>(
-    "react-router-dom",
-  );
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return { ...actual, useNavigate: () => navigateMock };
 });
 
@@ -43,10 +41,7 @@ vi.mock("@/lib/paddle", () => {
 });
 
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
-import {
-  CHECKOUT_PLAN_INTENT_STORAGE_KEY,
-  peekPlanIntent,
-} from "@/lib/checkoutPlanIntent";
+import { CHECKOUT_PLAN_INTENT_STORAGE_KEY, peekPlanIntent } from "@/lib/checkoutPlanIntent";
 
 function wrapper({ children }: { children: ReactNode }) {
   return <MemoryRouter initialEntries={["/pricing"]}>{children}</MemoryRouter>;
@@ -70,7 +65,11 @@ describe("usePaddleCheckout — Slice C plan intent survives /auth", () => {
     expect(peekPlanIntent()).toBe("pro_annual");
     expect(navigateMock).toHaveBeenCalledTimes(1);
     const target = navigateMock.mock.calls[0][0] as string;
-    expect(target.startsWith("/auth?redirectTo=")).toBe(true);
+    expect(target).toContain("/auth?mode=signup&");
+    expect(target).toContain("redirectTo=");
+    expect(target).toContain("utm_source=pricing_page");
+    expect(target).toContain("utm_medium=owned");
+    expect(target).toContain("utm_campaign=paid_launch");
     // jsdom's window.location.pathname is "/", not the MemoryRouter path —
     // asserting the redirectTo shape is enough to prove intent is preserved.
   });

@@ -24,6 +24,7 @@ export interface SubscriberGrowthCounts {
   pricingInterestContacted7d: number;
   pricingInterestDirect: number;
   pricingInterestLanding: number;
+  pricingInterestPricingPage: number;
   pricingInterestFounderPage: number;
   pricingInterestFounderShare: number;
   pricingInterestReferral: number;
@@ -67,6 +68,7 @@ const EMPTY_COUNTS: SubscriberGrowthCounts = Object.freeze({
   pricingInterestContacted7d: 0,
   pricingInterestDirect: 0,
   pricingInterestLanding: 0,
+  pricingInterestPricingPage: 0,
   pricingInterestFounderPage: 0,
   pricingInterestFounderShare: 0,
   pricingInterestReferral: 0,
@@ -135,6 +137,7 @@ export function parseSubscriberGrowthSnapshot(input: unknown): SubscriberGrowthS
       pricingInterestContacted7d: asCount(raw.pricing_interest_contacted_7d),
       pricingInterestDirect: asCount(raw.pricing_interest_direct),
       pricingInterestLanding: asCount(raw.pricing_interest_landing),
+      pricingInterestPricingPage: asCount(raw.pricing_interest_pricing_page),
       pricingInterestFounderPage: asCount(raw.pricing_interest_founder_page),
       pricingInterestFounderShare: asCount(raw.pricing_interest_founder_share),
       pricingInterestReferral: asCount(raw.pricing_interest_referral),

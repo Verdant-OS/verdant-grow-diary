@@ -78,7 +78,7 @@ describe("AI Doctor Context Check page", () => {
     expect(screen.getByTestId("context-check-coverage")).toHaveTextContent("9/12 · 75%");
     expect(screen.getByRole("link", { name: "Start a free grow memory" })).toHaveAttribute(
       "href",
-      "/auth",
+      "/auth?mode=signup&utm_source=context_check&utm_medium=owned&utm_campaign=context_check",
     );
     expect(screen.getByRole("link", { name: "Compare Free and Pro" })).toHaveAttribute(
       "href",

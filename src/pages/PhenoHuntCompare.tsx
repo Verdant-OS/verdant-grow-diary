@@ -22,6 +22,9 @@ import {
   PHENO_STATUS_LABELS,
 } from "@/constants/phenoOnboardingCopy";
 import { readCohortFromSearch, restrictCohortToHunt } from "@/lib/phenoComparisonCohort";
+import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
+import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
+import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 
 export default function PhenoHuntCompare() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +37,24 @@ export default function PhenoHuntCompare() {
   // param the full hunt is shown — the existing behaviour.
   const requestedCohort = useMemo(() => readCohortFromSearch(searchParams), [searchParams]);
   const cohortActive = requestedCohort.length >= 2;
+
+  // Manual evidence packets for the COMPARED candidates only (cohort or the
+  // hunt's loaded candidates). Read-only coverage; separate from readiness.
+  const comparedIdsForPackets = useMemo(() => {
+    if (!cohortActive) return candidates.map((c) => c.candidateId);
+    const ids = new Set(
+      restrictCohortToHunt(
+        requestedCohort,
+        candidates.map((c) => c.candidateId),
+      ),
+    );
+    return candidates.filter((c) => ids.has(c.candidateId)).map((c) => c.candidateId);
+  }, [cohortActive, requestedCohort, candidates]);
+  const evidencePackets = usePhenoEvidencePackets({
+    huntId: id ?? null,
+    plantIds: comparedIdsForPackets,
+    configuredGoals: hunt?.evidenceGoals ?? [],
+  });
   const comparedCandidates = useMemo(() => {
     if (!cohortActive) return candidates;
     const ids = new Set(
@@ -153,6 +174,32 @@ export default function PhenoHuntCompare() {
                 </Link>
               </p>
             ) : null}
+          </div>
+        </section>
+      ) : null}
+      {comparedCandidates.length > 0 ? (
+        <section
+          data-testid="pheno-hunt-compare-evidence-coverage"
+          aria-label="Manual evidence coverage for compared candidates"
+          className="container mx-auto max-w-6xl px-4 pt-4 space-y-2"
+        >
+          <h2 className="text-sm font-semibold">Manual evidence coverage</h2>
+          <p className="text-xs text-muted-foreground">
+            Configured-goal receipts from Quick Log. This is coverage of what you recorded — it is
+            separate from readiness and does not compare or pick candidates.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {comparedCandidates.map((c) => (
+              <div key={c.candidateId} className="space-y-1">
+                <p className="text-xs font-medium">{phenoCandidateDisplayLabel(c)}</p>
+                <PhenoCandidateEvidenceCoverage
+                  packet={evidencePackets.packets.get(c.candidateId) ?? null}
+                  status={evidencePackets.status}
+                  allowRecordActions={false}
+                  data-testid={`compare-evidence-coverage-${c.candidateId}`}
+                />
+              </div>
+            ))}
           </div>
         </section>
       ) : null}

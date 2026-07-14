@@ -58,6 +58,9 @@ import PhenoCompareCandidatesAction from "@/components/PhenoCompareCandidatesAct
 import { buildPhenoComparisonActionState } from "@/lib/phenoComparisonActionState";
 import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
+import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
+import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
+import type { PhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
 import {
   evaluatePhenoCandidateReadiness,
   readinessEvidenceFromCandidateInput,
@@ -532,6 +535,10 @@ interface EditorProps {
   roundRow: ScoreRoundRow | undefined;
   decision: KeeperDecisionRow | undefined;
   saving: boolean;
+  /** Manual evidence packet (configured-goal coverage) — separate axis from
+   * readiness. Null while its batch is loading. */
+  evidencePacket: PhenoCandidateEvidencePacket | null;
+  evidenceStatus: "loading" | "ready" | "error" | "disabled";
   selected: boolean;
   onToggleSelect: (plantId: string) => void;
   canAssign: boolean;
@@ -612,6 +619,8 @@ const CandidateEditor = memo(function CandidateEditor({
   roundRow,
   decision,
   saving,
+  evidencePacket,
+  evidenceStatus,
   selected,
   onToggleSelect,
   canAssign,
@@ -730,6 +739,15 @@ const CandidateEditor = memo(function CandidateEditor({
           candidateNumber={candidate.candidateNumber ?? null}
           canAssign={canAssign}
           onAssign={onAssignNumber}
+        />
+        <PhenoCandidateEvidenceCoverage
+          packet={evidencePacket}
+          status={evidenceStatus}
+          plantName={candidate.plantLabel ?? null}
+          growId={growId}
+          tentId={tentId}
+          allowRecordActions
+          data-testid={`workspace-evidence-coverage-${plantId}`}
         />
       </header>
 
@@ -986,6 +1004,17 @@ export default function PhenoHuntWorkspace() {
   const ws = usePhenoHuntWorkspace(id);
   const herm = usePhenoHermCullSuggestion();
   const stress = usePhenoStressObservations(ws.hunt?.id ?? null);
+  // Manual evidence packets for the LOADED candidates only — one bounded
+  // batch read per (hunt, id-set); Quick Log saves invalidate its key family.
+  const loadedCandidateIds = useMemo(
+    () => ws.candidates.map((c) => c.candidateId),
+    [ws.candidates],
+  );
+  const evidencePackets = usePhenoEvidencePackets({
+    huntId: ws.hunt?.id ?? null,
+    plantIds: loadedCandidateIds,
+    configuredGoals: ws.hunt?.evidenceGoals ?? [],
+  });
   const { entitlement } = useMyEntitlements();
   // Owner-only + Pro. Pheno surfaces are owner-only via RLS, so the viewer owns
   // the hunt; the presentation gate is an active Pheno Tracker Pro plan. The
@@ -1155,6 +1184,17 @@ export default function PhenoHuntWorkspace() {
       readinessByPlant,
       provenance: "live",
       exportedAt: new Date().toISOString(),
+      evidencePacketsByPlant: evidencePackets.packets,
+      loadedCandidateCount: candidates.length,
+      // Scope honesty (Codex review): ws.totalCandidateCount is the total for
+      // the ACTIVE filters. With a filter narrowing the workspace, matching
+      // loaded==total would falsely claim a complete hunt — so any active
+      // filter forces export_scope=loaded_candidates by withholding the total.
+      totalCandidateCount: Object.values(ws.filters).some(
+        (v) => typeof v === "string" && v.trim().length > 0,
+      )
+        ? null
+        : ws.totalCandidateCount,
     });
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -1370,10 +1410,30 @@ export default function PhenoHuntWorkspace() {
                 type="button"
                 data-testid="workspace-export-csv"
                 onClick={onExportCsv}
-                className="ml-auto rounded border border-border bg-secondary px-2 py-1 text-xs font-medium"
+                // Gate export until the evidence-packet batch settles (Codex
+                // review): while status is "loading" the packet map is empty,
+                // so an export would mislabel every candidate as
+                // manual_evidence=unavailable even though the read is only
+                // pending. "error"/"disabled"/"ready" all export honestly.
+                disabled={evidencePackets.status === "loading"}
+                aria-describedby={
+                  evidencePackets.status === "loading" ? "workspace-export-csv-pending" : undefined
+                }
+                className="ml-auto rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
               >
-                Export loaded CSV
+                {evidencePackets.status === "loading"
+                  ? "Preparing evidence…"
+                  : "Export loaded CSV"}
               </button>
+              {evidencePackets.status === "loading" ? (
+                <span
+                  id="workspace-export-csv-pending"
+                  data-testid="workspace-export-csv-pending"
+                  className="text-xs text-muted-foreground"
+                >
+                  Evidence coverage is still loading — export enables once it settles.
+                </span>
+              ) : null}
             </div>
 
             <div
@@ -1434,6 +1494,8 @@ export default function PhenoHuntWorkspace() {
                     }
                     decision={ws.decisionsByPlant[c.candidateId]}
                     saving={ws.saving === c.candidateId}
+                    evidencePacket={evidencePackets.packets.get(c.candidateId) ?? null}
+                    evidenceStatus={evidencePackets.status}
                     selected={selectedIds.includes(c.candidateId)}
                     onToggleSelect={onToggleSelect}
                     canAssign={canAssign}

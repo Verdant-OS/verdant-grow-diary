@@ -18,14 +18,12 @@ import {
   VERDANT_TRUST,
   VERDANT_LOOP,
 } from "@/constants/verdantPositioningCopy";
-import {
-  VERDANT_SEO_LANDING_SECTIONS,
-  VERDANT_LANDING_FAQ,
-} from "@/constants/verdantSeoCopy";
-import {
-  buildFaqPageJsonLd,
-  safeJsonLdStringify,
-} from "@/lib/seoStructuredData";
+import { VERDANT_SEO_LANDING_SECTIONS, VERDANT_LANDING_FAQ } from "@/constants/verdantSeoCopy";
+import { buildFaqPageJsonLd, safeJsonLdStringify } from "@/lib/seoStructuredData";
+import { trackPricingEvent } from "@/lib/pricingAnalytics";
+import { buildAttributedPricingPath } from "@/lib/paidAcquisitionAttributionRules";
+
+const LANDING_PRICING_PATH = buildAttributedPricingPath({ source: "landing_page" });
 
 /**
  * Public landing page for https://verdantgrowdiary.com.
@@ -67,12 +65,20 @@ export default function Landing() {
     };
   }, []);
 
-
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
         <BrandLogo size="md" showText />
         <div className="flex items-center gap-2">
+          <Link
+            to={LANDING_PRICING_PATH}
+            data-testid="landing-pricing-cta-header"
+            onClick={() => trackPricingEvent("landing_pricing_cta_clicked", { source: "header" })}
+          >
+            <Button variant="ghost" size="sm">
+              Pricing
+            </Button>
+          </Link>
           {user ? (
             <Link to="/">
               <Button variant="outline" size="sm">
@@ -115,14 +121,27 @@ export default function Landing() {
               </Button>
             </Link>
           ) : (
-            <Link to="/auth">
+            <Link
+              to="/auth"
+              data-testid="landing-signup-cta-hero"
+              onClick={() => trackPricingEvent("landing_signup_cta_clicked", { source: "hero" })}
+            >
               <Button size="lg" className="font-semibold">
                 {VERDANT_HERO.primaryCtaLabel}
               </Button>
             </Link>
           )}
+          <Link
+            to={LANDING_PRICING_PATH}
+            data-testid="landing-pricing-cta-hero"
+            onClick={() => trackPricingEvent("landing_pricing_cta_clicked", { source: "hero" })}
+          >
+            <Button size="lg" variant="outline" className="font-semibold">
+              {VERDANT_HERO.pricingCtaLabel}
+            </Button>
+          </Link>
           <a href="#loop">
-            <Button size="lg" variant="outline">
+            <Button size="lg" variant="ghost">
               {VERDANT_HERO.secondaryCtaLabel}
             </Button>
           </a>
@@ -132,9 +151,7 @@ export default function Landing() {
             </Button>
           </Link>
         </div>
-        <p className="mt-6 text-xs text-muted-foreground">
-          {VERDANT_HERO.safetyLine}
-        </p>
+        <p className="mt-6 text-xs text-muted-foreground">{VERDANT_HERO.safetyLine}</p>
         {user && <LandingAuthedOnboardingBridge />}
       </section>
 
@@ -144,8 +161,7 @@ export default function Landing() {
           Why growers use Verdant
         </h2>
         <p className="text-center text-muted-foreground max-w-2xl mx-auto mb-10">
-          A Grow OS for serious growers who already own hardware and do not
-          want another controller.
+          A Grow OS for serious growers who already own hardware and do not want another controller.
         </p>
         <div className="grid gap-6 md:grid-cols-2">
           {VERDANT_VALUE_DRIVERS.map((card) => (
@@ -189,9 +205,7 @@ export default function Landing() {
             id={section.id}
             className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-6"
           >
-            <h2 className="font-display text-2xl md:text-3xl font-semibold">
-              {section.heading}
-            </h2>
+            <h2 className="font-display text-2xl md:text-3xl font-semibold">{section.heading}</h2>
             <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed">
               {section.body}
             </p>
@@ -212,14 +226,11 @@ export default function Landing() {
           {VERDANT_LANDING_FAQ.map((entry, i) => (
             <AccordionItem key={entry.question} value={`landing-faq-${i}`}>
               <AccordionTrigger>{entry.question}</AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
-                {entry.answer}
-              </AccordionContent>
+              <AccordionContent className="text-muted-foreground">{entry.answer}</AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
       </section>
-
 
       {/* Legacy anchor tokens preserved for downstream tests/consumers.
           These are the human-facing categories the loop delivers on. */}
@@ -249,8 +260,7 @@ export default function Landing() {
             ))}
           </ul>
           <p className="mt-5 text-xs text-muted-foreground">
-            No blind automation. The grower stays in control. Verdant cannot
-            touch your equipment.
+            No blind automation. The grower stays in control. Verdant cannot touch your equipment.
           </p>
         </div>
       </section>
@@ -261,9 +271,8 @@ export default function Landing() {
           Start with your real grow
         </h2>
         <p className="mt-3 text-muted-foreground">
-          Create a free account to begin logging your tents, plants, and
-          sensor readings. Verdant tracks real grow data — there is no
-          synthetic preview mode.
+          Create a free account to begin logging your tents, plants, and sensor readings. Verdant
+          tracks real grow data — there is no synthetic preview mode.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           {user ? (
@@ -271,10 +280,27 @@ export default function Landing() {
               <Button size="lg">Open dashboard</Button>
             </Link>
           ) : (
-            <Link to="/auth">
+            <Link
+              to="/auth"
+              data-testid="landing-signup-cta-final"
+              onClick={() =>
+                trackPricingEvent("landing_signup_cta_clicked", { source: "final_cta" })
+              }
+            >
               <Button size="lg">{VERDANT_HERO.primaryCtaLabel}</Button>
             </Link>
           )}
+          <Link
+            to={LANDING_PRICING_PATH}
+            data-testid="landing-pricing-cta-final"
+            onClick={() =>
+              trackPricingEvent("landing_pricing_cta_clicked", { source: "final_cta" })
+            }
+          >
+            <Button size="lg" variant="outline">
+              {VERDANT_HERO.pricingCtaLabel}
+            </Button>
+          </Link>
           <Link to="/auth">
             <Button size="lg" variant="outline">
               Sign in
@@ -285,11 +311,6 @@ export default function Landing() {
           <Link to="/hardware-integrations">
             <Button size="sm" variant="ghost">
               Hardware integrations
-            </Button>
-          </Link>
-          <Link to="/pricing">
-            <Button size="sm" variant="ghost">
-              Pricing
             </Button>
           </Link>
           <a href="#features">
@@ -323,13 +344,18 @@ export default function Landing() {
           </a>
         </p>
         <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-4 gap-y-1">
-          <Link to="/terms" className="hover:text-foreground">Terms of Service</Link>
-          <Link to="/privacy" className="hover:text-foreground">Privacy Policy</Link>
-          <Link to="/refund" className="hover:text-foreground">Refund Policy</Link>
+          <Link to="/terms" className="hover:text-foreground">
+            Terms of Service
+          </Link>
+          <Link to="/privacy" className="hover:text-foreground">
+            Privacy Policy
+          </Link>
+          <Link to="/refund" className="hover:text-foreground">
+            Refund Policy
+          </Link>
         </nav>
         <p className="text-xs">
-          Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as
-          Merchant of Record.
+          Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as Merchant of Record.
         </p>
       </footer>
     </main>

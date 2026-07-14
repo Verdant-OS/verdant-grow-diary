@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { resolvePricingPlanPreselect } from "@/lib/pricingPlanPreselect";
 import { usePageSeo } from "@/hooks/usePageSeo";
@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
 import PricingCard from "@/components/pricing/PricingCard";
+import SubscriberInterestForm from "@/components/SubscriberInterestForm";
 import {
   PRICING,
   AI_CREDIT_EXPLAINER,
@@ -34,10 +35,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { trackPricingEvent } from "@/lib/pricingAnalytics";
+import { trackPricingEvent, type PricingAnalyticsName } from "@/lib/pricingAnalytics";
 import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
-
+import type { SubscriberInterestPlanId } from "@/lib/subscriberInterestRules";
+import { resolvePaidInterestLeadSource } from "@/lib/paidAcquisitionAttributionRules";
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -74,12 +76,42 @@ export default function Pricing() {
   // Legacy `/billing/:plan` redirects here with this exact contract.
   // NEVER auto-opens Paddle — the grower must click a Pricing CTA.
   const preselect = resolvePricingPlanPreselect(searchParams.get("plan"));
-  const [billing, setBilling] = useState<BillingPeriod>(
-    preselect.billing ?? "annual",
+  const paidInterestLeadSource = resolvePaidInterestLeadSource(searchParams);
+  const [billing, setBilling] = useState<BillingPeriod>(preselect.billing ?? "annual");
+  const [interestPlan, setInterestPlan] = useState<SubscriberInterestPlanId>(
+    preselect.plan ?? (preselect.billing === "monthly" ? "pro_monthly" : "pro_annual"),
   );
-  const { openCheckout, loading: checkoutLoading } = usePaddleCheckout();
+  const lastCheckoutPlanRef = useRef<SubscriberInterestPlanId>(interestPlan);
+  const [recoveryRequested, setRecoveryRequested] = useState(false);
+  const recoveryRef = useRef<HTMLElement>(null);
+  const {
+    openCheckout,
+    loading: checkoutLoading,
+    unavailable: checkoutUnavailable,
+    unavailableMessage,
+    blockedReason,
+  } = usePaddleCheckout();
+  const checkoutRecoveryReason = blockedReason ?? unavailableMessage;
 
-
+  function handlePaidIntent(
+    planId: SubscriberInterestPlanId,
+    eventName: PricingAnalyticsName,
+    source: string,
+  ) {
+    lastCheckoutPlanRef.current = planId;
+    setInterestPlan(planId);
+    setRecoveryRequested(true);
+    trackPricingEvent(eventName, { source });
+    if (checkoutRecoveryReason) {
+      trackPricingEvent("pricing_checkout_blocked", {
+        plan: planId,
+        source,
+        reason: blockedReason ? "runtime_failure" : "environment_unavailable",
+      });
+      return;
+    }
+    void openCheckout({ priceId: planId });
+  }
   usePageSeo({
     title: "Pricing — Free, Pro & Founder Lifetime | Verdant Grow Diary",
     description:
@@ -92,14 +124,49 @@ export default function Pricing() {
   }, []);
 
   useEffect(() => {
+    if (!blockedReason) return;
+    trackPricingEvent("pricing_checkout_blocked", {
+      plan: lastCheckoutPlanRef.current,
+      reason: "runtime_failure",
+    });
+  }, [blockedReason]);
+
+  useEffect(() => {
+    if (!checkoutRecoveryReason || !recoveryRequested) return;
+    recoveryRef.current?.focus();
+    recoveryRef.current?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  }, [checkoutRecoveryReason, recoveryRequested]);
+
+  useEffect(() => {
     const faqEntries: Array<[string, string]> = [
-      ["Who owns the grow data I put into Verdant?", "You do. Your grow logs, photos, and sensor snapshots are yours. Verdant does not sell your data and does not share it with advertisers. Pro includes advanced exports so you can take your full grow history with you whenever you want."],
-      ["Is the Free tier really free?", "Yes. Plant profiles, the basic grow diary, photo logs, manual notes, the basic timeline, and manual sensor entries are all included on Free. You can run a real grow on Free without paying."],
-      ["What do I actually get with Pro?", "Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot history, longer grow history, better timeline filtering, priority support, and early access to advanced grow reports."],
-      ["How does the Founder Lifetime Offer work?", `$${FOUNDER_LIFETIME_PRICE_USD} once. You get full Pro access for the life of the product. This is a limited early-supporter offer, limited to the first ${FOUNDER_LIFETIME_LIMIT} buyers.`],
-      ["Do I need specific hardware?", "No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge."],
-      ["Does Verdant control my equipment or grow for me?", "No. Verdant does not control fans, lights, pumps, heaters, or other equipment. AI insights are suggestions only, and every Action Queue item is grower-approved."],
-      ["Can I cancel anytime?", "Yes. Pro Monthly and Pro Annual can be canceled at any time. Your grow history stays on your account with read-only access to your logs."],
+      [
+        "Who owns the grow data I put into Verdant?",
+        "You do. Your grow logs, photos, and sensor snapshots are yours. Verdant does not sell your data and does not share it with advertisers. Pro includes advanced exports so you can take your full grow history with you whenever you want.",
+      ],
+      [
+        "Is the Free tier really free?",
+        "Yes. Plant profiles, the basic grow diary, photo logs, manual notes, the basic timeline, and manual sensor entries are all included on Free. You can run a real grow on Free without paying.",
+      ],
+      [
+        "What do I actually get with Pro?",
+        "Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot history, longer grow history, better timeline filtering, priority support, and early access to advanced grow reports.",
+      ],
+      [
+        "How does the Founder Lifetime Offer work?",
+        `$${FOUNDER_LIFETIME_PRICE_USD} once. You get full Pro access for the life of the product. This is a limited early-supporter offer, limited to the first ${FOUNDER_LIFETIME_LIMIT} buyers.`,
+      ],
+      [
+        "Do I need specific hardware?",
+        "No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge.",
+      ],
+      [
+        "Does Verdant control my equipment or grow for me?",
+        "No. Verdant does not control fans, lights, pumps, heaters, or other equipment. AI insights are suggestions only, and every Action Queue item is grower-approved.",
+      ],
+      [
+        "Can I cancel anytime?",
+        "Yes. Pro Monthly and Pro Annual can be canceled at any time. Your grow history stays on your account with read-only access to your logs.",
+      ],
       ...VERDANT_PRICING_FAQ_ADDITIONS.map(
         (entry) => [entry.question, entry.answer] as [string, string],
       ),
@@ -119,11 +186,26 @@ export default function Pricing() {
         {
           "@type": "Product",
           name: "Verdant Pro",
-          description: "Cloud sync, multi-tent grow memory, 100 AI Doctor credits/month, advanced exports, and sensor snapshot history.",
+          description:
+            "Cloud sync, multi-tent grow memory, 100 AI Doctor credits/month, advanced exports, and sensor snapshot history.",
           brand: { "@type": "Brand", name: "Verdant Grow Diary" },
           offers: [
-            { "@type": "Offer", price: String(PRO_MONTHLY_PRICE_USD), priceCurrency: "USD", url: "https://verdantgrowdiary.com/pricing", availability: "https://schema.org/InStock", category: "Monthly subscription" },
-            { "@type": "Offer", price: String(PRO_ANNUAL_PRICE_USD), priceCurrency: "USD", url: "https://verdantgrowdiary.com/pricing", availability: "https://schema.org/InStock", category: "Annual subscription" },
+            {
+              "@type": "Offer",
+              price: String(PRO_MONTHLY_PRICE_USD),
+              priceCurrency: "USD",
+              url: "https://verdantgrowdiary.com/pricing",
+              availability: "https://schema.org/InStock",
+              category: "Monthly subscription",
+            },
+            {
+              "@type": "Offer",
+              price: String(PRO_ANNUAL_PRICE_USD),
+              priceCurrency: "USD",
+              url: "https://verdantgrowdiary.com/pricing",
+              availability: "https://schema.org/InStock",
+              category: "Annual subscription",
+            },
           ],
         },
         {
@@ -155,7 +237,6 @@ export default function Pricing() {
       for (const n of nodes) n.remove();
     };
   }, []);
-
 
   const proPrice = billing === "annual" ? `$${PRO_ANNUAL_PRICE_USD}` : `$${PRO_MONTHLY_PRICE_USD}`;
   const proCadence = billing === "annual" ? "/ year" : "/ month";
@@ -215,13 +296,12 @@ export default function Pricing() {
           role="switch"
           aria-checked={billing === "annual"}
           aria-label="Toggle annual billing"
-          onClick={() =>
-            setBilling((prev) => {
-              const next = prev === "annual" ? "monthly" : "annual";
-              trackPricingEvent("pricing_billing_toggle", { period: next });
-              return next;
-            })
-          }
+          onClick={() => {
+            const next = billing === "annual" ? "monthly" : "annual";
+            setBilling(next);
+            setInterestPlan(next === "annual" ? "pro_annual" : "pro_monthly");
+            trackPricingEvent("pricing_billing_toggle", { period: next });
+          }}
           className="relative inline-flex h-7 w-12 items-center rounded-full border border-border/60 bg-secondary transition-colors"
         >
           <span
@@ -284,23 +364,27 @@ export default function Pricing() {
               className="w-full"
               disabled={checkoutLoading}
               data-testid={
-                billing === "annual"
-                  ? "pricing-cta-pro-annual"
-                  : "pricing-cta-pro-monthly"
+                billing === "annual" ? "pricing-cta-pro-annual" : "pricing-cta-pro-monthly"
               }
               onClick={() => {
-                const priceId =
-                  billing === "annual" ? "pro_annual" : "pro_monthly";
-                trackPricingEvent(
+                const priceId = billing === "annual" ? "pro_annual" : "pro_monthly";
+                handlePaidIntent(
+                  priceId,
                   billing === "annual"
                     ? "pricing_cta_pro_annual_clicked"
                     : "pricing_cta_pro_monthly_clicked",
+                  "plan_card",
                 );
-                void openCheckout({ priceId });
               }}
             >
-              Upgrade to Pro — {proPrice}
-              {proCadence}
+              {checkoutRecoveryReason ? (
+                "Join the Pro launch list"
+              ) : (
+                <>
+                  Upgrade to Pro — {proPrice}
+                  {proCadence}
+                </>
+              )}
             </Button>
           }
         />
@@ -323,16 +407,44 @@ export default function Pricing() {
               disabled={checkoutLoading}
               data-testid="pricing-cta-founder-lifetime"
               onClick={() => {
-                trackPricingEvent("pricing_cta_founder_lifetime_clicked");
-                void openCheckout({ priceId: "founder_lifetime" });
+                handlePaidIntent(
+                  "founder_lifetime",
+                  "pricing_cta_founder_lifetime_clicked",
+                  "plan_card",
+                );
               }}
             >
-              Claim Founder Lifetime — ${PRICING.founder.price}
+              {checkoutRecoveryReason
+                ? "Join the Founder launch list"
+                : `Claim Founder Lifetime — $${PRICING.founder.price}`}
             </Button>
           }
         />
-
       </section>
+
+      {checkoutRecoveryReason && (
+        <section
+          ref={recoveryRef}
+          id="subscriber-interest"
+          tabIndex={-1}
+          aria-label="Paid plan launch list"
+          data-testid="pricing-checkout-recovery"
+          className="px-6 pb-12 max-w-3xl mx-auto"
+        >
+          <div className="rounded-2xl border border-primary/35 bg-card/40 p-6 md:p-8">
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+              Paid plan update
+            </p>
+            <h2 className="mt-2 font-display text-2xl font-semibold">
+              Checkout isn't ready here yet. Get one launch email.
+            </h2>
+            <p className="mt-3 text-sm text-muted-foreground">{checkoutRecoveryReason}</p>
+            <div className="mt-5">
+              <SubscriberInterestForm planId={interestPlan} leadSource={paidInterestLeadSource} />
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* AI Credit explainer */}
       <section className="px-6 pb-12 max-w-4xl mx-auto">
@@ -422,21 +534,32 @@ export default function Pricing() {
               countdown gimmicks — when the first {FOUNDER_LIFETIME_LIMIT} are claimed, the offer
               ends.
             </p>
+            <Link
+              to="/founder"
+              className="mt-3 inline-flex text-sm font-medium text-primary underline underline-offset-4"
+              onClick={() =>
+                trackPricingEvent("pricing_founder_details_clicked", {
+                  source: "highlight_band",
+                })
+              }
+            >
+              See exactly what Founder includes
+            </Link>
           </div>
           <Button
             size="lg"
             className="shrink-0"
             disabled={checkoutLoading}
             onClick={() => {
-              trackPricingEvent("pricing_cta_founder_lifetime_clicked", {
-                source: "highlight_band",
-              });
-              void openCheckout({ priceId: "founder_lifetime" });
+              handlePaidIntent(
+                "founder_lifetime",
+                "pricing_cta_founder_lifetime_clicked",
+                "highlight_band",
+              );
             }}
           >
-            Claim Founder Lifetime
+            {checkoutRecoveryReason ? "Join the Founder launch list" : "Claim Founder Lifetime"}
           </Button>
-
         </div>
       </section>
 
@@ -633,9 +756,7 @@ export default function Pricing() {
               data-testid={`pricing-faq-grower-${i}`}
             >
               <AccordionTrigger>{entry.question}</AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
-                {entry.answer}
-              </AccordionContent>
+              <AccordionContent className="text-muted-foreground">{entry.answer}</AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
@@ -664,15 +785,11 @@ export default function Pricing() {
             size="lg"
             disabled={checkoutLoading}
             onClick={() => {
-              trackPricingEvent("pricing_cta_pro_monthly_clicked", {
-                source: "footer",
-              });
-              void openCheckout({ priceId: "pro_monthly" });
+              handlePaidIntent("pro_monthly", "pricing_cta_pro_monthly_clicked", "footer");
             }}
           >
-            Upgrade to Pro
+            {checkoutRecoveryReason ? "Join the Pro launch list" : "Upgrade to Pro"}
           </Button>
-
         </div>
       </section>
 
@@ -683,17 +800,21 @@ export default function Pricing() {
             verdantgrowdiary.com
           </a>
         </p>
-        <p>
-          Software only. We do not sell cannabis, seeds, or cultivation equipment.
-        </p>
+        <p>Software only. We do not sell cannabis, seeds, or cultivation equipment.</p>
         <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-4 gap-y-1">
-          <Link to="/terms" className="hover:text-foreground">Terms of Service</Link>
-          <Link to="/privacy" className="hover:text-foreground">Privacy Policy</Link>
-          <Link to="/refund" className="hover:text-foreground">Refund Policy</Link>
+          <Link to="/terms" className="hover:text-foreground">
+            Terms of Service
+          </Link>
+          <Link to="/privacy" className="hover:text-foreground">
+            Privacy Policy
+          </Link>
+          <Link to="/refund" className="hover:text-foreground">
+            Refund Policy
+          </Link>
         </nav>
         <p className="text-xs">
-          Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as
-          Merchant of Record. 30-day money-back guarantee.
+          Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as Merchant of Record.
+          30-day money-back guarantee.
         </p>
       </footer>
     </main>

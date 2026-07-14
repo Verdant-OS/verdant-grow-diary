@@ -67,6 +67,7 @@ const OperatorBillingSubscriptionUpdateAudit = lazy(
 const OperatorBillingEntitlementResolutionAudit = lazy(
   () => import("./pages/OperatorBillingEntitlementResolutionAudit"),
 );
+const OperatorSubscriberGrowth = lazy(() => import("./pages/OperatorSubscriberGrowth"));
 
 const EcowittBridgeStatus = lazy(() => import("./pages/EcowittBridgeStatus"));
 const EcowittBridgeDebug = lazy(() => import("./pages/EcowittBridgeDebug"));
@@ -81,6 +82,7 @@ const HardwareIntegrations = lazy(() => import("./pages/HardwareIntegrations"));
 const CreatorBeta = lazy(() => import("./pages/CreatorBeta"));
 const BreederBeta = lazy(() => import("./pages/BreederBeta"));
 const Pricing = lazy(() => import("./pages/Pricing"));
+const Founder = lazy(() => import("./pages/Founder"));
 const Upgrade = lazy(() => import("./pages/Upgrade"));
 const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
@@ -184,6 +186,7 @@ const App = () => (
                   <Route path="/creator-beta" element={<CreatorBeta />} />
                   <Route path="/breeder-beta" element={<BreederBeta />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/founder" element={<Founder />} />
                   <Route path="/upgrade" element={<Upgrade />} />
                   <Route path="/guides" element={<GuidesIndex />} />
                   <Route path="/guides/:slug" element={<GuidePage />} />
@@ -341,6 +344,10 @@ const App = () => (
                       <Route
                         path="/operator/billing-entitlement-resolution"
                         element={<OperatorBillingEntitlementResolutionAudit />}
+                      />
+                      <Route
+                        path="/operator/subscriber-growth"
+                        element={<OperatorSubscriberGrowth />}
                       />
                       <Route
                         path="/operator/one-tent-proof-record"

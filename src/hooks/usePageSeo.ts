@@ -10,8 +10,9 @@ import { useEffect } from "react";
  *
  * NOTE: this does NOT reach non-JS consumers (facebookexternalhit, Twitterbot,
  * LinkedIn/Slack link scrapers, and first-pass HTML crawlers). Fixing social
- * previews for those requires build-time prerendering of the public routes,
- * which is deferred — see the SEO plan. Zero-dependency by design.
+ * previews for those requires build-time route documents. The Founder route
+ * now has one; other public routes still use the generic entry document.
+ * Zero-dependency by design.
  */
 const SITE_ORIGIN = "https://verdantgrowdiary.com";
 const SITE_NAME = "Verdant Grow Diary";

@@ -1,0 +1,56 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  buildAttributedPricingPath,
+  buildFounderPricingPath,
+  resolvePaidAcquisitionSource,
+  resolvePaidInterestLeadSource,
+} from "@/lib/paidAcquisitionAttributionRules";
+
+describe("paid acquisition attribution rules", () => {
+  it.each([
+    ["landing_page", "owned", "paid_launch", "pricing_interest_landing"],
+    ["founder_page", "owned", "founder_launch", "pricing_interest_founder_page"],
+    ["founder_share", "referral", "founder_launch", "pricing_interest_founder_share"],
+    ["pricing_interest_share", "referral", "paid_launch", "pricing_interest_referral"],
+  ] as const)(
+    "round-trips the fixed %s attribution tuple",
+    (source, medium, campaign, leadSource) => {
+      const path = buildAttributedPricingPath({ source, planId: "pro_annual" });
+      const url = new URL(path, "https://verdantgrowdiary.com");
+      expect(Object.fromEntries(url.searchParams)).toEqual({
+        plan: "pro_annual",
+        utm_source: source,
+        utm_medium: medium,
+        utm_campaign: campaign,
+      });
+      expect(resolvePaidAcquisitionSource(url.searchParams)).toBe(source);
+      expect(resolvePaidInterestLeadSource(url.searchParams)).toBe(leadSource);
+    },
+  );
+
+  it("rejects raw, partial, mismatched, and PII-bearing query attribution", () => {
+    for (const query of [
+      "utm_source=reddit&utm_medium=referral&utm_campaign=paid_launch",
+      "utm_source=founder_share",
+      "utm_source=founder_share&utm_medium=owned&utm_campaign=founder_launch",
+      "utm_source=grower%40example.com&utm_medium=referral&utm_campaign=paid_launch",
+      "email=grower%40example.com&user_id=123&token=secret",
+    ]) {
+      expect(resolvePaidAcquisitionSource(query)).toBeNull();
+      expect(resolvePaidInterestLeadSource(query)).toBe("pricing_interest");
+    }
+  });
+
+  it("preserves a valid Founder share across the Founder-to-Pricing hop", () => {
+    const shared = buildFounderPricingPath(
+      "utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch",
+    );
+    expect(shared).toBe(
+      "/pricing?plan=founder_lifetime&utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch",
+    );
+    expect(buildFounderPricingPath("utm_source=evil")).toBe(
+      "/pricing?plan=founder_lifetime&utm_source=founder_page&utm_medium=owned&utm_campaign=founder_launch",
+    );
+  });
+});

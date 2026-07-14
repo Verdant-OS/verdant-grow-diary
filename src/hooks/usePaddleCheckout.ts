@@ -10,11 +10,7 @@ import { useAuth } from "@/store/auth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
-import {
-  consumePlanIntent,
-  isKnownPlanIntent,
-  savePlanIntent,
-} from "@/lib/checkoutPlanIntent";
+import { consumePlanIntent, isKnownPlanIntent, savePlanIntent } from "@/lib/checkoutPlanIntent";
 import { beginCheckoutSession } from "@/lib/checkoutOverlaySession";
 
 export interface OpenCheckoutOptions {
@@ -38,14 +34,17 @@ export interface UsePaddleCheckoutResult {
    */
   unavailableMessage: string | null;
   /**
-   * Set when `openCheckout` was called against an unavailable environment
-   * (or when Paddle initialization threw `PaddleCheckoutUnavailableError`).
-   * Callers can render an inline calm state instead of crashing. Cleared
+   * Set when checkout cannot open, including unavailable environments,
+   * resolver/network failures, and Paddle initialization errors. Callers can
+   * render an inline recovery path instead of losing the paid intent. Cleared
    * by `dismissBlocked()`.
    */
   blockedReason: string | null;
   dismissBlocked: () => void;
 }
+
+export const CHECKOUT_RECOVERY_MESSAGE =
+  "Checkout couldn't open. You can leave your email for one availability notice instead.";
 
 /**
  * Default post-checkout landing. When the current page carries a sanitized
@@ -102,7 +101,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
     // resolvePaddleCheckout reads module-scope + window.location.hostname;
     // both are stable across renders in production. This memo is a
     // per-render read, not a subscription — that is intentional.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     [],
   );
   const unavailableMessage = useMemo(
@@ -128,8 +127,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         if (isKnownPlanIntent(options.priceId)) {
           savePlanIntent(options.priceId);
         }
-        const back =
-          `${window.location.pathname}${window.location.search}` || "/pricing";
+        const back = `${window.location.pathname}${window.location.search}` || "/pricing";
         navigate(`/auth?redirectTo=${encodeURIComponent(back)}`);
         return;
       }
@@ -167,10 +165,10 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         if (err instanceof PaddleCheckoutUnavailableError) {
           setBlockedReason(err.message);
         } else {
+          setBlockedReason(CHECKOUT_RECOVERY_MESSAGE);
           toast({
             title: "Checkout unavailable",
-            description:
-              err instanceof Error ? err.message : "Please try again in a moment.",
+            description: err instanceof Error ? err.message : "Please try again in a moment.",
             variant: "destructive",
           });
         }

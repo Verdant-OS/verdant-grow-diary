@@ -66,8 +66,16 @@ export interface AppRouteEntry {
 export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "*", access: "public", description: "NotFound catch-all." },
   { path: "/", access: "auth", description: "Dashboard." },
-  { path: "/.lovable/oauth/consent", access: "public", description: "OAuth consent screen." },
-  { path: "/account/preferences", access: "auth" },
+  {
+    path: "/.lovable/oauth/consent",
+    access: "public",
+    description: "Lovable MCP OAuth consent page (public by protocol requirement).",
+  },
+  {
+    path: "/account/preferences",
+    access: "auth",
+    description: "Grower account preferences.",
+  },
   { path: "/action-queue", access: "redirect", description: "→ /actions" },
   { path: "/actions", access: "auth" },
   { path: "/actions/:actionId", access: "auth" },
@@ -110,8 +118,19 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },
   { path: "/features", access: "redirect", description: "→ /welcome" },
-  { path: "/glossary", access: "public" },
-  { path: "/grow-lineage", access: "auth" },
+  {
+    path: "/founder",
+    access: "public",
+    description: "Public Founder Lifetime acquisition and offer explainer.",
+  },
+  { path: "/glossary", access: "public", description: "Public grower glossary (SEO)." },
+  {
+    path: "/grow-lineage",
+    access: "auth",
+    label: "Lineage Repair",
+    description:
+      "Grower-facing repair tool for reassigning tents to grows (owner-scoped, RLS-protected).",
+  },
   { path: "/grow-room", access: "redirect", description: "→ /" },
   { path: "/grows", access: "auth" },
   { path: "/grows/:growId", access: "auth" },
@@ -243,7 +262,14 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/operator/release-readiness",
     access: "operator",
-    description: "Operator release readiness checklist (read-only).",
+    description:
+      "Read-only release readiness / validation status snapshot (static/manual, no live CI feed).",
+  },
+  {
+    path: "/operator/subscriber-growth",
+    access: "operator",
+    description:
+      "Operator subscriber-growth goal snapshot from authoritative billing counts (read-only).",
   },
   {
     path: "/pheno-comparison",

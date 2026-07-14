@@ -21,7 +21,10 @@ import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
 export default function AppShell() {
   const { user, loading } = useAuth();
   // Protected-route boundary: re-validate session against the auth server.
-  useRequireAuth("/auth");
+  // Keep both session checks on the same signed-out destination. Sending the
+  // server revalidation to /auth while the shell sent cached-session misses to
+  // /welcome created a race at the public root and bypassed the landing page.
+  useRequireAuth("/welcome");
   // Real persisted alerts (open only). RLS-scoped to the signed-in user.
   // Replaces the prior mock badge to remove the demo-vs-live mismatch.
   // Gated on a resolved session: an unauthenticated load (about to redirect

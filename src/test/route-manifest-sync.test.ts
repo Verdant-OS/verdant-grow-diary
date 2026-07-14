@@ -51,10 +51,7 @@ describe("Operator route surface", () => {
   it("every mounted /operator/* route is gated as operator or internal", () => {
     const mountedOps = new Set(getMountedOperatorPaths());
     const offenders = APP_ROUTES.filter(
-      (r) =>
-        mountedOps.has(r.path) &&
-        r.access !== "operator" &&
-        r.access !== "internal",
+      (r) => mountedOps.has(r.path) && r.access !== "operator" && r.access !== "internal",
     ).map((r) => ({ path: r.path, access: r.access }));
     expect(offenders).toEqual([]);
   });
@@ -62,9 +59,7 @@ describe("Operator route surface", () => {
   it("explicitly covers /operator/one-tent-proof-record", () => {
     const mounted = extractMountedAppRoutePaths();
     expect(mounted).toContain("/operator/one-tent-proof-record");
-    const entry = APP_ROUTES.find(
-      (r) => r.path === "/operator/one-tent-proof-record",
-    );
+    const entry = APP_ROUTES.find((r) => r.path === "/operator/one-tent-proof-record");
     expect(entry).toBeDefined();
     expect(entry?.access).toBe("operator");
   });
@@ -86,6 +81,7 @@ describe("Public SEO route surface", () => {
    */
   const PUBLIC_SEO_PATH_PATTERNS: ReadonlyArray<RegExp> = [
     /^\/guides(\/.*)?$/,
+    /^\/founder$/,
     /^\/welcome$/,
     /^\/pricing$/,
     /^\/hardware-integrations$/,
@@ -100,9 +96,7 @@ describe("Public SEO route surface", () => {
   it("every mounted public SEO route exists in the manifest", () => {
     const mounted = extractMountedAppRoutePaths();
     const manifestSet = new Set(APP_ROUTES.map((r) => r.path));
-    const missing = mounted
-      .filter(isPublicSeoPath)
-      .filter((p) => !manifestSet.has(p));
+    const missing = mounted.filter(isPublicSeoPath).filter((p) => !manifestSet.has(p));
     expect(missing).toEqual([]);
   });
 
@@ -121,4 +115,3 @@ describe("Public SEO route surface", () => {
     }
   });
 });
-

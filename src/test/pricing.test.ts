@@ -344,8 +344,9 @@ describe("Safety: no private data on public page", () => {
 // for the replacement coverage.
 
 describe("Landing links to /pricing", () => {
-  it("Landing page links to the public pricing route", () => {
-    expect(LANDING).toMatch(/to="\/pricing"/);
+  it("Landing page links to the centralized attributed public pricing route", () => {
+    expect(LANDING).toContain('buildAttributedPricingPath({ source: "landing_page" })');
+    expect(LANDING).toContain("to={LANDING_PRICING_PATH}");
   });
 });
 
@@ -399,7 +400,17 @@ describe("Pricing manifest snapshot (narrow)", () => {
     // Intentionally narrow: only pricing / public billing-relevant routes so
     // unrelated route changes do not create noisy snapshot diffs here.
     expect(getPricingManifestSnapshot()).toEqual([
-      { path: "/billing/:plan", access: "redirect", description: "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout)." },
+      {
+        path: "/billing/:plan",
+        access: "redirect",
+        description:
+          "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout).",
+      },
+      {
+        path: "/founder",
+        access: "public",
+        description: "Public Founder Lifetime acquisition and offer explainer.",
+      },
       { path: "/hardware-integrations", access: "public" },
       { path: "/pricing", access: "public" },
       { path: "/welcome", access: "public" },

@@ -20,9 +20,7 @@ import type { ReactNode } from "react";
 
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>(
-    "react-router-dom",
-  );
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return { ...actual, useNavigate: () => navigateMock };
 });
 
@@ -87,8 +85,7 @@ beforeEach(() => {
 describe("usePaddleCheckout — Slice B calm-blocked behavior", () => {
   it("exposes unavailable=true and the blocking message when environment is unavailable", () => {
     paddleState.env = "unavailable";
-    paddleState.message =
-      "Checkout disabled: localhost requires a Paddle sandbox token.";
+    paddleState.message = "Checkout disabled: localhost requires a Paddle sandbox token.";
 
     const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
 
@@ -101,8 +98,7 @@ describe("usePaddleCheckout — Slice B calm-blocked behavior", () => {
 
   it("refuses to open checkout when unavailable — no /auth redirect, no toast, calm blockedReason", async () => {
     paddleState.env = "unavailable";
-    paddleState.message =
-      "Checkout disabled: localhost requires a Paddle sandbox token.";
+    paddleState.message = "Checkout disabled: localhost requires a Paddle sandbox token.";
 
     const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
 
@@ -152,7 +148,7 @@ describe("usePaddleCheckout — Slice B calm-blocked behavior", () => {
     );
   });
 
-  it("non-fail-closed errors still surface via destructive toast (regression guard)", async () => {
+  it("non-fail-closed errors surface a toast and a recoverable paid-intent path", async () => {
     paddleState.env = "sandbox";
     paddleState.initShouldThrow = "generic";
 
@@ -166,7 +162,9 @@ describe("usePaddleCheckout — Slice B calm-blocked behavior", () => {
     const call = toastMock.mock.calls[0][0];
     expect(call.variant).toBe("destructive");
     expect(call.title).toBe("Checkout unavailable");
-    expect(result.current.blockedReason).toBeNull();
+    expect(result.current.blockedReason).toBe(
+      "Checkout couldn't open. You can leave your email for one availability notice instead.",
+    );
   });
 
   it("available sandbox environment opens Paddle overlay and does not enter blocked state", async () => {

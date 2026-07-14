@@ -1,61 +1,105 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 import { gatewayFetch, type PaddleEnv } from '../_shared/paddle.ts';
+import { resolveServerBillingEnvironment } from '../_shared/unionEntitlementLookup.ts';
 
 /**
- * Resolve a human-readable price ID (external_id) to its Paddle internal
- * price ID. Read-only. No DB writes. Safe.
+ * Resolve a paid plan id to its public Paddle price ID. Read-only; no DB
+ * writes.
+ *
+ * Hardened contract (paid-launch gate):
+ *  - Only the paid plan allowlist is accepted: pro_monthly, pro_annual,
+ *    founder_lifetime. Anything else fails closed with a sanitized error.
+ *  - Requires a verified signed-in user (auth.getUser on the caller's JWT).
+ *    Anonymous price scraping through our gateway credentials is not a
+ *    supported surface.
+ *  - Environment selection is SERVER-controlled via
+ *    resolveServerBillingEnvironment (PAYMENTS_ENVIRONMENT, else key
+ *    presence, else sandbox). A browser-supplied `environment` field is
+ *    ignored entirely.
+ *  - Returns ONLY the resolved public Paddle price id ({ paddleId }) — the
+ *    same response contract the checkout client already consumes.
+ *  - Errors are sanitized constants. No upstream error text, no gateway
+ *    details, no key material, no echo of unexpected input.
  */
+
+/** The only plans a price may be resolved for. Keep in lockstep with the
+ * client planCatalog and the reconciliation RPC's plan checks. */
+const PAID_PLAN_ALLOWLIST: ReadonlySet<string> = new Set([
+  'pro_monthly',
+  'pro_annual',
+  'founder_lifetime',
+]);
+
+function json(status: number, body: Record<string, unknown>): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+  if (req.method !== 'POST') {
+    return json(405, { error: 'method_not_allowed' });
+  }
 
   try {
-    const body = await req.json().catch(() => ({}));
-    const priceId = typeof body?.priceId === 'string' ? body.priceId : '';
-    const environment: PaddleEnv =
-      body?.environment === 'live' ? 'live' : 'sandbox';
-
-    if (!priceId || !/^[a-z0-9_]{1,64}$/.test(priceId)) {
-      return new Response(
-        JSON.stringify({ error: 'priceId is required (snake_case)' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      );
+    // 1. Verified signed-in user. The anon key + caller Authorization header
+    //    means auth.getUser() re-validates the JWT against the auth server;
+    //    no service_role anywhere in this function.
+    const authHeader = req.headers.get('Authorization') ?? '';
+    if (!authHeader.startsWith('Bearer ')) {
+      return json(401, { error: 'auth_required' });
     }
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return json(500, { error: 'price_resolution_unavailable' });
+    }
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false },
+    });
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) {
+      return json(401, { error: 'auth_required' });
+    }
+
+    // 2. Plan allowlist. The request field keeps its legacy name (priceId)
+    //    so the existing checkout client works unchanged, but only the three
+    //    paid plan ids pass; everything else fails closed.
+    const body = await req.json().catch(() => ({}));
+    const requested = typeof body?.priceId === 'string' ? body.priceId.trim() : '';
+    if (!PAID_PLAN_ALLOWLIST.has(requested)) {
+      return json(400, { error: 'unknown_plan' });
+    }
+
+    // 3. Server-controlled environment. Any client-supplied environment
+    //    field is ignored — the server decides sandbox vs live.
+    const environment: PaddleEnv = resolveServerBillingEnvironment();
 
     const response = await gatewayFetch(
       environment,
-      `/prices?external_id=${encodeURIComponent(priceId)}`,
+      `/prices?external_id=${encodeURIComponent(requested)}`,
     );
-    const data = await response.json();
+    if (!response.ok) {
+      // Upstream/gateway problems (including an environment with no
+      // configured credentials) fail closed without leaking detail.
+      return json(502, { error: 'price_resolution_unavailable' });
+    }
+    const data = await response.json().catch(() => null);
     const paddleId = data?.data?.[0]?.id;
 
-    if (!paddleId) {
-      return new Response(
-        JSON.stringify({ error: `Price not found: ${priceId}` }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      );
+    if (typeof paddleId !== 'string' || paddleId.length === 0) {
+      return json(404, { error: 'price_not_configured' });
     }
 
-    return new Response(JSON.stringify({ paddleId }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  } catch (err) {
-    return new Response(
-      JSON.stringify({
-        error: err instanceof Error ? err.message : 'Unknown error',
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      },
-    );
+    return json(200, { paddleId });
+  } catch (_err) {
+    // Never surface upstream error text, stack, or configuration detail.
+    return json(500, { error: 'price_resolution_unavailable' });
   }
 });

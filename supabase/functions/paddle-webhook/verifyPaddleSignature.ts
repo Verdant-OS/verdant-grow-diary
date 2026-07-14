@@ -12,20 +12,30 @@
  *  - Secret is server-only; never logged, never returned in errors.
  */
 
-export type PaddleSignatureParts = { ts: string; h1: string };
+export type PaddleSignatureParts = {
+  ts: string;
+  /** Last h1 value (back-compat with earlier callers/tests). */
+  h1: string;
+  /**
+   * ALL h1 values in header order. Paddle sends two h1 entries during
+   * webhook-secret rotation; verification passes when ANY matches, so
+   * rotation is zero-downtime.
+   */
+  h1s: readonly string[];
+};
 
 export function parsePaddleSignature(header: string): PaddleSignatureParts | null {
   if (typeof header !== "string" || header.length === 0) return null;
   const parts = header.split(";").map((s) => s.trim());
   let ts = "";
-  let h1 = "";
+  const h1s: string[] = [];
   for (const p of parts) {
     const [k, v] = p.split("=");
     if (k === "ts") ts = v ?? "";
-    else if (k === "h1") h1 = v ?? "";
+    else if (k === "h1" && v) h1s.push(v);
   }
-  if (!ts || !h1) return null;
-  return { ts, h1 };
+  if (!ts || h1s.length === 0) return null;
+  return { ts, h1: h1s[h1s.length - 1], h1s };
 }
 
 export function constantTimeEqual(a: string, b: string): boolean {
@@ -125,8 +135,15 @@ export async function verifyPaddleWebhookSignature(
     }
   }
 
+  // Rotation-safe: compare against EVERY provided h1 (constant-time each);
+  // any match verifies. No early exit on match order — all candidates are
+  // compared so timing does not reveal which slot matched.
   const expected = await hmacSha256Hex(secret, `${parsed.ts}:${rawBody}`);
-  if (!constantTimeEqual(expected, parsed.h1)) {
+  let anyMatch = false;
+  for (const candidate of parsed.h1s) {
+    if (constantTimeEqual(expected, candidate)) anyMatch = true;
+  }
+  if (!anyMatch) {
     return { ok: false, reason: "signature_mismatch" };
   }
   return { ok: true };

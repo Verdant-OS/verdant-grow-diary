@@ -8,11 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
-import {
-  AuthInlineMessage,
-  AuthPasswordField,
-  AuthTextField,
-} from "@/components/AuthFormField";
+import { AuthInlineMessage, AuthPasswordField, AuthTextField } from "@/components/AuthFormField";
 import {
   validateResetEmail,
   buildResetRedirectUrl,
@@ -28,7 +24,6 @@ import {
   canResendResetEmail,
   resetEmailCooldownRemainingMs,
 } from "@/lib/passwordResetResendRules";
-
 
 import {
   sanitizeAuthError,
@@ -136,7 +131,9 @@ export default function Auth() {
   // Same one-second tick for the "Resend reset email" cooldown.
   useEffect(() => {
     if (resetResendLastAttemptAt == null) return;
-    if (canResendResetEmail(Date.now(), resetResendLastAttemptAt, DEFAULT_RESET_EMAIL_COOLDOWN_MS)) {
+    if (
+      canResendResetEmail(Date.now(), resetResendLastAttemptAt, DEFAULT_RESET_EMAIL_COOLDOWN_MS)
+    ) {
       return;
     }
     const id = window.setInterval(() => {
@@ -178,13 +175,9 @@ export default function Auth() {
   );
   const resetResendDisabled =
     resetResendBusy || resetResendCooldownActive || forgotEmail.trim().length === 0;
-  const resetResendLabel = buildResetResendLabel(
-    resetResendBusy,
-    resetResendCooldownRemainingMs,
-  );
+  const resetResendLabel = buildResetResendLabel(resetResendBusy, resetResendCooldownRemainingMs);
 
   async function resendVerification() {
-
     if (resendBusy) return;
     if (!canResendVerification(Date.now(), resendLastAttemptAt, DEFAULT_VERIFICATION_COOLDOWN_MS)) {
       return;
@@ -272,7 +265,9 @@ export default function Auth() {
         }));
         await supabase
           .from("user_agreement_acceptances")
-          .upsert(rows, { onConflict: "user_id,agreement_type,version" });
+          // Append-only: ON CONFLICT DO NOTHING so only INSERT is needed (there is
+          // no UPDATE policy); an existing row must not drive the RLS-denied UPDATE.
+          .upsert(rows, { onConflict: "user_id,agreement_type,version", ignoreDuplicates: true });
       } catch {
         // Non-fatal — re-consent gate will catch missing acceptance later.
       }
@@ -365,7 +360,9 @@ export default function Auth() {
 
   async function resendResetEmail() {
     if (resetResendBusy) return;
-    if (!canResendResetEmail(Date.now(), resetResendLastAttemptAt, DEFAULT_RESET_EMAIL_COOLDOWN_MS)) {
+    if (
+      !canResendResetEmail(Date.now(), resetResendLastAttemptAt, DEFAULT_RESET_EMAIL_COOLDOWN_MS)
+    ) {
       return;
     }
     setResetResendBusy(true);
@@ -388,7 +385,6 @@ export default function Auth() {
       setResetResendNowTick(stamp);
     }
   }
-
 
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
@@ -424,7 +420,6 @@ export default function Auth() {
               setForgotSent(false);
               setResetResendNotice(null);
             }}
-
           >
             <TabsList className={AUTH_TAB_LIST_CLASSNAME}>
               {AUTH_MODE_TABS.map((tab) => (
@@ -512,9 +507,7 @@ export default function Auth() {
                         {VERIFICATION_COOLDOWN_HINT}
                       </p>
                     ) : null}
-                    {resendNotice ? (
-                      <AuthInlineMessage>{resendNotice}</AuthInlineMessage>
-                    ) : null}
+                    {resendNotice ? <AuthInlineMessage>{resendNotice}</AuthInlineMessage> : null}
                   </div>
                 ) : null}
                 <Button
@@ -527,8 +520,7 @@ export default function Auth() {
                 </Button>
                 <div className="grid gap-2 pt-2 border-t border-border/40 mt-1">
                   <p className="text-[11px] text-muted-foreground">
-                    Prefer not to type a password? We can email you a one-time
-                    sign-in link instead.
+                    Prefer not to type a password? We can email you a one-time sign-in link instead.
                   </p>
                   <Button
                     type="button"
@@ -604,9 +596,7 @@ export default function Auth() {
                         {VERIFICATION_COOLDOWN_HINT}
                       </p>
                     ) : null}
-                    {resendNotice ? (
-                      <AuthInlineMessage>{resendNotice}</AuthInlineMessage>
-                    ) : null}
+                    {resendNotice ? <AuthInlineMessage>{resendNotice}</AuthInlineMessage> : null}
                   </div>
                 ) : null}
                 <div className="flex items-start gap-2 pt-1">
@@ -621,13 +611,26 @@ export default function Auth() {
                     aria-describedby={consentError ? "signup-consent-error" : undefined}
                     className="mt-0.5"
                   />
-                  <label htmlFor="signup-consent" className="text-xs text-muted-foreground leading-snug">
+                  <label
+                    htmlFor="signup-consent"
+                    className="text-xs text-muted-foreground leading-snug"
+                  >
                     I agree to the{" "}
-                    <Link to="/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
+                    <Link
+                      to="/terms"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-2 hover:text-foreground"
+                    >
                       Terms of Service
                     </Link>{" "}
                     and{" "}
-                    <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
+                    <Link
+                      to="/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-2 hover:text-foreground"
+                    >
                       Privacy Policy
                     </Link>
                     .
@@ -640,8 +643,12 @@ export default function Auth() {
                     onCheckedChange={(v) => setMarketingOptIn(v === true)}
                     className="mt-0.5"
                   />
-                  <label htmlFor="signup-marketing" className="text-xs text-muted-foreground leading-snug">
-                    Send me occasional product updates and grow tips from Verdant. Optional — you can change this any time in settings.
+                  <label
+                    htmlFor="signup-marketing"
+                    className="text-xs text-muted-foreground leading-snug"
+                  >
+                    Send me occasional product updates and grow tips from Verdant. Optional — you
+                    can change this any time in settings.
                   </label>
                 </div>
                 {consentError ? (
@@ -666,9 +673,7 @@ export default function Auth() {
               </p>
               {forgotSent ? (
                 <div className="grid gap-3" role="status" aria-live="polite">
-                  <p className="text-sm text-muted-foreground">
-                    {GENERIC_RESET_REQUEST_SUCCESS}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{GENERIC_RESET_REQUEST_SUCCESS}</p>
                   <Button
                     type="button"
                     variant="outline"
@@ -693,8 +698,12 @@ export default function Auth() {
                   ) : null}
                 </div>
               ) : (
-
-                <form onSubmit={requestReset} noValidate className="grid gap-3" aria-label="Forgot password">
+                <form
+                  onSubmit={requestReset}
+                  noValidate
+                  className="grid gap-3"
+                  aria-label="Forgot password"
+                >
                   <AuthTextField
                     id="forgot-email"
                     label="Email"

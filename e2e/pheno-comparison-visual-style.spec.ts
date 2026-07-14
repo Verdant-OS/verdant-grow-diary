@@ -1,36 +1,31 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 
 /**
- * /pheno-comparison visual-style regression (screenshot + DOM).
+ * /pheno-comparison visual-style regression (screenshot + DOM) — selection-grade
+ * surface.
  *
  * Purpose:
- *  Prevent risky telemetry (stale / invalid / demo / unknown / incomplete)
- *  from accidentally rendering with green/OK/success visual styling on the
- *  read-only preview surface. This spec asserts NOT just on the top-level
- *  risky candidate cards, but on every risky SUBCOMPONENT inside the
- *  screenshot region — untrusted snapshot subtrees, source chips, snapshot
- *  missing-metric flags, missing-context lists, and the no-photo / no-sensor
- *  empty states — plus a generic descendant scan of each risky card.
+ *  Prevent risky selection evidence (thin / partial / stale / invalid / demo /
+ *  unknown / incomplete) from rendering with green/OK/success visual styling.
+ *  Scans not only the risky candidate cards but every risky SUBCOMPONENT inside
+ *  the screenshot region — the selection-strength chip, evidence-gap caveat
+ *  rows, "Not recorded" phenotype rows, timepoint/replication warnings, the
+ *  post-cure "not cured" state, and the demoted environment-context section
+ *  (source chip + stale/invalid badges + missing-metric flags).
  *
  * Primary pass/fail is deterministic DOM/class/data-attribute assertions.
- * Screenshots are captured for human visual review; snapshot equality is
- * NOT asserted (Playwright's `toHaveScreenshot` is intentionally not used
- * here — pixel diffs are too brittle across CI font/rendering variance).
+ * Screenshots are captured for human review only — no pixel equality asserted.
  *
  * SCOPING NOTE (important):
  *  The source legend renders a green/emerald "Live" swatch on every load
- *  (live IS a trusted source), so green-class / checkmark / healthy-text
- *  scans are deliberately scoped to risky candidate cards + untrusted
- *  subtrees — never the whole page region. Only the success *data-attribute*
- *  scan (data-status=ok/healthy, data-tone/variant=success) runs region-wide,
- *  because nothing legitimate on the page uses those.
+ *  (live IS a trusted source), so green-class / checkmark / healthy-text scans
+ *  are scoped to risky candidate cards + untrusted subtrees — never the whole
+ *  page region. Only the success *data-attribute* scan runs region-wide.
  *
- * Safety:
- *  - Read-only route mounted outside AppShell (fixture-only).
- *  - No auth, no Supabase, no writes, no clicks.
+ * Safety: read-only route mounted outside AppShell (fixture-only). No auth, no
+ * Supabase, no writes, no clicks.
  */
 
-// Success-status data attributes — safe to scan region-wide.
 const FORBIDDEN_STATUS_ATTRS: ReadonlyArray<{ attr: string; value: string }> = [
   { attr: "data-status", value: "ok" },
   { attr: "data-status", value: "healthy" },
@@ -38,7 +33,6 @@ const FORBIDDEN_STATUS_ATTRS: ReadonlyArray<{ attr: string; value: string }> = [
   { attr: "data-variant", value: "success" },
 ];
 
-// Mirrors pheno-comparison-visual-style-invariant.test.tsx (jsdom counterpart).
 // Passed as strings so they can be reconstructed inside page.evaluate().
 const FORBIDDEN_CLASS_RE_SRC = "\\b(?:bg|text|border|ring)-(?:green|emerald)-\\d";
 const FORBIDDEN_BADGE_RE_SRC = "badge-success|status-ok|is-healthy";
@@ -61,15 +55,18 @@ const HEALTHY_AFFIRMATIVE_SRC: readonly string[] = [
   "\\bstatus:\\s*success\\b",
 ];
 
-const RISKY_UNTRUSTED_CANDIDATES = [
-  "pheno-candidate-demo-cand-bravo",
-  "pheno-candidate-demo-cand-charlie",
+// Demo candidates with risky (partial / thin) selection evidence.
+const RISKY_CANDIDATES = [
+  "pheno-comparison-candidate-cand-2",
+  "pheno-comparison-candidate-cand-3",
+  "pheno-comparison-candidate-cand-4",
 ];
 const UNTRUSTED_SOURCES = ["demo", "stale", "invalid", "unknown"];
 
 const VIEWPORTS = [
   { name: "mobile-375", width: 375, height: 900 },
   { name: "tablet-768", width: 768, height: 1024 },
+  { name: "desktop-1024", width: 1024, height: 900 },
 ];
 
 interface ScanResult {
@@ -97,10 +94,7 @@ const SCAN_CFG: ScanCfg = {
   healthy: HEALTHY_AFFIRMATIVE_SRC,
 };
 
-/**
- * Walk a scope element + all descendants and report any success/healthy
- * styling. Runs entirely in-page for one round-trip per scope.
- */
+/** Walk a scope element + all descendants and report success/healthy styling. */
 async function scanScope(scope: Locator): Promise<ScanResult> {
   return scope.evaluate((root: Element, cfg: ScanCfg): ScanResult => {
     const classRe = new RegExp(cfg.classRe);
@@ -159,7 +153,7 @@ function expectScopeClean(label: string, r: ScanResult) {
 }
 
 /** Scan every element matched by `selector` inside the region. */
-async function scanEach(page: Page, region: Locator, selector: string, label: string) {
+async function scanEach(region: Locator, selector: string, label: string) {
   const loc = region.locator(selector);
   const count = await loc.count();
   for (let i = 0; i < count; i++) {
@@ -171,9 +165,10 @@ async function scanEach(page: Page, region: Locator, selector: string, label: st
 for (const vp of VIEWPORTS) {
   test(`/pheno-comparison risky-state visual-style stays non-success @ ${vp.name}`, async ({
     page,
+  }: {
+    page: Page;
   }) => {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    // Disable animations to stabilize screenshots.
     await page.addStyleTag({
       content: `*, *::before, *::after {
         animation-duration: 0s !important;
@@ -187,11 +182,17 @@ for (const vp of VIEWPORTS) {
     const region = page.getByTestId("pheno-comparison-page");
     await expect(region).toBeVisible();
 
-    // Disclaimer + legend + missing-data flags visible.
-    await expect(page.getByTestId("pheno-comparison-read-only-badge")).toBeVisible();
-    await expect(page.getByTestId("pheno-comparison-demo-banner")).toContainText(/not live/i);
+    // Disclaimer + legend + comparability verdict + a missing-photo flag.
+    await expect(page.getByTestId("pheno-comparison-readonly-badge")).toBeVisible();
+    await expect(page.getByTestId("pheno-comparison-demo-banner")).toContainText(
+      /not real telemetry/i,
+    );
     await expect(page.getByTestId("pheno-comparison-source-legend")).toBeVisible();
-    await expect(page.getByTestId("pheno-candidate-demo-cand-bravo-no-photo")).toBeVisible();
+    await expect(page.getByTestId("pheno-comparability-verdict")).toHaveAttribute(
+      "data-verdict",
+      "not_comparable",
+    );
+    await expect(page.getByTestId("pheno-photo-missing-cand-3")).toBeVisible();
 
     // (1) Region-wide: no success STATUS ATTRIBUTES anywhere (safe globally).
     for (const { attr, value } of FORBIDDEN_STATUS_ATTRS) {
@@ -201,61 +202,69 @@ for (const vp of VIEWPORTS) {
       ).toBe(0);
     }
 
-    // (2) Each risky candidate card: deep descendant scan (class + attr +
-    //     checkmark + aria/text) — covers all nested badges/tags/rows.
-    for (const candTestId of RISKY_UNTRUSTED_CANDIDATES) {
+    // (2) Each risky candidate card: deep descendant scan.
+    for (const candTestId of RISKY_CANDIDATES) {
       const card = page.getByTestId(candTestId);
       await expect(card).toBeVisible();
+      // The selection-strength chip must be risky-toned, never neutral/green.
+      const chip = card.getByTestId(
+        `pheno-selection-strength-${candTestId.replace("pheno-comparison-candidate-", "")}`,
+      );
+      const tone = await chip.getAttribute("data-tone");
+      expect(["caution", "danger"], `${candTestId} strength tone`).toContain(tone);
       expectScopeClean(`risky card ${candTestId}`, await scanScope(card));
     }
 
-    // (3) Risky SUBCOMPONENTS across the region, scanned individually so a
-    //     regression is pinpointed to the offending part:
-    //       - untrusted snapshot subtrees (source chip + metrics + flags)
-    //       - snapshot missing-metric flags
-    //       - candidate missing-context lists
-    //       - no-photo / no-sensor empty states
-    const untrustedSnaps = region.locator("[data-testid^='snapshot-'][data-source]");
-    const snapCount = await untrustedSnaps.count();
+    // (3) Risky SUBCOMPONENTS across the region, scanned individually:
+    const untrustedBadges = region.locator("[data-testid^='pheno-source-badge-'][data-source]");
+    const badgeCount = await untrustedBadges.count();
     let scannedUntrusted = 0;
-    for (let i = 0; i < snapCount; i++) {
-      const snap = untrustedSnaps.nth(i);
-      const source = (await snap.getAttribute("data-source")) ?? "";
-      if (!UNTRUSTED_SOURCES.includes(source)) continue; // trusted (live/manual/csv) may be non-red
+    for (let i = 0; i < badgeCount; i++) {
+      const badge = untrustedBadges.nth(i);
+      const source = (await badge.getAttribute("data-source")) ?? "";
+      if (!UNTRUSTED_SOURCES.includes(source)) continue; // trusted (live/manual/csv)
       scannedUntrusted++;
-      expectScopeClean(`untrusted snapshot [${source}]`, await scanScope(snap));
+      expectScopeClean(`untrusted source chip [${source}]`, await scanScope(badge));
     }
 
-    const missingFlagCount = await scanEach(
-      page,
+    const envFlagCount = await scanEach(
       region,
-      "[data-testid*='-missing-']",
-      "snapshot missing-metric flag",
+      "[data-testid*='-envflag-']",
+      "environment missing-metric flag",
     );
-    const missingListCount = await scanEach(
-      page,
+    const caveatCount = await scanEach(
       region,
-      "[data-testid$='-missing']",
-      "candidate missing-context list",
+      "[data-testid^='pheno-caveat-']",
+      "selection-evidence caveat row",
+    );
+    const staleCount = await scanEach(
+      region,
+      "[data-testid^='pheno-envcontext-stale-']",
+      "stale telemetry badge",
+    );
+    const invalidCount = await scanEach(
+      region,
+      "[data-testid^='pheno-envcontext-invalid-']",
+      "invalid telemetry badge",
     );
     const noPhotoCount = await scanEach(
-      page,
       region,
-      "[data-testid$='-no-photo']",
+      "[data-testid^='pheno-photo-missing-']",
       "no-photo empty state",
     );
-    await scanEach(page, region, "[data-testid$='-no-sensor']", "no-sensor empty state");
 
-    // Sanity: the demo dataset is expected to exercise these risky
-    // subcomponents, so the scans above must not be vacuously empty.
-    expect(scannedUntrusted, "expected >=1 untrusted snapshot subtree").toBeGreaterThan(0);
+    // Sanity: the demo dataset must actually exercise these risky
+    // subcomponents so the scans above are not vacuously empty.
+    expect(scannedUntrusted, "expected >=1 untrusted source chip").toBeGreaterThan(0);
+    expect(staleCount + invalidCount, "expected stale + invalid badges").toBeGreaterThan(0);
     expect(
-      missingFlagCount + missingListCount + noPhotoCount,
-      "expected >=1 missing/empty-state subcomponent",
+      caveatCount + noPhotoCount,
+      "expected >=1 caveat / no-photo subcomponent",
     ).toBeGreaterThan(0);
+    // envFlagCount may legitimately be 0 for this fixture set; reference it so
+    // lint does not flag an unused value.
+    void envFlagCount;
 
-    // Capture a stable screenshot of the region for human review. This is
-    // an artifact only — the test does NOT assert pixel equality.
     await region.screenshot({
       path: `e2e/screenshots/pheno-comparison-visual-style-${vp.name}.png`,
     });

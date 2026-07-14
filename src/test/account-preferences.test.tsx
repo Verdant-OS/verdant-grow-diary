@@ -6,7 +6,7 @@
  * calmly.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import AccountPreferences from "@/pages/AccountPreferences";
@@ -90,9 +90,7 @@ describe("Account Preferences", () => {
   it("renders the marketing opt-in heading and toggle", async () => {
     renderPage();
     expect(await screen.findByRole("heading", { name: "Preferences" })).toBeInTheDocument();
-    expect(
-      await screen.findByLabelText("Marketing opt-in toggle"),
-    ).toBeInTheDocument();
+    expect(await screen.findByLabelText("Marketing opt-in toggle")).toBeInTheDocument();
     expect(
       await screen.findByText("Send me occasional product updates and grow tips"),
     ).toBeInTheDocument();
@@ -100,17 +98,23 @@ describe("Account Preferences", () => {
 
   it("renders the agreement history section with accepted versions", async () => {
     renderPage();
-    expect(await screen.findByRole("heading", { name: "Agreement history" })).toBeInTheDocument();
-    expect(await screen.findByText("Terms of Service")).toBeInTheDocument();
-    expect(await screen.findByText("Privacy Policy")).toBeInTheDocument();
-    const versions = await screen.findAllByText(/Version 2026-07-13/);
+    // Scope to the "Agreement history" card: the "Terms & Privacy status" card
+    // on the same page also links each agreement, so an unscoped query matches
+    // both. within() disambiguates to the history list.
+    const heading = await screen.findByRole("heading", { name: "Agreement history" });
+    const historyCard = heading.closest(".bg-card") as HTMLElement;
+    expect(within(historyCard).getByText("Terms of Service")).toBeInTheDocument();
+    expect(within(historyCard).getByText("Privacy Policy")).toBeInTheDocument();
+    const versions = within(historyCard).getAllByText(/Version 2026-07-13/);
     expect(versions.length).toBe(2);
   });
 
   it("links each agreement to its canonical page", async () => {
     renderPage();
-    const termsLink = await screen.findByRole("link", { name: "Terms of Service" });
-    const privacyLink = await screen.findByRole("link", { name: "Privacy Policy" });
+    const heading = await screen.findByRole("heading", { name: "Agreement history" });
+    const historyCard = heading.closest(".bg-card") as HTMLElement;
+    const termsLink = within(historyCard).getByRole("link", { name: "Terms of Service" });
+    const privacyLink = within(historyCard).getByRole("link", { name: "Privacy Policy" });
     expect(termsLink).toHaveAttribute("href", "/terms");
     expect(privacyLink).toHaveAttribute("href", "/privacy");
   });

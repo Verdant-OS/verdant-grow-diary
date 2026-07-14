@@ -29,6 +29,7 @@ describe("buildQuickLogV2RefreshQueryKeys", () => {
     expect(out).toContain(JSON.stringify(["timeline_memory"]));
     expect(out).toContain(JSON.stringify(["manual_snapshot_timeline_cards"]));
     expect(out).toContain(JSON.stringify(["diary_entries"]));
+    expect(out).toContain(JSON.stringify(["pheno_evidence_receipts"]));
     expect(out).toContain(JSON.stringify(["grow_events"]));
     expect(out).toContain(JSON.stringify(["timeline"]));
   });

@@ -51,6 +51,17 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      # Stop-ship: the blocking Agreement Reconsent Gate must preserve its
+      # accessibility contract (dialog naming, focus trap, assertive
+      # validation alert, aria-invalid/aria-required wiring, error clearing,
+      # Escape/outside-interaction suppression, single-submission, and
+      # absence of the Radix "DialogContent requires a DialogTitle" warning).
+      # 10 targeted contracts in src/test/agreement-reconsent-gate-a11y.test.tsx.
+      # Fail-fast: runs only after typecheck passes; no continue-on-error,
+      # no shell fallbacks.
+      - name: Agreement reconsent accessibility contract
+        run: bun run test:reconsent-a11y
+
       # Stop-ship: the V0 operating loop contract test must pass.
       # See docs/v0-operating-loop-demo.md ("V0 contract test").
       - name: V0 operating loop contract test

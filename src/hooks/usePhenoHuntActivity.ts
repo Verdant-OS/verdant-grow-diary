@@ -9,6 +9,7 @@
  */
 import { useEffect, useState } from "react";
 import { loadPhenoHuntCandidates } from "@/lib/phenoHuntCandidatesService";
+import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import { listKeepersForHunt, listCrossesForHunt } from "@/lib/phenoKeepersService";
 import { listReversalsForKeepers } from "@/lib/phenoReversalsService";
 import { listLatestSexObservationsForHunt } from "@/lib/phenoSexObservationService";
@@ -68,7 +69,10 @@ export function usePhenoHuntActivity(huntId: string | null | undefined): UsePhen
       const candidateLabelById: Record<string, string | null> = {};
       if (candRes.ok === true) {
         for (const c of candRes.candidates)
-          candidateLabelById[c.candidateId] = c.candidateLabel ?? null;
+          // Include the candidate number when assigned ("#3 · Sour Zebra");
+          // otherwise preserve the "omit who when unlabeled" timeline contract.
+          candidateLabelById[c.candidateId] =
+            c.candidateNumber != null ? phenoCandidateDisplayLabel(c) : (c.candidateLabel ?? null);
       }
       const keeperNameById: Record<string, string> = {};
       for (const k of keepers) keeperNameById[k.id] = k.keeperName;

@@ -16,6 +16,7 @@ import { formatDistanceToNow } from "date-fns";
 import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions";
 import type { PlantAssignedTentActionRow } from "@/lib/plantAssignedTentActionRules";
 import { actionsPath } from "@/lib/routes";
+import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 
 interface Props {
   tentId: string | null | undefined;
@@ -104,7 +105,7 @@ function ActionRowItem({ row }: { row: PlantAssignedTentActionRow }) {
       ) : null}
       {row.reason ? (
         <p className="mt-1 text-xs text-muted-foreground leading-snug">
-          {row.reason}
+          {stripBackPointerTokens(row.reason)}
         </p>
       ) : null}
       {row.createdAt ? (
@@ -119,16 +120,9 @@ function ActionRowItem({ row }: { row: PlantAssignedTentActionRow }) {
   );
 }
 
-export default function PlantAssignedTentActionsPanel({
-  tentId,
-  tentName,
-  growId,
-}: Props) {
+export default function PlantAssignedTentActionsPanel({ tentId, tentName, growId }: Props) {
   const enabled = !!tentId;
-  const { rows, isLoading, isError } = usePlantAssignedTentActions(
-    tentId ?? null,
-    growId ?? null,
-  );
+  const { rows, isLoading, isError } = usePlantAssignedTentActions(tentId ?? null, growId ?? null);
 
   return (
     <Card data-testid="plant-assigned-tent-actions-panel" className="mt-4">
@@ -136,9 +130,7 @@ export default function PlantAssignedTentActionsPanel({
         <CardTitle className="text-base flex items-center gap-2">
           <ListTodo className="h-4 w-4" /> Pending Tasks
           {tentName ? (
-            <span className="text-xs font-normal text-muted-foreground">
-              · {tentName}
-            </span>
+            <span className="text-xs font-normal text-muted-foreground">· {tentName}</span>
           ) : null}
         </CardTitle>
         {enabled ? (
@@ -173,17 +165,11 @@ export default function PlantAssignedTentActionsPanel({
             Pending actions are temporarily unavailable.
           </p>
         ) : rows.length === 0 ? (
-          <p
-            className="text-muted-foreground"
-            data-testid="plant-assigned-tent-actions-empty"
-          >
+          <p className="text-muted-foreground" data-testid="plant-assigned-tent-actions-empty">
             No pending actions for this assigned tent.
           </p>
         ) : (
-          <ul
-            className="space-y-2"
-            data-testid="plant-assigned-tent-actions-list"
-          >
+          <ul className="space-y-2" data-testid="plant-assigned-tent-actions-list">
             {rows.map((r) => (
               <ActionRowItem key={r.id} row={r} />
             ))}

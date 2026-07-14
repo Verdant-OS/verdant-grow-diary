@@ -55,10 +55,7 @@ export interface AiDoctorResult {
   applied_safety_rules: readonly string[];
 }
 
-const TRUSTWORTHY: ReadonlySet<SensorSourceTag> = new Set<SensorSourceTag>([
-  "live",
-  "manual",
-]);
+const TRUSTWORTHY: ReadonlySet<SensorSourceTag> = new Set<SensorSourceTag>(["live", "manual"]);
 
 export const NEVER_DO_BASELINE: readonly string[] = Object.freeze([
   "Do not adjust nutrient strength based on this output.",
@@ -92,16 +89,9 @@ export interface ContextStrength {
   evidenceSignals: number;
 }
 
-export function assessContextStrength(
-  context: AiDoctorContext,
-): ContextStrength {
-  const trustworthyGroups = context.sensor_groups.filter((g) =>
-    TRUSTWORTHY.has(g.source),
-  );
-  const trustworthySensorReadings = trustworthyGroups.reduce(
-    (n, g) => n + g.sample_count,
-    0,
-  );
+export function assessContextStrength(context: AiDoctorContext): ContextStrength {
+  const trustworthyGroups = context.sensor_groups.filter((g) => TRUSTWORTHY.has(g.source));
+  const trustworthySensorReadings = trustworthyGroups.reduce((n, g) => n + g.sample_count, 0);
   const hasTrustworthySensors = trustworthySensorReadings > 0;
   const hasRecentEvents = context.recent_grow_events.length > 0;
   const hasStaleOrInvalid = context.sensor_groups.some(
@@ -109,8 +99,7 @@ export function assessContextStrength(
   );
   const hasAnySensors = context.sensor_groups.length > 0;
   const hasDemoOnly =
-    !hasTrustworthySensors &&
-    context.sensor_groups.some((g) => g.source === "demo");
+    !hasTrustworthySensors && context.sensor_groups.some((g) => g.source === "demo");
 
   let signals = 0;
   if (hasTrustworthySensors) signals += 1;
@@ -160,10 +149,52 @@ const DEVICE_COMMAND_PATTERNS: readonly RegExp[] = [
   /\brun (the )?(pump|fan|light|heater|dehumidifier|humidifier)\b/i,
 ];
 
+/**
+ * Device-control DETECTION patterns, exported for read-only reuse by the AI
+ * Doctor output evaluator (`aiDoctorOutputEvaluation`). Detection only — these
+ * BLOCK/flag device wording; they are never an execution surface.
+ *
+ * Deliberately NARROWER than `DEVICE_COMMAND_PATTERNS`. The engine only *strips*
+ * text that matches its list, so over-broad bare verbs (`execute`, `trigger`,
+ * `activate`, `automate`) are harmless there. In the evaluator the same tokens
+ * raise a hard `device_control_instruction` ERROR, which would fail safe advice
+ * like "this may trigger nutrient lockout" or "execute the plan". So every
+ * pattern here must be bound to an actual device/equipment object or an on/off
+ * action. Automatic-execution wording is covered separately by
+ * `automatic_action_queue_language`.
+ */
+const DEVICE_OBJECT =
+  "(fan|fans|light|lights|pump|heater|humidifier|dehumidifier|extractor|exhaust|valve)";
+
+export const DEVICE_CONTROL_DETECTION_PATTERNS: readonly RegExp[] = [
+  /\bturn (on|off)\b/i,
+  /\bpower (on|off)\b/i,
+  /\bswitch (on|off)\b/i,
+  // Pronoun on/off: "the humidifier is off; turn it on".
+  /\bturn\s+(it|them)\s+(on|off)\b/i,
+  // Object-BEFORE-on/off forms: "turn the fan off", "switching the lights off".
+  new RegExp(
+    `\\b(turn|turning|switch|switching|power|powering)\\s+(the\\s+|your\\s+)?${DEVICE_OBJECT}\\s+(on|off)\\b`,
+    "i",
+  ),
+  // Device-BOUND activate/trigger only. The BARE verbs stay out — they caused
+  // "this may trigger nutrient lockout" / "execute the plan" false positives —
+  // but "Activate the pump" / "Trigger the exhaust fan" are direct commands.
+  new RegExp(`\\b(activate|trigger)\\s+(the\\s+|your\\s+)?${DEVICE_OBJECT}\\b`, "i"),
+  // Device-bound enable/disable only. "Enable the review workflow" stays clean.
+  new RegExp(`\\b(enable|disable)\\s+(the\\s+|your\\s+)?${DEVICE_OBJECT}\\b`, "i"),
+  /\b(start|stop) (the )?(pump|fan|light|lights|heater|humidifier|dehumidifier)\b/i,
+  /\b(open|close) (the )?valve\b/i,
+  /\bauto-?dose\b/i,
+  /\brun (the )?(pump|fan|light|heater|dehumidifier|humidifier)\b/i,
+  /\bset (the )?(fan|light|lights|humidifier|dehumidifier|heater|temp|temperature|humidity)\b/i,
+  /\bset ?point\b/i,
+  /\brelay\b/i,
+  /\bactuate\b/i,
+];
+
 function stripDeviceCommands(items: readonly string[]): string[] {
-  return items.filter(
-    (s) => !DEVICE_COMMAND_PATTERNS.some((rx) => rx.test(s)),
-  );
+  return items.filter((s) => !DEVICE_COMMAND_PATTERNS.some((rx) => rx.test(s)));
 }
 
 /**
@@ -184,15 +215,11 @@ export function applyAiDoctorSafetyRules(
     applied.push("missing_information_when_no_recent_sensor_data");
   }
   if (strength.hasStaleOrInvalid) {
-    missing.add(
-      "Some recent sensor readings are stale or invalid — fresh confirmation needed.",
-    );
+    missing.add("Some recent sensor readings are stale or invalid — fresh confirmation needed.");
     applied.push("flag_stale_or_invalid_telemetry");
   }
   if (strength.hasDemoOnly) {
-    missing.add(
-      "Only demo sensor data available — not usable for a real diagnosis.",
-    );
+    missing.add("Only demo sensor data available — not usable for a real diagnosis.");
     applied.push("demo_only_not_usable");
   }
   if (!context.stage) {
@@ -231,9 +258,7 @@ export function applyAiDoctorSafetyRules(
   }
 
   // ---- strip any device-command-style wording defensively ----
-  const safeImmediate = DEVICE_COMMAND_PATTERNS.some((rx) =>
-    rx.test(draft.immediate_action),
-  )
+  const safeImmediate = DEVICE_COMMAND_PATTERNS.some((rx) => rx.test(draft.immediate_action))
     ? "Observe and re-check. Do not change inputs based on this output."
     : draft.immediate_action;
   if (safeImmediate !== draft.immediate_action) {

@@ -23,22 +23,19 @@ export const ACTION_QUEUE_SOURCE_VALUES = {
   MANUAL: "manual",
 } as const;
 
-
 export interface SourceLabelInput {
   source?: string | null;
 }
 
-
 const ALERT_TOKEN_RE = /\[alert:([A-Za-z0-9_-]{1,64})\]/;
 const SESSION_TOKEN_RE = /\[session:([A-Za-z0-9_-]{1,64})\]/;
+const EVENT_TOKEN_RE = /\[event:([A-Za-z0-9_-]{1,64})\]/;
 
 /**
  * Extracts the alert id embedded in an action's reason via `[alert:<id>]`.
  * Returns null when missing, malformed, or non-string.
  */
-export function extractSourceAlertId(
-  reason: string | null | undefined,
-): string | null {
+export function extractSourceAlertId(reason: string | null | undefined): string | null {
   if (typeof reason !== "string") return null;
   const m = reason.match(ALERT_TOKEN_RE);
   if (!m) return null;
@@ -53,9 +50,7 @@ export function extractSourceAlertId(
  * The token itself is internal and must never be rendered to growers — use
  * `stripBackPointerTokens` for any grower-facing reason text.
  */
-export function extractSourceAiDoctorSessionId(
-  reason: string | null | undefined,
-): string | null {
+export function extractSourceAiDoctorSessionId(reason: string | null | undefined): string | null {
   if (typeof reason !== "string") return null;
   const m = reason.match(SESSION_TOKEN_RE);
   if (!m) return null;
@@ -65,21 +60,35 @@ export function extractSourceAiDoctorSessionId(
 }
 
 /**
- * Strip internal back-pointer tokens (alert + session) from a user-facing
- * reason string. These tokens exist for audit/dedupe only and must never
- * leak into grower-visible copy.
+ * Extracts the source grow_event id embedded in an action's reason via
+ * `[event:<id>]` (used by breeding follow-up suggestions). Returns null when
+ * missing, malformed, or non-string. The token itself is internal and must
+ * never be rendered to growers — use `stripBackPointerTokens` for any
+ * grower-facing reason text.
  */
-export function stripBackPointerTokens(
-  reason: string | null | undefined,
-): string {
+export function extractSourceBreedingEventId(reason: string | null | undefined): string | null {
+  if (typeof reason !== "string") return null;
+  const m = reason.match(EVENT_TOKEN_RE);
+  if (!m) return null;
+  const id = m[1];
+  if (!id || id.length < 1 || id.length > 64) return null;
+  return id;
+}
+
+/**
+ * Strip internal back-pointer tokens (alert + session + event) from a
+ * user-facing reason string. These tokens exist for audit/dedupe only and
+ * must never leak into grower-visible copy.
+ */
+export function stripBackPointerTokens(reason: string | null | undefined): string {
   if (typeof reason !== "string" || !reason) return "";
   return reason
     .replace(/\s*\[session:[^\]]+\]\s*/g, " ")
     .replace(/\s*\[alert:[^\]]+\]\s*/g, " ")
+    .replace(/\s*\[event:[^\]]+\]\s*/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
-
 
 export function getActionQueueSourceKind(
   action: SourceLabelInput | null | undefined,
@@ -92,9 +101,7 @@ export function getActionQueueSourceKind(
   return "unknown";
 }
 
-export function getActionQueueSourceLabel(
-  action: SourceLabelInput | null | undefined,
-): string {
+export function getActionQueueSourceLabel(action: SourceLabelInput | null | undefined): string {
   switch (getActionQueueSourceKind(action)) {
     case "environment_alert":
       return "Environment Alert";
@@ -109,18 +116,13 @@ export function getActionQueueSourceLabel(
   }
 }
 
-export function isAlertDerived(
-  action: SourceLabelInput | null | undefined,
-): boolean {
+export function isAlertDerived(action: SourceLabelInput | null | undefined): boolean {
   return getActionQueueSourceKind(action) === "environment_alert";
 }
 
-export function isAiDoctorDerived(
-  action: SourceLabelInput | null | undefined,
-): boolean {
+export function isAiDoctorDerived(action: SourceLabelInput | null | undefined): boolean {
   return getActionQueueSourceKind(action) === "ai_doctor";
 }
-
 
 /**
  * Deterministic check: was `action` created from the alert with `alertId`?
@@ -128,10 +130,7 @@ export function isAiDoctorDerived(
  * back-pointer in the action's reason.
  */
 export function isActionDerivedFromAlert(
-  action:
-    | (SourceLabelInput & { reason?: string | null })
-    | null
-    | undefined,
+  action: (SourceLabelInput & { reason?: string | null }) | null | undefined,
   alertId: string | null | undefined,
 ): boolean {
   if (!action || typeof alertId !== "string" || !alertId) return false;
@@ -156,10 +155,7 @@ export function isClosedAlertStatus(
  */
 export function hasPendingActionsForClosedAlert(
   alertStatus: string | null | undefined,
-  relatedActions:
-    | ReadonlyArray<{ status?: string | null } | null | undefined>
-    | null
-    | undefined,
+  relatedActions: ReadonlyArray<{ status?: string | null } | null | undefined> | null | undefined,
 ): boolean {
   if (!isClosedAlertStatus(alertStatus)) return false;
   if (!Array.isArray(relatedActions) || relatedActions.length === 0) {
@@ -182,6 +178,3 @@ export function shouldWarnPendingActionHasClosedSourceAlert(
   if (actionStatus !== "pending_approval") return false;
   return isClosedAlertStatus(sourceAlertStatus);
 }
-
-
-

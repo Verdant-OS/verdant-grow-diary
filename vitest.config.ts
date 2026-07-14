@@ -26,11 +26,12 @@ function stripMjsShebang(): Plugin {
 }
 
 export default defineConfig({
+  root: __dirname,
   plugins: [stripMjsShebang(), react()],
   test: {
     environment: "jsdom",
     globals: true,
-    setupFiles: ["./src/test/setup.ts"],
+    setupFiles: [path.resolve(__dirname, "./src/test/setup.ts")],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     // Inline local `.mjs` scanner scripts so the shebang-strip plugin's
     // transform runs on them (vite externalizes `.mjs` otherwise).

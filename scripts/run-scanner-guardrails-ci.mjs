@@ -1,8 +1,7 @@
-#!/usr/bin/env node
 /**
  * Scanner guardrail CI wrapper.
  *
- * Responsibilities (test tooling only — no production behavior):
+ * Responsibilities (test tooling only --- no production behavior):
  *   1. Delete any stale slow-test JSONL report from a previous run.
  *   2. Run `bun run test:scanner-guardrails` (the underlying vitest suite).
  *   3. If a report was emitted, parse + validate every row, then exit
@@ -54,7 +53,7 @@ export function previewValue(v) {
     }
     if (s === undefined) s = String(v);
   }
-  if (s.length > MAX_VALUE_PREVIEW) s = s.slice(0, MAX_VALUE_PREVIEW - 1) + "…";
+  if (s.length > MAX_VALUE_PREVIEW) s = s.slice(0, MAX_VALUE_PREVIEW - 1) + "---";
   return s;
 }
 
@@ -71,7 +70,12 @@ export function validateScannerSlowRow(row) {
       ok: false,
       error: "row is not a plain object",
       failedFields: [
-        { field: "<row>", expected: "plain object", got: previewValue(row), message: "row is not a plain object" },
+        {
+          field: "<row>",
+          expected: "plain object",
+          got: previewValue(row),
+          message: "row is not a plain object",
+        },
       ],
     };
   }
@@ -92,7 +96,12 @@ export function validateScannerSlowRow(row) {
     if (row.file.includes("\\")) {
       push("file", "repo-relative POSIX path", row.file, "file must be POSIX (no backslashes)");
     } else if (row.file.startsWith("/") || /^[A-Za-z]:\//.test(row.file)) {
-      push("file", "repo-relative POSIX path", row.file, "file must be repo-relative (not absolute)");
+      push(
+        "file",
+        "repo-relative POSIX path",
+        row.file,
+        "file must be repo-relative (not absolute)",
+      );
     }
   }
   if ("durationMs" in row) {
@@ -114,7 +123,12 @@ export function validateScannerSlowRow(row) {
     } else {
       const t = Date.parse(row.recordedAt);
       if (!Number.isFinite(t) || new Date(t).toISOString() !== row.recordedAt) {
-        push("recordedAt", "ISO timestamp string", row.recordedAt, "recordedAt must be a valid ISO timestamp");
+        push(
+          "recordedAt",
+          "ISO timestamp string",
+          row.recordedAt,
+          "recordedAt must be a valid ISO timestamp",
+        );
       }
     }
   }
@@ -124,7 +138,10 @@ export function validateScannerSlowRow(row) {
 }
 
 export function parseAndValidateScannerSlowReport(content) {
-  const lines = content.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  const lines = content
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
   const rows = [];
   const errors = [];
   const failedFields = [];
@@ -136,7 +153,12 @@ export function parseAndValidateScannerSlowReport(content) {
       rows.push(null);
       errors.push(`line ${i + 1}: invalid JSON (${(err && err.message) || "parse error"})`);
       failedFields.push([
-        { field: "<row>", expected: "valid JSON", got: previewValue(lines[i]), message: "invalid JSON" },
+        {
+          field: "<row>",
+          expected: "valid JSON",
+          got: previewValue(lines[i]),
+          message: "invalid JSON",
+        },
       ]);
       continue;
     }
@@ -168,9 +190,18 @@ export function formatRowFieldDiff(lineNumber, fields) {
  */
 export function buildGithubAnnotation({ reportPath, lineNumber, row, failedFields }) {
   if (!failedFields || failedFields.length === 0) return "";
-  const suite = (row && typeof row.suite === "string" ? row.suite : "<unknown>").replace(/[\r\n]/g, " ");
-  const test = (row && typeof row.test === "string" ? row.test : "<unknown>").replace(/[\r\n]/g, " ");
-  const file = (row && typeof row.file === "string" ? row.file : "<unknown>").replace(/[\r\n]/g, " ");
+  const suite = (row && typeof row.suite === "string" ? row.suite : "<unknown>").replace(
+    /[\r\n]/g,
+    " ",
+  );
+  const test = (row && typeof row.test === "string" ? row.test : "<unknown>").replace(
+    /[\r\n]/g,
+    " ",
+  );
+  const file = (row && typeof row.file === "string" ? row.file : "<unknown>").replace(
+    /[\r\n]/g,
+    " ",
+  );
   const durationMs = row && typeof row.durationMs === "number" ? row.durationMs : "<unknown>";
   const thresholdMs =
     row && typeof row.thresholdMs === "number" ? row.thresholdMs : SCANNER_SLOW_THRESHOLD_MS;

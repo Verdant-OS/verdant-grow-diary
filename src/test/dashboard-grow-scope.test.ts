@@ -22,8 +22,7 @@ const DASHBOARD = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8")
 const GROW_DETAIL = readFileSync(resolve(ROOT, "src/pages/GrowDetail.tsx"), "utf8");
 
 const AI_COACH_CALL = /["'`]ai-coach["'`]|functions\/ai-coach|ai_coach/;
-const DEVICE_SURFACE =
-  /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
+const DEVICE_SURFACE = /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b/i;
 
 describe("dashboardPath helper", () => {
   it("returns /dashboard without growId", () => {
@@ -40,7 +39,9 @@ describe("dashboardPath helper", () => {
 
 describe("Dashboard — grow-scoped wiring", () => {
   it("imports the shared useScopedGrow hook", () => {
-    expect(DASHBOARD).toMatch(/import\s+\{\s*useScopedGrow\s*\}\s+from\s+["']@\/hooks\/useScopedGrow["']/);
+    expect(DASHBOARD).toMatch(
+      /import\s+\{\s*useScopedGrow\s*\}\s+from\s+["']@\/hooks\/useScopedGrow["']/,
+    );
     expect(DASHBOARD).toMatch(/useScopedGrow\(\)/);
   });
 
@@ -66,7 +67,7 @@ describe("Dashboard — grow-scoped wiring", () => {
 
   it("guards scopedGrowId on isValidScopedGrow so invalid ids fall back to all data", () => {
     expect(DASHBOARD).toMatch(
-      /scopedGrowId\s*=\s*isValidScopedGrow\s*\?\s*urlGrowId[^:]*:\s*undefined/,
+      /scopedGrowId\s*=\s*isValidScopedGrow\s*\?\s*\(?\s*urlGrowId[^:]*:\s*undefined/,
     );
   });
 
@@ -75,9 +76,7 @@ describe("Dashboard — grow-scoped wiring", () => {
   });
 
   it("introduces no new write paths or privileged surface", () => {
-    expect(DASHBOARD).not.toMatch(
-      /\.from\(["'][^"']+["']\)\s*\.(insert|update|delete|upsert)/,
-    );
+    expect(DASHBOARD).not.toMatch(/\.from\(["'][^"']+["']\)\s*\.(insert|update|delete|upsert)/);
     expect(DASHBOARD).not.toMatch(/service_role/);
     expect(DASHBOARD).not.toMatch(AI_COACH_CALL);
     expect(DASHBOARD).not.toMatch(DEVICE_SURFACE);

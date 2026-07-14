@@ -1,13 +1,11 @@
 # Pheno Comparison — Playwright quickstart
 
-Run the read-only **Pheno Comparison** Playwright specs locally, using the
-exact same mocked configuration as CI (`.github/workflows/pheno-comparison-v0.yml`).
+Run the read-only **Pheno Comparison** Playwright specs locally, using the exact
+same mocked configuration as CI (`.github/workflows/pheno-comparison-v0.yml`).
 
-These specs exercise `/pheno-comparison` and `/pheno-hunts/:id/compare`, which
-are **fixture-only, read-only** routes mounted outside AppShell. They require
-**no login, no credentials, and no saved auth state** — all Supabase traffic is
-either absent or intercepted, so the specs run against the local dev server with
-only the committed public client config.
+These specs exercise `/pheno-comparison` — a **fixture-only, read-only** route
+mounted outside AppShell and outside the auth/data providers. They require **no
+login, no credentials, and no saved auth state**; all data is demo fixtures.
 
 ## Prerequisites
 
@@ -31,13 +29,13 @@ bun run test:pheno-playwright
 
 This runs, on the `chromium-mocked` project (no auth setup, no storageState):
 
-- `e2e/pheno-comparison-responsive.spec.ts`
-- `e2e/pheno-comparison-reload.spec.ts`
-- `e2e/pheno-comparison-visual-style.spec.ts`
-- `e2e/pheno-hunts-compare-deep-link.spec.ts`
-- `e2e/pheno-hunts-compare-invalid-id.spec.ts`
+- `e2e/pheno-comparison-readonly.spec.ts` — renders + reloads + no write controls
+  - no Supabase/AI/device requests, at mobile/tablet/desktop.
+- `e2e/pheno-comparison-visual-style.spec.ts` — risky selection evidence
+  (partial/thin/stale/invalid) never renders with green/OK/success styling
+  (deep scan of every risky candidate card + subcomponent).
 
-Playwright auto-starts the app for you: `playwright.config.ts` `webServer` runs
+Playwright auto-starts the app: `playwright.config.ts` `webServer` runs
 `bunx vite --port 5173 --strictPort` and waits for it. You do **not** need to
 start Vite yourself.
 
@@ -79,11 +77,9 @@ Symptom: `browserType.launch: Executable doesn't exist at …chromium-XXXX…`.
 bun run e2e:install         # (re)install the matching Chromium build
 ```
 
-If you are on an offline or locked-down machine and cannot install browsers,
-you cannot run these specs locally — rely on CI, which installs Chromium in the
-`Install Playwright browsers (Chromium only)` step. The specs are also
-type-agnostic to the browser build; a mismatched cached Chromium is fixed by the
-install command above.
+If you are on an offline or locked-down machine and cannot install browsers, you
+cannot run these specs locally — rely on CI, which installs Chromium in the
+`Install Playwright browsers (Chromium only)` step.
 
 ## Troubleshooting — port conflicts
 
@@ -103,7 +99,8 @@ clear "Port 5173 is already in use" error instead of silently using another port
 
 - No auth credentials or `storageState` are required (the `chromium-mocked`
   project does not use `e2e/.auth/user.json`).
-- Routes are fixture-only; specs perform no writes, no Supabase calls, and no
-  clicks that mutate data.
+- The route is fixture-only; the specs perform no writes, no Supabase/AI calls,
+  and no clicks that mutate data. `pheno-comparison-readonly.spec.ts` actively
+  asserts no requests reach Supabase/AI/Action-Queue/device hosts.
 - Never commit `.env`, tokens, or `e2e/.auth/` auth state; CI artifact upload is
   scoped to report/results/review-screenshot paths only.

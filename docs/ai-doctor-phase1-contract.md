@@ -143,6 +143,20 @@ Phase 1 diagnosis does not write to:
 ### Conservative base score
 Scoring starts at `BASE_SCORE = 20`. Additive bonuses and penalties are applied, then hard caps and level thresholds are enforced.
 
+### Scored profile evidence
+
+Pot size is a bounded profile-evidence category because it materially informs
+root-zone and irrigation interpretation:
+
+| Condition | Score effect | Reported factor |
+|-----------|--------------|-----------------|
+| Non-blank compiled `pot_size` | `+5` | `known_pot_size` |
+| Missing or blank `pot_size` | No bonus | `unknown_pot_size` limiting factor |
+
+Unknown pot size does not create a safety flag or hard cap by itself, and the
+small bonus never substitutes for trustworthy sensor data, recent grow events,
+or useful visual context.
+
 ### Hard caps
 These caps are applied **after** all bonuses/penalties:
 

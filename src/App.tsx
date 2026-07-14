@@ -46,6 +46,7 @@ const PhenoHuntNew = lazy(() => import("./pages/PhenoHuntNew"));
 const PhenoHuntCompare = lazy(() => import("./pages/PhenoHuntCompare"));
 const PhenoHuntWorkspace = lazy(() => import("./pages/PhenoHuntWorkspace"));
 const PhenoKeepersPage = lazy(() => import("./pages/PhenoKeepersPage"));
+const BreedingLogNew = lazy(() => import("./pages/BreedingLogNew"));
 const BreedingProgramsIndex = lazy(() => import("./pages/BreedingProgramsIndex"));
 const BreedingProgramNew = lazy(() => import("./pages/BreedingProgramNew"));
 const BreedingProgramDetail = lazy(() => import("./pages/BreedingProgramDetail"));
@@ -200,7 +201,6 @@ const App = () => (
                   <Route path="/refund-policy" element={<Navigate to="/refund" replace />} />
                   <Route path="/terms-of-service" element={<Navigate to="/terms" replace />} />
                   <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
-
 
                   {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
                       no operator chrome (header, Quick Log) renders. */}

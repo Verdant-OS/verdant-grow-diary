@@ -2,10 +2,7 @@
  * phenoComparisonViewModel — pure view-model unit tests.
  */
 import { describe, it, expect } from "vitest";
-import {
-  buildPhenoComparisonView,
-  type PhenoCandidateInput,
-} from "@/lib/phenoComparisonViewModel";
+import { buildPhenoComparisonView, type PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
 
 const base: PhenoCandidateInput = {
   candidateId: "a",
@@ -37,10 +34,7 @@ describe("buildPhenoComparisonView", () => {
   });
 
   it("aggregates two candidates deterministically", () => {
-    const v = buildPhenoComparisonView([
-      { ...base, candidateId: "b", candidateLabel: "B" },
-      base,
-    ]);
+    const v = buildPhenoComparisonView([{ ...base, candidateId: "b", candidateLabel: "B" }, base]);
     expect(v.ok).toBe(true);
     expect(v.candidates.map((c) => c.candidateId)).toEqual(["a", "b"]);
   });
@@ -63,9 +57,7 @@ describe("buildPhenoComparisonView", () => {
     ]);
     const z = v.candidates.find((c) => c.candidateId === "z")!;
     expect(z.hasAnyTrustedSensor).toBe(false);
-    expect(z.missing.map((m) => m.code)).toEqual(
-      expect.arrayContaining(["no_photo", "no_diary"]),
-    );
+    expect(z.missing.map((m) => m.code)).toEqual(expect.arrayContaining(["no_photo", "no_diary"]));
     const stale = z.sensorSnapshots.find((s) => s.id === "st")!;
     expect(stale.source).toBe("stale");
     expect(stale.missing.map((m) => m.code)).toContain("stale_reading");

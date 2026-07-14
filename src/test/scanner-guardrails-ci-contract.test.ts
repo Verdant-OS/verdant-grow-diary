@@ -118,7 +118,7 @@ describe("scanner-guardrails-ci JSONL contract", () => {
     expect(diff).toContain("[scanner-guardrails] line 2 failed fields:");
     expect(diff).toMatch(/- file: expected repo-relative/);
     expect(diff).toMatch(/- thresholdMs: expected 5000, got 3000/);
-    // Compact — no giant payload dump.
+    // Compact --- no giant payload dump.
     for (const line of diff.split("\n")) expect(line.length).toBeLessThan(200);
   });
 
@@ -126,7 +126,7 @@ describe("scanner-guardrails-ci JSONL contract", () => {
     const huge = "x".repeat(500);
     const preview = previewValue(huge);
     expect(preview.length).toBeLessThanOrEqual(82);
-    expect(preview.endsWith("…")).toBe(true);
+    expect(preview.endsWith("---")).toBe(true);
   });
 
   it("builds a GitHub Actions ::error annotation for the first offender", () => {

@@ -109,6 +109,10 @@ import {
 import { buildEnvironmentCheckSensorContext } from "@/lib/environmentCheckSensorContextRules";
 import { buildSensorNormalizationPreviewViewModel } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
 import { SensorNormalizationPreviewPanel } from "@/components/SensorNormalizationPreviewPanel";
+import PhenoEvidenceQuickLogPanel from "@/components/PhenoEvidenceQuickLogPanel";
+import { usePhenoEvidenceCaptureContext } from "@/hooks/usePhenoEvidenceCaptureContext";
+import { buildPhenoEvidenceReceiptDetails } from "@/lib/phenoEvidenceCaptureRules";
+import type { PhenoEvidenceGoalId } from "@/lib/phenoEvidenceGoals";
 import {
   buildHarvestInspectionPreviewViewModel,
   HARVEST_PHOTO_COMPARISON_ANGLES,
@@ -285,6 +289,8 @@ export default function QuickLog({
   const [envEcMscm, setEnvEcMscm] = useState<string>("");
   const [harvestPhotoAngle, setHarvestPhotoAngle] = useState<HarvestPhotoAngle | "">("");
   const [harvestPhotoLighting, setHarvestPhotoLighting] = useState<HarvestPhotoLighting | "">("");
+  const [selectedPhenoEvidenceGoal, setSelectedPhenoEvidenceGoal] =
+    useState<PhenoEvidenceGoalId | null>(null);
 
   const wateringInputRef = useRef<HTMLInputElement | null>(null);
   const plantSelectTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -328,6 +334,15 @@ export default function QuickLog({
   const selectedPlant = useMemo(
     () => scopedPlants.find((p) => p.id === plantId) ?? null,
     [plantId, scopedPlants],
+  );
+
+  const selectedPhenoHuntId = useMemo(() => {
+    const raw = (selectedPlant as { pheno_hunt_id?: unknown } | null)?.pheno_hunt_id;
+    return typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : null;
+  }, [selectedPlant]);
+  const phenoEvidenceContext = usePhenoEvidenceCaptureContext(
+    selectedPhenoHuntId,
+    selectedPlant?.id ?? null,
   );
 
   const selectedTent = useMemo(
@@ -420,6 +435,12 @@ export default function QuickLog({
     if (eventType === "watering") setShowMore(true);
   }, [open, eventType]);
 
+  // A receipt always requires a fresh, explicit goal selection for the
+  // current candidate. Never carry a choice between plants or dialog opens.
+  useEffect(() => {
+    setSelectedPhenoEvidenceGoal(null);
+  }, [open, plantId, selectedPhenoHuntId]);
+
   useEffect(() => {
     if (eventType !== "watering" || details.watering.trim()) setWateringError(null);
   }, [eventType, details.watering]);
@@ -478,6 +499,7 @@ export default function QuickLog({
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
+    setSelectedPhenoEvidenceGoal(null);
   }
 
   /**
@@ -548,6 +570,7 @@ export default function QuickLog({
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
+    setSelectedPhenoEvidenceGoal(null);
     if (keepPlantId) setPlantId(keepPlantId);
     setTimeout(() => noteRef.current?.focus(), 0);
   }
@@ -659,6 +682,25 @@ export default function QuickLog({
       const environmentCheckRecord: Record<string, unknown> | null = environmentCheckEnvelope
         ? { ...environmentCheckEnvelope }
         : null;
+      const configuredPhenoGoal =
+        eventType === "observation" &&
+        selectedPhenoEvidenceGoal &&
+        phenoEvidenceContext.status === "ready" &&
+        phenoEvidenceContext.context?.huntId === selectedPhenoHuntId &&
+        phenoEvidenceContext.context.plantId === selectedPlant.id &&
+        phenoEvidenceContext.context.coverage.goals.some(
+          (goal) => goal.id === selectedPhenoEvidenceGoal,
+        )
+          ? selectedPhenoEvidenceGoal
+          : null;
+      const phenoEvidenceReceipt = configuredPhenoGoal
+        ? buildPhenoEvidenceReceiptDetails({
+            huntId: selectedPhenoHuntId,
+            plantId: selectedPlant.id,
+            evidenceGoal: configuredPhenoGoal,
+            stage: normalizeQuickLogStage(stage),
+          })
+        : null;
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
         idempotencyKey: newQuickLogSaveKey(),
@@ -669,6 +711,7 @@ export default function QuickLog({
         sensorAttachPayload,
         earlyStage: earlyStageRecord,
         environmentCheck: environmentCheckRecord,
+        phenoEvidenceReceipt,
         noteSuffix: earlyStageSuffix || null,
       });
       if (built.ok !== true) {
@@ -1390,6 +1433,27 @@ export default function QuickLog({
               spellCheck={true}
             />
           </section>
+
+          {selectedPhenoHuntId && eventType === "observation" && (
+            <PhenoEvidenceQuickLogPanel
+              status={
+                phenoEvidenceContext.status === "ready"
+                  ? "ready"
+                  : phenoEvidenceContext.status === "error"
+                    ? "error"
+                    : "loading"
+              }
+              context={phenoEvidenceContext.context}
+              candidateLabel={
+                typeof (selectedPlant as { candidate_label?: unknown } | null)?.candidate_label ===
+                "string"
+                  ? (selectedPlant as { candidate_label: string }).candidate_label || null
+                  : null
+              }
+              selectedGoal={selectedPhenoEvidenceGoal}
+              onSelectedGoalChange={setSelectedPhenoEvidenceGoal}
+            />
+          )}
 
           {(() => {
             const visibility = evaluateEarlyStageVisibility({

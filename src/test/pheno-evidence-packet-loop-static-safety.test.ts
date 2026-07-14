@@ -106,7 +106,9 @@ describe("packet-loop slice — surfaces wired", () => {
     expect(page).toMatch(/PhenoCandidateEvidenceCoverage/);
     expect(page).toMatch(/CandidateReadinessBadge/); // readiness axis untouched
     expect(page).toMatch(/evidencePacketsByPlant: evidencePackets\.packets/);
-    expect(page).toMatch(/totalCandidateCount: ws\.totalCandidateCount/);
+    // Scope honesty: active filters withhold the (filtered) total so the CSV
+    // can never claim complete_hunt for a filtered page export.
+    expect(page).toMatch(/\?\s*null\s*:\s*ws\.totalCandidateCount/);
   });
 
   it("compare page renders read-only coverage for the compared cohort", () => {

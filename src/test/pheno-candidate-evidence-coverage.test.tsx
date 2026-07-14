@@ -125,6 +125,19 @@ describe("PhenoCandidateEvidenceCoverage", () => {
     );
   });
 
+  it("unavailable never renders as zero recorded coverage (failed read ≠ no evidence)", () => {
+    render(
+      <PhenoCandidateEvidenceCoverage packet={packet({ unavailable: true })} status="error" />,
+    );
+    const summary = screen.getByTestId("pheno-candidate-evidence-coverage-summary");
+    expect(summary).toHaveTextContent(/coverage unknown/i);
+    expect(summary.textContent).not.toMatch(/0 of \d+/);
+    // No per-goal "missing" chips either — missingness is unknown here.
+    expect(
+      screen.queryByTestId("pheno-candidate-evidence-coverage-goals"),
+    ).toBeNull();
+  });
+
   it("loading renders a placeholder; disabled renders nothing", () => {
     const { container, rerender } = render(
       <PhenoCandidateEvidenceCoverage packet={null} status="loading" />,

@@ -84,13 +84,21 @@ export default function PhenoCandidateEvidenceCoverage({
       aria-label="Manual evidence coverage"
       className="space-y-1.5 rounded-md border border-border/60 bg-muted/20 p-2 text-xs"
     >
-      <p className="font-medium" data-testid={`${testId}-summary`}>
-        Manual evidence: {packet.recordedGoalCount} of {packet.configuredGoalCount} configured
-        goals recorded
-        {when ? (
-          <span className="ml-1 font-normal text-muted-foreground">· latest {when}</span>
-        ) : null}
-      </p>
+      {packet.state === "unavailable" ? (
+        // A failed read is NOT zero evidence (Codex review): never render the
+        // zeroed X-of-Y line when receipts could not be loaded at all.
+        <p className="font-medium" data-testid={`${testId}-summary`}>
+          Manual evidence: coverage unknown
+        </p>
+      ) : (
+        <p className="font-medium" data-testid={`${testId}-summary`}>
+          Manual evidence: {packet.recordedGoalCount} of {packet.configuredGoalCount} configured
+          goals recorded
+          {when ? (
+            <span className="ml-1 font-normal text-muted-foreground">· latest {when}</span>
+          ) : null}
+        </p>
+      )}
 
       {compromised ? (
         <p role="status" data-testid={`${testId}-state`} className="text-muted-foreground">
@@ -101,7 +109,8 @@ export default function PhenoCandidateEvidenceCoverage({
         </p>
       ) : null}
 
-      {packet.configuredGoalCount === 0 && !compromised ? (
+      {packet.state === "unavailable" ? null : packet.configuredGoalCount === 0 &&
+        !compromised ? (
         <p className="text-muted-foreground">
           This hunt has no evidence goals configured yet.
         </p>

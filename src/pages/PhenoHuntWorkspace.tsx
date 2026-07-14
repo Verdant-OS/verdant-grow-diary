@@ -1186,7 +1186,15 @@ export default function PhenoHuntWorkspace() {
       exportedAt: new Date().toISOString(),
       evidencePacketsByPlant: evidencePackets.packets,
       loadedCandidateCount: candidates.length,
-      totalCandidateCount: ws.totalCandidateCount,
+      // Scope honesty (Codex review): ws.totalCandidateCount is the total for
+      // the ACTIVE filters. With a filter narrowing the workspace, matching
+      // loaded==total would falsely claim a complete hunt — so any active
+      // filter forces export_scope=loaded_candidates by withholding the total.
+      totalCandidateCount: Object.values(ws.filters).some(
+        (v) => typeof v === "string" && v.trim().length > 0,
+      )
+        ? null
+        : ws.totalCandidateCount,
     });
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);

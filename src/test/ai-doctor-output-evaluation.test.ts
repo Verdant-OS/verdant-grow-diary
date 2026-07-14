@@ -909,4 +909,75 @@ describe("evaluateAiDoctorOutput — review-defect regressions", () => {
       expect(hasCode(e, "device_control_instruction")).toBe(true);
     },
   );
+
+  // 12. Event provenance only on an explicit LOGGED-ACTION claim.
+  //     Visual / diagnostic language must stay valid without a grow event.
+  const noEventContext = () =>
+    compilePlantContextFromRows({
+      plant: { id: "p", tent_id: "t", grow_id: "g", name: "P", strain: "Auto", stage: "veg" },
+      growEvents: [], // no watering / feeding events at all
+      sensorReadings: [
+        { metric: "humidity_pct", value: 58, captured_at: isoAgo(3 * HOUR_MS), source: "manual" },
+      ],
+      now: NOW,
+    });
+
+  it.each([
+    "Leaf posture suggests water stress.",
+    "The photo may indicate underwatering.",
+    "Possible nutrient stress.",
+    "Possible nutrient deficiency.",
+  ])("visual/diagnostic language needs no logged event: %s", (evidence) => {
+    const e = evaluateAiDoctorOutput(inputWith(resultWithEvidence([evidence]), noEventContext()));
+    expect(hasCode(e, "evidence_not_in_context")).toBe(false);
+  });
+
+  it.each([
+    "Plant was watered yesterday.",
+    "Irrigation was applied on Tuesday.",
+    "Nutrient solution was applied yesterday.",
+    "Feeding log shows a dose at 1.2 EC.",
+  ])("an explicit logged-action claim requires a matching event: %s", (evidence) => {
+    const e = evaluateAiDoctorOutput(inputWith(resultWithEvidence([evidence]), noEventContext()));
+    expect(hasCode(e, "evidence_not_in_context")).toBe(true);
+  });
+
+  // 13. Feed-strength safety. NEVER_DO_BASELINE forbids adjusting nutrient
+  //     strength UNCONDITIONALLY, so this is flagged at every readiness level.
+  it.each(["partial", "strong"] as const)(
+    "flags 'Increase feed strength' under %s readiness (universally forbidden)",
+    (readiness) => {
+      const r = makeValidResult();
+      r.twenty_four_hour_follow_up = "Increase feed strength tomorrow.";
+      const e = evaluateAiDoctorOutput(makeInput(r, readiness));
+      expect(hasCode(e, "aggressive_nutrient_change")).toBe(true);
+    },
+  );
+
+  it.each([
+    "Raise feed strength slightly.",
+    "Bump the EC a little.",
+    "Increase EC to 1.4.",
+    "Raise nutrient strength this week.",
+  ])("flags bounded feed/EC increase: %s", (action) => {
+    const r = makeValidResult();
+    r.immediate_action = action;
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "aggressive_nutrient_change")).toBe(true);
+  });
+
+  it("does not flag 'Monitor feed response'", () => {
+    const r = makeValidResult();
+    r.immediate_action = "Monitor feed response over the next few days.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "aggressive_nutrient_change")).toBe(false);
+  });
+
+  it("does not flag a 'Do not increase feed strength' prohibition", () => {
+    const r = makeValidResult();
+    r.what_not_to_do = ["Do not increase feed strength."];
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "aggressive_nutrient_change")).toBe(false);
+    expect(e.status).toBe("pass");
+  });
 });

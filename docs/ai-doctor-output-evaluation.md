@@ -211,11 +211,26 @@ or secrets.
   evaluator deliberately does **not** build (bounded lexicons only). Read the
   code as a coarse "asserted a cause with no evidence at all" signal, not as
   semantic entailment.
-- **Grow-event tracing covers watering / feeding / transplant citations only.**
-  Visual claims ("the photo shows yellowing") are accepted as valid Phase-1
-  vision evidence and are not traced to a diary event, because
-  `Phase1PlantContextPayload` carries no vision field. Fabricated _visual_
-  claims are therefore not detectable by evidence tracing today.
+- **Grow-event tracing runs only on an explicit LOGGED-ACTION claim.** A bare
+  domain word is not proof an action occurred: "leaf posture suggests water
+  stress", "the photo may indicate underwatering" and "possible nutrient stress"
+  are visual/diagnostic language and stay valid **without** a matching grow
+  event. Only claims that an action was performed or logged ("watered
+  yesterday", "irrigation was applied", "fed at 1.2 EC", "nutrient solution was
+  applied") are traced to `recent_grow_events`. Consequence: a fabricated
+  _visual_ claim is not detectable by evidence tracing today, because
+  `Phase1PlantContextPayload` carries no vision field.
+
+**Why nutrient/irrigation changes are flagged at EVERY readiness level.**
+`applyAiDoctorSafetyRules` pushes `NEVER_DO_BASELINE` — which includes _"Do not
+adjust nutrient strength based on this output."_ and _"Do not change irrigation
+schedule based on this output."_ — into `what_not_to_do` **unconditionally** (no
+readiness or context-strength guard; only `AUTOFLOWER_NEVER_DO` is conditional).
+Those changes are therefore universally prohibited by the canonical AI Doctor
+contract, so `aggressive_nutrient_change` / `aggressive_irrigation_change` are
+detected at **all** readiness levels including `strong`. The evaluator mirrors
+the existing rule; it does not invent a new policy.
+
 - `automatedConfidence` is accepted but reserved (no active rule in v1).
 - v1 targets the Phase 1 result family only. The `AiDoctorReviewResult` /
   `Diagnosis` / `AiDoctorResult` families are out of scope until a thin adapter

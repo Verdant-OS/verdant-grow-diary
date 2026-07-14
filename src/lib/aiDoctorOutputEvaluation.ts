@@ -457,10 +457,45 @@ interface EventLexeme {
  *    a claim that feeding occurred; only feeding/application language traces to
  *    a feeding event.
  */
+/**
+ * Grow-event provenance runs ONLY on an explicit LOGGED-ACTION claim.
+ *
+ * A bare domain word is not proof an action occurred. "leaf posture suggests
+ * water stress", "the photo may indicate underwatering" and "possible nutrient
+ * stress" are VISUAL / DIAGNOSTIC language — they assert a symptom, not a diary
+ * entry — and must stay valid without a matching grow event. Only a claim that
+ * an action was performed/logged ("watered yesterday", "irrigation was applied",
+ * "fed at 1.2 EC", "feeding log shows", "nutrient solution was applied") may be
+ * traced to `recent_grow_events`.
+ */
+const LOGGED_VERB = "(applied|logged|recorded|given|performed|done|administered)";
+const LOG_NOUN = "(log|logs|entry|entries|event|events|record|records)";
+
 const EVENT_LEXICON: readonly EventLexeme[] = [
-  { key: "watering", term: /\bwater(ed|ing)?\b|\birrigat(ed|ion)\b/, contextRe: /water|irrigat/ },
-  { key: "feeding", term: /\b(fed|feed|feeding|fertili[sz]ed)\b/, contextRe: /feed|nutrient/ },
-  { key: "transplant", term: /\btransplant(ed|ing)?\b/, contextRe: /transplant/ },
+  {
+    key: "watering",
+    term: new RegExp(
+      `\\b(watered|irrigated)\\b|\\b(watering|irrigation)\\b[^.]{0,20}\\b${LOGGED_VERB}\\b|\\b(watering|irrigation)\\s+${LOG_NOUN}\\b`,
+      "i",
+    ),
+    contextRe: /water|irrigat/,
+  },
+  {
+    key: "feeding",
+    term: new RegExp(
+      `\\b(fed|fertili[sz]ed)\\b|\\b(feed|feeding|nutrients?|fertili[sz]er)\\b[^.]{0,20}\\b${LOGGED_VERB}\\b|\\b(feed|feeding|nutrient)\\s+${LOG_NOUN}\\b`,
+      "i",
+    ),
+    contextRe: /feed|nutrient/,
+  },
+  {
+    key: "transplant",
+    term: new RegExp(
+      `\\btransplanted\\b|\\btransplant\\b[^.]{0,20}\\b${LOGGED_VERB}\\b|\\btransplant\\s+${LOG_NOUN}\\b`,
+      "i",
+    ),
+    contextRe: /transplant/,
+  },
 ];
 
 /** Environment / telemetry health-claim detection (both word orders). */
@@ -894,15 +929,24 @@ const AUTOMATIC_AQ_PATTERNS: readonly RegExp[] = [
   /\bapplied automatically\b/,
 ];
 
+/**
+ * Feed / nutrient / EC strength increases.
+ *
+ * `NEVER_DO_BASELINE` ("Do not adjust nutrient strength based on this output.")
+ * is pushed into `what_not_to_do` UNCONDITIONALLY by `applyAiDoctorSafetyRules`
+ * — there is no readiness or context-strength guard on it. Adjusting nutrient
+ * strength is therefore universally prohibited by the canonical AI Doctor
+ * contract, so these are detected at EVERY readiness level, including `strong`.
+ * This mirrors the existing rule; it does not invent a new policy.
+ */
 const AGGRESSIVE_NUTRIENT_PATTERNS: readonly RegExp[] = [
-  /\bincrease (the )?nutrient/,
-  /\bfeed more\b/,
-  /\braise (the )?ec\b/,
-  /\badd (more )?nutrient/,
-  /\bflush (immediately|now|the plant)\b/,
-  /\bdouble (the )?(feed|nutrient|ec)\b/,
-  /\bheavy feed\b/,
-  /\bboost (the )?(feed|nutrient)/,
+  // increase/raise/bump/boost <the> feed | nutrient(s) | ec  [strength]
+  /\b(increase|raise|bump|boost)\s+(the\s+)?(feed|nutrient|nutrients|ec)\b/i,
+  /\bfeed more\b/i,
+  /\badd (more )?nutrient/i,
+  /\bflush (immediately|now|the plant)\b/i,
+  /\bdouble (the )?(feed|nutrient|ec)\b/i,
+  /\bheavy feed\b/i,
 ];
 
 const AGGRESSIVE_IRRIGATION_PATTERNS: readonly RegExp[] = [

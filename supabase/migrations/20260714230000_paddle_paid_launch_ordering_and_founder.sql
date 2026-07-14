@@ -170,7 +170,9 @@ BEGIN
        AND v_existing.provider_subscription_id IS NOT DISTINCT FROM v_processing.provider_subscription_id
        AND v_existing.current_period_end IS NOT DISTINCT FROM v_processing.current_period_end
        AND v_existing.cancel_at_period_end IS NOT DISTINCT FROM v_processing.cancel_at_period_end
-       AND v_existing.founder_number IS NULL THEN
+       AND v_existing.founder_number IS NULL
+       AND (v_processing.occurred_at IS NULL
+            OR v_existing.last_provider_event_occurred_at IS NOT DISTINCT FROM v_processing.occurred_at) THEN
       RETURN jsonb_build_object('ok', true, 'status', 'noop', 'reason', 'already_applied', 'processing_id', v_processing.id, 'user_id', v_link.user_id, 'plan_id', v_existing.plan_id, 'subscription_status', v_existing.status);
     END IF;
 

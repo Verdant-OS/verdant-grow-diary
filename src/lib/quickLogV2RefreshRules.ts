@@ -56,6 +56,7 @@ const ALWAYS_KEYS: ReadonlyArray<QuickLogV2RefreshKey> = [
   ["timeline_memory"],
   ["manual_snapshot_timeline_cards"],
   ["diary_entries"],
+  ["pheno_evidence_receipts"],
   ["grow_events"],
   ["timeline"],
   // Dashboard recent activity / memory surfaces. Conditional at apply time.
@@ -136,10 +137,7 @@ export function buildQuickLogV2RefreshQueryKeys(
 export interface QuickLogV2RefreshClient {
   invalidateQueries: (opts: { queryKey: readonly unknown[] }) => unknown;
   getQueryCache: () => {
-    findAll: (opts: {
-      queryKey: readonly unknown[];
-      exact?: boolean;
-    }) => ReadonlyArray<unknown>;
+    findAll: (opts: { queryKey: readonly unknown[]; exact?: boolean }) => ReadonlyArray<unknown>;
   };
 }
 
@@ -158,9 +156,7 @@ export function applyQuickLogV2Refresh(
   for (const key of planned) {
     const k = JSON.stringify(key);
     if (CONDITIONAL_KEY_SET.has(k)) {
-      const matches = client
-        .getQueryCache()
-        .findAll({ queryKey: key as readonly unknown[] });
+      const matches = client.getQueryCache().findAll({ queryKey: key as readonly unknown[] });
       if (!matches || matches.length === 0) continue;
     }
     client.invalidateQueries({ queryKey: key as readonly unknown[] });

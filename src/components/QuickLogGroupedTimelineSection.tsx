@@ -14,6 +14,7 @@ import type {
   QuickLogTimelineEntry,
 } from "@/lib/quickLogTimelineGroupingViewModel";
 import { AiDoctorPhase1TimelineEvidenceCard } from "@/components/AiDoctorPhase1TimelineEvidenceCard";
+import PhenoEvidenceTimelineCard from "@/components/PhenoEvidenceTimelineCard";
 import {
   buildAiDoctorPhase1TimelineEvidenceViewModel,
   buildAiDoctorPhase1TimelineReviewHref,
@@ -159,16 +160,13 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
   const [auditExpanded, setAuditExpanded] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const auditable = isAuditableQuickLogEntry(entry);
-  const reviewable =
-    entry.kind === "grouped" && isReviewableQuickLogEntry(entry);
+  const reviewable = entry.kind === "grouped" && isReviewableQuickLogEntry(entry);
   const reviewActionSection =
-    entry.kind === "grouped"
-      ? buildQuickLogReviewActionSection(entry)
-      : null;
+    entry.kind === "grouped" ? buildQuickLogReviewActionSection(entry) : null;
 
   const evidence =
     entry.kind === "action" || entry.kind === "grouped"
-      ? entry.action.aiDoctorPhase1Evidence ?? null
+      ? (entry.action.aiDoctorPhase1Evidence ?? null)
       : null;
   const evidenceViewModel = evidence
     ? buildAiDoctorPhase1TimelineEvidenceViewModel({
@@ -182,6 +180,29 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
       })
     : null;
 
+  const phenoReceipt =
+    entry.kind === "action" || entry.kind === "grouped"
+      ? (entry.action.phenoEvidenceReceipt ?? null)
+      : null;
+
+  if (phenoReceipt && (entry.kind === "action" || entry.kind === "grouped")) {
+    return (
+      <Card
+        {...commonDataAttrs}
+        data-entry-kind="pheno-evidence-receipt"
+        data-action-id={entry.action.id}
+      >
+        <CardContent className="p-3 space-y-3">
+          <PhenoEvidenceTimelineCard
+            receipt={phenoReceipt}
+            noteText={entry.action.noteText ?? null}
+          />
+          {entry.kind === "grouped" && <ManualSnapshotTimelineCard card={entry.environmentCard} />}
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (evidenceViewModel && (entry.kind === "action" || entry.kind === "grouped")) {
     return (
       <Card
@@ -191,9 +212,7 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
       >
         <CardContent className="p-3 space-y-3">
           <AiDoctorPhase1TimelineEvidenceCard viewModel={evidenceViewModel} />
-          {entry.kind === "grouped" && (
-            <ManualSnapshotTimelineCard card={entry.environmentCard} />
-          )}
+          {entry.kind === "grouped" && <ManualSnapshotTimelineCard card={entry.environmentCard} />}
         </CardContent>
       </Card>
     );
@@ -211,10 +230,7 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
       >
         <CardContent className="space-y-3 p-3">
           {auditExpanded ? (
-            <div
-              className="space-y-3"
-              data-testid="quick-log-grouped-audit-expanded"
-            >
+            <div className="space-y-3" data-testid="quick-log-grouped-audit-expanded">
               <div
                 className="rounded-md border border-border/60 p-3 space-y-1"
                 data-testid="quick-log-grouped-audit-action-subcard"
@@ -311,10 +327,7 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
                   >
                     {reviewActionSection.kindLabel}
                   </span>
-                  <Badge
-                    variant="secondary"
-                    data-testid="quick-log-grouped-review-action-source"
-                  >
+                  <Badge variant="secondary" data-testid="quick-log-grouped-review-action-source">
                     {reviewActionSection.sourceLabel}
                   </Badge>
                 </div>
@@ -325,10 +338,7 @@ function EntryItem({ entry, demoVariant }: EntryItemProps) {
                   {reviewActionSection.occurredAt}
                 </p>
                 {reviewActionSection.volumeMl != null && (
-                  <p
-                    className="text-xs"
-                    data-testid="quick-log-grouped-review-action-volume"
-                  >
+                  <p className="text-xs" data-testid="quick-log-grouped-review-action-volume">
                     {reviewActionSection.volumeMl} ml
                   </p>
                 )}
@@ -425,19 +435,17 @@ function defaultTargetKeyFor(props: Props): string | null {
 
 function aiDoctorResultsHrefFor(props: Props): string {
   return buildAiDoctorPhase1TimelineReviewHref({
-    plantId: props.scope === "plant" ? props.plantId ?? null : null,
+    plantId: props.scope === "plant" ? (props.plantId ?? null) : null,
     growId: props.growId ?? null,
     tentId: props.tentId ?? null,
   }).href;
 }
 
-export const QUICK_LOG_GROUPED_TIMELINE_UPDATING_LABEL =
-  "Updating QuickLog timeline…";
+export const QUICK_LOG_GROUPED_TIMELINE_UPDATING_LABEL = "Updating QuickLog timeline…";
 
 export default function QuickLogGroupedTimelineSection(props: Props) {
   const scope = toScope(props);
-  const { entries, isLoading, isFetching, isError } =
-    useQuickLogGroupedTimeline(scope);
+  const { entries, isLoading, isFetching, isError } = useQuickLogGroupedTimeline(scope);
   const [filter, setFilter] = useState<QuickLogGroupedTimelineFilter>("all");
   const [quickLogOpen, setQuickLogOpen] = useState(false);
 
@@ -452,10 +460,7 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
   }, [entries, props.demoEntries]);
 
   const filteredWrapped = useMemo(
-    () =>
-      wrapped.filter((w) =>
-        filterQuickLogGroupedTimelineEntries([w.entry], filter).length > 0,
-      ),
+    () => wrapped.filter((w) => filterQuickLogGroupedTimelineEntries([w.entry], filter).length > 0),
     [wrapped, filter],
   );
 
@@ -464,10 +469,7 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
   const isAiDoctorEvidenceFilter = filter === "ai-doctor-evidence";
 
   return (
-    <Card
-      data-testid="quick-log-grouped-timeline-section"
-      data-scope={props.scope}
-    >
+    <Card data-testid="quick-log-grouped-timeline-section" data-scope={props.scope}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <History className="h-4 w-4" aria-hidden /> QuickLog memory
@@ -559,10 +561,7 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
             </Button>
           </div>
         ) : !hasAnyEntries ? (
-          <div
-            className="space-y-3"
-            data-testid="quick-log-grouped-timeline-empty"
-          >
+          <div className="space-y-3" data-testid="quick-log-grouped-timeline-empty">
             <p
               className="text-sm font-medium text-foreground"
               data-testid="quick-log-grouped-timeline-empty-title"
@@ -596,10 +595,7 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
             {QUICK_LOG_GROUPED_TIMELINE_EMPTY_FILTERED_TEXT}
           </p>
         ) : (
-          <ul
-            className="space-y-3"
-            data-testid="quick-log-grouped-timeline-list"
-          >
+          <ul className="space-y-3" data-testid="quick-log-grouped-timeline-list">
             {filteredWrapped.map((w, i) => {
               const entry = w.entry;
               const key =

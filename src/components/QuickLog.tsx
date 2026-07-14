@@ -152,6 +152,16 @@ export interface QuickLogPrefill {
    * Never used as a write path discriminator.
    */
   preset?: string | null;
+  /**
+   * Optional Pheno evidence-goal handoff (grower clicked "Record <goal>
+   * evidence" in the hunt workspace/compare). Seeds the evidence-goal chip
+   * ONLY when the loaded Pheno context confirms the plant, hunt, and goal —
+   * and the existing reset/revalidation still applies: the selection clears
+   * on plant/hunt/dialog change and is re-checked against the hunt's live
+   * configured goals at save time. Never selects a goal on its own.
+   */
+  phenoHuntId?: string | null;
+  phenoEvidenceGoal?: string | null;
 }
 
 interface Props {
@@ -440,6 +450,52 @@ export default function QuickLog({
   useEffect(() => {
     setSelectedPhenoEvidenceGoal(null);
   }, [open, plantId, selectedPhenoHuntId]);
+
+  // One-shot guard for the evidence-goal handoff seed. It is consumed the
+  // moment the goal is seeded and reset only when the dialog closes, so a
+  // React Query refetch that replaces phenoEvidenceContext.context (window
+  // focus, or the pheno_evidence_receipts-family invalidation after a
+  // successful save) can NEVER silently re-seed the original goal after the
+  // grower changed it or cleared it via "Log another". Fresh explicit
+  // selection stays the grower's, not the handoff's.
+  const phenoSeedConsumedRef = useRef(false);
+  useEffect(() => {
+    if (!open) phenoSeedConsumedRef.current = false;
+  }, [open]);
+
+  // Seed the goal from a "Record <goal> evidence" handoff — the grower
+  // clicked that exact goal in the workspace. Declared AFTER the reset
+  // effect so a legitimate seed survives the same-commit reset, and guarded
+  // so it only applies when the ready context confirms the same plant, the
+  // same hunt, and that the goal is still one of the hunt's configured
+  // goals. Any mismatch (candidate changed, hunt changed, goal unconfigured)
+  // leaves the selection empty — never auto-picks a different goal. Runs at
+  // most ONCE per dialog handoff via phenoSeedConsumedRef.
+  useEffect(() => {
+    if (!open) return;
+    if (phenoSeedConsumedRef.current) return;
+    const goal = prefill?.phenoEvidenceGoal;
+    if (typeof goal !== "string" || goal.length === 0) return;
+    if (!prefill?.plantId || selectedPlant?.id !== prefill.plantId) return;
+    if (!prefill?.phenoHuntId || selectedPhenoHuntId !== prefill.phenoHuntId) return;
+    if (phenoEvidenceContext.status !== "ready" || !phenoEvidenceContext.context) return;
+    if (phenoEvidenceContext.context.huntId !== prefill.phenoHuntId) return;
+    const configured = phenoEvidenceContext.context.coverage.goals.some((g) => g.id === goal);
+    if (!configured) return;
+    // Consume the handoff BEFORE seeding so any concurrent context refetch
+    // that re-runs this effect finds the guard already set.
+    phenoSeedConsumedRef.current = true;
+    setSelectedPhenoEvidenceGoal(goal as PhenoEvidenceGoalId);
+  }, [
+    open,
+    prefill?.phenoEvidenceGoal,
+    prefill?.phenoHuntId,
+    prefill?.plantId,
+    selectedPlant?.id,
+    selectedPhenoHuntId,
+    phenoEvidenceContext.status,
+    phenoEvidenceContext.context,
+  ]);
 
   useEffect(() => {
     if (eventType !== "watering" || details.watering.trim()) setWateringError(null);

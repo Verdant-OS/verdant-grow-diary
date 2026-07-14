@@ -16,6 +16,17 @@ vi.mock("@/hooks/usePhenoHuntCandidates", () => ({
 
 import PhenoHuntCompare from "@/pages/PhenoHuntCompare";
 
+// Packet coverage is exercised by its own suites; here it stays disabled so
+// these tests keep testing their original axis without a QueryClient.
+vi.mock("@/hooks/usePhenoEvidencePackets", () => ({
+  usePhenoEvidencePackets: () => ({
+    status: "disabled" as const,
+    packets: new Map(),
+    truncated: false,
+  }),
+}));
+
+
 const HUNT_ID = "hunt-inc-1";
 
 function baseCandidate(id: string): PhenoCandidateInput {

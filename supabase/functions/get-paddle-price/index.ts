@@ -23,8 +23,14 @@ import { resolveServerBillingEnvironment } from '../_shared/unionEntitlementLook
  *    details, no key material, no echo of unexpected input.
  */
 
-/** The only plans a price may be resolved for. Keep in lockstep with the
- * client planCatalog and the reconciliation RPC's plan checks. */
+/**
+ * The only plans a price may be resolved for. Keep in lockstep with the
+ * client planCatalog and the reconciliation RPC's plan checks.
+ *
+ * Every entry here MUST also appear as a key in SERVER_PRICE_CONFIG below,
+ * and the corresponding PADDLE_PRICE_* env var must be populated before this
+ * function is deployed to a live environment.
+ */
 const PAID_PLAN_ALLOWLIST: ReadonlySet<string> = new Set([
   'pro_monthly',
   'pro_annual',
@@ -33,9 +39,12 @@ const PAID_PLAN_ALLOWLIST: ReadonlySet<string> = new Set([
 
 /**
  * Server-configured Paddle price IDs — the same source the webhook uses for
- * plan classification. Populated at cold-start from env so the map is built
- * once per instance. An empty string means the var is not configured; the
- * gateway result is then rejected rather than returned unvalidated.
+ * plan classification (paddle-webhook/index.ts PADDLE_PRICE_CONFIG). Populated
+ * at cold-start from env so the map is built once per instance. An empty
+ * string means the var is not configured; the gateway result is then rejected
+ * rather than returned unvalidated.
+ *
+ * Keep keys in lockstep with PAID_PLAN_ALLOWLIST above.
  */
 const SERVER_PRICE_CONFIG: Readonly<Record<string, string>> = {
   pro_monthly: Deno.env.get('PADDLE_PRICE_PRO_MONTHLY') ?? '',

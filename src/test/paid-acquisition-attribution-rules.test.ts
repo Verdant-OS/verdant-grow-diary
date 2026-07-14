@@ -13,6 +13,7 @@ describe("paid acquisition attribution rules", () => {
     ["founder_page", "owned", "founder_launch", "pricing_interest_founder_page"],
     ["founder_share", "referral", "founder_launch", "pricing_interest_founder_share"],
     ["pricing_interest_share", "referral", "paid_launch", "pricing_interest_referral"],
+    ["grower_invite", "referral", "grower_invite", "pricing_interest_grower_invite"],
   ] as const)(
     "round-trips the fixed %s attribution tuple",
     (source, medium, campaign, leadSource) => {

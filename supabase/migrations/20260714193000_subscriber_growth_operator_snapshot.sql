@@ -65,7 +65,8 @@ BEGIN
           'pricing_interest_landing',
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
-          'pricing_interest_referral'
+          'pricing_interest_referral',
+          'pricing_interest_grower_invite'
         )
       ) AS pricing_interest_total,
       count(DISTINCT lower(btrim(l.email))) FILTER (
@@ -74,7 +75,8 @@ BEGIN
           'pricing_interest_landing',
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
-          'pricing_interest_referral'
+          'pricing_interest_referral',
+          'pricing_interest_grower_invite'
         )
           AND l.created_at >= now() - interval '7 days'
       ) AS pricing_interest_7d,
@@ -84,7 +86,8 @@ BEGIN
           'pricing_interest_landing',
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
-          'pricing_interest_referral'
+          'pricing_interest_referral',
+          'pricing_interest_grower_invite'
         )
           AND l.status IN ('new', 'reviewed')
           AND l.contacted_at IS NULL
@@ -95,7 +98,8 @@ BEGIN
           'pricing_interest_landing',
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
-          'pricing_interest_referral'
+          'pricing_interest_referral',
+          'pricing_interest_grower_invite'
         )
           AND l.status = 'follow_up'
           AND l.follow_up_at IS NOT NULL
@@ -107,7 +111,8 @@ BEGIN
           'pricing_interest_landing',
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
-          'pricing_interest_referral'
+          'pricing_interest_referral',
+          'pricing_interest_grower_invite'
         )
           AND l.contacted_at >= now() - interval '7 days'
       ) AS pricing_interest_contacted_7d,
@@ -126,6 +131,9 @@ BEGIN
       count(DISTINCT lower(btrim(l.email))) FILTER (
         WHERE l.source = 'pricing_interest_referral'
       ) AS pricing_interest_referral,
+      count(DISTINCT lower(btrim(l.email))) FILTER (
+        WHERE l.source = 'pricing_interest_grower_invite'
+      ) AS pricing_interest_grower_invite,
       count(DISTINCT lower(btrim(l.email))) FILTER (
         WHERE l.created_at >= now() - interval '7 days'
       ) AS all_leads_7d
@@ -150,6 +158,7 @@ BEGIN
     'pricing_interest_founder_page', lc.pricing_interest_founder_page,
     'pricing_interest_founder_share', lc.pricing_interest_founder_share,
     'pricing_interest_referral', lc.pricing_interest_referral,
+    'pricing_interest_grower_invite', lc.pricing_interest_grower_invite,
     'all_leads_7d', lc.all_leads_7d
   )
   INTO v_counts
@@ -179,6 +188,7 @@ BEGIN
       'pricing_interest_founder_page', 0,
       'pricing_interest_founder_share', 0,
       'pricing_interest_referral', 0,
+      'pricing_interest_grower_invite', 0,
       'all_leads_7d', 0
     ))
   );

@@ -59,6 +59,7 @@ describe("OperatorSubscriberGrowth", () => {
           pricing_interest_founder_page: 5,
           pricing_interest_founder_share: 3,
           pricing_interest_referral: 4,
+          pricing_interest_grower_invite: 6,
           all_leads_7d: 9,
         },
       },
@@ -75,6 +76,7 @@ describe("OperatorSubscriberGrowth", () => {
     expect(screen.getByText("Interest signals — not subscribers")).toBeInTheDocument();
     expect(screen.getByText("Founder shares")).toBeInTheDocument();
     expect(screen.getByText("Paid-interest shares")).toBeInTheDocument();
+    expect(screen.getByText("Grower invites")).toBeInTheDocument();
     expect(screen.getByText("Needs first contact")).toBeInTheDocument();
     expect(screen.getByText("Follow-up due")).toBeInTheDocument();
     expect(screen.getByText("Contacted — 7 days")).toBeInTheDocument();

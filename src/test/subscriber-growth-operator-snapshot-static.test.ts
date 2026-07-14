@@ -44,10 +44,13 @@ describe("subscriber growth operator snapshot — security and truth fences", ()
     expect(SQL).toContain("FROM public.leads AS l");
     expect(SQL).toContain("'pricing_interest_founder_share'");
     expect(SQL).toContain("'pricing_interest_referral'");
+    expect(SQL).toContain("'pricing_interest_grower_invite'");
     expect(SQL).toContain("AS pricing_interest_founder_share");
     expect(SQL).toContain("AS pricing_interest_referral");
+    expect(SQL).toContain("AS pricing_interest_grower_invite");
     expect(PAGE).toContain("Interest signals — not subscribers");
     expect(PAGE).toMatch(/they\s+never\s+increase\s+the\s+paid-subscriber\s+total/);
+    expect(PAGE).toContain("Grower invites");
   });
 
   it("deduplicates interest metrics and exposes actionable follow-up workload", () => {

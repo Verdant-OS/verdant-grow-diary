@@ -84,6 +84,16 @@ describe("Pricing checkout recovery", () => {
     );
   });
 
+  it("keeps authenticated grower-invite attribution at the lead boundary", () => {
+    renderPricing(
+      "/pricing?utm_source=grower_invite&utm_medium=referral&utm_campaign=grower_invite",
+    );
+    expect(screen.getByTestId("subscriber-interest-form")).toHaveAttribute(
+      "data-lead-source",
+      "pricing_interest_grower_invite",
+    );
+  });
+
   it("does not retry checkout after a runtime failure", async () => {
     mocks.checkout.unavailable = false;
     mocks.checkout.unavailableMessage = null;

@@ -12,6 +12,7 @@ import {
   Settings,
   ClipboardCheck,
   LineChart,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -72,7 +73,10 @@ export const moreGroups: MoreGroup[] = [
   },
   {
     heading: "Account",
-    items: [{ to: "/settings", label: "Settings", icon: Settings }],
+    items: [
+      { to: "/settings", label: "Settings", icon: Settings },
+      { to: "/invite", label: "Invite a Grower", icon: Users },
+    ],
   },
 ];
 

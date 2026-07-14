@@ -37,6 +37,7 @@ const Alerts = lazy(() => import("./pages/Alerts"));
 const AlertDetail = lazy(() => import("./pages/AlertDetail"));
 const Settings = lazy(() => import("./pages/Settings"));
 const AccountPreferences = lazy(() => import("./pages/AccountPreferences"));
+const GrowerInvite = lazy(() => import("./pages/GrowerInvite"));
 const AgentIntegrations = lazy(() => import("./pages/AgentIntegrations"));
 const Timeline = lazy(() => import("./pages/Timeline"));
 const Grows = lazy(() => import("./pages/Grows"));
@@ -318,6 +319,7 @@ const App = () => (
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/settings/agent-integrations" element={<AgentIntegrations />} />
                     <Route path="/account/preferences" element={<AccountPreferences />} />
+                    <Route path="/invite" element={<GrowerInvite />} />
                     <Route path="/health" element={<HealthCheck />} />
                     {/* Operator-only routes. Authenticated via AppShell's useRequireAuth,
                         then gated by server-side has_role('operator') via RequireOperatorRole.

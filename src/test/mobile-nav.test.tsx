@@ -60,7 +60,10 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
         ["Reports", "/reports"],
         ["Harvest Archive", "/grows"],
       ],
-      Account: [["Settings", "/settings"]],
+      Account: [
+        ["Settings", "/settings"],
+        ["Invite a Grower", "/invite"],
+      ],
     };
 
     for (const [heading, items] of Object.entries(expectations)) {

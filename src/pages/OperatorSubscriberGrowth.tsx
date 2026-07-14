@@ -215,7 +215,7 @@ export default function OperatorSubscriberGrowth() {
               />
               <MetricCard label="All leads — 7 days" value={snapshot.counts.allLeads7d} />
             </CardContent>
-            <CardContent className="grid gap-3 border-t border-border/60 pt-6 sm:grid-cols-2 lg:grid-cols-5">
+            <CardContent className="grid gap-3 border-t border-border/60 pt-6 sm:grid-cols-2 lg:grid-cols-6">
               <MetricCard label="Direct pricing" value={snapshot.counts.pricingInterestDirect} />
               <MetricCard label="Landing page" value={snapshot.counts.pricingInterestLanding} />
               <MetricCard label="Founder page" value={snapshot.counts.pricingInterestFounderPage} />
@@ -226,6 +226,10 @@ export default function OperatorSubscriberGrowth() {
               <MetricCard
                 label="Paid-interest shares"
                 value={snapshot.counts.pricingInterestReferral}
+              />
+              <MetricCard
+                label="Grower invites"
+                value={snapshot.counts.pricingInterestGrowerInvite}
               />
             </CardContent>
           </Card>

@@ -22,7 +22,8 @@ WITH CHECK (
     'pricing_interest_landing',
     'pricing_interest_founder_page',
     'pricing_interest_founder_share',
-    'pricing_interest_referral'
+    'pricing_interest_referral',
+    'pricing_interest_grower_invite'
   )
   AND length(COALESCE(message, '')) <= 2000
 );

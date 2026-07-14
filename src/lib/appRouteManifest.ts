@@ -175,6 +175,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "internal",
     description: "Sensor truth internal static audit.",
   },
+  {
+    path: "/invite",
+    access: "auth",
+    description: "Authenticated PII-free grower referral surface.",
+  },
   { path: "/leads", access: "internal" },
   { path: "/login", access: "redirect", description: "→ /auth" },
   { path: "/logs", access: "redirect", description: "→ /timeline" },

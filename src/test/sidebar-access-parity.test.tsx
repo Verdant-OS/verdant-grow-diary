@@ -54,9 +54,7 @@ function hrefSet(): Set<string> {
 }
 
 const OPERATOR_OR_INTERNAL_PATHS = new Set(
-  APP_ROUTES.filter((r) => r.access === "operator" || r.access === "internal").map(
-    (r) => r.path,
-  ),
+  APP_ROUTES.filter((r) => r.access === "operator" || r.access === "internal").map((r) => r.path),
 );
 
 describe("AppSidebar — non-operator authenticated grower", () => {
@@ -88,6 +86,7 @@ describe("AppSidebar — non-operator authenticated grower", () => {
       "/grows",
       "/grow-lineage",
       "/settings",
+      "/invite",
     ]) {
       expect(links.has(path), `missing grower link ${path}`).toBe(true);
     }
@@ -153,8 +152,9 @@ describe("AppSidebar — operator user", () => {
 
   it("exposes the Operator Mode group label", () => {
     render(wrap(<AppSidebar />));
-    const labels = Array.from(document.querySelectorAll('[data-sidebar="group-label"]'))
-      .map((el) => el.textContent?.trim());
+    const labels = Array.from(document.querySelectorAll('[data-sidebar="group-label"]')).map((el) =>
+      el.textContent?.trim(),
+    );
     expect(labels).toContain("Operator Mode");
   });
 });
@@ -230,9 +230,9 @@ describe("UI Simplification Slice 1 — operator group placement", () => {
 
   it("places AI Doctor Results and Release Readiness inside the Operator Mode group", () => {
     render(wrap(<AppSidebar />));
-    const heading = Array.from(
-      document.querySelectorAll('[data-sidebar="group-label"]'),
-    ).find((el) => el.textContent?.trim() === "Operator Mode");
+    const heading = Array.from(document.querySelectorAll('[data-sidebar="group-label"]')).find(
+      (el) => el.textContent?.trim() === "Operator Mode",
+    );
     expect(heading, "Operator Mode group label not rendered").toBeTruthy();
     const group = heading?.closest('[data-sidebar="group"]');
     expect(group).not.toBeNull();
@@ -242,15 +242,11 @@ describe("UI Simplification Slice 1 — operator group placement", () => {
   });
 });
 
-
-
 describe("Mobile More sheet — manifest access parity", () => {
   it("primary tabs and More entries only point at manifest 'auth' paths", async () => {
     const { primary, more } = await import("@/components/MobileNav");
     const allowedAuthOrRedirect = new Set(
-      APP_ROUTES.filter((r) => r.access === "auth" || r.access === "redirect").map(
-        (r) => r.path,
-      ),
+      APP_ROUTES.filter((r) => r.access === "auth" || r.access === "redirect").map((r) => r.path),
     );
     for (const item of [...primary, ...more]) {
       expect(

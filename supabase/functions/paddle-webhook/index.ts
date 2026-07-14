@@ -41,6 +41,12 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const PADDLE_WEBHOOK_SECRET = Deno.env.get("PADDLE_WEBHOOK_SECRET") ?? "";
 const PADDLE_ENVIRONMENT = (Deno.env.get("PADDLE_ENVIRONMENT") ?? "").toLowerCase();
 
+// Replay bounds for the Paddle-Signature timestamp. A signed delivery older
+// than this window (or too far in the future) is rejected before any DB
+// write — a captured webhook can no longer be replayed indefinitely.
+const SIGNATURE_MAX_AGE_SECONDS = 300;
+const SIGNATURE_MAX_FUTURE_SKEW_SECONDS = 60;
+
 const PADDLE_PRICE_CONFIG = {
   pro_monthly: Deno.env.get("PADDLE_PRICE_PRO_MONTHLY") ?? "",
   pro_annual: Deno.env.get("PADDLE_PRICE_PRO_ANNUAL") ?? "",
@@ -92,6 +98,10 @@ type ProcessingPayload = {
   current_period_end: string | null;
   cancel_at_period_end: boolean;
   is_founder_candidate: boolean;
+  /** Provider-declared occurrence time (payload.occurred_at). Drives the
+   * ordering guard in the subscription-update RPC so an old replayed event
+   * can never overwrite newer state. Null when the payload omits it. */
+  occurred_at: string | null;
   details: Record<string, unknown>;
 };
 
@@ -99,6 +109,9 @@ type ProcessingResult = {
   id: string | null;
   status: ProcessingPayload["status"];
   duplicate: boolean;
+  /** True when the processing row is a founder_lifetime candidate — routes
+   * the handoff to the founder allocation RPC instead of the recurring one. */
+  isFounderCandidate: boolean;
 };
 
 type ExistingBillingCustomerLinkRow = {
@@ -128,9 +141,7 @@ function jsonResponse(body: unknown, status: number): Response {
 // Signature verifier helpers live in a shared module so the exact same
 // implementation is exercised by supabase/functions/paddle-webhook/security.test.ts.
 import {
-  constantTimeEqual,
-  hmacSha256Hex,
-  parsePaddleSignature,
+  verifyPaddleWebhookSignature,
 } from "./verifyPaddleSignature.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -182,7 +193,11 @@ function customDataCandidates(payload: Record<string, unknown>, data: Record<str
 function metadataUserIds(payload: Record<string, unknown>, data: Record<string, unknown>): string[] {
   const ids: Array<string | null> = [];
   for (const custom of customDataCandidates(payload, data)) {
-    ids.push(firstStringPath(custom, [["verdant_user_id"], ["user_id"], ["auth_user_id"], ["verdant_auth_user_id"]]));
+    // "userId" (camelCase) is the key the live checkout actually sends
+    // (usePaddleCheckout customData: { userId: user.id }); Paddle passes
+    // custom_data through verbatim. Without it, paid events record but link
+    // capture returns missing_user_id and the buyer gets no entitlement.
+    ids.push(firstStringPath(custom, [["verdant_user_id"], ["user_id"], ["userId"], ["auth_user_id"], ["verdant_auth_user_id"]]));
   }
   return uniqueStrings(ids);
 }
@@ -280,6 +295,7 @@ function baseProcessingPayload(
     current_period_end: null,
     cancel_at_period_end: false,
     is_founder_candidate: false,
+    occurred_at: readString(row.payload?.occurred_at) ?? null,
     details,
   };
 }
@@ -398,7 +414,7 @@ async function fetchExistingProcessing(
 ): Promise<ProcessingResult | null> {
   const { data, error } = await supabase
     .from("paddle_event_processing")
-    .select("id,status")
+    .select("id,status,is_founder_candidate")
     .eq("paddle_event_id", paddleEventId)
     .maybeSingle();
 
@@ -407,8 +423,17 @@ async function fetchExistingProcessing(
     return null;
   }
 
-  const row = data as { id: string; status: ProcessingPayload["status"] };
-  return { id: row.id, status: row.status, duplicate: true };
+  const row = data as {
+    id: string;
+    status: ProcessingPayload["status"];
+    is_founder_candidate: boolean;
+  };
+  return {
+    id: row.id,
+    status: row.status,
+    duplicate: true,
+    isFounderCandidate: row.is_founder_candidate === true,
+  };
 }
 
 async function insertProcessingPayload(
@@ -422,14 +447,24 @@ async function insertProcessingPayload(
     .single();
   if (!error && data) {
     const row = data as { id: string; status: ProcessingPayload["status"] };
-    return { id: row.id, status: row.status, duplicate: false };
+    return {
+      id: row.id,
+      status: row.status,
+      duplicate: false,
+      isFounderCandidate: payload.is_founder_candidate === true,
+    };
   }
 
   const code = (error as { code?: string } | null)?.code;
   if (code === "23505") {
     const existing = await fetchExistingProcessing(supabase, payload.paddle_event_id);
     if (existing) return existing;
-    return { id: null, status: payload.status, duplicate: true };
+    return {
+      id: null,
+      status: payload.status,
+      duplicate: true,
+      isFounderCandidate: payload.is_founder_candidate === true,
+    };
   }
 
   throw error;
@@ -515,7 +550,14 @@ async function applyPaddleSubscriptionUpdate(
     return { status: "skipped", reason: "link_capture_not_ready" };
   }
 
-  const { data, error } = await supabase.rpc("apply_paddle_subscription_update_with_audit", {
+  // Founder lifetime is a ONE-TIME paid entitlement: it routes to the atomic,
+  // cap-enforced allocation RPC. Recurring lifecycle events keep routing to
+  // the reviewed subscription updater. Both are service-role-only SECURITY
+  // DEFINER functions that re-validate everything server-side.
+  const rpcName = processing.isFounderCandidate
+    ? "allocate_founder_lifetime_with_audit"
+    : "apply_paddle_subscription_update_with_audit";
+  const { data, error } = await supabase.rpc(rpcName, {
     p_processing_id: processing.id,
   });
 
@@ -567,19 +609,27 @@ Deno.serve(async (req) => {
   // CRITICAL: read RAW body before any parsing.
   const rawBody = await req.text();
 
-  const sigHeader = req.headers.get("paddle-signature") ?? "";
-  const parsed = parsePaddleSignature(sigHeader);
-  if (!parsed) {
-    return jsonResponse({ error: "invalid_signature_header" }, 400);
-  }
-
-  const expected = await hmacSha256Hex(
+  // Full verification via the tested single source of truth: numeric-ts
+  // validation, replay bounds (stale/future), rotation-safe multi-h1
+  // compare, constant-time throughout. The previous inline parse+hmac path
+  // enforced none of the timestamp bounds in production.
+  const sigHeader = req.headers.get("paddle-signature");
+  const verification = await verifyPaddleWebhookSignature(
     PADDLE_WEBHOOK_SECRET,
-    `${parsed.ts}:${rawBody}`,
+    sigHeader,
+    rawBody,
+    {
+      maxAgeSeconds: SIGNATURE_MAX_AGE_SECONDS,
+      maxFutureSkewSeconds: SIGNATURE_MAX_FUTURE_SKEW_SECONDS,
+    },
   );
-  const verified = constantTimeEqual(expected, parsed.h1);
-  if (!verified) {
-    return jsonResponse({ error: "signature_mismatch" }, 401);
+  if (!verification.ok) {
+    const status =
+      verification.reason === "missing_header" ||
+      verification.reason === "invalid_signature_header"
+        ? 400
+        : 401;
+    return jsonResponse({ error: verification.reason }, status);
   }
 
   // Parse only AFTER verification.

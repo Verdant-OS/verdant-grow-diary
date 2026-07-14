@@ -363,36 +363,35 @@ function validateContractShape(result: Phase1DiagnosisResult, findings: FindingL
  * claims through. That is a false NEGATIVE in a safety gate, so the exemption
  * is deliberately narrow.
  */
-const CAUTIONARY_MARKERS: readonly string[] = [
-  "stale",
-  "invalid",
-  "missing",
-  "unknown",
-  "unavailable",
-  "not available",
-  "not recorded",
-  "not present",
-  "not enough",
-  "no recent",
-  "no data",
-  "no reading",
-  "no sensor",
-  "no live",
-  "no manual",
-  "no photo",
-  "without",
-  "lack",
-  "limited",
-  "insufficient",
-  "cannot",
-  "can't",
-  "unclear",
-  "unconfirmed",
-  "unverified",
+/**
+ * A limitation word alone is NOT enough — it must attach to a DATA noun.
+ *
+ * Bare-substring markers are structurally unsafe here: "missing", "lack",
+ * "insufficient" and "without" all appear in ordinary *affirmative deficiency
+ * claims* ("Plant is missing calcium because pH is off", "Plant lacks nitrogen
+ * because EC is low"). Treating those as cautionary would exempt them from every
+ * provenance check and let unsupported metric claims through the stop-ship gate.
+ *
+ * So an item is cautionary only when a limitation word sits near a word that
+ * denotes DATA/EVIDENCE (reading, sensor, snapshot, log, photo, …) — never a
+ * nutrient or a plant symptom.
+ */
+const DATA_NOUN =
+  "(data|reading|readings|sensor|sensors|snapshot|snapshots|telemetry|measurement|measurements|timestamp|photo|image|entry|entries|event|events|log|logs|history|information|context|evidence|clarity)";
+const LIMITATION_WORD =
+  "(no|not|none|missing|lack|lacks|lacking|without|insufficient|limited|unavailable|unknown|unverified|unconfirmed|unclear|stale|invalid|absent)";
+
+const CAUTIONARY_PATTERNS: readonly RegExp[] = [
+  // limitation → data noun: "no recent readings", "stale and invalid readings"
+  new RegExp(`\\b${LIMITATION_WORD}\\b[^.]{0,25}\\b${DATA_NOUN}\\b`, "i"),
+  // data noun → limitation: "humidity data is stale", "sensor reading is missing"
+  new RegExp(`\\b${DATA_NOUN}\\b[^.]{0,25}\\b${LIMITATION_WORD}\\b`, "i"),
+  /\bnot enough\b/i,
+  /\bcan(?:not|'t) be (trusted|verified|confirmed|used)\b/i,
 ];
 
 function isCautionary(lower: string): boolean {
-  return CAUTIONARY_MARKERS.some((m) => lower.includes(m));
+  return CAUTIONARY_PATTERNS.some((re) => re.test(lower));
 }
 
 function asText(v: unknown): string {
@@ -706,18 +705,22 @@ function validateEvidenceIntegrity(
     }
   }
 
-  // 5. Healthy/stable telemetry claim not backed by trustworthy telemetry.
+  // 5. Healthy/stable environment claim not backed by TRUSTWORTHY telemetry.
+  //
+  // The absence of telemetry is still unverified telemetry: with no readings at
+  // all, "the room environment is stable and in range" is exactly as unsupported
+  // as the same claim made over stale data. So the only thing that licenses an
+  // environment health claim is live/manual data — not merely "no bad data".
   const positive = positiveClaimText(input.result);
   if (
     (ENV_HEALTHY_RE_A.test(positive) || ENV_HEALTHY_RE_B.test(positive)) &&
-    !prov.hasTrustworthy &&
-    (prov.hasStaleOrInvalid || prov.hasDemo)
+    !prov.hasTrustworthy
   ) {
     findings.add({
       code: "healthy_claim_from_bad_telemetry",
       severity: "error",
       message:
-        "Result presents the environment as stable/healthy using stale, invalid, or demo telemetry.",
+        "Result presents the environment as stable/healthy without trustworthy (live/manual) telemetry to support it.",
     });
   }
 

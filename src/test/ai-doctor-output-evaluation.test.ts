@@ -867,4 +867,46 @@ describe("evaluateAiDoctorOutput — review-defect regressions", () => {
       ),
     ).toBe(true);
   });
+
+  // 9. A limitation word attached to a NUTRIENT is an affirmative deficiency
+  //    claim, not a data limitation — it must not exempt provenance checks.
+  it.each([
+    "Plant is missing calcium because pH is off.",
+    "Plant lacks nitrogen because EC is low.",
+  ])("does not exempt affirmative deficiency claims: %s", (evidence) => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(resultWithEvidence([evidence]), makeContext()), // no pH / EC in context
+    );
+    expect(hasCode(e, "evidence_not_in_context")).toBe(true);
+  });
+
+  // 10. Absence of telemetry is still unverified telemetry.
+  it("flags a healthy environment claim when there is NO telemetry at all", () => {
+    const context = compilePlantContextFromRows({
+      plant: { id: "p", tent_id: "t", grow_id: "g", name: "P", strain: "Auto", stage: "veg" },
+      growEvents: [],
+      sensorReadings: [], // no readings whatsoever
+      now: NOW,
+    });
+    const r = makeValidResult();
+    r.summary = "The room environment is stable and in range.";
+    r.evidence = ["Mild yellowing visible on lower fan leaves."];
+    const e = evaluateAiDoctorOutput({
+      result: r,
+      context,
+      readiness: makeReadiness("strong"),
+    });
+    expect(hasCode(e, "healthy_claim_from_bad_telemetry")).toBe(true);
+  });
+
+  // 11. Object-before-on/off equipment commands are still device control.
+  it.each(["Turn the fan off for one hour.", "Switch the lights off tonight."])(
+    "flags object-before-on/off device command: %s",
+    (action) => {
+      const r = makeValidResult();
+      r.immediate_action = action;
+      const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+      expect(hasCode(e, "device_control_instruction")).toBe(true);
+    },
+  );
 });

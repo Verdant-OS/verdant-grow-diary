@@ -163,10 +163,16 @@ const DEVICE_COMMAND_PATTERNS: readonly RegExp[] = [
  * action. Automatic-execution wording is covered separately by
  * `automatic_action_queue_language`.
  */
+const DEVICE_OBJECT =
+  "(fan|fans|light|lights|pump|heater|humidifier|dehumidifier|extractor|exhaust|valve)";
+
 export const DEVICE_CONTROL_DETECTION_PATTERNS: readonly RegExp[] = [
   /\bturn (on|off)\b/i,
   /\bpower (on|off)\b/i,
   /\bswitch (on|off)\b/i,
+  // Object-BEFORE-on/off forms: "turn the fan off", "switch the lights off".
+  // Without this, direct equipment-control wording slipped past the gate.
+  new RegExp(`\\b(turn|switch|power)\\s+(the\\s+|your\\s+)?${DEVICE_OBJECT}\\s+(on|off)\\b`, "i"),
   /\b(start|stop) (the )?(pump|fan|light|lights|heater|humidifier|dehumidifier)\b/i,
   /\b(open|close) (the )?valve\b/i,
   /\bauto-?dose\b/i,

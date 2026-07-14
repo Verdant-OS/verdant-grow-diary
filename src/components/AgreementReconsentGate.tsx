@@ -207,14 +207,16 @@ export function AgreementReconsentGate() {
           </span>
         </label>
 
-        <p
-          id="reconsent-error"
-          role="alert"
-          aria-live="assertive"
-          className={`text-sm text-destructive min-h-5 ${error ? "" : "sr-only"}`}
-        >
-          {error ?? ""}
-        </p>
+        {error ? (
+          <p
+            id="reconsent-error"
+            role="alert"
+            aria-live="assertive"
+            className="text-sm text-destructive"
+          >
+            {error}
+          </p>
+        ) : null}
 
         <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="ghost" onClick={() => void signOut()} disabled={submitting}>

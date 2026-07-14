@@ -80,13 +80,33 @@ export function usePhenoEvidencePackets(input: {
       });
     }
     if (!result || result.ok !== true) return EMPTY_PACKETS;
-    return buildPhenoEvidencePackets({
+    // The bounded read caps the plant-id list, so `result.plantIds` is the set
+    // ACTUALLY queried — it can be a strict subset of what we requested. Build
+    // real packets only for those; use rowCapHit (not the combined truncated)
+    // so a candidate whose receipts all came back is not falsely marked
+    // "truncated" just because OTHER candidates were dropped by the id cap.
+    const queried = buildPhenoEvidencePackets({
       huntId,
-      plantIds,
+      plantIds: result.plantIds,
       configuredGoals: input.configuredGoals,
       rows: result.rows,
-      truncated: result.truncated,
+      truncated: result.rowCapHit,
     });
+    const overflowIds = plantIds.filter((id) => !queried.has(id));
+    if (overflowIds.length === 0) return queried;
+    // Candidates dropped by the id cap were NEVER queried: their coverage is
+    // unknown, not zero. Represent them as "unavailable" so the compare /
+    // workspace panels and CSV never show false zero coverage for the overflow.
+    const overflow = buildPhenoEvidencePackets({
+      huntId,
+      plantIds: overflowIds,
+      configuredGoals: input.configuredGoals,
+      rows: [],
+      unavailable: true,
+    });
+    const merged = new Map(queried);
+    for (const [id, packet] of overflow) merged.set(id, packet);
+    return merged;
     // idsKey is the deduped/sorted derivation of plantIds used in the fetch.
   }, [enabled, huntId, idsKey, loadFailed, result, input.configuredGoals]);
 

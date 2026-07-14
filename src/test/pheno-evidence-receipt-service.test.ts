@@ -87,6 +87,9 @@ describe("loadPhenoEvidenceReceiptRows — bounded batch read", () => {
     if (res.ok) {
       expect(res.plantIds).toHaveLength(PHENO_EVIDENCE_PACKET_MAX_PLANT_IDS);
       expect(res.truncated).toBe(true);
+      // The plant-id cap dropped candidates; the row cap was not hit.
+      expect(res.idCapHit).toBe(true);
+      expect(res.rowCapHit).toBe(false);
     }
   });
 
@@ -97,12 +100,17 @@ describe("loadPhenoEvidenceReceiptRows — bounded batch read", () => {
     };
     const res = await loadPhenoEvidenceReceiptRows({ huntId: "hunt-1", plantIds: ["p1"] });
     expect(res.ok && res.truncated).toBe(true);
+    // Row cap hit, but every requested id was queried.
+    expect(res.ok && res.rowCapHit).toBe(true);
+    expect(res.ok && res.idCapHit).toBe(false);
   });
 
   it("is not truncated below both caps", async () => {
     resolveWith = { data: [{ id: "d1" }], error: null };
     const res = await loadPhenoEvidenceReceiptRows({ huntId: "hunt-1", plantIds: ["p1", "p2"] });
     expect(res.ok && !res.truncated).toBe(true);
+    expect(res.ok && res.idCapHit).toBe(false);
+    expect(res.ok && res.rowCapHit).toBe(false);
   });
 
   it("fails closed on missing hunt id / empty ids / query error", async () => {

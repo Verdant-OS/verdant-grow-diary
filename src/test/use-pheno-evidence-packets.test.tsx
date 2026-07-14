@@ -132,12 +132,14 @@ describe("usePhenoEvidencePackets", () => {
     expect(result.current.packets.get("p2")!.state).toBe("unavailable");
   });
 
-  it("truncated batches surface truncated packets, never complete", async () => {
+  it("row-cap truncation surfaces truncated packets, never complete", async () => {
     loadMock.mockResolvedValue({
       ok: true,
       rows: [receiptRow("p1", "structure"), receiptRow("p1", "aroma")],
       plantIds: ["p1"],
       truncated: true,
+      idCapHit: false,
+      rowCapHit: true,
     });
     const { result } = renderHook(
       () =>
@@ -147,6 +149,47 @@ describe("usePhenoEvidencePackets", () => {
     await waitFor(() => expect(result.current.status).toBe("ready"));
     expect(result.current.truncated).toBe(true);
     expect(result.current.packets.get("p1")!.state).toBe("truncated");
+  });
+
+  it("id-cap overflow: candidates the query dropped are unavailable, never zero coverage", async () => {
+    // The hunt has more candidates than the id cap allows. The service returns
+    // only the ids it actually queried (p1, p2) plus idCapHit; p3 was dropped.
+    loadMock.mockResolvedValue({
+      ok: true,
+      rows: [receiptRow("p1", "aroma")],
+      plantIds: ["p1", "p2"],
+      truncated: true,
+      idCapHit: true,
+      rowCapHit: false,
+    });
+    const { result } = renderHook(
+      () =>
+        usePhenoEvidencePackets({
+          huntId: "hunt-1",
+          plantIds: ["p1", "p2", "p3"],
+          configuredGoals: GOALS,
+        }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    // p1 was queried and has a receipt: real partial coverage.
+    expect(result.current.packets.get("p1")!.recordedGoalCount).toBe(1);
+    expect(result.current.packets.get("p1")!.state).toBe("partial");
+    // p2 was queried and genuinely has no receipts: real zero, state partial —
+    // NOT truncated (its rows all came back; only the id list was capped).
+    expect(result.current.packets.get("p2")!.recordedGoalCount).toBe(0);
+    expect(result.current.packets.get("p2")!.state).toBe("partial");
+    // p3 was NEVER queried (dropped by the id cap): coverage unknown, not zero.
+    // The "unavailable" state is exactly what the CSV builder and coverage
+    // presenter special-case to blank fields / "coverage unknown", so a query
+    // the cap dropped can never render as false zero coverage. This is the
+    // crux: p2 (queried, real zero) is "partial"; p3 (dropped) is "unavailable".
+    const p3 = result.current.packets.get("p3")!;
+    expect(p3.state).toBe("unavailable");
+    expect(p3.truncated).toBe(false);
+    expect(p3.state).not.toBe(result.current.packets.get("p2")!.state);
+    // The batch was still truncated overall (banner stays honest).
+    expect(result.current.truncated).toBe(true);
   });
 
   it("query key lives under the pheno_evidence_receipts family that Quick Log saves invalidate", async () => {

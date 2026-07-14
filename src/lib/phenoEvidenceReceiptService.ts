@@ -31,8 +31,20 @@ export type LoadPhenoEvidenceReceiptRowsResult =
       rows: RawPhenoEvidenceDiaryRow[];
       /** Ids actually queried (deduplicated, capped, input order). */
       plantIds: string[];
-      /** True when the plant-id cap or the row cap was hit. */
+      /** True when the plant-id cap OR the row cap was hit. */
       truncated: boolean;
+      /**
+       * True when the plant-id cap dropped candidates: some requested ids were
+       * NEVER queried. Callers must treat those dropped ids as coverage-unknown
+       * (unavailable), never as zero evidence.
+       */
+      idCapHit: boolean;
+      /**
+       * True when the row cap was hit: the candidates that WERE queried may be
+       * undercounted, so their coverage is truncated (never promoted to
+       * complete). Independent of the plant-id cap.
+       */
+      rowCapHit: boolean;
     }
   | { ok: false; error: string };
 
@@ -82,10 +94,13 @@ export async function loadPhenoEvidenceReceiptRows(input: {
   if (error) return { ok: false, error: "Could not load manual evidence receipts." };
 
   const rows = (data ?? []) as unknown as RawPhenoEvidenceDiaryRow[];
+  const rowCapHit = rows.length >= PHENO_EVIDENCE_PACKET_ROW_CAP;
   return {
     ok: true,
     rows,
     plantIds,
-    truncated: idCapHit || rows.length >= PHENO_EVIDENCE_PACKET_ROW_CAP,
+    truncated: idCapHit || rowCapHit,
+    idCapHit,
+    rowCapHit,
   };
 }

@@ -36,13 +36,15 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: () => makeChain() },
 }));
 
+const MOCK_USER = { id: "u1", email: "grower@example.com" };
+const MOCK_AUTH = {
+  user: MOCK_USER,
+  session: null,
+  loading: false,
+  signOut: signOutSpy,
+};
 vi.mock("@/store/auth", () => ({
-  useAuth: () => ({
-    user: { id: "u1", email: "grower@example.com" },
-    session: null,
-    loading: false,
-    signOut: signOutSpy,
-  }),
+  useAuth: () => MOCK_AUTH,
 }));
 
 async function renderGate() {

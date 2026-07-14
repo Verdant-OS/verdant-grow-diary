@@ -22,6 +22,7 @@ import type { KeeperDecisionRow } from "@/lib/phenoKeeperDecisionService";
 import type { SexObservationRow } from "@/lib/phenoSexObservationService";
 import type { SmokeTestRow } from "@/lib/phenoSmokeTestService";
 import type { LabResultRow } from "@/lib/phenoLabResultsService";
+import type { PhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import {
   evaluatePhenoCandidateReadiness,
@@ -59,6 +60,20 @@ export interface PhenoHuntCsvInput {
    * demo data as live.
    */
   readonly provenance?: string;
+  /**
+   * Optional manual-evidence packets per plant (configured-goal coverage
+   * from Quick Log receipts). Absent → the coverage columns export as
+   * "unavailable" with blank counts; legacy callers stay valid.
+   */
+  readonly evidencePacketsByPlant?: ReadonlyMap<string, PhenoCandidateEvidencePacket> | null;
+  /**
+   * Honest export scope. `loadedCandidateCount` is the rows actually in this
+   * file; `totalCandidateCount` the server total when known. The builder
+   * only claims "complete_hunt" when both are known AND equal — a loaded-page
+   * export is always labeled "loaded_candidates".
+   */
+  readonly loadedCandidateCount?: number | null;
+  readonly totalCandidateCount?: number | null;
   /** Injected ISO export timestamp. Pure — the builder never reads the clock. */
   readonly exportedAt?: string;
 }
@@ -125,6 +140,16 @@ export function buildPhenoHuntCsv(input: PhenoHuntCsvInput): string {
   const traitKeys = LOUD_TRAIT_AXES.map((a) => a.key);
   const provenance = input.provenance ?? "live";
   const exportedAt = input.exportedAt ?? "";
+  // Honest scope: only claim a complete hunt when the loaded row count and
+  // the known server total agree. A page export never masquerades as full.
+  const loadedCount =
+    typeof input.loadedCandidateCount === "number"
+      ? input.loadedCandidateCount
+      : input.candidates.length;
+  const exportScope =
+    typeof input.totalCandidateCount === "number" && loadedCount === input.totalCandidateCount
+      ? "complete_hunt"
+      : "loaded_candidates";
   const header = [
     "hunt_id",
     "hunt",
@@ -153,6 +178,16 @@ export function buildPhenoHuntCsv(input: PhenoHuntCsvInput): string {
     "coa_cbd_pct",
     "data_provenance",
     "exported_at",
+    "configured_goal_count",
+    "recorded_goal_count",
+    "missing_goal_ids",
+    "latest_manual_evidence_at",
+    "manual_receipt_count",
+    "manual_evidence_status",
+    "manual_evidence_truncated",
+    "export_scope",
+    "loaded_candidate_count",
+    "total_candidate_count",
   ];
   const lines = [header.map(csvField).join(",")];
 
@@ -163,6 +198,10 @@ export function buildPhenoHuntCsv(input: PhenoHuntCsvInput): string {
     const sex = input.sexByPlant[id];
     const smoke = input.smokeByPlant[id];
     const lab = input.labByKey[`${id}:coa`];
+    const packet = input.evidencePacketsByPlant?.get(id) ?? null;
+    // "unavailable" = the receipt read failed; its zeroed counts are defaults,
+    // not facts, so they must not reach the export as evidence.
+    const packetHasCoverage = packet !== null && packet.state !== "unavailable";
     const readiness = deriveReadiness(input, c);
     lines.push(
       [
@@ -194,6 +233,23 @@ export function buildPhenoHuntCsv(input: PhenoHuntCsvInput): string {
         csvField(lab?.cbdPct ?? ""),
         csvField(provenance),
         csvField(exportedAt),
+        // An unavailable packet is a FAILED read, not observed evidence:
+        // blank every receipt-derived field so a query failure can never be
+        // exported as "0 recorded / all missing". Only manual_evidence_status
+        // carries the honest "unavailable". The configured goal count is a
+        // property of the hunt (not the failed read), so it is still exported.
+        csvField(packetHasCoverage ? packet!.configuredGoalCount : ""),
+        csvField(packetHasCoverage ? packet!.recordedGoalCount : ""),
+        // Stable serialization: configured order, ";"-joined (matches the
+        // readiness goal columns above).
+        csvField(packetHasCoverage ? packet!.missingGoalIds.join(";") : ""),
+        csvField(packetHasCoverage ? (packet!.latestEntryAt ?? "") : ""),
+        csvField(packetHasCoverage ? packet!.receiptCount : ""),
+        csvField(packet ? packet.state : "unavailable"),
+        csvField(packetHasCoverage ? (packet!.truncated ? "yes" : "no") : ""),
+        csvField(exportScope),
+        csvField(loadedCount ?? ""),
+        csvField(input.totalCandidateCount ?? ""),
       ].join(","),
     );
   }

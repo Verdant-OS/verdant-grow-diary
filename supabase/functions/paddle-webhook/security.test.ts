@@ -7,6 +7,7 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   hmacSha256Hex,
+  parsePaddleSignature,
   verifyPaddleWebhookSignature,
 } from "./verifyPaddleSignature.ts";
 
@@ -117,4 +118,40 @@ Deno.test("failure reasons never leak secret or signature material", async () =>
   if (/[0-9a-f]{64}/.test(serialised)) {
     throw new Error("hmac hex leaked into failure reason");
   }
+});
+
+// --- Paid-launch gate additions: rotation-safe multi-h1 verification -------
+
+Deno.test("secret-rotation header with old+new h1 verifies when either matches", async () => {
+  const hOld = await hmacSha256Hex("obviously-fake-retired-secret", `${NOW}:${RAW}`);
+  const hNew = await hmacSha256Hex(TEST_SECRET, `${NOW}:${RAW}`);
+  // Paddle emits both signatures during rotation: ts=..;h1=old;h1=new
+  const header = `ts=${NOW};h1=${hOld};h1=${hNew}`;
+  const r = await verifyPaddleWebhookSignature(TEST_SECRET, header, RAW, {
+    nowSeconds: NOW,
+  });
+  assertEquals(r, { ok: true });
+  // Order-independent: new;old also verifies.
+  const reversed = `ts=${NOW};h1=${hNew};h1=${hOld}`;
+  const r2 = await verifyPaddleWebhookSignature(TEST_SECRET, reversed, RAW, {
+    nowSeconds: NOW,
+  });
+  assertEquals(r2, { ok: true });
+});
+
+Deno.test("rotation header where NO h1 matches still fails closed", async () => {
+  const h1 = await hmacSha256Hex("obviously-fake-secret-1", `${NOW}:${RAW}`);
+  const h2 = await hmacSha256Hex("obviously-fake-secret-2", `${NOW}:${RAW}`);
+  const header = `ts=${NOW};h1=${h1};h1=${h2}`;
+  const r = await verifyPaddleWebhookSignature(TEST_SECRET, header, RAW, {
+    nowSeconds: NOW,
+  });
+  assertEquals(r, { ok: false, reason: "signature_mismatch" });
+});
+
+Deno.test("parsePaddleSignature exposes all h1 values with last-wins back-compat", () => {
+  const parsed = parsePaddleSignature("ts=123;h1=aaa;h1=bbb");
+  if (!parsed) throw new Error("expected header to parse");
+  assertEquals(parsed.h1, "bbb");
+  assertEquals([...parsed.h1s], ["aaa", "bbb"]);
 });

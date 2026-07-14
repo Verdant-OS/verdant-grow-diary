@@ -192,6 +192,13 @@ describe("pi-ingest edge skeleton audit — service_role confinement", () => {
           // redaction-denylist keyword (to scrub it from proof reports) —
           // it never reads the env var's value.
           if (p.replace(/\\/g, "/").endsWith("src/lib/proofReportRedactionRules.ts")) continue;
+          // releaseReceiptParserContract.ts lists it as an unsafe-substring
+          // keyword (to detect accidental secret leakage in receipts) —
+          // it never reads the env var's value.
+          if (p.replace(/\\/g, "/").endsWith("src/lib/releaseReceiptParserContract.ts")) continue;
+          // sanitizedDbError.ts uses it as a forbidden-leak detection pattern
+          // in a test-helper RegExp — it never reads the env var's value.
+          if (p.replace(/\\/g, "/").endsWith("_helpers/sanitizedDbError.ts")) continue;
           const text = readFileSync(p, "utf8");
           if (/SUPABASE_SERVICE_ROLE_KEY/.test(text)) offenders.push(p);
         }

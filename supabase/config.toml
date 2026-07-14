@@ -7,3 +7,16 @@ project_id = "knkwiiywfkbqznbxwqfh"
     verify_jwt = true
   [functions.rls-selftest]
     verify_jwt = false
+  # Paid-launch gate: JWT posture pinned explicitly per function.
+  # get-paddle-price requires a signed-in user (and re-verifies via
+  # auth.getUser inside the function — defence in depth).
+  [functions.get-paddle-price]
+    verify_jwt = true
+  # Webhook receivers accept Paddle requests, which carry no Supabase user
+  # JWT. They grant NOTHING until the raw-body Paddle signature verifies
+  # inside the function; platform JWT verification must be off or Paddle
+  # deliveries would bounce at the gateway with 401 before verification.
+  [functions.paddle-webhook]
+    verify_jwt = false
+  [functions.payments-webhook]
+    verify_jwt = false

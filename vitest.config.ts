@@ -9,7 +9,7 @@ import path from "path";
  * shebangs — so on Node 26 + Windows importing these scripts throws
  * "SyntaxError: Invalid or unexpected token" and takes down several
  * pre-existing docs-safety scanner tests (all green in CI/Linux). Replacing
- * the shebang with a blank keeps line numbers stable.
+ * the shebang with a blank line keeps line numbers stable.
  */
 function stripMjsShebang(): Plugin {
   return {

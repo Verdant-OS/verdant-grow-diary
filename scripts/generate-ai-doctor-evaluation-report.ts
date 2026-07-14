@@ -17,7 +17,7 @@
  *     tokens — only case ids/descriptions (synthetic), statuses, and finding
  *     codes/severities/fields/messages (generic templates).
  */
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -156,11 +156,12 @@ function buildMarkdown(): string {
   return lines.join("\n");
 }
 
-mkdirSync(OUT_DIR, { recursive: true });
+// Idempotent: `recursive: true` still throws EEXIST on some platforms (bun on
+// Windows) when the directory already exists, so guard with existsSync.
+if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(resolve(OUT_DIR, "summary.json"), `${JSON.stringify(json, null, 2)}\n`, "utf8");
 writeFileSync(resolve(OUT_DIR, "summary.md"), buildMarkdown(), "utf8");
 
- 
 console.log(
   `AI Doctor evaluation report written to ${OUT_DIR} (verdict: ${verdict}, ${expectedMatchCount}/${perCase.length} match).`,
 );

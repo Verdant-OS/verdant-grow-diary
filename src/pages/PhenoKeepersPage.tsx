@@ -9,6 +9,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { usePhenoKeepers } from "@/hooks/usePhenoKeepers";
+import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import {
   buildPhenoKeeperLineage,
   type PhenoKeeperLineageView,
@@ -200,7 +201,7 @@ export default function PhenoKeepersPage() {
 
   const candidateLabelById = useMemo(() => {
     const m: Record<string, string> = {};
-    for (const c of ks.candidates) m[c.candidateId] = c.candidateLabel ?? c.candidateId;
+    for (const c of ks.candidates) m[c.candidateId] = phenoCandidateDisplayLabel(c);
     return m;
   }, [ks.candidates]);
 
@@ -292,7 +293,7 @@ export default function PhenoKeepersPage() {
             <option value="">Choose a candidate…</option>
             {ks.candidates.map((c) => (
               <option key={c.candidateId} value={c.candidateId}>
-                {c.candidateLabel ?? c.candidateId}
+                {phenoCandidateDisplayLabel(c)}
               </option>
             ))}
           </select>

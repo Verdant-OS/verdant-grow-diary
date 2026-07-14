@@ -50,13 +50,17 @@ export async function upsertCandidateScore(input: {
 /** Load all trait-score cards for a hunt, keyed by plant id. RLS-scoped read. */
 export async function listCandidateScoresForHunt(
   huntId: string,
+  plantIds?: readonly string[],
 ): Promise<Record<string, CandidateScoreRow>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
-  const { data, error } = await phenoDb
+  let query = phenoDb
     .from("pheno_candidate_scores")
     .select("plant_id, traits, note")
     .eq("hunt_id", id);
+  // Page-scoped read: fetch only the visible candidates' scores at scale.
+  if (plantIds && plantIds.length > 0) query = query.in("plant_id", plantIds as string[]);
+  const { data, error } = await query;
   if (error || !data) return {};
   const map: Record<string, CandidateScoreRow> = {};
   for (const row of data) {

@@ -99,6 +99,44 @@ export const EVENT_TYPES: EventTypeDef[] = [
     icon: Sprout,
     tone: "bg-primary/20 text-primary border-primary/40",
   },
+  // Breeding crossing-workflow subtypes (logged via /breeding/new). Without
+  // these, getEventType() falls back to "Observation" and hides what was logged.
+  {
+    value: "reversal_application",
+    label: "Reversal",
+    icon: FlaskConical,
+    tone: "bg-pink-500/15 text-pink-300 border-pink-500/30",
+  },
+  {
+    value: "isolation_start",
+    label: "Isolation",
+    icon: FlaskConical,
+    tone: "bg-pink-500/15 text-pink-300 border-pink-500/30",
+  },
+  {
+    value: "pollination",
+    label: "Pollination",
+    icon: FlaskConical,
+    tone: "bg-pink-500/15 text-pink-300 border-pink-500/30",
+  },
+  {
+    value: "pollen_shed_observed",
+    label: "Pollen shed",
+    icon: FlaskConical,
+    tone: "bg-pink-500/15 text-pink-300 border-pink-500/30",
+  },
+  {
+    value: "stigmas_receptive",
+    label: "Stigmas receptive",
+    icon: FlaskConical,
+    tone: "bg-pink-500/15 text-pink-300 border-pink-500/30",
+  },
+  {
+    value: "cross_harvest",
+    label: "Cross harvest",
+    icon: FlaskConical,
+    tone: "bg-pink-500/15 text-pink-300 border-pink-500/30",
+  },
   {
     value: "action_followup",
     label: "Follow-up check",

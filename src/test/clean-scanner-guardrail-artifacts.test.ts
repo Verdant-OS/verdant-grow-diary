@@ -1,7 +1,7 @@
 /**
  * Runtime test for the local scanner guardrail artifact cleanup script.
  * Verifies default path, optional report-path override, absent-file,
- * and unrelated-file safety — without touching real test-results/.
+ * and unrelated-file safety --- without touching real test-results/.
  *
  * Safety: test-tooling only.
  */

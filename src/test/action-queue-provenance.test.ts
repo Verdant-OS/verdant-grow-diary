@@ -7,28 +7,25 @@ import { resolve } from "node:path";
 
 import {
   extractSourceAlertId,
+  extractSourceBreedingEventId,
   getActionQueueSourceKind,
   getActionQueueSourceLabel,
   isAlertDerived,
+  stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
 import { stripSourceComments } from "./utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
 const QUEUE = readFileSync(resolve(ROOT, "src/pages/ActionQueue.tsx"), "utf8");
 const DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8");
-const RULES = readFileSync(
-  resolve(ROOT, "src/lib/actionQueueProvenanceRules.ts"),
-  "utf8",
-);
+const RULES = readFileSync(resolve(ROOT, "src/lib/actionQueueProvenanceRules.ts"), "utf8");
 
 describe("extractSourceAlertId", () => {
   it("extracts a valid alert id token", () => {
     expect(extractSourceAlertId("High RH [alert:abc-123]")).toBe("abc-123");
-    expect(
-      extractSourceAlertId(
-        "x [alert:550e8400-e29b-41d4-a716-446655440000] tail",
-      ),
-    ).toBe("550e8400-e29b-41d4-a716-446655440000");
+    expect(extractSourceAlertId("x [alert:550e8400-e29b-41d4-a716-446655440000] tail")).toBe(
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
   });
   it("returns null when no token", () => {
     expect(extractSourceAlertId("Plain reason without token")).toBeNull();
@@ -44,26 +41,55 @@ describe("extractSourceAlertId", () => {
     expect(extractSourceAlertId(undefined)).toBeNull();
     expect(extractSourceAlertId("")).toBeNull();
     // deterministic
-    expect(extractSourceAlertId("a [alert:zzz]")).toBe(
-      extractSourceAlertId("a [alert:zzz]"),
+    expect(extractSourceAlertId("a [alert:zzz]")).toBe(extractSourceAlertId("a [alert:zzz]"));
+  });
+});
+
+describe("extractSourceBreedingEventId", () => {
+  it("extracts a valid event id token", () => {
+    expect(extractSourceBreedingEventId("Reversal applied [event:abc-123]")).toBe("abc-123");
+  });
+  it("returns null when no token", () => {
+    expect(extractSourceBreedingEventId("Plain reason without token")).toBeNull();
+  });
+  it("returns null for malformed tokens", () => {
+    expect(extractSourceBreedingEventId("[event:]")).toBeNull();
+    expect(extractSourceBreedingEventId("[event:has spaces]")).toBeNull();
+  });
+  it("is null-safe", () => {
+    expect(extractSourceBreedingEventId(null)).toBeNull();
+    expect(extractSourceBreedingEventId(undefined)).toBeNull();
+    expect(extractSourceBreedingEventId("")).toBeNull();
+  });
+});
+
+describe("stripBackPointerTokens — breeding [event:<id>] coverage", () => {
+  it("strips a bare [event:<id>] token", () => {
+    expect(stripBackPointerTokens("Check donor for visible pollen shed [event:9c1b3e2a-...]")).toBe(
+      "Check donor for visible pollen shed",
     );
+  });
+  it("strips [event:...] alongside [alert:...] / [session:...] in the same string", () => {
+    expect(stripBackPointerTokens("reason [alert:a1] [event:e1] [session:s1] tail")).toBe(
+      "reason tail",
+    );
+  });
+  it("never leaves a raw [event: fragment behind", () => {
+    const out = stripBackPointerTokens("x [event:some-id] y");
+    expect(out).not.toMatch(/\[event:/);
   });
 });
 
 describe("source labels", () => {
   it("maps known sources", () => {
-    expect(getActionQueueSourceKind({ source: "environment_alert" })).toBe(
-      "environment_alert",
-    );
+    expect(getActionQueueSourceKind({ source: "environment_alert" })).toBe("environment_alert");
     expect(getActionQueueSourceKind({ source: "ai_coach" })).toBe("ai_coach");
     expect(getActionQueueSourceKind({ source: "manual" })).toBe("manual");
     expect(getActionQueueSourceKind({ source: "weird" })).toBe("unknown");
     expect(getActionQueueSourceKind(null)).toBe("unknown");
   });
   it("renders friendly labels", () => {
-    expect(getActionQueueSourceLabel({ source: "environment_alert" })).toBe(
-      "Environment Alert",
-    );
+    expect(getActionQueueSourceLabel({ source: "environment_alert" })).toBe("Environment Alert");
     expect(getActionQueueSourceLabel({ source: "ai_coach" })).toBe("AI Coach");
     expect(getActionQueueSourceLabel({ source: "manual" })).toBe("Manual");
     expect(getActionQueueSourceLabel(undefined)).toBe("Unknown");
@@ -79,9 +105,7 @@ describe("ActionQueue UI — provenance presentation", () => {
   it("imports the provenance helpers (no duplicated mapping)", () => {
     expect(QUEUE).toMatch(/from "@\/lib\/actionQueueProvenanceRules"/);
     // No duplicated literal label table inside JSX
-    expect(
-      (QUEUE.match(/Environment Alert/g) ?? []).length,
-    ).toBeLessThanOrEqual(2);
+    expect((QUEUE.match(/Environment Alert/g) ?? []).length).toBeLessThanOrEqual(2);
   });
   it("offers an Environment Alerts filter chip", () => {
     expect(QUEUE).toMatch(/ACTION_QUEUE_SOURCE_VALUES\.ENVIRONMENT_ALERT/);
@@ -138,9 +162,7 @@ describe("ActionDetail UI — source section", () => {
   });
   it("renders 'Open source alert' only when a valid alert id is found", () => {
     // Link is guarded by `sourceAlertId &&`
-    expect(DETAIL).toMatch(
-      /sourceAlertId\s*&&\s*\(\s*<Button[\s\S]{0,200}Open source alert/,
-    );
+    expect(DETAIL).toMatch(/sourceAlertId\s*&&\s*\(\s*<Button[\s\S]{0,200}Open source alert/);
     expect(DETAIL).toMatch(/alertDetailPath\(sourceAlertId\)/);
   });
   it("does not regex-parse [alert:...] inline in JSX", () => {
@@ -197,15 +219,17 @@ describe("ActionQueue / ActionDetail — forbidden copy hardening", () => {
 
   it("ActionQueue executable source contains no forbidden device-command/automation phrasing", () => {
     for (const phrase of FORBIDDEN_PHRASES) {
-      expect(QUEUE_EXEC, `forbidden phrase leaked into ActionQueue: "${phrase}"`)
-        .not.toContain(phrase);
+      expect(QUEUE_EXEC, `forbidden phrase leaked into ActionQueue: "${phrase}"`).not.toContain(
+        phrase,
+      );
     }
   });
 
   it("ActionDetail executable source contains no forbidden device-command/automation phrasing", () => {
     for (const phrase of FORBIDDEN_PHRASES) {
-      expect(DETAIL_EXEC, `forbidden phrase leaked into ActionDetail: "${phrase}"`)
-        .not.toContain(phrase);
+      expect(DETAIL_EXEC, `forbidden phrase leaked into ActionDetail: "${phrase}"`).not.toContain(
+        phrase,
+      );
     }
   });
 
@@ -230,10 +254,11 @@ describe("ActionQueue / ActionDetail — forbidden copy hardening", () => {
     expect(DETAIL).not.toMatch(/\{\s*row\.reason\s*\}/);
   });
 
-  it("never renders raw [alert:<id>] or [session:<id>] tokens as JSX literals", () => {
+  it("never renders raw [alert:<id>], [session:<id>], or [event:<id>] tokens as JSX literals", () => {
     for (const src of [QUEUE, DETAIL]) {
       expect(src).not.toMatch(/>\s*\[alert:/);
       expect(src).not.toMatch(/>\s*\[session:/);
+      expect(src).not.toMatch(/>\s*\[event:/);
     }
   });
 

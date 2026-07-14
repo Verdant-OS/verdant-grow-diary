@@ -17,14 +17,17 @@ export const PHENO_COMPARISON_SENSOR_SOURCES = [
   "invalid",
 ] as const;
 
-export type PhenoComparisonSensorSource =
-  (typeof PHENO_COMPARISON_SENSOR_SOURCES)[number];
+export type PhenoComparisonSensorSource = (typeof PHENO_COMPARISON_SENSOR_SOURCES)[number];
 
-export const PHENO_COMPARISON_TRUSTED_SOURCES: ReadonlySet<PhenoComparisonSensorSource> =
-  new Set(["live", "manual", "csv"]);
+export const PHENO_COMPARISON_TRUSTED_SOURCES: ReadonlySet<PhenoComparisonSensorSource> = new Set([
+  "live",
+  "manual",
+  "csv",
+]);
 
-export const PHENO_COMPARISON_UNTRUSTED_SOURCES: ReadonlySet<PhenoComparisonSensorSource> =
-  new Set(["demo", "stale", "invalid"]);
+export const PHENO_COMPARISON_UNTRUSTED_SOURCES: ReadonlySet<PhenoComparisonSensorSource> = new Set(
+  ["demo", "stale", "invalid"],
+);
 
 const SOURCE_LABEL: Record<PhenoComparisonSensorSource, string> = {
   live: "Live",
@@ -35,9 +38,7 @@ const SOURCE_LABEL: Record<PhenoComparisonSensorSource, string> = {
   invalid: "Invalid",
 };
 
-export function normalizePhenoSensorSource(
-  input: unknown,
-): PhenoComparisonSensorSource {
+export function normalizePhenoSensorSource(input: unknown): PhenoComparisonSensorSource {
   if (typeof input !== "string") return "invalid";
   const v = input.trim().toLowerCase();
   if ((PHENO_COMPARISON_SENSOR_SOURCES as readonly string[]).includes(v)) {
@@ -46,15 +47,11 @@ export function normalizePhenoSensorSource(
   return "invalid";
 }
 
-export function phenoSensorSourceLabel(
-  source: PhenoComparisonSensorSource,
-): string {
+export function phenoSensorSourceLabel(source: PhenoComparisonSensorSource): string {
   return SOURCE_LABEL[source];
 }
 
-export function isPhenoSensorSourceTrusted(
-  source: PhenoComparisonSensorSource,
-): boolean {
+export function isPhenoSensorSourceTrusted(source: PhenoComparisonSensorSource): boolean {
   return PHENO_COMPARISON_TRUSTED_SOURCES.has(source);
 }
 
@@ -74,10 +71,7 @@ export interface PhenoMissingFlag {
   message: string;
 }
 
-export const PHENO_MISSING_MESSAGES: Record<
-  PhenoMissingFlag["code"],
-  string
-> = {
+export const PHENO_MISSING_MESSAGES: Record<PhenoMissingFlag["code"], string> = {
   no_photo: "No photo attached",
   no_sensor_snapshot: "No sensor snapshot",
   no_diary: "No Quick Log entries yet",
@@ -101,9 +95,24 @@ export const PHENO_SOURCE_LEGEND: ReadonlyArray<{
   { source: "live", label: "Live", description: "Live device reading.", trusted: true },
   { source: "manual", label: "Manual", description: "Grower-entered snapshot.", trusted: true },
   { source: "csv", label: "CSV", description: "Imported history from CSV.", trusted: true },
-  { source: "demo", label: "Demo", description: "Sample data — not real telemetry.", trusted: false },
-  { source: "stale", label: "Stale", description: "Old reading — not treated as current.", trusted: false },
-  { source: "invalid", label: "Invalid", description: "Bad or unknown reading — never treated as healthy.", trusted: false },
+  {
+    source: "demo",
+    label: "Demo",
+    description: "Sample data — not real telemetry.",
+    trusted: false,
+  },
+  {
+    source: "stale",
+    label: "Stale",
+    description: "Old reading — not treated as current.",
+    trusted: false,
+  },
+  {
+    source: "invalid",
+    label: "Invalid",
+    description: "Bad or unknown reading — never treated as healthy.",
+    trusted: false,
+  },
 ];
 
 /** Read-only confidence caveat shown on the preview surface. */

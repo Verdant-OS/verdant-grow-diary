@@ -135,6 +135,31 @@ jobs:
       - name: AI Doctor preview safety
         run: bun run ai-doctor:preview-safety
 
+      # Stop-ship: the deterministic AI Doctor OUTPUT evaluator (contract,
+      # evidence/provenance integrity, confidence calibration against the
+      # readiness gate, recommendation safety) + its adversarial golden
+      # fixtures + static-safety scanner. Runs AFTER typecheck and the AI
+      # Doctor readiness/preview checks, and before the broad/full suites.
+      # Pure: no network, no model provider, no Supabase, no secrets. See
+      # docs/ai-doctor-output-evaluation.md.
+      - name: AI Doctor output safety and golden cases
+        run: bun run test:ai-doctor-output-evaluation
+
+      # Optional machine-readable report (informational, never a hard gate;
+      # the step above is the gate). Contains no plant/user data, raw
+      # payloads, or secrets.
+      - name: Generate AI Doctor evaluation report
+        if: always()
+        run: bun run report:ai-doctor-output-evaluation
+
+      - name: Upload AI Doctor evaluation report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ai-doctor-evaluation-report
+          path: artifacts/ai-doctor-evaluation/
+          if-no-files-found: ignore
+
       # Stop-ship: Action Queue device-control surface scanner + allow-list
       # guard tests. Locks the narrow safety-file allow-list (e.g.
       # `blocked_device_command_risk`, `DEVICE_COMMAND_PATTERNS`) so it can
@@ -236,16 +261,11 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: bun run test:db:quicklog-rpc-runtime
 
-      # Monolithic full-suite run kept per the QuickLog CI-wiring guard
-      # ("CI still runs the full suite after the targeted slice"). The
-      # 16-way batched gate (vitest-full-suite-pr-gate.yml) is the primary
-      # memory-safe full-suite check; this single-process run gets the same
-      # old-space headroom the batched runner uses so it fails on real
-      # regressions, not heap exhaustion.
-      - name: Full test suite
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
-        run: bunx vitest run
+      # NOTE: the full Vitest suite (~21k tests) is intentionally NOT run here.
+      # It runs in the separate sharded `full-suite` job below (4 parallel
+      # shards), which keeps this stop-ship gate job fast and lets it reach the
+      # Build step, and prevents the whole suite from OOM-ing / exceeding the
+      # job timeout on a single runner. See docs/testing/ci-full-suite-shards.md.
 
       # Scanner guardrail timeout sentinel — re-runs only the filesystem-
       # scanning guardrail suites in isolation. The CI wrapper deletes stale
@@ -315,6 +335,8 @@ jobs:
     name: test:legal-seo
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -358,3 +380,70 @@ jobs:
             e2e/screenshots/
           if-no-files-found: ignore
           retention-days: 14
+
+  # Full Vitest suite, sharded across parallel runners. Pulled out of the
+  # `test` job so the whole suite (~21k tests, jsdom-heavy) doesn't exceed the
+  # 20-minute job timeout when run on a single runner.
+  #
+  # 8 shards run on independent 16 GB runners; each covers ~1/8 of the files
+  # (~200) via vitest's hash-based file distribution. Measured on Linux/Node 20
+  # at the cap below, a shard runs the vitest step in ~90s — well under the
+  # 20-minute job timeout even with checkout + install + ripgrep setup — with
+  # peak worker heap far below the ceiling.
+  #
+  # History: the suite was briefly split into 36 shards to keep each worker
+  # below an OOM. That OOM was NOT diffuse jsdom accumulation — it was a single
+  # test file (ecowitt-bridge-status-page) whose unstable useToast mock spun an
+  # unbounded render loop that exhausted the worker heap. With that fixed (#188),
+  # shard count is bounded only by the per-shard wall-clock budget, so 8 shards
+  # is ample. If the suite grows and a shard nears the timeout, raise the count
+  # (update the matrix list AND the `/N` divisor together).
+  #
+  # `NODE_OPTIONS=--max-old-space-size=3584` keeps total memory container-safe:
+  # the forks pool runs ~4 workers on a 4-vCPU runner, so 4 x 3584 MB ≈ 14 GB,
+  # under the 16 GB runner. A lower ceiling than the file load requires also
+  # means any regression OOM fails fast instead of GC-thrashing to the timeout.
+  #
+  # `fail-fast: false` so one shard failing still reports the others.
+  # See docs/testing/ci-full-suite-shards.md.
+  full-suite:
+    name: Full test suite (shard ${{ matrix.shard }}/8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # ripgrep (rg) is required by scripts invoked from tests in the full
+      # suite (e.g. scan-gamification-direct-inserts.mjs). It is not
+      # preinstalled on the runner; without it those tests' child process
+      # exits 2. Mirrors the same step in the `test` job.
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Run test shard
+        env:
+          NODE_OPTIONS: --max-old-space-size=3584
+        run: bunx vitest run --shard=${{ matrix.shard }}/8

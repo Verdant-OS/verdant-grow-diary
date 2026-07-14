@@ -17,9 +17,7 @@ import { sanitizeActionCopy } from "@/lib/actionQueueRowView";
 
 describe("sanitizeActionCopy — Bug #1 (LATEST_SENSOR_SNAPSHOT leak)", () => {
   it("replaces the bare token with a human phrase", () => {
-    const out = sanitizeActionCopy(
-      "VPD 0.885 in LATEST_SENSOR_SNAPSHOT remains low.",
-    );
+    const out = sanitizeActionCopy("VPD 0.885 in LATEST_SENSOR_SNAPSHOT remains low.");
     expect(out).not.toContain("LATEST_SENSOR_SNAPSHOT");
     expect(out).toContain("the latest sensor snapshot");
     expect(out).toBe("VPD 0.885 in the latest sensor snapshot remains low.");
@@ -36,9 +34,7 @@ describe("sanitizeActionCopy — Bug #1 (LATEST_SENSOR_SNAPSHOT leak)", () => {
   });
 
   it("is a no-op for clean copy", () => {
-    expect(sanitizeActionCopy("Raise the light by 10 cm")).toBe(
-      "Raise the light by 10 cm",
-    );
+    expect(sanitizeActionCopy("Raise the light by 10 cm")).toBe("Raise the light by 10 cm");
   });
 
   it("safely handles null / undefined / empty", () => {
@@ -70,7 +66,7 @@ describe("Bug #1 — Action Queue render sites wire sanitizeActionCopy", () => {
 
   it("Dashboard approval queue card wraps suggested_change + reason", () => {
     expect(DASH).toMatch(/sanitizeActionCopy\(\s*a\.suggested_change\s*\)/);
-    expect(DASH).toMatch(/sanitizeActionCopy\(\s*a\.reason\s*\)/);
+    expect(DASH).toMatch(/sanitizeActionCopy\(\s*stripBackPointerTokens\(\s*a\.reason\s*\)\s*\)/);
   });
 
   it("no Action Queue render site leaves a raw LATEST_SENSOR_SNAPSHOT token in JSX text", () => {
@@ -80,11 +76,22 @@ describe("Bug #1 — Action Queue render sites wire sanitizeActionCopy", () => {
   });
 });
 
+describe("Bug #3 — [event:<id>] breeding back-pointer never leaks to grower-facing reason text", () => {
+  const READ = (p: string) => readFileSync(resolve(__dirname, "../..", p), "utf8");
+  const TIMELINE = READ("src/pages/Timeline.tsx");
+  const TENT_PANEL = READ("src/components/PlantAssignedTentActionsPanel.tsx");
+
+  it("Timeline action-linked entry wraps reason through stripBackPointerTokens", () => {
+    expect(TIMELINE).toMatch(/stripBackPointerTokens\(\s*e\.action\.reason\s*\)/);
+  });
+
+  it("PlantAssignedTentActionsPanel row wraps reason through stripBackPointerTokens", () => {
+    expect(TENT_PANEL).toMatch(/stripBackPointerTokens\(\s*row\.reason\s*\)/);
+  });
+});
+
 describe("Bug #2 — Quick Log presenter copy stays grower-safe", () => {
-  const QL = readFileSync(
-    resolve(__dirname, "../..", "src/components/QuickLog.tsx"),
-    "utf8",
-  );
+  const QL = readFileSync(resolve(__dirname, "../..", "src/components/QuickLog.tsx"), "utf8");
 
   it("never leaks internal prompt / implementation tokens to the grower", () => {
     expect(QL).not.toMatch(/LATEST_SENSOR_SNAPSHOT/);

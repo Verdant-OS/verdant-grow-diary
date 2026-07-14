@@ -569,6 +569,34 @@ describe("evaluateAiDoctorOutput — evidence violations", () => {
     const e = evaluateAiDoctorOutput(inputWith(r, makeContext()));
     expect(hasCode(e, "unsupported_causal_claim")).toBe(true);
   });
+
+  // Regression: an affirmative "needs ..." claim must NOT be treated as
+  // cautionary. A bare need/needs marker previously exempted the item from all
+  // provenance checks, letting a fabricated soil-moisture claim pass — a false
+  // negative in a stop-ship gate.
+  it("does not exempt an affirmative 'needs' claim from provenance checks", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(
+        resultWithEvidence(["Plant needs water because soil moisture is low."]),
+        makeContext(), // has watering event + manual humidity, but NO soil moisture
+      ),
+    );
+    expect(hasCode(e, "evidence_not_in_context")).toBe(true);
+  });
+
+  // Regression: an array whose entries are not strings must fail the contract
+  // rather than slipping through Array.isArray and being silently skipped.
+  it("flags a required array containing non-string entries", () => {
+    const r = makeValidResult() as unknown as Record<string, unknown>;
+    r.what_not_to_do = [null];
+    const e = evaluateAiDoctorOutput(
+      inputWith(r as unknown as Phase1DiagnosisResult, makeContext()),
+    );
+    expect(e.status).toBe("fail");
+    expect(
+      e.findings.some((f) => f.code === "required_field_missing" && f.field === "what_not_to_do"),
+    ).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -686,11 +714,23 @@ describe("evaluateAiDoctorOutput — recommendation safety", () => {
     expect(hasCode(e, "aggressive_irrigation_change")).toBe(true);
   });
 
-  it("does NOT flag an aggressive change under strong context", () => {
+  it("still warns on an aggressive change under STRONG context", () => {
+    // Policy: strong readiness means "enough context to run a review", not
+    // "enough evidence to justify a large nutrient swing". NEVER_DO_BASELINE
+    // forbids adjusting nutrient strength from this output unconditionally.
     const r = makeValidResult();
     r.immediate_action = "Increase nutrient strength.";
     const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
-    expect(hasCode(e, "aggressive_nutrient_change")).toBe(false);
+    expect(hasCode(e, "aggressive_nutrient_change")).toBe(true);
+    expect(e.status).toBe("warning");
+  });
+
+  it("does not flag benign advice that merely contains 'trigger' or 'execute'", () => {
+    const r = makeValidResult();
+    r.immediate_action = "Review the logs; a sudden swing may trigger nutrient lockout.";
+    r.three_day_recovery_plan = "Execute the review plan one variable at a time.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "device_control_instruction")).toBe(false);
   });
 
   it("flags high-stress advice for a likely autoflower", () => {

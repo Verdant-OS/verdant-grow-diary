@@ -143,7 +143,11 @@ function isNonEmptyString(v: unknown): boolean {
 }
 
 function isStringArray(v: unknown): v is readonly string[] {
-  return Array.isArray(v);
+  // Every entry must be a string. Checking only `Array.isArray` would let
+  // malformed output (e.g. `evidence: [{...}]`, `what_not_to_do: [null]`)
+  // satisfy the contract while the evidence validator silently skips the
+  // non-string entries — an unsupported result could then pass.
+  return Array.isArray(v) && v.every((entry) => typeof entry === "string");
 }
 
 function isValidConfidence(v: unknown): boolean {
@@ -333,6 +337,13 @@ function validateContractShape(result: Phase1DiagnosisResult, findings: FindingL
  * limitation), which exempts it from affirmative-claim rules. Cautionary
  * mentions of stale/invalid/missing data are exactly what we WANT the result
  * to say, so they must never be flagged.
+ *
+ * These MUST be limitation PHRASES, never bare words. A bare `"need"` /
+ * `"needs"` would exempt an affirmative claim ("plant needs water because soil
+ * moisture is low"), and a bare `"no "` / `"not "` would exempt "humidity is
+ * not optimal" — silently skipping provenance checks and letting unsupported
+ * claims through. That is a false NEGATIVE in a safety gate, so the exemption
+ * is deliberately narrow.
  */
 const CAUTIONARY_MARKERS: readonly string[] = [
   "stale",
@@ -341,8 +352,16 @@ const CAUTIONARY_MARKERS: readonly string[] = [
   "unknown",
   "unavailable",
   "not available",
-  "no ",
-  "not ",
+  "not recorded",
+  "not present",
+  "not enough",
+  "no recent",
+  "no data",
+  "no reading",
+  "no sensor",
+  "no live",
+  "no manual",
+  "no photo",
   "without",
   "lack",
   "limited",
@@ -352,8 +371,6 @@ const CAUTIONARY_MARKERS: readonly string[] = [
   "unclear",
   "unconfirmed",
   "unverified",
-  "need ",
-  "needs ",
 ];
 
 function isCautionary(lower: string): boolean {
@@ -701,7 +718,12 @@ function validateEvidenceIntegrity(
 export const AI_DOCTOR_READINESS_CONFIDENCE_CEILING: Record<AiDoctorContextReadiness, number> =
   Object.freeze({
     insufficient: 0,
-    partial: 0.6,
+    // 0.5 aligns with the engine's own hardest cap
+    // (`cap_confidence_when_stale_or_invalid`). A looser 0.6 would sit ABOVE
+    // every cap `applyAiDoctorSafetyRules` already applies (0.3 without
+    // trustworthy sensors, 0.39 on a single weak signal, 0.5 stale/invalid),
+    // making this rule effectively inert for real engine output.
+    partial: 0.5,
     strong: 0.95,
   });
 
@@ -1003,9 +1025,6 @@ function validateRecommendationSafety(
   findings: FindingList,
 ): void {
   const result = input.result as unknown as Record<string, unknown>;
-  const readiness = (input.readiness as { readiness?: unknown } | null | undefined)?.readiness as
-    | AiDoctorContextReadiness
-    | undefined;
   const advice = adviceText(input.result);
   const aq = result.action_queue_suggestion;
 
@@ -1037,19 +1056,23 @@ function validateRecommendationSafety(
   }
 
   // Aggressive changes under weak (non-strong) context.
-  const weak = readiness !== "strong";
-  if (weak && AGGRESSIVE_NUTRIENT_PATTERNS.some((re) => re.test(advice))) {
+  // Aggressive changes warn at EVERY readiness level. `strong` readiness means
+  // "enough trustworthy context to run a review" — it does NOT mean "enough
+  // evidence to justify a large nutrient or irrigation swing". The engine's own
+  // NEVER_DO_BASELINE forbids adjusting nutrient strength / irrigation from this
+  // output unconditionally, so exempting strong context would contradict it.
+  if (AGGRESSIVE_NUTRIENT_PATTERNS.some((re) => re.test(advice))) {
     findings.add({
       code: "aggressive_nutrient_change",
       severity: "warning",
-      message: "Aggressive nutrient change recommended under weak/partial context.",
+      message: "Aggressive nutrient change recommended from an AI Doctor result.",
     });
   }
-  if (weak && AGGRESSIVE_IRRIGATION_PATTERNS.some((re) => re.test(advice))) {
+  if (AGGRESSIVE_IRRIGATION_PATTERNS.some((re) => re.test(advice))) {
     findings.add({
       code: "aggressive_irrigation_change",
       severity: "warning",
-      message: "Aggressive irrigation change recommended under weak/partial context.",
+      message: "Aggressive irrigation change recommended from an AI Doctor result.",
     });
   }
 

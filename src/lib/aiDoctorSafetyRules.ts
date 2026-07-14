@@ -150,16 +150,26 @@ const DEVICE_COMMAND_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
- * Extended device-control DETECTION patterns: the engine command patterns plus
- * setpoint/switch/relay/actuate wording. Exported for read-only reuse by the
- * AI Doctor output evaluator (`aiDoctorOutputEvaluation`). Detection only —
- * these BLOCK/flag device wording; they are never an execution surface.
+ * Device-control DETECTION patterns, exported for read-only reuse by the AI
+ * Doctor output evaluator (`aiDoctorOutputEvaluation`). Detection only — these
+ * BLOCK/flag device wording; they are never an execution surface.
+ *
+ * Deliberately NARROWER than `DEVICE_COMMAND_PATTERNS`. The engine only *strips*
+ * text that matches its list, so over-broad bare verbs (`execute`, `trigger`,
+ * `activate`, `automate`) are harmless there. In the evaluator the same tokens
+ * raise a hard `device_control_instruction` ERROR, which would fail safe advice
+ * like "this may trigger nutrient lockout" or "execute the plan". So every
+ * pattern here must be bound to an actual device/equipment object or an on/off
+ * action. Automatic-execution wording is covered separately by
+ * `automatic_action_queue_language`.
  */
 export const DEVICE_CONTROL_DETECTION_PATTERNS: readonly RegExp[] = [
-  ...DEVICE_COMMAND_PATTERNS,
+  /\bturn (on|off)\b/i,
+  /\bpower (on|off)\b/i,
+  /\bswitch (on|off)\b/i,
+  /\brun (the )?(pump|fan|light|heater|dehumidifier|humidifier)\b/i,
   /\bset (the )?(fan|light|lights|humidifier|dehumidifier|heater|temp|temperature|humidity)\b/i,
   /\bset ?point\b/i,
-  /\bswitch (on|off)\b/i,
   /\brelay\b/i,
   /\bactuate\b/i,
 ];

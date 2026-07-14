@@ -15,10 +15,13 @@
  *   4. wrong environment (live) → blocked, zero writes
  *   5. unknown plan → blocked; missing link → blocked
  *   6. cancel/pause/past-due transitions apply; older occurred_at → noop
- *   7. founder: allocation, idempotent duplicate, concurrency (parallel
- *      calls mint distinct numbers), cap respected, subscription events
- *      cannot allocate
- *   8. authenticated client cannot write any billing row; anon denied
+ *   7. founder: allocation; same-buyer duplicate race → exactly one
+ *      allocation + one already_founder noop; distinct-buyer race → both
+ *      succeed with distinct numbers; cap boundary → slot 75 allocates and
+ *      the next verified transaction is founder_cap_reached with NO row
+ *   8. isolation: anon AND a real signed-in (JWT-backed) user can neither
+ *      write billing rows nor execute the founder RPC; the signed-in user can
+ *      read only the aggregate founder availability
  *   9. every RPC invocation leaves a sanitized audit row
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -56,14 +59,21 @@ function check(name: string, ok: boolean, detail?: unknown) {
 
 type SeededEvent = { eventId: string; processingId: string };
 
-async function seedUser(tag: string): Promise<string> {
+// One throwaway password shared by the RUN's seeded users so the harness can
+// sign in as a REAL authenticated user for the isolation proofs (a JWT-backed
+// client, not just the unsigned anon key). Never printed; users are deleted
+// in cleanup.
+const RUN_PASSWORD = `Plh-${crypto.randomUUID()}`;
+
+async function seedUser(tag: string): Promise<{ id: string; email: string }> {
+  const email = `${RUN}-${tag}@verdant.test`;
   const { data, error } = await admin.auth.admin.createUser({
-    email: `${RUN}-${tag}@verdant.test`,
-    password: crypto.randomUUID(),
+    email,
+    password: RUN_PASSWORD,
     email_confirm: true,
   });
   if (error || !data.user) throw new Error(`seed user ${tag}: ${error?.message}`);
-  return data.user.id;
+  return { id: data.user.id, email };
 }
 
 async function seedEvent(opts: {
@@ -153,8 +163,8 @@ async function billingRow(userId: string) {
 
 async function main() {
   console.log(`paid-launch proof harness run ${RUN}`);
-  const userA = await seedUser("a");
-  const userB = await seedUser("b");
+  const { id: userA, email: emailA } = await seedUser("a");
+  const { id: userB } = await seedUser("b");
   const cleanupUsers = [userA, userB];
 
   // 1. valid event → exactly one row
@@ -216,15 +226,76 @@ async function main() {
   ]);
   const rowB = await billingRow(userB);
   const outcomes = [rf1, rf2].map((x) => `${x.status}:${x.reason ?? ""}`).sort();
+  // STRICT: the advisory lock serializes BEFORE the existing-row read, so a
+  // same-buyer duplicate race must resolve as exactly one allocation and one
+  // already_founder noop — never a unique-violation 'failed'.
+  const allocations = [rf1, rf2].filter((x) => x.status === "created" || x.status === "updated").length;
+  const idempotentNoops = [rf1, rf2].filter((x) => x.status === "noop" && x.reason === "already_founder").length;
   check(
-    "concurrent founder events yield ONE allocation + one noop/idempotent outcome",
+    "same-buyer concurrent duplicates: EXACTLY one allocation + one already_founder noop",
     rowB?.plan_id === "founder_lifetime" &&
       typeof rowB?.founder_number === "number" &&
-      outcomes.some((o) => o.startsWith("created") || o.startsWith("updated")),
+      allocations === 1 &&
+      idempotentNoops === 1,
     outcomes,
   );
   r = await rpc("allocate_founder_lifetime_with_audit", evF1.processingId);
   check("replayed founder event is a noop", r.ok && r.reason === "already_founder");
+
+  // DISTINCT-BUYER race: parallel verified transactions for two different
+  // buyers must BOTH succeed with DIFFERENT founder numbers.
+  const { id: userC } = await seedUser("c");
+  const { id: userD } = await seedUser("d");
+  cleanupUsers.push(userC, userD);
+  const cC = `fake_ctm_${RUN}_c`;
+  const cD = `fake_ctm_${RUN}_d`;
+  await seedLink(userC, cC, null);
+  await seedLink(userD, cD, null);
+  const evFC = await seedEvent({ tag: "fc", eventType: "transaction.completed", customerId: cC, subscriptionId: null, planId: "founder_lifetime", founder: true });
+  const evFD = await seedEvent({ tag: "fd", eventType: "transaction.completed", customerId: cD, subscriptionId: null, planId: "founder_lifetime", founder: true });
+  const [rfc, rfd] = await Promise.all([
+    rpc("allocate_founder_lifetime_with_audit", evFC.processingId),
+    rpc("allocate_founder_lifetime_with_audit", evFD.processingId),
+  ]);
+  const rowC = await billingRow(userC);
+  const rowD = await billingRow(userD);
+  check(
+    "distinct-buyer concurrent allocations both succeed with distinct numbers",
+    rfc.ok === true &&
+      rfd.ok === true &&
+      typeof rowC?.founder_number === "number" &&
+      typeof rowD?.founder_number === "number" &&
+      rowC.founder_number !== rowD.founder_number,
+    { c: rowC?.founder_number, d: rowD?.founder_number },
+  );
+
+  // CAP BOUNDARY (disposable project only — this harness refuses to run
+  // anywhere else): push this RUN's highest allocated number to 74, prove
+  // slot 75 allocates, then prove the NEXT verified transaction is blocked
+  // with founder_cap_reached and writes NOTHING.
+  const numbered = [
+    { user: userB, n: rowB?.founder_number ?? 0 },
+    { user: userC, n: rowC?.founder_number ?? 0 },
+    { user: userD, n: rowD?.founder_number ?? 0 },
+  ].sort((x, y) => y.n - x.n);
+  const { error: bumpError } = await admin
+    .from("billing_subscriptions")
+    .update({ founder_number: 74 })
+    .eq("user_id", numbered[0].user);
+  check("cap-boundary setup: RUN's max founder number moved to 74", !bumpError);
+
+  const { id: userE } = await seedUser("e");
+  const { id: userF } = await seedUser("f");
+  cleanupUsers.push(userE, userF);
+  await seedLink(userE, `fake_ctm_${RUN}_e`, null);
+  await seedLink(userF, `fake_ctm_${RUN}_f`, null);
+  const evFE = await seedEvent({ tag: "fe", eventType: "transaction.completed", customerId: `fake_ctm_${RUN}_e`, subscriptionId: null, planId: "founder_lifetime", founder: true });
+  r = await rpc("allocate_founder_lifetime_with_audit", evFE.processingId);
+  check("boundary slot 75 allocates", r.ok === true && (await billingRow(userE))?.founder_number === 75);
+  const evFF = await seedEvent({ tag: "ff", eventType: "transaction.completed", customerId: `fake_ctm_${RUN}_f`, subscriptionId: null, planId: "founder_lifetime", founder: true });
+  r = await rpc("allocate_founder_lifetime_with_audit", evFF.processingId);
+  check("beyond the cap: blocked with founder_cap_reached", !r.ok && r.reason === "founder_cap_reached");
+  check("beyond the cap: no entitlement row written", (await billingRow(userF)) === null);
 
   // 8. client-side isolation (RLS)
   const { error: anonRead } = await anon.from("billing_subscriptions").select("*").limit(1);
@@ -236,6 +307,32 @@ async function main() {
   check("anon cannot write billing rows", !!anonWrite);
   const { error: anonRpc } = await anon.rpc("allocate_founder_lifetime", { p_processing_id: ev1.processingId });
   check("anon cannot execute founder RPC", !!anonRpc);
+
+  // A REAL signed-in user (JWT-backed client), not just the unsigned anon
+  // key: a regression that grants billing writes or founder-RPC execution to
+  // `authenticated` must fail this harness, and the aggregate availability
+  // read (deliberately authenticated-readable) must work.
+  const authed: SupabaseClient = createClient(URL, ANON, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { error: signInError } = await authed.auth.signInWithPassword({
+    email: emailA,
+    password: RUN_PASSWORD,
+  });
+  check("seeded user signs in for the authenticated isolation proofs", !signInError);
+  const { error: authedWrite } = await authed
+    .from("billing_subscriptions")
+    .insert({ user_id: userA, plan_id: "founder_lifetime", status: "active" });
+  check("authenticated user cannot write billing rows", !!authedWrite);
+  const { error: authedRpc } = await authed.rpc("allocate_founder_lifetime", { p_processing_id: ev1.processingId });
+  check("authenticated user cannot execute the founder RPC", !!authedRpc);
+  const { data: slots, error: slotsError } = await authed.rpc("founder_lifetime_slots_remaining");
+  check(
+    "authenticated user CAN read only the aggregate founder availability (0..75)",
+    !slotsError && typeof slots === "number" && slots >= 0 && slots <= 75,
+    slots,
+  );
+  await authed.auth.signOut();
 
   // 9. audit rows exist and are sanitized
   const { data: audits } = await admin

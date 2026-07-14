@@ -763,3 +763,108 @@ describe("evaluateAiDoctorOutput — recommendation safety", () => {
     expect(e.status).toBe("pass");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Review-defect regressions (one per proven defect)
+// ---------------------------------------------------------------------------
+
+describe("evaluateAiDoctorOutput — review-defect regressions", () => {
+  // 1. Device language hidden in summary/likely_issue must not bypass the gate.
+  it("detects device-control language in summary", () => {
+    const r = makeValidResult();
+    r.summary = "Turn on the humidifier now to correct the room.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "device_control_instruction")).toBe(true);
+  });
+
+  it("detects device-control language in likely_issue", () => {
+    const r = makeValidResult();
+    r.likely_issue = "Low humidity; start the pump to compensate.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "device_control_instruction")).toBe(true);
+  });
+
+  // 2. Visual evidence is valid Phase-1 vision evidence, not a diary event.
+  it("accepts visual/photo evidence without requiring a diary photo event", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(
+        resultWithEvidence(["The photo shows yellowing on the lower fan leaves."]),
+        makeContext(), // no photo grow-event in context
+      ),
+    );
+    expect(hasCode(e, "evidence_not_in_context")).toBe(false);
+    expect(e.status).toBe("pass");
+  });
+
+  // 3. A nutrient-deficiency diagnosis is not a claim that feeding occurred.
+  it("does not treat bare 'nutrient' language as a feeding-event citation", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(
+        resultWithEvidence(["Leaf pattern may indicate a nutrient deficiency."]),
+        makeContext(), // no feeding grow-event in context
+      ),
+    );
+    expect(hasCode(e, "evidence_not_in_context")).toBe(false);
+  });
+
+  // 4. Canonical autoflower detection (catches "autoflowering", which the old
+  //    local regex missed).
+  it("flags autoflower stress using the canonical detector (autoflowering)", () => {
+    const context = compilePlantContextFromRows({
+      plant: {
+        id: "p",
+        tent_id: "t",
+        grow_id: "g",
+        name: "P",
+        strain: "Blue Autoflowering",
+        stage: "veg",
+      },
+      growEvents: [],
+      sensorReadings: [],
+      now: NOW,
+    });
+    const r = makeValidResult();
+    r.immediate_action = "Transplant the plant into a bigger pot today.";
+    r.evidence = ["Mild yellowing visible on lower fan leaves."];
+    const e = evaluateAiDoctorOutput({
+      result: r,
+      context,
+      readiness: makeReadiness("strong"),
+    });
+    expect(hasCode(e, "unsafe_autoflower_stress")).toBe(true);
+  });
+
+  // 5. Bounded device detection for pump/valve verbs.
+  it.each([
+    "Start the pump for ten minutes.",
+    "Stop the pump immediately.",
+    "Open the valve to the res.",
+    "Close the valve after feeding.",
+  ])("flags bounded device command: %s", (action) => {
+    const r = makeValidResult();
+    r.immediate_action = action;
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "device_control_instruction")).toBe(true);
+  });
+
+  // 6. Omitted contractually-required fields must not slip through.
+  it("flags an omitted likely_issue field", () => {
+    const r = makeValidResult() as unknown as Record<string, unknown>;
+    delete r.likely_issue;
+    const e = evaluateAiDoctorOutput(makeInput(r as unknown as Phase1DiagnosisResult));
+    expect(
+      e.findings.some((f) => f.code === "required_field_missing" && f.field === "likely_issue"),
+    ).toBe(true);
+  });
+
+  it("flags an omitted action_queue_suggestion field", () => {
+    const r = makeValidResult() as unknown as Record<string, unknown>;
+    delete r.action_queue_suggestion;
+    const e = evaluateAiDoctorOutput(makeInput(r as unknown as Phase1DiagnosisResult));
+    expect(
+      e.findings.some(
+        (f) => f.code === "required_field_missing" && f.field === "action_queue_suggestion",
+      ),
+    ).toBe(true);
+  });
+});

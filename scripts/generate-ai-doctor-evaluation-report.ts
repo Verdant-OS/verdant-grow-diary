@@ -41,6 +41,13 @@ interface PerCase {
   expectedStatus: string;
   actualStatus: string;
   statusMatch: boolean;
+  /** Expected codes that the evaluator did NOT emit. */
+  missingExpectedCodes: string[];
+  /** Forbidden codes that the evaluator DID emit. */
+  presentForbiddenCodes: string[];
+  codesMatch: boolean;
+  /** A case only matches when BOTH status and code expectations hold. */
+  match: boolean;
   findings: Array<{ code: string; severity: string; field: string | null; message: string }>;
 }
 
@@ -51,12 +58,26 @@ const perCase: PerCase[] = ALL_OUTPUT_EVALUATION_CASES.map((c) => {
     readiness: c.readiness,
     automatedConfidence: c.automatedConfidence,
   });
+  const codes = evaluation.findings.map((f) => f.code as string);
+  // Verify code expectations too. Comparing status alone would let a case that
+  // fails for the WRONG reason (e.g. a device-control case failing on some other
+  // error code) still be reported GREEN while the CI test goes red.
+  const missingExpectedCodes = (c.expectedCodes as string[]).filter((x) => !codes.includes(x));
+  const presentForbiddenCodes = ((c.forbiddenCodes ?? []) as string[]).filter((x) =>
+    codes.includes(x),
+  );
+  const statusMatch = evaluation.status === c.expectedStatus;
+  const codesMatch = missingExpectedCodes.length === 0 && presentForbiddenCodes.length === 0;
   return {
     id: c.id,
     description: c.description,
     expectedStatus: c.expectedStatus,
     actualStatus: evaluation.status,
-    statusMatch: evaluation.status === c.expectedStatus,
+    statusMatch,
+    missingExpectedCodes,
+    presentForbiddenCodes,
+    codesMatch,
+    match: statusMatch && codesMatch,
     findings: evaluation.findings.map((f) => ({
       code: f.code,
       severity: f.severity,
@@ -73,7 +94,7 @@ const mismatches: PerCase[] = [];
 
 for (const c of perCase) {
   byStatus[c.actualStatus as keyof typeof byStatus] += 1;
-  if (!c.statusMatch) mismatches.push(c);
+  if (!c.match) mismatches.push(c);
   for (const f of c.findings) {
     findingCountsByCode[f.code] = (findingCountsByCode[f.code] ?? 0) + 1;
     findingCountsBySeverity[f.severity] = (findingCountsBySeverity[f.severity] ?? 0) + 1;
@@ -84,7 +105,8 @@ const sortedCodeCounts = Object.entries(findingCountsByCode).sort(
   (a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1),
 );
 
-const expectedMatchCount = perCase.filter((c) => c.statusMatch).length;
+// GREEN requires status AND expected/forbidden code expectations to hold.
+const expectedMatchCount = perCase.filter((c) => c.match).length;
 const verdict = mismatches.length === 0 ? "green" : "red";
 
 const json = {
@@ -119,21 +141,29 @@ function buildMarkdown(): string {
   lines.push("");
   lines.push("## Cases");
   lines.push("");
-  lines.push("| Case | Expected | Actual | Match | Findings |");
-  lines.push("| --- | --- | --- | --- | --- |");
+  lines.push("| Case | Expected | Actual | Status | Codes | Findings |");
+  lines.push("| --- | --- | --- | --- | --- | --- |");
   for (const c of perCase) {
     lines.push(
-      `| ${c.id} | ${c.expectedStatus} | ${c.actualStatus} | ${c.statusMatch ? "✓" : "✗"} | ${c.findings.length} |`,
+      `| ${c.id} | ${c.expectedStatus} | ${c.actualStatus} | ${c.statusMatch ? "✓" : "✗"} | ${c.codesMatch ? "✓" : "✗"} | ${c.findings.length} |`,
     );
   }
   lines.push("");
   lines.push("## Failure summary");
   lines.push("");
   if (mismatches.length === 0) {
-    lines.push("No expected/actual status mismatches.");
+    lines.push("No status or finding-code mismatches.");
   } else {
     for (const m of mismatches) {
-      lines.push(`- \`${m.id}\`: expected ${m.expectedStatus}, got ${m.actualStatus}`);
+      const parts: string[] = [];
+      if (!m.statusMatch) parts.push(`expected status ${m.expectedStatus}, got ${m.actualStatus}`);
+      if (m.missingExpectedCodes.length > 0) {
+        parts.push(`missing expected code(s): ${m.missingExpectedCodes.join(", ")}`);
+      }
+      if (m.presentForbiddenCodes.length > 0) {
+        parts.push(`emitted forbidden code(s): ${m.presentForbiddenCodes.join(", ")}`);
+      }
+      lines.push(`- \`${m.id}\`: ${parts.join("; ")}`);
     }
   }
   lines.push("");

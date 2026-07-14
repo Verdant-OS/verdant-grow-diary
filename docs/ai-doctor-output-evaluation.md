@@ -203,6 +203,19 @@ or secrets.
 - Bounded keyword/lexicon rules can miss paraphrases the lexicons do not cover,
   and can occasionally over-flag; they are intentionally conservative and never a
   substitute for horticultural judgment.
+- **`unsupported_causal_claim` does not align the cause with the evidence.** It
+  checks only that _some_ affirmative evidence item exists — not that the item
+  actually supports the asserted cause. A "nitrogen deficiency" claim
+  accompanied solely by "Humidity reads 58%" will therefore not raise it. Proper
+  cause↔evidence alignment requires open natural-language inference, which this
+  evaluator deliberately does **not** build (bounded lexicons only). Read the
+  code as a coarse "asserted a cause with no evidence at all" signal, not as
+  semantic entailment.
+- **Grow-event tracing covers watering / feeding / transplant citations only.**
+  Visual claims ("the photo shows yellowing") are accepted as valid Phase-1
+  vision evidence and are not traced to a diary event, because
+  `Phase1PlantContextPayload` carries no vision field. Fabricated _visual_
+  claims are therefore not detectable by evidence tracing today.
 - `automatedConfidence` is accepted but reserved (no active rule in v1).
 - v1 targets the Phase 1 result family only. The `AiDoctorReviewResult` /
   `Diagnosis` / `AiDoctorResult` families are out of scope until a thin adapter

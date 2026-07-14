@@ -33,7 +33,11 @@
 import type { Phase1DiagnosisResult, Phase1PlantContextPayload } from "@/lib/aiDoctorEngine";
 import type { AiDoctorContextResult, AiDoctorContextReadiness } from "@/lib/aiDoctorContextRules";
 import type { AiDoctorConfidenceResult } from "@/lib/aiDoctorConfidenceAdapter";
-import { bandForConfidence, DEVICE_CONTROL_DETECTION_PATTERNS } from "@/lib/aiDoctorSafetyRules";
+import {
+  bandForConfidence,
+  isLikelyAutoflower,
+  DEVICE_CONTROL_DETECTION_PATTERNS,
+} from "@/lib/aiDoctorSafetyRules";
 
 // ---------------------------------------------------------------------------
 // Contract version
@@ -210,13 +214,15 @@ function validateContractShape(result: Phase1DiagnosisResult, findings: FindingL
   // Treat the result defensively: malformed/unknown-shaped input must not throw.
   const r = result as unknown as Record<string, unknown>;
 
-  // likely_issue: may be empty, but must be a string when present.
-  if (r.likely_issue !== undefined && !isString(r.likely_issue)) {
+  // likely_issue: REQUIRED and must be a string. Only its *value* may be empty
+  // (weak context ⇒ no certain issue) — an omitted field is a contract breach,
+  // because a documented output section would simply be absent.
+  if (!isString(r.likely_issue)) {
     findings.add({
       code: "required_field_missing",
       severity: "error",
       field: "likely_issue",
-      message: "likely_issue must be a string.",
+      message: "likely_issue is missing or not a string (an empty string is allowed).",
     });
   }
 
@@ -297,6 +303,18 @@ function validateContractShape(result: Phase1DiagnosisResult, findings: FindingL
   // action_queue_suggestion: null OR a structurally valid advisory suggestion.
   // Semantic "automatic execution" language is enforced in Commit 3; here we
   // only guard the structural shape of a present suggestion.
+  // action_queue_suggestion is REQUIRED: it must be explicitly `null` (no
+  // suggestion) or an advisory object. An omitted field would slip past the
+  // advertised shape validation entirely.
+  if (!("action_queue_suggestion" in r) || r.action_queue_suggestion === undefined) {
+    findings.add({
+      code: "required_field_missing",
+      severity: "error",
+      field: "action_queue_suggestion",
+      message: "action_queue_suggestion is missing (must be null or an advisory object).",
+    });
+  }
+
   const suggestion = r.action_queue_suggestion;
   if (suggestion !== null && suggestion !== undefined) {
     if (typeof suggestion !== "object") {
@@ -425,10 +443,24 @@ interface EventLexeme {
   term: RegExp;
   contextRe: RegExp;
 }
+/**
+ * Grow-EVENT citations only. Each lexeme must assert that an action was
+ * LOGGED, so it can be traced to `recent_grow_events`.
+ *
+ * Deliberately absent:
+ *  - photo/image/picture. Phase 1 is multimodal: its primary evidence IS the
+ *    vision analysis, and `Phase1PlantContextPayload` carries no vision field.
+ *    Treating "the photo shows yellowing" as a diary-event citation would flag
+ *    ordinary visual evidence as `evidence_not_in_context` — a false positive
+ *    that would withhold legitimate diagnoses at runtime. Visual claims are
+ *    accepted as valid Phase-1 vision evidence.
+ *  - bare `nutrient`. "may indicate a nutrient deficiency" is a DIAGNOSIS, not
+ *    a claim that feeding occurred; only feeding/application language traces to
+ *    a feeding event.
+ */
 const EVENT_LEXICON: readonly EventLexeme[] = [
   { key: "watering", term: /\bwater(ed|ing)?\b|\birrigat(ed|ion)\b/, contextRe: /water|irrigat/ },
-  { key: "feeding", term: /\b(fed|feed(ing)?|nutrient(s)?)\b/, contextRe: /feed|nutrient/ },
-  { key: "photo", term: /\b(photo|image|picture)\b/, contextRe: /photo|image|picture/ },
+  { key: "feeding", term: /\b(fed|feed|feeding|fertili[sz]ed)\b/, contextRe: /feed|nutrient/ },
   { key: "transplant", term: /\btransplant(ed|ing)?\b/, contextRe: /transplant/ },
 ];
 
@@ -892,8 +924,6 @@ const AUTOFLOWER_STRESS_PATTERNS: readonly RegExp[] = [
   /\baggressive flush\b/,
 ];
 
-const AUTOFLOWER_NAME_RE = /\bauto(flower)?s?\b/;
-
 interface VariableLex {
   key: string;
   inc: readonly RegExp[];
@@ -979,6 +1009,24 @@ function adviceText(result: Phase1DiagnosisResult): string {
     .toLowerCase();
 }
 
+/**
+ * Every AFFIRMATIVE, user-visible surface — anything a grower could read as an
+ * instruction, including `summary` and `likely_issue`. Device/automation
+ * scanning must cover these: a result placing "Turn on the humidifier now" in
+ * `summary` would otherwise bypass `device_control_instruction` entirely.
+ *
+ * Deliberately EXCLUDES `what_not_to_do` (prohibitions — "Do not turn on the
+ * humidifier" must never be read as a device instruction) and
+ * `missing_information` (stated limitations).
+ */
+function affirmativeResultText(result: Phase1DiagnosisResult): string {
+  const r = result as unknown as Record<string, unknown>;
+  return [asText(r.summary), asText(r.likely_issue), adviceText(result)]
+    .filter((s) => s.trim().length > 0)
+    .join(" \n ")
+    .toLowerCase();
+}
+
 function detectRecommendationConflicts(result: Phase1DiagnosisResult, findings: FindingList): void {
   const r = result as unknown as Record<string, unknown>;
   const immediate = asText(r.immediate_action).toLowerCase();
@@ -1026,10 +1074,13 @@ function validateRecommendationSafety(
 ): void {
   const result = input.result as unknown as Record<string, unknown>;
   const advice = adviceText(input.result);
+  // Device + automation language is scanned across EVERY affirmative surface
+  // (including summary / likely_issue), not just the recommendation sections.
+  const affirmative = affirmativeResultText(input.result);
   const aq = result.action_queue_suggestion;
 
   // Device / equipment control — read-only advisor must never instruct it.
-  if (DEVICE_CONTROL_PATTERNS.some((re) => re.test(advice))) {
+  if (DEVICE_CONTROL_PATTERNS.some((re) => re.test(affirmative))) {
     findings.add({
       code: "device_control_instruction",
       severity: "error",
@@ -1038,7 +1089,7 @@ function validateRecommendationSafety(
   }
 
   // Automatic Action Queue execution — language OR a non-advisory suggestion.
-  let autoAq = AUTOMATIC_AQ_PATTERNS.some((re) => re.test(advice));
+  let autoAq = AUTOMATIC_AQ_PATTERNS.some((re) => re.test(affirmative));
   if (aq !== null && aq !== undefined && typeof aq === "object") {
     const s = aq as Record<string, unknown>;
     if (s.action_type !== "advisory" || s.status !== "pending_approval") {
@@ -1076,11 +1127,10 @@ function validateRecommendationSafety(
     });
   }
 
-  // Autoflower high-stress technique.
-  const ctx = input.context as unknown as Record<string, unknown>;
-  const strainBlob = `${asText(ctx.strain)} ${asText(ctx.plant_name)}`.toLowerCase();
+  // Autoflower high-stress technique. Reuses the CANONICAL detector so both
+  // safety paths stay aligned — a local regex missed forms like "autoflowering".
   if (
-    AUTOFLOWER_NAME_RE.test(strainBlob) &&
+    isLikelyAutoflower(input.context) &&
     AUTOFLOWER_STRESS_PATTERNS.some((re) => re.test(advice))
   ) {
     findings.add({

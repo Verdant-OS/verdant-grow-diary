@@ -53,6 +53,19 @@ describe("AI Doctor output evaluation — golden cases", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  // Regression: a case must be judged on its finding CODES, not just its status.
+  // Status alone would let a case that fails for the WRONG reason (e.g. a
+  // device-control case failing on some unrelated error) still look "matched".
+  it("every case satisfies its expected AND forbidden codes, not just status", () => {
+    for (const c of ALL_OUTPUT_EVALUATION_CASES) {
+      const codes = evaluateAiDoctorOutput(inputFor(c)).findings.map((f) => f.code);
+      const missingExpected = c.expectedCodes.filter((x) => !codes.includes(x));
+      const presentForbidden = (c.forbiddenCodes ?? []).filter((x) => codes.includes(x));
+      expect(missingExpected, `${c.id}: missing expected codes`).toEqual([]);
+      expect(presentForbidden, `${c.id}: emitted forbidden codes`).toEqual([]);
+    }
+  });
+
   // No `.skip` / `.todo` anywhere — every case runs.
   for (const c of ALL_OUTPUT_EVALUATION_CASES) {
     describe(c.id, () => {

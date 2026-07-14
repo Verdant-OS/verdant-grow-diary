@@ -570,3 +570,156 @@ describe("evaluateAiDoctorOutput — evidence violations", () => {
     expect(hasCode(e, "unsupported_causal_claim")).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Commit 3 — confidence calibration
+// ---------------------------------------------------------------------------
+
+describe("evaluateAiDoctorOutput — confidence calibration", () => {
+  it("fails a diagnosis produced under insufficient readiness", () => {
+    const e = evaluateAiDoctorOutput(makeInput(makeValidResult(), "insufficient"));
+    expect(e.status).toBe("fail");
+    expect(hasCode(e, "diagnosis_generated_while_insufficient")).toBe(true);
+  });
+
+  it("passes partial readiness with cautious, bounded confidence + limitation", () => {
+    const r = makeValidResult();
+    r.confidence = 0.3;
+    r.immediate_action = "Observe and re-check; this review has limited confidence.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "partial"));
+    expect(e.status).toBe("pass");
+  });
+
+  it("flags confidence above the partial-readiness ceiling", () => {
+    const r = makeValidResult();
+    r.confidence = 0.9;
+    const e = evaluateAiDoctorOutput(makeInput(r, "partial"));
+    expect(hasCode(e, "confidence_exceeds_readiness")).toBe(true);
+  });
+
+  it("flags partial readiness with no missing information", () => {
+    const r = makeValidResult();
+    r.missing_information = [];
+    r.immediate_action = "Observe the plant.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "partial"));
+    expect(hasCode(e, "missing_information_absent")).toBe(true);
+  });
+
+  it("flags partial readiness lacking any visible limitation", () => {
+    const r = makeValidResult();
+    r.missing_information = [];
+    r.immediate_action = "Observe the plant.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "partial"));
+    expect(hasCode(e, "partial_context_limitation_absent")).toBe(true);
+  });
+
+  it("rejects absolute-certainty language even under strong readiness", () => {
+    const r = makeValidResult();
+    r.summary = "This is definitely a nitrogen deficiency, guaranteed.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "overconfident_language")).toBe(true);
+  });
+
+  it("does not cap a valid strong-readiness confidence below its ceiling", () => {
+    const r = makeValidResult();
+    r.confidence = 0.8;
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "confidence_exceeds_readiness")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Commit 3 — recommendation safety
+// ---------------------------------------------------------------------------
+
+describe("evaluateAiDoctorOutput — recommendation safety", () => {
+  it("fails a device-control instruction", () => {
+    const r = makeValidResult();
+    r.immediate_action = "Turn on the dehumidifier now.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(e.status).toBe("fail");
+    expect(hasCode(e, "device_control_instruction")).toBe(true);
+  });
+
+  it("fails automatic Action Queue execution language", () => {
+    const r = makeValidResult();
+    r.immediate_action = "This will be applied automatically without approval.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "automatic_action_queue_language")).toBe(true);
+  });
+
+  it("fails a non-advisory / pre-approved Action Queue suggestion", () => {
+    const r = makeValidResult() as unknown as Record<string, unknown>;
+    r.action_queue_suggestion = {
+      action_type: "execute",
+      status: "approved",
+      reason: "Run the fix",
+      risk_level: "low",
+    };
+    const e = evaluateAiDoctorOutput(makeInput(r as unknown as Phase1DiagnosisResult, "strong"));
+    expect(hasCode(e, "automatic_action_queue_language")).toBe(true);
+  });
+
+  it("accepts an advisory, approval-required Action Queue suggestion", () => {
+    const r = makeValidResult();
+    r.action_queue_suggestion = {
+      action_type: "advisory",
+      status: "pending_approval",
+      reason: "Review recent watering cadence with a grower.",
+      risk_level: "low",
+    };
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(e.status).toBe("pass");
+  });
+
+  it("warns on an aggressive nutrient change under partial context", () => {
+    const r = makeValidResult();
+    r.immediate_action = "Increase nutrient strength significantly today.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "partial"));
+    expect(hasCode(e, "aggressive_nutrient_change")).toBe(true);
+  });
+
+  it("warns on an aggressive irrigation change under partial context", () => {
+    const r = makeValidResult();
+    r.immediate_action = "Increase the watering volume right away.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "partial"));
+    expect(hasCode(e, "aggressive_irrigation_change")).toBe(true);
+  });
+
+  it("does NOT flag an aggressive change under strong context", () => {
+    const r = makeValidResult();
+    r.immediate_action = "Increase nutrient strength.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "aggressive_nutrient_change")).toBe(false);
+  });
+
+  it("flags high-stress advice for a likely autoflower", () => {
+    const r = makeValidResult();
+    r.immediate_action = "Transplant the plant into a bigger pot today.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "unsafe_autoflower_stress")).toBe(true);
+  });
+
+  it("flags a contradiction between immediate action and what-not-to-do", () => {
+    const r = makeValidResult();
+    r.immediate_action = "Increase the watering today.";
+    r.what_not_to_do = ["Do not increase the watering."];
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "recommendation_conflict")).toBe(true);
+  });
+
+  it("flags a contradiction between the 24-hour and 3-day plans", () => {
+    const r = makeValidResult();
+    r.twenty_four_hour_follow_up = "Increase the feed strength tomorrow.";
+    r.three_day_recovery_plan = "Reduce the feed strength over the next three days.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "recommendation_conflict")).toBe(true);
+  });
+
+  it("passes a safe, review-first, one-variable recovery plan", () => {
+    const r = makeValidResult();
+    r.immediate_action = "Review recent logs, confirm the trend, and adjust gradually if needed.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "partial"));
+    expect(e.status).toBe("pass");
+  });
+});

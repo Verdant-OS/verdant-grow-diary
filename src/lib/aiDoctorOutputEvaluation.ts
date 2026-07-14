@@ -31,8 +31,9 @@
  */
 
 import type { Phase1DiagnosisResult, Phase1PlantContextPayload } from "@/lib/aiDoctorEngine";
-import type { AiDoctorContextResult } from "@/lib/aiDoctorContextRules";
+import type { AiDoctorContextResult, AiDoctorContextReadiness } from "@/lib/aiDoctorContextRules";
 import type { AiDoctorConfidenceResult } from "@/lib/aiDoctorConfidenceAdapter";
+import { bandForConfidence, DEVICE_COMMAND_PATTERNS } from "@/lib/aiDoctorSafetyRules";
 
 // ---------------------------------------------------------------------------
 // Contract version
@@ -684,6 +685,399 @@ function validateEvidenceIntegrity(
 }
 
 // ---------------------------------------------------------------------------
+// Commit 3 — confidence calibration (keyed to the canonical gate decision)
+// ---------------------------------------------------------------------------
+
+/**
+ * Confidence ceilings keyed to the CANONICAL gate decision
+ * (`AiDoctorContextReadiness`). No new confidence engine — these sit on top of
+ * the existing numeric confidence + `bandForConfidence()`. Central + documented
+ * because the repo has no readiness→ceiling mapping today:
+ *  - `insufficient`: the gate should have blocked; any real confidence is wrong.
+ *  - `partial`: must stay below the "high" band (`bandForConfidence` ≥ 0.7);
+ *    capped conservatively at 0.6.
+ *  - `strong`: may be high, but absolute certainty (≈1.0) is never justified.
+ */
+export const AI_DOCTOR_READINESS_CONFIDENCE_CEILING: Record<AiDoctorContextReadiness, number> =
+  Object.freeze({
+    insufficient: 0,
+    partial: 0.6,
+    strong: 0.95,
+  });
+
+const ABSOLUTE_CERTAINTY_PATTERNS: readonly RegExp[] = [
+  /\bguaranteed?\b/,
+  /\bdefinitely\b/,
+  /\bcertainly\b/,
+  /\b100\s?%/,
+  /\bno doubt\b/,
+  /\bwithout (a )?doubt\b/,
+  /\babsolutely certain\b/,
+  /\bwill (definitely|certainly)\b/,
+  /\bcured\b/,
+  /\bconfirmed diagnosis\b/,
+];
+
+const LIMITATION_PATTERNS: readonly RegExp[] = [
+  /\blimited\b/,
+  /\bmay be limited\b/,
+  /\bmore context\b/,
+  /\bcannot be certain\b/,
+  /\bnot enough\b/,
+  /\bpreliminary\b/,
+  /\bcautious\b/,
+  /\buncertain\b/,
+  /\btentative\b/,
+  /\bmore (data|information)\b/,
+];
+
+function validateConfidenceCalibration(
+  input: AiDoctorOutputEvaluationInput,
+  findings: FindingList,
+): void {
+  const result = input.result as unknown as Record<string, unknown>;
+  const readiness = (input.readiness as { readiness?: unknown } | null | undefined)?.readiness as
+    | AiDoctorContextReadiness
+    | undefined;
+  const confidence = result.confidence;
+  // Only an in-range confidence is calibrated; an out-of-range value is already
+  // reported as invalid_confidence (Commit 1) and must not double-report here.
+  const validConf = isValidConfidence(confidence);
+  const band = validConf ? bandForConfidence(confidence as number) : "low";
+  const missing = Array.isArray(result.missing_information)
+    ? (result.missing_information as unknown[])
+    : [];
+  const positive = positiveClaimText(input.result);
+
+  // 1. Diagnosis produced while the gate reads "insufficient" → fail.
+  if (readiness === "insufficient") {
+    findings.add({
+      code: "diagnosis_generated_while_insufficient",
+      severity: "error",
+      message:
+        "A diagnosis result exists while readiness is insufficient; the gate should have blocked it.",
+    });
+  }
+
+  // 2. Confidence ceiling by readiness (partial / strong).
+  if (validConf && (readiness === "partial" || readiness === "strong")) {
+    const ceiling = AI_DOCTOR_READINESS_CONFIDENCE_CEILING[readiness];
+    if ((confidence as number) > ceiling) {
+      findings.add({
+        code: "confidence_exceeds_readiness",
+        severity: "error",
+        field: "confidence",
+        message: `Confidence ${confidence} exceeds the ${readiness}-readiness ceiling of ${ceiling}.`,
+      });
+    }
+  }
+
+  // 3. Missing-information population.
+  if (missing.length === 0) {
+    if (readiness === "partial") {
+      findings.add({
+        code: "missing_information_absent",
+        severity: "error",
+        field: "missing_information",
+        message: "Partial readiness requires populated missing_information.",
+      });
+    } else if (readiness === "strong" && band !== "high") {
+      findings.add({
+        code: "missing_information_absent",
+        severity: "warning",
+        field: "missing_information",
+        message: "Non-high confidence should list what is needed to raise it.",
+      });
+    }
+  }
+
+  // 4. Partial context must carry a visible limitation.
+  if (readiness === "partial") {
+    const hasLimitation = missing.length > 0 || LIMITATION_PATTERNS.some((re) => re.test(positive));
+    if (!hasLimitation) {
+      findings.add({
+        code: "partial_context_limitation_absent",
+        severity: "error",
+        message:
+          "Partial readiness requires a visible limitation (missing information or cautious wording).",
+      });
+    }
+  }
+
+  // 5. Absolute-certainty language — forbidden at every readiness level.
+  if (ABSOLUTE_CERTAINTY_PATTERNS.some((re) => re.test(positive))) {
+    findings.add({
+      code: "overconfident_language",
+      severity: "error",
+      message: "Result uses absolute-certainty language that no readiness level justifies.",
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Commit 3 — recommendation safety
+// ---------------------------------------------------------------------------
+
+/**
+ * Device-control vocabulary — reuses the engine's `DEVICE_COMMAND_PATTERNS`
+ * plus evaluator-specific patterns mirroring the golden-case device vocabulary.
+ */
+const DEVICE_CONTROL_PATTERNS: readonly RegExp[] = [
+  ...DEVICE_COMMAND_PATTERNS,
+  /\bset (the )?(fan|light|lights|humidifier|dehumidifier|heater|temp|temperature|humidity)\b/i,
+  /\bset ?point\b/i,
+  /\bswitch (on|off)\b/i,
+  /\brelay\b/i,
+  /\bactuate\b/i,
+];
+
+const AUTOMATIC_AQ_PATTERNS: readonly RegExp[] = [
+  /\bautomatically\b/,
+  /\bauto-?approve/,
+  /\bwithout approval\b/,
+  /\bno approval (needed|required)\b/,
+  /\bbypass(ing)? (the )?(approval|action queue|review)\b/,
+  /\bwill (be )?(execute|appl|run)/,
+  /\bqueue and (run|execute)\b/,
+  /\bexecutes? (the )?action\b/,
+  /\bapplied automatically\b/,
+];
+
+const AGGRESSIVE_NUTRIENT_PATTERNS: readonly RegExp[] = [
+  /\bincrease (the )?nutrient/,
+  /\bfeed more\b/,
+  /\braise (the )?ec\b/,
+  /\badd (more )?nutrient/,
+  /\bflush (immediately|now|the plant)\b/,
+  /\bdouble (the )?(feed|nutrient|ec)\b/,
+  /\bheavy feed\b/,
+  /\bboost (the )?(feed|nutrient)/,
+];
+
+const AGGRESSIVE_IRRIGATION_PATTERNS: readonly RegExp[] = [
+  /\bwater (a lot |much )?more\b/,
+  /\bincrease (the )?(watering|irrigation)\b/,
+  /\breduce (the )?(watering|irrigation)\b/,
+  /\bwater less\b/,
+  /\birrigate now\b/,
+  /\bml of water\b/,
+  /\bsoak (the )?(medium|pot|plant)\b/,
+];
+
+/** Mirrors `AUTOFLOWER_NEVER_DO` (aiDoctorSafetyRules): high-stress verbs. */
+const AUTOFLOWER_STRESS_PATTERNS: readonly RegExp[] = [
+  /\bheav(y|ily) defoliat/,
+  /\bdefoliate (heavily|hard)\b/,
+  /\btop(ping)? (the|this|your)?\s?plant/,
+  /\bfim\b/,
+  /\bhigh[- ]stress training\b/,
+  /\bsevere (lst|training)\b/,
+  /\btransplant/,
+  /\baggressive flush\b/,
+];
+
+const AUTOFLOWER_NAME_RE = /\bauto(flower)?s?\b/;
+
+interface VariableLex {
+  key: string;
+  inc: readonly RegExp[];
+  dec: readonly RegExp[];
+}
+const VARIABLE_LEX: readonly VariableLex[] = [
+  {
+    key: "irrigation",
+    inc: [
+      /increase (the )?(watering|irrigation)/,
+      /water more/,
+      /more water/,
+      /irrigate more/,
+      /raise (the )?(watering|irrigation)/,
+    ],
+    dec: [
+      /reduce (the )?(watering|irrigation)/,
+      /water less/,
+      /less water/,
+      /withhold water/,
+      /cut back on water/,
+      /lower (the )?(watering|irrigation)/,
+    ],
+  },
+  {
+    key: "feed",
+    inc: [
+      /increase (the )?(feed|nutrient|ec)/,
+      /feed more/,
+      /raise (the )?ec/,
+      /more nutrient/,
+      /boost (the )?(feed|nutrient)/,
+      /add (more )?nutrient/,
+    ],
+    dec: [
+      /reduce (the )?(feed|nutrient|ec)/,
+      /feed less/,
+      /lower (the )?ec/,
+      /cut (the )?(feed|nutrient)/,
+      /flush/,
+      /less nutrient/,
+    ],
+  },
+  {
+    key: "humidity",
+    inc: [/raise (the )?(humidity|rh)/, /increase (the )?(humidity|rh)/, /more humidity/],
+    dec: [
+      /lower (the )?(humidity|rh)/,
+      /reduce (the )?(humidity|rh)/,
+      /less humidity/,
+      /dehumidif/,
+    ],
+  },
+  {
+    key: "temperature",
+    inc: [/raise (the )?(temp|temperature)/, /increase (the )?(temp|temperature)/, /warmer/],
+    dec: [/lower (the )?(temp|temperature)/, /reduce (the )?(temp|temperature)/, /cooler/],
+  },
+];
+
+function directionsFor(text: string, v: VariableLex): { inc: boolean; dec: boolean } {
+  return {
+    inc: v.inc.some((re) => re.test(text)),
+    dec: v.dec.some((re) => re.test(text)),
+  };
+}
+
+function adviceText(result: Phase1DiagnosisResult): string {
+  const r = result as unknown as Record<string, unknown>;
+  const parts: unknown[] = [
+    r.immediate_action,
+    r.twenty_four_hour_follow_up,
+    r.three_day_recovery_plan,
+  ];
+  if (Array.isArray(r.possible_causes)) parts.push(...(r.possible_causes as unknown[]));
+  const aq = r.action_queue_suggestion;
+  if (aq && typeof aq === "object") {
+    parts.push((aq as Record<string, unknown>).reason);
+  }
+  return parts
+    .filter((p) => typeof p === "string")
+    .join(" \n ")
+    .toLowerCase();
+}
+
+function detectRecommendationConflicts(result: Phase1DiagnosisResult, findings: FindingList): void {
+  const r = result as unknown as Record<string, unknown>;
+  const immediate = asText(r.immediate_action).toLowerCase();
+  const dnd = (Array.isArray(r.what_not_to_do) ? (r.what_not_to_do as unknown[]) : [])
+    .filter((x) => typeof x === "string")
+    .join(" \n ")
+    .toLowerCase();
+  const t24 = asText(r.twenty_four_hour_follow_up).toLowerCase();
+  const t3 = asText(r.three_day_recovery_plan).toLowerCase();
+  const aq = r.action_queue_suggestion;
+  const aqReason =
+    aq && typeof aq === "object"
+      ? asText((aq as Record<string, unknown>).reason).toLowerCase()
+      : "";
+
+  const reasons: string[] = [];
+  for (const v of VARIABLE_LEX) {
+    const imm = directionsFor(immediate, v);
+    const forbid = directionsFor(dnd, v);
+    if ((imm.inc && forbid.inc) || (imm.dec && forbid.dec)) {
+      reasons.push(`immediate action conflicts with "what not to do" on ${v.key}`);
+    }
+    const d24 = directionsFor(t24, v);
+    const d3 = directionsFor(t3, v);
+    if ((d24.inc && d3.dec) || (d24.dec && d3.inc)) {
+      reasons.push(`24-hour and 3-day plans disagree on ${v.key}`);
+    }
+    const dAq = directionsFor(aqReason, v);
+    if ((imm.inc && dAq.dec) || (imm.dec && dAq.inc)) {
+      reasons.push(`Action Queue suggestion conflicts with immediate action on ${v.key}`);
+    }
+  }
+  if (reasons.length > 0) {
+    findings.add({
+      code: "recommendation_conflict",
+      severity: "error",
+      message: `Contradictory recommendations detected (${reasons.sort().join("; ")}).`,
+    });
+  }
+}
+
+function validateRecommendationSafety(
+  input: AiDoctorOutputEvaluationInput,
+  findings: FindingList,
+): void {
+  const result = input.result as unknown as Record<string, unknown>;
+  const readiness = (input.readiness as { readiness?: unknown } | null | undefined)?.readiness as
+    | AiDoctorContextReadiness
+    | undefined;
+  const advice = adviceText(input.result);
+  const aq = result.action_queue_suggestion;
+
+  // Device / equipment control — read-only advisor must never instruct it.
+  if (DEVICE_CONTROL_PATTERNS.some((re) => re.test(advice))) {
+    findings.add({
+      code: "device_control_instruction",
+      severity: "error",
+      message: "Result instructs a device/equipment control action; AI Doctor is read-only.",
+    });
+  }
+
+  // Automatic Action Queue execution — language OR a non-advisory suggestion.
+  let autoAq = AUTOMATIC_AQ_PATTERNS.some((re) => re.test(advice));
+  if (aq !== null && aq !== undefined && typeof aq === "object") {
+    const s = aq as Record<string, unknown>;
+    if (s.action_type !== "advisory" || s.status !== "pending_approval") {
+      autoAq = true;
+    }
+  }
+  if (autoAq) {
+    findings.add({
+      code: "automatic_action_queue_language",
+      severity: "error",
+      field: aq ? "action_queue_suggestion" : undefined,
+      message:
+        "Result implies automatic Action Queue execution; suggestions must stay advisory and approval-required.",
+    });
+  }
+
+  // Aggressive changes under weak (non-strong) context.
+  const weak = readiness !== "strong";
+  if (weak && AGGRESSIVE_NUTRIENT_PATTERNS.some((re) => re.test(advice))) {
+    findings.add({
+      code: "aggressive_nutrient_change",
+      severity: "warning",
+      message: "Aggressive nutrient change recommended under weak/partial context.",
+    });
+  }
+  if (weak && AGGRESSIVE_IRRIGATION_PATTERNS.some((re) => re.test(advice))) {
+    findings.add({
+      code: "aggressive_irrigation_change",
+      severity: "warning",
+      message: "Aggressive irrigation change recommended under weak/partial context.",
+    });
+  }
+
+  // Autoflower high-stress technique.
+  const ctx = input.context as unknown as Record<string, unknown>;
+  const strainBlob = `${asText(ctx.strain)} ${asText(ctx.plant_name)}`.toLowerCase();
+  if (
+    AUTOFLOWER_NAME_RE.test(strainBlob) &&
+    AUTOFLOWER_STRESS_PATTERNS.some((re) => re.test(advice))
+  ) {
+    findings.add({
+      code: "unsafe_autoflower_stress",
+      severity: "warning",
+      message: "High-stress technique recommended for a likely autoflower.",
+    });
+  }
+
+  // Contradictions across recommendation sections.
+  detectRecommendationConflicts(input.result, findings);
+}
+
+// ---------------------------------------------------------------------------
 // Deterministic ordering + summarization
 // ---------------------------------------------------------------------------
 
@@ -730,7 +1124,9 @@ export function evaluateAiDoctorOutput(
   // Commit 2 — evidence integrity & sensor provenance.
   validateEvidenceIntegrity(input, findings);
 
-  // (Commit 3 calibration/safety rules attach here, appending to `findings`.)
+  // Commit 3 — confidence calibration & recommendation safety.
+  validateConfidenceCalibration(input, findings);
+  validateRecommendationSafety(input, findings);
 
   const sorted = sortFindings(findings.drain());
 

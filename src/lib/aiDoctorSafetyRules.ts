@@ -55,10 +55,7 @@ export interface AiDoctorResult {
   applied_safety_rules: readonly string[];
 }
 
-const TRUSTWORTHY: ReadonlySet<SensorSourceTag> = new Set<SensorSourceTag>([
-  "live",
-  "manual",
-]);
+const TRUSTWORTHY: ReadonlySet<SensorSourceTag> = new Set<SensorSourceTag>(["live", "manual"]);
 
 export const NEVER_DO_BASELINE: readonly string[] = Object.freeze([
   "Do not adjust nutrient strength based on this output.",
@@ -92,16 +89,9 @@ export interface ContextStrength {
   evidenceSignals: number;
 }
 
-export function assessContextStrength(
-  context: AiDoctorContext,
-): ContextStrength {
-  const trustworthyGroups = context.sensor_groups.filter((g) =>
-    TRUSTWORTHY.has(g.source),
-  );
-  const trustworthySensorReadings = trustworthyGroups.reduce(
-    (n, g) => n + g.sample_count,
-    0,
-  );
+export function assessContextStrength(context: AiDoctorContext): ContextStrength {
+  const trustworthyGroups = context.sensor_groups.filter((g) => TRUSTWORTHY.has(g.source));
+  const trustworthySensorReadings = trustworthyGroups.reduce((n, g) => n + g.sample_count, 0);
   const hasTrustworthySensors = trustworthySensorReadings > 0;
   const hasRecentEvents = context.recent_grow_events.length > 0;
   const hasStaleOrInvalid = context.sensor_groups.some(
@@ -109,8 +99,7 @@ export function assessContextStrength(
   );
   const hasAnySensors = context.sensor_groups.length > 0;
   const hasDemoOnly =
-    !hasTrustworthySensors &&
-    context.sensor_groups.some((g) => g.source === "demo");
+    !hasTrustworthySensors && context.sensor_groups.some((g) => g.source === "demo");
 
   let signals = 0;
   if (hasTrustworthySensors) signals += 1;
@@ -150,7 +139,7 @@ export interface AiDoctorDraft {
   action_queue_suggestion: AiDoctorActionQueueSuggestion | null;
 }
 
-const DEVICE_COMMAND_PATTERNS: readonly RegExp[] = [
+export const DEVICE_COMMAND_PATTERNS: readonly RegExp[] = [
   /\bturn (on|off)\b/i,
   /\bpower (on|off)\b/i,
   /\bactivate\b/i,
@@ -161,9 +150,7 @@ const DEVICE_COMMAND_PATTERNS: readonly RegExp[] = [
 ];
 
 function stripDeviceCommands(items: readonly string[]): string[] {
-  return items.filter(
-    (s) => !DEVICE_COMMAND_PATTERNS.some((rx) => rx.test(s)),
-  );
+  return items.filter((s) => !DEVICE_COMMAND_PATTERNS.some((rx) => rx.test(s)));
 }
 
 /**
@@ -184,15 +171,11 @@ export function applyAiDoctorSafetyRules(
     applied.push("missing_information_when_no_recent_sensor_data");
   }
   if (strength.hasStaleOrInvalid) {
-    missing.add(
-      "Some recent sensor readings are stale or invalid — fresh confirmation needed.",
-    );
+    missing.add("Some recent sensor readings are stale or invalid — fresh confirmation needed.");
     applied.push("flag_stale_or_invalid_telemetry");
   }
   if (strength.hasDemoOnly) {
-    missing.add(
-      "Only demo sensor data available — not usable for a real diagnosis.",
-    );
+    missing.add("Only demo sensor data available — not usable for a real diagnosis.");
     applied.push("demo_only_not_usable");
   }
   if (!context.stage) {
@@ -231,9 +214,7 @@ export function applyAiDoctorSafetyRules(
   }
 
   // ---- strip any device-command-style wording defensively ----
-  const safeImmediate = DEVICE_COMMAND_PATTERNS.some((rx) =>
-    rx.test(draft.immediate_action),
-  )
+  const safeImmediate = DEVICE_COMMAND_PATTERNS.some((rx) => rx.test(draft.immediate_action))
     ? "Observe and re-check. Do not change inputs based on this output."
     : draft.immediate_action;
   if (safeImmediate !== draft.immediate_action) {

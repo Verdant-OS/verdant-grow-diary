@@ -18,19 +18,32 @@ const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
 
 describe("ActionDetail — quick context links", () => {
   it("links Tent ID to /tents/:id when tent_id exists", () => {
+<<<<<<< HEAD
     expect(DETAIL).toMatch(/row\.tent_id\s*&&\s*\(?\s*<IdField[^>]*to=\{tentDetailPath\(row\.tent_id\)\}/);
   });
 
   it("links Plant ID to /plants/:id when plant_id exists", () => {
     expect(DETAIL).toMatch(/row\.plant_id\s*&&\s*\(?\s*<IdField[^>]*to=\{plantDetailPath\(row\.plant_id\)\}/);
+=======
+    expect(DETAIL).toMatch(
+      /row\.tent_id\s*&&\s*\(?\s*<IdField[^>]*to=\{tentDetailPath\(row\.tent_id\)\}/,
+    );
+  });
+
+  it("links Plant ID to /plants/:id when plant_id exists", () => {
+    expect(DETAIL).toMatch(
+      /row\.plant_id\s*&&\s*\(?\s*<IdField[^>]*to=\{plantDetailPath\(row\.plant_id\)\}/,
+    );
+>>>>>>> origin/main
   });
 
 
   it("links Grow ID to /grows/:growId now that the route exists", () => {
-    expect(DETAIL).toMatch(/<IdField\s+label="Grow"\s+id=\{row\.grow_id\}\s+to=\{growDetailPath\(row\.grow_id\)\}/);
+    expect(DETAIL).toMatch(
+      /<IdField\s+label="Grow"\s+id=\{row\.grow_id\}\s+to=\{growDetailPath\(row\.grow_id\)\}/,
+    );
     expect(APP).toMatch(/path="\/grows\/:growId"/);
   });
-
 
   it("IdField renders a Link only when 'to' is provided, plain span otherwise", () => {
     expect(DETAIL).toMatch(/function IdField[\s\S]*?to \? \(\s*<Link[\s\S]*?\) : \(\s*<span>/);
@@ -42,8 +55,12 @@ describe("ActionDetail — quick context links", () => {
   });
 
   it("audit events remain read-only (no update/delete)", () => {
-    expect(DETAIL).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.update\(/);
-    expect(DETAIL).not.toMatch(/\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.delete\(/);
+    expect(DETAIL).not.toMatch(
+      /\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.update\(/,
+    );
+    expect(DETAIL).not.toMatch(
+      /\.from\(\s*["']action_queue_events["']\s*\)[\s\S]{0,200}\.delete\(/,
+    );
   });
 
   it("introduces no device-control surface or service_role", () => {

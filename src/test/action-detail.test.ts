@@ -47,10 +47,14 @@ describe("Action Queue detail view", () => {
   it("guards transitions on terminal statuses via shared helper", () => {
     expect(DETAIL).toMatch(/from "@\/lib\/actionQueueTransitions"/);
     expect(DETAIL).toMatch(/isTerminalStatus/);
+<<<<<<< HEAD
     // Terminal-status guard wraps the transition-controls block. Allow
     // whitespace/newline between the `&&` and the IIFE for prettier-friendly
     // formatting; the semantic invariant is the guard itself.
     expect(DETAIL).toMatch(/!isTerminalStatus\(row\.status\)\s*&&\s*\(\(\)\s*=>\s*\{/);
+=======
+    expect(DETAIL).toMatch(/!isTerminalStatus\(row\.status\)\s*&&\s*\(\(\) => \{/);
+>>>>>>> origin/main
     expect(DETAIL).toMatch(/if \(!row \|\| isTerminal\(row\.status\)\) return;/);
   });
 

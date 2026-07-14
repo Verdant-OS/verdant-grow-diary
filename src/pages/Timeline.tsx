@@ -5,11 +5,28 @@ import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { STAGES, stageLabel } from "@/lib/grow";
 import { format, formatDistanceToNow } from "date-fns";
+<<<<<<< HEAD
 import { Sprout, Image as ImageIcon, Loader2, Camera, FileText, FlaskConical, Check, Pencil, Leaf, Gauge, Bell, ListChecks, ClipboardCheck } from "lucide-react";
 import { isActionResponseCandidateDetails } from "@/lib/actionResponseMemoryRules";
 import { buildActionResponseMemoryCardViewModel } from "@/lib/actionResponseMemoryViewModel";
 import { useActionResponseMemory } from "@/hooks/useActionResponseMemory";
 import ActionResponseMemoryCard from "@/components/ActionResponseMemoryCard";
+=======
+import {
+  Sprout,
+  Image as ImageIcon,
+  Loader2,
+  Camera,
+  FileText,
+  FlaskConical,
+  Check,
+  Pencil,
+  Leaf,
+  Gauge,
+  Bell,
+  ListChecks,
+} from "lucide-react";
+>>>>>>> origin/main
 import { Button } from "@/components/ui/button";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
@@ -41,6 +58,7 @@ import {
 } from "@/components/QuickLogHistoryPanels";
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
+import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { actionDetailPath, alertDetailPath, growLearningPath, logsPath, timelinePath } from "@/lib/routes";
 import {
@@ -89,7 +107,10 @@ import {
 import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
 import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
-import { classifyTimelineSensorSource, type TimelineSensorSourceKind } from "@/lib/timelineSensorSourceBadgeRules";
+import {
+  classifyTimelineSensorSource,
+  type TimelineSensorSourceKind,
+} from "@/lib/timelineSensorSourceBadgeRules";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 import { SENSOR_SOURCE_KINDS, SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
 import DiaryEntryRemoveButton from "@/components/DiaryEntryRemoveButton";
@@ -123,20 +144,27 @@ import { buildCopyableTraceLinkFromDiaryDetails } from "@/lib/actionQueueTraceLi
 import CopyTraceLinkButton from "@/components/CopyTraceLinkButton";
 import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoScroll";
 
-
-
-
-
 const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
 
 interface Entry {
-  id: string; note: string; photo_url: string | null; stage: string | null;
-  details: Record<string, unknown>; entry_at: string;
-  plant_id: string | null; tent_id: string | null;
+  id: string;
+  note: string;
+  photo_url: string | null;
+  stage: string | null;
+  details: Record<string, unknown>;
+  entry_at: string;
+  plant_id: string | null;
+  tent_id: string | null;
 }
 
 type ActionEventType =
-  | "created" | "simulated" | "approved" | "rejected" | "completed" | "cancelled" | "note";
+  | "created"
+  | "simulated"
+  | "approved"
+  | "rejected"
+  | "completed"
+  | "cancelled"
+  | "note";
 
 interface ActionQueueEvent {
   id: string;
@@ -149,8 +177,7 @@ interface ActionQueueEvent {
   action?: { suggested_change: string | null; reason: string | null } | null;
 }
 
-type AlertEventType =
-  | "created" | "acknowledged" | "resolved" | "dismissed" | "reopened";
+type AlertEventType = "created" | "acknowledged" | "resolved" | "dismissed" | "reopened";
 
 interface AlertEventRow {
   id: string;
@@ -203,8 +230,14 @@ function entryKinds(e: Entry): EventFilter[] {
 
 export default function Timeline() {
   const { user } = useAuth();
-  const { activeGrow, activeGrowId: storeGrowId, grows, loading: growsLoading, setActiveGrowId } = useGrows();
-  
+  const {
+    activeGrow,
+    activeGrowId: storeGrowId,
+    grows,
+    loading: growsLoading,
+    setActiveGrowId,
+  } = useGrows();
+
   const { pathname } = useLocation();
   // Shared URL `?growId=` resolution. urlGrowId is preserved as the source of truth
   // for filter precedence; scopedGrowName/backHref come from the same hook.
@@ -263,9 +296,8 @@ export default function Timeline() {
     [searchParams],
   );
 
-
-  const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>(
-    () => parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM)),
+  const [sensorSourceFilter, setSensorSourceFilter] = useState<TimelineSensorSourceKind[]>(() =>
+    parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM)),
   );
 
   // Pull URL → state when the param changes externally (e.g. via Link).
@@ -286,6 +318,7 @@ export default function Timeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sensorSourceFilter]);
 
+<<<<<<< HEAD
   // One-shot seed of plant/tent filters from URL params written by the
   // Quick Log → Timeline continuity link. Never overwrites later edits.
   useEffect(() => {
@@ -299,6 +332,8 @@ export default function Timeline() {
   }, [searchParams]);
 
 
+=======
+>>>>>>> origin/main
   async function load() {
     if (!user || !activeGrowId) {
       setEntries([]);
@@ -310,16 +345,31 @@ export default function Timeline() {
     }
 
     setLoading(true);
+<<<<<<< HEAD
     const { data, count } = await supabase.from("diary_entries")
       .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", { count: "exact" })
       .eq("grow_id", activeGrowId).order("entry_at", { ascending: false }).limit(100);
     setEntriesTotal(typeof count === "number" ? count : null);
+=======
+    const { data } = await supabase
+      .from("diary_entries")
+      .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+      .eq("grow_id", activeGrowId)
+      .order("entry_at", { ascending: false })
+      .limit(100);
+>>>>>>> origin/main
     const rows = (data as Entry[]) || [];
-    const paths = rows.map((r) => r.photo_url).filter((p): p is string => !!p && !p.startsWith("http"));
+    const paths = rows
+      .map((r) => r.photo_url)
+      .filter((p): p is string => !!p && !p.startsWith("http"));
     if (paths.length) {
-      const { data: signed } = await supabase.storage.from("diary-photos").createSignedUrls(paths, 3600);
+      const { data: signed } = await supabase.storage
+        .from("diary-photos")
+        .createSignedUrls(paths, 3600);
       const map = new Map((signed || []).map((s) => [s.path as string, s.signedUrl]));
-      rows.forEach((r) => { if (r.photo_url && map.has(r.photo_url)) r.photo_url = map.get(r.photo_url)!; });
+      rows.forEach((r) => {
+        if (r.photo_url && map.has(r.photo_url)) r.photo_url = map.get(r.photo_url)!;
+      });
     }
     setEntries(rows);
 
@@ -336,11 +386,13 @@ export default function Timeline() {
       .limit(100);
     setGrowEvents((geData as unknown as GrowEventRowForRecent[]) || []);
 
-
     // Action Queue events for this grow (read-only audit trail).
     // RLS ensures only the owner sees their events.
-    const { data: aqe } = await supabase.from("action_queue_events")
-      .select("id,action_queue_id,event_type,previous_status,new_status,note,created_at,action:action_queue(suggested_change,reason)")
+    const { data: aqe } = await supabase
+      .from("action_queue_events")
+      .select(
+        "id,action_queue_id,event_type,previous_status,new_status,note,created_at,action:action_queue(suggested_change,reason)",
+      )
       .eq("grow_id", activeGrowId)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -348,8 +400,11 @@ export default function Timeline() {
 
     // Alert events for this grow (read-only audit trail). Joins parent alert
     // for title/severity/metric/status. RLS enforces owner-only visibility.
-    const { data: ale } = await supabase.from("alert_events")
-      .select("id,alert_id,event_type,previous_status,new_status,note,created_at,alert:alerts(title,severity,metric,status)")
+    const { data: ale } = await supabase
+      .from("alert_events")
+      .select(
+        "id,alert_id,event_type,previous_status,new_status,note,created_at,alert:alerts(title,severity,metric,status)",
+      )
       .eq("grow_id", activeGrowId)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -358,6 +413,7 @@ export default function Timeline() {
     setLoading(false);
   }
 
+<<<<<<< HEAD
   /**
    * Keyset "Load older" — fetches the next page strictly before the oldest
    * loaded entry_at. Read-only, owner-scoped by RLS, same signing pass as
@@ -401,6 +457,12 @@ export default function Timeline() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [activeGrowId, user]);
+=======
+   
+  useEffect(() => {
+    load();
+  }, [activeGrowId, user]);
+>>>>>>> origin/main
   useEffect(() => {
     const h = () => load();
     window.addEventListener("verdant:entry-created", h);
@@ -409,13 +471,24 @@ export default function Timeline() {
 
   const stageCounts = useMemo(() => {
     const m: Record<string, number> = {};
-    entries.forEach((e) => { if (e.stage) m[e.stage] = (m[e.stage] || 0) + 1; });
+    entries.forEach((e) => {
+      if (e.stage) m[e.stage] = (m[e.stage] || 0) + 1;
+    });
     return m;
   }, [entries]);
 
   const eventCounts = useMemo(() => {
+<<<<<<< HEAD
     const m = { all: entries.length, photo: 0, note: 0, measurement: 0, followup: 0, actionresponse: 0 };
     entries.forEach((e) => entryKinds(e).forEach((k) => { m[k] = (m[k] || 0) + 1; }));
+=======
+    const m = { all: entries.length, photo: 0, note: 0, measurement: 0, followup: 0 };
+    entries.forEach((e) =>
+      entryKinds(e).forEach((k) => {
+        m[k] = (m[k] || 0) + 1;
+      }),
+    );
+>>>>>>> origin/main
     return m;
   }, [entries]);
 
@@ -438,10 +511,7 @@ export default function Timeline() {
 
   const plantOptions = useMemo(() => deriveTimelinePlantOptions(entries), [entries]);
   const tentOptions = useMemo(() => deriveTimelineTentOptions(entries), [entries]);
-  const eventTypeOptions = useMemo(
-    () => deriveTimelineEventTypeOptions(entries),
-    [entries],
-  );
+  const eventTypeOptions = useMemo(() => deriveTimelineEventTypeOptions(entries), [entries]);
 
   const evidenceFilterInput = {
     query: searchQuery,
@@ -488,10 +558,7 @@ export default function Timeline() {
   // entries. Pure helper, no writes. The active photo is tracked by id so
   // filter changes that hide or reorder the active photo auto-close or
   // re-align navigation without pointing at the wrong item.
-  const lightboxItems = useMemo(
-    () => buildTimelinePhotoLightboxList(filtered),
-    [filtered],
-  );
+  const lightboxItems = useMemo(() => buildTimelinePhotoLightboxList(filtered), [filtered]);
   const lightboxIndex = useMemo(
     () => findTimelinePhotoIndexById(lightboxItems, lightboxPhotoId),
     [lightboxItems, lightboxPhotoId],
@@ -542,9 +609,7 @@ export default function Timeline() {
     });
     const diaryById = new Map(entries.map((e) => [e.id, e] as const));
     const growMappedById = new Map(
-      mapGrowEventsToRecentRawEntries(growEvents).map(
-        (r) => [r.id, r] as const,
-      ),
+      mapGrowEventsToRecentRawEntries(growEvents).map((r) => [r.id, r] as const),
     );
     const out: Array<Entry | ReturnType<typeof mapGrowEventsToRecentRawEntries>[number]> = [];
     for (const m of merged) {
@@ -559,7 +624,6 @@ export default function Timeline() {
     return out;
   }, [entries, growEvents]);
 
-
   // Pure normalized timeline view-model. Drives per-entry tags/warnings and a
   // future-proof empty/limited disclosure. Includes invalid entries so
   // malformed diary rows still surface as "Limited data" instead of vanishing.
@@ -572,8 +636,7 @@ export default function Timeline() {
         tent_id: e.tent_id,
         stage: e.stage,
         entry_at: e.entry_at,
-        entry_type:
-          (e.details && (e.details.event_type as string | undefined)) ?? "note",
+        entry_type: (e.details && (e.details.event_type as string | undefined)) ?? "note",
         note: e.note,
         photo_url: e.photo_url,
         details: e.details,
@@ -598,11 +661,24 @@ export default function Timeline() {
 
   const currentStageIdx = STAGES.findIndex((s) => s.value === activeGrow?.stage);
 
-  if (growsLoading) return <Center><Loader2 className="h-5 w-5 animate-spin" /></Center>;
+  if (growsLoading)
+    return (
+      <Center>
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </Center>
+    );
 
   if (grows.length === 0) {
     return (
-      <Empty title="Start your first grow" desc="Create a grow to begin tracking your plants." cta={<Button asChild className="gradient-leaf text-primary-foreground"><Link to="/grows">Create grow</Link></Button>} />
+      <Empty
+        title="Start your first grow"
+        desc="Create a grow to begin tracking your plants."
+        cta={
+          <Button asChild className="gradient-leaf text-primary-foreground">
+            <Link to="/grows">Create grow</Link>
+          </Button>
+        }
+      />
     );
   }
 
@@ -621,13 +697,17 @@ export default function Timeline() {
         testId="timeline-one-tent-loop-next-step-card"
         className="mb-3"
       />
-      
-      
-      
+
       {activeGrow && (
         <div className="mb-5">
           <h1 className="text-2xl font-display font-bold">{activeGrow.name}</h1>
-          <p className="text-sm text-muted-foreground">{stageLabel(activeGrow.stage)} · day {Math.max(1, Math.floor((Date.now() - new Date(activeGrow.started_at).getTime()) / 86400000))}</p>
+          <p className="text-sm text-muted-foreground">
+            {stageLabel(activeGrow.stage)} · day{" "}
+            {Math.max(
+              1,
+              Math.floor((Date.now() - new Date(activeGrow.started_at).getTime()) / 86400000),
+            )}
+          </p>
         </div>
       )}
 
@@ -635,8 +715,12 @@ export default function Timeline() {
       {activeGrow && (
         <div className="glass rounded-2xl p-4 mb-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stage progression</h2>
-            <span className="text-[11px] text-muted-foreground">{entries.length} {entries.length === 1 ? "entry" : "entries"}</span>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Stage progression
+            </h2>
+            <span className="text-[11px] text-muted-foreground">
+              {entries.length} {entries.length === 1 ? "entry" : "entries"}
+            </span>
           </div>
           <ol className="grid grid-cols-6 gap-1.5">
             {STAGES.map((s, i) => {
@@ -645,15 +729,27 @@ export default function Timeline() {
               const isPast = currentStageIdx >= 0 && i < currentStageIdx;
               return (
                 <li key={s.value} className="flex flex-col items-center gap-1.5">
-                  <div className={cn(
-                    "h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-semibold border transition",
-                    isCurrent && "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/30",
-                    isPast && "bg-primary/20 text-primary border-primary/40",
-                    !isCurrent && !isPast && "bg-secondary/50 text-muted-foreground border-border/50",
-                  )}>
+                  <div
+                    className={cn(
+                      "h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-semibold border transition",
+                      isCurrent &&
+                        "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/30",
+                      isPast && "bg-primary/20 text-primary border-primary/40",
+                      !isCurrent &&
+                        !isPast &&
+                        "bg-secondary/50 text-muted-foreground border-border/50",
+                    )}
+                  >
                     {isPast ? <Check className="h-3.5 w-3.5" /> : i + 1}
                   </div>
-                  <span className={cn("text-[10px] leading-tight text-center", isCurrent ? "text-foreground font-medium" : "text-muted-foreground")}>{s.label}</span>
+                  <span
+                    className={cn(
+                      "text-[10px] leading-tight text-center",
+                      isCurrent ? "text-foreground font-medium" : "text-muted-foreground",
+                    )}
+                  >
+                    {s.label}
+                  </span>
                   <span className="text-[10px] text-muted-foreground">{count}</span>
                 </li>
               );
@@ -663,8 +759,6 @@ export default function Timeline() {
       )}
 
       {urlGrowId && <PhenoHuntTimelineSection growId={urlGrowId} />}
-
-
 
       {urlGrowId && (
         <ScopedGrowBanner
@@ -787,6 +881,7 @@ export default function Timeline() {
           data-testid="timeline-results-count"
           aria-live="polite"
         >
+<<<<<<< HEAD
           Showing {filtered.length} of {entriesTotal ?? entries.length}{" "}
           {(entriesTotal ?? entries.length) === 1 ? "entry" : "entries"}
           {entriesTotal !== null && entriesTotal > entries.length
@@ -836,33 +931,69 @@ export default function Timeline() {
               <p
                 className="text-[11px] text-muted-foreground"
                 data-testid={TIMELINE_HIGHLIGHT_BLOCKERS_TESTID}
+=======
+          Showing {filtered.length} of {entries.length} {entries.length === 1 ? "entry" : "entries"}
+        </p>
+        {highlight &&
+          highlightIsMissingFromList(filtered, highlight) &&
+          (() => {
+            const blockers = detectTimelineHighlightBlockers({
+              searchQuery,
+              stageFilter,
+              eventFilter,
+              eventTypeFilter,
+              plantFilter,
+              tentFilter,
+              sensorSourceCount: sensorSourceFilter.length,
+            });
+            const blockersLine = formatTimelineHighlightBlockersLine(blockers);
+            const handleClear = () => {
+              clearEvidenceFilters();
+              setStageFilter("all");
+              setEventFilter("all");
+              // Preserve highlight (and any other) query params untouched.
+            };
+            return (
+              <div
+                className="mt-1 space-y-1"
+                role="status"
+                aria-label={TIMELINE_HIGHLIGHT_ARIA_LABEL}
+                data-testid={TIMELINE_HIGHLIGHT_NOT_VISIBLE_TESTID}
+>>>>>>> origin/main
               >
-                {blockersLine ?? TIMELINE_HIGHLIGHT_NO_BLOCKERS_COPY}
-              </p>
-              {blockers.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleClear}
-                  data-testid={TIMELINE_HIGHLIGHT_CLEAR_FILTERS_TESTID}
+                <p className="text-xs text-muted-foreground">
+                  {TIMELINE_HIGHLIGHT_NOT_VISIBLE_COPY}
+                </p>
+                <p
+                  className="text-[11px] text-muted-foreground"
+                  data-testid={TIMELINE_HIGHLIGHT_BLOCKERS_TESTID}
                 >
-                  {TIMELINE_HIGHLIGHT_CLEAR_FILTERS_LABEL}
-                </Button>
-              )}
-              {highlight && backToActions.wasProvided && (
-                <div>
-                  <Link
-                    to={backToActions.href}
-                    className="text-xs text-primary hover:underline"
-                    data-testid={BACK_TO_ACTIONS_TESTID}
+                  {blockersLine ?? TIMELINE_HIGHLIGHT_NO_BLOCKERS_COPY}
+                </p>
+                {blockers.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleClear}
+                    data-testid={TIMELINE_HIGHLIGHT_CLEAR_FILTERS_TESTID}
                   >
-                    {BACK_TO_ACTIONS_LABEL}
-                  </Link>
-                </div>
-              )}
-            </div>
-          );
-        })()}
+                    {TIMELINE_HIGHLIGHT_CLEAR_FILTERS_LABEL}
+                  </Button>
+                )}
+                {highlight && backToActions.wasProvided && (
+                  <div>
+                    <Link
+                      to={backToActions.href}
+                      className="text-xs text-primary hover:underline"
+                      data-testid={BACK_TO_ACTIONS_TESTID}
+                    >
+                      {BACK_TO_ACTIONS_LABEL}
+                    </Link>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         {/* Always-on Back to Actions affordance when a safe return path
             and highlight token are present, even if the entry is found
             and visible. Keeps the round-trip discoverable. */}
@@ -881,12 +1012,15 @@ export default function Timeline() {
           )}
       </div>
 
-
-
       {/* Filters */}
       <div className="space-y-2 mb-4">
         <div className="flex flex-wrap gap-1.5">
-          <FilterChip active={stageFilter === "all"} onClick={() => setStageFilter("all")} label="All stages" count={entries.length} />
+          <FilterChip
+            active={stageFilter === "all"}
+            onClick={() => setStageFilter("all")}
+            label="All stages"
+            count={entries.length}
+          />
           {STAGES.map((s) => (
             <FilterChip
               key={s.value}
@@ -899,15 +1033,51 @@ export default function Timeline() {
           ))}
         </div>
         <div className="flex flex-wrap gap-1.5">
+<<<<<<< HEAD
           <FilterChip active={eventFilter === "all"} onClick={() => setEventFilter("all")} label="All" count={eventCounts.all} />
           <FilterChip active={eventFilter === "photo"} onClick={() => setEventFilter("photo")} label="Photos" icon={<Camera className="h-3 w-3" />} count={eventCounts.photo} />
           <FilterChip active={eventFilter === "note"} onClick={() => setEventFilter("note")} label="Notes" icon={<FileText className="h-3 w-3" />} count={eventCounts.note} />
           <FilterChip active={eventFilter === "measurement"} onClick={() => setEventFilter("measurement")} label="Measurements" icon={<FlaskConical className="h-3 w-3" />} count={eventCounts.measurement} />
           <FilterChip active={eventFilter === "followup"} onClick={() => setEventFilter("followup")} label="Follow-ups" icon={<Check className="h-3 w-3" />} count={eventCounts.followup} />
           <FilterChip active={eventFilter === "actionresponse"} onClick={() => setEventFilter("actionresponse")} label="Action responses" icon={<ClipboardCheck className="h-3 w-3" />} count={eventCounts.actionresponse} />
+=======
+          <FilterChip
+            active={eventFilter === "all"}
+            onClick={() => setEventFilter("all")}
+            label="All"
+            count={eventCounts.all}
+          />
+          <FilterChip
+            active={eventFilter === "photo"}
+            onClick={() => setEventFilter("photo")}
+            label="Photos"
+            icon={<Camera className="h-3 w-3" />}
+            count={eventCounts.photo}
+          />
+          <FilterChip
+            active={eventFilter === "note"}
+            onClick={() => setEventFilter("note")}
+            label="Notes"
+            icon={<FileText className="h-3 w-3" />}
+            count={eventCounts.note}
+          />
+          <FilterChip
+            active={eventFilter === "measurement"}
+            onClick={() => setEventFilter("measurement")}
+            label="Measurements"
+            icon={<FlaskConical className="h-3 w-3" />}
+            count={eventCounts.measurement}
+          />
+          <FilterChip
+            active={eventFilter === "followup"}
+            onClick={() => setEventFilter("followup")}
+            label="Follow-ups"
+            icon={<Check className="h-3 w-3" />}
+            count={eventCounts.followup}
+          />
+>>>>>>> origin/main
         </div>
       </div>
-
 
       <div className="mb-4 flex items-center justify-end gap-2 flex-wrap">
         <Link
@@ -928,12 +1098,10 @@ export default function Timeline() {
         </Link>
       </div>
 
-
       <TimelineCsvContextPanel
         growId={activeGrowId}
         entries={entries.map((e) => ({ id: e.id, tent_id: e.tent_id, entry_at: e.entry_at }))}
       />
-
 
       {/* Quick Log history lanes (read-only). Order: recent activity first
           so growers always see what they just saved, then per-event-type
@@ -976,52 +1144,50 @@ export default function Timeline() {
         <AlertEventsSection events={alertEvents} />
       </div>
 
-
-
-
-
-
-      {loading ? <Center><Loader2 className="h-5 w-5 animate-spin" /></Center>
-        : entries.length === 0 ? (
-          <Empty title="No entries yet" desc="Tap the + button to log your first photo and note." />
-        ) : filtered.length === 0 ? (
-          <Empty
-            title={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_TITLE : "No matching entries"}
-            desc={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_DESC : "Try a different stage or event filter."}
-          />
-
-        ) : (
-          <div className="space-y-5">
-            {groupedByStage.map((group, gi) => (
-              <section key={`${group.stage}-${gi}`}>
-                <div className="flex items-center gap-2 mb-2 sticky top-0 z-10 py-1 bg-background/80 backdrop-blur-sm">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
-                    <Sprout className="h-3.5 w-3.5" />{stageLabel(group.stage)}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">{group.items.length} {group.items.length === 1 ? "entry" : "entries"}</span>
-                  <div className="h-px flex-1 bg-border/50" />
-                </div>
-                <ul className="space-y-3">
-                  {group.items.map((e) => {
-                    const isHighlighted = diaryEntryMatchesHighlight(e, highlight);
-                    return (
+      {loading ? (
+        <Center>
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </Center>
+      ) : entries.length === 0 ? (
+        <Empty title="No entries yet" desc="Tap the + button to log your first photo and note." />
+      ) : filtered.length === 0 ? (
+        <Empty
+          title={evidenceActive ? TIMELINE_EVIDENCE_EMPTY_TITLE : "No matching entries"}
+          desc={
+            evidenceActive ? TIMELINE_EVIDENCE_EMPTY_DESC : "Try a different stage or event filter."
+          }
+        />
+      ) : (
+        <div className="space-y-5">
+          {groupedByStage.map((group, gi) => (
+            <section key={`${group.stage}-${gi}`}>
+              <div className="flex items-center gap-2 mb-2 sticky top-0 z-10 py-1 bg-background/80 backdrop-blur-sm">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
+                  <Sprout className="h-3.5 w-3.5" />
+                  {stageLabel(group.stage)}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {group.items.length} {group.items.length === 1 ? "entry" : "entries"}
+                </span>
+                <div className="h-px flex-1 bg-border/50" />
+              </div>
+              <ul className="space-y-3">
+                {group.items.map((e) => {
+                  const isHighlighted = diaryEntryMatchesHighlight(e, highlight);
+                  return (
                     <li
                       key={e.id}
                       id={`timeline-entry-${e.id}`}
-                      data-testid={
-                        isHighlighted
-                          ? TIMELINE_HIGHLIGHT_TESTID
-                          : "timeline-entry"
-                      }
+                      data-testid={isHighlighted ? TIMELINE_HIGHLIGHT_TESTID : "timeline-entry"}
                       data-highlight={isHighlighted ? "action-queue-trace" : undefined}
                       aria-label={isHighlighted ? TIMELINE_HIGHLIGHT_ARIA_LABEL : undefined}
                       tabIndex={isHighlighted ? -1 : undefined}
                       className={cn(
                         "glass rounded-2xl overflow-hidden animate-fade-in",
-                        isHighlighted && "ring-2 ring-primary ring-offset-2 ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                        isHighlighted &&
+                          "ring-2 ring-primary ring-offset-2 ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                       )}
                     >
-
                       {e.photo_url ? (
                         (() => {
                           const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
@@ -1035,7 +1201,9 @@ export default function Timeline() {
                             <>
                               <button
                                 type="button"
-                                onClick={() => { if (idx >= 0) setLightboxPhotoId(e.id); }}
+                                onClick={() => {
+                                  if (idx >= 0) setLightboxPhotoId(e.id);
+                                }}
                                 aria-label={`Open photo: ${alt}`}
                                 data-testid="timeline-photo-open"
                                 className="block w-full focus:outline-none focus:ring-2 focus:ring-primary/60"
@@ -1078,14 +1246,24 @@ export default function Timeline() {
                         }}
                       >
                         {(() => {
-                          const et = getEventType((e.details?.event_type as string | undefined) ?? null);
+                          const et = getEventType(
+                            (e.details?.event_type as string | undefined) ?? null,
+                          );
                           const Icon = et.icon;
                           const plantName = e.details?.plant_name as string | undefined;
                           // QuickLog writes `sensor_snapshot`; older entries may still use `sensor`.
                           const sensor = (e.details?.sensor_snapshot ?? e.details?.sensor) as
-                            | { ts?: string; temp?: number; rh?: number; vpd?: number; co2?: number; soil?: number }
+                            | {
+                                ts?: string;
+                                temp?: number;
+                                rh?: number;
+                                vpd?: number;
+                                co2?: number;
+                                soil?: number;
+                              }
                             | undefined;
                           const remindAt = e.details?.remind_at as string | undefined;
+<<<<<<< HEAD
                           const eventTypeValue = (e.details?.event_type as string | undefined) ?? null;
                           // Learning-loop rows (follow-up / outcome / decision) carry join
                           // ids (action_queue_id, *_entry_id, source_alert_id) that must
@@ -1120,26 +1298,56 @@ export default function Timeline() {
                             (typeof loopEntryGrowId === "string" && loopEntryGrowId) ||
                             activeGrowId ||
                             null;
+=======
+                          const HIDDEN = [
+                            "event_type",
+                            "plant_id",
+                            "plant_name",
+                            "tent_id",
+                            "sensor",
+                            "sensor_snapshot",
+                            "remind_at",
+                          ];
+                          const extra = Object.entries(e.details || {}).filter(
+                            ([k]) => !HIDDEN.includes(k),
+                          );
+>>>>>>> origin/main
                           return (
                             <>
                               <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground flex-wrap">
-                                <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-medium", et.tone)}>
-                                  <Icon className="h-3 w-3" />{et.label}
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-medium",
+                                    et.tone,
+                                  )}
+                                >
+                                  <Icon className="h-3 w-3" />
+                                  {et.label}
                                 </span>
-                                <span className="inline-flex items-center gap-1 text-primary"><Sprout className="h-3 w-3" />{stageLabel(e.stage)}</span>
+                                <span className="inline-flex items-center gap-1 text-primary">
+                                  <Sprout className="h-3 w-3" />
+                                  {stageLabel(e.stage)}
+                                </span>
                                 {plantName && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 text-[11px]">
-                                    <Leaf className="h-3 w-3" />{plantName}
+                                    <Leaf className="h-3 w-3" />
+                                    {plantName}
                                   </span>
                                 )}
-                                <span title={format(new Date(e.entry_at), "PPpp")}>{formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}</span>
+                                <span title={format(new Date(e.entry_at), "PPpp")}>
+                                  {formatDistanceToNow(new Date(e.entry_at), { addSuffix: true })}
+                                </span>
                                 <button
                                   type="button"
-                                  onClick={(ev) => { ev.stopPropagation(); setEditingId(e.id); }}
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setEditingId(e.id);
+                                  }}
                                   aria-label="Edit entry"
                                   className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition"
                                 >
-                                  <Pencil className="h-3 w-3" />Edit
+                                  <Pencil className="h-3 w-3" />
+                                  Edit
                                 </button>
                                 <DiaryEntryRemoveButton
                                   entry={{ id: e.id, photoUrl: e.photo_url, kind: "diary" }}
@@ -1152,8 +1360,6 @@ export default function Timeline() {
                                     setEntries((rows) => rows.filter((r) => r.id !== removedId));
                                   }}
                                 />
-
-
                               </div>
                               <p className="text-sm whitespace-pre-wrap">{e.note}</p>
                               {(() => {
@@ -1251,52 +1457,72 @@ export default function Timeline() {
                               })()}
                               {remindAt && (
                                 <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-300">
-                                  <Bell className="h-3 w-3" />Remind {format(new Date(remindAt), "PPp")}
+                                  <Bell className="h-3 w-3" />
+                                  Remind {format(new Date(remindAt), "PPp")}
                                 </div>
                               )}
-                              {sensor && (() => {
-                                const snapTs = sensor.ts ?? e.entry_at;
-                                const snapAgeMs = snapTs ? Date.now() - new Date(snapTs).getTime() : Number.POSITIVE_INFINITY;
-                                const snapStale = !Number.isFinite(snapAgeMs) || snapAgeMs > TIMELINE_SNAPSHOT_STALE_MS;
-                                const vpdClassification = classifyVpdAgainstStage({
-                                  value: sensor.vpd ?? null,
-                                  stage: e.stage ?? null,
-                                  stale: snapStale,
-                                });
-                                const rawSource = (sensor as { source?: string | null }).source ?? null;
-                                const sourceBadge = classifyTimelineSensorSource({
-                                  rawSource,
-                                  capturedAt: snapTs ?? null,
-                                  staleMs: TIMELINE_SNAPSHOT_STALE_MS,
-                                  // Quick Log sensor_snapshot is intrinsically grower-entered.
-                                  fallback: "manual",
-                                });
-                                return (
-                                  <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="timeline-manual-snapshot">
-                                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
-                                      <Gauge className="h-3 w-3" />Manual snapshot
-                                    </span>
-                                    <TimelineSensorSourceBadge badge={sourceBadge} />
-                                    {sensor.temp != null && <SnapChip>{(sensor.temp * 9 / 5 + 32).toFixed(1)}°F</SnapChip>}
-                                    {sensor.rh != null && <SnapChip>{sensor.rh}% RH</SnapChip>}
-                                    {sensor.vpd != null && <SnapChip>VPD {sensor.vpd}</SnapChip>}
-                                    {sensor.co2 != null && <SnapChip>CO₂ {sensor.co2}</SnapChip>}
-                                    {sensor.soil != null && <SnapChip>Soil {sensor.soil}%</SnapChip>}
-                                    {sensor.vpd != null && (
-                                      <span
-                                        className="text-[11px] text-muted-foreground"
-                                        data-testid="timeline-vpd-stage-hint"
-                                      >
-                                        {vpdClassification.label}
+                              {sensor &&
+                                (() => {
+                                  const snapTs = sensor.ts ?? e.entry_at;
+                                  const snapAgeMs = snapTs
+                                    ? Date.now() - new Date(snapTs).getTime()
+                                    : Number.POSITIVE_INFINITY;
+                                  const snapStale =
+                                    !Number.isFinite(snapAgeMs) ||
+                                    snapAgeMs > TIMELINE_SNAPSHOT_STALE_MS;
+                                  const vpdClassification = classifyVpdAgainstStage({
+                                    value: sensor.vpd ?? null,
+                                    stage: e.stage ?? null,
+                                    stale: snapStale,
+                                  });
+                                  const rawSource =
+                                    (sensor as { source?: string | null }).source ?? null;
+                                  const sourceBadge = classifyTimelineSensorSource({
+                                    rawSource,
+                                    capturedAt: snapTs ?? null,
+                                    staleMs: TIMELINE_SNAPSHOT_STALE_MS,
+                                    // Quick Log sensor_snapshot is intrinsically grower-entered.
+                                    fallback: "manual",
+                                  });
+                                  return (
+                                    <div
+                                      className="mt-2 flex flex-wrap items-center gap-1.5"
+                                      data-testid="timeline-manual-snapshot"
+                                    >
+                                      <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                                        <Gauge className="h-3 w-3" />
+                                        Manual snapshot
                                       </span>
-                                    )}
-                                  </div>
-                                );
-                              })()}
+                                      <TimelineSensorSourceBadge badge={sourceBadge} />
+                                      {sensor.temp != null && (
+                                        <SnapChip>
+                                          {((sensor.temp * 9) / 5 + 32).toFixed(1)}°F
+                                        </SnapChip>
+                                      )}
+                                      {sensor.rh != null && <SnapChip>{sensor.rh}% RH</SnapChip>}
+                                      {sensor.vpd != null && <SnapChip>VPD {sensor.vpd}</SnapChip>}
+                                      {sensor.co2 != null && <SnapChip>CO₂ {sensor.co2}</SnapChip>}
+                                      {sensor.soil != null && (
+                                        <SnapChip>Soil {sensor.soil}%</SnapChip>
+                                      )}
+                                      {sensor.vpd != null && (
+                                        <span
+                                          className="text-[11px] text-muted-foreground"
+                                          data-testid="timeline-vpd-stage-hint"
+                                        >
+                                          {vpdClassification.label}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               {extra.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                   {extra.map(([k, v]) => (
-                                    <span key={k} className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 capitalize">
+                                    <span
+                                      key={k}
+                                      className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40 capitalize"
+                                    >
                                       {k}: {String(v)}
                                     </span>
                                   ))}
@@ -1308,17 +1534,25 @@ export default function Timeline() {
                               })()}
                               <AiDoctorCheckInTimelineBadge event={e} />
                               {(() => {
-                                const kindValue = (e.details?.event_type as string | undefined) ?? null;
+                                const kindValue =
+                                  (e.details?.event_type as string | undefined) ?? null;
                                 if (!isEnvironmentCheckKind(kindValue)) return null;
-                                const details = (e as { details?: Record<string, unknown> }).details ?? {};
+                                const details =
+                                  (e as { details?: Record<string, unknown> }).details ?? {};
                                 const num = (k: string): number | null => {
                                   const v = details[k];
                                   return typeof v === "number" && Number.isFinite(v) ? v : null;
                                 };
-                                const src = typeof details.source === "string" ? details.source : "manual";
+                                const src =
+                                  typeof details.source === "string" ? details.source : "manual";
                                 const vm = buildEnvironmentCheckDiaryViewModel({
                                   entryId: e.id,
-                                  occurredAt: String((e as { occurred_at?: string; created_at?: string }).occurred_at ?? (e as { created_at?: string }).created_at ?? ""),
+                                  occurredAt: String(
+                                    (e as { occurred_at?: string; created_at?: string })
+                                      .occurred_at ??
+                                      (e as { created_at?: string }).created_at ??
+                                      "",
+                                  ),
                                   kind: kindValue ?? "environment",
                                   snapshot: {
                                     source: src,
@@ -1336,13 +1570,16 @@ export default function Timeline() {
                                         tentId: e.tent_id ?? null,
                                         plantId: e.plant_id ?? null,
                                         capturedAt: String(
-                                          (e as { occurred_at?: string; created_at?: string }).occurred_at ??
+                                          (e as { occurred_at?: string; created_at?: string })
+                                            .occurred_at ??
                                             (e as { created_at?: string }).created_at ??
                                             "",
                                         ),
                                         sensorSnapshotId:
-                                          typeof (details as { sensor_snapshot_id?: unknown }).sensor_snapshot_id === "string"
-                                            ? ((details as { sensor_snapshot_id?: string }).sensor_snapshot_id ?? null)
+                                          typeof (details as { sensor_snapshot_id?: unknown })
+                                            .sensor_snapshot_id === "string"
+                                            ? ((details as { sensor_snapshot_id?: string })
+                                                .sensor_snapshot_id ?? null)
                                             : null,
                                         source: typeof src === "string" ? src : null,
                                       }}
@@ -1357,19 +1594,24 @@ export default function Timeline() {
                       </div>
                     </li>
                   );
-                  })}
-
-                </ul>
-              </section>
-            ))}
-          </div>
-        )}
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
 
       <EntryEditDialog
         entry={entries.find((e) => e.id === editingId) || null}
         open={!!editingId}
-        onOpenChange={(o) => { if (!o) setEditingId(null); }}
-        onSaved={(patch) => setEntries((rows) => rows.map((r) => r.id === patch.id ? { ...r, ...patch } as Entry : r))}
+        onOpenChange={(o) => {
+          if (!o) setEditingId(null);
+        }}
+        onSaved={(patch) =>
+          setEntries((rows) =>
+            rows.map((r) => (r.id === patch.id ? ({ ...r, ...patch } as Entry) : r)),
+          )
+        }
         onDeleted={(id) => setEntries((rows) => rows.filter((r) => r.id !== id))}
       />
       {lightboxIndex >= 0 && lightboxItems.length > 0 && (
@@ -1403,7 +1645,21 @@ export default function Timeline() {
   );
 }
 
-function FilterChip({ active, onClick, label, count, icon, disabled }: { active: boolean; onClick: () => void; label: string; count?: number; icon?: React.ReactNode; disabled?: boolean }) {
+function FilterChip({
+  active,
+  onClick,
+  label,
+  count,
+  icon,
+  disabled,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count?: number;
+  icon?: React.ReactNode;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -1411,24 +1667,37 @@ function FilterChip({ active, onClick, label, count, icon, disabled }: { active:
       disabled={disabled}
       className={cn(
         "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition",
-        active ? "bg-primary text-primary-foreground border-primary" : "bg-secondary/50 text-foreground border-border/50 hover:bg-secondary",
+        active
+          ? "bg-primary text-primary-foreground border-primary"
+          : "bg-secondary/50 text-foreground border-border/50 hover:bg-secondary",
         disabled && "opacity-40 cursor-not-allowed hover:bg-secondary/50",
       )}
     >
       {icon}
       <span>{label}</span>
       {typeof count === "number" && (
-        <span className={cn("text-[10px] px-1.5 py-0 rounded-full", active ? "bg-primary-foreground/20" : "bg-background/60")}>{count}</span>
+        <span
+          className={cn(
+            "text-[10px] px-1.5 py-0 rounded-full",
+            active ? "bg-primary-foreground/20" : "bg-background/60",
+          )}
+        >
+          {count}
+        </span>
       )}
     </button>
   );
 }
 
-function Center({ children }: { children: React.ReactNode }) { return <div className="py-20 flex justify-center text-muted-foreground">{children}</div>; }
+function Center({ children }: { children: React.ReactNode }) {
+  return <div className="py-20 flex justify-center text-muted-foreground">{children}</div>;
+}
 function Empty({ title, desc, cta }: { title: string; desc: string; cta?: React.ReactNode }) {
   return (
     <div className="py-16 text-center">
-      <div className="mx-auto h-16 w-16 rounded-2xl glass flex items-center justify-center mb-4"><Sprout className="h-7 w-7 text-primary" /></div>
+      <div className="mx-auto h-16 w-16 rounded-2xl glass flex items-center justify-center mb-4">
+        <Sprout className="h-7 w-7 text-primary" />
+      </div>
       <h2 className="font-display text-lg font-semibold">{title}</h2>
       <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-xs mx-auto">{desc}</p>
       {cta}
@@ -1437,17 +1706,21 @@ function Empty({ title, desc, cta }: { title: string; desc: string; cta?: React.
 }
 
 function SnapChip({ children }: { children: React.ReactNode }) {
-  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40">{children}</span>;
+  return (
+    <span className="text-[11px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/40">
+      {children}
+    </span>
+  );
 }
 
 const ACTION_EVENT_TONE: Record<ActionEventType, string> = {
-  created:   "bg-secondary/60 border-border/50 text-foreground",
+  created: "bg-secondary/60 border-border/50 text-foreground",
   simulated: "bg-blue-500/10 border-blue-500/30 text-blue-300",
-  approved:  "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
-  rejected:  "bg-red-500/10 border-red-500/30 text-red-300",
+  approved: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
+  rejected: "bg-red-500/10 border-red-500/30 text-red-300",
   completed: "bg-primary/10 border-primary/30 text-primary",
   cancelled: "bg-muted/40 border-border/50 text-muted-foreground",
-  note:      "bg-amber-500/10 border-amber-500/30 text-amber-300",
+  note: "bg-amber-500/10 border-amber-500/30 text-amber-300",
 };
 
 function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
@@ -1469,10 +1742,7 @@ function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
       </div>
       <ul className="space-y-2">
         {sorted.map((e) => (
-          <li
-            key={e.id}
-            className="rounded-xl border border-border/50 bg-secondary/30 p-3"
-          >
+          <li key={e.id} className="rounded-xl border border-border/50 bg-secondary/30 p-3">
             <div className="flex items-center gap-2 flex-wrap text-xs">
               <span
                 className={cn(
@@ -1504,11 +1774,11 @@ function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
               <p className="text-sm mt-2">{e.action.suggested_change}</p>
             )}
             {e.action?.reason && (
-              <p className="text-xs text-muted-foreground mt-1">{e.action.reason}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stripBackPointerTokens(e.action.reason)}
+              </p>
             )}
-            {e.note && (
-              <p className="text-xs italic text-muted-foreground mt-2">· {e.note}</p>
-            )}
+            {e.note && <p className="text-xs italic text-muted-foreground mt-2">· {e.note}</p>}
           </li>
         ))}
       </ul>
@@ -1524,11 +1794,11 @@ const ALERT_SEVERITY_TONE: Record<string, string> = {
 };
 
 const ALERT_EVENT_TONE: Record<AlertEventType, string> = {
-  created:      "bg-secondary/60 border-border/50 text-foreground",
+  created: "bg-secondary/60 border-border/50 text-foreground",
   acknowledged: "bg-amber-500/10 border-amber-500/30 text-amber-300",
-  resolved:     "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
-  dismissed:    "bg-muted/40 border-border/50 text-muted-foreground",
-  reopened:     "bg-primary/10 border-primary/30 text-primary",
+  resolved: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
+  dismissed: "bg-muted/40 border-border/50 text-muted-foreground",
+  reopened: "bg-primary/10 border-primary/30 text-primary",
 };
 
 function AlertEventsSection({ events }: { events: AlertEventRow[] }) {
@@ -1550,10 +1820,7 @@ function AlertEventsSection({ events }: { events: AlertEventRow[] }) {
       </div>
       <ul className="space-y-2">
         {sorted.map((e) => (
-          <li
-            key={e.id}
-            className="rounded-xl border border-border/50 bg-secondary/30 p-3"
-          >
+          <li key={e.id} className="rounded-xl border border-border/50 bg-secondary/30 p-3">
             <div className="flex items-center gap-2 flex-wrap text-xs">
               <span
                 className={cn(
@@ -1567,8 +1834,7 @@ function AlertEventsSection({ events }: { events: AlertEventRow[] }) {
                 <span
                   className={cn(
                     "inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-medium uppercase",
-                    ALERT_SEVERITY_TONE[e.alert.severity] ??
-                      ALERT_SEVERITY_TONE.info,
+                    ALERT_SEVERITY_TONE[e.alert.severity] ?? ALERT_SEVERITY_TONE.info,
                   )}
                 >
                   {e.alert.severity}
@@ -1592,17 +1858,11 @@ function AlertEventsSection({ events }: { events: AlertEventRow[] }) {
                 </Link>
               )}
             </div>
-            {e.alert?.title && (
-              <p className="text-sm mt-2">{e.alert.title}</p>
-            )}
+            {e.alert?.title && <p className="text-sm mt-2">{e.alert.title}</p>}
             {e.alert?.metric && (
-              <p className="text-xs text-muted-foreground mt-1">
-                metric: {e.alert.metric}
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">metric: {e.alert.metric}</p>
             )}
-            {e.note && (
-              <p className="text-xs italic text-muted-foreground mt-2">· {e.note}</p>
-            )}
+            {e.note && <p className="text-xs italic text-muted-foreground mt-2">· {e.note}</p>}
           </li>
         ))}
       </ul>

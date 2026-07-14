@@ -41,7 +41,17 @@ export const QUICK_LOG_EVENT_LANES: Record<string, HistoryLane> = {
   reminder: "activity",
   action_followup: "activity",
   action_outcome: "activity",
+<<<<<<< HEAD
   run_learning_decision: "activity",
+=======
+  // Breeding-workflow event types surface in the "All recent activity" lane.
+  reversal_application: "activity",
+  isolation_start: "activity",
+  pollination: "activity",
+  pollen_shed_observed: "activity",
+  stigmas_receptive: "activity",
+  cross_harvest: "activity",
+>>>>>>> origin/main
   other: "activity",
 };
 
@@ -52,9 +62,7 @@ export function laneForEventType(eventType: string | null | undefined): HistoryL
 }
 
 /** All known Quick Log event values from src/lib/diary.ts EVENT_TYPES. */
-export const QUICK_LOG_EVENT_VALUES: readonly string[] = EVENT_TYPES.map(
-  (e) => e.value,
-);
+export const QUICK_LOG_EVENT_VALUES: readonly string[] = EVENT_TYPES.map((e) => e.value);
 
 // ---------------------------------------------------------------------------
 // Manual handheld readings
@@ -139,9 +147,7 @@ export function parseManualHandheldReadings(
   return out;
 }
 
-export function hasManualHandheldReadings(
-  note: string | null | undefined,
-): boolean {
+export function hasManualHandheldReadings(note: string | null | undefined): boolean {
   return splitHardwareReadingsFromNote(note).hasHardwareBlock;
 }
 
@@ -236,13 +242,7 @@ function normalizeRecentText(value: string): string {
 function recentCompanionKey(row: QuickLogHistoryRow): string | null {
   const note = normalizeRecentText(row.noteBody);
   if (!row.occurredAt || !row.eventType || !note) return null;
-  return [
-    row.plantId ?? "",
-    row.tentId ?? "",
-    row.occurredAt,
-    row.eventType,
-    note,
-  ].join("||");
+  return [row.plantId ?? "", row.tentId ?? "", row.occurredAt, row.eventType, note].join("||");
 }
 
 function recentRowRichness(row: QuickLogHistoryRow): number {

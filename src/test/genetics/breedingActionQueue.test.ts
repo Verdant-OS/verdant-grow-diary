@@ -22,8 +22,22 @@ describe("breedingActionQueue payloads", () => {
       expect(p.reason).toContain("[event:ev_123]");
       expect(p.target_metric).toBe("breeding_follow_up");
 
+<<<<<<< HEAD
       const suggestedChange = JSON.parse(p.suggested_change as string);
       expect(suggestedChange.source_event_id).toBe("ev_123");
+=======
+      // target_metric must be present to satisfy action_queue_target_present_chk.
+      expect(p.target_metric).toBe("breeding_workflow");
+
+      // suggested_change is grower-facing readable copy (not a JSON blob) — the
+      // Action Queue renders it verbatim. Event linkage lives in `reason`.
+      expect(typeof p.suggested_change).toBe("string");
+      expect((p.suggested_change as string).trim().startsWith("{")).toBe(false);
+      expect((p.suggested_change as string).length).toBeGreaterThan(0);
+      // preserves the computed follow-up due date in readable form (YYYY-MM-DD).
+      expect(p.suggested_change as string).toMatch(/\d{4}-\d{2}-\d{2}/);
+      expect(p).not.toHaveProperty("due_at");
+>>>>>>> origin/main
     });
   });
 

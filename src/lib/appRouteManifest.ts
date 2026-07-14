@@ -79,6 +79,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/alerts", access: "auth" },
   { path: "/alerts/:alertId", access: "auth" },
   { path: "/auth", access: "public" },
+<<<<<<< HEAD
   {
     path: "/billing/:plan",
     access: "redirect",
@@ -104,6 +105,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Customer Mode QR guide shell (read-only, no private grow data).",
   },
+=======
+  { path: "/billing/:plan", access: "public", description: "Billing placeholder." },
+  { path: "/breeding/new", access: "auth", description: "New breeding event entry." },
+  { path: "/customer/:shareId", access: "public", description: "Customer Mode QR guide shell (read-only, no private grow data)." },
+>>>>>>> origin/main
   { path: "/daily-check", access: "auth" },
   { path: "/demo", access: "redirect", description: "→ /welcome" },
   {
@@ -231,6 +237,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Operator-only One-Tent Evidence Chain demo preview (read-only, demo-labeled).",
   },
   { path: "/operator/ecowitt", access: "operator", description: "Cloud Canary preview." },
+<<<<<<< HEAD
   {
     path: "/operator/ecowitt-bridge-debug",
     access: "operator",
@@ -316,6 +323,20 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description:
       "Hunt workspace (scores + keeper decisions). Write-capable (RLS-scoped own data) — mounted behind the auth gate inside AppShell.",
   },
+=======
+  { path: "/operator/ecowitt-bridge-debug", access: "operator", description: "EcoWitt bridge debug (read-only)." },
+  { path: "/operator/ecowitt-bridge-status", access: "operator", description: "EcoWitt bridge status (read-only)." },
+  { path: "/operator/ecowitt-live-bringup", access: "operator", description: "EcoWitt live bring-up tooling (read-only)." },
+  { path: "/operator/ecowitt-tent-preview", access: "operator", description: "EcoWitt per-tent preview (read-only)." },
+  { path: "/operator/ggs-real-payload-ingest", access: "operator", description: "GGS Sentinel smoke runner verdict over real Spider Farmer GGS rows." },
+  { path: "/operator/one-tent-live-proof", access: "operator", description: "Operator one-tent live proof page." },
+  { path: "/operator/one-tent-loop-smoke-test", access: "operator", description: "Operator one-tent loop smoke test (read-only)." },
+  { path: "/operator/one-tent-proof-record", access: "operator", description: "One-tent proof record export." },
+  { path: "/operator/paddle-processing-audit", access: "operator", description: "Operator Paddle processing audit (read-only)." },
+  { path: "/operator/post-grow-reflection-dry-run", access: "operator", description: "Post-Grow Reflection dry-run diagnostics panel (read-only)." },
+  
+  { path: "/pheno-comparison", access: "public", description: "Read-only Pheno Comparison preview (sample data, mounted outside AuthProvider/GrowsProvider/AppShell — no grows read, no write chrome)." },
+>>>>>>> origin/main
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
   { path: "/pi-ingest-status", access: "operator" },
   { path: "/plants", access: "auth" },

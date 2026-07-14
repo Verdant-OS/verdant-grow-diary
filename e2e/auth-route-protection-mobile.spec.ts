@@ -75,6 +75,7 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/how-ai-doctor-works",
   "/partners/csv-preview",
   "/customer/:shareId",
+<<<<<<< HEAD
   "/pheno-comparison",
   "/pheno-hunts/:id/compare",
   "/.lovable/oauth/consent",
@@ -99,6 +100,12 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
 const UNAUTH_FIXTURE_ROUTES: string[] = [
   "/internal/contextual-pheno-comparison-demo",
   "/internal/demo-proof-walkthrough",
+=======
+  // Read-only Pheno Comparison preview: public, fixture-only, mounted outside
+  // AuthProvider/GrowsProvider/AppShell — must render signed-out on mobile with
+  // zero private-table fetches.
+  "/pheno-comparison",
+>>>>>>> origin/main
 ];
 
 async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {

@@ -80,8 +80,7 @@ const SCHEDULED_STATUS_PATTERNS = [
   /status\s*:\s*["']executed["']/,
 ];
 
-const AUTO_ACTION_QUEUE_INSERT =
-  /\.from\(\s*["']action_queue["']\s*\)\s*\.insert\s*\(/;
+const AUTO_ACTION_QUEUE_INSERT = /\.from\(\s*["']action_queue["']\s*\)\s*\.insert\s*\(/;
 
 /**
  * Patterns that indicate *automatic* (non-grower-initiated) execution
@@ -113,9 +112,7 @@ const SCHEDULED_ANALYSIS_HINT = /scheduled[_-]?(plant[_-]?)?analysis/i;
  * `// no service_role usage` do not trigger frontend-private-term hits.
  */
 function stripComments(src) {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 }
 
 /**
@@ -124,8 +121,7 @@ function stripComments(src) {
  */
 export function scanContent(relPath, content) {
   const violations = [];
-  const isFrontend =
-    relPath.startsWith(`src${sep}`) || relPath.startsWith("src/");
+  const isFrontend = relPath.startsWith(`src${sep}`) || relPath.startsWith("src/");
   const isTestFile =
     /[\\/](test|tests|__tests__|fixtures)[\\/]/.test(relPath) ||
     /\.test\.(t|j)sx?$/.test(relPath) ||
@@ -136,15 +132,24 @@ export function scanContent(relPath, content) {
   const hasContractMarker = content.includes(SAFETY_CONTRACT_MARKER);
   const codeOnly = stripComments(content);
 
+  const FRONTEND_PRIVATE_ALLOWLIST = ["src/lib/proofReportRedactionRules.ts"];
+  const isFrontendPrivateAllowlisted = FRONTEND_PRIVATE_ALLOWLIST.some((p) =>
+    relPath.replace(/\\/g, "/").endsWith(p),
+  );
+
   if (isThisScanner) return violations;
 
   // 1. Frontend private/server-only credentials — check only non-comment code.
+<<<<<<< HEAD
   // Files that declare the SAFETY-CONTRACT marker AND only mention the term
   // as a bare keyword literal (denylist / redaction list) are exempt — they
   // exist to PROTECT against leaks, not cause them. Real usage patterns
   // (env reads, createClient options, KEY=value) still trip the explicit
   // FRONTEND_PRIVATE_PATTERNS regexes above.
   if (isFrontend && !isTestFile && !hasContractMarker) {
+=======
+  if (isFrontend && !isTestFile && !isFrontendPrivateAllowlisted) {
+>>>>>>> origin/main
     for (const { name, re } of FRONTEND_PRIVATE_PATTERNS) {
       if (re.test(codeOnly)) {
         violations.push({
@@ -226,17 +231,7 @@ export function scanContent(relPath, content) {
 }
 
 const DEFAULT_SCAN_DIRS = ["src", "scripts", "supabase", ".github"];
-const SCAN_EXTS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".mjs",
-  ".cjs",
-  ".jsx",
-  ".sql",
-  ".yml",
-  ".yaml",
-]);
+const SCAN_EXTS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".jsx", ".sql", ".yml", ".yaml"]);
 const SKIP_DIRS = new Set([
   "node_modules",
   "dist",
@@ -307,9 +302,7 @@ if (isMain) {
     process.exit(0);
   }
   // eslint-disable-next-line no-console
-  console.error(
-    `✗ sensor-intelligence safety scan: ${v.length} violation(s)`,
-  );
+  console.error(`✗ sensor-intelligence safety scan: ${v.length} violation(s)`);
   for (const item of v) {
     // eslint-disable-next-line no-console
     console.error(`  - [${item.rule}] ${item.message}`);

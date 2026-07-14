@@ -34,6 +34,7 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     // Debugging artifacts kept only when a test fails (CI uploads them).
+<<<<<<< HEAD
     //
     // Traces record network request/response headers and bodies. Real-auth
     // runs (E2E_TEST_EMAIL present) would bake the disposable test account's
@@ -42,6 +43,9 @@ export default defineConfig({
     // runs. Screenshots and videos are pixels (no headers) and stay on.
     // Mocked/unauthenticated runs keep failure traces (no real tokens).
     trace: process.env.E2E_TEST_EMAIL ? "off" : "retain-on-failure",
+=======
+    trace: "retain-on-failure",
+>>>>>>> origin/main
     video: "retain-on-failure",
     screenshot: "only-on-failure",
   },

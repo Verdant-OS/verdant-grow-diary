@@ -66,6 +66,7 @@ describe("Quick Log Playwright harness safety", () => {
   it("contains no hardcoded credentials or service_role usage", () => {
     for (const { file, body, scrubbed } of files) {
       if (!/\.(ts|tsx)$/.test(file)) continue;
+<<<<<<< HEAD
       // Scrubbed body has comments + string + regex literal bodies
       // blanked, so denylist definitions like
       //   { label: "service_role", re: /service_role/i }
@@ -81,6 +82,9 @@ describe("Quick Log Playwright harness safety", () => {
       }
       // Passwords / bearer JWTs are literal-string leaks, so scan the
       // raw body — a real leak would appear as a string literal.
+=======
+      expect(body, `${file} must not reference service_role`).not.toMatch(/service_role/i);
+>>>>>>> origin/main
       expect(body, `${file} must not hardcode passwords`).not.toMatch(
         /password\s*[:=]\s*["'][^"']+["']/i,
       );
@@ -94,6 +98,7 @@ describe("Quick Log Playwright harness safety", () => {
       // Auth route-protection specs legitimately list action_queue as a
       // private table they guard against — exempt them from this check.
       if (/auth-route-protection/.test(file)) continue;
+<<<<<<< HEAD
       // Demo Proof Walkthrough read-only guard spec enumerates action_queue
       // and functions.invoke in its FORBIDDEN list to ASSERT the walkthrough
       // page never calls them. The spec issues no such calls itself.
@@ -115,6 +120,14 @@ describe("Quick Log Playwright harness safety", () => {
       expect(scrubbed, `${file} must not call action_queue`).not.toMatch(/action_queue/);
       expect(scrubbed, `${file} must not call functions.invoke`).not.toMatch(/functions\.invoke/);
       expect(scrubbed, `${file} must not import mini-chart UI`).not.toMatch(/MiniChart|mini-chart/);
+=======
+      // The read-only demo walkthrough lists action_queue as a forbidden
+      // network-request pattern it asserts against, never calls it.
+      if (/demo-proof-walkthrough-readonly/.test(file)) continue;
+      expect(body, `${file} must not call action_queue`).not.toMatch(/action_queue/);
+      expect(body, `${file} must not call functions.invoke`).not.toMatch(/functions\.invoke/);
+      expect(body, `${file} must not import mini-chart UI`).not.toMatch(/MiniChart|mini-chart/);
+>>>>>>> origin/main
     }
   });
 

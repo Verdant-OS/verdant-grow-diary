@@ -178,6 +178,66 @@ describe("calculateAiDoctorConfidence — unit", () => {
     expect(r.safety_flags).toEqual([...r.safety_flags].sort());
   });
 
+  it("adds a bounded score contribution for known pot size", async () => {
+    const sensors = [liveReading("temperature_c", 24)];
+    const events = [recentEvent("watering")];
+    const unknownContext = buildContext(sensors, events);
+    const knownContext = compilePlantContextFromRows({
+      plant: { ...PLANT, pot_size: "5 gal" },
+      growEvents: events,
+      sensorReadings: sensors,
+      now: NOW,
+    });
+    const diagnosis = await diagnose(unknownContext, visionGood());
+    const fixedDiagnosis: Phase1DiagnosisResult = {
+      ...diagnosis,
+      missing_information: Object.freeze([]) as readonly string[],
+    };
+
+    const unknown = calculateAiDoctorConfidence({
+      diagnosis: fixedDiagnosis,
+      context: unknownContext,
+      vision: visionGood(),
+    });
+    const known = calculateAiDoctorConfidence({
+      diagnosis: fixedDiagnosis,
+      context: knownContext,
+      vision: visionGood(),
+    });
+
+    expect(known.score - unknown.score).toBe(5);
+    expect(known.positive_factors).toContain("known_pot_size");
+    expect(known.limiting_factors).not.toContain("unknown_pot_size");
+    expect(known.explanation).toContain("Pot size: known.");
+    expect(unknown.positive_factors).not.toContain("known_pot_size");
+    expect(unknown.limiting_factors).toContain("unknown_pot_size");
+    expect(unknown.safety_flags).not.toContain("unknown_pot_size");
+    expect(unknown.explanation).toContain("Pot size: unknown.");
+  });
+
+  it("does not score blank pot size and stays deterministic", async () => {
+    const context = {
+      ...buildContext(
+        [liveReading("temperature_c", 24)],
+        [recentEvent("watering")],
+      ),
+      pot_size: "   ",
+    } as PlantContextPayload;
+    const diagnosis = await diagnose(context, visionGood());
+    const input: AiDoctorConfidenceInput = {
+      diagnosis,
+      context,
+      vision: visionGood(),
+    };
+
+    const first = calculateAiDoctorConfidence(input);
+    const second = calculateAiDoctorConfidence(input);
+
+    expect(first).toEqual(second);
+    expect(first.positive_factors).not.toContain("known_pot_size");
+    expect(first.limiting_factors).toContain("unknown_pot_size");
+  });
+
   it("caps score at 35 with no trustworthy sensors and no recent events", async () => {
     const ctx = buildContext([], []);
     const dx = await diagnose(ctx, visionGood());

@@ -9,9 +9,9 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../..");
-const pkg = JSON.parse(
-  readFileSync(resolve(ROOT, "package.json"), "utf8"),
-) as { scripts?: Record<string, string> };
+const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8")) as {
+  scripts?: Record<string, string>;
+};
 const ciPath = resolve(ROOT, ".github/workflows/ci.yml");
 const ci = existsSync(ciPath) ? readFileSync(ciPath, "utf8") : "";
 
@@ -38,7 +38,11 @@ describe("QuickLog RPC ownership CI wiring", () => {
     expect(ci).toMatch(new RegExp(`run:\\s*bun\\s+run\\s+${SCRIPT}`));
   });
 
-  it("CI still runs the full suite after the targeted slice", () => {
-    expect(ci).toMatch(/bunx\s+vitest\s+run\s*$/m);
+  it("CI still runs the full suite (now sharded) alongside the targeted slice", () => {
+    // The full suite was pulled into a dedicated sharded matrix job so it no
+    // longer OOMs / exceeds the 20-min job timeout on a single runner. It
+    // still runs on every PR — now via `bunx vitest run --shard=<n>/N`.
+    // See docs/testing/ci-full-suite-shards.md.
+    expect(ci).toMatch(/bunx\s+vitest\s+run\s+--shard=/);
   });
 });

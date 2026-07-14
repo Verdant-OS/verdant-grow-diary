@@ -33,6 +33,7 @@ const EcowittIngestAudit = lazy(() => import("./pages/EcowittIngestAudit"));
 const SensorsIngestNormalizer = lazy(() => import("./pages/SensorsIngestNormalizer"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 // Cameras removed from current Verdant build (out of V0 scope).
+<<<<<<< HEAD
 const Alerts = lazy(() => import("./pages/Alerts"));
 const AlertDetail = lazy(() => import("./pages/AlertDetail"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -51,6 +52,19 @@ const BreedingProgramNew = lazy(() => import("./pages/BreedingProgramNew"));
 const BreedingProgramDetail = lazy(() => import("./pages/BreedingProgramDetail"));
 const Reports = lazy(() => import("./pages/Reports"));
 const PostGrowLearningReport = lazy(() => import("./pages/PostGrowLearningReport"));
+=======
+import Alerts from "./pages/Alerts";
+import AlertDetail from "./pages/AlertDetail";
+import Settings from "./pages/Settings";
+import Timeline from "./pages/Timeline";
+import Grows from "./pages/Grows";
+import GrowDetail from "./pages/GrowDetail";
+import PhenoHuntNew from "./pages/PhenoHuntNew";
+import BreedingLogNew from "./pages/BreedingLogNew";
+import PhenoComparison from "./pages/PhenoComparison";
+import Reports from "./pages/Reports";
+import PostGrowLearningReport from "./pages/PostGrowLearningReport";
+>>>>>>> origin/main
 
 const Coach = lazy(() => import("./pages/Coach"));
 const AiDoctorSessionDetail = lazy(() => import("./pages/AiDoctorSessionDetail"));
@@ -149,6 +163,7 @@ function PageLoader() {
 }
 
 const App = () => (
+<<<<<<< HEAD
   <RootErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -424,6 +439,192 @@ const App = () => (
       </TooltipProvider>
     </QueryClientProvider>
   </RootErrorBoundary>
+=======
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <AnalyticsShell />
+        <Routes>
+          {/* Read-only Pheno Comparison preview — mounted OUTSIDE AuthProvider
+              and GrowsProvider (and AppShell) so visiting it triggers no
+              grows/Supabase read and renders no write chrome. Fixture-only,
+              read-only, with no way to create or save entries. */}
+          <Route path="/pheno-comparison" element={<PhenoComparison />} />
+          <Route
+            path="*"
+            element={
+              <AuthProvider>
+                <GrowsProvider>
+                  <Routes>
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                    {/* Deprecated auth entry points — redirect to canonical /auth to
+                  prevent funnel leaks from old bookmarks, emails, ads, and
+                  creator posts that still point to /login /signup /register. */}
+                    <Route path="/login" element={<Navigate to="/auth" replace />} />
+                    <Route path="/signup" element={<Navigate to="/auth" replace />} />
+                    <Route path="/register" element={<Navigate to="/auth" replace />} />
+
+                    <Route path="/features" element={<Navigate to="/welcome" replace />} />
+
+                    <Route path="/welcome" element={<Landing />} />
+                    {/* /demo route removed — Verdant tracks real grow data only.
+                  Old bookmarks redirect to the landing page. */}
+                    <Route path="/demo" element={<Navigate to="/welcome" replace />} />
+                    <Route path="/hardware-integrations" element={<HardwareIntegrations />} />
+                    <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/billing/:plan" element={<BillingPlaceholder />} />
+                    {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
+                  no operator chrome (header, Quick Log) renders. */}
+                    <Route path="/customer/:shareId" element={<CustomerModeGuide />} />
+
+                    {/* Internal read-only walkthrough presenter. Mounted OUTSIDE
+                  AppShell so the no-write E2E guard can render it without a
+                  signed-in session. The page performs no Supabase, AI,
+                  alerts, Action Queue, or device-control calls. Path remains
+                  unlinked and is hidden by URL only. */}
+                    <Route
+                      path="/internal/demo-proof-walkthrough"
+                      element={<DemoProofWalkthrough />}
+                    />
+
+                    <Route element={<AppShell />}>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/onboarding" element={<Onboarding />} />
+                      {/* Legacy Live Dashboard route — consolidated into the
+                    main Dashboard. Redirect preserves old bookmarks. */}
+                      <Route path="/grow-room" element={<Navigate to="/" replace />} />
+
+                      <Route path="/daily-check" element={<DailyCheck />} />
+                      <Route path="/tents" element={<Tents />} />
+                      <Route path="/tents/:id" element={<TentDetail />} />
+                      <Route path="/plants" element={<Plants />} />
+                      <Route path="/plants/:id" element={<PlantDetail />} />
+                      <Route path="/sensors" element={<Sensors />} />
+                      <Route path="/sensors/ecowitt-audit" element={<EcowittIngestAudit />} />
+                      <Route
+                        path="/sensors/ingest-normalizer"
+                        element={<SensorsIngestNormalizer />}
+                      />
+                      <Route path="/logs" element={<Timeline />} />
+                      <Route path="/timeline" element={<Timeline />} />
+                      <Route path="/tasks" element={<Tasks />} />
+                      {/* /cameras route removed — out of current V0 scope. */}
+                      <Route path="/alerts" element={<Alerts />} />
+                      <Route path="/alerts/:alertId" element={<AlertDetail />} />
+                      <Route path="/doctor" element={<Coach />} />
+                      <Route path="/doctor/sessions" element={<AiDoctorSessionsIndex />} />
+                      <Route
+                        path="/doctor/sessions/:sessionId"
+                        element={<AiDoctorSessionDetail />}
+                      />
+                      <Route path="/actions" element={<ActionQueue />} />
+                      <Route path="/actions/:actionId" element={<ActionDetail />} />
+                      {/* Legacy alias — canonical route is /actions. Keeps old
+                    bookmarks, docs, and external links working. */}
+                      <Route path="/action-queue" element={<Navigate to="/actions" replace />} />
+                      <Route path="/grow-lineage" element={<GrowLineageRepair />} />
+                      <Route path="/grows" element={<Grows />} />
+                      <Route path="/grows/:growId" element={<GrowDetail />} />
+                      <Route path="/pheno-hunts/new" element={<PhenoHuntNew />} />
+                      <Route path="/breeding/new" element={<BreedingLogNew />} />
+                      <Route path="/reports" element={<Reports />} />
+                      <Route
+                        path="/reports/post-grow/:growId"
+                        element={<PostGrowLearningReport />}
+                      />
+                      <Route
+                        path="/diary/environment-summary"
+                        element={<EnvironmentSummaryReportPage />}
+                      />
+
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="/diagnostics" element={<Diagnostics />} />
+                      <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
+                      <Route
+                        path="/operator/ai-doctor-phase1"
+                        element={<OperatorAiDoctorPhase1Page />}
+                      />
+                      <Route
+                        path="/operator/paddle-processing-audit"
+                        element={<OperatorPaddleProcessingAudit />}
+                      />
+                      <Route
+                        path="/operator/billing-subscription-updates"
+                        element={<OperatorBillingSubscriptionUpdateAudit />}
+                      />
+                      <Route
+                        path="/operator/billing-entitlement-resolution"
+                        element={<OperatorBillingEntitlementResolutionAudit />}
+                      />
+                      <Route
+                        path="/operator/one-tent-proof-record"
+                        element={<OneTentProofRecord />}
+                      />
+                      <Route path="/demo/one-tent-live-proof" element={<OneTentLiveProof />} />
+                      <Route path="/operator/one-tent-live-proof" element={<OneTentLiveProof />} />
+                      <Route
+                        path="/operator/ecowitt-bridge-status"
+                        element={<EcowittBridgeStatus />}
+                      />
+                      <Route
+                        path="/operator/ecowitt-bridge-debug"
+                        element={<EcowittBridgeDebug />}
+                      />
+                      <Route
+                        path="/operator/ecowitt-live-bringup"
+                        element={<EcowittLiveBringup />}
+                      />
+                      <Route
+                        path="/operator/ecowitt-tent-preview"
+                        element={<OperatorEcowittTentPreview />}
+                      />
+
+                      <Route
+                        path="/operator/one-tent-loop-smoke-test"
+                        element={<OperatorOneTentLoopSmokeTest />}
+                      />
+                      <Route
+                        path="/operator/post-grow-reflection-dry-run"
+                        element={<OperatorPostGrowReflectionDryRun />}
+                      />
+                      <Route
+                        path="/operator/ggs-real-payload-ingest"
+                        element={<OperatorGgsRealPayloadIngest />}
+                      />
+                      <Route path="/pi-ingest-status" element={<PiIngestStatus />} />
+                      <Route path="/ingest-inspector" element={<IngestInspector />} />
+                      <Route
+                        path="/internal/ai-doctor-phase1-preview"
+                        element={<AiDoctorPhase1Preview />}
+                      />
+                      <Route path="/internal/one-tent-loop-proof" element={<OneTentLoopProof />} />
+                      <Route path="/internal/sensor-truth-audit" element={<SensorTruthAudit />} />
+                      <Route
+                        path="/internal/ai-doctor-confidence-audit"
+                        element={<AiDoctorConfidenceAudit />}
+                      />
+                      {/* Leads is an internal admin/operator module, intentionally not
+
+                    surfaced in grower-facing navigation. Primary route is
+                    /admin/leads; /leads is retained as a back-compat alias. */}
+                      <Route path="/admin/leads" element={<Leads />} />
+                      <Route path="/leads" element={<Leads />} />
+                    </Route>
+
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </GrowsProvider>
+              </AuthProvider>
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+>>>>>>> origin/main
 );
 
 export default App;

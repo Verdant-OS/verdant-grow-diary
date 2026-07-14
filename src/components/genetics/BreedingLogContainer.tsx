@@ -26,12 +26,20 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
   }) => {
     setBusy(true);
     try {
+<<<<<<< HEAD
       if (!user) {
         throw new Error("You must be signed in to log a breeding event.");
       }
       // 1. Save to grow_events
+=======
+      // 1. Save through the breeding_log_save_event RPC. The RPC applies the
+      //    auth.uid() trust boundary + ownership checks server-side; the client
+      //    never sends a user_id.
+>>>>>>> origin/main
       const selectedPlant = plants.find((p) => p.id === data.plantId);
+      const details = (data.details ?? {}) as Record<string, string>;
 
+<<<<<<< HEAD
       const payload = {
         grow_id: activeGrowId,
         plant_id: data.plantId,
@@ -44,16 +52,30 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
         occurred_at: new Date().toISOString(),
         user_id: user.id,
       };
+=======
+      const { data: rpcData, error: rpcError } = await supabase.rpc("breeding_log_save_event", {
+        p_grow_id: activeGrowId,
+        p_plant_id: data.plantId,
+        p_event_type: data.subType,
+        p_tent_id: selectedPlant?.tent_id ?? null,
+        p_method: typeof details.method === "string" ? details.method : null,
+        p_intensity: typeof details.intensity === "string" ? details.intensity : null,
+        p_details: details,
+      });
+>>>>>>> origin/main
 
-      const { data: eventRow, error: insertError } = await supabase
-        .from("grow_events")
-        .insert(payload)
-        .select()
-        .single();
-
-      if (insertError) {
-        throw new Error(`Failed to save event: ${insertError.message}`);
+      if (rpcError) {
+        throw new Error(`Failed to save event: ${rpcError.message}`);
       }
+      const result = rpcData as {
+        ok?: boolean;
+        grow_event_id?: string;
+        reason?: string;
+      } | null;
+      if (!result?.ok || !result.grow_event_id) {
+        throw new Error(`Failed to save event: ${result?.reason ?? "unknown_error"}`);
+      }
+      const eventId = result.grow_event_id;
 
       // 2. Invoke Edge Function for Action Queue Suggestions
       // Provenance Rule: "Action Queue insertion failure must not roll back or block the original Quick Log event save."
@@ -61,7 +83,11 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
         const { data: fnData, error: fnError } = await supabase.functions.invoke(
           "create-breeding-suggestions",
           {
+<<<<<<< HEAD
             body: { event_id: eventRow.id, breeding_event_type: data.subType },
+=======
+            body: { event_id: eventId },
+>>>>>>> origin/main
           },
         );
         if (fnError) {

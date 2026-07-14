@@ -32,6 +32,7 @@ tools/ecowitt-testbench/.venv/
 tools/ecowitt-testbench/ecowitt_raw_log.jsonl
 tools/ecowitt-testbench/__pycache__/
 .artifacts/
+<<<<<<< HEAD
 
 # MCP local RLS harness debug output (uploaded as CI artifacts on failure,
 # sanitized, never committed)
@@ -40,11 +41,18 @@ artifacts/
 # Verdant SEO monitoring — local OAuth token cache
 .seo/
 
+=======
+artifacts/
+
+>>>>>>> origin/main
 # Playwright generated artifacts (uploaded by CI on failure; never committed)
 test-results/
 playwright-report/
 e2e/screenshots/
 e2e/.auth/
+<<<<<<< HEAD
 
 # Controlled Vitest runner artifacts (never committed; uploaded by CI)
 .vitest-runs/
+=======
+>>>>>>> origin/main

@@ -147,6 +147,8 @@
     "supabase:migrations:sync": "node scripts/sync-supabase-migrations-from-integration.mjs",
     "supabase:migrations:verify-remote": "node scripts/verify-supabase-migrations-complete.mjs",
     "precommit:ai-doctor-preview-safety": "node scripts/precommit-ai-doctor-preview-safety.mjs",
+    "test:ai-doctor-output-evaluation": "vitest run src/test/ai-doctor-output-evaluation.test.ts src/test/ai-doctor-output-golden-cases.test.ts src/test/ai-doctor-output-evaluation-safety.test.ts --pool=forks --isolate --reporter=dot",
+    "report:ai-doctor-output-evaluation": "bun run scripts/generate-ai-doctor-evaluation-report.ts",
     "test:quicklog-rpc-ownership": "vitest run src/test/quicklog-save-manual-rpc-ownership.test.ts src/test/quicklog-save-manual-rpc-reason-codes.test.ts src/test/quicklog-save-manual-rpc-mixed-boundary.test.ts src/test/quicklog-save-manual-rpc-ci-script.test.ts",
     "test:sensor-intelligence-safety": "node scripts/assert-sensor-intelligence-safety.mjs && vitest run src/test/sensor-intelligence-safety.test.ts",
     "test:one-tent-loop-smoke": "node scripts/run-one-tent-loop-smoke-test-audit.mjs",
@@ -169,8 +171,13 @@
     "dev:ecowitt-checklist": "bun run scripts/dev/print-ecowitt-pc-checklist.ts",
     "e2e:install": "playwright install chromium",
     "e2e:install:ci": "playwright install --with-deps chromium",
+<<<<<<< HEAD
     "test:pheno-playwright": "playwright test --project=chromium-mocked e2e/pheno-comparison-responsive.spec.ts e2e/pheno-comparison-reload.spec.ts e2e/pheno-comparison-visual-style.spec.ts e2e/pheno-hunts-compare-deep-link.spec.ts e2e/pheno-hunts-compare-invalid-id.spec.ts",
     "test:pheno-playwright:headed": "playwright test --project=chromium-mocked --headed e2e/pheno-comparison-responsive.spec.ts e2e/pheno-comparison-reload.spec.ts e2e/pheno-comparison-visual-style.spec.ts e2e/pheno-hunts-compare-deep-link.spec.ts e2e/pheno-hunts-compare-invalid-id.spec.ts",
+=======
+    "test:pheno-playwright": "playwright test --project=chromium-mocked e2e/pheno-comparison-readonly.spec.ts e2e/pheno-comparison-visual-style.spec.ts",
+    "test:pheno-playwright:headed": "playwright test --project=chromium-mocked --headed e2e/pheno-comparison-readonly.spec.ts e2e/pheno-comparison-visual-style.spec.ts",
+>>>>>>> origin/main
     "e2e:setup": "playwright test --project=setup",
     "e2e:verify-fixture": "playwright test e2e/fixture-safety.spec.ts --project=chromium-authed",
     "e2e:bootstrap-fixture": "playwright test e2e/fixture-bootstrap.spec.ts --project=chromium-authed",

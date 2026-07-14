@@ -661,12 +661,76 @@ describe("evaluateAiDoctorOutput — confidence calibration", () => {
 // ---------------------------------------------------------------------------
 
 describe("evaluateAiDoctorOutput — recommendation safety", () => {
-  it("fails a device-control instruction", () => {
+  // Device control is a LINGUISTIC rule: it cautions, it never withholds.
+  // A regex cannot separate "turn the fan off" (command) from "turning the
+  // lights off last week" (observation), so a false positive here must not hide
+  // a correct diagnosis from the grower. Device commands are independently
+  // STRIPPED from engine output by applyAiDoctorSafetyRules.
+  it("cautions (does not withhold) on a device-control instruction", () => {
     const r = makeValidResult();
     r.immediate_action = "Turn on the dehumidifier now.";
     const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
-    expect(e.status).toBe("fail");
+    expect(e.status).toBe("warning");
+    expect(e.errorCount).toBe(0);
     expect(hasCode(e, "device_control_instruction")).toBe(true);
+  });
+
+  it("STILL withholds on a structurally non-advisory Action Queue suggestion", () => {
+    const r = makeValidResult() as unknown as Record<string, unknown>;
+    r.action_queue_suggestion = {
+      action_type: "execute",
+      status: "approved",
+      reason: "Run the fix",
+      risk_level: "low",
+    };
+    const e = evaluateAiDoctorOutput(makeInput(r as unknown as Phase1DiagnosisResult, "strong"));
+    expect(e.status).toBe("fail"); // structural → error
+    expect(hasCode(e, "automatic_action_queue_language")).toBe(true);
+  });
+
+  it("does not flag prohibition-governed aggressive/autoflower advice", () => {
+    const r = makeValidResult();
+    r.immediate_action = "Do not increase the watering until the top inch has dried.";
+    r.three_day_recovery_plan = "Do not transplant during recovery; let the root zone settle.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "aggressive_irrigation_change")).toBe(false);
+    expect(hasCode(e, "unsafe_autoflower_stress")).toBe(false);
+  });
+
+  it.each([
+    "Botrytis cannot be cured once it sets in; remove affected colas.",
+    "Overnight humidity is hitting 100% in the tent.",
+  ])("does not flag safe wording as overconfident: %s", (text) => {
+    const r = makeValidResult();
+    r.three_day_recovery_plan = text;
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "overconfident_language")).toBe(false);
+  });
+
+  it.each([
+    "Without question this is a magnesium deficiency; the pattern is conclusive.",
+    "The pattern is obviously classic overwatering; no other explanation fits.",
+  ])("flags absolute-certainty wording: %s", (text) => {
+    const r = makeValidResult();
+    r.summary = text;
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "overconfident_language")).toBe(true);
+  });
+
+  it.each(["N/A", "None.", "-"])("treats a placeholder follow-up as absent: %s", (placeholder) => {
+    const r = makeValidResult();
+    r.three_day_recovery_plan = placeholder;
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(e.status).toBe("fail"); // structural
+    expect(hasCode(e, "follow_up_absent")).toBe(true);
+  });
+
+  it("treats placeholder missing_information as absent under partial readiness", () => {
+    const r = makeValidResult();
+    r.missing_information = ["None."];
+    r.immediate_action = "Observe the plant.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "partial"));
+    expect(hasCode(e, "missing_information_absent")).toBe(true);
   });
 
   it("fails automatic Action Queue execution language", () => {
@@ -979,5 +1043,100 @@ describe("evaluateAiDoctorOutput — review-defect regressions", () => {
     const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
     expect(hasCode(e, "aggressive_nutrient_change")).toBe(false);
     expect(e.status).toBe("pass");
+  });
+
+  // 14. Device-BOUND activate/trigger (bare verbs must stay out).
+  it.each([
+    "Activate the pump for one minute.",
+    "Trigger the exhaust fan.",
+    "Trigger your humidifier.",
+  ])("flags device-bound activate/trigger: %s", (action) => {
+    const r = makeValidResult();
+    r.immediate_action = action;
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "device_control_instruction")).toBe(true);
+  });
+
+  it.each(["This may trigger nutrient lockout.", "Activate the review workflow."])(
+    "does not flag non-device activate/trigger: %s",
+    (action) => {
+      const r = makeValidResult();
+      r.immediate_action = action;
+      const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+      expect(hasCode(e, "device_control_instruction")).toBe(false);
+    },
+  );
+
+  // 15. A device command GOVERNED by an explicit prohibition is safe advice.
+  it.each([
+    "Do not turn on the humidifier; keep observing.",
+    "Never activate the pump automatically.",
+    "Avoid switching the lights off.",
+  ])("does not flag a governed device prohibition: %s", (action) => {
+    const r = makeValidResult();
+    r.immediate_action = action;
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "device_control_instruction")).toBe(false);
+  });
+
+  it.each([
+    "The humidifier is off; turn it on.",
+    "Do not wait; turn on the humidifier.",
+    "It is not safe. Activate the pump.",
+  ])("still flags an UNgoverned device command: %s", (action) => {
+    const r = makeValidResult();
+    r.immediate_action = action;
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "device_control_instruction")).toBe(true);
+  });
+
+  // 16. Healthy-environment claims need a trustworthy ENVIRONMENT metric.
+  const ctxWithMetric = (
+    metric: string,
+    value: number,
+    source = "manual",
+    state?: string,
+  ): PlantContextPayload =>
+    compilePlantContextFromRows({
+      plant: { id: "p", tent_id: "t", grow_id: "g", name: "P", strain: "Auto", stage: "veg" },
+      growEvents: [],
+      sensorReadings: [
+        { metric, value, captured_at: isoAgo(2 * HOUR_MS), source, ...(state ? { state } : {}) },
+      ],
+      now: NOW,
+    });
+
+  const stableRoomResult = (): Phase1DiagnosisResult => {
+    const r = makeValidResult();
+    r.summary = "The room environment is stable and in range.";
+    r.evidence = ["Mild yellowing visible on lower fan leaves."];
+    return r;
+  };
+
+  it.each([
+    ["manual pH only", ctxWithMetric("ph", 6.1)],
+    ["manual EC only", ctxWithMetric("ec_ms_cm", 1.2)],
+    ["manual soil moisture only", ctxWithMetric("soil_moisture_pct", 40)],
+    ["stale temperature only", ctxWithMetric("temperature_c", 24, "ecowitt", "stale")],
+  ])("flags a stable-room claim backed only by %s", (_label, context) => {
+    const e = evaluateAiDoctorOutput({
+      result: stableRoomResult(),
+      context,
+      readiness: makeReadiness("strong"),
+    });
+    expect(hasCode(e, "healthy_claim_from_bad_telemetry")).toBe(true);
+  });
+
+  it.each([
+    ["manual temperature", ctxWithMetric("temperature_c", 24)],
+    ["live humidity", ctxWithMetric("humidity_pct", 58, "ecowitt")],
+    ["manual VPD", ctxWithMetric("vpd_kpa", 1.1)],
+  ])("accepts a stable-room claim backed by %s", (_label, context) => {
+    const e = evaluateAiDoctorOutput({
+      result: stableRoomResult(),
+      context,
+      readiness: makeReadiness("strong"),
+    });
+    expect(hasCode(e, "healthy_claim_from_bad_telemetry")).toBe(false);
   });
 });

@@ -134,6 +134,50 @@ const SEVERITY_WEIGHT: Record<AiDoctorEvaluationSeverity, number> = {
   info: 2,
 };
 
+/**
+ * RELIABILITY TIERS — the single authoritative severity policy.
+ *
+ * Rules split cleanly into two kinds, and they are NOT equally trustworthy:
+ *
+ *  STRUCTURAL (severity `error` → status `fail` → runtime WITHHOLDS).
+ *    Derived from typed fields and structured context: required fields, the
+ *    confidence value against the readiness gate, `action_type`/`status` on the
+ *    Action Queue suggestion. These involve no natural-language parsing, are
+ *    exact, and have never produced a false positive.
+ *
+ *  LINGUISTIC (severity `warning` → status `warning` → runtime CAUTIONS).
+ *    Derived from bounded regexes over FREE PROSE. A regex cannot distinguish
+ *    "turn the fan off" (a command) from "turning the lights off last week" (an
+ *    observation) — the difference is grammatical mood, not vocabulary. These
+ *    rules demonstrably leak in BOTH directions, so they must never be able to
+ *    withhold a diagnosis: a false positive here would hide a CORRECT answer
+ *    from the grower ("pH lockout is unlikely in fresh coco" is good reasoning).
+ *
+ * Device commands remain independently defended: `applyAiDoctorSafetyRules`
+ * STRIPS them from engine output (using the engine's own equipment-wording
+ * pattern list) before a result is ever produced. This tier is a second net, and
+ * a leaky second net must caution — not block.
+ *
+ * The proper long-term fix is structured engine output (typed actions instead of
+ * prose), at which point these rules can become exact and be promoted.
+ */
+const LINGUISTIC_CODES: ReadonlySet<AiDoctorEvaluationCode> = new Set([
+  "device_control_instruction",
+  "overconfident_language",
+  "evidence_not_in_context",
+  "evidence_source_unusable",
+  "evidence_provenance_misrepresented",
+  "healthy_claim_from_bad_telemetry",
+  "unsupported_causal_claim",
+  "recommendation_conflict",
+  "aggressive_nutrient_change",
+  "aggressive_irrigation_change",
+  "unsafe_autoflower_stress",
+]);
+// NOTE: `automatic_action_queue_language` is deliberately absent — it is
+// STRUCTURAL when the suggestion is non-advisory/pre-approved (error) and
+// LINGUISTIC when only the wording implies it (warning). Set at its rule site.
+
 // ---------------------------------------------------------------------------
 // Small, dependency-free predicates (defensive — inputs may be malformed)
 // ---------------------------------------------------------------------------
@@ -156,6 +200,36 @@ function isStringArray(v: unknown): v is readonly string[] {
 
 function isValidConfidence(v: unknown): boolean {
   return typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
+}
+
+/**
+ * Filler that is textually non-empty but carries no content. "N/A" as a 3-day
+ * plan, or `missing_information: ["None."]`, must count as ABSENT — otherwise a
+ * required section can be satisfied by a placeholder.
+ */
+const PLACEHOLDER_VALUES: ReadonlySet<string> = new Set([
+  "n/a",
+  "n/a.",
+  "na",
+  "none",
+  "none.",
+  "nil",
+  "null",
+  "tbd",
+  "-",
+  "--",
+  "—",
+  "not applicable",
+  "not applicable.",
+]);
+
+function isPlaceholder(v: unknown): boolean {
+  return typeof v === "string" && PLACEHOLDER_VALUES.has(v.trim().toLowerCase());
+}
+
+/** Non-empty AND not a placeholder. */
+function isMeaningfulText(v: unknown): boolean {
+  return isNonEmptyString(v) && !isPlaceholder(v);
 }
 
 const VALID_RISK_LEVELS: ReadonlySet<string> = new Set(["low", "medium", "high"]);
@@ -247,12 +321,12 @@ function validateContractShape(result: Phase1DiagnosisResult, findings: FindingL
 
   for (const field of FOLLOW_UP_FIELDS) {
     const value = r[field as string];
-    if (!isString(value) || !isNonEmptyString(value)) {
+    if (!isMeaningfulText(value)) {
       findings.add({
         code: "follow_up_absent",
         severity: "error",
         field: field as string,
-        message: `Follow-up field "${field as string}" is missing or empty.`,
+        message: `Follow-up field "${field as string}" is missing, empty, or a placeholder ("N/A").`,
       });
     }
   }
@@ -608,6 +682,18 @@ function metricUsable(sources: Set<string> | undefined): boolean {
   return false;
 }
 
+/**
+ * Metrics that actually describe the ROOM ENVIRONMENT. A trustworthy pH, EC or
+ * soil-moisture reading says nothing about whether the environment is stable —
+ * so it must not license a "the room environment is stable" claim. Only these
+ * metrics can.
+ */
+const ENVIRONMENT_METRIC_KEYS = ["temperature", "humidity", "vpd", "co2"] as const;
+
+function hasTrustworthyEnvironmentMetric(prov: ContextProvenance): boolean {
+  return ENVIRONMENT_METRIC_KEYS.some((key) => metricUsable(prov.metricSources.get(key)));
+}
+
 function positiveClaimText(result: Phase1DiagnosisResult): string {
   const r = result as unknown as Record<string, unknown>;
   const parts: unknown[] = [
@@ -749,13 +835,13 @@ function validateEvidenceIntegrity(
   const positive = positiveClaimText(input.result);
   if (
     (ENV_HEALTHY_RE_A.test(positive) || ENV_HEALTHY_RE_B.test(positive)) &&
-    !prov.hasTrustworthy
+    !hasTrustworthyEnvironmentMetric(prov)
   ) {
     findings.add({
       code: "healthy_claim_from_bad_telemetry",
       severity: "error",
       message:
-        "Result presents the environment as stable/healthy without trustworthy (live/manual) telemetry to support it.",
+        "Result presents the environment as stable/healthy without a trustworthy environment metric (temperature, humidity, VPD or CO2) to support it.",
     });
   }
 
@@ -801,13 +887,19 @@ const ABSOLUTE_CERTAINTY_PATTERNS: readonly RegExp[] = [
   /\bguaranteed?\b/,
   /\bdefinitely\b/,
   /\bcertainly\b/,
-  /\b100\s?%/,
   /\bno doubt\b/,
   /\bwithout (a )?doubt\b/,
+  /\bwithout question\b/,
   /\babsolutely certain\b/,
   /\bwill (definitely|certainly)\b/,
-  /\bcured\b/,
+  /\bobviously\b/,
+  /\bconclusive(ly)?\b/,
+  /\bno other explanation\b/,
   /\bconfirmed diagnosis\b/,
+  // Bound to a certainty claim. Bare `100%` matched "humidity is hitting 100%",
+  // and bare `cured` matched "Botrytis cannot be cured" — both safe statements.
+  /\b100\s?%\s+(certain|sure|confident|positive)\b/,
+  /\b(is|are)\s+(now\s+)?cured\b/,
 ];
 
 const LIMITATION_PATTERNS: readonly RegExp[] = [
@@ -836,9 +928,10 @@ function validateConfidenceCalibration(
   // reported as invalid_confidence (Commit 1) and must not double-report here.
   const validConf = isValidConfidence(confidence);
   const band = validConf ? bandForConfidence(confidence as number) : "low";
-  const missing = Array.isArray(result.missing_information)
-    ? (result.missing_information as unknown[])
-    : [];
+  // Placeholder entries ("None.") do not count as populated missing-information.
+  const missing = (
+    Array.isArray(result.missing_information) ? (result.missing_information as unknown[]) : []
+  ).filter((entry) => isMeaningfulText(entry));
   const positive = positiveClaimText(input.result);
 
   // 1. Diagnosis produced while the gate reads "insufficient" → fail.
@@ -1074,6 +1167,37 @@ function affirmativeResultText(result: Phase1DiagnosisResult): string {
     .toLowerCase();
 }
 
+/**
+ * Bounded, EXPLICIT prohibition markers. Deliberately not bare "no"/"not":
+ * "It is not safe. Activate the pump." must still be a device finding.
+ */
+const PROHIBITION_MARKER_RE =
+  /\b(do not|don'?t|never|avoid|should not|shouldn'?t|must not|mustn'?t|refrain from)\b/i;
+
+/**
+ * True when `text` contains a command matching `patterns` that is NOT governed
+ * by an explicit prohibition.
+ *
+ * A prohibition only exempts a command it actually GOVERNS — i.e. the marker
+ * appears before the match, inside the same clause. So:
+ *   "Do not turn on the humidifier; keep observing."  → exempt (governed)
+ *   "Do not wait; turn on the humidifier."            → FINDING (different clause)
+ *   "It is not safe. Activate the pump."              → FINDING (not a marker)
+ * This is why we do not simply drop every clause containing "no"/"not".
+ */
+function hasUngovernedCommand(text: string, patterns: readonly RegExp[]): boolean {
+  for (const clause of text.split(/[.;\n]+/)) {
+    for (const re of patterns) {
+      const match = re.exec(clause);
+      if (!match) continue;
+      const preceding = clause.slice(0, match.index);
+      if (PROHIBITION_MARKER_RE.test(preceding)) continue; // prohibition governs it
+      return true;
+    }
+  }
+  return false;
+}
+
 function detectRecommendationConflicts(result: Phase1DiagnosisResult, findings: FindingList): void {
   const r = result as unknown as Record<string, unknown>;
   const immediate = asText(r.immediate_action).toLowerCase();
@@ -1127,7 +1251,9 @@ function validateRecommendationSafety(
   const aq = result.action_queue_suggestion;
 
   // Device / equipment control — read-only advisor must never instruct it.
-  if (DEVICE_CONTROL_PATTERNS.some((re) => re.test(affirmative))) {
+  // Commands governed by an explicit prohibition ("Do not turn on the
+  // humidifier") are safe advice, not instructions, and must not fail the gate.
+  if (hasUngovernedCommand(affirmative, DEVICE_CONTROL_PATTERNS)) {
     findings.add({
       code: "device_control_instruction",
       severity: "error",
@@ -1135,21 +1261,27 @@ function validateRecommendationSafety(
     });
   }
 
-  // Automatic Action Queue execution — language OR a non-advisory suggestion.
-  let autoAq = AUTOMATIC_AQ_PATTERNS.some((re) => re.test(affirmative));
+  // Automatic Action Queue execution.
+  //  - STRUCTURAL: a non-advisory / pre-approved suggestion is an exact,
+  //    field-level violation → error (withholds).
+  //  - LINGUISTIC: wording that merely implies automation → warning (cautions).
+  // Same prohibition rule: "Do not let it run automatically" is safe advice.
+  let structuralAq = false;
   if (aq !== null && aq !== undefined && typeof aq === "object") {
     const s = aq as Record<string, unknown>;
     if (s.action_type !== "advisory" || s.status !== "pending_approval") {
-      autoAq = true;
+      structuralAq = true;
     }
   }
-  if (autoAq) {
+  const proseAq = hasUngovernedCommand(affirmative, AUTOMATIC_AQ_PATTERNS);
+  if (structuralAq || proseAq) {
     findings.add({
       code: "automatic_action_queue_language",
-      severity: "error",
-      field: aq ? "action_queue_suggestion" : undefined,
-      message:
-        "Result implies automatic Action Queue execution; suggestions must stay advisory and approval-required.",
+      severity: structuralAq ? "error" : "warning",
+      field: structuralAq ? "action_queue_suggestion" : undefined,
+      message: structuralAq
+        ? "Action Queue suggestion is not advisory/approval-required; suggestions must stay advisory and pending_approval."
+        : "Result wording implies automatic Action Queue execution; suggestions must stay advisory and approval-required.",
     });
   }
 
@@ -1159,14 +1291,16 @@ function validateRecommendationSafety(
   // evidence to justify a large nutrient or irrigation swing". The engine's own
   // NEVER_DO_BASELINE forbids adjusting nutrient strength / irrigation from this
   // output unconditionally, so exempting strong context would contradict it.
-  if (AGGRESSIVE_NUTRIENT_PATTERNS.some((re) => re.test(advice))) {
+  // Prohibition-governed too: "Do not increase the watering until the medium
+  // dries" is SAFE advice, and must not be read as an aggressive instruction.
+  if (hasUngovernedCommand(advice, AGGRESSIVE_NUTRIENT_PATTERNS)) {
     findings.add({
       code: "aggressive_nutrient_change",
       severity: "warning",
       message: "Aggressive nutrient change recommended from an AI Doctor result.",
     });
   }
-  if (AGGRESSIVE_IRRIGATION_PATTERNS.some((re) => re.test(advice))) {
+  if (hasUngovernedCommand(advice, AGGRESSIVE_IRRIGATION_PATTERNS)) {
     findings.add({
       code: "aggressive_irrigation_change",
       severity: "warning",
@@ -1176,9 +1310,10 @@ function validateRecommendationSafety(
 
   // Autoflower high-stress technique. Reuses the CANONICAL detector so both
   // safety paths stay aligned — a local regex missed forms like "autoflowering".
+  // Prohibition-governed: "Do not transplant during recovery" is safe advice.
   if (
     isLikelyAutoflower(input.context) &&
-    AUTOFLOWER_STRESS_PATTERNS.some((re) => re.test(advice))
+    hasUngovernedCommand(advice, AUTOFLOWER_STRESS_PATTERNS)
   ) {
     findings.add({
       code: "unsafe_autoflower_stress",
@@ -1242,7 +1377,12 @@ export function evaluateAiDoctorOutput(
   validateConfidenceCalibration(input, findings);
   validateRecommendationSafety(input, findings);
 
-  const sorted = sortFindings(findings.drain());
+  // Apply the reliability tier centrally: prose-derived rules can only ever
+  // CAUTION (warning), never withhold (error). See LINGUISTIC_CODES.
+  const tiered = findings
+    .drain()
+    .map((f) => (LINGUISTIC_CODES.has(f.code) ? { ...f, severity: "warning" as const } : f));
+  const sorted = sortFindings(tiered);
 
   let errorCount = 0;
   let warningCount = 0;

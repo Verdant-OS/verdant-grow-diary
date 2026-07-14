@@ -59,31 +59,63 @@ Findings are stable-sorted by (1) severity, (2) code, (3) field, (4) message, so
 regression output is byte-identical run over run. The evaluator is pure and
 never mutates its inputs.
 
+## Reliability tiers — which findings may WITHHOLD
+
+Not all rules are equally trustworthy, and the evaluator is explicit about it.
+
+| Tier           | Reads                               | Severity  | Status    | Runtime effect |
+| -------------- | ----------------------------------- | --------- | --------- | -------------- |
+| **STRUCTURAL** | typed fields + structured context   | `error`   | `fail`    | **withholds**  |
+| **LINGUISTIC** | bounded regexes over **free prose** | `warning` | `warning` | **cautions**   |
+
+**Why.** A regex cannot distinguish _"turn the fan off"_ (a command) from _"turning
+the lights off last week"_ (an observation) — the difference is grammatical mood,
+not vocabulary. An adversarial sweep confirmed **31 real defects** in the prose
+layer, in _both_ directions, including safe reasoning like _"pH lockout is
+unlikely in fresh coco"_ and _"The feeding log shows nothing unusual"_ being hard-
+failed. A false positive in an enforcement gate does not merely annoy: it
+**withholds a correct diagnosis from the grower**. So prose-derived rules may only
+ever caution.
+
+Structural rules read exact values (required fields, the confidence number against
+the readiness gate, `action_type`/`status` on the suggestion). They involve no
+language parsing and have produced no false positives.
+
+**Device commands remain defended twice over:** `applyAiDoctorSafetyRules` already
+**strips** them from engine output via `DEVICE_COMMAND_PATTERNS` before a result
+exists. This evaluator is a second net — and a leaky second net must caution, not
+block.
+
+> The proper long-term fix is **structured engine output** (typed actions such as
+> `{kind: 'observe' | 'adjust_feed' | 'device_change', target, magnitude}` instead
+> of prose). Then these rules check fields rather than English, become exact, and
+> can be promoted to STRUCTURAL.
+
 ## Stable finding codes
 
-| Code                                     | Severity        | Meaning                                                        |
-| ---------------------------------------- | --------------- | -------------------------------------------------------------- |
-| `required_field_missing`                 | error           | A required field is absent or the wrong type.                  |
-| `required_field_empty`                   | error           | A required text field / `what_not_to_do` is blank.             |
-| `follow_up_absent`                       | error           | 24-hour or 3-day plan is blank.                                |
-| `invalid_confidence`                     | error           | `confidence` is not a number in `[0,1]`.                       |
-| `invalid_risk_level`                     | error           | `risk_level` not `low\|medium\|high`.                          |
-| `diagnosis_generated_while_insufficient` | error           | A result exists while the gate reads `insufficient`.           |
-| `confidence_exceeds_readiness`           | error           | Confidence over the readiness ceiling.                         |
-| `missing_information_absent`             | error / warning | `missing_information` empty when it must be populated.         |
-| `partial_context_limitation_absent`      | error           | Partial context lacks any visible limitation.                  |
-| `overconfident_language`                 | error           | Absolute-certainty wording at any readiness level.             |
-| `evidence_not_in_context`                | error           | Cited metric / grow event is not in the compiled context.      |
-| `evidence_source_unusable`               | error           | Cited data is stale / invalid / unknown provenance.            |
-| `evidence_provenance_misrepresented`     | error           | CSV/other called "live", or demo presented as real.            |
-| `healthy_claim_from_bad_telemetry`       | error           | Environment "stable/healthy" claim with only bad telemetry.    |
-| `unsupported_causal_claim`               | warning         | Definitive cause with no supporting evidence item.             |
-| `recommendation_conflict`                | error           | Contradictory recommendations across sections.                 |
-| `aggressive_nutrient_change`             | warning         | Aggressive nutrient change (flagged at any readiness level).   |
-| `aggressive_irrigation_change`           | warning         | Aggressive irrigation change (flagged at any readiness level). |
-| `unsafe_autoflower_stress`               | warning         | High-stress technique for a likely autoflower.                 |
-| `device_control_instruction`             | error           | Instruction to control equipment.                              |
-| `automatic_action_queue_language`        | error           | Automatic execution / non-advisory suggestion.                 |
+| Code                                     | Tier       | Severity        | Meaning                                                                                                                          |
+| ---------------------------------------- | ---------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------ | ------ |
+| `required_field_missing`                 | structural | error           | A required field is absent or the wrong type.                                                                                    |
+| `required_field_empty`                   | structural | error           | A required text field / `what_not_to_do` is blank.                                                                               |
+| `follow_up_absent`                       | structural | error           | 24-hour or 3-day plan is blank or a placeholder (N/A).                                                                           |
+| `invalid_confidence`                     | structural | error           | `confidence` is not a number in `[0,1]`.                                                                                         |
+| `invalid_risk_level`                     | structural | error           | `risk_level` not `low                                                                                                            | medium | high`. |
+| `diagnosis_generated_while_insufficient` | structural | error           | A result exists while the gate reads `insufficient`.                                                                             |
+| `confidence_exceeds_readiness`           | structural | error           | Confidence over the readiness ceiling.                                                                                           |
+| `missing_information_absent`             | structural | error / warning | `missing_information` empty (or placeholder-only) when it must be populated.                                                     |
+| `partial_context_limitation_absent`      | structural | error           | Partial context lacks any visible limitation.                                                                                    |
+| `automatic_action_queue_language`        | **both**   | error / warning | **error** when the suggestion is structurally non-advisory / pre-approved; **warning** when only the wording implies automation. |
+| `device_control_instruction`             | linguistic | warning         | Wording instructs equipment control.                                                                                             |
+| `overconfident_language`                 | linguistic | warning         | Absolute-certainty wording.                                                                                                      |
+| `evidence_not_in_context`                | linguistic | warning         | Cited metric / logged event is not in the compiled context.                                                                      |
+| `evidence_source_unusable`               | linguistic | warning         | Cited data is stale / invalid / unknown provenance.                                                                              |
+| `evidence_provenance_misrepresented`     | linguistic | warning         | CSV/other called "live", or demo presented as real.                                                                              |
+| `healthy_claim_from_bad_telemetry`       | linguistic | warning         | Environment stable/healthy claim with no trustworthy ENV metric.                                                                 |
+| `unsupported_causal_claim`               | linguistic | warning         | Definitive cause with no supporting evidence item.                                                                               |
+| `recommendation_conflict`                | linguistic | warning         | Contradictory recommendations across sections.                                                                                   |
+| `aggressive_nutrient_change`             | linguistic | warning         | Nutrient/feed/EC strength change (forbidden at ANY readiness).                                                                   |
+| `aggressive_irrigation_change`           | linguistic | warning         | Irrigation-schedule change (forbidden at ANY readiness).                                                                         |
+| `unsafe_autoflower_stress`               | linguistic | warning         | High-stress technique for a likely autoflower.                                                                                   |
 
 ## Confidence calibration
 
@@ -230,6 +262,32 @@ Those changes are therefore universally prohibited by the canonical AI Doctor
 contract, so `aggressive_nutrient_change` / `aggressive_irrigation_change` are
 detected at **all** readiness levels including `strong`. The evaluator mirrors
 the existing rule; it does not invent a new policy.
+
+### Known gaps in the LINGUISTIC tier (measured, not guessed)
+
+An adversarial sweep confirmed these against the real evaluator. They are
+**documented rather than patched**, because each added regex has historically
+created a new false positive — and every one of these is a `warning`, so none can
+withhold a diagnosis. The real fix is structured engine output, not more patterns.
+
+- **Device vocabulary is incomplete.** `DEVICE_OBJECT` has no `AC` /
+  `air conditioner`, `chiller`, `mini-split`, `timer`, `heat mat`, `controller`,
+  `carbon filter`. Verbs like `power down`, `unplug` / `plug in`, `dial`,
+  `reprogram`, `crank` are unmatched. So _"Unplug the humidifier overnight"_ and
+  _"crank the AC down two degrees"_ are missed. (The engine still strips much of
+  this before output.)
+- **Metric vocabulary is incomplete.** `PPM`, `TDS`, `runoff EC`, `dew point`,
+  `leaf-surface temp` are outside `METRIC_LEXICON`, so _"Runoff PPM is 1150"_ is
+  not traced.
+- **Liveness phrasing.** `LIVE_CLAIM_PATTERNS` misses _"as of this morning's
+  reading"_ / _"current reading"_.
+- **Aggressive-action phrasing.** _"Cut the feed in half"_, _"take the res up to
+  900 ppm"_, _"run a heavy flush"_, _"water to 20% runoff"_, and the autoflower
+  techniques _supercrop_ / _lollipop_ are not matched.
+- **The cautionary exemption can shield a claim.** A limitation word near a data
+  noun exempts the whole evidence item, so _"Diary log shows no issues, and EC is
+  steady at 1.8"_ escapes provenance checking.
+- **Overconfidence phrasing** is a bounded list; paraphrases will slip through.
 
 - `automatedConfidence` is accepted but reserved (no active rule in v1).
 - v1 targets the Phase 1 result family only. The `AiDoctorReviewResult` /

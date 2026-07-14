@@ -451,7 +451,7 @@ const CASES: AiDoctorGoldenCase[] = [
       summary: "This is definitely a nitrogen deficiency, guaranteed.",
       evidence: BACKED_EVIDENCE,
     }),
-    expectedStatus: "fail",
+    expectedStatus: "warning",
     expectedCodes: ["overconfident_language"],
   },
 
@@ -472,7 +472,7 @@ const CASES: AiDoctorGoldenCase[] = [
     readiness: readiness("strong"),
     context: ctxBacked(),
     result: result({ evidence: ["EC of 1.8 mS/cm is on target."] }),
-    expectedStatus: "fail",
+    expectedStatus: "warning",
     expectedCodes: ["evidence_not_in_context"],
   },
   {
@@ -521,7 +521,7 @@ const CASES: AiDoctorGoldenCase[] = [
       evidence: ["Live sensor data shows temperature is 24C."],
       missing_information: ["No live or manual readings."],
     }),
-    expectedStatus: "fail",
+    expectedStatus: "warning",
     expectedCodes: ["evidence_provenance_misrepresented"],
   },
   {
@@ -535,7 +535,7 @@ const CASES: AiDoctorGoldenCase[] = [
       evidence: ["Temperature of 24C confirms the room is fine."],
       missing_information: ["Recent readings are stale or invalid."],
     }),
-    expectedStatus: "fail",
+    expectedStatus: "warning",
     expectedCodes: ["evidence_source_unusable"],
   },
   {
@@ -550,7 +550,7 @@ const CASES: AiDoctorGoldenCase[] = [
       evidence: ["Only stale and invalid readings are available."],
       missing_information: ["Recent readings are stale or invalid."],
     }),
-    expectedStatus: "fail",
+    expectedStatus: "warning",
     expectedCodes: ["healthy_claim_from_bad_telemetry"],
   },
   {
@@ -564,7 +564,7 @@ const CASES: AiDoctorGoldenCase[] = [
       evidence: ["Temperature of 24C shows the plant is comfortable."],
       missing_information: ["Only demo/imported data is available."],
     }),
-    expectedStatus: "fail",
+    expectedStatus: "warning",
     expectedCodes: ["evidence_provenance_misrepresented"],
   },
   {
@@ -578,7 +578,7 @@ const CASES: AiDoctorGoldenCase[] = [
       evidence: ["Temperature reading of 24C is on target."],
       missing_information: ["Sensor reading lacks a usable timestamp."],
     }),
-    expectedStatus: "fail",
+    expectedStatus: "warning",
     expectedCodes: ["evidence_not_in_context"],
   },
   {
@@ -592,7 +592,7 @@ const CASES: AiDoctorGoldenCase[] = [
       evidence: ["pH reading of 6.0 looks on target."],
       missing_information: ["Sensor provenance could not be confirmed."],
     }),
-    expectedStatus: "fail",
+    expectedStatus: "warning",
     expectedCodes: ["evidence_source_unusable"],
   },
 
@@ -648,7 +648,7 @@ const CASES: AiDoctorGoldenCase[] = [
       what_not_to_do: ["Do not increase the watering."],
       evidence: BACKED_EVIDENCE,
     }),
-    expectedStatus: "fail",
+    expectedStatus: "warning",
     expectedCodes: ["recommendation_conflict"],
   },
   {
@@ -661,7 +661,7 @@ const CASES: AiDoctorGoldenCase[] = [
       three_day_recovery_plan: "Reduce the feed strength over the next three days.",
       evidence: BACKED_EVIDENCE,
     }),
-    expectedStatus: "fail",
+    expectedStatus: "warning",
     expectedCodes: ["recommendation_conflict"],
   },
   {
@@ -670,7 +670,7 @@ const CASES: AiDoctorGoldenCase[] = [
     readiness: readiness("strong"),
     context: ctxBacked(),
     result: result({ immediate_action: "Turn on the humidifier now.", evidence: BACKED_EVIDENCE }),
-    expectedStatus: "fail",
+    expectedStatus: "warning",
     expectedCodes: ["device_control_instruction"],
   },
   {
@@ -682,7 +682,7 @@ const CASES: AiDoctorGoldenCase[] = [
       immediate_action: "The fix will be applied automatically without approval.",
       evidence: BACKED_EVIDENCE,
     }),
-    expectedStatus: "fail",
+    expectedStatus: "warning",
     expectedCodes: ["automatic_action_queue_language"],
   },
   {
@@ -748,7 +748,7 @@ const CASES: AiDoctorGoldenCase[] = [
       evidence: ["Only stale readings are available."],
       missing_information: ["Recent readings are stale or invalid."],
     }),
-    expectedStatus: "fail",
+    expectedStatus: "warning",
     expectedCodes: ["healthy_claim_from_bad_telemetry"],
   },
   {

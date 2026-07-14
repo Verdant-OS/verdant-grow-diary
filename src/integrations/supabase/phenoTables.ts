@@ -230,6 +230,37 @@ type PhenoPollenViabilityTestRow = {
   created_at: string;
 };
 
+/**
+ * Narrow `plants` read/write shape for the Pheno candidate surfaces.
+ *
+ * The generated types.ts `plants` Row LAGS the 2026-07-12 candidate-number
+ * migration (it has `candidate_label` but not `candidate_number`), so reading
+ * or assigning `candidate_number` through the default client fails typecheck.
+ * This narrow row pins exactly the columns the pheno candidate read + the
+ * owner-only number-assignment write path need — nothing more.
+ *
+ * `Update` is deliberately restricted to `{ candidate_number?: number | null }`:
+ * this typed boundary can ONLY change the candidate number. Every other plants
+ * mutation (hunt tag, archive, grow move, delete) stays on the default client
+ * and its generated types — this boundary never becomes a general plants writer.
+ * The database triggers (plants_candidate_number_guard) remain authoritative for
+ * ownership, Pro-gating, immutability, lineage, and clear-on-detach.
+ */
+type PhenoCandidatePlantRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  candidate_label: string | null;
+  candidate_number: number | null;
+  strain: string | null;
+  stage: string | null;
+  grow_id: string | null;
+  tent_id: string | null;
+  photo_url: string | null;
+  pheno_hunt_id: string | null;
+  is_archived: boolean;
+};
+
 export interface PhenoDatabase {
   public: {
     Tables: {
@@ -332,6 +363,23 @@ export interface PhenoDatabase {
         PhenoPollenViabilityTestRow,
         "id" | "result" | "germination_pct" | "note" | "tested_at" | "created_at",
         never
+      >;
+      // Narrow plants boundary — SELECT the candidate columns (incl.
+      // candidate_number) and UPDATE only candidate_number. Insert is not used
+      // through this boundary (plants are created via the default client).
+      plants: Tbl<
+        PhenoCandidatePlantRow,
+        | "id"
+        | "candidate_label"
+        | "candidate_number"
+        | "strain"
+        | "stage"
+        | "grow_id"
+        | "tent_id"
+        | "photo_url"
+        | "pheno_hunt_id"
+        | "is_archived",
+        { candidate_number?: number | null }
       >;
     };
     Views: Record<string, never>;

@@ -13,6 +13,7 @@
  * them. Archived plants are excluded. Nothing is inferred or fabricated.
  */
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
+import { comparePhenoCandidateIdentity } from "@/lib/phenoCandidateIdentity";
 import type {
   PhenoExpressionInput,
   PhenoLabResultInput,
@@ -25,6 +26,12 @@ export interface PhenoHuntCandidatePlantRow {
   id: string;
   name: string;
   candidate_label: string | null;
+  /**
+   * Owner-assigned candidate number (plants.candidate_number). NULL = legacy /
+   * unassigned. Optional so older callers/test stubs that predate the numbering
+   * migration stay compatible (missing → treated as unnumbered).
+   */
+  candidate_number?: number | null;
   strain: string | null;
   stage: string | null;
   grow_id: string | null;
@@ -69,8 +76,15 @@ export interface AdaptPhenoHuntCandidatesInput {
   readonly smokeTestByPlantId?: Readonly<Record<string, PhenoHuntCandidateSmokeEvidence>> | null;
   /** plantId → best available lab result row (coa > estimate > unspecified). */
   readonly labResultByPlantId?: Readonly<Record<string, PhenoHuntCandidateLabEvidence>> | null;
+  /**
+   * When true, keep the INPUT row order instead of re-sorting by the identity
+   * comparator. The bounded server-paginated read is already ordered by the
+   * database (candidate_number NULLS LAST, label, name, id); re-sorting a single
+   * page would risk page-boundary inconsistencies, so the paginated path sets
+   * this. The full-hunt compare path leaves it false to get canonical ordering.
+   */
+  readonly preserveOrder?: boolean;
 }
-
 
 /** Flower is the stage where EC/pH/PPFD are treated as relevant metrics. */
 function stageRequiresFullMetrics(stage: string | null): boolean {
@@ -212,6 +226,7 @@ export function adaptPhenoHuntCandidates(
 
     candidates.push({
       candidateId: p.id,
+      candidateNumber: validCandidateNumber(p.candidate_number),
       candidateLabel: cleanLabel(p.candidate_label) ?? cleanLabel(p.name),
       plantLabel: cleanLabel(p.name),
       strain: cleanLabel(p.strain),
@@ -225,13 +240,19 @@ export function adaptPhenoHuntCandidates(
     });
   }
 
-  candidates.sort((a, b) => {
-    const al = (a.candidateLabel ?? a.plantLabel ?? "").toLowerCase();
-    const bl = (b.candidateLabel ?? b.plantLabel ?? "").toLowerCase();
-    if (al !== bl) return al < bl ? -1 : 1;
-    return a.candidateId < b.candidateId ? -1 : a.candidateId > b.candidateId ? 1 : 0;
-  });
+  // Deterministic identity order: numbered candidates ascending, then
+  // unnumbered-labeled alphabetically, then id fallback with an explicit id
+  // tie-breaker. Shared with the workspace/compare/export so ordering is
+  // identical everywhere (no locale, no randomness). Skipped for the
+  // server-paginated path, which is already ordered authoritatively by the DB.
+  if (input.preserveOrder !== true) {
+    candidates.sort(comparePhenoCandidateIdentity);
+  }
 
   return candidates;
 }
 
+/** A valid candidate number is a finite positive integer; else null. */
+function validCandidateNumber(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+}

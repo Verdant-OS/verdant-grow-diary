@@ -250,24 +250,11 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: bun run test:db:quicklog-rpc-runtime
 
-<<<<<<< HEAD
-      # Monolithic full-suite run kept per the QuickLog CI-wiring guard
-      # ("CI still runs the full suite after the targeted slice"). The
-      # 16-way batched gate (vitest-full-suite-pr-gate.yml) is the primary
-      # memory-safe full-suite check; this single-process run gets the same
-      # old-space headroom the batched runner uses so it fails on real
-      # regressions, not heap exhaustion.
-      - name: Full test suite
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
-        run: bunx vitest run
-=======
       # NOTE: the full Vitest suite (~21k tests) is intentionally NOT run here.
       # It runs in the separate sharded `full-suite` job below (4 parallel
       # shards), which keeps this stop-ship gate job fast and lets it reach the
       # Build step, and prevents the whole suite from OOM-ing / exceeding the
       # job timeout on a single runner. See docs/testing/ci-full-suite-shards.md.
->>>>>>> origin/main
 
       # Scanner guardrail timeout sentinel — re-runs only the filesystem-
       # scanning guardrail suites in isolation. The CI wrapper deletes stale
@@ -320,7 +307,6 @@ jobs:
       - name: Build
         run: bun run build
 
-<<<<<<< HEAD
   # Dedicated legal SEO regression gate.
   #
   # Stable job id `legal-seo` and stable step name `test:legal-seo` — this is
@@ -338,7 +324,50 @@ jobs:
     name: test:legal-seo
     runs-on: ubuntu-latest
     timeout-minutes: 15
-=======
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun install
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Legal page SEO structured data (vitest)
+        run: bun run test:legal-seo
+
+      - name: Install Playwright browsers (chromium + deps)
+        run: bunx playwright install --with-deps chromium
+
+      - name: Legal page SEO metadata (Playwright)
+        run: bun run test:legal-seo:e2e
+
+      - name: Upload Playwright artifacts (failure only)
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: legal-seo-playwright-artifacts
+          path: |
+            playwright-report/
+            test-results/
+            e2e/screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
+
   # Full Vitest suite, sharded across parallel runners. Pulled out of the
   # `test` job so the whole suite (~21k tests, jsdom-heavy) doesn't exceed the
   # 20-minute job timeout when run on a single runner.
@@ -372,7 +401,6 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
->>>>>>> origin/main
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -382,11 +410,7 @@ jobs:
         with:
           bun-version: latest
 
-<<<<<<< HEAD
-      - name: Cache Bun install
-=======
       - name: Cache
->>>>>>> origin/main
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.bun/install/cache
@@ -397,31 +421,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-<<<<<<< HEAD
-      - name: Typecheck
-        run: bun run typecheck
-
-      - name: Legal page SEO structured data (vitest)
-        run: bun run test:legal-seo
-
-      - name: Install Playwright browsers (chromium + deps)
-        run: bunx playwright install --with-deps chromium
-
-      - name: Legal page SEO metadata (Playwright)
-        run: bun run test:legal-seo:e2e
-
-      - name: Upload Playwright artifacts (failure only)
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: legal-seo-playwright-artifacts
-          path: |
-            playwright-report/
-            test-results/
-            e2e/screenshots/
-          if-no-files-found: ignore
-          retention-days: 14
-=======
       # ripgrep (rg) is required by scripts invoked from tests in the full
       # suite (e.g. scan-gamification-direct-inserts.mjs). It is not
       # preinstalled on the runner; without it those tests' child process
@@ -433,4 +432,3 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=3584
         run: bunx vitest run --shard=${{ matrix.shard }}/8
->>>>>>> origin/main

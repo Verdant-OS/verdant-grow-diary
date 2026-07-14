@@ -9,11 +9,7 @@ import path from "path";
  * shebangs — so on Node 26 + Windows importing these scripts throws
  * "SyntaxError: Invalid or unexpected token" and takes down several
  * pre-existing docs-safety scanner tests (all green in CI/Linux). Replacing
-<<<<<<< HEAD
- * the shebang with a blank line keeps line numbers stable.
-=======
  * the shebang with a blank keeps line numbers stable.
->>>>>>> origin/main
  */
 function stripMjsShebang(): Plugin {
   return {
@@ -30,10 +26,7 @@ function stripMjsShebang(): Plugin {
 }
 
 export default defineConfig({
-<<<<<<< HEAD
-=======
   root: __dirname,
->>>>>>> origin/main
   plugins: [stripMjsShebang(), react()],
   test: {
     environment: "jsdom",

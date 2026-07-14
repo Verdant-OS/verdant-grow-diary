@@ -5,7 +5,6 @@ import type { BreedingEvent } from "../_shared/genetics/breedingTypes.ts";
 
 interface Body {
   event_id?: string;
-  breeding_event_type?: string;
 }
 
 Deno.serve(async (req) => {
@@ -32,13 +31,9 @@ Deno.serve(async (req) => {
     // 1. Fetch the event
     const { data: eventRow, error: fetchErr } = await supabase
       .from("grow_events")
-<<<<<<< HEAD
-      .select("id, event_type, occurred_at, grow_id, plant_id, tent_id")
-=======
       .select(
         "id, event_type, occurred_at, grow_id, plant_id, tent_id, breeding_events(method, intensity, details)",
       )
->>>>>>> origin/main
       .eq("id", body.event_id)
       .maybeSingle();
 
@@ -51,12 +46,6 @@ Deno.serve(async (req) => {
       return json({ error: "event not found" }, 404);
     }
 
-<<<<<<< HEAD
-    // 2. Map row to BreedingEvent
-    // Prefer breeding_event_type from the request body (the grow_events.event_type may be
-    // stored as "observation" to satisfy the DB constraint; the true breeding subtype is
-    // passed explicitly by the client).
-=======
     // 2. Map row to BreedingEvent. Breeding details live in the breeding_events
     //    subtype; flatten method/intensity so the advisor's branching sees them.
     const subRaw = (eventRow as { breeding_events?: unknown }).breeding_events;
@@ -74,15 +63,11 @@ Deno.serve(async (req) => {
       ...(sub?.intensity ? { intensity: sub.intensity } : {}),
     };
 
->>>>>>> origin/main
     const breedingEvent: BreedingEvent = {
       id: eventRow.id,
-      type: body.breeding_event_type ?? eventRow.event_type,
+      type: eventRow.event_type,
       occurred_at: eventRow.occurred_at,
-<<<<<<< HEAD
-=======
       details: mergedDetails,
->>>>>>> origin/main
       plant_id: eventRow.plant_id ?? undefined,
       tent_id: eventRow.tent_id ?? undefined,
     };

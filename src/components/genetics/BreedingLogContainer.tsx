@@ -9,7 +9,7 @@ import { useAuth } from "@/store/auth";
 
 interface Props {
   activeGrowId: string;
-  plants: Array<{ id: string; name?: string | null; tent_id: string | null }>;
+  plants: any[];
   onCreated: () => void;
   onCancel: () => void;
 }
@@ -22,37 +22,16 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
   const handleSubmit = async (data: {
     plantId: string;
     subType: BreedingEventType;
-    details: unknown;
+    details: any;
   }) => {
     setBusy(true);
     try {
-<<<<<<< HEAD
-      if (!user) {
-        throw new Error("You must be signed in to log a breeding event.");
-      }
-      // 1. Save to grow_events
-=======
       // 1. Save through the breeding_log_save_event RPC. The RPC applies the
       //    auth.uid() trust boundary + ownership checks server-side; the client
       //    never sends a user_id.
->>>>>>> origin/main
       const selectedPlant = plants.find((p) => p.id === data.plantId);
       const details = (data.details ?? {}) as Record<string, string>;
 
-<<<<<<< HEAD
-      const payload = {
-        grow_id: activeGrowId,
-        plant_id: data.plantId,
-        tent_id: selectedPlant?.tent_id ?? null,
-        // grow_events.event_type is constrained to watering|feeding|training|observation|photo|environment.
-        // Breeding subtypes (e.g. "pollination") are not valid event_type values, so we store this
-        // event as "observation". The actual breeding subtype is passed via breeding_event_type to the
-        // edge function so action queue suggestions are correctly generated.
-        event_type: "observation" as const,
-        occurred_at: new Date().toISOString(),
-        user_id: user.id,
-      };
-=======
       const { data: rpcData, error: rpcError } = await supabase.rpc("breeding_log_save_event", {
         p_grow_id: activeGrowId,
         p_plant_id: data.plantId,
@@ -62,7 +41,6 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
         p_intensity: typeof details.intensity === "string" ? details.intensity : null,
         p_details: details,
       });
->>>>>>> origin/main
 
       if (rpcError) {
         throw new Error(`Failed to save event: ${rpcError.message}`);
@@ -83,11 +61,7 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
         const { data: fnData, error: fnError } = await supabase.functions.invoke(
           "create-breeding-suggestions",
           {
-<<<<<<< HEAD
-            body: { event_id: eventRow.id, breeding_event_type: data.subType },
-=======
             body: { event_id: eventId },
->>>>>>> origin/main
           },
         );
         if (fnError) {
@@ -120,8 +94,8 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
 
       toast.success("Breeding event logged 🌱");
       onCreated();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save");
     } finally {
       setBusy(false);
     }

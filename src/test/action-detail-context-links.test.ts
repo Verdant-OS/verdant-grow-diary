@@ -18,13 +18,6 @@ const APP = readFileSync(resolve(ROOT, "src/App.tsx"), "utf8");
 
 describe("ActionDetail — quick context links", () => {
   it("links Tent ID to /tents/:id when tent_id exists", () => {
-<<<<<<< HEAD
-    expect(DETAIL).toMatch(/row\.tent_id\s*&&\s*\(?\s*<IdField[^>]*to=\{tentDetailPath\(row\.tent_id\)\}/);
-  });
-
-  it("links Plant ID to /plants/:id when plant_id exists", () => {
-    expect(DETAIL).toMatch(/row\.plant_id\s*&&\s*\(?\s*<IdField[^>]*to=\{plantDetailPath\(row\.plant_id\)\}/);
-=======
     expect(DETAIL).toMatch(
       /row\.tent_id\s*&&\s*\(?\s*<IdField[^>]*to=\{tentDetailPath\(row\.tent_id\)\}/,
     );
@@ -34,9 +27,7 @@ describe("ActionDetail — quick context links", () => {
     expect(DETAIL).toMatch(
       /row\.plant_id\s*&&\s*\(?\s*<IdField[^>]*to=\{plantDetailPath\(row\.plant_id\)\}/,
     );
->>>>>>> origin/main
   });
-
 
   it("links Grow ID to /grows/:growId now that the route exists", () => {
     expect(DETAIL).toMatch(

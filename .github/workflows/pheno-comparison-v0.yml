@@ -1,10 +1,6 @@
 name: Pheno Comparison v0
 
 on:
-<<<<<<< HEAD
-  pull_request:
-    branches: [main]
-=======
   # Path-scoped rather than base-branch-scoped: this gate must run on any PR that
   # touches the Pheno Comparison surface, its tests/specs, or this workflow —
   # including stacked PRs whose base is not `main`. Path filtering keeps it from
@@ -22,7 +18,6 @@ on:
       - "vitest.config.ts"
       - "playwright.config.ts"
       - "package.json"
->>>>>>> origin/main
 
 permissions:
   contents: read
@@ -50,38 +45,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-<<<<<<< HEAD
-      # Pheno Comparison Vitest specs — read-only surface, no secrets required.
-      - name: Vitest — Pheno Comparison
-        run: |
-          bunx vitest run \
-            src/test/pheno-comparison-hardening.test.tsx \
-            src/test/pheno-comparison-never-healthy-invariant.test.tsx \
-            src/test/pheno-comparison-no-network.test.tsx \
-            src/test/pheno-comparison-page.test.tsx \
-            src/test/pheno-comparison-static-safety.test.ts \
-            src/test/pheno-comparison-view-model.test.ts \
-            src/test/pheno-comparison-a11y.test.tsx \
-            src/test/pheno-comparison-visual-style-invariant.test.tsx
-
-      # Contextual Pheno Comparison v0 suite — reuses existing script.
-      - name: Vitest — Contextual Pheno Comparison v0
-        run: bun run test:contextual-pheno-comparison-v0
-
-      # Contextual Pheno Comparison viewport a11y (375px + 768px).
-      - name: Vitest — Contextual Pheno Comparison a11y viewports
-        run: |
-          bunx vitest run \
-            src/test/contextual-pheno-comparison-a11y-viewports.test.tsx
-
-      # Route manifest sync — ensures /pheno-comparison + /pheno-hunts/:id/compare
-      # stay wired.
-      - name: Vitest — route manifest sync
-        run: |
-          bunx vitest run \
-            $(git ls-files 'src/test/**/*route*manifest*' 'src/test/**/route-manifest*' 2>/dev/null || true) \
-            --passWithNoTests
-=======
       # Selection-grade Pheno Comparison Vitest specs — read-only surface,
       # no secrets required.
       - name: Vitest — Pheno Comparison
@@ -102,36 +65,12 @@ jobs:
             src/test/app-route-manifest.test.ts \
             src/test/route-manifest-sync.test.ts \
             src/test/pricing.test.ts
->>>>>>> origin/main
 
       - name: Typecheck
         run: bun run typecheck
 
       # Narrow lint step.
       #
-<<<<<<< HEAD
-      # WHY NARROW: repo-wide `bun run lint` currently reports 90 pre-existing
-      # ESLint errors across unrelated files (spider-farmer, verdant-genetics,
-      # bucket-owner-policies, etc.). Fixing those is out of scope for the
-      # pheno comparison hardening slice. This step lints the exact pheno /
-      # contextual pheno source + presenter-owned test files this workflow
-      # protects, and MUST stay green on every PR.
-      - name: Lint — Pheno / Contextual Pheno owned files
-        run: |
-          bunx eslint \
-            src/pages/PhenoComparison.tsx \
-            src/components/ContextualPhenoComparisonPanel.tsx \
-            src/lib/phenoComparisonRules.ts \
-            src/lib/contextualPhenoComparisonViewModel.ts \
-            src/test/pheno-comparison-a11y.test.tsx \
-            src/test/pheno-comparison-visual-style-invariant.test.tsx \
-            src/test/contextual-pheno-comparison-a11y-viewports.test.tsx \
-            src/test/contextual-pheno-comparison-panel-a11y.test.tsx
-
-      # Playwright — Pheno Comparison specs only. Route is mounted outside
-      # AppShell (fixture-only), so no auth secrets are required and the
-      # mocked project (chromium-mocked) is used to skip storageState setup.
-=======
       # WHY NARROW: repo-wide `bun run lint` currently reports pre-existing
       # ESLint errors across unrelated files (see docs/eslint-cleanup-plan.md).
       # Fixing those is out of scope for the pheno comparison slice. This step
@@ -157,7 +96,6 @@ jobs:
       # Playwright — Pheno Comparison specs only. Route is mounted outside
       # AppShell + providers (fixture-only), so no auth secrets are required and
       # the mocked project (chromium-mocked) is used to skip storageState setup.
->>>>>>> origin/main
       - name: Install Playwright browsers (Chromium only)
         run: bunx playwright install --with-deps chromium
 
@@ -166,16 +104,8 @@ jobs:
           bunx playwright test \
             --project=chromium-mocked \
             --reporter=list,html \
-<<<<<<< HEAD
-            e2e/pheno-comparison-responsive.spec.ts \
-            e2e/pheno-comparison-reload.spec.ts \
-            e2e/pheno-comparison-visual-style.spec.ts \
-            e2e/pheno-hunts-compare-deep-link.spec.ts \
-            e2e/pheno-hunts-compare-invalid-id.spec.ts
-=======
             e2e/pheno-comparison-readonly.spec.ts \
             e2e/pheno-comparison-visual-style.spec.ts
->>>>>>> origin/main
 
       # On failure, upload Playwright debugging artifacts for triage:
       # HTML report, traces/videos/screenshots (test-results/), and the
@@ -187,11 +117,7 @@ jobs:
       # tokens, or any storageState auth artifacts.
       - name: Upload Playwright artifacts on failure
         if: failure()
-<<<<<<< HEAD
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-=======
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
->>>>>>> origin/main
         with:
           name: pheno-playwright-artifacts
           if-no-files-found: ignore

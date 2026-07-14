@@ -31,10 +31,6 @@ import OnboardingChecklistCard from "@/components/OnboardingChecklistCard";
 import FirstRunChecklist from "@/components/FirstRunChecklist";
 import OnboardingProgressPill from "@/components/OnboardingProgressPill";
 import DashboardZeroTentEmptyState from "@/components/DashboardZeroTentEmptyState";
-import OperatorModeCallout from "@/components/OperatorModeCallout";
-import { usePageSeo } from "@/hooks/usePageSeo";
-import ReleaseReadinessOperatorCard from "@/components/ReleaseReadinessOperatorCard";
-import LineageRepairCta from "@/components/LineageRepairCta";
 
 import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOutcomeReviewsCard";
 import SafeByDesignNotice from "@/components/SafeByDesignNotice";
@@ -97,9 +93,6 @@ import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPa
 
 import { Badge } from "@/components/ui/badge";
 import SensorSourceBadge from "@/components/SensorSourceBadge";
-<<<<<<< HEAD
-import { actionDetailPath, actionsPath, alertDetailPath, alertsPath, dashboardPath, timelinePath, tentDetailPath, tentsPath } from "@/lib/routes";
-=======
 import {
   actionDetailPath,
   actionsPath,
@@ -110,7 +103,6 @@ import {
   tentDetailPath,
   tentsPath,
 } from "@/lib/routes";
->>>>>>> origin/main
 import {
   buildTentSnapshotView,
   type BuildTentSnapshotInput,
@@ -161,12 +153,6 @@ function groupReadings(rows: SensorReadingRow[]): DashReading[] {
 }
 
 export default function Dashboard() {
-  usePageSeo({
-    title: "Grow Room Dashboard | Verdant Grow Diary",
-    description:
-      "Track tents, plants, sensor snapshots, environment stability, and grow activity in one grower-controlled dashboard.",
-    path: "/",
-  });
   // Shared URL `?growId=` resolution against RLS-loaded grows. When growId is
   // absent or invalid, hooks fetch the user's full set (legacy behavior).
   const { urlGrowId, scopedGrow, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
@@ -248,7 +234,7 @@ export default function Dashboard() {
   const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
 
   return (
-    <main className="space-y-4 md:space-y-6" data-testid="dashboard-root" aria-labelledby="dashboard-page-header">
+    <div>
       <QuickLogV2Fab />
       <GrowBreadcrumbs
         growId={urlGrowId}
@@ -264,10 +250,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 flex-wrap">
             <OnboardingProgressPill vm={onboardingVm} />
             <Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">
-              {/* Route still targets /daily-check (the underlying Quick Log
-                  surface). Label unified to "Quick Log" so the Dashboard
-                  presents a single grower-facing logging concept. */}
-              <Link to="/daily-check">Quick Log</Link>
+              <Link to="/daily-check">Daily Grow Check</Link>
             </Button>
             <Button asChild className="gradient-leaf text-primary-foreground">
               <Link to={tentsPath()}>Open tents</Link>
@@ -290,23 +273,15 @@ export default function Dashboard() {
       </div>
 
       <div className="my-3">
-        <OperatorModeCallout />
+        <FirstRunChecklist
+          growCount={grows.length}
+          tentCount={tents.length}
+          plantCount={plants.length}
+          quickLogCount={diaryRecentCount}
+          sensorSnapshotCount={rawReadings.length}
+        />
       </div>
 
-<<<<<<< HEAD
-      <div className="my-3">
-        <ReleaseReadinessOperatorCard />
-      </div>
-
-
-      {/* Lineage Repair + First-Run Checklist intentionally moved below the
-          core Quick Log + Environment loop so they don't compete visually on
-          mobile. See Today Trust + Route Polish v1. */}
-
-
-
-=======
->>>>>>> origin/main
       {/* Dashboard intentionally has a single Quick Log entry point (QuickLogV2Fab).
           The "Log your first plant memory" CTA was a duplicate entry point and was removed.
           The same CTA remains on TentDetail where it is contextually unique. */}
@@ -329,13 +304,6 @@ export default function Dashboard() {
           label="Plants"
           value={plants.length}
           icon={<Sprout className="h-3.5 w-3.5" />}
-<<<<<<< HEAD
-          hint={`${plants.filter((p) => p.health === "healthy").length} marked healthy · user-assigned, not sensor-derived`}
-          accent="success"
-        />
-        <KpiCard label="Open alerts" value={openAlerts} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent={openAlerts > 0 ? "destructive" : "success"} />
-        <KpiCard label="Due today" value={dueToday} hint={dueToday === 0 ? "No tasks yet" : undefined} icon={<ListChecks className="h-3.5 w-3.5" />} accent={dueToday > 0 ? "warning" : "success"} />
-=======
           hint={`${plants.filter((p) => p.health === "healthy").length} healthy`}
           accent="success"
         />
@@ -352,19 +320,11 @@ export default function Dashboard() {
           icon={<ListChecks className="h-3.5 w-3.5" />}
           accent={dueToday > 0 ? "warning" : "success"}
         />
->>>>>>> origin/main
       </div>
 
       {tents.length === 0 ? (
         <DashboardZeroTentEmptyState />
       ) : (
-        <>
-          <h2
-            data-testid="dashboard-section-heading-environment"
-            className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-2 mb-1 md:mt-4"
-          >
-            Environment
-          </h2>
         <section
           aria-labelledby="dashboard-environment-snapshot-heading"
           data-testid="dashboard-environment-snapshot"
@@ -388,141 +348,6 @@ export default function Dashboard() {
               </Link>
             </Button>
           </div>
-<<<<<<< HEAD
-        {(() => {
-          const anyReading = latestPerTent.some((x) => !!x.last);
-          const snapshotQuality = sensorState.status === "ok"
-            ? evaluateSensorQuality(sensorState.snapshot)
-            : null;
-          const isStaleSnap = sensorState.status === "ok"
-            && !!sensorState.snapshot.ts
-            && isStale(sensorState.snapshot.ts);
-          const isInvalidSnap = !!snapshotQuality && snapshotQuality.suspiciousFields.length > 0;
-          if (!anyReading) {
-            return (
-              <div
-                data-testid="dashboard-environment-snapshot-empty"
-                className="glass rounded-2xl p-6 text-center"
-              >
-                <h3 className="font-display font-semibold text-base mb-1">
-                  No sensor snapshot yet
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Add a manual reading or{" "}
-                  <Link
-                    to="/sensors"
-                    data-testid="dashboard-environment-snapshot-empty-sensors-link"
-                    className="underline text-primary hover:opacity-80"
-                  >
-                    connect Ecowitt
-                  </Link>{" "}
-                  to see your environment here.
-                </p>
-                <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
-                  {/* Sensors entry-point dedupe: a single primary "Go to
-                      Sensors" CTA. Manual reading + Import sensor data
-                      remain available as secondary anchors into the same
-                      Sensors page (no new routes). */}
-                  <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
-                    <Link
-                      to="/sensors"
-                      data-testid="dashboard-environment-snapshot-go-to-sensors"
-                      aria-label="Go to Sensors page"
-                    >
-                      Go to Sensors
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link
-                      to="/sensors#manual-reading"
-                      data-testid="dashboard-environment-snapshot-add-manual-reading"
-                      aria-label="Add manual sensor reading"
-                    >
-                      Add manual reading
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link
-                      to="/sensors#import-sensor-data"
-                      data-testid="dashboard-environment-snapshot-import-sensor-data"
-                      aria-label="Import sensor data"
-                    >
-                      Import sensor data
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            );
-          }
-          return (
-            <>
-              {(isStaleSnap || isInvalidSnap) && (
-                <div
-                  data-testid="dashboard-environment-snapshot-status-banner"
-                  data-state={isInvalidSnap ? "invalid" : "stale"}
-                  className="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200"
-                >
-                  {isInvalidSnap
-                    ? "Latest reading looks invalid — not shown as current. Check the sensor source on the Sensors page."
-                    : "Latest reading is stale (older than 30 minutes) — not shown as current."}
-                </div>
-              )}
-        <div className="grid lg:grid-cols-3 gap-4">
-
-
-          <div className="lg:col-span-2 glass rounded-2xl p-4">
-            <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
-                <div>
-                  <h2 className="font-display font-semibold">Tent A · 7-day environment</h2>
-                  <p className="text-xs text-muted-foreground">Temperature, humidity, VPD</p>
-                </div>
-                {(() => {
-                  const latest = (readings as unknown as SensorReading[])
-                    .filter((r) => r.tentId === (tents[0]?.id ?? ""))
-                    .slice(-1)[0];
-                  if (!latest) return null;
-                  return (
-                    <SensorSourceBadge
-                      source={latest.source}
-                      status={latest.status}
-                      testId="dashboard-tent-chart-source-badge"
-                    />
-                  );
-                })()}
-              </div>
-              <Button asChild size="sm" variant="ghost"><Link to="/sensors">Sensor data <ArrowRight className="h-3 w-3" /></Link></Button>
-            </div>
-            <SensorChart data={readings.filter((r) => r.tentId === (tents[0]?.id ?? "")) as unknown as SensorReading[]} metric="temp" height={200} />
-          </div>
-
-          <div className="glass rounded-2xl p-4">
-            <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="font-display font-semibold">Environment strip</h2>
-                {(() => {
-                  const latest = (readings as unknown as SensorReading[]).slice(-1)[0];
-                  if (!latest) return null;
-                  return (
-                    <SensorSourceBadge
-                      source={latest.source}
-                      status={latest.status}
-                      testId="dashboard-env-strip-source-badge"
-                    />
-                  );
-                })()}
-              </div>
-              {(() => {
-                const rollup = computeStabilityRollup(
-                  latestPerTent.map((x) => x.stability),
-                );
-                return (
-                  <div
-                    data-testid="dashboard-stability-rollup"
-                    className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${STABILITY_ROLLUP_TONE_CLASS[rollup.tone]}`}
-                  >
-                    {rollup.copy}
-=======
           {(() => {
             const anyReading = latestPerTent.some((x) => !!x.last);
             const snapshotQuality =
@@ -580,7 +405,6 @@ export default function Dashboard() {
                         Go to Sensors
                       </Link>
                     </Button>
->>>>>>> origin/main
                   </div>
                 </div>
               );
@@ -770,20 +594,8 @@ export default function Dashboard() {
             );
           })()}
         </section>
-        </>
       )}
 
-<<<<<<< HEAD
-
-
-      <h2
-        data-testid="dashboard-section-heading-needs-attention"
-        className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-4 mb-1"
-      >
-        Needs attention
-      </h2>
-=======
->>>>>>> origin/main
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between mb-3">
@@ -860,51 +672,6 @@ export default function Dashboard() {
       </div>
       {scopedGrowId ? (
         <>
-<<<<<<< HEAD
-        <DashboardSensorHealthSummary
-          summary={buildDashboardSensorHealthSummary(sensorState)}
-          activeAlertCount={openAlerts}
-          growId={scopedGrowId}
-          className="mt-4"
-        />
-        <section
-          className="glass rounded-2xl p-4 mt-4"
-          aria-label="Latest environment"
-        >
-          <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
-            <div>
-              <h2 className="font-display font-semibold">Latest Environment</h2>
-              <p className="text-xs text-muted-foreground">
-                Grow-scoped detail with per-tent filter and persisted alerts. Not live device control.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {selectableTents.length > 1 && (
-                <Select
-                  value={tentSelection}
-                  onValueChange={(v) => setTentSelection(v as TentSelection)}
-                >
-                  <SelectTrigger
-                    className="h-7 text-xs w-[140px]"
-                    aria-label="Tent filter"
-                    data-testid="latest-env-tent-select"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All tents</SelectItem>
-                    {selectableTents.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <Link
-                to={timelinePath(scopedGrowId)}
-                className="text-xs text-primary hover:underline"
-=======
           <DashboardSensorHealthSummary
             summary={buildDashboardSensorHealthSummary(sensorState)}
             activeAlertCount={openAlerts}
@@ -951,7 +718,6 @@ export default function Dashboard() {
               <div
                 className="mb-3 text-xs text-muted-foreground"
                 data-testid="latest-env-persisted-count"
->>>>>>> origin/main
               >
                 {persistedOpenCount > 0 ? (
                   <>
@@ -1207,14 +973,6 @@ export default function Dashboard() {
                         Latest snapshot vs configured grow targets. Not a plant-health diagnosis.
                       </p>
                     </div>
-<<<<<<< HEAD
-                    <Link
-                      to={timelinePath(scopedGrowId)}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Inspect history →
-                    </Link>
-=======
                     <div className="flex items-center gap-3">
                       <Link
                         to={logsPath(scopedGrowId)}
@@ -1230,7 +988,6 @@ export default function Dashboard() {
                         Edit targets
                       </Button>
                     </div>
->>>>>>> origin/main
                   </div>
                   <div className="flex items-center gap-2 flex-wrap mb-2">
                     <Badge variant="outline" className={`text-[10px] uppercase ${tone}`}>
@@ -1445,504 +1202,6 @@ export default function Dashboard() {
               );
             })()}
           </section>
-<<<<<<< HEAD
-        )}
-        <div className="my-3">
-          <LineageRepairCta />
-        </div>
-        <div className="my-3">
-          <FirstRunChecklist
-            growCount={grows.length}
-            tentCount={tents.length}
-            plantCount={plants.length}
-            quickLogCount={diaryRecentCount}
-            sensorSnapshotCount={rawReadings.length}
-          />
-        </div>
-        <h2
-          data-testid="dashboard-section-heading-advanced"
-          className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-6 mb-1"
-        >
-          Advanced
-        </h2>
-        <section
-          className="glass rounded-2xl p-4 mt-2"
-          aria-label="Environment Trends"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h2 className="font-display font-semibold">Environment Trends</h2>
-              <p className="text-xs text-muted-foreground">
-                Recent readings summary. Not a plant-health diagnosis.
-              </p>
-            </div>
-            <Link
-              to={timelinePath(scopedGrowId)}
-              className="text-xs text-primary hover:underline"
-            >
-              Open Timeline →
-            </Link>
-          </div>
-          {trendsState.status === "loading" || trendsState.status === "idle" ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : trendsState.status === "unavailable" ? (
-            <p className="text-sm text-muted-foreground">
-              Trend data unavailable.
-            </p>
-          ) : trendsState.trends.status === "empty" ? (
-            <p className="text-sm text-muted-foreground">No trend data yet.</p>
-          ) : (
-            <div>
-              <div className="flex items-center gap-2 flex-wrap mb-2">
-                <Badge variant="outline" className="text-[10px] uppercase">
-                  {trendsState.trends.headline}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {trendsState.trends.count} reading
-                  {trendsState.trends.count === 1 ? "" : "s"}
-                </span>
-                {trendsState.trends.latestTs && (
-                  <span className="text-xs text-muted-foreground">
-                    · latest{" "}
-                    {formatDistanceToNow(new Date(trendsState.trends.latestTs), {
-                      addSuffix: true,
-                    })}
-                  </span>
-                )}
-                <Badge variant="outline" className="text-[10px] uppercase">
-                  {SOURCE_LABEL[trendsState.trends.source]}
-                </Badge>
-              </div>
-              <dl className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-                {[
-                  {
-                    label: "Temperature",
-                    avg: formatTemperatureDisplay(trendsState.trends.temp.avg, { digits: 1 }),
-                    range: `${formatTemperatureDisplay(trendsState.trends.temp.min, { digits: 1 })} – ${formatTemperatureDisplay(trendsState.trends.temp.max, { digits: 1 })}`,
-                  },
-                  {
-                    label: "Humidity",
-                    avg: formatValue(trendsState.trends.rh.avg, "%"),
-                    range: `${formatValue(trendsState.trends.rh.min, "%")} – ${formatValue(trendsState.trends.rh.max, "%")}`,
-                  },
-                  {
-                    label: "VPD",
-                    avg: formatValue(trendsState.trends.vpd.avg, " kPa", 2),
-                    range: `${formatValue(trendsState.trends.vpd.min, " kPa", 2)} – ${formatValue(trendsState.trends.vpd.max, " kPa", 2)}`,
-                  },
-                ].map((m) => (
-                  <div
-                    key={m.label}
-                    className="rounded-lg border border-border/40 bg-secondary/20 p-2"
-                  >
-                    <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                      {m.label} · avg
-                    </dt>
-                    <dd className="text-sm font-medium">{m.avg}</dd>
-                    <dd className="text-[11px] text-muted-foreground">
-                      range {m.range}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          )}
-        </section>
-        <section
-          className="glass rounded-2xl p-4 mt-4"
-          aria-label="Target Comparison"
-        >
-          {(() => {
-            const snap =
-              sensorState.status === "ok" ? sensorState.snapshot : null;
-            const targets =
-              targetsState.status === "ok" ? targetsState.targets : null;
-            const result = compareSnapshotToTargets(snap, targets);
-            const tone =
-              result.status === "in_range"
-                ? "border-emerald-500 text-emerald-600"
-                : result.status === "out_of_range"
-                  ? "border-amber-500 text-amber-600"
-                  : "border-muted-foreground text-muted-foreground";
-            return (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h2 className="font-display font-semibold">
-                      Target Comparison
-                    </h2>
-                    <p className="text-xs text-muted-foreground">
-                      Latest snapshot vs configured grow targets. Not a
-                      plant-health diagnosis.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Link
-                      to={timelinePath(scopedGrowId)}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Inspect history →
-                    </Link>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setTargetsEditorOpen(true)}
-                    >
-                      Edit targets
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap mb-2">
-                  <Badge variant="outline" className={`text-[10px] uppercase ${tone}`}>
-
-                    {result.headline}
-                  </Badge>
-                  {result.status === "missing_targets" && (
-                    <span className="text-xs text-muted-foreground">
-                      No grow targets configured.
-                    </span>
-                  )}
-                </div>
-                {result.metrics.length > 0 && (
-                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                    {result.metrics.map((m) => {
-                      const valueText =
-                        m.value === null ? "Unknown" : String(m.value);
-                      const rangeText =
-                        m.min === null && m.max === null
-                          ? "No target set"
-                          : `${m.min ?? "—"} – ${m.max ?? "—"}`;
-                      const stateTone =
-                        m.state === "low" || m.state === "high"
-                          ? "text-amber-600"
-                          : m.state === "in_range"
-                            ? "text-emerald-600"
-                            : "text-muted-foreground";
-                      return (
-                        <div
-                          key={m.metric}
-                          className="rounded-lg border border-border/40 bg-secondary/20 p-2"
-                        >
-                          <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            {m.label}
-                          </dt>
-                          <dd className="text-sm font-medium">
-                            {valueText}{" "}
-                            <span className={`text-xs ${stateTone}`}>
-                              ({m.state.replace("_", " ")})
-                            </span>
-                          </dd>
-                          <dd className="text-[11px] text-muted-foreground">
-                            target {rangeText}
-                          </dd>
-                        </div>
-                      );
-                    })}
-                  </dl>
-                )}
-                {result.reasons.length > 0 && (
-                  <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5 mt-2">
-                    {result.reasons.map((r) => (
-                      <li key={r}>{r}</li>
-                    ))}
-                  </ul>
-                )}
-                {(() => {
-                  const vpdValue = snap?.vpd ?? null;
-                  const stale = snap ? isStale(snap.ts) : false;
-                  const vpd = classifyVpdAgainstStage({
-                    value: vpdValue,
-                    stage: scopedGrow?.stage ?? null,
-                    stale,
-                  });
-                  const toneCls =
-                    vpd.classification === "in_target"
-                      ? "border-emerald-500 text-emerald-600"
-                      : vpd.classification === "below_target" ||
-                          vpd.classification === "above_target"
-                        ? "border-amber-500 text-amber-600"
-                        : "border-muted-foreground text-muted-foreground";
-                  const rangeText =
-                    vpd.band.min === null && vpd.band.max === null
-                      ? "no active VPD target"
-                      : `${vpd.band.min ?? "—"}–${vpd.band.max ?? "—"} kPa`;
-                  return (
-                    <div
-                      className="mt-3 rounded-lg border border-border/40 bg-secondary/10 p-2"
-                      aria-label="Stage-aware VPD"
-                      data-testid="dashboard-stage-aware-vpd"
-                    >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] uppercase ${toneCls}`}
-                        >
-                          Stage VPD · {vpd.band.stage.replace("_", " ")}
-                        </Badge>
-                        <span className="text-xs">
-                          {vpd.value === null ? "—" : `${vpd.value.toFixed(2)} kPa`}{" "}
-                          <span className="text-muted-foreground">
-                            (target {rangeText})
-                          </span>
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        {vpd.label}. {vpd.band.helper}
-                      </p>
-                      {vpd.classification === "stage_unknown" && (
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          {VPD_STAGE_HELPER_TEXT}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            );
-          })()}
-        </section>
-        <section
-          className="glass rounded-2xl p-4 mt-4"
-          aria-label="Environment Alerts"
-        >
-          {(() => {
-            const snap =
-              sensorState.status === "ok" ? sensorState.snapshot : null;
-            const quality = evaluateSensorQuality(snap);
-            const targetsCmp = compareSnapshotToTargets(
-              snap,
-              targetsState.status === "ok" ? targetsState.targets : null,
-            );
-            const alerts = buildEnvironmentAlerts({
-              snapshot: snap,
-              quality,
-              targets: targetsCmp,
-              stage: scopedGrow?.stage ?? null,
-            });
-            const vpdStageMissing =
-              snap?.vpd != null && normalizeVpdStage(scopedGrow?.stage) === "unknown";
-            return (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h2 className="font-display font-semibold">
-                      Environment Alerts
-                    </h2>
-                    <p className="text-xs text-muted-foreground">
-                      Read-only summary of data quality and target status. Not a
-                      plant-health diagnosis. Not device control.
-                    </p>
-                  </div>
-                </div>
-                {vpdStageMissing && (
-                  <VpdStageMissingBadge
-                    testId="dashboard-vpd-stage-missing-badge"
-                    className="mb-2"
-                  />
-                )}
-                {alerts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {EMPTY_ALERTS_MESSAGE}
-                  </p>
-
-                ) : (
-                  <ul className="space-y-2">
-                    {alerts.map((a) => {
-                      const tone =
-                        a.severity === "critical"
-                          ? "border-destructive text-destructive"
-                          : a.severity === "warning"
-                            ? "border-amber-500 text-amber-600"
-                            : a.severity === "watch"
-                              ? "border-amber-400 text-amber-500"
-                              : "border-muted-foreground text-muted-foreground";
-                      return (
-                        <li
-                          key={a.id}
-                          className="rounded-lg border border-border/40 bg-secondary/20 p-2 text-sm"
-                        >
-                          <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <Badge
-                              variant="outline"
-                              className={`text-[10px] uppercase ${tone}`}
-                            >
-                              {a.severity}
-                            </Badge>
-                            <span className="font-medium text-sm">
-                              {a.title}
-                            </span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {a.reason}
-                          </p>
-                          {scopedGrowId && (
-                            <div className="mt-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={async () => {
-                                  try {
-                                    const saved = await saveAlert({
-                                      grow_id: scopedGrowId,
-                                      severity: a.severity,
-                                      title: a.title,
-                                      reason: a.reason,
-                                      metric:
-                                        typeof a.metric === "string"
-                                          ? a.metric
-                                          : null,
-                                    });
-                                    try {
-                                      await logAlertEvent({
-                                        alert_id: saved.id,
-                                        grow_id: scopedGrowId,
-                                        event_type: "created",
-                                        new_status: "open",
-                                      });
-                                      toast.success("Alert saved", {
-                                        action: {
-                                          label: "View",
-                                          onClick: () => window.location.assign(alertDetailPath(saved.id)),
-                                        },
-                                      });
-                                    } catch (logErr) {
-                                      toast.warning(
-                                        `Alert saved, but audit log failed: ${(logErr as Error).message}`,
-                                      );
-                                    }
-                                  } catch (err) {
-                                    toast.error(
-                                      `Failed to save alert: ${(err as Error).message}`,
-                                    );
-                                  }
-                                }}
-                              >
-                                Save alert
-                              </Button>
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            );
-          })()}
-        </section>
-        {scopedGrowId && (
-          <GrowTargetsEditor
-            open={targetsEditorOpen}
-            onOpenChange={setTargetsEditorOpen}
-            growId={scopedGrowId}
-            growName={scopedGrowName ?? undefined}
-            onSaved={() => {
-              targetsState.reload();
-            }}
-
-          />
-        )}
-        <h2
-          data-testid="dashboard-section-heading-recent-activity"
-          className="font-display text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-6 mb-1"
-        >
-          Recent activity
-        </h2>
-        <div className="grid lg:grid-cols-2 gap-4 mt-2">
-
-
-
-
-
-          <section
-            className="glass rounded-2xl p-4"
-            aria-label="Recent activity"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-display font-semibold">Recent Activity</h2>
-              <Link
-                to={timelinePath(scopedGrowId)}
-                className="text-xs text-primary hover:underline"
-              >
-                View full Timeline →
-              </Link>
-            </div>
-            {recent.status === "loading" || recent.status === "idle" ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : recent.status === "unavailable" ? (
-              <p className="text-sm text-muted-foreground">
-                Recent activity unavailable.
-              </p>
-            ) : recent.items.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No recent activity yet.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {recent.items.map((item) => (
-                  <li
-                    key={item.id}
-                    className="rounded-lg border border-border/40 bg-secondary/20 p-2 text-sm"
-                  >
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="outline" className="text-[10px] uppercase">
-                        {item.kind === "diary"
-                          ? "Diary Entry"
-                          : "Action Queue Event"}
-                      </Badge>
-                      <span className="text-xs truncate">{item.title}</span>
-                      <span className="ml-auto text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(item.ts), {
-                          addSuffix: true,
-                        })}
-                      </span>
-                    </div>
-                    {item.detail && (
-                      <p className="text-xs mt-1 italic text-muted-foreground">
-                        {item.detail}
-                      </p>
-                    )}
-                    {item.href && (
-                      <Link
-                        to={item.href}
-                        className="text-xs text-primary hover:underline"
-                      >
-                        View details →
-                      </Link>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section
-            className="glass rounded-2xl p-4"
-            aria-label="Pending actions"
-            data-testid="dashboard-approval-queue-section"
-          >
-            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-              <div>
-                <h2 className="font-display font-semibold">Pending Actions</h2>
-                <p
-                  className="text-xs text-muted-foreground"
-                  data-testid="dashboard-approval-queue-subtitle"
-                >
-                  Approval-Required Action Queue · Verdant suggests, you approve.
-                </p>
-              </div>
-              <Link
-                to={actionsPath(scopedGrowId)}
-                className="text-xs text-primary hover:underline"
-              >
-                View all actions →
-              </Link>
-            </div>
-            <SafeByDesignNotice
-              variant="compact"
-              className="mb-3"
-              testId="dashboard-approval-queue-safe-by-design"
-=======
           {scopedGrowId && (
             <GrowTargetsEditor
               open={targetsEditorOpen}
@@ -1952,7 +1211,6 @@ export default function Dashboard() {
               onSaved={() => {
                 targetsState.reload();
               }}
->>>>>>> origin/main
             />
           )}
           <div className="grid lg:grid-cols-2 gap-4 mt-4">
@@ -2145,6 +1403,6 @@ export default function Dashboard() {
       ) : (
         <p className="text-sm text-muted-foreground mt-4">Select a grow to see scoped activity.</p>
       )}
-    </main>
+    </div>
   );
 }

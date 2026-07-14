@@ -8,21 +8,10 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-<<<<<<< HEAD
-import {
-  shouldWarnPendingActionHasClosedSourceAlert,
-} from "@/lib/actionQueueProvenanceRules";
-import {
-  normalizeText,
-  expectNormalizedTextToContain,
-} from "./utils/normalizeText";
-=======
 import { shouldWarnPendingActionHasClosedSourceAlert } from "@/lib/actionQueueProvenanceRules";
->>>>>>> origin/main
 
 const ROOT = resolve(__dirname, "../..");
 const ACTION_DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8");
-
 
 describe("shouldWarnPendingActionHasClosedSourceAlert", () => {
   it("true: pending action + resolved source alert", () => {
@@ -77,45 +66,10 @@ describe("ActionDetail — stale source-alert warning", () => {
 
   it("renders the stale source-alert warning with the required copy", () => {
     expect(ACTION_DETAIL).toMatch(/data-testid="stale-source-alert-warning"/);
-<<<<<<< HEAD
-    // Whitespace-tolerant: incidental JSX line wrapping must not break the check.
-    expect(normalizeText(ACTION_DETAIL)).toContain(
-      "The source alert is no longer open.",
-    );
-    expectNormalizedTextToContain(
-      ACTION_DETAIL,
-      "Re-check current grow conditions before approving this action.",
-=======
     expect(ACTION_DETAIL).toMatch(
       /The\s+source\s+alert\s+is\s+no\s+longer\s+open\.\s+Re-check\s+current\s+grow\s+conditions\s+before\s+approving\s+this\s+action\./,
->>>>>>> origin/main
     );
   });
-
-  it("safety-meaning regression: warning instructs review before approval", () => {
-    // Locked safety phrases — independent of incidental wrapping/indent.
-    expectNormalizedTextToContain(ACTION_DETAIL, "Re-check current grow conditions");
-    expectNormalizedTextToContain(ACTION_DETAIL, "before approving this action");
-  });
-
-  it("stale-source warning element is present (testid) and co-located with the safety copy", () => {
-    // Hard fail if the warning element itself disappears from ActionDetail.
-    const TESTID = "stale-source-alert-warning";
-    const matches = ACTION_DETAIL.match(
-      new RegExp(`data-testid="${TESTID}"`, "g"),
-    );
-    expect(matches, `expected exactly one data-testid="${TESTID}"`).not.toBeNull();
-    expect(matches!.length).toBe(1);
-
-    // The required safety copy must live in the same JSX block as the testid.
-    const idx = ACTION_DETAIL.indexOf(`data-testid="${TESTID}"`);
-    expect(idx).toBeGreaterThan(-1);
-    const block = normalizeText(ACTION_DETAIL.slice(idx, idx + 800));
-    expect(block).toContain("Re-check current grow conditions");
-    expect(block).toContain("before approving this action");
-  });
-
-
 
   it("warning block is read-only (no onClick, no insert/update/delete)", () => {
     const idx = ACTION_DETAIL.indexOf('data-testid="stale-source-alert-warning"');

@@ -75,7 +75,9 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/how-ai-doctor-works",
   "/partners/csv-preview",
   "/customer/:shareId",
-<<<<<<< HEAD
+  // Read-only Pheno Comparison preview: public, fixture-only, mounted outside
+  // AuthProvider/GrowsProvider/AppShell — must render signed-out on mobile with
+  // zero private-table fetches.
   "/pheno-comparison",
   "/pheno-hunts/:id/compare",
   "/.lovable/oauth/consent",
@@ -89,23 +91,6 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/terms",
   "/privacy",
   "/refund",
-];
-
-// Internal fixture-only demo surfaces DELIBERATELY mounted OUTSIDE AppShell
-// (see App.tsx comments): they render signed-out by design so the read-only
-// E2E guards can exercise them without a session. Their safety contract is
-// not "redirects to /auth" but "renders fixture content with ZERO private
-// REST hits". Do NOT add real operator/internal pages here — the vitest
-// coverage guardrail pins this list to exactly these two routes.
-const UNAUTH_FIXTURE_ROUTES: string[] = [
-  "/internal/contextual-pheno-comparison-demo",
-  "/internal/demo-proof-walkthrough",
-=======
-  // Read-only Pheno Comparison preview: public, fixture-only, mounted outside
-  // AuthProvider/GrowsProvider/AppShell — must render signed-out on mobile with
-  // zero private-table fetches.
-  "/pheno-comparison",
->>>>>>> origin/main
 ];
 
 async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {

@@ -9,8 +9,7 @@ const DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8")
 describe("Action Queue detail view", () => {
   it("registers the /actions/:actionId route in App.tsx", () => {
     expect(APP).toMatch(/path="\/actions\/:actionId"\s+element=\{<ActionDetail\s*\/>\}/);
-    // Route pages are code-split via React.lazy; App.tsx imports them dynamically.
-    expect(APP).toMatch(/import\(\s*["']\.\/pages\/ActionDetail["']\s*\)/);
+    expect(APP).toMatch(/import ActionDetail from "\.\/pages\/ActionDetail"/);
   });
 
   it("uses the useParams actionId from the URL", () => {
@@ -47,14 +46,7 @@ describe("Action Queue detail view", () => {
   it("guards transitions on terminal statuses via shared helper", () => {
     expect(DETAIL).toMatch(/from "@\/lib\/actionQueueTransitions"/);
     expect(DETAIL).toMatch(/isTerminalStatus/);
-<<<<<<< HEAD
-    // Terminal-status guard wraps the transition-controls block. Allow
-    // whitespace/newline between the `&&` and the IIFE for prettier-friendly
-    // formatting; the semantic invariant is the guard itself.
-    expect(DETAIL).toMatch(/!isTerminalStatus\(row\.status\)\s*&&\s*\(\(\)\s*=>\s*\{/);
-=======
     expect(DETAIL).toMatch(/!isTerminalStatus\(row\.status\)\s*&&\s*\(\(\) => \{/);
->>>>>>> origin/main
     expect(DETAIL).toMatch(/if \(!row \|\| isTerminal\(row\.status\)\) return;/);
   });
 

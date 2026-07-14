@@ -1,37 +1,3 @@
-<<<<<<< HEAD
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
-import EcowittBridgeStatus from "@/pages/EcowittBridgeStatus";
-import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
-
-vi.mock("@/hooks/use-toast", () => ({
-  useToast: () => ({ toast: vi.fn() }),
-}));
-
-// Stub the local forwarding status widget. It auto-fetches
-// http://localhost:8787 on mount via the real `fetch` (jsdom has no
-// listener), which leaves dangling promises and DOM across the 6 render
-// cycles in this suite — observed as >4GB OOM in CI batch chunking even
-// when run alone. The stub keeps the page render path intact while
-// removing the network/effect surface that isn't under test here.
-vi.mock("@/components/EcowittLocalForwardingStatusWidget", () => ({
-  default: () => null,
-}));
-
-// Stub the drawer too — it pulls in Radix Dialog + report panel and
-// remounts on every render in this suite. The page-level button +
-// `latestReport` plumbing remain covered by the import/clear tests.
-vi.mock("@/components/IngestAttemptReportDrawer", () => ({
-  default: () => null,
-}));
-
-afterEach(() => {
-  cleanup();
-  vi.clearAllMocks();
-});
-
-=======
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
@@ -50,7 +16,6 @@ vi.mock("@/hooks/use-toast", () => ({
   useToast: () => toastApi,
 }));
 
->>>>>>> origin/main
 function renderPage() {
   return render(
     <BrowserRouter>
@@ -76,11 +41,7 @@ const VALID_REPORT = JSON.stringify({
 
 describe("EcowittBridgeStatus page", () => {
   beforeEach(() => {
-<<<<<<< HEAD
-    clearLocalStorageForTest();
-=======
     window.localStorage.clear();
->>>>>>> origin/main
   });
 
   it("renders empty state when no attempts exist", () => {
@@ -103,9 +64,7 @@ describe("EcowittBridgeStatus page", () => {
     fireEvent.change(ta, { target: { value: VALID_REPORT } });
     fireEvent.click(screen.getByTestId("ecowitt-bridge-import"));
     expect(screen.getByTestId("stat-dry-run")).toHaveTextContent("1");
-    expect(screen.getByTestId("stat-last-classification")).toHaveTextContent(
-      /dry_run/,
-    );
+    expect(screen.getByTestId("stat-last-classification")).toHaveTextContent(/dry_run/);
   });
 
   it("clear action removes local diagnostics", () => {
@@ -127,10 +86,7 @@ describe("EcowittBridgeStatus page", () => {
   });
 
   it("does not import supabase or write helpers", async () => {
-    const src = (await import("node:fs")).readFileSync(
-      "src/pages/EcowittBridgeStatus.tsx",
-      "utf8",
-    );
+    const src = (await import("node:fs")).readFileSync("src/pages/EcowittBridgeStatus.tsx", "utf8");
     expect(src).not.toMatch(/@\/integrations\/supabase/);
     expect(src).not.toMatch(/\.(insert|upsert|update|delete)\s*\(/);
     expect(src).not.toMatch(/service[_-]?role/i);

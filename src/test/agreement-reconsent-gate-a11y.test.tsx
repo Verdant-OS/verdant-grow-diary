@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { axe } from "vitest-axe";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 
 const upsertSpy = vi.fn();
@@ -246,5 +247,15 @@ describe("AgreementReconsentGate accessibility", () => {
     const [rows] = upsertSpy.mock.calls[0] as [Array<{ user_id: string; agreement_type: string; version: string }>];
     expect(rows.every((r) => r.user_id === "u1")).toBe(true);
     expect(rows.map((r) => r.agreement_type).sort()).toEqual(["privacy", "terms"]);
+  });
+
+  it("has no automated axe accessibility violations", async () => {
+    // jsdom does not perform real layout, so `color-contrast` cannot be
+    // evaluated reliably. All ARIA / naming / label / role rules stay on.
+    const { container } = await renderGate();
+    const results = await axe(container, {
+      rules: { "color-contrast": { enabled: false } },
+    });
+    expect(results.violations).toEqual([]);
   });
 });

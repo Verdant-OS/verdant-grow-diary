@@ -60,14 +60,7 @@ jobs:
       # Fail-fast: runs only after typecheck passes; no continue-on-error,
       # no shell fallbacks.
       - name: Agreement reconsent accessibility contract
-        run: |
-          bunx vitest run \
-            src/test/agreement-reconsent-gate-a11y.test.tsx \
-            --pool=forks \
-            --isolate \
-            --reporter=dot \
-            --testTimeout=10000 \
-            --hookTimeout=10000
+        run: bun run test:reconsent-a11y
 
       # Stop-ship: the V0 operating loop contract test must pass.
       # See docs/v0-operating-loop-demo.md ("V0 contract test").

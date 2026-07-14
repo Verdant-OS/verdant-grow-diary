@@ -199,6 +199,9 @@ export function buildPhenoHuntCsv(input: PhenoHuntCsvInput): string {
     const smoke = input.smokeByPlant[id];
     const lab = input.labByKey[`${id}:coa`];
     const packet = input.evidencePacketsByPlant?.get(id) ?? null;
+    // "unavailable" = the receipt read failed; its zeroed counts are defaults,
+    // not facts, so they must not reach the export as evidence.
+    const packetHasCoverage = packet !== null && packet.state !== "unavailable";
     const readiness = deriveReadiness(input, c);
     lines.push(
       [
@@ -230,15 +233,20 @@ export function buildPhenoHuntCsv(input: PhenoHuntCsvInput): string {
         csvField(lab?.cbdPct ?? ""),
         csvField(provenance),
         csvField(exportedAt),
-        csvField(packet ? packet.configuredGoalCount : ""),
-        csvField(packet ? packet.recordedGoalCount : ""),
+        // An unavailable packet is a FAILED read, not observed evidence:
+        // blank every receipt-derived field so a query failure can never be
+        // exported as "0 recorded / all missing". Only manual_evidence_status
+        // carries the honest "unavailable". The configured goal count is a
+        // property of the hunt (not the failed read), so it is still exported.
+        csvField(packetHasCoverage ? packet!.configuredGoalCount : ""),
+        csvField(packetHasCoverage ? packet!.recordedGoalCount : ""),
         // Stable serialization: configured order, ";"-joined (matches the
         // readiness goal columns above).
-        csvField(packet ? packet.missingGoalIds.join(";") : ""),
-        csvField(packet?.latestEntryAt ?? ""),
-        csvField(packet ? packet.receiptCount : ""),
+        csvField(packetHasCoverage ? packet!.missingGoalIds.join(";") : ""),
+        csvField(packetHasCoverage ? (packet!.latestEntryAt ?? "") : ""),
+        csvField(packetHasCoverage ? packet!.receiptCount : ""),
         csvField(packet ? packet.state : "unavailable"),
-        csvField(packet ? (packet.truncated ? "yes" : "no") : ""),
+        csvField(packetHasCoverage ? (packet!.truncated ? "yes" : "no") : ""),
         csvField(exportScope),
         csvField(loadedCount ?? ""),
         csvField(input.totalCandidateCount ?? ""),

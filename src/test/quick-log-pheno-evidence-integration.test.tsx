@@ -80,13 +80,14 @@ vi.mock("sonner", () => ({
 
 import QuickLog from "@/components/QuickLog";
 
-function renderQuickLog() {
+function renderQuickLog(prefill: Record<string, unknown> = { plantId: "plant-1", growId: "grow-1" }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  return render(
+  const result = render(
     <QueryClientProvider client={client}>
-      <QuickLog open onOpenChange={vi.fn()} prefill={{ plantId: "plant-1", growId: "grow-1" }} />
+      <QuickLog open onOpenChange={vi.fn()} prefill={prefill} />
     </QueryClientProvider>,
   );
+  return { ...result, client };
 }
 
 describe("Quick Log Pheno evidence integration", () => {
@@ -132,6 +133,47 @@ describe("Quick Log Pheno evidence integration", () => {
         device_control: false,
       },
     });
+  });
+
+  it("a delayed receipt-context refetch never re-seeds a handoff goal the grower changed", async () => {
+    // Handoff prefill seeds 'structure'. The grower then switches to 'aroma'.
+    // A later pheno_evidence_receipts-family invalidation (e.g. after a save)
+    // refetches the hunt context — the one-shot guard must NOT restore
+    // 'structure'.
+    const { client } = renderQuickLog({
+      plantId: "plant-1",
+      growId: "grow-1",
+      phenoHuntId: "hunt-1",
+      phenoEvidenceGoal: "structure",
+    });
+    const panel = await screen.findByTestId("quick-log-pheno-evidence-panel");
+    await waitFor(() => expect(panel).toHaveAttribute("data-status", "ready"));
+
+    // Seeded from the handoff.
+    await waitFor(() =>
+      expect(within(panel).getByTestId("quick-log-pheno-evidence-goal-structure")).toHaveAttribute(
+        "aria-checked",
+        "true",
+      ),
+    );
+
+    // Grower changes to a different configured goal.
+    fireEvent.click(within(panel).getByTestId("quick-log-pheno-evidence-goal-aroma"));
+    expect(
+      within(panel).getByTestId("quick-log-pheno-evidence-goal-aroma"),
+    ).toHaveAttribute("aria-checked", "true");
+
+    // Force the exact refetch that a successful save triggers.
+    await client.invalidateQueries({ queryKey: ["pheno_evidence_receipts"] });
+
+    // The grower's choice survives; the handoff goal is NOT silently restored.
+    await waitFor(() => expect(panel).toHaveAttribute("data-status", "ready"));
+    expect(
+      within(panel).getByTestId("quick-log-pheno-evidence-goal-aroma"),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(
+      within(panel).getByTestId("quick-log-pheno-evidence-goal-structure"),
+    ).toHaveAttribute("aria-checked", "false");
   });
 
   it("fails closed for an unavailable hunt but still saves a normal Quick Log", async () => {

@@ -1410,10 +1410,30 @@ export default function PhenoHuntWorkspace() {
                 type="button"
                 data-testid="workspace-export-csv"
                 onClick={onExportCsv}
-                className="ml-auto rounded border border-border bg-secondary px-2 py-1 text-xs font-medium"
+                // Gate export until the evidence-packet batch settles (Codex
+                // review): while status is "loading" the packet map is empty,
+                // so an export would mislabel every candidate as
+                // manual_evidence=unavailable even though the read is only
+                // pending. "error"/"disabled"/"ready" all export honestly.
+                disabled={evidencePackets.status === "loading"}
+                aria-describedby={
+                  evidencePackets.status === "loading" ? "workspace-export-csv-pending" : undefined
+                }
+                className="ml-auto rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
               >
-                Export loaded CSV
+                {evidencePackets.status === "loading"
+                  ? "Preparing evidence…"
+                  : "Export loaded CSV"}
               </button>
+              {evidencePackets.status === "loading" ? (
+                <span
+                  id="workspace-export-csv-pending"
+                  data-testid="workspace-export-csv-pending"
+                  className="text-xs text-muted-foreground"
+                >
+                  Evidence coverage is still loading — export enables once it settles.
+                </span>
+              ) : null}
             </div>
 
             <div

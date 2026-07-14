@@ -115,6 +115,30 @@ describe("pheno CSV — manual evidence coverage columns", () => {
     expect(unknownTotal[1][col(unknownTotal, "export_scope")]).toBe("loaded_candidates");
   });
 
+  it("unavailable packets blank every receipt-derived field (failed read ≠ zero evidence)", () => {
+    const unavailable = new Map([
+      [
+        "p1",
+        buildPhenoCandidateEvidencePacket({
+          huntId: "hunt-1",
+          plantId: "p1",
+          configuredGoals: ["structure", "aroma"],
+          rows: [],
+          unavailable: true,
+        }),
+      ],
+    ]);
+    const rows = rowsOf(buildPhenoHuntCsv({ ...BASE, evidencePacketsByPlant: unavailable }));
+    const r = rows[1];
+    expect(r[col(rows, "manual_evidence_status")]).toBe("unavailable");
+    // Receipt-derived fields blank — never 0 / all-missing.
+    expect(r[col(rows, "recorded_goal_count")]).toBe("");
+    expect(r[col(rows, "missing_goal_ids")]).toBe("");
+    expect(r[col(rows, "manual_receipt_count")]).toBe("");
+    expect(r[col(rows, "latest_manual_evidence_at")]).toBe("");
+    expect(r[col(rows, "manual_evidence_truncated")]).toBe("");
+  });
+
   it("truncated packets export truncated status, never complete", () => {
     const truncated = new Map([
       [

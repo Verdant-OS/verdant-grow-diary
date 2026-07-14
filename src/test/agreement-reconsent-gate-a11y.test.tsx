@@ -78,7 +78,9 @@ afterEach(() => {
 });
 
 describe("AgreementReconsentGate accessibility", () => {
-  it("renders a dialog with accessible name and description wired by aria attrs", async () => {
+  it("renders a dialog with accessible name and description wired by aria attrs and does not emit the Radix missing-title warning", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { dialog } = await renderGate();
 
     expect(dialog).toBeInTheDocument();
@@ -88,8 +90,23 @@ describe("AgreementReconsentGate accessibility", () => {
     const describedBy = dialog.getAttribute("aria-describedby");
     expect(labelledBy).toBeTruthy();
     expect(describedBy).toBeTruthy();
-    expect(document.querySelectorAll(`#${labelledBy}`)).toHaveLength(1);
-    expect(document.querySelectorAll(`#${describedBy}`)).toHaveLength(1);
+    expect(document.querySelectorAll(`#${CSS.escape(labelledBy!)}`)).toHaveLength(1);
+    expect(document.querySelectorAll(`#${CSS.escape(describedBy!)}`)).toHaveLength(1);
+
+    // Visible heading rendered exactly once and its id matches aria-labelledby.
+    const titles = screen.getAllByText(/updated agreements|accept our agreements/i);
+    expect(titles).toHaveLength(1);
+    expect(titles[0].id).toBe(labelledBy);
+
+    const allCalls = [...errSpy.mock.calls, ...warnSpy.mock.calls].map((args) =>
+      args.map((a) => (typeof a === "string" ? a : "")).join(" "),
+    );
+    expect(
+      allCalls.some((m) => m.includes("DialogContent` requires a `DialogTitle")),
+    ).toBe(false);
+
+    errSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 
   it("keeps Accept enabled while the consent box is unchecked, and it is keyboard-reachable", async () => {

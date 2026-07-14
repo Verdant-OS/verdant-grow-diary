@@ -114,6 +114,29 @@ describe("founder lifetime — one-time, atomic, capped, idempotent", () => {
     expect(WEBHOOK).toMatch(/processing\.isFounderCandidate\s*\?\s*"allocate_founder_lifetime_with_audit"\s*:\s*"apply_paddle_subscription_update_with_audit"/);
   });
 
+  it("sold-out is blocked BEFORE payment via an aggregate-only availability RPC", () => {
+    // The function exposes nothing but GREATEST(0, 75 - COUNT(*)) — no rows,
+    // no ids, no PII. anon stays revoked; signed-in callers (the price
+    // resolver runs as the verified caller) and service_role may read it.
+    expect(MIGRATION).toMatch(/CREATE OR REPLACE FUNCTION public\.founder_lifetime_slots_remaining\(\)\s*\nRETURNS integer/);
+    expect(MIGRATION).toMatch(/GREATEST\(\s*\n?\s*0,\s*\n?\s*75 - \(SELECT COUNT\(\*\)::int FROM public\.billing_subscriptions WHERE founder_number IS NOT NULL\)/);
+    expect(MIGRATION).toContain("REVOKE ALL ON FUNCTION public.founder_lifetime_slots_remaining() FROM PUBLIC;");
+    expect(MIGRATION).toContain("REVOKE ALL ON FUNCTION public.founder_lifetime_slots_remaining() FROM anon;");
+    expect(MIGRATION).toContain("GRANT EXECUTE ON FUNCTION public.founder_lifetime_slots_remaining() TO authenticated;");
+    expect(MIGRATION).toContain("GRANT EXECUTE ON FUNCTION public.founder_lifetime_slots_remaining() TO service_role;");
+    // And the price resolver actually consults it for founder_lifetime.
+    const priceFn = read("supabase/functions/get-paddle-price/index.ts");
+    expect(priceFn).toMatch(/founder_lifetime_slots_remaining/);
+    expect(priceFn).toMatch(/plan_sold_out/);
+  });
+
+  it("checkout attribution: the webhook accepts the userId key the live checkout sends", () => {
+    // usePaddleCheckout sends customData: { userId } — without this key in the
+    // extraction list, paid events record but link capture returns
+    // missing_user_id and the buyer gets no entitlement.
+    expect(WEBHOOK).toMatch(/\[\s*"userId"\s*\]/);
+  });
+
   it("founder allocation stays sandbox-only until live is explicitly approved", () => {
     const founderFn = MIGRATION.slice(MIGRATION.indexOf("allocate_founder_lifetime("));
     expect(founderFn).toMatch(/v_processing\.environment <> 'sandbox' OR v_event\.environment <> 'sandbox'/);

@@ -193,7 +193,11 @@ function customDataCandidates(payload: Record<string, unknown>, data: Record<str
 function metadataUserIds(payload: Record<string, unknown>, data: Record<string, unknown>): string[] {
   const ids: Array<string | null> = [];
   for (const custom of customDataCandidates(payload, data)) {
-    ids.push(firstStringPath(custom, [["verdant_user_id"], ["user_id"], ["auth_user_id"], ["verdant_auth_user_id"]]));
+    // "userId" (camelCase) is the key the live checkout actually sends
+    // (usePaddleCheckout customData: { userId: user.id }); Paddle passes
+    // custom_data through verbatim. Without it, paid events record but link
+    // capture returns missing_user_id and the buyer gets no entitlement.
+    ids.push(firstStringPath(custom, [["verdant_user_id"], ["user_id"], ["userId"], ["auth_user_id"], ["verdant_auth_user_id"]]));
   }
   return uniqueStrings(ids);
 }

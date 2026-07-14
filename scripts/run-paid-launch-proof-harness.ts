@@ -68,7 +68,10 @@ async function seedUser(tag: string): Promise<string> {
 
 async function seedEvent(opts: {
   tag: string;
-  eventType: string;
+  /** Defaults to "subscription.updated" — paddle_events.event_type is NOT
+   * NULL, and the recurring-path seeds don't care which lifecycle type it is.
+   * Founder seeds pass it explicitly (transaction.completed is REQUIRED). */
+  eventType?: string;
   environment?: string;
   signatureVerified?: boolean;
   planId?: string | null;
@@ -85,7 +88,7 @@ async function seedEvent(opts: {
     .from("paddle_events")
     .insert({
       event_id: `fake_evt_${RUN}_${opts.tag}`,
-      event_type: opts.eventType,
+      event_type: opts.eventType ?? "subscription.updated",
       environment: env,
       signature_verified: opts.signatureVerified ?? true,
       payload: { fake: true, run: RUN },
@@ -98,7 +101,7 @@ async function seedEvent(opts: {
     .insert({
       paddle_event_id: evt.id,
       event_id: `fake_evt_${RUN}_${opts.tag}`,
-      event_type: opts.eventType,
+      event_type: opts.eventType ?? "subscription.updated",
       environment: env,
       status: opts.processingStatus ?? "processed",
       reason: null,

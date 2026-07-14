@@ -46,6 +46,32 @@ describe("get-paddle-price — server-controlled environment", () => {
     expect(SRC).toMatch(/resolveServerBillingEnvironment\(\)/);
     expect(stripped).not.toMatch(/body\??\.environment/);
   });
+
+  it("rejects a live environment until the approved live-enable change lands", () => {
+    // The webhook and both reconciliation RPCs are sandbox-only; a live price
+    // would let a real charge settle with no entitlement path.
+    expect(stripped).toMatch(/if \(environment === 'live'\)/);
+    expect(SRC).toMatch(/live_billing_not_enabled/);
+  });
+});
+
+describe("get-paddle-price — founder sold-out pre-check (before payment)", () => {
+  it("founder_lifetime availability is checked via the aggregate RPC before any price is returned", () => {
+    expect(SRC).toMatch(/requested === 'founder_lifetime'/);
+    expect(SRC).toMatch(/supabase\.rpc\(\s*'founder_lifetime_slots_remaining',?\s*\)/);
+    expect(SRC).toMatch(/plan_sold_out/);
+  });
+
+  it("fails closed: RPC error blocks checkout, and a non-number or <=0 count is sold out", () => {
+    expect(stripped).toMatch(/if \(capError\) \{/);
+    expect(stripped).toMatch(/typeof remaining !== 'number' \|\| remaining <= 0/);
+    // The pre-check happens BEFORE the gateway price fetch in source order,
+    // so a sold-out founder plan can never reach checkout pricing at all.
+    const soldOutIdx = stripped.indexOf("plan_sold_out");
+    const gatewayIdx = stripped.indexOf("await gatewayFetch(");
+    expect(soldOutIdx).toBeGreaterThan(-1);
+    expect(soldOutIdx).toBeLessThan(gatewayIdx);
+  });
 });
 
 describe("get-paddle-price — sanitized output", () => {

@@ -343,6 +343,37 @@ REVOKE ALL ON FUNCTION public.allocate_founder_lifetime(uuid) FROM anon;
 REVOKE ALL ON FUNCTION public.allocate_founder_lifetime(uuid) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.allocate_founder_lifetime(uuid) TO service_role;
 
+-- Pre-checkout founder availability. Returns ONLY an aggregate count of
+-- remaining founder slots (0..75) — never a row, an id, or any PII.
+-- get-paddle-price calls this (as the signed-in caller) to block a sold-out
+-- founder checkout BEFORE payment, so a user is never charged for a slot
+-- allocate_founder_lifetime would then refuse to entitle. Best-effort:
+-- allocate_founder_lifetime's advisory-locked cap check remains the
+-- authoritative backstop for the residual race between this read and
+-- settlement (operator refund case, documented in the runbook).
+-- The 75 here matches billing_subscriptions.founder_number CHECK (1..75) and
+-- allocate_founder_lifetime's c_founder_cap; changing the cap is a reviewed
+-- migration, never a runtime knob.
+CREATE OR REPLACE FUNCTION public.founder_lifetime_slots_remaining()
+RETURNS integer
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+STABLE
+AS $$
+  SELECT GREATEST(
+    0,
+    75 - (SELECT COUNT(*)::int FROM public.billing_subscriptions WHERE founder_number IS NOT NULL)
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.founder_lifetime_slots_remaining() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.founder_lifetime_slots_remaining() FROM anon;
+-- Signed-in callers may read the aggregate (the price resolver runs as the
+-- verified caller, never service_role). anon stays revoked.
+GRANT EXECUTE ON FUNCTION public.founder_lifetime_slots_remaining() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.founder_lifetime_slots_remaining() TO service_role;
+
 -- Audit wrapper — mirrors apply_paddle_subscription_update_with_audit: one
 -- sanitized append-only row per invocation, never provider ids or payloads.
 CREATE OR REPLACE FUNCTION public.allocate_founder_lifetime_with_audit(

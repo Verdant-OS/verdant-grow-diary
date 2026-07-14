@@ -98,9 +98,39 @@ Deno.serve(async (req) => {
       return json(400, { error: 'unknown_plan' });
     }
 
+    // 2b. Founder Lifetime is a capped one-time plan (75 slots). Block a
+    //     sold-out checkout HERE, before a price is ever returned, so a user
+    //     is never charged for a slot allocate_founder_lifetime would then
+    //     refuse to entitle. The RPC exposes only an aggregate remaining count
+    //     (no rows, no PII) and runs as the verified caller. It is the
+    //     pre-payment guard; the allocation RPC's advisory-locked cap check
+    //     stays the authoritative backstop for the tiny residual race between
+    //     this read and settlement (operator refund case, per the runbook).
+    if (requested === 'founder_lifetime') {
+      const { data: remaining, error: capError } = await supabase.rpc(
+        'founder_lifetime_slots_remaining',
+      );
+      if (capError) {
+        // Fail closed: if availability cannot be proven, no founder checkout.
+        return json(503, { error: 'price_resolution_unavailable' });
+      }
+      if (typeof remaining !== 'number' || remaining <= 0) {
+        return json(409, { error: 'plan_sold_out' });
+      }
+    }
+
     // 3. Server-controlled environment. Any client-supplied environment
     //    field is ignored — the server decides sandbox vs live.
     const environment: PaddleEnv = resolveServerBillingEnvironment();
+
+    // 3b. Launch posture: this slice's webhook and BOTH reconciliation RPCs
+    //     are sandbox-only. Returning a live price here would let a real
+    //     charge settle with no path to an entitlement. Reject live until the
+    //     separately approved live-enable migration lands (it flips the RPC
+    //     environment gates in the same change).
+    if (environment === 'live') {
+      return json(409, { error: 'live_billing_not_enabled' });
+    }
 
     const response = await gatewayFetch(
       environment,

@@ -94,12 +94,12 @@ block.
 ## Stable finding codes
 
 | Code                                     | Tier       | Severity        | Meaning                                                                                                                          |
-| ---------------------------------------- | ---------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------ | ------ |
+| ---------------------------------------- | ---------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `required_field_missing`                 | structural | error           | A required field is absent or the wrong type.                                                                                    |
 | `required_field_empty`                   | structural | error           | A required text field / `what_not_to_do` is blank.                                                                               |
 | `follow_up_absent`                       | structural | error           | 24-hour or 3-day plan is blank or a placeholder (N/A).                                                                           |
 | `invalid_confidence`                     | structural | error           | `confidence` is not a number in `[0,1]`.                                                                                         |
-| `invalid_risk_level`                     | structural | error           | `risk_level` not `low                                                                                                            | medium | high`. |
+| `invalid_risk_level`                     | structural | error           | `risk_level` is not one of low / medium / high.                                                                                  |
 | `diagnosis_generated_while_insufficient` | structural | error           | A result exists while the gate reads `insufficient`.                                                                             |
 | `confidence_exceeds_readiness`           | structural | error           | Confidence over the readiness ceiling.                                                                                           |
 | `missing_information_absent`             | structural | error / warning | `missing_information` empty (or placeholder-only) when it must be populated.                                                     |

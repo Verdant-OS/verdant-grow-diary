@@ -345,12 +345,15 @@ function validateContractShape(result: Phase1DiagnosisResult, findings: FindingL
 
   // what_not_to_do must always carry at least one entry (contract: even a
   // healthy plant gets one cautionary line). Only checked when it IS an array.
-  if (isStringArray(r.what_not_to_do) && r.what_not_to_do.length === 0) {
+  if (
+    isStringArray(r.what_not_to_do) &&
+    !r.what_not_to_do.some((entry) => isMeaningfulText(entry))
+  ) {
     findings.add({
       code: "required_field_empty",
       severity: "error",
       field: "what_not_to_do",
-      message: "what_not_to_do must contain at least one cautionary entry.",
+      message: "what_not_to_do must contain at least one meaningful cautionary entry.",
     });
   }
 
@@ -460,7 +463,6 @@ const CAUTIONARY_PATTERNS: readonly RegExp[] = [
   new RegExp(`\\b${LIMITATION_WORD}\\b[^.]{0,25}\\b${DATA_NOUN}\\b`, "i"),
   // data noun → limitation: "humidity data is stale", "sensor reading is missing"
   new RegExp(`\\b${DATA_NOUN}\\b[^.]{0,25}\\b${LIMITATION_WORD}\\b`, "i"),
-  /\bnot enough\b/i,
   /\bcan(?:not|'t) be (trusted|verified|confirmed|used)\b/i,
 ];
 
@@ -683,6 +685,76 @@ function metricUsable(sources: Set<string> | undefined): boolean {
 }
 
 /**
+ * Trace one metric-bearing claim to the compiled context. The same bounded
+ * provenance rules apply whether the claim appears in `evidence`, `summary`,
+ * or `likely_issue`; only the finding field/message label differs.
+ */
+function validateMetricClaim(
+  text: string,
+  field: "evidence" | "summary" | "likely_issue",
+  cautionary: boolean,
+  prov: ContextProvenance,
+  findings: FindingList,
+  evidenceKey?: string,
+): boolean {
+  let findingAdded = false;
+  const claimLabel = field === "evidence" ? "Evidence" : `Result field "${field}"`;
+  const evidenceKeys = evidenceKey === undefined ? {} : { evidenceKeys: [evidenceKey] };
+
+  for (const lex of METRIC_LEXICON) {
+    if (!lex.term.test(text)) continue;
+    const sources = prov.metricSources.get(lex.key);
+    if (!sources || sources.size === 0) {
+      if (!cautionary) {
+        findings.add({
+          code: "evidence_not_in_context",
+          severity: "error",
+          field,
+          message: `${claimLabel} cites ${lex.key} data that is not present in the compiled context.`,
+          ...evidenceKeys,
+        });
+        findingAdded = true;
+      }
+      continue;
+    }
+    if (cautionary || metricUsable(sources)) continue;
+
+    if (sources.has("stale") || sources.has("invalid")) {
+      findings.add({
+        code: "evidence_source_unusable",
+        severity: "error",
+        field,
+        message: `${claimLabel} relies on ${lex.key} data from a stale or invalid source, which cannot support a conclusion.`,
+        ...evidenceKeys,
+      });
+      findingAdded = true;
+    } else if (sources.has("csv")) {
+      // CSV is honest historical support unless described as live elsewhere.
+    } else if (sources.has("demo")) {
+      findings.add({
+        code: "evidence_provenance_misrepresented",
+        severity: "error",
+        field,
+        message: `${claimLabel} presents demo ${lex.key} data as real plant evidence.`,
+        ...evidenceKeys,
+      });
+      findingAdded = true;
+    } else {
+      findings.add({
+        code: "evidence_source_unusable",
+        severity: "error",
+        field,
+        message: `${claimLabel} relies on ${lex.key} data of unknown provenance, which cannot support a conclusion.`,
+        ...evidenceKeys,
+      });
+      findingAdded = true;
+    }
+  }
+
+  return findingAdded;
+}
+
+/**
  * Metrics that actually describe the ROOM ENVIRONMENT. A trustworthy pH, EC or
  * soil-moisture reading says nothing about whether the environment is stable —
  * so it must not license a "the room environment is stable" claim. Only these
@@ -710,6 +782,22 @@ function positiveClaimText(result: Phase1DiagnosisResult): string {
     .toLowerCase();
 }
 
+/**
+ * Non-assertive metric mentions in diagnosis prose should not be treated as
+ * evidence claims. This keeps "check pH" and "pH lockout is unlikely" from
+ * becoming false provenance warnings while still tracing "low pH caused...".
+ */
+const NEGATED_METRIC_MENTION_RE =
+  /\b(unlikely|not indicated|not supported|no evidence of|cannot confirm|can't confirm|unclear|unknown)\b/i;
+const METRIC_REQUEST_RE = /\b(check|monitor|measure|recheck|verify)\b/i;
+const METRIC_ASSERTION_RE =
+  /\b(low|high|elevated|reduced|off|outside|out of range|lockout|deficien\w*|excess\w*|due to|caused by|because)\b/i;
+
+function isNonassertiveMetricMention(clause: string): boolean {
+  if (NEGATED_METRIC_MENTION_RE.test(clause)) return true;
+  return METRIC_REQUEST_RE.test(clause) && !METRIC_ASSERTION_RE.test(clause);
+}
+
 function validateEvidenceIntegrity(
   input: AiDoctorOutputEvaluationInput,
   findings: FindingList,
@@ -719,13 +807,17 @@ function validateEvidenceIntegrity(
 
   const evidence = Array.isArray(result.evidence) ? (result.evidence as unknown[]) : [];
   let affirmativeEvidenceCount = 0;
+  const affirmativeEvidenceText: string[] = [];
 
   for (const raw of evidence) {
     if (typeof raw !== "string") continue;
     const item = raw;
     const lower = item.toLowerCase();
     const cautionary = isCautionary(lower);
-    if (!cautionary) affirmativeEvidenceCount += 1;
+    if (!cautionary) {
+      affirmativeEvidenceCount += 1;
+      affirmativeEvidenceText.push(lower);
+    }
 
     // 1. Live misrepresentation — claims "live" when no live source exists.
     if (!cautionary && LIVE_CLAIM_PATTERNS.some((re) => re.test(lower)) && !prov.hasLive) {
@@ -740,58 +832,14 @@ function validateEvidenceIntegrity(
     }
 
     // 2. Metric tracing — cited metric must exist in context and be usable.
-    let metricFindingAdded = false;
-    for (const lex of METRIC_LEXICON) {
-      if (!lex.term.test(lower)) continue;
-      const sources = prov.metricSources.get(lex.key);
-      if (!sources || sources.size === 0) {
-        if (!cautionary) {
-          findings.add({
-            code: "evidence_not_in_context",
-            severity: "error",
-            field: "evidence",
-            message: `Evidence cites ${lex.key} data that is not present in the compiled context.`,
-            evidenceKeys: [item],
-          });
-          metricFindingAdded = true;
-        }
-        continue;
-      }
-      if (cautionary || metricUsable(sources)) continue; // present & usable → ok
-      // Present, but only via non-trustworthy sources. Resolve most-severe first.
-      if (sources.has("stale") || sources.has("invalid")) {
-        findings.add({
-          code: "evidence_source_unusable",
-          severity: "error",
-          field: "evidence",
-          message: `Evidence relies on ${lex.key} data from a stale or invalid source, which cannot support a conclusion.`,
-          evidenceKeys: [item],
-        });
-        metricFindingAdded = true;
-      } else if (sources.has("csv")) {
-        // CSV is honest historical support (valid interpretation). Allowed
-        // unless it was described as live (handled by the live-claim rule).
-      } else if (sources.has("demo")) {
-        findings.add({
-          code: "evidence_provenance_misrepresented",
-          severity: "error",
-          field: "evidence",
-          message: `Evidence presents demo ${lex.key} data as real plant evidence.`,
-          evidenceKeys: [item],
-        });
-        metricFindingAdded = true;
-      } else {
-        // Unknown / unrecognized provenance → conservative: cannot support a claim.
-        findings.add({
-          code: "evidence_source_unusable",
-          severity: "error",
-          field: "evidence",
-          message: `Evidence relies on ${lex.key} data of unknown provenance, which cannot support a conclusion.`,
-          evidenceKeys: [item],
-        });
-        metricFindingAdded = true;
-      }
-    }
+    const metricFindingAdded = validateMetricClaim(
+      lower,
+      "evidence",
+      cautionary,
+      prov,
+      findings,
+      item,
+    );
     if (metricFindingAdded) continue;
 
     // 3. Generic sensor reliance with only stale/invalid data available.
@@ -826,13 +874,29 @@ function validateEvidenceIntegrity(
     }
   }
 
-  // 5. Healthy/stable environment claim not backed by TRUSTWORTHY telemetry.
+  // 5. Metric-specific claims in diagnosis prose must also trace to context.
+  // Split into clauses so a cautious clause does not exempt a later assertion.
+  for (const field of ["summary", "likely_issue"] as const) {
+    const text = asText(result[field]).toLowerCase();
+    for (const clause of text.split(/[.;\n]+/)) {
+      if (
+        clause.trim().length === 0 ||
+        isCautionary(clause) ||
+        isNonassertiveMetricMention(clause)
+      ) {
+        continue;
+      }
+      validateMetricClaim(clause, field, false, prov, findings);
+    }
+  }
+
+  // 6. Healthy/stable environment claim not backed by TRUSTWORTHY telemetry.
   //
   // The absence of telemetry is still unverified telemetry: with no readings at
   // all, "the room environment is stable and in range" is exactly as unsupported
   // as the same claim made over stale data. So the only thing that licenses an
   // environment health claim is live/manual data — not merely "no bad data".
-  const positive = positiveClaimText(input.result);
+  const positive = `${positiveClaimText(input.result)} \n ${affirmativeEvidenceText.join(" \n ")}`;
   if (
     (ENV_HEALTHY_RE_A.test(positive) || ENV_HEALTHY_RE_B.test(positive)) &&
     !hasTrustworthyEnvironmentMetric(prov)
@@ -845,7 +909,7 @@ function validateEvidenceIntegrity(
     });
   }
 
-  // 6. Definitive single cause asserted with no supporting evidence item.
+  // 7. Definitive single cause asserted with no supporting evidence item.
   const claimText = `${asText(result.likely_issue)} \n ${asText(result.summary)}`.toLowerCase();
   if (CAUSAL_CLAIM_RE.test(claimText) && affirmativeEvidenceCount === 0) {
     findings.add({
@@ -1036,6 +1100,9 @@ const AGGRESSIVE_NUTRIENT_PATTERNS: readonly RegExp[] = [
   // increase/raise/bump/boost <the> feed | nutrient(s) | ec  [strength]
   /\b(increase|raise|bump|boost)\s+(the\s+)?(feed|nutrient|nutrients|ec)\b/i,
   /\bfeed more\b/i,
+  /\b(reduce|lower|decrease|cut|drop)\s+(the\s+)?(feed|nutrient|nutrients|ec)\b/i,
+  /\bfeed less\b/i,
+  /\bless nutrients?\b/i,
   /\badd (more )?nutrient/i,
   /\bflush (immediately|now|the plant)\b/i,
   /\bdouble (the )?(feed|nutrient|ec)\b/i,
@@ -1186,7 +1253,7 @@ const PROHIBITION_MARKER_RE =
  * This is why we do not simply drop every clause containing "no"/"not".
  */
 function hasUngovernedCommand(text: string, patterns: readonly RegExp[]): boolean {
-  for (const clause of text.split(/[.;\n]+/)) {
+  for (const clause of text.split(/[.;,:\n]+/)) {
     for (const re of patterns) {
       const match = re.exec(clause);
       if (!match) continue;

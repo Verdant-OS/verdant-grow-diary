@@ -138,8 +138,12 @@ AI_DOCTOR_READINESS_CONFIDENCE_CEILING = { insufficient: 0, partial: 0.5, strong
 ## Evidence traceability & sensor provenance
 
 Every affirmative evidence claim must trace to the compiled
-`Phase1PlantContextPayload`. Provenance is the closed `SensorSourceTag` union
-(`live | manual | csv | demo | stale | invalid`); `TRUSTWORTHY = {live, manual}`.
+`Phase1PlantContextPayload`. Metric-specific claims in `summary` and
+`likely_issue` use the same trace, while non-assertive wording such as "check pH"
+or "pH lockout is unlikely" stays exempt. Healthy/stable environment claims are
+checked across diagnosis prose and affirmative evidence. Provenance is the closed
+`SensorSourceTag` union (`live | manual | csv | demo | stale | invalid`);
+`TRUSTWORTHY = {live, manual}`.
 
 - `live` / `manual` support conclusions.
 - `csv` is honest **historical** support — usable for interpretation, but never
@@ -281,9 +285,9 @@ withhold a diagnosis. The real fix is structured engine output, not more pattern
   not traced.
 - **Liveness phrasing.** `LIVE_CLAIM_PATTERNS` misses _"as of this morning's
   reading"_ / _"current reading"_.
-- **Aggressive-action phrasing.** _"Cut the feed in half"_, _"take the res up to
-  900 ppm"_, _"run a heavy flush"_, _"water to 20% runoff"_, and the autoflower
-  techniques _supercrop_ / _lollipop_ are not matched.
+- **Aggressive-action phrasing.** _"Take the res up to 900 ppm"_, _"run a heavy
+  flush"_, _"water to 20% runoff"_, and the autoflower techniques _supercrop_ /
+  _lollipop_ are not matched.
 - **The cautionary exemption can shield a claim.** A limitation word near a data
   noun exempts the whole evidence item, so _"Diary log shows no issues, and EC is
   steady at 1.8"_ escapes provenance checking.

@@ -181,6 +181,8 @@ export const DEVICE_CONTROL_DETECTION_PATTERNS: readonly RegExp[] = [
   // "this may trigger nutrient lockout" / "execute the plan" false positives —
   // but "Activate the pump" / "Trigger the exhaust fan" are direct commands.
   new RegExp(`\\b(activate|trigger)\\s+(the\\s+|your\\s+)?${DEVICE_OBJECT}\\b`, "i"),
+  // Device-bound enable/disable only. "Enable the review workflow" stays clean.
+  new RegExp(`\\b(enable|disable)\\s+(the\\s+|your\\s+)?${DEVICE_OBJECT}\\b`, "i"),
   /\b(start|stop) (the )?(pump|fan|light|lights|heater|humidifier|dehumidifier)\b/i,
   /\b(open|close) (the )?valve\b/i,
   /\bauto-?dose\b/i,

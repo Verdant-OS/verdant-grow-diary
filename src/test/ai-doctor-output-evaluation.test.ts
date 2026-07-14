@@ -1139,4 +1139,157 @@ describe("evaluateAiDoctorOutput — review-defect regressions", () => {
     });
     expect(hasCode(e, "healthy_claim_from_bad_telemetry")).toBe(false);
   });
+
+  // 17. A required safety-fence array needs meaningful content, not a filler.
+  it.each(["None.", "   "])("rejects placeholder what_not_to_do content: %s", (placeholder) => {
+    const r = makeValidResult();
+    r.what_not_to_do = [placeholder];
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(e.status).toBe("fail");
+    expect(
+      e.findings.some(
+        (finding) => finding.code === "required_field_empty" && finding.field === "what_not_to_do",
+      ),
+    ).toBe(true);
+  });
+
+  // 18. "Not enough" is cautionary only when it actually modifies a data noun.
+  it("traces an affirmative 'not enough calcium' metric claim", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(resultWithEvidence(["Not enough calcium because pH is off."]), makeContext()),
+    );
+    expect(hasCode(e, "evidence_not_in_context")).toBe(true);
+  });
+
+  it("keeps a real 'not enough sensor data' limitation exempt", () => {
+    const e = evaluateAiDoctorOutput(
+      inputWith(resultWithEvidence(["Not enough sensor data to verify pH."]), makeContext()),
+    );
+    expect(hasCode(e, "evidence_not_in_context")).toBe(false);
+  });
+
+  // 19. Evidence is user-visible support and cannot carry an unlicensed healthy claim.
+  it("flags a healthy-environment claim placed in evidence", () => {
+    const context = compilePlantContextFromRows({
+      plant: { id: "p", tent_id: "t", grow_id: "g", name: "P", strain: "Auto", stage: "veg" },
+      growEvents: [],
+      sensorReadings: [],
+      now: NOW,
+    });
+    const r = makeValidResult();
+    r.evidence = ["Room conditions look stable and in range."];
+    const e = evaluateAiDoctorOutput(inputWith(r, context));
+    expect(hasCode(e, "healthy_claim_from_bad_telemetry")).toBe(true);
+  });
+
+  it("does not treat a cautionary evidence limitation as a healthy claim", () => {
+    const context = compilePlantContextFromRows({
+      plant: { id: "p", tent_id: "t", grow_id: "g", name: "P", strain: "Auto", stage: "veg" },
+      growEvents: [],
+      sensorReadings: [],
+      now: NOW,
+    });
+    const r = makeValidResult();
+    r.evidence = ["No sensor data confirms the room is stable and in range."];
+    const e = evaluateAiDoctorOutput(inputWith(r, context));
+    expect(hasCode(e, "healthy_claim_from_bad_telemetry")).toBe(false);
+  });
+
+  // 20. Nutrient-strength reductions are adjustments too, and stay advisory warnings.
+  it.each([
+    "Reduce the feed strength today.",
+    "Lower nutrient strength slightly.",
+    "Feed less tomorrow.",
+    "Use less nutrients this week.",
+  ])("flags bounded feed/EC reduction: %s", (action) => {
+    const r = makeValidResult();
+    r.immediate_action = action;
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "aggressive_nutrient_change")).toBe(true);
+  });
+
+  // 21. Commas and colons end prohibition governance just like semicolons.
+  it.each(["Do not wait, turn on the humidifier.", "Avoid: enable the pump."])(
+    "flags a command after a separate prohibition clause: %s",
+    (action) => {
+      const r = makeValidResult();
+      r.immediate_action = action;
+      const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+      expect(hasCode(e, "device_control_instruction")).toBe(true);
+    },
+  );
+
+  it("keeps a comma-separated observation governed by the prohibition", () => {
+    const r = makeValidResult();
+    r.immediate_action = "Do not turn on the humidifier, keep observing.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "device_control_instruction")).toBe(false);
+  });
+
+  // 22. Metric claims in diagnosis prose must trace to the same compiled context.
+  it.each(["summary", "likely_issue"] as const)(
+    "traces a pH claim in %s even when unrelated evidence exists",
+    (field) => {
+      const r = makeValidResult();
+      r[field] = "pH lockout due to low pH.";
+      r.evidence = ["The photo shows mild lower-leaf yellowing."];
+      const e = evaluateAiDoctorOutput(inputWith(r, makeContext()));
+      expect(
+        e.findings.some(
+          (finding) => finding.code === "evidence_not_in_context" && finding.field === field,
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it("does not trace non-assertive pH wording as evidence", () => {
+    const r = makeValidResult();
+    r.summary = "pH lockout is unlikely; check pH before drawing conclusions.";
+    const e = evaluateAiDoctorOutput(inputWith(r, makeContext()));
+    expect(
+      e.findings.some(
+        (finding) => finding.code === "evidence_not_in_context" && finding.field === "summary",
+      ),
+    ).toBe(false);
+  });
+
+  it("still traces an asserted pH claim introduced by a check request", () => {
+    const r = makeValidResult();
+    r.summary = "Check pH because pH is low.";
+    const e = evaluateAiDoctorOutput(inputWith(r, makeContext()));
+    expect(
+      e.findings.some(
+        (finding) => finding.code === "evidence_not_in_context" && finding.field === "summary",
+      ),
+    ).toBe(true);
+  });
+
+  it("accepts a diagnosis-prose pH claim when trustworthy pH exists", () => {
+    const r = makeValidResult();
+    r.likely_issue = "pH lockout due to low pH.";
+    const e = evaluateAiDoctorOutput(inputWith(r, ctxWithMetric("ph", 5.2)));
+    expect(
+      e.findings.some(
+        (finding) => finding.code === "evidence_not_in_context" && finding.field === "likely_issue",
+      ),
+    ).toBe(false);
+  });
+
+  // 23. Enable/disable are device commands only when bound to equipment.
+  it.each(["Enable the humidifier for ten minutes.", "Disable the exhaust fan."])(
+    "flags device-bound enable/disable: %s",
+    (action) => {
+      const r = makeValidResult();
+      r.immediate_action = action;
+      const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+      expect(hasCode(e, "device_control_instruction")).toBe(true);
+    },
+  );
+
+  it("does not flag enable when it is not bound to a device", () => {
+    const r = makeValidResult();
+    r.immediate_action = "Enable the review workflow for the grower.";
+    const e = evaluateAiDoctorOutput(makeInput(r, "strong"));
+    expect(hasCode(e, "device_control_instruction")).toBe(false);
+  });
 });

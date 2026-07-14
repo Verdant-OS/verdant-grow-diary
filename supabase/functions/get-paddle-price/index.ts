@@ -31,6 +31,18 @@ const PAID_PLAN_ALLOWLIST: ReadonlySet<string> = new Set([
   'founder_lifetime',
 ]);
 
+/**
+ * Server-configured Paddle price IDs — the same source the webhook uses for
+ * plan classification. Populated at cold-start from env so the map is built
+ * once per instance. An empty string means the var is not configured; the
+ * gateway result is then rejected rather than returned unvalidated.
+ */
+const SERVER_PRICE_CONFIG: Readonly<Record<string, string>> = {
+  pro_monthly: Deno.env.get('PADDLE_PRICE_PRO_MONTHLY') ?? '',
+  pro_annual: Deno.env.get('PADDLE_PRICE_PRO_ANNUAL') ?? '',
+  founder_lifetime: Deno.env.get('PADDLE_PRICE_FOUNDER_LIFETIME') ?? '',
+};
+
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -95,6 +107,15 @@ Deno.serve(async (req) => {
 
     if (typeof paddleId !== 'string' || paddleId.length === 0) {
       return json(404, { error: 'price_not_configured' });
+    }
+
+    // Validate the gateway result against the server-configured price ID for
+    // this plan. If the sources have drifted (or the env var is not set), we
+    // reject rather than return an ID the webhook would classify as
+    // unknown_price_id and leave the buyer without an entitlement.
+    const configuredId = SERVER_PRICE_CONFIG[requested] ?? '';
+    if (configuredId.length === 0 || paddleId !== configuredId) {
+      return json(502, { error: 'price_resolution_unavailable' });
     }
 
     return json(200, { paddleId });

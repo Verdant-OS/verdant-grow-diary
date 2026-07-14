@@ -70,6 +70,16 @@ export function buildBreedingActionQueuePayloads(
       suggested_change: `${suggestion.title} — by ${dueLabel}`,
       reason: `${suggestion.reason} [event:${event.id}]`,
       risk_level: suggestion.risk_level,
+      // Privacy-safe back-reference: only id, type, source, occurred_at —
+      // no raw notes, no user_id, no device data, no secret-like fields.
+      originating_timeline_events: [
+        {
+          id: event.id,
+          type: event.type,
+          source: "manual",
+          occurred_at: event.occurred_at,
+        },
+      ],
     };
   });
 }

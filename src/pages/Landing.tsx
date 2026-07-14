@@ -265,6 +265,27 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Public first-value utility */}
+      <section className="px-6 py-14 max-w-3xl mx-auto" data-testid="landing-context-check">
+        <div className="rounded-2xl border border-border/70 bg-card p-6 text-center md:p-8">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary/80">
+            Free 60-second check
+          </p>
+          <h2 className="mt-3 font-display text-2xl font-semibold md:text-3xl">
+            Is your grow context ready for AI Doctor?
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
+            Check plant stage, medium, pot size, recent care, photos, sensors, grow targets, and
+            plant history. Nothing is uploaded, and the result never pretends to diagnose a plant.
+          </p>
+          <Link to="/ai-doctor-readiness-check" data-testid="landing-context-check-cta">
+            <Button size="lg" variant="outline" className="mt-6">
+              Check my context
+            </Button>
+          </Link>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className="px-6 py-16 max-w-3xl mx-auto text-center">
         <h2 className="font-display text-2xl md:text-3xl font-semibold">

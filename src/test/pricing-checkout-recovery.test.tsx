@@ -94,6 +94,14 @@ describe("Pricing checkout recovery", () => {
     );
   });
 
+  it("keeps context-check attribution at the lead boundary", () => {
+    renderPricing("/pricing?utm_source=context_check&utm_medium=owned&utm_campaign=context_check");
+    expect(screen.getByTestId("subscriber-interest-form")).toHaveAttribute(
+      "data-lead-source",
+      "pricing_interest_context_check",
+    );
+  });
+
   it("does not retry checkout after a runtime failure", async () => {
     mocks.checkout.unavailable = false;
     mocks.checkout.unavailableMessage = null;

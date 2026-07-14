@@ -81,6 +81,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/actions/:actionId", access: "auth" },
   { path: "/admin/leads", access: "internal" },
   { path: "/ai-doctor", access: "redirect", description: "→ /doctor" },
+  {
+    path: "/ai-doctor-readiness-check",
+    access: "public",
+    description: "Private, no-diagnosis AI Doctor context coverage check.",
+  },
   { path: "/alerts", access: "auth" },
   { path: "/alerts/:alertId", access: "auth" },
   { path: "/auth", access: "public" },

@@ -9,6 +9,14 @@
 export const PRICING_ANALYTICS_EVENT = "verdant:analytics" as const;
 
 export type PricingAnalyticsName =
+  | "context_check_page_view"
+  | "context_check_completed"
+  | "context_check_reset"
+  | "context_check_pricing_clicked"
+  | "context_check_signup_clicked"
+  | "context_check_share_clicked"
+  | "context_check_share_completed"
+  | "context_check_share_failed"
   | "grower_invite_page_view"
   | "grower_invite_share_clicked"
   | "grower_invite_share_completed"

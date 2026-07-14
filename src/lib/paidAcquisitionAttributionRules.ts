@@ -5,7 +5,8 @@ export type PaidAcquisitionSource =
   | "founder_page"
   | "founder_share"
   | "pricing_interest_share"
-  | "grower_invite";
+  | "grower_invite"
+  | "context_check";
 
 export type PaidInterestLeadSource =
   | "pricing_interest"
@@ -13,12 +14,13 @@ export type PaidInterestLeadSource =
   | "pricing_interest_founder_page"
   | "pricing_interest_founder_share"
   | "pricing_interest_referral"
-  | "pricing_interest_grower_invite";
+  | "pricing_interest_grower_invite"
+  | "pricing_interest_context_check";
 
 interface PaidAcquisitionAttribution {
   source: PaidAcquisitionSource;
   medium: "owned" | "referral";
-  campaign: "paid_launch" | "founder_launch" | "grower_invite";
+  campaign: "paid_launch" | "founder_launch" | "grower_invite" | "context_check";
   leadSource: PaidInterestLeadSource;
 }
 
@@ -55,6 +57,12 @@ export const PAID_ACQUISITION_ATTRIBUTIONS: Readonly<
     campaign: "grower_invite",
     leadSource: "pricing_interest_grower_invite",
   }),
+  context_check: Object.freeze({
+    source: "context_check",
+    medium: "owned",
+    campaign: "context_check",
+    leadSource: "pricing_interest_context_check",
+  }),
 });
 
 const PAID_INTEREST_LEAD_SOURCE_SET = new Set<PaidInterestLeadSource>([
@@ -64,6 +72,7 @@ const PAID_INTEREST_LEAD_SOURCE_SET = new Set<PaidInterestLeadSource>([
   "pricing_interest_founder_share",
   "pricing_interest_referral",
   "pricing_interest_grower_invite",
+  "pricing_interest_context_check",
 ]);
 
 export function isPaidInterestLeadSource(value: unknown): value is PaidInterestLeadSource {

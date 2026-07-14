@@ -23,6 +23,7 @@ describe("subscriber-interest lead RLS recovery", () => {
       "pricing_interest_founder_share",
       "pricing_interest_referral",
       "pricing_interest_grower_invite",
+      "pricing_interest_context_check",
     ]) {
       expect(migration).toContain(`'${source}'`);
     }

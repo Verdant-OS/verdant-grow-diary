@@ -24,6 +24,11 @@ const ROUTES = [
     canonical: `${ORIGIN}/founder`,
   },
   {
+    path: "/ai-doctor-readiness-check",
+    expectTitle: /Free AI Doctor Context Check/,
+    canonical: `${ORIGIN}/ai-doctor-readiness-check`,
+  },
+  {
     path: "/hardware-integrations",
     expectTitle: /Sensor & Hardware Integrations/,
     canonical: `${ORIGIN}/hardware-integrations`,

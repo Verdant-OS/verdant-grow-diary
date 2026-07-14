@@ -53,6 +53,13 @@ describe("subscriberInterestRules", () => {
       buildSubscriberInterestLead({
         email: "g@example.com",
         planId: "pro_annual",
+        leadSource: "pricing_interest_context_check",
+      }),
+    ).toMatchObject({ ok: true, payload: { source: "pricing_interest_context_check" } });
+    expect(
+      buildSubscriberInterestLead({
+        email: "g@example.com",
+        planId: "pro_annual",
         leadSource: "reddit:user@example.com",
       }),
     ).toMatchObject({ ok: true, payload: { source: "pricing_interest" } });

@@ -150,12 +150,19 @@ describe("Pricing — proof polish copy", () => {
     expect(text.toLowerCase()).toContain("alerts");
   });
 
-  it("Pricing FAQ v1.1 — checkout sandbox honesty FAQ renders", () => {
+  it("Pricing FAQ v1.1 — checkout honesty FAQ renders (environment-agnostic)", () => {
+    // The old copy described the retired /upgrade sandbox placeholder and
+    // became false in both directions once real checkout shipped: this FAQ
+    // must stay true in sandbox AND live, so it pins the mechanism (Paddle
+    // charges, server verifies, page never self-grants) instead of an
+    // environment state.
     renderPricing();
     const text = openFaqAndGetText("pricing-faq-checkout-sandbox");
     expect(text).toContain("Is checkout live?");
-    expect(text.toLowerCase()).toContain("sandbox preview");
-    expect(text.toLowerCase()).toContain("no live charge");
+    expect(text.toLowerCase()).toContain("paddle");
+    expect(text.toLowerCase()).toContain("server-side");
+    expect(text.toLowerCase()).toContain("never charge you or grant access");
+    expect(text.toLowerCase()).toContain("nothing is charged");
   });
 });
 

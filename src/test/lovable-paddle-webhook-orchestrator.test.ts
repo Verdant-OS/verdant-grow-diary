@@ -417,3 +417,95 @@ describe('handleVerifiedEvent — founder_lifetime price resolution', () => {
     expect(f.upsertCalls).toHaveLength(1);
   });
 });
+
+describe('handleVerifiedEvent — Pro→Founder provider cancellation (double-bill fix)', () => {
+  type CancelDep = NonNullable<Deps['cancelOtherRecurringSubscriptions']>;
+  type CancelResult = Awaited<ReturnType<CancelDep>>;
+
+  function wireFounderPath(
+    f: ReturnType<typeof makeFixture>,
+    cancelResult: CancelResult,
+    allocReason: 'allocated' | 'idempotent' = 'allocated',
+  ) {
+    (f.deps as Deps).allocateFounderLifetime = vi.fn(async () => ({
+      ok: true as const,
+      reason: allocReason,
+    }));
+    const cancel = vi.fn(async () => cancelResult);
+    (f.deps as Deps).cancelOtherRecurringSubscriptions = cancel;
+    return cancel;
+  }
+
+  it('successful grant cancels the other recurring subscriptions with the right scope', async () => {
+    const f = makeFixture();
+    const cancel = wireFounderPath(f, { ok: true, canceled: 1 });
+    const res = await handleVerifiedEvent(f.deps, txEvent('evt_cancel_1'), 'sandbox', NOW, {});
+    expect(res.httpStatus).toBe(200);
+    expect(res.reason).toBe('processed:record_lifetime');
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(cancel).toHaveBeenCalledWith({
+      user_id: 'user-uuid-1',
+      environment: 'sandbox',
+      exceptPaddleSubscriptionId: 'lifetime_txn_abc',
+    });
+    const mark = f.markCalls.at(-1)?.patch;
+    expect(mark?.processing_status).toBe('processed');
+    expect(mark?.processed_ok).toBe(true);
+    expect(mark?.last_error).toBeNull();
+  });
+
+  it('cancel failure NEVER unwinds the grant: still processed + 200, failure on last_error', async () => {
+    const f = makeFixture();
+    wireFounderPath(f, { ok: false, error: 'sub_old_pro:paddle 502' });
+    const res = await handleVerifiedEvent(f.deps, txEvent('evt_cancel_2'), 'sandbox', NOW, {});
+    expect(res.httpStatus).toBe(200);
+    expect(res.reason).toBe('processed:record_lifetime;provider_cancel_failed');
+    const mark = f.markCalls.at(-1)?.patch;
+    expect(mark?.processing_status).toBe('processed');
+    expect(mark?.processed_ok).toBe(true);
+    expect(mark?.last_error).toMatch(/^provider_cancel_failed:/);
+  });
+
+  it('idempotent replay re-attempts the cancel (retries a possibly-failed first pass)', async () => {
+    const f = makeFixture();
+    const cancel = wireFounderPath(f, { ok: true, canceled: 0 }, 'idempotent');
+    const res = await handleVerifiedEvent(f.deps, txEvent('evt_cancel_3'), 'sandbox', NOW, {});
+    expect(res.httpStatus).toBe(200);
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('cap_reached refusal never triggers a cancel (no grant → no cancellation)', async () => {
+    const f = makeFixture();
+    (f.deps as Deps).allocateFounderLifetime = vi.fn(async () => ({
+      ok: false as const,
+      reason: 'cap_reached',
+    }));
+    const cancel = vi.fn(async (): Promise<CancelResult> => ({ ok: true, canceled: 0 }));
+    (f.deps as Deps).cancelOtherRecurringSubscriptions = cancel;
+    const res = await handleVerifiedEvent(f.deps, txEvent('evt_cancel_4'), 'sandbox', NOW, {});
+    expect(res.reason).toBe('skipped:founder_cap_reached');
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it('allocator hard failure (500 path) never triggers a cancel', async () => {
+    const f = makeFixture();
+    (f.deps as Deps).allocateFounderLifetime = vi.fn(async () => ({
+      ok: false as const,
+      reason: 'rpc_error:boom',
+    }));
+    const cancel = vi.fn(async (): Promise<CancelResult> => ({ ok: true, canceled: 0 }));
+    (f.deps as Deps).cancelOtherRecurringSubscriptions = cancel;
+    const res = await handleVerifiedEvent(f.deps, txEvent('evt_cancel_5'), 'sandbox', NOW, {});
+    expect(res.httpStatus).toBe(500);
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it('recurring subscription events never touch the cancel dep', async () => {
+    const f = makeFixture();
+    const cancel = vi.fn(async (): Promise<CancelResult> => ({ ok: true, canceled: 0 }));
+    (f.deps as Deps).cancelOtherRecurringSubscriptions = cancel;
+    const res = await handleVerifiedEvent(f.deps, subEvent(undefined, 'evt_cancel_6'), 'sandbox', NOW, {});
+    expect(res.reason).toBe('processed:upsert_subscription');
+    expect(cancel).not.toHaveBeenCalled();
+  });
+});

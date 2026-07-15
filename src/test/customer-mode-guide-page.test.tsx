@@ -89,6 +89,13 @@ describe("CustomerModeGuide", () => {
     expect(screen.getByTestId("customer-guide-trust-footer")).toBeInTheDocument();
   });
 
+  it("renders the cannabis care FAQ link pointing to the customer-mode FAQ page", () => {
+    renderAt("/customer/share-abc");
+    const link = screen.getByTestId("customer-mode-cannabis-care-link-anchor");
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute("href", "/customer/share-abc/cannabis-care");
+  });
+
   it("timeline shell renders the 'only events explicitly published' copy", () => {
     renderAt("/customer/share-abc");
     expect(

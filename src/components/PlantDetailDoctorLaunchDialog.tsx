@@ -280,9 +280,24 @@ export default function PlantDetailDoctorLaunchDialog({
           <p className="text-xs text-muted-foreground leading-snug">
             {DOCTOR_LAUNCH_HELPER_LINES[1]}
           </p>
+          <p
+            className={
+              blocked
+                ? "text-xs text-amber-300 leading-snug"
+                : "text-xs text-muted-foreground leading-snug"
+            }
+            data-testid="plant-detail-doctor-launch-readiness-notice"
+            data-readiness={readinessResult.readiness}
+          >
+            {gate.message}
+          </p>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+        <DialogFooter
+          className="gap-2 sm:gap-2 flex-col sm:flex-row"
+          data-testid="plant-detail-doctor-launch-footer"
+          data-readiness={readinessResult.readiness}
+        >
           {addContextDecision.kind !== "none" &&
             (addContextDecision.to ? (
               <Button
@@ -314,16 +329,32 @@ export default function PlantDetailDoctorLaunchDialog({
                 <Plus className="h-3.5 w-3.5" /> {addContextDecision.label}
               </Button>
             ))}
-          <Button
-            asChild
-            size="sm"
-            className="gap-1"
-            data-testid="plant-detail-doctor-launch-continue"
-          >
-            <Link to={doctorHref} aria-label="Continue to AI Doctor with plant context">
+          {blocked ? (
+            <Button
+              type="button"
+              size="sm"
+              className="gap-1"
+              disabled
+              aria-disabled="true"
+              title={gate.message}
+              data-testid="plant-detail-doctor-launch-continue-blocked"
+              data-readiness={readinessResult.readiness}
+            >
               Continue to AI Doctor <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </Button>
+            </Button>
+          ) : (
+            <Button
+              asChild
+              size="sm"
+              className="gap-1"
+              data-testid="plant-detail-doctor-launch-continue"
+              data-readiness={readinessResult.readiness}
+            >
+              <Link to={doctorHref} aria-label="Continue to AI Doctor with plant context">
+                Continue to AI Doctor <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

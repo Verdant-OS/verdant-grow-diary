@@ -175,24 +175,30 @@ export default function GuidePage() {
                 const value = `faq-${i}`;
                 const isHighlighted = highlightedFaq === value;
                 return (
-                  <AccordionItem
-                    key={entry.question}
-                    value={value}
+                  <div
+                    key={value}
                     id={value}
+                    ref={(el) => (faqItemRefs.current[value] = el)}
+                    tabIndex={-1}
                     data-highlighted={isHighlighted ? "true" : undefined}
                     className={
                       isHighlighted
-                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 transition-colors duration-500 scroll-mt-24"
-                        : "transition-colors duration-500 scroll-mt-24"
+                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 transition-colors duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        : "transition-colors duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     }
                   >
-                    <AccordionTrigger className="text-left px-2">
-                      {entry.question}
-                    </AccordionTrigger>
-                    <AccordionContent className="px-2">
-                      {entry.answer}
-                    </AccordionContent>
-                  </AccordionItem>
+                    <AccordionItem
+                      value={value}
+                      className="border-0"
+                    >
+                      <AccordionTrigger className="text-left px-2">
+                        {entry.question}
+                      </AccordionTrigger>
+                      <AccordionContent className="px-2">
+                        {entry.answer}
+                      </AccordionContent>
+                    </AccordionItem>
+                  </div>
                 );
               })}
             </Accordion>

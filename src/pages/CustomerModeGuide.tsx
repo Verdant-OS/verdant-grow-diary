@@ -118,6 +118,26 @@ export default function CustomerModeGuide() {
           </dl>
         </section>
 
+        <section
+          data-testid="customer-mode-cannabis-care-link"
+          className="rounded-xl border border-border/60 bg-card/60 p-5"
+        >
+          <h2 className="text-base font-semibold tracking-tight">
+            Cannabis plant care FAQ
+          </h2>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Quick answers to the five most common home-grower questions:
+            watering, nutrients, yellow leaves, environment, and harvest timing.
+          </p>
+          <Link
+            to={shareId ? `/customer/${shareId}/cannabis-care` : "/customer/guide/cannabis-care"}
+            className="mt-3 inline-block text-sm text-primary hover:underline"
+            data-testid="customer-mode-cannabis-care-link-anchor"
+          >
+            Open the FAQ →
+          </Link>
+        </section>
+
         <CustomerGuideTrustFooter />
 
 

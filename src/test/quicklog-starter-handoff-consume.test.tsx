@@ -246,6 +246,43 @@ describe("Quick Log starter-handoff consume-once", () => {
     expect(storedDraftRaw()).toBe(before);
   });
 
+  it("ambiguous handoff (suppressPlantDefault) never auto-picks: not last-target, not the only scoped plant", async () => {
+    // A remembered last target AND a single plant in the active grow are
+    // both present — the two fallbacks pickDefaultQuickLogPlant would
+    // normally use. The ambiguous handoff must leave the choice empty and
+    // refuse to write until the grower picks.
+    seedDraft();
+    setLocalStorageItemForTest(
+      "verdant.quickLog.lastTarget.v1",
+      JSON.stringify({
+        plantId: "plant-1",
+        growId: "grow-1",
+        tentId: "tent-1",
+        savedAt: "2026-07-15T09:00:00.000Z",
+      }),
+    );
+    const before = storedDraftRaw();
+    renderWithClient(
+      <QuickLog
+        open
+        onOpenChange={vi.fn()}
+        prefill={handoffPrefill({
+          plantId: null,
+          plantName: null,
+          growId: null,
+          tentId: null,
+          suppressPlantDefault: true,
+        })}
+      />,
+    );
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument(),
+    );
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(storedDraftRaw()).toBe(before);
+  });
+
   it("seeds the starter watering volume only-if-empty and the grower-confirmed payload carries it", async () => {
     seedDraft(
       starterDraft({ id: "draft-w", logType: "watering", note: "", wateringVolumeMl: 500 }),

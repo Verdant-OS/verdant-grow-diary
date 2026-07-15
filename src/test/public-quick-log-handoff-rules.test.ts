@@ -268,6 +268,7 @@ describe("mapDraftToQuickLogPrefill — supported fields only, nothing invented"
       suggestSnapshot: false,
       source: "public-starter",
       publicStarterDraftId: "draft-1",
+      suppressPlantDefault: false,
     });
   });
 
@@ -312,9 +313,24 @@ describe("mapDraftToQuickLogPrefill — supported fields only, nothing invented"
     expect(prefill.plantName).toBeNull();
     expect(prefill.growId).toBeNull();
     expect(prefill.tentId).toBeNull();
+    // ...and the dialog's own auto-defaulting is suppressed, so nothing
+    // quietly pre-selects a plant the grower was told THEY would pick
+    // (last-target / only-plant-in-active-grow fallbacks included).
+    expect(prefill.suppressPlantDefault).toBe(true);
     // The nickname is the grower's word, not a database key — it must not
     // masquerade as a resolved plant name.
     expect(JSON.stringify(prefill)).not.toContain("Blue Dream");
+  });
+
+  it("suggestion-less matches always carry suppressPlantDefault; suggestions never do", () => {
+    const none = matchHandoffPlant("Anything", []);
+    expect(
+      mapDraftToQuickLogPrefill({ draft: draft(), match: none }).suppressPlantDefault,
+    ).toBe(true);
+    const only = matchHandoffPlant("No Match", listEligibleHandoffPlants([plant()], []));
+    expect(
+      mapDraftToQuickLogPrefill({ draft: draft(), match: only }).suppressPlantDefault,
+    ).toBe(false);
   });
 
   it("never emits URLs or query strings (grower content stays in memory)", () => {

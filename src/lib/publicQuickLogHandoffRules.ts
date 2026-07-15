@@ -204,6 +204,13 @@ export interface PublicQuickLogHandoffPrefill {
   suggestSnapshot: false;
   source: "public-starter";
   publicStarterDraftId: string;
+  /**
+   * True when the handoff carries NO plant suggestion (ambiguous or no
+   * eligible plants): the resume card told the grower THEY choose, so the
+   * Quick Log dialog's own last-target/only-plant defaulting must not
+   * quietly pre-select one either.
+   */
+  suppressPlantDefault: boolean;
 }
 
 /**
@@ -240,5 +247,6 @@ export function mapDraftToQuickLogPrefill(args: {
     suggestSnapshot: false,
     source: "public-starter",
     publicStarterDraftId: args.draft.id,
+    suppressPlantDefault: suggested === null,
   };
 }

@@ -179,6 +179,12 @@ export interface QuickLogPrefill {
    * never sent anywhere and never triggers a write by itself.
    */
   publicStarterDraftId?: string | null;
+  /**
+   * True when an ambiguous starter handoff requires the grower to choose
+   * the plant themselves: suppresses the dialog's last-target/only-plant
+   * auto-defaulting so nothing is quietly pre-selected.
+   */
+  suppressPlantDefault?: boolean | null;
 }
 
 interface Props {
@@ -426,6 +432,9 @@ export default function QuickLog({
   useEffect(() => {
     if (!open) return;
     if (plantId) return;
+    // Ambiguous public-starter handoffs told the grower THEY pick the
+    // plant; last-target / only-plant defaults must not pick one for them.
+    if (prefill?.suppressPlantDefault && !prefill?.plantId) return;
 
     const lastTarget = readLastTarget();
     const lastPlantId = lastTarget?.plantId ?? null;
@@ -439,7 +448,7 @@ export default function QuickLog({
       plantId || null,
     );
     if (next && next !== plantId) setPlantId(next);
-  }, [open, plantId, scopedPlants, prefill?.plantId]);
+  }, [open, plantId, scopedPlants, prefill?.plantId, prefill?.suppressPlantDefault]);
 
   const sensorTentId = selectedPlant?.tent_id ?? null;
   const sensorState = useLatestTentSensorSnapshot(sensorTentId);

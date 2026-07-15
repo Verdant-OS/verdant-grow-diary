@@ -214,6 +214,7 @@ describe("<PublicQuickLogHandoffCard />", () => {
       suggestSnapshot: false,
       source: "public-starter",
       publicStarterDraftId: "draft-1",
+      suppressPlantDefault: false,
     });
     // Draft untouched: display/handoff never consumes it.
     expect(storedDraftRaw()).toBe(before);
@@ -291,6 +292,7 @@ describe("<PublicQuickLogHandoffCard />", () => {
     window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
     expect(events[0].detail.plantId).toBeNull();
     expect(events[0].detail.plantName).toBeNull();
+    expect(events[0].detail.suppressPlantDefault).toBe(true);
   });
 
   it("feeding drafts state the 'Coming soon' caveat up front", () => {

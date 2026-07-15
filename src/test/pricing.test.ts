@@ -320,16 +320,31 @@ describe("Safety: no private data on public page", () => {
 
   it("does not import supabase client or private hooks", () => {
     expect(PAGE).not.toMatch(/@\/integrations\/supabase\/client/);
-    // Allowed: usePageSeo (SEO <head> only) and usePaddleCheckout
-    // (auth-state + Paddle overlay; signed-out users bounce to /auth). Any
-    // other @/hooks import (dashboard data hooks) remains forbidden.
-    expect(PAGE).not.toMatch(/@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b)/);
+    // Allowed: usePageSeo (SEO <head> only), usePaddleCheckout
+    // (auth-state + Paddle overlay; signed-out users bounce to /auth), and
+    // useFounderSlotsRemaining (public slot counter via edge function;
+    // fails soft, never grants entitlement). Any other @/hooks import
+    // (dashboard data hooks) remains forbidden.
+    expect(PAGE).not.toMatch(
+      /@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b|useFounderSlotsRemaining\b)/,
+    );
     // And the checkout hook itself must stay free of private data reads —
     // it may read auth session state, never tables or the supabase client.
     const CHECKOUT_HOOK = readSrc("hooks/usePaddleCheckout.ts");
     expect(CHECKOUT_HOOK).not.toMatch(/@\/integrations\/supabase\/client/);
     expect(CHECKOUT_HOOK).not.toMatch(/supabase\s*\.\s*from\(/);
     expect(CHECKOUT_HOOK).not.toMatch(/service_role/);
+    // The founder-slots hook may invoke ONLY its public edge function —
+    // no table reads, no service_role, no other function invocations.
+    const SLOTS_HOOK = readSrc("hooks/useFounderSlotsRemaining.ts");
+    expect(SLOTS_HOOK).not.toMatch(/supabase\s*\.\s*from\(/);
+    expect(SLOTS_HOOK).not.toMatch(/service_role/);
+    const invokes =
+      SLOTS_HOOK.match(/functions\.invoke\(\s*["']([^"']+)["']/g) ?? [];
+    expect(invokes.length).toBeGreaterThan(0);
+    for (const inv of invokes) {
+      expect(inv).toMatch(/founder-slots-remaining/);
+    }
   });
 
   it("introduces no service_role or ai-coach call", () => {

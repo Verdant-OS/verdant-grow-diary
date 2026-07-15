@@ -91,6 +91,9 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/terms",
   "/privacy",
   "/refund",
+  // Public 30-second Quick Log starter: local draft only, mounted outside
+  // AppShell — must render signed-out with zero private-table fetches.
+  "/quick-log",
 ];
 
 // Internal fixture-only demo surfaces DELIBERATELY mounted OUTSIDE AppShell

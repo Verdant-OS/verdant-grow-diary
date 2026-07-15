@@ -16,7 +16,9 @@ export type AiDoctorContextQuickActionKind =
   | "update_plant_profile"
   | "add_recent_log"
   | "add_manual_sensor_snapshot"
+  | "capture_new_snapshot"
   | "add_plant_photo";
+
 
 export interface AiDoctorContextQuickActionLinkTarget {
   kind: "link";

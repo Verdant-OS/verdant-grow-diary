@@ -13,12 +13,10 @@ export type PlanId =
 
 export type SubscriptionStatus =
   | "active"
-  | "trialing"
   | "past_due"
   | "canceled"
   | "paused"
   | "expired";
-
 
 export type BillingProvider = "stripe" | "paddle";
 

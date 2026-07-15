@@ -68,13 +68,11 @@ const KNOWN_PRICE_TO_PLAN: Readonly<Record<string, PlanId>> = Object.freeze({
 
 const KNOWN_STATUSES: ReadonlyArray<SubscriptionStatus> = [
   "active",
-  "trialing",
   "past_due",
   "canceled",
   "paused",
   "expired",
 ];
-
 
 function isKnownStatus(v: string): v is SubscriptionStatus {
   return (KNOWN_STATUSES as ReadonlyArray<string>).includes(v);

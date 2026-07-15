@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { XCircle } from "lucide-react";
-import { consumeCheckoutReturnTo } from "@/lib/checkoutReturnToSession";
 
 /**
  * Cancel / not-completed landing.
@@ -12,12 +10,6 @@ import { consumeCheckoutReturnTo } from "@/lib/checkoutReturnToSession";
  * Reached when the Paddle overlay is dismissed without completing or
  * when the checkout URL is opened directly. Copy is calm — no fake
  * urgency, no re-prompt aggression.
- *
- * L5 (audit fix): consume the sanitized return-to that
- * usePaddleCheckout persisted before opening the overlay, and offer it
- * as the primary "Go back" target so a buyer who cancelled from a gated
- * surface (e.g. /pheno-hunts/new) can return there in one click instead
- * of being dropped on generic /pricing.
  */
 export default function CheckoutCancel() {
   usePageSeo({
@@ -26,25 +18,10 @@ export default function CheckoutCancel() {
     path: "/checkout/cancel",
   });
 
-  const [safeReturnTo, setSafeReturnTo] = useState<string | null>(null);
-
-  // Consume once on mount. useMemo would swallow StrictMode double-invoke
-  // but useEffect is the correct one-shot boundary here.
-  useEffect(() => {
-    setSafeReturnTo(consumeCheckoutReturnTo());
-  }, []);
-
-  const returnLabel = useMemo(() => {
-    if (!safeReturnTo) return null;
-    if (safeReturnTo.startsWith("/pheno")) return "Back to Pheno Hunt";
-    return "Back to where you were";
-  }, [safeReturnTo]);
-
   return (
     <main
       className="min-h-screen bg-background text-foreground flex flex-col"
       data-testid="checkout-cancel-page"
-      data-return-to={safeReturnTo ?? ""}
     >
       <header className="px-6 py-5 max-w-6xl mx-auto w-full">
         <Link to="/" className="flex items-center gap-2">
@@ -63,15 +40,8 @@ export default function CheckoutCancel() {
           diary stays on the Free tier until you complete a purchase.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          {safeReturnTo && returnLabel && (
-            <Link to={safeReturnTo} data-testid="checkout-cancel-return-to">
-              <Button size="lg">{returnLabel}</Button>
-            </Link>
-          )}
-          <Link to="/pricing" data-testid="checkout-cancel-pricing">
-            <Button size="lg" variant={safeReturnTo ? "outline" : "default"}>
-              Back to pricing
-            </Button>
+          <Link to="/pricing">
+            <Button size="lg">Back to pricing</Button>
           </Link>
           <Link to="/">
             <Button size="lg" variant="outline">

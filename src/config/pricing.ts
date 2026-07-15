@@ -1,47 +1,32 @@
 /**
- * Pricing tiers — presenter data for the /upgrade page.
+ * Pricing tiers — source of truth for the /upgrade page.
  *
- * L1 (audit fix): price display strings and the founder cap number are
- * DERIVED from `src/constants/pricing.ts` so /pricing and /upgrade cannot
- * disagree on the number a user sees. Feature copy and comparison rows
- * remain here because /upgrade has a wider comparison table than the
- * /pricing cards; both pages nonetheless reference the same source of
- * truth for cardinal numbers.
+ * All tier data (names, prices, billing periods, Paddle price IDs, features,
+ * caps) lives here and nowhere else. Components must READ from this module —
+ * never hardcode a price, tier name, or feature string in JSX.
  *
  * SAFETY:
- *  - Never grants entitlement.
- *  - `paddlePriceId` is a HUMAN-READABLE plan id (e.g. "pro_monthly"), not
- *    a raw `pri_...`; get-paddle-price resolves it server-side. This
- *    mirrors what /pricing already does via usePaddleCheckout.
- *  - `cap.claimed` here is a legacy display default; the live counter now
- *    comes from `useFounderSlotsRemaining()`.
+ *  - `priceDisplay` values are PLACEHOLDERS and provisional. Do not treat as final.
+ *  - Every `paddlePriceId` is `null` until the corresponding Paddle price is
+ *    created. Any CTA bound to a null price MUST be inert (see Upgrade page).
+ *  - `cap.claimed` is display-only. Founder-cap enforcement happens server-side.
  */
-
-import {
-  PRO_MONTHLY_PRICE_USD,
-  PRO_ANNUAL_PRICE_USD,
-  FOUNDER_LIFETIME_PRICE_USD,
-  FOUNDER_LIFETIME_LIMIT,
-} from "@/constants/pricing";
 
 export type BillingPeriod = "free" | "monthly" | "annual" | "lifetime";
 
 export interface PricingTier {
   id: string;
   name: string;
-  /** Display price string; derived from constants/pricing for L1 consistency. */
+  /** PLACEHOLDER, provisional display string. */
   priceDisplay: string;
   priceSubtext: string;
   billingPeriod: BillingPeriod;
-  /**
-   * Human-readable plan id passed to `usePaddleCheckout` / `get-paddle-price`.
-   * `null` means "no checkout for this tier" (the Free tier).
-   */
+  /** null until the Paddle price is created. CTA must be inert when null. */
   paddlePriceId: string | null;
   /** Exact feature strings shown on pricing cards and the upgrade success panel. */
   features: string[];
   highlighted?: boolean;
-  /** Founder Lifetime only. Display-only fallback; live counter overrides. */
+  /** Founder Lifetime only. Display-only counters. */
   cap?: { total: number; claimed: number };
 }
 
@@ -67,30 +52,30 @@ export const PRICING_TIERS: PricingTier[] = [
   {
     id: "pro_monthly",
     name: "Pro",
-    priceDisplay: `$${PRO_MONTHLY_PRICE_USD}`,
+    priceDisplay: "$12", // PLACEHOLDER
     priceSubtext: "per month",
     billingPeriod: "monthly",
-    paddlePriceId: "pro_monthly",
+    paddlePriceId: null,
     highlighted: true,
     features: [...PRO_UNLOCKED_FEATURES],
   },
   {
     id: "pro_annual",
     name: "Pro Annual",
-    priceDisplay: `$${PRO_ANNUAL_PRICE_USD}`,
+    priceDisplay: "$115", // PLACEHOLDER
     priceSubtext: "per year",
     billingPeriod: "annual",
-    paddlePriceId: "pro_annual",
+    paddlePriceId: null,
     features: [...PRO_UNLOCKED_FEATURES, "Annual billing value"],
   },
   {
     id: "founder_lifetime",
     name: "Founder Lifetime",
-    priceDisplay: `$${FOUNDER_LIFETIME_PRICE_USD}`,
+    priceDisplay: "$129", // PLACEHOLDER
     priceSubtext: "one-time",
     billingPeriod: "lifetime",
-    paddlePriceId: "founder_lifetime",
-    cap: { total: FOUNDER_LIFETIME_LIMIT, claimed: 0 },
+    paddlePriceId: null,
+    cap: { total: 75, claimed: 0 },
     features: [
       ...PRO_UNLOCKED_FEATURES,
       "Ongoing Pro-level access",
@@ -98,7 +83,6 @@ export const PRICING_TIERS: PricingTier[] = [
     ],
   },
 ];
-
 
 /**
  * Plan comparison rows.
@@ -117,12 +101,11 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
     label: "Price",
     values: {
       free: "$0",
-      pro_monthly: `$${PRO_MONTHLY_PRICE_USD} / mo`,
-      pro_annual: `$${PRO_ANNUAL_PRICE_USD} / yr`,
-      founder_lifetime: `$${FOUNDER_LIFETIME_PRICE_USD} once`,
+      pro_monthly: "$12 / mo",
+      pro_annual: "$115 / yr",
+      founder_lifetime: "$129 once",
     },
   },
-
   {
     label: "Billing period",
     values: {

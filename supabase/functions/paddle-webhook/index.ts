@@ -1,18 +1,5 @@
-// Paddle webhook receiver — LEGACY BYO ("bring-your-own-key") STACK · SANDBOX ONLY.
+// Paddle webhook receiver — SANDBOX ONLY.
 //
-// M2 (audit fix): this file is NOT the canonical Lovable Stack A webhook.
-// The active production sink is `supabase/functions/payments-webhook/`,
-// which is what Lovable's built-in Paddle registration points at (env=live
-// and env=sandbox both route there). This BYO handler stays behind because
-// the operator audit surfaces (OperatorPaddleProcessingAudit,
-// OperatorBillingSubscriptionUpdateAudit,
-// OperatorBillingEntitlementResolutionAudit) still read from the
-// `paddle_events` / `paddle_event_processing` / `billing_subscriptions`
-// tables it maintains. It is deliberately sandbox-only — a live payload
-// arriving here would be refused by the environment gate below, since no
-// registered live endpoint routes into this function.
-//
-
 // Responsibilities:
 //   1. Read the RAW request body (signature verification requires the exact
 //      bytes Paddle signed; do NOT JSON.parse before verifying).

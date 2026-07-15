@@ -62,8 +62,6 @@ import PhenoTrackerPreviewCard from "@/components/PhenoTrackerPreviewCard";
 import { logsPath } from "@/lib/routes";
 import { resolvePaddleConfig, unavailableMessage, type PaddleConfig } from "@/lib/paddleConfig";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
-import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
-
 
 // --- Paddle overlay typing (loose — we only call a couple of methods). -------
 interface PaddleCheckoutOpenPayload {
@@ -641,8 +639,6 @@ export default function Upgrade() {
     setConfirmState({ tier });
   };
 
-  const { openCheckout: canonicalOpenCheckout } = usePaddleCheckout();
-
   const handleConfirm = () => {
     const tier = confirmState?.tier;
     setConfirmState(null);
@@ -652,27 +648,33 @@ export default function Upgrade() {
       toast.error("Checkout is not available for this plan yet.");
       return;
     }
-    if (!paddleConfig.available) {
+    if (!paddleConfig.available || !paddle?.Checkout) {
       toast.error("Checkout is not ready yet.");
       return;
     }
-    // M1 (audit fix): route through the canonical usePaddleCheckout so
-    // cancel events go through the shared `checkoutOverlaySession` router
-    // (which navigates to /checkout/cancel) and the returnTo is persisted
-    // by `saveCheckoutReturnTo` for L5. The previous local `paddle.Checkout.open`
-    // path forgot to register the overlay session, so a dismissed overlay
-    // silently left the buyer on /upgrade with no signal.
-    const safeReturnTo = sanitizeCheckoutReturnTo(searchParams.get("returnTo"));
-    const successBase = `${window.location.origin}/checkout/success`;
-    const successUrl = safeReturnTo
-      ? `${successBase}?returnTo=${encodeURIComponent(safeReturnTo)}`
-      : successBase;
-    void canonicalOpenCheckout({
-      priceId: tier.paddlePriceId,
-      successUrl,
-    });
+    try {
+      // Forward a same-origin returnTo (e.g. /upgrade?returnTo=/pheno-hunts/new)
+      // into Paddle's successUrl so CheckoutSuccess can round-trip the buyer
+      // back to the gated surface once entitlement is confirmed. Raw query
+      // value is sanitized first — unsafe values are dropped, never forwarded,
+      // and no customer/subscription IDs are ever placed in the URL.
+      const safeReturnTo = sanitizeCheckoutReturnTo(searchParams.get("returnTo"));
+      const successBase = `${window.location.origin}/checkout/success`;
+      const successUrl = safeReturnTo
+        ? `${successBase}?returnTo=${encodeURIComponent(safeReturnTo)}`
+        : successBase;
+      paddle.Checkout.open({
+        items: [{ priceId: tier.paddlePriceId, quantity: 1 }],
+        settings: { successUrl },
+        successCallback: () => {
+          toast.success("Checkout complete. Your plan will update once confirmed.");
+        },
+        closeCallback: () => {},
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Checkout failed to open.");
+    }
   };
-
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-12">

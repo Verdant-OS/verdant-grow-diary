@@ -119,30 +119,8 @@ function buildDeps(): Deps {
         return { ok: false, error: String(e instanceof Error ? e.message : e) };
       }
     },
-    async allocateFounderLifetime({ user_id, paddle_transaction_id, paddle_customer_id, environment, now }) {
-      // H3 (audit fix): atomic Founder Lifetime allocation. Delegates to
-      // allocate_lovable_founder_lifetime, which is service_role-only,
-      // advisory-locked, and enforces the 75-slot cap.
-      const { data, error } = await sb.rpc('allocate_lovable_founder_lifetime', {
-        p_user_id: user_id,
-        p_paddle_transaction_id: paddle_transaction_id,
-        p_paddle_customer_id: paddle_customer_id,
-        p_environment: environment,
-        p_now: now.toISOString(),
-      });
-      if (error) {
-        return { ok: false, reason: `rpc_error:${error.message}` };
-      }
-      const payload = (data ?? {}) as { ok?: boolean; reason?: string };
-      if (payload.ok === true) {
-        const reason = payload.reason === 'idempotent' ? 'idempotent' : 'allocated';
-        return { ok: true, reason };
-      }
-      return { ok: false, reason: payload.reason ?? 'unknown_allocator_result' };
-    },
   };
 }
-
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {

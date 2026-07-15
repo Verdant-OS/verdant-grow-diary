@@ -47,14 +47,12 @@ describe("get-paddle-price — server-controlled environment", () => {
     expect(stripped).not.toMatch(/body\??\.environment/);
   });
 
-  it("H1 (audit fix): the blanket live_billing_not_enabled 409 is removed so live checkout can settle", () => {
-    // The Lovable webhook path (payments-webhook + allocate_lovable_founder_lifetime)
-    // now handles both environments and enforces the founder cap atomically,
-    // so the previous blanket live refusal is no longer correct.
-    expect(stripped).not.toMatch(/if \(environment === 'live'\)/);
-    expect(SRC).not.toMatch(/live_billing_not_enabled/);
+  it("rejects a live environment until the approved live-enable change lands", () => {
+    // The webhook and both reconciliation RPCs are sandbox-only; a live price
+    // would let a real charge settle with no entitlement path.
+    expect(stripped).toMatch(/if \(environment === 'live'\)/);
+    expect(SRC).toMatch(/live_billing_not_enabled/);
   });
-
 });
 
 describe("get-paddle-price — founder sold-out pre-check (before payment)", () => {

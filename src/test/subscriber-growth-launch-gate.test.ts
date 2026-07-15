@@ -6,6 +6,7 @@ import {
   formatSubscriberGrowthLaunchGate,
 } from "../../scripts/releases/subscriber-growth-launch-gate-rules.mjs";
 import {
+  formattableChangedFiles,
   parseGitPorcelainPaths,
   parseSubscriberGrowthGateArgs,
   parseVitestTotals,
@@ -45,6 +46,7 @@ const source = {
   releaseDirtyPaths: [],
   changedFiles: 100,
   changedTestFiles: 55,
+  changedFormattableFiles: 95,
 };
 
 const localParity = {
@@ -257,5 +259,31 @@ describe("subscriber growth launch gate", () => {
     expect(
       parseGitPorcelainPaths(" M supabase/functions/mcp/index.ts\r\n?? docs/release note.md\r\n"),
     ).toEqual(["supabase/functions/mcp/index.ts", "docs/release note.md"]);
+  });
+
+  it("format-checks the complete base-relative release diff instead of only the tip commit", () => {
+    const releaseDiff = [
+      "src/lib/subscriberGrowthSprintRules.ts",
+      "docs/releases/subscriber-growth-launch-runbook.md",
+      "supabase/migrations/20260714190000_restore_public_lead_insert_only.sql",
+      "dist/assets/index.js",
+    ];
+
+    expect(formattableChangedFiles(releaseDiff)).toEqual([
+      "src/lib/subscriberGrowthSprintRules.ts",
+      "docs/releases/subscriber-growth-launch-runbook.md",
+      "dist/assets/index.js",
+    ]);
+    expect(
+      formatSubscriberGrowthLaunchGate({
+        ...buildSubscriberGrowthReleaseReceipt({
+          generatedAt: "2026-07-15T00:00:00.000Z",
+          source,
+          commands,
+          localParity,
+          liveRequired: false,
+        }),
+      }),
+    ).toContain("Format scope: 95 changed files");
   });
 });

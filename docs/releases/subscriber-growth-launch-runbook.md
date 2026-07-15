@@ -3,7 +3,8 @@
 This gate packages the subscriber-growth branch into reproducible release
 evidence. It checks the repository identity and base ancestry, requires a
 clean release scope, runs every changed targeted test plus type-check/build/lint/
-diff integrity, verifies formatting on the release commit, audits the
+diff integrity, verifies formatting across the complete base-relative release
+diff, audits the
 production build through a local Vite preview, and optionally compares the
 live site with the same capability contract.
 
@@ -28,8 +29,9 @@ bun run release:subscriber-growth:gate:local
    when it is not part of the branch diff; every other dirty path blocks.
 3. At least one changed targeted test.
 4. Every changed targeted test passing.
-5. Type-check, production build, branch-wide changed-code ESLint, release-
-   commit Prettier, and branch diff integrity passing.
+5. Type-check, production build, branch-wide changed-code ESLint, base-relative
+   changed-file Prettier, and branch diff integrity passing. A merge commit must
+   not substitute newly arrived default-branch files for the release diff.
 6. All four fixed subscriber-growth migrations passing the source, RLS,
    operator-only aggregate, active-paid, attribution, and activation contract.
 7. All public subscriber-growth routes and all fixed capability markers

@@ -87,15 +87,6 @@ function changedFiles(baseRef) {
   return output ? output.split(/\r?\n/).filter(Boolean) : [];
 }
 
-function headCommitFiles() {
-  try {
-    const output = git(["diff", "--name-only", "HEAD^", "HEAD"]);
-    return output ? output.split(/\r?\n/).filter(Boolean) : [];
-  } catch {
-    return [];
-  }
-}
-
 function runnableChangedTests(files) {
   return files.filter(
     (file) => /^src\/test\/.*\.test\.[cm]?[jt]sx?$/.test(file) && !file.includes("/helpers/"),
@@ -108,7 +99,7 @@ function lintableChangedFiles(files) {
   );
 }
 
-function formattableChangedFiles(files) {
+export function formattableChangedFiles(files) {
   return files.filter((file) => /\.(?:[cm]?[jt]s|tsx|json|md|yml|yaml)$/.test(file));
 }
 
@@ -173,7 +164,7 @@ function inspectMigrationContract() {
   };
 }
 
-function inspectSource(args, files, tests) {
+function inspectSource(args, files, tests, formattable) {
   const remote = git(["remote", "get-url", "origin"]);
   let baseAncestor = false;
   try {
@@ -208,6 +199,7 @@ function inspectSource(args, files, tests) {
     releaseDirtyPaths,
     changedFiles: files.length,
     changedTestFiles: tests.length,
+    changedFormattableFiles: formattable.length,
   };
 }
 
@@ -233,11 +225,10 @@ function writeReceipt(out, receipt) {
 
 export async function runSubscriberGrowthLaunchGate(args) {
   const files = changedFiles(args.baseRef);
-  const commitFiles = headCommitFiles();
   const tests = runnableChangedTests(files);
   const lintable = lintableChangedFiles(files);
-  const formattable = formattableChangedFiles(commitFiles);
-  const source = inspectSource(args, files, tests);
+  const formattable = formattableChangedFiles(files);
+  const source = inspectSource(args, files, tests, formattable);
 
   const commands = [
     runCommand("targeted_tests", "bunx", ["vitest", "run", ...tests, "--reporter=dot"]),

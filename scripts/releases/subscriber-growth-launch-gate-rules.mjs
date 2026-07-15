@@ -137,6 +137,7 @@ export function formatSubscriberGrowthLaunchGate(receipt) {
     `Commit: ${receipt.source.head}`,
     `Branch: ${receipt.source.branch}`,
     `Changed tests: ${receipt.source.changedTestFiles}`,
+    `Format scope: ${receipt.source.changedFormattableFiles ?? 0} changed files`,
     `Ignored generated paths: ${receipt.source.ignoredDirtyPaths?.length ?? 0}`,
     `Targeted tests: ${tests?.testsPassed ?? 0}/${tests?.testsTotal ?? 0}`,
     `Migration contract: ${migrations?.migrationsPassed ?? 0}/${migrations?.migrationsTotal ?? 0}`,

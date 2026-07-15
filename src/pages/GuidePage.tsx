@@ -48,11 +48,17 @@ export default function GuidePage() {
     if (!hash.startsWith("faq-")) return;
     setOpenFaq(hash);
     setHighlightedFaq(hash);
-    // Defer scroll until after the accordion item opens.
+    // Defer scroll until after the accordion item opens, then move focus
+    // to the highlighted item so keyboard users land on the answer they
+    // deep-linked into.
     const scrollT = window.setTimeout(() => {
-      const el = document.getElementById(hash);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
+      const el = faqItemRefs.current[hash] ?? document.getElementById(hash);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        // Focus is safe to call after scrolling; the wrapper has tabIndex=-1.
+        el.focus({ preventScroll: true });
+      }
+    }, 100);
     // Fade the highlight after a few seconds so it doesn't dominate.
     const fadeT = window.setTimeout(() => setHighlightedFaq(undefined), 2600);
     return () => {

@@ -217,6 +217,18 @@ export function buildAiDoctorContextQuickActions(
     if (!prev.includes(code)) prev.push(code);
     bucket.set(kind, prev);
   }
+  // "Capture new snapshot" is triggered by freshness state (stale /
+  // missing), independent of the 7-day missing-context code. Tagged
+  // with a synthetic satisfies code so downstream tests/analytics can
+  // distinguish it from the 7-day surface.
+  if (
+    args.snapshotFreshnessState === "stale" ||
+    args.snapshotFreshnessState === "missing"
+  ) {
+    bucket.set("capture_new_snapshot", [
+      `snapshot-freshness-${args.snapshotFreshnessState}`,
+    ]);
+  }
   const out: AiDoctorContextQuickAction[] = [];
   for (const kind of ACTION_ORDER) {
     const codes = bucket.get(kind);
@@ -225,6 +237,7 @@ export function buildAiDoctorContextQuickActions(
   }
   return out;
 }
+
 
 /** Calm, non-actionable copy when no warning context exists. */
 export const AI_DOCTOR_NO_WARNING_CONTEXT_COPY = "No warning context found.";

@@ -254,7 +254,9 @@ export default function Dashboard() {
   const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
 
   return (
-    <main className="space-y-4 md:space-y-6" data-testid="dashboard-root" aria-labelledby="dashboard-page-header">
+    {/* Non-landmark container: AppShell already owns the <main> landmark
+        around the route Outlet, so the page root must not nest another. */}
+    <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
       <QuickLogV2Fab />
       <GrowBreadcrumbs
         growId={urlGrowId}
@@ -1529,7 +1531,7 @@ export default function Dashboard() {
           Select a grow to see scoped activity.
         </p>
       )}
-    </main>
+    </div>
   );
 }
 

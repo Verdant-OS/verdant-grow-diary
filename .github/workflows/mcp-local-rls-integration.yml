@@ -49,10 +49,11 @@ jobs:
     name: MCP RLS harness (local Supabase)
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # OPTIONAL lane (mirrors security-db-local.yml): the harness needs a local
-    # Supabase container the shared runners cannot always provide. Never
-    # blocks the merge queue; enable deliberately per run or via repo var.
-    continue-on-error: true
+    # OPT-IN lane (mirrors security-db-local.yml): the harness needs a local
+    # Supabase container the shared runners cannot always provide. Disabled
+    # runs skip every step and pass; when an operator or repo var enables the
+    # lane, results are authoritative — no continue-on-error, so an isolation
+    # regression fails the workflow instead of being masked.
     env:
       ENABLED: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_mcp_rls == true) || vars.ENABLE_MCP_RLS_LANE == 'true' }}
     steps:

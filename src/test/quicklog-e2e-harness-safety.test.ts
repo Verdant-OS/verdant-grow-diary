@@ -79,6 +79,13 @@ describe("Quick Log Playwright harness safety", () => {
       if (!serviceRoleIdentifierExempt) {
         expect(scrubbed, `${file} must not reference service_role`).not.toMatch(/service_role/i);
       }
+      // The scrub blanks string literals, so an executable env read like
+      // Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") disappears from the
+      // scrubbed text. Catch the call-site shape in the RAW source —
+      // denylist declarations never take this exact form.
+      expect(body, `${file} must not read a service-role env key`).not.toMatch(
+        /env\.get\(\s*["'`][^"'`\n]*SERVICE_ROLE[^"'`\n]*["'`]\s*\)/i,
+      );
       // Passwords / bearer JWTs are literal-string leaks, so scan the
       // raw body — a real leak would appear as a string literal.
       expect(body, `${file} must not hardcode passwords`).not.toMatch(
@@ -89,7 +96,7 @@ describe("Quick Log Playwright harness safety", () => {
   });
 
   it("does not touch action_queue, functions.invoke, or mini-charts", () => {
-    for (const { file, scrubbed } of files) {
+    for (const { file, body, scrubbed } of files) {
       if (!/\.(ts|tsx)$/.test(file)) continue;
       // Auth route-protection specs legitimately list action_queue as a
       // private table they guard against — exempt them from this check.
@@ -115,14 +122,34 @@ describe("Quick Log Playwright harness safety", () => {
       expect(scrubbed, `${file} must not call action_queue`).not.toMatch(/action_queue/);
       expect(scrubbed, `${file} must not call functions.invoke`).not.toMatch(/functions\.invoke/);
       expect(scrubbed, `${file} must not import mini-chart UI`).not.toMatch(/MiniChart|mini-chart/);
+      // The scrub blanks string literals, so runtime table access like
+      // `.from("action_queue")` or a `/rest/v1/action_queue` fetch URL
+      // would vanish from the scrubbed text. Catch executable call-site
+      // shapes in the RAW source — denylist declarations (labels, regex
+      // sources, FORBIDDEN lists) never take these exact forms.
+      expect(body, `${file} must not query the action_queue table`).not.toMatch(
+        /\.from\(\s*["'`]action_queue["'`]/,
+      );
+      expect(body, `${file} must not target action_queue REST paths`).not.toMatch(
+        /["'`][^"'`\n]*\/rest\/v1\/action_queue/,
+      );
+      expect(body, `${file} must not import mini-chart module paths`).not.toMatch(
+        /from\s+["'`][^"'`\n]*mini-chart/i,
+      );
     }
   });
 
   it("does not rely on localStorage attach persistence", () => {
-    for (const { file, scrubbed } of files) {
+    for (const { file, body, scrubbed } of files) {
       if (!/\.(ts|tsx)$/.test(file)) continue;
       expect(scrubbed, `${file} must not toggle attach via localStorage`).not.toMatch(
         /localStorage[\s\S]{0,40}attach/i,
+      );
+      // The scrub blanks string literals, so a real call like
+      // localStorage.setItem("attach", ...) loses its key before the check
+      // above runs. Catch the executable call-site shape in the RAW source.
+      expect(body, `${file} must not persist attach via localStorage`).not.toMatch(
+        /localStorage\s*\.\s*(?:set|get|remove)Item\(\s*["'`][^"'`\n]*attach/i,
       );
     }
   });

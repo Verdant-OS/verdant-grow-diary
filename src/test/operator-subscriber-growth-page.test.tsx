@@ -104,6 +104,12 @@ describe("OperatorSubscriberGrowth", () => {
     expect(rpcMock).toHaveBeenCalledWith("signup_acquisition_operator_snapshot");
     expect(screen.getByText("49")).toBeInTheDocument();
     expect(screen.getByText("1.9/day")).toBeInTheDocument();
+    expect(screen.getByTestId("subscriber-growth-sprint-board")).toBeInTheDocument();
+    expect(screen.getByTestId("subscriber-growth-sprint-status")).toHaveAttribute(
+      "data-status",
+      "behind_pace",
+    );
+    expect(screen.getByText("Paid needed — next 7d")).toBeInTheDocument();
     expect(screen.getByText("Interest signals — not subscribers")).toBeInTheDocument();
     expect(screen.getByText("Account starts — not subscribers")).toBeInTheDocument();
     expect(screen.getByText("Accounts — all time")).toBeInTheDocument();

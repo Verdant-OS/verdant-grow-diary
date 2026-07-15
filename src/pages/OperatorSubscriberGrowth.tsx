@@ -16,6 +16,7 @@ import {
   parseSignupAcquisitionSnapshot,
   type SignupAcquisitionSnapshot,
 } from "@/lib/signupAcquisitionSnapshotRules";
+import SubscriberGrowthSprintBoard from "@/components/SubscriberGrowthSprintBoard";
 
 type SubscriberGrowthRpcClient = {
   rpc(
@@ -201,6 +202,12 @@ export default function OperatorSubscriberGrowth() {
               description={`${progress.progressPercent}% of goal`}
             />
           </section>
+
+          <SubscriberGrowthSprintBoard
+            progress={progress}
+            counts={snapshot.counts}
+            acquisitionCounts={acquisition?.ok ? acquisition.counts : null}
+          />
 
           <Card>
             <CardHeader>

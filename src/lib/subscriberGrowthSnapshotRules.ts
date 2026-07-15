@@ -9,6 +9,7 @@ export const SUBSCRIBER_GROWTH_GOAL_LABEL =
   "More than 100 active paid subscribers by August 31, 2026";
 
 export interface SubscriberGrowthCounts {
+  activationMetricsAvailable: boolean;
   activePaid: number;
   proMonthly: number;
   proAnnual: number;
@@ -17,6 +18,11 @@ export interface SubscriberGrowthCounts {
   scheduledCancellation: number;
   newActive7d: number;
   newActive30d: number;
+  activePaidWithGrow: number;
+  activePaidWithTent: number;
+  activePaidWithPlant: number;
+  activePaidWithFirstSignal: number;
+  activePaidCoreActivated: number;
   pricingInterestTotal: number;
   pricingInterest7d: number;
   pricingInterestNeedsContact: number;
@@ -54,6 +60,7 @@ export interface SubscriberGrowthProgress {
 }
 
 const EMPTY_COUNTS: SubscriberGrowthCounts = Object.freeze({
+  activationMetricsAvailable: false,
   activePaid: 0,
   proMonthly: 0,
   proAnnual: 0,
@@ -62,6 +69,11 @@ const EMPTY_COUNTS: SubscriberGrowthCounts = Object.freeze({
   scheduledCancellation: 0,
   newActive7d: 0,
   newActive30d: 0,
+  activePaidWithGrow: 0,
+  activePaidWithTent: 0,
+  activePaidWithPlant: 0,
+  activePaidWithFirstSignal: 0,
+  activePaidCoreActivated: 0,
   pricingInterestTotal: 0,
   pricingInterest7d: 0,
   pricingInterestNeedsContact: 0,
@@ -93,6 +105,10 @@ function asCount(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
 }
 
+function isValidCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
@@ -115,6 +131,13 @@ export function parseSubscriberGrowthSnapshot(input: unknown): SubscriberGrowthS
   const ok = input.ok === true;
   const reason = asString(input.reason) ?? (ok ? null : "unknown_response");
   const raw = isRecord(input.counts) ? input.counts : {};
+  const activationMetricsAvailable = [
+    raw.active_paid_with_grow,
+    raw.active_paid_with_tent,
+    raw.active_paid_with_plant,
+    raw.active_paid_with_first_signal,
+    raw.active_paid_core_activated,
+  ].every(isValidCount);
 
   return {
     ok,
@@ -124,6 +147,7 @@ export function parseSubscriberGrowthSnapshot(input: unknown): SubscriberGrowthS
       : null,
     generatedAt: asString(input.generated_at),
     counts: {
+      activationMetricsAvailable,
       activePaid: asCount(raw.active_paid),
       proMonthly: asCount(raw.pro_monthly),
       proAnnual: asCount(raw.pro_annual),
@@ -132,6 +156,11 @@ export function parseSubscriberGrowthSnapshot(input: unknown): SubscriberGrowthS
       scheduledCancellation: asCount(raw.scheduled_cancellation),
       newActive7d: asCount(raw.new_active_7d),
       newActive30d: asCount(raw.new_active_30d),
+      activePaidWithGrow: asCount(raw.active_paid_with_grow),
+      activePaidWithTent: asCount(raw.active_paid_with_tent),
+      activePaidWithPlant: asCount(raw.active_paid_with_plant),
+      activePaidWithFirstSignal: asCount(raw.active_paid_with_first_signal),
+      activePaidCoreActivated: asCount(raw.active_paid_core_activated),
       pricingInterestTotal: asCount(raw.pricing_interest_total),
       pricingInterest7d: asCount(raw.pricing_interest_7d),
       pricingInterestNeedsContact: asCount(raw.pricing_interest_needs_contact),

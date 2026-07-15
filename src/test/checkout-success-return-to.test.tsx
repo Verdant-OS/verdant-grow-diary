@@ -134,9 +134,10 @@ describe("CheckoutSuccess returnTo handling", () => {
     // Stays on the success page.
     expect(screen.getByTestId("checkout-success-confirmed-heading")).toBeDefined();
     expect(screen.queryByTestId("landed-pheno-new")).toBeNull();
-    // Primary CTA falls back to "/".
+    // Confirmed paid users enter the core-loop setup path.
     const primary = screen.getByTestId("checkout-success-primary-link");
-    expect(primary.getAttribute("href")).toBe("/");
+    expect(primary.getAttribute("href")).toBe("/grows");
+    expect(screen.getByTestId("checkout-success-activation-handoff")).toBeDefined();
   });
 
   it.each([
@@ -150,7 +151,7 @@ describe("CheckoutSuccess returnTo handling", () => {
     expect(screen.getByTestId("checkout-success-confirmed-heading")).toBeDefined();
     expect(screen.queryByTestId("landed-pheno-new")).toBeNull();
     const primary = screen.getByTestId("checkout-success-primary-link");
-    expect(primary.getAttribute("href")).toBe("/");
+    expect(primary.getAttribute("href")).toBe("/grows");
   });
 
   it("never renders provider customer or subscription IDs", () => {

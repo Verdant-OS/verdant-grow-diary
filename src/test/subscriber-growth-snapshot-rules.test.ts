@@ -20,6 +20,11 @@ describe("subscriber growth snapshot rules", () => {
         scheduled_cancellation: 1,
         new_active_7d: 4,
         new_active_30d: 10,
+        active_paid_with_grow: 10,
+        active_paid_with_tent: 9,
+        active_paid_with_plant: 8,
+        active_paid_with_first_signal: 7,
+        active_paid_core_activated: 6,
         pricing_interest_total: 25,
         pricing_interest_7d: 8,
         pricing_interest_needs_contact: 6,
@@ -46,6 +51,7 @@ describe("subscriber growth snapshot rules", () => {
       reasonLabel: null,
       generatedAt: "2026-07-14T12:00:00Z",
       counts: {
+        activationMetricsAvailable: true,
         activePaid: 12,
         proMonthly: 5,
         proAnnual: 4,
@@ -54,6 +60,11 @@ describe("subscriber growth snapshot rules", () => {
         scheduledCancellation: 1,
         newActive7d: 4,
         newActive30d: 10,
+        activePaidWithGrow: 10,
+        activePaidWithTent: 9,
+        activePaidWithPlant: 8,
+        activePaidWithFirstSignal: 7,
+        activePaidCoreActivated: 6,
         pricingInterestTotal: 25,
         pricingInterest7d: 8,
         pricingInterestNeedsContact: 6,
@@ -89,6 +100,7 @@ describe("subscriber growth snapshot rules", () => {
     expect(parsed.counts.proMonthly).toBe(0);
     expect(parsed.counts.proAnnual).toBe(0);
     expect(parsed.counts.founderLifetime).toBe(2);
+    expect(parsed.counts.activationMetricsAvailable).toBe(false);
   });
 
   it("calculates the exact >100 target pace deterministically", () => {

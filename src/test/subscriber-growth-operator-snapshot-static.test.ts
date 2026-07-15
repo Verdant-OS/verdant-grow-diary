@@ -40,6 +40,17 @@ describe("subscriber growth operator snapshot — security and truth fences", ()
     expect(SQL).not.toContain("profiles.tier");
   });
 
+  it("reports aggregate core-loop activation without exposing subscriber rows", () => {
+    expect(SQL).toContain("FROM (SELECT DISTINCT user_id FROM active_paid) AS ap");
+    expect(SQL).toContain("FROM public.grows AS g WHERE g.user_id = ap.user_id");
+    expect(SQL).toContain("FROM public.tents AS t WHERE t.user_id = ap.user_id");
+    expect(SQL).toContain("FROM public.plants AS p WHERE p.user_id = ap.user_id");
+    expect(SQL).toContain("FROM public.diary_entries AS de WHERE de.user_id = ap.user_id");
+    expect(SQL).toContain("FROM public.sensor_readings AS sr WHERE sr.user_id = ap.user_id");
+    expect(SQL).toContain("AS active_paid_core_activated");
+    expect(PAGE).toContain("<SubscriberActivationCard counts={snapshot.counts} />");
+  });
+
   it("keeps pricing interest separate from paid subscriber counts", () => {
     expect(SQL).toContain("FROM public.leads AS l");
     expect(SQL).toContain("'pricing_interest_founder_share'");

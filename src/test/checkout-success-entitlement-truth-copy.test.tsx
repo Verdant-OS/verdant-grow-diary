@@ -48,12 +48,20 @@ function renderPage() {
 
 describe("CheckoutSuccess truth copy", () => {
   it("shows pending copy when entitlement resolves to free", () => {
-    mockEnt.value = { ...mockEnt.value, effectivePlanId: "free", isActive: true, displayPlanId: "free" };
+    mockEnt.value = {
+      ...mockEnt.value,
+      effectivePlanId: "free",
+      isActive: true,
+      displayPlanId: "free",
+    };
     renderPage();
     expect(screen.getByTestId("checkout-success-page")).toHaveAttribute("data-confirmed", "false");
-    expect(screen.getByTestId("checkout-success-pending-heading")).toHaveTextContent(/Checkout completed/i);
+    expect(screen.getByTestId("checkout-success-pending-heading")).toHaveTextContent(
+      /Checkout completed/i,
+    );
     expect(screen.getByTestId("checkout-success-refresh-button")).toBeInTheDocument();
     expect(screen.queryByTestId("checkout-success-confirmed-heading")).toBeNull();
+    expect(screen.queryByTestId("checkout-success-activation-handoff")).toBeNull();
   });
 
   it('shows "Verdant Pro is active." after entitlement confirms an active paid plan', () => {
@@ -66,8 +74,13 @@ describe("CheckoutSuccess truth copy", () => {
     };
     renderPage();
     expect(screen.getByTestId("checkout-success-page")).toHaveAttribute("data-confirmed", "true");
-    expect(screen.getByTestId("checkout-success-confirmed-heading")).toHaveTextContent("Verdant Pro is active.");
+    expect(screen.getByTestId("checkout-success-confirmed-heading")).toHaveTextContent(
+      "Verdant Pro is active.",
+    );
     expect(screen.getByTestId("account-plan-badge")).toHaveTextContent("Pro Monthly");
+    expect(screen.getByTestId("checkout-success-activation-handoff")).toHaveTextContent(
+      "Grow → Tent → Plant → Quick Log",
+    );
   });
 
   it("shows confirmed state for Founder Lifetime", () => {

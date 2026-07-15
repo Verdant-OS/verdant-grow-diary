@@ -18,6 +18,7 @@ import {
 } from "@/lib/signupAcquisitionSnapshotRules";
 import SubscriberGrowthSprintBoard from "@/components/SubscriberGrowthSprintBoard";
 import SignupToPaidConversionCard from "@/components/SignupToPaidConversionCard";
+import SubscriberActivationCard from "@/components/SubscriberActivationCard";
 import {
   parseSignupToPaidSnapshot,
   type SignupToPaidSnapshot,
@@ -258,6 +259,8 @@ export default function OperatorSubscriberGrowth() {
             counts={snapshot.counts}
             acquisitionCounts={acquisition?.ok ? acquisition.counts : null}
           />
+
+          <SubscriberActivationCard counts={snapshot.counts} />
 
           {conversion?.ok && (
             <SignupToPaidConversionCard

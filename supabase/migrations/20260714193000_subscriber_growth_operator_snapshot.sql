@@ -53,6 +53,29 @@ BEGIN
       ) AS new_active_30d
     FROM active_paid AS ap
   ),
+  activation_flags AS (
+    SELECT
+      ap.user_id,
+      EXISTS (SELECT 1 FROM public.grows AS g WHERE g.user_id = ap.user_id) AS has_grow,
+      EXISTS (SELECT 1 FROM public.tents AS t WHERE t.user_id = ap.user_id) AS has_tent,
+      EXISTS (SELECT 1 FROM public.plants AS p WHERE p.user_id = ap.user_id) AS has_plant,
+      (
+        EXISTS (SELECT 1 FROM public.diary_entries AS de WHERE de.user_id = ap.user_id)
+        OR EXISTS (SELECT 1 FROM public.sensor_readings AS sr WHERE sr.user_id = ap.user_id)
+      ) AS has_first_signal
+    FROM (SELECT DISTINCT user_id FROM active_paid) AS ap
+  ),
+  activation_counts AS (
+    SELECT
+      count(*) FILTER (WHERE af.has_grow) AS active_paid_with_grow,
+      count(*) FILTER (WHERE af.has_tent) AS active_paid_with_tent,
+      count(*) FILTER (WHERE af.has_plant) AS active_paid_with_plant,
+      count(*) FILTER (WHERE af.has_first_signal) AS active_paid_with_first_signal,
+      count(*) FILTER (
+        WHERE af.has_grow AND af.has_tent AND af.has_plant AND af.has_first_signal
+      ) AS active_paid_core_activated
+    FROM activation_flags AS af
+  ),
   risk_counts AS (
     SELECT count(DISTINCT pr.user_id) AS at_risk
     FROM paid_risk AS pr
@@ -172,6 +195,11 @@ BEGIN
     'scheduled_cancellation', ac.scheduled_cancellation,
     'new_active_7d', ac.new_active_7d,
     'new_active_30d', ac.new_active_30d,
+    'active_paid_with_grow', act.active_paid_with_grow,
+    'active_paid_with_tent', act.active_paid_with_tent,
+    'active_paid_with_plant', act.active_paid_with_plant,
+    'active_paid_with_first_signal', act.active_paid_with_first_signal,
+    'active_paid_core_activated', act.active_paid_core_activated,
     'pricing_interest_total', lc.pricing_interest_total,
     'pricing_interest_7d', lc.pricing_interest_7d,
     'pricing_interest_needs_contact', lc.pricing_interest_needs_contact,
@@ -190,6 +218,7 @@ BEGIN
   )
   INTO v_counts
   FROM active_counts AS ac
+  CROSS JOIN activation_counts AS act
   CROSS JOIN risk_counts AS rc
   CROSS JOIN lead_counts AS lc;
 
@@ -205,6 +234,11 @@ BEGIN
       'scheduled_cancellation', 0,
       'new_active_7d', 0,
       'new_active_30d', 0,
+      'active_paid_with_grow', 0,
+      'active_paid_with_tent', 0,
+      'active_paid_with_plant', 0,
+      'active_paid_with_first_signal', 0,
+      'active_paid_core_activated', 0,
       'pricing_interest_total', 0,
       'pricing_interest_7d', 0,
       'pricing_interest_needs_contact', 0,

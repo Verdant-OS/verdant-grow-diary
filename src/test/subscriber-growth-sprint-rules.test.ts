@@ -8,6 +8,7 @@ import {
 import type { SignupAcquisitionCounts } from "@/lib/signupAcquisitionSnapshotRules";
 
 const COUNTS: SubscriberGrowthCounts = {
+  activationMetricsAvailable: true,
   activePaid: 10,
   proMonthly: 4,
   proAnnual: 3,
@@ -16,6 +17,11 @@ const COUNTS: SubscriberGrowthCounts = {
   scheduledCancellation: 2,
   newActive7d: 4,
   newActive30d: 10,
+  activePaidWithGrow: 10,
+  activePaidWithTent: 9,
+  activePaidWithPlant: 8,
+  activePaidWithFirstSignal: 7,
+  activePaidCoreActivated: 6,
   pricingInterestTotal: 18,
   pricingInterest7d: 7,
   pricingInterestNeedsContact: 6,

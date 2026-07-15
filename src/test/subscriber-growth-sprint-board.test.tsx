@@ -9,6 +9,7 @@ import SubscriberGrowthSprintBoard from "@/components/SubscriberGrowthSprintBoar
 import { buildSubscriberGrowthProgress } from "@/lib/subscriberGrowthSnapshotRules";
 
 const COUNTS = {
+  activationMetricsAvailable: true,
   activePaid: 10,
   proMonthly: 4,
   proAnnual: 3,
@@ -17,6 +18,11 @@ const COUNTS = {
   scheduledCancellation: 2,
   newActive7d: 4,
   newActive30d: 10,
+  activePaidWithGrow: 10,
+  activePaidWithTent: 9,
+  activePaidWithPlant: 8,
+  activePaidWithFirstSignal: 7,
+  activePaidCoreActivated: 6,
   pricingInterestTotal: 18,
   pricingInterest7d: 7,
   pricingInterestNeedsContact: 6,

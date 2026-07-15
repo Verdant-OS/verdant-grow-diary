@@ -229,6 +229,8 @@ export default function Timeline() {
     if (urlGrowId !== storeGrowId) setActiveGrowId(urlGrowId);
   }, [urlGrowId, grows, storeGrowId, setActiveGrowId]);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
   const [actionEvents, setActionEvents] = useState<ActionQueueEvent[]>([]);
   const [alertEvents, setAlertEvents] = useState<AlertEventRow[]>([]);
@@ -286,6 +288,7 @@ export default function Timeline() {
   async function load() {
     if (!user || !activeGrowId) {
       setEntries([]);
+      setEntriesTotal(null);
       setGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
@@ -294,9 +297,13 @@ export default function Timeline() {
     }
 
     setLoading(true);
-    const { data } = await supabase
+    // The diary is unbounded but the page loads the newest 100 rows first
+    // and exposes a keyset-paginated "Load older entries" affordance so
+    // long-running grows do not silently lose access to months of logs.
+    // `count: "exact"` powers the "N more" affordance below.
+    const { data, count } = await supabase
       .from("diary_entries")
-      .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+      .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", { count: "exact" })
       .eq("grow_id", activeGrowId)
       .order("entry_at", { ascending: false })
       .limit(100);
@@ -314,6 +321,7 @@ export default function Timeline() {
       });
     }
     setEntries(rows);
+    setEntriesTotal(typeof count === "number" ? count : null);
 
     // Quick Log v2 manual saves land in `grow_events`, not `diary_entries`.
     // Fetch them in parallel for the Recent Quick Logs panel so newly
@@ -353,6 +361,48 @@ export default function Timeline() {
     setAlertEvents((ale as unknown as AlertEventRow[]) || []);
 
     setLoading(false);
+  }
+
+  // Keyset pagination: fetch the next 100 diary_entries strictly older than
+  // the oldest currently-loaded row. Uses `.lt("entry_at", cursor)` against
+  // the same descending order so a grower can walk back through months of
+  // history without ever hitting the silent 100-row ceiling.
+  async function loadOlder() {
+    if (!user || !activeGrowId) return;
+    if (loadingOlder) return;
+    const oldest = entries[entries.length - 1];
+    if (!oldest) return;
+    setLoadingOlder(true);
+    try {
+      const { data } = await supabase
+        .from("diary_entries")
+        .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+        .eq("grow_id", activeGrowId)
+        .lt("entry_at", oldest.entry_at)
+        .order("entry_at", { ascending: false })
+        .limit(100);
+      const rows = (data as Entry[]) || [];
+      const paths = rows
+        .map((r) => r.photo_url)
+        .filter((p): p is string => !!p && !p.startsWith("http"));
+      if (paths.length) {
+        const { data: signed } = await supabase.storage
+          .from("diary-photos")
+          .createSignedUrls(paths, 3600);
+        const map = new Map((signed || []).map((s) => [s.path as string, s.signedUrl]));
+        rows.forEach((r) => {
+          if (r.photo_url && map.has(r.photo_url)) r.photo_url = map.get(r.photo_url)!;
+        });
+      }
+      // Guard against overlap in the unlikely case new rows arrived at the
+      // exact cursor timestamp between fetches.
+      setEntries((prev) => {
+        const seen = new Set(prev.map((r) => r.id));
+        return [...prev, ...rows.filter((r) => !seen.has(r.id))];
+      });
+    } finally {
+      setLoadingOlder(false);
+    }
   }
 
   useEffect(() => {
@@ -754,7 +804,10 @@ export default function Timeline() {
           data-testid="timeline-results-count"
           aria-live="polite"
         >
-          Showing {filtered.length} of {entries.length} {entries.length === 1 ? "entry" : "entries"}
+          Showing {filtered.length} of {entries.length} loaded
+          {typeof entriesTotal === "number" && entriesTotal > entries.length
+            ? ` (${entriesTotal - entries.length} older not yet loaded)`
+            : ""}
         </p>
         {highlight &&
           highlightIsMissingFromList(filtered, highlight) &&
@@ -1318,6 +1371,32 @@ export default function Timeline() {
           ))}
         </div>
       )}
+
+      {!loading &&
+        entries.length > 0 &&
+        typeof entriesTotal === "number" &&
+        entries.length < entriesTotal && (
+          <div className="flex justify-center pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={loadOlder}
+              disabled={loadingOlder}
+              data-testid="timeline-load-older"
+              aria-label={`Load older diary entries (${entriesTotal - entries.length} remaining)`}
+            >
+              {loadingOlder ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+                  Loading older…
+                </>
+              ) : (
+                <>Load older entries ({entriesTotal - entries.length} more)</>
+              )}
+            </Button>
+          </div>
+        )}
 
       <EntryEditDialog
         entry={entries.find((e) => e.id === editingId) || null}

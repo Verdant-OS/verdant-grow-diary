@@ -189,3 +189,102 @@ describe("buildAiDoctorSnapshotStalenessExplanation — missing / invalid inputs
     }
   });
 });
+
+describe("buildAiDoctorSnapshotStalenessExplanation — near-boundary ms offsets", () => {
+  // Symmetric sweep around the exact 48h cutoff. Every offset <= 0 must be
+  // fresh (inclusive), every offset > 0 must be stale. No off-by-one, no
+  // hidden rounding, no drift as offset magnitude grows.
+  const FRESH_OFFSETS_MS = [0, -1, -2, -100, -999, -1_000, -60_000];
+  const STALE_OFFSETS_MS = [1, 2, 100, 999, 1_000, 60_000, 3_600_000];
+
+  for (const offset of FRESH_OFFSETS_MS) {
+    it(`offset ${offset}ms from cutoff → fresh (inclusive boundary)`, () => {
+      const snap = new Date(
+        NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS + Math.abs(offset),
+      ).toISOString();
+      // Equivalent: snapshot age = 48h - |offset|, so age <= 48h.
+      const res = buildAiDoctorSnapshotStalenessExplanation({
+        latestSnapshotAtIso: snap,
+        now: NOW,
+      });
+      expect(res.isStale).toBe(false);
+      expect(res.sentence).toBe("");
+      expect(res.snapshotAtIso).toBe(snap);
+      expect(res.cutoffAtIso).toBe(CUTOFF_ISO);
+    });
+  }
+
+  for (const offset of STALE_OFFSETS_MS) {
+    it(`offset ${offset}ms past cutoff → stale (strict >)`, () => {
+      const snap = new Date(
+        NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS - offset,
+      ).toISOString();
+      const res = buildAiDoctorSnapshotStalenessExplanation({
+        latestSnapshotAtIso: snap,
+        now: NOW,
+      });
+      expect(res.isStale).toBe(true);
+      expect(res.snapshotAtIso).toBe(snap);
+      expect(res.cutoffAtIso).toBe(CUTOFF_ISO);
+      expect(res.sentence).toContain("48h freshness cutoff");
+    });
+  }
+
+  it("sweeping ±3ms across the cutoff never flips outside the strict > rule", () => {
+    // Dense sweep: at every integer ms in [-3, +3] the classification is
+    // fully determined by sign, not by any surrounding jitter.
+    for (let d = -3; d <= 3; d++) {
+      const snap = new Date(NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS - d).toISOString();
+      const res = buildAiDoctorSnapshotStalenessExplanation({
+        latestSnapshotAtIso: snap,
+        now: NOW,
+      });
+      // d > 0 → snapshot is (48h + d)ms old → stale.
+      // d <= 0 → snapshot is (48h - |d|)ms old (or exactly 48h) → fresh.
+      expect(res.isStale).toBe(d > 0);
+    }
+  });
+});
+
+describe("buildAiDoctorSnapshotStalenessExplanation — leap-second-like inputs", () => {
+  // V8/Node treat "…:59:60Z" as NaN (no leap-second support in ECMAScript
+  // Date). The helper must degrade to the unparseable branch — never
+  // flip a snapshot into stale via a NaN comparison.
+  const LEAP_STRINGS = [
+    "2016-12-31T23:59:60Z",
+    "2016-12-31T23:59:60.000Z",
+    "2016-12-31T23:59:60.500Z",
+    "2015-06-30T23:59:60Z",
+  ];
+
+  for (const leap of LEAP_STRINGS) {
+    it(`leap-second-like input "${leap}" is treated as unparseable (not stale)`, () => {
+      // Guard the platform assumption so a future engine change surfaces
+      // here instead of silently altering the helper's behavior.
+      expect(Number.isFinite(Date.parse(leap))).toBe(false);
+      const res = buildAiDoctorSnapshotStalenessExplanation({
+        latestSnapshotAtIso: leap,
+        now: NOW,
+      });
+      expect(res).toEqual({
+        isStale: false,
+        snapshotAtIso: leap,
+        cutoffAtIso: CUTOFF_ISO,
+        sentence: "",
+      });
+    });
+  }
+
+  it("a plausible pre-leap-second timestamp one second earlier is classified normally", () => {
+    // Sanity: the surrounding real second parses fine and is stale (well
+    // past the 48h window from NOW=2026-06-01).
+    const realIso = "2016-12-31T23:59:59.000Z";
+    expect(Number.isFinite(Date.parse(realIso))).toBe(true);
+    const res = buildAiDoctorSnapshotStalenessExplanation({
+      latestSnapshotAtIso: realIso,
+      now: NOW,
+    });
+    expect(res.isStale).toBe(true);
+    expect(res.snapshotAtIso).toBe(realIso);
+  });
+});

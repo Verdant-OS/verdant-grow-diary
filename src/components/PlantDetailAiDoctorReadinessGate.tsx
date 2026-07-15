@@ -87,20 +87,33 @@ function FreshnessRow({
   status: ReturnType<typeof buildAiDoctorSnapshotFreshnessStatus>;
 }) {
   const s = FRESHNESS_STYLES[status.state];
+  const stateWord =
+    status.state === "fresh"
+      ? "Fresh"
+      : status.state === "stale"
+        ? "Stale"
+        : "Missing";
+  const groupLabel = `Manual sensor snapshot freshness: ${stateWord}. ${status.description}`;
   return (
     <div
+      role="group"
+      aria-label={groupLabel}
       className="flex items-start gap-2 rounded-md border border-border/40 bg-background/30 px-3 py-2"
       data-testid="plant-ai-doctor-readiness-gate-snapshot-freshness"
       data-freshness-state={status.state}
       data-snapshot-at={status.snapshotAtIso ?? ""}
       data-age-minutes={status.ageMinutes ?? ""}
     >
+      <span className="sr-only">
+        Snapshot freshness status: {stateWord}.
+      </span>
       <span
         className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] sm:text-xs shrink-0 ${s.badge}`}
         data-testid="plant-ai-doctor-readiness-gate-snapshot-freshness-badge"
+        aria-label={`Snapshot ${stateWord}: ${status.label}`}
       >
         {s.icon}
-        {status.label}
+        <span aria-hidden="true">{status.label}</span>
       </span>
       <p
         className="text-xs text-muted-foreground leading-snug"

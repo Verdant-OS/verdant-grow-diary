@@ -264,6 +264,32 @@ describe("Quick Log starter-handoff consume-once", () => {
     expect(key3, "a new logical submission mints a fresh key").not.toBe(key1);
   });
 
+  it("closing the dialog abandons the submission: the key rotates so a later log is never deduped away", async () => {
+    // Failed save (key kept for in-place retry) → grower CLOSES instead →
+    // a brand-new log must carry a NEW key, or the RPC would return the
+    // abandoned entry as a duplicate and silently skip the new content.
+    saveMock.mockResolvedValueOnce({ ok: false, reason: "tent_not_found" });
+    seedDraft();
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={handoffPrefill()} />);
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-save-error")).toBeInTheDocument(),
+    );
+    const key1 = (saveMock.mock.calls[0][0] as Record<string, unknown>).p_idempotency_key;
+
+    // Close (Escape) — the dialog wrapper runs reset(), abandoning the
+    // submission. The harness keeps `open` true, so the form stays mounted.
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+
+    fireEvent.change(screen.getByTestId("quicklog-note"), {
+      target: { value: "a different, later note" },
+    });
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    const key2 = (saveMock.mock.calls[1][0] as Record<string, unknown>).p_idempotency_key;
+    expect(key2, "a post-close submission must mint a fresh key").not.toBe(key1);
+  });
+
   it("a prefilled plant outside the current scope is never displaced by stale defaults", async () => {
     // Cross-grow handoff: the matched plant belongs to a grow that is not
     // active yet (setActiveGrowId still propagating). The dialog must NOT

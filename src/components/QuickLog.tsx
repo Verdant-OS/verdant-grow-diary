@@ -592,6 +592,12 @@ export default function QuickLog({
   }
 
   function reset() {
+    // Closing the dialog abandons the current logical submission, so the
+    // idempotency key rotates too. Only an in-place retry (save error
+    // shown, dialog still open) reuses the key — a fresh dialog session
+    // must never be deduped against an abandoned one, or the RPC could
+    // hand back the OLD entry and silently skip the new content.
+    saveIdempotencyKeyRef.current = newQuickLogSaveKey();
     setNote("");
     setShowMore(false);
     setEventType("observation");

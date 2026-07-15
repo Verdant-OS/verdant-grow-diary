@@ -42,7 +42,13 @@ import {
 } from "@/lib/publicQuickLogHandoffViewModel";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
-const NOW = new Date("2026-07-15T12:00:00.000Z");
+// The dispatch-time revalidation inside the card reads the REAL clock,
+// so all freshness-sensitive fixtures are derived from it — fixed dates
+// would rot into the lapsed branch as wall time passes.
+const NOW = new Date();
+const HOURS = 3_600_000;
+const FRESH_UPDATED_AT = new Date(NOW.getTime() - 2 * HOURS).toISOString();
+const STALE_UPDATED_AT = new Date(NOW.getTime() - 25 * HOURS).toISOString();
 const NOT_NOW_KEY = "verdant.quickLogHandoff.notNow.v1";
 
 const ROOT = resolve(__dirname, "../..");
@@ -58,8 +64,8 @@ function draft(
   return {
     v: 1,
     id: "draft-1",
-    createdAt: "2026-07-15T10:00:00.000Z",
-    updatedAt: "2026-07-15T10:00:00.000Z",
+    createdAt: FRESH_UPDATED_AT,
+    updatedAt: FRESH_UPDATED_AT,
     plantNickname: "Blue Dream #1",
     stage: "veg",
     logType: "observation",
@@ -131,7 +137,7 @@ describe("<PublicQuickLogHandoffCard />", () => {
   });
 
   it("renders nothing for a stale draft and retains it in storage", () => {
-    seedDraft(draft({ updatedAt: "2026-07-13T10:00:00.000Z" }));
+    seedDraft(draft({ updatedAt: STALE_UPDATED_AT }));
     renderCard();
     expect(screen.queryByTestId("public-quick-log-handoff-card")).toBeNull();
     expect(storedDraftRaw()).not.toBeNull();
@@ -214,7 +220,7 @@ describe("<PublicQuickLogHandoffCard />", () => {
       suggestSnapshot: false,
       source: "public-starter",
       publicStarterDraftId: "draft-1",
-      publicStarterDraftUpdatedAt: "2026-07-15T10:00:00.000Z",
+      publicStarterDraftUpdatedAt: FRESH_UPDATED_AT,
       suppressPlantDefault: false,
     });
     // Draft untouched: display/handoff never consumes it.
@@ -352,11 +358,11 @@ describe("<PublicQuickLogHandoffCard />", () => {
     // The `now` prop keeps the RENDER-time freshness check happy, but the
     // draft is >24h old against the real clock the dispatch guard uses —
     // simulating a card left mounted across the expiry boundary.
-    seedDraft(draft({ updatedAt: "2026-07-13T10:00:00.000Z" }));
+    seedDraft(draft({ updatedAt: STALE_UPDATED_AT }));
     const events: CustomEvent[] = [];
     const listener = (e: Event) => events.push(e as CustomEvent);
     window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
-    renderCard({ now: new Date("2026-07-13T11:00:00.000Z") });
+    renderCard({ now: new Date(new Date(STALE_UPDATED_AT).getTime() + 1 * HOURS) });
     expect(screen.getByTestId("public-quick-log-handoff-card")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("public-quick-log-handoff-review-save"));
     window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);

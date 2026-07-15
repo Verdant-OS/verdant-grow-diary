@@ -10,6 +10,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { act, render, screen, waitFor } from "@testing-library/react";
 
+// Slow shared CI runners can stall the async linked-action-count queries
+// past RTL's 1s findBy default and vitest's 5s per-test default; the
+// structural fix (same as the action-queue redaction/provenance suites)
+// is a generous per-file budget, not a rerun.
+vi.setConfig({ testTimeout: 30_000 });
+const FIND_TIMEOUT = { timeout: 15_000 } as const;
+
 // Flush pending async state updates inside React's act() boundary so
 // async effects in AlertDetail (linked-action-count queries) don't
 // trigger "not wrapped in act(...)" warnings.
@@ -155,7 +162,7 @@ describe("AlertDetail — Linked action count badge", () => {
       },
     ];
     renderDetail();
-    const badge = await screen.findByTestId("alert-detail-linked-action");
+    const badge = await screen.findByTestId("alert-detail-linked-action", undefined, FIND_TIMEOUT);
     expect(badge.textContent ?? "").toMatch(/has linked action/i);
   });
 
@@ -175,14 +182,14 @@ describe("AlertDetail — Linked action count badge", () => {
       },
     ];
     renderDetail();
-    const badge = await screen.findByTestId("alert-detail-linked-action");
+    const badge = await screen.findByTestId("alert-detail-linked-action", undefined, FIND_TIMEOUT);
     expect(badge.textContent ?? "").toMatch(/2 linked actions/i);
   });
 
   it("renders no badge when no linked open action exists", async () => {
     actionQueueRows = [];
     renderDetail();
-    await screen.findByText("VPD too high");
+    await screen.findByText("VPD too high", undefined, FIND_TIMEOUT);
     await flushAsync();
     expect(screen.queryByTestId("alert-detail-linked-action")).toBeNull();
   });
@@ -203,7 +210,7 @@ describe("AlertDetail — Linked action count badge", () => {
       },
     ];
     renderDetail();
-    await screen.findByText("VPD too high");
+    await screen.findByText("VPD too high", undefined, FIND_TIMEOUT);
     await flushAsync();
     expect(screen.queryByTestId("alert-detail-linked-action")).toBeNull();
   });
@@ -218,7 +225,7 @@ describe("AlertDetail — Linked action count badge", () => {
       },
     ];
     renderDetail();
-    await screen.findByText("VPD too high");
+    await screen.findByText("VPD too high", undefined, FIND_TIMEOUT);
     await flushAsync();
     expect(screen.queryByTestId("alert-detail-linked-action")).toBeNull();
   });
@@ -235,6 +242,8 @@ describe("AlertDetail — Linked action count badge", () => {
     renderDetail();
     const anchor = (await screen.findByTestId(
       "alert-detail-linked-action-anchor",
+      undefined,
+      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(anchor.getAttribute("href")).toBe(actionDetailPath("aq-open-1"));
   });
@@ -257,6 +266,8 @@ describe("AlertDetail — Linked action count badge", () => {
     renderDetail();
     const anchor = (await screen.findByTestId(
       "alert-detail-linked-action-anchor",
+      undefined,
+      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(anchor.getAttribute("href") ?? "").toMatch(/^\/actions/);
     expect(anchor.getAttribute("href") ?? "").toBe(
@@ -279,7 +290,7 @@ describe("AlertDetail — Linked action count badge", () => {
       },
     ];
     const { container } = renderDetail();
-    await screen.findByTestId("alert-detail-linked-action");
+    await screen.findByTestId("alert-detail-linked-action", undefined, FIND_TIMEOUT);
     const text = container.textContent ?? "";
     expect(text).not.toContain("[alert:");
     expect(text).not.toContain("[session:");
@@ -299,6 +310,8 @@ describe("AlertDetail — Linked action count badge", () => {
     renderDetail();
     const anchor = await screen.findByTestId(
       "alert-detail-linked-action-anchor",
+      undefined,
+      FIND_TIMEOUT,
     );
     const lower = (anchor.textContent ?? "").toLowerCase();
     for (const tok of [

@@ -363,6 +363,48 @@ export default function Timeline() {
     setLoading(false);
   }
 
+  // Keyset pagination: fetch the next 100 diary_entries strictly older than
+  // the oldest currently-loaded row. Uses `.lt("entry_at", cursor)` against
+  // the same descending order so a grower can walk back through months of
+  // history without ever hitting the silent 100-row ceiling.
+  async function loadOlder() {
+    if (!user || !activeGrowId) return;
+    if (loadingOlder) return;
+    const oldest = entries[entries.length - 1];
+    if (!oldest) return;
+    setLoadingOlder(true);
+    try {
+      const { data } = await supabase
+        .from("diary_entries")
+        .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+        .eq("grow_id", activeGrowId)
+        .lt("entry_at", oldest.entry_at)
+        .order("entry_at", { ascending: false })
+        .limit(100);
+      const rows = (data as Entry[]) || [];
+      const paths = rows
+        .map((r) => r.photo_url)
+        .filter((p): p is string => !!p && !p.startsWith("http"));
+      if (paths.length) {
+        const { data: signed } = await supabase.storage
+          .from("diary-photos")
+          .createSignedUrls(paths, 3600);
+        const map = new Map((signed || []).map((s) => [s.path as string, s.signedUrl]));
+        rows.forEach((r) => {
+          if (r.photo_url && map.has(r.photo_url)) r.photo_url = map.get(r.photo_url)!;
+        });
+      }
+      // Guard against overlap in the unlikely case new rows arrived at the
+      // exact cursor timestamp between fetches.
+      setEntries((prev) => {
+        const seen = new Set(prev.map((r) => r.id));
+        return [...prev, ...rows.filter((r) => !seen.has(r.id))];
+      });
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
+
   useEffect(() => {
     load();
   }, [activeGrowId, user]);

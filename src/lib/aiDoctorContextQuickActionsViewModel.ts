@@ -114,6 +114,7 @@ const ACTION_ORDER: AiDoctorContextQuickActionKind[] = [
 
 function quickLogPayload(
   args: BuildAiDoctorContextQuickActionsArgs,
+  eventType: "observation" | "environment" = "observation",
 ): AiDoctorContextQuickLogEventPayload | null {
   if (!args.plantId) return null;
   return {
@@ -122,10 +123,11 @@ function quickLogPayload(
     growId: args.growId ?? null,
     tentId: args.tentId ?? null,
     tentName: args.tentName ?? null,
-    eventType: "observation",
+    eventType,
     suggestSnapshot: true,
   };
 }
+
 
 function buildAction(
   kind: AiDoctorContextQuickActionKind,

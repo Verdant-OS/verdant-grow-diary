@@ -86,6 +86,7 @@ describe("Public SEO route surface", () => {
     /^\/pricing$/,
     /^\/hardware-integrations$/,
     /^\/how-ai-doctor-works$/,
+    /^\/tools(\/.*)?$/,
     /^\/customer\/.+$/,
   ];
 

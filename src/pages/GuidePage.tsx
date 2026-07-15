@@ -28,7 +28,6 @@ import {
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
 
-
 export default function GuidePage() {
   const { slug } = useParams<{ slug: string }>();
   const guide = findGuideBySlug(slug);
@@ -50,10 +49,7 @@ export default function GuidePage() {
       questions: guide.faq,
     });
     const crumbs = buildBreadcrumbListJsonLd({
-      items: [
-        ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
-        { name: guide.h1, url: guideUrl },
-      ],
+      items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.h1, url: guideUrl }],
     });
     const faqScript = document.createElement("script");
     faqScript.type = "application/ld+json";
@@ -62,10 +58,7 @@ export default function GuidePage() {
     document.head.appendChild(faqScript);
     const crumbScript = document.createElement("script");
     crumbScript.type = "application/ld+json";
-    crumbScript.setAttribute(
-      "data-page-ldjson",
-      `guide-${guide.slug}-breadcrumb`,
-    );
+    crumbScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-breadcrumb`);
     crumbScript.text = safeJsonLdStringify(crumbs);
     document.head.appendChild(crumbScript);
     return () => {
@@ -73,7 +66,6 @@ export default function GuidePage() {
       crumbScript.remove();
     };
   }, [guide]);
-
 
   if (!guide) {
     return <Navigate to="/guides" replace />;
@@ -115,9 +107,7 @@ export default function GuidePage() {
         <div className="mt-10 space-y-8">
           {guide.sections.map((section) => (
             <section key={section.heading}>
-              <h2 className="font-display text-xl md:text-2xl font-semibold">
-                {section.heading}
-              </h2>
+              <h2 className="font-display text-xl md:text-2xl font-semibold">{section.heading}</h2>
               <p className="mt-3 text-base text-foreground/90">{section.body}</p>
             </section>
           ))}
@@ -131,9 +121,7 @@ export default function GuidePage() {
             <Accordion type="single" collapsible className="w-full">
               {guide.faq.map((entry, i) => (
                 <AccordionItem key={entry.question} value={`faq-${i}`}>
-                  <AccordionTrigger className="text-left">
-                    {entry.question}
-                  </AccordionTrigger>
+                  <AccordionTrigger className="text-left">{entry.question}</AccordionTrigger>
                   <AccordionContent>{entry.answer}</AccordionContent>
                 </AccordionItem>
               ))}
@@ -141,10 +129,29 @@ export default function GuidePage() {
           </section>
         )}
 
+        {guide.slug === "grow-room-vpd-tracker" && (
+          <section className="mt-12 rounded-xl border border-primary/30 bg-primary/5 p-5">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+              Put the guide into practice
+            </p>
+            <h2 className="mt-2 font-display text-xl font-semibold">
+              Calculate air VPD from a manual reading
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Verdant's free calculator keeps the source honest: manual inputs, derived air VPD, no
+              upload, no diagnosis, and no device control.
+            </p>
+            <Link
+              to="/tools/vpd-calculator"
+              className="mt-4 inline-flex text-sm font-semibold text-primary hover:underline"
+            >
+              Open the stage-aware VPD calculator
+            </Link>
+          </section>
+        )}
+
         <section className="mt-12 rounded-lg border border-border/60 p-5">
-          <h2 className="font-display text-lg font-semibold">
-            Keep reading
-          </h2>
+          <h2 className="font-display text-lg font-semibold">Keep reading</h2>
           <ul className="mt-3 space-y-2 text-sm">
             {related.map((r) => (
               <li key={r.slug}>
@@ -157,18 +164,12 @@ export default function GuidePage() {
               </li>
             ))}
             <li>
-              <Link
-                to="/guides"
-                className="underline hover:text-foreground text-muted-foreground"
-              >
+              <Link to="/guides" className="underline hover:text-foreground text-muted-foreground">
                 All grower guides
               </Link>
             </li>
             <li>
-              <Link
-                to="/welcome"
-                className="underline hover:text-foreground text-muted-foreground"
-              >
+              <Link to="/welcome" className="underline hover:text-foreground text-muted-foreground">
                 See how Verdant works
               </Link>
             </li>
@@ -182,10 +183,7 @@ export default function GuidePage() {
             </li>
 
             <li>
-              <Link
-                to="/pricing"
-                className="underline hover:text-foreground text-muted-foreground"
-              >
+              <Link to="/pricing" className="underline hover:text-foreground text-muted-foreground">
                 Compare Free and Pro pricing
               </Link>
             </li>
@@ -200,9 +198,8 @@ export default function GuidePage() {
             See a real One-Tent Loop before signing up
           </h2>
           <p className="mt-2 text-sm md:text-base text-muted-foreground">
-            Walk through how Verdant connects a grow, tent, plant, Quick Log,
-            timeline, sensor snapshot, cautious AI review, and grower-approved
-            action queue.
+            Walk through how Verdant connects a grow, tent, plant, Quick Log, timeline, sensor
+            snapshot, cautious AI review, and grower-approved action queue.
           </p>
           <div className="mt-4">
             <Link

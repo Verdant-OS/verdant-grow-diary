@@ -16,6 +16,7 @@ describe("paid acquisition attribution rules", () => {
     ["pricing_interest_share", "referral", "paid_launch", "pricing_interest_referral"],
     ["grower_invite", "referral", "grower_invite", "pricing_interest_grower_invite"],
     ["context_check", "owned", "context_check", "pricing_interest_context_check"],
+    ["vpd_calculator", "owned", "vpd_calculator", "pricing_interest_vpd_calculator"],
   ] as const)(
     "round-trips the fixed %s attribution tuple",
     (source, medium, campaign, leadSource) => {

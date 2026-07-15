@@ -19,6 +19,7 @@ describe("signup acquisition migration safety", () => {
       "pricing_interest_share",
       "grower_invite",
       "context_check",
+      "vpd_calculator",
     ]) {
       expect(SQL).toContain(`'${source}'`);
     }

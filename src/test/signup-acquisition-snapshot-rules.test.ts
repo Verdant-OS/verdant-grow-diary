@@ -20,6 +20,7 @@ describe("signup acquisition snapshot rules", () => {
         pricing_interest_share: 1,
         grower_invite: 2,
         context_check: 1,
+        vpd_calculator: 4,
         email: "must-not-survive@example.com",
       },
       user_id: "must-not-survive",
@@ -43,6 +44,7 @@ describe("signup acquisition snapshot rules", () => {
         pricingInterestShare: 1,
         growerInvite: 2,
         contextCheck: 1,
+        vpdCalculator: 4,
       },
     });
     expect(JSON.stringify(parsed)).not.toContain("must-not-survive");

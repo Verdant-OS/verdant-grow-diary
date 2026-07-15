@@ -258,7 +258,7 @@ export default function OperatorSubscriberGrowth() {
                   description="Includes accounts created before attribution launched"
                 />
               </CardContent>
-              <CardContent className="grid gap-3 border-t border-border/60 pt-6 sm:grid-cols-2 lg:grid-cols-7">
+              <CardContent className="grid gap-3 border-t border-border/60 pt-6 sm:grid-cols-2 lg:grid-cols-4">
                 <MetricCard label="Landing signup" value={acquisition.counts.landingPage} />
                 <MetricCard label="Pricing signup" value={acquisition.counts.pricingPage} />
                 <MetricCard label="Founder page signup" value={acquisition.counts.founderPage} />
@@ -269,6 +269,10 @@ export default function OperatorSubscriberGrowth() {
                 />
                 <MetricCard label="Grower invite signup" value={acquisition.counts.growerInvite} />
                 <MetricCard label="Context check signup" value={acquisition.counts.contextCheck} />
+                <MetricCard
+                  label="VPD calculator signup"
+                  value={acquisition.counts.vpdCalculator}
+                />
               </CardContent>
             </Card>
           )}
@@ -305,7 +309,7 @@ export default function OperatorSubscriberGrowth() {
               />
               <MetricCard label="All leads — 7 days" value={snapshot.counts.allLeads7d} />
             </CardContent>
-            <CardContent className="grid gap-3 border-t border-border/60 pt-6 sm:grid-cols-2 lg:grid-cols-8">
+            <CardContent className="grid gap-3 border-t border-border/60 pt-6 sm:grid-cols-2 lg:grid-cols-3">
               <MetricCard label="Direct pricing" value={snapshot.counts.pricingInterestDirect} />
               <MetricCard label="Landing page" value={snapshot.counts.pricingInterestLanding} />
               <MetricCard label="Pricing page" value={snapshot.counts.pricingInterestPricingPage} />
@@ -325,6 +329,10 @@ export default function OperatorSubscriberGrowth() {
               <MetricCard
                 label="Context check"
                 value={snapshot.counts.pricingInterestContextCheck}
+              />
+              <MetricCard
+                label="VPD calculator"
+                value={snapshot.counts.pricingInterestVpdCalculator}
               />
             </CardContent>
           </Card>

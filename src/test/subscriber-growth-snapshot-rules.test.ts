@@ -33,6 +33,7 @@ describe("subscriber growth snapshot rules", () => {
         pricing_interest_referral: 3,
         pricing_interest_grower_invite: 4,
         pricing_interest_context_check: 9,
+        pricing_interest_vpd_calculator: 10,
         all_leads_7d: 11,
         email: "must-not-survive@example.com",
       },
@@ -66,6 +67,7 @@ describe("subscriber growth snapshot rules", () => {
         pricingInterestReferral: 3,
         pricingInterestGrowerInvite: 4,
         pricingInterestContextCheck: 9,
+        pricingInterestVpdCalculator: 10,
         allLeads7d: 11,
       },
     });

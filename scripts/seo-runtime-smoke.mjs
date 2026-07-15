@@ -29,6 +29,11 @@ const ROUTES = [
     canonical: `${ORIGIN}/ai-doctor-readiness-check`,
   },
   {
+    path: "/tools/vpd-calculator",
+    expectTitle: /Free Cannabis VPD Calculator by Growth Stage/,
+    canonical: `${ORIGIN}/tools/vpd-calculator`,
+  },
+  {
     path: "/hardware-integrations",
     expectTitle: /Sensor & Hardware Integrations/,
     canonical: `${ORIGIN}/hardware-integrations`,

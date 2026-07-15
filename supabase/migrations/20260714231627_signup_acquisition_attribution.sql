@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS public.signup_acquisition_attributions (
       'founder_share',
       'pricing_interest_share',
       'grower_invite',
-      'context_check'
+      'context_check',
+      'vpd_calculator'
     )
   )
 );
@@ -54,7 +55,8 @@ BEGIN
       'founder_share',
       'pricing_interest_share',
       'grower_invite',
-      'context_check'
+      'context_check',
+      'vpd_calculator'
     ) THEN NEW.raw_user_meta_data->>'verdant_signup_source'
     ELSE NULL
   END;
@@ -96,7 +98,8 @@ WHERE u.raw_user_meta_data->>'verdant_signup_source' IN (
   'founder_share',
   'pricing_interest_share',
   'grower_invite',
-  'context_check'
+  'context_check',
+  'vpd_calculator'
 )
 ON CONFLICT (user_id) DO NOTHING;
 
@@ -136,7 +139,8 @@ BEGIN
       count(*) FILTER (WHERE a.source = 'founder_share') AS founder_share,
       count(*) FILTER (WHERE a.source = 'pricing_interest_share') AS pricing_interest_share,
       count(*) FILTER (WHERE a.source = 'grower_invite') AS grower_invite,
-      count(*) FILTER (WHERE a.source = 'context_check') AS context_check
+      count(*) FILTER (WHERE a.source = 'context_check') AS context_check,
+      count(*) FILTER (WHERE a.source = 'vpd_calculator') AS vpd_calculator
     FROM public.signup_acquisition_attributions AS a
   )
   SELECT jsonb_build_object(
@@ -151,7 +155,8 @@ BEGIN
     'founder_share', ac.founder_share,
     'pricing_interest_share', ac.pricing_interest_share,
     'grower_invite', ac.grower_invite,
-    'context_check', ac.context_check
+    'context_check', ac.context_check,
+    'vpd_calculator', ac.vpd_calculator
   )
   INTO v_counts
   FROM profile_counts AS pc

@@ -90,6 +90,7 @@ const GuidePage = lazy(() => import("./pages/GuidePage"));
 const Glossary = lazy(() => import("./pages/Glossary"));
 const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
 const AiDoctorContextCheck = lazy(() => import("./pages/AiDoctorContextCheck"));
+const PublicVpdCalculator = lazy(() => import("./pages/PublicVpdCalculator"));
 const LegacyBillingRedirect = lazy(() => import("./pages/LegacyBillingRedirect"));
 const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
 const CheckoutCancel = lazy(() => import("./pages/CheckoutCancel"));
@@ -195,6 +196,7 @@ const App = () => (
                   <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
                   <Route path="/ai-doctor-readiness-check" element={<AiDoctorContextCheck />} />
+                  <Route path="/tools/vpd-calculator" element={<PublicVpdCalculator />} />
                   {/* Legacy `/billing/:plan` entry — redirect to canonical
                       `/pricing` with plan preselect + safe returnTo. */}
                   <Route path="/billing/:plan" element={<LegacyBillingRedirect />} />

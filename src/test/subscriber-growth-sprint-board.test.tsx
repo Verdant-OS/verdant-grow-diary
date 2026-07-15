@@ -30,6 +30,7 @@ const COUNTS = {
   pricingInterestReferral: 4,
   pricingInterestGrowerInvite: 6,
   pricingInterestContextCheck: 8,
+  pricingInterestVpdCalculator: 9,
   allLeads7d: 9,
 };
 
@@ -53,6 +54,7 @@ describe("SubscriberGrowthSprintBoard", () => {
             pricingInterestShare: 1,
             growerInvite: 2,
             contextCheck: 1,
+            vpdCalculator: 3,
           }}
         />
       </MemoryRouter>,

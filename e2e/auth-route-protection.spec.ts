@@ -78,6 +78,19 @@ async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {
 test.describe("Auth route-protection (mocked, 1280x800)", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
+  test.beforeAll(async ({ browser, baseURL }, testInfo) => {
+    // Keep cold Vite compilation outside the route assertions so startup time
+    // cannot masquerade as an auth-redirect regression.
+    testInfo.setTimeout(120_000);
+    const page = await browser.newPage({ baseURL });
+    try {
+      await mockAllSupabase(page);
+      await page.goto("/welcome", { waitUntil: "domcontentloaded", timeout: 110_000 });
+    } finally {
+      await page.close();
+    }
+  });
+
   test.beforeEach(async ({ page }) => {
     await mockAllSupabase(page);
   });

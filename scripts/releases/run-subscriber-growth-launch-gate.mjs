@@ -118,7 +118,7 @@ export function buildChangedE2eCommandArgs(specs) {
     ...specs,
     "--project=chromium-mocked",
     "--reporter=line",
-    "--workers=2",
+    "--workers=1",
   ];
 }
 

@@ -181,6 +181,20 @@ test.use({
 });
 
 test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
+  test.beforeAll(async ({ browser, baseURL }, testInfo) => {
+    // Vite's first browser-driven module graph compile can exceed the normal
+    // assertion budget on a cold Windows checkout. Warm the mocked app once;
+    // every actual route test keeps the standard 60-second timeout.
+    testInfo.setTimeout(120_000);
+    const page = await browser.newPage({ baseURL });
+    try {
+      await mockAllSupabase(page);
+      await page.goto("/welcome", { waitUntil: "domcontentloaded", timeout: 110_000 });
+    } finally {
+      await page.close();
+    }
+  });
+
   test.beforeEach(async ({ page }) => {
     await mockAllSupabase(page);
   });

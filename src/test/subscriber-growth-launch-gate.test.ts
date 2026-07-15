@@ -96,7 +96,7 @@ describe("subscriber growth launch gate", () => {
       ...files.slice(0, 2),
       "--project=chromium-mocked",
       "--reporter=line",
-      "--workers=2",
+      "--workers=1",
     ]);
   });
 

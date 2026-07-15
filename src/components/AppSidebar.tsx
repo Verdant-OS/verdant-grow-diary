@@ -14,6 +14,7 @@ import {
   Wrench,
   LineChart,
   ClipboardList,
+  HelpCircle,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -84,10 +85,13 @@ const growerGroups: { label: string; items: NavItem[] }[] = [
       { to: "/grow-lineage", label: "Lineage Repair", icon: Wrench },
     ],
   },
-  { label: "Account", items: [
-    { to: "/settings", label: "Settings", icon: Settings },
-    { to: "/account/preferences", label: "Preferences", icon: UserCog },
-  ] },
+  {
+    label: "Account",
+    items: [
+      { to: "/settings", label: "Settings", icon: Settings },
+      { to: "/account/preferences", label: "Preferences", icon: UserCog },
+    ],
+  },
 ];
 
 /**
@@ -103,6 +107,7 @@ const operatorGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { to: "/operator/release-readiness", label: "Release Readiness", icon: ClipboardList },
       { to: "/operator/ai-doctor-phase1", label: "AI Doctor Results", icon: Stethoscope },
+      { to: "/guides/cannabis-plant-care", label: "Help/Guides", icon: HelpCircle },
     ],
   },
 ];
@@ -119,9 +124,7 @@ export default function AppSidebar() {
     return (
       <SidebarGroup key={g.label}>
         {!collapsed && (
-          <SidebarGroupLabel className="text-[10px] tracking-wider">
-            {g.label}
-          </SidebarGroupLabel>
+          <SidebarGroupLabel className="text-[10px] tracking-wider">{g.label}</SidebarGroupLabel>
         )}
         <SidebarGroupContent>
           <SidebarMenu>
@@ -185,4 +188,3 @@ export default function AppSidebar() {
     </Sidebar>
   );
 }
-

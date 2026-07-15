@@ -5,8 +5,8 @@
  * so visible copy and FAQPage JSON-LD share a single source of truth.
  * No Supabase, no AI calls, no Action Queue writes, no device control.
  */
-import { useEffect } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
@@ -31,7 +31,26 @@ import {
 
 export default function GuidePage() {
   const { slug } = useParams<{ slug: string }>();
+  const location = useLocation();
   const guide = findGuideBySlug(slug);
+  const initialFaqValue = (() => {
+    const hash = location.hash.replace(/^#/, "");
+    return hash.startsWith("faq-") ? hash : undefined;
+  })();
+  const [openFaq, setOpenFaq] = useState<string | undefined>(initialFaqValue);
+
+  useEffect(() => {
+    const hash = location.hash.replace(/^#/, "");
+    if (!hash.startsWith("faq-")) return;
+    setOpenFaq(hash);
+    // Defer scroll until after the accordion item opens.
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(hash);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, [location.hash]);
+
 
   // Always call hooks before conditional returns.
   usePageSeo({
@@ -128,9 +147,19 @@ export default function GuidePage() {
             <h2 className="font-display text-xl md:text-2xl font-semibold mb-4">
               Common questions
             </h2>
-            <Accordion type="single" collapsible className="w-full">
+            <Accordion
+              type="single"
+              collapsible
+              className="w-full"
+              value={openFaq}
+              onValueChange={(v) => setOpenFaq(v || undefined)}
+            >
               {guide.faq.map((entry, i) => (
-                <AccordionItem key={entry.question} value={`faq-${i}`}>
+                <AccordionItem
+                  key={entry.question}
+                  value={`faq-${i}`}
+                  id={`faq-${i}`}
+                >
                   <AccordionTrigger className="text-left">
                     {entry.question}
                   </AccordionTrigger>
@@ -138,6 +167,7 @@ export default function GuidePage() {
                 </AccordionItem>
               ))}
             </Accordion>
+
           </section>
         )}
 

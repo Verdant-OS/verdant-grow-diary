@@ -73,9 +73,7 @@ describe("diaryFaqLinkClickTracker", () => {
       "timestamp",
       "sessionId",
     ]) {
-      expect(Object.prototype.hasOwnProperty.call(parsed, forbidden)).toBe(
-        false,
-      );
+      expect(Object.prototype.hasOwnProperty.call(parsed, forbidden)).toBe(false);
     }
   });
 
@@ -119,11 +117,7 @@ describe("diaryFaqLinkClickTracker", () => {
       watering: 5,
       nutrients: 0,
     });
-    expect(ranked.map((r) => r.topic)).toEqual([
-      "watering",
-      "yellowing",
-      "environment",
-    ]);
+    expect(ranked.map((r) => r.topic)).toEqual(["watering", "yellowing", "environment"]);
     expect(ranked.every((r) => r.count > 0)).toBe(true);
   });
 
@@ -136,9 +130,7 @@ describe("diaryFaqLinkClickTracker", () => {
       recordDiaryFaqLinkClick("yellowing", storage);
       setDiaryFaqLinkClickTrackingEnabled(false, storage);
       expect(isDiaryFaqLinkClickTrackingEnabled(storage)).toBe(false);
-      expect(
-        storage.data.get(DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY),
-      ).toBe("false");
+      expect(storage.data.get(DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY)).toBe("false");
 
       // Attempted click while disabled must not change counts.
       recordDiaryFaqLinkClick("yellowing", storage);
@@ -156,19 +148,13 @@ describe("diaryFaqLinkClickTracker", () => {
     });
 
     it("ignores garbage preference values and returns the default", () => {
-      storage.setItem(
-        DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY,
-        "not-a-bool",
-      );
+      storage.setItem(DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY, "not-a-bool");
       expect(isDiaryFaqLinkClickTrackingEnabled(storage)).toBe(true);
     });
 
     it("is a safe no-op when storage is null", () => {
       expect(isDiaryFaqLinkClickTrackingEnabled(null)).toBe(true);
-      expect(() =>
-        setDiaryFaqLinkClickTrackingEnabled(false, null),
-      ).not.toThrow();
+      expect(() => setDiaryFaqLinkClickTrackingEnabled(false, null)).not.toThrow();
     });
   });
 });
-

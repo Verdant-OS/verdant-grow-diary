@@ -11,6 +11,7 @@ export interface SignupAcquisitionCounts {
   founderPage: number;
   founderShare: number;
   pricingInterestShare: number;
+  operatorOutreach: number;
   growerInvite: number;
   contextCheck: number;
   vpdCalculator: number;
@@ -35,6 +36,7 @@ const EMPTY_COUNTS: SignupAcquisitionCounts = Object.freeze({
   founderPage: 0,
   founderShare: 0,
   pricingInterestShare: 0,
+  operatorOutreach: 0,
   growerInvite: 0,
   contextCheck: 0,
   vpdCalculator: 0,
@@ -92,6 +94,7 @@ export function parseSignupAcquisitionSnapshot(input: unknown): SignupAcquisitio
       founderPage: asCount(raw.founder_page),
       founderShare: asCount(raw.founder_share),
       pricingInterestShare: asCount(raw.pricing_interest_share),
+      operatorOutreach: asCount(raw.operator_outreach),
       growerInvite: asCount(raw.grower_invite),
       contextCheck: asCount(raw.context_check),
       vpdCalculator: asCount(raw.vpd_calculator),

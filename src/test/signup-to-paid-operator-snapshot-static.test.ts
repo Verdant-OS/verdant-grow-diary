@@ -31,6 +31,7 @@ describe("signup-to-paid operator snapshot safety", () => {
     expect(SQL).toContain("bs.status = 'active'");
     expect(SQL).toContain("bs.current_period_end IS NULL OR bs.current_period_end > now()");
     expect(SQL).toContain("LEFT JOIN public.signup_acquisition_attributions AS a");
+    expect(SQL).toContain("('operator_outreach'::text)");
     expect(SQL).not.toContain("profiles.tier");
     expect(SQL).not.toContain("public.subscriptions");
   });

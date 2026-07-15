@@ -52,6 +52,7 @@ describe("SubscriberGrowthSprintBoard", () => {
             founderPage: 1,
             founderShare: 2,
             pricingInterestShare: 1,
+            operatorOutreach: 0,
             growerInvite: 2,
             contextCheck: 1,
             vpdCalculator: 3,

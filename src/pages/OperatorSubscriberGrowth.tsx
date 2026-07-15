@@ -324,6 +324,10 @@ export default function OperatorSubscriberGrowth() {
                   label="Interest share signup"
                   value={acquisition.counts.pricingInterestShare}
                 />
+                <MetricCard
+                  label="Operator outreach signup"
+                  value={acquisition.counts.operatorOutreach}
+                />
                 <MetricCard label="Grower invite signup" value={acquisition.counts.growerInvite} />
                 <MetricCard label="Context check signup" value={acquisition.counts.contextCheck} />
                 <MetricCard

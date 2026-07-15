@@ -31,6 +31,7 @@ BEGIN
       ('founder_page'::text),
       ('founder_share'::text),
       ('pricing_interest_share'::text),
+      ('operator_outreach'::text),
       ('grower_invite'::text),
       ('context_check'::text),
       ('vpd_calculator'::text),

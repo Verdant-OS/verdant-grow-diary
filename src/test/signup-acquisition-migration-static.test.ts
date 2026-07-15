@@ -10,6 +10,7 @@ const SQL = readFileSync(
 describe("signup acquisition migration safety", () => {
   it("stores one allowlisted, immutable first-touch source without client table access", () => {
     expect(SQL).toContain("CREATE TABLE IF NOT EXISTS public.signup_acquisition_attributions");
+    expect(SQL).toContain("'operator_outreach'");
     expect(SQL).toContain("user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE");
     for (const source of [
       "landing_page",
@@ -54,6 +55,7 @@ describe("signup acquisition migration safety", () => {
     expect(SQL).toContain(
       "CREATE OR REPLACE FUNCTION public.signup_acquisition_operator_snapshot()",
     );
+    expect(SQL).toContain("'operator_outreach', ac.operator_outreach");
     expect(SQL).toContain("public.has_role(auth.uid(), 'operator'::public.app_role)");
     expect(SQL).toContain("SECURITY DEFINER");
     expect(SQL).toContain("STABLE");

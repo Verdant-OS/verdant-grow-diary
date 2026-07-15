@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.signup_acquisition_attributions (
       'founder_page',
       'founder_share',
       'pricing_interest_share',
+      'operator_outreach',
       'grower_invite',
       'context_check',
       'vpd_calculator'
@@ -54,6 +55,7 @@ BEGIN
       'founder_page',
       'founder_share',
       'pricing_interest_share',
+      'operator_outreach',
       'grower_invite',
       'context_check',
       'vpd_calculator'
@@ -97,6 +99,7 @@ WHERE u.raw_user_meta_data->>'verdant_signup_source' IN (
   'founder_page',
   'founder_share',
   'pricing_interest_share',
+  'operator_outreach',
   'grower_invite',
   'context_check',
   'vpd_calculator'
@@ -138,6 +141,7 @@ BEGIN
       count(*) FILTER (WHERE a.source = 'founder_page') AS founder_page,
       count(*) FILTER (WHERE a.source = 'founder_share') AS founder_share,
       count(*) FILTER (WHERE a.source = 'pricing_interest_share') AS pricing_interest_share,
+      count(*) FILTER (WHERE a.source = 'operator_outreach') AS operator_outreach,
       count(*) FILTER (WHERE a.source = 'grower_invite') AS grower_invite,
       count(*) FILTER (WHERE a.source = 'context_check') AS context_check,
       count(*) FILTER (WHERE a.source = 'vpd_calculator') AS vpd_calculator
@@ -154,6 +158,7 @@ BEGIN
     'founder_page', ac.founder_page,
     'founder_share', ac.founder_share,
     'pricing_interest_share', ac.pricing_interest_share,
+    'operator_outreach', ac.operator_outreach,
     'grower_invite', ac.grower_invite,
     'context_check', ac.context_check,
     'vpd_calculator', ac.vpd_calculator

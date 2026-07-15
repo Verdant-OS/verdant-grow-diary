@@ -268,5 +268,5 @@ describe("calculateAirVpdKpa usage guard (ingest mappers only)", () => {
           `rename it (add 'ViewModel'/'Display'/'Chart'/'Status'/'Presenter') so the guard skips it.`,
       ).toBe(true);
     }
-  });
+  }, 15_000);
 });

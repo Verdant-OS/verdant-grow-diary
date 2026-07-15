@@ -108,7 +108,7 @@ export function formattableChangedFiles(files) {
 }
 
 export function buildTargetedTestCommandArgs(tests) {
-  return ["vitest", "run", ...tests, "--reporter=dot", "--maxWorkers=2"];
+  return ["vitest", "run", ...tests, "--reporter=dot", "--maxWorkers=1"];
 }
 
 export function buildChangedE2eCommandArgs(specs) {

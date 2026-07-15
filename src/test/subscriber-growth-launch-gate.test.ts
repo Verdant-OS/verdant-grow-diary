@@ -78,7 +78,7 @@ describe("subscriber growth launch gate", () => {
       "src/test/a.test.ts",
       "src/test/b.test.ts",
       "--reporter=dot",
-      "--maxWorkers=2",
+      "--maxWorkers=1",
     ]);
   });
 

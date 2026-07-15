@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
@@ -55,24 +55,26 @@ describe("AI Doctor Context Check page", () => {
     });
   });
 
-  it("reaches strong coverage only after the core, current, and historical contract is present", async () => {
-    const user = userEvent.setup();
+  it("reaches strong coverage only after the core, current, and historical contract is present", () => {
     renderPage();
 
-    for (const name of [
-      /Plant stage/,
-      /Strain or cultivar/,
-      /Growing medium/,
-      /Pot size or reservoir volume/,
-      /Recent watering/,
-      /Recent feeding/,
-      /Recent photos/,
-      /Diary entries/,
-      /Grow targets/,
-    ]) {
-      await user.click(screen.getByRole("checkbox", { name }));
+    const selectedCheckboxes = [
+      [0, /Plant stage/],
+      [1, /Strain or cultivar/],
+      [2, /Growing medium/],
+      [3, /Pot size or reservoir volume/],
+      [4, /Recent watering/],
+      [5, /Recent feeding/],
+      [7, /Recent photos/],
+      [8, /Diary entries/],
+      [10, /Grow targets/],
+    ] as const;
+    const checkboxes = screen.getAllByRole("checkbox");
+    for (const [index, name] of selectedCheckboxes) {
+      expect(checkboxes[index]).toHaveAccessibleName(name);
+      fireEvent.click(checkboxes[index]);
     }
-    await user.click(screen.getByRole("button", { name: /Check my context/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Check my context/ }));
 
     expect(screen.getByText("Strong context coverage")).toBeInTheDocument();
     expect(screen.getByTestId("context-check-coverage")).toHaveTextContent("9/12 · 75%");

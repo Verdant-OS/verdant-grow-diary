@@ -53,11 +53,14 @@ function renderSignup() {
   );
 }
 
-async function completeSignupForm() {
+async function completeSignupForm({ marketingOptIn = false } = {}) {
   const user = userEvent.setup();
   await user.type(screen.getByLabelText("Email"), "grower@example.com");
   await user.type(screen.getByLabelText("Password"), "correct-horse-battery-staple");
   await user.click(screen.getByLabelText(/I agree to the Terms of Service/));
+  if (marketingOptIn) {
+    await user.click(screen.getByLabelText(/Send me occasional product updates/i));
+  }
   await user.click(screen.getByRole("button", { name: "Create account" }));
 }
 
@@ -77,7 +80,7 @@ describe("Auth signup acquisition handoff", () => {
       password: "correct-horse-battery-staple",
       options: {
         emailRedirectTo: `${window.location.origin}${redirectTo}`,
-        data: { verdant_signup_source: "founder_share" },
+        data: { verdant_signup_source: "founder_share", marketing_opt_in: false },
       },
     });
     expect(mocks.track).toHaveBeenCalledWith("signup_page_view", {
@@ -98,6 +101,25 @@ describe("Auth signup acquisition handoff", () => {
     expect(JSON.stringify(mocks.track.mock.calls)).not.toMatch(
       /grower@example|password|correct-horse|token|user_?id/i,
     );
+  });
+
+  it("carries an explicit marketing opt-in through confirmation-required signup", async () => {
+    renderSignup();
+
+    await completeSignupForm({ marketingOptIn: true });
+
+    await waitFor(() => expect(mocks.signUp).toHaveBeenCalledTimes(1));
+    expect(mocks.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          data: {
+            verdant_signup_source: "founder_share",
+            marketing_opt_in: true,
+          },
+        }),
+      }),
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(/check your inbox/i);
   });
 
   it("continues to the safe return path when signup immediately creates a session", async () => {

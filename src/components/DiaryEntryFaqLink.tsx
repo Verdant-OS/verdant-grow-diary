@@ -13,6 +13,7 @@ import {
   buildDiaryFaqLink,
   type DiaryFaqLinkInput,
 } from "@/lib/diaryFaqLinkRules";
+import { recordDiaryFaqLinkClick } from "@/lib/diaryFaqLinkClickTracker";
 import { cn } from "@/lib/utils";
 
 export interface DiaryEntryFaqLinkProps {

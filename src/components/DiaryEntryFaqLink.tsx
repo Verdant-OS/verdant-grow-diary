@@ -13,6 +13,7 @@ import {
   buildDiaryFaqLink,
   type DiaryFaqLinkInput,
 } from "@/lib/diaryFaqLinkRules";
+import { recordDiaryFaqLinkClick } from "@/lib/diaryFaqLinkClickTracker";
 import { cn } from "@/lib/utils";
 
 export interface DiaryEntryFaqLinkProps {
@@ -32,6 +33,9 @@ export default function DiaryEntryFaqLink({
       data-testid="diary-entry-faq-link"
       data-faq-topic={link.matchedTopic}
       data-faq-index={String(link.faqIndex)}
+      onClick={() => {
+        recordDiaryFaqLinkClick(link.matchedTopic);
+      }}
       className={cn(
         "mt-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2",
         className,

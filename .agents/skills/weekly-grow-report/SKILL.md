@@ -63,7 +63,34 @@ Render as static SVG/canvas suitable for print (no interactive tooltips required
 
 If a chart has zero eligible data points, render an honest empty state ("No feeding events logged in this window") — never a fake baseline.
 
-### 4. What happened (narrative)
+### 4. Week-over-week comparison
+Side-by-side visual + numeric diff of **this week** vs the **immediately prior 7-day window** of equal length, ending exactly where this week begins. Purpose: show how the environment and inputs *changed*, not whether they're "good".
+
+Rendered as a **compare strip** above each of these existing charts (env trend, VPD, feed EC & pH, watering volume) plus a small **stat-delta table**:
+
+- **Overlaid dual-series line** for env trend + VPD — this week solid, last week dashed and de-emphasized, same target band shaded. Same y-axis scale so eyeballing is honest.
+- **Grouped bars** for feed EC & pH and daily watering ml — this week vs last week per weekday (Mon..Sun), same y-axis.
+- **Delta table** with one row per metric:
+  - Waterings (count, total ml)
+  - Feedings (count, avg EC, avg pH)
+  - Avg temp / RH / VPD (per source, provenance-weighted)
+  - Hours outside temp/RH/VPD target band
+  - Observations, photos, training events
+  - Alerts triggered / resolved
+  - AI Doctor sessions
+  - Action Queue: pending / approved / dismissed
+  Each row shows: `this week | last week | Δ absolute | Δ %` (or "—" if either side is empty). No arrows/emoji urgency. No red/green good-vs-bad framing.
+
+Comparison rules — non-negotiable:
+
+- **Provenance is honored on both sides.** `demo | stale | invalid` readings are excluded from both this-week and last-week trend math identically. If exclusions differ (e.g. last week was all `stale`), state that explicitly under the chart.
+- **Stage-aware caveat.** If the plant crossed a stage boundary (veg → flower, flower week N → N+1) between the two windows, print a one-line notice: "Comparison spans a stage change (<from> → <on <date>>); trends may reflect the transition rather than a real change." Never suppress the comparison — just annotate it.
+- **Missing last week.** If the prior window has < 3 days of coverage for a metric, render its delta as "insufficient prior data — showing this week only" and skip the % change. Never extrapolate.
+- **Timezone-consistent windows.** Both windows use the same grower-local weekday alignment; no UTC drift.
+- **Deterministic.** Same two windows = same numbers, same ordering, same rendered chart.
+- **No causal claims.** The section shows *what changed*, never *why*. Causal reasoning is deferred to the grower and to AI Doctor.
+
+### 5. What happened (narrative)
 Deterministic bullet list, grouped by day (most recent first):
 - Day header (weekday + date).
 - One line per event, with time, event type, and a short factual detail (e.g. "Watering 500 ml, runoff pH 6.2").

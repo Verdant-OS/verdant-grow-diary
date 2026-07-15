@@ -36,7 +36,7 @@ export default function GuidePage() {
   const guide = findGuideBySlug(slug);
   const initialResolved = resolveGuideFaqFromHash(guide, location.hash);
   const initialFaqValue = initialResolved?.value;
-  const [openFaq, setOpenFaq] = useState<string | undefined>(initialFaqValue);
+  const [openFaq, setOpenFaq] = useState<string>(initialFaqValue ?? "");
   const [highlightedFaq, setHighlightedFaq] = useState<string | undefined>(
     initialFaqValue,
   );
@@ -48,6 +48,7 @@ export default function GuidePage() {
     const target = resolved.value;
     setOpenFaq(target);
     setHighlightedFaq(target);
+
     // Defer scroll until after the accordion item opens, then move focus
     // to the highlighted item so keyboard users land on the answer they
     // deep-linked into.
@@ -64,13 +65,11 @@ export default function GuidePage() {
         el.focus({ preventScroll: true });
       }
     }, 100);
-    // Fade the highlight after a few seconds so it doesn't dominate.
-    const fadeT = window.setTimeout(() => setHighlightedFaq(undefined), 2600);
     return () => {
       window.clearTimeout(scrollT);
-      window.clearTimeout(fadeT);
     };
   }, [location.hash, guide]);
+
 
 
 
@@ -174,7 +173,14 @@ export default function GuidePage() {
               collapsible
               className="w-full"
               value={openFaq}
-              onValueChange={(v) => setOpenFaq(v || undefined)}
+              onValueChange={(v) => {
+                // Keep the accordion controlled by using an empty string
+                // for the collapsed state rather than undefined.
+                setOpenFaq(v ?? "");
+                // Clear the deep-link highlight when the user manually
+                // collapses the accordion; otherwise keep it visible.
+                if (!v) setHighlightedFaq(undefined);
+              }}
             >
               {guide.faq.map((entry, i) => {
                 const value = `faq-${i}`;

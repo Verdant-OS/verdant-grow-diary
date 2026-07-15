@@ -36,7 +36,7 @@ export default function GuidePage() {
   const guide = findGuideBySlug(slug);
   const initialResolved = resolveGuideFaqFromHash(guide, location.hash);
   const initialFaqValue = initialResolved?.value;
-  const [openFaq, setOpenFaq] = useState<string | undefined>(initialFaqValue);
+  const [openFaq, setOpenFaq] = useState<string>(initialFaqValue ?? "");
   const [highlightedFaq, setHighlightedFaq] = useState<string | undefined>(
     initialFaqValue,
   );

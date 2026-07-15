@@ -5,8 +5,8 @@
  * so visible copy and FAQPage JSON-LD share a single source of truth.
  * No Supabase, no AI calls, no Action Queue writes, no device control.
  */
-import { useEffect } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
@@ -28,11 +28,45 @@ import {
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
 import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
+import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
 
 export default function GuidePage() {
   const { slug } = useParams<{ slug: string }>();
+  const location = useLocation();
   const guide = findGuideBySlug(slug);
+  const initialResolved = resolveGuideFaqFromHash(guide, location.hash);
+  const initialFaqValue = initialResolved?.value;
+  const [openFaq, setOpenFaq] = useState<string>(initialFaqValue ?? "");
+  const [highlightedFaq, setHighlightedFaq] = useState<string | undefined>(initialFaqValue);
+  const faqItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
+  useEffect(() => {
+    const resolved = resolveGuideFaqFromHash(guide, location.hash);
+    if (!resolved) return;
+    const target = resolved.value;
+    setOpenFaq(target);
+    setHighlightedFaq(target);
+
+    // Defer scroll until after the accordion item opens, then move focus
+    // to the highlighted item so keyboard users land on the answer they
+    // deep-linked into.
+    const scrollT = window.setTimeout(() => {
+      const el = faqItemRefs.current[target] ?? document.getElementById(target);
+      if (el) {
+        // jsdom does not implement scrollIntoView; guard so focus still runs.
+        try {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        } catch {
+          /* ignore */
+        }
+        // Focus is safe to call after scrolling; the item has tabIndex=-1.
+        el.focus({ preventScroll: true });
+      }
+    }, 100);
+    return () => {
+      window.clearTimeout(scrollT);
+    };
+  }, [location.hash, guide]);
   // Always call hooks before conditional returns.
   usePageSeo({
     title: guide?.title ?? "Grower Guide | Verdant Grow Diary",
@@ -119,13 +153,42 @@ export default function GuidePage() {
             <h2 className="font-display text-xl md:text-2xl font-semibold mb-4">
               Common questions
             </h2>
-            <Accordion type="single" collapsible className="w-full">
-              {guide.faq.map((entry, i) => (
-                <AccordionItem key={entry.question} value={`faq-${i}`}>
-                  <AccordionTrigger className="text-left">{entry.question}</AccordionTrigger>
-                  <AccordionContent>{entry.answer}</AccordionContent>
-                </AccordionItem>
-              ))}
+            <Accordion
+              type="single"
+              collapsible
+              className="w-full"
+              value={openFaq}
+              onValueChange={(v) => {
+                // Keep the accordion controlled by using an empty string
+                // for the collapsed state rather than undefined.
+                setOpenFaq(v ?? "");
+                // Clear the deep-link highlight when the user manually
+                // collapses the accordion; otherwise keep it visible.
+                if (!v) setHighlightedFaq(undefined);
+              }}
+            >
+              {guide.faq.map((entry, i) => {
+                const value = `faq-${i}`;
+                const isHighlighted = highlightedFaq === value;
+                return (
+                  <AccordionItem
+                    key={entry.question}
+                    value={value}
+                    id={value}
+                    ref={(el) => (faqItemRefs.current[value] = el)}
+                    tabIndex={-1}
+                    data-highlighted={isHighlighted ? "true" : undefined}
+                    className={
+                      isHighlighted
+                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        : "motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    }
+                  >
+                    <AccordionTrigger className="text-left px-2">{entry.question}</AccordionTrigger>
+                    <AccordionContent className="px-2">{entry.answer}</AccordionContent>
+                  </AccordionItem>
+                );
+              })}
             </Accordion>
           </section>
         )}

@@ -15,6 +15,7 @@ import GlobalFastAddButton from "./GlobalFastAddButton";
 import AuthStatusIndicator from "./AuthStatusIndicator";
 import SignOutConfirmDialog from "./SignOutConfirmDialog";
 import VerificationPendingBanner from "./VerificationPendingBanner";
+import GlobalSearchDialog from "./GlobalSearchDialog";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
 
@@ -34,6 +35,19 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Global ⌘K / Ctrl+K shortcut to open the search palette.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     function onOpen(e: Event) {
@@ -83,7 +97,13 @@ export default function AppShell({ children }: { children?: ReactNode }) {
               </div>
 
               <div className="ml-auto flex items-center gap-2">
-                <button className="hidden md:inline-flex items-center gap-2 px-3 h-9 rounded-lg border border-border/50 bg-secondary/30 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition">
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(true)}
+                  aria-label="Open global search"
+                  data-testid="global-search-trigger"
+                  className="hidden md:inline-flex items-center gap-2 px-3 h-9 rounded-lg border border-border/50 bg-secondary/30 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition"
+                >
                   <Search className="h-4 w-4" />
                   <span className="hidden lg:inline">Search…</span>
                   <kbd className="hidden lg:inline ml-2 text-[10px] px-1.5 py-0.5 rounded bg-background/60 border border-border/40">
@@ -163,6 +183,8 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           prefill={prefill}
           onCreated={() => window.dispatchEvent(new Event("verdant:entry-created"))}
         />
+
+        <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
       </div>
     </SidebarProvider>
   );

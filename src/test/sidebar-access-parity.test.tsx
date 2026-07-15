@@ -208,7 +208,7 @@ describe("UI Simplification Slice 1 — grower-facing group structure", () => {
     const group = advanced.closest('[data-sidebar="group"]');
     expect(group).not.toBeNull();
     expect(group?.textContent ?? "").toContain("Lineage Repair");
-    expect(group?.textContent ?? "").toContain("Harvest Archive");
+    expect(group?.textContent ?? "").toContain("My Grows");
   });
 
   it("does NOT place AI Doctor Results or Release Readiness in any grower group", () => {

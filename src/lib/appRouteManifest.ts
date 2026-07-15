@@ -110,6 +110,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Customer Mode QR guide shell (read-only, no private grow data).",
   },
+  {
+    path: "/customer/:shareId/cannabis-care",
+    access: "public",
+    description: "Customer Mode cannabis plant care FAQ page (read-only).",
+  },
   { path: "/daily-check", access: "auth" },
   { path: "/demo", access: "redirect", description: "→ /welcome" },
   {

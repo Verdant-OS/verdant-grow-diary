@@ -15,6 +15,7 @@ import {
   LineChart,
   ClipboardList,
   Users,
+  HelpCircle,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -78,7 +79,7 @@ const growerGroups: { label: string; items: NavItem[] }[] = [
     label: "Advanced",
     items: [
       { to: "/reports", label: "Reports", icon: LineChart },
-      { to: "/grows", label: "Harvest Archive", icon: Sprout },
+      { to: "/grows", label: "My Grows", icon: Sprout },
       // /grow-lineage is manifest access "auth" (grower-facing repair tool).
       // Owner-scoped reads/writes only, RLS-protected. MUST stay visible to
       // every authenticated grower — do not gate behind operator role.
@@ -108,6 +109,7 @@ const operatorGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { to: "/operator/release-readiness", label: "Release Readiness", icon: ClipboardList },
       { to: "/operator/ai-doctor-phase1", label: "AI Doctor Results", icon: Stethoscope },
+      { to: "/guides/cannabis-plant-care", label: "Help/Guides", icon: HelpCircle },
     ],
   },
 ];

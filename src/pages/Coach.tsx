@@ -358,7 +358,7 @@ export default function Coach() {
   return (
     <div>
       <div className="mb-5">
-        <h1 className="text-2xl font-display font-bold flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />AI Coach</h1>
+        <h1 className="text-2xl font-display font-bold flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />AI Doctor</h1>
         <p className="text-sm text-muted-foreground">
           {activeGrow ? <>Coaching <span className="text-foreground">{activeGrow.name}</span> using your recent diary.</> : "Pick a grow for personalized advice."}
         </p>

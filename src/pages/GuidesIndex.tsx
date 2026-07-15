@@ -8,6 +8,7 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
+import DiaryFaqLinkStatsPanel from "@/components/DiaryFaqLinkStatsPanel";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   Accordion,
@@ -164,7 +165,9 @@ export default function GuidesIndex() {
           </Link>
           .
         </p>
+        <DiaryFaqLinkStatsPanel className="mt-10" />
       </section>
     </main>
+
   );
 }

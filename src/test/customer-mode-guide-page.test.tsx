@@ -42,9 +42,7 @@ describe("CustomerModeGuide", () => {
       "care_notes",
       "trust_footer",
     ]) {
-      expect(
-        screen.getByTestId(`customer-guide-section-${id}`),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId(`customer-guide-section-${id}`)).toBeInTheDocument();
       expect(
         screen.getByTestId(`customer-guide-section-${id}-placeholder-label`),
       ).toHaveTextContent(/placeholder content/i);
@@ -59,9 +57,7 @@ describe("CustomerModeGuide", () => {
     expect(screen.getByTestId("customer-guide-timeline-empty")).toHaveTextContent(
       /no customer-facing events have been published yet/i,
     );
-    expect(
-      screen.getByRole("heading", { name: /customer-facing timeline/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /customer-facing timeline/i })).toBeInTheDocument();
   });
 
   it("never echoes the :shareId into the visible DOM outside the QR URL block", () => {
@@ -71,9 +67,7 @@ describe("CustomerModeGuide", () => {
     // Remove the QR block (which legitimately renders the public URL
     // containing the shareId) before scanning the rest of the page.
     const clone = page.cloneNode(true) as HTMLElement;
-    clone
-      .querySelectorAll('[data-testid="customer-guide-qr-block"]')
-      .forEach((el) => el.remove());
+    clone.querySelectorAll('[data-testid="customer-guide-qr-block"]').forEach((el) => el.remove());
     expect(clone.textContent ?? "").not.toContain(shareId);
   });
 
@@ -89,10 +83,17 @@ describe("CustomerModeGuide", () => {
     expect(screen.getByTestId("customer-guide-trust-footer")).toBeInTheDocument();
   });
 
+  it("renders the cannabis care FAQ link pointing to the customer-mode FAQ page", () => {
+    renderAt("/customer/share-abc");
+    const link = screen.getByTestId("customer-mode-cannabis-care-link-anchor");
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute("href", "/customer/share-abc/cannabis-care");
+  });
+
   it("timeline shell renders the 'only events explicitly published' copy", () => {
     renderAt("/customer/share-abc");
-    expect(
-      screen.getByTestId("customer-guide-timeline-published-only"),
-    ).toHaveTextContent(/only events explicitly published for customers appear here/i);
+    expect(screen.getByTestId("customer-guide-timeline-published-only")).toHaveTextContent(
+      /only events explicitly published for customers appear here/i,
+    );
   });
 });

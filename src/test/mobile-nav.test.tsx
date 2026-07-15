@@ -58,7 +58,7 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
       ],
       Advanced: [
         ["Reports", "/reports"],
-        ["Harvest Archive", "/grows"],
+        ["My Grows", "/grows"],
       ],
       Account: [
         ["Settings", "/settings"],

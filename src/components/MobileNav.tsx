@@ -67,7 +67,7 @@ export const moreGroups: MoreGroup[] = [
     heading: "Advanced",
     items: [
       { to: "/reports", label: "Reports", icon: LineChart },
-      { to: "/grows", label: "Harvest Archive", icon: Sprout },
+      { to: "/grows", label: "My Grows", icon: Sprout },
     ],
   },
   {

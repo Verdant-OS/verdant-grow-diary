@@ -18,7 +18,10 @@ function scrollToAnchor(targetId: string) {
   if (typeof document === "undefined") return;
   const el = document.getElementById(targetId);
   if (!el) return;
-  el.scrollIntoView({ behavior: "smooth", block: "start" });
+  // "center" keeps the target near the middle of the viewport instead of
+  // snapping the page all the way down when the target sits near the
+  // bottom of a long page (the "jarring auto-scroll to bottom" report).
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
   if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
   (el as HTMLElement).focus({ preventScroll: true });
 }
@@ -42,7 +45,7 @@ function renderEntry(entry: PlantDetailSectionEntry) {
           aria-disabled="true"
           aria-label={ariaLabelFor(entry)}
           data-testid={entry.testId}
-          className={`${FOCUS_CLASSES} opacity-60 cursor-not-allowed`}
+          className={`${FOCUS_CLASSES} h-7 px-2 text-xs rounded-full opacity-60 cursor-not-allowed`}
         >
           {entry.label}
         </Button>
@@ -62,8 +65,8 @@ function renderEntry(entry: PlantDetailSectionEntry) {
       key={entry.kind}
       type="button"
       size="sm"
-      variant="ghost"
-      className={`shrink-0 ${FOCUS_CLASSES}`}
+      variant="outline"
+      className={`shrink-0 h-7 px-2 text-xs rounded-full ${FOCUS_CLASSES}`}
       data-testid={entry.testId}
       aria-label={ariaLabelFor(entry)}
       onClick={() => scrollToAnchor(entry.anchorId)}
@@ -83,8 +86,14 @@ export default function PlantDetailSectionNav(
       data-testid="plant-detail-section-nav"
       className="my-3 -mx-1 overflow-x-auto"
     >
-      <div className="flex items-start gap-1 px-1">
-        {entries.map(renderEntry)}
+      <div className="flex items-center gap-2 px-1">
+        <span
+          aria-hidden="true"
+          className="shrink-0 text-[11px] uppercase tracking-wider text-muted-foreground"
+        >
+          Jump to
+        </span>
+        <div className="flex items-start gap-1.5">{entries.map(renderEntry)}</div>
       </div>
     </nav>
   );

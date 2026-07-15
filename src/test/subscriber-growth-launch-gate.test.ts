@@ -71,14 +71,14 @@ const liveParity = {
 };
 
 describe("subscriber growth launch gate", () => {
-  it("caps changed-test concurrency without relaxing the per-test timeout", () => {
+  it("uses controlled worker counts without relaxing per-test timeouts", () => {
     expect(buildTargetedTestCommandArgs(["src/test/a.test.ts", "src/test/b.test.ts"])).toEqual([
       "vitest",
       "run",
       "src/test/a.test.ts",
       "src/test/b.test.ts",
       "--reporter=dot",
-      "--maxWorkers=4",
+      "--maxWorkers=2",
     ]);
   });
 
@@ -96,6 +96,7 @@ describe("subscriber growth launch gate", () => {
       ...files.slice(0, 2),
       "--project=chromium-mocked",
       "--reporter=line",
+      "--workers=2",
     ]);
   });
 

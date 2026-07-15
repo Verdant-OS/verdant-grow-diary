@@ -108,11 +108,18 @@ export function formattableChangedFiles(files) {
 }
 
 export function buildTargetedTestCommandArgs(tests) {
-  return ["vitest", "run", ...tests, "--reporter=dot", "--maxWorkers=4"];
+  return ["vitest", "run", ...tests, "--reporter=dot", "--maxWorkers=2"];
 }
 
 export function buildChangedE2eCommandArgs(specs) {
-  return ["playwright", "test", ...specs, "--project=chromium-mocked", "--reporter=line"];
+  return [
+    "playwright",
+    "test",
+    ...specs,
+    "--project=chromium-mocked",
+    "--reporter=line",
+    "--workers=2",
+  ];
 }
 
 function stripAnsi(value) {

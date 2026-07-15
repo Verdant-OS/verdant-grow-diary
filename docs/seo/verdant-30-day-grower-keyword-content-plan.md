@@ -11,6 +11,15 @@
   snapshot), then earn the higher-intent long tails already scheduled below:
   `grow diary app`, `grow log app`, `cannabis grow journal`, and the
   `autoflower grow diary` term.
+- **Treat nutrient schedules as brand-chart evaluation, not a generic FAQ.**
+  The supplied Semrush US snapshot shows brand-anchored demand: `fox farm
+feeding schedule` (1,900/mo), `fox farm soil feeding schedule` (1,600/mo),
+  `general hydroponics flora series` (1,300/mo), `canna coco` (1,000/mo), and
+  `jacks 321` (590/mo). Question-form demand for an abstract "nutrient
+  schedule" is too thin for a dedicated FAQ. Do not compete with manufacturers
+  by republishing their charts. Target the Verdant-shaped follow-up instead:
+  is the grower following the selected chart, what did the input and runoff
+  meters report, and how did this plant respond over time?
 - **Do not chase ERP/compliance head terms first.** Semrush US data shows
   the visible volume around "cannabis cultivation software" (~70/mo) is
   small, and the larger adjacent volume clusters (Metrc, Distru, Trym,
@@ -31,7 +40,31 @@
   SERP is B2B ERP procurement.
 - **Do not chase:** Metrc, seed-to-sale ERP, cannabis compliance
   software, cannabis ERP, dispensary POS, commercial inventory
-  tracking, state compliance tracking.
+  tracking, state compliance tracking, manufacturer feeding-chart head terms,
+  or a generic nutrient-schedule FAQ.
+
+### Brand-chart evaluation queue
+
+These are grow-diary companion posts, not substitute feeding charts. Link to
+the manufacturer's current instructions for the schedule itself, avoid copying
+proprietary chart artwork, and keep changes cautious when evidence is weak.
+Cronk Nutrients is the first publishing priority because it is the product line
+used consistently in Verdant's own documented grows. That makes it the strongest
+source of real, attributable plant-memory examples; it does not make Cronk a
+universal recommendation for every grower, medium, or cultivar.
+
+| Priority | Working title                                                                              | Evaluation intent                                            | Verdant evidence to log                            |
+| -------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------- |
+| 1        | Using Cronk Nutrients with a grow diary: verify the chart against this plant's response    | Is the selected Cronk line and chart step working here?      | Product line, recipe, medium, EC/pH, runoff, stage |
+| 2        | Using Fox Farm's schedule with a grow diary: what to log so you can tell if it is working  | Is Fox Farm burning my plants, or did something else change? | Product/dose, input EC/pH, runoff, photos, stage   |
+| 3        | GH Flora Series and plant response: a diary-first way to evaluate the chart                | Is this Flora Series step working for this plant and medium? | Mix, medium, input/runoff EC and pH, symptoms      |
+| 4        | Following a Canna Coco chart without losing the plant-level story                          | How should I evaluate a chart adjustment in coco?            | Coco context, irrigation event, runoff, trend      |
+| 5        | Jack's 3-2-1 grow log: record the mix, meter readings, and response before changing course | Is the current recipe producing the expected response?       | Mix record, input EC/pH, runoff, photos, timeline  |
+
+Do not publish a thin FAQ for "nutrient schedules." Use Day 20 as the pillar
+and interlink these brand companions to it. For harvest-transition or flushing
+queries, explain what to record and how to verify the current manufacturer and
+medium guidance; do not present a universal stop-feeding date.
 
 ## B. 30-day plan
 

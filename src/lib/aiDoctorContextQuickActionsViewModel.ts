@@ -41,9 +41,11 @@ export interface AiDoctorContextQuickLogEventPayload {
   growId: string | null;
   tentId: string | null;
   tentName: string | null;
-  eventType: "observation";
+  eventType: "observation" | "environment";
   suggestSnapshot: boolean;
 }
+
+
 
 export interface AiDoctorContextQuickAction {
   kind: AiDoctorContextQuickActionKind;

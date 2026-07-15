@@ -88,6 +88,7 @@ export default function CustomerModeCannabisCareFaq() {
           <Link
             to={shareId ? `/customer/${shareId}` : "/customer/guide"}
             className="text-sm text-muted-foreground hover:text-foreground underline"
+            data-testid="customer-mode-cannabis-care-back-link"
           >
             ← Back to customer guide
           </Link>

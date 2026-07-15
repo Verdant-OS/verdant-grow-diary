@@ -97,6 +97,8 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
   beforeEach(() => {
     useRecentMock.mockReset();
     useRecentMock.mockReturnValue({ data: [], isLoading: false });
+    useTimelineMemoryMock.mockReset();
+    useTimelineMemoryMock.mockReturnValue({ items: [] });
   });
 
   it("does not open the summary dialog until Ask Doctor is clicked (no AI on mount)", () => {

@@ -179,8 +179,27 @@ function buildAction(
         testId,
       };
     }
+    case "capture_new_snapshot": {
+      const payload = quickLogPayload(args, "environment");
+      return {
+        kind,
+        label: QUICK_ACTION_LABELS[kind],
+        satisfies,
+        target: {
+          kind: "event",
+          eventName: PLANT_QUICKLOG_PREFILL_EVENT,
+          payload,
+        },
+        disabled: !args.plantId,
+        disabledReason: args.plantId
+          ? undefined
+          : "Plant context is not loaded yet.",
+        testId,
+      };
+    }
   }
 }
+
 
 /**
  * Build the deterministic list of quick actions that address the given

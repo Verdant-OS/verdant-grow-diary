@@ -61,6 +61,7 @@ import {
   buildAiDoctorReadinessBlockedExplanation,
   AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
 } from "@/lib/aiDoctorReadinessGateViewModel";
+import { buildAiDoctorSnapshotStalenessExplanation } from "@/lib/aiDoctorSnapshotStalenessExplanationViewModel";
 
 interface Props {
   plantId: string | null | undefined;
@@ -219,6 +220,27 @@ export default function PlantDetailDoctorLaunchDialog({
     [readinessResult.readiness, readinessResult.missing, addContextDecision],
   );
 
+  const snapshotStaleness = useMemo(() => {
+    const nowMs = now ? now.getTime() : Date.now();
+    const fmt = (iso: string) => {
+      const d = new Date(iso);
+      if (!Number.isFinite(d.getTime())) return iso;
+      try {
+        return d.toLocaleString(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        });
+      } catch {
+        return d.toISOString();
+      }
+    };
+    return buildAiDoctorSnapshotStalenessExplanation({
+      latestSnapshotAtIso: readinessResult.latest.manualSnapshotAt,
+      now: nowMs,
+      formatDateTime: fmt,
+    });
+  }, [readinessResult.latest.manualSnapshotAt, now]);
+
   const handleAddContext = useCallback(() => {
     if (typeof window !== "undefined" && addContextDecision.quickLogEvent) {
       window.dispatchEvent(
@@ -333,6 +355,23 @@ export default function PlantDetailDoctorLaunchDialog({
                   ))}
                 </ul>
               ) : null}
+            </div>
+          ) : null}
+          {snapshotStaleness.isStale ? (
+            <div
+              className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 space-y-1"
+              data-testid="plant-detail-doctor-launch-snapshot-stale-explanation"
+              data-cutoff-at={snapshotStaleness.cutoffAtIso}
+              data-snapshot-at={snapshotStaleness.snapshotAtIso ?? ""}
+              role="status"
+              aria-live="polite"
+            >
+              <p
+                className="text-xs text-amber-200 leading-snug"
+                data-testid="plant-detail-doctor-launch-snapshot-stale-sentence"
+              >
+                {snapshotStaleness.sentence}
+              </p>
             </div>
           ) : null}
         </div>

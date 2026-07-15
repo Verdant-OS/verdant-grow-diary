@@ -5,7 +5,7 @@
  * so visible copy and FAQPage JSON-LD share a single source of truth.
  * No Supabase, no AI calls, no Action Queue writes, no device control.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
@@ -41,17 +41,29 @@ export default function GuidePage() {
   const [highlightedFaq, setHighlightedFaq] = useState<string | undefined>(
     initialFaqValue,
   );
+  const faqItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     const hash = location.hash.replace(/^#/, "");
     if (!hash.startsWith("faq-")) return;
     setOpenFaq(hash);
     setHighlightedFaq(hash);
-    // Defer scroll until after the accordion item opens.
+    // Defer scroll until after the accordion item opens, then move focus
+    // to the highlighted item so keyboard users land on the answer they
+    // deep-linked into.
     const scrollT = window.setTimeout(() => {
-      const el = document.getElementById(hash);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
+      const el = faqItemRefs.current[hash] ?? document.getElementById(hash);
+      if (el) {
+        // jsdom does not implement scrollIntoView; guard so focus still runs.
+        try {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        } catch {
+          /* ignore */
+        }
+        // Focus is safe to call after scrolling; the item has tabIndex=-1.
+        el.focus({ preventScroll: true });
+      }
+    }, 100);
     // Fade the highlight after a few seconds so it doesn't dominate.
     const fadeT = window.setTimeout(() => setHighlightedFaq(undefined), 2600);
     return () => {
@@ -172,11 +184,13 @@ export default function GuidePage() {
                     key={entry.question}
                     value={value}
                     id={value}
+                    ref={(el) => (faqItemRefs.current[value] = el)}
+                    tabIndex={-1}
                     data-highlighted={isHighlighted ? "true" : undefined}
                     className={
                       isHighlighted
-                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 transition-colors duration-500 scroll-mt-24"
-                        : "transition-colors duration-500 scroll-mt-24"
+                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 transition-colors duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        : "transition-colors duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     }
                   >
                     <AccordionTrigger className="text-left px-2">

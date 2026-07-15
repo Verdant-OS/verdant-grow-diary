@@ -9,7 +9,7 @@
  * No Supabase, no network, no AI, no device control.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import GuidesIndex from "@/pages/GuidesIndex";
 import GuidePage from "@/pages/GuidePage";
@@ -175,5 +175,15 @@ describe("/guides/:slug detail — public render", () => {
     renderAt("/guides/grow-diary-app");
     // FAQ heading is present.
     expect(screen.getByText(/Common questions/i)).toBeTruthy();
+  });
+
+  it("moves keyboard focus to the deep-linked FAQ accordion item", async () => {
+    renderAt("/guides/cannabis-plant-care#faq-2");
+    const target = document.getElementById("faq-2");
+    expect(target).toBeTruthy();
+    expect(target?.getAttribute("tabindex")).toBe("-1");
+    await waitFor(() => expect(document.activeElement).toBe(target), {
+      timeout: 300,
+    });
   });
 });

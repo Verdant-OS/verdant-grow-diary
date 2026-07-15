@@ -41,6 +41,7 @@ export const QUICK_LOG_EVENT_LANES: Record<string, HistoryLane> = {
   reminder: "activity",
   action_followup: "activity",
   action_outcome: "activity",
+  run_learning_decision: "activity",
   // Breeding-workflow event types surface in the "All recent activity" lane.
   reversal_application: "activity",
   isolation_start: "activity",

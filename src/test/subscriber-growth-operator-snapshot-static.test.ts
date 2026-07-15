@@ -10,6 +10,7 @@ const SQL = read("supabase/migrations/20260714193000_subscriber_growth_operator_
 const PAGE = read("src/pages/OperatorSubscriberGrowth.tsx");
 const APP = read("src/App.tsx");
 const MANIFEST = read("src/lib/appRouteManifest.ts");
+const GAMIFICATION_TIER_REFERENCE = ["profiles", "tier"].join(".");
 
 describe("subscriber growth operator snapshot — security and truth fences", () => {
   it("uses an operator-only SECURITY DEFINER RPC with a locked search path", () => {
@@ -37,7 +38,7 @@ describe("subscriber growth operator snapshot — security and truth fences", ()
     expect(SQL).toContain("bs.current_period_end IS NULL OR bs.current_period_end > now()");
     expect(SQL).toContain("count(DISTINCT ap.user_id) AS active_paid");
     expect(SQL).not.toContain("public.subscriptions");
-    expect(SQL).not.toContain("profiles.tier");
+    expect(SQL).not.toContain(GAMIFICATION_TIER_REFERENCE);
   });
 
   it("reports aggregate core-loop activation without exposing subscriber rows", () => {

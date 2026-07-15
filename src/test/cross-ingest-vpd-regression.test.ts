@@ -28,9 +28,7 @@ import { describe, it, expect } from "vitest";
 import { normalizeIngestPayload } from "@/lib/sensorIngestNormalizationRules";
 import { buildEcoWittRoutedRows } from "@/lib/ecowittRoutedRowBuilder";
 import type { EcoWittRouterEligibleTent } from "@/lib/ecowittChannelTentRouter";
-import {
-  normalizeEcowittLiveSoilPayload,
-} from "@/lib/ecowittLiveSoilIngestRules";
+import { normalizeEcowittLiveSoilPayload } from "@/lib/ecowittLiveSoilIngestRules";
 import { calculateAirVpdKpa } from "@/lib/vpdRules";
 
 const TENT = "11111111-1111-1111-1111-111111111111";
@@ -101,9 +99,7 @@ const piRoute: IngestRoute = {
       tent_id: TENT,
       source: "pi_bridge",
       captured_at: TS,
-      readings: [
-        { metric: "temperature_c", value: VALID_TEMP_C, unit: "temperature_c" },
-      ],
+      readings: [{ metric: "temperature_c", value: VALID_TEMP_C, unit: "temperature_c" }],
     });
     return r.rows.find((row) => row.metric === "vpd_kpa")?.value ?? null;
   },
@@ -177,9 +173,7 @@ describe("cross-ingest VPD regression guard", () => {
       const vpd = route.validVpd();
       expect(vpd).not.toBeNull();
       // All routes should agree on derived VPD within rounding tolerance.
-      expect(Math.abs((vpd as number) - (EXPECTED_VPD as number))).toBeLessThan(
-        0.05,
-      );
+      expect(Math.abs((vpd as number) - (EXPECTED_VPD as number))).toBeLessThan(0.05);
     });
 
     it("does NOT derive vpd_kpa when RH is out of range (>100)", () => {
@@ -238,7 +232,9 @@ describe("calculateAirVpdKpa usage guard (ingest mappers only)", () => {
     // Display/presenter helpers may derive VPD for on-screen rendering
     // without emitting a persisted vpd_kpa metric. Those are legitimate
     // non-ingest uses and are skipped by this narrow guard.
-    const NON_INGEST_FILENAME = /viewmodel|chart|status|display|presenter|target|advisor|drift|snapshotband/i;
+    const NON_INGEST_FILENAME =
+      /viewmodel|chart|status|display|presenter|target|advisor|drift|snapshotband/i;
+    const NON_INGEST_EXACT_FILENAMES = new Set(["publicVpdCalculatorRules.ts"]);
     const importers: string[] = [];
 
     async function walk(dir: string): Promise<void> {
@@ -252,7 +248,7 @@ describe("calculateAirVpdKpa usage guard (ingest mappers only)", () => {
         const p = path.join(dir, e.name);
         if (e.isDirectory()) await walk(p);
         else if (/\.(ts|tsx)$/.test(e.name) && !/\.test\./.test(e.name)) {
-          if (NON_INGEST_FILENAME.test(e.name)) continue;
+          if (NON_INGEST_FILENAME.test(e.name) || NON_INGEST_EXACT_FILENAMES.has(e.name)) continue;
           const src = await fs.readFile(p, "utf8");
           if (/^vpdRules\.ts$/.test(e.name)) continue; // definition site
           if (/\bcalculateAirVpdKpa\b/.test(src)) importers.push(p);
@@ -261,6 +257,7 @@ describe("calculateAirVpdKpa usage guard (ingest mappers only)", () => {
     }
     for (const r of roots) await walk(r);
 
+    expect([...NON_INGEST_EXACT_FILENAMES]).toEqual(["publicVpdCalculatorRules.ts"]);
     expect(importers.length).toBeGreaterThan(0);
     for (const file of importers) {
       const src = await fs.readFile(file, "utf8");

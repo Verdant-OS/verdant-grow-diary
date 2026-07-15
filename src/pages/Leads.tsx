@@ -54,6 +54,7 @@ import {
   type InteractionEventType,
 } from "@/lib/leadEventRules";
 import {
+  buildLeadConversionQueueSearchParams,
   resolveLeadConversionQueueFocus,
   type LeadConversionQueueFocus,
 } from "@/lib/leadConversionQueueRules";
@@ -109,9 +110,7 @@ export default function Leads() {
   const conversionFocus = resolveLeadConversionQueueFocus(searchParams.get("conversion"));
 
   function setConversionFocus(focus: LeadConversionQueueFocus) {
-    const next = new URLSearchParams(searchParams);
-    if (focus === "all") next.delete("conversion");
-    else next.set("conversion", focus);
+    const next = buildLeadConversionQueueSearchParams(searchParams, focus);
     setSearchParams(next, { replace: true });
   }
 

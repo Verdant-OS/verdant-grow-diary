@@ -75,6 +75,24 @@ export function resolveLeadConversionQueueFocus(value: unknown): LeadConversionQ
 }
 
 /**
+ * Returns a new query-string snapshot for the selected conversion worklist.
+ * Existing parameters (including repeated values) are preserved, the input is
+ * never mutated, and the default "all" focus is represented by no conversion
+ * parameter at all.
+ */
+export function buildLeadConversionQueueSearchParams(
+  current: URLSearchParams,
+  focus: LeadConversionQueueFocus,
+): URLSearchParams {
+  const next = new URLSearchParams();
+  current.forEach((value, key) => {
+    if (key !== "conversion") next.append(key, value);
+  });
+  if (focus !== "all") next.set("conversion", focus);
+  return next;
+}
+
+/**
  * Builds an operator-reviewed checkout-interest worklist. This helper performs
  * no I/O, sends nothing, and never treats a lead or drafted email as a paid
  * subscriber. Future follow-ups remain visible but are not counted ready now.

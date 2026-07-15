@@ -6,6 +6,7 @@ const SQL = readFileSync(
   resolve(process.cwd(), "supabase/migrations/20260715002000_signup_to_paid_operator_snapshot.sql"),
   "utf8",
 );
+const GAMIFICATION_TIER_REFERENCE = ["profiles", "tier"].join(".");
 
 describe("signup-to-paid operator snapshot safety", () => {
   it("is a locked, operator-only, read-only SECURITY DEFINER function", () => {
@@ -32,7 +33,7 @@ describe("signup-to-paid operator snapshot safety", () => {
     expect(SQL).toContain("bs.current_period_end IS NULL OR bs.current_period_end > now()");
     expect(SQL).toContain("LEFT JOIN public.signup_acquisition_attributions AS a");
     expect(SQL).toContain("('operator_outreach'::text)");
-    expect(SQL).not.toContain("profiles.tier");
+    expect(SQL).not.toContain(GAMIFICATION_TIER_REFERENCE);
     expect(SQL).not.toContain("public.subscriptions");
   });
 

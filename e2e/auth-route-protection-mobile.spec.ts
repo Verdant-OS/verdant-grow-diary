@@ -42,6 +42,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/paddle-processing-audit",
   "/operator/post-grow-reflection-dry-run",
   "/operator/release-readiness",
+  "/operator/subscriber-growth",
   "/operator/demo-preview",
 
   "/pi-ingest-status",
@@ -72,6 +73,8 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/hardware-integrations",
   "/guides",
   "/guides/:slug",
+  "/ai-doctor-readiness-check",
+  "/founder",
   "/how-ai-doctor-works",
   "/partners/csv-preview",
   "/customer/:shareId",
@@ -91,6 +94,7 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/terms",
   "/privacy",
   "/refund",
+  "/tools/vpd-calculator",
   // Public 30-second Quick Log starter: local draft only, mounted outside
   // AppShell — must render signed-out with zero private-table fetches.
   "/quick-log",

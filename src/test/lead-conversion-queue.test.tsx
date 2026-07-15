@@ -7,6 +7,7 @@ import LeadConversionQueuePanel from "@/components/LeadConversionQueuePanel";
 import type { LeadRow } from "@/hooks/useLeadsList";
 import {
   buildLeadConversionQueue,
+  buildLeadConversionQueueSearchParams,
   resolveLeadConversionQueueFocus,
 } from "@/lib/leadConversionQueueRules";
 
@@ -132,6 +133,23 @@ describe("lead conversion queue rules", () => {
     const second = buildLeadConversionQueue(fixture(), { now: NOW });
     expect(second).toEqual(first);
     expect(JSON.stringify(first)).not.toMatch(/mailto:|subject|email body/i);
+  });
+
+  it("updates worklist focus without mutating or dropping unrelated query values", () => {
+    const source = new URLSearchParams("source=landing&conversion=follow_up&tag=first&tag=second");
+
+    const firstContact = buildLeadConversionQueueSearchParams(source, "first_contact");
+    const all = buildLeadConversionQueueSearchParams(source, "all");
+
+    expect(firstContact.get("conversion")).toBe("first_contact");
+    expect(firstContact.get("source")).toBe("landing");
+    expect(firstContact.getAll("tag")).toEqual(["first", "second"]);
+    expect(all.has("conversion")).toBe(false);
+    expect(all.getAll("tag")).toEqual(["first", "second"]);
+    expect(source.get("conversion")).toBe("follow_up");
+    expect(buildLeadConversionQueueSearchParams(source, "first_contact").toString()).toBe(
+      firstContact.toString(),
+    );
   });
 });
 

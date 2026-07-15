@@ -6,6 +6,7 @@ const HANDOFF = readFileSync(
   resolve(process.cwd(), "docs/releases/subscriber-growth-publication-handoff.md"),
   "utf8",
 );
+const GAMIFICATION_TIER_REFERENCE = ["profiles", "tier"].join(".");
 
 const MIGRATIONS = [
   "20260714190000_restore_public_lead_insert_only.sql",
@@ -49,6 +50,6 @@ describe("subscriber growth publication handoff", () => {
     );
     expect(HANDOFF).toMatch(/forward migration/i);
     expect(HANDOFF).toMatch(/rollback invalidates the prior live receipt/i);
-    expect(HANDOFF).not.toContain("profiles.tier");
+    expect(HANDOFF).not.toContain(GAMIFICATION_TIER_REFERENCE);
   });
 });

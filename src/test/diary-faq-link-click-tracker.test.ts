@@ -8,10 +8,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   clearDiaryFaqLinkClickCounts,
   DIARY_FAQ_LINK_CLICKS_STORAGE_KEY,
+  DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY,
   DIARY_FAQ_TOPIC_LABELS,
+  isDiaryFaqLinkClickTrackingEnabled,
   rankDiaryFaqLinkClicks,
   readDiaryFaqLinkClickCounts,
   recordDiaryFaqLinkClick,
+  setDiaryFaqLinkClickTrackingEnabled,
   type DiaryFaqLinkClickStorage,
 } from "@/lib/diaryFaqLinkClickTracker";
 
@@ -123,4 +126,49 @@ describe("diaryFaqLinkClickTracker", () => {
     ]);
     expect(ranked.every((r) => r.count > 0)).toBe(true);
   });
+
+  describe("tracking preference toggle", () => {
+    it("defaults to enabled when unset", () => {
+      expect(isDiaryFaqLinkClickTrackingEnabled(storage)).toBe(true);
+    });
+
+    it("persists a false preference and blocks new increments", () => {
+      recordDiaryFaqLinkClick("yellowing", storage);
+      setDiaryFaqLinkClickTrackingEnabled(false, storage);
+      expect(isDiaryFaqLinkClickTrackingEnabled(storage)).toBe(false);
+      expect(
+        storage.data.get(DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY),
+      ).toBe("false");
+
+      // Attempted click while disabled must not change counts.
+      recordDiaryFaqLinkClick("yellowing", storage);
+      recordDiaryFaqLinkClick("environment", storage);
+      expect(readDiaryFaqLinkClickCounts(storage)).toEqual({ yellowing: 1 });
+    });
+
+    it("resumes recording after re-enabling without wiping prior counts", () => {
+      recordDiaryFaqLinkClick("watering", storage);
+      setDiaryFaqLinkClickTrackingEnabled(false, storage);
+      recordDiaryFaqLinkClick("watering", storage); // ignored
+      setDiaryFaqLinkClickTrackingEnabled(true, storage);
+      recordDiaryFaqLinkClick("watering", storage);
+      expect(readDiaryFaqLinkClickCounts(storage)).toEqual({ watering: 2 });
+    });
+
+    it("ignores garbage preference values and returns the default", () => {
+      storage.setItem(
+        DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY,
+        "not-a-bool",
+      );
+      expect(isDiaryFaqLinkClickTrackingEnabled(storage)).toBe(true);
+    });
+
+    it("is a safe no-op when storage is null", () => {
+      expect(isDiaryFaqLinkClickTrackingEnabled(null)).toBe(true);
+      expect(() =>
+        setDiaryFaqLinkClickTrackingEnabled(false, null),
+      ).not.toThrow();
+    });
+  });
 });
+

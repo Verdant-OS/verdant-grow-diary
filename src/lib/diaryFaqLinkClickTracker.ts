@@ -19,6 +19,12 @@ import type { DiaryFaqTopic } from "@/lib/diaryFaqLinkRules";
 export const DIARY_FAQ_LINK_CLICKS_STORAGE_KEY =
   "verdant.diaryFaqLinkClicks.v1";
 
+export const DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY =
+  "verdant.diaryFaqLinkClicks.enabled.v1";
+
+/** Default preference when the operator has not opted out. */
+export const DIARY_FAQ_LINK_TRACKING_DEFAULT_ENABLED = true;
+
 const KNOWN_TOPICS: readonly DiaryFaqTopic[] = [
   "yellowing",
   "environment",
@@ -80,14 +86,60 @@ export function readDiaryFaqLinkClickCounts(
 }
 
 /**
+ * Read the operator's local preference for whether Related-FAQ click
+ * tracking is enabled in this browser. Defaults to
+ * DIARY_FAQ_LINK_TRACKING_DEFAULT_ENABLED when unset or unreadable.
+ */
+export function isDiaryFaqLinkClickTrackingEnabled(
+  storage: DiaryFaqLinkClickStorage | null = defaultStorage(),
+): boolean {
+  if (!storage) return DIARY_FAQ_LINK_TRACKING_DEFAULT_ENABLED;
+  try {
+    const raw = storage.getItem(
+      DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY,
+    );
+    if (raw === null) return DIARY_FAQ_LINK_TRACKING_DEFAULT_ENABLED;
+    if (raw === "true") return true;
+    if (raw === "false") return false;
+    return DIARY_FAQ_LINK_TRACKING_DEFAULT_ENABLED;
+  } catch {
+    return DIARY_FAQ_LINK_TRACKING_DEFAULT_ENABLED;
+  }
+}
+
+/**
+ * Persist the tracking preference. When disabling, existing counts are
+ * left in place so the operator can still review them, but no new
+ * clicks will be recorded until re-enabled.
+ */
+export function setDiaryFaqLinkClickTrackingEnabled(
+  enabled: boolean,
+  storage: DiaryFaqLinkClickStorage | null = defaultStorage(),
+): void {
+  if (!storage) return;
+  try {
+    storage.setItem(
+      DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY,
+      enabled ? "true" : "false",
+    );
+  } catch {
+    // ignore
+  }
+}
+
+/**
  * Increment the counter for a topic by 1 and persist. Returns the new
- * counts map. Silently no-ops on any storage error.
+ * counts map. Silently no-ops on any storage error, or when the
+ * operator has disabled tracking in this browser.
  */
 export function recordDiaryFaqLinkClick(
   topic: DiaryFaqTopic,
   storage: DiaryFaqLinkClickStorage | null = defaultStorage(),
 ): DiaryFaqLinkClickCounts {
   if (!storage) return {};
+  if (!isDiaryFaqLinkClickTrackingEnabled(storage)) {
+    return readDiaryFaqLinkClickCounts(storage);
+  }
   const current = { ...readDiaryFaqLinkClickCounts(storage) } as Record<
     DiaryFaqTopic,
     number
@@ -104,6 +156,7 @@ export function recordDiaryFaqLinkClick(
   }
   return current;
 }
+
 
 /** Remove all recorded click counts. Silent on error. */
 export function clearDiaryFaqLinkClickCounts(

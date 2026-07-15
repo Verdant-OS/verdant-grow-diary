@@ -183,8 +183,8 @@ beforeEach(() => {
 // (observed repeatedly across full-suite batches; passes locally in <3s).
 // Raise the per-test budget for this file and give the async-load awaits
 // a generous findBy timeout beneath it.
-vi.setConfig({ testTimeout: 30_000 });
-const FIND_TIMEOUT = { timeout: 15_000 };
+vi.setConfig({ testTimeout: 60_000 });
+const FIND_TIMEOUT = { timeout: 30_000 };
 
 describe("actionQueueRedactionRules — pure helpers", () => {
   it("detects MAC address, vendor id, bridge-token and long hex blob", () => {

@@ -2,7 +2,7 @@
  * Reports / Grow Learning Hub page — render + static safety tests.
  *
  * Mocks the data hook and scoped-grow / grows store to verify:
- *  - Page renders with the "Grow Learning Hub" title.
+ *  - Page renders with the "Reports" title.
  *  - Empty state copy renders when there are no grows.
  *  - Cards render when data exists and link to existing detail surfaces.
  *  - Scoped grow takes precedence over active grow.
@@ -114,7 +114,9 @@ describe("Reports / Grow Learning Hub", () => {
     });
     vi.mocked(useReportsHubData).mockReturnValue(populatedData as never);
     renderPage();
-    expect(screen.getByText("Grow Learning Hub")).toBeInTheDocument();
+    // Trunk renamed the page title from "Grow Learning Hub" to the
+    // canonical nav label "Reports"; the pin follows the source.
+    expect(screen.getByText("Reports")).toBeInTheDocument();
   });
 
   it("renders empty state when the user has no grows", () => {

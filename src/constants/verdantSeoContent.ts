@@ -362,7 +362,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "How to start a grow journal (in 30 seconds) | Verdant Grow Diary",
     h1: "How to start a grow journal without overthinking it",
     description:
-      "How to start a grow journal that survives past week two: one plant, one note, one photo — and a 30-second first entry you can try without an account.",
+      "How to start a grow journal that survives past week two: one plant, one honest note, and a 30-second first entry you can try without an account — the draft stays on your device until you keep it.",
     targetKeyword: "how to start a grow journal",
     intro:
       "Most grow journals die in the first two weeks — not because growers stop caring, but because the format asks for too much. If you are wondering how to start a grow journal that you will actually keep, start smaller than you think: one plant, one nickname, one honest note about what you did or saw today.",
@@ -381,7 +381,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "Let the journal drive decisions, not just memories",
-        body: "The payoff arrives the first time you ask what changed before things went sideways — and the timeline answers. With enough entries, Verdant's cautious AI Doctor can point at likely causes and cite your own logged evidence, and any suggested step waits in an approval-required Action Queue. The journal informs; the grower decides.",
+        body: "The payoff arrives the first time you ask what changed before things went sideways — and the timeline answers. With enough entries, Verdant's cautious AI Doctor can point at likely causes and cite your own logged evidence. It never acts on its own: a suggested step reaches the approval-required Action Queue only if you choose to add it. The journal informs; the grower decides.",
       },
     ],
     faq: [
@@ -410,7 +410,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     sections: [
       {
         heading: "The core four: water, feed, training, observation",
-        body: "Waterings (with volume), feedings (with what you fed), training or defoliation, and plain observations cover most of what future-you needs. These are exactly the four entry types in Verdant's Quick Log — and in the public starter at /quick-log, where you can draft one without an account and the draft stays in your browser until you keep it.",
+        body: "Waterings (with volume), feedings (with what you fed), training or defoliation, and plain observations cover most of what future-you needs. The public starter at /quick-log covers observation, watering, feeding, and environment drafts without an account — the draft stays in your browser until you keep it — and the full diary adds more entry types once you're signed in.",
       },
       {
         heading: "Log inputs with their numbers, not adjectives",
@@ -463,14 +463,14 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "Growing past the template",
-        body: "When a template stops being enough — you want photos on entries, source-labeled sensor snapshots, CSV imports from AC Infinity or Spider Farmer gear, or a cautious AI review of a problem — the same five fields carry straight into Verdant's full Quick Log, with every extra strictly optional.",
+        body: "When a template stops being enough — you want photos on entries, source-labeled sensor snapshots, CSV imports from AC Infinity or Spider Farmer gear, or a cautious AI review of a problem — Verdant's full Quick Log picks up where the starter leaves off. Nothing transfers on its own: your draft stays on your device until you review and save it yourself, with every extra strictly optional.",
       },
     ],
     faq: [
       {
         question: "Is there a free grow journal template I can try in the browser?",
         answer:
-          "Yes — the public Quick Log starter at /quick-log is the template in interactive form. No account, no download; the draft lives in your browser until you clear it or sign up.",
+          "Yes — the public Quick Log starter at /quick-log is the template in interactive form. No account, no download; the draft lives in your browser until you clear it, or until you review and save it into a free diary after signing up.",
       },
       {
         question: "What fields should a grow journal template include?",
@@ -508,7 +508,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "Reading the pattern",
-        body: "After a few weeks, the log answers real questions: is the interval shrinking as the plant stacks? Did droop follow the big pot-up watering? If you ask Verdant's cautious AI Doctor about a symptom, your watering history is the kind of evidence it cites — and anything it suggests waits for your approval in the Action Queue.",
+        body: "After a few weeks, the log answers real questions: is the interval shrinking as the plant stacks? Did droop follow the big pot-up watering? If you ask Verdant's cautious AI Doctor about a symptom, your watering history is the kind of evidence it cites — and a suggestion enters the approval-required Action Queue only when you add it yourself.",
       },
     ],
     faq: [
@@ -533,11 +533,11 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "How to try a grow journal without an account: a public 30-second Quick Log starter whose draft stays on your device — with the trade-offs stated plainly.",
     targetKeyword: "grow journal without an account",
     intro:
-      "Wanting to try a grow journal without an account is reasonable: signup walls before value are exhausting. Verdant's answer is a public 30-second Quick Log starter you can use immediately — with the trade-offs stated plainly instead of hidden.",
+      "Wanting to try a grow journal without an account is reasonable: signup walls before value are exhausting. Verdant's answer is a public 30-second Quick Log starter you can use immediately — the draft stays on your device, and the trade-offs are stated plainly instead of hidden.",
     sections: [
       {
         heading: "What works with no account at all",
-        body: "At /quick-log you can nickname a plant, pick an entry type (watering, feeding, observation, environment check), set a stage or honestly leave it unknown, write a note, and save a draft. No email, no signup, no server involved.",
+        body: "At /quick-log you can nickname a plant, pick an entry type (watering, feeding, observation, environment check), set a stage or honestly leave it unknown, write a note, and save a draft that stays on this device. No email, no signup, no server involved.",
       },
       {
         heading: "Where the draft actually lives",
@@ -561,7 +561,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "What happens to my draft if I sign up later?",
         answer:
-          "Today the draft stays on your device — creating an account starts your grow diary, and you copy the note over. The starter keeps its promises small and true rather than implying an import that does not exist yet.",
+          "The draft stays on your device until you act on it. If it is recent and you sign in on the same browser, Verdant offers a “Continue your Quick Log” card where you review the draft and save it into your diary yourself — nothing is imported automatically, and the draft is only cleared after that save succeeds.",
       },
     ],
     related: ["how-to-start-a-grow-journal", "grow-journal-template", "grow-diary-app"],
@@ -582,7 +582,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "One entry per change, against the plant",
-        body: "Log against the specific plant, not the room in general, so each timeline stays readable. Verdant's Quick Log covers the four types a daily pass produces — watering, feeding, observation, environment check — and the public starter at /quick-log lets you rehearse the format with no account, draft kept on your device.",
+        body: "Log against the specific plant, not the room in general, so each timeline stays readable. The public Quick Log starter at /quick-log covers the four types a daily pass produces — watering, feeding, observation, environment check — and lets you rehearse the format with no account, draft kept on your device.",
       },
       {
         heading: "Weekly additions that stay cheap",
@@ -590,7 +590,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "When the checklist catches something",
-        body: "The checklist's real value is the day something looks off. Your recent entries become the evidence trail: last watering volume, last feed, the photo from three days ago. Verdant's cautious AI Doctor works from exactly that context and puts any suggested step into the approval-required Action Queue — you stay the one who decides.",
+        body: "The checklist's real value is the day something looks off. Your recent entries become the evidence trail: last watering volume, last feed, the photo from three days ago. Verdant's cautious AI Doctor works from exactly that context, and a suggested step reaches the approval-required Action Queue only when you choose to add it — you stay the one who decides.",
       },
     ],
     faq: [

@@ -59,10 +59,17 @@ export const PRICING_TIERS: PricingTier[] = [
     id: "free",
     name: "Free",
     priceDisplay: "$0",
-    priceSubtext: "Local only",
+    priceSubtext: "free forever",
     billingPeriod: "free",
     paddlePriceId: null,
-    features: ["Core One-Tent Loop", "Single tent & plant", "Local data only"],
+    // Mirrors truthful entries from constants/pricing PRICING.free.features —
+    // the old "Local only / Single tent & plant" copy was wrong (data lives
+    // in Supabase for signed-in growers; no single-tent gate is enforced).
+    features: [
+      "Core One-Tent Loop",
+      "Historical logs kept forever",
+      "Manual sensor entries & CSV import",
+    ],
   },
   {
     id: "pro_monthly",

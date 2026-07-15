@@ -62,7 +62,7 @@ export const VERDANT_GROWER_GUIDE_FAQ: ReadonlyArray<FaqEntry> = [
   {
     question: "Can I use Verdant without live sensors?",
     answer:
-      "Yes. You can log everything manually, upload CSV history from AC Infinity, Spider Farmer, TrolMaster, EcoWitt, or similar gear, or start with photos and diary entries alone. Live integrations are always read-only and always optional.",
+      "Yes. You can log everything manually, upload CSV history from AC Infinity, Spider Farmer, or any gear whose export includes timestamp, temperature, and humidity columns, or start with photos and diary entries alone. Live integrations are always read-only and always optional.",
   },
   {
     question: "What does source-labeled sensor data mean?",
@@ -122,7 +122,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Do I need sensors to use a grow diary app?",
         answer:
-          "No. You can start with manual entries and photos, then add CSV imports from AC Infinity, Spider Farmer, TrolMaster, or EcoWitt later. Verdant treats manual and CSV as first-class sources with their own labels.",
+          "No. You can start with manual entries and photos, then add CSV imports from AC Infinity, Spider Farmer, or similar environment exports later. Verdant treats manual and CSV as first-class sources with their own labels.",
       },
     ],
     related: ["grow-log-app-vs-grow-journal", "sensor-truth-grow-room"],

@@ -71,9 +71,7 @@ export default function CustomerModeCannabisCareFaq() {
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
             Customer Mode
           </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight">
-            {vm.brandLabel}
-          </h1>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight">{vm.brandLabel}</h1>
           <p
             data-testid="customer-mode-shell-disclaimer"
             className="mt-3 text-xs text-amber-300/80"
@@ -106,9 +104,8 @@ export default function CustomerModeCannabisCareFaq() {
             Cannabis Plant Care FAQ
           </h2>
           <p className="mt-2 text-xs text-muted-foreground">
-            Verdant suggests; the grower decides. Verdant cannot touch your
-            equipment. These are general care principles; every cultivar and
-            grow environment is different.
+            Verdant suggests; the grower decides. Verdant cannot touch your equipment. These are
+            general care principles; every cultivar and grow environment is different.
           </p>
 
           <Accordion type="single" collapsible className="mt-4">

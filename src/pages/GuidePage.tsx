@@ -64,13 +64,11 @@ export default function GuidePage() {
         el.focus({ preventScroll: true });
       }
     }, 100);
-    // Fade the highlight after a few seconds so it doesn't dominate.
-    const fadeT = window.setTimeout(() => setHighlightedFaq(undefined), 2600);
     return () => {
       window.clearTimeout(scrollT);
-      window.clearTimeout(fadeT);
     };
   }, [location.hash, guide]);
+
 
 
 

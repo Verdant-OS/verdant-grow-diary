@@ -55,6 +55,50 @@ async function assertReadOnlySurface(page: Page) {
   expect(await cards.count()).toBeGreaterThanOrEqual(2);
 }
 
+/**
+ * ACTIVE trunk safety fence — runs while the structure spec below stays
+ * test.fixme pending "Reconcile imported Pheno Comparison v0 surface".
+ * Pins only invariants the TRUNK page actually provides (verified against
+ * src/components/PhenoComparisonView.tsx): the page region + h1 + read-only
+ * status render, demo candidate sections exist, a reload re-renders, there
+ * are zero write controls, no forbidden data-plane hosts are contacted, and
+ * no uncaught page errors fire. A regression that makes /pheno-comparison
+ * writable or network-active fails HERE even with the fixme block skipped.
+ */
+test("/pheno-comparison trunk safety fence: read-only render, zero write surfaces, no forbidden hosts", async ({
+  page,
+}: {
+  page: Page;
+}) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (e) => pageErrors.push(String(e)));
+  const forbidden: string[] = [];
+  page.on("request", (req: Request) => {
+    const url = req.url();
+    if (!isLocalhost(url) && FORBIDDEN_REQUEST_RE.test(url)) {
+      forbidden.push(`${req.method()} ${url}`);
+    }
+  });
+
+  await page.goto("/pheno-comparison");
+  await expect(page.getByRole("heading", { level: 1, name: /pheno comparison/i })).toBeVisible();
+  await expect(page.getByRole("status", { name: "Read-only preview" })).toBeVisible();
+  const region = page.getByTestId("pheno-comparison-page");
+  await expect(region).toBeVisible();
+  expect(
+    await region.locator("section[data-testid^='pheno-candidate-']").count(),
+    "demo candidate sections render",
+  ).toBeGreaterThanOrEqual(2);
+  await assertNoWriteControls(page);
+
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1, name: /pheno comparison/i })).toBeVisible();
+  await assertNoWriteControls(page);
+
+  expect(forbidden, "forbidden data-plane requests").toEqual([]);
+  expect(pageErrors, "uncaught page errors").toEqual([]);
+});
+
 async function assertNoWriteControls(page: Page) {
   const region = page.getByTestId("pheno-comparison-page");
   for (const tag of ["button", "form", "input", "select", "textarea"]) {

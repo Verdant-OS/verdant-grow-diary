@@ -38,18 +38,28 @@ export default function GuidePage() {
     return hash.startsWith("faq-") ? hash : undefined;
   })();
   const [openFaq, setOpenFaq] = useState<string | undefined>(initialFaqValue);
+  const [highlightedFaq, setHighlightedFaq] = useState<string | undefined>(
+    initialFaqValue,
+  );
 
   useEffect(() => {
     const hash = location.hash.replace(/^#/, "");
     if (!hash.startsWith("faq-")) return;
     setOpenFaq(hash);
+    setHighlightedFaq(hash);
     // Defer scroll until after the accordion item opens.
-    const t = window.setTimeout(() => {
+    const scrollT = window.setTimeout(() => {
       const el = document.getElementById(hash);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 50);
-    return () => window.clearTimeout(t);
+    // Fade the highlight after a few seconds so it doesn't dominate.
+    const fadeT = window.setTimeout(() => setHighlightedFaq(undefined), 2600);
+    return () => {
+      window.clearTimeout(scrollT);
+      window.clearTimeout(fadeT);
+    };
   }, [location.hash]);
+
 
 
   // Always call hooks before conditional returns.
@@ -154,18 +164,30 @@ export default function GuidePage() {
               value={openFaq}
               onValueChange={(v) => setOpenFaq(v || undefined)}
             >
-              {guide.faq.map((entry, i) => (
-                <AccordionItem
-                  key={entry.question}
-                  value={`faq-${i}`}
-                  id={`faq-${i}`}
-                >
-                  <AccordionTrigger className="text-left">
-                    {entry.question}
-                  </AccordionTrigger>
-                  <AccordionContent>{entry.answer}</AccordionContent>
-                </AccordionItem>
-              ))}
+              {guide.faq.map((entry, i) => {
+                const value = `faq-${i}`;
+                const isHighlighted = highlightedFaq === value;
+                return (
+                  <AccordionItem
+                    key={entry.question}
+                    value={value}
+                    id={value}
+                    data-highlighted={isHighlighted ? "true" : undefined}
+                    className={
+                      isHighlighted
+                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 transition-colors duration-500 scroll-mt-24"
+                        : "transition-colors duration-500 scroll-mt-24"
+                    }
+                  >
+                    <AccordionTrigger className="text-left px-2">
+                      {entry.question}
+                    </AccordionTrigger>
+                    <AccordionContent className="px-2">
+                      {entry.answer}
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
             </Accordion>
 
           </section>

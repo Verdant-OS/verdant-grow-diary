@@ -26,6 +26,8 @@ jobs:
         run: bun run test:security-static
       - name: Gamification direct-insert RLS scan
         run: bun run test:security-gamification
+      - name: sensor_readings tent ownership RLS test
+        run: bun run test:sensor-readings-tent-ownership
       - name: Payments webhook security tests
         run: bun run test:payments-security
       - name: Storage bucket policy tests

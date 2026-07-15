@@ -64,6 +64,7 @@
     "test:storage-security": "vitest run src/test/diary-storage-buckets-contract.test.ts src/test/verdant-bucket-owner-policies-migration.test.ts",
     "test:pi-ingest-security": "vitest run src/test/sensor-history-import-replay-guard.test.ts src/test/pi-ingest-readings-contract-doc.test.ts",
     "test:security-regression": "bun run test:security-static && bun run test:payments-security && bun run test:storage-security && bun run test:pi-ingest-security",
+    "test:sensor-readings-tent-ownership": "vitest run src/test/sensor-readings-insert-tent-ownership-rls.test.ts",
     "test:pi-ingest-db-security": "node scripts/security/run-pi-ingest-db-security.mjs",
     "test:storage-db-security": "node scripts/security/run-storage-db-security.mjs",
     "test:profiles-db-security": "node scripts/security/run-profiles-db-security.mjs",

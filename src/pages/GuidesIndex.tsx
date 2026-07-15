@@ -147,7 +147,9 @@ export default function GuidesIndex() {
           </Link>
           .
         </p>
+        <DiaryFaqLinkStatsPanel className="mt-10" />
       </section>
     </main>
+
   );
 }

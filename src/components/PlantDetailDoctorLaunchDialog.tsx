@@ -220,6 +220,27 @@ export default function PlantDetailDoctorLaunchDialog({
     [readinessResult.readiness, readinessResult.missing, addContextDecision],
   );
 
+  const snapshotStaleness = useMemo(() => {
+    const nowMs = now ? now.getTime() : Date.now();
+    const fmt = (iso: string) => {
+      const d = new Date(iso);
+      if (!Number.isFinite(d.getTime())) return iso;
+      try {
+        return d.toLocaleString(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        });
+      } catch {
+        return d.toISOString();
+      }
+    };
+    return buildAiDoctorSnapshotStalenessExplanation({
+      latestSnapshotAtIso: readinessResult.latest.manualSnapshotAt,
+      now: nowMs,
+      formatDateTime: fmt,
+    });
+  }, [readinessResult.latest.manualSnapshotAt, now]);
+
   const handleAddContext = useCallback(() => {
     if (typeof window !== "undefined" && addContextDecision.quickLogEvent) {
       window.dispatchEvent(

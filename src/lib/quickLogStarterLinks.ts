@@ -43,3 +43,25 @@ export function buildQuickLogStarterSignupHref(search: string | null | undefined
   }
   return `/auth?${params.toString()}`;
 }
+
+/**
+ * Fixed attribution for the search-to-first-value guide cluster. Every
+ * guide links to the starter with EXACTLY these three campaign params plus
+ * utm_content=<guide slug>. Values are static string constants — nothing
+ * user-entered can reach a URL through this builder.
+ */
+export const GUIDE_TO_STARTER_UTM = {
+  utm_source: "organic_guide",
+  utm_medium: "owned",
+  utm_campaign: "search_to_first_value",
+} as const;
+
+/** Build the guide → starter CTA href with the fixed cluster attribution. */
+export function buildGuideQuickLogStarterHref(guideSlug: string): string {
+  const params = new URLSearchParams();
+  params.set("utm_source", GUIDE_TO_STARTER_UTM.utm_source);
+  params.set("utm_medium", GUIDE_TO_STARTER_UTM.utm_medium);
+  params.set("utm_campaign", GUIDE_TO_STARTER_UTM.utm_campaign);
+  params.set("utm_content", guideSlug);
+  return `${PUBLIC_QUICK_LOG_STARTER_PATH}?${params.toString()}`;
+}

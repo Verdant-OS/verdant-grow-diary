@@ -3046,6 +3046,16 @@ export type Database = {
         }
         Returns: Json
       }
+      allocate_lovable_founder_lifetime: {
+        Args: {
+          p_environment: string
+          p_now: string
+          p_paddle_customer_id: string
+          p_paddle_transaction_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       award_nugs: {
         Args: {
           _amount: number
@@ -3131,6 +3141,7 @@ export type Database = {
           sample_count: number
         }[]
       }
+      founder_lifetime_slots_remaining: { Args: never; Returns: number }
       get_latest_tent_sensor_snapshot: {
         Args: { _tent_id: string }
         Returns: Json

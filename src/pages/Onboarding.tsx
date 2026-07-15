@@ -33,6 +33,7 @@ import {
 import { runStarterSetup, StarterSetupError } from "@/lib/starterSetupService";
 import { starterSetupSupabaseAdapter } from "@/lib/starterSetupSupabaseAdapter";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import PublicQuickLogHandoffCard from "@/components/PublicQuickLogHandoffCard";
 
 export default function Onboarding() {
   const { user, loading } = useAuth();
@@ -98,6 +99,8 @@ export default function Onboarding() {
         <p className="text-xs text-muted-foreground mb-4">
           Verdant works best when logs come first, then sensors, then AI.
         </p>
+
+        <PublicQuickLogHandoffCard className="mb-4" />
 
         <fieldset
           role="radiogroup"

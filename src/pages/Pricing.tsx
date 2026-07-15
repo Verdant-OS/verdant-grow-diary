@@ -45,6 +45,7 @@ import {
 } from "@/lib/paidAcquisitionAttributionRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
+import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -104,6 +105,7 @@ export default function Pricing() {
     environment: checkoutEnvironment,
     blocked: Boolean(checkoutRecoveryReason),
   });
+  const founderSlots = useFounderSlotsRemaining();
 
   function handlePaidIntent(
     planId: SubscriberInterestPlanId,
@@ -428,14 +430,25 @@ export default function Pricing() {
           cadence={` ${PRICING.founder.cadence}`}
           description={PRICING.founder.description}
           features={PRICING.founder.features}
-          badge={PRICING.founder.badge}
-          footnote={`Founder Lifetime is limited; availability may close manually when the first ${PRICING.founder.limit} are claimed.`}
+          badge={
+            founderSlots.status === "ready" && founderSlots.claimed !== null
+              ? `${founderSlots.claimed} of ${founderSlots.total} claimed`
+              : PRICING.founder.badge
+          }
+          footnote={
+            founderSlots.status === "ready" && founderSlots.soldOut
+              ? "Founder Lifetime is currently sold out. Additional slots may open if a purchase is refunded."
+              : `Founder Lifetime is limited; availability may close manually when the first ${PRICING.founder.limit} are claimed.`
+          }
           cta={
             <Button
               size="lg"
               className="w-full"
-              disabled={checkoutLoading}
+              disabled={
+                checkoutLoading || (founderSlots.status === "ready" && founderSlots.soldOut)
+              }
               data-testid="pricing-cta-founder-lifetime"
+              data-founder-remaining={founderSlots.remaining ?? ""}
               onClick={() => {
                 handlePaidIntent(
                   "founder_lifetime",
@@ -444,9 +457,11 @@ export default function Pricing() {
                 );
               }}
             >
-              {checkoutRecoveryReason
-                ? "Join the Founder launch list"
-                : `Claim Founder Lifetime — $${PRICING.founder.price}`}
+              {founderSlots.status === "ready" && founderSlots.soldOut
+                ? "Founder Lifetime sold out"
+                : checkoutRecoveryReason
+                  ? "Join the Founder launch list"
+                  : `Claim Founder Lifetime — $${PRICING.founder.price}`}
             </Button>
           }
         />

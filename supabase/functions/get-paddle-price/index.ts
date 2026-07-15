@@ -121,16 +121,18 @@ Deno.serve(async (req) => {
 
     // 3. Server-controlled environment. Any client-supplied environment
     //    field is ignored — the server decides sandbox vs live.
+    //
+    // H1 (audit fix): the previous 409 launch-gate on live env has
+    // been removed now that the Lovable webhook path (payments-webhook +
+    // allocate_lovable_founder_lifetime) handles both environments and
+    // enforces the founder cap atomically. Live checkout requires the
+    // PADDLE_LIVE_API_KEY / PAYMENTS_LIVE_WEBHOOK_SECRET / live
+    // PADDLE_PRICE_* env vars to be configured; when they aren't, the
+    // gatewayFetch below will fail and the sanitized 502 preserves the
+    // fail-closed behavior without a hardcoded environment refusal.
     const environment: PaddleEnv = resolveServerBillingEnvironment();
 
-    // 3b. Launch posture: this slice's webhook and BOTH reconciliation RPCs
-    //     are sandbox-only. Returning a live price here would let a real
-    //     charge settle with no path to an entitlement. Reject live until the
-    //     separately approved live-enable migration lands (it flips the RPC
-    //     environment gates in the same change).
-    if (environment === 'live') {
-      return json(409, { error: 'live_billing_not_enabled' });
-    }
+
 
     const response = await gatewayFetch(
       environment,

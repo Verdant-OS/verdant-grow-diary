@@ -21,8 +21,15 @@ import { CheckCircle2, Loader2 } from "lucide-react";
  *    `effectivePlanId !== 'free'`.
  */
 
+// L4 (audit fix): extended the bounded poll window from ~10s to ~30s. Paddle
+// webhook delivery + our own event → subscriptions upsert commonly settles
+// under 5s but can spike past 10s under load; a 30s ceiling gives real
+// customers a "confirming…" state that actually confirms without asking
+// them to manually refresh. Interval stays at 1.5s to keep the network
+// footprint small (≤20 refetches over the whole window).
 const POLL_INTERVAL_MS = 1500;
-const POLL_TIMEOUT_MS = 10_000;
+const POLL_TIMEOUT_MS = 30_000;
+
 
 export default function CheckoutSuccess() {
   const { loading, entitlement, refetch } = useMyEntitlements();

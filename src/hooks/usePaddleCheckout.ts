@@ -21,6 +21,7 @@ import { resolvePaidAcquisitionSource } from "@/lib/paidAcquisitionAttributionRu
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import type { PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
 import { buildCheckoutCancelPath } from "@/lib/checkoutCancelRecoveryRules";
+import { saveCheckoutReturnTo } from "@/lib/checkoutReturnToSession";
 
 export interface OpenCheckoutOptions {
   priceId: string;
@@ -160,6 +161,13 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         await initializePaddle();
         const paddlePriceId = await getPaddlePriceId(options.priceId);
 
+        // L5 (audit fix): persist the sanitized returnTo BEFORE opening the
+        // overlay so the cancel path (/checkout/cancel) can restore the
+        // buyer to the gated surface they came from. Consumed one-shot on
+        // the cancel page. Success path still uses the successUrl query
+        // param; both branches call sanitizeCheckoutReturnTo.
+        saveCheckoutReturnTo(new URLSearchParams(window.location.search).get("returnTo"));
+
         // Slice D: register overlay session BEFORE calling
         // Paddle.Checkout.open so the module-level eventCallback (set at
         // Initialize) always has a target when checkout.completed /
@@ -172,7 +180,6 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
           if (!mountedRef.current) return;
           navigate(cancelPath);
         });
-
         (window as any).Paddle.Checkout.open({
           items: [{ priceId: paddlePriceId, quantity: options.quantity ?? 1 }],
           customer: user.email ? { email: user.email } : undefined,

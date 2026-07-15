@@ -26,11 +26,13 @@ import { PLAN_CATALOG, isKnownPlanId } from "./planCatalog";
 
 const KNOWN_STATUSES: ReadonlyArray<SubscriptionStatus> = [
   "active",
+  "trialing",
   "past_due",
   "canceled",
   "paused",
   "expired",
 ];
+
 
 function isKnownStatus(value: unknown): value is SubscriptionStatus {
   return typeof value === "string" &&
@@ -128,7 +130,11 @@ export function resolveEntitlements(
     }
   }
 
-  if (status === "active" && !periodElapsed) {
+  // M6 (audit fix): treat 'trialing' as active-in-period so a Paddle-issued
+  // trial row unlocks the same capabilities as a paid active row until the
+  // trial's current_period_end. This matches the partial index
+  // idx_subscriptions_user_env_active which already includes 'trialing'.
+  if ((status === "active" || status === "trialing") && !periodElapsed) {
     return applyStaffLift({
       effectivePlanId: planId,
       displayPlanId: planId,
@@ -147,7 +153,8 @@ export function resolveEntitlements(
     : status === "canceled" ? "canceled"
     : status === "paused" ? "paused"
     : status === "expired" ? "expired"
-    : "expired"; // active + periodElapsed
+    : "expired"; // active/trialing + periodElapsed
+
 
   return applyStaffLift({
     effectivePlanId: "free",

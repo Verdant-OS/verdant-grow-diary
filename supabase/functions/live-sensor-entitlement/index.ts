@@ -40,7 +40,6 @@ import {
   resolveServerBillingEnvironment,
 } from "../_shared/unionEntitlementLookup.ts";
 
-
 const ALLOWED_SURFACES = new Set<string>([
   "live_sensor_stream",
   "live_sensor_dashboard_widget",
@@ -148,8 +147,8 @@ Deno.serve(async (req) => {
   }
 
   // Wrap the entitlement lookup + ownership checks so a thrown exception
-  // (network hiccup, RLS surfaced as throw, resolver bug) becomes a structured
-  // deny response instead of an unhandled 500 that blocks premium users.
+  // (network hiccup, RLS surfaced as throw, resolver bug) becomes a structured,
+  // fail-closed 500 response instead of an unhandled exception.
   try {
     // Server-authoritative: NEVER trust client-supplied billing_env.
     const expectedBillingEnvironment = resolveServerBillingEnvironment();

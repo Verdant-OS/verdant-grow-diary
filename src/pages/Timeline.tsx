@@ -288,6 +288,7 @@ export default function Timeline() {
   async function load() {
     if (!user || !activeGrowId) {
       setEntries([]);
+      setEntriesTotal(null);
       setGrowEvents([]);
       setActionEvents([]);
       setAlertEvents([]);
@@ -296,9 +297,13 @@ export default function Timeline() {
     }
 
     setLoading(true);
-    const { data } = await supabase
+    // The diary is unbounded but the page loads the newest 100 rows first
+    // and exposes a keyset-paginated "Load older entries" affordance so
+    // long-running grows do not silently lose access to months of logs.
+    // `count: "exact"` powers the "N more" affordance below.
+    const { data, count } = await supabase
       .from("diary_entries")
-      .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+      .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", { count: "exact" })
       .eq("grow_id", activeGrowId)
       .order("entry_at", { ascending: false })
       .limit(100);
@@ -316,6 +321,7 @@ export default function Timeline() {
       });
     }
     setEntries(rows);
+    setEntriesTotal(typeof count === "number" ? count : null);
 
     // Quick Log v2 manual saves land in `grow_events`, not `diary_entries`.
     // Fetch them in parallel for the Recent Quick Logs panel so newly

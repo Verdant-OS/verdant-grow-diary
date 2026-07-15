@@ -15,7 +15,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const sql = readFileSync(
-  resolve(process.cwd(), "supabase/migrations/20260707120000_pheno_reversals_and_cross_types.sql"),
+  // Version 20260707120001: renamed from 20260707120000, which collided with
+  // 20260707120000_breeding_workflow_v1.sql and broke every `supabase db
+  // reset` (schema_migrations pkey violation). Apply order is unchanged.
+  resolve(process.cwd(), "supabase/migrations/20260707120001_pheno_reversals_and_cross_types.sql"),
   "utf8",
 );
 

@@ -31,7 +31,7 @@ const DISALLOW_RULES = ROBOTS.split(/\r?\n/)
   .map((l) => l.replace(/^Disallow:\s*/i, "").trim())
   .filter((rule) => rule.length > 0);
 
-/** The 8 required guide URLs, pinned literally per the SEO plan. */
+/** The 15 required guide URLs, pinned literally per the SEO plan. */
 const REQUIRED_GUIDE_URLS = [
   "https://verdantgrowdiary.com/guides",
   "https://verdantgrowdiary.com/guides/grow-diary-app",
@@ -47,6 +47,7 @@ const REQUIRED_GUIDE_URLS = [
   "https://verdantgrowdiary.com/guides/plant-watering-log",
   "https://verdantgrowdiary.com/guides/grow-journal-app-without-account",
   "https://verdantgrowdiary.com/guides/daily-grow-log-checklist",
+  "https://verdantgrowdiary.com/guides/cannabis-plant-care",
 ];
 
 function manifestEntryFor(pathname: string) {

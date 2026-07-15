@@ -54,6 +54,7 @@ const EXPECTED_SLUGS = [
   "plant-watering-log",
   "grow-journal-app-without-account",
   "daily-grow-log-checklist",
+  "cannabis-plant-care",
 ];
 
 describe("Verdant grower guide FAQ (/guides)", () => {
@@ -105,8 +106,8 @@ describe("Verdant grower guide FAQ (/guides)", () => {
   });
 });
 
-describe("Verdant SEO guide pages (13)", () => {
-  it("defines exactly the thirteen expected slugs, in order", () => {
+describe("Verdant SEO guide pages (14)", () => {
+  it("defines exactly the fourteen expected slugs, in order", () => {
     expect(VERDANT_GUIDE_SLUGS).toEqual(EXPECTED_SLUGS);
   });
 

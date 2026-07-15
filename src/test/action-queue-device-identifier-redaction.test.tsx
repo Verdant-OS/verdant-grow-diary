@@ -309,11 +309,18 @@ describe("ActionQueue list — full-DOM device-identifier scan", () => {
 });
 
 describe("ActionDetail — full-DOM device-identifier scan", () => {
-  it("MAC-bearing row does not leak the MAC anywhere", async () => {
+  it("MAC-bearing row leaks nothing and exposes no clipboard/download/print surface", async () => {
     detailRow = ROW_WITH_MAC;
     renderDetail("aq-mac-1");
     await screen.findByText("Raise the light by 10 cm", undefined, FIND_TIMEOUT);
     expectNoDeviceLeakAnywhere("ActionDetail MAC row");
+    // Step 0 negative check, asserted on this same loaded render: each
+    // additional ActionDetail mount in this file gets measurably slower on
+    // CI runners, and a fourth render just for these selector scans was
+    // the file's deterministic CI timeout. Same assertions, same DOM.
+    expect(document.querySelectorAll("a[download]").length).toBe(0);
+    expect(document.querySelectorAll("[data-export-action]").length).toBe(0);
+    expect(document.querySelectorAll("[data-print-action]").length).toBe(0);
   });
 
   it("vendor-id row does not leak the vendor id anywhere", async () => {
@@ -328,14 +335,5 @@ describe("ActionDetail — full-DOM device-identifier scan", () => {
     renderDetail("aq-token-1");
     await screen.findByText("Adjust feed strength to 1.2 EC", undefined, FIND_TIMEOUT);
     expectNoDeviceLeakAnywhere("ActionDetail bridge-token row");
-  });
-
-  it("introduces no clipboard / download / print surface on detail", async () => {
-    detailRow = ROW_WITH_MAC;
-    renderDetail("aq-mac-1");
-    await screen.findByText("Raise the light by 10 cm", undefined, FIND_TIMEOUT);
-    expect(document.querySelectorAll("a[download]").length).toBe(0);
-    expect(document.querySelectorAll("[data-export-action]").length).toBe(0);
-    expect(document.querySelectorAll("[data-print-action]").length).toBe(0);
   });
 });

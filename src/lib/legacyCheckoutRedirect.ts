@@ -4,10 +4,9 @@
  * `plan` preselect and a sanitized `returnTo`.
  *
  * Canonical-route ruling: `/pricing` is the sole user-facing checkout entry
- * (it owns `usePaddleCheckout`). `/upgrade` is a presenter-only page and is
- * NOT canonical. `/billing/:plan` remains mounted purely as a compatibility
- * redirect and MUST land on `/pricing` so the grower can actually complete
- * checkout.
+ * (it owns `usePaddleCheckout`). `/upgrade` and `/billing/:plan` remain
+ * mounted purely as compatibility redirects and MUST land on `/pricing` so
+ * the grower sees one truthful plan and checkout surface.
  *
  * Presenter-only. No Paddle calls, no auth reads, no entitlement grants.
  * The redirect never auto-opens Paddle — Pricing shows the preselected
@@ -27,6 +26,11 @@
 
 import type { PlanId } from "@/lib/entitlements/types";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
+import {
+  buildAttributedPricingPath,
+  resolvePaidAcquisitionSource,
+} from "@/lib/paidAcquisitionAttributionRules";
+import { isPreselectPlanId } from "@/lib/pricingPlanPreselect";
 
 /**
  * Allowlist of legacy plan slugs. Underscore variants are included so a
@@ -35,11 +39,11 @@ import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
  */
 const LEGACY_PLAN_SLUG_MAP: Readonly<Record<string, PlanId>> = Object.freeze({
   "pro-monthly": "pro_monthly",
-  "pro_monthly": "pro_monthly",
+  pro_monthly: "pro_monthly",
   "pro-annual": "pro_annual",
-  "pro_annual": "pro_annual",
+  pro_annual: "pro_annual",
   "founder-lifetime": "founder_lifetime",
-  "founder_lifetime": "founder_lifetime",
+  founder_lifetime: "founder_lifetime",
 });
 
 /**
@@ -70,17 +74,13 @@ export interface BuildLegacyBillingRedirectInput {
  * Always returns a same-origin app path. Order of appended params is stable
  * (`plan` before `returnTo`) so tests can assert exact strings.
  */
-export function buildLegacyBillingRedirect(
-  input: BuildLegacyBillingRedirectInput,
-): string {
+export function buildLegacyBillingRedirect(input: BuildLegacyBillingRedirectInput): string {
   const plan = resolveLegacyPlanSlug(input.planSlug);
 
   let returnTo: string | null = null;
   if (input.search != null) {
     const params =
-      typeof input.search === "string"
-        ? new URLSearchParams(input.search)
-        : input.search;
+      typeof input.search === "string" ? new URLSearchParams(input.search) : input.search;
     returnTo = sanitizeCheckoutReturnTo(params.get("returnTo"));
   }
 
@@ -89,4 +89,43 @@ export function buildLegacyBillingRedirect(
   if (returnTo) out.set("returnTo", returnTo);
   const qs = out.toString();
   return qs ? `/pricing?${qs}` : "/pricing";
+}
+
+export interface BuildLegacyUpgradeRedirectInput {
+  /** Current `/upgrade` query. Every field is untrusted and allowlisted below. */
+  search?: URLSearchParams | string | null;
+}
+
+/**
+ * Retires the stale `/upgrade` plan surface into canonical `/pricing` while
+ * preserving only a known paid plan, safe same-origin return path, and an
+ * exact first-party acquisition tuple. Unknown query data is dropped. The
+ * redirect never opens checkout; the grower must still click a Pricing CTA.
+ */
+export function buildLegacyUpgradeRedirect(input: BuildLegacyUpgradeRedirectInput = {}): string {
+  const params =
+    input.search instanceof URLSearchParams
+      ? input.search
+      : new URLSearchParams(input.search ?? "");
+  const plan = resolveLegacyPlanSlug(params.get("plan"));
+  const returnTo = sanitizeCheckoutReturnTo(params.get("returnTo"));
+  const source = resolvePaidAcquisitionSource(params);
+
+  if (!source) {
+    return buildLegacyBillingRedirect({
+      planSlug: plan,
+      search: returnTo ? new URLSearchParams({ returnTo }) : null,
+    });
+  }
+
+  const attributedPath = buildAttributedPricingPath({
+    source,
+    planId: isPreselectPlanId(plan) ? plan : null,
+  });
+  if (!returnTo) return attributedPath;
+
+  const [pathname, query = ""] = attributedPath.split("?");
+  const out = new URLSearchParams(query);
+  out.set("returnTo", returnTo);
+  return `${pathname}?${out.toString()}`;
 }

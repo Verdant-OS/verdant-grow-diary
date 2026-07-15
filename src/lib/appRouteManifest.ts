@@ -338,7 +338,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "public",
     description: "Public manual-input, stage-aware air VPD calculator.",
   },
-  { path: "/upgrade", access: "public", description: "Public upgrade and checkout surface." },
+  {
+    path: "/upgrade",
+    access: "redirect",
+    description: "→ /pricing with allowlisted plan, acquisition, and return intent.",
+  },
   { path: "/welcome", access: "public" },
 ];
 

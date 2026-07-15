@@ -84,7 +84,6 @@ const CreatorBeta = lazy(() => import("./pages/CreatorBeta"));
 const BreederBeta = lazy(() => import("./pages/BreederBeta"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Founder = lazy(() => import("./pages/Founder"));
-const Upgrade = lazy(() => import("./pages/Upgrade"));
 const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
 const Glossary = lazy(() => import("./pages/Glossary"));
@@ -92,6 +91,7 @@ const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
 const AiDoctorContextCheck = lazy(() => import("./pages/AiDoctorContextCheck"));
 const PublicVpdCalculator = lazy(() => import("./pages/PublicVpdCalculator"));
 const LegacyBillingRedirect = lazy(() => import("./pages/LegacyBillingRedirect"));
+const LegacyUpgradeRedirect = lazy(() => import("./pages/LegacyUpgradeRedirect"));
 const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
 const CheckoutCancel = lazy(() => import("./pages/CheckoutCancel"));
 const Terms = lazy(() => import("./pages/TermsOfService"));
@@ -194,7 +194,9 @@ const App = () => (
                   <Route path="/breeder-beta" element={<BreederBeta />} />
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/founder" element={<Founder />} />
-                  <Route path="/upgrade" element={<Upgrade />} />
+                  {/* Retired duplicate plan surface — preserve known paid
+                      intent and route every old link to live `/pricing`. */}
+                  <Route path="/upgrade" element={<LegacyUpgradeRedirect />} />
                   <Route path="/guides" element={<GuidesIndex />} />
                   <Route path="/guides/:slug" element={<GuidePage />} />
                   <Route path="/glossary" element={<Glossary />} />

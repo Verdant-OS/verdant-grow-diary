@@ -44,6 +44,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
+import { useTimelineMemory, TIMELINE_MEMORY_DEFAULT_LIMIT } from "@/hooks/useTimelineMemory";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import {
   buildPlantDetailDoctorContextPreview,
@@ -54,6 +55,8 @@ import {
   buildPlantDetailDoctorAddContextRoute,
   ADD_CONTEXT_HELPER_COPY,
 } from "@/lib/plantDetailDoctorAddContextRouter";
+import { evaluateAiDoctorContextFromSources } from "@/lib/aiDoctorContextViewModel";
+import { buildAiDoctorReadinessGate } from "@/lib/aiDoctorReadinessGateViewModel";
 
 interface Props {
   plantId: string | null | undefined;

@@ -103,6 +103,14 @@ export default function PlantDetailAiDoctorReadinessGate({
     [result.missing, plantId, plant?.name, plant?.growId, plant?.tentId],
   );
 
+  const freshness = useMemo(
+    () =>
+      buildAiDoctorSnapshotFreshnessStatus({
+        latestSnapshotAtIso: result.latest.manualSnapshotAt,
+      }),
+    [result.latest.manualSnapshotAt],
+  );
+
   const onPrimary = useCallback(() => {
     const id = gate.primary.anchorId;
     if (!id || typeof document === "undefined") return;

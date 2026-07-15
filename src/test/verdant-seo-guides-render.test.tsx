@@ -176,4 +176,14 @@ describe("/guides/:slug detail — public render", () => {
     // FAQ heading is present.
     expect(screen.getByText(/Common questions/i)).toBeTruthy();
   });
+
+  it("moves keyboard focus to the deep-linked FAQ accordion item", async () => {
+    renderAt("/guides/cannabis-plant-care#faq-2");
+    const target = document.getElementById("faq-2");
+    expect(target).toBeTruthy();
+    expect(target?.getAttribute("tabindex")).toBe("-1");
+    await waitFor(() => expect(document.activeElement).toBe(target), {
+      timeout: 300,
+    });
+  });
 });

@@ -130,6 +130,15 @@ export function resolvePaidInterestLeadSource(
   return source ? PAID_ACQUISITION_ATTRIBUTIONS[source].leadSource : "pricing_interest";
 }
 
+export function buildAttributedLandingPath(input: { source: PaidAcquisitionSource }): string {
+  const config = PAID_ACQUISITION_ATTRIBUTIONS[input.source];
+  const params = new URLSearchParams();
+  params.set("utm_source", config.source);
+  params.set("utm_medium", config.medium);
+  params.set("utm_campaign", config.campaign);
+  return `/welcome?${params.toString()}`;
+}
+
 export function buildAttributedPricingPath(input: {
   source: PaidAcquisitionSource;
   planId?: PricingPreselectPlan | null;

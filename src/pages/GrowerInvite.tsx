@@ -36,7 +36,10 @@ export default function GrowerInvite() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>It opens Verdant Pricing, where the recipient can choose Free or review paid plans.</p>
+          <p>
+            It opens Verdant's public product tour, where the recipient can see the One-Tent Loop,
+            start Free, or review paid plans.
+          </p>
           <p>It never grants access to your grows, plants, diary, photos, sensors, or account.</p>
           <p>It does not promise a reward, discount, entitlement, or reserved Founder position.</p>
         </CardContent>

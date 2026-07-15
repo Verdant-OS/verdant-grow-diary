@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 import { buildGrowerInviteShareData } from "@/lib/growerInviteRules";
 
 describe("grower invite rules", () => {
-  it("builds a deterministic PII-free Pricing referral", () => {
+  it("builds a deterministic PII-free public product-tour referral", () => {
     const first = buildGrowerInviteShareData();
     const second = buildGrowerInviteShareData();
     const url = new URL(first.url);
 
     expect(first).toEqual(second);
-    expect(url.origin + url.pathname).toBe("https://verdantgrowdiary.com/pricing");
+    expect(url.origin + url.pathname).toBe("https://verdantgrowdiary.com/welcome");
     expect(Object.fromEntries(url.searchParams)).toEqual({
       utm_source: "grower_invite",
       utm_medium: "referral",

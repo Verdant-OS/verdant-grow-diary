@@ -346,8 +346,8 @@ describe("Safety: no private data on public page", () => {
 
 describe("Landing links to /pricing", () => {
   it("Landing page links to the centralized attributed public pricing route", () => {
-    expect(LANDING).toContain('buildAttributedPricingPath({ source: "landing_page" })');
-    expect(LANDING).toContain("to={LANDING_PRICING_PATH}");
+    expect(LANDING).toContain("buildAttributedPricingPath({ source: acquisitionSource })");
+    expect(LANDING).toContain("to={pricingPath}");
   });
 });
 

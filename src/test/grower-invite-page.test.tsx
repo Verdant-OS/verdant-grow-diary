@@ -22,7 +22,7 @@ describe("GrowerInvite page", () => {
     );
 
     expect(screen.getByText("Invite a grower")).toBeInTheDocument();
-    expect(screen.getByText(/opens Verdant Pricing/)).toBeInTheDocument();
+    expect(screen.getByText(/opens Verdant's public product tour/)).toBeInTheDocument();
     expect(screen.getByText(/never grants access to your grows/)).toBeInTheDocument();
     expect(screen.getByText(/does not promise a reward/)).toBeInTheDocument();
     expect(mocks.track).toHaveBeenCalledWith("grower_invite_page_view");

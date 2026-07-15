@@ -93,11 +93,13 @@ describe("landing subscriber funnel", () => {
     await user.click(screen.getByTestId("landing-pricing-cta-hero"));
     expect(mocks.track).toHaveBeenCalledWith("landing_pricing_cta_clicked", {
       source: "hero",
+      item: "landing_page",
     });
 
     await user.click(screen.getByTestId("landing-signup-cta-hero"));
     expect(mocks.track).toHaveBeenCalledWith("landing_signup_cta_clicked", {
       source: "hero",
+      item: "landing_page",
     });
     expect(JSON.stringify(mocks.track.mock.calls)).not.toMatch(/email|user_id|token/i);
   });
@@ -117,7 +119,38 @@ describe("landing subscriber funnel", () => {
     const heroEntry = screen.getByTestId("landing-loop-cta-hero");
     expect(heroEntry).toHaveAttribute("href", "#loop");
     await user.click(heroEntry);
-    expect(mocks.track).toHaveBeenCalledWith("landing_loop_opened", { source: "hero" });
+    expect(mocks.track).toHaveBeenCalledWith("landing_loop_opened", {
+      source: "hero",
+      item: "landing_page",
+    });
+  });
+
+  it("preserves a valid grower referral through proof, signup, and pricing", () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          "/welcome?utm_source=grower_invite&utm_medium=referral&utm_campaign=grower_invite",
+        ]}
+      >
+        <Landing />
+      </MemoryRouter>,
+    );
+
+    expect(mocks.track).toHaveBeenCalledWith("landing_page_view", {
+      source: "grower_invite",
+    });
+    expect(screen.getByTestId("landing-signup-cta-hero")).toHaveAttribute(
+      "href",
+      "/auth?mode=signup&utm_source=grower_invite&utm_medium=referral&utm_campaign=grower_invite",
+    );
+    expect(screen.getByTestId("landing-pricing-cta-hero")).toHaveAttribute(
+      "href",
+      "/pricing?utm_source=grower_invite&utm_medium=referral&utm_campaign=grower_invite",
+    );
+    expect(screen.getByTestId("public-one-tent-tour-signup-cta")).toHaveAttribute(
+      "href",
+      "/auth?mode=signup&utm_source=grower_invite&utm_medium=referral&utm_campaign=grower_invite",
+    );
   });
 
   it("sends every AppShell auth check to the public landing, never directly to auth", () => {

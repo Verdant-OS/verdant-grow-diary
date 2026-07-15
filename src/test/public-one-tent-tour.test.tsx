@@ -110,6 +110,7 @@ describe("public One-Tent tour", () => {
     await user.click(signup);
     expect(mocks.track).toHaveBeenCalledWith("landing_loop_signup_clicked", {
       source: "one_tent_tour",
+      item: "landing_page",
     });
 
     const pricing = screen.getByTestId("public-one-tent-tour-pricing-cta");
@@ -120,7 +121,25 @@ describe("public One-Tent tour", () => {
     await user.click(pricing);
     expect(mocks.track).toHaveBeenCalledWith("landing_loop_pricing_clicked", {
       source: "one_tent_tour",
+      item: "landing_page",
     });
+  });
+
+  it("preserves grower-invite attribution after the product tour", () => {
+    render(
+      <MemoryRouter>
+        <PublicOneTentTour hasAccount={false} acquisitionSource="grower_invite" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("public-one-tent-tour-signup-cta")).toHaveAttribute(
+      "href",
+      "/auth?mode=signup&utm_source=grower_invite&utm_medium=referral&utm_campaign=grower_invite",
+    );
+    expect(screen.getByTestId("public-one-tent-tour-pricing-cta")).toHaveAttribute(
+      "href",
+      "/pricing?utm_source=grower_invite&utm_medium=referral&utm_campaign=grower_invite",
+    );
   });
 
   it("sends signed-in growers back to their dashboard", () => {

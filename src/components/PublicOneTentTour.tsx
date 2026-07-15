@@ -2,7 +2,10 @@ import { useState } from "react";
 import { ArrowRight, CheckCircle2, ShieldCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { buildAttributedPricingPath } from "@/lib/paidAcquisitionAttributionRules";
+import {
+  buildAttributedPricingPath,
+  type PaidAcquisitionSource,
+} from "@/lib/paidAcquisitionAttributionRules";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import {
   getNextPublicOneTentTourStepId,
@@ -12,14 +15,17 @@ import {
 } from "@/lib/publicOneTentTourRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 
-const TOUR_SIGNUP_PATH = buildAttributedSignupPath({ source: "landing_page" });
-const TOUR_PRICING_PATH = buildAttributedPricingPath({ source: "landing_page" });
-
 interface PublicOneTentTourProps {
   hasAccount: boolean;
+  acquisitionSource?: PaidAcquisitionSource;
 }
 
-export default function PublicOneTentTour({ hasAccount }: PublicOneTentTourProps) {
+export default function PublicOneTentTour({
+  hasAccount,
+  acquisitionSource = "landing_page",
+}: PublicOneTentTourProps) {
+  const signupPath = buildAttributedSignupPath({ source: acquisitionSource });
+  const pricingPath = buildAttributedPricingPath({ source: acquisitionSource });
   const [activeId, setActiveId] = useState<PublicOneTentTourStepId>("home");
   const activeStep = resolvePublicOneTentTourStep(activeId);
   const nextStepId = getNextPublicOneTentTourStepId(activeId);
@@ -209,20 +215,26 @@ export default function PublicOneTentTour({ hasAccount }: PublicOneTentTourProps
             </Link>
           ) : (
             <Link
-              to={TOUR_SIGNUP_PATH}
+              to={signupPath}
               data-testid="public-one-tent-tour-signup-cta"
               onClick={() =>
-                trackPricingEvent("landing_loop_signup_clicked", { source: "one_tent_tour" })
+                trackPricingEvent("landing_loop_signup_clicked", {
+                  source: "one_tent_tour",
+                  item: acquisitionSource,
+                })
               }
             >
               <Button size="lg">Start your real grow free</Button>
             </Link>
           )}
           <Link
-            to={TOUR_PRICING_PATH}
+            to={pricingPath}
             data-testid="public-one-tent-tour-pricing-cta"
             onClick={() =>
-              trackPricingEvent("landing_loop_pricing_clicked", { source: "one_tent_tour" })
+              trackPricingEvent("landing_loop_pricing_clicked", {
+                source: "one_tent_tour",
+                item: acquisitionSource,
+              })
             }
           >
             <Button size="lg" variant="outline">

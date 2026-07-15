@@ -38,6 +38,7 @@ export type PricingAnalyticsName =
   | "founder_share_completed"
   | "founder_share_failed"
   | "founder_start_free_clicked"
+  | "landing_page_view"
   | "landing_pricing_cta_clicked"
   | "landing_signup_cta_clicked"
   | "landing_loop_opened"

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildAttributedLandingPath,
   buildAttributedPricingPath,
   buildFounderPricingPath,
   resolvePaidAcquisitionSource,
@@ -8,6 +9,12 @@ import {
 } from "@/lib/paidAcquisitionAttributionRules";
 
 describe("paid acquisition attribution rules", () => {
+  it("builds a fixed public proof-first referral path", () => {
+    expect(buildAttributedLandingPath({ source: "grower_invite" })).toBe(
+      "/welcome?utm_source=grower_invite&utm_medium=referral&utm_campaign=grower_invite",
+    );
+  });
+
   it.each([
     ["landing_page", "owned", "paid_launch", "pricing_interest_landing"],
     ["pricing_page", "owned", "paid_launch", "pricing_interest_pricing_page"],

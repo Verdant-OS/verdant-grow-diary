@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -21,11 +21,11 @@ import {
 import { VERDANT_SEO_LANDING_SECTIONS, VERDANT_LANDING_FAQ } from "@/constants/verdantSeoCopy";
 import { buildFaqPageJsonLd, safeJsonLdStringify } from "@/lib/seoStructuredData";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
-import { buildAttributedPricingPath } from "@/lib/paidAcquisitionAttributionRules";
+import {
+  buildAttributedPricingPath,
+  resolvePaidAcquisitionSource,
+} from "@/lib/paidAcquisitionAttributionRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
-
-const LANDING_PRICING_PATH = buildAttributedPricingPath({ source: "landing_page" });
-const LANDING_SIGNUP_PATH = buildAttributedSignupPath({ source: "landing_page" });
 
 /**
  * Public landing page for https://verdantgrowdiary.com.
@@ -47,6 +47,16 @@ export interface LandingProps {
 
 export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const acquisitionSource = resolvePaidAcquisitionSource(searchParams) ?? "landing_page";
+  const pricingPath = useMemo(
+    () => buildAttributedPricingPath({ source: acquisitionSource }),
+    [acquisitionSource],
+  );
+  const signupPath = useMemo(
+    () => buildAttributedSignupPath({ source: acquisitionSource }),
+    [acquisitionSource],
+  );
 
   usePageSeo({
     title: "Grow Diary & Grow Room Tracking App | Verdant Grow Diary",
@@ -71,15 +81,24 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
     };
   }, [canonicalPath]);
 
+  useEffect(() => {
+    trackPricingEvent("landing_page_view", { source: acquisitionSource });
+  }, [acquisitionSource]);
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
         <BrandLogo size="md" showText />
         <div className="flex items-center gap-2">
           <Link
-            to={LANDING_PRICING_PATH}
+            to={pricingPath}
             data-testid="landing-pricing-cta-header"
-            onClick={() => trackPricingEvent("landing_pricing_cta_clicked", { source: "header" })}
+            onClick={() =>
+              trackPricingEvent("landing_pricing_cta_clicked", {
+                source: "header",
+                item: acquisitionSource,
+              })
+            }
           >
             <Button variant="ghost" size="sm">
               Pricing
@@ -128,9 +147,14 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
             </Link>
           ) : (
             <Link
-              to={LANDING_SIGNUP_PATH}
+              to={signupPath}
               data-testid="landing-signup-cta-hero"
-              onClick={() => trackPricingEvent("landing_signup_cta_clicked", { source: "hero" })}
+              onClick={() =>
+                trackPricingEvent("landing_signup_cta_clicked", {
+                  source: "hero",
+                  item: acquisitionSource,
+                })
+              }
             >
               <Button size="lg" className="font-semibold">
                 {VERDANT_HERO.primaryCtaLabel}
@@ -138,9 +162,14 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
             </Link>
           )}
           <Link
-            to={LANDING_PRICING_PATH}
+            to={pricingPath}
             data-testid="landing-pricing-cta-hero"
-            onClick={() => trackPricingEvent("landing_pricing_cta_clicked", { source: "hero" })}
+            onClick={() =>
+              trackPricingEvent("landing_pricing_cta_clicked", {
+                source: "hero",
+                item: acquisitionSource,
+              })
+            }
           >
             <Button size="lg" variant="outline" className="font-semibold">
               {VERDANT_HERO.pricingCtaLabel}
@@ -149,7 +178,12 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
           <a
             href="#loop"
             data-testid="landing-loop-cta-hero"
-            onClick={() => trackPricingEvent("landing_loop_opened", { source: "hero" })}
+            onClick={() =>
+              trackPricingEvent("landing_loop_opened", {
+                source: "hero",
+                item: acquisitionSource,
+              })
+            }
           >
             <Button size="lg" variant="outline">
               {VERDANT_HERO.secondaryCtaLabel}
@@ -160,7 +194,7 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
         {user && <LandingAuthedOnboardingBridge />}
       </section>
 
-      <PublicOneTentTour hasAccount={Boolean(user)} />
+      <PublicOneTentTour hasAccount={Boolean(user)} acquisitionSource={acquisitionSource} />
 
       {/* Value drivers */}
       <section id="features" className="px-6 py-14 max-w-5xl mx-auto">
@@ -286,20 +320,26 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
             </Link>
           ) : (
             <Link
-              to={LANDING_SIGNUP_PATH}
+              to={signupPath}
               data-testid="landing-signup-cta-final"
               onClick={() =>
-                trackPricingEvent("landing_signup_cta_clicked", { source: "final_cta" })
+                trackPricingEvent("landing_signup_cta_clicked", {
+                  source: "final_cta",
+                  item: acquisitionSource,
+                })
               }
             >
               <Button size="lg">{VERDANT_HERO.primaryCtaLabel}</Button>
             </Link>
           )}
           <Link
-            to={LANDING_PRICING_PATH}
+            to={pricingPath}
             data-testid="landing-pricing-cta-final"
             onClick={() =>
-              trackPricingEvent("landing_pricing_cta_clicked", { source: "final_cta" })
+              trackPricingEvent("landing_pricing_cta_clicked", {
+                source: "final_cta",
+                item: acquisitionSource,
+              })
             }
           >
             <Button size="lg" variant="outline">

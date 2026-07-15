@@ -440,6 +440,32 @@ export default function PlantDetailDoctorLaunchDialog({
           data-testid="plant-detail-doctor-launch-footer"
           data-readiness={readinessResult.readiness}
         >
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="gap-1"
+            onClick={handleLogReadinessToDiary}
+            disabled={!canLogReadiness || logging}
+            aria-disabled={!canLogReadiness || logging}
+            title={
+              canLogReadiness
+                ? "Record this readiness check as a diary entry"
+                : "A grow is required to log readiness"
+            }
+            data-testid="plant-detail-doctor-launch-log-readiness-to-diary"
+            data-readiness={readinessResult.readiness}
+            data-snapshot-freshness={
+              snapshotStaleness.isStale
+                ? "stale"
+                : readinessResult.latest.manualSnapshotAt
+                  ? "fresh"
+                  : "missing"
+            }
+          >
+            <BookText className="h-3.5 w-3.5" />
+            {logging ? "Logging…" : "Log readiness to diary"}
+          </Button>
           {addContextDecision.kind !== "none" &&
             (addContextDecision.to ? (
               <Button

@@ -63,6 +63,55 @@ const READINESS_STYLES: Record<
   },
 };
 
+const FRESHNESS_STYLES: Record<
+  AiDoctorSnapshotFreshnessState,
+  { badge: string; icon: JSX.Element }
+> = {
+  fresh: {
+    badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+    icon: <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />,
+  },
+  stale: {
+    badge: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+    icon: <Clock className="h-3.5 w-3.5" aria-hidden="true" />,
+  },
+  missing: {
+    badge: "bg-muted/40 text-muted-foreground border-border/50",
+    icon: <Info className="h-3.5 w-3.5" aria-hidden="true" />,
+  },
+};
+
+function FreshnessRow({
+  status,
+}: {
+  status: ReturnType<typeof buildAiDoctorSnapshotFreshnessStatus>;
+}) {
+  const s = FRESHNESS_STYLES[status.state];
+  return (
+    <div
+      className="flex items-start gap-2 rounded-md border border-border/40 bg-background/30 px-3 py-2"
+      data-testid="plant-ai-doctor-readiness-gate-snapshot-freshness"
+      data-freshness-state={status.state}
+      data-snapshot-at={status.snapshotAtIso ?? ""}
+      data-age-minutes={status.ageMinutes ?? ""}
+    >
+      <span
+        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] sm:text-xs shrink-0 ${s.badge}`}
+        data-testid="plant-ai-doctor-readiness-gate-snapshot-freshness-badge"
+      >
+        {s.icon}
+        {status.label}
+      </span>
+      <p
+        className="text-xs text-muted-foreground leading-snug"
+        data-testid="plant-ai-doctor-readiness-gate-snapshot-freshness-description"
+      >
+        {status.description}
+      </p>
+    </div>
+  );
+}
+
 export default function PlantDetailAiDoctorReadinessGate({
   plantId,
   plant,

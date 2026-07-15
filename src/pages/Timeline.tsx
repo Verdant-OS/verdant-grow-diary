@@ -1372,6 +1372,32 @@ export default function Timeline() {
         </div>
       )}
 
+      {!loading &&
+        entries.length > 0 &&
+        typeof entriesTotal === "number" &&
+        entries.length < entriesTotal && (
+          <div className="flex justify-center pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={loadOlder}
+              disabled={loadingOlder}
+              data-testid="timeline-load-older"
+              aria-label={`Load older diary entries (${entriesTotal - entries.length} remaining)`}
+            >
+              {loadingOlder ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+                  Loading older…
+                </>
+              ) : (
+                <>Load older entries ({entriesTotal - entries.length} more)</>
+              )}
+            </Button>
+          </div>
+        )}
+
       <EntryEditDialog
         entry={entries.find((e) => e.id === editingId) || null}
         open={!!editingId}

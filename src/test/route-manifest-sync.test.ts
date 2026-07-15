@@ -91,6 +91,7 @@ describe("Public SEO route surface", () => {
     /^\/hardware-integrations$/,
     /^\/how-ai-doctor-works$/,
     /^\/customer\/.+$/,
+    /^\/quick-log$/,
   ];
 
   function isPublicSeoPath(p: string): boolean {
@@ -119,6 +120,12 @@ describe("Public SEO route surface", () => {
       expect(entry, `manifest entry for ${path}`).toBeDefined();
       expect(entry?.access).toBe("public");
     }
+  });
+
+  it("explicitly covers /quick-log as public (acquisition-cluster contract)", () => {
+    const entry = APP_ROUTES.find((r) => r.path === "/quick-log");
+    expect(entry, "manifest entry for /quick-log").toBeDefined();
+    expect(entry?.access).toBe("public");
   });
 });
 

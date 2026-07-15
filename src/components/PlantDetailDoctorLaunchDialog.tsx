@@ -56,7 +56,11 @@ import {
   ADD_CONTEXT_HELPER_COPY,
 } from "@/lib/plantDetailDoctorAddContextRouter";
 import { evaluateAiDoctorContextFromSources } from "@/lib/aiDoctorContextViewModel";
-import { buildAiDoctorReadinessGate } from "@/lib/aiDoctorReadinessGateViewModel";
+import {
+  buildAiDoctorReadinessGate,
+  buildAiDoctorReadinessBlockedExplanation,
+  AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
+} from "@/lib/aiDoctorReadinessGateViewModel";
 
 interface Props {
   plantId: string | null | undefined;
@@ -202,6 +206,19 @@ export default function PlantDetailDoctorLaunchDialog({
     });
   }, [preview.items, plantId, plantName, growId, tentId, tentName]);
 
+  const blockedExplanation = useMemo(
+    () =>
+      buildAiDoctorReadinessBlockedExplanation({
+        readiness: readinessResult.readiness,
+        missing: readinessResult.missing,
+        nextActionLabel:
+          addContextDecision.kind !== "none"
+            ? addContextDecision.label
+            : AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
+      }),
+    [readinessResult.readiness, readinessResult.missing, addContextDecision],
+  );
+
   const handleAddContext = useCallback(() => {
     if (typeof window !== "undefined" && addContextDecision.quickLogEvent) {
       window.dispatchEvent(
@@ -283,7 +300,7 @@ export default function PlantDetailDoctorLaunchDialog({
           <p
             className={
               blocked
-                ? "text-xs text-amber-300 leading-snug"
+                ? "text-xs text-amber-300 leading-snug font-medium"
                 : "text-xs text-muted-foreground leading-snug"
             }
             data-testid="plant-detail-doctor-launch-readiness-notice"
@@ -291,7 +308,35 @@ export default function PlantDetailDoctorLaunchDialog({
           >
             {gate.message}
           </p>
+          {blocked && blockedExplanation.sentence ? (
+            <div
+              className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 space-y-1"
+              data-testid="plant-detail-doctor-launch-blocked-explanation"
+              role="status"
+              aria-live="polite"
+            >
+              <p
+                className="text-xs text-amber-200 leading-snug"
+                data-testid="plant-detail-doctor-launch-blocked-sentence"
+              >
+                {blockedExplanation.sentence}
+              </p>
+              {blockedExplanation.blockingLabels.length > 0 ? (
+                <ul
+                  className="list-disc pl-4 text-xs text-amber-100/90 space-y-0.5"
+                  data-testid="plant-detail-doctor-launch-blocked-list"
+                >
+                  {blockedExplanation.blockingCodes.map((code, i) => (
+                    <li key={code} data-blocking-code={code}>
+                      {blockedExplanation.blockingLabels[i]}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
         </div>
+
 
         <DialogFooter
           className="gap-2 sm:gap-2 flex-col sm:flex-row"

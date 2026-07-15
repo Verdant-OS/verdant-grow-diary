@@ -78,4 +78,5 @@ jobs:
             --reporter=${{ github.event.inputs.reporter }} \
             --chunk-size=1 \
             --isolate \
-            --pool=forks
+            --pool=forks \
+            --retry-failed-chunk-once

@@ -236,6 +236,14 @@ function renderIndex(client: QueryClient, initialPath = "/doctor/sessions") {
   );
 }
 
+// ActionDetail resolves its row through async effects that can exceed
+// testing-library's 1s findBy default AND vitest's 5s per-test timeout on
+// loaded shared CI runners (observed repeatedly across full-suite batches;
+// passes locally in seconds). Raise the per-test budget for this file and
+// give the async-load awaits a generous findBy timeout beneath it.
+vi.setConfig({ testTimeout: 60_000 });
+const FIND_TIMEOUT = { timeout: 30_000 };
+
 beforeEach(() => {
   sessionRows = [makeRow(SESSION_ID), makeRow(OTHER_ID)];
   reviewRows = [seededDurableEvent()];
@@ -278,7 +286,7 @@ describe("AI Doctor review workflow — Clear review status error rollback", () 
       // include the session before any failed mutation.
       cleanup();
       renderIndex(client);
-      await screen.findByTestId("ai-doctor-sessions-index-list");
+      await screen.findByTestId("ai-doctor-sessions-index-list", undefined, FIND_TIMEOUT);
       await waitFor(() => {
         const chips = screen.getAllByTestId(
           "ai-doctor-sessions-index-review-status-chip",
@@ -297,6 +305,8 @@ describe("AI Doctor review workflow — Clear review status error rollback", () 
       fireEvent.click(visibleChipPre);
       const savedSelectPre = (await screen.findByTestId(
         "ai-doctor-sessions-saved-views-select",
+      undefined,
+      FIND_TIMEOUT,
       )) as HTMLSelectElement;
       await waitFor(() =>
         expect(savedSelectPre.value).toBe(BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID),
@@ -358,7 +368,7 @@ describe("AI Doctor review workflow — Clear review status error rollback", () 
       // 13+14+15+16: Index still reflects Needs follow-up everywhere.
       cleanup();
       renderIndex(client);
-      await screen.findByTestId("ai-doctor-sessions-index-list");
+      await screen.findByTestId("ai-doctor-sessions-index-list", undefined, FIND_TIMEOUT);
       await waitFor(() => {
         const chips = screen.getAllByTestId(
           "ai-doctor-sessions-index-review-status-chip",
@@ -377,6 +387,8 @@ describe("AI Doctor review workflow — Clear review status error rollback", () 
 
       const reviewFilter = (await screen.findByTestId(
         "ai-doctor-sessions-index-filter-review-status",
+      undefined,
+      FIND_TIMEOUT,
       )) as HTMLSelectElement;
       fireEvent.change(reviewFilter, { target: { value: "needs_follow_up" } });
       await waitFor(() => {
@@ -393,6 +405,8 @@ describe("AI Doctor review workflow — Clear review status error rollback", () 
       fireEvent.click(visibleChipPost);
       const savedSelectPost = (await screen.findByTestId(
         "ai-doctor-sessions-saved-views-select",
+      undefined,
+      FIND_TIMEOUT,
       )) as HTMLSelectElement;
       await waitFor(() =>
         expect(savedSelectPost.value).toBe(BUILTIN_SAVED_VIEW_NEEDS_FOLLOW_UP_ID),
@@ -405,6 +419,8 @@ describe("AI Doctor review workflow — Clear review status error rollback", () 
       // 17: reviewStatus=not_reviewed excludes the still-flagged session.
       const reviewFilter2 = (await screen.findByTestId(
         "ai-doctor-sessions-index-filter-review-status",
+      undefined,
+      FIND_TIMEOUT,
       )) as HTMLSelectElement;
       fireEvent.change(reviewFilter2, { target: { value: "not_reviewed" } });
       await waitFor(() => {

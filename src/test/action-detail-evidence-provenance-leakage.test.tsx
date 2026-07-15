@@ -258,32 +258,16 @@ describe("ActionDetail evidence/origin panels — AI Doctor leakage guards", () 
 
     assertNoUnsafeStrings(container.textContent ?? "");
     assertNoUnsafeStrings(container.innerHTML);
-  });
 
-  it("renders the Review timeline link inside the AI Doctor panel using the scoped helper", async () => {
-    detailRow = AI_DOCTOR_ROW;
-    renderDetail("aq-leak-2");
+    // The two full-DOM scans below assert on THIS same loaded render.
+    // They used to be separate tests, each with its own ActionDetail
+    // mount — and each successive mount in this file gets measurably
+    // slower on CI runners, which made the trailing tests deterministic
+    // CI timeouts (the same class fixed in
+    // action-queue-device-identifier-redaction). Same assertions, no
+    // extra mounts.
 
-    const link = (await screen.findByTestId(
-      "action-detail-evidence-review-link",
-      undefined,
-      FIND_TIMEOUT,
-    )) as HTMLAnchorElement;
-
-    expect(link.tagName).toBe("A");
-    expect(link.textContent).toBe(ACTION_EVIDENCE_REVIEW_LINK_LABEL);
-    expect(link.getAttribute("href")).toBe(plantDetailPath("p1"));
-  });
-
-  it("does not render device-control / automation language anywhere in the panel", async () => {
-    detailRow = AI_DOCTOR_ROW;
-    const { container } = renderDetail("aq-leak-2");
-    await screen.findByTestId(
-      "action-detail-ai-doctor-provenance",
-      undefined,
-      FIND_TIMEOUT,
-    );
-
+    // No device-control / automation language anywhere in the panel.
     const lower = (container.textContent ?? "").toLowerCase();
     for (const tok of [
       "turn on",
@@ -301,23 +285,29 @@ describe("ActionDetail evidence/origin panels — AI Doctor leakage guards", () 
     ]) {
       expect(lower).not.toContain(tok);
     }
-  });
 
-  it("does not render raw back-pointer tokens or seeded extra payload fields", async () => {
-    detailRow = AI_DOCTOR_ROW;
-    const { container } = renderDetail("aq-leak-2");
-    await screen.findByTestId(
-      "action-detail-ai-doctor-provenance",
-      undefined,
-      FIND_TIMEOUT,
-    );
-
+    // No raw back-pointer tokens or seeded extra payload fields.
     const text = container.textContent ?? "";
     expect(text).not.toContain("[alert:");
     expect(text).not.toContain("[session:");
     expect(text.toLowerCase()).not.toContain("bridge_token");
     expect(text.toLowerCase()).not.toContain("service_role_key");
     expect(text.toLowerCase()).not.toContain("target_device");
+  });
+
+  it("renders the Review timeline link inside the AI Doctor panel using the scoped helper", async () => {
+    detailRow = AI_DOCTOR_ROW;
+    renderDetail("aq-leak-2");
+
+    const link = (await screen.findByTestId(
+      "action-detail-evidence-review-link",
+      undefined,
+      FIND_TIMEOUT,
+    )) as HTMLAnchorElement;
+
+    expect(link.tagName).toBe("A");
+    expect(link.textContent).toBe(ACTION_EVIDENCE_REVIEW_LINK_LABEL);
+    expect(link.getAttribute("href")).toBe(plantDetailPath("p1"));
   });
 });
 

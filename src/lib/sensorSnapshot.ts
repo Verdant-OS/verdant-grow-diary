@@ -9,7 +9,20 @@ import { normalizeQuickLogSnapshotMetrics } from "@/lib/quick-log/quickLogSnapsh
 import { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";
 
 
-export type SnapshotSource = "live" | "manual" | "sim" | "diary" | "csv" | "unavailable";
+export type SnapshotSource =
+  | "live"
+  | "manual"
+  | "sim"
+  | "diary"
+  | "csv"
+  | "unavailable"
+  /**
+   * Rows exist but their `source` is not a recognized trust value (raw
+   * vendor strings like "ecowitt"/"pi_bridge", canonical "stale"/"invalid",
+   * or anything unexpected). Never rendered as "Live sensor" — claiming
+   * live requires every row at the timestamp to literally say "live".
+   */
+  | "unverified";
 
 /**
  * Per-metric provenance ref keys for {@link SensorSnapshot.metric_refs}.
@@ -108,6 +121,7 @@ export const SOURCE_LABEL: Record<SnapshotSource, string> = {
   diary: "Diary snapshot",
   csv: "CSV history",
   unavailable: "Unavailable",
+  unverified: "Unverified source",
 };
 
 /** Default stale threshold (30 minutes). */
@@ -181,11 +195,27 @@ export function snapshotFromReadings(
     return r ? toFiniteNumber(r.value) : null;
   };
   const anyManual = latest.some((r) => r.source === "manual");
+  // "demo" is the canonical name for simulated data in sensor_readings;
+  // fold it into the card's existing "sim" bucket so demo rows can never
+  // fall through to a live claim.
   const allSim =
-    latest.length > 0 && latest.every((r) => r.source === "sim");
+    latest.length > 0 &&
+    latest.every((r) => r.source === "sim" || r.source === "demo");
   const allCsv =
     latest.length > 0 && latest.every((r) => r.source === "csv");
   const anyCsv = latest.some((r) => r.source === "csv");
+  // "Live sensor" is a claim, not a default: it requires EVERY row at the
+  // latest timestamp to carry a source in the live reservation. That
+  // reservation is exactly {"live", "pi_bridge"} — the Pi bridge is the
+  // first-party live-ingest path and its inclusion is pinned by
+  // manual-sensor-snapshot-v1-audit ("reserved for pi_bridge/live rows
+  // only"). Everything else — raw vendor strings like "ecowitt",
+  // canonical "stale"/"invalid", or unexpected junk — classifies as
+  // "unverified"; the strict trust-badge path refuses the same
+  // promotion, and this card must not be looser than it.
+  const allLive =
+    latest.length > 0 &&
+    latest.every((r) => r.source === "live" || r.source === "pi_bridge");
   // CSV history must never be promoted to "live". If every row at the
   // latest timestamp is CSV, classify as "csv". If CSV is mixed with
   // non-live sources but no manual, still prefer csv over live so
@@ -198,7 +228,9 @@ export function snapshotFromReadings(
         ? "csv"
         : anyCsv
           ? "csv"
-          : "live";
+          : allLive
+            ? "live"
+            : "unverified";
   // Prefer a device_id from a row matching the resolved source so manual
   // device notes (device_id = "manual:...") are surfaced for manual
   // snapshots; otherwise fall back to any device_id at the latest ts.

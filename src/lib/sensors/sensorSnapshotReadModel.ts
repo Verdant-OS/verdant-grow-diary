@@ -73,6 +73,8 @@ const SOURCE_TONE: Record<SnapshotSource, SensorSnapshotReadModelTone> = {
   diary: "muted",
   csv: "neutral",
   unavailable: "muted",
+  // Unrecognized/vendor sources: visually muted, never the live tone.
+  unverified: "muted",
 };
 
 export interface BuildSensorSnapshotReadModelInput {

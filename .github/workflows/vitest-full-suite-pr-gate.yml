@@ -64,4 +64,5 @@ jobs:
             --reporter=dot \
             --chunk-size=1 \
             --isolate \
-            --pool=forks
+            --pool=forks \
+            --retry-failed-chunk-once

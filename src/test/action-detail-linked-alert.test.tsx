@@ -114,6 +114,14 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), message: vi.fn() },
 }));
 
+// ActionDetail resolves its row through async effects that can exceed
+// testing-library's 1s findBy default AND vitest's 5s per-test timeout on
+// loaded shared CI runners (observed repeatedly across full-suite batches;
+// passes locally in <2s). Raise the per-test budget for this file and give
+// the async-load awaits a generous findBy timeout beneath it.
+vi.setConfig({ testTimeout: 60_000 });
+const FIND_TIMEOUT = { timeout: 30_000 };
+
 beforeEach(() => {
   detailRow = ALERT_DERIVED_ROW;
 });
@@ -131,10 +139,12 @@ function renderDetail(actionId = "aq-1") {
 describe("ActionDetail header — Linked alert link", () => {
   it("renders chip + link for an alert-derived action with a safe alert id", async () => {
     renderDetail();
-    const header = await screen.findByTestId("action-detail-linked-alert-header");
+    const header = await screen.findByTestId("action-detail-linked-alert-header", undefined, FIND_TIMEOUT);
     expect(header.textContent ?? "").toMatch(/linked alert/i);
     const link = (await screen.findByTestId(
       "action-detail-linked-alert-link",
+      undefined,
+      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(link.textContent).toBe("View linked alert");
     expect(link.getAttribute("href")).toBe(alertDetailPath("alert-abc"));
@@ -145,10 +155,14 @@ describe("ActionDetail header — Linked alert link", () => {
     renderDetail("aq-2");
     const aiLink = (await screen.findByTestId(
       "action-detail-ai-doctor-saved-session-link",
+      undefined,
+      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(aiLink.getAttribute("href")).toBe(aiDoctorSessionDetailPath("sess-xyz"));
     const alertLink = (await screen.findByTestId(
       "action-detail-linked-alert-link",
+      undefined,
+      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(alertLink.getAttribute("href")).toBe(alertDetailPath("alert-abc"));
   });
@@ -156,7 +170,7 @@ describe("ActionDetail header — Linked alert link", () => {
   it("does not render Linked alert when no alert id is parseable", async () => {
     detailRow = NO_ALERT_ROW;
     renderDetail("aq-3");
-    await screen.findByText("Drop EC slightly");
+    await screen.findByText("Drop EC slightly", undefined, FIND_TIMEOUT);
     expect(screen.queryByTestId("action-detail-linked-alert-link")).toBeNull();
     expect(screen.queryByTestId("action-detail-linked-alert-header")).toBeNull();
   });
@@ -164,7 +178,7 @@ describe("ActionDetail header — Linked alert link", () => {
   it("renders nothing on actions without any alert or AI Doctor token", async () => {
     detailRow = NON_ALERT_NON_AI_ROW;
     renderDetail("aq-4");
-    await screen.findByText("Manual note");
+    await screen.findByText("Manual note", undefined, FIND_TIMEOUT);
     expect(screen.queryByTestId("action-detail-linked-alert-link")).toBeNull();
     expect(
       screen.queryByTestId("action-detail-ai-doctor-saved-session-link"),
@@ -174,7 +188,7 @@ describe("ActionDetail header — Linked alert link", () => {
   it("does not leak raw [alert:<id>], [session:<id>] tokens, or target_device", async () => {
     detailRow = AI_DOCTOR_ROW_WITH_ALERT;
     const { container } = renderDetail("aq-2");
-    await screen.findByTestId("action-detail-linked-alert-link");
+    await screen.findByTestId("action-detail-linked-alert-link", undefined, FIND_TIMEOUT);
     const text = container.textContent ?? "";
     expect(text).not.toContain("[alert:");
     expect(text).not.toContain("[session:");
@@ -184,7 +198,7 @@ describe("ActionDetail header — Linked alert link", () => {
 
   it("link copy does not imply automation, execution, or status transition", async () => {
     renderDetail();
-    const link = await screen.findByTestId("action-detail-linked-alert-link");
+    const link = await screen.findByTestId("action-detail-linked-alert-link", undefined, FIND_TIMEOUT);
     const lower = (link.textContent ?? "").toLowerCase();
     for (const tok of [
       "auto-execute",
@@ -208,7 +222,7 @@ describe("ActionDetail header — Linked alert link", () => {
   it("preserves the existing AI Doctor 'Suggestion origin' panel when applicable", async () => {
     detailRow = AI_DOCTOR_ROW_WITH_ALERT;
     renderDetail("aq-2");
-    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance");
+    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance", undefined, FIND_TIMEOUT);
     expect(panel.textContent ?? "").toContain("Suggestion origin");
   });
 });

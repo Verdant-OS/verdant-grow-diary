@@ -275,6 +275,7 @@ const SOURCE_LABELS: Record<SnapshotSource, string> = {
   diary: "Diary",
   sim: "Simulated",
   unavailable: "Unknown",
+  unverified: "Unverified",
 };
 
 /** Deterministic relative-time helper. Pure: no Intl.RelativeTimeFormat

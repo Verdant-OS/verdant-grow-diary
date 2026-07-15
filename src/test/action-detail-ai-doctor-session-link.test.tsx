@@ -122,6 +122,14 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), message: vi.fn() },
 }));
 
+// ActionDetail resolves its row through async effects that can exceed
+// testing-library's 1s findBy default AND vitest's 5s per-test timeout on
+// loaded shared CI runners (observed repeatedly across full-suite batches;
+// passes locally in seconds). Raise the per-test budget for this file and
+// give the async-load awaits a generous findBy timeout beneath it.
+vi.setConfig({ testTimeout: 60_000 });
+const FIND_TIMEOUT = { timeout: 30_000 };
+
 beforeEach(() => {
   detailRow = AI_DOCTOR_ROW;
 });
@@ -150,6 +158,8 @@ describe("ActionDetail header — Linked from AI Doctor affordance", () => {
     // After unification there is exactly ONE header session link.
     const anchor = (await screen.findByTestId(
       "action-detail-ai-doctor-saved-session-link",
+      undefined,
+      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(anchor.textContent ?? "").toBe("View saved AI Doctor session");
     expect(anchor.getAttribute("href")).toBe(aiDoctorSessionDetailPath("sess-abc"));
@@ -162,7 +172,7 @@ describe("ActionDetail header — Linked from AI Doctor affordance", () => {
   it("does not render the affordance when AI Doctor row lacks a session id", async () => {
     detailRow = AI_DOCTOR_ROW_NO_SESSION;
     renderDetail("aq-ai-2");
-    await screen.findByText("Raise the light by 10 cm");
+    await screen.findByText("Raise the light by 10 cm", undefined, FIND_TIMEOUT);
     expect(
       screen.queryByTestId("action-detail-ai-doctor-session-header-link"),
     ).toBeNull();
@@ -174,7 +184,7 @@ describe("ActionDetail header — Linked from AI Doctor affordance", () => {
   it("does not render the affordance on non-AI-Doctor actions", async () => {
     detailRow = COACH_ROW;
     renderDetail("aq-coach-1");
-    await screen.findByText("Lower humidity to 55%");
+    await screen.findByText("Lower humidity to 55%", undefined, FIND_TIMEOUT);
     expect(
       screen.queryByTestId("action-detail-ai-doctor-session-header-link"),
     ).toBeNull();
@@ -182,7 +192,7 @@ describe("ActionDetail header — Linked from AI Doctor affordance", () => {
 
   it("preserves the existing 'Suggestion origin' panel for AI Doctor rows", async () => {
     renderDetail();
-    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance");
+    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance", undefined, FIND_TIMEOUT);
     expect(panel.textContent ?? "").toContain("Suggestion origin");
   });
 

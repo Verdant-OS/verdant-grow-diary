@@ -15,6 +15,11 @@ import { Plus, Sprout, Check, Trash2, Loader2, AlertCircle } from "lucide-react"
 import { GROW_TYPES, STAGES, growTypeLabel, stageLabel } from "@/lib/grow";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import {
+  evaluateGrowCreationGate,
+  FREE_TIER_UPGRADE_PATH,
+} from "@/lib/entitlements/freeTierGates";
 
 export default function Grows() {
   const { user } = useAuth();
@@ -23,9 +28,23 @@ export default function Grows() {
   const [form, setForm] = useState({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
   const [busy, setBusy] = useState(false);
 
+  // Free-tier grow gate. The grows store already returns only non-archived
+  // rows, so its length IS the active-grow count. Fails open while the
+  // entitlement resolver is loading — the gate is UX honesty, and a paying
+  // grower must never be blocked by a resolver hiccup.
+  const { loading: entLoading, entitlement } = useMyEntitlements();
+  const growGate = evaluateGrowCreationGate(
+    entLoading ? null : entitlement.capabilities,
+    grows.length,
+  );
+
   async function create(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
+    if (!growGate.allowed) {
+      toast.error(growGate.blockedCopy);
+      return;
+    }
     setBusy(true);
     const { data, error } = await supabase.from("grows").insert({
       user_id: user.id, name: form.name.trim(), grow_type: form.grow_type, stage: form.stage,
@@ -51,10 +70,28 @@ export default function Grows() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-2xl font-display font-bold">My Grows</h1>
-        <Button onClick={() => setOpen(true)} size="sm" className="gradient-leaf text-primary-foreground gap-1">
+        <Button
+          onClick={() => setOpen(true)}
+          size="sm"
+          className="gradient-leaf text-primary-foreground gap-1"
+          disabled={!growGate.allowed}
+          data-testid="grows-new-button"
+        >
           <Plus className="h-4 w-4" />New
         </Button>
       </div>
+
+      {!growGate.allowed && (
+        <p
+          className="mb-4 rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+          data-testid="grow-create-gate-notice"
+        >
+          {growGate.blockedCopy}{" "}
+          <Link to={FREE_TIER_UPGRADE_PATH} className="underline underline-offset-2">
+            See plans
+          </Link>
+        </p>
+      )}
 
       {loading ? (
         <div className="py-16 text-center text-muted-foreground" data-testid="grows-loading">

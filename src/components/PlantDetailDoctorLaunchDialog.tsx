@@ -369,7 +369,7 @@ export default function PlantDetailDoctorLaunchDialog({
             <section
               className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 space-y-1"
               data-testid="plant-detail-doctor-launch-blocked-explanation"
-              role="alert"
+              role="status"
               aria-live="polite"
               aria-labelledby="plant-detail-doctor-launch-blocked-heading"
             >

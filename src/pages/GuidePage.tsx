@@ -41,6 +41,7 @@ export default function GuidePage() {
   const [highlightedFaq, setHighlightedFaq] = useState<string | undefined>(
     initialFaqValue,
   );
+  const faqItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     const hash = location.hash.replace(/^#/, "");

@@ -1,5 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -53,15 +52,18 @@ function renderSignup() {
   );
 }
 
-async function completeSignupForm({ marketingOptIn = false } = {}) {
-  const user = userEvent.setup();
-  await user.type(screen.getByLabelText("Email"), "grower@example.com");
-  await user.type(screen.getByLabelText("Password"), "correct-horse-battery-staple");
-  await user.click(screen.getByLabelText(/I agree to the Terms of Service/));
+function completeSignupForm({ marketingOptIn = false } = {}) {
+  fireEvent.change(screen.getByLabelText("Email"), {
+    target: { value: "grower@example.com" },
+  });
+  fireEvent.change(screen.getByLabelText("Password"), {
+    target: { value: "correct-horse-battery-staple" },
+  });
+  fireEvent.click(screen.getByLabelText(/I agree to the Terms of Service/));
   if (marketingOptIn) {
-    await user.click(screen.getByLabelText(/Send me occasional product updates/i));
+    fireEvent.click(screen.getByLabelText(/Send me occasional product updates/i));
   }
-  await user.click(screen.getByRole("button", { name: "Create account" }));
+  fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 }
 
 describe("Auth signup acquisition handoff", () => {
@@ -72,7 +74,7 @@ describe("Auth signup acquisition handoff", () => {
       "data-state",
       "active",
     );
-    await completeSignupForm();
+    completeSignupForm();
 
     await waitFor(() => expect(mocks.signUp).toHaveBeenCalledTimes(1));
     expect(mocks.signUp).toHaveBeenCalledWith({
@@ -106,7 +108,7 @@ describe("Auth signup acquisition handoff", () => {
   it("carries an explicit marketing opt-in through confirmation-required signup", async () => {
     renderSignup();
 
-    await completeSignupForm({ marketingOptIn: true });
+    completeSignupForm({ marketingOptIn: true });
 
     await waitFor(() => expect(mocks.signUp).toHaveBeenCalledTimes(1));
     expect(mocks.signUp).toHaveBeenCalledWith(
@@ -129,7 +131,7 @@ describe("Auth signup acquisition handoff", () => {
     });
     renderSignup();
 
-    await completeSignupForm();
+    completeSignupForm();
 
     expect(await screen.findByTestId("pricing-return")).toBeInTheDocument();
     expect(mocks.track).not.toHaveBeenCalledWith("signup_verification_required", expect.anything());

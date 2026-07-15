@@ -6,6 +6,7 @@ import {
   formatSubscriberGrowthLaunchGate,
 } from "../../scripts/releases/subscriber-growth-launch-gate-rules.mjs";
 import {
+  parseGitPorcelainPaths,
   parseSubscriberGrowthGateArgs,
   parseVitestTotals,
 } from "../../scripts/releases/run-subscriber-growth-launch-gate.mjs";
@@ -231,5 +232,8 @@ describe("subscriber growth launch gate", () => {
       testsSkipped: 1,
       testsTotal: 246,
     });
+    expect(
+      parseGitPorcelainPaths(" M supabase/functions/mcp/index.ts\r\n?? docs/release note.md\r\n"),
+    ).toEqual(["supabase/functions/mcp/index.ts", "docs/release note.md"]);
   });
 });

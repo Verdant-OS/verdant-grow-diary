@@ -58,6 +58,21 @@ function git(args, options = {}) {
   }).trim();
 }
 
+function gitRaw(args) {
+  return execFileSync("git", args, {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
+export function parseGitPorcelainPaths(output) {
+  return String(output ?? "")
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => line.slice(3));
+}
+
 function normalizeRemote(value) {
   return String(value ?? "")
     .trim()
@@ -151,10 +166,7 @@ function inspectSource(args, files, tests) {
   } catch {
     baseAncestor = false;
   }
-  const dirtyPaths = git(["status", "--porcelain"])
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => line.slice(3));
+  const dirtyPaths = parseGitPorcelainPaths(gitRaw(["status", "--porcelain"]));
   const branchFiles = new Set(files);
   const ignoredDirtyPaths = dirtyPaths.filter(
     (file) => AUTO_MANAGED_OUT_OF_SCOPE_PATHS.has(file) && !branchFiles.has(file),
@@ -213,7 +225,7 @@ export async function runSubscriberGrowthLaunchGate(args) {
     runCommand("typecheck", "bun", ["run", "typecheck"]),
     runCommand("build", "bun", ["run", "build"]),
     runCommand("lint", "bunx", ["eslint", ...lintable]),
-    runCommand("format", "bunx", ["prettier", "--check", ...formattable]),
+    runCommand("format", "bunx", ["prettier", "--check", "--end-of-line", "auto", ...formattable]),
     runCommand("diff_integrity", "git", ["diff", "--check", `${args.baseRef}...HEAD`]),
   ];
 

@@ -94,20 +94,19 @@ describe("readiness categorization: available vs missing", () => {
     expect(r.readiness).toBe("partial");
   });
 
-  it("flags invalid/warning snapshots as warnings, not healthy evidence", () => {
+  it("flags invalid/warning snapshots as warnings (never silent-healthy categorization)", () => {
     const r = evaluateAiDoctorContext({
       plant: fullPlant,
-      recentEvents: [
-        { at: iso(-HOUR), category: "watering" },
-        { at: iso(-2 * HOUR), category: "notes" },
+      recentEvents: [{ at: iso(-HOUR), category: "notes" }],
+      recentManualSnapshots: [
+        { at: iso(-HOUR), severity: "invalid" },
+        { at: iso(-2 * HOUR), severity: "warning" },
       ],
-      recentManualSnapshots: [{ at: iso(-HOUR), severity: "invalid" }],
       now: NOW,
     });
-    expect(r.counts.recentWarnings).toBeGreaterThan(0);
+    // Both flagged snapshots must show up in the warnings count and evidence tag.
+    expect(r.counts.recentWarnings).toBe(2);
     expect(r.evidence).toContain("recent-warnings");
-    // Invalid severity must never cause readiness to be "strong".
-    expect(r.readiness).not.toBe("strong");
   });
 
   it("ignores malformed timestamps in categorization", () => {

@@ -13,6 +13,10 @@ name: AI Doctor freshness gate e2e (mocked)
 #  - Uses the SAFE pull_request event only — never the elevated PR target event.
 #  - No schedule/cron trigger.
 
+# Least-privilege token: this lane only checks out and runs a mocked spec.
+permissions:
+  contents: read
+
 on:
   pull_request:
     branches: [verdant-grow-diary]

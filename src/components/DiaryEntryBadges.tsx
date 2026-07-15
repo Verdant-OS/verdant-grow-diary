@@ -14,6 +14,7 @@ import {
   FOLLOWUP_SAFE_CAPTION,
   normalizeFollowupKindLabel,
 } from "@/lib/actionFollowupVisibilityRules";
+import DiaryEntryFaqLink from "@/components/DiaryEntryFaqLink";
 
 const TAG_LABELS: Record<string, string> = {
   watering: "Watering",

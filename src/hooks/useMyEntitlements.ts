@@ -99,18 +99,13 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
   }, [user, expectedBillingEnvironment]);
 
   useEffect(() => {
-    let cancelled = false;
+    // M3 (audit fix): the previous `cancelled` guard was dead code —
+    // nothing inside the async closure read it, and `mountedRef` above
+    // already covers the real unmount hazard.
     if (authLoading) return;
-    void (async () => {
-      await doLoad();
-      if (cancelled) {
-        // Prevent stale state application if unmounted mid-load.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void doLoad();
   }, [authLoading, doLoad]);
+
 
   return { loading, entitlement, refetch: doLoad };
 }

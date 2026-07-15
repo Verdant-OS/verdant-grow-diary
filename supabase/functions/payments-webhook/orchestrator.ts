@@ -36,6 +36,18 @@ export type InsertResult =
   | { ok: true; duplicate?: boolean }
   | { ok: false; error: string };
 
+/**
+ * Result of allocate_lovable_founder_lifetime. `ok=true, reason='allocated'`
+ * inserted a new lifetime row; `ok=true, reason='idempotent'` matched an
+ * existing row for the same paddle transaction id; `ok=false,
+ * reason='cap_reached'` refused because 75 active founder rows already
+ * exist. Any other `ok=false` is an unexpected shape and is surfaced as
+ * a transient failure so Paddle retries.
+ */
+export type FounderAllocationResult =
+  | { ok: true; reason: 'allocated' | 'idempotent' }
+  | { ok: false; reason: 'cap_reached' | 'invalid_input' | string };
+
 export interface ExistingEventRow {
   processing_status: ProcessingStatus;
 }
@@ -90,7 +102,23 @@ export interface Deps {
     env: PaddleEnv,
     paddlePriceId: string,
   ): Promise<{ ok: true; externalId: string | null } | { ok: false; error: string }>;
+  /**
+   * H3 (audit fix): atomic Founder Lifetime allocator. Called for
+   * `transaction.completed` + `price_external_id='founder_lifetime'`
+   * events INSTEAD of the raw upsert path. Wraps the DB RPC
+   * `allocate_lovable_founder_lifetime` which enforces the 75-slot cap
+   * under a transactional advisory lock. Optional so pure unit tests for
+   * subscription paths don't need to provide it.
+   */
+  allocateFounderLifetime?(input: {
+    user_id: string;
+    paddle_transaction_id: string;
+    paddle_customer_id: string;
+    environment: PaddleEnv;
+    now: Date;
+  }): Promise<FounderAllocationResult>;
 }
+
 
 export interface HandleResult {
   httpStatus: 200 | 500;
@@ -184,7 +212,62 @@ export async function handleVerifiedEvent(
 
   // 3) Write.
   let writeRes: IoResult;
-  if (decision.kind === 'upsert_subscription' || decision.kind === 'record_lifetime') {
+  if (decision.kind === 'record_lifetime') {
+    // H3 (audit fix): the raw upsert path used to write the founder row
+    // directly, bypassing the 75-slot cap. Route through the atomic
+    // service-role RPC instead. If the allocator dep is not wired (pure
+    // unit tests for subscription paths), fall back to the plain upsert
+    // — those tests never exercise the founder path.
+    if (deps.allocateFounderLifetime) {
+      const row = decision.row;
+      // The pseudo-subscription id is `lifetime_<paddle_transaction_id>`
+      // (see eventProcessor.decide). Recover the transaction id so the
+      // RPC can rebuild it identically for idempotency.
+      const txId = row.paddle_subscription_id.startsWith('lifetime_')
+        ? row.paddle_subscription_id.slice('lifetime_'.length)
+        : row.paddle_subscription_id;
+      const alloc = await deps.allocateFounderLifetime({
+        user_id: row.user_id,
+        paddle_transaction_id: txId,
+        paddle_customer_id: row.paddle_customer_id,
+        environment: env,
+        now,
+      });
+      if (!alloc.ok) {
+        if (alloc.reason === 'cap_reached') {
+          // Cap enforcement is not a webhook failure — the buyer's payment
+          // needs an operator refund per the runbook, but Paddle should
+          // stop retrying. Mark as skipped and 200.
+          const mark = await deps.markEvent(paddleEventId, {
+            processing_status: 'skipped',
+            processed_ok: false,
+            skip_reason: 'founder_cap_reached',
+            last_error: null,
+          });
+          if ('error' in mark) {
+            return {
+              httpStatus: 500,
+              reason: `mark_skipped_failed:${redactError(mark.error)}`,
+            };
+          }
+          return { httpStatus: 200, reason: 'skipped:founder_cap_reached' };
+        }
+        // Any other allocator failure is transient — surface as 500 so
+        // Paddle retries (allocator is idempotent by paddle_subscription_id).
+        const err = `founder_allocator_failed:${alloc.reason}`;
+        await deps.markEvent(paddleEventId, {
+          processing_status: 'failed',
+          processed_ok: false,
+          skip_reason: null,
+          last_error: redactError(err),
+        });
+        return { httpStatus: 500, reason: `write_failed:${redactError(err)}` };
+      }
+      writeRes = { ok: true };
+    } else {
+      writeRes = await deps.upsertSubscription(decision.row);
+    }
+  } else if (decision.kind === 'upsert_subscription') {
     writeRes = await deps.upsertSubscription(decision.row);
   } else {
     writeRes = await deps.updateSubscription(decision.paddleSubscriptionId, decision.patch, env);
@@ -201,6 +284,7 @@ export async function handleVerifiedEvent(
     });
     return { httpStatus: 500, reason: `write_failed:${redactError(err)}` };
   }
+
 
   // 4) Mark processed.
   const mark = await deps.markEvent(paddleEventId, {

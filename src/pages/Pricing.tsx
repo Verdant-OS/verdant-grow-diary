@@ -37,6 +37,8 @@ import {
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
+import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
+
 
 
 type BillingPeriod = "monthly" | "annual";
@@ -78,6 +80,8 @@ export default function Pricing() {
     preselect.billing ?? "annual",
   );
   const { openCheckout, loading: checkoutLoading } = usePaddleCheckout();
+  const founderSlots = useFounderSlotsRemaining();
+
 
 
   usePageSeo({
@@ -314,25 +318,40 @@ export default function Pricing() {
           cadence={` ${PRICING.founder.cadence}`}
           description={PRICING.founder.description}
           features={PRICING.founder.features}
-          badge={PRICING.founder.badge}
-          footnote={`Founder Lifetime is limited; availability may close manually when the first ${PRICING.founder.limit} are claimed.`}
+          badge={
+            founderSlots.status === "ready" && founderSlots.claimed !== null
+              ? `${founderSlots.claimed} of ${founderSlots.total} claimed`
+              : PRICING.founder.badge
+          }
+          footnote={
+            founderSlots.status === "ready" && founderSlots.soldOut
+              ? "Founder Lifetime is currently sold out. Additional slots may open if a purchase is refunded."
+              : `Founder Lifetime is limited; availability may close manually when the first ${PRICING.founder.limit} are claimed.`
+          }
           cta={
             <Button
               size="lg"
               className="w-full"
-              disabled={checkoutLoading}
+              disabled={
+                checkoutLoading ||
+                (founderSlots.status === "ready" && founderSlots.soldOut)
+              }
               data-testid="pricing-cta-founder-lifetime"
+              data-founder-remaining={founderSlots.remaining ?? ""}
               onClick={() => {
                 trackPricingEvent("pricing_cta_founder_lifetime_clicked");
                 void openCheckout({ priceId: "founder_lifetime" });
               }}
             >
-              Claim Founder Lifetime — ${PRICING.founder.price}
+              {founderSlots.status === "ready" && founderSlots.soldOut
+                ? "Founder Lifetime sold out"
+                : `Claim Founder Lifetime — $${PRICING.founder.price}`}
             </Button>
           }
         />
 
       </section>
+
 
       {/* AI Credit explainer */}
       <section className="px-6 pb-12 max-w-4xl mx-auto">

@@ -41,6 +41,12 @@ const REQUIRED_GUIDE_URLS = [
   "https://verdantgrowdiary.com/guides/spider-farmer-data-logging",
   "https://verdantgrowdiary.com/guides/sensor-truth-grow-room",
   "https://verdantgrowdiary.com/guides/ai-grow-doctor",
+  "https://verdantgrowdiary.com/guides/how-to-start-a-grow-journal",
+  "https://verdantgrowdiary.com/guides/what-to-log-in-a-grow-journal",
+  "https://verdantgrowdiary.com/guides/grow-journal-template",
+  "https://verdantgrowdiary.com/guides/plant-watering-log",
+  "https://verdantgrowdiary.com/guides/grow-journal-app-without-account",
+  "https://verdantgrowdiary.com/guides/daily-grow-log-checklist",
 ];
 
 function manifestEntryFor(pathname: string) {

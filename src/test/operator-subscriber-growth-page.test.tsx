@@ -37,6 +37,28 @@ describe("OperatorSubscriberGrowth", () => {
   it("renders authoritative paid progress and labels interest separately", async () => {
     vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-07-14T05:00:00.000Z"));
     rpcMock.mockImplementation((fn: string) => {
+      if (fn === "signup_to_paid_operator_snapshot") {
+        return Promise.resolve({
+          data: {
+            ok: true,
+            generated_at: "2026-07-14T05:00:00Z",
+            counts: {
+              accounts_total: 20,
+              active_paid_total: 10,
+              attributed_accounts_total: 12,
+              attributed_active_paid_total: 8,
+              unattributed_accounts_total: 8,
+              unattributed_active_paid_total: 2,
+            },
+            sources: {
+              landing_page: { accounts: 6, active_paid: 3 },
+              grower_invite: { accounts: 6, active_paid: 5 },
+              unattributed: { accounts: 8, active_paid: 2 },
+            },
+          },
+          error: null,
+        });
+      }
       if (fn === "signup_acquisition_operator_snapshot") {
         return Promise.resolve({
           data: {
@@ -104,6 +126,7 @@ describe("OperatorSubscriberGrowth", () => {
     expect(screen.queryByText(/verified paid/i)).not.toBeInTheDocument();
     expect(rpcMock).toHaveBeenCalledWith("subscriber_growth_operator_snapshot");
     expect(rpcMock).toHaveBeenCalledWith("signup_acquisition_operator_snapshot");
+    expect(rpcMock).toHaveBeenCalledWith("signup_to_paid_operator_snapshot");
     expect(screen.getByText("49")).toBeInTheDocument();
     expect(screen.getByText("1.9/day")).toBeInTheDocument();
     expect(screen.getByTestId("subscriber-growth-sprint-board")).toBeInTheDocument();
@@ -116,13 +139,15 @@ describe("OperatorSubscriberGrowth", () => {
     expect(screen.getByText("Account starts — not subscribers")).toBeInTheDocument();
     expect(screen.getByText("Accounts — all time")).toBeInTheDocument();
     expect(screen.getByText("Pricing signup")).toBeInTheDocument();
-    expect(screen.getByText("Source unavailable")).toBeInTheDocument();
-    expect(screen.getByText("Founder shares")).toBeInTheDocument();
-    expect(screen.getByText("Paid-interest shares")).toBeInTheDocument();
-    expect(screen.getByText("Grower invites")).toBeInTheDocument();
+    expect(screen.getAllByText("Source unavailable").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Founder shares").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Paid-interest shares").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Grower invites").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Context check")).toBeInTheDocument();
-    expect(screen.getByText("VPD calculator")).toBeInTheDocument();
+    expect(screen.getAllByText("VPD calculator").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("VPD calculator signup")).toBeInTheDocument();
+    expect(screen.getByText("Signup-to-active-paid cohorts")).toBeInTheDocument();
+    expect(screen.getByTestId("paid-reconciliation")).toHaveTextContent("Paid total reconciled");
     expect(screen.getByText("Needs first contact")).toBeInTheDocument();
     expect(screen.getByText("Follow-up due")).toBeInTheDocument();
     expect(screen.getByText("Contacted — 7 days")).toBeInTheDocument();
@@ -159,5 +184,28 @@ describe("OperatorSubscriberGrowth", () => {
     );
     expect(screen.getByText("Active paid subscribers")).toBeInTheDocument();
     expect(screen.queryByTestId("signup-acquisition-snapshot")).not.toBeInTheDocument();
+  });
+
+  it("keeps paid progress visible when the conversion cohort RPC is unavailable", async () => {
+    rpcMock.mockImplementation((fn: string) => {
+      if (fn === "signup_to_paid_operator_snapshot") {
+        return Promise.resolve({ data: null, error: { message: "migration unavailable" } });
+      }
+      if (fn === "signup_acquisition_operator_snapshot") {
+        return Promise.resolve({ data: { ok: true, counts: {} }, error: null });
+      }
+      return Promise.resolve({
+        data: { ok: true, counts: { active_paid: 3 } },
+        error: null,
+      });
+    });
+
+    renderPage();
+
+    expect(await screen.findByTestId("signup-to-paid-error")).toHaveTextContent(
+      "Signup-to-paid conversion unavailable.",
+    );
+    expect(screen.getByText("Active paid subscribers")).toBeInTheDocument();
+    expect(screen.queryByTestId("signup-to-paid-conversion-card")).not.toBeInTheDocument();
   });
 });

@@ -17,10 +17,18 @@ import {
   type SignupAcquisitionSnapshot,
 } from "@/lib/signupAcquisitionSnapshotRules";
 import SubscriberGrowthSprintBoard from "@/components/SubscriberGrowthSprintBoard";
+import SignupToPaidConversionCard from "@/components/SignupToPaidConversionCard";
+import {
+  parseSignupToPaidSnapshot,
+  type SignupToPaidSnapshot,
+} from "@/lib/signupToPaidSnapshotRules";
 
 type SubscriberGrowthRpcClient = {
   rpc(
-    fn: "subscriber_growth_operator_snapshot" | "signup_acquisition_operator_snapshot",
+    fn:
+      | "subscriber_growth_operator_snapshot"
+      | "signup_acquisition_operator_snapshot"
+      | "signup_to_paid_operator_snapshot",
   ): Promise<{ data: unknown; error: { message?: string } | null }>;
 };
 
@@ -42,6 +50,16 @@ async function fetchSignupAcquisition(): Promise<SignupAcquisitionSnapshot> {
     throw new Error(error.message ?? "signup_acquisition_snapshot_failed");
   }
   return parseSignupAcquisitionSnapshot(data);
+}
+
+async function fetchSignupToPaid(): Promise<SignupToPaidSnapshot> {
+  const { data, error } = await (supabase as unknown as SubscriberGrowthRpcClient).rpc(
+    "signup_to_paid_operator_snapshot",
+  );
+  if (error) {
+    throw new Error(error.message ?? "signup_to_paid_snapshot_failed");
+  }
+  return parseSignupToPaidSnapshot(data);
 }
 
 function MetricCard({
@@ -80,10 +98,18 @@ export default function OperatorSubscriberGrowth() {
     enabled: role.granted,
     staleTime: 30_000,
   });
+  const conversionQuery = useQuery({
+    queryKey: ["operator", "signup-to-paid"],
+    queryFn: fetchSignupToPaid,
+    enabled: role.granted,
+    staleTime: 30_000,
+  });
 
   const snapshot = snapshotQuery.data;
   const acquisition = acquisitionQuery.data;
-  const refreshing = snapshotQuery.isFetching || acquisitionQuery.isFetching;
+  const conversion = conversionQuery.data;
+  const refreshing =
+    snapshotQuery.isFetching || acquisitionQuery.isFetching || conversionQuery.isFetching;
   const progress = useMemo(
     () => buildSubscriberGrowthProgress(snapshot?.counts.activePaid ?? 0, Date.now()),
     [snapshot?.counts.activePaid],
@@ -116,6 +142,7 @@ export default function OperatorSubscriberGrowth() {
               onClick={() => {
                 void snapshotQuery.refetch();
                 void acquisitionQuery.refetch();
+                void conversionQuery.refetch();
               }}
               disabled={!role.granted || refreshing}
             >
@@ -178,6 +205,29 @@ export default function OperatorSubscriberGrowth() {
         </Card>
       )}
 
+      {role.granted && conversionQuery.isError && (
+        <Card data-testid="signup-to-paid-error">
+          <CardHeader>
+            <CardTitle>Signup-to-paid conversion unavailable.</CardTitle>
+            <CardDescription>
+              Subscriber totals remain available. The read-only cohort report failed and no account,
+              attribution, or billing data was changed.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
+      {role.granted && conversion && !conversion.ok && (
+        <Card data-testid="signup-to-paid-denied">
+          <CardHeader>
+            <CardTitle>Signup-to-paid conversion unavailable.</CardTitle>
+            <CardDescription>
+              {conversion.reasonLabel ?? "Signup-to-paid conversion data is not available."}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
       {role.granted && snapshot?.ok && (
         <>
           <section
@@ -208,6 +258,13 @@ export default function OperatorSubscriberGrowth() {
             counts={snapshot.counts}
             acquisitionCounts={acquisition?.ok ? acquisition.counts : null}
           />
+
+          {conversion?.ok && (
+            <SignupToPaidConversionCard
+              snapshot={conversion}
+              authoritativeActivePaid={snapshot.counts.activePaid}
+            />
+          )}
 
           <Card>
             <CardHeader>

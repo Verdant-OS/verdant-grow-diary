@@ -642,8 +642,11 @@ export default function Pricing() {
           <AccordionItem value="checkout-sandbox" data-testid="pricing-faq-checkout-sandbox">
             <AccordionTrigger>Is checkout live?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              If you reach the billing placeholder, checkout is in sandbox preview and no live
-              charge is made from that page.
+              Checkout opens a secure Paddle overlay. A charge happens only when Paddle
+              confirms a real payment, and your plan activates only after Verdant verifies
+              that payment server-side — this page can never charge you or grant access by
+              itself. If billing is not enabled in the current environment, checkout simply
+              will not complete and nothing is charged.
             </AccordionContent>
           </AccordionItem>
 

@@ -1,8 +1,9 @@
 /**
  * Static ownership guard: proves the canonical checkout topology stays intact.
  *
- *   - `/pricing` (Pricing.tsx) is the sole user-facing caller of
- *     `usePaddleCheckout` / `openCheckout`.
+ *   - `/pricing` (Pricing.tsx) is the sole routed user-facing caller of
+ *     `usePaddleCheckout`; the retired Upgrade presenter may delegate to the
+ *     same hook but is not mounted by App.tsx.
  *   - `/upgrade` and `/billing/:plan` are compatibility redirects to
  *     canonical `/pricing` and never mount a second checkout surface.
  *   - `PhenoTrackerUpgradeGate`, `StartPhenoHuntButton`, and the auth
@@ -48,14 +49,24 @@ function isRuntime(file: string): boolean {
 }
 
 describe("Canonical checkout ownership — static guard", () => {
-  it("Pricing.tsx is the sole user-facing usePaddleCheckout caller", () => {
+  it("keeps checkout opening in the canonical hook across approved presenters", () => {
     const callers = ALL.filter(
       (f) => isRuntime(f.file) && /from\s+["']@\/hooks\/usePaddleCheckout["']/.test(f.text),
-    ).map((f) => f.file);
-    // Only the hook file itself and Pricing.tsx should reference the hook.
-    const filtered = callers.filter((c) => !c.endsWith("usePaddleCheckout.ts"));
-    expect(filtered.length).toBe(1);
-    expect(filtered[0]).toMatch(/pages[\\/]+Pricing\.tsx$/);
+    )
+      .map((f) => f.file)
+      .filter((file) => !file.endsWith("usePaddleCheckout.ts"))
+      .map((file) => file.slice(file.lastIndexOf("/src/") + 5))
+      .sort();
+
+    expect(callers).toEqual(["pages/Pricing.tsx", "pages/Upgrade.tsx"]);
+
+    const app = ALL.find((entry) => entry.file.endsWith("/src/App.tsx"));
+    const retiredUpgrade = ALL.find((entry) => entry.file.endsWith("/src/pages/Upgrade.tsx"));
+    expect(app).toBeDefined();
+    expect(retiredUpgrade).toBeDefined();
+    expect(app!.text).not.toMatch(/import\(["']\.\/pages\/Upgrade["']\)/);
+    expect(app!.text).toMatch(/path="\/upgrade"\s+element=\{<LegacyUpgradeRedirect\s*\/>\}/);
+    expect(retiredUpgrade!.text).not.toMatch(/Paddle\.Checkout\.open\s*\(/);
   });
 
   it("legacy checkout routes only navigate — no Paddle or plan presenter", () => {

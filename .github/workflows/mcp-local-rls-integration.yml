@@ -17,6 +17,12 @@ name: MCP local RLS integration
 
 on:
   workflow_dispatch:
+    inputs:
+      run_mcp_rls:
+        description: "Boot local Supabase and run the MCP RLS harness"
+        type: boolean
+        required: false
+        default: true
   push:
     branches: [main, verdant-grow-diary]
     paths:
@@ -43,28 +49,49 @@ jobs:
     name: MCP RLS harness (local Supabase)
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # OPTIONAL lane (mirrors security-db-local.yml): the harness needs a local
+    # Supabase container the shared runners cannot always provide. Never
+    # blocks the merge queue; enable deliberately per run or via repo var.
+    continue-on-error: true
+    env:
+      ENABLED: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_mcp_rls == true) || vars.ENABLE_MCP_RLS_LANE == 'true' }}
     steps:
+      - name: Skip notice (lane disabled)
+        if: env.ENABLED != 'true'
+        run: |
+          echo "MCP RLS lane is disabled for this run." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Enable via workflow_dispatch input run_mcp_rls=true," | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "or set repository variable ENABLE_MCP_RLS_LANE=true." | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Checkout
+        if: env.ENABLED == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Bun
+        if: env.ENABLED == 'true'
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: latest
 
       - name: Install dependencies
+        if: env.ENABLED == 'true'
         run: bun install --frozen-lockfile
 
       - name: Setup Supabase CLI
+        if: env.ENABLED == 'true'
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
         with:
-          version: latest
+          # Pinned: "latest" resolves through an unauthenticated GitHub API
+          # call that rate-limits on shared runners (see security-db-local.yml,
+          # two fast lane failures on 2026-07-09). Bump deliberately.
+          version: 2.109.1
 
       - name: Start local Supabase
+        if: env.ENABLED == 'true'
         run: |
           supabase start --exclude studio,inbucket,imgproxy,pgadmin-schema-diff,pgbouncer,realtime,edge-runtime,logflare,vector
 
       - name: Extract local Supabase env (masked)
+        if: env.ENABLED == 'true'
         id: sb
         run: |
           set -euo pipefail
@@ -81,6 +108,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Wait for local Supabase readiness
+        if: env.ENABLED == 'true'
         env:
           LOCAL_URL: ${{ steps.sb.outputs.api_url }}
           LOCAL_ANON: ${{ steps.sb.outputs.anon_key }}
@@ -104,6 +132,7 @@ jobs:
           supabase status > /dev/null
 
       - name: Apply and verify local migrations
+        if: env.ENABLED == 'true'
         run: |
           set -euo pipefail
           # Reset the LOCAL database and re-apply every repo migration
@@ -114,6 +143,7 @@ jobs:
           supabase migration list --local
 
       - name: Grant hosted-parity API-role privileges (LOCAL database only)
+        if: env.ENABLED == 'true'
         env:
           DB_URL: ${{ steps.sb.outputs.db_url }}
         run: |
@@ -136,6 +166,7 @@ jobs:
           SQL
 
       - name: Re-check readiness after migration reset
+        if: env.ENABLED == 'true'
         env:
           LOCAL_URL: ${{ steps.sb.outputs.api_url }}
           LOCAL_ANON: ${{ steps.sb.outputs.anon_key }}
@@ -152,6 +183,7 @@ jobs:
           exit 1
 
       - name: Diagnostic REST probes (no keys printed; error bodies only)
+        if: env.ENABLED == 'true'
         env:
           LOCAL_URL: ${{ steps.sb.outputs.api_url }}
           LOCAL_ANON: ${{ steps.sb.outputs.anon_key }}
@@ -173,6 +205,7 @@ jobs:
           probe "anon key" "${LOCAL_ANON}"
 
       - name: Run MCP local RLS integration test
+        if: env.ENABLED == 'true'
         env:
           MCP_LOCAL_RLS_HARNESS: "1"
           LOCAL_SUPABASE_URL: ${{ steps.sb.outputs.api_url }}
@@ -185,14 +218,14 @@ jobs:
             | tee artifacts/mcp-local-rls/vitest-output.log
 
       - name: Sanitize failure artifacts
-        if: failure()
+        if: failure() && env.ENABLED == 'true'
         env:
           LOCAL_SUPABASE_ANON_KEY: ${{ steps.sb.outputs.anon_key }}
           LOCAL_SUPABASE_SERVICE_ROLE_KEY: ${{ steps.sb.outputs.service_role_key }}
         run: node scripts/sanitize-mcp-rls-artifacts.mjs artifacts/mcp-local-rls
 
       - name: Upload sanitized failure artifacts
-        if: failure()
+        if: failure() && env.ENABLED == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: mcp-local-rls-failure-artifacts

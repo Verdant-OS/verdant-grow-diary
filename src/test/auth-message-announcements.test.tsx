@@ -121,6 +121,9 @@ describe("/auth — message announcement coverage", () => {
     fireEvent.change(screen.getByLabelText(/^password$/i), {
       target: { value: "short" },
     });
+    // Signup requires explicit ToS/Privacy consent (deliberate gate, PR #229);
+    // accept it so validation/server paths are reachable.
+    fireEvent.click(screen.getByRole("checkbox", { name: /terms of service/i }));
     fireEvent.click(screen.getByRole("button", { name: /^create account$/i }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/at least 8 characters/i);
@@ -137,6 +140,9 @@ describe("/auth — message announcement coverage", () => {
     fireEvent.change(screen.getByLabelText(/^password$/i), {
       target: { value: "longenough1" },
     });
+    // Signup requires explicit ToS/Privacy consent (deliberate gate, PR #229);
+    // accept it so validation/server paths are reachable.
+    fireEvent.click(screen.getByRole("checkbox", { name: /terms of service/i }));
     fireEvent.click(screen.getByRole("button", { name: /^create account$/i }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/couldn['’]t create that account/i);
@@ -185,7 +191,9 @@ describe("/reset-password — message announcement coverage", () => {
     sessionResult = { data: { session: null } };
     renderReset();
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(/missing or expired/i);
+    // Deliberate per-cause diagnosis copy (resetPasswordLinkRules): missing link
+    // renders its own guidance, still inside role="alert".
+    expect(alert).toHaveTextContent(/no reset link detected/i);
   });
 
   it("checking state uses role=status with aria-live=polite", async () => {

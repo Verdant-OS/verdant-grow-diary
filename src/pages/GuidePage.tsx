@@ -22,6 +22,11 @@ import {
   VERDANT_SEO_GUIDES,
   VERDANT_SITE_ORIGIN,
 } from "@/constants/verdantSeoContent";
+import {
+  buildBreadcrumbListJsonLd,
+  buildFaqPageJsonLd,
+  safeJsonLdStringify,
+} from "@/lib/seoStructuredData";
 import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
 
 

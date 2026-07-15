@@ -464,31 +464,51 @@ export default function Dashboard() {
         <div className="grid lg:grid-cols-3 gap-4">
 
 
-          <div className="lg:col-span-2 glass rounded-2xl p-4">
-            <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
-                <div>
-                  <h2 className="font-display font-semibold">Tent A · 7-day environment</h2>
-                  <p className="text-xs text-muted-foreground">Temperature, humidity, VPD</p>
+          {(() => {
+            // Pick the first tent that actually has readings so the chart
+            // isn't blank when tents[0] has none but other tents do.
+            // Falls back to tents[0] (or null) so the label + empty state
+            // still make sense.
+            const chartTent =
+              tents.find((t) =>
+                (readings as unknown as SensorReading[]).some((r) => r.tentId === t.id),
+              ) ?? tents[0] ?? null;
+            const chartTentName = chartTent?.name ?? "Tent";
+            const chartReadings = chartTent
+              ? (readings as unknown as SensorReading[]).filter((r) => r.tentId === chartTent.id)
+              : [];
+            const latest = chartReadings.slice(-1)[0];
+            return (
+              <div className="lg:col-span-2 glass rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div>
+                      <h2 className="font-display font-semibold">{chartTentName} · 7-day environment</h2>
+                      <p className="text-xs text-muted-foreground">Temperature, humidity, VPD</p>
+                    </div>
+                    {latest && (
+                      <SensorSourceBadge
+                        source={latest.source}
+                        status={latest.status}
+                        testId="dashboard-tent-chart-source-badge"
+                      />
+                    )}
+                  </div>
+                  <Button asChild size="sm" variant="ghost"><Link to="/sensors">Sensor data <ArrowRight className="h-3 w-3" /></Link></Button>
                 </div>
-                {(() => {
-                  const latest = (readings as unknown as SensorReading[])
-                    .filter((r) => r.tentId === (tents[0]?.id ?? ""))
-                    .slice(-1)[0];
-                  if (!latest) return null;
-                  return (
-                    <SensorSourceBadge
-                      source={latest.source}
-                      status={latest.status}
-                      testId="dashboard-tent-chart-source-badge"
-                    />
-                  );
-                })()}
+                {chartReadings.length === 0 ? (
+                  <div
+                    data-testid="dashboard-tent-chart-empty"
+                    className="rounded-xl border border-border/40 bg-secondary/20 p-4 text-center text-sm text-muted-foreground"
+                  >
+                    No readings yet for {chartTentName}. Add a manual reading or connect a sensor to see the 7-day environment here.
+                  </div>
+                ) : (
+                  <SensorChart data={chartReadings} metric="temp" height={200} />
+                )}
               </div>
-              <Button asChild size="sm" variant="ghost"><Link to="/sensors">Sensor data <ArrowRight className="h-3 w-3" /></Link></Button>
-            </div>
-            <SensorChart data={readings.filter((r) => r.tentId === (tents[0]?.id ?? "")) as unknown as SensorReading[]} metric="temp" height={200} />
-          </div>
+            );
+          })()}
 
           <div className="glass rounded-2xl p-4">
             <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">

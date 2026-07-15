@@ -177,6 +177,12 @@ beforeEach(() => {
 // Pure helper tests
 // ---------------------------------------------------------------------------
 
+// Slow-runner guard: these action-detail tests await an async load whose
+// resolution can exceed testing-library's default 5s findBy timeout on
+// loaded shared CI runners (observed repeatedly across full-suite batches;
+// passes locally in <3s). Give the async-load awaits a generous timeout.
+const FIND_TIMEOUT = { timeout: 15_000 };
+
 describe("actionQueueRedactionRules — pure helpers", () => {
   it("detects MAC address, vendor id, bridge-token and long hex blob", () => {
     expect(containsDeviceIdentifierLeak(MAC)).toBe(true);
@@ -303,28 +309,28 @@ describe("ActionDetail — full-DOM device-identifier scan", () => {
   it("MAC-bearing row does not leak the MAC anywhere", async () => {
     detailRow = ROW_WITH_MAC;
     renderDetail("aq-mac-1");
-    await screen.findByText("Raise the light by 10 cm");
+    await screen.findByText("Raise the light by 10 cm", undefined, FIND_TIMEOUT);
     expectNoDeviceLeakAnywhere("ActionDetail MAC row");
   });
 
   it("vendor-id row does not leak the vendor id anywhere", async () => {
     detailRow = ROW_WITH_VENDOR_ID;
     renderDetail("aq-vendor-1");
-    await screen.findByText("Lower humidity to 55%");
+    await screen.findByText("Lower humidity to 55%", undefined, FIND_TIMEOUT);
     expectNoDeviceLeakAnywhere("ActionDetail vendor row");
   });
 
   it("bridge-token row does not leak the token anywhere", async () => {
     detailRow = ROW_WITH_BRIDGE_TOKEN;
     renderDetail("aq-token-1");
-    await screen.findByText("Adjust feed strength to 1.2 EC");
+    await screen.findByText("Adjust feed strength to 1.2 EC", undefined, FIND_TIMEOUT);
     expectNoDeviceLeakAnywhere("ActionDetail bridge-token row");
   });
 
   it("introduces no clipboard / download / print surface on detail", async () => {
     detailRow = ROW_WITH_MAC;
     renderDetail("aq-mac-1");
-    await screen.findByText("Raise the light by 10 cm");
+    await screen.findByText("Raise the light by 10 cm", undefined, FIND_TIMEOUT);
     expect(document.querySelectorAll("a[download]").length).toBe(0);
     expect(document.querySelectorAll("[data-export-action]").length).toBe(0);
     expect(document.querySelectorAll("[data-print-action]").length).toBe(0);

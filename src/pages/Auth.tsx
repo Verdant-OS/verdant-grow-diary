@@ -39,6 +39,7 @@ import {
   resolveSignupAcquisitionSource,
 } from "@/lib/signupAcquisitionRules";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
 import { buildAcceptanceRows } from "@/lib/agreementConsent";
 import { resolveSignupCompletionDisposition } from "@/lib/signupCompletionRules";
@@ -319,6 +320,7 @@ export default function Auth() {
     }
     setBusy(false);
     trackPricingEvent("signup_completed", { source: signupSource ?? "direct" });
+    trackFunnelEvent("signup", { method: "email" });
     setPassword("");
     if (resolveSignupCompletionDisposition(data) === "verification_required") {
       trackPricingEvent("signup_verification_required", {

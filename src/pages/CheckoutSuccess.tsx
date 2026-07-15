@@ -7,6 +7,7 @@ import { usePageSeo } from "@/hooks/usePageSeo";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import { buildCheckoutActivationViewModel } from "@/lib/checkoutActivationRules";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
 /**
@@ -55,6 +56,18 @@ export default function CheckoutSuccess() {
     description: "Your Verdant Pro purchase is being confirmed by the billing webhook.",
     path: "/checkout/success",
   });
+
+  // Funnel ping once per mount, only after the server-side resolver has
+  // actually confirmed the active paid plan — this page never self-grants,
+  // and the analytics event holds itself to the same standard.
+  const activationTrackedRef = useRef(false);
+  useEffect(() => {
+    if (!confirmed || activationTrackedRef.current) return;
+    activationTrackedRef.current = true;
+    trackFunnelEvent("subscription_activated", {
+      plan: entitlement.effectivePlanId,
+    });
+  }, [confirmed, entitlement.effectivePlanId]);
 
   // Bounded poll — stops when confirmed or after POLL_TIMEOUT_MS.
   const startedAt = useRef<number>(Date.now());

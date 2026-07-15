@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { FileUp } from "lucide-react";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 
 import { EnvironmentCsvImportModal } from "@/components/EnvironmentCsvImportModal";
 import {
@@ -137,6 +138,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
             ? `${res.insertedCount} reading(s) added as CSV context. Skipped ${res.duplicateCount} duplicate reading(s) already in Verdant.`
             : `${res.insertedCount} reading(s) added as CSV context.`;
         toast({ title: "CSV history imported", description });
+        trackFunnelEvent("csv_import_completed", { rows: res.insertedCount });
         qc.invalidateQueries({ queryKey: ["sensor_readings"] });
         qc.invalidateQueries({ queryKey: ["csv-timeline-context"] });
         if (typeof window !== "undefined") {

@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 
 export interface QuickLogV2SaveResult {
   ok: boolean;
@@ -40,6 +41,9 @@ export function useQuickLogV2Save() {
           setError(reason);
           return { ok: false, reason };
         }
+        // Funnel ping only after the RPC confirms the write; p_action is a
+        // closed enum ("water" | "note"), never grower text.
+        trackFunnelEvent("quick_log_saved", { event_type: payload.p_action });
         return {
           ok: true,
           growEventId: r.grow_event_id ?? null,

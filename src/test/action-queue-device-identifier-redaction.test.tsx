@@ -178,9 +178,12 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 // Slow-runner guard: these action-detail tests await an async load whose
-// resolution can exceed testing-library's default 5s findBy timeout on
-// loaded shared CI runners (observed repeatedly across full-suite batches;
-// passes locally in <3s). Give the async-load awaits a generous timeout.
+// resolution can exceed BOTH testing-library's default 5s findBy timeout
+// AND vitest's default 5s per-test timeout on loaded shared CI runners
+// (observed repeatedly across full-suite batches; passes locally in <3s).
+// Raise the per-test budget for this file and give the async-load awaits
+// a generous findBy timeout beneath it.
+vi.setConfig({ testTimeout: 30_000 });
 const FIND_TIMEOUT = { timeout: 15_000 };
 
 describe("actionQueueRedactionRules — pure helpers", () => {

@@ -206,4 +206,32 @@ describe("/guides/:slug detail — public render", () => {
       expect(target).not.toHaveAttribute("data-highlighted", "true"),
     );
   });
+
+  it("honors prefers-reduced-motion and still highlights the deep-linked item", async () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = (query: string) =>
+      ({
+        matches: query === "(prefers-reduced-motion: reduce)",
+        media: query,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      } as MediaQueryList);
+
+    try {
+      renderAt("/guides/cannabis-plant-care#faq-2");
+      const target = document.getElementById("faq-2");
+      await waitFor(() => expect(target).toHaveAttribute("data-highlighted", "true"), {
+        timeout: 300,
+      });
+      // The highlight classes should use motion-safe variants, leaving the
+      // visual state immediately present without a transition animation.
+      expect(target?.className).toContain("motion-safe:transition-colors");
+      expect(target?.className).not.toContain("transition-colors duration-500");
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
+  });
 });

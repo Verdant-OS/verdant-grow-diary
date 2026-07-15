@@ -47,10 +47,22 @@ Production is MISSING these repo migrations (verified live 2026-07-14):
 4. `20260621015000_apply_paddle_subscription_update_rpc.sql`
 5. `20260622170000_billing_subscription_update_audit.sql`
 6. `20260622171621_*purge_billing_subscription_update_audit*.sql`
-7. `20260714230000_paddle_paid_launch_ordering_and_founder.sql` (this PR)
+7. `20260714230000_paddle_paid_launch_ordering_and_founder.sql`
+8. `20260715001000_paddle_paid_launch_review_hardening.sql` (review follow-up:
+   founder lock before existing-row read, FK-safe append-only audit trigger,
+   audit DELETE/TRUNCATE revoked from service_role)
 
 Apply in timestamp order via the Lovable/Supabase migration path for
 `knkwiiywfkbqznbxwqfh` — never via the personal project.
+
+## Checkout metadata contract (attribution)
+
+The BYO webhook attributes buyers ONLY from checkout `custom_data`. The live
+checkout (`src/hooks/usePaddleCheckout.ts`) sends `customData: { userId }`,
+and the webhook accepts `verdant_user_id`, `user_id`, `userId`,
+`auth_user_id`, or `verdant_auth_user_id`. If the checkout payload shape ever
+changes, update the webhook's extraction list in the SAME change — a mismatch
+records paid events with `missing_user_id` and grants no entitlement.
 
 ## Required configuration (presence only — never echo values)
 

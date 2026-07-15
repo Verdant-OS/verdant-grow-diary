@@ -1,6 +1,6 @@
 ---
 name: weekly-grow-report
-description: Compiles the grower's last 7 days of diary actions (waterings, feedings, observations, photos, training, alerts, AI Doctor sessions) plus environment/sensor snapshots into a printable dashboard-style weekly summary with key charts (VPD/temp/RH trends, feed EC/pH, watering volume, event timeline) and a next-week focus areas section. Use when the grower asks "generate my weekly report", "weekly summary", "how did this week go?", "print my grow log for the week", or "what should I focus on next week?".
+description: Compiles the grower's last 7 days of diary actions (waterings, feedings, observations, photos, training, alerts, AI Doctor sessions) plus environment/sensor snapshots into a printable dashboard-style weekly summary with key charts (VPD/temp/RH trends, feed EC/pH, watering volume, event timeline), week-over-week comparison charts against the prior 7 days, and a next-week focus areas section. Use when the grower asks "generate my weekly report", "weekly summary", "how did this week go?", "compare this week to last week", "week over week", "print my grow log for the week", or "what should I focus on next week?".
 ---
 
 # Weekly Grow Report

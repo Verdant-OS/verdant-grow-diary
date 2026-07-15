@@ -35,6 +35,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
 import { useFounderSlotsRemaining } from "@/hooks/useFounderSlotsRemaining";
@@ -93,6 +94,7 @@ export default function Pricing() {
 
   useEffect(() => {
     trackPricingEvent("pricing_page_view");
+    trackFunnelEvent("paywall_viewed", { surface: "pricing" });
   }, []);
 
   useEffect(() => {

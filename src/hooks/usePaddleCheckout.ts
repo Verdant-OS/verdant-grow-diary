@@ -16,6 +16,7 @@ import {
   savePlanIntent,
 } from "@/lib/checkoutPlanIntent";
 import { beginCheckoutSession } from "@/lib/checkoutOverlaySession";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { saveCheckoutReturnTo } from "@/lib/checkoutReturnToSession";
 
 
@@ -138,6 +139,11 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
 
       setLoading(true);
       setBlockedReason(null);
+      // Funnel ping: an authenticated grower initiated checkout. Fires
+      // before price resolution on purpose — a blocked or sold-out
+      // resolution is exactly the drop-off the funnel needs to see.
+      // options.priceId is a plan slug (allowlist-checked), never input.
+      trackFunnelEvent("checkout_started", { plan: options.priceId });
       try {
         await initializePaddle();
         const paddlePriceId = await getPaddlePriceId(options.priceId);

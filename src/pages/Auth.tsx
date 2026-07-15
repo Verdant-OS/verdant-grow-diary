@@ -33,6 +33,7 @@ import {
   RESEND_VERIFICATION_GENERIC_FAILURE,
 } from "@/lib/authErrorRules";
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
 import { buildAcceptanceRows } from "@/lib/agreementConsent";
 import {
@@ -288,6 +289,7 @@ export default function Auth() {
       }
     }
     setBusy(false);
+    trackFunnelEvent("signup", { method: "email" });
     setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
     nav(postSignInTarget(), { replace: true });
   }

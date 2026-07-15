@@ -6,7 +6,10 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 let signInResult: { error: { message: string } | null } = { error: null };
-let signUpResult: { error: { message: string } | null } = { error: null };
+let signUpResult: { data: { user: null }; error: { message: string } | null } = {
+  data: { user: null },
+  error: null,
+};
 let resetForEmailResult: { error: { message: string } | null } = { error: null };
 let updateUserResult: { error: { message: string } | null } = { error: null };
 let sessionResult: { data: { session: unknown } } = {
@@ -44,7 +47,7 @@ import ResetPassword from "@/pages/ResetPassword";
 
 beforeEach(() => {
   signInResult = { error: null };
-  signUpResult = { error: null };
+  signUpResult = { data: { user: null }, error: null };
   resetForEmailResult = { error: null };
   updateUserResult = { error: null };
   sessionResult = { data: { session: { user: { id: "u-1" } } } };
@@ -131,7 +134,7 @@ describe("/auth — message announcement coverage", () => {
   });
 
   it("create-account server failure shows friendly copy in role=alert", async () => {
-    signUpResult = { error: { message: "User already registered" } };
+    signUpResult = { data: { user: null }, error: { message: "User already registered" } };
     renderAuth();
     activateTab(/create account/i);
     fireEvent.change(screen.getByLabelText(/^email$/i), {

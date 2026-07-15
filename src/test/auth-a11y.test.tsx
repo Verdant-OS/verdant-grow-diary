@@ -9,7 +9,10 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 let signInResult: { error: { message: string } | null } = { error: null };
-let signUpResult: { error: { message: string } | null } = { error: null };
+let signUpResult: { data: { user: null }; error: { message: string } | null } = {
+  data: { user: null },
+  error: null,
+};
 let resetForEmailResult: { error: { message: string } | null } = { error: null };
 let updateUserResult: { error: { message: string } | null } = { error: null };
 
@@ -73,7 +76,7 @@ import ResetPassword from "@/pages/ResetPassword";
 
 beforeEach(() => {
   signInResult = { error: null };
-  signUpResult = { error: null };
+  signUpResult = { data: { user: null }, error: null };
   resetForEmailResult = { error: null };
   updateUserResult = { error: null };
   signInResolve = null;

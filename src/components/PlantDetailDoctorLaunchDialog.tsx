@@ -264,7 +264,9 @@ export default function PlantDetailDoctorLaunchDialog({
       now: now ? now.getTime() : undefined,
     });
     if (!built.ok) {
-      toast.error("Could not log readiness", { description: built.reason });
+      toast.error("Could not log readiness", {
+        description: (built as { ok: false; reason: string }).reason,
+      });
       setLogging(false);
       return;
     }

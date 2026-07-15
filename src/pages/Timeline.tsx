@@ -804,7 +804,10 @@ export default function Timeline() {
           data-testid="timeline-results-count"
           aria-live="polite"
         >
-          Showing {filtered.length} of {entries.length} {entries.length === 1 ? "entry" : "entries"}
+          Showing {filtered.length} of {entries.length} loaded
+          {typeof entriesTotal === "number" && entriesTotal > entries.length
+            ? ` (${entriesTotal - entries.length} older not yet loaded)`
+            : ""}
         </p>
         {highlight &&
           highlightIsMissingFromList(filtered, highlight) &&

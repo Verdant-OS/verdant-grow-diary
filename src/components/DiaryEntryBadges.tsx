@@ -55,6 +55,11 @@ export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesPr
   const sensorBadge = sensorSnapshotBadge(item.sensorSnapshotState);
   const sourceLabel = item.hasSensorSnapshot ? item.sensorSourceLabel ?? null : null;
   const vendorLabel = item.hasSensorSnapshot ? item.sensorVendorLabel ?? null : null;
+  const faqLinkInput = {
+    eventType: item.eventType,
+    tags: item.tags,
+    notePreview: item.notePreview,
+  };
 
   if (
     tagsToShow.length === 0 &&
@@ -63,8 +68,9 @@ export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesPr
     !sourceLabel &&
     !vendorLabel
   ) {
-    return null;
+    return <DiaryEntryFaqLink item={faqLinkInput} />;
   }
+
 
   const variantClasses: Record<SensorSnapshotBadge["variant"], string> = {
     positive:

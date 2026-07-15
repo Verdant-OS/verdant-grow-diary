@@ -195,8 +195,8 @@ export default function GuidePage() {
                     data-highlighted={isHighlighted ? "true" : undefined}
                     className={
                       isHighlighted
-                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 transition-colors duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        : "transition-colors duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        : "motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     }
                   >
                     <AccordionTrigger className="text-left px-2">

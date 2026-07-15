@@ -73,10 +73,7 @@ export default function GrowStageCareGuide() {
       questions: GROW_STAGE_CARE_FAQ,
     });
     const crumbs = buildBreadcrumbListJsonLd({
-      items: [
-        ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
-        { name: "Grow stage care guide", url: PAGE_URL },
-      ],
+      items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: "Grow stage care guide", url: PAGE_URL }],
     });
     const faqScript = document.createElement("script");
     faqScript.type = "application/ld+json";
@@ -106,7 +103,9 @@ export default function GrowStageCareGuide() {
       if (stageFilter !== "all" && item.stage !== stageFilter) return false;
       if (activeCategory !== "all" && item.category !== activeCategory) return false;
       if (normalizedQuery.length === 0) return true;
-      const haystack = normalizeSearch(`${item.label} ${item.detail} ${GROW_STAGE_LABELS[item.stage]} ${CARE_CATEGORY_LABELS[item.category]}`);
+      const haystack = normalizeSearch(
+        `${item.label} ${item.detail} ${GROW_STAGE_LABELS[item.stage]} ${CARE_CATEGORY_LABELS[item.category]}`,
+      );
       return haystack.includes(normalizedQuery);
     });
   }, [stageFilter, activeCategory, normalizedQuery]);
@@ -132,7 +131,9 @@ export default function GrowStageCareGuide() {
   };
 
   const visibleStages: ReadonlyArray<GrowStage> = useMemo(() => {
-    return (stageFilter === "all" ? ["seedling", "veg", "flower"] : [stageFilter]) as ReadonlyArray<GrowStage>;
+    return (
+      stageFilter === "all" ? ["seedling", "veg", "flower"] : [stageFilter]
+    ) as ReadonlyArray<GrowStage>;
   }, [stageFilter]);
 
   return (
@@ -162,10 +163,9 @@ export default function GrowStageCareGuide() {
           Grow-stage care guide
         </h1>
         <p className="mt-5 text-lg text-muted-foreground">
-          A searchable checklist for seedling, vegetative, and flower stages.
-          Filter by stage and category, search for any task, and check items off
-          as you work. The guidance is stage-based, not calendar-based, because
-          cultivars move at different speeds.
+          A searchable checklist for seedling, vegetative, and flower stages. Filter by stage and
+          category, search for any task, and check items off as you work. The guidance is
+          stage-based, not calendar-based, because cultivars move at different speeds.
         </p>
 
         {/* Search + filters */}
@@ -291,9 +291,7 @@ export default function GrowStageCareGuide() {
                                 >
                                   {item.label}
                                 </label>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                  {item.detail}
-                                </p>
+                                <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
                               </div>
                             </li>
                           ))}
@@ -309,15 +307,11 @@ export default function GrowStageCareGuide() {
 
         {/* FAQ */}
         <section className="mt-14">
-          <h2 className="font-display text-xl md:text-2xl font-semibold mb-4">
-            Common questions
-          </h2>
+          <h2 className="font-display text-xl md:text-2xl font-semibold mb-4">Common questions</h2>
           <Accordion type="single" collapsible className="w-full">
             {GROW_STAGE_CARE_FAQ.map((entry, i) => (
               <AccordionItem key={entry.question} value={`faq-${i}`}>
-                <AccordionTrigger className="text-left">
-                  {entry.question}
-                </AccordionTrigger>
+                <AccordionTrigger className="text-left">{entry.question}</AccordionTrigger>
                 <AccordionContent>{entry.answer}</AccordionContent>
               </AccordionItem>
             ))}
@@ -345,18 +339,12 @@ export default function GrowStageCareGuide() {
               </Link>
             </li>
             <li>
-              <Link
-                to="/guides"
-                className="underline hover:text-foreground text-muted-foreground"
-              >
+              <Link to="/guides" className="underline hover:text-foreground text-muted-foreground">
                 All grower guides
               </Link>
             </li>
             <li>
-              <Link
-                to="/welcome"
-                className="underline hover:text-foreground text-muted-foreground"
-              >
+              <Link to="/welcome" className="underline hover:text-foreground text-muted-foreground">
                 See how Verdant works
               </Link>
             </li>
@@ -371,9 +359,8 @@ export default function GrowStageCareGuide() {
             See a real One-Tent Loop before signing up
           </h2>
           <p className="mt-2 text-sm md:text-base text-muted-foreground">
-            Walk through how Verdant connects a grow, tent, plant, Quick Log,
-            timeline, sensor snapshot, cautious AI review, and grower-approved
-            action queue.
+            Walk through how Verdant connects a grow, tent, plant, Quick Log, timeline, sensor
+            snapshot, cautious AI review, and grower-approved action queue.
           </p>
           <div className="mt-4">
             <Link

@@ -46,9 +46,7 @@ const REQUIRED_GUIDE_URLS = [
 ];
 
 /** Custom interactive guide pages that are not in the generic SEO guide slug list. */
-const CUSTOM_GUIDE_URLS = [
-  "https://verdantgrowdiary.com/guides/grow-stage-care-guide",
-];
+const CUSTOM_GUIDE_URLS = ["https://verdantgrowdiary.com/guides/grow-stage-care-guide"];
 
 function manifestEntryFor(pathname: string) {
   const segs = pathname.split("/").filter(Boolean);
@@ -82,7 +80,9 @@ describe("sitemap.xml exposes the /guides surface", () => {
     const custom = new Set(CUSTOM_GUIDE_URLS);
     for (const url of REQUIRED_GUIDE_URLS.filter((u) => u !== `${VERDANT_SITE_ORIGIN}/guides`)) {
       const isAccountedFor = derived.has(url) || custom.has(url);
-      expect(isAccountedFor, `${url} is not in VERDANT_GUIDE_SLUGS or CUSTOM_GUIDE_URLS`).toBe(true);
+      expect(isAccountedFor, `${url} is not in VERDANT_GUIDE_SLUGS or CUSTOM_GUIDE_URLS`).toBe(
+        true,
+      );
     }
   });
 

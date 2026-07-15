@@ -107,8 +107,12 @@ describe("GrowStageCareGuide page", () => {
 
   it("renders the FAQ accordion with all three questions", () => {
     renderGuide("/guides/grow-stage-care-guide");
-    expect(screen.getByText("Can I use the same checklist for every cultivar?")).toBeInTheDocument();
-    expect(screen.getByText("Why is the checklist grouped by stage instead of by week?")).toBeInTheDocument();
+    expect(
+      screen.getByText("Can I use the same checklist for every cultivar?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Why is the checklist grouped by stage instead of by week?"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Should I check every item every day?")).toBeInTheDocument();
   });
 
@@ -154,12 +158,12 @@ describe("GrowStageCareGuide page", () => {
     const { container } = renderGuide("/guides/grow-stage-care-guide");
     const description =
       document.head.querySelector('meta[name="description"]')?.getAttribute("content") ?? "";
-    const haystack = `${container.textContent ?? ""}\n${document.title}\n${description}`.toLowerCase();
+    const haystack =
+      `${container.textContent ?? ""}\n${document.title}\n${description}`.toLowerCase();
     for (const phrase of FORBIDDEN_DEVICE_PHRASES) {
-      expect(
-        haystack.includes(phrase.toLowerCase()),
-        `contains forbidden phrase: ${phrase}`,
-      ).toBe(false);
+      expect(haystack.includes(phrase.toLowerCase()), `contains forbidden phrase: ${phrase}`).toBe(
+        false,
+      );
     }
   });
 });

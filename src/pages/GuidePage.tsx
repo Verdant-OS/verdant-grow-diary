@@ -174,7 +174,9 @@ export default function GuidePage() {
               className="w-full"
               value={openFaq}
               onValueChange={(v) => {
-                setOpenFaq(v || undefined);
+                // Keep the accordion controlled by using an empty string
+                // for the collapsed state rather than undefined.
+                setOpenFaq(v ?? "");
                 // Clear the deep-link highlight when the user manually
                 // collapses the accordion; otherwise keep it visible.
                 if (!v) setHighlightedFaq(undefined);

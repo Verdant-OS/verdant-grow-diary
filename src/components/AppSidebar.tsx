@@ -85,10 +85,13 @@ const growerGroups: { label: string; items: NavItem[] }[] = [
       { to: "/grow-lineage", label: "Lineage Repair", icon: Wrench },
     ],
   },
-  { label: "Account", items: [
-    { to: "/settings", label: "Settings", icon: Settings },
-    { to: "/account/preferences", label: "Preferences", icon: UserCog },
-  ] },
+  {
+    label: "Account",
+    items: [
+      { to: "/settings", label: "Settings", icon: Settings },
+      { to: "/account/preferences", label: "Preferences", icon: UserCog },
+    ],
+  },
 ];
 
 /**
@@ -121,9 +124,7 @@ export default function AppSidebar() {
     return (
       <SidebarGroup key={g.label}>
         {!collapsed && (
-          <SidebarGroupLabel className="text-[10px] tracking-wider">
-            {g.label}
-          </SidebarGroupLabel>
+          <SidebarGroupLabel className="text-[10px] tracking-wider">{g.label}</SidebarGroupLabel>
         )}
         <SidebarGroupContent>
           <SidebarMenu>
@@ -187,4 +188,3 @@ export default function AppSidebar() {
     </Sidebar>
   );
 }
-

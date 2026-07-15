@@ -8,10 +8,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const SIDEBAR_SRC = readFileSync(
-  resolve(__dirname, "../components/AppSidebar.tsx"),
-  "utf8",
-);
+const SIDEBAR_SRC = readFileSync(resolve(__dirname, "../components/AppSidebar.tsx"), "utf8");
 
 describe("Operator Mode Help/Guides link", () => {
   it("AppSidebar exposes a 'Help/Guides' item under Operator Mode", () => {

@@ -23,6 +23,14 @@ vi.mock("@/hooks/useTimelineMemory", () => ({
   TIMELINE_MEMORY_DEFAULT_LIMIT: 100,
 }));
 
+const logReadinessMock = vi.fn().mockResolvedValue({ ok: true });
+vi.mock("@/hooks/useLogAiDoctorReadinessToDiary", () => ({
+  useLogAiDoctorReadinessToDiary: () => ({
+    log: logReadinessMock,
+    logging: false,
+  }),
+}));
+
 import PlantDetailDoctorLaunchDialog, {
   DOCTOR_LAUNCH_HELPER_LINES,
 } from "@/components/PlantDetailDoctorLaunchDialog";

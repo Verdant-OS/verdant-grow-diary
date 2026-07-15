@@ -366,12 +366,19 @@ export default function PlantDetailDoctorLaunchDialog({
             {gate.message}
           </p>
           {blocked && blockedExplanation.sentence ? (
-            <div
+            <section
               className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 space-y-1"
               data-testid="plant-detail-doctor-launch-blocked-explanation"
-              role="status"
+              role="alert"
               aria-live="polite"
+              aria-labelledby="plant-detail-doctor-launch-blocked-heading"
             >
+              <h3
+                id="plant-detail-doctor-launch-blocked-heading"
+                className="sr-only"
+              >
+                AI Doctor blocked: insufficient context
+              </h3>
               <p
                 className="text-xs text-amber-200 leading-snug"
                 id="plant-detail-doctor-launch-blocked-sentence"
@@ -383,6 +390,7 @@ export default function PlantDetailDoctorLaunchDialog({
                 <ul
                   className="list-disc pl-4 text-xs text-amber-100/90 space-y-0.5"
                   data-testid="plant-detail-doctor-launch-blocked-list"
+                  aria-label="Reasons AI Doctor is blocked"
                 >
                   {blockedExplanation.blockingCodes.map((code, i) => (
                     <li key={code} data-blocking-code={code}>
@@ -391,24 +399,31 @@ export default function PlantDetailDoctorLaunchDialog({
                   ))}
                 </ul>
               ) : null}
-            </div>
+            </section>
           ) : null}
           {snapshotStaleness.isStale ? (
-            <div
+            <section
               className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 space-y-1"
               data-testid="plant-detail-doctor-launch-snapshot-stale-explanation"
               data-cutoff-at={snapshotStaleness.cutoffAtIso}
               data-snapshot-at={snapshotStaleness.snapshotAtIso ?? ""}
               role="status"
               aria-live="polite"
+              aria-labelledby="plant-detail-doctor-launch-snapshot-stale-heading"
             >
+              <h3
+                id="plant-detail-doctor-launch-snapshot-stale-heading"
+                className="sr-only"
+              >
+                Manual sensor snapshot is stale
+              </h3>
               <p
                 className="text-xs text-amber-200 leading-snug"
                 data-testid="plant-detail-doctor-launch-snapshot-stale-sentence"
               >
                 {snapshotStaleness.sentence}
               </p>
-            </div>
+            </section>
           ) : null}
         </div>
 

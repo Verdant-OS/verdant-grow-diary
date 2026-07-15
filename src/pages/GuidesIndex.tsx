@@ -27,13 +27,11 @@ import {
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
 
-
 const PAGE_URL = "https://verdantgrowdiary.com/guides";
 
 export default function GuidesIndex() {
   usePageSeo({
-    title:
-      "Verdant Grower Guides | Grow Diary, VPD Tracking, and Sensor Truth",
+    title: "Verdant Grower Guides | Grow Diary, VPD Tracking, and Sensor Truth",
     description:
       "Practical grower guides for using plant timelines, source-labeled sensor data, VPD context, and cautious AI to make better cultivation decisions.",
     path: "/guides",
@@ -63,12 +61,8 @@ export default function GuidesIndex() {
     };
   }, []);
 
-
   return (
-    <main
-      data-testid="guides-index-page"
-      className="min-h-screen bg-background text-foreground"
-    >
+    <main data-testid="guides-index-page" className="min-h-screen bg-background text-foreground">
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
         <Link to="/welcome" aria-label="Verdant Grow Diary home">
           <BrandLogo size="md" showText />
@@ -91,19 +85,15 @@ export default function GuidesIndex() {
           The Verdant grower guide
         </h1>
         <p className="mt-4 text-lg text-muted-foreground">
-          Plant memory. Sensor truth. Grower-approved decisions. These guides
-          explain how Verdant turns the gear you already own — AC Infinity,
-          Spider Farmer, TrolMaster, EcoWitt, and more — into one plant
-          timeline with source-labeled sensor snapshots and cautious AI
-          support. Verdant suggests; the grower decides. Verdant cannot touch
-          your equipment.
+          Plant memory. Sensor truth. Grower-approved decisions. These guides explain how Verdant
+          turns the gear you already own — AC Infinity, Spider Farmer, TrolMaster, EcoWitt, and more
+          — into one plant timeline with source-labeled sensor snapshots and cautious AI support.
+          Verdant suggests; the grower decides. Verdant cannot touch your equipment.
         </p>
       </section>
 
       <section className="px-6 pb-16 max-w-3xl mx-auto">
-        <h2 className="font-display text-2xl font-semibold mb-6">
-          Start here
-        </h2>
+        <h2 className="font-display text-2xl font-semibold mb-6">Start here</h2>
         <ul className="space-y-4">
           {VERDANT_SEO_GUIDES.map((g) => (
             <li
@@ -112,25 +102,30 @@ export default function GuidesIndex() {
             >
               <Link to={`/guides/${g.slug}`} className="block">
                 <h3 className="font-semibold text-lg">{g.h1}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {g.description}
-                </p>
+                <p className="mt-2 text-sm text-muted-foreground">{g.description}</p>
               </Link>
             </li>
           ))}
+          <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
+            <Link to="/guides/grow-stage-care-guide" className="block">
+              <h3 className="font-semibold text-lg">
+                Grow-stage care guide: seedling, veg, and flower checklists
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                A searchable checklist for watering, nutrients, environment, and harvest tasks
+                across each grow stage.
+              </p>
+            </Link>
+          </li>
         </ul>
       </section>
 
       <section className="px-6 pb-20 max-w-3xl mx-auto">
-        <h2 className="font-display text-2xl font-semibold mb-6">
-          Common grower questions
-        </h2>
+        <h2 className="font-display text-2xl font-semibold mb-6">Common grower questions</h2>
         <Accordion type="single" collapsible className="w-full">
           {VERDANT_GROWER_GUIDE_FAQ.map((entry, i) => (
             <AccordionItem key={entry.question} value={`faq-${i}`}>
-              <AccordionTrigger className="text-left">
-                {entry.question}
-              </AccordionTrigger>
+              <AccordionTrigger className="text-left">{entry.question}</AccordionTrigger>
               <AccordionContent>{entry.answer}</AccordionContent>
             </AccordionItem>
           ))}
@@ -142,10 +137,7 @@ export default function GuidesIndex() {
             what Verdant does
           </Link>
           ,{" "}
-          <Link
-            to={VERDANT_CUSTOMER_GUIDE_PATH}
-            className="underline hover:text-foreground"
-          >
+          <Link to={VERDANT_CUSTOMER_GUIDE_PATH} className="underline hover:text-foreground">
             start with the Customer Guide
           </Link>
           , or compare{" "}
@@ -156,6 +148,5 @@ export default function GuidesIndex() {
         </p>
       </section>
     </main>
-
   );
 }

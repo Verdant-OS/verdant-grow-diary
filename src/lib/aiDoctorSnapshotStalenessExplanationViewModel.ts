@@ -47,9 +47,17 @@ const DEFAULT_FORMAT = (iso: string) => iso;
 export function buildAiDoctorSnapshotStalenessExplanation(
   args: BuildAiDoctorSnapshotStalenessExplanationArgs,
 ): AiDoctorSnapshotStalenessExplanation {
+  // JS `Date` is defined on ±8.64e15 ms from epoch. Values outside that
+  // range make `new Date(x).toISOString()` throw "RangeError: Invalid
+  // time value". Treat out-of-range `now` the same as non-finite: fall
+  // back to the wall clock so the helper NEVER throws.
+  const MAX_SAFE_DATE_MS = 8_640_000_000_000_000;
+  const nowCandidate = args.now;
   const now =
-    typeof args.now === "number" && Number.isFinite(args.now)
-      ? args.now
+    typeof nowCandidate === "number" &&
+    Number.isFinite(nowCandidate) &&
+    Math.abs(nowCandidate) <= MAX_SAFE_DATE_MS - AI_DOCTOR_SNAPSHOT_FRESH_MS
+      ? nowCandidate
       : Date.now();
   const freshMs =
     typeof args.snapshotFreshMs === "number" &&

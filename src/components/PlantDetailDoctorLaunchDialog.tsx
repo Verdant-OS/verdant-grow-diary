@@ -56,7 +56,11 @@ import {
   ADD_CONTEXT_HELPER_COPY,
 } from "@/lib/plantDetailDoctorAddContextRouter";
 import { evaluateAiDoctorContextFromSources } from "@/lib/aiDoctorContextViewModel";
-import { buildAiDoctorReadinessGate } from "@/lib/aiDoctorReadinessGateViewModel";
+import {
+  buildAiDoctorReadinessGate,
+  buildAiDoctorReadinessBlockedExplanation,
+  AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
+} from "@/lib/aiDoctorReadinessGateViewModel";
 
 interface Props {
   plantId: string | null | undefined;

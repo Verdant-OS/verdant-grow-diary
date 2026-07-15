@@ -213,12 +213,13 @@ describe("/guides/:slug detail — public render", () => {
       ({
         matches: query === "(prefers-reduced-motion: reduce)",
         media: query,
+        onchange: null,
         addListener: () => {},
         removeListener: () => {},
         addEventListener: () => {},
         removeEventListener: () => {},
         dispatchEvent: () => false,
-      } as MediaQueryList);
+      } as unknown as MediaQueryList);
 
     try {
       renderAt("/guides/cannabis-plant-care#faq-2");

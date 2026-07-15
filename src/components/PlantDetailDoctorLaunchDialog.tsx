@@ -357,6 +357,23 @@ export default function PlantDetailDoctorLaunchDialog({
               ) : null}
             </div>
           ) : null}
+          {snapshotStaleness.isStale ? (
+            <div
+              className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 space-y-1"
+              data-testid="plant-detail-doctor-launch-snapshot-stale-explanation"
+              data-cutoff-at={snapshotStaleness.cutoffAtIso}
+              data-snapshot-at={snapshotStaleness.snapshotAtIso ?? ""}
+              role="status"
+              aria-live="polite"
+            >
+              <p
+                className="text-xs text-amber-200 leading-snug"
+                data-testid="plant-detail-doctor-launch-snapshot-stale-sentence"
+              >
+                {snapshotStaleness.sentence}
+              </p>
+            </div>
+          ) : null}
         </div>
 
 

@@ -138,6 +138,10 @@ export default function PlantDetailDoctorLaunchDialog({
 }: Props) {
   const [open, setOpen] = useState(false);
   const { data: rawRows } = usePlantRecentActivity(plantId);
+  const { items: timelineItems } = useTimelineMemory(
+    plantId ? { kind: "plant", plantId } : null,
+    TIMELINE_MEMORY_DEFAULT_LIMIT,
+  );
 
   const preview = useMemo(() => {
     const rows = buildPlantRecentActivity(rawRows ?? [], {
@@ -153,6 +157,34 @@ export default function PlantDetailDoctorLaunchDialog({
       now: now ?? new Date(),
     });
   }, [rawRows, plantId, stage, hasPlantPhoto, openAlertsCount, pendingActionsCount, now]);
+
+  const readinessResult = useMemo(
+    () =>
+      evaluateAiDoctorContextFromSources({
+        plant: plantId
+          ? {
+              id: plantId,
+              name: plantName ?? null,
+              stage: stage ?? null,
+              hasPlantPhoto: !!hasPlantPhoto,
+            }
+          : null,
+        timelineItems,
+        now: now ? now.getTime() : undefined,
+      }),
+    [plantId, plantName, stage, hasPlantPhoto, timelineItems, now],
+  );
+
+  const gate = useMemo(
+    () =>
+      buildAiDoctorReadinessGate({
+        readiness: readinessResult.readiness,
+        hasSafeAiDoctorFlow: true,
+      }),
+    [readinessResult.readiness],
+  );
+
+  const blocked = readinessResult.readiness === "insufficient";
 
   const addContextDecision = useMemo(() => {
     const stateOf = (kind: DoctorContextItem["kind"]): DoctorContextItemState | null =>

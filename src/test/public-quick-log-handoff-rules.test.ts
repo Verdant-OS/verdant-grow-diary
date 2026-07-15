@@ -268,6 +268,7 @@ describe("mapDraftToQuickLogPrefill — supported fields only, nothing invented"
       suggestSnapshot: false,
       source: "public-starter",
       publicStarterDraftId: "draft-1",
+      publicStarterDraftUpdatedAt: "2026-07-15T10:00:00.000Z",
       suppressPlantDefault: false,
     });
   });

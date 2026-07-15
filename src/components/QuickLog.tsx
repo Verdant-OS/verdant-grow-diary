@@ -180,6 +180,12 @@ export interface QuickLogPrefill {
    */
   publicStarterDraftId?: string | null;
   /**
+   * Revision (updatedAt) of the exact draft revision reviewed. Draft ids
+   * survive edits, so consume-once requires BOTH id and revision to match
+   * the stored draft — never clearing an edit made after review.
+   */
+  publicStarterDraftUpdatedAt?: string | null;
+  /**
    * True when an ambiguous starter handoff requires the grower to choose
    * the plant themselves: suppresses the dialog's last-target/only-plant
    * auto-defaulting so nothing is quietly pre-selected.
@@ -336,6 +342,12 @@ export default function QuickLog({
   // second submit before `busy` state has propagated. Complements the
   // existing `busy || !!savedTarget` button-disabled logic.
   const submitInFlightRef = useRef(false);
+  // One idempotency key per LOGICAL submission (quickLogIdempotencyKey
+  // contract, same pattern as the V2 sheet): retries after a failure or a
+  // lost response REUSE the key so the RPC dedupes instead of writing a
+  // second entry. Rotated only when a submission completes successfully
+  // or the grower starts a genuinely new log.
+  const saveIdempotencyKeyRef = useRef<string>(newQuickLogSaveKey());
 
   useEffect(() => {
     if (!open || !prefill) return;
@@ -435,6 +447,20 @@ export default function QuickLog({
     // Ambiguous public-starter handoffs told the grower THEY pick the
     // plant; last-target / only-plant defaults must not pick one for them.
     if (prefill?.suppressPlantDefault && !prefill?.plantId) return;
+    // A prefilled plant whose grow switch is STILL PROPAGATING (the
+    // prefill names another grow and setActiveGrowId hasn't re-scoped the
+    // plant list yet) must not be displaced by the OLD grow's
+    // last-target/only-plant fallbacks. Hold until the scope catches up.
+    // Once the grows agree, an unresolvable plantId (archived/foreign)
+    // falls through to the normal default + mismatch banner as before.
+    if (
+      prefill?.plantId &&
+      prefill?.growId &&
+      prefill.growId !== activeGrowId &&
+      !scopedPlants.some((p) => p.id === prefill.plantId)
+    ) {
+      return;
+    }
 
     const lastTarget = readLastTarget();
     const lastPlantId = lastTarget?.plantId ?? null;
@@ -641,6 +667,8 @@ export default function QuickLog({
   }
 
   function resetForAnother() {
+    // "Log another" starts a genuinely new logical submission.
+    saveIdempotencyKeyRef.current = newQuickLogSaveKey();
     const keepPlantId = savedTarget?.id ?? plantId;
     setNote("");
     setShowMore(false);
@@ -799,7 +827,7 @@ export default function QuickLog({
         : null;
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
-        idempotencyKey: newQuickLogSaveKey(),
+        idempotencyKey: saveIdempotencyKeyRef.current,
         noteWithHardware,
         plantId: selectedPlant.id,
         plantTentId: selectedPlant.tent_id ?? null,
@@ -847,6 +875,11 @@ export default function QuickLog({
         await supabase.from("grows").update({ stage }).eq("id", activeGrowId);
       }
 
+      // Submission completed: the next logical submission gets a fresh key.
+      // (Failures/exceptions above return first, so retries reuse the key
+      // and the RPC dedupes a lost-response double-submit.)
+      saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+
       const plantLabel = selectedPlant.name;
       const finalMessage =
         successMessage && successMessage !== "Logged 🌱"
@@ -877,7 +910,11 @@ export default function QuickLog({
       // retains the draft.
       if (prefill?.publicStarterDraftId) {
         const storedStarterDraft = readPublicQuickLogStarterDraft();
-        if (storedStarterDraft && storedStarterDraft.id === prefill.publicStarterDraftId) {
+        if (
+          storedStarterDraft &&
+          storedStarterDraft.id === prefill.publicStarterDraftId &&
+          storedStarterDraft.updatedAt === prefill.publicStarterDraftUpdatedAt
+        ) {
           clearPublicQuickLogStarterDraft();
         }
       }

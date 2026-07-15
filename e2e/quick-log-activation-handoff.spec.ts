@@ -240,8 +240,18 @@ async function storedDraftRaw(page: Page): Promise<string | null> {
   );
 }
 
+/**
+ * Step 1 of the journey is GENUINELY signed out: no session has been
+ * seeded when this runs, proving the draft is created anonymously and
+ * survives into the authenticated session established afterwards.
+ */
 async function createAnonymousDraft(page: Page) {
   await page.goto("/quick-log");
+  const sessionRaw = await page.evaluate(
+    (key) => window.sessionStorage.getItem(key),
+    SB_SESSION_KEY,
+  );
+  expect(sessionRaw, "draft creation must be anonymous").toBeNull();
   await expect(page.getByTestId("public-quick-log-starter")).toBeVisible();
   await page.getByTestId("starter-plant-nickname").fill(NICKNAME);
   await page.getByTestId("starter-note").fill(NOTE_TEXT);
@@ -287,7 +297,10 @@ test.describe("Public Quick Log → first diary entry activation loop (mocked)",
       test.info().project.name !== MOCKED_PROJECT,
       `activation-loop proof runs once, under the ${MOCKED_PROJECT} project`,
     );
-    await seedFakeSession(page);
+    // NOTE: the fake session is deliberately NOT seeded here. Each test
+    // creates the draft anonymously first, then calls seedFakeSession —
+    // the mocked stand-in for completing signup — so the journey proves
+    // an anonymous draft survives authentication.
   });
 
   test("desktop 1280x800: draft survives signup, becomes exactly one entry, appears in Timeline", async ({
@@ -299,6 +312,9 @@ test.describe("Public Quick Log → first diary entry activation loop (mocked)",
     const traffic = watchTraffic(page);
 
     await createAnonymousDraft(page);
+    // "Signup completes": the mocked session takes effect on the next
+    // navigation, exactly where the real redirectTo flow would land.
+    await seedFakeSession(page);
     await walkResumeToSave(page, world);
 
     // Confirmed success: post-save panel, exactly one RPC write, draft gone.
@@ -328,6 +344,7 @@ test.describe("Public Quick Log → first diary entry activation loop (mocked)",
     const traffic = watchTraffic(page);
 
     await createAnonymousDraft(page);
+    await seedFakeSession(page);
 
     await page.goto("/onboarding");
     await acceptReconsentGateIfShown(page);
@@ -364,6 +381,9 @@ test.describe("Public Quick Log → first diary entry activation loop (mocked)",
     const traffic = watchTraffic(page);
 
     await createAnonymousDraft(page);
+    // "Signup completes": the mocked session takes effect on the next
+    // navigation, exactly where the real redirectTo flow would land.
+    await seedFakeSession(page);
     await walkResumeToSave(page, world);
 
     // Failure: recoverable error shown, NO success panel, draft retained.

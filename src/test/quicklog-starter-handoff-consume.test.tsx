@@ -131,6 +131,7 @@ function handoffPrefill(overrides: Partial<QuickLogPrefill> = {}): QuickLogPrefi
     suggestSnapshot: false,
     source: "public-starter",
     publicStarterDraftId: "draft-1",
+    publicStarterDraftUpdatedAt: "2026-07-15T10:00:00.000Z",
     ...overrides,
   };
 }
@@ -207,6 +208,94 @@ describe("Quick Log starter-handoff consume-once", () => {
     renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={handoffPrefill()} />);
     fireEvent.click(saveButton());
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(storedDraftRaw()).toBe(before);
+  });
+
+  it("never clears a draft EDITED after review (same id, newer revision)", async () => {
+    // Draft ids survive edits; the marker also carries the reviewed
+    // updatedAt, so an edit made in another tab mid-review is preserved.
+    seedDraft(starterDraft({ updatedAt: "2026-07-15T11:30:00.000Z" }));
+    const before = storedDraftRaw();
+    renderWithClient(
+      <QuickLog
+        open
+        onOpenChange={vi.fn()}
+        prefill={handoffPrefill({
+          publicStarterDraftUpdatedAt: "2026-07-15T10:00:00.000Z",
+        })}
+      />,
+    );
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument(),
+    );
+    expect(storedDraftRaw()).toBe(before);
+  });
+
+  it("retries reuse ONE idempotency key; a new logical submission rotates it", async () => {
+    // quickLogIdempotencyKey contract: a lost-response retry must dedupe
+    // server-side, so the key may only rotate after success/"Log another".
+    saveMock.mockResolvedValueOnce({ ok: false, reason: "tent_not_found" });
+    seedDraft();
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={handoffPrefill()} />);
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-save-error")).toBeInTheDocument(),
+    );
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    const key1 = (saveMock.mock.calls[0][0] as Record<string, unknown>).p_idempotency_key;
+    const key2 = (saveMock.mock.calls[1][0] as Record<string, unknown>).p_idempotency_key;
+    expect(typeof key1).toBe("string");
+    expect(key2, "retry must reuse the same idempotency key").toBe(key1);
+
+    // Success happened on the retry; "Log another" starts a new submission.
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("quick-log-post-save-another"));
+    fireEvent.change(screen.getByTestId("quicklog-note"), {
+      target: { value: "another note" },
+    });
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(3));
+    const key3 = (saveMock.mock.calls[2][0] as Record<string, unknown>).p_idempotency_key;
+    expect(key3, "a new logical submission mints a fresh key").not.toBe(key1);
+  });
+
+  it("a prefilled plant outside the current scope is never displaced by stale defaults", async () => {
+    // Cross-grow handoff: the matched plant belongs to a grow that is not
+    // active yet (setActiveGrowId still propagating). The dialog must NOT
+    // grab the old grow's last-target/only-plant while it waits — the
+    // wrong-plant selection would be one click from a mis-attributed save.
+    seedDraft();
+    setLocalStorageItemForTest(
+      "verdant.quickLog.lastTarget.v1",
+      JSON.stringify({
+        plantId: "plant-1",
+        growId: "grow-1",
+        tentId: "tent-1",
+        savedAt: "2026-07-15T09:00:00.000Z",
+      }),
+    );
+    const before = storedDraftRaw();
+    renderWithClient(
+      <QuickLog
+        open
+        onOpenChange={vi.fn()}
+        prefill={handoffPrefill({
+          plantId: "99999999-9999-4999-8999-999999999999",
+          growId: "grow-2",
+          tentId: "tent-2",
+        })}
+      />,
+    );
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-plant-error")).toBeInTheDocument(),
+    );
+    expect(saveMock).not.toHaveBeenCalled();
     expect(storedDraftRaw()).toBe(before);
   });
 

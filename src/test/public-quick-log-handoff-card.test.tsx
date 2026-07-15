@@ -214,6 +214,7 @@ describe("<PublicQuickLogHandoffCard />", () => {
       suggestSnapshot: false,
       source: "public-starter",
       publicStarterDraftId: "draft-1",
+      publicStarterDraftUpdatedAt: "2026-07-15T10:00:00.000Z",
       suppressPlantDefault: false,
     });
     // Draft untouched: display/handoff never consumes it.
@@ -301,6 +302,68 @@ describe("<PublicQuickLogHandoffCard />", () => {
     expect(
       screen.getByTestId("public-quick-log-handoff-type-caveat").textContent,
     ).toMatch(/not saveable from Quick Log yet/i);
+  });
+
+  it("while the plant inventory loads, never claims 'no plants' and never offers setup", () => {
+    usePlantsMock.mockReturnValue({ data: undefined, isLoading: true });
+    seedDraft();
+    renderCard();
+    const checking = screen.getByTestId("public-quick-log-handoff-checking");
+    expect(checking).toBeDisabled();
+    expect(screen.queryByTestId("public-quick-log-handoff-setup-link")).toBeNull();
+    expect(screen.queryByTestId("public-quick-log-handoff-review-save")).toBeNull();
+    expect(
+      screen.getByTestId("public-quick-log-handoff-match-hint").textContent,
+    ).toMatch(/checking your plants/i);
+  });
+
+  it("a failed inventory read still allows review (no suggestion, defaults suppressed) — never the setup CTA", () => {
+    usePlantsMock.mockReturnValue({ data: undefined, isError: true });
+    seedDraft();
+    const events: CustomEvent[] = [];
+    const listener = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    renderCard();
+    expect(screen.queryByTestId("public-quick-log-handoff-setup-link")).toBeNull();
+    expect(
+      screen.getByTestId("public-quick-log-handoff-match-hint").textContent,
+    ).toMatch(/couldn't check your plants/i);
+    fireEvent.click(screen.getByTestId("public-quick-log-handoff-review-save"));
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    expect(events).toHaveLength(1);
+    expect(events[0].detail.plantId).toBeNull();
+    expect(events[0].detail.suppressPlantDefault).toBe(true);
+  });
+
+  it("moves focus into the discard confirmation (safe action) and back on cancel", () => {
+    seedDraft();
+    renderCard();
+    fireEvent.click(screen.getByTestId("public-quick-log-handoff-discard"));
+    expect(document.activeElement).toBe(
+      screen.getByTestId("public-quick-log-handoff-discard-cancel"),
+    );
+    fireEvent.click(screen.getByTestId("public-quick-log-handoff-discard-cancel"));
+    expect(document.activeElement).toBe(
+      screen.getByTestId("public-quick-log-handoff-discard"),
+    );
+  });
+
+  it("re-validates at dispatch time: a draft past the 24h cap while mounted is never dispatched", () => {
+    // The `now` prop keeps the RENDER-time freshness check happy, but the
+    // draft is >24h old against the real clock the dispatch guard uses —
+    // simulating a card left mounted across the expiry boundary.
+    seedDraft(draft({ updatedAt: "2026-07-13T10:00:00.000Z" }));
+    const events: CustomEvent[] = [];
+    const listener = (e: Event) => events.push(e as CustomEvent);
+    window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    renderCard({ now: new Date("2026-07-13T11:00:00.000Z") });
+    expect(screen.getByTestId("public-quick-log-handoff-card")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("public-quick-log-handoff-review-save"));
+    window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, listener);
+    expect(events).toHaveLength(0);
+    // The card hides itself and the draft is RETAINED (stale ≠ discarded).
+    expect(screen.queryByTestId("public-quick-log-handoff-card")).toBeNull();
+    expect(storedDraftRaw()).not.toBeNull();
   });
 
   it("has no automated axe accessibility violations", async () => {

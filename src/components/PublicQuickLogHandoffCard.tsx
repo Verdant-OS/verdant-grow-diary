@@ -22,7 +22,7 @@
  *  - Never auto-creates grows/tents/plants: with zero eligible plants it
  *    links to the existing setup flow and says the draft will wait.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { NotebookPen, ArrowRight, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import {
   clearPublicQuickLogStarterDraft,
+  readPublicQuickLogStarterDraft,
   usePublicQuickLogStarterDraft,
 } from "@/lib/publicQuickLogStarterDraftStore";
 import type { PublicQuickLogStarterDraft } from "@/lib/publicQuickLogStarterRules";
@@ -39,6 +40,7 @@ import {
   mapDraftToQuickLogPrefill,
   matchHandoffPlant,
   resolvePublicQuickLogHandoffDraft,
+  type HandoffPlantMatch,
 } from "@/lib/publicQuickLogHandoffRules";
 import {
   PUBLIC_QUICK_LOG_HANDOFF_DISCARD_CANCEL_LABEL,
@@ -50,6 +52,8 @@ import {
   PUBLIC_QUICK_LOG_HANDOFF_PRIMARY_LABEL,
   PUBLIC_QUICK_LOG_HANDOFF_SETUP_LABEL,
   PUBLIC_QUICK_LOG_HANDOFF_TITLE,
+  PUBLIC_QUICK_LOG_HANDOFF_CHECKING_LABEL,
+  PUBLIC_QUICK_LOG_HANDOFF_PLANTS_UNAVAILABLE_HINT,
   buildHandoffMatchHint,
   buildHandoffSummaryRows,
   buildHandoffTypeCaveat,
@@ -129,6 +133,14 @@ export default function PublicQuickLogHandoffCard({
   );
 }
 
+/** No-suggestion fallback when the inventory read failed: the grower picks
+ * in the review form, and the dialog's auto-defaulting stays suppressed. */
+const NO_SUGGESTION_MATCH: HandoffPlantMatch = {
+  kind: "ambiguous",
+  plant: null,
+  eligibleCount: 0,
+};
+
 function HandoffCardInner({
   draft,
   className,
@@ -138,28 +150,76 @@ function HandoffCardInner({
   className?: string;
   onNotNow: () => void;
 }) {
-  const { data: plants = [] } = usePlants();
+  const { data: plants = [], isLoading: plantsLoading, isError: plantsError } = usePlants();
   const { data: tents = [] } = useTents();
   const location = useLocation();
   const navigate = useNavigate();
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  // Set when a dispatch-time re-check finds the reviewed draft gone, edited
+  // elsewhere, or past the freshness cap while the card sat mounted.
+  const [lapsed, setLapsed] = useState(false);
+  const keepDraftBtnRef = useRef<HTMLButtonElement | null>(null);
+  const discardTriggerBtnRef = useRef<HTMLButtonElement | null>(null);
+  const wasConfirmingRef = useRef(false);
+
+  // "Loading" and "failed" must never read as "no plants": the setup CTA
+  // (and any match claim) waits for a successful plants read.
+  const inventoryState: "loading" | "error" | "ready" = plantsLoading
+    ? "loading"
+    : plantsError
+      ? "error"
+      : "ready";
 
   const match = useMemo(
     () =>
-      matchHandoffPlant(
-        draft.plantNickname,
-        listEligibleHandoffPlants(plants, tents),
-      ),
-    [draft.plantNickname, plants, tents],
+      inventoryState === "ready"
+        ? matchHandoffPlant(draft.plantNickname, listEligibleHandoffPlants(plants, tents))
+        : null,
+    [inventoryState, draft.plantNickname, plants, tents],
   );
 
+  // Discard-confirm focus management: entering the confirm state moves
+  // focus to the safe "Keep draft" action; cancelling returns it to the
+  // "Discard draft" trigger. Screen-reader/keyboard users never land on
+  // the document body mid-flow.
+  useEffect(() => {
+    if (confirmingDiscard) {
+      keepDraftBtnRef.current?.focus();
+    } else if (wasConfirmingRef.current) {
+      discardTriggerBtnRef.current?.focus();
+    }
+    wasConfirmingRef.current = confirmingDiscard;
+  }, [confirmingDiscard]);
+
+  if (lapsed) return null;
+
   const summaryRows = buildHandoffSummaryRows(draft);
-  const matchHint = buildHandoffMatchHint(match);
+  const matchHint =
+    inventoryState === "ready" && match
+      ? buildHandoffMatchHint(match)
+      : inventoryState === "error"
+        ? PUBLIC_QUICK_LOG_HANDOFF_PLANTS_UNAVAILABLE_HINT
+        : PUBLIC_QUICK_LOG_HANDOFF_CHECKING_LABEL;
   const typeCaveat = buildHandoffTypeCaveat(draft.logType);
-  const needsSetup = match.kind === "none";
+  const needsSetup = inventoryState === "ready" && match?.kind === "none";
 
   const handleReviewAndSave = () => {
-    const prefill = mapDraftToQuickLogPrefill({ draft, match });
+    // Re-validate against the LIVE store at dispatch time: the card may
+    // have sat mounted past the 24h cap, or the draft may have been
+    // edited/cleared in another tab since this render. Never hand a
+    // stale revision to the review form.
+    const live = resolvePublicQuickLogHandoffDraft({
+      draft: readPublicQuickLogStarterDraft(),
+      now: new Date(),
+    });
+    if (!live.draft || live.draft.id !== draft.id || live.draft.updatedAt !== draft.updatedAt) {
+      setLapsed(true);
+      return;
+    }
+    const prefill = mapDraftToQuickLogPrefill({
+      draft: live.draft,
+      match: match ?? NO_SUGGESTION_MATCH,
+    });
     // The global Quick Log dialog lives in AppShell; the dashboard route is
     // the canonical host (mirrors Onboarding's guided starter-setup flow).
     if (location.pathname !== "/") {
@@ -259,6 +319,7 @@ function HandoffCardInner({
               {PUBLIC_QUICK_LOG_HANDOFF_DISCARD_CONFIRM_LABEL}
             </Button>
             <Button
+              ref={keepDraftBtnRef}
               type="button"
               size="sm"
               variant="outline"
@@ -271,7 +332,18 @@ function HandoffCardInner({
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          {needsSetup ? (
+          {inventoryState === "loading" ? (
+            <Button
+              type="button"
+              size="sm"
+              className="gap-1 min-h-11"
+              disabled
+              aria-disabled="true"
+              data-testid="public-quick-log-handoff-checking"
+            >
+              {PUBLIC_QUICK_LOG_HANDOFF_CHECKING_LABEL}
+            </Button>
+          ) : needsSetup ? (
             <Button
               asChild
               size="sm"
@@ -306,6 +378,7 @@ function HandoffCardInner({
             {PUBLIC_QUICK_LOG_HANDOFF_NOT_NOW_LABEL}
           </Button>
           <Button
+            ref={discardTriggerBtnRef}
             type="button"
             size="sm"
             variant="ghost"

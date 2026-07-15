@@ -39,6 +39,13 @@ export const PUBLIC_QUICK_LOG_HANDOFF_SETUP_LABEL = "Set up your grow first" as 
 export const PUBLIC_QUICK_LOG_HANDOFF_SETUP_HINT =
   "You need a grow, tent, and plant before this note can join your diary. Your draft stays on this device while you set them up." as const;
 
+/** Shown while the plant inventory is still loading — never claim "no plants". */
+export const PUBLIC_QUICK_LOG_HANDOFF_CHECKING_LABEL = "Checking your plants…" as const;
+
+/** Shown when the plant inventory read failed — the review form owns the pick. */
+export const PUBLIC_QUICK_LOG_HANDOFF_PLANTS_UNAVAILABLE_HINT =
+  "Couldn't check your plants right now — you'll pick one when you review." as const;
+
 export interface PublicQuickLogHandoffSummaryRow {
   key: "plant" | "type" | "stage" | "volume" | "note";
   label: string;

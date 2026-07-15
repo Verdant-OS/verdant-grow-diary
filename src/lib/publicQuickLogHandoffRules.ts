@@ -205,6 +205,13 @@ export interface PublicQuickLogHandoffPrefill {
   source: "public-starter";
   publicStarterDraftId: string;
   /**
+   * Revision stamp of the exact draft the grower reviewed. Draft ids are
+   * stable across edits, so the consume-once clear must match BOTH id and
+   * updatedAt — an edit made in another tab after review mints a newer
+   * updatedAt and must never be cleared by the stale review's save.
+   */
+  publicStarterDraftUpdatedAt: string;
+  /**
    * True when the handoff carries NO plant suggestion (ambiguous or no
    * eligible plants): the resume card told the grower THEY choose, so the
    * Quick Log dialog's own last-target/only-plant defaulting must not
@@ -247,6 +254,7 @@ export function mapDraftToQuickLogPrefill(args: {
     suggestSnapshot: false,
     source: "public-starter",
     publicStarterDraftId: args.draft.id,
+    publicStarterDraftUpdatedAt: args.draft.updatedAt,
     suppressPlantDefault: suggested === null,
   };
 }

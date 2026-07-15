@@ -61,6 +61,7 @@ import {
   buildAiDoctorReadinessBlockedExplanation,
   AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
 } from "@/lib/aiDoctorReadinessGateViewModel";
+import { buildAiDoctorSnapshotStalenessExplanation } from "@/lib/aiDoctorSnapshotStalenessExplanationViewModel";
 
 interface Props {
   plantId: string | null | undefined;

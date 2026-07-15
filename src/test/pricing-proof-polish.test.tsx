@@ -10,6 +10,18 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Pricing from "@/pages/Pricing";
 
+vi.mock("@/hooks/usePaddleCheckout", () => ({
+  usePaddleCheckout: () => ({
+    openCheckout: vi.fn(),
+    loading: false,
+    environment: "sandbox",
+    unavailable: false,
+    unavailableMessage: null,
+    blockedReason: null,
+    dismissBlocked: vi.fn(),
+  }),
+}));
+
 vi.mock("@/lib/pricingAnalytics", () => ({
   trackPricingEvent: vi.fn(),
   PRICING_ANALYTICS_EVENT: "verdant:analytics",
@@ -41,9 +53,9 @@ function renderPricing() {
 describe("Pricing — proof polish copy", () => {
   it("hero shows the protect-grow-history line", () => {
     renderPricing();
-    expect(
-      screen.getByRole("heading", { level: 1 }).textContent ?? "",
-    ).toContain("Protect your grow history");
+    expect(screen.getByRole("heading", { level: 1 }).textContent ?? "").toContain(
+      "Protect your grow history",
+    );
   });
 
   it("renders the Plant memory. Sensor truth. tagline", () => {
@@ -152,10 +164,14 @@ describe("Pricing — proof polish copy", () => {
 
   it("Pricing FAQ v1.1 — checkout sandbox honesty FAQ renders", () => {
     renderPricing();
-    const text = openFaqAndGetText("pricing-faq-checkout-sandbox");
+    expect(screen.getByTestId("pricing-checkout-trust")).toHaveAttribute(
+      "data-checkout-state",
+      "sandbox",
+    );
+    const text = openFaqAndGetText("pricing-faq-checkout-status");
     expect(text).toContain("Is checkout live?");
-    expect(text.toLowerCase()).toContain("sandbox preview");
-    expect(text.toLowerCase()).toContain("no live charge");
+    expect(text.toLowerCase()).toContain("sandbox");
+    expect(text.toLowerCase()).toContain("cannot create a live charge");
   });
 });
 

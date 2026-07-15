@@ -14,6 +14,7 @@ import { consumePlanIntent, isKnownPlanIntent, savePlanIntent } from "@/lib/chec
 import { beginCheckoutSession } from "@/lib/checkoutOverlaySession";
 import { resolvePaidAcquisitionSource } from "@/lib/paidAcquisitionAttributionRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
+import type { PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
 
 export interface OpenCheckoutOptions {
   priceId: string;
@@ -24,6 +25,8 @@ export interface OpenCheckoutOptions {
 export interface UsePaddleCheckoutResult {
   openCheckout: (options: OpenCheckoutOptions) => Promise<void>;
   loading: boolean;
+  /** The token/host environment decision that also gates checkout. */
+  environment: PaddleCheckoutEnvironment;
   /**
    * True when the client-side environment gate has blocked checkout
    * (missing/malformed token, or live token on a loopback host). Derived
@@ -98,14 +101,15 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
   // Derived at every render so a hot-reload / rerender after the token
   // becomes available flips `unavailable` back to false without needing
   // to remount. Cheap — pure string/hostname checks.
-  const unavailable = useMemo(
-    () => resolvePaddleCheckout() === "unavailable",
+  const environment = useMemo(
+    () => resolvePaddleCheckout(),
     // resolvePaddleCheckout reads module-scope + window.location.hostname;
     // both are stable across renders in production. This memo is a
     // per-render read, not a subscription — that is intentional.
 
     [],
   );
+  const unavailable = environment === "unavailable";
   const unavailableMessage = useMemo(
     () => (unavailable ? getCheckoutUnavailableMessage() : null),
     [unavailable],
@@ -205,6 +209,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
   return {
     openCheckout,
     loading,
+    environment,
     unavailable,
     unavailableMessage,
     blockedReason,

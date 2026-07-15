@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   openCheckout: vi.fn(),
   track: vi.fn(),
   checkout: {
+    environment: "unavailable" as "live" | "sandbox" | "unavailable",
     unavailable: true,
     unavailableMessage: "Checkout is still in test mode." as string | null,
     blockedReason: null as string | null,
@@ -17,6 +18,7 @@ vi.mock("@/hooks/usePaddleCheckout", () => ({
   usePaddleCheckout: () => ({
     openCheckout: mocks.openCheckout,
     loading: false,
+    environment: mocks.checkout.environment,
     unavailable: mocks.checkout.unavailable,
     unavailableMessage: mocks.checkout.unavailableMessage,
     blockedReason: mocks.checkout.blockedReason,
@@ -42,6 +44,7 @@ function renderPricing(initialEntry = "/pricing") {
 beforeEach(() => {
   mocks.openCheckout.mockReset();
   mocks.track.mockReset();
+  mocks.checkout.environment = "unavailable";
   mocks.checkout.unavailable = true;
   mocks.checkout.unavailableMessage = "Checkout is still in test mode.";
   mocks.checkout.blockedReason = null;
@@ -50,6 +53,11 @@ beforeEach(() => {
 describe("Pricing checkout recovery", () => {
   it("shows an honest paid-interest path when checkout is unavailable", () => {
     renderPricing();
+    expect(screen.getByTestId("pricing-checkout-trust")).toHaveAttribute(
+      "data-checkout-state",
+      "unavailable",
+    );
+    expect(screen.getByTestId("pricing-checkout-trust")).toHaveTextContent("no charge is created");
     expect(screen.getByTestId("pricing-checkout-recovery")).toHaveTextContent(
       "Checkout is still in test mode.",
     );
@@ -103,6 +111,7 @@ describe("Pricing checkout recovery", () => {
   });
 
   it("does not retry checkout after a runtime failure", async () => {
+    mocks.checkout.environment = "live";
     mocks.checkout.unavailable = false;
     mocks.checkout.unavailableMessage = null;
     mocks.checkout.blockedReason = "Checkout couldn't open.";

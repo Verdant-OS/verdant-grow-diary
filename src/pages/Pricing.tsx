@@ -44,6 +44,7 @@ import {
   resolvePaidInterestLeadSource,
 } from "@/lib/paidAcquisitionAttributionRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
+import { buildCheckoutTrustCopy } from "@/lib/checkoutTrustCopyRules";
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -94,11 +95,15 @@ export default function Pricing() {
   const {
     openCheckout,
     loading: checkoutLoading,
-    unavailable: checkoutUnavailable,
+    environment: checkoutEnvironment,
     unavailableMessage,
     blockedReason,
   } = usePaddleCheckout();
   const checkoutRecoveryReason = blockedReason ?? unavailableMessage;
+  const checkoutTrustCopy = buildCheckoutTrustCopy({
+    environment: checkoutEnvironment,
+    blocked: Boolean(checkoutRecoveryReason),
+  });
 
   function handlePaidIntent(
     planId: SubscriberInterestPlanId,
@@ -174,6 +179,7 @@ export default function Pricing() {
         "Can I cancel anytime?",
         "Yes. Pro Monthly and Pro Annual can be canceled at any time. Your grow history stays on your account with read-only access to your logs.",
       ],
+      [checkoutTrustCopy.faqQuestion, checkoutTrustCopy.faqAnswer],
       ...VERDANT_PRICING_FAQ_ADDITIONS.map(
         (entry) => [entry.question, entry.answer] as [string, string],
       ),
@@ -243,7 +249,7 @@ export default function Pricing() {
     return () => {
       for (const n of nodes) n.remove();
     };
-  }, []);
+  }, [checkoutTrustCopy.faqAnswer, checkoutTrustCopy.faqQuestion]);
 
   const proPrice = billing === "annual" ? `$${PRO_ANNUAL_PRICE_USD}` : `$${PRO_MONTHLY_PRICE_USD}`;
   const proCadence = billing === "annual" ? "/ year" : "/ month";
@@ -326,6 +332,23 @@ export default function Pricing() {
         >
           Annual
         </span>
+      </section>
+
+      <section className="px-6 pb-8 max-w-3xl mx-auto" aria-label="Checkout status">
+        <div
+          data-testid="pricing-checkout-trust"
+          data-checkout-state={checkoutTrustCopy.state}
+          className="flex items-start gap-3 rounded-xl border border-border/60 bg-card/35 px-4 py-3"
+          aria-live="polite"
+        >
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <div>
+            <p className="text-sm font-medium text-foreground">{checkoutTrustCopy.label}</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {checkoutTrustCopy.summary}
+            </p>
+          </div>
+        </div>
       </section>
 
       {/* Pricing tier cards */}
@@ -748,11 +771,10 @@ export default function Pricing() {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="checkout-sandbox" data-testid="pricing-faq-checkout-sandbox">
-            <AccordionTrigger>Is checkout live?</AccordionTrigger>
+          <AccordionItem value="checkout-status" data-testid="pricing-faq-checkout-status">
+            <AccordionTrigger>{checkoutTrustCopy.faqQuestion}</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              If you reach the billing placeholder, checkout is in sandbox preview and no live
-              charge is made from that page.
+              {checkoutTrustCopy.faqAnswer}
             </AccordionContent>
           </AccordionItem>
 

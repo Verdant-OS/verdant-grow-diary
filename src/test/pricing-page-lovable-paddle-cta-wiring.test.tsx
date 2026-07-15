@@ -28,6 +28,11 @@ vi.mock("@/hooks/usePaddleCheckout", () => ({
   usePaddleCheckout: () => ({
     openCheckout: openCheckoutMock,
     loading: false,
+    environment: "live",
+    unavailable: false,
+    unavailableMessage: null,
+    blockedReason: null,
+    dismissBlocked: vi.fn(),
   }),
 }));
 
@@ -65,6 +70,21 @@ describe("Pricing page — built-in Paddle wiring", () => {
     expect(proCard.textContent).toMatch(/\$99/);
     const founderCard = screen.getByTestId("pricing-card-founder");
     expect(founderCard.textContent).toMatch(/\$129/);
+  });
+
+  it("labels the production purchase path as live and requires buyer review", async () => {
+    const user = userEvent.setup();
+    renderPricing();
+
+    const trust = screen.getByTestId("pricing-checkout-trust");
+    expect(trust).toHaveAttribute("data-checkout-state", "live");
+    expect(trust).toHaveTextContent("Secure live checkout");
+    expect(trust).toHaveTextContent("review the plan, price, and total");
+
+    await user.click(screen.getByTestId("pricing-faq-checkout-status").querySelector("button")!);
+    expect(screen.getByTestId("pricing-faq-checkout-status")).toHaveTextContent(
+      "A completed purchase can charge",
+    );
   });
 
   it("Pro Annual CTA opens checkout with priceId=pro_annual", async () => {

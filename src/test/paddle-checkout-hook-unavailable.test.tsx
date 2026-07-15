@@ -89,6 +89,7 @@ describe("usePaddleCheckout — Slice B calm-blocked behavior", () => {
 
     const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
 
+    expect(result.current.environment).toBe("unavailable");
     expect(result.current.unavailable).toBe(true);
     expect(result.current.unavailableMessage).toBe(
       "Checkout disabled: localhost requires a Paddle sandbox token.",
@@ -113,6 +114,15 @@ describe("usePaddleCheckout — Slice B calm-blocked behavior", () => {
     );
     // Loading must not stay stuck on true after the calm short-circuit.
     expect(result.current.loading).toBe(false);
+  });
+
+  it("exposes the available environment used by the checkout gate", () => {
+    paddleState.env = "live";
+
+    const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
+
+    expect(result.current.environment).toBe("live");
+    expect(result.current.unavailable).toBe(false);
   });
 
   it("dismissBlocked() clears the calm blocked state", async () => {

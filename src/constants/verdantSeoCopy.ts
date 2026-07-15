@@ -99,7 +99,7 @@ export const VERDANT_SEO_LANDING_SECTIONS: ReadonlyArray<SeoSection> = [
     id: "seo-hardware-neutral",
     heading: "Use the grow gear you already own",
     body:
-      "Bring in readings from AC Infinity, Spider Farmer, TrolMaster, EcoWitt, and other hardware through exports, manual snapshots, CSV files, or read-only integrations without replacing your controller. Verdant is not another controller — it turns existing grow-room data logging into plant memory.",
+      "Bring in readings without replacing your controller: AC Infinity and Spider Farmer exports import as labeled CSV history, while TrolMaster, EcoWitt, and other gear come in through manual snapshots or read-only integrations where available. Verdant is not another controller — it turns existing grow-room data logging into plant memory.",
     targetPhrases: [
       "AC Infinity data logging",
       "Spider Farmer data logging",
@@ -151,7 +151,7 @@ export const VERDANT_LANDING_FAQ: ReadonlyArray<FaqEntry> = [
   {
     question: "Can Verdant work with the grow equipment I already own?",
     answer:
-      "Yes. Verdant is hardware-neutral. Bring in readings from AC Infinity, Spider Farmer, TrolMaster, EcoWitt, SensorPush, and similar gear through CSV imports, manual snapshots, or read-only integrations. Verdant does not replace your controller.",
+      "Yes. Verdant is hardware-neutral. AC Infinity and Spider Farmer exports import as CSV; TrolMaster, EcoWitt, SensorPush, and similar gear come in through manual snapshots or read-only integrations where available. Verdant does not replace your controller.",
   },
   {
     question: "Does Verdant control my lights, fans, irrigation, or humidifier?",
@@ -193,7 +193,7 @@ export const VERDANT_PRICING_FAQ_ADDITIONS: ReadonlyArray<FaqEntry> = [
   {
     question: "Does Verdant replace AC Infinity, Spider Farmer, or TrolMaster?",
     answer:
-      "No. Verdant is not a controller. It works alongside AC Infinity, Spider Farmer, TrolMaster, EcoWitt, and similar hardware by reading your data through CSV or read-only integrations. Your gear keeps doing what it does.",
+      "No. Verdant is not a controller. It works alongside AC Infinity, Spider Farmer, TrolMaster, EcoWitt, and similar hardware by reading your data through CSV imports, manual snapshots, or read-only integrations where available. Your gear keeps doing what it does.",
   },
   {
     question: "Does Verdant charge extra for AI Doctor?",

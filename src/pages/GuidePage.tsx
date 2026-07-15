@@ -48,6 +48,7 @@ export default function GuidePage() {
     const target = resolved.value;
     setOpenFaq(target);
     setHighlightedFaq(target);
+
     // Defer scroll until after the accordion item opens, then move focus
     // to the highlighted item so keyboard users land on the answer they
     // deep-linked into.

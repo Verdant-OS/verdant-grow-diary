@@ -27,10 +27,22 @@ headless Linux container against pre-installed `node_modules`.
   `/opt/pw-browsers` (`chromium-1194`, `chromium-1228`). Both the driver and
   `bunx playwright test` launch headless out of the box; no manual setup.
 
-> **`node_modules` is pre-provisioned in this environment** — build/dev/test all
-> work as-is. A clean `bun install --frozen-lockfile` **fails here** with a
-> `403` from the private registry mirror (see Troubleshooting); you do not need
-> to reinstall.
+### Dependencies (first run)
+
+If `node_modules` already exists (managed environments pre-provision it), use
+it as-is — do **not** reinstall. If it is absent, do NOT reach for
+`bun install --frozen-lockfile`: `bun.lock` pins ~137 tarball URLs on a private
+registry mirror (`*.pkg.dev/lovable-core-prod`) that 403s outside the Lovable
+sandbox, and a registry override cannot rewrite bun's locked URLs. The
+**verified bootstrap** is npm with a public-registry override (npm re-resolves;
+602 packages in ~14s here):
+
+```bash
+printf 'registry=https://registry.npmjs.org/\n' > .npmrc.tmp
+npm_config_userconfig=$PWD/.npmrc.tmp npm install --no-audit --no-fund
+rm .npmrc.tmp
+git checkout -- package-lock.json   # npm rewrites resolved URLs; restore it
+```
 
 ---
 
@@ -96,9 +108,17 @@ E2E_BASE_URL=http://127.0.0.1:8080 bunx playwright test --project=chromium-mocke
 Chromium launches, mocked routes intercept, specs execute; failure screenshots/
 videos/traces land in `test-results/`. (Observed on `auth-loading`: 3 passed,
 4 skipped, 1 failed — a timing-sensitive double-submit assertion. Individual
-mocked specs can flake; treat a *new* failure in specs you touched as the signal,
-not the absolute count.) Drop the trailing `auth-loading` to run every mocked
-spec. Specs needing real login use `--project=chromium-authed` with
+mocked specs can flake; treat a _new_ failure in specs you touched as the signal,
+not the absolute count.)
+
+> **Always keep an explicit spec filter** (like `auth-loading` above). The
+> `chromium-mocked` project does NOT install global route mocks — it only sets
+> `testIgnore: /auth\.setup\.ts/` — so running it with no filter also selects
+> authenticated/live specs, which can restore saved auth state and hit real
+> Supabase when fixture env vars are present. Pick specs that stub their own
+> traffic via `page.route()` (e.g. `auth-loading`, `auth-desktop`).
+
+Specs needing real login use `--project=chromium-authed` with
 `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD`/`E2E_BASE_URL`.
 
 ## Run (internals path) — Vitest
@@ -136,8 +156,11 @@ Targeted sub-suites exist (`bun run test:payments-security`,
 
 ## Gotchas
 
-- **Use `127.0.0.1`, not `localhost`.** Vite binds IPv4; `localhost` can resolve
-  to `::1` and the connection hangs. The driver defaults to `http://127.0.0.1:8080`.
+- **Use `127.0.0.1`, not `localhost`.** `vite.config.ts` defaults to
+  `host: "::"` (IPv6 wildcard), which proved unreliable in this container —
+  that's why the recommended command binds `--host 127.0.0.1` explicitly. Once
+  bound to IPv4, `localhost` (which can resolve to `::1`) is not served, so
+  always target `127.0.0.1`. The driver defaults to `http://127.0.0.1:8080`.
 - **Port 8080, not 5173.** `vite.config.ts` hardcodes `port: 8080`. When reusing
   a running server for Playwright, set `E2E_BASE_URL=http://127.0.0.1:8080` so it
   doesn't spawn its own server on 5173.
@@ -160,14 +183,12 @@ Targeted sub-suites exist (`bun run test:payments-security`,
 ## Troubleshooting
 
 - **`bun install --frozen-lockfile` → `403` from `*.pkg.dev/lovable-core-prod`.**
-  The lockfile pins a private Google Artifact Registry mirror that 403s from this
-  sandbox (hit firsthand on `playwright-core`, `hono`). `node_modules` is already
-  present, so you normally skip install entirely. If you must reinstall, override
-  to the public registry for the run:
-  ```bash
-  printf 'registry=https://registry.npmjs.org/\n' > .npmrc.tmp
-  npm_config_userconfig=$PWD/.npmrc.tmp bun install   # then: rm .npmrc.tmp
-  ```
+  `bun.lock` hardcodes ~137 tarball URLs on that private mirror (hit firsthand
+  on `playwright-core`, `hono`), and **no registry override can rewrite bun's
+  locked URLs** — any `bun install` against this lockfile keeps fetching the
+  mirror. Recovery is the npm bootstrap in Prerequisites → "Dependencies
+  (first run)" (verified in a clean worktree: 602 packages, ~14s); npm
+  re-resolves against the override registry, then restore `package-lock.json`.
 - **Playwright can't find a browser / revision mismatch.** Set
   `CHROMIUM=/opt/pw-browsers/chromium-1228/chrome-linux/chrome` (the driver reads
   it) or `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` for `bunx playwright test`.

@@ -9,6 +9,9 @@
 export const PRICING_ANALYTICS_EVENT = "verdant:analytics" as const;
 
 export type PricingAnalyticsName =
+  | "checkout_cancel_page_view"
+  | "checkout_cancel_pricing_clicked"
+  | "checkout_cancel_return_clicked"
   | "context_check_page_view"
   | "context_check_completed"
   | "context_check_reset"

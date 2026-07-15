@@ -17,9 +17,7 @@ import type { ReactNode } from "react";
 
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>(
-    "react-router-dom",
-  );
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return { ...actual, useNavigate: () => navigateMock };
 });
 
@@ -48,6 +46,14 @@ import {
 
 function wrapper({ children }: { children: ReactNode }) {
   return <MemoryRouter initialEntries={["/pricing"]}>{children}</MemoryRouter>;
+}
+
+function wrapperWithReturnTo({ children }: { children: ReactNode }) {
+  return (
+    <MemoryRouter initialEntries={["/pricing?returnTo=%2Fpheno-hunts%2Fnew"]}>
+      {children}
+    </MemoryRouter>
+  );
 }
 
 beforeEach(() => {
@@ -82,7 +88,21 @@ describe("usePaddleCheckout — Slice D overlay cancel wiring", () => {
     });
 
     act(() => handlePaddleCheckoutEvent({ name: "checkout.closed" }));
-    expect(navigateMock).toHaveBeenCalledWith("/checkout/cancel");
+    expect(navigateMock).toHaveBeenCalledWith("/checkout/cancel?plan=pro_annual");
+  });
+
+  it("preserves a sanitized return path in the cancel recovery route", async () => {
+    const { result } = renderHook(() => usePaddleCheckout(), {
+      wrapper: wrapperWithReturnTo,
+    });
+    await act(async () => {
+      await result.current.openCheckout({ priceId: "founder_lifetime" });
+    });
+
+    act(() => handlePaddleCheckoutEvent({ name: "checkout.closed" }));
+    expect(navigateMock).toHaveBeenCalledWith(
+      "/checkout/cancel?plan=founder_lifetime&returnTo=%2Fpheno-hunts%2Fnew",
+    );
   });
 
   it("does NOT route to /checkout/cancel when completion precedes close", async () => {
@@ -95,7 +115,9 @@ describe("usePaddleCheckout — Slice D overlay cancel wiring", () => {
       handlePaddleCheckoutEvent({ name: "checkout.completed" });
       handlePaddleCheckoutEvent({ name: "checkout.closed" });
     });
-    expect(navigateMock).not.toHaveBeenCalledWith("/checkout/cancel");
+    expect(
+      navigateMock.mock.calls.some(([path]) => String(path).startsWith("/checkout/cancel")),
+    ).toBe(false);
   });
 
   it("cancel callback no-ops when the hook has unmounted", async () => {
@@ -108,6 +130,8 @@ describe("usePaddleCheckout — Slice D overlay cancel wiring", () => {
 
     unmount();
     act(() => handlePaddleCheckoutEvent({ name: "checkout.closed" }));
-    expect(navigateMock).not.toHaveBeenCalledWith("/checkout/cancel");
+    expect(
+      navigateMock.mock.calls.some(([path]) => String(path).startsWith("/checkout/cancel")),
+    ).toBe(false);
   });
 });

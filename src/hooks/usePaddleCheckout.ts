@@ -7,7 +7,7 @@ import {
   PaddleCheckoutUnavailableError,
 } from "@/lib/paddle";
 import { useAuth } from "@/store/auth";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import { consumePlanIntent, isKnownPlanIntent, savePlanIntent } from "@/lib/checkoutPlanIntent";
@@ -15,6 +15,7 @@ import { beginCheckoutSession } from "@/lib/checkoutOverlaySession";
 import { resolvePaidAcquisitionSource } from "@/lib/paidAcquisitionAttributionRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 import type { PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
+import { buildCheckoutCancelPath } from "@/lib/checkoutCancelRecoveryRules";
 
 export interface OpenCheckoutOptions {
   priceId: string;
@@ -84,6 +85,7 @@ function defaultSuccessUrl(): string {
 export function usePaddleCheckout(): UsePaddleCheckoutResult {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
 
@@ -133,7 +135,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         if (isKnownPlanIntent(options.priceId)) {
           savePlanIntent(options.priceId);
         }
-        const back = `${window.location.pathname}${window.location.search}` || "/pricing";
+        const back = `${location.pathname}${location.search}` || "/pricing";
         navigate(
           buildAttributedSignupPath({
             source: resolvePaidAcquisitionSource(window.location.search) ?? "pricing_page",
@@ -153,9 +155,13 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         // Paddle.Checkout.open so the module-level eventCallback (set at
         // Initialize) always has a target when checkout.completed /
         // checkout.closed fire.
+        const cancelPath = buildCheckoutCancelPath({
+          planId: options.priceId,
+          returnTo: new URLSearchParams(location.search).get("returnTo"),
+        });
         beginCheckoutSession(() => {
           if (!mountedRef.current) return;
-          navigate("/checkout/cancel");
+          navigate(cancelPath);
         });
 
         (window as any).Paddle.Checkout.open({
@@ -187,7 +193,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         setLoading(false);
       }
     },
-    [navigate, user],
+    [location.pathname, location.search, navigate, user],
   );
 
   // Slice C: auto-resume a pending plan intent EXACTLY ONCE after auth.

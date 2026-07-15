@@ -1,8 +1,11 @@
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { XCircle } from "lucide-react";
+import { resolveCheckoutCancelRecovery } from "@/lib/checkoutCancelRecoveryRules";
+import { trackPricingEvent } from "@/lib/pricingAnalytics";
 
 /**
  * Cancel / not-completed landing.
@@ -12,11 +15,20 @@ import { XCircle } from "lucide-react";
  * urgency, no re-prompt aggression.
  */
 export default function CheckoutCancel() {
+  const [searchParams] = useSearchParams();
+  const recovery = resolveCheckoutCancelRecovery(searchParams);
+
   usePageSeo({
     title: "Checkout not completed | Verdant Grow Diary",
     description: "No charge was made. You can try again anytime.",
     path: "/checkout/cancel",
   });
+
+  useEffect(() => {
+    trackPricingEvent("checkout_cancel_page_view", {
+      plan: recovery.planId ?? "unknown",
+    });
+  }, [recovery.planId]);
 
   return (
     <main
@@ -36,16 +48,36 @@ export default function CheckoutCancel() {
           Checkout was not completed. No charge was made.
         </h1>
         <p className="mt-4 text-muted-foreground">
-          You can head back to pricing whenever you're ready. Your grow
-          diary stays on the Free tier until you complete a purchase.
+          {recovery.planLabel
+            ? `Your ${recovery.planLabel} choice is still selected if you want to review it again. `
+            : "You can head back to pricing whenever you're ready. "}
+          Your grow diary stays on the Free tier until you complete a purchase.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link to="/pricing">
-            <Button size="lg">Back to pricing</Button>
+          <Link
+            to={recovery.pricingPath}
+            data-testid="checkout-cancel-pricing-link"
+            onClick={() =>
+              trackPricingEvent("checkout_cancel_pricing_clicked", {
+                plan: recovery.planId ?? "unknown",
+              })
+            }
+          >
+            <Button size="lg">
+              {recovery.planLabel ? `Review ${recovery.planLabel} again` : "Back to pricing"}
+            </Button>
           </Link>
-          <Link to="/">
+          <Link
+            to={recovery.returnPath}
+            data-testid="checkout-cancel-return-link"
+            onClick={() =>
+              trackPricingEvent("checkout_cancel_return_clicked", {
+                plan: recovery.planId ?? "unknown",
+              })
+            }
+          >
             <Button size="lg" variant="outline">
-              Go to my grow
+              {recovery.returnLabel}
             </Button>
           </Link>
         </div>

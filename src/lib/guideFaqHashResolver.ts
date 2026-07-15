@@ -13,7 +13,8 @@
  * The resolver returns undefined when nothing matches so the accordion
  * simply stays closed rather than opening the wrong item.
  */
-import type { FaqEntry, SeoGuidePage } from "@/constants/verdantSeoContent";
+import type { SeoGuidePage } from "@/constants/verdantSeoContent";
+import type { FaqEntry } from "@/constants/verdantSeoCopy";
 
 /** Topic slugs supported for the cannabis-plant-care guide. Matches
  * diaryFaqLinkRules' DiaryFaqTopic → FAQ index mapping so a diary link

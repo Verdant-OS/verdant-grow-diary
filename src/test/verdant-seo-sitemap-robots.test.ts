@@ -31,7 +31,7 @@ const DISALLOW_RULES = ROBOTS.split(/\r?\n/)
   .map((l) => l.replace(/^Disallow:\s*/i, "").trim())
   .filter((rule) => rule.length > 0);
 
-/** The 15 required guide URLs, pinned literally per the SEO plan. */
+/** The 16 required guide URLs, pinned literally per the SEO plan. */
 const REQUIRED_GUIDE_URLS = [
   "https://verdantgrowdiary.com/guides",
   "https://verdantgrowdiary.com/guides/grow-diary-app",
@@ -48,7 +48,11 @@ const REQUIRED_GUIDE_URLS = [
   "https://verdantgrowdiary.com/guides/grow-journal-app-without-account",
   "https://verdantgrowdiary.com/guides/daily-grow-log-checklist",
   "https://verdantgrowdiary.com/guides/cannabis-plant-care",
+  "https://verdantgrowdiary.com/guides/grow-stage-care-guide",
 ];
+
+/** Custom interactive guide pages that are not in the generic SEO guide slug list. */
+const CUSTOM_GUIDE_URLS = ["https://verdantgrowdiary.com/guides/grow-stage-care-guide"];
 
 function manifestEntryFor(pathname: string) {
   const segs = pathname.split("/").filter(Boolean);
@@ -79,8 +83,12 @@ describe("sitemap.xml exposes the /guides surface", () => {
 
   it("shared slug constants and the literal contract agree (no drift)", () => {
     const derived = new Set(VERDANT_GUIDE_SLUGS.map((s) => `${VERDANT_SITE_ORIGIN}/guides/${s}`));
+    const custom = new Set(CUSTOM_GUIDE_URLS);
     for (const url of REQUIRED_GUIDE_URLS.filter((u) => u !== `${VERDANT_SITE_ORIGIN}/guides`)) {
-      expect(derived.has(url), `slug constants no longer include ${url}`).toBe(true);
+      const isAccountedFor = derived.has(url) || custom.has(url);
+      expect(isAccountedFor, `${url} is not in VERDANT_GUIDE_SLUGS or CUSTOM_GUIDE_URLS`).toBe(
+        true,
+      );
     }
   });
 

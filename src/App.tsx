@@ -86,6 +86,7 @@ const Pricing = lazy(() => import("./pages/Pricing"));
 const Founder = lazy(() => import("./pages/Founder"));
 const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
+const GrowStageCareGuide = lazy(() => import("./pages/GrowStageCareGuide"));
 const Glossary = lazy(() => import("./pages/Glossary"));
 const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
 const AiDoctorContextCheck = lazy(() => import("./pages/AiDoctorContextCheck"));
@@ -199,6 +200,7 @@ const App = () => (
                       intent and route every old link to live `/pricing`. */}
                   <Route path="/upgrade" element={<LegacyUpgradeRedirect />} />
                   <Route path="/guides" element={<GuidesIndex />} />
+                  <Route path="/guides/grow-stage-care-guide" element={<GrowStageCareGuide />} />
                   <Route path="/guides/:slug" element={<GuidePage />} />
                   <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />

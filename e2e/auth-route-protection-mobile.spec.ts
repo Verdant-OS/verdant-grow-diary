@@ -73,6 +73,7 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/hardware-integrations",
   "/guides",
   "/guides/:slug",
+  "/guides/grow-stage-care-guide",
   "/ai-doctor-readiness-check",
   "/founder",
   "/how-ai-doctor-works",

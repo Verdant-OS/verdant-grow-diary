@@ -10,6 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { STAGES } from "@/lib/grow";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
+import { useTents } from "@/hooks/use-tents";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import {
+  evaluateTentCreationGate,
+  FREE_TIER_UPGRADE_PATH,
+} from "@/lib/entitlements/freeTierGates";
 
 interface Props {
   trigger?: React.ReactNode;
@@ -24,8 +31,21 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ name: "", size: "", brand: "", stage: "seedling" });
 
+  // Free-tier tent gate (multiTent=false → single tent). useTents already
+  // filters archived tents. Fails open while entitlements load.
+  const { data: tents } = useTents();
+  const { loading: entLoading, entitlement } = useMyEntitlements();
+  const tentGate = evaluateTentCreationGate(
+    entLoading ? null : entitlement.capabilities,
+    (tents ?? []).length,
+  );
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!tentGate.allowed) {
+      toast.error(tentGate.blockedCopy);
+      return;
+    }
     if (!user) {
       toast.error("Not signed in");
       return;
@@ -74,6 +94,17 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
         <p className="text-xs text-muted-foreground -mt-1">
           Start simple. You can add size, brand, and stage later. Verdant works best once your first plant memory exists.
         </p>
+        {!tentGate.allowed && (
+          <p
+            className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+            data-testid="tent-create-gate-notice"
+          >
+            {tentGate.blockedCopy}{" "}
+            <Link to={FREE_TIER_UPGRADE_PATH} className="underline underline-offset-2">
+              See plans
+            </Link>
+          </p>
+        )}
         <form onSubmit={submit} className="grid gap-3">
           <div>
             <Label>Name</Label>
@@ -106,7 +137,13 @@ export default function CreateTentDialog({ trigger, defaultGrowId, onCreated }: 
               </div>
             </div>
           </details>
-          <Button disabled={busy} className="gradient-leaf text-primary-foreground">Create tent</Button>
+          <Button
+            disabled={busy || !tentGate.allowed}
+            className="gradient-leaf text-primary-foreground"
+            data-testid="tent-create-submit"
+          >
+            Create tent
+          </Button>
         </form>
       </DialogContent>
     </Dialog>

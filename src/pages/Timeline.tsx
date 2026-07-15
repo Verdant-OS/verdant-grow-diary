@@ -794,7 +794,10 @@ export default function Timeline() {
             ? ` (${entries.length} loaded)`
             : ""}
         </p>
-        {entriesTotal !== null && entriesTotal > entries.length && (
+        {/* Guard against the scope-switch race: while a grow reload is in
+            flight the previous grow's entries (and cursor) are still in
+            state, so pagination must stay hidden until the new page lands. */}
+        {!loading && entries.length > 0 && entriesTotal !== null && entriesTotal > entries.length && (
           <button
             type="button"
             data-testid="timeline-load-older"

@@ -15,7 +15,7 @@
  */
 import { useEffect, useMemo } from "react";
 import LegalFooterLinks from "@/components/LegalFooterLinks";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import CustomerGuideSectionView from "@/components/customer/CustomerGuideSection";
 import CustomerGuideTimeline from "@/components/customer/CustomerGuideTimeline";
 import CustomerGuideQrBlock from "@/components/customer/CustomerGuideQrBlock";

@@ -25,6 +25,6 @@ describe("subscriber activation card", () => {
 
   it("contains no direct database reads, writes, or subscriber identifiers", () => {
     expect(CARD).not.toMatch(/supabase|\.from\(|fetch\(|user_id|email|provider_/);
-    expect(CARD).toContain("Activity never grants or proves an entitlement");
+    expect(CARD).toMatch(/Activity\s+never\s+grants\s+or\s+proves\s+an\s+entitlement/);
   });
 });

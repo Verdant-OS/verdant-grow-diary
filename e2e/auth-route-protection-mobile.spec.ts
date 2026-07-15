@@ -93,6 +93,17 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/refund",
 ];
 
+// Internal fixture-only demo surfaces DELIBERATELY mounted OUTSIDE AppShell
+// (see App.tsx comments): they render signed-out by design so the read-only
+// E2E guards can exercise them without a session. Their safety contract is
+// not "redirects to /auth" but "renders fixture content with ZERO private
+// REST hits". Do NOT add real operator/internal pages here — the vitest
+// coverage guardrail pins this list to exactly these two routes.
+const UNAUTH_FIXTURE_ROUTES: string[] = [
+  "/internal/contextual-pheno-comparison-demo",
+  "/internal/demo-proof-walkthrough",
+];
+
 async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {
   await page.route(/\/auth\/v1\//, async (route, req) => {
     const url = req.url();

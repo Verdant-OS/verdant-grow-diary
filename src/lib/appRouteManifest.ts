@@ -79,7 +79,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/billing/:plan",
     access: "redirect",
-    description: "Legacy billing entry — redirects to /pricing with plan preselect.",
+    description: "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout).",
   },
   { path: "/breeder-beta", access: "public", description: "Breeder beta landing page." },
   { path: "/breeding", access: "auth" },

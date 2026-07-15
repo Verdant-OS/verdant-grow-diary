@@ -11,7 +11,12 @@ const WEBHOOK_SRC = readProjectFile("supabase/functions/paddle-webhook/index.ts"
 describe("paddle webhook subscription update handoff", () => {
   it("hands off to the reviewed updater RPC only after event storage, processing, and link capture", () => {
     expect(WEBHOOK_SRC).toContain("function applyPaddleSubscriptionUpdate");
-    expect(WEBHOOK_SRC).toContain('supabase.rpc("apply_paddle_subscription_update_with_audit"');
+    // #234 routes founder candidates to the capped, audited allocation RPC and
+    // recurring events to the audited updater — pin the dispatch exactly.
+    expect(WEBHOOK_SRC).toMatch(
+      /const rpcName = processing\.isFounderCandidate\s*\?\s*"allocate_founder_lifetime_with_audit"\s*:\s*"apply_paddle_subscription_update_with_audit";/,
+    );
+    expect(WEBHOOK_SRC).toMatch(/await supabase\.rpc\(rpcName,\s*\{\s*p_processing_id: processing\.id,?\s*\}/);
 
     const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');
     const processingIdx = WEBHOOK_SRC.indexOf("recordProcessing(supabase, recordedEvent)");
@@ -49,7 +54,7 @@ describe("paddle webhook subscription update handoff", () => {
   it("keeps sandbox-only and signature-before-parse order before any update handoff", () => {
     const sandboxIdx = WEBHOOK_SRC.indexOf('PADDLE_ENVIRONMENT !== "sandbox"');
     const rawIdx = WEBHOOK_SRC.indexOf("req.text()");
-    const verifyIdx = WEBHOOK_SRC.indexOf("constantTimeEqual(expected, parsed.h1)");
+    const verifyIdx = WEBHOOK_SRC.indexOf("await verifyPaddleWebhookSignature(");
     const parseIdx = WEBHOOK_SRC.indexOf("JSON.parse(rawBody)");
     const updateIdx = WEBHOOK_SRC.indexOf("applyPaddleSubscriptionUpdate(supabase, processing, linkCapture)");
 

@@ -209,6 +209,7 @@ const App = () => (
                   {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
                       no operator chrome (header, Quick Log) renders. */}
                   <Route path="/customer/:shareId" element={<CustomerModeGuide />} />
+                  <Route path="/customer/:shareId/cannabis-care" element={<CustomerModeCannabisCareFaq />} />
 
                   {/* Internal read-only walkthrough presenter. Mounted OUTSIDE
                       AppShell so the no-write E2E guard can render it without a

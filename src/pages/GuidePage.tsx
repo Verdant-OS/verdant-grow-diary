@@ -175,8 +175,9 @@ export default function GuidePage() {
                 const value = `faq-${i}`;
                 const isHighlighted = highlightedFaq === value;
                 return (
-                  <div
-                    key={value}
+                  <AccordionItem
+                    key={entry.question}
+                    value={value}
                     id={value}
                     ref={(el) => (faqItemRefs.current[value] = el)}
                     tabIndex={-1}
@@ -187,18 +188,13 @@ export default function GuidePage() {
                         : "transition-colors duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     }
                   >
-                    <AccordionItem
-                      value={value}
-                      className="border-0"
-                    >
-                      <AccordionTrigger className="text-left px-2">
-                        {entry.question}
-                      </AccordionTrigger>
-                      <AccordionContent className="px-2">
-                        {entry.answer}
-                      </AccordionContent>
-                    </AccordionItem>
-                  </div>
+                    <AccordionTrigger className="text-left px-2">
+                      {entry.question}
+                    </AccordionTrigger>
+                    <AccordionContent className="px-2">
+                      {entry.answer}
+                    </AccordionContent>
+                  </AccordionItem>
                 );
               })}
             </Accordion>

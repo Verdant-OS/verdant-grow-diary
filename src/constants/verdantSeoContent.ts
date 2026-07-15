@@ -14,6 +14,7 @@
  */
 
 import type { FaqEntry } from "@/constants/verdantSeoCopy";
+import { CANNABIS_PLANT_CARE_FAQ } from "@/constants/cannabisPlantCareFaq";
 
 export interface GuideSection {
   readonly heading: string;

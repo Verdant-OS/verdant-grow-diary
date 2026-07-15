@@ -47,6 +47,7 @@ export type PricingAnalyticsName =
   | "signup_page_view"
   | "signup_started"
   | "signup_completed"
+  | "signup_verification_required"
   | "signup_failed"
   | "pricing_page_view"
   | "pricing_billing_toggle"

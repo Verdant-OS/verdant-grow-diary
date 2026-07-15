@@ -10,7 +10,12 @@ import { useAuth } from "@/store/auth";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
-import { consumePlanIntent, isKnownPlanIntent, savePlanIntent } from "@/lib/checkoutPlanIntent";
+import {
+  buildCheckoutPlanReturnPath,
+  consumePlanIntent,
+  isKnownPlanIntent,
+  savePlanIntent,
+} from "@/lib/checkoutPlanIntent";
 import { beginCheckoutSession } from "@/lib/checkoutOverlaySession";
 import { resolvePaidAcquisitionSource } from "@/lib/paidAcquisitionAttributionRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
@@ -135,7 +140,11 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         if (isKnownPlanIntent(options.priceId)) {
           savePlanIntent(options.priceId);
         }
-        const back = `${location.pathname}${location.search}` || "/pricing";
+        const back = buildCheckoutPlanReturnPath({
+          pathname: location.pathname,
+          search: location.search,
+          plan: options.priceId,
+        });
         navigate(
           buildAttributedSignupPath({
             source: resolvePaidAcquisitionSource(window.location.search) ?? "pricing_page",

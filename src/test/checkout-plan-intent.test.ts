@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import {
   CHECKOUT_PLAN_INTENT_STORAGE_KEY,
   DEFAULT_PLAN_INTENT_MAX_AGE_MS,
+  buildCheckoutPlanReturnPath,
   clearPlanIntent,
   consumePlanIntent,
   isKnownPlanIntent,
@@ -15,6 +16,45 @@ import {
   savePlanIntent,
   type PlanIntentStorage,
 } from "@/lib/checkoutPlanIntent";
+
+describe("buildCheckoutPlanReturnPath", () => {
+  it("carries the allowlisted plan into the verification return URL", () => {
+    expect(
+      buildCheckoutPlanReturnPath({
+        pathname: "/pricing",
+        search: "?utm_source=pricing_page&utm_medium=owned&utm_campaign=paid_launch",
+        plan: "pro_annual",
+      }),
+    ).toBe(
+      "/pricing?utm_source=pricing_page&utm_medium=owned&utm_campaign=paid_launch&plan=pro_annual",
+    );
+  });
+
+  it("preserves a safe feature return path while replacing an older plan", () => {
+    expect(
+      buildCheckoutPlanReturnPath({
+        pathname: "/pricing",
+        search: "?plan=pro_monthly&returnTo=%2Fpheno-hunts%2Fnew",
+        plan: "founder_lifetime",
+      }),
+    ).toBe("/pricing?plan=founder_lifetime&returnTo=%2Fpheno-hunts%2Fnew");
+  });
+
+  it("drops unknown plans and fails hostile paths closed to Pricing", () => {
+    expect(
+      buildCheckoutPlanReturnPath({
+        pathname: "https://evil.example",
+        search: "?plan=founder_lifetime",
+        plan: "operator_override",
+      }),
+    ).toBe("/pricing");
+  });
+
+  it("is deterministic", () => {
+    const input = { pathname: "/pricing", search: "", plan: "pro_monthly" } as const;
+    expect(buildCheckoutPlanReturnPath(input)).toBe(buildCheckoutPlanReturnPath(input));
+  });
+});
 
 function makeStorage(seed: Record<string, string> = {}): PlanIntentStorage & {
   dump: () => Record<string, string>;
@@ -33,9 +73,8 @@ function makeStorage(seed: Record<string, string> = {}): PlanIntentStorage & {
 }
 
 describe("isKnownPlanIntent", () => {
-  it.each(["pro_monthly", "pro_annual", "founder_lifetime"] as const)(
-    "accepts %s",
-    (id) => expect(isKnownPlanIntent(id)).toBe(true),
+  it.each(["pro_monthly", "pro_annual", "founder_lifetime"] as const)("accepts %s", (id) =>
+    expect(isKnownPlanIntent(id)).toBe(true),
   );
   it.each([
     "",

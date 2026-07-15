@@ -41,6 +41,7 @@ import {
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
 import { buildAcceptanceRows } from "@/lib/agreementConsent";
+import { resolveSignupCompletionDisposition } from "@/lib/signupCompletionRules";
 import {
   DEFAULT_VERIFICATION_COOLDOWN_MS,
   VERIFICATION_COOLDOWN_HINT,
@@ -280,7 +281,11 @@ export default function Auth() {
     // session yet, in which case the insert is skipped and the re-consent
     // gate will prompt on first authenticated load. Signup itself must not
     // fail on a consent-log write error.
-    if (data.user?.id) {
+    // Confirmation-required signups have a user id but no authenticated
+    // session, so protected writes would only add two RLS-denied round trips
+    // before the inbox prompt appears. The re-consent gate covers acceptance
+    // after verification; marketing remains safely opted out by default.
+    if (data?.user?.id && data.session) {
       try {
         const rows = buildAcceptanceRows(data.user.id).map((r) => ({
           ...r,
@@ -312,7 +317,17 @@ export default function Auth() {
     }
     setBusy(false);
     trackPricingEvent("signup_completed", { source: signupSource ?? "direct" });
-    setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
+    setPassword("");
+    if (resolveSignupCompletionDisposition(data) === "verification_required") {
+      trackPricingEvent("signup_verification_required", {
+        source: signupSource ?? "direct",
+      });
+      setSignUpSuccess(
+        "Account created. Check your inbox and open the verification link to continue.",
+      );
+      return;
+    }
+    setSignUpSuccess("Welcome to Verdant. Your account is ready.");
     nav(postSignInTarget(), { replace: true });
   }
 
@@ -682,11 +697,15 @@ export default function Auth() {
                 ) : null}
                 <Button
                   type="submit"
-                  disabled={busy}
+                  disabled={busy || !!signUpSuccess}
                   aria-busy={busy}
                   className="gradient-leaf text-primary-foreground"
                 >
-                  {busy ? "Creating account…" : "Create account"}
+                  {busy
+                    ? "Creating account…"
+                    : signUpSuccess
+                      ? "Account created"
+                      : "Create account"}
                 </Button>
               </form>
             </TabsContent>

@@ -70,8 +70,8 @@ describe("usePaddleCheckout — Slice C plan intent survives /auth", () => {
     expect(target).toContain("utm_source=pricing_page");
     expect(target).toContain("utm_medium=owned");
     expect(target).toContain("utm_campaign=paid_launch");
-    // jsdom's window.location.pathname is "/", not the MemoryRouter path —
-    // asserting the redirectTo shape is enough to prove intent is preserved.
+    const authQuery = new URLSearchParams(target.slice(target.indexOf("?") + 1));
+    expect(authQuery.get("redirectTo")).toBe("/pricing?plan=pro_annual");
   });
 
   it("does NOT save intent for an unknown priceId (allowlist gate)", async () => {

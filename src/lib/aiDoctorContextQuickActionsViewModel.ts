@@ -59,6 +59,8 @@ export interface AiDoctorContextQuickAction {
   testId: string;
 }
 
+export type AiDoctorSnapshotFreshnessTrigger = "fresh" | "stale" | "missing";
+
 export interface BuildAiDoctorContextQuickActionsArgs {
   missing: readonly string[];
   plantId?: string | null;
@@ -66,12 +68,20 @@ export interface BuildAiDoctorContextQuickActionsArgs {
   growId?: string | null;
   tentId?: string | null;
   tentName?: string | null;
+  /**
+   * Freshness state of the latest manual sensor snapshot. When "stale"
+   * or "missing", a "Capture new snapshot" quick action is appended
+   * that opens the Environment Check Quick Log prefilled with plant
+   * / tent identity context (no sensor values are pre-filled).
+   */
+  snapshotFreshnessState?: AiDoctorSnapshotFreshnessTrigger;
 }
 
 const QUICK_ACTION_LABELS: Record<AiDoctorContextQuickActionKind, string> = {
   update_plant_profile: "Edit plant details",
   add_recent_log: "Add note",
   add_manual_sensor_snapshot: "Add sensor snapshot",
+  capture_new_snapshot: "Capture new snapshot",
   add_plant_photo: "Add photo",
 };
 
@@ -97,8 +107,10 @@ const ACTION_ORDER: AiDoctorContextQuickActionKind[] = [
   "update_plant_profile",
   "add_recent_log",
   "add_manual_sensor_snapshot",
+  "capture_new_snapshot",
   "add_plant_photo",
 ];
+
 
 function quickLogPayload(
   args: BuildAiDoctorContextQuickActionsArgs,

@@ -112,6 +112,7 @@ const OperatorPostGrowReflectionDryRun = lazy(
 );
 const OperatorDemoPreview = lazy(() => import("./pages/OperatorDemoPreview"));
 const CustomerModeGuide = lazy(() => import("./pages/CustomerModeGuide"));
+const CustomerModeCannabisCareFaq = lazy(() => import("./pages/CustomerModeCannabisCareFaq"));
 const OperatorAiDoctorPhase1Page = lazy(() =>
   import("./pages/OperatorAiDoctorPhase1").then((m) => ({
     default: m.OperatorAiDoctorPhase1Page,
@@ -208,6 +209,10 @@ const App = () => (
                   {/* Public Customer Mode shell. Mounted OUTSIDE AppShell so
                       no operator chrome (header, Quick Log) renders. */}
                   <Route path="/customer/:shareId" element={<CustomerModeGuide />} />
+                  <Route
+                    path="/customer/:shareId/cannabis-care"
+                    element={<CustomerModeCannabisCareFaq />}
+                  />
 
                   {/* Internal read-only walkthrough presenter. Mounted OUTSIDE
                       AppShell so the no-write E2E guard can render it without a

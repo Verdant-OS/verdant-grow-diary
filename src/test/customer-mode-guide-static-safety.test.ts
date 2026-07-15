@@ -18,6 +18,7 @@ const FILES = [
   "src/components/customer/CustomerGuideTrustFooter.tsx",
   "src/components/customer/CustomerShareLinkPreview.tsx",
   "src/pages/CustomerModeGuide.tsx",
+  "src/pages/CustomerModeCannabisCareFaq.tsx",
 ];
 
 function read(rel: string): string {

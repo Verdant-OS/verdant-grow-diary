@@ -15,25 +15,19 @@
  */
 import { useEffect, useMemo } from "react";
 import LegalFooterLinks from "@/components/LegalFooterLinks";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import CustomerGuideSectionView from "@/components/customer/CustomerGuideSection";
 import CustomerGuideTimeline from "@/components/customer/CustomerGuideTimeline";
 import CustomerGuideQrBlock from "@/components/customer/CustomerGuideQrBlock";
 import CustomerGuideTrustFooter from "@/components/customer/CustomerGuideTrustFooter";
 import { buildCustomerModeGuideViewModel } from "@/lib/customerModeGuideViewModel";
 import { VERDANT_CUSTOMER_MODE_GROWER_FAQ } from "@/constants/verdantSeoContent";
-import {
-  buildFaqPageJsonLd,
-  safeJsonLdStringify,
-} from "@/lib/seoStructuredData";
+import { buildFaqPageJsonLd, safeJsonLdStringify } from "@/lib/seoStructuredData";
 
 export default function CustomerModeGuide() {
   const params = useParams<{ shareId?: string }>();
   const shareId = params.shareId ?? null;
-  const vm = useMemo(
-    () => buildCustomerModeGuideViewModel({ shareId }),
-    [shareId],
-  );
+  const vm = useMemo(() => buildCustomerModeGuideViewModel({ shareId }), [shareId]);
 
   useEffect(() => {
     const faq = buildFaqPageJsonLd({
@@ -49,7 +43,6 @@ export default function CustomerModeGuide() {
     };
   }, []);
 
-
   return (
     <main
       data-testid="customer-mode-guide-page"
@@ -61,9 +54,7 @@ export default function CustomerModeGuide() {
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
             Customer Mode
           </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight">
-            {vm.brandLabel}
-          </h1>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight">{vm.brandLabel}</h1>
           <p
             data-testid="customer-mode-shell-disclaimer"
             className="mt-3 text-xs text-amber-300/80"
@@ -99,27 +90,38 @@ export default function CustomerModeGuide() {
             Grower questions
           </h2>
           <p className="mt-2 text-xs text-muted-foreground">
-            Verdant suggests; the grower decides. Verdant cannot touch your
-            equipment. Sensor readings are labeled by source — live, manual,
-            csv, demo, stale, or invalid.
+            Verdant suggests; the grower decides. Verdant cannot touch your equipment. Sensor
+            readings are labeled by source — live, manual, csv, demo, stale, or invalid.
           </p>
           <dl className="mt-4 space-y-4">
             {VERDANT_CUSTOMER_MODE_GROWER_FAQ.map((item) => (
-              <div
-                key={item.question}
-                data-testid={`customer-mode-grower-faq-item`}
-              >
+              <div key={item.question} data-testid={`customer-mode-grower-faq-item`}>
                 <dt className="text-sm font-medium">{item.question}</dt>
-                <dd className="mt-1 text-sm text-muted-foreground">
-                  {item.answer}
-                </dd>
+                <dd className="mt-1 text-sm text-muted-foreground">{item.answer}</dd>
               </div>
             ))}
           </dl>
         </section>
 
-        <CustomerGuideTrustFooter />
+        <section
+          data-testid="customer-mode-cannabis-care-link"
+          className="rounded-xl border border-border/60 bg-card/60 p-5"
+        >
+          <h2 className="text-base font-semibold tracking-tight">Cannabis plant care FAQ</h2>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Quick answers to the five most common home-grower questions: watering, nutrients, yellow
+            leaves, environment, and harvest timing.
+          </p>
+          <Link
+            to={shareId ? `/customer/${shareId}/cannabis-care` : "/customer/guide/cannabis-care"}
+            className="mt-3 inline-block text-sm text-primary hover:underline"
+            data-testid="customer-mode-cannabis-care-link-anchor"
+          >
+            Open the FAQ →
+          </Link>
+        </section>
 
+        <CustomerGuideTrustFooter />
 
         <footer
           data-testid="customer-mode-guide-footer"

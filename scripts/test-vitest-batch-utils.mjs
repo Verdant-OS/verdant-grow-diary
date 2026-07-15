@@ -145,6 +145,16 @@ t("parseBatchArgs: defaults", () => {
   assert.equal(o.chunkSize, null);
   assert.equal(o.isolate, false);
   assert.equal(o.pool, null);
+  // Retry is strictly opt-in: a runner invoked without the flag behaves
+  // exactly as before this option existed.
+  assert.equal(o.retryFailedChunkOnce, false);
+});
+
+t("parseBatchArgs: parses --retry-failed-chunk-once", () => {
+  assert.equal(
+    parseBatchArgs(["--retry-failed-chunk-once"]).retryFailedChunkOnce,
+    true,
+  );
 });
 
 t("parseBatchArgs: parses flags", () => {

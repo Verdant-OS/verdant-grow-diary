@@ -178,6 +178,12 @@ export function parseBatchArgs(argv) {
     chunkSize: null,
     isolate: false,
     pool: null,
+    // Flake containment (explicitly approved by the repo owner): re-run a
+    // FAILED chunk exactly once before marking the batch failed. Real
+    // failures still fail (twice); one-off runner flakes pass on the
+    // retry. Every retry is visible in the chunk markers — never a
+    // silent pass.
+    retryFailedChunkOnce: false,
   };
   for (const raw of argv) {
     if (!raw.startsWith("--")) continue;
@@ -233,6 +239,9 @@ export function parseBatchArgs(argv) {
       }
       case "continue-on-fail":
         out.continueOnFail = val === "true" || val === "1";
+        break;
+      case "retry-failed-chunk-once":
+        out.retryFailedChunkOnce = val === "true" || val === "1";
         break;
       default:
         // Ignore unknown flags so Vitest forwarding can be layered later.

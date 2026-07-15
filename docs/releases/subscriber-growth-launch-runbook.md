@@ -4,9 +4,11 @@ This gate packages the subscriber-growth branch into reproducible release
 evidence. It checks the repository identity and base ancestry, requires a
 clean release scope, runs every changed targeted test plus type-check/build/lint/
 diff integrity, verifies formatting across the complete base-relative release
-diff, audits the
-production build through a local Vite preview, and optionally compares the
+diff, audits the production build through a local Vite preview, and optionally compares the
 live site with the same capability contract.
+
+Use `subscriber-growth-publication-handoff.md` for the ordered reviewer,
+database, deployment, live-verification, and first-24-hour workflow.
 
 It never pushes, deploys, merges, mutates billing, or proves the August
 subscriber goal. Those are separate operator decisions and evidence.

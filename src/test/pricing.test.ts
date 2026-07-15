@@ -321,16 +321,30 @@ describe("Safety: no private data on public page", () => {
 
   it("does not import supabase client or private hooks", () => {
     expect(PAGE).not.toMatch(/@\/integrations\/supabase\/client/);
-    // Allowed: usePageSeo (SEO <head> only) and usePaddleCheckout
-    // (auth-state + Paddle overlay; signed-out users bounce to /auth). Any
-    // other @/hooks import (dashboard data hooks) remains forbidden.
-    expect(PAGE).not.toMatch(/@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b)/);
+    // Allowed: usePageSeo (SEO <head> only), usePaddleCheckout
+    // (auth-state + Paddle overlay; signed-out users bounce to /auth), and
+    // useFounderSlotsRemaining (a fixed public aggregate counter). Any other
+    // @/hooks import (dashboard data hooks) remains forbidden.
+    expect(PAGE).not.toMatch(
+      /@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b|useFounderSlotsRemaining\b)/,
+    );
     // And the checkout hook itself must stay free of private data reads —
     // it may read auth session state, never tables or the supabase client.
     const CHECKOUT_HOOK = readSrc("hooks/usePaddleCheckout.ts");
     expect(CHECKOUT_HOOK).not.toMatch(/@\/integrations\/supabase\/client/);
     expect(CHECKOUT_HOOK).not.toMatch(/supabase\s*\.\s*from\(/);
     expect(CHECKOUT_HOOK).not.toMatch(/service_role/);
+
+    // The Founder availability hook may call only the fixed public aggregate
+    // endpoint. It must never query tables or become entitlement authority.
+    const FOUNDER_SLOTS_HOOK = readSrc("hooks/useFounderSlotsRemaining.ts");
+    expect(FOUNDER_SLOTS_HOOK).toContain('"founder-slots-remaining"');
+    expect(FOUNDER_SLOTS_HOOK.match(/functions\.invoke\(/g)).toHaveLength(1);
+    expect(FOUNDER_SLOTS_HOOK).not.toMatch(/supabase\s*\.\s*from\(/);
+    expect(FOUNDER_SLOTS_HOOK).not.toMatch(/service_role/);
+    for (const table of PRIVATE_TABLES) {
+      expect(FOUNDER_SLOTS_HOOK).not.toMatch(new RegExp(`\\.from\\(["']${table}["']`));
+    }
   });
 
   it("introduces no service_role or ai-coach call", () => {

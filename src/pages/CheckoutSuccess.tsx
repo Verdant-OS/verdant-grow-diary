@@ -30,7 +30,6 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 30_000;
 
-
 export default function CheckoutSuccess() {
   const { loading, entitlement, refetch } = useMyEntitlements();
   const [searchParams] = useSearchParams();

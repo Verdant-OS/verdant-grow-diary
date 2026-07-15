@@ -27,16 +27,15 @@ import {
   buildFaqPageJsonLd,
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
+import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
 
 
 export default function GuidePage() {
   const { slug } = useParams<{ slug: string }>();
   const location = useLocation();
   const guide = findGuideBySlug(slug);
-  const initialFaqValue = (() => {
-    const hash = location.hash.replace(/^#/, "");
-    return hash.startsWith("faq-") ? hash : undefined;
-  })();
+  const initialResolved = resolveGuideFaqFromHash(guide, location.hash);
+  const initialFaqValue = initialResolved?.value;
   const [openFaq, setOpenFaq] = useState<string | undefined>(initialFaqValue);
   const [highlightedFaq, setHighlightedFaq] = useState<string | undefined>(
     initialFaqValue,
@@ -44,15 +43,16 @@ export default function GuidePage() {
   const faqItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
-    const hash = location.hash.replace(/^#/, "");
-    if (!hash.startsWith("faq-")) return;
-    setOpenFaq(hash);
-    setHighlightedFaq(hash);
+    const resolved = resolveGuideFaqFromHash(guide, location.hash);
+    if (!resolved) return;
+    const target = resolved.value;
+    setOpenFaq(target);
+    setHighlightedFaq(target);
     // Defer scroll until after the accordion item opens, then move focus
     // to the highlighted item so keyboard users land on the answer they
     // deep-linked into.
     const scrollT = window.setTimeout(() => {
-      const el = faqItemRefs.current[hash] ?? document.getElementById(hash);
+      const el = faqItemRefs.current[target] ?? document.getElementById(target);
       if (el) {
         // jsdom does not implement scrollIntoView; guard so focus still runs.
         try {
@@ -70,7 +70,7 @@ export default function GuidePage() {
       window.clearTimeout(scrollT);
       window.clearTimeout(fadeT);
     };
-  }, [location.hash]);
+  }, [location.hash, guide]);
 
 
 

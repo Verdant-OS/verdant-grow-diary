@@ -20,7 +20,7 @@ export const VERDANT_HERO = {
   tagline: "Plant memory. Sensor truth. Grower-approved decisions.",
   primaryCtaLabel: "Start Free",
   pricingCtaLabel: "See Pro & Founder plans",
-  secondaryCtaLabel: "See how Verdant works",
+  secondaryCtaLabel: "Take the 60-second tour",
   safetyLine: "No fake live data. No blind automation. The grower stays in control.",
 } as const;
 

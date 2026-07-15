@@ -11,12 +11,12 @@ import { useAuth } from "@/store/auth";
 import BrandLogo from "@/components/BrandLogo";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
 import LandingAuthedOnboardingBridge from "@/components/LandingAuthedOnboardingBridge";
+import PublicOneTentTour from "@/components/PublicOneTentTour";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   VERDANT_HERO,
   VERDANT_VALUE_DRIVERS,
   VERDANT_TRUST,
-  VERDANT_LOOP,
 } from "@/constants/verdantPositioningCopy";
 import { VERDANT_SEO_LANDING_SECTIONS, VERDANT_LANDING_FAQ } from "@/constants/verdantSeoCopy";
 import { buildFaqPageJsonLd, safeJsonLdStringify } from "@/lib/seoStructuredData";
@@ -142,20 +142,21 @@ export default function Landing() {
               {VERDANT_HERO.pricingCtaLabel}
             </Button>
           </Link>
-          <a href="#loop">
-            <Button size="lg" variant="ghost">
+          <a
+            href="#loop"
+            data-testid="landing-loop-cta-hero"
+            onClick={() => trackPricingEvent("landing_loop_opened", { source: "hero" })}
+          >
+            <Button size="lg" variant="outline">
               {VERDANT_HERO.secondaryCtaLabel}
             </Button>
           </a>
-          <Link to="/auth">
-            <Button size="lg" variant="ghost">
-              Sign in
-            </Button>
-          </Link>
         </div>
         <p className="mt-6 text-xs text-muted-foreground">{VERDANT_HERO.safetyLine}</p>
         {user && <LandingAuthedOnboardingBridge />}
       </section>
+
+      <PublicOneTentTour hasAccount={Boolean(user)} />
 
       {/* Value drivers */}
       <section id="features" className="px-6 py-14 max-w-5xl mx-auto">
@@ -170,29 +171,6 @@ export default function Landing() {
             <FeatureCard key={card.title} title={card.title} body={card.body} />
           ))}
         </div>
-      </section>
-
-      {/* One-Tent Loop */}
-      <section id="loop" className="px-6 py-14 max-w-5xl mx-auto">
-        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
-          {VERDANT_LOOP.heading}
-        </h2>
-        <p className="mt-3 text-center text-muted-foreground max-w-2xl mx-auto">
-          {VERDANT_LOOP.body}
-        </p>
-        <ol className="mt-8 flex flex-wrap items-stretch justify-center gap-2">
-          {VERDANT_LOOP.steps.map((step, i) => (
-            <li
-              key={step}
-              className="flex items-center gap-2 rounded-lg border border-border/50 bg-card/40 px-3 py-2 text-sm"
-            >
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <span className="font-medium">{step}</span>
-            </li>
-          ))}
-        </ol>
       </section>
 
       {/* SEO landing sections — grower-intent keyword clusters. */}

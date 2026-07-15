@@ -78,6 +78,24 @@ describe("landing subscriber funnel", () => {
     expect(JSON.stringify(mocks.track.mock.calls)).not.toMatch(/email|user_id|token/i);
   });
 
+  it("puts the illustrative One-Tent tour directly after the hero and measures entry", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <Landing />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("public-one-tent-tour")).toBeInTheDocument();
+    expect(screen.getByTestId("public-one-tent-tour-demo-label")).toHaveTextContent(
+      /illustrative product walkthrough/i,
+    );
+    const heroEntry = screen.getByTestId("landing-loop-cta-hero");
+    expect(heroEntry).toHaveAttribute("href", "#loop");
+    await user.click(heroEntry);
+    expect(mocks.track).toHaveBeenCalledWith("landing_loop_opened", { source: "hero" });
+  });
+
   it("sends every AppShell auth check to the public landing, never directly to auth", () => {
     expect(APP_SHELL).toMatch(/useRequireAuth\("\/welcome"\)/);
     expect(APP_SHELL).toMatch(/nav\("\/welcome"/);

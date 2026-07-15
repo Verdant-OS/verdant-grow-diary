@@ -172,7 +172,7 @@ export function buildSubscriberGrowthSprintBoard(
       title: "Clear due follow-ups",
       description: `${followUpDue} pricing-interest ${followUpDue === 1 ? "contact is" : "contacts are"} due for human follow-up. These are leads, not subscribers.`,
       ctaLabel: "Review due follow-ups",
-      href: "/admin/leads",
+      href: "/admin/leads?conversion=follow_up",
       sortWeight: 100,
     });
   }
@@ -184,7 +184,7 @@ export function buildSubscriberGrowthSprintBoard(
       title: "Start first contact",
       description: `${needsFirstContact} pricing-interest ${needsFirstContact === 1 ? "lead has" : "leads have"} not received a recorded first contact. Outreach stays manual and operator-reviewed.`,
       ctaLabel: "Open interest leads",
-      href: "/admin/leads",
+      href: "/admin/leads?conversion=first_contact",
       sortWeight: 95,
     });
   }

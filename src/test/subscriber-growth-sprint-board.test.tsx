@@ -82,7 +82,11 @@ describe("SubscriberGrowthSprintBoard", () => {
     );
     expect(screen.getByText("Review due follow-ups").closest("a")).toHaveAttribute(
       "href",
-      "/admin/leads",
+      "/admin/leads?conversion=follow_up",
+    );
+    expect(screen.getByText("Open interest leads").closest("a")).toHaveAttribute(
+      "href",
+      "/admin/leads?conversion=first_contact",
     );
     expect(screen.getByText("Audit entitlements").closest("a")).toHaveAttribute(
       "href",

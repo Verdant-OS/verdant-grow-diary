@@ -86,6 +86,12 @@ describe("subscriber growth sprint rules", () => {
       "close_pace_gap",
       "activate_referrals",
     ]);
+    expect(board.actions.find((action) => action.id === "follow_up_due")?.href).toBe(
+      "/admin/leads?conversion=follow_up",
+    );
+    expect(board.actions.find((action) => action.id === "first_contact")?.href).toBe(
+      "/admin/leads?conversion=first_contact",
+    );
     expect(board.comparisonNote).toMatch(/separate windows, not a cohort conversion rate/i);
     expect(
       buildSubscriberGrowthSprintBoard({

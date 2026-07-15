@@ -103,6 +103,10 @@ export function formattableChangedFiles(files) {
   return files.filter((file) => /\.(?:[cm]?[jt]s|tsx|json|md|yml|yaml)$/.test(file));
 }
 
+export function buildTargetedTestCommandArgs(tests) {
+  return ["vitest", "run", ...tests, "--reporter=dot", "--maxWorkers=4"];
+}
+
 function stripAnsi(value) {
   return String(value ?? "").replace(ANSI_PATTERN, "");
 }
@@ -231,7 +235,7 @@ export async function runSubscriberGrowthLaunchGate(args) {
   const source = inspectSource(args, files, tests, formattable);
 
   const commands = [
-    runCommand("targeted_tests", "bunx", ["vitest", "run", ...tests, "--reporter=dot"]),
+    runCommand("targeted_tests", "bunx", buildTargetedTestCommandArgs(tests)),
     inspectMigrationContract(),
     runCommand("typecheck", "bun", ["run", "typecheck"]),
     runCommand("build", "bun", ["run", "build"]),

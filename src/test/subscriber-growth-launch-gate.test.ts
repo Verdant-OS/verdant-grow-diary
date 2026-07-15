@@ -6,6 +6,7 @@ import {
   formatSubscriberGrowthLaunchGate,
 } from "../../scripts/releases/subscriber-growth-launch-gate-rules.mjs";
 import {
+  buildTargetedTestCommandArgs,
   formattableChangedFiles,
   parseGitPorcelainPaths,
   parseSubscriberGrowthGateArgs,
@@ -64,6 +65,17 @@ const liveParity = {
 };
 
 describe("subscriber growth launch gate", () => {
+  it("caps changed-test concurrency without relaxing the per-test timeout", () => {
+    expect(buildTargetedTestCommandArgs(["src/test/a.test.ts", "src/test/b.test.ts"])).toEqual([
+      "vitest",
+      "run",
+      "src/test/a.test.ts",
+      "src/test/b.test.ts",
+      "--reporter=dot",
+      "--maxWorkers=4",
+    ]);
+  });
+
   it("reports LOCAL_READY only after clean source, all commands, and local production parity pass", () => {
     expect(
       evaluateSubscriberGrowthLaunchGate({

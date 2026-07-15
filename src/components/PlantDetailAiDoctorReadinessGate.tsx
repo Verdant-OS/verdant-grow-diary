@@ -241,12 +241,19 @@ export default function PlantDetailAiDoctorReadinessGate({
         </button>
       </div>
 
-      {gate.showQuickActions && quickActions.length > 0 ? (
+      {quickActions.length > 0 &&
+      (gate.showQuickActions ||
+        quickActions.some((a) => a.kind === "capture_new_snapshot")) ? (
         <AiDoctorContextQuickActions
-          actions={quickActions}
+          actions={
+            gate.showQuickActions
+              ? quickActions
+              : quickActions.filter((a) => a.kind === "capture_new_snapshot")
+          }
           testIdPrefix="plant-ai-doctor-readiness-gate"
         />
       ) : null}
+
     </section>
   );
 }

@@ -247,6 +247,56 @@ export default function PlantDetailDoctorLaunchDialog({
     });
   }, [readinessResult.latest.manualSnapshotAt, now]);
 
+  const queryClient = useQueryClient();
+  const [logging, setLogging] = useState(false);
+  const canLogReadiness = typeof growId === "string" && growId.trim().length > 0;
+
+  const handleLogReadinessToDiary = useCallback(async () => {
+    if (!canLogReadiness || !plantId) return;
+    setLogging(true);
+    const built = buildAiDoctorReadinessDiaryEntry({
+      readiness: readinessResult.readiness,
+      latestSnapshotAtIso: readinessResult.latest.manualSnapshotAt,
+      blockingCodes: blockedExplanation.blockingCodes,
+      growId,
+      plantId,
+      tentId: tentId ?? null,
+      now: now ? now.getTime() : undefined,
+    });
+    if (!built.ok) {
+      toast.error("Could not log readiness", { description: built.reason });
+      setLogging(false);
+      return;
+    }
+    const { draft } = built;
+    const { error } = await supabase.from("diary_entries").insert({
+      grow_id: draft.grow_id,
+      plant_id: draft.plant_id,
+      tent_id: draft.tent_id,
+      note: draft.note,
+      details: draft.details as unknown as Json,
+    });
+    if (error) {
+      toast.error("Failed to log readiness", { description: error.message });
+    } else {
+      toast.success("Readiness logged to diary");
+      queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
+      queryClient.invalidateQueries({ queryKey: ["timeline-memory"] });
+      queryClient.invalidateQueries({ queryKey: ["plant-recent-activity"] });
+    }
+    setLogging(false);
+  }, [
+    canLogReadiness,
+    plantId,
+    readinessResult.readiness,
+    readinessResult.latest.manualSnapshotAt,
+    blockedExplanation.blockingCodes,
+    growId,
+    tentId,
+    now,
+    queryClient,
+  ]);
+
   const handleAddContext = useCallback(() => {
     if (typeof window !== "undefined" && addContextDecision.quickLogEvent) {
       window.dispatchEvent(

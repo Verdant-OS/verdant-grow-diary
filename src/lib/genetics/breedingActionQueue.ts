@@ -70,8 +70,6 @@ export function buildBreedingActionQueuePayloads(
       suggested_change: `${suggestion.title} — by ${dueLabel}`,
       reason: `${suggestion.reason} [event:${event.id}]`,
       risk_level: suggestion.risk_level,
-<<<<<<< HEAD
-=======
       // Privacy-safe back-reference: only id, type, source, occurred_at —
       // no raw notes, no user_id, no device data, no secret-like fields.
       originating_timeline_events: [
@@ -82,7 +80,6 @@ export function buildBreedingActionQueuePayloads(
           occurred_at: event.occurred_at,
         },
       ],
->>>>>>> origin/verdant-grow-diary
     };
   });
 }

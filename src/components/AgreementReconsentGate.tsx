@@ -177,13 +177,9 @@ export function AgreementReconsentGate() {
         <DialogHeader>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-primary" aria-hidden />
-<<<<<<< HEAD
             <DialogTitle id="reconsent-title">
               {anyPrior ? "Updated agreements" : "Accept our agreements"}
             </DialogTitle>
-=======
-            <DialogTitle>{anyPrior ? "Updated agreements" : "Accept our agreements"}</DialogTitle>
->>>>>>> origin/verdant-grow-diary
           </div>
           <DialogDescription>
             {anyPrior

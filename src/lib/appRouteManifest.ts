@@ -66,22 +66,12 @@ export interface AppRouteEntry {
 export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "*", access: "public", description: "NotFound catch-all." },
   { path: "/", access: "auth", description: "Dashboard." },
-<<<<<<< HEAD
-=======
   { path: "/.lovable/oauth/consent", access: "public", description: "OAuth consent screen." },
   { path: "/account/preferences", access: "auth" },
->>>>>>> origin/verdant-grow-diary
   { path: "/action-queue", access: "redirect", description: "→ /actions" },
   { path: "/actions", access: "auth" },
   { path: "/actions/:actionId", access: "auth" },
   { path: "/admin/leads", access: "internal" },
-<<<<<<< HEAD
-  { path: "/alerts", access: "auth" },
-  { path: "/alerts/:alertId", access: "auth" },
-  { path: "/auth", access: "public" },
-  { path: "/billing/:plan", access: "public", description: "Billing placeholder." },
-  { path: "/breeding/new", access: "auth", description: "New breeding event entry." },
-=======
   { path: "/ai-doctor", access: "redirect", description: "→ /doctor" },
   { path: "/alerts", access: "auth" },
   { path: "/alerts/:alertId", access: "auth" },
@@ -98,7 +88,6 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/checkout/cancel", access: "public", description: "Checkout cancelled landing page." },
   { path: "/checkout/success", access: "public", description: "Checkout success landing page." },
   { path: "/creator-beta", access: "public", description: "Creator beta landing page." },
->>>>>>> origin/verdant-grow-diary
   {
     path: "/customer/:shareId",
     access: "public",
@@ -108,13 +97,8 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/demo", access: "redirect", description: "→ /welcome" },
   {
     path: "/demo/one-tent-live-proof",
-<<<<<<< HEAD
-    access: "auth",
-    description: "One-tent live proof page (legacy /demo path, mounted inside AppShell).",
-=======
     access: "operator",
     description: "One-tent live proof page (legacy /demo path, operator-only).",
->>>>>>> origin/verdant-grow-diary
   },
   { path: "/diagnostics", access: "operator" },
   {
@@ -126,14 +110,6 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },
   { path: "/features", access: "redirect", description: "→ /welcome" },
-<<<<<<< HEAD
-  { path: "/grow-lineage", access: "internal" },
-  { path: "/grow-room", access: "redirect", description: "→ /" },
-  { path: "/grows", access: "auth" },
-  { path: "/grows/:growId", access: "auth" },
-  { path: "/hardware-integrations", access: "public" },
-
-=======
   { path: "/glossary", access: "public" },
   { path: "/grow-lineage", access: "auth" },
   { path: "/grow-room", access: "redirect", description: "→ /" },
@@ -149,7 +125,6 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/hardware-integrations", access: "public" },
   { path: "/health", access: "auth", description: "Health check page." },
   { path: "/how-ai-doctor-works", access: "public", description: "AI Doctor explainer page." },
->>>>>>> origin/verdant-grow-diary
   { path: "/ingest-inspector", access: "operator" },
   {
     path: "/internal/ai-doctor-confidence-audit",
@@ -162,14 +137,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Static Phase 1 view model preview.",
   },
   {
-<<<<<<< HEAD
-=======
     path: "/internal/contextual-pheno-comparison-demo",
     access: "internal",
     description: "Internal read-only Contextual Pheno Comparison v0.1 demo (fixture data only).",
   },
   {
->>>>>>> origin/verdant-grow-diary
     path: "/internal/demo-proof-walkthrough",
     access: "internal",
     description: "Read-only operator walkthrough of the V0 One-Tent Loop proof path.",
@@ -186,25 +158,18 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   { path: "/leads", access: "internal" },
   { path: "/login", access: "redirect", description: "→ /auth" },
-<<<<<<< HEAD
-  { path: "/logs", access: "auth" },
-=======
   { path: "/logs", access: "redirect", description: "→ /timeline" },
->>>>>>> origin/verdant-grow-diary
   {
     path: "/onboarding",
     access: "auth",
     description: "Post-sign-in start-screen choice (diary-first default).",
   },
   {
-<<<<<<< HEAD
-=======
     path: "/one-tent-loop-proof",
     access: "internal",
     description: "Live one-tent loop proof page (operator-gated).",
   },
   {
->>>>>>> origin/verdant-grow-diary
     path: "/operator/ai-doctor-phase1",
     access: "operator",
     description: "Operator AI Doctor Phase 1 results page.",
@@ -219,14 +184,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "operator",
     description: "Operator billing subscription update audit (read-only).",
   },
-<<<<<<< HEAD
-=======
   {
     path: "/operator/demo-preview",
     access: "operator",
     description: "Operator demo preview page (read-only).",
   },
->>>>>>> origin/verdant-grow-diary
   { path: "/operator/ecowitt", access: "operator", description: "Cloud Canary preview." },
   {
     path: "/operator/ecowitt-bridge-debug",
@@ -278,22 +240,16 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "operator",
     description: "Post-Grow Reflection dry-run diagnostics panel (read-only).",
   },
-<<<<<<< HEAD
-
-=======
   {
     path: "/operator/release-readiness",
     access: "operator",
     description: "Operator release readiness checklist (read-only).",
   },
->>>>>>> origin/verdant-grow-diary
   {
     path: "/pheno-comparison",
     access: "public",
     description:
       "Read-only Pheno Comparison preview (sample data, mounted outside AuthProvider/GrowsProvider/AppShell — no grows read, no write chrome).",
-<<<<<<< HEAD
-=======
   },
   {
     path: "/pheno-expression-showcase",
@@ -309,7 +265,6 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     path: "/pheno-hunts/:id/keepers",
     access: "auth",
     description: "Pheno hunt keepers selection.",
->>>>>>> origin/verdant-grow-diary
   },
   { path: "/pheno-hunts/:id/workspace", access: "auth", description: "Pheno hunt workspace." },
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
@@ -317,14 +272,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/plants", access: "auth" },
   { path: "/plants/:id", access: "auth" },
   { path: "/pricing", access: "public" },
-<<<<<<< HEAD
-=======
   { path: "/privacy", access: "public", description: "Privacy policy page." },
   { path: "/privacy-policy", access: "redirect", description: "→ /privacy" },
   { path: "/refund", access: "public", description: "Refund policy page." },
   { path: "/refund-policy", access: "redirect", description: "→ /refund" },
   { path: "/refunds", access: "redirect", description: "→ /refund" },
->>>>>>> origin/verdant-grow-diary
   { path: "/register", access: "redirect", description: "→ /auth" },
   { path: "/reports", access: "auth" },
   { path: "/reports/post-grow/:growId", access: "auth", description: "Post-grow learning report." },
@@ -333,26 +285,19 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/sensors/ecowitt-audit", access: "operator" },
   { path: "/sensors/ingest-normalizer", access: "operator" },
   { path: "/settings", access: "auth" },
-<<<<<<< HEAD
-=======
   {
     path: "/settings/agent-integrations",
     access: "auth",
     description: "Agent integrations settings.",
   },
->>>>>>> origin/verdant-grow-diary
   { path: "/signup", access: "redirect", description: "→ /auth" },
   { path: "/tasks", access: "auth" },
   { path: "/tents", access: "auth" },
   { path: "/tents/:id", access: "auth" },
-<<<<<<< HEAD
-  { path: "/timeline", access: "auth" },
-=======
   { path: "/terms", access: "public", description: "Terms of service page." },
   { path: "/terms-of-service", access: "redirect", description: "→ /terms" },
   { path: "/timeline", access: "auth" },
   { path: "/upgrade", access: "public", description: "Upgrade / pricing presenter page." },
->>>>>>> origin/verdant-grow-diary
   { path: "/welcome", access: "public" },
 ];
 

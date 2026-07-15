@@ -147,9 +147,19 @@ export default function GuidePage() {
             <h2 className="font-display text-xl md:text-2xl font-semibold mb-4">
               Common questions
             </h2>
-            <Accordion type="single" collapsible className="w-full">
+            <Accordion
+              type="single"
+              collapsible
+              className="w-full"
+              value={openFaq}
+              onValueChange={(v) => setOpenFaq(v || undefined)}
+            >
               {guide.faq.map((entry, i) => (
-                <AccordionItem key={entry.question} value={`faq-${i}`}>
+                <AccordionItem
+                  key={entry.question}
+                  value={`faq-${i}`}
+                  id={`faq-${i}`}
+                >
                   <AccordionTrigger className="text-left">
                     {entry.question}
                   </AccordionTrigger>
@@ -157,6 +167,7 @@ export default function GuidePage() {
                 </AccordionItem>
               ))}
             </Accordion>
+
           </section>
         )}
 

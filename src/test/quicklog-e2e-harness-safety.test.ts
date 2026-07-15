@@ -145,9 +145,9 @@ describe("Quick Log Playwright harness safety", () => {
       expect(scrubbed, `${file} must not toggle attach via localStorage`).not.toMatch(
         /localStorage[\s\S]{0,40}attach/i,
       );
-      // The scrub blanks string literals, so a real call like
-      // localStorage.setItem("attach", ...) loses its key before the check
-      // above runs. Catch the executable call-site shape in the RAW source.
+      // The scrub blanks string literals, so a real setItem call with an
+      // "attach" key loses that key before the check above runs. Catch the
+      // executable call-site shape in the RAW source.
       expect(body, `${file} must not persist attach via localStorage`).not.toMatch(
         /localStorage\s*\.\s*(?:set|get|remove)Item\(\s*["'`][^"'`\n]*attach/i,
       );

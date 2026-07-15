@@ -33,6 +33,13 @@ export interface BuildAiDoctorSnapshotStalenessExplanationArgs {
   latestSnapshotAtIso: string | null;
   /** "Now" epoch ms — injectable for deterministic tests. */
   now?: number;
+  /**
+   * Pluggable clock used when `now` is missing, non-finite, or outside
+   * the safe JS `Date` range. Defaults to `Date.now`. Injectable so
+   * tests can make the out-of-range fallback path fully deterministic
+   * without stubbing globals.
+   */
+  nowFallback?: () => number;
   /** Override the freshness window (ms). Defaults to the shared 48h. */
   snapshotFreshMs?: number;
   /**

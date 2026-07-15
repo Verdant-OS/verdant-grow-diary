@@ -172,7 +172,12 @@ export default function GuidePage() {
               collapsible
               className="w-full"
               value={openFaq}
-              onValueChange={(v) => setOpenFaq(v || undefined)}
+              onValueChange={(v) => {
+                setOpenFaq(v || undefined);
+                // Clear the deep-link highlight when the user manually
+                // collapses the accordion; otherwise keep it visible.
+                if (!v) setHighlightedFaq(undefined);
+              }}
             >
               {guide.faq.map((entry, i) => {
                 const value = `faq-${i}`;

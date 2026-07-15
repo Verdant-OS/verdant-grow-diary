@@ -17,14 +17,16 @@ export interface CheckoutTrustCopyInput {
   blocked: boolean;
 }
 
+export const CHECKOUT_MECHANISM_FAQ_ANSWER =
+  "Checkout opens a secure Paddle overlay. A charge happens only when Paddle confirms a real payment, and your plan activates only after Verdant verifies that payment server-side — this page can never charge you or grant access by itself. If billing is not enabled in the current environment, checkout simply will not complete and nothing is charged.";
+
 const LIVE_COPY: CheckoutTrustCopy = Object.freeze({
   state: "live",
   label: "Secure live checkout",
   summary:
     "Payments are processed by Paddle. You will review the plan, price, and total before confirming your purchase.",
   faqQuestion: "Is checkout live?",
-  faqAnswer:
-    "Yes. This site uses Paddle's live checkout. A completed purchase can charge your selected payment method, and you will review the plan, price, and total before confirming.",
+  faqAnswer: CHECKOUT_MECHANISM_FAQ_ANSWER,
   canCreateLiveCharge: true,
 });
 
@@ -34,8 +36,7 @@ const SANDBOX_COPY: CheckoutTrustCopy = Object.freeze({
   summary:
     "This environment uses Paddle's sandbox for checkout testing. It cannot create a live charge.",
   faqQuestion: "Is checkout live?",
-  faqAnswer:
-    "No. This environment uses Paddle's sandbox for checkout testing. It cannot create a live charge.",
+  faqAnswer: CHECKOUT_MECHANISM_FAQ_ANSWER,
   canCreateLiveCharge: false,
 });
 
@@ -45,8 +46,7 @@ const UNAVAILABLE_COPY: CheckoutTrustCopy = Object.freeze({
   summary:
     "Checkout cannot open in this environment right now. You can request one availability notice instead; no charge is created.",
   faqQuestion: "Is checkout live?",
-  faqAnswer:
-    "Checkout cannot open in this environment right now. You can request one availability notice instead; no charge is created.",
+  faqAnswer: CHECKOUT_MECHANISM_FAQ_ANSWER,
   canCreateLiveCharge: false,
 });
 

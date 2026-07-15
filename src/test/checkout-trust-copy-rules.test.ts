@@ -8,8 +8,8 @@ describe("buildCheckoutTrustCopy", () => {
     expect(result.state).toBe("live");
     expect(result.canCreateLiveCharge).toBe(true);
     expect(result.summary).toContain("review");
-    expect(result.faqAnswer).toContain("can charge");
-    expect(result.faqAnswer).not.toMatch(/sandbox|no live charge/i);
+    expect(result.faqAnswer).toContain("Paddle");
+    expect(result.faqAnswer).toContain("server-side");
   });
 
   it("labels sandbox checkout and never implies a live charge", () => {
@@ -18,7 +18,7 @@ describe("buildCheckoutTrustCopy", () => {
     expect(result.state).toBe("sandbox");
     expect(result.canCreateLiveCharge).toBe(false);
     expect(result.summary).toContain("sandbox");
-    expect(result.faqAnswer).toContain("cannot create a live charge");
+    expect(result.faqAnswer).toContain("nothing is charged");
   });
 
   it("fails closed for unavailable and missing environments", () => {
@@ -26,7 +26,7 @@ describe("buildCheckoutTrustCopy", () => {
       const result = buildCheckoutTrustCopy({ environment, blocked: false });
       expect(result.state).toBe("unavailable");
       expect(result.canCreateLiveCharge).toBe(false);
-      expect(result.faqAnswer).toContain("no charge is created");
+      expect(result.faqAnswer).toContain("nothing is charged");
     }
   });
 

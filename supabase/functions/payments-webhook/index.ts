@@ -140,6 +140,44 @@ function buildDeps(): Deps {
       }
       return { ok: false, reason: payload.reason ?? 'unknown_allocator_result' };
     },
+    async cancelOtherRecurringSubscriptions({ user_id, environment, exceptPaddleSubscriptionId }) {
+      // Double-bill fix: a Founder Lifetime buyer's old recurring Pro plan
+      // must stop billing. Cancel at the NEXT billing period (they keep the
+      // period they already paid for; founder entitlement covers everything
+      // anyway). Local rows are the candidate list; Paddle's own
+      // subscription.canceled webhook closes the loop by flipping
+      // cancel_at_period_end on the row, which also removes it from this
+      // candidate query on any replay.
+      const { data, error } = await sb
+        .from('subscriptions')
+        .select('paddle_subscription_id')
+        .eq('user_id', user_id)
+        .eq('environment', environment)
+        .in('status', ['active', 'trialing', 'past_due'])
+        .eq('cancel_at_period_end', false)
+        .not('paddle_subscription_id', 'like', 'lifetime_%')
+        .neq('paddle_subscription_id', exceptPaddleSubscriptionId);
+      if (error) return { ok: false, error: `candidate_query:${error.message}` };
+      const rows = (data ?? []) as Array<{ paddle_subscription_id: string }>;
+      if (rows.length === 0) return { ok: true, canceled: 0 };
+      const paddle = getPaddleClient(environment);
+      let canceled = 0;
+      const failures: string[] = [];
+      for (const row of rows) {
+        try {
+          await paddle.subscriptions.cancel(row.paddle_subscription_id, {
+            effectiveFrom: 'next_billing_period',
+          });
+          canceled += 1;
+        } catch (e) {
+          failures.push(
+            `${row.paddle_subscription_id}:${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+      }
+      if (failures.length > 0) return { ok: false, error: failures.join('; ') };
+      return { ok: true, canceled };
+    },
   };
 }
 

@@ -117,6 +117,33 @@ export interface Deps {
     environment: PaddleEnv;
     now: Date;
   }): Promise<FounderAllocationResult>;
+  /**
+   * Double-bill fix: after a Founder Lifetime grant, cancel the buyer's
+   * OTHER active recurring provider subscriptions (effective at the next
+   * billing period — they keep what they already paid for). Without this,
+   * a Pro subscriber who buys Founder keeps getting charged monthly by
+   * Paddle while their entitlement reads Founder.
+   *
+   * Contract:
+   *  - BEST-EFFORT: the founder grant must never be blocked or unwound by
+   *    a cancel failure. A failure is recorded on the processed event's
+   *    last_error (`provider_cancel_failed:...`) for operator
+   *    reconciliation and surfaced in the response reason — the event
+   *    still marks processed and returns 200.
+   *  - Runs on BOTH fresh ('allocated') and replayed ('idempotent')
+   *    grants: a replay retries a cancel that may have failed the first
+   *    time, and a subscription already canceled at the provider is
+   *    filtered out locally once its subscription.canceled webhook lands.
+   *  - Never targets lifetime pseudo-rows (`lifetime_*`).
+   *
+   * Optional so unit tests for subscription paths don't need to provide
+   * it. The runtime wires this in index.ts.
+   */
+  cancelOtherRecurringSubscriptions?(input: {
+    user_id: string;
+    environment: PaddleEnv;
+    exceptPaddleSubscriptionId: string;
+  }): Promise<{ ok: true; canceled: number } | { ok: false; error: string }>;
 }
 
 
@@ -212,6 +239,10 @@ export async function handleVerifiedEvent(
 
   // 3) Write.
   let writeRes: IoResult;
+  // Set when the post-grant provider cancellation fails; recorded on the
+  // processed mark's last_error for operator reconciliation. Never blocks
+  // the grant or the 200.
+  let providerCancelError: string | null = null;
   if (decision.kind === 'record_lifetime') {
     // H3 (audit fix): the raw upsert path used to write the founder row
     // directly, bypassing the 75-slot cap. Route through the atomic
@@ -263,6 +294,18 @@ export async function handleVerifiedEvent(
         });
         return { httpStatus: 500, reason: `write_failed:${redactError(err)}` };
       }
+      // Double-bill fix: the grant succeeded (fresh or idempotent replay) —
+      // best-effort cancel the buyer's other recurring provider
+      // subscriptions so Paddle stops billing the old Pro plan. Failures
+      // never unwind the grant; they land in last_error for the operator.
+      if (deps.cancelOtherRecurringSubscriptions) {
+        const cancelRes = await deps.cancelOtherRecurringSubscriptions({
+          user_id: decision.row.user_id,
+          environment: env,
+          exceptPaddleSubscriptionId: decision.row.paddle_subscription_id,
+        });
+        if ('error' in cancelRes) providerCancelError = cancelRes.error;
+      }
       writeRes = { ok: true };
     } else {
       writeRes = await deps.upsertSubscription(decision.row);
@@ -286,12 +329,16 @@ export async function handleVerifiedEvent(
   }
 
 
-  // 4) Mark processed.
+  // 4) Mark processed. A failed post-grant provider cancellation rides on
+  // last_error (processed_ok stays true — the grant itself succeeded) so
+  // the operator audit surface can reconcile the double-bill risk.
   const mark = await deps.markEvent(paddleEventId, {
     processing_status: 'processed',
     processed_ok: true,
     skip_reason: null,
-    last_error: null,
+    last_error: providerCancelError
+      ? redactError(`provider_cancel_failed:${providerCancelError}`)
+      : null,
   });
   if ('error' in mark) {
     // Subscription upsert is idempotent (unique paddle_subscription_id), so
@@ -299,6 +346,11 @@ export async function handleVerifiedEvent(
     return { httpStatus: 500, reason: `mark_processed_failed:${redactError(mark.error)}` };
   }
 
-  return { httpStatus: 200, reason: `processed:${decision.kind}` };
+  return {
+    httpStatus: 200,
+    reason: providerCancelError
+      ? `processed:${decision.kind};provider_cancel_failed`
+      : `processed:${decision.kind}`,
+  };
 }
 

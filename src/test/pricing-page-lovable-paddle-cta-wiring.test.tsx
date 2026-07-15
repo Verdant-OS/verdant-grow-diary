@@ -83,7 +83,10 @@ describe("Pricing page — built-in Paddle wiring", () => {
 
     await user.click(screen.getByTestId("pricing-faq-checkout-status").querySelector("button")!);
     expect(screen.getByTestId("pricing-faq-checkout-status")).toHaveTextContent(
-      "A completed purchase can charge",
+      "A charge happens only when Paddle confirms a real payment",
+    );
+    expect(screen.getByTestId("pricing-faq-checkout-status")).toHaveTextContent(
+      "Verdant verifies that payment server-side",
     );
   });
 

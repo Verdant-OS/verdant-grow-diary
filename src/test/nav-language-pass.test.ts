@@ -65,18 +65,20 @@ describe("Primary navigation: Tents and Plants are emphasized", () => {
     expect(importLine).not.toContain("logsPath");
   });
 
-  it("AppSidebar moves 'Grows' index under Archive as 'Harvest Archive'", () => {
-    expect(SIDEBAR).toContain('"Harvest Archive"');
+  it("AppSidebar labels the /grows index as 'My Grows' (was 'Harvest Archive', which misrepresented the active-grows list)", () => {
+    expect(SIDEBAR).toContain('"My Grows"');
     expect(SIDEBAR).not.toMatch(/label:\s*"Grows"/);
+    expect(SIDEBAR).not.toContain('"Harvest Archive"');
   });
 
-  it("MobileNav primary tabs put Tents before Plants and rename Grows", () => {
+  it("MobileNav primary tabs put Tents before Plants and label /grows as 'My Grows'", () => {
     const tIdx = MOBILE.indexOf('label: "Tents"');
     const pIdx = MOBILE.indexOf('label: "Plants"');
     expect(tIdx).toBeGreaterThan(-1);
     expect(pIdx).toBeGreaterThan(tIdx);
     expect(MOBILE).not.toMatch(/label:\s*"Grows"/);
-    expect(MOBILE).toContain('"Harvest Archive"');
+    expect(MOBILE).toContain('"My Grows"');
+    expect(MOBILE).not.toContain('"Harvest Archive"');
   });
 });
 

@@ -3,9 +3,9 @@
 This gate packages the subscriber-growth branch into reproducible release
 evidence. It checks the repository identity and base ancestry, requires a
 clean worktree, runs every changed targeted test plus type-check/build/lint/
-format/diff integrity, audits the production build through a local Vite
-preview, and optionally compares the live site with the same capability
-contract.
+diff integrity, verifies formatting on the release commit, audits the
+production build through a local Vite preview, and optionally compares the
+live site with the same capability contract.
 
 It never pushes, deploys, merges, mutates billing, or proves the August
 subscriber goal. Those are separate operator decisions and evidence.
@@ -26,7 +26,8 @@ bun run release:subscriber-growth:gate:local
 2. A clean worktree.
 3. At least one changed targeted test.
 4. Every changed targeted test passing.
-5. Type-check, production build, ESLint, Prettier, and diff integrity passing.
+5. Type-check, production build, branch-wide changed-code ESLint, release-
+   commit Prettier, and branch diff integrity passing.
 6. All public subscriber-growth routes and all fixed capability markers
    present in the local production preview.
 

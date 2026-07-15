@@ -70,6 +70,15 @@ function changedFiles(baseRef) {
   return output ? output.split(/\r?\n/).filter(Boolean) : [];
 }
 
+function headCommitFiles() {
+  try {
+    const output = git(["diff", "--name-only", "HEAD^", "HEAD"]);
+    return output ? output.split(/\r?\n/).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
 function runnableChangedTests(files) {
   return files.filter(
     (file) => /^src\/test\/.*\.test\.[cm]?[jt]sx?$/.test(file) && !file.includes("/helpers/"),
@@ -184,9 +193,10 @@ function writeReceipt(out, receipt) {
 
 export async function runSubscriberGrowthLaunchGate(args) {
   const files = changedFiles(args.baseRef);
+  const commitFiles = headCommitFiles();
   const tests = runnableChangedTests(files);
   const lintable = lintableChangedFiles(files);
-  const formattable = formattableChangedFiles(files);
+  const formattable = formattableChangedFiles(commitFiles);
   const source = inspectSource(args, files, tests);
 
   const commands = [

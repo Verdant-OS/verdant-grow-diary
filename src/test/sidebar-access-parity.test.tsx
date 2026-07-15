@@ -243,11 +243,18 @@ describe("UI Simplification Slice 1 — operator group placement", () => {
 });
 
 describe("Mobile More sheet — manifest access parity", () => {
-  it("primary tabs and More entries only point at manifest 'auth' paths", async () => {
+  it("primary tabs and More entries point at auth routes or the session-aware apex", async () => {
     const { primary, more } = await import("@/components/MobileNav");
     const allowedAuthOrRedirect = new Set(
       APP_ROUTES.filter((r) => r.access === "auth" || r.access === "redirect").map((r) => r.path),
     );
+    // `/` is intentionally session-aware: signed-out visitors receive the
+    // public landing page while authenticated MobileNav users receive the
+    // Dashboard through RootEntry. It is the sole public route allowed in
+    // authenticated grower navigation.
+    const root = APP_ROUTES.find((route) => route.path === "/");
+    expect(root).toMatchObject({ access: "public" });
+    allowedAuthOrRedirect.add("/");
     for (const item of [...primary, ...more]) {
       expect(
         allowedAuthOrRedirect.has(item.to),

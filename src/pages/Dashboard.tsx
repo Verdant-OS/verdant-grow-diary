@@ -253,9 +253,9 @@ export default function Dashboard() {
 
   const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
 
+  // Non-landmark container: AppShell already owns the <main> landmark around
+  // the route Outlet, so the page root must not nest another.
   return (
-    {/* Non-landmark container: AppShell already owns the <main> landmark
-        around the route Outlet, so the page root must not nest another. */}
     <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
       <QuickLogV2Fab />
       <GrowBreadcrumbs

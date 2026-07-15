@@ -1,12 +1,13 @@
 import "@testing-library/jest-dom";
 import { beforeEach, afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
 // Ensure localStorage never leaks across tests (Diary Calendar persists
 // the active filter; stale state would break unrelated suites).
 beforeEach(() => {
   try {
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   } catch {
     // ignore (SSR-like envs)
   }

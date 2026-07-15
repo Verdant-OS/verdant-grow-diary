@@ -19,6 +19,43 @@ vi.mock("@/hooks/usePlantRecentActivity", () => ({
   usePlantRecentActivity: (id: string | null | undefined) => useRecentMock(id),
 }));
 
+// The launch dialog reads learning-loop timeline memory via TanStack Query;
+// mock the hook (same idiom as plant-detail-doctor-launch-dialog.test.tsx)
+// so these presentation tests need no QueryClientProvider.
+// Items are FRESH relative to the fixed now (2026-06-01T12:00Z) used by
+// open() below, so the 48h snapshot-freshness gate does not block the
+// Continue CTA — these tests cover context-gap wiring, not the gate.
+vi.mock("@/hooks/useTimelineMemory", () => ({
+  useTimelineMemory: () => ({
+    items: [
+      {
+        kind: "diary",
+        key: "d1",
+        occurredAt: "2026-06-01T06:00:00.000Z",
+        eventType: "watering",
+        hasPhoto: false,
+        note: null,
+      },
+      {
+        kind: "diary",
+        key: "d2",
+        occurredAt: "2026-06-01T06:00:00.000Z",
+        eventType: "note",
+        hasPhoto: false,
+        note: "ok",
+      },
+    ],
+  }),
+  TIMELINE_MEMORY_DEFAULT_LIMIT: 100,
+}));
+
+vi.mock("@/hooks/useLogAiDoctorReadinessToDiary", () => ({
+  useLogAiDoctorReadinessToDiary: () => ({
+    log: vi.fn().mockResolvedValue({ ok: true }),
+    logging: false,
+  }),
+}));
+
 import {
   buildPlantDetailDoctorAddContextRoute,
   ADD_CONTEXT_HELPER_COPY,

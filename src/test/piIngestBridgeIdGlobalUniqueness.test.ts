@@ -24,7 +24,8 @@ function loadUniquenessMigration(): { name: string; text: string } {
     const txt = readFileSync(join(MIG_DIR, f), "utf8");
     if (
       /pi_ingest_bridge_credentials_bridge_id_global_unique/.test(txt) ||
-      (/pi_ingest_bridge_credentials/.test(txt) && /UNIQUE\s*\(\s*bridge_id\s*\)/i.test(txt))
+      (/pi_ingest_bridge_credentials/.test(txt) &&
+        /UNIQUE\s*\(\s*bridge_id\s*\)/i.test(txt))
     ) {
       return { name: f, text: txt };
     }
@@ -47,7 +48,8 @@ describe("pi_ingest_bridge_credentials global bridge_id uniqueness migration", (
   it("adds a GLOBAL unique constraint or index on bridge_id (not partial)", () => {
     // Full global uniqueness: an ALTER TABLE ADD CONSTRAINT ... UNIQUE (bridge_id)
     // or a CREATE UNIQUE INDEX ... (bridge_id) with no WHERE clause.
-    const hasConstraint = /ADD\s+CONSTRAINT\s+\w+\s+UNIQUE\s*\(\s*bridge_id\s*\)/i.test(MIG.text);
+    const hasConstraint =
+      /ADD\s+CONSTRAINT\s+\w+\s+UNIQUE\s*\(\s*bridge_id\s*\)/i.test(MIG.text);
     const indexMatch = MIG.text.match(
       /CREATE\s+UNIQUE\s+INDEX[\s\S]*?\(\s*bridge_id\s*\)([^;]*);/i,
     );
@@ -60,7 +62,8 @@ describe("pi_ingest_bridge_credentials global bridge_id uniqueness migration", (
     // that is insufficient. Ensure no WHERE is_active=... gate on the only
     // bridge_id uniqueness expression.
     const partialOnly =
-      /CREATE\s+UNIQUE\s+INDEX[^;]*\(\s*bridge_id\s*\)[^;]*WHERE[^;]*is_active/i.test(MIG.text) &&
+      /CREATE\s+UNIQUE\s+INDEX[^;]*\(\s*bridge_id\s*\)[^;]*WHERE[^;]*is_active/i
+        .test(MIG.text) &&
       !/ADD\s+CONSTRAINT[^;]*UNIQUE\s*\(\s*bridge_id\s*\)/i.test(MIG.text);
     expect(partialOnly).toBe(false);
   });
@@ -73,14 +76,19 @@ describe("pi_ingest_bridge_credentials global bridge_id uniqueness migration", (
   });
 
   it("does not silently delete, merge, or rename duplicate rows", () => {
-    expect(/DELETE\s+FROM\s+public\.pi_ingest_bridge_credentials/i.test(MIG.text)).toBe(false);
-    expect(/UPDATE\s+public\.pi_ingest_bridge_credentials/i.test(MIG.text)).toBe(false);
-    expect(/MERGE\s+INTO\s+public\.pi_ingest_bridge_credentials/i.test(MIG.text)).toBe(false);
+    expect(/DELETE\s+FROM\s+public\.pi_ingest_bridge_credentials/i.test(MIG.text))
+      .toBe(false);
+    expect(/UPDATE\s+public\.pi_ingest_bridge_credentials/i.test(MIG.text)).toBe(
+      false,
+    );
+    expect(/MERGE\s+INTO\s+public\.pi_ingest_bridge_credentials/i.test(MIG.text))
+      .toBe(false);
   });
 
   it("does not drop existing (user_id, bridge_id) uniqueness", () => {
     expect(
-      /DROP\s+CONSTRAINT[^;]*pi_ingest_bridge_credentials_user_bridge_unique/i.test(MIG.text),
+      /DROP\s+CONSTRAINT[^;]*pi_ingest_bridge_credentials_user_bridge_unique/i
+        .test(MIG.text),
     ).toBe(false);
     expect(/DROP\s+INDEX[^;]*user_id[^;]*bridge_id/i.test(MIG.text)).toBe(false);
   });
@@ -94,7 +102,8 @@ describe("pi_ingest_bridge_credentials global bridge_id uniqueness migration", (
       "secret_hash",
     ]) {
       expect(
-        new RegExp(`ALTER\\s+COLUMN\\s+${col}|DROP\\s+COLUMN\\s+${col}`, "i").test(MIG.text),
+        new RegExp(`ALTER\\s+COLUMN\\s+${col}|DROP\\s+COLUMN\\s+${col}`, "i")
+          .test(MIG.text),
       ).toBe(false);
     }
   });
@@ -142,7 +151,11 @@ describe("Edge Function ingestion remains fail-closed", () => {
       resolve(ROOT, "supabase/functions/pi-ingest-readings/index.ts"),
       "utf8",
     );
-    expect(/secret_resolver_not_implemented|auth_ok_pipeline_not_implemented/.test(idx)).toBe(true);
+    expect(
+      /secret_resolver_not_implemented|auth_ok_pipeline_not_implemented/.test(
+        idx,
+      ),
+    ).toBe(true);
   });
 
   it("no SUPABASE_SERVICE_ROLE_KEY runtime read in src/", () => {
@@ -159,10 +172,20 @@ describe("Edge Function ingestion remains fail-closed", () => {
     for (const p of files) {
       if (!/\.(ts|tsx)$/.test(p)) continue;
       if (/\.test\.(ts|tsx)$/.test(p)) continue;
-      // proofReportRedactionRules.ts lists the string as a redaction-denylist
-      // keyword (to scrub it out of proof reports) — it never reads the env
-      // var's value, so it's not a runtime read this guard should flag.
-      if (p.replace(/\\/g, "/").endsWith("src/lib/proofReportRedactionRules.ts")) continue;
+      // Skip the whole src/test/ subtree — test helpers/fixtures (e.g.
+      // integration/_helpers/sanitizedDbError.ts) legitimately name the env
+      // var in denylists/assertions; none of it is shipped runtime code.
+      if (/[\\/]src[\\/]test[\\/]/.test(p)) continue;
+      // Scoped allow-list (EXACT FILE PATH ONLY): the proof-report redaction
+      // helper lists `SUPABASE_SERVICE_ROLE_KEY` as a SECRET_KEYWORDS denylist
+      // literal so it can STRIP the token from human-readable copy/print
+      // output. It does not read or use the env value — it exists to PROTECT
+      // against leaks. See proofReportRedactionRules.ts.
+      if (/[\\/]src[\\/]lib[\\/]proofReportRedactionRules\.ts$/.test(p)) continue;
+      // Same legitimate denylist pattern: releaseReceiptParserContract.ts lists
+      // the token in RELEASE_RECEIPT_UNSAFE_SUBSTRINGS to REJECT secret-like
+      // receipt fields. It does not read or use the env value.
+      if (/[\\/]src[\\/]lib[\\/]releaseReceiptParserContract\.ts$/.test(p)) continue;
       const txt = readFileSync(p, "utf8");
       expect(
         /SUPABASE_SERVICE_ROLE_KEY/.test(txt),

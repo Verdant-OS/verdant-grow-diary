@@ -28,6 +28,8 @@ const PUBLIC_DEMO_FILES: ReadonlyArray<string> = [
   "src/pages/PartnerCsvPreviewLanding.tsx",
   "src/pages/HardwareIntegrations.tsx",
   "src/pages/CustomerModeGuide.tsx",
+  "src/pages/QuickLogStarter.tsx",
+  "src/constants/publicQuickLogStarterCopy.ts",
   "docs/csv-preview-partner-demo.md",
 ];
 

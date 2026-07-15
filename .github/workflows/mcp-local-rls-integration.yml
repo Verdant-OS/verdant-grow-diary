@@ -17,6 +17,12 @@ name: MCP local RLS integration
 
 on:
   workflow_dispatch:
+    inputs:
+      run_mcp_rls:
+        description: "Boot local Supabase and run the MCP RLS harness"
+        type: boolean
+        required: false
+        default: true
   push:
     branches: [main, verdant-grow-diary]
     paths:
@@ -43,6 +49,14 @@ jobs:
     name: MCP RLS harness (local Supabase)
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # OPT-IN lane (mirrors security-db-local.yml): the harness needs a local
+    # Supabase container the shared runners cannot always provide. The
+    # job-level `if` makes disabled runs report as SKIPPED (visibly not-run,
+    # never a false green pass), and enabled runs are authoritative — no
+    # continue-on-error, so an isolation regression fails the workflow
+    # instead of being masked. Enable via workflow_dispatch input
+    # run_mcp_rls=true or repository variable ENABLE_MCP_RLS_LANE=true.
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_mcp_rls == true) || vars.ENABLE_MCP_RLS_LANE == 'true' }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -58,7 +72,10 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
         with:
-          version: latest
+          # Pinned: "latest" resolves through an unauthenticated GitHub API
+          # call that rate-limits on shared runners (see security-db-local.yml,
+          # two fast lane failures on 2026-07-09). Bump deliberately.
+          version: 2.109.1
 
       - name: Start local Supabase
         run: |

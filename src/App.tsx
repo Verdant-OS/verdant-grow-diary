@@ -126,6 +126,7 @@ const DemoProofWalkthrough = lazy(() => import("./pages/DemoProofWalkthrough"));
 const ContextualPhenoComparisonDemo = lazy(() => import("./pages/ContextualPhenoComparisonDemo"));
 const PhenoComparison = lazy(() => import("./pages/PhenoComparison"));
 const PhenoExpressionShowcase = lazy(() => import("./pages/PhenoExpressionShowcase"));
+const QuickLogStarter = lazy(() => import("./pages/QuickLogStarter"));
 const ReleaseReadiness = lazy(() => import("./pages/ReleaseReadiness"));
 const HealthCheck = lazy(() => import("./pages/HealthCheck"));
 
@@ -249,6 +250,12 @@ const App = () => (
                       RLS-scoped SELECT (empty/graceful without a session);
                       still read-only — no writes/AI/automation. */}
                   <Route path="/pheno-hunts/:id/compare" element={<PhenoHuntCompare />} />
+
+                  {/* Public 30-second Quick Log starter. Local draft on this
+                      device only — no Supabase/AI/device calls, no fake-live
+                      data. Mounted outside AppShell so no operator chrome
+                      renders. */}
+                  <Route path="/quick-log" element={<QuickLogStarter />} />
 
                   <Route element={<AppShell />}>
                     <Route path="/onboarding" element={<Onboarding />} />

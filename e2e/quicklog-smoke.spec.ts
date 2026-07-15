@@ -74,6 +74,29 @@ async function openQuickLogDialog(page: import("@playwright/test").Page) {
   await expect(page.getByRole("dialog")).toBeVisible();
 }
 
+/**
+ * The live deployment opens the agreement re-consent gate
+ * (src/components/AgreementReconsentGate.tsx) whenever the signed-in account
+ * has no recorded acceptance for the CURRENT agreement version — the modal
+ * intentionally blocks every pointer interaction until accepted. The E2E
+ * fixture account hits this after each agreement-version bump, which stalled
+ * this checklist at the first click for a full test-timeout. Accept it for
+ * the disposable fixture account (a real, persisted acceptance — the same
+ * click-through a returning grower performs) and continue. No-op when the
+ * gate is not shown.
+ */
+async function acceptReconsentGateIfShown(page: import("@playwright/test").Page) {
+  const gate = page.getByTestId("agreement-reconsent-gate");
+  const shown = await gate
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!shown) return;
+  await gate.locator("#reconsent-accept").click();
+  await gate.getByRole("button", { name: /accept and continue/i }).click();
+  await gate.waitFor({ state: "hidden", timeout: 15_000 });
+}
+
 test.describe("Quick Log smoke checklist", () => {
   test.skip(!PLANT_URL, "Set E2E_GROW_1_PLANT_URL to a Grow #1 plant page to run this smoke test.");
 
@@ -82,6 +105,7 @@ test.describe("Quick Log smoke checklist", () => {
 
     try {
       await page.goto(PLANT_URL!);
+      await acceptReconsentGateIfShown(page);
 
       await openQuickLogDialog(page);
       const dialog = page.getByRole("dialog");

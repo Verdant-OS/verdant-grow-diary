@@ -73,12 +73,16 @@ describe("harvest/cure Quick Log persistence slice static safety", () => {
     ]) {
       expect(sql).toContain(ev);
     }
-    // No RLS changes in this migration.
-    expect(/CREATE\s+POLICY|DROP\s+POLICY|ALTER\s+TABLE[^;]*ROW LEVEL SECURITY/i.test(sql)).toBe(
-      false,
-    );
-    // No service_role grants added.
-    expect(/GRANT[^;]*service_role/i.test(sql)).toBe(false);
+    // No RLS/policy/grant changes touching grow_events. (New tables a later
+    // migration creates — e.g. breeding_events with owner-scoped RLS — are
+    // legitimate and out of this invariant's scope.)
+    expect(
+      /(?:CREATE|DROP)\s+POLICY[^;]*\bgrow_events\b|ALTER\s+TABLE[^;]*\bgrow_events\b[^;]*ROW LEVEL SECURITY/i.test(
+        sql,
+      ),
+    ).toBe(false);
+    // No service_role grants added on grow_events.
+    expect(/GRANT[^;]*\bgrow_events\b[^;]*service_role/i.test(sql)).toBe(false);
   });
 
   it("latest quicklog_save_event migration includes harvest + cure_check in whitelist", () => {

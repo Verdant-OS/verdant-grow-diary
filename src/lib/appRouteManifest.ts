@@ -310,7 +310,13 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/pricing", access: "public" },
   { path: "/privacy", access: "public", description: "Privacy policy." },
   { path: "/privacy-policy", access: "redirect", description: "→ /privacy" },
-  { path: "/refund", access: "public", description: "Refund policy." },
+  {
+    path: "/quick-log",
+    access: "public",
+    description:
+      "Public 30-second Quick Log starter (local draft on this device only; routes to signup with allow-listed UTM attribution).",
+  },
+  { path: "/refund", access: "public", description: "Refund policy page." },
   { path: "/refund-policy", access: "redirect", description: "→ /refund" },
   { path: "/refunds", access: "redirect", description: "→ /refund" },
   { path: "/register", access: "redirect", description: "→ /auth" },

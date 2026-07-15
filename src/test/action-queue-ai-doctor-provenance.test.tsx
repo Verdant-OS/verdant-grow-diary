@@ -27,6 +27,15 @@ import {
   stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
 
+// Slow-runner guard: these action-detail tests await an async load whose
+// resolution can exceed BOTH testing-library's default 5s findBy timeout
+// AND vitest's default 5s per-test timeout on loaded shared CI runners
+// (observed repeatedly across full-suite batches; passes locally in <3s).
+// Raise the per-test budget for this file and give the async-load awaits
+// a generous findBy timeout beneath it.
+vi.setConfig({ testTimeout: 30_000 });
+const FIND_TIMEOUT = { timeout: 15_000 };
+
 describe("actionQueueProvenanceRules — AI Doctor helpers", () => {
   it("extracts a session id from [session:<id>]", () => {
     expect(
@@ -283,6 +292,8 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
     renderDetail();
     const panel = await screen.findByTestId(
       "action-detail-ai-doctor-provenance",
+      undefined,
+      FIND_TIMEOUT,
     );
     expect(panel.textContent ?? "").toContain("Suggestion origin");
     expect(panel.textContent ?? "").toContain("Source: AI Doctor");
@@ -293,6 +304,8 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
     renderDetail();
     const link = (await screen.findByTestId(
       "action-detail-ai-doctor-session-link",
+      undefined,
+      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(link.textContent ?? "").toBe("View saved AI Doctor session");
     expect(link.getAttribute("href")).toBe("/doctor/sessions/sess-abc");
@@ -301,7 +314,7 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
   it("does NOT render a session link when no session id is present", async () => {
     detailRow = AI_DOCTOR_ROW_NO_SESSION;
     renderDetail("aq-ai-2");
-    await screen.findByTestId("action-detail-ai-doctor-provenance");
+    await screen.findByTestId("action-detail-ai-doctor-provenance", undefined, FIND_TIMEOUT);
     expect(
       screen.queryByTestId("action-detail-ai-doctor-session-link"),
     ).toBeNull();
@@ -310,7 +323,7 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
   it("does NOT render the panel for non-AI-Doctor sources", async () => {
     detailRow = COACH_ROW;
     renderDetail("aq-coach-1");
-    await screen.findByText("Lower humidity to 55%");
+    await screen.findByText("Lower humidity to 55%", undefined, FIND_TIMEOUT);
     expect(
       screen.queryByTestId("action-detail-ai-doctor-provenance"),
     ).toBeNull();
@@ -318,7 +331,7 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
 
   it("never renders [session:<id>] token anywhere on the detail page", async () => {
     renderDetail();
-    await screen.findByTestId("action-detail-ai-doctor-provenance");
+    await screen.findByTestId("action-detail-ai-doctor-provenance", undefined, FIND_TIMEOUT);
     expect(document.body.innerHTML).not.toContain("[session:");
   });
 
@@ -326,6 +339,8 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
     renderDetail();
     const panel = await screen.findByTestId(
       "action-detail-ai-doctor-provenance",
+      undefined,
+      FIND_TIMEOUT,
     );
     expect(panel.textContent ?? "").not.toContain("secret-device-name");
   });
@@ -334,6 +349,8 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
     renderDetail();
     const panel = await screen.findByTestId(
       "action-detail-ai-doctor-provenance",
+      undefined,
+      FIND_TIMEOUT,
     );
     const txt = (panel.textContent ?? "").toLowerCase();
     for (const banned of [

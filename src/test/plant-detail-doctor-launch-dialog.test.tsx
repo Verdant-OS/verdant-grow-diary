@@ -17,6 +17,20 @@ vi.mock("@/hooks/usePlantRecentActivity", () => ({
   usePlantRecentActivity: (id: string | null | undefined) => useRecentMock(id),
 }));
 
+const useTimelineMemoryMock = vi.fn();
+vi.mock("@/hooks/useTimelineMemory", () => ({
+  useTimelineMemory: (...args: unknown[]) => useTimelineMemoryMock(...args),
+  TIMELINE_MEMORY_DEFAULT_LIMIT: 100,
+}));
+
+const logReadinessMock = vi.fn().mockResolvedValue({ ok: true });
+vi.mock("@/hooks/useLogAiDoctorReadinessToDiary", () => ({
+  useLogAiDoctorReadinessToDiary: () => ({
+    log: logReadinessMock,
+    logging: false,
+  }),
+}));
+
 import PlantDetailDoctorLaunchDialog, {
   DOCTOR_LAUNCH_HELPER_LINES,
 } from "@/components/PlantDetailDoctorLaunchDialog";
@@ -91,6 +105,8 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
   beforeEach(() => {
     useRecentMock.mockReset();
     useRecentMock.mockReturnValue({ data: [], isLoading: false });
+    useTimelineMemoryMock.mockReset();
+    useTimelineMemoryMock.mockReturnValue({ items: [] });
   });
 
   it("does not open the summary dialog until Ask Doctor is clicked (no AI on mount)", () => {
@@ -127,7 +143,13 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     ).toBe("missing");
   });
 
+  const passingTimelineItems = () => [
+    { kind: "diary", key: "d1", occurredAt: FRESH, eventType: "watering", hasPhoto: false, note: null },
+    { kind: "diary", key: "d2", occurredAt: FRESH, eventType: "note", hasPhoto: false, note: "ok" },
+  ];
+
   it("Continue to AI Doctor routes safely with plant context", () => {
+    useTimelineMemoryMock.mockReturnValue({ items: passingTimelineItems() });
     renderDialog();
     fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
     const cont = screen.getByTestId("plant-detail-doctor-launch-continue");
@@ -135,6 +157,7 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
   });
 
   it("encodes special characters in the plant id for the route param", () => {
+    useTimelineMemoryMock.mockReturnValue({ items: passingTimelineItems() });
     renderDialog({ plantId: "p 1/2" });
     fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
     const cont = screen.getByTestId("plant-detail-doctor-launch-continue");
@@ -200,6 +223,61 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     expect(text).not.toMatch(/plant-secret/);
     expect(text).not.toMatch(/tent-secret/);
     expect(text).not.toMatch(/raw-payload/);
+  });
+
+  it("gate blocks Continue when readiness is insufficient (no timeline activity or snapshots)", () => {
+    // Default beforeEach seeds empty timeline items → insufficient readiness.
+    renderDialog();
+    fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
+    // The enabled Link Continue is replaced by a disabled button.
+    expect(screen.queryByTestId("plant-detail-doctor-launch-continue")).toBeNull();
+    const blocked = screen.getByTestId("plant-detail-doctor-launch-continue-blocked");
+    expect(blocked).toBeDisabled();
+    expect(blocked.getAttribute("aria-disabled")).toBe("true");
+    const notice = screen.getByTestId("plant-detail-doctor-launch-readiness-notice");
+    expect(notice.getAttribute("data-readiness")).toBe("insufficient");
+    expect(notice.textContent).toMatch(/More context needed/);
+  });
+
+  it("shows a blocked explanation naming the missing categories and the exact next button", () => {
+    // Default beforeEach → empty timeline → insufficient readiness.
+    renderDialog();
+    fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
+    const explanation = screen.getByTestId(
+      "plant-detail-doctor-launch-blocked-explanation",
+    );
+    const sentence = screen.getByTestId("plant-detail-doctor-launch-blocked-sentence");
+    // Explicitly names the missing categories that block diagnosis.
+    expect(sentence.textContent).toMatch(/recent note, watering, feeding, or photo/);
+    expect(sentence.textContent).toMatch(/recent manual sensor snapshot/);
+    // Explicitly names the exact button to press next.
+    const addBtn = screen.getByTestId("plant-detail-doctor-launch-add-context");
+    const label = addBtn.textContent?.trim() ?? "";
+    expect(sentence.textContent).toContain(`Tap "${label}"`);
+    // The list surfaces the blocking codes deterministically.
+    const list = screen.getByTestId("plant-detail-doctor-launch-blocked-list");
+    const codes = Array.from(list.querySelectorAll("li")).map((li) =>
+      li.getAttribute("data-blocking-code"),
+    );
+    expect(codes).toEqual([
+      "recent-timeline-activity",
+      "recent-manual-sensor-snapshot",
+    ]);
+    expect(explanation.getAttribute("role")).toBe("status");
+  });
+
+  it("gate allows Continue when readiness reaches partial (existing route behavior preserved, no blocked explanation)", () => {
+    useTimelineMemoryMock.mockReturnValue({ items: passingTimelineItems() });
+    renderDialog();
+    fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
+    expect(screen.queryByTestId("plant-detail-doctor-launch-continue-blocked")).toBeNull();
+    expect(
+      screen.queryByTestId("plant-detail-doctor-launch-blocked-explanation"),
+    ).toBeNull();
+    const cont = screen.getByTestId("plant-detail-doctor-launch-continue");
+    expect(cont.getAttribute("href")).toBe("/doctor?plantId=p1");
+    const notice = screen.getByTestId("plant-detail-doctor-launch-readiness-notice");
+    expect(["partial", "strong"]).toContain(notice.getAttribute("data-readiness"));
   });
 });
 

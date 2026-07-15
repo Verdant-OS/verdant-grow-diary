@@ -118,6 +118,17 @@ export default function GuidesIndex() {
               </Link>
             </li>
           ))}
+          <li className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
+            <Link to="/guides/grow-stage-care-guide" className="block">
+              <h3 className="font-semibold text-lg">
+                Grow-stage care guide: seedling, veg, and flower checklists
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                A searchable checklist for watering, nutrients, environment,
+                and harvest tasks across each grow stage.
+              </p>
+            </Link>
+          </li>
         </ul>
       </section>
 

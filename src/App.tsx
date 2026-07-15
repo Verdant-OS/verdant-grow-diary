@@ -84,6 +84,7 @@ const Pricing = lazy(() => import("./pages/Pricing"));
 const Upgrade = lazy(() => import("./pages/Upgrade"));
 const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
+const GrowStageCareGuide = lazy(() => import("./pages/GrowStageCareGuide"));
 const Glossary = lazy(() => import("./pages/Glossary"));
 const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
 const LegacyBillingRedirect = lazy(() => import("./pages/LegacyBillingRedirect"));
@@ -187,6 +188,7 @@ const App = () => (
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/upgrade" element={<Upgrade />} />
                   <Route path="/guides" element={<GuidesIndex />} />
+                  <Route path="/guides/grow-stage-care-guide" element={<GrowStageCareGuide />} />
                   <Route path="/guides/:slug" element={<GuidePage />} />
                   <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />

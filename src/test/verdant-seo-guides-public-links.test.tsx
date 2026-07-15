@@ -174,12 +174,14 @@ describe("/guides internal links resolve to explicitly-public routes", () => {
     });
   }
 
-  it("guide-family slugs linked from /guides all exist in shared constants", () => {
+  it("guide-family slugs linked from /guides all exist in shared constants or known custom guide pages", () => {
     const { container } = renderGuides("/guides");
     const { internal } = collectLinks(container);
     const guideLinks = internal.filter((h) => /^\/guides\/[^/]+$/.test(h));
-    expect(guideLinks.length).toBe(VERDANT_GUIDE_SLUGS.length);
+    const CUSTOM_GUIDE_PATHS = ["/guides/grow-stage-care-guide"];
+    expect(guideLinks.length).toBe(VERDANT_GUIDE_SLUGS.length + CUSTOM_GUIDE_PATHS.length);
     for (const href of guideLinks) {
+      if (CUSTOM_GUIDE_PATHS.includes(href)) continue;
       const slug = href.replace("/guides/", "");
       expect(VERDANT_GUIDE_SLUGS).toContain(slug);
     }

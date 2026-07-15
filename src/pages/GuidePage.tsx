@@ -164,18 +164,30 @@ export default function GuidePage() {
               value={openFaq}
               onValueChange={(v) => setOpenFaq(v || undefined)}
             >
-              {guide.faq.map((entry, i) => (
-                <AccordionItem
-                  key={entry.question}
-                  value={`faq-${i}`}
-                  id={`faq-${i}`}
-                >
-                  <AccordionTrigger className="text-left">
-                    {entry.question}
-                  </AccordionTrigger>
-                  <AccordionContent>{entry.answer}</AccordionContent>
-                </AccordionItem>
-              ))}
+              {guide.faq.map((entry, i) => {
+                const value = `faq-${i}`;
+                const isHighlighted = highlightedFaq === value;
+                return (
+                  <AccordionItem
+                    key={entry.question}
+                    value={value}
+                    id={value}
+                    data-highlighted={isHighlighted ? "true" : undefined}
+                    className={
+                      isHighlighted
+                        ? "rounded-md ring-2 ring-primary/70 bg-primary/5 transition-colors duration-500 scroll-mt-24"
+                        : "transition-colors duration-500 scroll-mt-24"
+                    }
+                  >
+                    <AccordionTrigger className="text-left px-2">
+                      {entry.question}
+                    </AccordionTrigger>
+                    <AccordionContent className="px-2">
+                      {entry.answer}
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
             </Accordion>
 
           </section>

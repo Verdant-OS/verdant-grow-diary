@@ -70,6 +70,10 @@ import {
 } from "@/lib/quickLogPlantOptionRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 import EventTypeSelector from "@/components/EventTypeSelector";
+import {
+  clearPublicQuickLogStarterDraft,
+  readPublicQuickLogStarterDraft,
+} from "@/lib/publicQuickLogStarterDraftStore";
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
@@ -162,6 +166,19 @@ export interface QuickLogPrefill {
    */
   phenoHuntId?: string | null;
   phenoEvidenceGoal?: string | null;
+  /**
+   * Optional watering amount (ml) from the public starter handoff. Seeded
+   * into the watering field ONLY when the grower has not typed a volume,
+   * exactly like `note`. The grower still reviews and saves manually.
+   */
+  wateringVolumeMl?: number | null;
+  /**
+   * Opaque id of the public starter draft this prefill came from — never
+   * grower content. When present AND the save succeeds AND the on-device
+   * draft still has this id, the draft is cleared (consume-once). It is
+   * never sent anywhere and never triggers a write by itself.
+   */
+  publicStarterDraftId?: string | null;
 }
 
 interface Props {
@@ -326,6 +343,19 @@ export default function QuickLog({
     if (typeof prefill.note === "string" && prefill.note.length > 0) {
       setNote((prev) => (prev.trim().length === 0 ? (prefill.note ?? "") : prev));
     }
+    // Same only-if-empty rule for a starter watering amount: never clobber
+    // a volume the grower already typed.
+    if (
+      typeof prefill.wateringVolumeMl === "number" &&
+      Number.isFinite(prefill.wateringVolumeMl) &&
+      prefill.wateringVolumeMl > 0
+    ) {
+      setDetails((prev) =>
+        prev.watering.trim().length === 0
+          ? { ...prev, watering: String(prefill.wateringVolumeMl) }
+          : prev,
+      );
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     open,
@@ -334,6 +364,7 @@ export default function QuickLog({
     prefill?.eventType,
     prefill?.suggestSnapshot,
     prefill?.note,
+    prefill?.wateringVolumeMl,
   ]);
 
   const scopedPlants = useMemo(
@@ -829,6 +860,18 @@ export default function QuickLog({
         savedAt: new Date().toISOString(),
       });
       onCreated?.();
+      // Public starter handoff consume-once: the anonymous on-device draft
+      // is cleared ONLY here — after the RPC confirmed the write — and only
+      // when the stored draft is still the exact one the grower reviewed
+      // (id match guards against a newer draft written in another tab).
+      // Failures above return before this line, so a failed save always
+      // retains the draft.
+      if (prefill?.publicStarterDraftId) {
+        const storedStarterDraft = readPublicQuickLogStarterDraft();
+        if (storedStarterDraft && storedStarterDraft.id === prefill.publicStarterDraftId) {
+          clearPublicQuickLogStarterDraft();
+        }
+      }
       setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",

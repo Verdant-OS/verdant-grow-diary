@@ -206,6 +206,19 @@ export default function PlantDetailDoctorLaunchDialog({
     });
   }, [preview.items, plantId, plantName, growId, tentId, tentName]);
 
+  const blockedExplanation = useMemo(
+    () =>
+      buildAiDoctorReadinessBlockedExplanation({
+        readiness: readinessResult.readiness,
+        missing: readinessResult.missing,
+        nextActionLabel:
+          addContextDecision.kind !== "none"
+            ? addContextDecision.label
+            : AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
+      }),
+    [readinessResult.readiness, readinessResult.missing, addContextDecision],
+  );
+
   const handleAddContext = useCallback(() => {
     if (typeof window !== "undefined" && addContextDecision.quickLogEvent) {
       window.dispatchEvent(

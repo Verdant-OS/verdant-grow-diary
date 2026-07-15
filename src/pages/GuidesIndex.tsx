@@ -8,6 +8,7 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
+import DiaryFaqLinkStatsPanel from "@/components/DiaryFaqLinkStatsPanel";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   Accordion,

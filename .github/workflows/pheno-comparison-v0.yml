@@ -47,15 +47,20 @@ jobs:
 
       # Selection-grade Pheno Comparison Vitest specs — read-only surface,
       # no secrets required.
+      # NOTE: this list once also named pheno-comparison-route,
+      # pheno-comparison-display-safety, pheno-selection-rules, and
+      # pheno-comparison-a11y-viewports test files. Those specs never landed
+      # on this branch — they exist only on the side branch that authored
+      # this surface (e7e4e72d / be8ac1f7) and were written against a lib
+      # version that predates the Pheno Hunt foundation now on trunk.
+      # Referencing them made the eslint step below fail unconditionally.
+      # Reconciling the imported surface with the evolved libs is tracked
+      # follow-up work.
       - name: Vitest — Pheno Comparison
         run: |
           bunx vitest run \
             src/test/pheno-comparison-view-model.test.ts \
-            src/test/pheno-comparison-route.test.tsx \
-            src/test/pheno-comparison-static-safety.test.ts \
-            src/test/pheno-comparison-display-safety.test.tsx \
-            src/test/pheno-selection-rules.test.ts \
-            src/test/pheno-comparison-a11y-viewports.test.tsx
+            src/test/pheno-comparison-static-safety.test.ts
 
       # Route manifest sync — ensures /pheno-comparison stays wired
       # (App.tsx <-> appRouteManifest).
@@ -85,11 +90,7 @@ jobs:
             src/lib/phenoSelectionRules.ts \
             src/lib/phenoComparisonFixtures.ts \
             src/test/pheno-comparison-view-model.test.ts \
-            src/test/pheno-comparison-route.test.tsx \
             src/test/pheno-comparison-static-safety.test.ts \
-            src/test/pheno-comparison-display-safety.test.tsx \
-            src/test/pheno-selection-rules.test.ts \
-            src/test/pheno-comparison-a11y-viewports.test.tsx \
             e2e/pheno-comparison-visual-style.spec.ts \
             e2e/pheno-comparison-readonly.spec.ts
 

@@ -27,6 +27,8 @@ import DiaryEntryBadges from "@/components/DiaryEntryBadges";
 import EnvironmentCheckTimelineBadge from "@/components/EnvironmentCheckTimelineBadge";
 import EnvironmentCheckSnapshotLinkButton from "@/components/EnvironmentCheckSnapshotLinkButton";
 import AiDoctorCheckInTimelineBadge from "@/components/AiDoctorCheckInTimelineBadge";
+import AiDoctorReadinessTimelineBadge from "@/components/AiDoctorReadinessTimelineBadge";
+import { isAiDoctorReadinessCheckEvent } from "@/lib/aiDoctorReadinessTimelineBadge";
 import {
   buildEnvironmentCheckDiaryViewModel,
   isEnvironmentCheckKind,
@@ -1099,10 +1101,18 @@ export default function Timeline() {
                             eventTypeValue === "action_followup" ||
                             eventTypeValue === "action_outcome" ||
                             eventTypeValue === RUN_LEARNING_DECISION_EVENT_TYPE;
+                          // Readiness-check rows carry machine fields
+                          // (kind, readiness, allowed, snapshot_*,
+                          // blocking_codes, checked_at) that must never
+                          // render as raw chips — the dedicated badge
+                          // below presents them instead.
+                          const isReadinessCheckEvent = isAiDoctorReadinessCheckEvent(e);
                           const HIDDEN = ["event_type","plant_id","plant_name","tent_id","sensor","sensor_snapshot","remind_at"];
                           const extra = isLearningLoopEvent
                             ? []
-                            : Object.entries(e.details || {}).filter(([k]) => !HIDDEN.includes(k));
+                            : isReadinessCheckEvent
+                              ? []
+                              : Object.entries(e.details || {}).filter(([k]) => !HIDDEN.includes(k));
                           const loopActionId =
                             isLearningLoopEvent && typeof e.details?.action_queue_id === "string"
                               ? (e.details.action_queue_id as string)
@@ -1311,6 +1321,7 @@ export default function Timeline() {
                                 return ni ? <DiaryEntryBadges item={ni} /> : null;
                               })()}
                               <AiDoctorCheckInTimelineBadge event={e} />
+                              <AiDoctorReadinessTimelineBadge event={e} />
                               {(() => {
                                 const kindValue = (e.details?.event_type as string | undefined) ?? null;
                                 if (!isEnvironmentCheckKind(kindValue)) return null;

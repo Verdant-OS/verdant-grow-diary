@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import CreateTentDialog from "@/components/CreateTentDialog";
@@ -90,6 +91,7 @@ export default function CreatePlantDialog({ trigger, defaultTentId, defaultGrowI
       return;
     }
     toast.success("Plant created");
+    trackFunnelEvent("plant_created");
     qc.invalidateQueries({ queryKey: ["plants"] });
     qc.invalidateQueries({ queryKey: ["grow", "plants"] });
     setForm({ name: "", strain: "", tent_id: defaultTentId ?? "none", stage: "seedling", health: "healthy", started_at: "" });

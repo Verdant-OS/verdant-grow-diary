@@ -63,6 +63,7 @@ import { logsPath } from "@/lib/routes";
 import { resolvePaddleConfig, unavailableMessage, type PaddleConfig } from "@/lib/paddleConfig";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 
 
 // --- Paddle overlay typing (loose — we only call a couple of methods). -------
@@ -615,6 +616,10 @@ export default function Upgrade() {
   const paddleConfig = useMemo(() => resolvePaddleConfig(), []);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    trackFunnelEvent("paywall_viewed", { surface: "upgrade" });
+  }, []);
 
   const paddleUnavailableReason = paddleConfig.available
     ? null

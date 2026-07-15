@@ -59,13 +59,23 @@ export function buildAiDoctorSnapshotStalenessExplanation(
   // time value". Treat out-of-range `now` the same as non-finite: fall
   // back to the wall clock so the helper NEVER throws.
   const MAX_SAFE_DATE_MS = 8_640_000_000_000_000;
+  const SAFE_LIMIT = MAX_SAFE_DATE_MS - AI_DOCTOR_SNAPSHOT_FRESH_MS;
+  const isSafeNow = (value: unknown): value is number =>
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    Math.abs(value) <= SAFE_LIMIT;
+  const clock =
+    typeof args.nowFallback === "function" ? args.nowFallback : Date.now;
   const nowCandidate = args.now;
-  const now =
-    typeof nowCandidate === "number" &&
-    Number.isFinite(nowCandidate) &&
-    Math.abs(nowCandidate) <= MAX_SAFE_DATE_MS - AI_DOCTOR_SNAPSHOT_FRESH_MS
-      ? nowCandidate
-      : Date.now();
+  let now: number;
+  if (isSafeNow(nowCandidate)) {
+    now = nowCandidate;
+  } else {
+    const fallback = clock();
+    // Guard the injected clock too — a misbehaving clock must never let
+    // `new Date(now - freshMs).toISOString()` throw.
+    now = isSafeNow(fallback) ? fallback : Date.now();
+  }
   const freshMs =
     typeof args.snapshotFreshMs === "number" &&
     Number.isFinite(args.snapshotFreshMs) &&

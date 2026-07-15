@@ -10,6 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "audit:subscriber-growth-live": "node scripts/audit-subscriber-growth-live-parity.mjs",
+    "release:subscriber-growth:gate": "node scripts/releases/run-subscriber-growth-launch-gate.mjs",
+    "release:subscriber-growth:gate:local": "node scripts/releases/run-subscriber-growth-launch-gate.mjs --local-only",
     "e2e:one-tent:preflight": "node scripts/e2e/lovable-managed-session-preflight.mjs",
     "e2e:one-tent:seed": "node scripts/e2e/seed-one-tent-golden-path.mjs",
     "e2e:one-tent:teardown": "node scripts/e2e/teardown-one-tent-golden-path.mjs",

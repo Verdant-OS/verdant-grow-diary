@@ -19,6 +19,12 @@ import type { DiaryFaqTopic } from "@/lib/diaryFaqLinkRules";
 export const DIARY_FAQ_LINK_CLICKS_STORAGE_KEY =
   "verdant.diaryFaqLinkClicks.v1";
 
+export const DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY =
+  "verdant.diaryFaqLinkClicks.enabled.v1";
+
+/** Default preference when the operator has not opted out. */
+export const DIARY_FAQ_LINK_TRACKING_DEFAULT_ENABLED = true;
+
 const KNOWN_TOPICS: readonly DiaryFaqTopic[] = [
   "yellowing",
   "environment",

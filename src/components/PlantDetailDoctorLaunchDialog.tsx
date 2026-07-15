@@ -243,14 +243,12 @@ export default function PlantDetailDoctorLaunchDialog({
     });
   }, [readinessResult.latest.manualSnapshotAt, now]);
 
-  const queryClient = useQueryClient();
-  const [logging, setLogging] = useState(false);
+  const { log: logReadiness, logging } = useLogAiDoctorReadinessToDiary();
   const canLogReadiness = typeof growId === "string" && growId.trim().length > 0;
 
-  const handleLogReadinessToDiary = useCallback(async () => {
+  const handleLogReadinessToDiary = useCallback(() => {
     if (!canLogReadiness || !plantId) return;
-    setLogging(true);
-    const built = buildAiDoctorReadinessDiaryEntry({
+    void logReadiness({
       readiness: readinessResult.readiness,
       latestSnapshotAtIso: readinessResult.latest.manualSnapshotAt,
       blockingCodes: blockedExplanation.blockingCodes,
@@ -259,30 +257,6 @@ export default function PlantDetailDoctorLaunchDialog({
       tentId: tentId ?? null,
       now: now ? now.getTime() : undefined,
     });
-    if (!built.ok) {
-      toast.error("Could not log readiness", {
-        description: (built as { ok: false; reason: string }).reason,
-      });
-      setLogging(false);
-      return;
-    }
-    const { draft } = built;
-    const { error } = await supabase.from("diary_entries").insert({
-      grow_id: draft.grow_id,
-      plant_id: draft.plant_id,
-      tent_id: draft.tent_id,
-      note: draft.note,
-      details: draft.details as unknown as Json,
-    });
-    if (error) {
-      toast.error("Failed to log readiness", { description: error.message });
-    } else {
-      toast.success("Readiness logged to diary");
-      queryClient.invalidateQueries({ queryKey: ["diary_entries"] });
-      queryClient.invalidateQueries({ queryKey: ["timeline-memory"] });
-      queryClient.invalidateQueries({ queryKey: ["plant-recent-activity"] });
-    }
-    setLogging(false);
   }, [
     canLogReadiness,
     plantId,
@@ -292,7 +266,7 @@ export default function PlantDetailDoctorLaunchDialog({
     growId,
     tentId,
     now,
-    queryClient,
+    logReadiness,
   ]);
 
   const handleAddContext = useCallback(() => {

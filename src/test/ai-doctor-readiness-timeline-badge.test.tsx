@@ -70,6 +70,7 @@ describe("buildAiDoctorReadinessTimelineBadge — stored truth only", () => {
         snapshot_freshness: "fresh",
         snapshot_at: "2026-06-01T09:00:00.000Z",
         snapshot_age_minutes: 180,
+        checked_at: "2026-06-01T12:00:00.000Z",
       }),
     );
     expect(vm).not.toBeNull();
@@ -85,6 +86,7 @@ describe("buildAiDoctorReadinessTimelineBadge — stored truth only", () => {
         snapshot_freshness: "stale",
         snapshot_at: "2026-05-29T12:00:00.000Z",
         snapshot_age_minutes: 3 * 24 * 60,
+        checked_at: "2026-06-01T12:00:00.000Z",
       }),
     );
     expect(vm!.freshness).toBe("stale");
@@ -107,12 +109,14 @@ describe("buildAiDoctorReadinessTimelineBadge — stored truth only", () => {
   });
 
   it("never re-grades against the current clock: an old fresh-at-check entry stays fresh", () => {
-    // Snapshot + check happened long before "today"; stored freshness wins.
+    // Snapshot + check happened long before "today"; the stored evidence
+    // is coherent AT CHECK TIME, so the historical grade wins.
     const vm = buildAiDoctorReadinessTimelineBadge(
       readinessEvent({
         snapshot_freshness: "fresh",
         snapshot_at: "2020-01-01T00:00:00.000Z",
         snapshot_age_minutes: 5,
+        checked_at: "2020-01-01T00:05:00.000Z",
       }),
     );
     expect(vm!.freshness).toBe("fresh");
@@ -153,6 +157,12 @@ describe("buildAiDoctorReadinessTimelineBadge — stored truth only", () => {
         snapshot_at: "2026-06-01T09:00:00.000Z",
         snapshot_age_minutes: -5,
       },
+      // Complete but missing the checked_at the builder always writes.
+      {
+        snapshot_freshness: "fresh",
+        snapshot_at: "2026-06-01T09:00:00.000Z",
+        snapshot_age_minutes: 180,
+      },
     ];
     for (const details of incompleteCases) {
       const vm = buildAiDoctorReadinessTimelineBadge(readinessEvent(details));
@@ -161,6 +171,64 @@ describe("buildAiDoctorReadinessTimelineBadge — stored truth only", () => {
       expect(vm!.variant, JSON.stringify(details)).toBe("neutral");
       expect(vm!.label, JSON.stringify(details)).toBe("No snapshot at check");
       expect(vm!.snapshotAtIso, JSON.stringify(details)).toBeNull();
+    }
+  });
+
+  it("never renders a positive badge from complete-but-inconsistent evidence", () => {
+    // The builder derives grade, age, and checked_at from one instant, so
+    // legitimate rows always self-agree. Contradictory combinations are
+    // corruption and must collapse to neutral — judged against CHECK time,
+    // never the current clock.
+    const inconsistentCases: Array<Record<string, unknown>> = [
+      // Codex-review scenario: "fresh" + years-old timestamp + age 5m.
+      {
+        snapshot_freshness: "fresh",
+        snapshot_at: "2020-01-01T00:00:00.000Z",
+        snapshot_age_minutes: 5,
+        checked_at: "2026-06-01T12:00:00.000Z",
+      },
+      // Age disagrees with checked_at - snapshot_at (3h real vs 5m claimed).
+      {
+        snapshot_freshness: "fresh",
+        snapshot_at: "2026-06-01T09:00:00.000Z",
+        snapshot_age_minutes: 5,
+        checked_at: "2026-06-01T12:00:00.000Z",
+      },
+      // Grade disagrees with the coherent age: 3h old is fresh, not stale.
+      {
+        snapshot_freshness: "stale",
+        snapshot_at: "2026-06-01T09:00:00.000Z",
+        snapshot_age_minutes: 180,
+        checked_at: "2026-06-01T12:00:00.000Z",
+      },
+      // Grade disagrees the other way: 3 days old is stale, not fresh.
+      {
+        snapshot_freshness: "fresh",
+        snapshot_at: "2026-05-29T12:00:00.000Z",
+        snapshot_age_minutes: 3 * 24 * 60,
+        checked_at: "2026-06-01T12:00:00.000Z",
+      },
+      // Snapshot claimed to be AFTER the check.
+      {
+        snapshot_freshness: "fresh",
+        snapshot_at: "2026-06-01T12:00:00.000Z",
+        snapshot_age_minutes: 0,
+        checked_at: "2026-06-01T09:00:00.000Z",
+      },
+      // Unparseable checked_at.
+      {
+        snapshot_freshness: "fresh",
+        snapshot_at: "2026-06-01T09:00:00.000Z",
+        snapshot_age_minutes: 180,
+        checked_at: "sometime",
+      },
+    ];
+    for (const details of inconsistentCases) {
+      const vm = buildAiDoctorReadinessTimelineBadge(readinessEvent(details));
+      expect(vm, JSON.stringify(details)).not.toBeNull();
+      expect(vm!.freshness, JSON.stringify(details)).toBe("missing");
+      expect(vm!.variant, JSON.stringify(details)).toBe("neutral");
+      expect(vm!.label, JSON.stringify(details)).toBe("No snapshot at check");
     }
   });
 
@@ -211,6 +279,7 @@ describe("<AiDoctorReadinessTimelineBadge />", () => {
           snapshot_freshness: "stale",
           snapshot_at: "2026-05-29T12:00:00.000Z",
           snapshot_age_minutes: 4320,
+          checked_at: "2026-06-01T12:00:00.000Z",
         })}
       />,
     );

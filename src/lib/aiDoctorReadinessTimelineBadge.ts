@@ -12,12 +12,18 @@
  *    a check logged as "fresh" three days ago stays labeled as fresh
  *    AT CHECK TIME, and the copy says so ("at check").
  *  - `details` is untrusted JSON. The positive/warning variants require
- *    the FULL evidence the builder always writes for them (a parseable
- *    `snapshot_at` AND a finite `snapshot_age_minutes`); any missing or
- *    malformed field collapses to the neutral no-snapshot state, so
+ *    the FULL, SELF-CONSISTENT evidence the builder always writes for
+ *    them: a parseable `snapshot_at`, a finite `snapshot_age_minutes`,
+ *    a parseable `checked_at`, an age that agrees with
+ *    `checked_at - snapshot_at`, and a grade that agrees with that age
+ *    under the shared 48h window. Any missing, malformed, or mutually
+ *    contradictory field collapses to the neutral no-snapshot state, so
  *    corrupted rows can never present unknown telemetry as fresh.
+ *    (Consistency is judged against CHECK time — never the current
+ *    clock — so old-but-coherent entries keep their historical grade.)
  */
 import { AI_DOCTOR_READINESS_CHECK_KIND } from "@/lib/aiDoctorReadinessDiaryEntryRules";
+import { AI_DOCTOR_SNAPSHOT_FRESH_MS } from "@/lib/aiDoctorContextRules";
 
 export type AiDoctorReadinessBadgeVariant = "positive" | "warning" | "neutral";
 
@@ -78,6 +84,7 @@ export function buildAiDoctorReadinessTimelineBadge(
   const rawFreshness = details.snapshot_freshness;
   const rawAge = details.snapshot_age_minutes;
   const rawAt = details.snapshot_at;
+  const rawCheckedAt = details.checked_at;
 
   const snapshotAtIso =
     typeof rawAt === "string" && Number.isFinite(Date.parse(rawAt)) ? rawAt : null;
@@ -85,16 +92,30 @@ export function buildAiDoctorReadinessTimelineBadge(
     typeof rawAge === "number" && Number.isFinite(rawAge) && rawAge >= 0
       ? rawAge
       : null;
+  const checkedAtMs =
+    typeof rawCheckedAt === "string" && Number.isFinite(Date.parse(rawCheckedAt))
+      ? Date.parse(rawCheckedAt)
+      : null;
 
   // Fresh/stale claims must carry the full evidence the builder writes
-  // for them: a parseable timestamp AND a recorded age. A bare
-  // `snapshot_freshness: "fresh"` in corrupted details is not enough to
-  // render a positive state.
-  if (
-    (rawFreshness === "fresh" || rawFreshness === "stale") &&
-    snapshotAtIso !== null &&
-    ageMinutes !== null
-  ) {
+  // for them AND that evidence must agree with itself at CHECK time:
+  // the recorded age must match `checked_at - snapshot_at` (builder
+  // floors to whole minutes; allow 1 minute of slack), and the recorded
+  // grade must match that age under the shared 48h window. A row saying
+  // "fresh" over a years-old timestamp with `snapshot_age_minutes: 5`
+  // is corrupted, not fresh.
+  const evidenceIsCoherent = (() => {
+    if (snapshotAtIso === null || ageMinutes === null || checkedAtMs === null) {
+      return false;
+    }
+    const ageAtCheckMs = checkedAtMs - Date.parse(snapshotAtIso);
+    if (ageAtCheckMs < 0) return false;
+    if (Math.abs(Math.floor(ageAtCheckMs / 60_000) - ageMinutes) > 1) return false;
+    const gradeAtCheck = ageAtCheckMs <= AI_DOCTOR_SNAPSHOT_FRESH_MS ? "fresh" : "stale";
+    return gradeAtCheck === rawFreshness;
+  })();
+
+  if ((rawFreshness === "fresh" || rawFreshness === "stale") && evidenceIsCoherent) {
     const ageText = formatAgeAtCheck(ageMinutes);
     if (rawFreshness === "fresh") {
       return {

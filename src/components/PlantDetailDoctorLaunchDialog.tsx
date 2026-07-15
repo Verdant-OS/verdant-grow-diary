@@ -23,6 +23,8 @@
  */
 import { useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   Stethoscope,
   ArrowRight,
@@ -30,7 +32,11 @@ import {
   MinusCircle,
   Clock,
   Plus,
+  BookText,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { buildAiDoctorReadinessDiaryEntry } from "@/lib/aiDoctorReadinessDiaryEntryRules";
+import type { Json } from "@/integrations/supabase/types";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

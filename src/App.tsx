@@ -12,6 +12,7 @@ import PhenoTrackerUpgradeGate from "@/components/PhenoTrackerUpgradeGate";
 import RequireOperatorRole from "./components/RequireOperatorRole";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
+import RootEntry from "@/components/RootEntry";
 
 // Route pages and the authenticated AppShell are code-split so the public
 // marketing / auth entry paths (/welcome, /pricing, /hardware-integrations,
@@ -23,7 +24,6 @@ const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Tents = lazy(() => import("./pages/Tents"));
 const TentDetail = lazy(() => import("./pages/TentDetail"));
 const Plants = lazy(() => import("./pages/Plants"));
@@ -181,6 +181,10 @@ const App = () => (
 
                   <Route path="/features" element={<Navigate to="/welcome" replace />} />
 
+                  {/* Session-aware apex: signed-out visitors receive the public
+                      landing directly; signed-in growers retain Dashboard in
+                      the authenticated AppShell. */}
+                  <Route path="/" element={<RootEntry />} />
                   <Route path="/welcome" element={<Landing />} />
                   {/* /demo route removed — Verdant tracks real grow data only.
                       Old bookmarks redirect to the landing page. */}
@@ -245,7 +249,6 @@ const App = () => (
                   <Route path="/pheno-hunts/:id/compare" element={<PhenoHuntCompare />} />
 
                   <Route element={<AppShell />}>
-                    <Route path="/" element={<Dashboard />} />
                     <Route path="/onboarding" element={<Onboarding />} />
                     {/* Legacy Live Dashboard route — consolidated into the
                         main Dashboard. Redirect preserves old bookmarks. */}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import LegalFooterLinks from "@/components/LegalFooterLinks";
 import { Outlet, useNavigate } from "react-router-dom";
 import { Bell, LogOut, Plus, Search } from "lucide-react";
@@ -18,7 +18,7 @@ import VerificationPendingBanner from "./VerificationPendingBanner";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
 
-export default function AppShell() {
+export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading } = useAuth();
   // Protected-route boundary: re-validate session against the auth server.
   // Keep both session checks on the same signed-out destination. Sending the
@@ -61,6 +61,7 @@ export default function AppShell() {
   if (!user) return null;
 
   const unread = openAlerts.filter((a) => a.status === "open").length;
+  const pageContent = children ?? <Outlet />;
 
   return (
     <SidebarProvider defaultOpen>
@@ -125,7 +126,7 @@ export default function AppShell() {
             {isEmailVerificationPending(user) ? (
               <VerificationPendingBanner email={user.email ?? ""} />
             ) : (
-              <Outlet />
+              pageContent
             )}
             {/* In-flow legal footer: stays at the end of scrolled content
                 (never fixed), so the mobile FAB cannot clip it. */}

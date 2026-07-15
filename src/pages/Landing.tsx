@@ -41,20 +41,24 @@ const LANDING_SIGNUP_PATH = buildAttributedSignupPath({ source: "landing_page" }
  * Copy lives in `src/constants/verdantPositioningCopy.ts`. This file is a
  * presenter only.
  */
-export default function Landing() {
+export interface LandingProps {
+  canonicalPath?: "/" | "/welcome";
+}
+
+export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
   const { user } = useAuth();
 
   usePageSeo({
     title: "Grow Diary & Grow Room Tracking App | Verdant Grow Diary",
     description:
       "See what changed in your grow and decide what to do next. Verdant turns logs, photos, and sensor readings from the gear you already own into one plant timeline.",
-    path: "/welcome",
+    path: canonicalPath,
   });
 
   // FAQPage JSON-LD — must mirror the visible FAQ below (same source constant).
   useEffect(() => {
     const faq = buildFaqPageJsonLd({
-      pageUrl: "https://verdantgrowdiary.com/welcome",
+      pageUrl: `https://verdantgrowdiary.com${canonicalPath}`,
       questions: VERDANT_LANDING_FAQ,
     });
     const s = document.createElement("script");
@@ -65,7 +69,7 @@ export default function Landing() {
     return () => {
       s.remove();
     };
-  }, []);
+  }, [canonicalPath]);
 
   return (
     <main className="min-h-screen bg-background text-foreground">

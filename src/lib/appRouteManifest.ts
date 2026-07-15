@@ -65,7 +65,11 @@ export interface AppRouteEntry {
  */
 export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "*", access: "public", description: "NotFound catch-all." },
-  { path: "/", access: "auth", description: "Dashboard." },
+  {
+    path: "/",
+    access: "public",
+    description: "Public landing when signed out; authenticated Dashboard when signed in.",
+  },
   {
     path: "/.lovable/oauth/consent",
     access: "public",

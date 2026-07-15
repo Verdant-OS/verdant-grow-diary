@@ -3,8 +3,9 @@
 A concise map of how Verdant is structured today: product layers, routes,
 data ownership, AI/Action Queue safety, and the dashboard intelligence stack.
 
-**Production deployment:** https://verdantgrowdiary.com — the only public
-route is `/welcome` (marketing landing). Every other surface requires auth.
+**Production deployment:** https://verdantgrowdiary.com — signed-out visitors
+see the public marketing landing at both `/` and `/welcome`. Signed-in growers
+retain the Dashboard at `/`; every other product surface requires auth.
 
 For development standards and PR rules, see [`README.md`](../README.md),
 [`docs/security-checklist.md`](./security-checklist.md),
@@ -116,8 +117,8 @@ tests under `src/test/scoped-grow-navigation-contract.test.tsx` and
 The scoped Dashboard composes a small, read-only intelligence stack:
 
 1. **Latest environment snapshot** — `src/hooks/useLatestSensorSnapshot.ts`
-   + `src/lib/sensorSnapshot.ts`. Renders the most recent reading with a
-   source label and a stale badge when applicable.
+   - `src/lib/sensorSnapshot.ts`. Renders the most recent reading with a
+     source label and a stale badge when applicable.
 2. **Sensor data quality** — `src/lib/sensorQuality.ts`. Classifies the
    snapshot as usable, stale, missing, or suspicious.
 3. **Environment trends** — `src/hooks/useEnvironmentTrends.ts` +

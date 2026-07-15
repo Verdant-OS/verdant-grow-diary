@@ -6,13 +6,16 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  seo: vi.fn(),
   track: vi.fn(),
 }));
 
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: null, loading: false }),
 }));
-vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
+vi.mock("@/hooks/usePageSeo", () => ({
+  usePageSeo: (input: unknown) => mocks.seo(input),
+}));
 vi.mock("@/lib/pricingAnalytics", () => ({
   trackPricingEvent: (...args: unknown[]) => mocks.track(...args),
 }));
@@ -28,10 +31,31 @@ import Landing from "@/pages/Landing";
 const APP_SHELL = readFileSync(resolve(__dirname, "../components/AppShell.tsx"), "utf8");
 
 beforeEach(() => {
+  mocks.seo.mockReset();
   mocks.track.mockReset();
 });
 
 describe("landing subscriber funnel", () => {
+  it("uses a truthful canonical for both public entry paths", () => {
+    const { unmount } = render(
+      <MemoryRouter>
+        <Landing canonicalPath="/" />
+      </MemoryRouter>,
+    );
+    expect(mocks.seo).toHaveBeenLastCalledWith(expect.objectContaining({ path: "/" }));
+    expect(document.head.querySelector('[data-page-ldjson="landing-faq"]')?.textContent).toContain(
+      '"url":"https://verdantgrowdiary.com/"',
+    );
+
+    unmount();
+    render(
+      <MemoryRouter>
+        <Landing />
+      </MemoryRouter>,
+    );
+    expect(mocks.seo).toHaveBeenLastCalledWith(expect.objectContaining({ path: "/welcome" }));
+  });
+
   it("puts a paid-plan path in the header, hero, and final CTA", () => {
     render(
       <MemoryRouter>

@@ -57,7 +57,6 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/leads",
   "/one-tent-loop-proof",
   // representative auth-gated surfaces
-  "/",
   "/actions",
   "/sensors",
   "/settings",
@@ -67,6 +66,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
 ];
 
 const PUBLIC_MOBILE_ROUTES: string[] = [
+  "/",
   "/welcome",
   "/pricing",
   "/hardware-integrations",
@@ -166,7 +166,7 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
   });
 
   for (const path of PROTECTED_MOBILE_ROUTES) {
-    test(`mobile signed-out → ${path} redirects to /auth and makes no private REST hits`, async ({
+    test(`mobile signed-out → ${path} redirects to /welcome and makes no private REST hits`, async ({
       page,
       baseURL,
     }) => {
@@ -187,7 +187,7 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
       // flake). Use domcontentloaded for the navigation and a polling URL
       // assertion for the auth-gate redirect with a generous timeout.
       await page.goto(path, { waitUntil: "domcontentloaded" });
-      await expect(page).toHaveURL(/\/auth(\?|$)/, { timeout: 20_000 });
+      await expect(page).toHaveURL(/\/welcome(\?|$)/, { timeout: 20_000 });
       const url = new URL(page.url());
       expect(url.origin).toBe(new URL(baseURL!).origin);
       const redirectTo = url.searchParams.get("redirectTo");

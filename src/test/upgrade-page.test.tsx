@@ -20,6 +20,19 @@ const paddleMock = vi.hoisted(() => ({
   retryCount: 0,
 }));
 
+// Trunk routed confirm through the canonical usePaddleCheckout hook (M1
+// audit fix); direct paddle.Checkout.open is no longer called by the page.
+// The canonical spy is the positive assertion seam; checkoutOpen remains as
+// a never-called guard against a direct-open regression.
+const canonicalCheckout = vi.hoisted(() => ({ openCheckout: vi.fn() }));
+
+vi.mock("@/hooks/usePaddleCheckout", () => ({
+  usePaddleCheckout: () => ({
+    openCheckout: canonicalCheckout.openCheckout,
+    loading: false,
+  }),
+}));
+
 const tierOverride = vi.hoisted(() => ({
   founderClaimed: 0 as number,
   proMonthlyPriceId: "pri_pro_month" as string | null,
@@ -94,6 +107,7 @@ beforeEach(() => {
   paddleMock.loading = false;
   paddleMock.error = null;
   paddleMock.checkoutOpen.mockReset();
+  canonicalCheckout.openCheckout.mockReset();
   tierOverride.founderClaimed = 0;
   tierOverride.proMonthlyPriceId = "pri_pro_month";
   // Mutate live pricing tiers so all paid CTAs are active by default; individual
@@ -132,36 +146,41 @@ describe("Upgrade page", () => {
     expect(cta.textContent).toMatch(/Available soon/i);
   });
 
-  it("free tier CTA never opens confirmation or Paddle checkout", () => {
+  it("free tier CTA never opens confirmation or any checkout", () => {
     renderPage();
     fireEvent.click(screen.getByTestId("tier-free-cta"));
     expect(screen.queryByTestId("checkout-confirm-dialog")).toBeNull();
     expect(paddleMock.checkoutOpen).not.toHaveBeenCalled();
+    expect(canonicalCheckout.openCheckout).not.toHaveBeenCalled();
   });
 
-  it("paid tier click opens confirmation dialog before Paddle checkout", () => {
+  it("paid tier click opens confirmation dialog before any checkout", () => {
     renderPage();
     fireEvent.click(screen.getByTestId("tier-pro_annual-cta"));
     const dialog = screen.getByTestId("checkout-confirm-dialog");
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByTestId("checkout-confirm-price").textContent).toMatch(/\$/);
     expect(paddleMock.checkoutOpen).not.toHaveBeenCalled();
+    expect(canonicalCheckout.openCheckout).not.toHaveBeenCalled();
   });
 
-  it("cancel in confirmation dialog does not call Paddle.Checkout.open", () => {
+  it("cancel in confirmation dialog opens no checkout", () => {
     renderPage();
     fireEvent.click(screen.getByTestId("tier-pro_annual-cta"));
     fireEvent.click(screen.getByTestId("checkout-confirm-cancel"));
     expect(paddleMock.checkoutOpen).not.toHaveBeenCalled();
+    expect(canonicalCheckout.openCheckout).not.toHaveBeenCalled();
   });
 
-  it("confirm calls Paddle.Checkout.open when paddlePriceId is valid and Paddle is ready", () => {
+  it("confirm opens checkout via the canonical hook when paddlePriceId is valid and Paddle is ready", () => {
     renderPage();
     fireEvent.click(screen.getByTestId("tier-pro_monthly-cta"));
     fireEvent.click(screen.getByTestId("checkout-confirm-continue"));
-    expect(paddleMock.checkoutOpen).toHaveBeenCalledTimes(1);
-    const payload = paddleMock.checkoutOpen.mock.calls[0][0];
-    expect(payload.items[0].priceId).toBe("pri_pro_month");
+    expect(canonicalCheckout.openCheckout).toHaveBeenCalledTimes(1);
+    const options = canonicalCheckout.openCheckout.mock.calls[0][0];
+    expect(options.priceId).toBe("pri_pro_month");
+    // Never a direct Paddle.Checkout.open — the hook is the only path.
+    expect(paddleMock.checkoutOpen).not.toHaveBeenCalled();
   });
 
   it("founder sold-out state disables CTA", () => {

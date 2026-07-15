@@ -162,6 +162,37 @@ async function scanEach(region: Locator, selector: string, label: string) {
   return count;
 }
 
+/**
+ * ACTIVE trunk visual-honesty fence — runs while the structure spec below
+ * stays test.fixme pending "Reconcile imported Pheno Comparison v0 surface".
+ * Reuses this spec's own success-cue scanner against anchors the TRUNK page
+ * actually renders: every demo candidate section that declares missing
+ * context (data-testid pheno-candidate-<id>-missing) must show ZERO
+ * green/success class tokens, success status attributes, checkmark icons,
+ * or healthy/OK wording. A regression that renders risky candidates as
+ * healthy fails HERE even with the fixme block skipped.
+ */
+test("trunk fence: missing-context candidates never render success cues", async ({
+  page,
+}: {
+  page: Page;
+}) => {
+  await page.goto("/pheno-comparison");
+  await expect(page.getByTestId("pheno-comparison-page")).toBeVisible();
+  const cards = page.locator("section[data-testid^='pheno-candidate-']");
+  await expect(cards.first()).toBeVisible();
+  const count = await cards.count();
+  expect(count, "demo candidate sections render").toBeGreaterThanOrEqual(2);
+  let scanned = 0;
+  for (let i = 0; i < count; i++) {
+    const card = cards.nth(i);
+    if ((await card.locator("[data-testid$='-missing']").count()) === 0) continue;
+    scanned++;
+    expectScopeClean(`missing-context candidate[${i}]`, await scanScope(card));
+  }
+  expect(scanned, "at least one missing-context candidate in the demo fixtures").toBeGreaterThan(0);
+});
+
 for (const vp of VIEWPORTS) {
   // FIXME: never-green on this branch — this spec was authored on the side
   // branch that built the Pheno Comparison surface (e7e4e72d / be8ac1f7) and

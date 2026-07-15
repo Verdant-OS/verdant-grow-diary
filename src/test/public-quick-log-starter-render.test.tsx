@@ -7,7 +7,7 @@
  * link against the route manifest's public entries — the same contract that
  * lets guides link here.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import QuickLogStarter from "@/pages/QuickLogStarter";
@@ -146,6 +146,22 @@ describe("draft lifecycle through the real store", () => {
     setLocalStorageItemForTest(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY, "{corrupt!!");
     renderStarter();
     expect(screen.getByTestId("public-quick-log-starter")).toBeInTheDocument();
+    expect(screen.queryByTestId("starter-saved-draft")).toBeNull();
+  });
+});
+
+describe("storage-failure honesty", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("a failed storage write shows the honest error instead of a saved card", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("QuotaExceededError");
+    });
+    renderStarter();
+    saveMinimalDraft();
+    expect(screen.getByTestId("starter-storage-error")).toHaveTextContent(COPY.storageErrorLine);
     expect(screen.queryByTestId("starter-saved-draft")).toBeNull();
   });
 });

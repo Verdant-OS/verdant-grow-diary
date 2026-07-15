@@ -172,7 +172,7 @@ export function validatePublicQuickLogStarterInput(
   const note = input.note.trim();
   const isWatering = input.logType === "watering";
   if (note.length === 0 && !isWatering) {
-    errors.note = "Write a short note — it becomes your first diary entry.";
+    errors.note = "Write a short note about what you did or noticed.";
   } else if (note.length > PUBLIC_QUICK_LOG_STARTER_MAX_NOTE_LENGTH) {
     errors.note = `Keep the note under ${PUBLIC_QUICK_LOG_STARTER_MAX_NOTE_LENGTH} characters.`;
   }
@@ -201,16 +201,21 @@ export function validatePublicQuickLogStarterInput(
   };
 }
 
-function mintDraftId(): string {
+let fallbackIdCounter = 0;
+
+function mintDraftId(now: Date): string {
   try {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
       return crypto.randomUUID();
     }
   } catch {
-    /* fall through to the counter-free fallback below */
+    /* fall through to the deterministic fallback below */
   }
-  // Non-cryptographic fallback — the id only distinguishes drafts locally.
-  return `starter-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+  // Deterministic fallback from the caller-supplied clock + a module
+  // counter — no hidden Date.now()/Math.random() reads (module contract:
+  // callers inject time). The id only distinguishes drafts locally.
+  fallbackIdCounter += 1;
+  return `starter-${now.getTime().toString(36)}-${fallbackIdCounter.toString(36)}`;
 }
 
 /**
@@ -226,7 +231,7 @@ export function buildPublicQuickLogStarterDraft(args: {
   const iso = args.now.toISOString();
   return {
     v: 1,
-    id: args.previous?.id ?? mintDraftId(),
+    id: args.previous?.id ?? mintDraftId(args.now),
     createdAt: args.previous?.createdAt ?? iso,
     updatedAt: iso,
     plantNickname: args.fields.plantNickname,
@@ -287,18 +292,29 @@ export function parsePublicQuickLogStarterDraft(
   if (plantNickname.length === 0) return null;
   if (typeof d.logType !== "string" || !isStarterLogType(d.logType)) return null;
   if (typeof d.note !== "string") return null;
-  const note = d.note.slice(0, PUBLIC_QUICK_LOG_STARTER_MAX_NOTE_LENGTH);
+  const note = d.note.trim().slice(0, PUBLIC_QUICK_LOG_STARTER_MAX_NOTE_LENGTH);
+  // Same invariant as the form validator: every type except watering
+  // requires a non-empty note. Untrusted storage does not get to bypass it.
+  if (note.length === 0 && d.logType !== "watering") return null;
   const stage =
     typeof d.stage === "string" && d.stage !== UNKNOWN_STAGE
       ? (normalizeQuickLogStage(d.stage) ?? UNKNOWN_STAGE)
       : UNKNOWN_STAGE;
+  // localStorage is untrusted input: re-apply the same type-specific
+  // invariants the save validator enforces. A watering draft without a
+  // positive volume is structurally invalid (reject); a volume on any
+  // other type is an impossible state (drop it).
   let wateringVolumeMl: number | null = null;
-  if (
-    typeof d.wateringVolumeMl === "number" &&
-    Number.isFinite(d.wateringVolumeMl) &&
-    d.wateringVolumeMl > 0
-  ) {
-    wateringVolumeMl = d.wateringVolumeMl;
+  if (d.logType === "watering") {
+    if (
+      typeof d.wateringVolumeMl === "number" &&
+      Number.isFinite(d.wateringVolumeMl) &&
+      d.wateringVolumeMl > 0
+    ) {
+      wateringVolumeMl = d.wateringVolumeMl;
+    } else {
+      return null;
+    }
   }
   return {
     v: 1,

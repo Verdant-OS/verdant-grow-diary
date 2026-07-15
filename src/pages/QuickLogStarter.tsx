@@ -102,6 +102,7 @@ export default function QuickLogStarter() {
   );
   const [errors, setErrors] = useState<Partial<Record<PublicQuickLogStarterField, string>>>({});
   const [justSaved, setJustSaved] = useState(false);
+  const [storageError, setStorageError] = useState<string | null>(null);
 
   const activity =
     QUICK_LOG_ACTIVITY_DEFINITIONS[PUBLIC_QUICK_LOG_STARTER_TYPE_TO_ACTIVITY_ID[logType]];
@@ -116,7 +117,7 @@ export default function QuickLogStarter() {
     });
     if (result.fields) {
       setErrors({});
-      writePublicQuickLogStarterDraft(
+      const persisted = writePublicQuickLogStarterDraft(
         buildPublicQuickLogStarterDraft({
           fields: result.fields,
           attribution: pickSafeUtmParams(location.search),
@@ -124,10 +125,12 @@ export default function QuickLogStarter() {
           previous: draft,
         }),
       );
-      setJustSaved(true);
+      setStorageError(persisted ? null : COPY.storageErrorLine);
+      setJustSaved(persisted);
     } else {
       setErrors(result.errors);
       setJustSaved(false);
+      setStorageError(null);
     }
   }
 
@@ -290,6 +293,15 @@ export default function QuickLogStarter() {
             <Button type="button" onClick={onSave} data-testid="starter-save-draft">
               {COPY.saveDraftLabel}
             </Button>
+            {storageError ? (
+              <p
+                role="alert"
+                className="text-sm text-destructive"
+                data-testid="starter-storage-error"
+              >
+                {storageError}
+              </p>
+            ) : null}
             <p className="text-xs text-muted-foreground" data-testid="starter-truth-line">
               {COPY.truthLine}
             </p>

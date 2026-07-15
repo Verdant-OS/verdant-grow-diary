@@ -222,6 +222,49 @@ describe("parse / serialize round-trip", () => {
     expect(weirdStage?.stage).toBe("");
   });
 
+  it("re-applies type-specific invariants on parse (untrusted storage)", () => {
+    const base = JSON.parse(serializePublicQuickLogStarterDraft(validDraft()));
+    // A volume on a non-watering draft is an impossible state — dropped.
+    const observationWithVolume = parsePublicQuickLogStarterDraft(
+      JSON.stringify({ ...base, logType: "observation", wateringVolumeMl: 500 }),
+    );
+    expect(observationWithVolume?.wateringVolumeMl).toBeNull();
+    // A watering draft without a positive volume is invalid — rejected.
+    for (const bad of [undefined, null, 0, -5, "500"]) {
+      expect(
+        parsePublicQuickLogStarterDraft(
+          JSON.stringify({ ...base, logType: "watering", note: "", wateringVolumeMl: bad }),
+        ),
+        `watering draft with volume ${String(bad)} must be rejected`,
+      ).toBeNull();
+    }
+    // A well-formed watering draft still parses.
+    expect(
+      parsePublicQuickLogStarterDraft(
+        JSON.stringify({ ...base, logType: "watering", wateringVolumeMl: 500 }),
+      )?.wateringVolumeMl,
+    ).toBe(500);
+  });
+
+  it("trims stored notes and rejects whitespace-only notes for note-required types", () => {
+    const base = JSON.parse(serializePublicQuickLogStarterDraft(validDraft()));
+    expect(
+      parsePublicQuickLogStarterDraft(JSON.stringify({ ...base, note: "  padded  " }))?.note,
+    ).toBe("padded");
+    for (const logType of ["observation", "feeding", "environment"]) {
+      expect(
+        parsePublicQuickLogStarterDraft(JSON.stringify({ ...base, logType, note: "   " })),
+        `${logType} draft with whitespace-only note must be rejected`,
+      ).toBeNull();
+    }
+    // Watering may have an empty note (volume carries the entry).
+    expect(
+      parsePublicQuickLogStarterDraft(
+        JSON.stringify({ ...base, logType: "watering", note: "   ", wateringVolumeMl: 500 }),
+      )?.note,
+    ).toBe("");
+  });
+
   it("truncates overlong text instead of losing the draft, and drops bad volumes", () => {
     const base = JSON.parse(serializePublicQuickLogStarterDraft(validDraft()));
     const parsed = parsePublicQuickLogStarterDraft(

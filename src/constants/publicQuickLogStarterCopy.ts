@@ -27,10 +27,13 @@ export const PUBLIC_QUICK_LOG_STARTER_COPY = {
    */
   truthLine:
     "This draft lives only in this browser — it is not synced to an account and clearing browser data will delete it.",
-  ctaLine: "Create a free account to keep it in your grow diary.",
+  ctaLine:
+    "Create a free account to start your grow diary — the draft stays on this device for you to copy over.",
   signupCtaLabel: "Create a free account",
   clearDraftLabel: "Delete draft",
   saveDraftLabel: "Save draft to this device",
+  storageErrorLine:
+    "Couldn't save on this device — the browser blocked storage or it is full. Your note is still in the form above; copy it somewhere safe before leaving.",
   faq: [
     {
       question: "Where is my note saved?",
@@ -40,7 +43,7 @@ export const PUBLIC_QUICK_LOG_STARTER_COPY = {
     {
       question: "What happens if I clear my browser data?",
       answer:
-        "The draft is deleted. Your browser holds the only copy until you create a free account and add the note to your grow diary.",
+        "The draft is deleted. Your browser holds the only copy — if you want the note in a grow diary, copy it into your account after signing up.",
     },
     {
       question: "Do I need sensors or hardware to start a grow diary?",

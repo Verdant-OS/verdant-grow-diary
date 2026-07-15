@@ -69,17 +69,25 @@ export function readPublicQuickLogStarterDraft(): PublicQuickLogStarterDraft | n
   return cachedDraft;
 }
 
-/** Persist the draft. Fails open (still emits) so the UI never blocks. */
-export function writePublicQuickLogStarterDraft(draft: PublicQuickLogStarterDraft): void {
+/**
+ * Persist the draft. Never throws; returns whether the write actually
+ * landed in storage so the page can tell the grower the truth instead of
+ * showing an unpersisted draft as "saved on this device" (storage can be
+ * full, blocked, or unavailable in private-mode browsers).
+ */
+export function writePublicQuickLogStarterDraft(draft: PublicQuickLogStarterDraft): boolean {
   const s = safeStorage();
+  let persisted = false;
   if (s) {
     try {
       s.setItem(PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY, serializePublicQuickLogStarterDraft(draft));
+      persisted = true;
     } catch {
-      /* storage full/blocked — the in-page state still shows the draft */
+      /* storage full/blocked — reported via the return value */
     }
   }
   emit();
+  return persisted;
 }
 
 /**

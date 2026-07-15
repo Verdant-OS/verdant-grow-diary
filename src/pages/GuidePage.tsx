@@ -31,7 +31,26 @@ import {
 
 export default function GuidePage() {
   const { slug } = useParams<{ slug: string }>();
+  const location = useLocation();
   const guide = findGuideBySlug(slug);
+  const initialFaqValue = (() => {
+    const hash = location.hash.replace(/^#/, "");
+    return hash.startsWith("faq-") ? hash : undefined;
+  })();
+  const [openFaq, setOpenFaq] = useState<string | undefined>(initialFaqValue);
+
+  useEffect(() => {
+    const hash = location.hash.replace(/^#/, "");
+    if (!hash.startsWith("faq-")) return;
+    setOpenFaq(hash);
+    // Defer scroll until after the accordion item opens.
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(hash);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, [location.hash]);
+
 
   // Always call hooks before conditional returns.
   usePageSeo({

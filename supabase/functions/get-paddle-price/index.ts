@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
     // 3. Server-controlled environment. Any client-supplied environment
     //    field is ignored — the server decides sandbox vs live.
     //
-    // H1 (audit fix): the previous 409 live_billing_not_enabled gate has
+    // H1 (audit fix): the previous 409 launch-gate on live env has
     // been removed now that the Lovable webhook path (payments-webhook +
     // allocate_lovable_founder_lifetime) handles both environments and
     // enforces the founder cap atomically. Live checkout requires the

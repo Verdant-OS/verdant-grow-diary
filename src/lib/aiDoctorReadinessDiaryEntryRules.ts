@@ -15,13 +15,20 @@ import {
   type AiDoctorSnapshotFreshnessState,
 } from "@/lib/aiDoctorSnapshotFreshnessStatusViewModel";
 
+/**
+ * `details.kind` discriminator for readiness-check diary entries. The
+ * timeline badge presenter keys off this same constant — never inline
+ * the literal elsewhere.
+ */
+export const AI_DOCTOR_READINESS_CHECK_KIND = "ai_doctor_readiness_check" as const;
+
 export interface AiDoctorReadinessDiaryDraft {
   grow_id: string;
   plant_id: string | null;
   tent_id: string | null;
   note: string;
   details: {
-    kind: "ai_doctor_readiness_check";
+    kind: typeof AI_DOCTOR_READINESS_CHECK_KIND;
     readiness: AiDoctorContextReadiness;
     allowed: boolean;
     snapshot_freshness: AiDoctorSnapshotFreshnessState;
@@ -93,7 +100,7 @@ export function buildAiDoctorReadinessDiaryEntry(
           : null,
       note,
       details: {
-        kind: "ai_doctor_readiness_check",
+        kind: AI_DOCTOR_READINESS_CHECK_KIND,
         readiness: args.readiness,
         allowed,
         snapshot_freshness: freshness.state,

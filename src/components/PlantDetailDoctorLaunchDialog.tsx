@@ -110,11 +110,14 @@ function stateLabel(state: DoctorContextItemState): string {
 }
 
 function SummaryRow({ item }: { item: DoctorContextItem }) {
+  // State icons are aria-hidden and the badge is visual-only, so the row
+  // itself carries the "label: state" coupling for screen readers.
   return (
     <li
       className="flex items-center justify-between gap-2 rounded-md border border-border/40 bg-background/30 px-2.5 py-1.5"
       data-testid={`plant-detail-doctor-launch-item-${item.kind}`}
       data-state={item.state}
+      aria-label={`${item.label}: ${stateLabel(item.state)}`}
     >
       <div className="min-w-0 flex items-center gap-2">
         {stateIcon(item.state)}
@@ -333,6 +336,7 @@ export default function PlantDetailDoctorLaunchDialog({
           <ul
             className="space-y-1.5"
             data-testid="plant-detail-doctor-launch-list"
+            aria-label="AI Doctor context readiness"
           >
             {preview.items.map((it) => (
               <SummaryRow key={it.kind} item={it} />
@@ -353,8 +357,11 @@ export default function PlantDetailDoctorLaunchDialog({
                 ? "text-xs text-amber-300 leading-snug font-medium"
                 : "text-xs text-muted-foreground leading-snug"
             }
+            id="plant-detail-doctor-launch-readiness-notice"
             data-testid="plant-detail-doctor-launch-readiness-notice"
             data-readiness={readinessResult.readiness}
+            role="status"
+            aria-live="polite"
           >
             {gate.message}
           </p>
@@ -367,6 +374,7 @@ export default function PlantDetailDoctorLaunchDialog({
             >
               <p
                 className="text-xs text-amber-200 leading-snug"
+                id="plant-detail-doctor-launch-blocked-sentence"
                 data-testid="plant-detail-doctor-launch-blocked-sentence"
               >
                 {blockedExplanation.sentence}
@@ -475,6 +483,11 @@ export default function PlantDetailDoctorLaunchDialog({
               disabled
               aria-disabled="true"
               title={gate.message}
+              aria-describedby={
+                blockedExplanation.sentence
+                  ? "plant-detail-doctor-launch-readiness-notice plant-detail-doctor-launch-blocked-sentence"
+                  : "plant-detail-doctor-launch-readiness-notice"
+              }
               data-testid="plant-detail-doctor-launch-continue-blocked"
               data-readiness={readinessResult.readiness}
             >

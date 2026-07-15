@@ -54,8 +54,13 @@ export default function GuidePage() {
     const scrollT = window.setTimeout(() => {
       const el = faqItemRefs.current[hash] ?? document.getElementById(hash);
       if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-        // Focus is safe to call after scrolling; the wrapper has tabIndex=-1.
+        // jsdom does not implement scrollIntoView; guard so focus still runs.
+        try {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        } catch {
+          /* ignore */
+        }
+        // Focus is safe to call after scrolling; the item has tabIndex=-1.
         el.focus({ preventScroll: true });
       }
     }, 100);

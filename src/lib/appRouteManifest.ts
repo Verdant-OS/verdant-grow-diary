@@ -126,12 +126,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Post-grow learning report for a specific grow.",
   },
   { path: "/guides", access: "public", description: "Grower guides index." },
+  { path: "/guides/:slug", access: "public", description: "Individual grower guide page." },
   {
     path: "/guides/grow-stage-care-guide",
     access: "public",
     description: "Searchable grow-stage care guide with checklists.",
   },
-  { path: "/guides/:slug", access: "public", description: "Individual grower guide page." },
   { path: "/hardware-integrations", access: "public" },
   { path: "/health", access: "auth", description: "Health check page." },
   { path: "/how-ai-doctor-works", access: "public", description: "AI Doctor explainer page." },

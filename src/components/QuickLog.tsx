@@ -70,6 +70,10 @@ import {
 } from "@/lib/quickLogPlantOptionRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 import EventTypeSelector from "@/components/EventTypeSelector";
+import {
+  clearPublicQuickLogStarterDraft,
+  readPublicQuickLogStarterDraft,
+} from "@/lib/publicQuickLogStarterDraftStore";
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
@@ -162,6 +166,31 @@ export interface QuickLogPrefill {
    */
   phenoHuntId?: string | null;
   phenoEvidenceGoal?: string | null;
+  /**
+   * Optional watering amount (ml) from the public starter handoff. Seeded
+   * into the watering field ONLY when the grower has not typed a volume,
+   * exactly like `note`. The grower still reviews and saves manually.
+   */
+  wateringVolumeMl?: number | null;
+  /**
+   * Opaque id of the public starter draft this prefill came from — never
+   * grower content. When present AND the save succeeds AND the on-device
+   * draft still has this id, the draft is cleared (consume-once). It is
+   * never sent anywhere and never triggers a write by itself.
+   */
+  publicStarterDraftId?: string | null;
+  /**
+   * Revision (updatedAt) of the exact draft revision reviewed. Draft ids
+   * survive edits, so consume-once requires BOTH id and revision to match
+   * the stored draft — never clearing an edit made after review.
+   */
+  publicStarterDraftUpdatedAt?: string | null;
+  /**
+   * True when an ambiguous starter handoff requires the grower to choose
+   * the plant themselves: suppresses the dialog's last-target/only-plant
+   * auto-defaulting so nothing is quietly pre-selected.
+   */
+  suppressPlantDefault?: boolean | null;
 }
 
 interface Props {
@@ -313,6 +342,18 @@ export default function QuickLog({
   // second submit before `busy` state has propagated. Complements the
   // existing `busy || !!savedTarget` button-disabled logic.
   const submitInFlightRef = useRef(false);
+  // One idempotency key per LOGICAL submission (quickLogIdempotencyKey
+  // contract, same pattern as the V2 sheet): retries after a failure or a
+  // lost response REUSE the key so the RPC dedupes instead of writing a
+  // second entry. Rotated when a submission completes successfully, when
+  // the grower starts a genuinely new log (reset / Log another), or when
+  // the payload CHANGES after a failed attempt — an edited retry is a new
+  // submission, and a dedupe hit would hand back the OLD entry while the
+  // edits silently never saved.
+  const saveIdempotencyKeyRef = useRef<string>(newQuickLogSaveKey());
+  // Signature (key + timestamp excluded) of the last FAILED attempt's
+  // payload, so an edited retry is distinguished from a pure retry.
+  const lastFailedSaveSigRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!open || !prefill) return;
@@ -326,6 +367,19 @@ export default function QuickLog({
     if (typeof prefill.note === "string" && prefill.note.length > 0) {
       setNote((prev) => (prev.trim().length === 0 ? (prefill.note ?? "") : prev));
     }
+    // Same only-if-empty rule for a starter watering amount: never clobber
+    // a volume the grower already typed.
+    if (
+      typeof prefill.wateringVolumeMl === "number" &&
+      Number.isFinite(prefill.wateringVolumeMl) &&
+      prefill.wateringVolumeMl > 0
+    ) {
+      setDetails((prev) =>
+        prev.watering.trim().length === 0
+          ? { ...prev, watering: String(prefill.wateringVolumeMl) }
+          : prev,
+      );
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     open,
@@ -334,6 +388,7 @@ export default function QuickLog({
     prefill?.eventType,
     prefill?.suggestSnapshot,
     prefill?.note,
+    prefill?.wateringVolumeMl,
   ]);
 
   const scopedPlants = useMemo(
@@ -395,6 +450,23 @@ export default function QuickLog({
   useEffect(() => {
     if (!open) return;
     if (plantId) return;
+    // Ambiguous public-starter handoffs told the grower THEY pick the
+    // plant; last-target / only-plant defaults must not pick one for them.
+    if (prefill?.suppressPlantDefault && !prefill?.plantId) return;
+    // A prefilled plant whose grow switch is STILL PROPAGATING (the
+    // prefill names another grow and setActiveGrowId hasn't re-scoped the
+    // plant list yet) must not be displaced by the OLD grow's
+    // last-target/only-plant fallbacks. Hold until the scope catches up.
+    // Once the grows agree, an unresolvable plantId (archived/foreign)
+    // falls through to the normal default + mismatch banner as before.
+    if (
+      prefill?.plantId &&
+      prefill?.growId &&
+      prefill.growId !== activeGrowId &&
+      !scopedPlants.some((p) => p.id === prefill.plantId)
+    ) {
+      return;
+    }
 
     const lastTarget = readLastTarget();
     const lastPlantId = lastTarget?.plantId ?? null;
@@ -408,7 +480,7 @@ export default function QuickLog({
       plantId || null,
     );
     if (next && next !== plantId) setPlantId(next);
-  }, [open, plantId, scopedPlants, prefill?.plantId]);
+  }, [open, plantId, scopedPlants, prefill?.plantId, prefill?.suppressPlantDefault]);
 
   const sensorTentId = selectedPlant?.tent_id ?? null;
   const sensorState = useLatestTentSensorSnapshot(sensorTentId);
@@ -526,6 +598,13 @@ export default function QuickLog({
   }
 
   function reset() {
+    // Closing the dialog abandons the current logical submission, so the
+    // idempotency key rotates too. Only an in-place retry (save error
+    // shown, dialog still open) reuses the key — a fresh dialog session
+    // must never be deduped against an abandoned one, or the RPC could
+    // hand back the OLD entry and silently skip the new content.
+    saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+    lastFailedSaveSigRef.current = null;
     setNote("");
     setShowMore(false);
     setEventType("observation");
@@ -601,6 +680,9 @@ export default function QuickLog({
   }
 
   function resetForAnother() {
+    // "Log another" starts a genuinely new logical submission.
+    saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+    lastFailedSaveSigRef.current = null;
     const keepPlantId = savedTarget?.id ?? plantId;
     setNote("");
     setShowMore(false);
@@ -759,7 +841,7 @@ export default function QuickLog({
         : null;
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
-        idempotencyKey: newQuickLogSaveKey(),
+        idempotencyKey: saveIdempotencyKeyRef.current,
         noteWithHardware,
         plantId: selectedPlant.id,
         plantTentId: selectedPlant.tent_id ?? null,
@@ -776,8 +858,24 @@ export default function QuickLog({
         return;
       }
 
+      // Pure retries reuse the idempotency key; EDITED retries must not.
+      // Compare this attempt's payload (key + occurred_at excluded) to the
+      // last failed attempt: a change means new content, so a fresh key —
+      // otherwise a lost-response dedupe would return the old entry and
+      // silently drop the edits.
+      const attemptSig = JSON.stringify({
+        ...built.payload,
+        p_idempotency_key: null,
+        p_occurred_at: null,
+      });
+      if (lastFailedSaveSigRef.current !== null && lastFailedSaveSigRef.current !== attemptSig) {
+        saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+        built.payload.p_idempotency_key = saveIdempotencyKeyRef.current;
+      }
+
       const result = await saveViaRpc(built.payload);
       if (!result.ok) {
+        lastFailedSaveSigRef.current = attemptSig;
         const reason = result.reason ?? "save_failed";
         const message = quickLogReasonToOperatorMessage(reason);
         setSaveError(
@@ -807,6 +905,12 @@ export default function QuickLog({
         await supabase.from("grows").update({ stage }).eq("id", activeGrowId);
       }
 
+      // Submission completed: the next logical submission gets a fresh key.
+      // (Failures/exceptions above return first, so retries reuse the key
+      // and the RPC dedupes a lost-response double-submit.)
+      saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      lastFailedSaveSigRef.current = null;
+
       const plantLabel = selectedPlant.name;
       const finalMessage =
         successMessage && successMessage !== "Logged 🌱"
@@ -829,6 +933,22 @@ export default function QuickLog({
         savedAt: new Date().toISOString(),
       });
       onCreated?.();
+      // Public starter handoff consume-once: the anonymous on-device draft
+      // is cleared ONLY here — after the RPC confirmed the write — and only
+      // when the stored draft is still the exact one the grower reviewed
+      // (id match guards against a newer draft written in another tab).
+      // Failures above return before this line, so a failed save always
+      // retains the draft.
+      if (prefill?.publicStarterDraftId) {
+        const storedStarterDraft = readPublicQuickLogStarterDraft();
+        if (
+          storedStarterDraft &&
+          storedStarterDraft.id === prefill.publicStarterDraftId &&
+          storedStarterDraft.updatedAt === prefill.publicStarterDraftUpdatedAt
+        ) {
+          clearPublicQuickLogStarterDraft();
+        }
+      }
       setTimeout(() => viewPlantBtnRef.current?.focus(), 0);
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",

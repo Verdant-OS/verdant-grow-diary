@@ -11,17 +11,24 @@ import {
   parseVitestTotals,
 } from "../../scripts/releases/run-subscriber-growth-launch-gate.mjs";
 
-const commands = ["targeted_tests", "typecheck", "build", "lint", "format", "diff_integrity"].map(
-  (id) => ({
-    id,
-    status: "PASS",
-    exitCode: 0,
-    durationMs: 1,
-    ...(id === "targeted_tests"
-      ? { testsPassed: 321, testsFailed: 0, testsSkipped: 0, testsTotal: 321 }
-      : {}),
-  }),
-);
+const commands = [
+  "targeted_tests",
+  "migration_contract",
+  "typecheck",
+  "build",
+  "lint",
+  "format",
+  "diff_integrity",
+].map((id) => ({
+  id,
+  status: "PASS",
+  exitCode: 0,
+  durationMs: 1,
+  ...(id === "targeted_tests"
+    ? { testsPassed: 321, testsFailed: 0, testsSkipped: 0, testsTotal: 321 }
+    : {}),
+  ...(id === "migration_contract" ? { migrationsPassed: 4, migrationsTotal: 4 } : {}),
+}));
 
 const source = {
   repositoryVerified: true,
@@ -158,6 +165,21 @@ describe("subscriber growth launch gate", () => {
     });
     expect(result.status).toBe("HOLD");
     expect(result.problems).toContain("local production preview parity did not pass");
+  });
+
+  it("rejects reduced migration totals even when the command reports PASS", () => {
+    const result = evaluateSubscriberGrowthLaunchGate({
+      source,
+      commands: commands.map((command) =>
+        command.id === "migration_contract"
+          ? { ...command, migrationsPassed: 3, migrationsTotal: 3 }
+          : command,
+      ),
+      localParity,
+      liveRequired: false,
+    });
+    expect(result.status).toBe("HOLD");
+    expect(result.problems).toContain("migration_contract did not pass");
   });
 
   it("requires identified live-deployment parity before reporting LIVE_VERIFIED", () => {

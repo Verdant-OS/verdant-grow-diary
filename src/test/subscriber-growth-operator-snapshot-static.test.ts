@@ -55,12 +55,14 @@ describe("subscriber growth operator snapshot — security and truth fences", ()
     expect(SQL).toContain("FROM public.leads AS l");
     expect(SQL).toContain("'pricing_interest_founder_share'");
     expect(SQL).toContain("'pricing_interest_referral'");
+    expect(SQL).toContain("'pricing_interest_operator_outreach'");
     expect(SQL).toContain("'pricing_interest_pricing_page'");
     expect(SQL).toContain("'pricing_interest_grower_invite'");
     expect(SQL).toContain("'pricing_interest_context_check'");
     expect(SQL).toContain("'pricing_interest_vpd_calculator'");
     expect(SQL).toContain("AS pricing_interest_founder_share");
     expect(SQL).toContain("AS pricing_interest_referral");
+    expect(SQL).toContain("AS pricing_interest_operator_outreach");
     expect(SQL).toContain("AS pricing_interest_grower_invite");
     expect(SQL).toContain("AS pricing_interest_context_check");
     expect(SQL).toContain("AS pricing_interest_vpd_calculator");

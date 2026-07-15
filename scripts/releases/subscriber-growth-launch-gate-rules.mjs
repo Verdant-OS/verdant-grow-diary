@@ -8,6 +8,7 @@ export const SUBSCRIBER_GROWTH_RELEASE_STATUSES = Object.freeze({
 
 export const SUBSCRIBER_GROWTH_REQUIRED_COMMAND_IDS = Object.freeze([
   "targeted_tests",
+  "migration_contract",
   "typecheck",
   "build",
   "lint",
@@ -17,6 +18,7 @@ export const SUBSCRIBER_GROWTH_REQUIRED_COMMAND_IDS = Object.freeze([
 
 const EXPECTED_ROUTE_COUNT = 4;
 const EXPECTED_CAPABILITY_COUNT = 5;
+const EXPECTED_MIGRATION_COUNT = 4;
 
 function finiteNonNegative(value) {
   return Number.isFinite(value) && value >= 0 ? value : 0;
@@ -24,6 +26,12 @@ function finiteNonNegative(value) {
 
 function commandPassed(command) {
   if (command?.status !== "PASS" || command?.exitCode !== 0) return false;
+  if (command.id === "migration_contract") {
+    return (
+      command.migrationsTotal === EXPECTED_MIGRATION_COUNT &&
+      command.migrationsPassed === EXPECTED_MIGRATION_COUNT
+    );
+  }
   if (command.id !== "targeted_tests") return true;
   return (
     finiteNonNegative(command.testsTotal) > 0 &&
@@ -123,6 +131,7 @@ export function buildSubscriberGrowthReleaseReceipt(input) {
 
 export function formatSubscriberGrowthLaunchGate(receipt) {
   const tests = receipt.commands.find((command) => command.id === "targeted_tests");
+  const migrations = receipt.commands.find((command) => command.id === "migration_contract");
   const lines = [
     `Subscriber growth launch gate: ${receipt.status}`,
     `Commit: ${receipt.source.head}`,
@@ -130,6 +139,7 @@ export function formatSubscriberGrowthLaunchGate(receipt) {
     `Changed tests: ${receipt.source.changedTestFiles}`,
     `Ignored generated paths: ${receipt.source.ignoredDirtyPaths?.length ?? 0}`,
     `Targeted tests: ${tests?.testsPassed ?? 0}/${tests?.testsTotal ?? 0}`,
+    `Migration contract: ${migrations?.migrationsPassed ?? 0}/${migrations?.migrationsTotal ?? 0}`,
     `Local parity: ${receipt.localParity?.capabilitiesPassed ?? 0}/${receipt.localParity?.capabilitiesTotal ?? 0}`,
   ];
   if (receipt.liveParity) {

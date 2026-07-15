@@ -13,6 +13,7 @@ import {
   buildSubscriberGrowthReleaseReceipt,
   formatSubscriberGrowthLaunchGate,
 } from "./subscriber-growth-launch-gate-rules.mjs";
+import { auditSubscriberGrowthMigrationContract } from "./subscriber-growth-migration-contract.mjs";
 
 const EXPECTED_REMOTE = "https://github.com/Verdant-OS/verdant-grow-diary.git";
 const DEFAULT_BASE_REF = "origin/verdant-grow-diary";
@@ -154,6 +155,24 @@ function runCommand(id, file, args) {
   return record;
 }
 
+function inspectMigrationContract() {
+  const started = Date.now();
+  const audit = auditSubscriberGrowthMigrationContract((file) =>
+    fs.readFileSync(path.resolve(file), "utf8"),
+  );
+  if (!audit.ok) {
+    process.stderr.write(`\nmigration_contract failed:\n${audit.issues.join("\n")}\n`);
+  }
+  return {
+    id: "migration_contract",
+    status: audit.ok ? "PASS" : "FAIL",
+    exitCode: audit.ok ? 0 : 1,
+    durationMs: Date.now() - started,
+    migrationsPassed: audit.migrationsPassed,
+    migrationsTotal: audit.migrationsTotal,
+  };
+}
+
 function inspectSource(args, files, tests) {
   const remote = git(["remote", "get-url", "origin"]);
   let baseAncestor = false;
@@ -222,6 +241,7 @@ export async function runSubscriberGrowthLaunchGate(args) {
 
   const commands = [
     runCommand("targeted_tests", "bunx", ["vitest", "run", ...tests, "--reporter=dot"]),
+    inspectMigrationContract(),
     runCommand("typecheck", "bun", ["run", "typecheck"]),
     runCommand("build", "bun", ["run", "build"]),
     runCommand("lint", "bunx", ["eslint", ...lintable]),

@@ -90,6 +90,7 @@ BEGIN
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
           'pricing_interest_referral',
+          'pricing_interest_operator_outreach',
           'pricing_interest_grower_invite',
           'pricing_interest_context_check',
           'pricing_interest_vpd_calculator'
@@ -103,6 +104,7 @@ BEGIN
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
           'pricing_interest_referral',
+          'pricing_interest_operator_outreach',
           'pricing_interest_grower_invite',
           'pricing_interest_context_check',
           'pricing_interest_vpd_calculator'
@@ -117,6 +119,7 @@ BEGIN
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
           'pricing_interest_referral',
+          'pricing_interest_operator_outreach',
           'pricing_interest_grower_invite',
           'pricing_interest_context_check',
           'pricing_interest_vpd_calculator'
@@ -132,6 +135,7 @@ BEGIN
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
           'pricing_interest_referral',
+          'pricing_interest_operator_outreach',
           'pricing_interest_grower_invite',
           'pricing_interest_context_check',
           'pricing_interest_vpd_calculator'
@@ -148,6 +152,7 @@ BEGIN
           'pricing_interest_founder_page',
           'pricing_interest_founder_share',
           'pricing_interest_referral',
+          'pricing_interest_operator_outreach',
           'pricing_interest_grower_invite',
           'pricing_interest_context_check',
           'pricing_interest_vpd_calculator'
@@ -172,6 +177,9 @@ BEGIN
       count(DISTINCT lower(btrim(l.email))) FILTER (
         WHERE l.source = 'pricing_interest_referral'
       ) AS pricing_interest_referral,
+      count(DISTINCT lower(btrim(l.email))) FILTER (
+        WHERE l.source = 'pricing_interest_operator_outreach'
+      ) AS pricing_interest_operator_outreach,
       count(DISTINCT lower(btrim(l.email))) FILTER (
         WHERE l.source = 'pricing_interest_grower_invite'
       ) AS pricing_interest_grower_invite,
@@ -211,6 +219,7 @@ BEGIN
     'pricing_interest_founder_page', lc.pricing_interest_founder_page,
     'pricing_interest_founder_share', lc.pricing_interest_founder_share,
     'pricing_interest_referral', lc.pricing_interest_referral,
+    'pricing_interest_operator_outreach', lc.pricing_interest_operator_outreach,
     'pricing_interest_grower_invite', lc.pricing_interest_grower_invite,
     'pricing_interest_context_check', lc.pricing_interest_context_check,
     'pricing_interest_vpd_calculator', lc.pricing_interest_vpd_calculator,
@@ -250,6 +259,7 @@ BEGIN
       'pricing_interest_founder_page', 0,
       'pricing_interest_founder_share', 0,
       'pricing_interest_referral', 0,
+      'pricing_interest_operator_outreach', 0,
       'pricing_interest_grower_invite', 0,
       'pricing_interest_context_check', 0,
       'pricing_interest_vpd_calculator', 0,

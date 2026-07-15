@@ -24,6 +24,7 @@ WITH CHECK (
     'pricing_interest_founder_page',
     'pricing_interest_founder_share',
     'pricing_interest_referral',
+    'pricing_interest_operator_outreach',
     'pricing_interest_grower_invite',
     'pricing_interest_context_check',
     'pricing_interest_vpd_calculator'

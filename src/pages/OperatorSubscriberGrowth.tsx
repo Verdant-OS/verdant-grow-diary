@@ -387,6 +387,10 @@ export default function OperatorSubscriberGrowth() {
                 value={snapshot.counts.pricingInterestReferral}
               />
               <MetricCard
+                label="Operator outreach"
+                value={snapshot.counts.pricingInterestOperatorOutreach}
+              />
+              <MetricCard
                 label="Grower invites"
                 value={snapshot.counts.pricingInterestGrowerInvite}
               />

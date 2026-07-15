@@ -30,7 +30,9 @@ bun run release:subscriber-growth:gate:local
 4. Every changed targeted test passing.
 5. Type-check, production build, branch-wide changed-code ESLint, release-
    commit Prettier, and branch diff integrity passing.
-6. All public subscriber-growth routes and all fixed capability markers
+6. All four fixed subscriber-growth migrations passing the source, RLS,
+   operator-only aggregate, active-paid, attribution, and activation contract.
+7. All public subscriber-growth routes and all fixed capability markers
    present in the local production preview.
 
 The command writes a redacted JSON receipt to:
@@ -42,6 +44,30 @@ artifacts/release-readiness/subscriber-growth/launch-gate.v1.json
 The artifact records paths (including any explicitly ignored generated path), counts, statuses, commit identity, and deployment
 identity only. It does not store command output, environment values, account
 data, lead data, or subscriber identities.
+
+## Before an authorized deployment
+
+The source gate cannot prove the remote Supabase migration ledger. From an
+explicitly linked, authenticated release environment, inspect the ledger and
+dry-run the database changes before deploying the frontend:
+
+```bash
+npx --yes supabase@latest migration list --linked
+npx --yes supabase@latest db push --linked --dry-run
+```
+
+Confirm the dry run contains these migrations, in order:
+
+1. `20260714190000_restore_public_lead_insert_only.sql`
+2. `20260714193000_subscriber_growth_operator_snapshot.sql`
+3. `20260714231627_signup_acquisition_attribution.sql`
+4. `20260715002000_signup_to_paid_operator_snapshot.sql`
+
+Only after explicit deployment authorization: apply the migrations, deploy
+the required payment/webhook functions, then deploy the frontend. Stop if the
+ledger is linked to the wrong project, any migration is unexpectedly remote-
+only, the dry run is empty when these migrations are absent, or the contract
+gate is not `LOCAL_READY`. Do not infer migration state from frontend assets.
 
 ## After an authorized deployment
 
@@ -80,6 +106,7 @@ authoritative operator subscriber snapshot remains the source for that goal.
 ## Rollback
 
 This tooling is additive. Remove the two package scripts and delete the gate
-runner, pure rules module, runbook, and targeted test to restore the prior
-release process. No schema, RLS, auth, checkout, or public UI rollback is
-required.
+runner, pure rules modules, runbook, and targeted tests to restore the prior
+release process. Application rollback does not reverse applied database
+migrations; use a separately reviewed forward migration for any schema or RLS
+rollback.

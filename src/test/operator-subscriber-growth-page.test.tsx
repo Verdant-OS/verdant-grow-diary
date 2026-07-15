@@ -108,6 +108,7 @@ describe("OperatorSubscriberGrowth", () => {
             pricing_interest_founder_share: 3,
             pricing_interest_referral: 4,
             pricing_interest_grower_invite: 6,
+            pricing_interest_operator_outreach: 2,
             pricing_interest_context_check: 8,
             pricing_interest_vpd_calculator: 9,
             all_leads_7d: 9,
@@ -143,6 +144,7 @@ describe("OperatorSubscriberGrowth", () => {
     expect(screen.getAllByText("Founder shares").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Paid-interest shares").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Grower invites").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Operator outreach").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Context check")).toBeInTheDocument();
     expect(screen.getAllByText("VPD calculator").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("VPD calculator signup")).toBeInTheDocument();

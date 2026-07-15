@@ -29,6 +29,7 @@ const COUNTS: SubscriberGrowthCounts = {
   pricingInterestFounderPage: 0,
   pricingInterestFounderShare: 0,
   pricingInterestReferral: 0,
+  pricingInterestOperatorOutreach: 0,
   pricingInterestGrowerInvite: 0,
   pricingInterestContextCheck: 0,
   pricingInterestVpdCalculator: 0,

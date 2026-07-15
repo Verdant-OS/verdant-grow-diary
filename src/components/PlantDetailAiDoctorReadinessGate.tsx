@@ -155,6 +155,8 @@ export default function PlantDetailAiDoctorReadinessGate({
         </span>
       </header>
 
+      <FreshnessRow status={freshness} />
+
       <div>
         <button
           type="button"

@@ -48,6 +48,7 @@ const EXPECTED_SLUGS = [
   "spider-farmer-data-logging",
   "sensor-truth-grow-room",
   "ai-grow-doctor",
+  "cannabis-plant-care",
 ];
 
 describe("Verdant grower guide FAQ (/guides)", () => {
@@ -101,8 +102,8 @@ describe("Verdant grower guide FAQ (/guides)", () => {
   });
 });
 
-describe("Verdant SEO guide pages (7)", () => {
-  it("defines exactly the seven expected slugs, in order", () => {
+describe("Verdant SEO guide pages (8)", () => {
+  it("defines exactly the eight expected slugs, in order", () => {
     expect(VERDANT_GUIDE_SLUGS).toEqual(EXPECTED_SLUGS);
   });
 

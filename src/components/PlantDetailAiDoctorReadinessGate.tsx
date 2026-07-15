@@ -153,6 +153,14 @@ export default function PlantDetailAiDoctorReadinessGate({
     [result.readiness, hasSafeAiDoctorFlow],
   );
 
+  const freshness = useMemo(
+    () =>
+      buildAiDoctorSnapshotFreshnessStatus({
+        latestSnapshotAtIso: result.latest.manualSnapshotAt,
+      }),
+    [result.latest.manualSnapshotAt],
+  );
+
   const quickActions = useMemo(
     () =>
       buildAiDoctorContextQuickActions({
@@ -161,17 +169,18 @@ export default function PlantDetailAiDoctorReadinessGate({
         plantName: plant?.name ?? null,
         growId: plant?.growId ?? null,
         tentId: plant?.tentId ?? null,
+        snapshotFreshnessState: freshness.state,
       }),
-    [result.missing, plantId, plant?.name, plant?.growId, plant?.tentId],
+    [
+      result.missing,
+      plantId,
+      plant?.name,
+      plant?.growId,
+      plant?.tentId,
+      freshness.state,
+    ],
   );
 
-  const freshness = useMemo(
-    () =>
-      buildAiDoctorSnapshotFreshnessStatus({
-        latestSnapshotAtIso: result.latest.manualSnapshotAt,
-      }),
-    [result.latest.manualSnapshotAt],
-  );
 
   const onPrimary = useCallback(() => {
     const id = gate.primary.anchorId;
@@ -232,12 +241,19 @@ export default function PlantDetailAiDoctorReadinessGate({
         </button>
       </div>
 
-      {gate.showQuickActions && quickActions.length > 0 ? (
+      {quickActions.length > 0 &&
+      (gate.showQuickActions ||
+        quickActions.some((a) => a.kind === "capture_new_snapshot")) ? (
         <AiDoctorContextQuickActions
-          actions={quickActions}
+          actions={
+            gate.showQuickActions
+              ? quickActions
+              : quickActions.filter((a) => a.kind === "capture_new_snapshot")
+          }
           testIdPrefix="plant-ai-doctor-readiness-gate"
         />
       ) : null}
+
     </section>
   );
 }

@@ -8,10 +8,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   clearDiaryFaqLinkClickCounts,
   DIARY_FAQ_LINK_CLICKS_STORAGE_KEY,
+  DIARY_FAQ_LINK_TRACKING_ENABLED_STORAGE_KEY,
   DIARY_FAQ_TOPIC_LABELS,
+  isDiaryFaqLinkClickTrackingEnabled,
   rankDiaryFaqLinkClicks,
   readDiaryFaqLinkClickCounts,
   recordDiaryFaqLinkClick,
+  setDiaryFaqLinkClickTrackingEnabled,
   type DiaryFaqLinkClickStorage,
 } from "@/lib/diaryFaqLinkClickTracker";
 

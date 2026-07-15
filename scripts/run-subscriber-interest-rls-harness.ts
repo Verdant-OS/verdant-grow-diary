@@ -91,6 +91,7 @@ async function main() {
   const authenticated = await signedInClient();
   const anonAllowedEmail = leadEmail("anon-allowed");
   const authAllowedEmail = leadEmail("auth-allowed");
+  const teardownErrors: string[] = [];
 
   try {
     console.log("→ allowed insert assertions");
@@ -219,7 +220,32 @@ async function main() {
   } finally {
     console.log("→ teardown");
     if (cleanupEmails.length > 0) await admin.from("leads").delete().in("email", cleanupEmails);
-    if (authUserId) await admin.auth.admin.deleteUser(authUserId);
+    if (authUserId) {
+      const { error: profileDeleteError } = await admin
+        .from("profiles")
+        .delete()
+        .eq("id", authUserId);
+      if (profileDeleteError) {
+        teardownErrors.push(`profile delete: ${profileDeleteError.message}`);
+      } else {
+        const { data: remainingProfiles, error: profileVerifyError } = await admin
+          .from("profiles")
+          .select("id")
+          .eq("id", authUserId);
+        if (profileVerifyError) {
+          teardownErrors.push(`profile cleanup verification: ${profileVerifyError.message}`);
+        } else if ((remainingProfiles?.length ?? 0) !== 0) {
+          teardownErrors.push("profile cleanup verification: synthetic profile remains");
+        }
+      }
+
+      const { error: authDeleteError } = await admin.auth.admin.deleteUser(authUserId);
+      if (authDeleteError) teardownErrors.push(`auth user delete: ${authDeleteError.message}`);
+    }
+  }
+
+  if (teardownErrors.length > 0) {
+    throw new Error(`teardown failed: ${teardownErrors.join("; ")}`);
   }
 
   console.log(`\nresult: ${passed} passed, ${failed} failed`);

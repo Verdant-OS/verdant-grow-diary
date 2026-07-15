@@ -44,7 +44,10 @@ describe("subscriber growth publication handoff", () => {
   });
 
   it("keeps subscriber truth and rollback fail-closed", () => {
-    expect(HANDOFF).toMatch(/only active rows in `billing_subscriptions` count/i);
+    expect(HANDOFF).toMatch(/only active, in-period rows from the server-written billing/i);
+    expect(HANDOFF).toContain("incumbent `billing_subscriptions`");
+    expect(HANDOFF).toContain("live-environment `subscriptions`");
+    expect(HANDOFF).toMatch(/deduplicates users across both/i);
     expect(HANDOFF).toMatch(
       /Do not claim progress\s+toward 101 from account, lead, click, or activity counts/i,
     );

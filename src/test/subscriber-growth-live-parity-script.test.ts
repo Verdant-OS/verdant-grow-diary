@@ -38,7 +38,7 @@ function buildFetch(overrides: Partial<Record<string, ReturnType<typeof response
     if (overrides[key]) return overrides[key];
     if (routes.has(key)) {
       return response(`<script type="module" src="${MAIN_PATH}"></script>`, 200, {
-        "x-deployment-id": "deploy-test",
+        "x-vercel-id": "iad1::deploy-test",
       });
     }
     if (url.pathname === MAIN_PATH) return response(main);
@@ -65,7 +65,7 @@ describe("subscriber growth live parity script", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.deploymentId).toBe("deploy-test");
+    expect(result.deploymentId).toBe("iad1::deploy-test");
     expect(result.routesPassed).toBe(4);
     expect(result.capabilitiesPassed).toBe(5);
     expect(formatSubscriberGrowthLiveParity(result)).toContain(

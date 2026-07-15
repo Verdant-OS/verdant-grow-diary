@@ -26,15 +26,18 @@ describe("signup-to-paid operator snapshot safety", () => {
     );
   });
 
-  it("uses the authoritative active-paid definition and immutable attribution table", () => {
+  it("uses the deduplicated active-paid union and immutable attribution table", () => {
     expect(SQL).toContain("FROM public.billing_subscriptions AS bs");
     expect(SQL).toContain("bs.plan_id IN ('pro_monthly', 'pro_annual', 'founder_lifetime')");
     expect(SQL).toContain("bs.status = 'active'");
     expect(SQL).toContain("bs.current_period_end IS NULL OR bs.current_period_end > now()");
+    expect(SQL).toContain("FROM public.subscriptions AS s");
+    expect(SQL).toContain("s.environment = 'live'");
+    expect(SQL).toContain("s.paddle_subscription_id LIKE 'lifetime_%'");
+    expect(SQL).toContain("SELECT DISTINCT ON (candidate.user_id)");
     expect(SQL).toContain("LEFT JOIN public.signup_acquisition_attributions AS a");
     expect(SQL).toContain("('operator_outreach'::text)");
     expect(SQL).not.toContain(GAMIFICATION_TIER_REFERENCE);
-    expect(SQL).not.toContain("public.subscriptions");
   });
 
   it("returns aggregates only and performs no writes", () => {

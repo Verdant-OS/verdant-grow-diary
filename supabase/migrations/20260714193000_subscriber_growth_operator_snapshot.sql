@@ -1,6 +1,9 @@
 -- Read-only subscriber-growth scoreboard for authenticated operators.
--- Counts paid subscribers from billing_subscriptions (the entitlement source
--- of truth) and reports lead interest separately. No PII or row identifiers
+-- Counts active paid users across the two server-written Paddle sinks used by
+-- Verdant today. billing_subscriptions remains the incumbent entitlement
+-- authority; public.subscriptions is included as a live-environment reporting
+-- compatibility source so the canonical /pricing checkout is not omitted.
+-- This analytics-only union grants no capability. No PII or row identifiers
 -- leave this function, and it performs no writes.
 
 CREATE OR REPLACE FUNCTION public.subscriber_growth_operator_snapshot()
@@ -21,22 +24,68 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'reason', 'operator_required');
   END IF;
 
-  WITH active_paid AS (
+  WITH active_paid_candidates AS (
     SELECT
       bs.user_id,
       bs.plan_id,
       bs.cancel_at_period_end,
-      bs.created_at
+      bs.created_at,
+      0 AS source_priority
     FROM public.billing_subscriptions AS bs
     WHERE bs.plan_id IN ('pro_monthly', 'pro_annual', 'founder_lifetime')
       AND bs.status = 'active'
       AND (bs.current_period_end IS NULL OR bs.current_period_end > now())
+
+    UNION ALL
+
+    SELECT
+      s.user_id,
+      s.price_id AS plan_id,
+      s.cancel_at_period_end,
+      s.created_at,
+      1 AS source_priority
+    FROM public.subscriptions AS s
+    WHERE s.environment = 'live'
+      AND s.price_id IN ('pro_monthly', 'pro_annual', 'founder_lifetime')
+      AND s.status = 'active'
+      AND (
+        (
+          s.price_id = 'founder_lifetime'
+          AND s.paddle_subscription_id LIKE 'lifetime_%'
+          AND s.current_period_end IS NULL
+        )
+        OR (
+          s.price_id IN ('pro_monthly', 'pro_annual')
+          AND s.current_period_end > now()
+        )
+      )
+  ),
+  active_paid AS (
+    SELECT DISTINCT ON (candidate.user_id)
+      candidate.user_id,
+      candidate.plan_id,
+      candidate.cancel_at_period_end,
+      candidate.created_at
+    FROM active_paid_candidates AS candidate
+    ORDER BY
+      candidate.user_id,
+      CASE WHEN candidate.plan_id = 'founder_lifetime' THEN 0 ELSE 1 END,
+      candidate.source_priority,
+      candidate.created_at DESC
   ),
   paid_risk AS (
     SELECT bs.user_id
     FROM public.billing_subscriptions AS bs
     WHERE bs.plan_id IN ('pro_monthly', 'pro_annual', 'founder_lifetime')
       AND bs.status IN ('past_due', 'paused')
+
+    UNION
+
+    SELECT s.user_id
+    FROM public.subscriptions AS s
+    WHERE s.environment = 'live'
+      AND s.price_id IN ('pro_monthly', 'pro_annual', 'founder_lifetime')
+      AND s.status IN ('past_due', 'paused')
   ),
   active_counts AS (
     SELECT
@@ -62,7 +111,24 @@ BEGIN
       (
         EXISTS (SELECT 1 FROM public.diary_entries AS de WHERE de.user_id = ap.user_id)
         OR EXISTS (SELECT 1 FROM public.sensor_readings AS sr WHERE sr.user_id = ap.user_id)
-      ) AS has_first_signal
+      ) AS has_first_signal,
+      EXISTS (
+        SELECT 1
+        FROM public.diary_entries AS de
+        INNER JOIN public.grows AS g
+          ON g.id = de.grow_id
+         AND g.user_id = ap.user_id
+        INNER JOIN public.tents AS t
+          ON t.id = de.tent_id
+         AND t.user_id = ap.user_id
+         AND t.grow_id = g.id
+        INNER JOIN public.plants AS p
+          ON p.id = de.plant_id
+         AND p.user_id = ap.user_id
+         AND p.grow_id = g.id
+         AND p.tent_id = t.id
+        WHERE de.user_id = ap.user_id
+      ) AS has_connected_core
     FROM (SELECT DISTINCT user_id FROM active_paid) AS ap
   ),
   activation_counts AS (
@@ -71,14 +137,14 @@ BEGIN
       count(*) FILTER (WHERE af.has_tent) AS active_paid_with_tent,
       count(*) FILTER (WHERE af.has_plant) AS active_paid_with_plant,
       count(*) FILTER (WHERE af.has_first_signal) AS active_paid_with_first_signal,
-      count(*) FILTER (
-        WHERE af.has_grow AND af.has_tent AND af.has_plant AND af.has_first_signal
-      ) AS active_paid_core_activated
+      count(*) FILTER (WHERE af.has_connected_core) AS active_paid_core_activated
     FROM activation_flags AS af
   ),
   risk_counts AS (
     SELECT count(DISTINCT pr.user_id) AS at_risk
     FROM paid_risk AS pr
+    LEFT JOIN active_paid AS ap ON ap.user_id = pr.user_id
+    WHERE ap.user_id IS NULL
   ),
   lead_counts AS (
     SELECT

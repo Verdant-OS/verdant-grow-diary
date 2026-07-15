@@ -15,6 +15,9 @@ TO anon, authenticated
 WITH CHECK (
   length(btrim(email)) BETWEEN 3 AND 255
   AND position('@' IN btrim(email)) > 1
+  AND length(COALESCE(name, '')) <= 100
+  AND length(COALESCE(company, '')) <= 120
+  AND role IS NULL
   AND lead_type IN ('beta_user', 'hardware_partner', 'grower', 'investor', 'other')
   AND source IN (
     'landing',
@@ -30,6 +33,12 @@ WITH CHECK (
     'pricing_interest_vpd_calculator'
   )
   AND length(COALESCE(message, '')) <= 2000
+  AND status = 'new'
+  AND operator_notes IS NULL
+  AND contacted_at IS NULL
+  AND follow_up_at IS NULL
+  AND created_at BETWEEN now() - interval '5 minutes' AND now() + interval '1 minute'
+  AND updated_at BETWEEN now() - interval '5 minutes' AND now() + interval '1 minute'
 );
 
 -- Keep the anonymous role at the minimum privilege needed by the public form.

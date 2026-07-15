@@ -93,7 +93,8 @@ async function readResponse(response) {
     ok: response.ok === true,
     status: Number.isFinite(response.status) ? response.status : 0,
     text,
-    deploymentId: response.headers?.get?.("x-deployment-id") ?? null,
+    deploymentId:
+      response.headers?.get?.("x-deployment-id") ?? response.headers?.get?.("x-vercel-id") ?? null,
   };
 }
 

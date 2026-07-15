@@ -30,9 +30,11 @@ Review in this order so trust boundaries are settled before copy or layout:
 
 1. **Public lead insert boundary** — anonymous users may submit only the fixed
    pricing-interest sources; they cannot read or mutate leads.
-2. **Paid truth** — only active rows in `billing_subscriptions` count toward the
-   subscriber goal. Accounts, interest leads, and product activity never count
-   as subscribers.
+2. **Paid truth** — only active, in-period rows from the server-written billing
+   sinks count toward the subscriber goal: incumbent `billing_subscriptions`
+   plus live-environment `subscriptions` rows produced by the canonical
+   checkout. The report deduplicates users across both. Accounts, interest
+   leads, and product activity never count as subscribers.
 3. **Operator snapshots** — aggregate-only output, operator role required, no
    lead email/name or subscriber identity returned.
 4. **Acquisition continuity** — first-party attribution survives landing,

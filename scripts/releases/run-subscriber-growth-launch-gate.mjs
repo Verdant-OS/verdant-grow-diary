@@ -93,6 +93,10 @@ function runnableChangedTests(files) {
   );
 }
 
+export function runnableChangedE2e(files) {
+  return files.filter((file) => /^e2e\/.*\.spec\.[cm]?[jt]s$/.test(file));
+}
+
 function lintableChangedFiles(files) {
   return files.filter(
     (file) => /\.(?:[cm]?[jt]s|tsx)$/.test(file) && !file.startsWith("supabase/migrations/"),
@@ -105,6 +109,10 @@ export function formattableChangedFiles(files) {
 
 export function buildTargetedTestCommandArgs(tests) {
   return ["vitest", "run", ...tests, "--reporter=dot", "--maxWorkers=4"];
+}
+
+export function buildChangedE2eCommandArgs(specs) {
+  return ["playwright", "test", ...specs, "--project=chromium-mocked", "--reporter=line"];
 }
 
 function stripAnsi(value) {
@@ -150,6 +158,44 @@ function runCommand(id, file, args) {
   return record;
 }
 
+function runChangedE2e(specs) {
+  if (specs.length === 0) {
+    return {
+      id: "changed_e2e",
+      status: "PASS",
+      exitCode: 0,
+      durationMs: 0,
+      specFiles: 0,
+    };
+  }
+  return {
+    ...runCommand("changed_e2e", "bunx", buildChangedE2eCommandArgs(specs)),
+    specFiles: specs.length,
+  };
+}
+
+function runSubscriberInterestRls() {
+  const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
+  const hasAnonKey = Boolean(
+    process.env.SUPABASE_ANON_KEY ??
+    process.env.SUPABASE_PUBLISHABLE_KEY ??
+    process.env.VITE_SUPABASE_ANON_KEY,
+  );
+  if (!required.every((name) => Boolean(process.env[name])) || !hasAnonKey) {
+    return {
+      id: "subscriber_interest_rls",
+      status: "SKIP",
+      exitCode: null,
+      durationMs: 0,
+      reason: "missing_local_supabase_env",
+    };
+  }
+  return runCommand("subscriber_interest_rls", "bun", [
+    "run",
+    "test:subscriber-interest-db-security",
+  ]);
+}
+
 function inspectMigrationContract() {
   const started = Date.now();
   const audit = auditSubscriberGrowthMigrationContract((file) =>
@@ -168,7 +214,7 @@ function inspectMigrationContract() {
   };
 }
 
-function inspectSource(args, files, tests, formattable) {
+function inspectSource(args, files, tests, e2eSpecs, formattable) {
   const remote = git(["remote", "get-url", "origin"]);
   let baseAncestor = false;
   try {
@@ -203,6 +249,7 @@ function inspectSource(args, files, tests, formattable) {
     releaseDirtyPaths,
     changedFiles: files.length,
     changedTestFiles: tests.length,
+    changedE2eFiles: e2eSpecs.length,
     changedFormattableFiles: formattable.length,
   };
 }
@@ -230,12 +277,15 @@ function writeReceipt(out, receipt) {
 export async function runSubscriberGrowthLaunchGate(args) {
   const files = changedFiles(args.baseRef);
   const tests = runnableChangedTests(files);
+  const e2eSpecs = runnableChangedE2e(files);
   const lintable = lintableChangedFiles(files);
   const formattable = formattableChangedFiles(files);
-  const source = inspectSource(args, files, tests, formattable);
+  const source = inspectSource(args, files, tests, e2eSpecs, formattable);
 
   const commands = [
     runCommand("targeted_tests", "bunx", buildTargetedTestCommandArgs(tests)),
+    runChangedE2e(e2eSpecs),
+    runSubscriberInterestRls(),
     inspectMigrationContract(),
     runCommand("typecheck", "bun", ["run", "typecheck"]),
     runCommand("build", "bun", ["run", "build"]),

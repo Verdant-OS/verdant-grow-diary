@@ -20,7 +20,13 @@ describe("Auth signup marketing opt-in default", () => {
     expect(AUTH).toMatch(/const \[marketingOptIn, setMarketingOptIn\] = useState\(false\)/);
   });
 
-  it("persists the state value (not a hardcoded flag) and only timestamps when opted in", () => {
+  it("sends the explicit state through signup metadata before any session exists", () => {
+    expect(AUTH).toMatch(
+      /data:\s*\{\s*\.\.\.signupUserMetadata,\s*marketing_opt_in:\s*marketingOptIn\s*\}/,
+    );
+  });
+
+  it("keeps a session-path backup and only timestamps when opted in", () => {
     expect(AUTH).toMatch(/marketing_opt_in:\s*marketingOptIn\b/);
     expect(AUTH).toMatch(/marketing_opt_in_at:\s*marketingOptIn \?/);
   });

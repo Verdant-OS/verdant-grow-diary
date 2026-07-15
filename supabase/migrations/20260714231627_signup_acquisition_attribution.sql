@@ -36,9 +36,10 @@ COMMENT ON TABLE public.signup_acquisition_attributions IS
 COMMENT ON COLUMN public.signup_acquisition_attributions.source IS
   'Self-reported first-touch campaign source. Allowlisted for reporting only; user metadata is not trusted for authorization.';
 
--- Keep the existing profile creation behavior and copy only the first
--- allowlisted attribution source. CREATE OR REPLACE preserves the trigger and
--- is re-locked below because this SECURITY DEFINER function is in public.
+-- Keep the existing profile creation behavior, copy only the first allowlisted
+-- attribution source, and persist only an exact boolean marketing preference.
+-- CREATE OR REPLACE preserves the trigger and is re-locked below because this
+-- SECURITY DEFINER function is in public.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -47,6 +48,7 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_signup_source text;
+  v_marketing_opt_in boolean;
 BEGIN
   v_signup_source := CASE
     WHEN NEW.raw_user_meta_data->>'verdant_signup_source' IN (
@@ -63,10 +65,24 @@ BEGIN
     ELSE NULL
   END;
 
-  INSERT INTO public.profiles (user_id, display_name)
+  -- Only the exact JSON boolean true opts in. Missing values, strings such as
+  -- "true", malformed metadata, and false all preserve the safe opt-out.
+  v_marketing_opt_in := CASE
+    WHEN NEW.raw_user_meta_data->'marketing_opt_in' = 'true'::jsonb THEN true
+    ELSE false
+  END;
+
+  INSERT INTO public.profiles (
+    user_id,
+    display_name,
+    marketing_opt_in,
+    marketing_opt_in_at
+  )
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1))
+    COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)),
+    v_marketing_opt_in,
+    CASE WHEN v_marketing_opt_in THEN COALESCE(NEW.created_at, now()) ELSE NULL END
   )
   ON CONFLICT (user_id) DO NOTHING;
 

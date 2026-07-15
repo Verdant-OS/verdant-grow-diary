@@ -46,7 +46,13 @@ describe("signup acquisition migration safety", () => {
   it("keeps the public trigger function locked and preserves profile creation", () => {
     expect(SQL).toContain("CREATE OR REPLACE FUNCTION public.handle_new_user()");
     expect(SQL).toContain("SET search_path = public, pg_temp");
-    expect(SQL).toContain("INSERT INTO public.profiles (user_id, display_name)");
+    expect(SQL).toContain("INSERT INTO public.profiles (");
+    expect(SQL).toContain("marketing_opt_in,");
+    expect(SQL).toContain("marketing_opt_in_at");
+    expect(SQL).toContain("NEW.raw_user_meta_data->'marketing_opt_in' = 'true'::jsonb");
+    expect(SQL).toContain(
+      "CASE WHEN v_marketing_opt_in THEN COALESCE(NEW.created_at, now()) ELSE NULL END",
+    );
     expect(SQL).toContain("REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC");
     expect(SQL).toContain("REVOKE ALL ON FUNCTION public.handle_new_user() FROM authenticated");
   });

@@ -31,13 +31,18 @@ describe("subscriber growth operator snapshot — security and truth fences", ()
     );
   });
 
-  it("counts active paid users only from billing_subscriptions", () => {
+  it("deduplicates the incumbent billing source with verified live checkout rows", () => {
     expect(SQL).toContain("FROM public.billing_subscriptions AS bs");
     expect(SQL).toContain("bs.plan_id IN ('pro_monthly', 'pro_annual', 'founder_lifetime')");
     expect(SQL).toContain("bs.status = 'active'");
     expect(SQL).toContain("bs.current_period_end IS NULL OR bs.current_period_end > now()");
+    expect(SQL).toContain("FROM public.subscriptions AS s");
+    expect(SQL).toContain("s.environment = 'live'");
+    expect(SQL).toContain("s.paddle_subscription_id LIKE 'lifetime_%'");
+    expect(SQL).toContain("SELECT DISTINCT ON (candidate.user_id)");
     expect(SQL).toContain("count(DISTINCT ap.user_id) AS active_paid");
-    expect(SQL).not.toContain("public.subscriptions");
+    expect(SQL).toContain("LEFT JOIN active_paid AS ap ON ap.user_id = pr.user_id");
+    expect(SQL).toContain("WHERE ap.user_id IS NULL");
     expect(SQL).not.toContain(GAMIFICATION_TIER_REFERENCE);
   });
 
@@ -48,6 +53,14 @@ describe("subscriber growth operator snapshot — security and truth fences", ()
     expect(SQL).toContain("FROM public.plants AS p WHERE p.user_id = ap.user_id");
     expect(SQL).toContain("FROM public.diary_entries AS de WHERE de.user_id = ap.user_id");
     expect(SQL).toContain("FROM public.sensor_readings AS sr WHERE sr.user_id = ap.user_id");
+    expect(SQL).toContain("INNER JOIN public.grows AS g");
+    expect(SQL).toContain("INNER JOIN public.tents AS t");
+    expect(SQL).toContain("t.grow_id = g.id");
+    expect(SQL).toContain("INNER JOIN public.plants AS p");
+    expect(SQL).toContain("p.grow_id = g.id");
+    expect(SQL).toContain("p.tent_id = t.id");
+    expect(SQL).toContain("AS has_connected_core");
+    expect(SQL).toContain("count(*) FILTER (WHERE af.has_connected_core)");
     expect(SQL).toContain("AS active_paid_core_activated");
     expect(PAGE).toContain("<SubscriberActivationCard counts={snapshot.counts} />");
   });

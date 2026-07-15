@@ -2,7 +2,8 @@
 
 This gate packages the subscriber-growth branch into reproducible release
 evidence. It checks the repository identity and base ancestry, requires a
-clean release scope, runs every changed targeted test plus type-check/build/lint/
+clean release scope, runs every changed targeted test and all changed Playwright
+specs plus type-check/build/lint/
 diff integrity, verifies formatting across the complete base-relative release
 diff, audits the production build through a local Vite preview, and optionally compares the
 live site with the same capability contract.
@@ -38,6 +39,8 @@ bun run release:subscriber-growth:gate:local
    operator-only aggregate, active-paid, attribution, and activation contract.
 7. All public subscriber-growth routes and all fixed capability markers
    present in the local production preview.
+8. The subscriber-interest RLS runtime result recorded. Local-only runs may
+   record an explicit environment skip; `LIVE_VERIFIED` requires a real pass.
 
 The command writes a redacted JSON receipt to:
 
@@ -67,8 +70,9 @@ Confirm the dry run contains these migrations, in order:
 3. `20260714231627_signup_acquisition_attribution.sql`
 4. `20260715002000_signup_to_paid_operator_snapshot.sql`
 
-Only after explicit deployment authorization: apply the migrations, deploy
-the required payment/webhook functions, then deploy the frontend. Stop if the
+Only after explicit deployment authorization: apply the four migrations, then
+deploy the frontend. Do not deploy edge functions for this release; none are
+changed by this handoff. Stop if the
 ledger is linked to the wrong project, any migration is unexpectedly remote-
 only, the dry run is empty when these migrations are absent, or the contract
 gate is not `LOCAL_READY`. Do not infer migration state from frontend assets.

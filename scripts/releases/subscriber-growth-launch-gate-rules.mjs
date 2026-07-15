@@ -8,6 +8,8 @@ export const SUBSCRIBER_GROWTH_RELEASE_STATUSES = Object.freeze({
 
 export const SUBSCRIBER_GROWTH_REQUIRED_COMMAND_IDS = Object.freeze([
   "targeted_tests",
+  "changed_e2e",
+  "subscriber_interest_rls",
   "migration_contract",
   "typecheck",
   "build",
@@ -24,8 +26,18 @@ function finiteNonNegative(value) {
   return Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
-function commandPassed(command) {
+function commandPassed(command, source, liveRequired) {
+  if (command?.id === "subscriber_interest_rls" && command?.status === "SKIP") {
+    return liveRequired === false && command.reason === "missing_local_supabase_env";
+  }
   if (command?.status !== "PASS" || command?.exitCode !== 0) return false;
+  if (command.id === "changed_e2e") {
+    return (
+      Number.isInteger(source?.changedE2eFiles) &&
+      source.changedE2eFiles >= 0 &&
+      command.specFiles === source.changedE2eFiles
+    );
+  }
   if (command.id === "migration_contract") {
     return (
       command.migrationsTotal === EXPECTED_MIGRATION_COUNT &&
@@ -79,7 +91,7 @@ export function evaluateSubscriberGrowthLaunchGate(input) {
     const matches = commands.filter((command) => command?.id === id);
     if (matches.length !== 1) {
       commandProblems.push(`${id} evidence must appear exactly once`);
-    } else if (!commandPassed(matches[0])) {
+    } else if (!commandPassed(matches[0], input?.source, input?.liveRequired !== false)) {
       commandProblems.push(`${id} did not pass`);
     }
   }
@@ -132,6 +144,10 @@ export function buildSubscriberGrowthReleaseReceipt(input) {
 export function formatSubscriberGrowthLaunchGate(receipt) {
   const tests = receipt.commands.find((command) => command.id === "targeted_tests");
   const migrations = receipt.commands.find((command) => command.id === "migration_contract");
+  const changedE2e = receipt.commands.find((command) => command.id === "changed_e2e");
+  const subscriberInterestRls = receipt.commands.find(
+    (command) => command.id === "subscriber_interest_rls",
+  );
   const lines = [
     `Subscriber growth launch gate: ${receipt.status}`,
     `Commit: ${receipt.source.head}`,
@@ -140,6 +156,8 @@ export function formatSubscriberGrowthLaunchGate(receipt) {
     `Format scope: ${receipt.source.changedFormattableFiles ?? 0} changed files`,
     `Ignored generated paths: ${receipt.source.ignoredDirtyPaths?.length ?? 0}`,
     `Targeted tests: ${tests?.testsPassed ?? 0}/${tests?.testsTotal ?? 0}`,
+    `Changed Playwright specs: ${changedE2e?.specFiles ?? 0} (${changedE2e?.status ?? "MISSING"})`,
+    `Subscriber-interest RLS runtime: ${subscriberInterestRls?.status ?? "MISSING"}`,
     `Migration contract: ${migrations?.migrationsPassed ?? 0}/${migrations?.migrationsTotal ?? 0}`,
     `Local parity: ${receipt.localParity?.capabilitiesPassed ?? 0}/${receipt.localParity?.capabilitiesTotal ?? 0}`,
   ];

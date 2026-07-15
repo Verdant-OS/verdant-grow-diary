@@ -6,15 +6,19 @@ import {
   formatSubscriberGrowthLaunchGate,
 } from "../../scripts/releases/subscriber-growth-launch-gate-rules.mjs";
 import {
+  buildChangedE2eCommandArgs,
   buildTargetedTestCommandArgs,
   formattableChangedFiles,
   parseGitPorcelainPaths,
   parseSubscriberGrowthGateArgs,
   parseVitestTotals,
+  runnableChangedE2e,
 } from "../../scripts/releases/run-subscriber-growth-launch-gate.mjs";
 
 const commands = [
   "targeted_tests",
+  "changed_e2e",
+  "subscriber_interest_rls",
   "migration_contract",
   "typecheck",
   "build",
@@ -29,6 +33,7 @@ const commands = [
   ...(id === "targeted_tests"
     ? { testsPassed: 321, testsFailed: 0, testsSkipped: 0, testsTotal: 321 }
     : {}),
+  ...(id === "changed_e2e" ? { specFiles: 2 } : {}),
   ...(id === "migration_contract" ? { migrationsPassed: 4, migrationsTotal: 4 } : {}),
 }));
 
@@ -47,6 +52,7 @@ const source = {
   releaseDirtyPaths: [],
   changedFiles: 100,
   changedTestFiles: 55,
+  changedE2eFiles: 2,
   changedFormattableFiles: 95,
 };
 
@@ -73,6 +79,23 @@ describe("subscriber growth launch gate", () => {
       "src/test/b.test.ts",
       "--reporter=dot",
       "--maxWorkers=4",
+    ]);
+  });
+
+  it("discovers and runs every changed Playwright spec in the mocked project", () => {
+    const files = [
+      "e2e/auth-route-protection.spec.ts",
+      "e2e/auth-route-protection-mobile.spec.ts",
+      "e2e/helpers/auth.ts",
+      "src/test/auth.test.ts",
+    ];
+    expect(runnableChangedE2e(files)).toEqual(files.slice(0, 2));
+    expect(buildChangedE2eCommandArgs(files.slice(0, 2))).toEqual([
+      "playwright",
+      "test",
+      ...files.slice(0, 2),
+      "--project=chromium-mocked",
+      "--reporter=line",
     ]);
   });
 
@@ -140,6 +163,14 @@ describe("subscriber growth launch gate", () => {
     expect(incomplete.status).toBe("HOLD");
     expect(incomplete.problems).toContain("diff_integrity evidence must appear exactly once");
 
+    const missingE2eCount = evaluateSubscriberGrowthLaunchGate({
+      source: { ...source, changedE2eFiles: undefined },
+      commands,
+      localParity,
+      liveRequired: false,
+    });
+    expect(missingE2eCount.problems).toContain("changed_e2e did not pass");
+
     const ambiguous = evaluateSubscriberGrowthLaunchGate({
       source,
       commands: [...commands, commands[0]],
@@ -162,6 +193,36 @@ describe("subscriber growth launch gate", () => {
       });
       expect(result.problems).toContain("targeted_tests did not pass");
     }
+  });
+
+  it("records a missing local DB runtime but requires it for live verification", () => {
+    const skippedCommands = commands.map((command) =>
+      command.id === "subscriber_interest_rls"
+        ? {
+            ...command,
+            status: "SKIP",
+            exitCode: null,
+            reason: "missing_local_supabase_env",
+          }
+        : command,
+    );
+    expect(
+      evaluateSubscriberGrowthLaunchGate({
+        source,
+        commands: skippedCommands,
+        localParity,
+        liveRequired: false,
+      }),
+    ).toMatchObject({ status: "LOCAL_READY", localReady: true });
+    expect(
+      evaluateSubscriberGrowthLaunchGate({
+        source,
+        commands: skippedCommands,
+        localParity,
+        liveParity,
+        liveRequired: true,
+      }).problems,
+    ).toContain("subscriber_interest_rls did not pass");
   });
 
   it("rejects reduced parity totals even when every reported item passes", () => {

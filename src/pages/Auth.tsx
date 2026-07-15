@@ -263,7 +263,9 @@ export default function Auth() {
         emailRedirectTo: buildSignupEmailRedirectUrl(window.location.origin, explicitRedirect),
         // Analytics-only first touch. raw_user_meta_data is user-editable and
         // must never be used for roles, billing, credits, or entitlements.
-        data: signupUserMetadata,
+        // The explicit boolean opt-in is copied by the auth trigger so it also
+        // survives confirmation-required signups that have no session yet.
+        data: { ...signupUserMetadata, marketing_opt_in: marketingOptIn },
       },
     });
     if (error) {
@@ -282,9 +284,9 @@ export default function Auth() {
     // gate will prompt on first authenticated load. Signup itself must not
     // fail on a consent-log write error.
     // Confirmation-required signups have a user id but no authenticated
-    // session, so protected writes would only add two RLS-denied round trips
-    // before the inbox prompt appears. The re-consent gate covers acceptance
-    // after verification; marketing remains safely opted out by default.
+    // session, so protected writes would only add RLS-denied round trips before
+    // the inbox prompt appears. The auth trigger already copied the explicit
+    // marketing choice from metadata; the write below is a session-path backup.
     if (data?.user?.id && data.session) {
       try {
         const rows = buildAcceptanceRows(data.user.id).map((r) => ({

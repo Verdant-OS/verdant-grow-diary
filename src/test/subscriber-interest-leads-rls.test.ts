@@ -31,6 +31,15 @@ describe("subscriber-interest lead RLS recovery", () => {
       expect(migration).toContain(`'${source}'`);
     }
     expect(migration).toMatch(/position\('@' IN btrim\(email\)\) > 1/i);
+    expect(migration).toMatch(/length\(COALESCE\(name, ''\)\) <= 100/i);
+    expect(migration).toMatch(/length\(COALESCE\(company, ''\)\) <= 120/i);
+    expect(migration).toMatch(/role IS NULL/i);
+    expect(migration).toMatch(/status = 'new'/i);
+    expect(migration).toMatch(/operator_notes IS NULL/i);
+    expect(migration).toMatch(/contacted_at IS NULL/i);
+    expect(migration).toMatch(/follow_up_at IS NULL/i);
+    expect(migration).toMatch(/created_at BETWEEN now\(\) - interval '5 minutes'/i);
+    expect(migration).toMatch(/updated_at BETWEEN now\(\) - interval '5 minutes'/i);
     expect(migration).not.toMatch(/WITH CHECK \(true\)/i);
     expect(migration).toMatch(/REVOKE ALL ON TABLE public\.leads FROM anon/i);
     expect(migration).toMatch(/GRANT INSERT ON TABLE public\.leads TO anon/i);

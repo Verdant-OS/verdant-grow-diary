@@ -216,6 +216,31 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     expect(text).not.toMatch(/tent-secret/);
     expect(text).not.toMatch(/raw-payload/);
   });
+
+  it("gate blocks Continue when readiness is insufficient (no timeline activity or snapshots)", () => {
+    // Default beforeEach seeds empty timeline items → insufficient readiness.
+    renderDialog();
+    fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
+    // The enabled Link Continue is replaced by a disabled button.
+    expect(screen.queryByTestId("plant-detail-doctor-launch-continue")).toBeNull();
+    const blocked = screen.getByTestId("plant-detail-doctor-launch-continue-blocked");
+    expect(blocked).toBeDisabled();
+    expect(blocked.getAttribute("aria-disabled")).toBe("true");
+    const notice = screen.getByTestId("plant-detail-doctor-launch-readiness-notice");
+    expect(notice.getAttribute("data-readiness")).toBe("insufficient");
+    expect(notice.textContent).toMatch(/More context needed/);
+  });
+
+  it("gate allows Continue when readiness reaches partial (existing route behavior preserved)", () => {
+    useTimelineMemoryMock.mockReturnValue({ items: passingTimelineItems() });
+    renderDialog();
+    fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
+    expect(screen.queryByTestId("plant-detail-doctor-launch-continue-blocked")).toBeNull();
+    const cont = screen.getByTestId("plant-detail-doctor-launch-continue");
+    expect(cont.getAttribute("href")).toBe("/doctor?plantId=p1");
+    const notice = screen.getByTestId("plant-detail-doctor-launch-readiness-notice");
+    expect(["partial", "strong"]).toContain(notice.getAttribute("data-readiness"));
+  });
 });
 
 describe("Doctor launch dialog — static safety", () => {

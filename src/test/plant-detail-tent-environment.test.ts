@@ -58,9 +58,12 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
 
   it("maps available metrics and leaves missing ones as Unknown", () => {
     const ts = new Date().toISOString();
+    // source must literally be "live" to earn the Live sensor label — the
+    // old fixture's "sensor" string relied on the (fixed) default-to-live
+    // snapshot classification.
     const view = buildPlantTentEnvironmentView([
-      { ts, metric: "temperature_c", value: 24.5, source: "sensor" },
-      { ts, metric: "humidity_pct", value: 55, source: "sensor" },
+      { ts, metric: "temperature_c", value: 24.5, source: "live" },
+      { ts, metric: "humidity_pct", value: 55, source: "live" },
     ]);
     expect(view.hasReadings).toBe(true);
     expect(view.sourceLabel).toBe("Live sensor");
@@ -73,6 +76,15 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
     expect(temp.display).toContain("°F");
     expect(vpd.hasValue).toBe(false);
     expect(vpd.display).toBe("Unknown");
+  });
+
+  it("non-canonical source strings never earn the Live sensor label", () => {
+    const ts = new Date().toISOString();
+    const view = buildPlantTentEnvironmentView([
+      { ts, metric: "temperature_c", value: 24.5, source: "sensor" },
+    ]);
+    expect(view.hasReadings).toBe(true);
+    expect(view.sourceLabel).toBe("Unverified source");
   });
 
   it("does not invent missing values as zero", () => {

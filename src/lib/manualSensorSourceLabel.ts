@@ -117,6 +117,10 @@ const BASE_SOURCE_LABELS: Record<string, string> = {
   sim: "Simulated",
   diary: "Diary snapshot",
   unavailable: "Unavailable",
+  // Snapshot classification for rows whose source is not a recognized
+  // trust value — data exists but no trust path verified it. Distinct
+  // from "Unavailable" (no data at all) and never a live claim.
+  unverified: "Unverified source",
   // V1 webhook ingest sources. None of these are "live" by default —
   // freshness is derived on read; UI must still apply the stale guard.
   webhook_generic: "Webhook",

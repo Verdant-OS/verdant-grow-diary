@@ -147,6 +147,7 @@ export default function DiaryEntryBadges({ item, className }: DiaryEntryBadgesPr
           {normalizeFollowupKindLabel("24h_recheck")} · {FOLLOWUP_SAFE_CAPTION}
         </span>
       )}
+      <DiaryEntryFaqLink item={faqLinkInput} className="basis-full" />
     </div>
   );
 }

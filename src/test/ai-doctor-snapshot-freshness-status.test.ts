@@ -45,10 +45,11 @@ describe("buildAiDoctorSnapshotFreshnessStatus — 48h boundary", () => {
       now: NOW,
     });
     expect(r.state).toBe("fresh");
-    expect(r.label).toBe("Fresh · 48h ago");
+    // formatAge rolls to days once hours >= 48.
+    expect(r.label).toBe("Fresh · 2d ago");
     expect(r.ageMinutes).toBe(48 * 60);
     expect(r.description).toBe(
-      "Latest manual sensor snapshot is 48h ago — inside the 48h freshness window.",
+      "Latest manual sensor snapshot is 2d ago — inside the 48h freshness window.",
     );
   });
 
@@ -58,10 +59,9 @@ describe("buildAiDoctorSnapshotFreshnessStatus — 48h boundary", () => {
       now: NOW,
     });
     expect(r.state).toBe("stale");
-    // 48h + 1ms rounds down to 48h in the label formatter.
-    expect(r.label).toBe("Stale · 48h ago");
+    expect(r.label).toBe("Stale · 2d ago");
     expect(r.description).toBe(
-      "Latest manual sensor snapshot is 48h ago — older than the 48h freshness cutoff.",
+      "Latest manual sensor snapshot is 2d ago — older than the 48h freshness cutoff.",
     );
   });
 

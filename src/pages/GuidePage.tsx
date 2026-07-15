@@ -28,7 +28,7 @@ import {
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
 import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
-
+import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
 
 export default function GuidePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -90,10 +90,7 @@ export default function GuidePage() {
       questions: guide.faq,
     });
     const crumbs = buildBreadcrumbListJsonLd({
-      items: [
-        ...VERDANT_GUIDES_BREADCRUMB_ITEMS,
-        { name: guide.h1, url: guideUrl },
-      ],
+      items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.h1, url: guideUrl }],
     });
     const faqScript = document.createElement("script");
     faqScript.type = "application/ld+json";
@@ -102,10 +99,7 @@ export default function GuidePage() {
     document.head.appendChild(faqScript);
     const crumbScript = document.createElement("script");
     crumbScript.type = "application/ld+json";
-    crumbScript.setAttribute(
-      "data-page-ldjson",
-      `guide-${guide.slug}-breadcrumb`,
-    );
+    crumbScript.setAttribute("data-page-ldjson", `guide-${guide.slug}-breadcrumb`);
     crumbScript.text = safeJsonLdStringify(crumbs);
     document.head.appendChild(crumbScript);
     return () => {
@@ -113,7 +107,6 @@ export default function GuidePage() {
       crumbScript.remove();
     };
   }, [guide]);
-
 
   if (!guide) {
     return <Navigate to="/guides" replace />;
@@ -155,9 +148,7 @@ export default function GuidePage() {
         <div className="mt-10 space-y-8">
           {guide.sections.map((section) => (
             <section key={section.heading}>
-              <h2 className="font-display text-xl md:text-2xl font-semibold">
-                {section.heading}
-              </h2>
+              <h2 className="font-display text-xl md:text-2xl font-semibold">{section.heading}</h2>
               <p className="mt-3 text-base text-foreground/90">{section.body}</p>
             </section>
           ))}
@@ -214,9 +205,7 @@ export default function GuidePage() {
         )}
 
         <section className="mt-12 rounded-lg border border-border/60 p-5">
-          <h2 className="font-display text-lg font-semibold">
-            Keep reading
-          </h2>
+          <h2 className="font-display text-lg font-semibold">Keep reading</h2>
           <ul className="mt-3 space-y-2 text-sm">
             {related.map((r) => (
               <li key={r.slug}>
@@ -229,18 +218,12 @@ export default function GuidePage() {
               </li>
             ))}
             <li>
-              <Link
-                to="/guides"
-                className="underline hover:text-foreground text-muted-foreground"
-              >
+              <Link to="/guides" className="underline hover:text-foreground text-muted-foreground">
                 All grower guides
               </Link>
             </li>
             <li>
-              <Link
-                to="/welcome"
-                className="underline hover:text-foreground text-muted-foreground"
-              >
+              <Link to="/welcome" className="underline hover:text-foreground text-muted-foreground">
                 See how Verdant works
               </Link>
             </li>
@@ -254,14 +237,33 @@ export default function GuidePage() {
             </li>
 
             <li>
-              <Link
-                to="/pricing"
-                className="underline hover:text-foreground text-muted-foreground"
-              >
+              <Link to="/pricing" className="underline hover:text-foreground text-muted-foreground">
                 Compare Free and Pro pricing
               </Link>
             </li>
           </ul>
+        </section>
+
+        <section
+          data-testid="guide-starter-cta"
+          className="mt-10 rounded-lg border border-primary/40 p-6 bg-card/40"
+        >
+          <h2 className="font-display text-lg md:text-xl font-semibold">
+            Log your first grow note in 30 seconds — no account needed
+          </h2>
+          <p className="mt-2 text-sm md:text-base text-muted-foreground">
+            Try the public Quick Log starter: nickname a plant, jot one note, and the draft stays on
+            your device until you decide to keep it.
+          </p>
+          <div className="mt-4">
+            <Link
+              to={buildGuideQuickLogStarterHref(guide.slug)}
+              data-testid="guide-starter-cta-link"
+              className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Try the 30-second Quick Log
+            </Link>
+          </div>
         </section>
 
         <section
@@ -272,9 +274,8 @@ export default function GuidePage() {
             See a real One-Tent Loop before signing up
           </h2>
           <p className="mt-2 text-sm md:text-base text-muted-foreground">
-            Walk through how Verdant connects a grow, tent, plant, Quick Log,
-            timeline, sensor snapshot, cautious AI review, and grower-approved
-            action queue.
+            Walk through how Verdant connects a grow, tent, plant, Quick Log, timeline, sensor
+            snapshot, cautious AI review, and grower-approved action queue.
           </p>
           <div className="mt-4">
             <Link

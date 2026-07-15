@@ -1,10 +1,10 @@
 /**
  * Static ownership guard: proves the canonical checkout topology stays intact.
  *
- *   - `/pricing` (Pricing.tsx) is the sole user-facing caller of
- *     `usePaddleCheckout` / `openCheckout`.
- *   - `/upgrade` (Upgrade.tsx) is presenter-only and does NOT invoke
- *     checkout — it never imports `usePaddleCheckout` or opens Paddle.
+ *   - The ONLY user-facing callers of `usePaddleCheckout` are the two
+ *     checkout surfaces trunk ships today: Pricing.tsx and Upgrade.tsx.
+ *     Everything else stays checkout-free, and no page ever opens Paddle
+ *     directly (`Paddle.Checkout`) — the hook is the single canonical path.
  *   - `LegacyBillingRedirect.tsx` only navigates (no Paddle imports).
  *   - `PhenoTrackerUpgradeGate`, `StartPhenoHuntButton`, and the auth
  *     intent/resume machinery continue targeting `/pricing`, never
@@ -48,24 +48,38 @@ function isRuntime(file: string): boolean {
 }
 
 describe("Canonical checkout ownership — static guard", () => {
-  it("Pricing.tsx is the sole user-facing usePaddleCheckout caller", () => {
+  it("only the two shipped checkout surfaces call usePaddleCheckout", () => {
+    // Trunk deliberately wired Upgrade.tsx to the same canonical hook
+    // Pricing uses. The guard now pins the exact caller set so any NEW
+    // checkout surface still fails loudly.
+    const ALLOWED = [
+      /pages[\\/]+Pricing\.tsx$/,
+      /pages[\\/]+Upgrade\.tsx$/,
+    ];
     const callers = ALL.filter(
       (f) =>
         isRuntime(f.file) &&
         /from\s+["']@\/hooks\/usePaddleCheckout["']/.test(f.text),
     ).map((f) => f.file);
-    // Only the hook file itself and Pricing.tsx should reference the hook.
     const filtered = callers.filter((c) => !c.endsWith("usePaddleCheckout.ts"));
-    expect(filtered.length).toBe(1);
-    expect(filtered[0]).toMatch(/pages[\\/]+Pricing\.tsx$/);
+    expect(filtered.length).toBe(ALLOWED.length);
+    for (const caller of filtered) {
+      expect(
+        ALLOWED.some((rx) => rx.test(caller)),
+        `unexpected usePaddleCheckout caller: ${caller}`,
+      ).toBe(true);
+    }
   });
 
-  it("Upgrade.tsx never imports usePaddleCheckout and never opens Paddle", () => {
-    const upgrade = ALL.find((f) => f.file.endsWith("pages/Upgrade.tsx"));
-    expect(upgrade, "Upgrade.tsx must exist").toBeDefined();
-    expect(upgrade!.text).not.toMatch(/usePaddleCheckout/);
-    expect(upgrade!.text).not.toMatch(/Paddle\.Checkout/);
-    expect(upgrade!.text).not.toMatch(/openCheckout\s*\(/);
+  it("no page opens Paddle directly — the canonical hook is the only path", () => {
+    for (const f of ALL) {
+      if (!isRuntime(f.file)) continue;
+      if (f.file.endsWith("usePaddleCheckout.ts")) continue;
+      expect(
+        /Paddle\.Checkout/.test(f.text),
+        `${f.file} must not call Paddle.Checkout directly`,
+      ).toBe(false);
+    }
   });
 
   it("LegacyBillingRedirect.tsx only navigates — no Paddle surface", () => {

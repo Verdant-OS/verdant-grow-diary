@@ -40,7 +40,7 @@ const PRICING = read("src/pages/Pricing.tsx");
 const CUSTOMER_MODE_GUIDE = read("src/pages/CustomerModeGuide.tsx");
 
 
-const EXPECTED_SLUGS = [
+const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "grow-diary-app",
   "grow-log-app-vs-grow-journal",
   "grow-room-vpd-tracker",
@@ -49,6 +49,12 @@ const EXPECTED_SLUGS = [
   "sensor-truth-grow-room",
   "ai-grow-doctor",
   "cannabis-plant-care",
+  "how-to-start-a-grow-journal",
+  "what-to-log-in-a-grow-journal",
+  "grow-journal-template",
+  "plant-watering-log",
+  "grow-journal-app-without-account",
+  "daily-grow-log-checklist",
 ];
 
 describe("Verdant grower guide FAQ (/guides)", () => {

@@ -357,6 +357,256 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     faq: CANNABIS_PLANT_CARE_FAQ,
     related: ["grow-room-vpd-tracker", "grow-diary-app"],
   },
+  {
+    slug: "how-to-start-a-grow-journal",
+    title: "How to start a grow journal (in 30 seconds) | Verdant Grow Diary",
+    h1: "How to start a grow journal without overthinking it",
+    description:
+      "How to start a grow journal that survives past week two: one plant, one honest note, and a 30-second first entry you can try without an account — the draft stays on your device until you keep it.",
+    targetKeyword: "how to start a grow journal",
+    intro:
+      "Most grow journals die in the first two weeks — not because growers stop caring, but because the format asks for too much. If you are wondering how to start a grow journal that you will actually keep, start smaller than you think: one plant, one nickname, one honest note about what you did or saw today.",
+    sections: [
+      {
+        heading: "Start with one plant and one note",
+        body: "Pick the plant you check most often, give it a nickname, and write one sentence: what you did (watered, fed, trained) or what you noticed (droop, color, smell). That single entry starts the timeline every later decision builds on. You can try this right now in the public 30-second Quick Log starter at /quick-log — no account needed, and the draft stays on your device until you decide to keep it.",
+      },
+      {
+        heading: "Make the first week about habit, not completeness",
+        body: "A journal you fill in daily with three fields beats one you fill in weekly with thirty. In week one, log only waterings, feedings, and anything that surprised you. Verdant's Quick Log is built around a 30-second entry precisely so the habit forms before the ambition does.",
+      },
+      {
+        heading: "Add context as it becomes cheap",
+        body: "Photos and sensor context make a journal genuinely useful, but they should arrive when they are easy, not as homework. In Verdant, a photo rides along with any entry, and sensor snapshots are source-labeled — live, manual, csv, demo, stale, or invalid — so a reading you add later never pretends to be something it is not.",
+      },
+      {
+        heading: "Let the journal drive decisions, not just memories",
+        body: "The payoff arrives the first time you ask what changed before things went sideways — and the timeline answers. With enough entries, Verdant's cautious AI Doctor can point at likely causes and cite your own logged evidence. It never acts on its own: a suggested step reaches the approval-required Action Queue only if you choose to add it. The journal informs; the grower decides.",
+      },
+    ],
+    faq: [
+      {
+        question: "Do I need an account to start a grow journal?",
+        answer:
+          "Not to try it. The public Quick Log starter at /quick-log lets you draft your first entry with no account; the draft is stored only in your browser. Create a free account when you want a real timeline that builds across entries.",
+      },
+      {
+        question: "How long should a grow journal entry take?",
+        answer:
+          "About 30 seconds. Nickname, what you did or saw, and — when it is easy — a photo. Anything slower than that competes with the rest of your life and loses.",
+      },
+    ],
+    related: ["what-to-log-in-a-grow-journal", "daily-grow-log-checklist", "grow-diary-app"],
+  },
+  {
+    slug: "what-to-log-in-a-grow-journal",
+    title: "What to log in a grow journal (and what to skip) | Verdant Grow Diary",
+    h1: "What to log in a grow journal — and what you can safely skip",
+    description:
+      "What to log in a grow journal: waterings, feedings, training, symptoms, photos, and sensor context — and the fields you can skip until they earn their place.",
+    targetKeyword: "what to log in a grow journal",
+    intro:
+      "Deciding what to log in a grow journal is a trade between completeness and consistency. The entries that pay off later are the ones that capture change: what you did, what you saw, and the conditions around it. Everything else can wait until it earns its place in your routine.",
+    sections: [
+      {
+        heading: "The core four: water, feed, training, observation",
+        body: "Waterings (with volume), feedings (with what you fed), training or defoliation, and plain observations cover most of what future-you needs. The public starter at /quick-log covers observation, watering, feeding, and environment drafts without an account — the draft stays in your browser until you keep it — and the full diary adds more entry types once you're signed in.",
+      },
+      {
+        heading: "Log inputs with their numbers, not adjectives",
+        body: "\u201cFed lightly\u201d means nothing in six weeks. \u201c500 ml\u201d does. Verdant's numeric fields never invent values: an empty field stays empty instead of becoming a fake zero, because an honest gap beats a false number.",
+      },
+      {
+        heading: "Photos and sensor snapshots: the context multipliers",
+        body: "A photo turns a note into evidence. A sensor snapshot — temperature, humidity, VPD — turns it into context. Verdant labels every reading's source (live, manual, csv, demo, stale, invalid) so the context you attach stays trustworthy as it ages.",
+      },
+      {
+        heading: "What to skip until later",
+        body: "Skip anything you cannot sustain daily: exhaustive nutrient breakdowns, runoff measurements on every watering, or forms with ten required fields. Add depth when a problem or a goal demands it. A short log kept daily beats a complete log kept twice.",
+      },
+    ],
+    faq: [
+      {
+        question: "Should I log every single day?",
+        answer:
+          "Log every day you touch the plants or notice something. Days where nothing happened are fine to skip — an event-driven journal stays honest and sustainable.",
+      },
+      {
+        question: "What makes a grow journal entry useful months later?",
+        answer:
+          "That it captures change with context: what changed, when, what it looked like (photo), and the conditions around it (source-labeled sensor snapshot). Entries like that let you — or a cautious AI review — reason from evidence instead of memory.",
+      },
+    ],
+    related: ["how-to-start-a-grow-journal", "plant-watering-log", "sensor-truth-grow-room"],
+  },
+  {
+    slug: "grow-journal-template",
+    title: "Grow journal template you can use right now | Verdant Grow Diary",
+    h1: "A grow journal template that fits in 30 seconds",
+    description:
+      "A practical grow journal template: plant, entry type, stage, note, and one number when it matters — usable as an interactive starter in your browser, no account needed.",
+    targetKeyword: "grow journal template",
+    intro:
+      "Most grow journal template downloads are spreadsheets with twenty columns you will stop filling by Friday. A template earns its keep when it is small enough to complete every time: which plant, what kind of entry, what stage, one note, and one number when the entry type calls for it.",
+    sections: [
+      {
+        heading: "The five-field template",
+        body: "Plant nickname. Entry type (watering, feeding, observation, or environment check). Growth stage — with \u201cnot sure yet\u201d as a legitimate answer. A short note. And for waterings only, the volume in ml. That is the whole template, and it is enough to build a timeline worth trusting.",
+      },
+      {
+        heading: "Use it as an interactive starter, not a download",
+        body: "Instead of printing a sheet, you can fill this grow journal template directly in the public Quick Log starter at /quick-log. It runs without an account, and the draft is saved only on your device — honestly labeled as such — until you choose to create a free diary.",
+      },
+      {
+        heading: "Why the template refuses to guess",
+        body: "A good template never fills in what you did not say. Unknown stage stays unknown instead of defaulting to vegetative; an empty volume stays empty instead of becoming zero. Verdant applies those same rules in the full diary, so your history means what it says.",
+      },
+      {
+        heading: "Growing past the template",
+        body: "When a template stops being enough — you want photos on entries, source-labeled sensor snapshots, CSV imports from AC Infinity or Spider Farmer gear, or a cautious AI review of a problem — Verdant's full Quick Log picks up where the starter leaves off. Nothing transfers on its own: your draft stays on your device until you review and save it yourself, with every extra strictly optional.",
+      },
+    ],
+    faq: [
+      {
+        question: "Is there a free grow journal template I can try in the browser?",
+        answer:
+          "Yes — the public Quick Log starter at /quick-log is the template in interactive form. No account, no download; the draft lives in your browser until you clear it, or until you review and save it into a free diary after signing up.",
+      },
+      {
+        question: "What fields should a grow journal template include?",
+        answer:
+          "Plant, entry type, stage (allowed to be unknown), a note, and a volume for waterings. Photos and sensor context are the best next additions once the habit holds.",
+      },
+    ],
+    related: [
+      "how-to-start-a-grow-journal",
+      "what-to-log-in-a-grow-journal",
+      "grow-log-app-vs-grow-journal",
+    ],
+  },
+  {
+    slug: "plant-watering-log",
+    title: "Plant watering log: track volume, not vibes | Verdant Grow Diary",
+    h1: "A plant watering log that tracks volume, not vibes",
+    description:
+      "Why a plant watering log should record ml per watering, how to keep one in 30 seconds, and how volume history pairs with source-labeled sensor context.",
+    targetKeyword: "plant watering log",
+    intro:
+      "Overwatering and underwatering look identical from memory. A plant watering log replaces \u201cI think I watered Tuesday?\u201d with a record: when, how much, and what the plant did next. Kept honestly, it is the single highest-value habit in a grow room.",
+    sections: [
+      {
+        heading: "Record the number, every time",
+        body: "The unit of a useful plant watering log is milliliters, not adjectives. 300 ml versus 800 ml tells a story that \u201clight\u201d and \u201cheavy\u201d never will. In Verdant's Quick Log, a watering entry asks for exactly one number — and refuses to invent it if you leave it blank.",
+      },
+      {
+        heading: "Thirty seconds, right after you water",
+        body: "Log while the can is still in your hand. Plant, watering, volume, done. You can try the exact flow in the public starter at /quick-log without an account — the draft stays on your device until you decide it belongs in a real diary.",
+      },
+      {
+        heading: "Pair volume with conditions",
+        body: "Water demand follows the room. A watering history becomes far more readable next to temperature, humidity, and VPD — and Verdant keeps that context honest by labeling every reading's source: live, manual, csv, demo, stale, or invalid. A stale reading is flagged, never treated as current truth.",
+      },
+      {
+        heading: "Reading the pattern",
+        body: "After a few weeks, the log answers real questions: is the interval shrinking as the plant stacks? Did droop follow the big pot-up watering? If you ask Verdant's cautious AI Doctor about a symptom, your watering history is the kind of evidence it cites — and a suggestion enters the approval-required Action Queue only when you add it yourself.",
+      },
+    ],
+    faq: [
+      {
+        question: "What should a plant watering log include?",
+        answer:
+          "Date and time, plant, volume in ml, and optionally what you fed with it and a note about the plant's response. Volume is the field that makes the log worth keeping.",
+      },
+      {
+        question: "Can I keep a watering log without an app account?",
+        answer:
+          "You can draft watering entries in the public Quick Log starter at /quick-log with no account — the draft is stored only in your browser. A free account turns entries into a plant timeline you can read across weeks.",
+      },
+    ],
+    related: ["what-to-log-in-a-grow-journal", "daily-grow-log-checklist", "grow-room-vpd-tracker"],
+  },
+  {
+    slug: "grow-journal-app-without-account",
+    title: "Try a grow journal without an account | Verdant Grow Diary",
+    h1: "Try a grow journal without an account (honestly)",
+    description:
+      "How to try a grow journal without an account: a public 30-second Quick Log starter whose draft stays on your device — with the trade-offs stated plainly.",
+    targetKeyword: "grow journal without an account",
+    intro:
+      "Wanting to try a grow journal without an account is reasonable: signup walls before value are exhausting. Verdant's answer is a public 30-second Quick Log starter you can use immediately — the draft stays on your device, and the trade-offs are stated plainly instead of hidden.",
+    sections: [
+      {
+        heading: "What works with no account at all",
+        body: "At /quick-log you can nickname a plant, pick an entry type (watering, feeding, observation, environment check), set a stage or honestly leave it unknown, write a note, and save a draft that stays on this device. No email, no signup, no server involved.",
+      },
+      {
+        heading: "Where the draft actually lives",
+        body: "The draft is stored only in this browser — it is not sent anywhere, not synced to an account, and clearing browser data deletes it. The starter says this on the page, before and after you save, because a diary product that fudges where your data lives has already failed at its one job.",
+      },
+      {
+        heading: "What an account adds — and what it costs",
+        body: "A free account turns single drafts into plant timelines: entries accumulate, photos attach, source-labeled sensor snapshots add context, and history becomes something you can actually read. The free tier is enough to run a real diary; Pro adds depth when you want it.",
+      },
+      {
+        heading: "No dark patterns on the way in",
+        body: "The starter never auto-creates anything, never uploads your draft in the background, and the signup handoff carries only allow-listed campaign parameters — never your notes or plant names in a URL. Try it, keep the draft local as long as you like, and sign up only when the timeline is worth it to you.",
+      },
+    ],
+    faq: [
+      {
+        question: "Is the no-account grow journal really free?",
+        answer:
+          "The public starter is free and account-less by design — it writes only to your browser's local storage. The full diary has a free tier; the starter is not a trial that expires.",
+      },
+      {
+        question: "What happens to my draft if I sign up later?",
+        answer:
+          "The draft stays on your device until you act on it. If it is recent and you sign in on the same browser, Verdant offers a “Continue your Quick Log” card where you review the draft and save it into your diary yourself — nothing is imported automatically, and the draft is only cleared after that save succeeds.",
+      },
+    ],
+    related: ["how-to-start-a-grow-journal", "grow-journal-template", "grow-diary-app"],
+  },
+  {
+    slug: "daily-grow-log-checklist",
+    title: "Daily grow log checklist (60-second routine) | Verdant Grow Diary",
+    h1: "A daily grow log checklist you can finish in a minute",
+    description:
+      "A daily grow log checklist for real routines: look, touch, log what changed — with a 30-second entry format and source-labeled sensor context when you have it.",
+    targetKeyword: "daily grow log checklist",
+    intro:
+      "A daily grow log checklist works when it matches what you already do at the tent: look, touch, adjust, leave. The checklist's job is to catch what changed on the way out — in about a minute, not ten.",
+    sections: [
+      {
+        heading: "The 60-second pass",
+        body: "Look: color, posture, new growth, anything weird. Touch: pot weight or medium moisture. Then log only what changed — a watering with its volume, a feeding, or one observation line. If nothing changed, an honest empty day beats a filler entry.",
+      },
+      {
+        heading: "One entry per change, against the plant",
+        body: "Log against the specific plant, not the room in general, so each timeline stays readable. The public Quick Log starter at /quick-log covers the four types a daily pass produces — watering, feeding, observation, environment check — and lets you rehearse the format with no account, draft kept on your device.",
+      },
+      {
+        heading: "Weekly additions that stay cheap",
+        body: "Once or twice a week, add a photo from the same angle and, if you track conditions, a sensor snapshot. Verdant labels each snapshot's source — live, manual, csv, demo, stale, invalid — so a week-old number is flagged as stale rather than passing as today's truth.",
+      },
+      {
+        heading: "When the checklist catches something",
+        body: "The checklist's real value is the day something looks off. Your recent entries become the evidence trail: last watering volume, last feed, the photo from three days ago. Verdant's cautious AI Doctor works from exactly that context, and a suggested step reaches the approval-required Action Queue only when you choose to add it — you stay the one who decides.",
+      },
+    ],
+    faq: [
+      {
+        question: "What should be on a daily grow log checklist?",
+        answer:
+          "Look at the plant, check moisture, then log what changed: watering with volume, feeding, or one observation. Photos and sensor snapshots are weekly-cheap additions, not daily requirements.",
+      },
+      {
+        question: "How do I make a daily grow log stick?",
+        answer:
+          "Keep the entry under a minute and tie it to a trigger you already have — the moment you leave the tent. Formats you can complete every time beat thorough formats you abandon.",
+      },
+    ],
+    related: ["plant-watering-log", "how-to-start-a-grow-journal", "sensor-truth-grow-room"],
+  },
 ];
 
 /** Return the full published guide slugs, in the same order rendered on /guides. */

@@ -142,23 +142,73 @@ describe("capability-truth: cluster copy never overpromises", () => {
         "auto-import",
         "synced to your account",
         "backed up to your account",
+        // Transfer language that implies a 1:1 field handoff or a
+        // signup-terminated draft lifecycle (neither is shipped behavior).
+        "carry straight into",
+        "carries straight into",
+        "carries over",
+        "transfers automatically",
+        "until you sign up",
       ]) {
         expect(text, `${slug} must not claim "${banned}"`).not.toContain(banned);
       }
     }
   });
 
-  it("every no-account claim in cluster copy pairs with the on-device truth", () => {
+  it("guides pairing the draft with signup state the explicit review-and-save posture", () => {
+    // Positive counterpart to the denylist above: whenever cluster copy
+    // mentions both the local draft and signing up, it must state that the
+    // grower acts explicitly (review/save/keep/decide) — the draft never
+    // moves on its own.
     for (const slug of CLUSTER_SLUGS) {
       const g = findGuideBySlug(slug)!;
-      const text = [g.intro, ...g.sections.map((s) => s.body), ...g.faq.map((f) => f.answer)]
+      const text = [
+        g.description,
+        g.intro,
+        ...g.sections.map((s) => s.body),
+        ...g.faq.map((f) => `${f.question} ${f.answer}`),
+      ]
         .join("\n")
         .toLowerCase();
-      if (/no account|without an account|account-less/.test(text)) {
+      const mentionsDraft = text.includes("draft");
+      const mentionsSignup =
+        /sign up|signing up|signup|sign in|create a free|creating an account|free account/.test(
+          text,
+        );
+      if (mentionsDraft && mentionsSignup) {
         expect(
-          /your device|your browser|on this device|in this browser/.test(text),
-          `${slug}: a no-account claim must state where the draft lives`,
+          /you decide|until you keep it|you choose to|choose to add|review and save|save it into your diary yourself|nothing transfers on its own/.test(
+            text,
+          ),
+          `${slug}: draft+signup copy must state the explicit review/save posture`,
         ).toBe(true);
+      }
+    }
+  });
+
+  it("every no-account claim pairs with the on-device truth in the same passage", () => {
+    // Per-passage, not per-guide: descriptions render standalone on the
+    // guides index and as SEO metadata, and FAQ answers render standalone
+    // in FAQPage JSON-LD — a device disclosure elsewhere in the guide
+    // cannot rescue a passage that omits it.
+    for (const slug of CLUSTER_SLUGS) {
+      const g = findGuideBySlug(slug)!;
+      const passages: Array<[string, string]> = [
+        ["description", g.description],
+        ["intro", g.intro],
+        ...g.sections.map(
+          (s, i) => [`section[${i}]`, `${s.heading} ${s.body}`] as [string, string],
+        ),
+        ...g.faq.map((f, i) => [`faq[${i}]`, `${f.question} ${f.answer}`] as [string, string]),
+      ];
+      for (const [label, raw] of passages) {
+        const text = raw.toLowerCase();
+        if (/no account|no-account|without an account|account-less/.test(text)) {
+          expect(
+            /your device|your browser|this browser|this device|local storage/.test(text),
+            `${slug} ${label}: a no-account claim must state where the draft lives in the same passage`,
+          ).toBe(true);
+        }
       }
     }
   });

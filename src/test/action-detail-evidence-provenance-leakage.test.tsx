@@ -153,6 +153,14 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), message: vi.fn() },
 }));
 
+// ActionDetail resolves its row through async effects that can exceed
+// testing-library's 1s findBy default AND vitest's 5s per-test timeout on
+// loaded shared CI runners (observed repeatedly across full-suite batches;
+// passes locally in <2s). Raise the per-test budget for this file and give
+// the async-load awaits a generous findBy timeout beneath it.
+vi.setConfig({ testTimeout: 60_000 });
+const FIND_TIMEOUT = { timeout: 30_000 };
+
 beforeEach(() => {
   detailRow = ALERT_ROW;
 });
@@ -179,11 +187,17 @@ describe("ActionDetail evidence/origin panels — alert-derived leakage guards",
     const { container } = renderDetail("aq-leak-1");
 
     // Positive UI present.
-    const quality = await screen.findByTestId("action-detail-evidence-quality");
+    const quality = await screen.findByTestId(
+      "action-detail-evidence-quality",
+      undefined,
+      FIND_TIMEOUT,
+    );
     expect(quality.textContent).toBe(ACTION_EVIDENCE_QUALITY_UNAVAILABLE_LABEL);
 
     const missingHelp = await screen.findByTestId(
       "action-detail-evidence-missing-help",
+      undefined,
+      FIND_TIMEOUT,
     );
     expect(missingHelp.textContent).toBe(ACTION_EVIDENCE_MISSING_PANEL_HELP);
 
@@ -198,6 +212,8 @@ describe("ActionDetail evidence/origin panels — alert-derived leakage guards",
 
     const link = (await screen.findByTestId(
       "action-detail-evidence-review-link",
+      undefined,
+      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
 
     expect(link.tagName).toBe("A");
@@ -220,15 +236,23 @@ describe("ActionDetail evidence/origin panels — AI Doctor leakage guards", () 
 
     const origin = await screen.findByTestId(
       "action-detail-ai-doctor-provenance",
+      undefined,
+      FIND_TIMEOUT,
     );
     expect(origin.textContent ?? "").toContain("Suggestion origin");
     expect(origin.textContent ?? "").toContain("Grower review required");
 
-    const quality = await screen.findByTestId("action-detail-evidence-quality");
+    const quality = await screen.findByTestId(
+      "action-detail-evidence-quality",
+      undefined,
+      FIND_TIMEOUT,
+    );
     expect(quality.textContent).toBe(ACTION_EVIDENCE_QUALITY_UNAVAILABLE_LABEL);
 
     const missingHelp = await screen.findByTestId(
       "action-detail-evidence-missing-help",
+      undefined,
+      FIND_TIMEOUT,
     );
     expect(missingHelp.textContent).toBe(ACTION_EVIDENCE_MISSING_PANEL_HELP);
 
@@ -242,6 +266,8 @@ describe("ActionDetail evidence/origin panels — AI Doctor leakage guards", () 
 
     const link = (await screen.findByTestId(
       "action-detail-evidence-review-link",
+      undefined,
+      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
 
     expect(link.tagName).toBe("A");
@@ -252,7 +278,11 @@ describe("ActionDetail evidence/origin panels — AI Doctor leakage guards", () 
   it("does not render device-control / automation language anywhere in the panel", async () => {
     detailRow = AI_DOCTOR_ROW;
     const { container } = renderDetail("aq-leak-2");
-    await screen.findByTestId("action-detail-ai-doctor-provenance");
+    await screen.findByTestId(
+      "action-detail-ai-doctor-provenance",
+      undefined,
+      FIND_TIMEOUT,
+    );
 
     const lower = (container.textContent ?? "").toLowerCase();
     for (const tok of [
@@ -276,7 +306,11 @@ describe("ActionDetail evidence/origin panels — AI Doctor leakage guards", () 
   it("does not render raw back-pointer tokens or seeded extra payload fields", async () => {
     detailRow = AI_DOCTOR_ROW;
     const { container } = renderDetail("aq-leak-2");
-    await screen.findByTestId("action-detail-ai-doctor-provenance");
+    await screen.findByTestId(
+      "action-detail-ai-doctor-provenance",
+      undefined,
+      FIND_TIMEOUT,
+    );
 
     const text = container.textContent ?? "";
     expect(text).not.toContain("[alert:");

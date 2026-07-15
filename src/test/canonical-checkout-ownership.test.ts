@@ -80,6 +80,17 @@ describe("Canonical checkout ownership — static guard", () => {
     }
   });
 
+  it("no page opens Paddle directly — the canonical hook is the only path", () => {
+    for (const f of ALL) {
+      if (!isRuntime(f.file)) continue;
+      if (f.file.endsWith("usePaddleCheckout.ts")) continue;
+      expect(
+        /Paddle\.Checkout/.test(f.text),
+        `${f.file} must not call Paddle.Checkout directly`,
+      ).toBe(false);
+    }
+  });
+
   it("PhenoTrackerUpgradeGate targets /pricing (never /upgrade or /billing)", () => {
     const f = ALL.find((x) => x.file.endsWith("components/PhenoTrackerUpgradeGate.tsx"));
     expect(f).toBeDefined();

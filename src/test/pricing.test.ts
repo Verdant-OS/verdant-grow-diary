@@ -323,8 +323,9 @@ describe("Safety: no private data on public page", () => {
     expect(PAGE).not.toMatch(/@\/integrations\/supabase\/client/);
     // Allowed: usePageSeo (SEO <head> only), usePaddleCheckout
     // (auth-state + Paddle overlay; signed-out users bounce to /auth), and
-    // useFounderSlotsRemaining (a fixed public aggregate counter). Any other
-    // @/hooks import (dashboard data hooks) remains forbidden.
+    // useFounderSlotsRemaining (public slot counter via edge function;
+    // fails soft, never grants entitlement). Any other @/hooks import
+    // (dashboard data hooks) remains forbidden.
     expect(PAGE).not.toMatch(
       /@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b|useFounderSlotsRemaining\b)/,
     );
@@ -334,16 +335,17 @@ describe("Safety: no private data on public page", () => {
     expect(CHECKOUT_HOOK).not.toMatch(/@\/integrations\/supabase\/client/);
     expect(CHECKOUT_HOOK).not.toMatch(/supabase\s*\.\s*from\(/);
     expect(CHECKOUT_HOOK).not.toMatch(/service_role/);
-
-    // The Founder availability hook may call only the fixed public aggregate
-    // endpoint. It must never query tables or become entitlement authority.
-    const FOUNDER_SLOTS_HOOK = readSrc("hooks/useFounderSlotsRemaining.ts");
-    expect(FOUNDER_SLOTS_HOOK).toContain('"founder-slots-remaining"');
-    expect(FOUNDER_SLOTS_HOOK.match(/functions\.invoke\(/g)).toHaveLength(1);
-    expect(FOUNDER_SLOTS_HOOK).not.toMatch(/supabase\s*\.\s*from\(/);
-    expect(FOUNDER_SLOTS_HOOK).not.toMatch(/service_role/);
+    // The founder-slots hook may invoke ONLY its public edge function —
+    // no table reads, no service_role, no other function invocations.
+    const slotsHook = readSrc("hooks/useFounderSlotsRemaining.ts");
+    const invokes = [...slotsHook.matchAll(/functions\.invoke\(\s*["']([^"']+)["']/g)].map(
+      (match) => match[1],
+    );
+    expect(invokes).toEqual(["founder-slots-remaining"]);
+    expect(slotsHook).not.toMatch(/supabase\s*\.\s*from\(/);
+    expect(slotsHook).not.toMatch(/service_role/);
     for (const table of PRIVATE_TABLES) {
-      expect(FOUNDER_SLOTS_HOOK).not.toMatch(new RegExp(`\\.from\\(["']${table}["']`));
+      expect(slotsHook).not.toMatch(new RegExp(`\\.from\\(["']${table}["']`));
     }
   });
 

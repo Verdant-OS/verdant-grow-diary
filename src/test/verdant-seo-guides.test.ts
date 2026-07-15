@@ -39,7 +39,7 @@ const LANDING = read("src/pages/Landing.tsx");
 const PRICING = read("src/pages/Pricing.tsx");
 const CUSTOMER_MODE_GUIDE = read("src/pages/CustomerModeGuide.tsx");
 
-const EXPECTED_SLUGS = [
+const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "grow-diary-app",
   "grow-log-app-vs-grow-journal",
   "grow-room-vpd-tracker",
@@ -47,6 +47,7 @@ const EXPECTED_SLUGS = [
   "spider-farmer-data-logging",
   "sensor-truth-grow-room",
   "ai-grow-doctor",
+  "cannabis-plant-care",
   // Search-to-first-value cluster (funnels to the public /quick-log starter).
   "how-to-start-a-grow-journal",
   "what-to-log-in-a-grow-journal",
@@ -54,7 +55,6 @@ const EXPECTED_SLUGS = [
   "plant-watering-log",
   "grow-journal-app-without-account",
   "daily-grow-log-checklist",
-  "cannabis-plant-care",
 ];
 
 describe("Verdant grower guide FAQ (/guides)", () => {

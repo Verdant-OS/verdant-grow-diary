@@ -1,6 +1,6 @@
 /**
  * verdantSeoContent — shared content constants for the public /guides hub
- * and the grower-intent SEO guide pages.
+ * and the first seven grower-intent SEO guide pages.
  *
  * Presenter-only copy. No business logic, no data access, no side effects.
  * Centralized here so visible page copy and FAQPage JSON-LD share the same
@@ -14,6 +14,7 @@
  */
 
 import type { FaqEntry } from "@/constants/verdantSeoCopy";
+import { CANNABIS_PLANT_CARE_FAQ } from "@/constants/cannabisPlantCareFaq";
 
 export interface GuideSection {
   readonly heading: string;
@@ -81,7 +82,7 @@ export const VERDANT_GROWER_GUIDE_FAQ: ReadonlyArray<FaqEntry> = [
 ];
 
 /* ------------------------------------------------------------------ */
-/* Fourteen SEO guide pages (7 product-intent + 6 search-to-first-value + 1 care FAQ) */
+/* Seven SEO guide pages                                               */
 /* ------------------------------------------------------------------ */
 
 export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
@@ -327,11 +328,41 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     related: ["sensor-truth-grow-room", "grow-diary-app"],
   },
   {
+    slug: "cannabis-plant-care",
+    title: "Cannabis plant care FAQ for home growers | Verdant Grow Diary",
+    h1: "Cannabis plant care FAQ: the five questions every home grower asks",
+    description:
+      "Answers to the five most common cannabis plant care questions for home growers: watering, nutrients, yellow leaves, temperature and humidity, and harvest timing.",
+    targetKeyword: "cannabis plant care",
+    intro:
+      "New home growers usually ask the same five questions: how often to water, what to feed, why leaves turn yellow, what temperature and humidity to keep, and when to harvest. These answers are grounded in horticultural basics — not brand-specific schedules or bro-science — and tie back to the plant memory that makes good care repeatable.",
+    sections: [
+      {
+        heading: "Watering is the most common early mistake",
+        body: "Overwatering is more common than underwatering. The right frequency depends on medium, pot size, plant stage, temperature, and humidity. A soil grower might water when the top inch dries and the pot feels light; a coco or hydro grower uses a different rhythm. The goal is a moist, oxygenated root zone, not a soaked one.",
+      },
+      {
+        heading: "Nutrients follow the plant, not the bottle",
+        body: "Cannabis needs more nitrogen in vegetative growth and more phosphorus and potassium in flowering, but the exact strength depends on the medium, cultivar, and environment. Start at a lower dose, watch the plant, and adjust by EC or PPM. pH matters more than the brand: most soil grows sit near 6.0–6.8, and most soilless or hydro grows near 5.5–6.5.",
+      },
+      {
+        heading: "Environment and observation beat guessing",
+        body: "A stable grow room, a careful eye, and a simple log turn symptoms into diagnosis. Vapor-pressure deficit (VPD), light intensity, airflow, and root-zone health explain most leaf issues better than a single product. If context is missing, the safest answer is to gather more evidence before treating.",
+      },
+      {
+        heading: "Harvest timing needs trichome and pistil evidence",
+        body: "Days on a seed pack are estimates. The most reliable harvest signals are trichome color — clear, then milky, then amber — and pistil maturity. A jeweler's loupe or handheld microscope is enough. Rushing by calendar alone is a common source of regret.",
+      },
+    ],
+    faq: CANNABIS_PLANT_CARE_FAQ,
+    related: ["grow-room-vpd-tracker", "grow-diary-app"],
+  },
+  {
     slug: "how-to-start-a-grow-journal",
     title: "How to start a grow journal (in 30 seconds) | Verdant Grow Diary",
     h1: "How to start a grow journal without overthinking it",
     description:
-      "How to start a grow journal that survives past week two: one plant, one note, one photo — and a 30-second first entry you can try without an account.",
+      "How to start a grow journal that survives past week two: one plant, one honest note, and a 30-second first entry you can try without an account — the draft stays on your device until you keep it.",
     targetKeyword: "how to start a grow journal",
     intro:
       "Most grow journals die in the first two weeks — not because growers stop caring, but because the format asks for too much. If you are wondering how to start a grow journal that you will actually keep, start smaller than you think: one plant, one nickname, one honest note about what you did or saw today.",
@@ -350,7 +381,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "Let the journal drive decisions, not just memories",
-        body: "The payoff arrives the first time you ask what changed before things went sideways — and the timeline answers. With enough entries, Verdant's cautious AI Doctor can point at likely causes and cite your own logged evidence, and any suggested step waits in an approval-required Action Queue. The journal informs; the grower decides.",
+        body: "The payoff arrives the first time you ask what changed before things went sideways — and the timeline answers. With enough entries, Verdant's cautious AI Doctor can point at likely causes and cite your own logged evidence. It never acts on its own: a suggested step reaches the approval-required Action Queue only if you choose to add it. The journal informs; the grower decides.",
       },
     ],
     faq: [
@@ -379,7 +410,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     sections: [
       {
         heading: "The core four: water, feed, training, observation",
-        body: "Waterings (with volume), feedings (with what you fed), training or defoliation, and plain observations cover most of what future-you needs. These are exactly the four entry types in Verdant's Quick Log — and in the public starter at /quick-log, where you can draft one without an account and the draft stays in your browser until you keep it.",
+        body: "Waterings (with volume), feedings (with what you fed), training or defoliation, and plain observations cover most of what future-you needs. The public starter at /quick-log covers observation, watering, feeding, and environment drafts without an account — the draft stays in your browser until you keep it — and the full diary adds more entry types once you're signed in.",
       },
       {
         heading: "Log inputs with their numbers, not adjectives",
@@ -432,14 +463,14 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "Growing past the template",
-        body: "When a template stops being enough — you want photos on entries, source-labeled sensor snapshots, CSV imports from AC Infinity or Spider Farmer gear, or a cautious AI review of a problem — the same five fields carry straight into Verdant's full Quick Log, with every extra strictly optional.",
+        body: "When a template stops being enough — you want photos on entries, source-labeled sensor snapshots, CSV imports from AC Infinity or Spider Farmer gear, or a cautious AI review of a problem — Verdant's full Quick Log picks up where the starter leaves off. Nothing transfers on its own: your draft stays on your device until you review and save it yourself, with every extra strictly optional.",
       },
     ],
     faq: [
       {
         question: "Is there a free grow journal template I can try in the browser?",
         answer:
-          "Yes — the public Quick Log starter at /quick-log is the template in interactive form. No account, no download; the draft lives in your browser until you clear it or sign up.",
+          "Yes — the public Quick Log starter at /quick-log is the template in interactive form. No account, no download; the draft lives in your browser until you clear it, or until you review and save it into a free diary after signing up.",
       },
       {
         question: "What fields should a grow journal template include?",
@@ -477,7 +508,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "Reading the pattern",
-        body: "After a few weeks, the log answers real questions: is the interval shrinking as the plant stacks? Did droop follow the big pot-up watering? If you ask Verdant's cautious AI Doctor about a symptom, your watering history is the kind of evidence it cites — and anything it suggests waits for your approval in the Action Queue.",
+        body: "After a few weeks, the log answers real questions: is the interval shrinking as the plant stacks? Did droop follow the big pot-up watering? If you ask Verdant's cautious AI Doctor about a symptom, your watering history is the kind of evidence it cites — and a suggestion enters the approval-required Action Queue only when you add it yourself.",
       },
     ],
     faq: [
@@ -502,11 +533,11 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "How to try a grow journal without an account: a public 30-second Quick Log starter whose draft stays on your device — with the trade-offs stated plainly.",
     targetKeyword: "grow journal without an account",
     intro:
-      "Wanting to try a grow journal without an account is reasonable: signup walls before value are exhausting. Verdant's answer is a public 30-second Quick Log starter you can use immediately — with the trade-offs stated plainly instead of hidden.",
+      "Wanting to try a grow journal without an account is reasonable: signup walls before value are exhausting. Verdant's answer is a public 30-second Quick Log starter you can use immediately — the draft stays on your device, and the trade-offs are stated plainly instead of hidden.",
     sections: [
       {
         heading: "What works with no account at all",
-        body: "At /quick-log you can nickname a plant, pick an entry type (watering, feeding, observation, environment check), set a stage or honestly leave it unknown, write a note, and save a draft. No email, no signup, no server involved.",
+        body: "At /quick-log you can nickname a plant, pick an entry type (watering, feeding, observation, environment check), set a stage or honestly leave it unknown, write a note, and save a draft that stays on this device. No email, no signup, no server involved.",
       },
       {
         heading: "Where the draft actually lives",
@@ -530,7 +561,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "What happens to my draft if I sign up later?",
         answer:
-          "Today the draft stays on your device — creating an account starts your grow diary, and you copy the note over. The starter keeps its promises small and true rather than implying an import that does not exist yet.",
+          "The draft stays on your device until you act on it. If it is recent and you sign in on the same browser, Verdant offers a “Continue your Quick Log” card where you review the draft and save it into your diary yourself — nothing is imported automatically, and the draft is only cleared after that save succeeds.",
       },
     ],
     related: ["how-to-start-a-grow-journal", "grow-journal-template", "grow-diary-app"],
@@ -551,7 +582,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "One entry per change, against the plant",
-        body: "Log against the specific plant, not the room in general, so each timeline stays readable. Verdant's Quick Log covers the four types a daily pass produces — watering, feeding, observation, environment check — and the public starter at /quick-log lets you rehearse the format with no account, draft kept on your device.",
+        body: "Log against the specific plant, not the room in general, so each timeline stays readable. The public Quick Log starter at /quick-log covers the four types a daily pass produces — watering, feeding, observation, environment check — and lets you rehearse the format with no account, draft kept on your device.",
       },
       {
         heading: "Weekly additions that stay cheap",
@@ -559,7 +590,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "When the checklist catches something",
-        body: "The checklist's real value is the day something looks off. Your recent entries become the evidence trail: last watering volume, last feed, the photo from three days ago. Verdant's cautious AI Doctor works from exactly that context and puts any suggested step into the approval-required Action Queue — you stay the one who decides.",
+        body: "The checklist's real value is the day something looks off. Your recent entries become the evidence trail: last watering volume, last feed, the photo from three days ago. Verdant's cautious AI Doctor works from exactly that context, and a suggested step reaches the approval-required Action Queue only when you choose to add it — you stay the one who decides.",
       },
     ],
     faq: [
@@ -575,62 +606,6 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     related: ["plant-watering-log", "how-to-start-a-grow-journal", "sensor-truth-grow-room"],
-  },
-  {
-    slug: "cannabis-plant-care",
-    title: "Cannabis plant care FAQ for home growers | Verdant Grow Diary",
-    h1: "Cannabis plant care FAQ: the five questions every home grower asks",
-    description:
-      "Answers to the five most common cannabis plant care questions for home growers: watering, nutrients, yellow leaves, temperature and humidity, and harvest timing.",
-    targetKeyword: "cannabis plant care",
-    intro:
-      "New home growers usually ask the same five questions: how often to water, what to feed, why leaves turn yellow, what temperature and humidity to keep, and when to harvest. These answers are grounded in horticultural basics — not brand-specific schedules or bro-science — and tie back to the plant memory that makes good care repeatable.",
-    sections: [
-      {
-        heading: "Watering is the most common early mistake",
-        body: "Overwatering is more common than underwatering. The right frequency depends on medium, pot size, plant stage, temperature, and humidity. A soil grower might water when the top inch dries and the pot feels light; a coco or hydro grower uses a different rhythm. The goal is a moist, oxygenated root zone, not a soaked one.",
-      },
-      {
-        heading: "Nutrients follow the plant, not the bottle",
-        body: "Cannabis needs more nitrogen in vegetative growth and more phosphorus and potassium in flowering, but the exact strength depends on the medium, cultivar, and environment. Start at a lower dose, watch the plant, and adjust by EC or PPM. pH matters more than the brand: most soil grows sit near 6.0–6.8, and most soilless or hydro grows near 5.5–6.5.",
-      },
-      {
-        heading: "Environment and observation beat guessing",
-        body: "A stable grow room, a careful eye, and a simple log turn symptoms into diagnosis. Vapor-pressure deficit (VPD), light intensity, airflow, and root-zone health explain most leaf issues better than a single product. If context is missing, the safest answer is to gather more evidence before treating.",
-      },
-      {
-        heading: "Harvest timing needs trichome and pistil evidence",
-        body: "Days on a seed pack are estimates. The most reliable harvest signals are trichome color — clear, then milky, then amber — and pistil maturity. A jeweler's loupe or handheld microscope is enough. Rushing by calendar alone is a common source of regret.",
-      },
-    ],
-    faq: [
-      {
-        question: "How often should I water a cannabis plant?",
-        answer:
-          "It depends on the medium, pot size, stage, temperature, and humidity. In soil, let the top inch dry and the pot lighten before watering again. Coco and hydro follow a wetter rhythm, but the root zone still needs oxygen. Overwatering is more common than underwatering. A quick log of when and how much you water makes the pattern visible.",
-      },
-      {
-        question: "What nutrients should I give my cannabis plant?",
-        answer:
-          "Vegetative plants need more nitrogen; flowering plants need more phosphorus and potassium. Start conservatively, measure EC or PPM, and adjust by plant response. pH is usually more important than the brand: soil near 6.0–6.8, soilless or hydro near 5.5–6.5. Never feed aggressively on a weak or stressed plant.",
-      },
-      {
-        question: "Why are my cannabis leaves turning yellow?",
-        answer:
-          "Yellowing can be natural lower-leaf fade late in flower, or it can signal pH lockout, nitrogen deficiency, overwatering, light or heat stress, root problems, or pests. One symptom has many causes. Check the medium, runoff, recent changes, environment, and pest pressure before treating.",
-      },
-      {
-        question: "What temperature and humidity should a cannabis grow room have?",
-        answer:
-          "Rough targets: seedling 70–80°F / 65–75% RH; veg 75–85°F / 50–65% RH; flower 68–78°F / 45–55% RH. Read these alongside VPD and the cultivar's preferences. Stability matters more than chasing a single number.",
-      },
-      {
-        question: "How do I know when to harvest cannabis?",
-        answer:
-          "Use trichome color and pistil maturity, not the calendar alone. Clear trichomes are early; milky trichomes are peak for most cultivars; amber trichomes indicate more ripeness and sedation. A jeweler's loupe or handheld microscope is enough.",
-      },
-    ],
-    related: ["grow-room-vpd-tracker", "grow-diary-app"],
   },
 ];
 

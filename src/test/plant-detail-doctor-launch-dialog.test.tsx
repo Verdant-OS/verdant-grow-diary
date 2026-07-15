@@ -17,6 +17,12 @@ vi.mock("@/hooks/usePlantRecentActivity", () => ({
   usePlantRecentActivity: (id: string | null | undefined) => useRecentMock(id),
 }));
 
+const useTimelineMemoryMock = vi.fn();
+vi.mock("@/hooks/useTimelineMemory", () => ({
+  useTimelineMemory: (...args: unknown[]) => useTimelineMemoryMock(...args),
+  TIMELINE_MEMORY_DEFAULT_LIMIT: 100,
+}));
+
 import PlantDetailDoctorLaunchDialog, {
   DOCTOR_LAUNCH_HELPER_LINES,
 } from "@/components/PlantDetailDoctorLaunchDialog";

@@ -199,7 +199,7 @@ describe("/guides/:slug detail — public render", () => {
     expect(target).toHaveAttribute("data-highlighted", "true");
 
     // Manually collapse the accordion item to dismiss the highlight.
-    const trigger = target?.querySelector('[data-radix-accordion-trigger]');
+    const trigger = target?.querySelector("button");
     expect(trigger).toBeTruthy();
     fireEvent.click(trigger!);
     await waitFor(() =>

@@ -93,7 +93,7 @@ describe("CustomerModeCannabisCareFaq", () => {
 
   it("back link points to the main customer guide for the same shareId", () => {
     renderAt("/customer/share-abc/cannabis-care");
-    const backLink = screen.getByTestId("customer-mode-cannabis-care-link-anchor");
+    const backLink = screen.getByTestId("customer-mode-cannabis-care-back-link");
     expect(backLink).toHaveAttribute("href", "/customer/share-abc");
   });
 

@@ -112,6 +112,7 @@ const OperatorPostGrowReflectionDryRun = lazy(
 );
 const OperatorDemoPreview = lazy(() => import("./pages/OperatorDemoPreview"));
 const CustomerModeGuide = lazy(() => import("./pages/CustomerModeGuide"));
+const CustomerModeCannabisCareFaq = lazy(() => import("./pages/CustomerModeCannabisCareFaq"));
 const OperatorAiDoctorPhase1Page = lazy(() =>
   import("./pages/OperatorAiDoctorPhase1").then((m) => ({
     default: m.OperatorAiDoctorPhase1Page,

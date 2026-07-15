@@ -58,8 +58,8 @@ export function evaluateSubscriberGrowthLaunchGate(input) {
   if (input?.source?.baseAncestor !== true) {
     sourceProblems.push("required base is not an ancestor of HEAD");
   }
-  if (input?.source?.worktreeClean !== true) {
-    sourceProblems.push("worktree is not clean");
+  if (input?.source?.releaseScopeClean !== true) {
+    sourceProblems.push("release scope is not clean");
   }
   if (finiteNonNegative(input?.source?.changedTestFiles) < 1) {
     sourceProblems.push("no changed targeted tests were discovered");
@@ -128,6 +128,7 @@ export function formatSubscriberGrowthLaunchGate(receipt) {
     `Commit: ${receipt.source.head}`,
     `Branch: ${receipt.source.branch}`,
     `Changed tests: ${receipt.source.changedTestFiles}`,
+    `Ignored generated paths: ${receipt.source.ignoredDirtyPaths?.length ?? 0}`,
     `Targeted tests: ${tests?.testsPassed ?? 0}/${tests?.testsTotal ?? 0}`,
     `Local parity: ${receipt.localParity?.capabilitiesPassed ?? 0}/${receipt.localParity?.capabilitiesTotal ?? 0}`,
   ];

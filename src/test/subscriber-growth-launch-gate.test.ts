@@ -31,7 +31,10 @@ const source = {
   baseCommit: "b".repeat(40),
   baseAncestor: true,
   worktreeClean: true,
+  releaseScopeClean: true,
   dirtyPaths: [],
+  ignoredDirtyPaths: [],
+  releaseDirtyPaths: [],
   changedFiles: 100,
   changedTestFiles: 55,
 };
@@ -67,6 +70,7 @@ describe("subscriber growth launch gate", () => {
       source: {
         ...source,
         worktreeClean: false,
+        releaseScopeClean: false,
         dirtyPaths: ["supabase/functions/example/index.ts"],
         changedTestFiles: 0,
       },
@@ -80,12 +84,28 @@ describe("subscriber growth launch gate", () => {
     expect(result.status).toBe("HOLD");
     expect(result.problems).toEqual(
       expect.arrayContaining([
-        "worktree is not clean",
+        "release scope is not clean",
         "no changed targeted tests were discovered",
         "typecheck did not pass",
         "local production preview parity did not pass",
       ]),
     );
+  });
+
+  it("records but does not let the known out-of-scope generated MCP file contaminate the frontend gate", () => {
+    const result = evaluateSubscriberGrowthLaunchGate({
+      source: {
+        ...source,
+        worktreeClean: false,
+        releaseScopeClean: true,
+        dirtyPaths: ["supabase/functions/mcp/index.ts"],
+        ignoredDirtyPaths: ["supabase/functions/mcp/index.ts"],
+      },
+      commands,
+      localParity,
+      liveRequired: false,
+    });
+    expect(result).toMatchObject({ status: "LOCAL_READY", localReady: true, problems: [] });
   });
 
   it("rejects incomplete or ambiguous command evidence and empty/skipped test totals", () => {

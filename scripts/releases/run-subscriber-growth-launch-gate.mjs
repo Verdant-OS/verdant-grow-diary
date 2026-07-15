@@ -21,6 +21,7 @@ const DEFAULT_OUT = path.resolve(
 );
 const DEFAULT_PORT = 4187;
 const ANSI_PATTERN = /\u001b\[[0-9;]*m/g;
+const AUTO_MANAGED_OUT_OF_SCOPE_PATHS = new Set(["supabase/functions/mcp/index.ts"]);
 
 export function parseSubscriberGrowthGateArgs(argv) {
   const args = {
@@ -154,6 +155,11 @@ function inspectSource(args, files, tests) {
     .split(/\r?\n/)
     .filter(Boolean)
     .map((line) => line.slice(3));
+  const branchFiles = new Set(files);
+  const ignoredDirtyPaths = dirtyPaths.filter(
+    (file) => AUTO_MANAGED_OUT_OF_SCOPE_PATHS.has(file) && !branchFiles.has(file),
+  );
+  const releaseDirtyPaths = dirtyPaths.filter((file) => !ignoredDirtyPaths.includes(file));
   return {
     repositoryVerified:
       normalizeRemote(remote) === normalizeRemote(args.expectedRemote) &&
@@ -165,7 +171,10 @@ function inspectSource(args, files, tests) {
     baseCommit: git(["rev-parse", args.baseRef]),
     baseAncestor,
     worktreeClean: dirtyPaths.length === 0,
+    releaseScopeClean: releaseDirtyPaths.length === 0,
     dirtyPaths,
+    ignoredDirtyPaths,
+    releaseDirtyPaths,
     changedFiles: files.length,
     changedTestFiles: tests.length,
   };

@@ -25,6 +25,17 @@ vi.mock("@/hooks/usePhenoHermCullSuggestion", () => ({
 
 import PhenoHuntWorkspace from "@/pages/PhenoHuntWorkspace";
 
+// Packet coverage is exercised by its own suites; here it stays disabled so
+// these tests keep testing their original axis without a QueryClient.
+vi.mock("@/hooks/usePhenoEvidencePackets", () => ({
+  usePhenoEvidencePackets: () => ({
+    status: "disabled" as const,
+    packets: new Map(),
+    truncated: false,
+  }),
+}));
+
+
 function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
   const saveScore = state.saveScore ?? vi.fn().mockResolvedValue(true);
   const saveDecision = state.saveDecision ?? vi.fn().mockResolvedValue(true);
@@ -34,6 +45,14 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     status: "ok",
     hunt: { id: "h1", name: "Blue Dream Hunt", growId: "g1", tentId: "t1" },
     candidates: [],
+    totalCandidateCount: state.candidates?.length ?? 0,
+    loadingMore: false,
+    hasMore: false,
+    loadNextPage: state.loadNextPage ?? vi.fn(),
+    filters: {},
+    setFilter: state.setFilter ?? vi.fn(),
+    resetFilters: state.resetFilters ?? vi.fn(),
+    comparisonSummary: null,
     scoresByPlant: {},
     decisionsByPlant: {},
     roundsByKey: {},
@@ -44,6 +63,8 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     labByKey: {},
     error: null,
     saving: null,
+    assignCandidateNumber:
+      state.assignCandidateNumber ?? vi.fn().mockResolvedValue({ ok: true, candidateNumber: 1 }),
     loadDecisionHistory: state.loadDecisionHistory ?? vi.fn().mockResolvedValue(undefined),
     loadRound: state.loadRound ?? vi.fn().mockResolvedValue(undefined),
     saveScore,

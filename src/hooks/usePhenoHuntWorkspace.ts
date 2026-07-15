@@ -1,12 +1,30 @@
 /**
- * usePhenoHuntWorkspace — loads a grower's own hunt (candidates + saved trait
- * scores + keeper decisions) and exposes RLS-scoped save functions. Read/write,
- * but suggest-only: saving a score or decision persists the grower's own data
- * and acts on nothing. No AI, no Action Queue, no automation.
+ * usePhenoHuntWorkspace — loads a grower's own hunt in BOUNDED PAGES (candidate
+ * list + that page's trait scores, keeper decisions, sex, smoke, and lab rows)
+ * and exposes RLS-scoped save functions. Read/write, but suggest-only: saving a
+ * score or decision persists the grower's own data and acts on nothing. No AI,
+ * no Action Queue, no automation.
+ *
+ * Scale-up: the candidate list is read one bounded, deterministically-ordered
+ * page at a time (never an unbounded initial read), evidence is fetched only for
+ * the visible page, the hunt-wide "comparison ready" gate is derived from a
+ * bounded summary, filters are server-side and reset pagination, and stale page
+ * responses can never overwrite newer filter/page state.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { loadPhenoHuntCandidates, type PhenoHuntSummary } from "@/lib/phenoHuntCandidatesService";
+import {
+  loadPhenoHuntSummary,
+  loadPhenoHuntCandidatePage,
+  loadPhenoHuntComparisonSummary,
+  type PhenoHuntSummary,
+  type PhenoCandidatePageFilters,
+  type PhenoHuntComparisonSummary,
+} from "@/lib/phenoHuntCandidatesService";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
+import {
+  assignPhenoCandidateNumber,
+  type AssignCandidateNumberResult,
+} from "@/lib/phenoCandidateNumberService";
 import { listKeepersForHunt } from "@/lib/phenoKeepersService";
 import { listReversedKeeperIdsForKeepers } from "@/lib/phenoReversalsService";
 import {
@@ -52,10 +70,35 @@ import type { PhenoSexObservation } from "@/lib/phenoSexObservationModel";
 
 export type WorkspaceStatus = "idle" | "loading" | "ok" | "error";
 
+/** Explicit page size for the bounded candidate read. */
+export const CANDIDATE_PAGE_SIZE = 30;
+
+/** Server-side filters (identity/strain/stage push to WHERE; decision/sex via
+ * candidate-id intersection). Readiness is a computed refinement done in the
+ * presenter, never here. */
+export type PhenoWorkspaceFilters = PhenoCandidatePageFilters;
+
 export interface UsePhenoHuntWorkspaceState {
   status: WorkspaceStatus;
   hunt: PhenoHuntSummary | null;
+  /** Loaded candidates so far (accumulates as pages load). */
   candidates: PhenoCandidateInput[];
+  /** Honest server total for the active filters, or null if unavailable. */
+  totalCandidateCount: number | null;
+  /** True while an additional page is being fetched. */
+  loadingMore: boolean;
+  /** True when more pages remain for the active filters. */
+  hasMore: boolean;
+  /** Load the next bounded page (append). No-op while one is in flight. */
+  loadNextPage: () => void;
+  /** Active server-side filters. */
+  filters: PhenoWorkspaceFilters;
+  /** Patch the filters; resets pagination to page 0 with stale-response guard. */
+  setFilter: (patch: Partial<PhenoWorkspaceFilters>) => void;
+  /** Clear all server-side filters. */
+  resetFilters: () => void;
+  /** Bounded hunt-wide comparison-ready signals (never the full evidence set). */
+  comparisonSummary: PhenoHuntComparisonSummary | null;
   scoresByPlant: Record<string, CandidateScoreRow>;
   decisionsByPlant: Record<string, KeeperDecisionRow>;
   /** Per-round cards keyed "plantId:round", loaded on demand via loadRound. */
@@ -83,6 +126,11 @@ export interface UsePhenoHuntWorkspaceState {
   labByKey: Record<string, LabResultRow>;
   error: string | null;
   saving: string | null;
+  /** Owner-only candidate-number assignment (DB trigger is authoritative). */
+  assignCandidateNumber: (
+    plantId: string,
+    candidateNumber: number,
+  ) => Promise<AssignCandidateNumberResult>;
   saveScore: (
     plantId: string,
     traits: Record<string, number>,
@@ -126,6 +174,18 @@ export interface UsePhenoHuntWorkspaceState {
   ) => Promise<boolean>;
 }
 
+/** Fetch the five editable evidence maps for exactly one page of candidates. */
+async function loadPageEvidence(huntId: string, plantIds: string[]) {
+  const [scores, decisions, sexes, smokes, labs] = await Promise.all([
+    listCandidateScoresForHunt(huntId, plantIds),
+    listKeeperDecisionsForHunt(huntId, plantIds),
+    listLatestSexObservationsForHunt(huntId, plantIds),
+    listSmokeTestsForHunt(huntId, plantIds),
+    listLabResultsForHunt(huntId, plantIds),
+  ]);
+  return { scores, decisions, sexes, smokes, labs };
+}
+
 export function usePhenoHuntWorkspace(
   huntId: string | null | undefined,
 ): UsePhenoHuntWorkspaceState {
@@ -134,6 +194,12 @@ export function usePhenoHuntWorkspace(
   const [status, setStatus] = useState<WorkspaceStatus>("idle");
   const [hunt, setHunt] = useState<PhenoHuntSummary | null>(null);
   const [candidates, setCandidates] = useState<PhenoCandidateInput[]>([]);
+  const [totalCandidateCount, setTotalCandidateCount] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [filters, setFiltersState] = useState<PhenoWorkspaceFilters>({});
+  const [comparisonSummary, setComparisonSummary] = useState<PhenoHuntComparisonSummary | null>(
+    null,
+  );
   const [scoresByPlant, setScoresByPlant] = useState<Record<string, CandidateScoreRow>>({});
   const [decisionsByPlant, setDecisionsByPlant] = useState<Record<string, KeeperDecisionRow>>({});
   const [roundsByKey, setRoundsByKey] = useState<Record<string, ScoreRoundRow>>({});
@@ -146,17 +212,23 @@ export function usePhenoHuntWorkspace(
   const [labByKey, setLabByKey] = useState<Record<string, LabResultRow>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  // Pagination + stale-response guard. requestRef is bumped on every reset
+  // (mount / filter change); a page response tagged with an old id is dropped.
+  const pageRef = useRef<number>(0);
+  const requestRef = useRef<number>(0);
   // On-demand fetch guards: which plants' histories / which rounds are loaded
-  // (or in flight). Reset when the hunt changes.
+  // (or in flight). Reset when the hunt/filters change.
   const historyLoadedRef = useRef<Set<string>>(new Set());
   const roundsLoadedRef = useRef<Set<PhenoScoreRound>>(new Set());
 
+  // Reset + load page 0 whenever the hunt or the server-side filters change.
   useEffect(() => {
     if (!id) {
       setStatus("idle");
       return;
     }
     let cancelled = false;
+    const reqId = ++requestRef.current;
     setStatus("loading");
     setError(null);
     historyLoadedRef.current = new Set();
@@ -164,57 +236,104 @@ export function usePhenoHuntWorkspace(
     setDecisionHistoryByPlant({});
     setRoundsByKey({});
     (async () => {
-      const result = await loadPhenoHuntCandidates(id);
-      if (cancelled) return;
-      if (result.ok !== true) {
-        setError(result.error);
+      const [summaryRes, comparison, pageRes] = await Promise.all([
+        loadPhenoHuntSummary(id),
+        loadPhenoHuntComparisonSummary(id),
+        loadPhenoHuntCandidatePage({ huntId: id, page: 0, pageSize: CANDIDATE_PAGE_SIZE, filters }),
+      ]);
+      if (cancelled || reqId !== requestRef.current) return;
+      if (summaryRes.ok === false) {
+        setError(summaryRes.error);
         setStatus("error");
         return;
       }
-      // Decision history and round cards are NOT fetched here: both grow with
-      // candidates × time and are only viewed one candidate / one round at a
-      // time — loadDecisionHistory / loadRound fetch them on demand.
-      const [scores, decisions, sexes, smokes, labs, keepers] = await Promise.all([
-        listCandidateScoresForHunt(id),
-        listKeeperDecisionsForHunt(id),
-        listLatestSexObservationsForHunt(id),
-        listSmokeTestsForHunt(id),
-        listLabResultsForHunt(id),
-        // A candidate promoted to keeper may have a recorded chemical reversal
-        // (pheno_reversals) — needed to suppress the herm/cull nudge on the
-        // reversed-female-herm landmine (pollen sacs are EXPECTED on a
-        // deliberately reversed breeding female).
+      if (pageRes.ok === false) {
+        setError(pageRes.error);
+        setStatus("error");
+        return;
+      }
+      const pageIds = pageRes.candidates.map((c) => c.candidateId);
+      const [{ scores, decisions, sexes, smokes, labs }, keepers] = await Promise.all([
+        loadPageEvidence(id, pageIds),
         listKeepersForHunt(id),
       ]);
-      if (cancelled) return;
-      // Reversed-keeper ids -> their SOURCE PLANT id (candidates are keyed by
-      // plantId, reversals by keeperId; a keeper's sourcePlantId is the bridge).
-      // Only the id set is needed here, not full reversal rows (method/note/…).
+      if (cancelled || reqId !== requestRef.current) return;
       const reversedKeeperIds = new Set(
         await listReversedKeeperIdsForKeepers(keepers.map((k) => k.id)),
       );
-      if (cancelled) return;
-      const reversedPlants = new Set(
-        keepers.filter((k) => reversedKeeperIds.has(k.id)).map((k) => k.sourcePlantId),
-      );
-      setHunt(result.hunt);
-      setCandidates([...result.candidates]);
+      if (cancelled || reqId !== requestRef.current) return;
+      pageRef.current = 0;
+      setHunt(summaryRes.hunt);
+      setComparisonSummary(comparison);
+      setTotalCandidateCount(pageRes.total);
+      setCandidates(pageRes.candidates);
       setScoresByPlant(scores);
       setDecisionsByPlant(decisions);
       setSexByPlant(sexes);
-      setReversedPlantIds(reversedPlants);
       setSmokeByPlant(smokes);
       setLabByKey(labs);
+      setReversedPlantIds(
+        new Set(keepers.filter((k) => reversedKeeperIds.has(k.id)).map((k) => k.sourcePlantId)),
+      );
       setStatus("ok");
     })().catch(() => {
-      if (cancelled) return;
+      if (cancelled || reqId !== requestRef.current) return;
       setError("Could not load this hunt.");
       setStatus("error");
     });
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, filters]);
+
+  const hasMore =
+    status === "ok" && totalCandidateCount != null && candidates.length < totalCandidateCount;
+
+  const loadNextPage = useCallback(() => {
+    if (!id || loadingMore || status !== "ok") return;
+    if (totalCandidateCount != null && candidates.length >= totalCandidateCount) return;
+    const reqId = requestRef.current; // must match the active reset context
+    const nextPage = pageRef.current + 1;
+    setLoadingMore(true);
+    (async () => {
+      const pageRes = await loadPhenoHuntCandidatePage({
+        huntId: id,
+        page: nextPage,
+        pageSize: CANDIDATE_PAGE_SIZE,
+        filters,
+      });
+      // A filter reset happened while this page was in flight — drop it so a
+      // stale page can never overwrite newer state.
+      if (reqId !== requestRef.current) {
+        setLoadingMore(false);
+        return;
+      }
+      if (!pageRes.ok) {
+        setLoadingMore(false);
+        return;
+      }
+      const pageIds = pageRes.candidates.map((c) => c.candidateId);
+      const { scores, decisions, sexes, smokes, labs } = await loadPageEvidence(id, pageIds);
+      if (reqId !== requestRef.current) {
+        setLoadingMore(false);
+        return;
+      }
+      pageRef.current = nextPage;
+      setTotalCandidateCount(pageRes.total);
+      setCandidates((prev) => [...prev, ...pageRes.candidates]);
+      setScoresByPlant((prev) => ({ ...prev, ...scores }));
+      setDecisionsByPlant((prev) => ({ ...prev, ...decisions }));
+      setSexByPlant((prev) => ({ ...prev, ...sexes }));
+      setSmokeByPlant((prev) => ({ ...prev, ...smokes }));
+      setLabByKey((prev) => ({ ...prev, ...labs }));
+      setLoadingMore(false);
+    })().catch(() => setLoadingMore(false));
+  }, [id, loadingMore, status, totalCandidateCount, candidates.length, filters]);
+
+  const setFilter = useCallback((patch: Partial<PhenoWorkspaceFilters>) => {
+    setFiltersState((prev) => ({ ...prev, ...patch }));
+  }, []);
+  const resetFilters = useCallback(() => setFiltersState({}), []);
 
   const loadDecisionHistory = useCallback(
     async (plantId: string) => {
@@ -240,6 +359,24 @@ export function usePhenoHuntWorkspace(
       setRoundsByKey((prev) => ({ ...cards, ...prev }));
     },
     [id],
+  );
+
+  const assignCandidateNumber = useCallback(
+    async (plantId: string, candidateNumber: number): Promise<AssignCandidateNumberResult> => {
+      const res = await assignPhenoCandidateNumber({ plantId, candidateNumber });
+      if (res.ok) {
+        // Optimistic: show the number immediately. Canonical re-ordering by
+        // number happens on the next reload (assignment is a rare, once-per
+        // candidate action, so we don't reshuffle the loaded pages here).
+        setCandidates((prev) =>
+          prev.map((c) =>
+            c.candidateId === plantId ? { ...c, candidateNumber: res.candidateNumber } : c,
+          ),
+        );
+      }
+      return res;
+    },
+    [],
   );
 
   const saveScore = useCallback(
@@ -455,6 +592,14 @@ export function usePhenoHuntWorkspace(
     status,
     hunt,
     candidates,
+    totalCandidateCount,
+    loadingMore,
+    hasMore,
+    loadNextPage,
+    filters,
+    setFilter,
+    resetFilters,
+    comparisonSummary,
     scoresByPlant,
     decisionsByPlant,
     roundsByKey,
@@ -465,6 +610,7 @@ export function usePhenoHuntWorkspace(
     labByKey,
     error,
     saving,
+    assignCandidateNumber,
     loadDecisionHistory,
     loadRound,
     saveScore,

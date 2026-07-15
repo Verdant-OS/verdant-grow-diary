@@ -54,9 +54,11 @@ export async function appendSexObservation(input: {
 /** Latest sex observation per candidate for a hunt, keyed by plant id. */
 export async function listLatestSexObservationsForHunt(
   huntId: string,
+  plantIds?: readonly string[],
 ): Promise<Record<string, SexObservationRow>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
+  const pageIds = plantIds && plantIds.length > 0 ? (plantIds as string[]) : null;
   // Latest-per-plant view keeps the transfer at one row per candidate no
   // matter how much append-only history accumulates (scale audit C1). The
   // legacy full-history read remains as a fallback for deploy skew where
@@ -70,17 +72,22 @@ export async function listLatestSexObservationsForHunt(
         observed_at: string | null;
       }[]
     | null = null;
-  const viaView = await phenoDb
+  let viewQuery = phenoDb
     .from("pheno_sex_observations_latest")
     .select("plant_id, sex, herm_observed, note, observed_at")
     .eq("hunt_id", id);
+  // Page-scoped read: fetch only the visible candidates' sex rows at scale.
+  if (pageIds) viewQuery = viewQuery.in("plant_id", pageIds);
+  const viaView = await viewQuery;
   if (!viaView.error && viaView.data) {
     data = viaView.data;
   } else {
-    const legacy = await phenoDb
+    let legacyQuery = phenoDb
       .from("pheno_sex_observations")
       .select("plant_id, sex, herm_observed, note, observed_at")
-      .eq("hunt_id", id)
+      .eq("hunt_id", id);
+    if (pageIds) legacyQuery = legacyQuery.in("plant_id", pageIds);
+    const legacy = await legacyQuery
       .order("observed_at", { ascending: false })
       // Deploy-skew fallback only: newest-first keeps latest-per-plant
       // derivation correct within the cap, and the explicit bound stops an

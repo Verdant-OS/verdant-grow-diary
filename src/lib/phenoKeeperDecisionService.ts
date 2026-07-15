@@ -54,13 +54,17 @@ export async function recordKeeperDecision(input: {
 /** Load keeper decisions for a hunt, keyed by plant id. RLS-scoped read. */
 export async function listKeeperDecisionsForHunt(
   huntId: string,
+  plantIds?: readonly string[],
 ): Promise<Record<string, KeeperDecisionRow>> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return {};
-  const { data, error } = await phenoDb
+  let query = phenoDb
     .from("pheno_keeper_decisions")
     .select("plant_id, decision, note, decided_at")
     .eq("hunt_id", id);
+  // Page-scoped read: fetch only the visible candidates' decisions at scale.
+  if (plantIds && plantIds.length > 0) query = query.in("plant_id", plantIds as string[]);
+  const { data, error } = await query;
   if (error || !data) return {};
   const map: Record<string, KeeperDecisionRow> = {};
   for (const row of data) {

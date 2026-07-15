@@ -109,6 +109,10 @@ import {
 import { buildEnvironmentCheckSensorContext } from "@/lib/environmentCheckSensorContextRules";
 import { buildSensorNormalizationPreviewViewModel } from "@/lib/sensors/sensorNormalizationPreviewViewModel";
 import { SensorNormalizationPreviewPanel } from "@/components/SensorNormalizationPreviewPanel";
+import PhenoEvidenceQuickLogPanel from "@/components/PhenoEvidenceQuickLogPanel";
+import { usePhenoEvidenceCaptureContext } from "@/hooks/usePhenoEvidenceCaptureContext";
+import { buildPhenoEvidenceReceiptDetails } from "@/lib/phenoEvidenceCaptureRules";
+import type { PhenoEvidenceGoalId } from "@/lib/phenoEvidenceGoals";
 import {
   buildHarvestInspectionPreviewViewModel,
   HARVEST_PHOTO_COMPARISON_ANGLES,
@@ -148,6 +152,16 @@ export interface QuickLogPrefill {
    * Never used as a write path discriminator.
    */
   preset?: string | null;
+  /**
+   * Optional Pheno evidence-goal handoff (grower clicked "Record <goal>
+   * evidence" in the hunt workspace/compare). Seeds the evidence-goal chip
+   * ONLY when the loaded Pheno context confirms the plant, hunt, and goal —
+   * and the existing reset/revalidation still applies: the selection clears
+   * on plant/hunt/dialog change and is re-checked against the hunt's live
+   * configured goals at save time. Never selects a goal on its own.
+   */
+  phenoHuntId?: string | null;
+  phenoEvidenceGoal?: string | null;
 }
 
 interface Props {
@@ -285,6 +299,8 @@ export default function QuickLog({
   const [envEcMscm, setEnvEcMscm] = useState<string>("");
   const [harvestPhotoAngle, setHarvestPhotoAngle] = useState<HarvestPhotoAngle | "">("");
   const [harvestPhotoLighting, setHarvestPhotoLighting] = useState<HarvestPhotoLighting | "">("");
+  const [selectedPhenoEvidenceGoal, setSelectedPhenoEvidenceGoal] =
+    useState<PhenoEvidenceGoalId | null>(null);
 
   const wateringInputRef = useRef<HTMLInputElement | null>(null);
   const plantSelectTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -328,6 +344,15 @@ export default function QuickLog({
   const selectedPlant = useMemo(
     () => scopedPlants.find((p) => p.id === plantId) ?? null,
     [plantId, scopedPlants],
+  );
+
+  const selectedPhenoHuntId = useMemo(() => {
+    const raw = (selectedPlant as { pheno_hunt_id?: unknown } | null)?.pheno_hunt_id;
+    return typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : null;
+  }, [selectedPlant]);
+  const phenoEvidenceContext = usePhenoEvidenceCaptureContext(
+    selectedPhenoHuntId,
+    selectedPlant?.id ?? null,
   );
 
   const selectedTent = useMemo(
@@ -420,6 +445,58 @@ export default function QuickLog({
     if (eventType === "watering") setShowMore(true);
   }, [open, eventType]);
 
+  // A receipt always requires a fresh, explicit goal selection for the
+  // current candidate. Never carry a choice between plants or dialog opens.
+  useEffect(() => {
+    setSelectedPhenoEvidenceGoal(null);
+  }, [open, plantId, selectedPhenoHuntId]);
+
+  // One-shot guard for the evidence-goal handoff seed. It is consumed the
+  // moment the goal is seeded and reset only when the dialog closes, so a
+  // React Query refetch that replaces phenoEvidenceContext.context (window
+  // focus, or the pheno_evidence_receipts-family invalidation after a
+  // successful save) can NEVER silently re-seed the original goal after the
+  // grower changed it or cleared it via "Log another". Fresh explicit
+  // selection stays the grower's, not the handoff's.
+  const phenoSeedConsumedRef = useRef(false);
+  useEffect(() => {
+    if (!open) phenoSeedConsumedRef.current = false;
+  }, [open]);
+
+  // Seed the goal from a "Record <goal> evidence" handoff — the grower
+  // clicked that exact goal in the workspace. Declared AFTER the reset
+  // effect so a legitimate seed survives the same-commit reset, and guarded
+  // so it only applies when the ready context confirms the same plant, the
+  // same hunt, and that the goal is still one of the hunt's configured
+  // goals. Any mismatch (candidate changed, hunt changed, goal unconfigured)
+  // leaves the selection empty — never auto-picks a different goal. Runs at
+  // most ONCE per dialog handoff via phenoSeedConsumedRef.
+  useEffect(() => {
+    if (!open) return;
+    if (phenoSeedConsumedRef.current) return;
+    const goal = prefill?.phenoEvidenceGoal;
+    if (typeof goal !== "string" || goal.length === 0) return;
+    if (!prefill?.plantId || selectedPlant?.id !== prefill.plantId) return;
+    if (!prefill?.phenoHuntId || selectedPhenoHuntId !== prefill.phenoHuntId) return;
+    if (phenoEvidenceContext.status !== "ready" || !phenoEvidenceContext.context) return;
+    if (phenoEvidenceContext.context.huntId !== prefill.phenoHuntId) return;
+    const configured = phenoEvidenceContext.context.coverage.goals.some((g) => g.id === goal);
+    if (!configured) return;
+    // Consume the handoff BEFORE seeding so any concurrent context refetch
+    // that re-runs this effect finds the guard already set.
+    phenoSeedConsumedRef.current = true;
+    setSelectedPhenoEvidenceGoal(goal as PhenoEvidenceGoalId);
+  }, [
+    open,
+    prefill?.phenoEvidenceGoal,
+    prefill?.phenoHuntId,
+    prefill?.plantId,
+    selectedPlant?.id,
+    selectedPhenoHuntId,
+    phenoEvidenceContext.status,
+    phenoEvidenceContext.context,
+  ]);
+
   useEffect(() => {
     if (eventType !== "watering" || details.watering.trim()) setWateringError(null);
   }, [eventType, details.watering]);
@@ -478,6 +555,7 @@ export default function QuickLog({
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
+    setSelectedPhenoEvidenceGoal(null);
   }
 
   /**
@@ -548,6 +626,7 @@ export default function QuickLog({
     setEnvEcMscm("");
     setHarvestPhotoAngle("");
     setHarvestPhotoLighting("");
+    setSelectedPhenoEvidenceGoal(null);
     if (keepPlantId) setPlantId(keepPlantId);
     setTimeout(() => noteRef.current?.focus(), 0);
   }
@@ -659,6 +738,25 @@ export default function QuickLog({
       const environmentCheckRecord: Record<string, unknown> | null = environmentCheckEnvelope
         ? { ...environmentCheckEnvelope }
         : null;
+      const configuredPhenoGoal =
+        eventType === "observation" &&
+        selectedPhenoEvidenceGoal &&
+        phenoEvidenceContext.status === "ready" &&
+        phenoEvidenceContext.context?.huntId === selectedPhenoHuntId &&
+        phenoEvidenceContext.context.plantId === selectedPlant.id &&
+        phenoEvidenceContext.context.coverage.goals.some(
+          (goal) => goal.id === selectedPhenoEvidenceGoal,
+        )
+          ? selectedPhenoEvidenceGoal
+          : null;
+      const phenoEvidenceReceipt = configuredPhenoGoal
+        ? buildPhenoEvidenceReceiptDetails({
+            huntId: selectedPhenoHuntId,
+            plantId: selectedPlant.id,
+            evidenceGoal: configuredPhenoGoal,
+            stage: normalizeQuickLogStage(stage),
+          })
+        : null;
       const built = buildLegacyQuickLogUnifiedPayload({
         eventType,
         idempotencyKey: newQuickLogSaveKey(),
@@ -669,6 +767,7 @@ export default function QuickLog({
         sensorAttachPayload,
         earlyStage: earlyStageRecord,
         environmentCheck: environmentCheckRecord,
+        phenoEvidenceReceipt,
         noteSuffix: earlyStageSuffix || null,
       });
       if (built.ok !== true) {
@@ -1390,6 +1489,27 @@ export default function QuickLog({
               spellCheck={true}
             />
           </section>
+
+          {selectedPhenoHuntId && eventType === "observation" && (
+            <PhenoEvidenceQuickLogPanel
+              status={
+                phenoEvidenceContext.status === "ready"
+                  ? "ready"
+                  : phenoEvidenceContext.status === "error"
+                    ? "error"
+                    : "loading"
+              }
+              context={phenoEvidenceContext.context}
+              candidateLabel={
+                typeof (selectedPlant as { candidate_label?: unknown } | null)?.candidate_label ===
+                "string"
+                  ? (selectedPlant as { candidate_label: string }).candidate_label || null
+                  : null
+              }
+              selectedGoal={selectedPhenoEvidenceGoal}
+              onSelectedGoalChange={setSelectedPhenoEvidenceGoal}
+            />
+          )}
 
           {(() => {
             const visibility = evaluateEarlyStageVisibility({

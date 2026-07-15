@@ -12,7 +12,9 @@ const MAPPER_SRC = readProjectFile("src/lib/paddleEventEntitlementMapperRules.ts
 describe("paddle webhook processing recorder", () => {
   it("keeps raw-body signature verification before JSON parsing and runtime event processing", () => {
     const rawIdx = WEBHOOK_SRC.indexOf("req.text()");
-    const verifyIdx = WEBHOOK_SRC.indexOf("constantTimeEqual(expected, parsed.h1)");
+    // Paid-launch gate: verification now runs through the tested wrapper
+    // (numeric ts + replay bounds + rotation-safe multi-h1, constant-time).
+    const verifyIdx = WEBHOOK_SRC.indexOf("await verifyPaddleWebhookSignature(");
     const parseIdx = WEBHOOK_SRC.indexOf("JSON.parse(rawBody)");
     const clientIdx = WEBHOOK_SRC.indexOf("createClient(SUPABASE_URL, SERVICE_ROLE");
     const eventInsertIdx = WEBHOOK_SRC.indexOf('.from("paddle_events").insert');

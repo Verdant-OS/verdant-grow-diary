@@ -6,10 +6,17 @@
  * the grower's OWN data. Suggest-only: saving a decision records a note to self
  * and acts on nothing — no AI, no Action Queue, no automation, no device
  * control. Verdant never picks a phenotype for you.
+ *
+ * Scale-up: candidates load one bounded server page at a time (Show more loads
+ * the next page — never an unbounded initial read), filters are server-side and
+ * reset pagination, each candidate carries its owner-assigned number + an
+ * evidence-readiness summary, and the grower can gather a 2–6 candidate cohort
+ * to compare side by side. Client gating is presentation-only; the database is
+ * authoritative for numbering and Pro access.
  */
-import { memo, useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
-import { usePhenoHuntWorkspace } from "@/hooks/usePhenoHuntWorkspace";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { usePhenoHuntWorkspace, CANDIDATE_PAGE_SIZE } from "@/hooks/usePhenoHuntWorkspace";
 import { buildPhenoHuntCsv, phenoHuntCsvFilename } from "@/lib/phenoHuntCsvExport";
 import { LOUD_TRAIT_AXES } from "@/lib/phenoExpressionRules";
 import {
@@ -50,7 +57,28 @@ import PhenoHuntSetupProgressCard from "@/components/PhenoHuntSetupProgressCard"
 import PhenoCompareCandidatesAction from "@/components/PhenoCompareCandidatesAction";
 import { buildPhenoComparisonActionState } from "@/lib/phenoComparisonActionState";
 import { updatePhenoHuntSetup } from "@/lib/phenoHuntService";
-
+import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
+import PhenoCandidateEvidenceCoverage from "@/components/PhenoCandidateEvidenceCoverage";
+import { usePhenoEvidencePackets } from "@/hooks/usePhenoEvidencePackets";
+import type { PhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
+import {
+  evaluatePhenoCandidateReadiness,
+  readinessEvidenceFromCandidateInput,
+  PHENO_READINESS_LABELS,
+  type PhenoCandidateReadiness,
+  type PhenoReadinessLevel,
+  type PhenoReadinessExtras,
+} from "@/lib/phenoCandidateReadiness";
+import {
+  toggleCohortMember,
+  buildPhenoCompareHref,
+  isValidCohortSize,
+  PHENO_COHORT_MIN,
+  PHENO_COHORT_MAX,
+} from "@/lib/phenoComparisonCohort";
+import type { AssignCandidateNumberResult } from "@/lib/phenoCandidateNumberService";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { canWriteFeatureData } from "@/lib/featureEntitlements";
 
 function toIntOrNull(raw: string): number | null {
   const t = raw.trim();
@@ -65,6 +93,203 @@ function tags(raw: string): string[] {
     .map((s) => s.trim())
     .filter(Boolean);
 }
+
+function smokeHasContent(smoke: SmokeTestRow | undefined): boolean {
+  if (!smoke) return false;
+  return !!(
+    smoke.verdict?.trim() ||
+    smoke.flavorDescriptors.length > 0 ||
+    smoke.effectDescriptors.length > 0
+  );
+}
+
+/** Derive readiness extras (evidence not carried on the candidate) from maps. */
+function readinessExtras(
+  plantId: string,
+  score: CandidateScoreRow | undefined,
+  decision: KeeperDecisionRow | undefined,
+  sex: SexObservationRow | undefined,
+  smoke: SmokeTestRow | undefined,
+  lab: LabResultRow | undefined,
+): PhenoReadinessExtras {
+  return {
+    hasTraitScore: !!score && Object.keys(score.traits ?? {}).length > 0,
+    sexObserved: !!sex,
+    keeperDecision: decision?.decision ?? null,
+    keeperRationale: decision?.note ?? null,
+    hasPostCureSmokeTest: smokeHasContent(smoke),
+    hasLabResult: !!lab,
+    labSource: lab?.source ?? null,
+  };
+}
+
+function candidateReadiness(
+  candidate: PhenoCandidateInput,
+  score: CandidateScoreRow | undefined,
+  decision: KeeperDecisionRow | undefined,
+  sex: SexObservationRow | undefined,
+  smoke: SmokeTestRow | undefined,
+  lab: LabResultRow | undefined,
+): PhenoCandidateReadiness {
+  return evaluatePhenoCandidateReadiness(
+    readinessEvidenceFromCandidateInput(
+      candidate,
+      readinessExtras(candidate.candidateId, score, decision, sex, smoke, lab),
+    ),
+  );
+}
+
+const READINESS_SYMBOL: Record<PhenoReadinessLevel, string> = {
+  comparison_ready: "✓",
+  partial: "◐",
+  insufficient: "○",
+};
+
+/** Readiness badge — evidence completeness, never a keeper recommendation. Uses
+ * text + symbol (not colour alone) and deep-links a missing target to a real
+ * in-workspace record anchor. */
+function CandidateReadinessBadge({ readiness }: { readiness: PhenoCandidateReadiness }) {
+  const next = readiness.nextEvidenceTarget;
+  return (
+    <div
+      data-testid={`workspace-readiness-${readiness.candidateId}`}
+      data-readiness={readiness.readiness}
+      className="text-right text-xs"
+    >
+      <span className="font-medium">
+        <span aria-hidden="true">{READINESS_SYMBOL[readiness.readiness]} </span>
+        {PHENO_READINESS_LABELS[readiness.readiness]}
+      </span>
+      <span className="block text-muted-foreground">
+        {readiness.completedGoalCount}/{readiness.selectedGoalCount} evidence goals
+      </span>
+      {next ? (
+        next.anchor ? (
+          <a
+            href={`#${next.anchor}`}
+            data-testid={`workspace-readiness-next-${readiness.candidateId}`}
+            className="text-primary underline underline-offset-2"
+          >
+            Next: record {next.label}
+          </a>
+        ) : (
+          <span
+            data-testid={`workspace-readiness-next-${readiness.candidateId}`}
+            className="block text-muted-foreground"
+          >
+            Next: record {next.label}
+          </span>
+        )
+      ) : null}
+    </div>
+  );
+}
+
+/** Owner + Pro only. Never suggests "the next" number — the grower types it,
+ * and it becomes fixed for the hunt. Calm errors; DB is authoritative. */
+const CandidateNumberAssign = memo(function CandidateNumberAssign({
+  plantId,
+  candidateNumber,
+  canAssign,
+  onAssign,
+}: {
+  plantId: string;
+  candidateNumber: number | null;
+  canAssign: boolean;
+  onAssign: (plantId: string, candidateNumber: number) => Promise<AssignCandidateNumberResult>;
+}) {
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [assigned, setAssigned] = useState<number | null>(null);
+
+  const current = assigned ?? candidateNumber;
+  if (current != null) {
+    return (
+      <span
+        data-testid={`workspace-candidate-number-${plantId}`}
+        className="inline-block rounded border border-border bg-muted px-2 py-0.5 text-xs font-medium"
+      >
+        #{current} · fixed for this hunt
+      </span>
+    );
+  }
+  if (!canAssign) {
+    return (
+      <span
+        data-testid={`workspace-candidate-unnumbered-${plantId}`}
+        className="text-xs text-muted-foreground"
+      >
+        Unnumbered
+      </span>
+    );
+  }
+
+  const submit = async () => {
+    const n = Number(value.trim());
+    if (!Number.isInteger(n) || n <= 0) {
+      setErr("Enter a positive whole number.");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    const res = await onAssign(plantId, n);
+    setBusy(false);
+    if (res.ok === false) {
+      setErr(res.error);
+      return;
+    }
+    setAssigned(res.candidateNumber);
+    setValue("");
+  };
+
+  return (
+    <div
+      data-testid={`workspace-assign-number-${plantId}`}
+      className="flex flex-wrap items-center gap-2 text-xs"
+    >
+      <label className="flex items-center gap-1">
+        <span className="font-medium">Candidate #</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          step={1}
+          value={value}
+          onChange={(e) => {
+            setErr(null);
+            setValue(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void submit();
+          }}
+          aria-label={`Assign a candidate number for ${plantId}`}
+          data-testid={`workspace-assign-number-input-${plantId}`}
+          className="w-16 rounded border border-border bg-background px-2 py-1"
+        />
+      </label>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => void submit()}
+        data-testid={`workspace-assign-number-save-${plantId}`}
+        className="rounded border border-border bg-secondary px-2 py-1 font-medium disabled:opacity-50"
+      >
+        {busy ? "Saving…" : "Assign number"}
+      </button>
+      <span className="text-muted-foreground">Becomes permanently fixed for this hunt.</span>
+      {err ? (
+        <span
+          role="alert"
+          data-testid={`workspace-assign-number-error-${plantId}`}
+          className="font-medium text-red-600 dark:text-red-400"
+        >
+          {err}
+        </span>
+      ) : null}
+    </div>
+  );
+});
 
 /** Post-cure smoke test — the deciding gate. Own state + save. */
 function SmokeTestFields({
@@ -303,9 +528,6 @@ type WorkspaceRound = "overall" | PhenoScoreRound;
 // across parent re-renders (a fresh [] per render would defeat React.memo).
 const EMPTY_HISTORY: readonly KeeperDecisionLogEntry[] = [];
 
-/** Cards rendered per "Show more" click — keeps first paint bounded at 300+. */
-const CANDIDATE_PAGE_SIZE = 30;
-
 interface EditorProps {
   candidate: PhenoCandidateInput;
   round: WorkspaceRound;
@@ -313,6 +535,17 @@ interface EditorProps {
   roundRow: ScoreRoundRow | undefined;
   decision: KeeperDecisionRow | undefined;
   saving: boolean;
+  /** Manual evidence packet (configured-goal coverage) — separate axis from
+   * readiness. Null while its batch is loading. */
+  evidencePacket: PhenoCandidateEvidencePacket | null;
+  evidenceStatus: "loading" | "ready" | "error" | "disabled";
+  selected: boolean;
+  onToggleSelect: (plantId: string) => void;
+  canAssign: boolean;
+  onAssignNumber: (
+    plantId: string,
+    candidateNumber: number,
+  ) => Promise<AssignCandidateNumberResult>;
   onSaveScore: (
     plantId: string,
     traits: Record<string, number>,
@@ -386,6 +619,12 @@ const CandidateEditor = memo(function CandidateEditor({
   roundRow,
   decision,
   saving,
+  evidencePacket,
+  evidenceStatus,
+  selected,
+  onToggleSelect,
+  canAssign,
+  onAssignNumber,
   onSaveScore,
   onSaveRound,
   onSaveDecision,
@@ -405,6 +644,7 @@ const CandidateEditor = memo(function CandidateEditor({
   onSaveLabResult,
 }: EditorProps) {
   const plantId = candidate.candidateId;
+  const displayLabel = phenoCandidateDisplayLabel(candidate);
   const isRoundMode = round !== "overall";
   const [reason, setReason] = useState<string>("");
   const [sex, setSex] = useState<PhenoSexObservation>(sexRow?.sex ?? DEFAULT_SEX_OBSERVATION);
@@ -419,6 +659,13 @@ const CandidateEditor = memo(function CandidateEditor({
   );
   const [saved, setSaved] = useState(false);
   const [historyRequested, setHistoryRequested] = useState(false);
+
+  // Readiness is derived from THIS card's evidence props, so it only recomputes
+  // when this candidate's data changes — one save never re-renders every card.
+  const readiness = useMemo(
+    () => candidateReadiness(candidate, score, decision, sexRow, smokeRow, labRow),
+    [candidate, score, decision, sexRow, smokeRow, labRow],
+  );
 
   const setTrait = (key: string, raw: string) => {
     setSaved(false);
@@ -464,13 +711,44 @@ const CandidateEditor = memo(function CandidateEditor({
   return (
     <section
       data-testid={`pheno-workspace-candidate-${plantId}`}
+      data-selected={selected ? "true" : "false"}
       className="space-y-3 rounded-lg border border-border bg-card p-4"
     >
-      <header>
-        <h2 className="text-lg font-semibold">{candidate.candidateLabel ?? plantId}</h2>
-        <p className="text-xs text-muted-foreground">
-          {candidate.strain ?? "Strain unknown"} · {candidate.stage ?? "Stage unknown"}
-        </p>
+      <header className="space-y-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => onToggleSelect(plantId)}
+              data-testid={`workspace-select-${plantId}`}
+              aria-label={`Select ${displayLabel} for comparison`}
+              className="mt-1"
+            />
+            <div>
+              <h2 className="text-lg font-semibold">{displayLabel}</h2>
+              <p className="text-xs text-muted-foreground">
+                {candidate.strain ?? "Strain unknown"} · {candidate.stage ?? "Stage unknown"}
+              </p>
+            </div>
+          </div>
+          <CandidateReadinessBadge readiness={readiness} />
+        </div>
+        <CandidateNumberAssign
+          plantId={plantId}
+          candidateNumber={candidate.candidateNumber ?? null}
+          canAssign={canAssign}
+          onAssign={onAssignNumber}
+        />
+        <PhenoCandidateEvidenceCoverage
+          packet={evidencePacket}
+          status={evidenceStatus}
+          plantName={candidate.plantLabel ?? null}
+          growId={growId}
+          tentId={tentId}
+          allowRecordActions
+          data-testid={`workspace-evidence-coverage-${plantId}`}
+        />
       </header>
 
       <div className="space-y-2">
@@ -726,16 +1004,32 @@ export default function PhenoHuntWorkspace() {
   const ws = usePhenoHuntWorkspace(id);
   const herm = usePhenoHermCullSuggestion();
   const stress = usePhenoStressObservations(ws.hunt?.id ?? null);
-  const [round, setRound] = useState<WorkspaceRound>("overall");
-  const [filterText, setFilterText] = useState("");
-  const [filterDecision, setFilterDecision] = useState<"all" | "undecided" | PhenoKeeperDecision>(
-    "all",
+  // Manual evidence packets for the LOADED candidates only — one bounded
+  // batch read per (hunt, id-set); Quick Log saves invalidate its key family.
+  const loadedCandidateIds = useMemo(
+    () => ws.candidates.map((c) => c.candidateId),
+    [ws.candidates],
   );
-  const [visibleCount, setVisibleCount] = useState(CANDIDATE_PAGE_SIZE);
+  const evidencePackets = usePhenoEvidencePackets({
+    huntId: ws.hunt?.id ?? null,
+    plantIds: loadedCandidateIds,
+    configuredGoals: ws.hunt?.evidenceGoals ?? [],
+  });
+  const { entitlement } = useMyEntitlements();
+  // Owner-only + Pro. Pheno surfaces are owner-only via RLS, so the viewer owns
+  // the hunt; the presentation gate is an active Pheno Tracker Pro plan. The
+  // database trigger is authoritative regardless.
+  const canAssign = canWriteFeatureData(entitlement, "pheno_tracker");
+  const [round, setRound] = useState<WorkspaceRound>("overall");
+  const [textInput, setTextInput] = useState("");
+  const [readinessFilter, setReadinessFilter] = useState<"all" | PhenoReadinessLevel>("all");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [setupSaving, setSetupSaving] = useState(false);
   // Optimistic override so the card flips to "setup complete" instantly
   // after the grower confirms — the persisted hunt row is still authoritative.
   const [setupCompletedLocal, setSetupCompletedLocal] = useState<string | null>(null);
+
+  const { setFilter } = ws;
 
   const handleMarkSetupComplete = async () => {
     if (!ws.hunt?.id || setupSaving) return;
@@ -751,6 +1045,13 @@ export default function PhenoHuntWorkspace() {
     }
   };
 
+  // Debounce the free-text search into the server-side filter (resets paging).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilter({ text: textInput.trim() || undefined });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [textInput, setFilter]);
 
   // Round cards are fetched per selected round, not all five upfront.
   useEffect(() => {
@@ -758,33 +1059,35 @@ export default function PhenoHuntWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadRound is idempotent per round
   }, [round, ws.loadRound]);
 
-  const candidates = useMemo(() => ws.candidates, [ws.candidates]);
+  const candidates = ws.candidates;
 
-  // Comparison-ready is derived from RECORDED evidence, never from setup
-  // state. Setup complete ≠ Comparison-ready.
+  // Comparison-ready is derived from RECORDED evidence, never from setup state.
+  // Prefer the bounded hunt-wide summary; fall back to the loaded candidates +
+  // maps when no summary is present (e.g. mocked hook in tests).
   const comparisonState = useMemo(() => {
     const goalsSelected = (ws.hunt?.evidenceGoals ?? []).length;
+    if (ws.comparisonSummary) {
+      return buildPhenoComparisonActionState({
+        huntId: ws.hunt?.id ?? null,
+        candidateCount: ws.comparisonSummary.candidateCount,
+        goalsSelected,
+        allCandidatesHavePhenotypeNote: ws.comparisonSummary.allCandidatesHaveNote,
+        anyPostHarvestObservation: ws.comparisonSummary.anyPostHarvest,
+        anyPostCureObservation: ws.comparisonSummary.anyPostCure,
+      });
+    }
     const allHaveNote =
       candidates.length > 0 &&
       candidates.every((c) => {
         const note = ws.scoresByPlant[c.candidateId]?.note?.trim();
-        const decisionNote =
-          ws.decisionsByPlant[c.candidateId]?.note?.trim();
+        const decisionNote = ws.decisionsByPlant[c.candidateId]?.note?.trim();
         return !!(note || decisionNote);
       });
     const anyPostHarvest = candidates.some((c) => {
       const d = ws.decisionsByPlant[c.candidateId]?.decision;
       return !!d && d !== "undecided";
     });
-    const anyPostCure = candidates.some((c) => {
-      const s = ws.smokeByPlant[c.candidateId];
-      if (!s) return false;
-      return (
-        !!s.verdict?.trim() ||
-        (s.flavorDescriptors?.length ?? 0) > 0 ||
-        (s.effectDescriptors?.length ?? 0) > 0
-      );
-    });
+    const anyPostCure = candidates.some((c) => smokeHasContent(ws.smokeByPlant[c.candidateId]));
     return buildPhenoComparisonActionState({
       huntId: ws.hunt?.id ?? null,
       candidateCount: candidates.length,
@@ -795,6 +1098,7 @@ export default function PhenoHuntWorkspace() {
     });
   }, [
     candidates,
+    ws.comparisonSummary,
     ws.hunt?.id,
     ws.hunt?.evidenceGoals,
     ws.scoresByPlant,
@@ -802,42 +1106,95 @@ export default function PhenoHuntWorkspace() {
     ws.smokeByPlant,
   ]);
 
-  // Text + decision filters so a specific plant is findable among hundreds.
-  // Filtering narrows the view only — it never orders by score or suggests
-  // which candidate to keep.
-  const filteredCandidates = useMemo(() => {
-    const text = filterText.trim().toLowerCase();
-    return candidates.filter((c) => {
-      if (text) {
-        const hay = `${c.candidateLabel ?? ""} ${c.candidateId} ${c.strain ?? ""}`.toLowerCase();
-        if (!hay.includes(text)) return false;
-      }
-      if (filterDecision !== "all") {
-        const d = ws.decisionsByPlant[c.candidateId]?.decision;
-        if (filterDecision === "undecided") {
-          if (d && d !== "undecided") return false;
-        } else if (d !== filterDecision) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [candidates, filterText, filterDecision, ws.decisionsByPlant]);
+  // Readiness level per loaded candidate — drives ONLY the client-side readiness
+  // refinement (a computed filter that can't be a server WHERE), never card
+  // props, so it does not re-render cards.
+  const readinessLevelByPlant = useMemo(() => {
+    const map = new Map<string, PhenoReadinessLevel>();
+    for (const c of candidates) {
+      map.set(
+        c.candidateId,
+        candidateReadiness(
+          c,
+          ws.scoresByPlant[c.candidateId],
+          ws.decisionsByPlant[c.candidateId],
+          ws.sexByPlant[c.candidateId],
+          ws.smokeByPlant[c.candidateId],
+          ws.labByKey[`${c.candidateId}:coa`],
+        ).readiness,
+      );
+    }
+    return map;
+  }, [
+    candidates,
+    ws.scoresByPlant,
+    ws.decisionsByPlant,
+    ws.sexByPlant,
+    ws.smokeByPlant,
+    ws.labByKey,
+  ]);
 
-  const visibleCandidates = useMemo(
-    () => filteredCandidates.slice(0, visibleCount),
-    [filteredCandidates, visibleCount],
-  );
+  const visibleCandidates = useMemo(() => {
+    if (readinessFilter === "all") return candidates;
+    return candidates.filter((c) => readinessLevelByPlant.get(c.candidateId) === readinessFilter);
+  }, [candidates, readinessFilter, readinessLevelByPlant]);
+
+  const onToggleSelect = useCallback((plantId: string) => {
+    setSelectedIds((prev) => toggleCohortMember(prev, plantId).ids);
+  }, []);
+
+  const cohortHref =
+    ws.hunt?.id && isValidCohortSize(selectedIds.length)
+      ? buildPhenoCompareHref(ws.hunt.id, selectedIds)
+      : null;
 
   const onExportCsv = () => {
+    const readinessByPlant: Record<
+      string,
+      {
+        readiness: PhenoReadinessLevel;
+        completedGoals: readonly string[];
+        missingGoals: readonly string[];
+      }
+    > = {};
+    for (const c of candidates) {
+      const r = candidateReadiness(
+        c,
+        ws.scoresByPlant[c.candidateId],
+        ws.decisionsByPlant[c.candidateId],
+        ws.sexByPlant[c.candidateId],
+        ws.smokeByPlant[c.candidateId],
+        ws.labByKey[`${c.candidateId}:coa`],
+      );
+      readinessByPlant[c.candidateId] = {
+        readiness: r.readiness,
+        completedGoals: r.completedGoals,
+        missingGoals: r.missingGoals,
+      };
+    }
     const csv = buildPhenoHuntCsv({
       huntName: ws.hunt?.name ?? "hunt",
+      huntId: ws.hunt?.id ?? null,
       candidates,
       scoresByPlant: ws.scoresByPlant,
       decisionsByPlant: ws.decisionsByPlant,
       sexByPlant: ws.sexByPlant,
       smokeByPlant: ws.smokeByPlant,
       labByKey: ws.labByKey,
+      readinessByPlant,
+      provenance: "live",
+      exportedAt: new Date().toISOString(),
+      evidencePacketsByPlant: evidencePackets.packets,
+      loadedCandidateCount: candidates.length,
+      // Scope honesty (Codex review): ws.totalCandidateCount is the total for
+      // the ACTIVE filters. With a filter narrowing the workspace, matching
+      // loaded==total would falsely claim a complete hunt — so any active
+      // filter forces export_scope=loaded_candidates by withholding the total.
+      totalCandidateCount: Object.values(ws.filters).some(
+        (v) => typeof v === "string" && v.trim().length > 0,
+      )
+        ? null
+        : ws.totalCandidateCount,
     });
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -883,6 +1240,9 @@ export default function PhenoHuntWorkspace() {
     );
   }
 
+  const loadedCount = candidates.length;
+  const totalLabel = ws.totalCandidateCount != null ? String(ws.totalCandidateCount) : "…";
+
   return (
     <PhenoSamplingProvider>
       <main
@@ -920,7 +1280,7 @@ export default function PhenoHuntWorkspace() {
                 ...ws.hunt,
                 setupCompletedAt: setupCompletedLocal ?? ws.hunt.setupCompletedAt ?? null,
               }}
-              candidateCount={candidates.length}
+              candidateCount={ws.totalCandidateCount ?? candidates.length}
               comparisonReadiness={comparisonState.readiness}
               onMarkComplete={handleMarkSetupComplete}
               saving={setupSaving}
@@ -955,10 +1315,7 @@ export default function PhenoHuntWorkspace() {
           aria-hidden="true"
         />
 
-
-
-
-        {candidates.length === 0 ? (
+        {candidates.length === 0 && !hasActiveFilters(ws.filters, readinessFilter) ? (
           <p data-testid="pheno-workspace-empty" className="text-sm text-muted-foreground">
             No candidates tagged to this hunt yet.
           </p>
@@ -968,23 +1325,38 @@ export default function PhenoHuntWorkspace() {
               <input
                 type="search"
                 data-testid="workspace-filter-text"
-                value={filterText}
-                onChange={(e) => {
-                  setFilterText(e.target.value);
-                  setVisibleCount(CANDIDATE_PAGE_SIZE);
-                }}
-                placeholder="Find a candidate (label, strain)…"
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                placeholder="Find a candidate (#, label, strain)…"
+                aria-label="Search candidates by number, label, or strain"
                 className="w-56 rounded border border-border bg-background px-2 py-1"
+              />
+              <input
+                type="search"
+                data-testid="workspace-filter-strain"
+                value={ws.filters.strain ?? ""}
+                onChange={(e) => setFilter({ strain: e.target.value.trim() || undefined })}
+                placeholder="Strain…"
+                aria-label="Filter by strain"
+                className="w-32 rounded border border-border bg-background px-2 py-1"
+              />
+              <input
+                type="search"
+                data-testid="workspace-filter-stage"
+                value={ws.filters.stage ?? ""}
+                onChange={(e) => setFilter({ stage: e.target.value.trim() || undefined })}
+                placeholder="Stage…"
+                aria-label="Filter by stage"
+                className="w-28 rounded border border-border bg-background px-2 py-1"
               />
               <label className="flex items-center gap-1 text-xs">
                 Decision
                 <select
                   data-testid="workspace-filter-decision"
-                  value={filterDecision}
-                  onChange={(e) => {
-                    setFilterDecision(e.target.value as typeof filterDecision);
-                    setVisibleCount(CANDIDATE_PAGE_SIZE);
-                  }}
+                  value={ws.filters.decision ?? "all"}
+                  onChange={(e) =>
+                    setFilter({ decision: e.target.value === "all" ? undefined : e.target.value })
+                  }
                   className="rounded border border-border bg-background px-2 py-1"
                 >
                   <option value="all">All</option>
@@ -996,66 +1368,170 @@ export default function PhenoHuntWorkspace() {
                   ))}
                 </select>
               </label>
+              <label className="flex items-center gap-1 text-xs">
+                Sex
+                <select
+                  data-testid="workspace-filter-sex"
+                  value={ws.filters.sex ?? "all"}
+                  onChange={(e) =>
+                    setFilter({ sex: e.target.value === "all" ? undefined : e.target.value })
+                  }
+                  className="rounded border border-border bg-background px-2 py-1"
+                >
+                  <option value="all">All</option>
+                  {PHENO_SEX_OBSERVATIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {PHENO_SEX_OBSERVATION_LABELS[s]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-1 text-xs">
+                Readiness
+                <select
+                  data-testid="workspace-filter-readiness"
+                  value={readinessFilter}
+                  onChange={(e) => setReadinessFilter(e.target.value as typeof readinessFilter)}
+                  className="rounded border border-border bg-background px-2 py-1"
+                >
+                  <option value="all">All</option>
+                  <option value="insufficient">{PHENO_READINESS_LABELS.insufficient}</option>
+                  <option value="partial">{PHENO_READINESS_LABELS.partial}</option>
+                  <option value="comparison_ready">
+                    {PHENO_READINESS_LABELS.comparison_ready}
+                  </option>
+                </select>
+              </label>
               <span data-testid="workspace-visible-count" className="text-xs text-muted-foreground">
-                Showing {visibleCandidates.length} of {filteredCandidates.length} candidates
-                {filteredCandidates.length !== candidates.length
-                  ? ` (filtered from ${candidates.length})`
-                  : ""}
+                Showing {visibleCandidates.length} of {loadedCount} loaded · {totalLabel} total
+                {readinessFilter !== "all" ? " (readiness refines the loaded page)" : ""}
               </span>
               <button
                 type="button"
                 data-testid="workspace-export-csv"
                 onClick={onExportCsv}
-                className="ml-auto rounded border border-border bg-secondary px-2 py-1 text-xs font-medium"
+                // Gate export until the evidence-packet batch settles (Codex
+                // review): while status is "loading" the packet map is empty,
+                // so an export would mislabel every candidate as
+                // manual_evidence=unavailable even though the read is only
+                // pending. "error"/"disabled"/"ready" all export honestly.
+                disabled={evidencePackets.status === "loading"}
+                aria-describedby={
+                  evidencePackets.status === "loading" ? "workspace-export-csv-pending" : undefined
+                }
+                className="ml-auto rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
               >
-                Export hunt CSV
+                {evidencePackets.status === "loading"
+                  ? "Preparing evidence…"
+                  : "Export loaded CSV"}
               </button>
+              {evidencePackets.status === "loading" ? (
+                <span
+                  id="workspace-export-csv-pending"
+                  data-testid="workspace-export-csv-pending"
+                  className="text-xs text-muted-foreground"
+                >
+                  Evidence coverage is still loading — export enables once it settles.
+                </span>
+              ) : null}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              {visibleCandidates.map((c) => (
-                <CandidateEditor
-                  // Re-mount on round change so prefill state re-initializes.
-                  key={`${c.candidateId}:${round}`}
-                  candidate={c}
-                  round={round}
-                  score={ws.scoresByPlant[c.candidateId]}
-                  roundRow={
-                    round === "overall" ? undefined : ws.roundsByKey[`${c.candidateId}:${round}`]
-                  }
-                  decision={ws.decisionsByPlant[c.candidateId]}
-                  saving={ws.saving === c.candidateId}
-                  onSaveScore={ws.saveScore}
-                  onSaveRound={ws.saveRound}
-                  onSaveDecision={ws.saveDecision}
-                  history={ws.decisionHistoryByPlant[c.candidateId] ?? EMPTY_HISTORY}
-                  onLoadHistory={ws.loadDecisionHistory}
-                  sexRow={ws.sexByPlant[c.candidateId]}
-                  reversed={ws.reversedPlantIds.has(c.candidateId)}
-                  onSaveSex={ws.saveSex}
-                  growId={ws.hunt?.growId ?? null}
-                  tentId={ws.hunt?.tentId ?? null}
-                  onQueueRemoval={herm.queueRemoval}
-                  queuing={herm.queuing === c.candidateId}
-                  queued={herm.queuedPlantIds.has(c.candidateId)}
-                  smokeRow={ws.smokeByPlant[c.candidateId]}
-                  onSaveSmokeTest={ws.saveSmokeTest}
-                  labRow={ws.labByKey[`${c.candidateId}:coa`]}
-                  onSaveLabResult={ws.saveLabResult}
-                />
-              ))}
+            <div
+              data-testid="workspace-cohort-bar"
+              className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 p-2 text-xs"
+            >
+              <span data-testid="workspace-cohort-count" className="font-medium">
+                {selectedIds.length} selected to compare
+              </span>
+              <span className="text-muted-foreground">
+                Pick {PHENO_COHORT_MIN}–{PHENO_COHORT_MAX} candidates.
+              </span>
+              {selectedIds.length > 0 ? (
+                <button
+                  type="button"
+                  data-testid="workspace-cohort-clear"
+                  onClick={() => setSelectedIds([])}
+                  className="rounded border border-border px-2 py-0.5 font-medium"
+                >
+                  Clear
+                </button>
+              ) : null}
+              {cohortHref ? (
+                <Link
+                  to={cohortHref}
+                  data-testid="workspace-cohort-compare-link"
+                  className="ml-auto rounded border border-border bg-primary px-2 py-0.5 font-medium text-primary-foreground"
+                >
+                  Compare selected ({selectedIds.length})
+                </Link>
+              ) : (
+                <span data-testid="workspace-cohort-hint" className="ml-auto text-muted-foreground">
+                  {selectedIds.length > PHENO_COHORT_MAX
+                    ? `Select at most ${PHENO_COHORT_MAX}`
+                    : `Select at least ${PHENO_COHORT_MIN} to compare`}
+                </span>
+              )}
             </div>
 
-            {filteredCandidates.length > visibleCount && (
+            {visibleCandidates.length === 0 ? (
+              <p
+                data-testid="pheno-workspace-filtered-empty"
+                className="text-sm text-muted-foreground"
+              >
+                No loaded candidates match these filters.
+              </p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {visibleCandidates.map((c) => (
+                  <CandidateEditor
+                    // Re-mount on round change so prefill state re-initializes.
+                    key={`${c.candidateId}:${round}`}
+                    candidate={c}
+                    round={round}
+                    score={ws.scoresByPlant[c.candidateId]}
+                    roundRow={
+                      round === "overall" ? undefined : ws.roundsByKey[`${c.candidateId}:${round}`]
+                    }
+                    decision={ws.decisionsByPlant[c.candidateId]}
+                    saving={ws.saving === c.candidateId}
+                    evidencePacket={evidencePackets.packets.get(c.candidateId) ?? null}
+                    evidenceStatus={evidencePackets.status}
+                    selected={selectedIds.includes(c.candidateId)}
+                    onToggleSelect={onToggleSelect}
+                    canAssign={canAssign}
+                    onAssignNumber={ws.assignCandidateNumber}
+                    onSaveScore={ws.saveScore}
+                    onSaveRound={ws.saveRound}
+                    onSaveDecision={ws.saveDecision}
+                    history={ws.decisionHistoryByPlant[c.candidateId] ?? EMPTY_HISTORY}
+                    onLoadHistory={ws.loadDecisionHistory}
+                    sexRow={ws.sexByPlant[c.candidateId]}
+                    reversed={ws.reversedPlantIds.has(c.candidateId)}
+                    onSaveSex={ws.saveSex}
+                    growId={ws.hunt?.growId ?? null}
+                    tentId={ws.hunt?.tentId ?? null}
+                    onQueueRemoval={herm.queueRemoval}
+                    queuing={herm.queuing === c.candidateId}
+                    queued={herm.queuedPlantIds.has(c.candidateId)}
+                    smokeRow={ws.smokeByPlant[c.candidateId]}
+                    onSaveSmokeTest={ws.saveSmokeTest}
+                    labRow={ws.labByKey[`${c.candidateId}:coa`]}
+                    onSaveLabResult={ws.saveLabResult}
+                  />
+                ))}
+              </div>
+            )}
+
+            {ws.hasMore && (
               <div className="flex justify-center">
                 <button
                   type="button"
                   data-testid="workspace-show-more"
-                  onClick={() => setVisibleCount((n) => n + CANDIDATE_PAGE_SIZE)}
-                  className="rounded border border-border bg-secondary px-3 py-1.5 text-sm font-medium"
+                  disabled={ws.loadingMore}
+                  onClick={ws.loadNextPage}
+                  className="rounded border border-border bg-secondary px-3 py-1.5 text-sm font-medium disabled:opacity-50"
                 >
-                  Show {Math.min(CANDIDATE_PAGE_SIZE, filteredCandidates.length - visibleCount)}{" "}
-                  more
+                  {ws.loadingMore ? "Loading…" : `Load up to ${CANDIDATE_PAGE_SIZE} more`}
                 </button>
               </div>
             )}
@@ -1090,5 +1566,19 @@ export default function PhenoHuntWorkspace() {
         />
       </main>
     </PhenoSamplingProvider>
+  );
+}
+
+function hasActiveFilters(
+  filters: { text?: string; strain?: string; stage?: string; decision?: string; sex?: string },
+  readinessFilter: string,
+): boolean {
+  return (
+    !!filters.text ||
+    !!filters.strain ||
+    !!filters.stage ||
+    !!filters.decision ||
+    !!filters.sex ||
+    readinessFilter !== "all"
   );
 }

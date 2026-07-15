@@ -172,18 +172,20 @@ export function AgreementReconsentGate() {
         onEscapeKeyDown={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
-        aria-labelledby="reconsent-title"
-        aria-describedby="reconsent-description"
         data-testid="agreement-reconsent-gate"
       >
         <DialogHeader>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-primary" aria-hidden />
+<<<<<<< HEAD
             <DialogTitle id="reconsent-title">
               {anyPrior ? "Updated agreements" : "Accept our agreements"}
             </DialogTitle>
+=======
+            <DialogTitle>{anyPrior ? "Updated agreements" : "Accept our agreements"}</DialogTitle>
+>>>>>>> origin/verdant-grow-diary
           </div>
-          <DialogDescription id="reconsent-description">
+          <DialogDescription>
             {anyPrior
               ? "We've updated the agreements that govern your use of Verdant. Review what changed below, then accept the current versions to continue."
               : "Please review and accept the following to continue using Verdant."}
@@ -277,14 +279,16 @@ export function AgreementReconsentGate() {
           </span>
         </label>
 
-        <p
-          id="reconsent-error"
-          role="alert"
-          aria-live="assertive"
-          className={`text-sm text-destructive min-h-5 ${error ? "" : "sr-only"}`}
-        >
-          {error ?? ""}
-        </p>
+        {error ? (
+          <p
+            id="reconsent-error"
+            role="alert"
+            aria-live="assertive"
+            className="text-sm text-destructive"
+          >
+            {error}
+          </p>
+        ) : null}
 
         <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="ghost" onClick={() => void signOut()} disabled={submitting}>

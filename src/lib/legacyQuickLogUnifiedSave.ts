@@ -24,6 +24,7 @@
 
 import type { QuickLogV2SavePayload } from "./quickLogV2SavePayload";
 import type { buildSensorSnapshotSavePayload } from "./latestSensorSnapshotRules";
+import type { PhenoEvidenceReceiptDetails } from "./phenoEvidenceCaptureRules";
 
 /**
  * Redacted sensor envelope produced by `buildSensorSnapshotSavePayload`.
@@ -96,6 +97,12 @@ export interface LegacyQuickLogFormInput {
    */
   environmentCheck?: Record<string, unknown> | null;
   /**
+   * Optional, already-validated manual Pheno evidence receipt. Its discriminator
+   * stays at the top of `p_details` so a bounded read-only timeline query can
+   * find it without scanning unrelated diary entries.
+   */
+  phenoEvidenceReceipt?: PhenoEvidenceReceiptDetails | null;
+  /**
    * Optional human-readable suffix (e.g. milestone + vigor summary)
    * appended to the diary note so timelines that read the note column
    * stay informative without depending on JSON details.
@@ -104,7 +111,8 @@ export interface LegacyQuickLogFormInput {
 }
 
 export type LegacyUnifiedBuildResult =
-  { ok: true; payload: QuickLogV2SavePayload } | { ok: false; reason: string; message: string };
+  | { ok: true; payload: QuickLogV2SavePayload }
+  | { ok: false; reason: string; message: string };
 
 function trimStr(value: string | undefined | null): string {
   return (value ?? "").toString().trim();
@@ -158,7 +166,12 @@ export function buildLegacyQuickLogUnifiedPayload(
   // sensor payload and/or an early-stage milestone envelope. We never
   // invent details, never persist raw_payload, and never re-key the
   // sensor envelope as `sensor_snapshot`.
-  const envelopeFields: Record<string, unknown> = {};
+  const canAttachPhenoReceipt =
+    (input.eventType === "observation" || input.eventType === "note") &&
+    input.phenoEvidenceReceipt?.plant_id === input.plantId;
+  const envelopeFields: Record<string, unknown> = canAttachPhenoReceipt
+    ? { ...input.phenoEvidenceReceipt }
+    : {};
   if (input.sensorAttachPayload != null) {
     envelopeFields.sensor = input.sensorAttachPayload;
   }

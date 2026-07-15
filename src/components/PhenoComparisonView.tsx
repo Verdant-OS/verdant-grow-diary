@@ -46,7 +46,6 @@ export interface PhenoComparisonViewProps {
   readonly allowConclusions?: boolean;
 }
 
-
 function toneClass(view: PhenoSensorSnapshotView): string {
   if (view.source === "live")
     return "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300";
@@ -259,6 +258,14 @@ function CandidateColumn({
     >
       <header className="space-y-1">
         <h2 id={headingId} className="text-lg font-semibold">
+          {c.candidateNumber != null ? (
+            <span
+              data-testid={`pheno-candidate-${c.candidateId}-number`}
+              className="mr-1 rounded bg-muted px-1.5 py-0.5 text-sm font-medium"
+            >
+              #{c.candidateNumber}
+            </span>
+          ) : null}
           {c.candidateLabel}
         </h2>
         <p className="text-xs text-muted-foreground">
@@ -448,7 +455,6 @@ export default function PhenoComparisonView({
       aria-labelledby="pheno-comparison-heading"
       className="container mx-auto max-w-6xl px-4 py-6 space-y-4"
     >
-
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <h1 id="pheno-comparison-heading" className="text-2xl font-semibold">

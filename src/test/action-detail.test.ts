@@ -9,7 +9,11 @@ const DETAIL = readFileSync(resolve(ROOT, "src/pages/ActionDetail.tsx"), "utf8")
 describe("Action Queue detail view", () => {
   it("registers the /actions/:actionId route in App.tsx", () => {
     expect(APP).toMatch(/path="\/actions\/:actionId"\s+element=\{<ActionDetail\s*\/>\}/);
+<<<<<<< HEAD
     expect(APP).toMatch(/import ActionDetail from "\.\/pages\/ActionDetail"/);
+=======
+    expect(APP).toMatch(/ActionDetail\s*=\s*lazy\(\(\)\s*=>\s*import\("\.\/pages\/ActionDetail"\)\)/);
+>>>>>>> origin/verdant-grow-diary
   });
 
   it("uses the useParams actionId from the URL", () => {

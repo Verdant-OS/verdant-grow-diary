@@ -89,6 +89,24 @@ async function mockSignedInSupabase(page: Page) {
   );
 }
 
+// The signed-in agreement re-consent gate renders as a blocking modal for
+// accounts with no recorded consent rows — which describes the mocked user
+// (the /rest/v1/ catch-all returns [] for user_agreement_acceptances), so
+// the gate always appears here and swallows all pointer events. Accept it
+// before interacting; the acceptance write is absorbed by the same
+// catch-all. Same helper as the Quick Log smoke.
+async function acceptReconsentGateIfShown(page: Page) {
+  const gate = page.getByTestId("agreement-reconsent-gate");
+  const shown = await gate
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!shown) return;
+  await gate.locator("#reconsent-accept").click();
+  await gate.getByRole("button", { name: /accept and continue/i }).click();
+  await gate.waitFor({ state: "hidden", timeout: 15_000 });
+}
+
 const SECRET_PATTERNS: Array<{ label: string; re: RegExp }> = [
   { label: "JWT", re: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}/ },
   { label: "bearer", re: /bearer\s+[A-Za-z0-9._-]{10,}/i },
@@ -111,6 +129,7 @@ test.describe("Agent Integrations settings smoke (mocked, 1280x800)", () => {
     page,
   }) => {
     await page.goto("/settings/agent-integrations");
+    await acceptReconsentGateIfShown(page);
 
     await expect(page.getByTestId("manifest-identity")).toBeVisible();
     await expect(page.getByTestId("manifest-version")).toBeVisible();

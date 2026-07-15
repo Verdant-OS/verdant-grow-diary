@@ -1108,9 +1108,11 @@ export default function Timeline() {
                           // below presents them instead.
                           const isReadinessCheckEvent = isAiDoctorReadinessCheckEvent(e);
                           const HIDDEN = ["event_type","plant_id","plant_name","tent_id","sensor","sensor_snapshot","remind_at"];
-                          const extra = isLearningLoopEvent || isReadinessCheckEvent
+                          const extra = isLearningLoopEvent
                             ? []
-                            : Object.entries(e.details || {}).filter(([k]) => !HIDDEN.includes(k));
+                            : isReadinessCheckEvent
+                              ? []
+                              : Object.entries(e.details || {}).filter(([k]) => !HIDDEN.includes(k));
                           const loopActionId =
                             isLearningLoopEvent && typeof e.details?.action_queue_id === "string"
                               ? (e.details.action_queue_id as string)

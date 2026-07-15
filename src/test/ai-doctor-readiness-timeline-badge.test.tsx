@@ -119,23 +119,49 @@ describe("buildAiDoctorReadinessTimelineBadge — stored truth only", () => {
     expect(vm!.label).toBe("Snapshot fresh · 5m old at check");
   });
 
-  it("malformed freshness / age values collapse to honest fallbacks", () => {
+  it("malformed freshness / age values collapse to the honest neutral state", () => {
     const unknownFreshness = buildAiDoctorReadinessTimelineBadge(
       readinessEvent({ snapshot_freshness: "shiny", snapshot_age_minutes: 10 }),
     );
     expect(unknownFreshness!.freshness).toBe("missing");
     expect(unknownFreshness!.label).toBe("No snapshot at check");
 
-    const badAge = buildAiDoctorReadinessTimelineBadge(
+    const badEvidence = buildAiDoctorReadinessTimelineBadge(
       readinessEvent({
         snapshot_freshness: "stale",
         snapshot_age_minutes: Number.NaN,
         snapshot_at: "not-a-date",
       }),
     );
-    expect(badAge!.freshness).toBe("stale");
-    expect(badAge!.label).toBe("Snapshot stale · age unrecorded");
-    expect(badAge!.snapshotAtIso).toBeNull();
+    expect(badEvidence!.freshness).toBe("missing");
+    expect(badEvidence!.label).toBe("No snapshot at check");
+    expect(badEvidence!.snapshotAtIso).toBeNull();
+  });
+
+  it("never renders a positive badge from a fresh claim with incomplete evidence", () => {
+    // details is untrusted JSON: `snapshot_freshness: "fresh"` alone must
+    // not present unknown telemetry as healthy. The builder always writes
+    // BOTH snapshot_at and snapshot_age_minutes for fresh/stale states.
+    const incompleteCases: Array<Record<string, unknown>> = [
+      { snapshot_freshness: "fresh" },
+      { snapshot_freshness: "fresh", snapshot_at: null, snapshot_age_minutes: null },
+      { snapshot_freshness: "fresh", snapshot_at: "2026-06-01T09:00:00.000Z" },
+      { snapshot_freshness: "fresh", snapshot_age_minutes: 180 },
+      { snapshot_freshness: "fresh", snapshot_at: "garbage", snapshot_age_minutes: 180 },
+      {
+        snapshot_freshness: "fresh",
+        snapshot_at: "2026-06-01T09:00:00.000Z",
+        snapshot_age_minutes: -5,
+      },
+    ];
+    for (const details of incompleteCases) {
+      const vm = buildAiDoctorReadinessTimelineBadge(readinessEvent(details));
+      expect(vm, JSON.stringify(details)).not.toBeNull();
+      expect(vm!.freshness, JSON.stringify(details)).toBe("missing");
+      expect(vm!.variant, JSON.stringify(details)).toBe("neutral");
+      expect(vm!.label, JSON.stringify(details)).toBe("No snapshot at check");
+      expect(vm!.snapshotAtIso, JSON.stringify(details)).toBeNull();
+    }
   });
 
   it("returns null for non-readiness events", () => {
@@ -232,7 +258,9 @@ describe("Timeline integration (source pin)", () => {
     expect(TIMELINE_SRC).toContain(
       "const isReadinessCheckEvent = isAiDoctorReadinessCheckEvent(e);",
     );
-    expect(TIMELINE_SRC).toContain("isLearningLoopEvent || isReadinessCheckEvent");
+    // Mirrors the learning-loop pin in timeline-learning-loop-entries.test.ts,
+    // which requires the literal `isLearningLoopEvent ? []` to survive.
+    expect(TIMELINE_SRC).toMatch(/isReadinessCheckEvent\s*\?\s*\[\]/);
   });
 });
 

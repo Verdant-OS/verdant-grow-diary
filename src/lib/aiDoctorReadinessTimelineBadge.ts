@@ -11,8 +11,11 @@
  *    It never re-grades a historical check against the current clock —
  *    a check logged as "fresh" three days ago stays labeled as fresh
  *    AT CHECK TIME, and the copy says so ("at check").
- *  - Unknown/malformed freshness values render as the neutral
- *    no-snapshot state; nothing is ever invented.
+ *  - `details` is untrusted JSON. The positive/warning variants require
+ *    the FULL evidence the builder always writes for them (a parseable
+ *    `snapshot_at` AND a finite `snapshot_age_minutes`); any missing or
+ *    malformed field collapses to the neutral no-snapshot state, so
+ *    corrupted rows can never present unknown telemetry as fresh.
  */
 import { AI_DOCTOR_READINESS_CHECK_KIND } from "@/lib/aiDoctorReadinessDiaryEntryRules";
 
@@ -83,8 +86,16 @@ export function buildAiDoctorReadinessTimelineBadge(
       ? rawAge
       : null;
 
-  if (rawFreshness === "fresh" || rawFreshness === "stale") {
-    const ageText = ageMinutes !== null ? formatAgeAtCheck(ageMinutes) : "age unrecorded";
+  // Fresh/stale claims must carry the full evidence the builder writes
+  // for them: a parseable timestamp AND a recorded age. A bare
+  // `snapshot_freshness: "fresh"` in corrupted details is not enough to
+  // render a positive state.
+  if (
+    (rawFreshness === "fresh" || rawFreshness === "stale") &&
+    snapshotAtIso !== null &&
+    ageMinutes !== null
+  ) {
+    const ageText = formatAgeAtCheck(ageMinutes);
     if (rawFreshness === "fresh") {
       return {
         freshness: "fresh",
@@ -103,7 +114,8 @@ export function buildAiDoctorReadinessTimelineBadge(
     };
   }
 
-  // "missing" and any malformed value collapse to the honest neutral state.
+  // "missing", malformed freshness values, and fresh/stale claims with
+  // incomplete evidence all collapse to the honest neutral state.
   return {
     freshness: "missing",
     variant: "neutral",

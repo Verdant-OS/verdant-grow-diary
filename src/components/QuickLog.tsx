@@ -345,9 +345,15 @@ export default function QuickLog({
   // One idempotency key per LOGICAL submission (quickLogIdempotencyKey
   // contract, same pattern as the V2 sheet): retries after a failure or a
   // lost response REUSE the key so the RPC dedupes instead of writing a
-  // second entry. Rotated only when a submission completes successfully
-  // or the grower starts a genuinely new log.
+  // second entry. Rotated when a submission completes successfully, when
+  // the grower starts a genuinely new log (reset / Log another), or when
+  // the payload CHANGES after a failed attempt — an edited retry is a new
+  // submission, and a dedupe hit would hand back the OLD entry while the
+  // edits silently never saved.
   const saveIdempotencyKeyRef = useRef<string>(newQuickLogSaveKey());
+  // Signature (key + timestamp excluded) of the last FAILED attempt's
+  // payload, so an edited retry is distinguished from a pure retry.
+  const lastFailedSaveSigRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!open || !prefill) return;
@@ -598,6 +604,7 @@ export default function QuickLog({
     // must never be deduped against an abandoned one, or the RPC could
     // hand back the OLD entry and silently skip the new content.
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+    lastFailedSaveSigRef.current = null;
     setNote("");
     setShowMore(false);
     setEventType("observation");
@@ -675,6 +682,7 @@ export default function QuickLog({
   function resetForAnother() {
     // "Log another" starts a genuinely new logical submission.
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+    lastFailedSaveSigRef.current = null;
     const keepPlantId = savedTarget?.id ?? plantId;
     setNote("");
     setShowMore(false);
@@ -850,8 +858,24 @@ export default function QuickLog({
         return;
       }
 
+      // Pure retries reuse the idempotency key; EDITED retries must not.
+      // Compare this attempt's payload (key + occurred_at excluded) to the
+      // last failed attempt: a change means new content, so a fresh key —
+      // otherwise a lost-response dedupe would return the old entry and
+      // silently drop the edits.
+      const attemptSig = JSON.stringify({
+        ...built.payload,
+        p_idempotency_key: null,
+        p_occurred_at: null,
+      });
+      if (lastFailedSaveSigRef.current !== null && lastFailedSaveSigRef.current !== attemptSig) {
+        saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+        built.payload.p_idempotency_key = saveIdempotencyKeyRef.current;
+      }
+
       const result = await saveViaRpc(built.payload);
       if (!result.ok) {
+        lastFailedSaveSigRef.current = attemptSig;
         const reason = result.reason ?? "save_failed";
         const message = quickLogReasonToOperatorMessage(reason);
         setSaveError(
@@ -885,6 +909,7 @@ export default function QuickLog({
       // (Failures/exceptions above return first, so retries reuse the key
       // and the RPC dedupes a lost-response double-submit.)
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      lastFailedSaveSigRef.current = null;
 
       const plantLabel = selectedPlant.name;
       const finalMessage =

@@ -264,6 +264,30 @@ describe("Quick Log starter-handoff consume-once", () => {
     expect(key3, "a new logical submission mints a fresh key").not.toBe(key1);
   });
 
+  it("an EDITED retry after a failure mints a fresh key (pure retries keep it)", async () => {
+    // Lost-response scenario: the server may have committed under key1.
+    // Retrying UNCHANGED content must reuse key1 (dedupe is correct); but
+    // once the grower EDITS the note, a dedupe hit would return the old
+    // entry while the edits silently never saved — so the key must rotate.
+    saveMock.mockResolvedValueOnce({ ok: false, reason: "tent_not_found" });
+    seedDraft();
+    renderWithClient(<QuickLog open onOpenChange={vi.fn()} prefill={handoffPrefill()} />);
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(screen.getByTestId("quick-log-save-error")).toBeInTheDocument(),
+    );
+    const key1 = (saveMock.mock.calls[0][0] as Record<string, unknown>).p_idempotency_key;
+
+    fireEvent.change(screen.getByTestId("quicklog-note"), {
+      target: { value: "edited after the failure" },
+    });
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    const call2 = saveMock.mock.calls[1][0] as Record<string, unknown>;
+    expect(call2.p_note).toContain("edited after the failure");
+    expect(call2.p_idempotency_key, "edited retry must mint a fresh key").not.toBe(key1);
+  });
+
   it("closing the dialog abandons the submission: the key rotates so a later log is never deduped away", async () => {
     // Failed save (key kept for in-place retry) → grower CLOSES instead →
     // a brand-new log must carry a NEW key, or the RPC would return the

@@ -72,9 +72,11 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/hardware-integrations",
   "/guides",
   "/guides/:slug",
+  "/guides/grow-stage-care-guide",
   "/how-ai-doctor-works",
   "/partners/csv-preview",
   "/customer/:shareId",
+  "/customer/:shareId/cannabis-care",
   // Read-only Pheno Comparison preview: public, fixture-only, mounted outside
   // AuthProvider/GrowsProvider/AppShell — must render signed-out on mobile with
   // zero private-table fetches.

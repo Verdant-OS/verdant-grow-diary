@@ -38,18 +38,28 @@ export default function GuidePage() {
     return hash.startsWith("faq-") ? hash : undefined;
   })();
   const [openFaq, setOpenFaq] = useState<string | undefined>(initialFaqValue);
+  const [highlightedFaq, setHighlightedFaq] = useState<string | undefined>(
+    initialFaqValue,
+  );
 
   useEffect(() => {
     const hash = location.hash.replace(/^#/, "");
     if (!hash.startsWith("faq-")) return;
     setOpenFaq(hash);
+    setHighlightedFaq(hash);
     // Defer scroll until after the accordion item opens.
-    const t = window.setTimeout(() => {
+    const scrollT = window.setTimeout(() => {
       const el = document.getElementById(hash);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 50);
-    return () => window.clearTimeout(t);
+    // Fade the highlight after a few seconds so it doesn't dominate.
+    const fadeT = window.setTimeout(() => setHighlightedFaq(undefined), 2600);
+    return () => {
+      window.clearTimeout(scrollT);
+      window.clearTimeout(fadeT);
+    };
   }, [location.hash]);
+
 
 
   // Always call hooks before conditional returns.

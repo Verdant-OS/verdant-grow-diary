@@ -8,7 +8,7 @@
  *  - Gate copy + primary-action mapping lives in the view-model, not here.
  */
 import { useCallback, useMemo } from "react";
-import { CheckCircle2, AlertTriangle, Info } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Info, Clock } from "lucide-react";
 import {
   evaluateAiDoctorContextFromSources,
   AI_DOCTOR_READINESS_LABELS,
@@ -20,6 +20,10 @@ import {
 import {
   buildAiDoctorReadinessGate,
 } from "@/lib/aiDoctorReadinessGateViewModel";
+import {
+  buildAiDoctorSnapshotFreshnessStatus,
+  type AiDoctorSnapshotFreshnessState,
+} from "@/lib/aiDoctorSnapshotFreshnessStatusViewModel";
 import type { AiDoctorContextReadiness } from "@/lib/aiDoctorContextRules";
 import AiDoctorContextQuickActions from "@/components/AiDoctorContextQuickActions";
 import {

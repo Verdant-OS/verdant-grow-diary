@@ -20,8 +20,12 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Type check (fail fast)
         run: bun run typecheck
+      - name: Supabase migration safety scan (RLS / SECURITY DEFINER / permissive policies)
+        run: bun run check:supabase-security
       - name: Static client/published secret scan
         run: bun run test:security-static
+      - name: Gamification direct-insert RLS scan
+        run: bun run test:security-gamification
       - name: Payments webhook security tests
         run: bun run test:payments-security
       - name: Storage bucket policy tests

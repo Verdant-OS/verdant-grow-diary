@@ -44,6 +44,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
+import { useTimelineMemory, TIMELINE_MEMORY_DEFAULT_LIMIT } from "@/hooks/useTimelineMemory";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import {
   buildPlantDetailDoctorContextPreview,
@@ -54,6 +55,8 @@ import {
   buildPlantDetailDoctorAddContextRoute,
   ADD_CONTEXT_HELPER_COPY,
 } from "@/lib/plantDetailDoctorAddContextRouter";
+import { evaluateAiDoctorContextFromSources } from "@/lib/aiDoctorContextViewModel";
+import { buildAiDoctorReadinessGate } from "@/lib/aiDoctorReadinessGateViewModel";
 
 interface Props {
   plantId: string | null | undefined;
@@ -135,6 +138,10 @@ export default function PlantDetailDoctorLaunchDialog({
 }: Props) {
   const [open, setOpen] = useState(false);
   const { data: rawRows } = usePlantRecentActivity(plantId);
+  const { items: timelineItems } = useTimelineMemory(
+    plantId ? { kind: "plant", plantId } : null,
+    TIMELINE_MEMORY_DEFAULT_LIMIT,
+  );
 
   const preview = useMemo(() => {
     const rows = buildPlantRecentActivity(rawRows ?? [], {
@@ -150,6 +157,34 @@ export default function PlantDetailDoctorLaunchDialog({
       now: now ?? new Date(),
     });
   }, [rawRows, plantId, stage, hasPlantPhoto, openAlertsCount, pendingActionsCount, now]);
+
+  const readinessResult = useMemo(
+    () =>
+      evaluateAiDoctorContextFromSources({
+        plant: plantId
+          ? {
+              id: plantId,
+              name: plantName ?? null,
+              stage: stage ?? null,
+              hasPlantPhoto: !!hasPlantPhoto,
+            }
+          : null,
+        timelineItems,
+        now: now ? now.getTime() : undefined,
+      }),
+    [plantId, plantName, stage, hasPlantPhoto, timelineItems, now],
+  );
+
+  const gate = useMemo(
+    () =>
+      buildAiDoctorReadinessGate({
+        readiness: readinessResult.readiness,
+        hasSafeAiDoctorFlow: true,
+      }),
+    [readinessResult.readiness],
+  );
+
+  const blocked = readinessResult.readiness === "insufficient";
 
   const addContextDecision = useMemo(() => {
     const stateOf = (kind: DoctorContextItem["kind"]): DoctorContextItemState | null =>
@@ -245,9 +280,24 @@ export default function PlantDetailDoctorLaunchDialog({
           <p className="text-xs text-muted-foreground leading-snug">
             {DOCTOR_LAUNCH_HELPER_LINES[1]}
           </p>
+          <p
+            className={
+              blocked
+                ? "text-xs text-amber-300 leading-snug"
+                : "text-xs text-muted-foreground leading-snug"
+            }
+            data-testid="plant-detail-doctor-launch-readiness-notice"
+            data-readiness={readinessResult.readiness}
+          >
+            {gate.message}
+          </p>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+        <DialogFooter
+          className="gap-2 sm:gap-2 flex-col sm:flex-row"
+          data-testid="plant-detail-doctor-launch-footer"
+          data-readiness={readinessResult.readiness}
+        >
           {addContextDecision.kind !== "none" &&
             (addContextDecision.to ? (
               <Button
@@ -279,16 +329,32 @@ export default function PlantDetailDoctorLaunchDialog({
                 <Plus className="h-3.5 w-3.5" /> {addContextDecision.label}
               </Button>
             ))}
-          <Button
-            asChild
-            size="sm"
-            className="gap-1"
-            data-testid="plant-detail-doctor-launch-continue"
-          >
-            <Link to={doctorHref} aria-label="Continue to AI Doctor with plant context">
+          {blocked ? (
+            <Button
+              type="button"
+              size="sm"
+              className="gap-1"
+              disabled
+              aria-disabled="true"
+              title={gate.message}
+              data-testid="plant-detail-doctor-launch-continue-blocked"
+              data-readiness={readinessResult.readiness}
+            >
               Continue to AI Doctor <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </Button>
+            </Button>
+          ) : (
+            <Button
+              asChild
+              size="sm"
+              className="gap-1"
+              data-testid="plant-detail-doctor-launch-continue"
+              data-readiness={readinessResult.readiness}
+            >
+              <Link to={doctorHref} aria-label="Continue to AI Doctor with plant context">
+                Continue to AI Doctor <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

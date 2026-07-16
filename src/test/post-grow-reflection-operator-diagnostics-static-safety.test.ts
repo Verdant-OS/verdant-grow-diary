@@ -16,7 +16,10 @@ const DOCS = read("docs/post-grow-reflection-phase2e.md");
 describe("Post-Grow Reflection operator diagnostics static safety", () => {
   it("registers only the operator route and manifest entry", () => {
     expect(APP).toContain(`path="${ROUTE}"`);
-    expect(MANIFEST).toContain(`path: "${ROUTE}", access: "operator"`);
+    // Formatting-agnostic: prettier may reflow manifest entries with long
+    // descriptions across lines. The structural checks below (via
+    // getRoutesByAccess) carry the real access-gating contract.
+    expect(MANIFEST).toMatch(new RegExp(`path:\\s*"${ROUTE}",\\s*access:\\s*"operator"`));
     expect(getRoutesByAccess("operator").some((route) => route.path === ROUTE)).toBe(true);
     expect(getRoutesByAccess("auth").some((route) => route.path === ROUTE)).toBe(false);
     expect(getRoutesByAccess("public").some((route) => route.path === ROUTE)).toBe(false);

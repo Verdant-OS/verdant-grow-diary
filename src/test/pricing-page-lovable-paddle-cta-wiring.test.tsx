@@ -162,19 +162,22 @@ describe("Pricing page — built-in Paddle wiring", () => {
 });
 
 describe("Checkout success / cancel copy", () => {
-  it("success page renders the pending confirmation copy by default (truth copy — no client-side grant)", () => {
+  it("success page never overclaims by default (truth copy — no client-side grant)", () => {
     // Phase 2b truth copy: without a resolved active paid entitlement the
-    // page must NOT overclaim "Pro is active". The confirmed heading only
-    // appears once useMyEntitlements returns an active paid plan (covered
-    // by src/test/checkout-success-entitlement-truth-copy.test.tsx).
+    // page must NOT overclaim "Pro is active". A default render has no
+    // checkout context (no same-device marker, no returnTo), so it shows the
+    // no-context state; the confirmed heading only appears once
+    // useMyEntitlements returns an active paid plan (covered by
+    // src/test/checkout-success-entitlement-truth-copy.test.tsx).
     render(
       <MemoryRouter>
         <CheckoutSuccess />
       </MemoryRouter>,
     );
     expect(screen.getByTestId("checkout-success-page")).toBeInTheDocument();
-    expect(screen.getByTestId("checkout-success-pending-heading")).toBeInTheDocument();
+    expect(screen.getByTestId("checkout-success-no-context-heading")).toBeInTheDocument();
     expect(screen.queryByTestId("checkout-success-confirmed-heading")).toBeNull();
+    expect(document.body.textContent).not.toMatch(/Checkout completed/i);
   });
 
   it("cancel page renders the no-charge copy", () => {

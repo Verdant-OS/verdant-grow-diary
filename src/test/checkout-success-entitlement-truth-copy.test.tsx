@@ -2,16 +2,20 @@
  * Phase 2b — CheckoutSuccess truth-copy tests.
  *
  * Confirms:
- *  - pending copy shown while entitlement is loading / free
+ *  - "confirming" copy shown only with real checkout context (same-device
+ *    marker or returnTo handoff) while the resolver is pending
+ *  - a direct visit with no checkout context shows the no-context state and
+ *    never claims a completed checkout
  *  - "Verdant Pro is active." shown only after resolver confirms an active
  *    paid plan
- *  - Refresh action present in pending state
+ *  - Refresh action present in both unconfirmed states
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router-dom";
 import CheckoutSuccess from "@/pages/CheckoutSuccess";
+import { CHECKOUT_STARTED_STORAGE_KEY, markCheckoutStarted } from "@/lib/checkoutContextRules";
 import type { ResolvedEntitlement } from "@/lib/entitlements";
 
 const mockEnt: { value: ResolvedEntitlement; loading: boolean } = {
@@ -47,7 +51,11 @@ function renderPage() {
 }
 
 describe("CheckoutSuccess truth copy", () => {
-  it("shows pending copy when entitlement resolves to free", () => {
+  beforeEach(() => {
+    window.sessionStorage.removeItem(CHECKOUT_STARTED_STORAGE_KEY);
+  });
+
+  it("shows the no-context state on a direct visit — never claims a completed checkout", () => {
     mockEnt.value = {
       ...mockEnt.value,
       effectivePlanId: "free",
@@ -56,12 +64,46 @@ describe("CheckoutSuccess truth copy", () => {
     };
     renderPage();
     expect(screen.getByTestId("checkout-success-page")).toHaveAttribute("data-confirmed", "false");
-    expect(screen.getByTestId("checkout-success-pending-heading")).toHaveTextContent(
-      /Checkout completed/i,
+    expect(screen.getByTestId("checkout-success-page")).toHaveAttribute("data-view", "no_context");
+    expect(screen.getByTestId("checkout-success-no-context-heading")).toHaveTextContent(
+      /No recent checkout found/i,
     );
+    expect(document.body.textContent).not.toMatch(/Checkout completed/i);
     expect(screen.getByTestId("checkout-success-refresh-button")).toBeInTheDocument();
+    expect(screen.getByTestId("checkout-success-pricing-link")).toBeInTheDocument();
+    expect(screen.queryByTestId("checkout-success-pending-heading")).toBeNull();
     expect(screen.queryByTestId("checkout-success-confirmed-heading")).toBeNull();
     expect(screen.queryByTestId("checkout-success-activation-handoff")).toBeNull();
+  });
+
+  it("shows confirming copy (not completion) with a fresh same-device checkout marker", () => {
+    mockEnt.value = {
+      ...mockEnt.value,
+      effectivePlanId: "free",
+      isActive: true,
+      displayPlanId: "free",
+    };
+    markCheckoutStarted(Date.now(), window.sessionStorage);
+    renderPage();
+    expect(screen.getByTestId("checkout-success-page")).toHaveAttribute("data-view", "confirming");
+    expect(screen.getByTestId("checkout-success-pending-heading")).toHaveTextContent(
+      /Confirming your checkout/i,
+    );
+    expect(document.body.textContent).not.toMatch(/Checkout completed/i);
+    expect(screen.getByTestId("checkout-success-refresh-button")).toBeInTheDocument();
+    expect(screen.queryByTestId("checkout-success-confirmed-heading")).toBeNull();
+  });
+
+  it("treats an expired same-device marker as no context", () => {
+    mockEnt.value = {
+      ...mockEnt.value,
+      effectivePlanId: "free",
+      isActive: true,
+      displayPlanId: "free",
+    };
+    markCheckoutStarted(Date.now() - 3 * 60 * 60 * 1000, window.sessionStorage);
+    renderPage();
+    expect(screen.getByTestId("checkout-success-page")).toHaveAttribute("data-view", "no_context");
   });
 
   it('shows "Verdant Pro is active." after entitlement confirms an active paid plan', () => {

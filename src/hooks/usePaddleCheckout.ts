@@ -23,6 +23,7 @@ import type { PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
 import { buildCheckoutCancelPath } from "@/lib/checkoutCancelRecoveryRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { saveCheckoutReturnTo } from "@/lib/checkoutReturnToSession";
+import { markCheckoutStarted } from "@/lib/checkoutContextRules";
 
 export interface OpenCheckoutOptions {
   priceId: string;
@@ -173,6 +174,11 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         // the cancel page. Success path still uses the successUrl query
         // param; both branches call sanitizeCheckoutReturnTo.
         saveCheckoutReturnTo(new URLSearchParams(window.location.search).get("returnTo"));
+
+        // Same-device checkout-context marker so /checkout/success can show
+        // "confirming" vs "no checkout context". Grants nothing — see
+        // checkoutContextRules.
+        markCheckoutStarted(Date.now());
 
         // Slice D: register overlay session BEFORE calling
         // Paddle.Checkout.open so the module-level eventCallback (set at

@@ -11,7 +11,7 @@
  *  - Cancel never inserts.
  */
 import { useCallback, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useInRouterContext } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -71,6 +71,10 @@ const ERROR_COPY: Record<string, string> = {
 
 export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps) {
   const { open, onOpenChange, onConfirm, viewHistoryHref = null } = props;
+  // The handoff CTA is a router Link; render it only when a Router is
+  // actually mounted so bare mounts (tests, storybook-style harnesses)
+  // degrade to the Close-only footer instead of crashing.
+  const inRouter = useInRouterContext();
   const [state, setState] = useState<ImportState>(INITIAL_IMPORT_STATE);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -238,7 +242,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
               {CSV_IMPORT_HISTORICAL_CONTEXT_NOTE}
             </p>
             <DialogFooter>
-              {viewHistoryHref ? (
+              {viewHistoryHref && inRouter ? (
                 <Button
                   asChild
                   variant="secondary"

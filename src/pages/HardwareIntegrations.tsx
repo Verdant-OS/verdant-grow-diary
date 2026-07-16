@@ -151,7 +151,7 @@ export default function HardwareIntegrations() {
             Verdant keeps every imported reading source-labeled as CSV history — never live
             telemetry — and places it alongside your diary and photos. AI Doctor can use that
             history as read-only background context while still distinguishing it from current
-            manual or live readings. It never creates an action automatically.
+            manual entries or live telemetry. It never creates an action automatically.
           </p>
           <ol
             className="mt-6 grid gap-3 text-sm sm:grid-cols-3"

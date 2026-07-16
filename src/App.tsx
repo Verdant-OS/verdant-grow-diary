@@ -161,10 +161,6 @@ function PageLoader() {
 
 function LegacyStrainSlugRedirect() {
   // Preserves the slug when redirecting /strains/:slug → /cultivars/:slug.
-  // Keeps the legacy "strain" URL alias useful for search intent without
-  // maintaining a duplicate page tree.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { useParams } = require("react-router-dom") as typeof import("react-router-dom");
   const { slug } = useParams<{ slug: string }>();
   return <Navigate to={`/cultivars/${slug ?? ""}`} replace />;
 }

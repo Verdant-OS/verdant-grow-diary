@@ -91,6 +91,24 @@ export const VERDANT_CULTIVARS: readonly VerdantCultivarProfile[] = [
       "Bud density and stem strength under weight",
       "Finish uniformity across colas",
     ],
+    samplePhenos: [
+      {
+        label: "Oreoz #3 (gas-forward)",
+        structure: "Compact, thick main stem, short internodes",
+        aroma: "Loud gas, faint cookie backend",
+        resin: "Heavy — fully frosted sugar leaves by week 7",
+        yieldNote: "Moderate; dense golf-ball colas",
+        finishNote: "Even amber at ~68 days; no re-veg signs",
+      },
+      {
+        label: "Oreoz #7 (dessert-leaning)",
+        structure: "Slightly stretchier, secondary sites catch up late",
+        aroma: "Sweet cookie dominant, gas on grind",
+        resin: "Even coverage, less crystalline than #3",
+        yieldNote: "Higher; larger but airier colas",
+        finishNote: "Finishes 3–4 days later than #3",
+      },
+    ],
   },
   {
     slug: "do-si-dos",

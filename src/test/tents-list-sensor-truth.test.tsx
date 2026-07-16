@@ -248,6 +248,48 @@ describe("Tents list sensor truth — stale labeling parity with Tent Detail", (
   });
 });
 
+describe("Tents list sensor truth — pi_bridge provenance parity with Tent Detail", () => {
+  const bridgeRow = (over: Partial<BuildTentSnapshotInput>): BuildTentSnapshotInput =>
+    row({ source: "pi_bridge", ...over });
+
+  it("fresh bridge readings classify as live on BOTH presenters — never Unknown", () => {
+    const rows = [
+      bridgeRow({ ts: FRESH_TS, metric: "temperature_c", value: 21.78 }),
+      bridgeRow({ ts: FRESH_TS, metric: "humidity_pct", value: 56 }),
+    ];
+    const listView = buildTentSnapshotView(rows, "veg", NOW);
+    const detailHeader = buildTentSensorHeaderView(rows, NOW);
+    // Detail path: strict reservation in snapshotFromReadings → "Live sensor".
+    expect(detailHeader.sourceLabel).toBe("Live sensor");
+    // List path must agree on the provenance class, not drop to Unknown.
+    expect(listView.sourceLabel).toBe("Live");
+    expect(listView.sourceLabel).not.toBe("Unknown");
+  });
+
+  it("stale bridge readings label Stale on the list, matching detail's stale flag", () => {
+    const rows = [
+      bridgeRow({ metric: "temperature_c", value: 21.78 }), // NEWEST_TS → stale
+      bridgeRow({ metric: "humidity_pct", value: 56 }),
+    ];
+    const listView = buildTentSnapshotView(rows, "veg", NOW);
+    const detailHeader = buildTentSensorHeaderView(rows, NOW);
+    expect(detailHeader.stale).toBe(true);
+    expect(listView.stale).toBe(true);
+    expect(listView.sourceLabel).toBe("Stale");
+  });
+
+  it("a mixed latest group (bridge + unrecognized junk) is never promoted to live", () => {
+    const rows = [
+      bridgeRow({ ts: FRESH_TS, metric: "temperature_c", value: 21.78 }),
+      row({ ts: FRESH_TS, metric: "humidity_pct", value: 56, source: "junk-vendor" }),
+    ];
+    const listView = buildTentSnapshotView(rows, "veg", NOW);
+    const detailHeader = buildTentSensorHeaderView(rows, NOW);
+    expect(listView.sourceLabel).not.toMatch(/live/i);
+    expect(detailHeader.sourceLabel).not.toMatch(/^Live/);
+  });
+});
+
 describe("Tents list sensor truth — temperature unit preference", () => {
   it("defaults to °F (Dashboard-strip behavior unchanged)", () => {
     const v = buildTentSnapshotView(WALKTHROUGH_ROWS, "veg", NOW);

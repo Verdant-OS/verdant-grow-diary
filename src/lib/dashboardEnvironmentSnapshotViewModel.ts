@@ -133,8 +133,13 @@ export function buildTentSnapshotView(
 
   // Source resolution: derive from the actual contributing rows so an
   // unknown/garbage source can never be silently promoted to "live" by
-  // `snapshotFromReadings`'s heuristic default.
-  const RECOGNISED = new Set(["manual", "live", "csv", "import", "sim", "diary"]);
+  // `snapshotFromReadings`'s heuristic default. "pi_bridge" is a read-side
+  // ingest provenance tag inside the strict live reservation pinned in
+  // `snapshotFromReadings`; a group classifies as live ONLY when every row
+  // at the latest timestamp carries that reservation — recognizing the tag
+  // here routes it through that strict classification (parity with Tent
+  // Detail) without widening trust for any other source string.
+  const RECOGNISED = new Set(["manual", "live", "csv", "import", "sim", "diary", "pi_bridge"]);
   const hasRecognised = latestRows.some(
     (r) => typeof r.source === "string" && RECOGNISED.has(r.source),
   );

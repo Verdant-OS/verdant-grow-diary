@@ -264,6 +264,8 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
         // "founder lifetime never expires" treatment.
         current_period_end: null,
         cancel_at_period_end: false,
+        scheduled_change_action: null,
+        scheduled_change_at: null,
         environment: env,
         updated_at: nowIso,
       },

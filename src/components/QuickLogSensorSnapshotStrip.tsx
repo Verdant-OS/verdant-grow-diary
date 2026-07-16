@@ -119,8 +119,15 @@ export default function QuickLogSensorSnapshotStrip({
       attached,
     }),
   );
+  // The freshness view-model's warning copy is written for the attach
+  // world (e.g. stale warns "Save will be marked accordingly"), which is
+  // false on context surfaces where nothing is attached to the save — so
+  // the context variant renders no advisory line; its staleness/missing
+  // copy comes from the adapter's context descriptions instead.
   const advisory =
-    vm.display && vm.display.freshness === "fresh" ? null : (vm.warning ?? vm.emptyCopy);
+    variant === "context" || (vm.display && vm.display.freshness === "fresh")
+      ? null
+      : (vm.warning ?? vm.emptyCopy);
   const advisoryKind = vm.display ? vm.display.freshness : vm.emptyCopy ? "missing" : null;
   const showTrustBadge = shouldRenderTrustBadge(view.status, view.trustBadge.label);
   const pillIsRedundant = isPillRedundantWithBadge(view.status, view.trustBadge.label);

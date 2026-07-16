@@ -788,8 +788,10 @@ export default function QuickLogV2Sheet({
               writes, and (variant="context") its copy never claims the
               reading is attached to this log; the manual fields below stay
               the only sensor values this save can record. Gated on a
-              resolved target so an empty sheet stays quiet. */}
-          {form.action !== "feed" && resolvedTarget.ok && (
+              resolved tent id (legacy parity): a tentless plant's gap is
+              tent assignment, not sensors, so "add a snapshot" guidance
+              would mislead there. */}
+          {form.action !== "feed" && resolvedContext.tentId && (
             <QuickLogSensorSnapshotStrip
               growId={resolvedContext.growId}
               tentId={resolvedContext.tentId}

@@ -261,9 +261,12 @@ export interface BuildQuickLogStripFromTentStateArgs {
 }
 
 /**
- * Context-variant copy overrides. Only statuses whose attach-mode copy
- * promises attachment (usable) or names attachment (no_data) differ;
- * stale/invalid copy is already attachment-neutral and stays shared.
+ * Context-variant copy overrides. Context surfaces never attach the
+ * reading to the save, so every status whose attach-mode copy promises
+ * attachment (usable), names attachment (no_data), or ties the reading
+ * to the save event (stale's "before saving", no_data's "this log")
+ * gets attachment-free copy here. Invalid's copy is already
+ * attachment-neutral and stays shared.
  */
 const CONTEXT_TITLES: Partial<Record<QuickLogSnapshotStripStatus, string>> = {
   no_data: "No sensor snapshot",
@@ -271,6 +274,8 @@ const CONTEXT_TITLES: Partial<Record<QuickLogSnapshotStripStatus, string>> = {
 
 const CONTEXT_DESCRIPTIONS: Partial<Record<QuickLogSnapshotStripStatus, string>> = {
   usable: "Latest tent reading, shown for context only.",
+  stale: "Reading is stale — refresh from the Sensors page for current context.",
+  no_data: "No recent reading for this tent. Add a snapshot from the Sensors page.",
 };
 
 function narrowStrict(s: StrictSnapshotStatus): QuickLogSnapshotStripStatus {

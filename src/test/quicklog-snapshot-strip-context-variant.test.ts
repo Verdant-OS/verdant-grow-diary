@@ -67,12 +67,15 @@ describe("quickLogSnapshotStripAdapter — context variant copy contract", () =>
     expect(v.status).toBe("no_data");
     expect(v.title).toBe("No sensor snapshot");
     expect(v.title).not.toMatch(/attached/i);
-    // The add-a-snapshot guidance is attachment-neutral and stays shared.
-    expect(v.description).toBe("Add a snapshot so this log has room context.");
+    // Context copy never ties the reading to "this log".
+    expect(v.description).toBe(
+      "No recent reading for this tent. Add a snapshot from the Sensors page.",
+    );
+    expect(v.description).not.toMatch(/this log/i);
     expect(v.action.kind).toBe("add");
   });
 
-  it("context + stale keeps the shared honesty copy and refresh action", () => {
+  it("context + stale gets save-free staleness copy, same refresh action", () => {
     const attach = build({ snapshot: fullSnapshot({ status: "stale", freshness: "stale" }) });
     const context = build({
       snapshot: fullSnapshot({ status: "stale", freshness: "stale" }),
@@ -80,7 +83,11 @@ describe("quickLogSnapshotStripAdapter — context variant copy contract", () =>
     });
     expect(context.status).toBe("stale");
     expect(context.title).toBe(attach.title);
-    expect(context.description).toBe(attach.description);
+    expect(context.description).toBe(
+      "Reading is stale — refresh from the Sensors page for current context.",
+    );
+    // Attach-mode stale copy references the save event; context must not.
+    expect(context.description).not.toMatch(/saving|save/i);
     expect(context.action).toEqual(attach.action);
   });
 

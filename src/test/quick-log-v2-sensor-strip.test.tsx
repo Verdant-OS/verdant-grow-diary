@@ -34,7 +34,12 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [{ id: "p1", name: "Plant 1", tent_id: "t1", grow_id: "g1" }],
+    data: [
+      { id: "p1", name: "Plant 1", tent_id: "t1", grow_id: "g1" },
+      // Tentless plant: its gap is tent assignment, not sensors, so the
+      // strip must not render "add a snapshot" guidance for it.
+      { id: "p2", name: "Plant 2", tent_id: null, grow_id: "g1" },
+    ],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
@@ -131,6 +136,29 @@ describe("QuickLogV2Sheet — sensor snapshot strip", () => {
   it("renders no strip when no target is selected", () => {
     renderSheet(undefined);
     expect(screen.queryByTestId("quicklog-sensor-snapshot-strip")).toBeNull();
+  });
+
+  it("renders no strip for a plant with no tent assignment", () => {
+    renderSheet("plant:p2");
+    expect(screen.queryByTestId("quicklog-sensor-snapshot-strip")).toBeNull();
+  });
+
+  it("stale reading: no attach-world advisory, save-free context copy", () => {
+    mockUseLatestTentSensorSnapshot.mockReturnValue({
+      status: "ready",
+      snapshot: { ...freshSnapshot(), status: "stale", freshness: "stale" },
+      lastUpdatedAt: Date.parse("2026-06-02T12:00:00Z"),
+    });
+    renderSheet("tent:t1");
+    const strip = screen.getByTestId("quicklog-sensor-snapshot-strip");
+    expect(strip.getAttribute("data-status")).toBe("stale");
+    expect(
+      screen.getByText("Reading is stale — refresh from the Sensors page for current context."),
+    ).toBeTruthy();
+    // The freshness view-model's attach-world advisory ("Save will be
+    // marked accordingly") must never render on the context surface.
+    expect(screen.queryByText(/Save will be marked/i)).toBeNull();
+    expect(screen.queryByTestId("quicklog-sensor-snapshot-advisory")).toBeNull();
   });
 
   it("hides the strip for the Feed action (parity with the manual block)", () => {

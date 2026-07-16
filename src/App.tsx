@@ -205,6 +205,13 @@ const App = () => (
                   <Route path="/guides" element={<GuidesIndex />} />
                   <Route path="/guides/grow-stage-care-guide" element={<GrowStageCareGuide />} />
                   <Route path="/guides/:slug" element={<GuidePage />} />
+                  <Route path="/cultivars" element={<CultivarsIndex />} />
+                  <Route path="/cultivars/:slug" element={<CultivarPage />} />
+                  {/* Legacy "strain" URL aliases capture search intent for
+                      "Oreoz strain" / "Do-Si-Dos" etc. and route to the
+                      canonical /cultivars surface (vocab: cultivar, not strain). */}
+                  <Route path="/strains" element={<Navigate to="/cultivars" replace />} />
+                  <Route path="/strains/:slug" element={<Navigate to="/cultivars/:slug" replace />} />
                   <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
                   <Route path="/ai-doctor-readiness-check" element={<AiDoctorContextCheck />} />

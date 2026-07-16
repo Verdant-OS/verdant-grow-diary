@@ -61,6 +61,15 @@ inference.
   today" — resolves to the **current report day** (the local calendar date
   whose boundary window contains now), never the raw calendar date, so a
   selected window can never include report-day time that has not yet begun.
+- **Partial current windows, explicit and honest.** The current report day is
+  selectable, but its report-day window has not closed — so selecting it
+  yields an **explicitly partial window** whose upper bound is now, never a
+  boundary instant in the future. The header and companion display label the
+  final day "partial — through <local time>"; coverage and missing-data math
+  treat un-elapsed time as outside the window, never as missing data; and
+  week-over-week comparisons involving the partial day follow the existing
+  coverage-floor rules rather than comparing a part-day against a full day
+  as equals. Fully closed end dates resolve exactly as before.
 - **Report day boundary.** The local hour at which a report "day" begins
   (whole hours only, default `00:00`; e.g. `06:00` for a lights-on day).
   Window instants become `[boundaryInstant(D), boundaryInstant(D + 1))`,
@@ -103,7 +112,7 @@ A single control at the top of the report lets the grower generate a report for 
 - **Default:** the current report day in the **effective report timezone** — the validated report time preference when one is saved, else the validated browser zone (see report time preferences for both terms). If no valid IANA zone is available from either source, block all report generation with an honest "Timezone needed" state; neither window nor its future/floor bounds are safe to resolve. Do not silently fall back to the server timezone.
 - **Companion display (read-only):** next to the picker, render the resolved window as `<startDate> → <endDate>` in the effective report timezone so the grower can verify before generating. Also render the prior-week comparison window (`<priorStart> → <priorEnd>`) so the week-over-week math is transparent.
 - **Bounds:**
-  - Max selectable end date = the **current report day** in the effective report timezone. Future dates — and, with a non-midnight boundary, the calendar date whose report-day window has not yet begun — are disabled. Never generate a report for a window that includes the future.
+  - Max selectable end date = the **current report day** in the effective report timezone, which resolves as an explicitly partial window truncated at now (see report time preferences). Future dates — and, with a non-midnight boundary, the calendar date whose report-day window has not yet begun — are disabled. Never generate a report for a window that includes time later than now.
   - Min selectable end date = the earliest activity returned by the audited,
     RLS-scoped source adapters (or a hard floor of 2 years back, whichever is
     later). Do not claim this bound until every enabled source adapter

@@ -100,6 +100,13 @@ describe("Lovable weekly grow report skill contract", () => {
     expect(SKILL).toMatch(/never the raw calendar date/);
     expect(SKILL).toMatch(/never include report-day time that has not yet begun/);
     expect(SKILL).toMatch(/Max selectable end date = the \*\*current report day\*\*/);
+    // Selecting the still-open report day is an explicitly partial window
+    // truncated at now — never a window that runs into the future, and
+    // never a part-day silently compared against full days.
+    expect(SKILL).toMatch(/explicitly partial window\*\* whose upper bound is now/);
+    expect(SKILL).toMatch(/"partial — through <local time>"/);
+    expect(SKILL).toMatch(/un-elapsed time as outside the window, never as missing data/);
+    expect(SKILL).toMatch(/Never generate a report for a window that includes time later than now/);
     // Shared-browser safety: stored preferences are partitioned per grower.
     expect(SKILL).toMatch(/scoped to the signed-in user's ID\*\*/);
     expect(SKILL).toMatch(/never read, rendered, or\s+applied/);

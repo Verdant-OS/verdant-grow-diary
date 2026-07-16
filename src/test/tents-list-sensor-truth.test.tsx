@@ -634,8 +634,9 @@ describe("Tents list sensor truth — static wiring", () => {
   });
 
   it("drives freshness from a ticking clock, not a render-time Date.now()", () => {
-    expect(TENTS_SRC).toMatch(/setInterval/);
-    expect(TENTS_SRC).toMatch(/nowTick/);
+    // The interval lives in the shared useNowTick hook (used by the
+    // Dashboard strip too); the page must consume it and feed the presenter.
+    expect(TENTS_SRC).toMatch(/useNowTick/);
     expect(TENTS_SRC).toMatch(/buildTentSnapshotView\(\s*\(readingsByTent\[t\.id\][\s\S]*?nowTick/);
   });
 

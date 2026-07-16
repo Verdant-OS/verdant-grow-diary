@@ -1,5 +1,4 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Box, Lightbulb } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -15,6 +14,7 @@ import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
 import { useGrowPlants } from "@/hooks/useGrowData";
 import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import { useNowTick } from "@/hooks/useNowTick";
 
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { tentDetailPath, tentsPath } from "@/lib/routes";
@@ -51,11 +51,7 @@ export default function Tents() {
   const temperatureUnit = loadTemperatureUnitPreference();
   // Freshness is time-relative: re-evaluate the presenter's clock every
   // minute so an open tab cannot keep a fresh label past the stale boundary.
-  const [nowTick, setNowTick] = useState<number>(() => Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => setNowTick(Date.now()), 60_000);
-    return () => window.clearInterval(id);
-  }, []);
+  const nowTick = useNowTick();
   // AUD-001 fix: use real plants (Supabase, RLS-scoped) instead of mock
   // so plant counts match the assigned-tent reality. Mock plants reference
   // mock tent ids ("t1"..) which never match real tent UUIDs.

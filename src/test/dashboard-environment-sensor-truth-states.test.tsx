@@ -79,9 +79,7 @@ describe("Latest Environment (grow-scoped detail) — sensor truth copy", () => 
   });
 
   it("Timeline link uses the canonical /timeline route via timelinePath(scopedGrowId)", () => {
-    expect(DASHBOARD).toMatch(
-      /to=\{timelinePath\(scopedGrowId\)\}[\s\S]{0,200}Open Timeline/,
-    );
+    expect(DASHBOARD).toMatch(/to=\{timelinePath\(scopedGrowId\)\}[\s\S]{0,200}Open Timeline/);
     expect(DASHBOARD).not.toMatch(/logsPath\(/);
   });
 });
@@ -117,5 +115,31 @@ describe("Dashboard never claims live/healthy state for unknown or bad data", ()
   it("does not call demo or stale data 'Live'", () => {
     expect(DASHBOARD).not.toMatch(/\bDemo[\s-]*Live\b/i);
     expect(DASHBOARD).not.toMatch(/\bStale[\s-]*Live\b/i);
+  });
+});
+
+describe("Environment Snapshot strip — pending/failed/empty truth states (Tents-list parity)", () => {
+  it("distinguishes pending/failed reads from established absence", () => {
+    // statusByTent (loading/error/success) drives the per-tent branch; a
+    // pending or failed read must never render as "No sensor data yet".
+    expect(DASHBOARD).toMatch(/statusByTent/);
+    expect(DASHBOARD).toMatch(/dashboard-env-snapshot-loading-/);
+    expect(DASHBOARD).toMatch(/Loading sensor data/);
+    expect(DASHBOARD).toMatch(/dashboard-env-snapshot-unavailable-/);
+    expect(DASHBOARD).toMatch(/Sensor data unavailable/);
+    expect(DASHBOARD).toMatch(/dashboard-env-snapshot-no-data-/);
+    expect(DASHBOARD).toMatch(/No sensor data yet/);
+  });
+
+  it("only queries real UUID tent ids (mock-fallback ids short-circuit to established absence)", () => {
+    expect(DASHBOARD).toMatch(/\.filter\(\(id\) => isUuid\(id\)\)/);
+    expect(DASHBOARD).toMatch(/isUuid\(tent\.id\)/);
+  });
+
+  it("drives strip freshness from the shared ticking clock, not a render-time Date.now()", () => {
+    expect(DASHBOARD).toMatch(/useNowTick/);
+    expect(DASHBOARD).toMatch(
+      /buildTentSnapshotView\(\s*\(readingsByTent\[tent\.id\][\s\S]*?nowTick/,
+    );
   });
 });

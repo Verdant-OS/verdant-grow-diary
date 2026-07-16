@@ -29,6 +29,18 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
   }),
 }));
 
+const cancelNoticeMock = vi.hoisted(() => ({
+  visible: false as boolean,
+  accessUntilIso: null as string | null,
+  accessUntilLabel: "" as string,
+  reason: null as null | "cancel_at_period_end" | "scheduled_change_cancel",
+}));
+
+vi.mock("@/hooks/usePaddleCancelNotice", () => ({
+  usePaddleCancelNotice: () => cancelNoticeMock,
+}));
+
+
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "u1", email: "u@example.com" }, signOut: vi.fn() }),
 }));

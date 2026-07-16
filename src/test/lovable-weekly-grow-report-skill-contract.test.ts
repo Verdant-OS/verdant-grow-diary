@@ -86,10 +86,19 @@ describe("Lovable weekly grow report skill contract", () => {
     expect(SKILL).toMatch(
       /No control may consult the raw browser zone directly\s+once a valid preference exists/,
     );
-    expect(SKILL).toMatch(/today in the \*\*effective report timezone\*\*/);
+    expect(SKILL).toMatch(/current report day in the \*\*effective report timezone\*\*/);
     expect(SKILL).toMatch(
       /The effective report\s+timezone is displayed and is part of the report key/,
     );
+    // Non-midnight boundaries: "today" always means the current report day,
+    // so a selected window can never include time that has not begun.
+    expect(SKILL).toMatch(/\*\*Current report day\.\*\*/);
+    expect(SKILL).toMatch(/never the raw calendar date/);
+    expect(SKILL).toMatch(/never include report-day time that has not yet begun/);
+    expect(SKILL).toMatch(/Max selectable end date = the \*\*current report day\*\*/);
+    // Shared-browser safety: stored preferences are partitioned per grower.
+    expect(SKILL).toMatch(/scoped to the signed-in user's ID\*\*/);
+    expect(SKILL).toMatch(/never read, rendered, or\s+applied/);
     // Device-local only; account-synced persistence stays a separate slice.
     expect(SKILL).toMatch(/do not add tables for this slice/);
     // The original never-infer + no-server-persistence truths must survive.

@@ -54,6 +54,13 @@ inference.
   display, URL end-date resolution, day grouping, both comparison windows,
   and the report key. No control may consult the raw browser zone directly
   once a valid preference exists.
+- **Current report day.** With a non-midnight boundary, "today" is ambiguous:
+  before the boundary hour, the report day whose window contains now is
+  still the previous calendar date. Every "today" in selection rules — the
+  date-picker default and max bound, and relative preset rules like "ends
+  today" — resolves to the **current report day** (the local calendar date
+  whose boundary window contains now), never the raw calendar date, so a
+  selected window can never include report-day time that has not yet begun.
 - **Report day boundary.** The local hour at which a report "day" begins
   (whole hours only, default `00:00`; e.g. `06:00` for a lights-on day).
   Window instants become `[dayStart + boundary, nextDayStart + boundary)` —
@@ -70,9 +77,11 @@ inference.
 - **Selection, not history.** Zone and boundary are part of the report key;
   changing a preference is a new selection, never a silent rewrite of a
   previously generated report.
-- **Persistence (v1): device-local.** Stored in `localStorage` under a
-  versioned key, labeled "Saved on this device" in the UI. Stored values are
-  validated on load exactly like fresh input; unknown fields are discarded.
+- **Persistence (v1): device-local, per grower.** Stored in `localStorage`
+  under a versioned key **scoped to the signed-in user's ID** — on a shared
+  browser, another account's stored preferences are never read, rendered, or
+  applied. Stored values are validated on load exactly like fresh input;
+  unknown fields are discarded; the UI labels them "Saved on this device".
   No emails, notes, tokens, raw payloads, or another grower's identifiers are
   ever written to storage. An account-level (synced) preference is a separate
   schema slice that requires its own explicit authorization and migration —
@@ -86,10 +95,10 @@ inference.
 A single control at the top of the report lets the grower generate a report for **the 7-day window ending on any chosen day**. Purpose: let the grower re-run the report against past weeks or a non-Sunday cadence without needing custom filters.
 
 - **Control shape:** a single "Report end date" date picker (shadcn `Calendar` inside a `Popover` — see the shadcn-datepicker pattern, including `pointer-events-auto` on the calendar wrapper). Report window is always **7 local calendar days**, ending on the selected local date and starting 6 calendar dates before it.
-- **Default:** today in the **effective report timezone** — the validated report time preference when one is saved, else the validated browser zone. If no valid IANA zone is available from either source, block all report generation with an honest "Timezone needed" state; neither window nor its future/floor bounds are safe to resolve. Do not silently fall back to the server timezone.
+- **Default:** the current report day in the **effective report timezone** — the validated report time preference when one is saved, else the validated browser zone (see report time preferences for both terms). If no valid IANA zone is available from either source, block all report generation with an honest "Timezone needed" state; neither window nor its future/floor bounds are safe to resolve. Do not silently fall back to the server timezone.
 - **Companion display (read-only):** next to the picker, render the resolved window as `<startDate> → <endDate>` in the effective report timezone so the grower can verify before generating. Also render the prior-week comparison window (`<priorStart> → <priorEnd>`) so the week-over-week math is transparent.
 - **Bounds:**
-  - Max selectable end date = **today** in the effective report timezone. Future dates are disabled — never generate a report for a window that includes the future.
+  - Max selectable end date = the **current report day** in the effective report timezone. Future dates — and, with a non-midnight boundary, the calendar date whose report-day window has not yet begun — are disabled. Never generate a report for a window that includes the future.
   - Min selectable end date = the earliest activity returned by the audited,
     RLS-scoped source adapters (or a hard floor of 2 years back, whichever is
     later). Do not claim this bound until every enabled source adapter
@@ -151,14 +160,16 @@ regenerate in one click without reselecting settings.
   the preset**, so a grower who changes zones keeps consistent semantics.
   Never store emails, notes, sensor payloads, tokens, raw records, or another
   grower's identifiers.
-- **Applying a preset** resolves the rule against today in the validated
-  zone + boundary, shows the resolved window in the companion display, and
-  regenerates the report — a read-only selection change, exactly as if the
-  grower had set each control by hand. Bounds still apply: a resolved window
+- **Applying a preset** resolves the rule against the current report day in
+  the validated zone + boundary, shows the resolved window in the companion
+  display, and regenerates the report — a read-only selection change, exactly
+  as if the grower had set each control by hand. Bounds still apply: a resolved window
   may not include the future, and a fixed-date preset older than the search
   floor renders the floor-limit label, never fabricated data.
 - **Validation on load.** Presets persist device-locally (`localStorage`,
-  versioned key, "Saved on this device" label). Every stored preset is
+  versioned key **scoped to the signed-in user's ID**, "Saved on this
+  device" label); on a shared browser, another account's presets are never
+  listed, rendered, or applied. Every stored preset is
   re-validated on load like fresh input — unknown fields discarded, invalid
   dates/rules/plant references mark the preset "needs review" with an honest
   notice instead of applying partially. A plant reference that no longer

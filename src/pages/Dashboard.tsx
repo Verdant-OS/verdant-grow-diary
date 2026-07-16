@@ -656,7 +656,9 @@ export default function Dashboard() {
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="glass rounded-2xl p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-display font-semibold">Needs attention</h2>
+            {/* h3: nested under the "Needs attention" section H2 above —
+                keeping both as H2 rendered two identical visible H2s. */}
+            <h3 className="font-display font-semibold">Needs attention</h3>
             <Button asChild size="sm" variant="ghost"><Link to={alertsPath()}>All alerts <ArrowRight className="h-3 w-3" /></Link></Button>
           </div>
           {recentAlerts.length === 0 && (

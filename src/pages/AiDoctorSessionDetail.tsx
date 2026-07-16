@@ -6,10 +6,18 @@
  * RLS scopes ownership via auth.uid().
  */
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Stethoscope, Copy, Check, AlertCircle, Link as LinkIcon, ExternalLink } from "lucide-react";
+import {
+  ArrowLeft,
+  Stethoscope,
+  Copy,
+  Check,
+  AlertCircle,
+  Link as LinkIcon,
+  ExternalLink,
+} from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAiDoctorSession } from "@/hooks/use-ai-doctor-sessions";
@@ -313,9 +321,7 @@ function ReviewSummarySection({
                   data-linked-action-queue-id={linkedMatch?.id ?? undefined}
                 >
                   <span className="font-medium">{a.title}</span>
-                  {a.detail ? (
-                    <span className="text-muted-foreground"> — {a.detail}</span>
-                  ) : null}
+                  {a.detail ? <span className="text-muted-foreground"> — {a.detail}</span> : null}
                   {linkedMatch ? (
                     <div
                       className="mt-1 flex flex-wrap items-center gap-2"
@@ -341,10 +347,7 @@ function ReviewSummarySection({
                     </div>
                   ) : null}
                   {session ? (
-                    <AiDoctorSessionActionQueueButton
-                      session={session}
-                      action={a}
-                    />
+                    <AiDoctorSessionActionQueueButton session={session} action={a} />
                   ) : null}
                 </li>
               );
@@ -352,7 +355,6 @@ function ReviewSummarySection({
           </ul>
         )}
       </div>
-
 
       <ReviewList
         title="What not to do"
@@ -427,9 +429,7 @@ function ReviewBlock({
       <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </h4>
-      <p className={children ? "text-sm" : "text-xs text-muted-foreground"}>
-        {children ?? empty}
-      </p>
+      <p className={children ? "text-sm" : "text-xs text-muted-foreground"}>{children ?? empty}</p>
     </div>
   );
 }
@@ -451,10 +451,7 @@ function ReviewList({
         {title}
       </h4>
       {items.length === 0 ? (
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid={`${testid}-empty`}
-        >
+        <p className="text-xs text-muted-foreground" data-testid={`${testid}-empty`}>
           {empty}
         </p>
       ) : (
@@ -617,10 +614,7 @@ function SessionReviewStatusPanel({
           {vm.statusLabel}
         </Badge>
       </div>
-      <div
-        className="mt-2"
-        data-testid="ai-doctor-session-detail-review-status-history"
-      >
+      <div className="mt-2" data-testid="ai-doctor-session-detail-review-status-history">
         {vm.isEmpty ? (
           <p
             className="text-xs text-muted-foreground"
@@ -676,9 +670,7 @@ function SessionReviewActions({
   const mutation = useMarkAiDoctorSessionReview();
   const submitting = mutation.isPending;
 
-  const handle = async (
-    eventType: "marked_reviewed" | "needs_follow_up" | "cleared",
-  ) => {
+  const handle = async (eventType: "marked_reviewed" | "needs_follow_up" | "cleared") => {
     setErrorText(null);
     try {
       await mutation.mutateAsync({
@@ -693,17 +685,14 @@ function SessionReviewActions({
           ? (e as { message?: unknown }).message
           : null;
       const message =
-        typeof raw === "string" && raw.length > 0
-          ? raw
-          : "Could not save review event.";
+        typeof raw === "string" && raw.length > 0 ? raw : "Could not save review event.";
       setErrorText(message);
     }
   };
 
   const copy = buildSessionReviewActionsCopy(status);
   const disableMarkReviewed = submitting || copy.isMarkReviewedDisabledByStatus;
-  const disableNeedsFollowUp =
-    submitting || copy.isNeedsFollowUpDisabledByStatus;
+  const disableNeedsFollowUp = submitting || copy.isNeedsFollowUpDisabledByStatus;
   const disableClear = submitting || copy.isClearDisabledByStatus;
 
   return (
@@ -893,10 +882,7 @@ function SessionSummaryPanel({
             <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
               {it.label}
             </dt>
-            <dd
-              className="text-sm capitalize"
-              data-testid={it.testid}
-            >
+            <dd className="text-sm capitalize" data-testid={it.testid}>
               {it.value}
             </dd>
           </div>
@@ -921,7 +907,8 @@ function SessionSummaryPanel({
         className="text-[11px] text-muted-foreground"
         data-testid="ai-doctor-session-summary-review-note"
       >
-        Review this snapshot before acting on any suggestion. Verdant does not execute actions automatically.
+        Review this snapshot before acting on any suggestion. Verdant does not execute actions
+        automatically.
       </p>
     </section>
   );
@@ -957,8 +944,8 @@ function LinkedActionQueueEmpty() {
     >
       <h3 className="text-sm font-semibold">Linked Action Queue items</h3>
       <p className="text-xs text-muted-foreground">
-        No approval-required action has been queued from this review yet. Review the
-        snapshot before adding one.
+        No approval-required action has been queued from this review yet. Review the snapshot before
+        adding one.
       </p>
     </section>
   );
@@ -1010,10 +997,7 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
           View in Action Queue
         </Link>
       ) : (
-        <ul
-          className="space-y-1"
-          data-testid="ai-doctor-session-detail-linked-action-queue-list"
-        >
+        <ul className="space-y-1" data-testid="ai-doctor-session-detail-linked-action-queue-list">
           {vm.items.map((item) => (
             <li
               key={item.id}
@@ -1030,9 +1014,7 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
                 View in Action Queue
               </Link>
               {item.reasonText ? (
-                <span className="ml-2 text-muted-foreground">
-                  — {item.reasonText}
-                </span>
+                <span className="ml-2 text-muted-foreground">— {item.reasonText}</span>
               ) : null}
             </li>
           ))}
@@ -1041,7 +1023,6 @@ function LinkedActionQueueSection({ vm }: { vm: LinkedActionsViewModel }) {
     </section>
   );
 }
-
 
 function LinkedAlertSection({ vm }: { vm: LinkedActionsViewModel }) {
   const alertIds = vm.linkedAlertIds;
@@ -1065,8 +1046,8 @@ function LinkedAlertSection({ vm }: { vm: LinkedActionsViewModel }) {
         className="text-xs text-muted-foreground"
         data-testid="ai-doctor-session-detail-linked-alert-helper"
       >
-        This AI Doctor review is connected to an alert through an
-        approval-required Action Queue item.
+        This AI Doctor review is connected to an alert through an approval-required Action Queue
+        item.
       </p>
       <ul className="space-y-1" data-testid="ai-doctor-session-detail-linked-alert-list">
         {alertIds.map((aid) => (
@@ -1084,9 +1065,6 @@ function LinkedAlertSection({ vm }: { vm: LinkedActionsViewModel }) {
     </section>
   );
 }
-
-
-
 
 function fmtConfidence(val: number | null | undefined): string | null {
   if (typeof val !== "number" || !Number.isFinite(val)) return null;
@@ -1113,12 +1091,14 @@ export default function AiDoctorSessionDetail() {
         <CardHeader className="space-y-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="space-y-1">
-              <CardTitle
-                className="text-lg flex items-center gap-2"
+              {/* h1 (CardTitle renders an h3): this is the page's main title.
+                  Classes mirror CardTitle's base look at the text-lg size. */}
+              <h1
+                className="text-lg font-semibold leading-none tracking-tight flex items-center gap-2"
                 data-testid="ai-doctor-session-detail-title"
               >
                 <Stethoscope className="h-4 w-4" /> Historical AI Doctor Session
-              </CardTitle>
+              </h1>
               <p
                 className="text-xs text-muted-foreground"
                 data-testid="ai-doctor-session-detail-helper"
@@ -1216,7 +1196,6 @@ function SessionDetailBody({
   );
   const linkedActions = useAiDoctorSessionLinkedActionQueueItems(row.id);
 
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -1296,15 +1275,10 @@ function SessionDetailBody({
                 data-testid="ai-doctor-session-detail-caution-checklist"
                 className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"
               >
-                <p className="font-medium text-xs text-muted-foreground mb-1">
-                  Review checklist
-                </p>
+                <p className="font-medium text-xs text-muted-foreground mb-1">Review checklist</p>
                 <ul className="list-disc pl-5 text-sm space-y-0.5">
                   {checklist.map((item, i) => (
-                    <li
-                      key={i}
-                      data-testid="ai-doctor-session-detail-caution-checklist-item"
-                    >
+                    <li key={i} data-testid="ai-doctor-session-detail-caution-checklist-item">
                       {item}
                     </li>
                   ))}
@@ -1339,9 +1313,6 @@ function SessionDetailBody({
         linkedActions={linkedActions.vm}
       />
 
-
-
-
       {d?.likelyIssue ? (
         <div>
           <h3 className="text-sm font-semibold">Likely issue</h3>
@@ -1352,10 +1323,7 @@ function SessionDetailBody({
       {d?.summary ? (
         <div>
           <h3 className="text-sm font-semibold">Summary</h3>
-          <p
-            className="text-muted-foreground"
-            data-testid="ai-doctor-session-detail-summary"
-          >
+          <p className="text-muted-foreground" data-testid="ai-doctor-session-detail-summary">
             {d.summary}
           </p>
         </div>
@@ -1374,11 +1342,8 @@ function SessionDetailBody({
 
       <MissingInformationSection items={reviewVm.missingInformation} />
 
-
       <div>
-        <h3 className="text-sm font-semibold">
-          Suggested actions (read-only snapshot)
-        </h3>
+        <h3 className="text-sm font-semibold">Suggested actions (read-only snapshot)</h3>
         {actions.length === 0 ? (
           <p
             className="text-muted-foreground text-xs"
@@ -1387,10 +1352,7 @@ function SessionDetailBody({
             No suggested actions saved.
           </p>
         ) : (
-          <ul
-            className="space-y-2 mt-1"
-            data-testid="ai-doctor-session-detail-actions-list"
-          >
+          <ul className="space-y-2 mt-1" data-testid="ai-doctor-session-detail-actions-list">
             {actions.map((a, i) => (
               <li
                 key={i}
@@ -1398,9 +1360,7 @@ function SessionDetailBody({
                 data-testid="ai-doctor-session-detail-action"
               >
                 <div className="font-medium text-sm">{a.title}</div>
-                {a.detail ? (
-                  <p className="text-muted-foreground">{a.detail}</p>
-                ) : null}
+                {a.detail ? <p className="text-muted-foreground">{a.detail}</p> : null}
                 {a.reason ? (
                   <p className="text-muted-foreground italic">Reason: {a.reason}</p>
                 ) : null}

@@ -16,6 +16,12 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { MCP_MANIFEST } from "@/lib/mcp/manifestView";
+import listGrowsTool from "@/lib/mcp/tools/list-grows";
+import listDiaryTool from "@/lib/mcp/tools/list-recent-diary-entries";
+import getSnapshotTool from "@/lib/mcp/tools/get-latest-sensor-snapshot";
+
+/** The tool definitions the generated bundle/manifest are built from. */
+const SOURCE_TOOLS = [listGrowsTool, listDiaryTool, getSnapshotTool];
 
 type RawTool = {
   name: string;
@@ -58,9 +64,7 @@ describe("MCP manifest drift", () => {
   it("OAuth issuer is the direct supabase.co host, not a proxy", () => {
     expect(real.auth.type).toBe("oauth");
     expect(MCP_MANIFEST.oauthIssuer).toBe(real.auth.issuer);
-    expect(MCP_MANIFEST.oauthIssuer).toMatch(
-      /^https:\/\/[a-z0-9-]+\.supabase\.co\/auth\/v1$/,
-    );
+    expect(MCP_MANIFEST.oauthIssuer).toMatch(/^https:\/\/[a-z0-9-]+\.supabase\.co\/auth\/v1$/);
     expect(MCP_MANIFEST.oauthIssuer).not.toMatch(/lovable\.cloud/);
   });
 
@@ -69,11 +73,7 @@ describe("MCP manifest drift", () => {
     const viewNames = MCP_MANIFEST.tools.map((t) => t.name).sort();
     expect(viewNames).toEqual(realNames);
     expect(viewNames).toEqual(
-      [
-        "get_latest_sensor_snapshot",
-        "list_grows",
-        "list_recent_diary_entries",
-      ].sort(),
+      ["get_latest_sensor_snapshot", "list_grows", "list_recent_diary_entries"].sort(),
     );
   });
 
@@ -83,6 +83,34 @@ describe("MCP manifest drift", () => {
     }
     for (const tool of MCP_MANIFEST.tools) {
       expect(tool.readOnly).toBe(true);
+    }
+  });
+
+  it("tool titles and descriptions mirror the real manifest (not just param names)", () => {
+    for (const realTool of real.mcp.tools) {
+      const view = MCP_MANIFEST.tools.find((t) => t.name === realTool.name);
+      expect(view, `view missing for ${realTool.name}`).toBeDefined();
+      expect(view!.title, `stale title for ${realTool.name}`).toBe(realTool.title);
+      expect(view!.description, `stale description for ${realTool.name}`).toBe(
+        realTool.description,
+      );
+    }
+  });
+
+  it("tool source definitions match the generated manifest (title + description)", () => {
+    // Closes the drift triangle: source tools -> generated manifest -> TS
+    // view. A stale committed manifest (or a source edit that was never
+    // regenerated/mirrored) fails here instead of shipping silently.
+    expect(SOURCE_TOOLS.map((t) => t.name).sort()).toEqual(
+      real.mcp.tools.map((t) => t.name).sort(),
+    );
+    for (const tool of SOURCE_TOOLS) {
+      const realTool = real.mcp.tools.find((t) => t.name === tool.name);
+      expect(realTool, `manifest missing for ${tool.name}`).toBeDefined();
+      expect(realTool!.title, `manifest title drifted for ${tool.name}`).toBe(tool.title);
+      expect(realTool!.description, `manifest description drifted for ${tool.name}`).toBe(
+        tool.description,
+      );
     }
   });
 

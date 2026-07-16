@@ -13,11 +13,7 @@
  *   from the browser.
  */
 
-export type VerifyStatus =
-  | "authorized"
-  | "unauthorized"
-  | "harness_unavailable"
-  | "failed";
+export type VerifyStatus = "authorized" | "unauthorized" | "harness_unavailable" | "failed";
 
 export type VerifyMcpToolAccessResult = {
   status: VerifyStatus;
@@ -112,12 +108,23 @@ export async function verifyMcpToolAccess(
 export const defaultBrowserHarness: HarnessAdapter = { available: false };
 
 /**
+ * True when the adapter can actually run a probe. The Agent Integrations
+ * page uses this to render a static unavailable status instead of an
+ * interactive Verify button that could only ever report "unavailable".
+ */
+export function isHarnessUsable(adapter: HarnessAdapter | undefined): boolean {
+  return !!adapter && adapter.available === true && typeof adapter.probe === "function";
+}
+
+/** Presenter copy for the static harness-unavailable state. */
+export const HARNESS_UNAVAILABLE_LABEL = LABELS.harness_unavailable.label;
+export const HARNESS_UNAVAILABLE_DESCRIPTION = LABELS.harness_unavailable.description;
+
+/**
  * Safe next-step guidance for the Verify-tool-access status panel.
  * Presenter-safe copy only — no tokens, IDs, or private env values.
  */
-export function getVerifyStatusGuidance(
-  status: VerifyStatus | "not_checked",
-): string {
+export function getVerifyStatusGuidance(status: VerifyStatus | "not_checked"): string {
   switch (status) {
     case "not_checked":
       return "Run Verify tool access after connecting an agent.";
@@ -134,6 +141,4 @@ export function getVerifyStatusGuidance(
 }
 
 export const NOT_CHECKED_LABEL = "Not checked yet";
-export const NOT_CHECKED_DESCRIPTION =
-  "Verification has not run in this browser session.";
-
+export const NOT_CHECKED_DESCRIPTION = "Verification has not run in this browser session.";

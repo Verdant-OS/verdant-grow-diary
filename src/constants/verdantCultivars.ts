@@ -148,6 +148,24 @@ export const VERDANT_CULTIVARS: readonly VerdantCultivarProfile[] = [
       "Stretch ratio (final height ÷ flip height)",
       "Nose retention through cure",
     ],
+    samplePhenos: [
+      {
+        label: "Do-Si-Dos A (floral)",
+        structure: "Balanced, moderate stretch (~1.8x)",
+        aroma: "Sweet floral, light gas after cure",
+        resin: "Even, glassy heads by week 6",
+        yieldNote: "Moderate, spear-shaped colas",
+        finishNote: "Chop at ~63 days on cloudy/amber mix",
+      },
+      {
+        label: "Do-Si-Dos B (earthy-gas)",
+        structure: "Shorter, thicker stems, tighter node spacing",
+        aroma: "Earthy cookie backbone, gas on grind",
+        resin: "Heavier trichome load, milky at week 8",
+        yieldNote: "Slightly lower; denser flower",
+        finishNote: "5–7 days later than pheno A",
+      },
+    ],
   },
   {
     slug: "blue-cookies",

@@ -39,7 +39,9 @@ export async function maybeWriteActionFollowupDiaryEntry(
   const result = buildActionFollowupDiaryDraft(completed);
   if (!result.ok) return { ok: true, wrote: false, skipped: "draft_invalid" };
   const { draft } = result;
-  const actionId = completed.id as string;
+  // Canonical id from the draft (nonEmptyString-trimmed by the builder), so
+  // the idempotency lookup and the stored details can never disagree.
+  const actionId = draft.details.action_queue_id;
 
   // Idempotency lookup. RLS scopes this to the current user.
   const { data: existing, error: lookupErr } = await supabase

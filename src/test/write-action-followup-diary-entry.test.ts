@@ -70,6 +70,15 @@ describe("maybeWriteActionFollowupDiaryEntry", () => {
     expect((payload.note as string).length).toBeGreaterThan(0);
   });
 
+  it("canonicalizes a padded id — lookup and stored details always agree", async () => {
+    const result = await maybeWriteActionFollowupDiaryEntry(completedAction({ id: " a1 " }));
+    expect(result).toEqual({ ok: true, wrote: true });
+    const payload = insertMock.mock.calls[0][0] as Record<string, unknown>;
+    expect((payload.details as Record<string, unknown>).action_queue_id).toBe("a1");
+    const containsArgs = containsMock.mock.calls[0] as unknown[];
+    expect(containsArgs[1]).toMatchObject({ action_queue_id: "a1" });
+  });
+
   it("skips the insert when a matching follow-up already exists", async () => {
     lookupState.data = [
       { id: "d1", details: { event_type: "action_followup", action_queue_id: "a1" } },

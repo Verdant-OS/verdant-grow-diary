@@ -155,10 +155,27 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
   }
 
   // Subscription events → subscriptions table upsert / update.
+  //
+  // Paddle emits both the umbrella `subscription.updated` AND dedicated
+  // lifecycle events (`subscription.past_due`, `subscription.paused`,
+  // `subscription.resumed`, `subscription.trialing`, `subscription.activated`)
+  // for the same state transitions. They all carry the full SubscriptionData
+  // payload with an accurate `status` field, so we route them through the
+  // same upsert (idempotent via onConflict=paddle_subscription_id). This
+  // guarantees mirror state reflects dunning / pause / resume / trial
+  // transitions even when the umbrella `subscription.updated` is delayed or
+  // absent, and preserves the access-rule semantics in
+  // src/lib/paddleSubscriptionAccessRules.ts (active/trialing/past_due
+  // grant; paused revokes; canceled grants until period end — handled in
+  // its own branch below).
   if (
     type === 'subscription.created' ||
     type === 'subscription.updated' ||
-    type === 'subscription.activated'
+    type === 'subscription.activated' ||
+    type === 'subscription.resumed' ||
+    type === 'subscription.trialing' ||
+    type === 'subscription.past_due' ||
+    type === 'subscription.paused'
   ) {
     const sub = data as SubscriptionData;
     const userId = sub.customData?.userId;

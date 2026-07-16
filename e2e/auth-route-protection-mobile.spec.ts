@@ -74,6 +74,8 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/guides",
   "/guides/:slug",
   "/guides/grow-stage-care-guide",
+  "/cultivars",
+  "/cultivars/:slug",
   "/ai-doctor-readiness-check",
   "/founder",
   "/how-ai-doctor-works",

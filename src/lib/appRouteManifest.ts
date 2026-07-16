@@ -105,6 +105,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/checkout/cancel", access: "public", description: "Checkout cancellation return." },
   { path: "/checkout/success", access: "public", description: "Checkout success return." },
   { path: "/creator-beta", access: "public", description: "Creator beta landing page." },
+  { path: "/cultivars", access: "public", description: "Public cultivar guides index." },
+  {
+    path: "/cultivars/:slug",
+    access: "public",
+    description: "Public per-cultivar guide page (evergreen best-practice content).",
+  },
   {
     path: "/customer/:shareId",
     access: "public",
@@ -121,12 +127,6 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     path: "/demo/one-tent-live-proof",
     access: "operator",
     description: "Legacy operator one-tent live proof page.",
-  },
-  { path: "/cultivars", access: "public", description: "Public cultivar guides index." },
-  {
-    path: "/cultivars/:slug",
-    access: "public",
-    description: "Public per-cultivar guide page (evergreen best-practice content).",
   },
   { path: "/diagnostics", access: "operator" },
   {

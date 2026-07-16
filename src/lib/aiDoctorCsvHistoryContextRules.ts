@@ -115,11 +115,20 @@ function isSuspicious(row: CsvHistorySensorRowLike): boolean {
   return false;
 }
 
-function isCsvRow(row: CsvHistorySensorRowLike): boolean {
+/**
+ * True only for rows EXPLICITLY identified as imported CSV history:
+ * source === "csv" or a raw_payload.csv_import === true provenance flag.
+ * Manual, demo, live, stale, and invalid rows are never reinterpreted
+ * as CSV. Exported so packet builders can pre-filter with the exact
+ * same rule this summarizer applies internally.
+ */
+export function isCsvHistoryRow(row: CsvHistorySensorRowLike): boolean {
   if (row.source === "csv") return true;
   const payload = asRecord(row.raw_payload);
   return payload?.csv_import === true;
 }
+
+const isCsvRow = isCsvHistoryRow;
 
 function round3(n: number): number {
   return Math.round(n * 1000) / 1000;

@@ -24,6 +24,8 @@ import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
+import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import { isUuid } from "@/lib/growRepo";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
@@ -31,6 +33,9 @@ import {
   classificationFromStatusResult,
   type Classification,
 } from "@/lib/sensorSnapshotStatusContract";
+
+/** Stable empty-array identity so the packet memo does not churn. */
+const NO_TENT_SENSOR_ROWS: never[] = [];
 
 export const AI_DOCTOR_LIVE_REVIEW_LOADING_COPY = "Preparing cautious AI Doctor review…";
 export const AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY =
@@ -67,6 +72,16 @@ export default function PlantDetailAiDoctorLiveReview({
 }: PlantDetailAiDoctorLiveReviewProps) {
   const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
   const { data: bridgeHealth } = useSensorBridgeHealth();
+  // Bounded per-tent sensor window (same shared per-tent hook as the
+  // Dashboard/Tents surfaces; non-UUID tent ids are never queried). The
+  // rows only feed the pure packet builder, which forwards a sanitized
+  // imported-CSV-history summary — raw rows never enter the packet.
+  const { byTent: readingsByTent } = useSensorReadingsByTents(
+    isUuid(tentId) ? [tentId] : [],
+  );
+  const tentSensorRows = tentId
+    ? (readingsByTent[tentId] ?? NO_TENT_SENSOR_ROWS)
+    : NO_TENT_SENSOR_ROWS;
 
   const context = useMemo(
     () =>
@@ -86,9 +101,10 @@ export default function PlantDetailAiDoctorLiveReview({
             plant,
             timelineItems: items,
             context,
+            csvHistoryRows: tentSensorRows,
           })
         : null,
-    [allowed, plant, items, context],
+    [allowed, plant, items, context, tentSensorRows],
   );
 
   // Real intake classification — never synthesized from presence.

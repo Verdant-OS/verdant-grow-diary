@@ -126,14 +126,33 @@ interface CustomerData {
   status?: string | null;
 }
 
-function firstItem(data: SubscriptionData | TransactionData) {
-  return Array.isArray(data.items) && data.items.length > 0 ? data.items[0] : null;
+function firstItem(data: SubscriptionData | TransactionData | CustomerData) {
+  const items = (data as SubscriptionData | TransactionData).items;
+  return Array.isArray(items) && items.length > 0 ? items[0] : null;
 }
 
 export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
   const type = event.eventType ?? '';
   const data = event.data ?? {};
   const nowIso = now.toISOString();
+
+  // Customer mirror events → paddle_customers table upsert.
+  if (type === 'customer.created' || type === 'customer.updated') {
+    const c = data as CustomerData;
+    if (!c.id) return { kind: 'skip', reason: 'missing_customer_id' };
+    return {
+      kind: 'upsert_customer',
+      row: {
+        paddle_customer_id: c.id,
+        environment: env,
+        email: c.email ?? null,
+        name: c.name ?? null,
+        locale: c.locale ?? null,
+        status: c.status ?? null,
+        updated_at: nowIso,
+      },
+    };
+  }
 
   // Subscription events → subscriptions table upsert / update.
   if (
@@ -157,6 +176,9 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
       return { kind: 'skip', reason: 'unknown_price_id' };
     }
 
+    const scheduledAction = sub.scheduledChange?.action ?? null;
+    const scheduledAt = sub.scheduledChange?.effectiveAt ?? null;
+
     return {
       kind: 'upsert_subscription',
       row: {
@@ -168,7 +190,9 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
         status: sub.status ?? 'active',
         current_period_start: sub.currentBillingPeriod?.startsAt ?? null,
         current_period_end: sub.currentBillingPeriod?.endsAt ?? null,
-        cancel_at_period_end: sub.scheduledChange?.action === 'cancel',
+        cancel_at_period_end: scheduledAction === 'cancel',
+        scheduled_change_action: scheduledAction,
+        scheduled_change_at: scheduledAt,
         environment: env,
         updated_at: nowIso,
       },

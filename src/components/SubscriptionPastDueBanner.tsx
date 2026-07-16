@@ -16,7 +16,7 @@ import { AlertTriangle } from "lucide-react";
 
 export function SubscriptionPastDueBanner() {
   const { loading, entitlement } = useMyEntitlements();
-  const { opening, error, clearError } = useOpenCustomerPortalState();
+  const { opening, error, open, clearError } = useOpenCustomerPortalState();
 
   if (loading) return null;
   if (entitlement?.status !== "past_due") return null;

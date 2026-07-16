@@ -79,6 +79,17 @@ describe("Lovable weekly grow report skill contract", () => {
     expect(SKILL).toMatch(/Mixed-boundary comparisons\s+are forbidden/);
     expect(SKILL).toMatch(/Days run\s+06:00 → 06:00 local/);
     expect(SKILL).toMatch(/never a\s+silent fallback/);
+    // The selected zone governs every selection surface — the browser zone
+    // is only the fallback (PR #260 review finding).
+    expect(SKILL).toMatch(/\*\*Effective report timezone\.\*\*/);
+    expect(SKILL).toMatch(/governs every\s+selection surface/);
+    expect(SKILL).toMatch(
+      /No control may consult the raw browser zone directly\s+once a valid preference exists/,
+    );
+    expect(SKILL).toMatch(/today in the \*\*effective report timezone\*\*/);
+    expect(SKILL).toMatch(
+      /The effective report\s+timezone is displayed and is part of the report key/,
+    );
     // Device-local only; account-synced persistence stays a separate slice.
     expect(SKILL).toMatch(/do not add tables for this slice/);
     // The original never-infer + no-server-persistence truths must survive.

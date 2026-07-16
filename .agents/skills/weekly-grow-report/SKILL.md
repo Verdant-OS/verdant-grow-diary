@@ -48,6 +48,12 @@ inference.
   silent fallback and never a blocked report when the browser zone is valid.
   The never-infer rule stands: no zone from sensor timestamps, light-schedule
   text, locale, or IP.
+- **Effective report timezone.** One resolved zone — the validated saved
+  preference when present, else the validated browser zone — governs every
+  selection surface: date-picker defaults and bounds, the companion window
+  display, URL end-date resolution, day grouping, both comparison windows,
+  and the report key. No control may consult the raw browser zone directly
+  once a valid preference exists.
 - **Report day boundary.** The local hour at which a report "day" begins
   (whole hours only, default `00:00`; e.g. `06:00` for a lights-on day).
   Window instants become `[dayStart + boundary, nextDayStart + boundary)` —
@@ -80,10 +86,10 @@ inference.
 A single control at the top of the report lets the grower generate a report for **the 7-day window ending on any chosen day**. Purpose: let the grower re-run the report against past weeks or a non-Sunday cadence without needing custom filters.
 
 - **Control shape:** a single "Report end date" date picker (shadcn `Calendar` inside a `Popover` — see the shadcn-datepicker pattern, including `pointer-events-auto` on the calendar wrapper). Report window is always **7 local calendar days**, ending on the selected local date and starting 6 calendar dates before it.
-- **Default:** today in the validated browser timezone. If a valid IANA zone is unavailable, block all report generation with an honest "Timezone needed" state; neither window nor its future/floor bounds are safe to resolve. Do not silently fall back to the server timezone.
-- **Companion display (read-only):** next to the picker, render the resolved window as `<startDate> → <endDate>` in the grower's local timezone so they can verify before generating. Also render the prior-week comparison window (`<priorStart> → <priorEnd>`) so the week-over-week math is transparent.
+- **Default:** today in the **effective report timezone** — the validated report time preference when one is saved, else the validated browser zone. If no valid IANA zone is available from either source, block all report generation with an honest "Timezone needed" state; neither window nor its future/floor bounds are safe to resolve. Do not silently fall back to the server timezone.
+- **Companion display (read-only):** next to the picker, render the resolved window as `<startDate> → <endDate>` in the effective report timezone so the grower can verify before generating. Also render the prior-week comparison window (`<priorStart> → <priorEnd>`) so the week-over-week math is transparent.
 - **Bounds:**
-  - Max selectable end date = **today** in the grower's local timezone. Future dates are disabled — never generate a report for a window that includes the future.
+  - Max selectable end date = **today** in the effective report timezone. Future dates are disabled — never generate a report for a window that includes the future.
   - Min selectable end date = the earliest activity returned by the audited,
     RLS-scoped source adapters (or a hard floor of 2 years back, whichever is
     later). Do not claim this bound until every enabled source adapter
@@ -92,10 +98,11 @@ A single control at the top of the report lets the grower generate a report for 
   - If the selected window contains zero source events (no diary entries, no sensor readings, no alerts), render the report with honest empty states in each section — never fabricate a baseline and never silently shift the window.
 - **Comparison window follows automatically.** Selecting an end date of `D` sets this-week local dates to `D−6 ... D` and prior-week local dates to `D−13 ... D−7`. Resolve each as its own half-open instant window in the same timezone.
 - **URL + deterministic selection.** Encode only the validated end-date value
-  as `?end=YYYY-MM-DD` on the private report route. The browser timezone is
-  displayed and is part of the report key; the URL alone is not evidence that
-  a different device used the same timezone. Do not put emails, notes, sensor
-  payloads, service tokens, or unvalidated query values in the URL.
+  as `?end=YYYY-MM-DD` on the private report route. The effective report
+  timezone is displayed and is part of the report key; the URL alone is not
+  evidence that a different device resolved the same timezone. Do not put
+  emails, notes, sensor payloads, service tokens, or unvalidated query values
+  in the URL.
 - **Accessibility.** The picker is keyboard-navigable, has a visible label ("Report end date"), announces the resolved window to screen readers via `aria-live="polite"` when the date changes, and the calendar hit targets meet the existing a11y CI bar.
 - **Read-only.** Changing the date only re-reads existing data; it never writes, never triggers an AI call, never inserts Action Queue items, and never sends device commands.
 - **No preset shortcuts that imply value judgment.** A small neutral set of shortcuts is allowed — "Today", "Yesterday", "Last Sunday" — rendered as plain buttons in muted tokens. No "best week", "worst week", or streak framing. Grower-defined saved presets (below) are additionally allowed; the system itself never generates a judgment-framed preset.

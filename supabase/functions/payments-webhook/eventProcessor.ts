@@ -30,7 +30,8 @@ export type Decision =
   | { kind: 'skip'; reason: SkipReason }
   | { kind: 'upsert_subscription'; row: SubscriptionUpsertRow }
   | { kind: 'update_subscription'; paddleSubscriptionId: string; patch: SubscriptionPatch }
-  | { kind: 'record_lifetime'; row: SubscriptionUpsertRow };
+  | { kind: 'record_lifetime'; row: SubscriptionUpsertRow }
+  | { kind: 'upsert_customer'; row: CustomerUpsertRow };
 
 export type SkipReason =
   | 'missing_user_id'
@@ -39,6 +40,7 @@ export type SkipReason =
   | 'unknown_price_id'
   | 'missing_subscription_id'
   | 'missing_transaction_id'
+  | 'missing_customer_id'
   | 'unhandled_event_type'
   | 'lifetime_price_only_for_transactions'
   | 'non_lifetime_transaction'

@@ -29,3 +29,14 @@ project_id = "knkwiiywfkbqznbxwqfh"
   # tests / previews can hit it without editing project auth config.
   [functions.checkout-status]
     verify_jwt = false
+  # paddle-portal-session mints a Paddle customer-portal URL for the
+  # signed-in caller. Re-verifies the caller JWT inside the function via
+  # auth.getUser; keeps platform verify_jwt off for parity with the other
+  # audited billing surfaces.
+  [functions.paddle-portal-session]
+    verify_jwt = false
+  # delete-account revokes the caller's sessions and deletes their auth
+  # user. Re-verifies JWT inside via auth.getUser before any destructive
+  # write; service_role is only used after that check succeeds.
+  [functions.delete-account]
+    verify_jwt = false

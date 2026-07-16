@@ -26,6 +26,9 @@ import {
   verifyMcpToolAccess,
   defaultBrowserHarness,
   getVerifyStatusGuidance,
+  isHarnessUsable,
+  HARNESS_UNAVAILABLE_LABEL,
+  HARNESS_UNAVAILABLE_DESCRIPTION,
   NOT_CHECKED_LABEL,
   NOT_CHECKED_DESCRIPTION,
   type HarnessAdapter,
@@ -145,9 +148,20 @@ export default function AgentIntegrations({
     }
   }, [verifyHarness]);
 
-  const panelStatus = verifyResult?.status ?? "not_checked";
-  const panelLabel = verifyResult?.label ?? NOT_CHECKED_LABEL;
-  const panelDescription = verifyResult?.description ?? NOT_CHECKED_DESCRIPTION;
+  // Without a usable harness (the production default — the browser has no
+  // safe way to probe MCP without exposing tokens) the Verify button could
+  // only ever answer "harness unavailable", so render that as a static
+  // status instead of an interactive dead end.
+  const harnessUsable = isHarnessUsable(verifyHarness);
+  const panelStatus = harnessUsable
+    ? (verifyResult?.status ?? "not_checked")
+    : "harness_unavailable";
+  const panelLabel = harnessUsable
+    ? (verifyResult?.label ?? NOT_CHECKED_LABEL)
+    : HARNESS_UNAVAILABLE_LABEL;
+  const panelDescription = harnessUsable
+    ? (verifyResult?.description ?? NOT_CHECKED_DESCRIPTION)
+    : HARNESS_UNAVAILABLE_DESCRIPTION;
   const panelGuidance = getVerifyStatusGuidance(panelStatus);
 
   const [manifestModalOpen, setManifestModalOpen] = useState(false);
@@ -297,14 +311,20 @@ export default function AgentIntegrations({
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Verify tool access</h2>
-            <Button
-              onClick={onVerify}
-              disabled={verifyBusy}
-              data-testid="verify-tool-access-button"
-              variant="outline"
-            >
-              {verifyBusy ? "Verifying…" : "Verify tool access"}
-            </Button>
+            {harnessUsable ? (
+              <Button
+                onClick={onVerify}
+                disabled={verifyBusy}
+                data-testid="verify-tool-access-button"
+                variant="outline"
+              >
+                {verifyBusy ? "Verifying…" : "Verify tool access"}
+              </Button>
+            ) : (
+              <Badge variant="secondary" data-testid="verify-harness-unavailable-badge">
+                Unavailable in this build
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             Runs a read-only <code className="font-mono">list_grows</code> check against the local

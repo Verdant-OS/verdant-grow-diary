@@ -122,6 +122,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "operator",
     description: "Legacy operator one-tent live proof page.",
   },
+  { path: "/cultivars", access: "public", description: "Public cultivar guides index." },
+  {
+    path: "/cultivars/:slug",
+    access: "public",
+    description: "Public per-cultivar guide page (evergreen best-practice content).",
+  },
   { path: "/diagnostics", access: "operator" },
   {
     path: "/diary/environment-summary",
@@ -349,6 +355,8 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Authenticated agent integrations settings.",
   },
   { path: "/signup", access: "redirect", description: "→ /auth" },
+  { path: "/strains", access: "redirect", description: "→ /cultivars" },
+  { path: "/strains/:slug", access: "redirect", description: "→ /cultivars/:slug" },
   { path: "/tasks", access: "auth" },
   { path: "/tents", access: "auth" },
   { path: "/tents/:id", access: "auth" },

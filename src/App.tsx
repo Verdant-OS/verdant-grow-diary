@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -87,6 +87,8 @@ const Founder = lazy(() => import("./pages/Founder"));
 const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
 const GrowStageCareGuide = lazy(() => import("./pages/GrowStageCareGuide"));
+const CultivarsIndex = lazy(() => import("./pages/CultivarsIndex"));
+const CultivarPage = lazy(() => import("./pages/CultivarPage"));
 const Glossary = lazy(() => import("./pages/Glossary"));
 const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
 const AiDoctorContextCheck = lazy(() => import("./pages/AiDoctorContextCheck"));
@@ -157,6 +159,12 @@ function PageLoader() {
   );
 }
 
+function LegacyStrainSlugRedirect() {
+  // Preserves the slug when redirecting /strains/:slug → /cultivars/:slug.
+  const { slug } = useParams<{ slug: string }>();
+  return <Navigate to={`/cultivars/${slug ?? ""}`} replace />;
+}
+
 const App = () => (
   <RootErrorBoundary>
     <QueryClientProvider client={queryClient}>
@@ -203,6 +211,13 @@ const App = () => (
                   <Route path="/guides" element={<GuidesIndex />} />
                   <Route path="/guides/grow-stage-care-guide" element={<GrowStageCareGuide />} />
                   <Route path="/guides/:slug" element={<GuidePage />} />
+                  <Route path="/cultivars" element={<CultivarsIndex />} />
+                  <Route path="/cultivars/:slug" element={<CultivarPage />} />
+                  {/* Legacy "strain" URL aliases capture search intent for
+                      "Oreoz strain" / "Do-Si-Dos" etc. and route to the
+                      canonical /cultivars surface (vocab: cultivar, not strain). */}
+                  <Route path="/strains" element={<Navigate to="/cultivars" replace />} />
+                  <Route path="/strains/:slug" element={<LegacyStrainSlugRedirect />} />
                   <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
                   <Route path="/ai-doctor-readiness-check" element={<AiDoctorContextCheck />} />

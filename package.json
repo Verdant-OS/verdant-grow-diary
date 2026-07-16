@@ -13,6 +13,7 @@
     "format:check": "prettier --check .",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:mcp:rls:local": "bunx vitest run src/test/mcp-local-rls-integration.test.ts",
     "test:summarize-timeouts": "node scripts/summarize-vitest-timeouts.mjs",
     "test:demo-proof-guards": "vitest run demoProofWalkthrough-no-grows-route demoProofWalkthrough-route-snapshot proofReportRedactionRules --reporter=verbose",
     "test:demo-proof:full": "bun run test:demo-proof-guards && bunx vitest run proofReportRedactionRules DemoProofWalkthrough demoProofWalkthrough --reporter=verbose && bunx tsc -p tsconfig.app.json --noEmit && bun run test:e2e:demo-proof-readonly",
@@ -112,6 +113,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "@lovable.dev/mcp-js": "^0.20.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",

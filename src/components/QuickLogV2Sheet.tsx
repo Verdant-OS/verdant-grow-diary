@@ -25,6 +25,7 @@ import { useAuth } from "@/store/auth";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
+import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 
 import {
   buildQuickLogV2TargetOptions,
@@ -781,6 +782,22 @@ export default function QuickLogV2Sheet({
             visible={showMaturityEvidence}
             disabled={saving || feedingSaving}
           />
+
+          {/* Live tent sensor context at the moment of logging. Presenter
+              only — reads the strict resolver via the strip's hook, never
+              writes, and (variant="context") its copy never claims the
+              reading is attached to this log; the manual fields below stay
+              the only sensor values this save can record. Gated on a
+              resolved tent id (legacy parity): a tentless plant's gap is
+              tent assignment, not sensors, so "add a snapshot" guidance
+              would mislead there. */}
+          {form.action !== "feed" && resolvedContext.tentId && (
+            <QuickLogSensorSnapshotStrip
+              growId={resolvedContext.growId}
+              tentId={resolvedContext.tentId}
+              variant="context"
+            />
+          )}
 
           {form.action !== "feed" && (
           <details className="rounded-md border border-border p-3">

@@ -19,11 +19,11 @@ import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import {
   buildQuickLogStripFromTentState,
   type QuickLogSnapshotStripStatus,
+  type QuickLogStripVariant,
 } from "@/lib/quickLogSnapshotStripAdapter";
 import SnapshotTrustBadge from "@/components/SnapshotTrustBadge";
 import { buildQuickLogSensorSnapshotViewModel } from "@/lib/quickLogSensorSnapshotViewModel";
 import { adaptQuickLogSensorContextInput } from "@/lib/quickLogSensorSnapshotViewModelAdapter";
-
 
 interface Props {
   growId?: string | null | undefined;
@@ -33,6 +33,13 @@ interface Props {
    * omitted, defaults to true so legacy callers/tests keep their behavior.
    */
   attached?: boolean;
+  /**
+   * Copy variant. `attach` (default) is the legacy Quick Log, whose save
+   * really attaches a usable snapshot. `context` is for surfaces that show
+   * the reading as read-only context and never attach it (Quick Log v2) —
+   * its copy makes no attachment promises. See QuickLogStripVariant.
+   */
+  variant?: QuickLogStripVariant;
 }
 
 const TONE: Record<QuickLogSnapshotStripStatus, string> = {
@@ -70,7 +77,10 @@ const PILL_ARIA: Record<QuickLogSnapshotStripStatus, string> = {
 // label as the canonical badge, we suppress the pill text instead —
 // never the badge. The dedupe comparison is case-insensitive and
 // trim-normalized but does not change user-facing copy.
-function shouldRenderTrustBadge(_status: QuickLogSnapshotStripStatus, _trustLabel: string): boolean {
+function shouldRenderTrustBadge(
+  _status: QuickLogSnapshotStripStatus,
+  _trustLabel: string,
+): boolean {
   // Always render the canonical trust badge. See isPillRedundantWithBadge
   // for the inverse decision used to hide the duplicate pill label.
   return true;
@@ -84,13 +94,19 @@ function isPillRedundantWithBadge(
   return trustLabel.trim().toLowerCase() === PILL_LABEL[status].toLowerCase();
 }
 
-export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, attached = true }: Props) {
+export default function QuickLogSensorSnapshotStrip({
+  growId: _growId,
+  tentId,
+  attached = true,
+  variant = "attach",
+}: Props) {
   const state = useLatestTentSensorSnapshot(tentId ?? null);
   const view = buildQuickLogStripFromTentState({
     status: state.status,
     snapshot: state.snapshot,
     hasTent: !!tentId,
     attached,
+    variant,
   });
 
   // Additive: derive a single consistent freshness/empty advisory line
@@ -103,13 +119,16 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
       attached,
     }),
   );
+  // The freshness view-model's warning copy is written for the attach
+  // world (e.g. stale warns "Save will be marked accordingly"), which is
+  // false on context surfaces where nothing is attached to the save — so
+  // the context variant renders no advisory line; its staleness/missing
+  // copy comes from the adapter's context descriptions instead.
   const advisory =
-    vm.display && vm.display.freshness === "fresh" ? null : vm.warning ?? vm.emptyCopy;
-  const advisoryKind = vm.display
-    ? vm.display.freshness
-    : vm.emptyCopy
-      ? "missing"
-      : null;
+    variant === "context" || (vm.display && vm.display.freshness === "fresh")
+      ? null
+      : (vm.warning ?? vm.emptyCopy);
+  const advisoryKind = vm.display ? vm.display.freshness : vm.emptyCopy ? "missing" : null;
   const showTrustBadge = shouldRenderTrustBadge(view.status, view.trustBadge.label);
   const pillIsRedundant = isPillRedundantWithBadge(view.status, view.trustBadge.label);
 
@@ -117,6 +136,7 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
     <section
       data-testid="quicklog-sensor-snapshot-strip"
       data-status={view.status}
+      data-variant={variant}
       aria-label="Sensor snapshot summary"
       className={`rounded-lg border p-3 space-y-2 ${TONE[view.status]}`}
     >
@@ -158,8 +178,6 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
           </span>
 
           {showTrustBadge && <SnapshotTrustBadge view={view.trustBadge} showProvider={false} />}
-
-
         </div>
       </div>
 
@@ -182,14 +200,16 @@ export default function QuickLogSensorSnapshotStrip({ growId: _growId, tentId, a
             <span data-testid="quicklog-sensor-snapshot-age">Captured {view.ageLabel}</span>
           )}
           {view.metrics.map((m) => (
-            <span key={m.label} data-testid={`quicklog-sensor-snapshot-metric-${m.label.toLowerCase()}`}>
+            <span
+              key={m.label}
+              data-testid={`quicklog-sensor-snapshot-metric-${m.label.toLowerCase()}`}
+            >
               <span className="text-muted-foreground/70">{m.label}</span>{" "}
               <span className="text-foreground">{m.value}</span>
             </span>
           ))}
         </div>
       )}
-
 
       {view.action.kind !== "none" && (
         <a

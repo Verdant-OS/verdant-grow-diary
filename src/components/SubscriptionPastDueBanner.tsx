@@ -11,12 +11,12 @@
  * subscription transitions to canceled.
  */
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
-import { openPaddleCustomerPortal, useOpenCustomerPortalState } from "@/lib/customerPortal";
+import { useOpenCustomerPortalState } from "@/lib/customerPortal";
 import { AlertTriangle } from "lucide-react";
 
 export function SubscriptionPastDueBanner() {
   const { loading, entitlement } = useMyEntitlements();
-  const { opening, error, clearError } = useOpenCustomerPortalState();
+  const { opening, error, open, clearError } = useOpenCustomerPortalState();
 
   if (loading) return null;
   if (entitlement?.status !== "past_due") return null;
@@ -38,7 +38,7 @@ export function SubscriptionPastDueBanner() {
           type="button"
           onClick={() => {
             clearError();
-            void openPaddleCustomerPortal();
+            void open();
           }}
           disabled={opening}
           aria-busy={opening}

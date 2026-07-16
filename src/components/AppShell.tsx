@@ -16,6 +16,7 @@ import GlobalFastAddButton from "./GlobalFastAddButton";
 import AuthStatusIndicator from "./AuthStatusIndicator";
 import SignOutConfirmDialog from "./SignOutConfirmDialog";
 import VerificationPendingBanner from "./VerificationPendingBanner";
+import { SubscriptionPastDueBanner } from "./SubscriptionPastDueBanner";
 import GlobalSearchDialog from "./GlobalSearchDialog";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { isEmailVerificationPending } from "@/lib/emailVerificationRules";

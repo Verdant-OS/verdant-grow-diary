@@ -768,6 +768,32 @@ export default function Auth() {
                       : "Create account"}
                 </Button>
               </form>
+              <div className="relative my-4" aria-hidden="true">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border/50" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-background px-2 text-[11px] uppercase tracking-widest text-muted-foreground">
+                    Or
+                  </span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={signInWithGoogle}
+                disabled={googleBusy}
+                aria-busy={googleBusy}
+                data-testid="auth-google-signup"
+                className="w-full"
+              >
+                {googleBusy ? "Opening Google…" : "Continue with Google"}
+              </Button>
+              {googleError ? (
+                <AuthInlineMessage role="alert" tone="error">
+                  {googleError}
+                </AuthInlineMessage>
+              ) : null}
             </TabsContent>
 
             <TabsContent value="forgot">

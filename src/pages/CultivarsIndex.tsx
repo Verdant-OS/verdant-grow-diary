@@ -4,11 +4,42 @@
  * Presenter only. Evergreen, curated cultivator-focused profiles. No live
  * grow diaries, no fake sensor data, no AI-picks-winners claims. Content
  * comes from `verdantCultivars` constants so copy cannot drift.
+ *
+ * Search + difficulty filter are URL-synced (?q=, ?difficulty=) so a
+ * filtered view is directly deep-linkable and shareable.
  */
-import { Link } from "react-router-dom";
+import { useMemo } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
-import { VERDANT_CULTIVARS } from "@/constants/verdantCultivars";
+import {
+  VERDANT_CULTIVARS,
+  type VerdantCultivarProfile,
+} from "@/constants/verdantCultivars";
+
+type DifficultyFilter = "all" | VerdantCultivarProfile["difficulty"];
+
+const DIFFICULTY_OPTIONS: ReadonlyArray<{ value: DifficultyFilter; label: string }> = [
+  { value: "all", label: "All levels" },
+  { value: "Beginner-friendly", label: "Beginner-friendly" },
+  { value: "Intermediate", label: "Intermediate" },
+  { value: "Advanced", label: "Advanced" },
+];
+
+function normalize(s: string): string {
+  return s.toLowerCase().trim();
+}
+
+function matchesQuery(c: VerdantCultivarProfile, q: string): boolean {
+  if (!q) return true;
+  const needle = normalize(q);
+  return (
+    normalize(c.name).includes(needle) ||
+    normalize(c.searchAlias).includes(needle) ||
+    normalize(c.lineage).includes(needle) ||
+    normalize(c.slug).includes(needle)
+  );
+}
 
 export default function CultivarsIndex() {
   usePageSeo({
@@ -17,6 +48,36 @@ export default function CultivarsIndex() {
       "Evergreen cultivar profiles for serious home growers: environment ranges, flower windows, common issues, and what to compare when pheno-hunting.",
     path: "/cultivars",
   });
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawQuery = searchParams.get("q") ?? "";
+  const rawDifficulty = (searchParams.get("difficulty") ?? "all") as DifficultyFilter;
+  const difficulty: DifficultyFilter = DIFFICULTY_OPTIONS.some((o) => o.value === rawDifficulty)
+    ? rawDifficulty
+    : "all";
+
+  const updateParam = (key: "q" | "difficulty", value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (!value || (key === "difficulty" && value === "all")) {
+      next.delete(key);
+    } else {
+      next.set(key, value);
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  const filtered = useMemo(
+    () =>
+      VERDANT_CULTIVARS.filter(
+        (c) =>
+          matchesQuery(c, rawQuery) &&
+          (difficulty === "all" ? true : c.difficulty === difficulty),
+      ),
+    [rawQuery, difficulty],
+  );
+
+  const clearAll = () => setSearchParams(new URLSearchParams(), { replace: true });
+  const hasFilters = rawQuery.trim().length > 0 || difficulty !== "all";
 
   return (
     <main
@@ -61,26 +122,103 @@ export default function CultivarsIndex() {
       </section>
 
       <section className="px-6 pb-16 max-w-3xl mx-auto">
-        <h2 className="font-display text-2xl font-semibold mb-6">Featured cultivars</h2>
-        <ul className="space-y-4">
-          {VERDANT_CULTIVARS.map((c) => (
-            <li
-              key={c.slug}
-              className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors"
+        <h2 className="font-display text-2xl font-semibold mb-4">Featured cultivars</h2>
+
+        <form
+          role="search"
+          aria-label="Filter cultivar guides"
+          className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end"
+          onSubmit={(e) => e.preventDefault()}
+        >
+          <div className="flex-1">
+            <label
+              htmlFor="cultivar-search"
+              className="block text-xs uppercase tracking-wide text-muted-foreground mb-1"
             >
-              <Link to={`/cultivars/${c.slug}`} className="block">
-                <div className="flex items-baseline justify-between gap-4">
-                  <h3 className="font-semibold text-lg">{c.name}</h3>
-                  <span className="text-xs text-muted-foreground">{c.flowerWeeks}</span>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Lineage: {c.lineage} · {c.difficulty}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">{c.intro}</p>
-              </Link>
-            </li>
-          ))}
-        </ul>
+              Search
+            </label>
+            <input
+              id="cultivar-search"
+              type="search"
+              inputMode="search"
+              autoComplete="off"
+              placeholder="Try “Oreoz”, “cookies”, “blueberry”…"
+              value={rawQuery}
+              onChange={(e) => updateParam("q", e.target.value)}
+              className="w-full min-h-[44px] rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            />
+          </div>
+          <div className="sm:w-56">
+            <label
+              htmlFor="cultivar-difficulty"
+              className="block text-xs uppercase tracking-wide text-muted-foreground mb-1"
+            >
+              Difficulty
+            </label>
+            <select
+              id="cultivar-difficulty"
+              value={difficulty}
+              onChange={(e) => updateParam("difficulty", e.target.value)}
+              className="w-full min-h-[44px] rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            >
+              {DIFFICULTY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {hasFilters ? (
+            <button
+              type="button"
+              onClick={clearAll}
+              className="min-h-[44px] rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40"
+            >
+              Clear
+            </button>
+          ) : null}
+        </form>
+
+        <p
+          className="mb-3 text-xs text-muted-foreground"
+          aria-live="polite"
+          data-testid="cultivars-index-result-count"
+        >
+          {filtered.length === VERDANT_CULTIVARS.length
+            ? `Showing all ${VERDANT_CULTIVARS.length} cultivars`
+            : `Showing ${filtered.length} of ${VERDANT_CULTIVARS.length} cultivars`}
+        </p>
+
+        {filtered.length === 0 ? (
+          <div
+            data-testid="cultivars-index-empty"
+            className="rounded-lg border border-dashed border-border/60 p-6 text-sm text-muted-foreground"
+          >
+            No cultivar guides match those filters yet. Try clearing the search
+            or picking a different difficulty — the library is small and
+            curated on purpose.
+          </div>
+        ) : (
+          <ul className="space-y-4">
+            {filtered.map((c) => (
+              <li
+                key={c.slug}
+                className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors"
+              >
+                <Link to={`/cultivars/${c.slug}`} className="block">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <h3 className="font-semibold text-lg">{c.name}</h3>
+                    <span className="text-xs text-muted-foreground">{c.flowerWeeks}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Lineage: {c.lineage} · {c.difficulty}
+                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">{c.intro}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
 
         <p className="mt-8 text-sm text-muted-foreground">
           Looking for stage-by-stage checklists? See the{" "}

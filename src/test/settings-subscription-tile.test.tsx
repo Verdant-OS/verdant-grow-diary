@@ -57,6 +57,11 @@ beforeEach(() => {
   delete (window as any).Paddle;
   entitlementMock.loading = false;
   entitlementMock.displayPlanId = "free";
+  cancelNoticeMock.visible = false;
+  cancelNoticeMock.accessUntilIso = null;
+  cancelNoticeMock.accessUntilLabel = "";
+  cancelNoticeMock.reason = null;
+
   portalMock.invoke.mockReset();
   portalMock.invoke.mockResolvedValue({
     data: { url: "https://customer-portal.paddle.com/session-abc" },

@@ -56,6 +56,8 @@ export interface SubscriptionUpsertRow {
   current_period_start: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  scheduled_change_action: string | null;
+  scheduled_change_at: string | null;
   environment: PaddleEnv;
   updated_at: string;
 }
@@ -65,7 +67,22 @@ export interface SubscriptionPatch {
   current_period_start: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  scheduled_change_action: string | null;
+  scheduled_change_at: string | null;
   environment: PaddleEnv;
+  updated_at: string;
+}
+
+// Mirror row for the paddle_customers table (customer.created /
+// customer.updated events). Not tied to auth.users — mapping to the
+// app user happens via subscriptions.paddle_customer_id.
+export interface CustomerUpsertRow {
+  paddle_customer_id: string;
+  environment: PaddleEnv;
+  email: string | null;
+  name: string | null;
+  locale: string | null;
+  status: string | null;
   updated_at: string;
 }
 

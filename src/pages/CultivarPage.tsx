@@ -129,6 +129,10 @@ export default function CultivarPage() {
           </p>
         </section>
 
+        <CultivarPhenoSampleModule cultivar={cultivar} />
+
+
+
         <section className="mt-10 rounded-xl border border-primary/30 bg-primary/5 p-5">
           <h2 className="font-display text-xl font-semibold">Log your own {cultivar.name} run</h2>
           <p className="mt-2 text-sm text-muted-foreground">

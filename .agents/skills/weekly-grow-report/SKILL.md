@@ -66,10 +66,27 @@ If a chart has zero eligible data points, render an honest empty state ("No feed
 ### 4. Week-over-week comparison
 Side-by-side visual + numeric diff of **this week** vs the **immediately prior 7-day window** of equal length, ending exactly where this week begins. Purpose: show how the environment and inputs *changed*, not whether they're "good".
 
-Rendered as a **compare strip** above each of these existing charts (env trend, VPD, feed EC & pH, watering volume) plus a small **stat-delta table**:
+Rendered as an **at-a-glance delta card strip** at the top of the section, then a **compare strip** above each existing chart (env trend, VPD, feed EC & pH, watering volume), then a small **stat-delta table**:
 
+- **Delta cards (at-a-glance strip)** — a horizontal row of small stat cards shown **above the week-over-week charts**. Each card summarizes one headline metric so the grower can scan changes in <5 seconds before drilling into charts. Cards to render, in this order:
+  - Avg temperature (this week value, unit, Δ vs last week absolute + %)
+  - Avg RH
+  - Avg VPD
+  - Total watering volume (ml)
+  - Watering count
+  - Avg feed EC (`mS/cm`)
+  - Avg feed pH
+  - Hours outside target band (temp+RH+VPD combined)
+  Card rules — non-negotiable:
+  - Show `this week` as the primary value; show `Δ absolute (Δ %)` as a secondary line. If either window is empty, render "—" and label the card "insufficient prior data" — never "0%" and never a fabricated baseline.
+  - **No good/bad framing.** Neutral typography only — no red/green coloring, no up/down arrows implying value judgment, no emoji. A small neutral glyph (▲ ▼ —) is allowed *only* to indicate direction of change, styled in a muted token color, not success/destructive tokens.
+  - **Provenance-aware.** Cards exclude `demo | stale | invalid` readings from both sides identically, matching section 3/4 rules. If a card's math had to drop a provenance class, add a one-line footnote under the strip (e.g. "Temp/RH exclude 12 stale readings from last week").
+  - **Deterministic order and rounding.** Same inputs = same card values, same order, same rounding (1 decimal for temp/RH/VPD, integer ml, 2 decimals for EC, 1 decimal for pH).
+  - Colors, spacing, and typography come from existing semantic HSL tokens (`--muted`, `--muted-foreground`, `--border`, `--foreground`) — no hardcoded hex, no new tokens.
+  - Print-safe: cards render as static blocks that survive `window.print()` without clipping, and reflow to 2 columns on narrow print widths.
 - **Overlaid dual-series line** for env trend + VPD — this week solid, last week dashed and de-emphasized, same target band shaded. Same y-axis scale so eyeballing is honest.
 - **Grouped bars** for feed EC & pH and daily watering ml — this week vs last week per weekday (Mon..Sun), same y-axis.
+
 - **Delta table** with one row per metric:
   - Waterings (count, total ml)
   - Feedings (count, avg EC, avg pH)

@@ -14,10 +14,21 @@ export const DELETE_ACCOUNT_CONFIRMATION = "DELETE";
 
 export const DELETE_ACCOUNT_GENERIC_FAILURE =
   "We couldn't delete your account right now. Please try again or contact support.";
+export const DELETE_ACCOUNT_BILLING_FAILURE =
+  "We couldn't stop your recurring billing, so your account was not deleted. Please try again or contact support.";
 
 export interface DeleteAccountResult {
   ok: boolean;
   error?: string;
+}
+
+export function deleteAccountFailureMessage(
+  status: number | null | undefined,
+  errorCode: string | null | undefined,
+): string {
+  return status === 409 || errorCode === "billing_cancellation_failed"
+    ? DELETE_ACCOUNT_BILLING_FAILURE
+    : DELETE_ACCOUNT_GENERIC_FAILURE;
 }
 
 export async function requestAccountDeletion(
@@ -32,7 +43,8 @@ export async function requestAccountDeletion(
       { body: { confirm: DELETE_ACCOUNT_CONFIRMATION } },
     );
     if (error || !data?.ok) {
-      return { ok: false, error: DELETE_ACCOUNT_GENERIC_FAILURE };
+      const status = (error as { context?: { status?: number } } | null)?.context?.status;
+      return { ok: false, error: deleteAccountFailureMessage(status, data?.error) };
     }
     // Local sign-out. Server has already revoked; this drops the SPA cache.
     try {

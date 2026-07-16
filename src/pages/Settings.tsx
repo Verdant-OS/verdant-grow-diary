@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useOpenCustomerPortalState } from "@/lib/customerPortal";
+import { usePaddleCancelNotice } from "@/hooks/usePaddleCancelNotice";
+
 import {
   DELETE_ACCOUNT_CONFIRMATION,
   requestAccountDeletion,
@@ -278,8 +280,10 @@ function TemperatureUnitTile() {
 function SubscriptionTile() {
   const { loading, entitlement } = useMyEntitlements();
   const { opening, error: portalError, open: openPortal, clearError } = useOpenCustomerPortalState();
+  const cancelNotice = usePaddleCancelNotice();
 
   const planId = entitlement?.displayPlanId ?? null;
+
   const tier = planId ? PRICING_TIERS.find((t) => t.id === planId) ?? null : null;
 
   const label = loading
@@ -333,6 +337,17 @@ function SubscriptionTile() {
               Canceled — access continues until the end of your paid period.
             </p>
           )}
+          {cancelNotice.visible && entitlement?.status !== "canceled" && (
+            <p
+              className="text-xs text-muted-foreground mt-1"
+              data-testid="settings-subscription-cancel-notice"
+            >
+              {cancelNotice.accessUntilLabel
+                ? `Cancellation scheduled — access continues until ${cancelNotice.accessUntilLabel}.`
+                : "Cancellation scheduled — access continues until the end of your current period."}
+            </p>
+          )}
+
           {!loading && !tier && (
             <p className="text-xs text-muted-foreground">
               We couldn't determine your plan right now. Your grow data is safe
@@ -412,6 +427,8 @@ function SubscriptionTile() {
  *  - Typed confirmation ("DELETE") required before the request fires.
  *  - The edge function re-verifies the caller JWT and requires the same
  *    literal in the body; a click-through cannot silently delete.
+ *  - Recurring Paddle billing is canceled immediately server-side before
+ *    any Verdant data is removed. Provider failure leaves the account intact.
  *  - Rows in public.* cascade via existing FKs on auth.users(id).
  */
 function DeleteAccountTile() {
@@ -465,9 +482,9 @@ function DeleteAccountTile() {
             <DialogDescription>
               This permanently deletes your account, grows, tents, plants,
               diary entries, photos, and sensor snapshots. This cannot be
-              undone. If you have an active paid subscription, cancel it in
-              the billing portal first — deletion does not automatically
-              cancel Paddle billing.
+              undone. Any recurring Paddle subscription is canceled
+              immediately before deletion. Deletion does not automatically
+              issue a refund.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-2 py-2">
@@ -504,7 +521,7 @@ function DeleteAccountTile() {
               aria-busy={busy}
               data-testid="settings-delete-account-confirm"
             >
-              {busy ? "Deleting…" : "Permanently delete"}
+              {busy ? "Canceling billing and deleting…" : "Cancel billing and delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -585,4 +602,3 @@ export default function Settings() {
     </div>
   );
 }
-

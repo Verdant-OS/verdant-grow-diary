@@ -15,36 +15,38 @@
 // Local copy of PaddleEnv so this pure module never pulls the Deno-only
 // shared util into the frontend typecheck graph (unit tests import it
 // from src/test/**). The canonical export lives in ../_shared/paddle.ts.
-export type PaddleEnv = "sandbox" | "live";
+export type PaddleEnv = 'sandbox' | 'live';
 
 // The known human-readable price IDs we accept. Anything else is a config
 // mistake (a product created outside create_product/create_price) and is
 // skipped rather than written with a raw pri_/pro_ id.
 export const KNOWN_PRICE_IDS: ReadonlyArray<string> = [
-  "pro_monthly",
-  "pro_annual",
-  "founder_lifetime",
+  'pro_monthly',
+  'pro_annual',
+  'founder_lifetime',
 ];
 
 export type Decision =
-  | { kind: "skip"; reason: SkipReason }
-  | { kind: "upsert_subscription"; row: SubscriptionUpsertRow }
-  | { kind: "update_subscription"; paddleSubscriptionId: string; patch: SubscriptionPatch }
-  | { kind: "record_lifetime"; row: SubscriptionUpsertRow }
-  | { kind: "upsert_customer"; row: CustomerUpsertRow };
+  | { kind: 'skip'; reason: SkipReason }
+  | { kind: 'upsert_subscription'; row: SubscriptionUpsertRow }
+  | { kind: 'update_subscription'; paddleSubscriptionId: string; patch: SubscriptionPatch }
+  | { kind: 'record_lifetime'; row: SubscriptionUpsertRow }
+  | { kind: 'upsert_customer'; row: CustomerUpsertRow };
 
 export type SkipReason =
-  | "missing_user_id"
-  | "missing_price_external_id"
-  | "missing_product_external_id"
-  | "unknown_price_id"
-  | "missing_subscription_id"
-  | "missing_transaction_id"
-  | "missing_customer_id"
-  | "unhandled_event_type"
-  | "lifetime_price_only_for_transactions"
-  | "non_lifetime_transaction"
-  | "unknown_lifetime_price_id";
+  | 'missing_user_id'
+  | 'missing_price_external_id'
+  | 'missing_product_external_id'
+  | 'unknown_price_id'
+  | 'missing_subscription_id'
+  | 'missing_transaction_id'
+  | 'missing_customer_id'
+  | 'unhandled_event_type'
+  | 'lifetime_price_only_for_transactions'
+  | 'non_lifetime_transaction'
+  | 'unknown_lifetime_price_id'
+  | 'adjustment_audit_only';
+
 
 export interface SubscriptionUpsertRow {
   user_id: string;
@@ -132,16 +134,16 @@ function firstItem(data: SubscriptionData | TransactionData | CustomerData) {
 }
 
 export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
-  const type = event.eventType ?? "";
+  const type = event.eventType ?? '';
   const data = event.data ?? {};
   const nowIso = now.toISOString();
 
   // Customer mirror events → paddle_customers table upsert.
-  if (type === "customer.created" || type === "customer.updated") {
+  if (type === 'customer.created' || type === 'customer.updated') {
     const c = data as CustomerData;
-    if (!c.id) return { kind: "skip", reason: "missing_customer_id" };
+    if (!c.id) return { kind: 'skip', reason: 'missing_customer_id' };
     return {
-      kind: "upsert_customer",
+      kind: 'upsert_customer',
       row: {
         paddle_customer_id: c.id,
         environment: env,
@@ -155,42 +157,59 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
   }
 
   // Subscription events → subscriptions table upsert / update.
+  //
+  // Paddle emits both the umbrella `subscription.updated` AND dedicated
+  // lifecycle events (`subscription.past_due`, `subscription.paused`,
+  // `subscription.resumed`, `subscription.trialing`, `subscription.activated`)
+  // for the same state transitions. They all carry the full SubscriptionData
+  // payload with an accurate `status` field, so we route them through the
+  // same upsert (idempotent via onConflict=paddle_subscription_id). This
+  // guarantees mirror state reflects dunning / pause / resume / trial
+  // transitions even when the umbrella `subscription.updated` is delayed or
+  // absent, and preserves the access-rule semantics in
+  // src/lib/paddleSubscriptionAccessRules.ts (active/trialing/past_due
+  // grant; paused revokes; canceled grants until period end — handled in
+  // its own branch below).
   if (
-    type === "subscription.created" ||
-    type === "subscription.updated" ||
-    type === "subscription.activated"
+    type === 'subscription.created' ||
+    type === 'subscription.updated' ||
+    type === 'subscription.activated' ||
+    type === 'subscription.resumed' ||
+    type === 'subscription.trialing' ||
+    type === 'subscription.past_due' ||
+    type === 'subscription.paused'
   ) {
     const sub = data as SubscriptionData;
     const userId = sub.customData?.userId;
-    if (!userId) return { kind: "skip", reason: "missing_user_id" };
-    if (!sub.id) return { kind: "skip", reason: "missing_subscription_id" };
+    if (!userId) return { kind: 'skip', reason: 'missing_user_id' };
+    if (!sub.id) return { kind: 'skip', reason: 'missing_subscription_id' };
 
     const item = firstItem(sub);
     const priceExt = item?.price?.importMeta?.externalId;
-    const productExt = (
-      item as { product?: { importMeta?: { externalId?: string } | null } } | null
-    )?.product?.importMeta?.externalId;
-    if (!priceExt) return { kind: "skip", reason: "missing_price_external_id" };
-    if (!productExt) return { kind: "skip", reason: "missing_product_external_id" };
+    const productExt =
+      (item as { product?: { importMeta?: { externalId?: string } | null } } | null)
+        ?.product?.importMeta?.externalId;
+    if (!priceExt) return { kind: 'skip', reason: 'missing_price_external_id' };
+    if (!productExt) return { kind: 'skip', reason: 'missing_product_external_id' };
     if (!KNOWN_PRICE_IDS.includes(priceExt)) {
-      return { kind: "skip", reason: "unknown_price_id" };
+      return { kind: 'skip', reason: 'unknown_price_id' };
     }
 
     const scheduledAction = sub.scheduledChange?.action ?? null;
     const scheduledAt = sub.scheduledChange?.effectiveAt ?? null;
 
     return {
-      kind: "upsert_subscription",
+      kind: 'upsert_subscription',
       row: {
         user_id: userId,
         paddle_subscription_id: sub.id,
-        paddle_customer_id: sub.customerId ?? "",
+        paddle_customer_id: sub.customerId ?? '',
         product_id: productExt,
         price_id: priceExt,
-        status: sub.status ?? "active",
+        status: sub.status ?? 'active',
         current_period_start: sub.currentBillingPeriod?.startsAt ?? null,
         current_period_end: sub.currentBillingPeriod?.endsAt ?? null,
-        cancel_at_period_end: scheduledAction === "cancel",
+        cancel_at_period_end: scheduledAction === 'cancel',
         scheduled_change_action: scheduledAction,
         scheduled_change_at: scheduledAt,
         environment: env,
@@ -199,18 +218,18 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
     };
   }
 
-  if (type === "subscription.canceled") {
+  if (type === 'subscription.canceled') {
     const sub = data as SubscriptionData;
-    if (!sub.id) return { kind: "skip", reason: "missing_subscription_id" };
+    if (!sub.id) return { kind: 'skip', reason: 'missing_subscription_id' };
     return {
-      kind: "update_subscription",
+      kind: 'update_subscription',
       paddleSubscriptionId: sub.id,
       patch: {
-        status: "canceled",
+        status: 'canceled',
         current_period_start: sub.currentBillingPeriod?.startsAt ?? null,
         current_period_end: sub.currentBillingPeriod?.endsAt ?? null,
         cancel_at_period_end: true,
-        scheduled_change_action: sub.scheduledChange?.action ?? "cancel",
+        scheduled_change_action: sub.scheduledChange?.action ?? 'cancel',
         scheduled_change_at: sub.scheduledChange?.effectiveAt ?? null,
         environment: env,
         updated_at: nowIso,
@@ -228,37 +247,37 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
   // internal price id via the Paddle API before calling decide() and
   // mutates the event to fill it in. If it is still missing here, the
   // price cannot be identified reliably → skip as unknown_lifetime_price_id.
-  if (type === "transaction.completed") {
+  if (type === 'transaction.completed') {
     const tx = data as TransactionData;
-    if (tx.status && tx.status !== "completed" && tx.status !== "paid") {
-      return { kind: "skip", reason: "non_lifetime_transaction" };
+    if (tx.status && tx.status !== 'completed' && tx.status !== 'paid') {
+      return { kind: 'skip', reason: 'non_lifetime_transaction' };
     }
     if (tx.subscriptionId) {
       // Recurring subscription payment — handled via subscription events.
-      return { kind: "skip", reason: "non_lifetime_transaction" };
+      return { kind: 'skip', reason: 'non_lifetime_transaction' };
     }
     const item = firstItem(tx);
     const priceExt = item?.price?.importMeta?.externalId;
-    if (!priceExt) return { kind: "skip", reason: "unknown_lifetime_price_id" };
-    if (priceExt !== "founder_lifetime") {
-      return { kind: "skip", reason: "unknown_lifetime_price_id" };
+    if (!priceExt) return { kind: 'skip', reason: 'unknown_lifetime_price_id' };
+    if (priceExt !== 'founder_lifetime') {
+      return { kind: 'skip', reason: 'unknown_lifetime_price_id' };
     }
     const userId = tx.customData?.userId;
-    if (!userId) return { kind: "skip", reason: "missing_user_id" };
-    if (!tx.id) return { kind: "skip", reason: "missing_transaction_id" };
+    if (!userId) return { kind: 'skip', reason: 'missing_user_id' };
+    if (!tx.id) return { kind: 'skip', reason: 'missing_transaction_id' };
     // Synthesize a stable pseudo-subscription id from the transaction id so
     // lifetime rows share the subscriptions unique-key discipline and never
     // collide with real subscription rows.
     const pseudoSubId = `lifetime_${tx.id}`;
     return {
-      kind: "record_lifetime",
+      kind: 'record_lifetime',
       row: {
         user_id: userId,
         paddle_subscription_id: pseudoSubId,
-        paddle_customer_id: tx.customerId ?? "",
-        product_id: "founder_lifetime",
-        price_id: "founder_lifetime",
-        status: "active",
+        paddle_customer_id: tx.customerId ?? '',
+        product_id: 'founder_lifetime',
+        price_id: 'founder_lifetime',
+        status: 'active',
         current_period_start: nowIso,
         // NULL end = no expiry; matches the entitlement resolver's
         // "founder lifetime never expires" treatment.
@@ -272,8 +291,20 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
     };
   }
 
-  return { kind: "skip", reason: "unhandled_event_type" };
+  // Adjustment events (refunds / credits / chargebacks). RECORD-ONLY:
+  // insertEventReceived() has already persisted the raw payload to
+  // lovable_paddle_events for operator visibility. We deliberately do NOT
+  // mutate subscriptions, entitlements, or access rules here — refunds
+  // are handled operationally (see the runbook), not by silently flipping
+  // a user's plan. Distinct skip_reason so the audit surface can filter
+  // "recorded on purpose" from "unknown event type" noise.
+  if (type === 'adjustment.created' || type === 'adjustment.updated') {
+    return { kind: 'skip', reason: 'adjustment_audit_only' };
+  }
+
+  return { kind: 'skip', reason: 'unhandled_event_type' };
 }
+
 
 /**
  * If this is a `transaction.completed` event with no subscriptionId and no
@@ -286,7 +317,7 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
  * (`subscriptionId` present) since those get skipped as non_lifetime anyway.
  */
 export function transactionPriceIdNeedingLookup(event: EventLike): string | null {
-  if (event.eventType !== "transaction.completed") return null;
+  if (event.eventType !== 'transaction.completed') return null;
   const data = (event.data ?? {}) as TransactionData;
   if (data.subscriptionId) return null;
   const item = firstItem(data);
@@ -316,7 +347,7 @@ export function attachResolvedPriceExternalId(event: EventLike, externalId: stri
  * why an event did or didn't produce a row.
  */
 export function auditFields(event: EventLike, env: PaddleEnv) {
-  const type = event.eventType ?? "unknown";
+  const type = event.eventType ?? 'unknown';
   const data = (event.data ?? {}) as SubscriptionData & TransactionData;
   const item = firstItem(data);
   return {
@@ -324,12 +355,11 @@ export function auditFields(event: EventLike, env: PaddleEnv) {
     environment: env,
     user_id: data.customData?.userId ?? null,
     paddle_subscription_id: (data as SubscriptionData).id ?? null,
-    paddle_transaction_id: type.startsWith("transaction.")
-      ? ((data as TransactionData).id ?? null)
-      : null,
+    paddle_transaction_id:
+      type.startsWith('transaction.') ? ((data as TransactionData).id ?? null) : null,
     price_external_id: item?.price?.importMeta?.externalId ?? null,
     product_external_id:
-      (item as { product?: { importMeta?: { externalId?: string } | null } } | null)?.product
-        ?.importMeta?.externalId ?? null,
+      (item as { product?: { importMeta?: { externalId?: string } | null } } | null)
+        ?.product?.importMeta?.externalId ?? null,
   };
 }

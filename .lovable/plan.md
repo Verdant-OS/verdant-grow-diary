@@ -1,106 +1,104 @@
-# Billing reconciliation slice
 
-**Decisions locked in from your answers:**
-1. Canonical lane = **Lovable** (`payments-webhook` → `public.subscriptions`).
-2. Scope = **reconcile-only** (no customer portal, no adjustment handling, no cap-hoist in this slice).
-3. Narrow the live-union readers **now**.
-4. Preview walkthrough = chat + committed `docs/paddle-sandbox-smoke.md` checklist.
+# Read-only audit — Paddle billing + integrations
 
-Nothing outside the files listed is touched. No UI changes. No changes to `paddle-webhook` behavior (it stays as a sandbox-only audit sink). No client checkout changes. No AI Doctor / Action Queue / sensor / Pheno code.
+Audit only. No files were modified. Findings below are grouped by whether they are **code-fixable here** or **external-only** (a Paddle-account / DNS / registrar / provider step you must do outside Lovable).
+
+Environment: sandbox (test) `85201`, live `375764`.
 
 ---
 
-## What "narrow" means when Lovable is canonical
+## Area 1 — Paddle billing end-to-end
 
-The runbook was written assuming BYO would be canonical, so it framed the risk as trusting `subscriptions(env='live')`. With **Lovable canonical, the direction inverts**: `public.subscriptions` is the source of truth, and `public.billing_subscriptions` becomes an audit-only surface. The two SECURITY DEFINER gates (`has_pheno_tracker_entitlement`, `ai_credit_spend`) currently union both — after this slice they trust ONLY `public.subscriptions WHERE environment='live'`.
+### What is actually in place and working
 
-**Backfill safety net:** the runbook records one existing `billing_subscriptions` founder row of "unverified provenance." Dropping the BYO branch without action would revoke that row's access. The migration includes an idempotent, one-shot backfill that inserts any currently-entitling `billing_subscriptions` row into `public.subscriptions` as a `founder_lifetime` / `pro_*` row with `environment='live'` before the function bodies change, so no live entitlement is lost across the transition. The backfill is guarded by `ON CONFLICT (paddle_subscription_id) DO NOTHING` and only touches rows that resolve as entitling by the same `(status, current_period_end)` rules the RPCs use — no silent widening.
+- **Catalog + checkout (`src/pages/Pricing.tsx`, `usePaddleCheckout`, `get-paddle-price`)** — 3-tier, monthly + annual, human-readable external IDs (`pro_monthly`, `pro_annual`, `founder_lifetime`), price resolver via edge function, `customData.userId` passed, `successUrl` set. Env derived from client-token prefix.
+- **Webhook (`supabase/functions/payments-webhook/*`)** — signature verified via `verifyWebhook` before any DB write; `?env=sandbox|live` routes credentials; raw body cloned for audit; durable "received → decide → write → mark" lifecycle in a pure orchestrator; idempotent on `paddle_event_id` (23505 duplicate = no-op); handles `subscription.created/updated/canceled`, `transaction.completed` (Founder Lifetime via advisory-locked RPC with 75-slot cap + double-bill auto-cancel of prior recurring), and `customer.created/updated` (mirror). Skips rows with missing `importMeta.externalId`.
+- **Mirrored state (`public.subscriptions`, `paddle_customers`, `lovable_paddle_events`)** — RLS select-own on `subscriptions`; service-role writes only; `scheduled_change_action/_at` columns present.
+- **Access rules (`src/lib/paddleSubscriptionAccessRules.ts`, `has_active_subscription`)** — `active/trialing/past_due` grant; `canceled` grants until `current_period_end`; `paused` revokes. Defaults to `check_env='live'`.
+- **Customer portal (`paddle-portal-session` + `src/lib/customerPortal.ts`)** — JWT-verified, uid-scoped, env from row, skips `lifetime_%`, returns URL only, opens in new tab with `noopener`.
+- **Past-due banner (`SubscriptionPastDueBanner`)** — renders on `status==='past_due'`, links to portal.
+- **Self-serve delete (`delete-account`)** — JWT-verified, confirm-string gated, service-role deletes user + cascades.
+- **Client entitlement read (`useMyEntitlements`)** — env-filtered, presentation-only, bounded newest-first window keyed by `paddle_subscription_id` (avoids canceled Pro shadowing Founder Lifetime).
 
----
+### Code gaps — fixable inside Lovable
 
-## Files changed
+Prioritized. None are known-broken flows, but each is a real hole for a production billing surface:
 
-### Migration (one file, one transaction)
-`supabase/migrations/<ts>_narrow_entitlement_gates_lovable_canonical.sql`
+1. **P1 — `subscription.past_due` / `paused` events are not explicitly handled by the mapper.** The webhook processes `subscription.updated` and mirrors `status`, so past_due does flow through when Paddle sends it *as* an update, but there is no explicit dedicated handler / test coverage for the `paused` and dunning transitions. Worth confirming by fixture-testing a `subscription.past_due` payload against `eventProcessor.decide()` and adding an explicit case if it falls into `skip: unhandled_type`.
+2. **P1 — No handling of `subscription.trialing` distinct from `active`, and no handling of Paddle "resumed" / `subscription.activated`.** If any plan ever gets a trial, or a paused sub is resumed, mirror state can lag.
+3. **P2 — Portal function returns 404 when the newest sub is a `lifetime_` row and the user has no recurring sub at all.** Copy `PORTAL_NO_SUBSCRIPTION_MESSAGE` says "no active paid subscription" — misleading for Founder Lifetime users clicking "Manage subscription". Either hide the CTA for lifetime-only accounts or return a distinct reason code so the UI can say "Founder Lifetime — nothing to manage. Contact support for invoices."
+4. **P2 — No cancel-inside-app path.** Cancellation only works via the Paddle-hosted portal window. That's fine, but there is no in-app "You canceled — access until Nov 30" confirmation surface driven by `cancel_at_period_end` / `scheduled_change_*`. Small presenter surface, high UX value.
+5. **P2 — `transaction.payment_failed` is subscribed but appears to fall through as unhandled_type.** Should at least be persisted to `lovable_paddle_events` (it already is) and optionally trigger the past-due banner earlier than Paddle's own status transition.
+6. **P3 — `checkout-status` fallback + `CheckoutSuccess` polling.** Confirm the success page still polls `useMyEntitlements.refetch()` after redirect (webhook can lag by seconds). This exists but is worth re-verifying under real latency.
+7. **P3 — Refunds / `adjustment.*` events.** Per your prior decision (record + operator-manual), there is no handler. That is acceptable, but confirm they at least land in `lovable_paddle_events` for audit. Currently only subscribed events are handled; adjustment events aren't subscribed, so no audit row.
+8. **P3 — `paddle_customers` mirror is written but never read.** Not a bug, but if it's never queried it is dead weight; either surface it in the operator audit or drop it in a future cleanup.
+9. **P3 — No renewal-notice / receipt email on `transaction.completed`.** Paddle sends its own receipt, but the app never surfaces "renewed on X for $Y" in-app. Optional.
+10. **P4 — Legacy BYO `paddle-webhook` + `billing_subscriptions` remain deployed** (documented as audit-only, no longer entitles). Not broken — but two Paddle webhook receivers exist. Confirm the second is truly not entitlement-load-bearing after the recent migration, and consider a decommission plan.
 
-1. **Backfill first.** `INSERT INTO public.subscriptions (…) SELECT … FROM public.billing_subscriptions WHERE <entitling-today> ON CONFLICT (paddle_subscription_id) DO NOTHING`. `paddle_subscription_id` set to a deterministic synthetic value `byo_backfill:<billing_subscriptions.id>` so the natural unique key holds and re-runs are no-ops. `environment='live'`.
-2. **Replace `public.has_pheno_tracker_entitlement(uuid)`** — drop the `billing_subscriptions` EXISTS branch. Keep the anti-oracle guard, the `subscriptions(env='live')` branch, the canceled-in-period grace, and the grant posture identical.
-3. **Replace `public.ai_credit_spend(...)`** — drop the BYO plan read and the `ai_credit_effective_credit_plan_id` union step. Effective plan is resolved solely from `public.subscriptions(env='live', status='active', period NULL or future, price_id ∈ known plans)`. Everything else (idempotent replay, per-user advisory lock, staff monthly metering, grow ownership check, append-only ledger, return shape) stays byte-compatible with today's contract.
-4. Re-assert `REVOKE ALL … FROM PUBLIC/anon; GRANT EXECUTE … TO authenticated, service_role` on both functions.
+### External-only blockers (you must do these outside Lovable)
 
-No schema changes. No new tables. No RLS policy changes. `billing_subscriptions` table itself is untouched (still readable by operator audit surfaces).
-
-### Server helper
-`supabase/functions/_shared/unionEntitlementLookup.ts`
-
-- Drop the `billing_subscriptions` read from `loadUnionEntitlement`. Keep the `subscriptions(env='live')` read; the sandbox-when-server-expects-sandbox branch stays. Rename the helper from "union" to "Lovable-only" in the docstring; keep the export name (callers unchanged) to avoid a cross-function refactor in this slice.
-- Public function signature and return type unchanged. Callers (`environment-summary-report-entitlement`, `live-sensor-entitlement`, `premium-export-entitlement`) require no edits.
-
-### Client hook
-`src/hooks/useMyEntitlements.ts`
-
-- Drop the `billing_subscriptions` fetch. Feed `byoRow: null` into `resolveUnionEntitlements`. Header comment updated to state the client hook is Lovable-only and remains presentation-only, never authoritative.
-
-### Docs — reconcile canonical lane
-- `docs/paddle-paid-launch-runbook.md` — flip the "Canonical lane decision" section. State Lovable canonical. Remove the "webhook destination is repointed to `paddle-webhook`" line. Note the residual-risk section is now resolved by this slice.
-- `docs/billing-level-two-launch-gate.md` — update "Current Billing Chain" to describe `payments-webhook` → `lovable_paddle_events` → `subscriptions` as the entitlement path; keep the BYO chain as "operator audit surface only."
-- `docs/billing.md` — mention `VITE_PAYMENTS_CLIENT_TOKEN` alongside the deprecated `VITE_PADDLE_*` set; remove the "server-side entitlement updater" TODO (it's shipped in the Lovable lane); keep the going-live checklist.
-- `supabase/functions/paddle-webhook/index.ts` header comment — no change needed (already accurate).
-
-### Docs — new sandbox smoke checklist
-`docs/paddle-sandbox-smoke.md` (new file, ~80 lines)
-
-Repeatable checklist for verifying a preview purchase, mirroring runbook Release Gate items 6–7:
-- Which client token prefix must be present.
-- Signed-in preflight (`/pricing` shows Pro CTAs, banner is amber "test mode").
-- Test card matrix (4242…4242 success, 4000…3220 3DS challenge, 4000…0002 always-declined, 4000…0027…3184 succeeds initially / declines on renewal).
-- What to check after each flow: `subscriptions` row inserted with `environment='sandbox'`, `lovable_paddle_events` row with `processing_status='processed'`, entitlement badge in Settings updates within a few seconds, no rows in `billing_subscriptions` (Lovable canonical means BYO stays empty in sandbox).
-- Duplicate-delivery idempotency check (Paddle dashboard → Notifications → Replay; expect 23505 no-op, no duplicate row).
-- Founder Lifetime cap check (`founder_lifetime_slots_remaining` decrements by 1; sold-out state returns 409 `plan_sold_out` from `get-paddle-price`).
-- Cancel-and-resubscribe check (new row inserted, old row remains, entitlement resolves to the newer active row).
+- **Go-live blocker: `domain_review = action_required`.** This is the sole remaining live-mode step per `get_go_live_status`. Everything else (readiness, publish, verification, automated review) is `completed`. Until Paddle clears domain review, **live checkout will fail** with a Paddle-side error regardless of code correctness. Action: open the Payments tab and follow the domain-review prompt (usually TXT/CNAME on your registered domains, or Paddle support ticket referencing seller `375764`).
+- **Live webhook signing secret + live API key.** Auto-configured by `enable_paddle_payments`, but verify `PAYMENTS_LIVE_WEBHOOK_SECRET` and `PADDLE_LIVE_API_KEY` are present in edge-function secrets. Missing = live webhooks 400 on signature.
+- **Statement descriptor + checkout color** (`/settings/statement-descriptor`, `/settings/account`) — no code required; set once via Paddle so live bank statements read as your brand, not "PADDLE.NET*…".
+- **Tax / MoR jurisdictions** — Paddle handles as MoR; no action unless you sell into an excluded region.
 
 ---
 
-## Tests added
+## Area 2 — External integrations inventory + gaps
 
-- `src/lib/entitlements/unionEntitlements.test.ts` — a new case: `pickStrongestBilling(byoRow, lovableRow)` still deterministic when `byoRow` is `null` (the new production shape). Existing tie-breaking tests remain untouched to prove the pure resolver is unaffected.
-- `supabase/functions/_shared/unionEntitlementLookup.test.ts` (if a test harness already exists — check on file open; skip if not) — assert `loadUnionEntitlement` no longer issues a `billing_subscriptions` query.
-- Runtime harness — I will **not** add a new RPC harness in this slice; the existing `paddle_subscription_update_rpc_harness.sql` and billing RLS harnesses cover the write side. Adding an entitlement-narrowing harness is called out as a follow-up in the response.
+### Currently wired
 
-## Validation commands
+| Integration | Where | State |
+|---|---|---|
+| **Lovable Cloud (Supabase)** — auth, Postgres, storage, edge functions | `src/integrations/supabase/*`, `supabase/functions/*` | ✅ healthy; RLS-first; service_role only server-side |
+| **Google OAuth** | `src/integrations/lovable/index.ts` + `Auth.tsx` | ✅ wired via managed `@lovable.dev/cloud-auth-js`; `redirect_uri = window.location.origin` (open-redirect safe) |
+| **Paddle (payments)** | See Area 1 | ⚠️ sandbox complete, live blocked on domain review |
+| **Transactional + auth email** | `supabase/functions/auth-email-hook`, `process-email-queue`, `_shared/email-templates/*` | ✅ Lovable managed email (`@lovable.dev/email-js`); custom sender `notify.verdantgrowdiary.com`; DLQ + retries |
+| **Google Analytics 4** | `index.html` (`G-B3QRSZEM9S`) + `useGoogleAnalyticsPageViews` + `funnelAnalytics`/`pricingAnalytics` | ✅ page-view + funnel events; safe no-op when `gtag` absent |
+| **EcoWitt (sensor ingest)** | `ecowitt-real-ingest`, `sensor-ingest-webhook`, testbench | ✅ validated ingest path; bridge tokens; source-labeled |
+| **Pi ingest bridge** | `pi-ingest-readings`, `mint-bridge-token`, `revoke-bridge-token` | ✅ token-gated |
 
-```
-bun run type-check
-bunx vitest run src/lib/entitlements --reporter=dot
-bunx vitest run supabase/functions/_shared --reporter=dot
-```
+### Half-wired / missing / typically-needed gaps
 
-Full suite is not required for this slice (no cross-cutting surface changes), but I'll note whether it is worth running after the migration lands.
+Prioritized:
 
-## Safety verdict
+1. **P1 — No error/exception tracking (Sentry / Rollbar / Datadog RUM).** `RootErrorBoundary` pings `gtag` if present; that's not a triage tool. For a paid product you will want a real exception feed with source maps. External account + secret + tiny client init.
+2. **P1 — No product analytics (PostHog / Mixpanel / Amplitude).** GA4 alone gives page views and coarse funnel events; it does not give retention cohorts, feature adoption, or session replay. `funnelAnalytics.ts` already abstracts the sink — a second adapter would be small.
+3. **P2 — `notify.verdantgrowdiary.com` sender domain — verify SPF / DKIM / DMARC alignment.** Managed email requires DNS records at your registrar. If not fully aligned, dunning/reset/verification emails inbox poorly. External-only (DNS at registrar). Nothing to fix in code — but is a common silent gap.
+4. **P2 — No custom-domain `robots.txt` / `sitemap.xml` verification across all 6 custom domains** listed in `project_urls`. `public/sitemap.xml` + `public/robots.txt` exist; audit whether they resolve on `verdantgrowdiary.org`, `growdiary.app`, `diarygrow.app` etc. and whether canonicalization avoids duplicate-content penalties. External + `index.html` metadata.
+5. **P2 — No uptime / synthetics beyond `datadog-synthetics.yml` CI file.** Confirm the Datadog workflow is actually live and pointed at prod, or add a lightweight cron (BetterStack / UptimeRobot).
+6. **P3 — No customer-support surface.** No Intercom / Crisp / Plain / plain email link on paid pages. For a paid Grow OS this is common; a `mailto:` on Settings would be a code-only stub.
+7. **P3 — No CDP / marketing automation (Loops, Customer.io, Resend broadcasts).** Only transactional email. If you plan lifecycle emails ("your grow just hit week 6"), you'll want one.
+8. **P3 — No live-payment receipts inside the app.** Paddle emails receipts; the app has no `/settings/invoices` view. Portal covers it but is off-domain.
+9. **P4 — Sensor providers beyond EcoWitt.** SwitchBot etc. explicitly retired per `ecowitt-only-safety-scan`. Not a gap — a boundary.
+10. **P4 — Legal / consent surfaces are wired** (`user_agreement_acceptances`, agreements consent). ✅ complete for GDPR-lite; no cookie banner detected. If you sell to EU customers with GA4, a cookie/consent banner is typically required. External + code.
 
-- No schema, RLS policy, table, or column change.
-- Two SECURITY DEFINER function bodies replaced; grants re-asserted identically; anti-oracle guard preserved.
-- One idempotent, guarded backfill of currently-entitling rows to avoid revoking access.
-- No client-side gating change (client hook is already presentation-only).
-- No checkout, webhook signature, cap, refund, or founder-allocation behavior change.
-- BYO `paddle-webhook` still receives + audits sandbox events; nothing removed from the audit trail.
+---
 
-## Risks / rollback
+## Prioritized gap list (one merged view)
 
-- **Risk:** the backfill fires only once per unique `billing_subscriptions.id`. If future BYO rows are ever written by an operator, they will NOT auto-flow to `subscriptions` after this slice ships. That is intentional — Lovable is canonical, so new entitlements must come through `payments-webhook`. Documented in the runbook edit.
-- **Rollback:** re-run the pre-slice versions of the two functions from `20260709193855` (pheno) and `20260710010000` (credits). The backfill rows stay (they are correct-shape live `subscriptions` rows), no destructive action needed.
-- **Zero-user assumption:** the runbook states "0 verified live paid users" and one unverified `billing_subscriptions` row. The backfill covers that one row. If any other unlisted BYO row exists, the backfill covers it too by the same filter.
+**Must-fix before live launch**
+1. Clear Paddle **domain review** (external, blocking live checkout)
+2. Verify live webhook secret + live API key present
+3. Verify `notify.verdantgrowdiary.com` SPF/DKIM/DMARC alignment
 
-## Preview test walkthrough (delivered in chat after the plan runs)
+**High-value code follow-ups**
+4. Explicit `subscription.past_due` / `paused` / `trialing` / `resumed` mapper cases + tests
+5. In-app cancel-confirmation surface driven by `cancel_at_period_end` / `scheduled_change_*`
+6. Portal CTA behavior for Founder Lifetime accounts (distinct copy, not "no active sub")
+7. Subscribe to & audit `adjustment.*` events (refund record-only, per your rule)
+8. Add exception tracker (Sentry) + product analytics (PostHog) adapters
 
-Short version of the checklist:
-1. Confirm `/pricing` shows the amber "test mode" banner and the Pro CTAs.
-2. Sign in as a test account.
-3. Click Pro Monthly → checkout overlay opens → pay with `4242 4242 4242 4242`, any future expiry, any CVC, any name.
-4. Redirects to `/checkout/success`. Within a few seconds, Settings shows Pro.
-5. Verify in the DB: one row in `public.subscriptions` with `environment='sandbox'`, `status='active'`, matching `paddle_subscription_id`; matching row in `public.lovable_paddle_events` with `processing_status='processed'`.
-6. In the Paddle sandbox dashboard, Notifications → find the delivery → click Replay. Confirm no new `subscriptions` row appears (idempotent).
-7. Try `4000 0000 0000 0002` for a declined-card path; expect no `subscriptions` row and a decline notice in the Paddle overlay.
+**Nice-to-have**
+9. In-app invoice list / renewal notice
+10. EU cookie/consent banner if GA4 stays on for EU visitors
+11. Uptime synthetic hitting `/`, `/pricing`, `/auth`, `payments-webhook` health
+12. Decommission plan for legacy BYO `paddle-webhook` + `billing_subscriptions` after a full audit window
 
-Full details land in `docs/paddle-sandbox-smoke.md` when the slice runs.
+---
+
+## What I did NOT do
+
+- No code changes, no migrations, no webhook edits, no secret writes, no publish.
+- No live-mode transaction attempted.
+- No Paddle-side domain review action taken (only you can complete that step).

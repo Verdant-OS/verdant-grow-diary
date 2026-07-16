@@ -74,6 +74,10 @@ describe("Lovable weekly grow report skill contract", () => {
     );
     expect(SKILL).toMatch(/References and timestamps alone are insufficient/);
     expect(SKILL).toMatch(/late entry or corrected content changes this ID/);
+    // Partial windows are time-dependent: the as-of instant joins the digest
+    // so two partials generated at different times are distinguishable.
+    expect(SKILL).toMatch(/including the resolved window instants/);
+    expect(SKILL).toMatch(/never share a content version\s+ID/);
     expect(SKILL).toMatch(/Foundation-first implementation sequence/);
   });
 
@@ -134,6 +138,10 @@ describe("Lovable weekly grow report skill contract", () => {
     // currently selected scope; out-of-scope references are honest errors.
     expect(SKILL).toMatch(/belongs to the currently selected grow\/tent scope/);
     expect(SKILL).toMatch(/never silently accepted, never silently\s+swapped/);
+    // The URL contract carries the plant scope — one rule, no "only end
+    // date" contradiction that could drop scope on reload.
+    expect(SKILL).toMatch(/Encode exactly the validated end-date/);
+    expect(SKILL).toMatch(/never silently drop the plant scope back to All\s+plants/);
   });
 
   it("keeps saved presets device-local, validated, and judgment-free", () => {

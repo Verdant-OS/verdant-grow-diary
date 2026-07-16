@@ -127,8 +127,12 @@ A single control at the top of the report lets the grower generate a report for 
     limit, not "No grow data."
   - If the selected window contains zero source events (no diary entries, no sensor readings, no alerts), render the report with honest empty states in each section — never fabricate a baseline and never silently shift the window.
 - **Comparison window follows automatically.** Selecting an end date of `D` sets this-week local dates to `D−6 ... D` and prior-week local dates to `D−13 ... D−7`. Resolve each as its own half-open instant window in the same timezone.
-- **URL + deterministic selection.** Encode only the validated end-date value
-  as `?end=YYYY-MM-DD` on the private report route. The effective report
+- **URL + deterministic selection.** Encode exactly the validated end-date
+  value as `?end=YYYY-MM-DD` plus, when a single plant is selected, the
+  validated plant scope as `?plant=<opaque owned id>` (see the plant scope
+  selector) on the private report route — nothing else, so a reloaded or
+  preset-applied URL can never silently drop the plant scope back to All
+  plants. The effective report
   timezone is displayed and is part of the report key; the URL alone is not
   evidence that a different device resolved the same timezone. Do not put
   emails, notes, sensor payloads, service tokens, or unvalidated query values
@@ -461,7 +465,11 @@ Cap at **5 items**, ordered by risk then evidence strength. Never a device comma
   diary content may change without an `updated_at` field. Exclude raw payloads
   and unused private fields from the digest, but include every normalized value
   that can change a rendered number, label, note excerpt, source classification,
-  or omission. A late entry or corrected content changes this ID. Never claim
+  or omission — including the resolved window instants, so a partial
+  current-day report's as-of upper bound is part of its identity and two
+  partial reports generated at different times never share a content version
+  ID even when no new rows arrived (their coverage and missing-data math can
+  differ). A late entry or corrected content changes this ID. Never claim
   two reports with the same selection key have identical content when the
   underlying data changed.
 - Neither identifier exposes its raw hash inputs in rendered copy, URLs, or

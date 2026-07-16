@@ -1468,6 +1468,39 @@ export type Database = {
           },
         ]
       }
+      paddle_customers: {
+        Row: {
+          created_at: string
+          email: string | null
+          environment: string
+          locale: string | null
+          name: string | null
+          paddle_customer_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          environment: string
+          locale?: string | null
+          name?: string | null
+          paddle_customer_id: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          environment?: string
+          locale?: string | null
+          name?: string | null
+          paddle_customer_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       paddle_events: {
         Row: {
           environment: string
@@ -2651,6 +2684,8 @@ export type Database = {
           paddle_subscription_id: string
           price_id: string
           product_id: string
+          scheduled_change_action: string | null
+          scheduled_change_at: string | null
           status: string
           updated_at: string
           user_id: string
@@ -2666,6 +2701,8 @@ export type Database = {
           paddle_subscription_id: string
           price_id: string
           product_id: string
+          scheduled_change_action?: string | null
+          scheduled_change_at?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -2681,6 +2718,8 @@ export type Database = {
           paddle_subscription_id?: string
           price_id?: string
           product_id?: string
+          scheduled_change_action?: string | null
+          scheduled_change_at?: string | null
           status?: string
           updated_at?: string
           user_id?: string

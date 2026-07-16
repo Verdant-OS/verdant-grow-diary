@@ -10,6 +10,9 @@
  *  - Never uses service_role.
  *  - `expectedBillingEnvironment` is read from a narrow, whitelisted request
  *    input; it is NOT inferred from any provider fields on the row.
+ *  - Environment rule (matches the DB gates has_pheno_tracker_entitlement and
+ *    ai_credit_spend): an entitling environment='live' row always unlocks;
+ *    sandbox rows unlock only when the server expects sandbox.
  */
 
 // deno-lint-ignore-file no-explicit-any
@@ -57,29 +60,63 @@ export function pickExpectedBillingEnvironment(
   return raw === "live" ? "live" : "sandbox";
 }
 
+const SUBSCRIPTION_COLUMNS =
+  "user_id,paddle_subscription_id,paddle_customer_id,product_id,price_id,status,current_period_end,current_period_start,cancel_at_period_end,environment,created_at,updated_at";
+
+function newestSubscriptionRow(
+  supabase: any,
+  environment: LovableBillingEnvironment,
+) {
+  return supabase
+    .from("subscriptions")
+    .select(SUBSCRIPTION_COLUMNS)
+    .eq("environment", environment)
+    .order("created_at", { ascending: false })
+    .limit(1);
+}
+
+function firstRowOrNull(
+  res: { error: unknown; data?: unknown[] | null },
+): LovableSubscriptionRow | null {
+  if (res.error) return null;
+  return (res.data && res.data.length > 0
+    ? res.data[0]
+    : null) as LovableSubscriptionRow | null;
+}
+
+function isEntitling(entitlement: ResolvedEntitlement): boolean {
+  return entitlement.isActive && entitlement.effectivePlanId !== "free";
+}
+
 export async function loadUnionEntitlement(
   supabase: any,
   expectedBillingEnvironment: LovableBillingEnvironment,
   now: Date,
 ): Promise<{ entitlement: ResolvedEntitlement; lookupFailed: boolean }> {
-  const [byoRes, lovableRes] = await Promise.all([
+  // A live-environment subscriptions row is written ONLY by the service-role
+  // webhook for a signature-verified LIVE Paddle event, so it is entitling
+  // regardless of what environment this server instance expects. This mirrors
+  // the DB-side gates (has_pheno_tracker_entitlement, ai_credit_spend), which
+  // pin their Lovable branch to environment='live'. Without it, env-config
+  // drift (e.g. PAYMENTS_ENVIRONMENT left at 'sandbox' after go-live) makes
+  // edge gates fail closed against legitimate Founder/Pro live rows that
+  // /settings and the DB gates already honor. Sandbox rows still unlock ONLY
+  // when the server explicitly expects sandbox — never the other way around.
+  const wantsSandbox = expectedBillingEnvironment === "sandbox";
+  const [byoRes, lovableLiveRes, lovableSandboxRes] = await Promise.all([
     supabase
       .from("billing_subscriptions")
       .select(
         "id,user_id,plan_id,status,provider,provider_customer_id,provider_subscription_id,current_period_end,cancel_at_period_end,founder_number,created_at,updated_at",
       )
       .limit(1),
-    supabase
-      .from("subscriptions")
-      .select(
-        "user_id,paddle_subscription_id,paddle_customer_id,product_id,price_id,status,current_period_end,current_period_start,cancel_at_period_end,environment,created_at,updated_at",
-      )
-      .eq("environment", expectedBillingEnvironment)
-      .order("created_at", { ascending: false })
-      .limit(1),
+    newestSubscriptionRow(supabase, "live"),
+    wantsSandbox
+      ? newestSubscriptionRow(supabase, "sandbox")
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
-  // Fail closed on the BYO read; the Lovable read failing degrades to null.
+  // Fail closed on the BYO read; the Lovable reads failing degrade to null.
   if (byoRes.error) {
     return {
       lookupFailed: true,
@@ -96,18 +133,40 @@ export async function loadUnionEntitlement(
     (byoRes.data && byoRes.data.length > 0 ? byoRes.data[0] : null) as
       | BillingSubscriptionRow
       | null;
-  const lovableRow = lovableRes.error
-    ? null
-    : ((lovableRes.data && lovableRes.data.length > 0
-      ? lovableRes.data[0]
-      : null) as LovableSubscriptionRow | null);
+  const liveRow = firstRowOrNull(lovableLiveRes);
+
+  // The live row unlocks only when it is itself entitling (active, known
+  // plan, in period, lifetime invariants). A degraded/unknown live row never
+  // changes the sandbox-expected resolution below.
+  const liveRowEntitles =
+    liveRow != null &&
+    isEntitling(
+      resolveUnionEntitlements({
+        byoRow: null,
+        lovableRow: liveRow,
+        expectedBillingEnvironment: "live",
+        now,
+      }),
+    );
+
+  if (!wantsSandbox || liveRowEntitles) {
+    return {
+      lookupFailed: false,
+      entitlement: resolveUnionEntitlements({
+        byoRow,
+        lovableRow: liveRow,
+        expectedBillingEnvironment: "live",
+        now,
+      }),
+    };
+  }
 
   return {
     lookupFailed: false,
     entitlement: resolveUnionEntitlements({
       byoRow,
-      lovableRow,
-      expectedBillingEnvironment,
+      lovableRow: firstRowOrNull(lovableSandboxRes),
+      expectedBillingEnvironment: "sandbox",
       now,
     }),
   };

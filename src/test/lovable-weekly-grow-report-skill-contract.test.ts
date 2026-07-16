@@ -20,6 +20,11 @@ describe("Lovable weekly grow report skill contract", () => {
   it("uses explicit, DST-safe 7-calendar-day windows", () => {
     expect(SKILL).toMatch(/7 local calendar days/);
     expect(SKILL).toMatch(/half-open instants: `\[start, nextDayStart\)`/);
+    // The partial current-day truncation is canonical window model, not an
+    // exception a global-rule implementation could miss.
+    expect(SKILL).toMatch(/min\(boundaryInstant\(D \+ 1\), now\)/);
+    expect(SKILL).toMatch(/part of the one window\s+model — not an exception to it/);
+    expect(SKILL).toMatch(/partial final day never extends it/);
     expect(SKILL).toMatch(/167- or 169-hour weeks/);
     expect(SKILL).toMatch(/does not currently persist a\s+grower timezone/);
     expect(SKILL).toMatch(/block all report generation/);
@@ -125,6 +130,10 @@ describe("Lovable weekly grow report skill contract", () => {
     expect(SKILL).toMatch(/readings are tent-level, not\s+plant-specific/);
     expect(SKILL).toMatch(/never borrows tent-level events/);
     expect(SKILL).toMatch(/plant scope is part of the report key/);
+    // Ownership alone is insufficient — the plant must belong to the
+    // currently selected scope; out-of-scope references are honest errors.
+    expect(SKILL).toMatch(/belongs to the currently selected grow\/tent scope/);
+    expect(SKILL).toMatch(/never silently accepted, never silently\s+swapped/);
   });
 
   it("keeps saved presets device-local, validated, and judgment-free", () => {

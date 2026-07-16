@@ -31,6 +31,13 @@ Scope defaults to the grower's **active grow** (single tent for Free tier; growe
   Derive those instants from local calendar dates in the explicit timezone so
   daylight-saving transitions may produce 167- or 169-hour weeks without
   dropping or duplicating a local day.
+- Canonically, a window's upper bound is `min(boundaryInstant(D + 1), now)`:
+  for any fully closed end date the two are identical, and when the end date
+  is the still-open current report day the window is **explicitly partial**
+  (see report time preferences). This truncation is part of the one window
+  model — not an exception to it — so no implementation may ever include
+  future time. "7 local calendar days" describes the selected calendar span;
+  a partial final day never extends it.
 - Print the local date range, timezone name, and resolved UTC instants at the
   top of the report so the grower can verify the boundary.
 
@@ -155,6 +162,12 @@ the same 7-day report for a single plant without changing any other rule.
   only as the existing opaque owned plant ID on the private report route
   (`?plant=<id>`), validated against RLS-scoped ownership before use, subject
   to all existing URL rules (never in analytics, logs, copy, or share URLs).
+- **Scope coherence.** Ownership alone is not enough: a plant is accepted
+  only when it belongs to the currently selected grow/tent scope. An owned
+  plant from a different tent or grow (hand-edited URL, stale preset) is
+  rejected with an honest notice — never silently accepted, never silently
+  swapped for another plant, and never mixed with tent-level environment
+  from a scope it does not belong to.
 - **Empty plant windows are honest.** A plant with zero scoped events renders
   the standard empty states; the report never borrows tent-level events to
   fill a plant view.
@@ -188,8 +201,8 @@ regenerate in one click without reselecting settings.
   re-validated on load like fresh input — unknown fields discarded, invalid
   dates/rules/plant references mark the preset "needs review" with an honest
   notice instead of applying partially. A plant reference that no longer
-  resolves to an owned plant renders the preset invalid; it never falls back
-  to another plant.
+  resolves to an owned plant in the currently selected grow/tent scope
+  renders the preset invalid; it never falls back to another plant.
 - **Neutral naming, grower's words.** The grower's own preset names render
   verbatim in the picker but never appear in URLs, analytics, or logs. The
   system never creates presets itself and never adds judgment framing

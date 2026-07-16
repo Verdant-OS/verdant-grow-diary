@@ -19,6 +19,10 @@ import {
   IMPORTED_HISTORY_PROMPT_STRINGS,
   AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS,
 } from "./aiDoctorImportedHistoryPromptRules";
+import {
+  buildValidatorSafeAiDoctorPromptValue,
+  sanitizeAiDoctorPromptText,
+} from "./aiDoctorPromptVocabularyRules";
 
 export const AI_DOCTOR_BASE_SYSTEM_PROMPT =
   "You are a cautious cannabis grow assistant. Reply ONLY through the " +
@@ -38,9 +42,7 @@ export interface AiDoctorPromptMessages {
 }
 
 function asRecord(v: unknown): Record<string, unknown> | null {
-  return v && typeof v === "object" && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : null;
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 }
 
 /**
@@ -51,9 +53,7 @@ function asRecord(v: unknown): Record<string, unknown> | null {
  * `missingLiveSensorReadings`, the corresponding safety guidance and
  * historical-context blocks are appended.
  */
-export function buildAiDoctorPromptMessages(
-  packet: unknown,
-): AiDoctorPromptMessages {
+export function buildAiDoctorPromptMessages(packet: unknown): AiDoctorPromptMessages {
   const rec = asRecord(packet);
   const imported_sensor_history = (rec?.imported_sensor_history ?? null) as
     | Parameters<typeof buildAiDoctorImportedHistoryPromptFragment>[0]["imported_sensor_history"]
@@ -64,12 +64,14 @@ export function buildAiDoctorPromptMessages(
     imported_sensor_history,
     missingLiveSensorReadings,
   });
+  const guidance = Object.freeze(fragment.guidance.map(sanitizeAiDoctorPromptText));
+  const safePacket = buildValidatorSafeAiDoctorPromptValue(packet ?? null);
 
   const systemSections: string[] = [AI_DOCTOR_BASE_SYSTEM_PROMPT];
-  if (fragment.guidance.length > 0) {
+  if (guidance.length > 0) {
     systemSections.push(
-      "Imported sensor history safety rules:",
-      ...fragment.guidance.map((g) => `- ${g}`),
+      "Historical sensor context safety rules:",
+      ...guidance.map((g) => `- ${g}`),
     );
   }
   systemSections.push(
@@ -77,10 +79,7 @@ export function buildAiDoctorPromptMessages(
       AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS.join(" | "),
   );
 
-  const userSections: string[] = [
-    "Grower context packet (JSON):",
-    JSON.stringify(packet ?? null),
-  ];
+  const userSections: string[] = ["Grower context packet (JSON):", JSON.stringify(safePacket)];
   if (fragment.importedHistoryBlock) {
     userSections.push("", fragment.importedHistoryBlock);
   }
@@ -89,11 +88,15 @@ export function buildAiDoctorPromptMessages(
   }
 
   return {
-    system: systemSections.join("\n"),
-    user: userSections.join("\n"),
-    guidance: fragment.guidance,
-    importedHistoryBlock: fragment.importedHistoryBlock,
-    missingLiveReadingsBlock: fragment.missingLiveReadingsBlock,
+    system: sanitizeAiDoctorPromptText(systemSections.join("\n")),
+    user: sanitizeAiDoctorPromptText(userSections.join("\n")),
+    guidance,
+    importedHistoryBlock: fragment.importedHistoryBlock
+      ? sanitizeAiDoctorPromptText(fragment.importedHistoryBlock)
+      : null,
+    missingLiveReadingsBlock: fragment.missingLiveReadingsBlock
+      ? sanitizeAiDoctorPromptText(fragment.missingLiveReadingsBlock)
+      : null,
   };
 }
 

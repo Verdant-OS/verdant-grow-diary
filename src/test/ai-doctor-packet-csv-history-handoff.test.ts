@@ -377,7 +377,7 @@ describe("server prompt assembly (shared with the ai-doctor-review edge function
   it("the sanitized CSV summary reaches prompt assembly; raw rows and raw_payload do not", () => {
     const packet = buildPacket([csvRow(), csvRow({ value: 26 })]);
     const out = buildAiDoctorPromptMessages(packet);
-    expect(out.importedHistoryBlock).toContain("[Imported sensor history]");
+    expect(out.importedHistoryBlock).toContain("[Historical sensor context]");
     expect(out.importedHistoryBlock).toContain("CSV history");
     const everything = out.system + "\n" + out.user;
     for (const marker of Object.values(POISON)) {
@@ -390,14 +390,19 @@ describe("server prompt assembly (shared with the ai-doctor-review edge function
     const packet = buildPacket([csvRow()]);
     const out = buildAiDoctorPromptMessages(packet);
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notLiveCaveat);
-    expect(out.user).toContain(AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE);
+    expect(out.user).toContain(
+      "This is historical CSV history, not current telemetry. Do not diagnose from CSV history alone.",
+    );
+    expect(packet.imported_sensor_history?.notForLiveDiagnosis).toBe(
+      AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE,
+    );
   });
 
   it("prompt requests fresh context when current readings are missing", () => {
     const packet = buildPacket([csvRow()]);
     expect(packet.missingLiveSensorReadings).toBe(true);
     const out = buildAiDoctorPromptMessages(packet);
-    expect(out.missingLiveReadingsBlock).toContain("Missing live readings");
+    expect(out.missingLiveReadingsBlock).toContain("Missing current sensor readings");
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.missingLiveReadings);
     // Imported-only context also caps confidence.
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.confidenceCap);

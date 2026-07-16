@@ -19,8 +19,12 @@ export const AI_DOCTOR_REVIEW_ARRAY_CAP = 12;
 
 export const AI_DOCTOR_REVIEW_CONFIDENCE_VALUES: readonly AiDoctorReviewConfidence[] =
   Object.freeze(["low", "medium", "high"]);
-export const AI_DOCTOR_REVIEW_RISK_VALUES: readonly AiDoctorReviewRiskLevel[] =
-  Object.freeze(["low", "watch", "elevated", "high"]);
+export const AI_DOCTOR_REVIEW_RISK_VALUES: readonly AiDoctorReviewRiskLevel[] = Object.freeze([
+  "low",
+  "watch",
+  "elevated",
+  "high",
+]);
 
 export interface AiDoctorReviewActionQueueSuggestion {
   title: string;
@@ -55,13 +59,9 @@ const REQUIRED_STRING_FIELDS = [
   "three_day_recovery_plan",
 ] as const;
 
-const CAPPED_ARRAY_FIELDS = [
-  "evidence",
-  "missing_information",
-  "possible_causes",
-] as const;
+const CAPPED_ARRAY_FIELDS = ["evidence", "missing_information", "possible_causes"] as const;
 
-const BANNED_WORDS = [
+const BANNED_WORDS = Object.freeze([
   "confirmed",
   "certain",
   "cured",
@@ -70,9 +70,15 @@ const BANNED_WORDS = [
   "synced",
   "connected",
   "imported",
-];
+]);
 
 const BANNED_WORDS_RE = new RegExp(`\\b(${BANNED_WORDS.join("|")})\\b`, "i");
+
+/**
+ * Exported for prompt-side tests: guidance strings that the model is
+ * likely to echo in its response must never contain these words.
+ */
+export const AI_DOCTOR_REVIEW_BANNED_WORDS: readonly string[] = BANNED_WORDS;
 
 const DEVICE_CONTROL_RE =
   /\b(turn|switch|enable|disable|activate|deactivate|toggle|trigger|power)\b(?:\s+(?:on|off|the|a|an|your|all|every|this|that))*\s+\b(fan|fans|light|lights|pump|pumps|heater|heaters|humidifier|humidifiers|dehumidifier|dehumidifiers|valve|valves|relay|actuator|outlet|socket|controller|hvac|exhaust|intake|dosing|injector|irrigation|sprinkler)\b/i;
@@ -162,9 +168,7 @@ function sanitizeActionQueueSuggestion(
  * Strips unknown / sensitive keys silently. Rejects on enum/required/cap
  * violations, banned wording, or device-control instructions.
  */
-export function validateAiDoctorReviewResult(
-  input: unknown,
-): AiDoctorReviewValidation {
+export function validateAiDoctorReviewResult(input: unknown): AiDoctorReviewValidation {
   if (!isPlainObject(input)) return { ok: false, reason: "shape" };
 
   // Drop sensitive keys silently — keep validation working on a copy.
@@ -188,9 +192,7 @@ export function validateAiDoctorReviewResult(
   const confidence = safe.confidence;
   if (
     typeof confidence !== "string" ||
-    !AI_DOCTOR_REVIEW_CONFIDENCE_VALUES.includes(
-      confidence as AiDoctorReviewConfidence,
-    )
+    !AI_DOCTOR_REVIEW_CONFIDENCE_VALUES.includes(confidence as AiDoctorReviewConfidence)
   ) {
     return { ok: false, reason: "confidence_enum" };
   }

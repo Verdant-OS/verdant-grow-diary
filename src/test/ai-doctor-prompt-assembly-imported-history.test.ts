@@ -20,10 +20,10 @@ const baseImportedHistory = {
     earliest: "2026-05-01T00:00:00.000Z",
     latest: "2026-05-07T00:00:00.000Z",
   },
-  vendors: [{ sourceApp: "verdant_genetics_xlsx", vendorLabel: "Verdant Genetics XLSX", count: 12 }],
-  metrics: [
-    { metric: "temp", unit: "C", count: 12, min: 20, max: 26, avg: 23.5 },
+  vendors: [
+    { sourceApp: "verdant_genetics_xlsx", vendorLabel: "Verdant Genetics XLSX", count: 12 },
   ],
+  metrics: [{ metric: "temp", unit: "C", count: 12, min: 20, max: 26, avg: 23.5 }],
   suspiciousFlagCount: 0,
 };
 
@@ -49,7 +49,7 @@ describe("buildAiDoctorPromptMessages — imported-history injection", () => {
       missingLiveSensorReadings: false,
     });
     expect(out.importedHistoryBlock).not.toBeNull();
-    expect(out.user).toContain("[Imported sensor history]");
+    expect(out.user).toContain("[Historical sensor context]");
     expect(out.user).toContain("Verdant Genetics XLSX");
     expect(out.user).toContain("Date range:");
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notLiveCaveat);
@@ -64,7 +64,7 @@ describe("buildAiDoctorPromptMessages — imported-history injection", () => {
       missingLiveSensorReadings: true,
     });
     expect(out.missingLiveReadingsBlock).not.toBeNull();
-    expect(out.user).toContain("[Missing live readings]");
+    expect(out.user).toContain("[Missing current sensor readings]");
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.missingLiveReadings);
     expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.missingInfoIncludeLive);
   });
@@ -125,10 +125,7 @@ describe("buildAiDoctorPromptMessages — imported-history injection", () => {
   });
 
   it("static guard: edge function uses helper and contains no new Supabase write / schema / device-control calls", () => {
-    const path = resolve(
-      process.cwd(),
-      "supabase/functions/ai-doctor-review/index.ts",
-    );
+    const path = resolve(process.cwd(), "supabase/functions/ai-doctor-review/index.ts");
     const src = readFileSync(path, "utf8");
     expect(src).toContain("buildAiDoctorPromptMessages");
     // No new sensor_readings / alerts / action_queue writes added.

@@ -187,6 +187,10 @@ describe("Lovable weekly grow report skill contract", () => {
     );
     expect(SKILL).toMatch(/regenerating the report is what\s+changes it, never re-exporting it/);
     expect(SKILL).toMatch(/no server-side PDF service is ever\s+added/);
-    expect(SKILL).toMatch(/Never hashes, opaque IDs, emails, or grower notes in the filename/);
+    // Filenames distinguish scope/time selections so exports never
+    // silently overwrite each other.
+    expect(SKILL).toMatch(/selection-distinguishing/);
+    expect(SKILL).toMatch(/can never overwrite\s+each other in a downloads folder/);
+    expect(SKILL).toMatch(/never hashes, opaque IDs, emails, or grower notes in\s+the filename/);
   });
 });

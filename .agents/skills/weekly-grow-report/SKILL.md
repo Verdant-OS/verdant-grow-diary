@@ -528,9 +528,15 @@ report. It is a projection of the same data — never a second computation.
   counts — never raw URLs, internal IDs, or interactive-only affordances that
   a PDF cannot honor. The footer's report key and content version ID render
   in the PDF exactly as on screen.
-- **Honest filename.** Deterministic and content-safe: grow name slug +
-  window local dates (e.g. `verdant-weekly-blue-dream-2026-07-10-to-2026-07-16.pdf`).
-  Never hashes, opaque IDs, emails, or grower notes in the filename.
+- **Honest filename.** Deterministic, content-safe, and
+  selection-distinguishing: grow name slug + plant name slug when a single
+  plant is selected (omitted for All plants) + window local dates + the
+  boundary hour when non-midnight + a partial marker for partial windows
+  (e.g. `verdant-weekly-blue-dream-plant-505-2026-07-10-to-2026-07-16-day06.pdf`),
+  so different selections of the same grow and dates can never overwrite
+  each other in a downloads folder. Slugs come from the grower's own
+  names, sanitized; never hashes, opaque IDs, emails, or grower notes in
+  the filename.
 - **Read-only.** Export never writes, never invokes AI, never touches the
   Action Queue, never sends device commands.
 

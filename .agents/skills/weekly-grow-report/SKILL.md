@@ -37,7 +37,7 @@ Scope defaults to the grower's **active grow** (single tent for Free tier; growe
 A single control at the top of the report lets the grower generate a report for **the 7-day window ending on any chosen day**. Purpose: let the grower re-run the report against past weeks or a non-Sunday cadence without needing custom filters.
 
 - **Control shape:** a single "Report end date" date picker (shadcn `Calendar` inside a `Popover` — see the shadcn-datepicker pattern, including `pointer-events-auto` on the calendar wrapper). Report window is always **7 local calendar days**, ending on the selected local date and starting 6 calendar dates before it.
-- **Default:** today in the validated browser timezone. If a valid IANA zone is unavailable, block comparison math with an honest "Timezone needed" state; do not silently fall back to the server timezone.
+- **Default:** today in the validated browser timezone. If a valid IANA zone is unavailable, block all report generation with an honest "Timezone needed" state; neither window nor its future/floor bounds are safe to resolve. Do not silently fall back to the server timezone.
 - **Companion display (read-only):** next to the picker, render the resolved window as `<startDate> → <endDate>` in the grower's local timezone so they can verify before generating. Also render the prior-week comparison window (`<priorStart> → <priorEnd>`) so the week-over-week math is transparent.
 - **Bounds:**
   - Max selectable end date = **today** in the grower's local timezone. Future dates are disabled — never generate a report for a window that includes the future.
@@ -156,15 +156,17 @@ Rendered as an **at-a-glance delta card strip** at the top of the section, then 
 
 Card rules — non-negotiable:
 
-- Show `this week` as the primary value; show `Δ absolute (Δ %)` as a secondary line. If either window is empty, render "—" and label the card "insufficient prior data" — never "0%" and never a fabricated baseline. If the prior value is zero, percentage change is undefined; show the absolute delta and `—` for percent.
+- Show `this week` as the primary value; show `Δ absolute (Δ %)` as a secondary line. Treat numeric zero as observed data, never as missing. If current data is unavailable, show `—` as the primary value and label it "current data unavailable." If current data exists but prior data is unavailable, preserve the current value, show `—` for both deltas, and label only the comparison "insufficient prior data." If the prior value is a verified zero, preserve both values and the absolute delta; percentage change alone is undefined and renders `—`.
 - **No good/bad framing.** Neutral typography only — no red/green coloring, no up/down arrows implying value judgment, no emoji. A small neutral glyph (▲ ▼ —) is allowed _only_ to indicate direction of change, styled in a muted token color, not success/destructive tokens.
 - **Provenance-aware.** Cards exclude `demo | stale | invalid` readings from both sides identically, matching section 3/4 rules. If a card's math had to drop a provenance class, add a one-line footnote under the strip (e.g. "Temp/RH exclude 12 stale readings from last week").
 - **Deterministic order and rounding.** Same inputs = same card values, same order, same rounding (1 decimal for temp/RH/VPD, integer ml, 2 decimals for EC, 1 decimal for pH).
-- **Cadence-safe environment math.** Aggregate eligible sensor readings into
-  equal time buckets before averaging so a high-frequency device does not
-  outweigh a lower-frequency source. Report bucket size and coverage on both
-  sides. Do not compare averages when the configured coverage floor is not
-  met.
+- **Cadence-safe environment math.** Within each source series, aggregate raw
+  eligible readings into one value per equal time bucket. Only then may a
+  cross-source headline combine the per-source bucket values with an explicit,
+  deterministic equal-source rule. A high-frequency device must never receive
+  more weight because it emitted more raw points. Report bucket size, included
+  sources, and coverage on both sides. Do not compare averages when the
+  configured coverage floor is not met.
 - **No double-counted excursion time.** Compute the outside-target card as
   the union of covered time buckets where any requested metric is outside its
   band. Keep the per-metric hour counts in the detailed table.
@@ -188,7 +190,7 @@ Card rules — non-negotiable:
 - Action Queue: current verified lifecycle-status counts; no invented
   `dismissed` bucket
 
-Each row shows: `this week | last week | Δ absolute | Δ %` (or "—" if either side is empty or the prior value is zero). No arrows/emoji urgency. No red/green good-vs-bad framing.
+Each row shows: `this week | last week | Δ absolute | Δ %`. Preserve every observed value, including numeric zero. Missing current data renders only the current value and deltas unavailable; missing prior data preserves current and renders prior/deltas unavailable; a verified zero prior value preserves both values and the absolute delta while only percentage renders `—`. No arrows/emoji urgency. No red/green good-vs-bad framing.
 
 Comparison rules — non-negotiable:
 
@@ -293,10 +295,15 @@ Cap at **5 items**, ordered by risk then evidence strength. Never a device comma
 - **Report key:** stable hash of rules version + owned grow/tent scope + selected
   end date + validated timezone. It identifies the requested selection, not an
   immutable snapshot.
-- **Content version ID:** hash of the report key plus the sorted normalized
-  contribution references and their version/timestamp fields. A late diary
-  entry or corrected reading changes this ID. Never claim two reports with the
-  same selection key have identical content when the underlying data changed.
+- **Content version ID:** hash of the report key plus a canonical serialization
+  of every sorted normalized, output-affecting contribution field and exclusion
+  decision. References and timestamps alone are insufficient because mutable
+  diary content may change without an `updated_at` field. Exclude raw payloads
+  and unused private fields from the digest, but include every normalized value
+  that can change a rendered number, label, note excerpt, source classification,
+  or omission. A late entry or corrected content changes this ID. Never claim
+  two reports with the same selection key have identical content when the
+  underlying data changed.
 - Neither identifier exposes its raw hash inputs in rendered copy, URLs, or
   analytics.
 

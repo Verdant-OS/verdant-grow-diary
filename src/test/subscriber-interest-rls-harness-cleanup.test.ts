@@ -11,13 +11,14 @@ const HARNESS = readFileSync(
 describe("subscriber-interest RLS harness cleanup", () => {
   it("deletes and verifies the trigger-created profile before deleting the auth user", () => {
     const profileDelete = HARNESS.indexOf('.from("profiles")\n        .delete()');
-    const profileVerify = HARNESS.indexOf('.from("profiles")\n          .select("id")');
+    const profileVerify = HARNESS.indexOf('.from("profiles")\n          .select("user_id")');
     const authDelete = HARNESS.indexOf("admin.auth.admin.deleteUser(authUserId)");
 
     expect(profileDelete).toBeGreaterThan(-1);
     expect(profileVerify).toBeGreaterThan(profileDelete);
     expect(authDelete).toBeGreaterThan(profileVerify);
-    expect(HARNESS).toContain('.eq("id", authUserId)');
+    expect(HARNESS).toContain('.eq("user_id", authUserId)');
+    expect(HARNESS).not.toContain('.eq("id", authUserId)');
     expect(HARNESS).toContain("synthetic profile remains");
   });
 

@@ -224,14 +224,14 @@ async function main() {
       const { error: profileDeleteError } = await admin
         .from("profiles")
         .delete()
-        .eq("id", authUserId);
+        .eq("user_id", authUserId);
       if (profileDeleteError) {
         teardownErrors.push(`profile delete: ${profileDeleteError.message}`);
       } else {
         const { data: remainingProfiles, error: profileVerifyError } = await admin
           .from("profiles")
-          .select("id")
-          .eq("id", authUserId);
+          .select("user_id")
+          .eq("user_id", authUserId);
         if (profileVerifyError) {
           teardownErrors.push(`profile cleanup verification: ${profileVerifyError.message}`);
         } else if ((remainingProfiles?.length ?? 0) !== 0) {

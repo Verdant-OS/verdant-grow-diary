@@ -20,6 +20,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { verifyWebhook, getPaddleClient, type PaddleEnv } from '../_shared/paddle.ts';
 import { handleVerifiedEvent, type Deps, type EventLikeWithId } from './orchestrator.ts';
+import { insertPaddleEventLog } from './eventLogInsert.ts';
 
 let _supabase: ReturnType<typeof createClient> | null = null;
 function getSupabase() {
@@ -44,7 +45,7 @@ function buildDeps(): Deps {
   const sb = getSupabase();
   return {
     async insertEventReceived({ paddle_event_id, audit, payload }) {
-      const { error } = await sb.from('lovable_paddle_events').insert({
+      const row = {
         paddle_event_id,
         event_type: audit.event_type,
         environment: audit.environment,
@@ -58,13 +59,20 @@ function buildDeps(): Deps {
         skip_reason: null,
         last_error: null,
         payload,
+      } as const;
+      return await insertPaddleEventLog(row, async (candidate) => {
+        // createClient is intentionally untyped in this Edge wrapper, so its
+        // PostgREST Insert overload resolves to never. Runtime shape is fixed
+        // by PaddleEventLogRow and covered by the pure insert tests.
+        const { error } = await sb
+          .from('lovable_paddle_events')
+          .insert(candidate as never);
+        return {
+          error: error
+            ? { code: (error as { code?: string }).code, message: error.message }
+            : null,
+        };
       });
-      if (!error) return { ok: true };
-      // 23505 = unique_violation on paddle_event_id → duplicate delivery.
-      if ((error as { code?: string }).code === '23505') {
-        return { ok: true, duplicate: true };
-      }
-      return { ok: false, error: error.message };
     },
     async getExistingEvent(paddle_event_id) {
       const { data, error } = await sb

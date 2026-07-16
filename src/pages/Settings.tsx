@@ -412,6 +412,8 @@ function SubscriptionTile() {
  *  - Typed confirmation ("DELETE") required before the request fires.
  *  - The edge function re-verifies the caller JWT and requires the same
  *    literal in the body; a click-through cannot silently delete.
+ *  - Recurring Paddle billing is canceled immediately server-side before
+ *    any Verdant data is removed. Provider failure leaves the account intact.
  *  - Rows in public.* cascade via existing FKs on auth.users(id).
  */
 function DeleteAccountTile() {
@@ -465,9 +467,9 @@ function DeleteAccountTile() {
             <DialogDescription>
               This permanently deletes your account, grows, tents, plants,
               diary entries, photos, and sensor snapshots. This cannot be
-              undone. If you have an active paid subscription, cancel it in
-              the billing portal first — deletion does not automatically
-              cancel Paddle billing.
+              undone. Any recurring Paddle subscription is canceled
+              immediately before deletion. Deletion does not automatically
+              issue a refund.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-2 py-2">
@@ -504,7 +506,7 @@ function DeleteAccountTile() {
               aria-busy={busy}
               data-testid="settings-delete-account-confirm"
             >
-              {busy ? "Deleting…" : "Permanently delete"}
+              {busy ? "Canceling billing and deleting…" : "Cancel billing and delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -585,4 +587,3 @@ export default function Settings() {
     </div>
   );
 }
-

@@ -25,8 +25,11 @@ import { CheckCircle2, Info, Loader2 } from "lucide-react";
  *      "confirming" — real checkout context on this device (fresh marker
  *                     from checkoutContextRules, or a sanitized returnTo);
  *                     polls the resolver up to ~30 s.
- *      "no_context" — direct visit with nothing to confirm; calm copy,
- *                     no polling, no completion claim.
+ *      "no_context" — direct visit with nothing to confirm; calm copy, no
+ *                     completion claim. Still runs the same quiet bounded
+ *                     poll so a storage-blocked buyer (no marker, no
+ *                     returnTo) upgrades to confirmed when the webhook
+ *                     lands.
  *      "confirmed"  — resolver confirmed an active paid plan.
  *  - "Verdant Pro is active." is shown ONLY after `isActive` is true and
  *    `effectivePlanId !== 'free'`.
@@ -97,14 +100,18 @@ export default function CheckoutSuccess() {
     });
   }, [confirmed, entitlement.effectivePlanId]);
 
-  // Bounded poll — stops when confirmed or after POLL_TIMEOUT_MS. Only runs
-  // with real checkout context; a direct no-context visit must not burn ~20
-  // entitlement refetches waiting for a confirmation that never comes.
+  // Bounded poll — stops when confirmed or after POLL_TIMEOUT_MS. Runs in
+  // BOTH unconfirmed states: "confirming" shows it explicitly, while
+  // "no_context" polls quietly — a real buyer whose sessionStorage is
+  // blocked (private mode) and whose success URL carries no returnTo would
+  // otherwise land in no_context with no way to detect the webhook landing.
+  // The poll only ever upgrades the view via the server-side resolver; the
+  // copy never claims completion from the visit itself.
   const startedAt = useRef<number>(Date.now());
   const [pollExhausted, setPollExhausted] = useState(false);
 
   useEffect(() => {
-    if (view !== "confirming") return;
+    if (view === "confirmed") return;
     const id = setInterval(() => {
       if (Date.now() - startedAt.current >= POLL_TIMEOUT_MS) {
         setPollExhausted(true);

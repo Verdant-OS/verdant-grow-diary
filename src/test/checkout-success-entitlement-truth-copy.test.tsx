@@ -33,11 +33,12 @@ const mockEnt: { value: ResolvedEntitlement; loading: boolean } = {
   loading: false,
 };
 
+const refetchSpy = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: mockEnt.loading,
     entitlement: mockEnt.value,
-    refetch: async () => undefined,
+    refetch: refetchSpy,
   }),
 }));
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => undefined }));
@@ -92,6 +93,32 @@ describe("CheckoutSuccess truth copy", () => {
     expect(document.body.textContent).not.toMatch(/Checkout completed/i);
     expect(screen.getByTestId("checkout-success-refresh-button")).toBeInTheDocument();
     expect(screen.queryByTestId("checkout-success-confirmed-heading")).toBeNull();
+  });
+
+  it("no_context still runs the quiet bounded entitlement poll (storage-blocked buyers self-heal)", () => {
+    // A real buyer whose sessionStorage is blocked and whose success URL has
+    // no returnTo lands in no_context — the bounded poll must still detect
+    // the webhook landing server-side. The poll upgrades state; the copy
+    // itself never claims completion.
+    vi.useFakeTimers();
+    try {
+      refetchSpy.mockClear();
+      mockEnt.value = {
+        ...mockEnt.value,
+        effectivePlanId: "free",
+        isActive: true,
+        displayPlanId: "free",
+      };
+      renderPage();
+      expect(screen.getByTestId("checkout-success-page")).toHaveAttribute(
+        "data-view",
+        "no_context",
+      );
+      vi.advanceTimersByTime(1600);
+      expect(refetchSpy).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("treats an expired same-device marker as no context", () => {

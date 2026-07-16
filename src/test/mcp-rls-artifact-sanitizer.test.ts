@@ -69,6 +69,34 @@ describe("sanitize-mcp-rls-artifacts sanitizeText", () => {
     );
     expect(out).not.toContain("secret_reading");
     expect(out).toContain("raw_payload");
+    // Content AFTER the balanced block survives.
+    expect(out).toContain("next_field");
+  });
+
+  it("redacts pretty-printed multiline raw_payload blocks entirely", () => {
+    // Vitest failure diffs print objects across many lines — the block
+    // must be redacted past the first newline.
+    const out = sanitizeText(
+      [
+        '  "raw_payload": {',
+        '    "device_key": "abc-123",',
+        '    "nested": { "temp": 24.5, "note": "brace } in string" },',
+        "  },",
+        '  "next_field": "keep-me",',
+      ].join("\n"),
+    );
+    expect(out).not.toContain("device_key");
+    expect(out).not.toContain("abc-123");
+    expect(out).not.toContain("24.5");
+    expect(out).toContain("raw_payload");
+    expect(out).toContain("keep-me");
+  });
+
+  it("redacts vitest Object-style and truncated raw_payload blocks to end of input", () => {
+    const out = sanitizeText('raw_payload: Object {\n  "token_x": "leaky",\n');
+    expect(out).not.toContain("token_x");
+    expect(out).not.toContain("leaky");
+    expect(out).toContain("raw_payload");
   });
 
   it("redacts provided env secret values verbatim", () => {

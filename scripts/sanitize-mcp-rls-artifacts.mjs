@@ -54,10 +54,58 @@ const KEYED_VALUE_RULES = [
   ),
   // client_secret / client-secret
   new RegExp(`("?client[_-]?secret"?\\s*[:=]\\s*)(${QUOTED_OR_BARE_VALUE.source})`, "gi"),
-  // raw_payload — object/array values redact to end of line (nested JSON
-  // cannot be bounded safely by a regex; over-redacting is fail-safe).
-  new RegExp(`("?raw_payload"?\\s*[:=]\\s*)("(?:[^"\\\\]|\\\\.)*"|[^\\r\\n]+)`, "gi"),
 ];
+
+/**
+ * raw_payload values need their own pass: vitest failure diffs
+ * pretty-print objects across MANY lines ("raw_payload": Object { … }),
+ * and a regex cannot bound nested braces — a to-end-of-line rule leaks
+ * every line after the first. Scan forward from the opener balancing
+ * {}/[] while skipping quoted strings; a truncated (never-balanced)
+ * block redacts to end of input — over-redaction is fail-safe.
+ */
+const RAW_PAYLOAD_KEY = /"?raw_payload"?\s*[:=]\s*(?:Object\s*|Array\s*)?/gi;
+const SIMPLE_VALUE = new RegExp(`^(?:${QUOTED_OR_BARE_VALUE.source})`);
+
+function scanBalancedEnd(text, openIdx) {
+  let depth = 0;
+  let inString = null;
+  for (let i = openIdx; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (ch === "\\") i += 1;
+      else if (ch === inString) inString = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") inString = ch;
+    else if (ch === "{" || ch === "[") depth += 1;
+    else if (ch === "}" || ch === "]") {
+      depth -= 1;
+      if (depth <= 0) return i + 1;
+    }
+  }
+  return text.length;
+}
+
+function redactRawPayloadValues(text) {
+  let out = "";
+  let last = 0;
+  for (const m of text.matchAll(RAW_PAYLOAD_KEY)) {
+    if (m.index < last) continue; // key inside an already-redacted block
+    const valueStart = m.index + m[0].length;
+    const next = text[valueStart];
+    let end;
+    if (next === "{" || next === "[") {
+      end = scanBalancedEnd(text, valueStart);
+    } else {
+      const simple = SIMPLE_VALUE.exec(text.slice(valueStart));
+      end = valueStart + (simple ? simple[0].length : 0);
+    }
+    out += text.slice(last, valueStart) + REDACTED;
+    last = end;
+  }
+  return out + text.slice(last);
+}
 
 /** Header-style lines: redact everything after the separator. */
 const HEADER_VALUE_RULES = [
@@ -65,7 +113,9 @@ const HEADER_VALUE_RULES = [
 ];
 
 export function sanitizeText(text, extraSecrets = []) {
-  let out = text;
+  // raw_payload blocks first, on pristine text, so balanced-brace
+  // scanning is never confused by other rules' replacements.
+  let out = redactRawPayloadValues(text);
   for (const secret of extraSecrets) out = out.split(secret).join(REDACTED);
   for (const re of BARE_SECRET_RULES) out = out.replace(re, REDACTED);
   for (const re of HEADER_VALUE_RULES) out = out.replace(re, `$1${REDACTED}`);

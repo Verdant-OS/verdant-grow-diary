@@ -7,11 +7,16 @@
  * LIMIT would let one bursty metric push another metric's latest row out
  * of the scan window and silently drop it from the snapshot.
  *
- * Rows are ordered by capture time (captured_at) first — `ts` is ingest
- * time, which bridge/CSV backfills and retries can reorder — with the
- * ts DESC, created_at DESC tie-breakers the app's sensor loader uses
- * (src/hooks/useLatestSensorSnapshot.ts), then id DESC so equal
- * timestamps can never flip the snapshot between calls.
+ * "Latest" means COALESCE(captured_at, ts) DESC — capture time when the
+ * ingest path recorded one, ingest time for legacy null-captured rows.
+ * PostgREST cannot order by that expression, and captured_at DESC NULLS
+ * LAST alone would rank every captured row above every legacy row
+ * regardless of recency. So each metric fetches two candidates — the
+ * newest captured row (max captured_at) and the newest legacy row (max
+ * ts among captured_at IS NULL); the true coalesce-winner is always one
+ * of the two. Ties break by ts DESC, created_at DESC (the app loader's
+ * convention, src/hooks/useLatestSensorSnapshot.ts), then id DESC so
+ * equal timestamps can never flip the snapshot between calls.
  *
  * Preserves `source` and `quality` labels verbatim. Trust follows the
  * canonical SENSOR TRUTH contract: only quality `ok` + source `live`
@@ -57,6 +62,24 @@ interface SensorRow {
   captured_at: string | null;
 }
 
+const SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at";
+
+/** Effective capture time: COALESCE(captured_at, ts) as epoch millis. */
+function effectiveCaptureMs(row: SensorRow): number {
+  return Date.parse(row.captured_at ?? row.ts);
+}
+
+/** Deterministic winner between the captured and legacy candidates. */
+function newerReading(a: SensorRow, b: SensorRow): SensorRow {
+  const ea = effectiveCaptureMs(a);
+  const eb = effectiveCaptureMs(b);
+  if (ea !== eb) return ea > eb ? a : b;
+  const ta = Date.parse(a.ts);
+  const tb = Date.parse(b.ts);
+  if (ta !== tb) return ta > tb ? a : b;
+  return a.id > b.id ? a : b;
+}
+
 export default defineTool({
   name: "get_latest_sensor_snapshot",
   title: "Get latest sensor snapshot",
@@ -99,23 +122,36 @@ export default defineTool({
         isError: true,
       };
     }
-    // Latest row per metric. captured_at DESC NULLS LAST first (capture
-    // time beats ingest time), then the loader's ts/created_at convention,
-    // then id as a total-order tie-breaker.
+    // Latest row per metric under COALESCE(captured_at, ts) semantics:
+    // two candidates per metric (newest captured row + newest legacy
+    // null-captured row), winner picked by effective capture time. See
+    // the header comment for why a single NULLS LAST order is wrong.
     const results = await Promise.all(
-      KNOWN_METRICS.map((metric) =>
+      KNOWN_METRICS.flatMap((metric) => [
         supabase
           .from("sensor_readings")
-          .select("id,tent_id,metric,value,quality,source,ts,captured_at")
+          .select(SENSOR_COLUMNS)
           .eq("tent_id", tentId)
           .eq("metric", metric)
-          .order("captured_at", { ascending: false, nullsFirst: false })
+          .not("captured_at", "is", null)
+          .order("captured_at", { ascending: false })
           .order("ts", { ascending: false })
           .order("created_at", { ascending: false })
           .order("id", { ascending: false })
           .limit(1)
           .maybeSingle(),
-      ),
+        supabase
+          .from("sensor_readings")
+          .select(SENSOR_COLUMNS)
+          .eq("tent_id", tentId)
+          .eq("metric", metric)
+          .is("captured_at", null)
+          .order("ts", { ascending: false })
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]),
     );
     const failed = results.find((r) => r.error);
     if (failed?.error) {
@@ -127,7 +163,9 @@ export default defineTool({
     const readings: Record<string, SensorRow> = {};
     for (const result of results) {
       const row = result.data as SensorRow | null;
-      if (row) readings[row.metric] = row;
+      if (!row) continue;
+      const current = readings[row.metric];
+      readings[row.metric] = current ? newerReading(current, row) : row;
     }
     if (Object.keys(readings).length === 0) {
       return {

@@ -128,6 +128,19 @@ var KNOWN_METRICS = [
   "ec",
   "ppfd"
 ];
+var SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at";
+function effectiveCaptureMs(row) {
+  return Date.parse(row.captured_at ?? row.ts);
+}
+function newerReading(a, b) {
+  const ea = effectiveCaptureMs(a);
+  const eb = effectiveCaptureMs(b);
+  if (ea !== eb) return ea > eb ? a : b;
+  const ta = Date.parse(a.ts);
+  const tb = Date.parse(b.ts);
+  if (ta !== tb) return ta > tb ? a : b;
+  return a.id > b.id ? a : b;
+}
 var get_latest_sensor_snapshot_default = defineTool3({
   name: "get_latest_sensor_snapshot",
   title: "Get latest sensor snapshot",
@@ -153,9 +166,10 @@ var get_latest_sensor_snapshot_default = defineTool3({
       };
     }
     const results = await Promise.all(
-      KNOWN_METRICS.map(
-        (metric) => supabase.from("sensor_readings").select("id,tent_id,metric,value,quality,source,ts,captured_at").eq("tent_id", tentId).eq("metric", metric).order("captured_at", { ascending: false, nullsFirst: false }).order("ts", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(1).maybeSingle()
-      )
+      KNOWN_METRICS.flatMap((metric) => [
+        supabase.from("sensor_readings").select(SENSOR_COLUMNS).eq("tent_id", tentId).eq("metric", metric).not("captured_at", "is", null).order("captured_at", { ascending: false }).order("ts", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("sensor_readings").select(SENSOR_COLUMNS).eq("tent_id", tentId).eq("metric", metric).is("captured_at", null).order("ts", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(1).maybeSingle()
+      ])
     );
     const failed = results.find((r) => r.error);
     if (failed?.error) {
@@ -167,7 +181,9 @@ var get_latest_sensor_snapshot_default = defineTool3({
     const readings = {};
     for (const result of results) {
       const row = result.data;
-      if (row) readings[row.metric] = row;
+      if (!row) continue;
+      const current = readings[row.metric];
+      readings[row.metric] = current ? newerReading(current, row) : row;
     }
     if (Object.keys(readings).length === 0) {
       return {

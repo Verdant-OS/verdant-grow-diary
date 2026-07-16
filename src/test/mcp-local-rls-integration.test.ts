@@ -830,6 +830,31 @@ describeIfHarness("MCP local RLS integration", () => {
           ts: oldHumidityIso,
           captured_at: oldHumidityIso,
         },
+        // Legacy pair: an older bridge row WITH captured_at vs a newer
+        // manual row with captured_at NULL. COALESCE(captured_at, ts)
+        // semantics must let the newer legacy row win — a plain
+        // captured_at DESC NULLS LAST order would rank every captured
+        // row above every legacy row regardless of recency.
+        {
+          user_id: userA.id,
+          tent_id: burstTentId,
+          metric: "soil_moisture_pct",
+          value: 40,
+          source: "ecowitt",
+          quality: "ok",
+          ts: new Date(burstBase - 7_200_000).toISOString(),
+          captured_at: new Date(burstBase - 7_200_000).toISOString(),
+        },
+        {
+          user_id: userA.id,
+          tent_id: burstTentId,
+          metric: "soil_moisture_pct",
+          value: 45,
+          source: "manual",
+          quality: "ok",
+          ts: new Date(burstBase - 30_000).toISOString(),
+          captured_at: null,
+        },
         // Backfill pair: the row ingested last (newest ts) was captured
         // FIRST — capture time must win over ingest time.
         {
@@ -871,7 +896,12 @@ describeIfHarness("MCP local RLS integration", () => {
 
     it(`${NOISY_ROWS} newer rows on one metric cannot evict another metric's older latest row`, async () => {
       const readings = await snapshotReadings();
-      expect(Object.keys(readings).sort()).toEqual(["co2_ppm", "humidity_pct", "temperature_c"]);
+      expect(Object.keys(readings).sort()).toEqual([
+        "co2_ppm",
+        "humidity_pct",
+        "soil_moisture_pct",
+        "temperature_c",
+      ]);
       expect(readings.humidity_pct.value).toBe(51);
       expect(Date.parse(readings.humidity_pct.captured_at)).toBe(Date.parse(oldHumidityIso));
       expect(readings.temperature_c.value).toBe(24);
@@ -882,6 +912,15 @@ describeIfHarness("MCP local RLS integration", () => {
       const readings = await snapshotReadings();
       expect(readings.co2_ppm.value).toBe(650);
       expect(Date.parse(readings.co2_ppm.captured_at)).toBe(Date.parse(latestCaptureCo2Iso));
+    });
+
+    it("a newer legacy row with null captured_at beats an older captured bridge row", async () => {
+      // COALESCE(captured_at, ts) regression: NULLS LAST ordering alone
+      // would return the stale bridge row (40) here.
+      const readings = await snapshotReadings();
+      expect(readings.soil_moisture_pct.value).toBe(45);
+      expect(readings.soil_moisture_pct.source).toBe("manual");
+      expect(readings.soil_moisture_pct.captured_at).toBeNull();
     });
   });
 

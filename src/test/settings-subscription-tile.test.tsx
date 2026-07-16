@@ -165,4 +165,45 @@ describe("Settings — Subscription tile", () => {
     expect(text).not.toMatch(/(includes|with|full)\s+autopilot/);
     expect(text).not.toContain("device control included");
   });
+
+  it("Code #5: renders cancel-confirmation notice when a cancellation is scheduled", () => {
+    entitlementMock.displayPlanId = "pro_annual";
+    cancelNoticeMock.visible = true;
+    cancelNoticeMock.reason = "scheduled_change_cancel";
+    cancelNoticeMock.accessUntilIso = "2026-08-15T00:00:00.000Z";
+    cancelNoticeMock.accessUntilLabel = "August 15, 2026";
+    renderPage();
+    const notice = screen.getByTestId("settings-subscription-cancel-notice");
+    expect(notice.textContent).toMatch(/Cancellation scheduled/i);
+    expect(notice.textContent).toMatch(/August 15, 2026/);
+  });
+
+  it("Code #5: notice is not rendered when nothing is scheduled", () => {
+    entitlementMock.displayPlanId = "pro_monthly";
+    cancelNoticeMock.visible = false;
+    renderPage();
+    expect(screen.queryByTestId("settings-subscription-cancel-notice")).toBeNull();
+  });
+
+  it("Code #5: notice falls back to generic copy when no date is known", () => {
+    entitlementMock.displayPlanId = "pro_monthly";
+    cancelNoticeMock.visible = true;
+    cancelNoticeMock.reason = "cancel_at_period_end";
+    cancelNoticeMock.accessUntilIso = null;
+    cancelNoticeMock.accessUntilLabel = "";
+    renderPage();
+    const notice = screen.getByTestId("settings-subscription-cancel-notice");
+    expect(notice.textContent).toMatch(/Cancellation scheduled/i);
+    expect(notice.textContent).toMatch(/end of your current period/i);
+  });
+
+  it("Code #5 + Code #6: lifetime plan hides Manage CTA AND does not show cancel notice", () => {
+    entitlementMock.displayPlanId = "founder_lifetime";
+    cancelNoticeMock.visible = false;
+    renderPage();
+    expect(screen.queryByTestId("settings-subscription-manage")).toBeNull();
+    expect(screen.queryByTestId("settings-subscription-cancel-notice")).toBeNull();
+    expect(document.body.textContent).toMatch(/one-time purchase/i);
+  });
 });
+

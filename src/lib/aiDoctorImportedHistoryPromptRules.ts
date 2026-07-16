@@ -57,8 +57,11 @@ export const IMPORTED_HISTORY_PROMPT_STRINGS = Object.freeze({
     "In Missing information, include 'current sensor readings' when no current reading is available.",
   validatorSafeVocabulary:
     "Never use these words anywhere in your response: confirmed, certain, cured, guaranteed, live, synced, connected, imported. Say 'current sensor readings' instead of 'live sensor readings' and 'historical context' instead of 'imported history'.",
+  // Confidence levels named here must be members of the result contract's
+  // accepted enum (low | medium | high) — 'moderate' would be rejected
+  // with confidence_enum.
   confidenceCap:
-    "If only imported history is available (no current/live sensor readings), cap Confidence at 'low' or 'moderate' — never 'high'.",
+    "If only imported history is available (no current sensor readings), cap Confidence at 'low' or 'medium' — never 'high'.",
 });
 
 export interface ImportedHistoryPromptFragment {

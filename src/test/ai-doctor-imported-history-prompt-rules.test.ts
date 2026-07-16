@@ -10,6 +10,7 @@ import {
   compilePlantContextFromRows,
   type SensorReadingRowLike,
 } from "@/lib/aiDoctorContextCompiler";
+import { AI_DOCTOR_REVIEW_CONFIDENCE_VALUES } from "@/lib/aiDoctorReviewResultContract";
 
 const NOW = new Date("2026-06-04T12:00:00Z");
 const iso = (off: number) => new Date(NOW.getTime() - off).toISOString();
@@ -152,7 +153,17 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
       now: NOW,
     });
     const frag = buildAiDoctorImportedHistoryPromptFragment(ctx);
-    expect(frag.guidance.join(" ")).toContain("cap Confidence at 'low' or 'moderate'");
+    expect(frag.guidance.join(" ")).toContain("cap Confidence at 'low' or 'medium'");
+    // Every confidence level the guidance names must be one the result
+    // contract accepts — 'moderate' is not in the enum and an obedient
+    // response using it is rejected with confidence_enum.
+    const named = [...IMPORTED_HISTORY_PROMPT_STRINGS.confidenceCap.matchAll(/'(\w+)'/g)].map(
+      (m) => m[1],
+    );
+    expect(named.length).toBeGreaterThan(0);
+    for (const level of named) {
+      expect(AI_DOCTOR_REVIEW_CONFIDENCE_VALUES).toContain(level);
+    }
   });
 
   it("preserves required AI Doctor output structure", () => {

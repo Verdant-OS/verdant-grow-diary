@@ -139,10 +139,8 @@ export default function PlantDetailAiDoctorLiveReview({
 
   const { entitlement } = useMyEntitlements();
 
-  // Construct the return target locally via the canonical route helper
-  // (identical encoded output to the previous inline literal, and keeps
-  // the route-helper migration scanner satisfied). AiCreditLimitNotice
-  // validates it again before it reaches the pricing link.
+  // Keep route construction aligned with the shared route contract.
+  // AiCreditLimitNotice validates it again before it reaches the pricing link.
   const returnTo = useMemo(() => plantDetailPath(plantId), [plantId]);
 
   // Keep funnel tracking aligned with the notice's server-plan + defensive

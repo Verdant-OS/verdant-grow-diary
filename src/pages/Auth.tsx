@@ -56,6 +56,7 @@ import {
   getAuthTabTriggerClassName,
   type AuthMode,
 } from "@/lib/authModeTabRules";
+import { lovable } from "@/integrations/lovable/index";
 
 export default function Auth() {
   usePageSeo({

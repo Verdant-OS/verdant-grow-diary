@@ -199,6 +199,24 @@ export const VERDANT_CULTIVARS: readonly VerdantCultivarProfile[] = [
       "Fruit vs cookie terpene balance",
       "Yield vs bud-density trade-off between phenos",
     ],
+    samplePhenos: [
+      {
+        label: "Blue Cookies Fruit (fruit-forward)",
+        structure: "Balanced, moderate branching",
+        aroma: "Ripe blueberry, cookie tail",
+        resin: "Even coverage, glassy heads",
+        yieldNote: "Moderate; uniform mid-density colas",
+        finishNote: "Chops at ~58 days; light purple hues with cool nights",
+      },
+      {
+        label: "Blue Cookies Dough (cookie-forward)",
+        structure: "Stockier, shorter internodes",
+        aroma: "Sweet cookie dominant, faint fruit",
+        resin: "Heavier late-flower resin, cloudier at chop",
+        yieldNote: "Slightly higher, denser flower",
+        finishNote: "Chops 3–5 days later than Fruit pheno",
+      },
+    ],
   },
 ] as const;
 

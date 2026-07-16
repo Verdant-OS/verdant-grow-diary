@@ -38,7 +38,7 @@ export function SubscriptionPastDueBanner() {
           type="button"
           onClick={() => {
             clearError();
-            void openPaddleCustomerPortal();
+            void open();
           }}
           disabled={opening}
           aria-busy={opening}

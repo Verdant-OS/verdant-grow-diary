@@ -339,14 +339,16 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
     // Retired branch: loadUnionEntitlement no longer reads billing_subscriptions.
     // Any currently-entitling BYO row was backfilled into public.subscriptions
     // in the narrowing migration, so a fixture-only BYO row must not unlock.
+    // `isActive` reflects "on some tier" (free is a real tier); the security
+    // signals are effectivePlanId + capabilities.
     const { entitlement, lookupFailed } = await loadUnionEntitlement(
       fakeClient({ byo: { data: [byoFounderRow], error: null } }),
       "sandbox",
       NOW,
     );
     expect(lookupFailed).toBe(false);
-    expect(entitlement.isActive).toBe(false);
     expect(entitlement.effectivePlanId).toBe("free");
+    expect(entitlement.displayPlanId).toBe("free");
     expect(entitlement.capabilities.advancedExports).toBe(false);
   });
 

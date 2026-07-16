@@ -27,6 +27,7 @@ import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
+import { plantDetailPath } from "@/lib/routes";
 import {
   classificationFromStatusResult,
   type Classification,
@@ -116,9 +117,9 @@ export default function PlantDetailAiDoctorLiveReview({
 
   const { entitlement } = useMyEntitlements();
 
-  // Construct the return target locally from a single encoded route segment.
+  // Keep route construction aligned with the shared route contract.
   // AiCreditLimitNotice validates it again before it reaches the pricing link.
-  const returnTo = useMemo(() => `/plants/${encodeURIComponent(plantId)}`, [plantId]);
+  const returnTo = useMemo(() => plantDetailPath(plantId), [plantId]);
 
   // Keep funnel tracking aligned with the notice's server-plan + defensive
   // entitlement rules. Paid, founder, and unknown denials must never register

@@ -186,6 +186,27 @@ describe(".env.example sandbox keys", () => {
     expect(ENV_EXAMPLE).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY\s*=/);
   });
 
+  it("documents the canonical Lovable-lane vars — server secret NAMES comment-only", () => {
+    // Canonical publishable client token (docs/billing.md) ships as an
+    // empty assignment.
+    expect(ENV_EXAMPLE).toMatch(/^VITE_PAYMENTS_CLIENT_TOKEN=""$/m);
+    for (const name of [
+      "PADDLE_SANDBOX_API_KEY",
+      "PADDLE_LIVE_API_KEY",
+      "PAYMENTS_SANDBOX_WEBHOOK_SECRET",
+      "PAYMENTS_LIVE_WEBHOOK_SECRET",
+      "PAYMENTS_ENVIRONMENT",
+    ]) {
+      // Each server-only name is documented…
+      expect(ENV_EXAMPLE).toContain(name);
+      // …but never as an assignment — secrets live in Lovable Cloud only.
+      expect(ENV_EXAMPLE).not.toMatch(new RegExp(`^\\s*${name}\\s*=`, "m"));
+    }
+    // The webhook signing-secret vs API-key distinction stays documented.
+    expect(ENV_EXAMPLE).toMatch(/SIGNING secret \(NOT the API key\)/);
+    expect(ENV_EXAMPLE).toMatch(/RAW body/);
+  });
+
   it("does not hardcode real Paddle price IDs", () => {
     // Sandbox vars are present with empty defaults — values must come from env.
     expect(ENV_EXAMPLE).toMatch(/VITE_PADDLE_PRICE_PRO_MONTHLY=""/);

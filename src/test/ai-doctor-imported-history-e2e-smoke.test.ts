@@ -98,9 +98,7 @@ describe("AI Doctor imported history e2e smoke", () => {
 
   it("prompt includes imported history section + caveats + vendor labels", () => {
     expect(combined).toContain("Imported sensor history");
-    expect(combined).toContain(
-      "This is imported CSV history, not live telemetry.",
-    );
+    expect(combined).toContain("This is imported CSV history, not live telemetry.");
     expect(combined).toContain(
       "Imported history may show trends but is not proof of current conditions.",
     );
@@ -111,7 +109,11 @@ describe("AI Doctor imported history e2e smoke", () => {
   it("prompt includes missing-live-readings warning", () => {
     expect(messages.missingLiveReadingsBlock).not.toBeNull();
     expect(combined).toMatch(/missing|unavailable/i);
-    expect(combined).toContain("live sensor readings");
+    // The warning block header labels the condition; the instruction
+    // text itself stays inside the result validator's vocabulary
+    // ("current sensor readings", never the banned word).
+    expect(combined).toContain("[Missing live readings]");
+    expect(combined).toContain("Current sensor readings are missing or unavailable");
   });
 
   it("prompt never leaks raw_payload internals or private identifiers", () => {
@@ -136,10 +138,7 @@ describe("AI Doctor imported history e2e smoke", () => {
       "secret-cell",
     ];
     for (const term of forbidden) {
-      expect(
-        combined.includes(term),
-        `prompt must not include "${term}"`,
-      ).toBe(false);
+      expect(combined.includes(term), `prompt must not include "${term}"`).toBe(false);
     }
   });
 
@@ -164,12 +163,15 @@ describe("AI Doctor imported history e2e smoke", () => {
       expect(src).not.toMatch(/fetch\(/);
     }
     // The assembled prompt itself must not instruct creation of alerts
-    // or Action Queue items from imported history alone.
+    // or Action Queue items from imported history alone. The rule text
+    // says "historical sensor data" — guidance strings stay inside the
+    // result validator's vocabulary so the model cannot echo a banned
+    // word out of the rule list.
     expect(combined).toContain(
-      "Do not create or recommend alerts solely from imported history.",
+      "Do not create or recommend alerts solely from historical sensor data.",
     );
     expect(combined).toContain(
-      "Do not create or recommend Action Queue items solely from imported history.",
+      "Do not create or recommend Action Queue items solely from historical sensor data.",
     );
   });
 });

@@ -88,7 +88,7 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     // so the model is told to write "current sensor readings" instead.
     expect(frag.missingLiveReadingsBlock).toContain("Current sensor readings are missing");
     expect(frag.guidance.join(" ")).toContain("include 'current sensor readings'");
-    expect(frag.guidance.join(" ")).toContain("Never use these words anywhere in your response");
+    expect(frag.guidance.join(" ")).toContain("refer to telemetry as 'current sensor readings'");
     // The model is never instructed to emit a banned word.
     expect(frag.guidance.join(" ")).not.toContain("include 'live");
   });
@@ -133,7 +133,7 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     );
   });
 
-  it("tells model not to create alerts or Action Queue items solely from imported history", () => {
+  it("tells model not to create alerts or Action Queue items solely from historical data", () => {
     const ctx = compilePlantContextFromRows({
       plant,
       growEvents: [],
@@ -142,9 +142,11 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     });
     const frag = buildAiDoctorImportedHistoryPromptFragment(ctx);
     const joined = frag.guidance.join(" ");
-    expect(joined).toContain("Do not create or recommend alerts solely from imported history");
     expect(joined).toContain(
-      "Do not create or recommend Action Queue items solely from imported history",
+      "Do not create or recommend alerts solely from historical sensor data",
+    );
+    expect(joined).toContain(
+      "Do not create or recommend Action Queue items solely from historical sensor data",
     );
   });
 
@@ -169,21 +171,17 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     }
   });
 
-  it("echo-prone guidance strings contain no validator-banned words", () => {
-    // The model tends to restate these strings in its response (e.g. when
-    // explaining a capped Confidence), so they must stay inside the result
-    // validator's vocabulary. The vocabulary-ban rule itself is exempt —
-    // a deny-list must name the words it bans — and the caveats about the
-    // context data are shown to the model as input labels, not phrasing
-    // it is told to reproduce.
+  it("every guidance string contains no validator-banned words", () => {
+    // Guidance strings are rendered as an explicit rule list in the
+    // system prompt, and models restate rules in their responses (e.g.
+    // in "What not to do") — a banned word here becomes a banned word
+    // in the response and a refunded review. Only `sectionLabel` is
+    // exempt: it is an input-data block header, not a rule.
     const bannedRe = new RegExp(`\\b(${AI_DOCTOR_REVIEW_BANNED_WORDS.join("|")})\\b`, "i");
-    for (const key of [
-      "confidenceCap",
-      "missingLiveReadings",
-      "missingInfoIncludeLive",
-      "evidenceSeparation",
-    ] as const) {
-      expect(IMPORTED_HISTORY_PROMPT_STRINGS[key]).not.toMatch(bannedRe);
+    const inputLabelExempt = new Set(["sectionLabel"]);
+    for (const [key, value] of Object.entries(IMPORTED_HISTORY_PROMPT_STRINGS)) {
+      if (inputLabelExempt.has(key)) continue;
+      expect(value, `IMPORTED_HISTORY_PROMPT_STRINGS.${key}`).not.toMatch(bannedRe);
     }
   });
 

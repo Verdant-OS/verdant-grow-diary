@@ -33,30 +33,38 @@ export const AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS: readonly string[] = Object.free
   "Action Queue suggestion, if appropriate",
 ]);
 
-/** Verbatim caveat strings AI Doctor prompts must include. */
+/**
+ * Verbatim caveat strings AI Doctor prompts must include.
+ *
+ * Every string pushed into the fragment's `guidance` array is rendered
+ * as an explicit rule list in the system prompt, and models restate
+ * rules in their responses (e.g. in "What not to do"). The result
+ * contract rejects any response containing its banned words, so every
+ * guidance string here must stay inside the validator's vocabulary —
+ * banned words may appear only in input-data labels (`sectionLabel`,
+ * block fields). The echo-safety test enforces this per key.
+ */
 export const IMPORTED_HISTORY_PROMPT_STRINGS = Object.freeze({
   sectionLabel: "Imported sensor history",
   notLiveCaveat:
-    "Imported sensor history is historical context only. Do not treat it as live telemetry.",
-  notProofOfCurrent: "Imported history may show trends but is not proof of current conditions.",
-  noAlertsFromHistoryAlone: "Do not create or recommend alerts solely from imported history.",
+    "The historical sensor data in this request is background context only. Do not treat it as current telemetry.",
+  notProofOfCurrent:
+    "Historical sensor data may show trends but is not proof of current conditions.",
+  noAlertsFromHistoryAlone: "Do not create or recommend alerts solely from historical sensor data.",
   noActionQueueFromHistoryAlone:
-    "Do not create or recommend Action Queue items solely from imported history.",
+    "Do not create or recommend Action Queue items solely from historical sensor data.",
   notHealthyFromHistoryAlone:
-    "Do not state that the current environment is healthy based only on imported history.",
-  // Output-phrasing instructions must stay inside the review validator's
-  // vocabulary: the result contract REJECTS responses containing the
-  // banned words (live, imported, synced, connected, …), so the model is
-  // told to write "current sensor readings" / "historical context" — never
-  // the banned words themselves.
+    "Do not state that the current environment is healthy based only on historical sensor data.",
   evidenceSeparation:
     "In Evidence, clearly distinguish 'Current evidence' from 'Historical context'.",
   missingLiveReadings:
     "Current sensor readings are missing or unavailable. State this clearly in Missing information.",
   missingInfoIncludeLive:
     "In Missing information, include 'current sensor readings' when no current reading is available.",
+  // Positive vocabulary steering only — naming the banned words here
+  // would put them in front of the model as restatable text.
   validatorSafeVocabulary:
-    "Never use these words anywhere in your response: confirmed, certain, cured, guaranteed, live, synced, connected, imported. Say 'current sensor readings' instead of 'live sensor readings' and 'historical context' instead of 'imported history'.",
+    "Response wording: refer to telemetry as 'current sensor readings' or as 'historical context'. Hedge findings with 'likely', 'appears', or 'suggests' rather than absolute claims of certainty, cure, or guarantee, and do not assert device connectivity or data-sync status.",
   // Confidence levels named here must be members of the result contract's
   // accepted enum (low | medium | high) — 'moderate' would be rejected
   // with confidence_enum. The model tends to echo this string when

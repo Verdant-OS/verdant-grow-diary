@@ -21,10 +21,7 @@ import {
   AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP,
 } from "@/lib/aiDoctorReviewRequestPacket";
 import type { AiDoctorContextResult } from "@/lib/aiDoctorContextRules";
-import type {
-  TimelineManualSnapshotItem,
-  TimelineMemoryItem,
-} from "@/lib/timelineFilterRules";
+import type { TimelineManualSnapshotItem, TimelineMemoryItem } from "@/lib/timelineFilterRules";
 import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
 import type { CsvHistorySensorRowLike } from "@/lib/aiDoctorCsvHistoryContextRules";
 import {
@@ -34,9 +31,7 @@ import {
 import { buildAiDoctorPromptMessages } from "@/lib/aiDoctorPromptAssembly";
 import { IMPORTED_HISTORY_PROMPT_STRINGS } from "@/lib/aiDoctorImportedHistoryPromptRules";
 
-const ctx = (
-  o: Partial<AiDoctorContextResult> = {},
-): AiDoctorContextResult => ({
+const ctx = (o: Partial<AiDoctorContextResult> = {}): AiDoctorContextResult => ({
   readiness: "strong",
   missing: [],
   evidence: ["fresh-manual-sensor-snapshot"],
@@ -184,15 +179,26 @@ describe("packet — sanitized bounded CSV history summary", () => {
   });
 
   it("fails closed: non-CSV sources are never reinterpreted as CSV history", () => {
-    const rows = [
-      csvRow({ source: "manual", raw_payload: {} }),
-      csvRow({ source: "live", raw_payload: {} }),
-      csvRow({ source: "demo", raw_payload: {} }),
-      csvRow({ source: "stale", raw_payload: {} }),
-      csvRow({ source: "invalid", raw_payload: {} }),
-      csvRow({ source: "totally-unknown", raw_payload: {} }),
-    ];
+    const rows = ["manual", "live", "demo", "stale", "invalid", "totally-unknown"].map((source) =>
+      csvRow({
+        source,
+        raw_payload: { csv_import: true, source_app: "ac_infinity" },
+      }),
+    );
+    rows.push(
+      csvRow({
+        source: null,
+        raw_payload: { csv_import: true, source_app: "ac_infinity" },
+      }),
+    );
     expect(buildPacket(rows).imported_sensor_history).toBeNull();
+  });
+
+  it("accepts only the canonical and explicitly supported legacy CSV source labels", () => {
+    const rows = ["csv", "csv_import_ac_infinity", "csv_import_trolmaster", "csv_import_other"].map(
+      (source) => csvRow({ source, raw_payload: {} }),
+    );
+    expect(buildPacket(rows).imported_sensor_history?.totalReadings).toBe(4);
   });
 
   it("fails closed: malformed timestamps and non-numeric values are skipped", () => {
@@ -202,10 +208,7 @@ describe("packet — sanitized bounded CSV history summary", () => {
     ];
     expect(buildPacket(onlyBad).imported_sensor_history).toBeNull();
 
-    const mixed = [
-      csvRow({ value: "NaN-ish" as unknown as number }),
-      csvRow({ value: 24 }),
-    ];
+    const mixed = [csvRow({ value: "NaN-ish" as unknown as number }), csvRow({ value: 24 })];
     const h = buildPacket(mixed).imported_sensor_history;
     // Both rows have valid timestamps (counted), but only the numeric
     // value contributes to metric aggregates.
@@ -227,8 +230,7 @@ describe("packet — sanitized bounded CSV history summary", () => {
     ];
     const a = buildPacket(rows).imported_sensor_history;
     const b = buildPacket([...rows].reverse()).imported_sensor_history;
-    const c = buildPacket([rows[2], rows[0], rows[3], rows[1]])
-      .imported_sensor_history;
+    const c = buildPacket([rows[2], rows[0], rows[3], rows[1]]).imported_sensor_history;
     expect(JSON.stringify(b)).toBe(JSON.stringify(a));
     expect(JSON.stringify(c)).toBe(JSON.stringify(a));
   });
@@ -242,10 +244,7 @@ describe("packet — sanitized bounded CSV history summary", () => {
       rows.push(csvRow({ value: i, captured_at: ts }));
     }
     // Deterministic permutation: all odd indexes first, then evens.
-    const shuffled = [
-      ...rows.filter((_, i) => i % 2 === 1),
-      ...rows.filter((_, i) => i % 2 === 0),
-    ];
+    const shuffled = [...rows.filter((_, i) => i % 2 === 1), ...rows.filter((_, i) => i % 2 === 0)];
     const reversed = [...rows].reverse();
     const a = buildPacket(rows).imported_sensor_history;
     const b = buildPacket(reversed).imported_sensor_history;
@@ -253,6 +252,31 @@ describe("packet — sanitized bounded CSV history summary", () => {
     expect(JSON.stringify(b)).toBe(JSON.stringify(a));
     expect(JSON.stringify(c)).toBe(JSON.stringify(a));
     expect(a?.totalReadings).toBe(AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP);
+  });
+
+  it("uses summary-complete tie-breakers when timestamp, metric, and value are identical", () => {
+    const vendors = ["ac_infinity", "spider_farmer", "vivosun"];
+    const rows = Array.from({ length: AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP + 40 }, (_, i) =>
+      csvRow({
+        captured_at: "2026-06-01T10:00:00.000Z",
+        metric: "temperature_c",
+        value: 24,
+        unit: i % 2 === 0 ? "C" : "F",
+        raw_payload: {
+          csv_import: true,
+          source_app: vendors[i % vendors.length],
+          suspicious: i % 5 === 0,
+        },
+      }),
+    );
+    const shuffled = [
+      ...rows.filter((_, i) => i % 3 === 2),
+      ...rows.filter((_, i) => i % 3 === 0),
+      ...rows.filter((_, i) => i % 3 === 1),
+    ];
+    const expected = buildPacket(rows).imported_sensor_history;
+    expect(buildPacket([...rows].reverse()).imported_sensor_history).toEqual(expected);
+    expect(buildPacket(shuffled).imported_sensor_history).toEqual(expected);
   });
 
   it("bounds excess history at the named cap", () => {
@@ -286,9 +310,7 @@ describe("packet — sanitized bounded CSV history summary", () => {
     const h = buildPacket([csvRow()]).imported_sensor_history;
     expect(h?.historicalLabel).toBe("CSV history");
     expect(h?.notForLiveDiagnosis).toContain("not live telemetry");
-    expect(h?.guidance.join(" ")).toContain(
-      "not proof of current conditions",
-    );
+    expect(h?.guidance.join(" ")).toContain("not proof of current conditions");
   });
 });
 
@@ -300,9 +322,7 @@ describe("packet — missing-live-readings safety signal", () => {
 
   it("a fresh MANUAL snapshot still reports live readings missing (manual never counts as live)", () => {
     const when = "2026-06-01T10:00:00.000Z";
-    const items: TimelineMemoryItem[] = [
-      snapshotItem(manualSnapshotCard(when), when),
-    ];
+    const items: TimelineMemoryItem[] = [snapshotItem(manualSnapshotCard(when), when)];
     const packet = buildAiDoctorReviewRequestPacket({
       plant: PLANT,
       timelineItems: items,
@@ -315,9 +335,7 @@ describe("packet — missing-live-readings safety signal", () => {
 
   it("a fresh LIVE snapshot clears the missing-live signal", () => {
     const when = "2026-06-01T10:00:00.000Z";
-    const items: TimelineMemoryItem[] = [
-      snapshotItem(liveSnapshotCard(when), when),
-    ];
+    const items: TimelineMemoryItem[] = [snapshotItem(liveSnapshotCard(when), when)];
     const packet = buildAiDoctorReviewRequestPacket({
       plant: PLANT,
       timelineItems: items,
@@ -345,9 +363,7 @@ describe("server prompt assembly (shared with the ai-doctor-review edge function
   it("prompt states the data is historical and not live telemetry", () => {
     const packet = buildPacket([csvRow()]);
     const out = buildAiDoctorPromptMessages(packet);
-    expect(out.system).toContain(
-      IMPORTED_HISTORY_PROMPT_STRINGS.notLiveCaveat,
-    );
+    expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notLiveCaveat);
     expect(out.user).toContain(AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE);
   });
 
@@ -356,26 +372,16 @@ describe("server prompt assembly (shared with the ai-doctor-review edge function
     expect(packet.missingLiveSensorReadings).toBe(true);
     const out = buildAiDoctorPromptMessages(packet);
     expect(out.missingLiveReadingsBlock).toContain("Missing live readings");
-    expect(out.system).toContain(
-      IMPORTED_HISTORY_PROMPT_STRINGS.missingLiveReadings,
-    );
+    expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.missingLiveReadings);
     // Imported-only context also caps confidence.
-    expect(out.system).toContain(
-      IMPORTED_HISTORY_PROMPT_STRINGS.confidenceCap,
-    );
+    expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.confidenceCap);
   });
 
   it("imported-only context cannot justify alerts or Action Queue suggestions", () => {
     const packet = buildPacket([csvRow()]);
     const out = buildAiDoctorPromptMessages(packet);
-    expect(out.system).toContain(
-      IMPORTED_HISTORY_PROMPT_STRINGS.noActionQueueFromHistoryAlone,
-    );
-    expect(out.system).toContain(
-      IMPORTED_HISTORY_PROMPT_STRINGS.noAlertsFromHistoryAlone,
-    );
-    expect(out.system).toContain(
-      IMPORTED_HISTORY_PROMPT_STRINGS.notHealthyFromHistoryAlone,
-    );
+    expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.noActionQueueFromHistoryAlone);
+    expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.noAlertsFromHistoryAlone);
+    expect(out.system).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notHealthyFromHistoryAlone);
   });
 });

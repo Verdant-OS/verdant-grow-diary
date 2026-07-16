@@ -16,7 +16,11 @@ import {
   evaluateAiDoctorContextFromSources,
   type AiDoctorContextPlantSource,
 } from "@/lib/aiDoctorContextViewModel";
-import { buildAiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
+import {
+  AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP,
+  buildAiDoctorReviewRequestPacket,
+} from "@/lib/aiDoctorReviewRequestPacket";
+import { AI_DOCTOR_CSV_HISTORY_SOURCES } from "@/lib/aiDoctorCsvHistoryContextRules";
 import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
 
@@ -73,12 +77,14 @@ export default function PlantDetailAiDoctorLiveReview({
 }: PlantDetailAiDoctorLiveReviewProps) {
   const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
   const { data: bridgeHealth } = useSensorBridgeHealth();
-  // Bounded per-tent sensor window (same shared per-tent hook as the
-  // Dashboard/Tents surfaces; non-UUID tent ids are never queried). The
-  // rows only feed the pure packet builder, which forwards a sanitized
-  // imported-CSV-history summary — raw rows never enter the packet.
+  // Bounded, CSV-source-filtered per-tent sensor window (same shared hook as
+  // Dashboard/Tents; non-UUID tent ids are never queried). Filtering happens
+  // in the read query before the cap, so high-frequency current telemetry
+  // cannot crowd older imported history out of the packet.
   const { byTent: readingsByTent } = useSensorReadingsByTents(
     isUuid(tentId) ? [tentId] : [],
+    AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP,
+    AI_DOCTOR_CSV_HISTORY_SOURCES,
   );
   const tentSensorRows = tentId
     ? (readingsByTent[tentId] ?? NO_TENT_SENSOR_ROWS)

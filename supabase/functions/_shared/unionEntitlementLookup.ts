@@ -63,7 +63,16 @@ export function pickExpectedBillingEnvironment(
 const SUBSCRIPTION_COLUMNS =
   "user_id,paddle_subscription_id,paddle_customer_id,product_id,price_id,status,current_period_end,current_period_start,cancel_at_period_end,environment,created_at,updated_at";
 
-function newestSubscriptionRow(
+// public.subscriptions is unique per paddle_subscription_id, NOT per user, so
+// one account can hold several rows in one environment (e.g. an active
+// Founder Lifetime row plus a newer canceled Pro row). A single-newest-row
+// read would let the non-entitling newer row shadow the entitling older one,
+// so we scan a bounded window and apply any-entitling-row semantics — the
+// same EXISTS shape the DB gates use. 20 comfortably exceeds any real
+// per-user, per-environment row count.
+const SUBSCRIPTION_ROW_SCAN_LIMIT = 20;
+
+function newestSubscriptionRows(
   supabase: any,
   environment: LovableBillingEnvironment,
 ) {
@@ -72,20 +81,51 @@ function newestSubscriptionRow(
     .select(SUBSCRIPTION_COLUMNS)
     .eq("environment", environment)
     .order("created_at", { ascending: false })
-    .limit(1);
+    .limit(SUBSCRIPTION_ROW_SCAN_LIMIT);
 }
 
-function firstRowOrNull(
+function rowsOrEmpty(
   res: { error: unknown; data?: unknown[] | null },
-): LovableSubscriptionRow | null {
-  if (res.error) return null;
-  return (res.data && res.data.length > 0
-    ? res.data[0]
-    : null) as LovableSubscriptionRow | null;
+): LovableSubscriptionRow[] {
+  if (res.error) return [];
+  return (res.data ?? []) as LovableSubscriptionRow[];
 }
 
 function isEntitling(entitlement: ResolvedEntitlement): boolean {
   return entitlement.isActive && entitlement.effectivePlanId !== "free";
+}
+
+function rowEntitles(
+  row: LovableSubscriptionRow,
+  environment: LovableBillingEnvironment,
+  now: Date,
+): boolean {
+  return isEntitling(
+    resolveUnionEntitlements({
+      byoRow: null,
+      lovableRow: row,
+      expectedBillingEnvironment: environment,
+      now,
+    }),
+  );
+}
+
+/**
+ * Any-entitling-row selection (matches the DB gates' EXISTS semantics):
+ * rows arrive newest-first; the newest ENTITLING row wins so plan display is
+ * deterministic. When no row entitles, fall back to the newest row so the
+ * degraded-display resolution behaves exactly as the previous
+ * single-newest-row read did.
+ */
+function pickLovableRow(
+  rows: LovableSubscriptionRow[],
+  environment: LovableBillingEnvironment,
+  now: Date,
+): LovableSubscriptionRow | null {
+  for (const row of rows) {
+    if (rowEntitles(row, environment, now)) return row;
+  }
+  return rows.length > 0 ? rows[0] : null;
 }
 
 export async function loadUnionEntitlement(
@@ -110,9 +150,9 @@ export async function loadUnionEntitlement(
         "id,user_id,plan_id,status,provider,provider_customer_id,provider_subscription_id,current_period_end,cancel_at_period_end,founder_number,created_at,updated_at",
       )
       .limit(1),
-    newestSubscriptionRow(supabase, "live"),
+    newestSubscriptionRows(supabase, "live"),
     wantsSandbox
-      ? newestSubscriptionRow(supabase, "sandbox")
+      ? newestSubscriptionRows(supabase, "sandbox")
       : Promise.resolve({ data: [], error: null }),
   ]);
 
@@ -133,21 +173,12 @@ export async function loadUnionEntitlement(
     (byoRes.data && byoRes.data.length > 0 ? byoRes.data[0] : null) as
       | BillingSubscriptionRow
       | null;
-  const liveRow = firstRowOrNull(lovableLiveRes);
+  const liveRow = pickLovableRow(rowsOrEmpty(lovableLiveRes), "live", now);
 
   // The live row unlocks only when it is itself entitling (active, known
-  // plan, in period, lifetime invariants). A degraded/unknown live row never
-  // changes the sandbox-expected resolution below.
-  const liveRowEntitles =
-    liveRow != null &&
-    isEntitling(
-      resolveUnionEntitlements({
-        byoRow: null,
-        lovableRow: liveRow,
-        expectedBillingEnvironment: "live",
-        now,
-      }),
-    );
+  // plan, in period, lifetime invariants). Degraded/unknown live rows never
+  // change the sandbox-expected resolution below.
+  const liveRowEntitles = liveRow != null && rowEntitles(liveRow, "live", now);
 
   if (!wantsSandbox || liveRowEntitles) {
     return {
@@ -165,7 +196,7 @@ export async function loadUnionEntitlement(
     lookupFailed: false,
     entitlement: resolveUnionEntitlements({
       byoRow,
-      lovableRow: firstRowOrNull(lovableSandboxRes),
+      lovableRow: pickLovableRow(rowsOrEmpty(lovableSandboxRes), "sandbox", now),
       expectedBillingEnvironment: "sandbox",
       now,
     }),

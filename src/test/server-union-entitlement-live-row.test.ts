@@ -86,11 +86,15 @@ interface FakeDbState {
  * Minimal chainable fake of the supabase-js query builder — just enough for
  * loadUnionEntitlement's `.from().select().eq().order().limit()` chains.
  * Builders are thenables so `await Promise.all([...])` resolves them.
+ * `order`/`limit` are honored (sort + slice) so multi-row fixtures exercise
+ * the same newest-first window the real query returns.
  */
 function fakeClient(state: FakeDbState) {
   return {
     from(table: string) {
       let env: "live" | "sandbox" | null = null;
+      let descBy: string | null = null;
+      let max = Infinity;
       const builder = {
         select() {
           return builder;
@@ -99,10 +103,12 @@ function fakeClient(state: FakeDbState) {
           if (column === "environment") env = value;
           return builder;
         },
-        order() {
+        order(column: string, opts?: { ascending?: boolean }) {
+          if (opts?.ascending === false) descBy = column;
           return builder;
         },
-        limit() {
+        limit(n: number) {
+          max = n;
           return builder;
         },
         then(resolve: (v: { data: unknown[] | null; error: unknown }) => void) {
@@ -114,10 +120,16 @@ function fakeClient(state: FakeDbState) {
             resolve({ data: null, error: state.subsError });
             return;
           }
-          resolve({
-            data: (env && state.subsByEnv?.[env]) || [],
-            error: null,
-          });
+          let rows = [...((env && state.subsByEnv?.[env]) || [])];
+          if (descBy) {
+            rows.sort((a, b) =>
+              String(b[descBy as keyof LovableSubscriptionRow] ?? "").localeCompare(
+                String(a[descBy as keyof LovableSubscriptionRow] ?? ""),
+              ),
+            );
+          }
+          rows = rows.slice(0, max);
+          resolve({ data: rows, error: null });
         },
       };
       return builder;
@@ -204,6 +216,64 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
       NOW,
     );
     expect(sandboxStillWins.entitlement.capabilities.advancedExports).toBe(true);
+  });
+
+  it("REGRESSION: active Founder row + NEWER canceled Pro row → still Founder (expects sandbox)", async () => {
+    // public.subscriptions is unique per paddle_subscription_id, not per
+    // user: a Founder who later started (and canceled) a Pro subscription
+    // holds both rows. The newer non-entitling row must not shadow the
+    // entitling one.
+    const { entitlement } = await loadUnionEntitlement(
+      fakeClient({
+        subsByEnv: {
+          live: [
+            liveFounderRow({ created_at: "2026-07-01T00:00:00Z" }),
+            proRow({ status: "canceled", created_at: "2026-07-10T00:00:00Z" }),
+          ],
+        },
+      }),
+      "sandbox",
+      NOW,
+    );
+    expect(entitlement.isActive).toBe(true);
+    expect(entitlement.displayPlanId).toBe("founder_lifetime");
+    expect(entitlement.source).toBe("lovable_paddle_lifetime");
+    expect(entitlement.capabilities.advancedExports).toBe(true);
+  });
+
+  it("REGRESSION: active Founder row + NEWER canceled Pro row → still Founder (expects live)", async () => {
+    const { entitlement } = await loadUnionEntitlement(
+      fakeClient({
+        subsByEnv: {
+          live: [
+            liveFounderRow({ created_at: "2026-07-01T00:00:00Z" }),
+            proRow({ status: "canceled", created_at: "2026-07-10T00:00:00Z" }),
+          ],
+        },
+      }),
+      "live",
+      NOW,
+    );
+    expect(entitlement.isActive).toBe(true);
+    expect(entitlement.displayPlanId).toBe("founder_lifetime");
+    expect(entitlement.capabilities.advancedExports).toBe(true);
+  });
+
+  it("only canceled/expired live rows → not entitled (any-row semantics stays fail-closed)", async () => {
+    const { entitlement } = await loadUnionEntitlement(
+      fakeClient({
+        subsByEnv: {
+          live: [
+            liveFounderRow({ status: "canceled", created_at: "2026-07-01T00:00:00Z" }),
+            proRow({ status: "expired", created_at: "2026-07-10T00:00:00Z" }),
+          ],
+        },
+      }),
+      "sandbox",
+      NOW,
+    );
+    expect(entitlement.effectivePlanId).toBe("free");
+    expect(entitlement.capabilities.advancedExports).toBe(false);
   });
 
   it("BYO Founder Lifetime row unlocks regardless of expected environment (unchanged)", async () => {

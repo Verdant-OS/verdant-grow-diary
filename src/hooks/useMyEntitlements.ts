@@ -75,7 +75,11 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
         .select("*")
         .eq("user_id", user.id)
         .eq("environment", expectedBillingEnvironment)
+        // created_at is not unique; paddle_subscription_id is — without the
+        // tiebreak, equal timestamps make the window order (and therefore
+        // the picked row) nondeterministic.
         .order("created_at", { ascending: false })
+        .order("paddle_subscription_id", { ascending: false })
         .limit(SUBSCRIPTION_ROW_SCAN_LIMIT),
       supabase
         .from("user_roles")

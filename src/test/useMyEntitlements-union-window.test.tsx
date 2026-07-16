@@ -95,12 +95,13 @@ vi.mock("@/integrations/supabase/client", () => {
     chain.maybeSingle = async () => result;
     return chain;
   };
-  // Windowed subscriptions read: honor eq("environment"), order desc, and
-  // limit (sort + slice) so fixtures exercise the same newest-first window
-  // the real query returns — same shape as the server test's fakeClient.
+  // Windowed subscriptions read: honor eq("environment"), chained desc
+  // order keys, and limit (sort + slice) so fixtures exercise the same
+  // newest-first window (with unique tiebreak) the real query returns —
+  // same shape as the server test's fakeClient.
   const makeSubscriptionsChain = () => {
     let env: string | null = null;
-    let descBy: keyof LovableSubscriptionRow | null = null;
+    const descKeys: Array<keyof LovableSubscriptionRow> = [];
     let max = Infinity;
     const chain: Record<string, unknown> = {};
     chain.select = () => chain;
@@ -109,7 +110,7 @@ vi.mock("@/integrations/supabase/client", () => {
       return chain;
     };
     chain.order = (column: keyof LovableSubscriptionRow, opts?: { ascending?: boolean }) => {
-      if (opts?.ascending === false) descBy = column;
+      if (opts?.ascending === false) descKeys.push(column);
       return chain;
     };
     chain.limit = (n: number) => {
@@ -119,9 +120,14 @@ vi.mock("@/integrations/supabase/client", () => {
     };
     chain.then = (resolve: (v: { data: unknown[]; error: null }) => void) => {
       let rows = db.lovableRows.filter((r) => env == null || r.environment === env);
-      if (descBy != null) {
-        const by = descBy;
-        rows = [...rows].sort((a, b) => String(b[by] ?? "").localeCompare(String(a[by] ?? "")));
+      if (descKeys.length > 0) {
+        rows = [...rows].sort((a, b) => {
+          for (const key of descKeys) {
+            const cmp = String(b[key] ?? "").localeCompare(String(a[key] ?? ""));
+            if (cmp !== 0) return cmp;
+          }
+          return 0;
+        });
       }
       resolve({ data: rows.slice(0, max), error: null });
     };
@@ -170,6 +176,45 @@ describe("useMyEntitlements · bounded window, any-entitling-row wins", () => {
     expect(e.effectivePlanId).toBe("free");
     expect(e.capabilities.advancedExports).toBe(false);
     // Newest-row fallback preserves the old limit(1) degraded display.
+    expect(e.displayPlanId).toBe("pro_monthly");
+    expect(e.degraded).toBe(true);
+  });
+
+  it("REGRESSION: active Founder Lifetime row + NEWER ACTIVE Pro row → still displays Founder (lifetime-first precedence)", async () => {
+    // Both rows entitle. pickStrongestBilling documents that an active
+    // founder_lifetime beats any recurring plan, so recency must not let
+    // the Pro row take over the Founder's display identity.
+    db.lovableRows = [
+      liveFounderRow({ created_at: "2026-07-01T00:00:00Z" }),
+      proRow({ created_at: "2026-07-10T00:00:00Z" }),
+    ];
+    const e = await renderEntitlement();
+    expect(e.isActive).toBe(true);
+    expect(e.displayPlanId).toBe("founder_lifetime");
+    expect(e.source).toBe("lovable_paddle_lifetime");
+    expect(e.capabilities.advancedExports).toBe(true);
+  });
+
+  it("equal created_at rows resolve deterministically (paddle_subscription_id tiebreak)", async () => {
+    // created_at is not unique. Two degraded rows share a timestamp; the
+    // unique desc tiebreak makes sub_01zzz the window's newest row, so its
+    // plan identity wins the degraded display regardless of fixture order.
+    db.lovableRows = [
+      proRow({
+        status: "canceled",
+        price_id: "pro_annual",
+        paddle_subscription_id: "sub_01aaa",
+        created_at: "2026-07-10T00:00:00Z",
+      }),
+      proRow({
+        status: "canceled",
+        price_id: "pro_monthly",
+        paddle_subscription_id: "sub_01zzz",
+        created_at: "2026-07-10T00:00:00Z",
+      }),
+    ];
+    const e = await renderEntitlement();
+    expect(e.effectivePlanId).toBe("free");
     expect(e.displayPlanId).toBe("pro_monthly");
     expect(e.degraded).toBe(true);
   });

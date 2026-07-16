@@ -93,7 +93,7 @@ function fakeClient(state: FakeDbState) {
   return {
     from(table: string) {
       let env: "live" | "sandbox" | null = null;
-      let descBy: string | null = null;
+      const descKeys: Array<keyof LovableSubscriptionRow> = [];
       let max = Infinity;
       const builder = {
         select() {
@@ -104,7 +104,9 @@ function fakeClient(state: FakeDbState) {
           return builder;
         },
         order(column: string, opts?: { ascending?: boolean }) {
-          if (opts?.ascending === false) descBy = column;
+          // Chained .order() calls compose (created_at desc, then the unique
+          // paddle_subscription_id tiebreak), same as PostgREST.
+          if (opts?.ascending === false) descKeys.push(column as keyof LovableSubscriptionRow);
           return builder;
         },
         limit(n: number) {
@@ -121,12 +123,14 @@ function fakeClient(state: FakeDbState) {
             return;
           }
           let rows = [...((env && state.subsByEnv?.[env]) || [])];
-          if (descBy) {
-            rows.sort((a, b) =>
-              String(b[descBy as keyof LovableSubscriptionRow] ?? "").localeCompare(
-                String(a[descBy as keyof LovableSubscriptionRow] ?? ""),
-              ),
-            );
+          if (descKeys.length > 0) {
+            rows.sort((a, b) => {
+              for (const key of descKeys) {
+                const cmp = String(b[key] ?? "").localeCompare(String(a[key] ?? ""));
+                if (cmp !== 0) return cmp;
+              }
+              return 0;
+            });
           }
           rows = rows.slice(0, max);
           resolve({ data: rows, error: null });
@@ -257,6 +261,61 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
     expect(entitlement.isActive).toBe(true);
     expect(entitlement.displayPlanId).toBe("founder_lifetime");
     expect(entitlement.capabilities.advancedExports).toBe(true);
+  });
+
+  it("REGRESSION: active Founder row + NEWER ACTIVE Pro row → still Founder (lifetime-first precedence)", async () => {
+    // Both rows entitle, so any-entitling-row alone is not enough: the
+    // resolver documents that an active founder_lifetime beats any recurring
+    // plan, and recency must not let the Pro row take over effectivePlanId.
+    const { entitlement } = await loadUnionEntitlement(
+      fakeClient({
+        subsByEnv: {
+          live: [
+            liveFounderRow({ created_at: "2026-07-01T00:00:00Z" }),
+            proRow({ created_at: "2026-07-10T00:00:00Z" }),
+          ],
+        },
+      }),
+      "sandbox",
+      NOW,
+    );
+    expect(entitlement.isActive).toBe(true);
+    expect(entitlement.displayPlanId).toBe("founder_lifetime");
+    expect(entitlement.source).toBe("lovable_paddle_lifetime");
+    expect(entitlement.capabilities.advancedExports).toBe(true);
+  });
+
+  it("equal created_at rows resolve deterministically (paddle_subscription_id tiebreak)", async () => {
+    // created_at is not unique. Two degraded rows share a timestamp; the
+    // unique desc tiebreak makes sub_01zzz the window's newest row, so its
+    // plan identity wins the degraded display regardless of fixture order.
+    // (Server expects live here: a non-entitling live fallback row only
+    // reaches the resolution when live is the expected environment.)
+    const { entitlement } = await loadUnionEntitlement(
+      fakeClient({
+        subsByEnv: {
+          live: [
+            proRow({
+              status: "canceled",
+              price_id: "pro_annual",
+              paddle_subscription_id: "sub_01aaa",
+              created_at: "2026-07-10T00:00:00Z",
+            }),
+            proRow({
+              status: "canceled",
+              price_id: "pro_monthly",
+              paddle_subscription_id: "sub_01zzz",
+              created_at: "2026-07-10T00:00:00Z",
+            }),
+          ],
+        },
+      }),
+      "live",
+      NOW,
+    );
+    expect(entitlement.effectivePlanId).toBe("free");
+    expect(entitlement.displayPlanId).toBe("pro_monthly");
+    expect(entitlement.degraded).toBe(true);
   });
 
   it("only canceled/expired live rows → not entitled (any-row semantics stays fail-closed)", async () => {

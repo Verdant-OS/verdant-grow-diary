@@ -134,39 +134,67 @@ export function resolveUnionEntitlements(input: ResolveUnionInput): ResolvedEnti
  */
 export const SUBSCRIPTION_ROW_SCAN_LIMIT = 20;
 
-// Per-row entitlement probe. Deliberately passes no opts: caller-level lifts
-// (e.g. staff) must not make every row look entitling, or the picker would
-// degenerate back to newest-row-wins.
-function lovableRowEntitles(
+// Resolve one Lovable row in isolation. No opts on purpose: caller-level
+// lifts (e.g. staff) must not make every row look entitling, or the picker
+// would degenerate back to newest-row-wins.
+function resolveLovableRowAlone(
   row: LovableSubscriptionRow,
   environment: LovableBillingEnvironment,
   now: Date,
-): boolean {
-  const resolved = resolveUnionEntitlements({
+): ResolvedEntitlement {
+  return resolveUnionEntitlements({
     byoRow: null,
     lovableRow: row,
     expectedBillingEnvironment: environment,
     now,
   });
+}
+
+function isEntitling(resolved: ResolvedEntitlement): boolean {
   return resolved.isActive && resolved.effectivePlanId !== "free";
 }
 
 /**
- * Any-entitling-row selection over a newest-first window (matches the DB
- * gates' EXISTS semantics and pickLovableRow in
- * supabase/functions/_shared/unionEntitlementLookup.ts): rows arrive
- * newest-first; the newest ENTITLING row wins so plan display is
- * deterministic. When no row entitles, fall back to the newest row so the
- * degraded-display resolution behaves exactly as the previous
- * single-newest-row read did.
+ * Per-row entitlement probe. Shared with the server helper
+ * (supabase/functions/_shared/unionEntitlementLookup.ts) so both sides use
+ * identical row-level semantics.
+ */
+export function lovableRowEntitles(
+  row: LovableSubscriptionRow,
+  environment: LovableBillingEnvironment,
+  now: Date,
+): boolean {
+  return isEntitling(resolveLovableRowAlone(row, environment, now));
+}
+
+/**
+ * Any-entitling-row selection over a bounded window (matches the DB gates'
+ * EXISTS semantics). Shared by the client hook and the server helper
+ * (supabase/functions/_shared/unionEntitlementLookup.ts).
+ *
+ * Rows MUST arrive newest-first with a unique tiebreak (created_at desc,
+ * paddle_subscription_id desc — created_at alone is not unique, so without
+ * the tiebreak equal timestamps make the pick nondeterministic).
+ *
+ * Selection mirrors pickStrongestBilling's precedence:
+ *   1. Newest entitling founder_lifetime row — lifetime beats any recurring
+ *      plan regardless of recency, so a Founder who also holds a newer
+ *      active Pro row still displays as Founder.
+ *   2. Newest entitling recurring row.
+ *   3. Newest row (entitling or not), so the degraded-display resolution
+ *      behaves exactly as the previous single-newest-row read did.
  */
 export function pickEntitlingLovableRow(
   rows: ReadonlyArray<LovableSubscriptionRow>,
   environment: LovableBillingEnvironment,
   now: Date,
 ): LovableSubscriptionRow | null {
+  let newestEntitlingRecurring: LovableSubscriptionRow | null = null;
   for (const row of rows) {
-    if (lovableRowEntitles(row, environment, now)) return row;
+    const resolved = resolveLovableRowAlone(row, environment, now);
+    if (!isEntitling(resolved)) continue;
+    if (resolved.effectivePlanId === "founder_lifetime") return row;
+    if (newestEntitlingRecurring == null) newestEntitlingRecurring = row;
   }
-  return rows.length > 0 ? rows[0] : null;
+  return newestEntitlingRecurring ?? (rows.length > 0 ? rows[0] : null);
 }

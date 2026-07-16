@@ -94,6 +94,14 @@ function buildDeps(): Deps {
       if (error) return { ok: false, error: error.message };
       return { ok: true };
     },
+    async upsertCustomer(row) {
+      // Mirror-only. paddle_customer_id is the natural unique key.
+      const { error } = await sb
+        .from('paddle_customers')
+        .upsert(row, { onConflict: 'paddle_customer_id' });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
     async markEvent(paddle_event_id, patch) {
       const { error } = await sb
         .from('lovable_paddle_events')

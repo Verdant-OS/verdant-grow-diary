@@ -87,6 +87,8 @@ const Founder = lazy(() => import("./pages/Founder"));
 const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
 const GrowStageCareGuide = lazy(() => import("./pages/GrowStageCareGuide"));
+const CultivarsIndex = lazy(() => import("./pages/CultivarsIndex"));
+const CultivarPage = lazy(() => import("./pages/CultivarPage"));
 const Glossary = lazy(() => import("./pages/Glossary"));
 const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
 const AiDoctorContextCheck = lazy(() => import("./pages/AiDoctorContextCheck"));

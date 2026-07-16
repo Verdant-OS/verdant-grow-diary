@@ -61,7 +61,7 @@ const REQUIRED_STRING_FIELDS = [
 
 const CAPPED_ARRAY_FIELDS = ["evidence", "missing_information", "possible_causes"] as const;
 
-const BANNED_WORDS = [
+const BANNED_WORDS = Object.freeze([
   "confirmed",
   "certain",
   "cured",
@@ -70,7 +70,7 @@ const BANNED_WORDS = [
   "synced",
   "connected",
   "imported",
-];
+]);
 
 const BANNED_WORDS_RE = new RegExp(`\\b(${BANNED_WORDS.join("|")})\\b`, "i");
 

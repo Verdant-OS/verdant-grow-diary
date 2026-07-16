@@ -13,6 +13,10 @@ import { resolve } from "node:path";
 
 import { compilePlantContextFromRows } from "@/lib/aiDoctorContextCompiler";
 import { buildAiDoctorPromptMessages } from "@/lib/aiDoctorPromptAssembly";
+import {
+  AI_DOCTOR_REVIEW_BANNED_WORDS,
+  validateAiDoctorReviewResult,
+} from "@/lib/aiDoctorReviewResultContract";
 
 const NOW = new Date("2026-06-13T12:00:00.000Z");
 
@@ -97,10 +101,10 @@ describe("AI Doctor imported history e2e smoke", () => {
   });
 
   it("prompt includes imported history section + caveats + vendor labels", () => {
-    expect(combined).toContain("Imported sensor history");
-    expect(combined).toContain("This is imported CSV history, not live telemetry.");
+    expect(combined).toContain("Historical sensor context");
+    expect(combined).toContain("This is historical CSV history, not current telemetry.");
     expect(combined).toContain(
-      "Imported history may show trends but is not proof of current conditions.",
+      "Historical context may show trends but is not proof of current conditions.",
     );
     expect(combined).toContain("Verdant Genetics XLSX");
     expect(combined).toContain("Spider Farmer");
@@ -112,8 +116,38 @@ describe("AI Doctor imported history e2e smoke", () => {
     // The warning block header labels the condition; the instruction
     // text itself stays inside the result validator's vocabulary
     // ("current sensor readings", never the banned word).
-    expect(combined).toContain("[Missing live readings]");
+    expect(combined).toContain("[Missing current sensor readings]");
     expect(combined).toContain("Current sensor readings are missing or unavailable");
+  });
+
+  it("keeps the entire model-facing prompt inside the result validator vocabulary", () => {
+    const bannedRe = new RegExp(`\\b(${AI_DOCTOR_REVIEW_BANNED_WORDS.join("|")})\\b`, "i");
+    expect(messages.system).not.toMatch(bannedRe);
+    expect(messages.user).not.toMatch(bannedRe);
+    // Source truth remains unchanged outside the prompt boundary.
+    expect(ctx.imported_sensor_history?.notForLiveDiagnosis).toContain(
+      "This is imported CSV history, not live telemetry.",
+    );
+  });
+
+  it("accepts a plausible response that follows the safe current-versus-historical wording", () => {
+    const validation = validateAiDoctorReviewResult({
+      summary: "The historical context suggests a possible environmental pattern.",
+      likely_issue: "A temperature and humidity mismatch appears possible.",
+      confidence: "low",
+      evidence: ["Historical context shows a 24.5 C reading and 58 percent humidity."],
+      missing_information: ["Current sensor readings and a recent photo are unavailable."],
+      possible_causes: ["Environmental variation may have contributed."],
+      immediate_action: "Check the current environment and add a recent plant photo.",
+      what_not_to_do:
+        "Do not make aggressive feeding or equipment changes from this evidence alone.",
+      twenty_four_hour_follow_up: "Record another observation within 24 hours.",
+      three_day_recovery_plan:
+        "Compare new observations with the historical context for three days.",
+      risk_level: "watch",
+    });
+
+    expect(validation.ok).toBe(true);
   });
 
   it("prompt never leaks raw_payload internals or private identifiers", () => {

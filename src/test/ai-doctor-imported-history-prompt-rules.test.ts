@@ -68,9 +68,11 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
       now: NOW,
     });
     const frag = buildAiDoctorImportedHistoryPromptFragment(ctx);
-    expect(frag.importedHistoryBlock).toContain("Imported sensor history");
+    expect(frag.importedHistoryBlock).toContain("Historical sensor context");
     expect(frag.importedHistoryBlock).toContain("CSV history");
-    expect(frag.importedHistoryBlock).toContain("This is imported CSV history, not live telemetry");
+    expect(frag.importedHistoryBlock).toContain(
+      "This is historical CSV history, not current telemetry",
+    );
     expect(frag.guidance.join("\n")).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notLiveCaveat);
   });
 
@@ -175,12 +177,10 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     // Guidance strings are rendered as an explicit rule list in the
     // system prompt, and models restate rules in their responses (e.g.
     // in "What not to do") — a banned word here becomes a banned word
-    // in the response and a refunded review. Only `sectionLabel` is
-    // exempt: it is an input-data block header, not a rule.
+    // in the response and a refunded review. Prompt labels must follow
+    // the same boundary because models can restate input-data headers.
     const bannedRe = new RegExp(`\\b(${AI_DOCTOR_REVIEW_BANNED_WORDS.join("|")})\\b`, "i");
-    const inputLabelExempt = new Set(["sectionLabel"]);
     for (const [key, value] of Object.entries(IMPORTED_HISTORY_PROMPT_STRINGS)) {
-      if (inputLabelExempt.has(key)) continue;
       expect(value, `IMPORTED_HISTORY_PROMPT_STRINGS.${key}`).not.toMatch(bannedRe);
     }
   });

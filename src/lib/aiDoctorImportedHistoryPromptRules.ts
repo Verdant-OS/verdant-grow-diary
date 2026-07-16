@@ -16,6 +16,7 @@
  */
 
 import type { PlantContextPayload } from "./aiDoctorContextCompiler";
+import { sanitizeAiDoctorPromptText } from "./aiDoctorPromptVocabularyRules";
 
 /** Canonical AI Doctor required-output sections (rendered verbatim). */
 export const AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS: readonly string[] = Object.freeze([
@@ -40,12 +41,13 @@ export const AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS: readonly string[] = Object.free
  * as an explicit rule list in the system prompt, and models restate
  * rules in their responses (e.g. in "What not to do"). The result
  * contract rejects any response containing its banned words, so every
- * guidance string here must stay inside the validator's vocabulary —
- * banned words may appear only in input-data labels (`sectionLabel`,
- * block fields). The echo-safety test enforces this per key.
+ * guidance string and model-facing label here must stay inside the
+ * validator's vocabulary. Authoritative context retains its original
+ * source-truth wording outside this prompt boundary. The echo-safety
+ * tests enforce the model-facing contract per key and assembled prompt.
  */
 export const IMPORTED_HISTORY_PROMPT_STRINGS = Object.freeze({
-  sectionLabel: "Imported sensor history",
+  sectionLabel: "Historical sensor context",
   notLiveCaveat:
     "The historical sensor data in this request is background context only. Do not treat it as current telemetry.",
   notProofOfCurrent:
@@ -92,7 +94,7 @@ function formatVendors(
 ): string {
   const list = (vendors as ReadonlyArray<{ vendorLabel: string; count: number }>) ?? [];
   if (list.length === 0) return "unknown vendor";
-  return list.map((v) => `${v.vendorLabel} (${v.count})`).join(", ");
+  return list.map((v) => `${sanitizeAiDoctorPromptText(v.vendorLabel)} (${v.count})`).join(", ");
 }
 
 function formatMetrics(
@@ -109,7 +111,7 @@ function formatMetrics(
   return metrics
     .map(
       (m) =>
-        `${m.metric}${m.unit ? ` (${m.unit})` : ""}: min=${m.min}, max=${m.max}, avg=${m.avg}, n=${m.count}`,
+        `${sanitizeAiDoctorPromptText(m.metric)}${m.unit ? ` (${sanitizeAiDoctorPromptText(m.unit)})` : ""}: min=${m.min}, max=${m.max}, avg=${m.avg}, n=${m.count}`,
     )
     .join("; ");
 }
@@ -139,8 +141,8 @@ export function buildAiDoctorImportedHistoryPromptFragment(
     const dateRange = h.dateRange ? `${h.dateRange.earliest} → ${h.dateRange.latest}` : "unknown";
     importedHistoryBlock = [
       `[${s.sectionLabel}]`,
-      `Source label: ${h.historicalLabel}`,
-      `Caveat: ${h.notForLiveDiagnosis}`,
+      `Source label: ${sanitizeAiDoctorPromptText(h.historicalLabel)}`,
+      `Caveat: ${sanitizeAiDoctorPromptText(h.notForLiveDiagnosis)}`,
       `Vendors: ${formatVendors(h.vendors as never)}`,
       `Date range: ${dateRange}`,
       `Total readings: ${h.totalReadings}`,
@@ -155,7 +157,7 @@ export function buildAiDoctorImportedHistoryPromptFragment(
     if (ctx.imported_sensor_history) {
       guidance.push(s.confidenceCap);
     }
-    missingLiveReadingsBlock = "[Missing live readings] " + s.missingLiveReadings;
+    missingLiveReadingsBlock = "[Missing current sensor readings] " + s.missingLiveReadings;
   }
 
   // Always reinforce validator-safe response vocabulary and the required

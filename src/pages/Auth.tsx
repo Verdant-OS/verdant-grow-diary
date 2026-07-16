@@ -102,6 +102,34 @@ export default function Auth() {
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+
+  async function signInWithGoogle() {
+    if (googleBusy) return;
+    setGoogleBusy(true);
+    setGoogleError(null);
+    try {
+      // redirect_uri MUST be a same-origin public URL, not a protected route.
+      // The intended post-auth destination lives in `redirectTo` (already
+      // manifest-validated) and is applied after Supabase reports a session.
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
+      if (result.error) {
+        setGoogleError("Google sign-in didn't complete. Please try again.");
+        return;
+      }
+      if (result.redirected) return; // browser redirects to Google
+      // Tokens returned and session set — route to intended destination.
+      nav(postSignInTarget(), { replace: true });
+    } catch {
+      setGoogleError("Google sign-in didn't complete. Please try again.");
+    } finally {
+      setGoogleBusy(false);
+    }
+  }
+
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotError, setForgotError] = useState<string | null>(null);

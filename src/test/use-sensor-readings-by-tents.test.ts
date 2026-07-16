@@ -36,15 +36,52 @@ const FIXTURES: Record<string, Array<Record<string, unknown>>> = {
     },
   ],
   "tent-c": [],
+  "tent-history": [
+    ...Array.from({ length: 205 }, (_, i) => ({
+      id: `live-${i}`,
+      tent_id: "tent-history",
+      metric: "temperature_c",
+      value: 24,
+      source: "live",
+      ts: new Date(Date.UTC(2026, 6, 16, 12, i)).toISOString(),
+      created_at: new Date(Date.UTC(2026, 6, 16, 12, i)).toISOString(),
+    })),
+    {
+      id: "csv-canonical",
+      tent_id: "tent-history",
+      metric: "temperature_c",
+      value: 22,
+      source: "csv",
+      ts: "2025-01-01T00:00:00Z",
+      created_at: "2026-07-16T00:00:00Z",
+    },
+    {
+      id: "csv-legacy",
+      tent_id: "tent-history",
+      metric: "humidity_pct",
+      value: 55,
+      source: "csv_import_ac_infinity",
+      ts: "2025-01-01T00:05:00Z",
+      created_at: "2026-07-16T00:00:01Z",
+    },
+  ],
 };
 
 vi.mock("@/integrations/supabase/client", () => {
-  const builder = (tentId: string | null) => {
+  const builder = (tentId: string | null, sourceFilter: ReadonlySet<string> | null = null) => {
     const b: Record<string, unknown> = {};
     b.select = () => b;
     b.order = () => b;
-    b.limit = () => Promise.resolve({ data: tentId ? (FIXTURES[tentId] ?? []) : [], error: null });
-    b.eq = (_col: string, id: string) => builder(id);
+    b.limit = (limit: number) => {
+      const tentRows = tentId ? (FIXTURES[tentId] ?? []) : [];
+      const scopedRows = sourceFilter
+        ? tentRows.filter((row) => sourceFilter.has(String(row.source ?? "")))
+        : tentRows;
+      return Promise.resolve({ data: scopedRows.slice(0, limit), error: null });
+    };
+    b.eq = (_col: string, id: string) => builder(id, sourceFilter);
+    b.in = (column: string, values: string[]) =>
+      column === "source" ? builder(tentId, new Set(values)) : builder(tentId, sourceFilter);
     return b;
   };
   return {
@@ -55,6 +92,7 @@ vi.mock("@/integrations/supabase/client", () => {
 });
 
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import { AI_DOCTOR_CSV_HISTORY_SOURCES } from "@/lib/aiDoctorCsvHistoryContextRules";
 
 function wrapper({ children }: { children: ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -103,5 +141,17 @@ describe("useSensorReadingsByTents", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.statusByTent["tent-c"]).toBe("success");
     expect(result.current.byTent["tent-c"]).toEqual([]);
+  });
+
+  it("filters CSV sources before the cap so newer live rows cannot starve imported history", async () => {
+    const { result } = renderHook(
+      () => useSensorReadingsByTents(["tent-history"], 200, AI_DOCTOR_CSV_HISTORY_SOURCES),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.byTent["tent-history"].map((row) => row.id)).toEqual([
+      "csv-canonical",
+      "csv-legacy",
+    ]);
   });
 });

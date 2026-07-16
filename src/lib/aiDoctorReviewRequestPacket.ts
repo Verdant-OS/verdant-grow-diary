@@ -25,6 +25,7 @@ import {
   type ImportedSensorHistorySection,
 } from "@/lib/aiDoctorContextCompiler";
 import {
+  compareCsvHistoryRowsForBoundedSummary,
   isCsvHistoryRow,
   type CsvHistorySensorRowLike,
 } from "@/lib/aiDoctorCsvHistoryContextRules";
@@ -37,7 +38,6 @@ export const AI_DOCTOR_REVIEW_PACKET_EVENT_CAP = 20;
  */
 export const AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP = 200;
 export const AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION = 1 as const;
-
 
 export interface AiDoctorReviewRequestPlantProfile {
   strain: string | null;
@@ -110,8 +110,6 @@ export interface AiDoctorReviewRequestPacket {
   missingLiveSensorReadings?: boolean;
 }
 
-
-
 export interface BuildAiDoctorReviewPacketArgs {
   plant: (AiDoctorContextPlantSource & { potSize?: string | null }) | null;
   timelineItems: readonly TimelineMemoryItem[] | null | undefined;
@@ -129,7 +127,6 @@ export interface BuildAiDoctorReviewPacketArgs {
   csvHistoryRows?: ReadonlyArray<CsvHistorySensorRowLike> | null;
 }
 
-
 function cleanStringOrNull(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const t = v.trim();
@@ -144,7 +141,6 @@ function pickEventCategory(item: TimelineMemoryItem): string {
   }
   return "other";
 }
-
 
 function pickMostRecentSnapshotItem(
   items: readonly TimelineMemoryItem[],
@@ -244,22 +240,10 @@ export function buildAiDoctorReviewRequestPacket(
 
   // ---- imported CSV history (sanitized, bounded, deterministic) ----
   // Filter first so non-CSV rows can never consume the cap; then sort
-  // newest-first with stable tie-breakers (metric, then value) so equal
-  // timestamps and shuffled inputs always survive the cap identically.
-  const csvRows = (args.csvHistoryRows ?? []).filter(
-    (r) => !!r && isCsvHistoryRow(r),
-  );
-  const csvSorted = [...csvRows].sort((a, b) => {
-    const ta = Date.parse(a.captured_at ?? a.ts ?? "") || 0;
-    const tb = Date.parse(b.captured_at ?? b.ts ?? "") || 0;
-    if (tb !== ta) return tb - ta;
-    const ma = typeof a.metric === "string" ? a.metric : "";
-    const mb = typeof b.metric === "string" ? b.metric : "";
-    if (ma !== mb) return ma < mb ? -1 : 1;
-    const va = toFiniteOrZero(a.value);
-    const vb = toFiniteOrZero(b.value);
-    return va - vb;
-  });
+  // newest-first with summary-complete tie-breakers so shuffled inputs
+  // always produce the same bounded evidence packet.
+  const csvRows = (args.csvHistoryRows ?? []).filter((r) => !!r && isCsvHistoryRow(r));
+  const csvSorted = [...csvRows].sort(compareCsvHistoryRowsForBoundedSummary);
   const imported_sensor_history = buildImportedSensorHistorySection(
     csvSorted.slice(0, AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP),
   );
@@ -268,9 +252,7 @@ export function buildAiDoctorReviewRequestPacket(
   // whose provenance resolved to "live" counts. Manual/CSV/demo/stale/
   // invalid never satisfy it, so the prompt always requests fresh context
   // when current conditions matter.
-  const missingLiveSensorReadings = !isFreshLiveSnapshotAnnotation(
-    recentSensorSnapshotAnnotation,
-  );
+  const missingLiveSensorReadings = !isFreshLiveSnapshotAnnotation(recentSensorSnapshotAnnotation);
 
   return {
     schemaVersion: AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION,
@@ -292,9 +274,3 @@ export function buildAiDoctorReviewRequestPacket(
     missingLiveSensorReadings,
   };
 }
-
-function toFiniteOrZero(v: unknown): number {
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-

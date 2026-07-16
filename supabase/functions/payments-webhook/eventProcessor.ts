@@ -44,7 +44,9 @@ export type SkipReason =
   | 'unhandled_event_type'
   | 'lifetime_price_only_for_transactions'
   | 'non_lifetime_transaction'
-  | 'unknown_lifetime_price_id';
+  | 'unknown_lifetime_price_id'
+  | 'adjustment_audit_only';
+
 
 export interface SubscriptionUpsertRow {
   user_id: string;

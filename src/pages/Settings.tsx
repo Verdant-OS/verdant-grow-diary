@@ -280,8 +280,10 @@ function TemperatureUnitTile() {
 function SubscriptionTile() {
   const { loading, entitlement } = useMyEntitlements();
   const { opening, error: portalError, open: openPortal, clearError } = useOpenCustomerPortalState();
+  const cancelNotice = usePaddleCancelNotice();
 
   const planId = entitlement?.displayPlanId ?? null;
+
   const tier = planId ? PRICING_TIERS.find((t) => t.id === planId) ?? null : null;
 
   const label = loading

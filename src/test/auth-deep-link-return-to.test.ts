@@ -85,10 +85,28 @@ describe("buildSignedOutRedirect — AppShell signed-out target", () => {
     );
   });
 
+  it("preserves the location hash end-to-end (capture → restore)", () => {
+    // Capture side: hash rides along inside the encoded redirectTo…
+    expect(buildSignedOutRedirect("/sensors", "", "#manual-reading")).toBe(
+      "/welcome?redirectTo=%2Fsensors%23manual-reading",
+    );
+    expect(buildSignedOutRedirect("/actions", "?filter=open", "#row-3")).toBe(
+      "/welcome?redirectTo=%2Factions%3Ffilter%3Dopen%23row-3",
+    );
+    // …and the consume side hands it back intact (round trip).
+    expect(resolveKnownRouteReturnTo("/sensors#manual-reading")).toBe("/sensors#manual-reading");
+    expect(resolveKnownRouteReturnTo("/actions?filter=open#row-3")).toBe(
+      "/actions?filter=open#row-3",
+    );
+    // Hash never affects the manifest match — unknown paths stay rejected.
+    expect(resolveKnownRouteReturnTo("/not-a-route#anchor")).toBeNull();
+  });
+
   it("falls back to plain /welcome for the root, the landing itself, and unknown paths", () => {
     expect(buildSignedOutRedirect("/", "")).toBe(SIGNED_OUT_LANDING);
     expect(buildSignedOutRedirect("/welcome", "")).toBe(SIGNED_OUT_LANDING);
     expect(buildSignedOutRedirect("/welcome", "?redirectTo=%2Fplants")).toBe(SIGNED_OUT_LANDING);
+    expect(buildSignedOutRedirect("/welcome", "", "#features")).toBe(SIGNED_OUT_LANDING);
     expect(buildSignedOutRedirect("/not-a-route", "")).toBe(SIGNED_OUT_LANDING);
   });
 
@@ -99,9 +117,9 @@ describe("buildSignedOutRedirect — AppShell signed-out target", () => {
 });
 
 describe("Return-to wiring — static safety", () => {
-  it("AppShell builds its signed-out target from the current location", () => {
+  it("AppShell builds its signed-out target from the full current location (incl. hash)", () => {
     expect(APP_SHELL).toMatch(
-      /const signedOutRedirect = buildSignedOutRedirect\(location\.pathname, location\.search\)/,
+      /const signedOutRedirect = buildSignedOutRedirect\(\s*location\.pathname,\s*location\.search,\s*location\.hash,?\s*\)/,
     );
     expect(APP_SHELL).toMatch(/useRequireAuth\(signedOutRedirect\)/);
     expect(APP_SHELL).toMatch(/nav\(signedOutRedirect/);

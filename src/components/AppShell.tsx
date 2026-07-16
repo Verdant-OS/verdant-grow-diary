@@ -30,7 +30,11 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // The destination stays /welcome; buildSignedOutRedirect only appends a
   // manifest-validated redirectTo so a signed-out deep link (e.g. a /plants
   // bookmark) can be restored after sign-in instead of silently dropped.
-  const signedOutRedirect = buildSignedOutRedirect(location.pathname, location.search);
+  const signedOutRedirect = buildSignedOutRedirect(
+    location.pathname,
+    location.search,
+    location.hash,
+  );
   useRequireAuth(signedOutRedirect);
   // Real persisted alerts (open only). RLS-scoped to the signed-in user.
   // Replaces the prior mock badge to remove the demo-vs-live mismatch.

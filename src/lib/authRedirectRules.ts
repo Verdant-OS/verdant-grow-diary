@@ -91,17 +91,23 @@ export function resolveKnownRouteReturnTo(value: unknown): string | null {
 
 /**
  * Signed-out redirect target for the protected-route boundary. Preserves the
- * intended in-app location as a `redirectTo` query param on the landing path
- * so /auth can restore it after sign-in — but only when the location is a
+ * intended in-app location — path, query, AND hash (e.g.
+ * /sensors#manual-reading) — as a `redirectTo` query param on the landing
+ * path so /auth can restore it after sign-in. Only when the location is a
  * known manifest route (never raw attacker-controllable strings).
  */
-export function buildSignedOutRedirect(pathname: string, search: string = ""): string {
-  const returnTo = resolveKnownRouteReturnTo(`${pathname}${search}`);
+export function buildSignedOutRedirect(
+  pathname: string,
+  search: string = "",
+  hash: string = "",
+): string {
+  const returnTo = resolveKnownRouteReturnTo(`${pathname}${search}${hash}`);
   if (
     !returnTo ||
     returnTo === DEFAULT_AUTH_REDIRECT ||
     returnTo === SIGNED_OUT_LANDING ||
-    returnTo.startsWith(`${SIGNED_OUT_LANDING}?`)
+    returnTo.startsWith(`${SIGNED_OUT_LANDING}?`) ||
+    returnTo.startsWith(`${SIGNED_OUT_LANDING}#`)
   ) {
     return SIGNED_OUT_LANDING;
   }

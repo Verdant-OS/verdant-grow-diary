@@ -36,6 +36,20 @@ export interface VerdantCultivarProfile {
   commonIssues: Array<{ issue: string; mitigation: string }>;
   /** Pheno-hunt evidence points that matter for this cultivar. */
   phenoHuntFocus: string[];
+  /**
+   * Illustrative sample phenos for the public /cultivars page comparison
+   * module. NEVER real grower data. Presented alongside an explicit
+   * "Sample data" label in the UI; used purely to show what a Pheno Hunt
+   * side-by-side looks like inside Verdant.
+   */
+  samplePhenos: ReadonlyArray<{
+    label: string;
+    structure: string;
+    aroma: string;
+    resin: string;
+    yieldNote: string;
+    finishNote: string;
+  }>;
 }
 
 export const VERDANT_CULTIVARS: readonly VerdantCultivarProfile[] = [

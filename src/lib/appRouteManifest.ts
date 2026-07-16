@@ -180,13 +180,15 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   {
     path: "/internal/contextual-pheno-comparison-demo",
-    access: "internal",
-    description: "Internal read-only Contextual Pheno Comparison v0.1 demo (fixture data only).",
+    access: "public",
+    description:
+      "Read-only Contextual Pheno Comparison v0.1 demo (fixture data only; mounted outside AppShell, unlinked / hidden by URL — no private data).",
   },
   {
     path: "/internal/demo-proof-walkthrough",
-    access: "internal",
-    description: "Read-only operator walkthrough of the V0 One-Tent Loop proof path.",
+    access: "public",
+    description:
+      "Read-only walkthrough of the V0 One-Tent Loop proof path (fixture-only presenter; mounted outside AppShell, unlinked / hidden by URL — no private data).",
   },
   {
     path: "/internal/one-tent-loop-proof",

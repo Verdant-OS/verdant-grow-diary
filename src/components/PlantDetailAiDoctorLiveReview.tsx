@@ -26,6 +26,7 @@ import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedN
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { isUuid } from "@/lib/growRepo";
+import { plantDetailPath } from "@/lib/routes";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
@@ -132,9 +133,11 @@ export default function PlantDetailAiDoctorLiveReview({
 
   const { entitlement } = useMyEntitlements();
 
-  // Construct the return target locally from a single encoded route segment.
-  // AiCreditLimitNotice validates it again before it reaches the pricing link.
-  const returnTo = useMemo(() => `/plants/${encodeURIComponent(plantId)}`, [plantId]);
+  // Construct the return target locally via the canonical route helper
+  // (identical encoded output to the previous inline literal, and keeps
+  // the route-helper migration scanner satisfied). AiCreditLimitNotice
+  // validates it again before it reaches the pricing link.
+  const returnTo = useMemo(() => plantDetailPath(plantId), [plantId]);
 
   // Keep funnel tracking aligned with the notice's server-plan + defensive
   // entitlement rules. Paid, founder, and unknown denials must never register

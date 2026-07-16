@@ -49,6 +49,8 @@ import {
 } from "@/lib/dashboardActionQueueViewModel";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import { useNowTick } from "@/hooks/useNowTick";
+import { isUuid } from "@/lib/growRepo";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
@@ -174,8 +176,15 @@ export default function Dashboard() {
   // Per-tent sensor windows for the stability summary. Each tent gets its
   // own 200-row window so a busy tent cannot push another tent's VPD rows
   // out of a shared global cap. Read-only; no writes.
-  const tentIds = tents.map((t) => t.id);
-  const { byTent: readingsByTent } = useSensorReadingsByTents(tentIds);
+  // Mock-fallback tent ids ("t1"…) would 400 against the uuid tent_id
+  // column — only query real UUIDs; a non-UUID id cannot have rows, so its
+  // absence is established (same guard as the Tents list).
+  const tentIds = tents.map((t) => t.id).filter((id) => isUuid(id));
+  const { byTent: readingsByTent, statusByTent: sensorStatusByTent } =
+    useSensorReadingsByTents(tentIds);
+  // Freshness is time-relative: re-evaluate the snapshot strip's clock every
+  // minute so an open tab cannot keep a fresh label past the stale boundary.
+  const nowTick = useNowTick();
   // AI Insights: no real-data hook yet — render an honest empty state below.
   const { recent, pending } = useDashboardScopedData(scopedGrowId ?? null);
   // Multi-tent selector for the Latest Environment card. Defaults to "all"
@@ -544,12 +553,20 @@ export default function Dashboard() {
             </div>
 
             <div className="space-y-2.5">
-              {latestPerTent.map(({ tent, last, stability }) => {
+              {latestPerTent.map(({ tent, stability }) => {
                 const stabilityView = formatStabilityChipView(stability);
                 const snapView = buildTentSnapshotView(
                   (readingsByTent[tent.id] ?? []) as BuildTentSnapshotInput[],
                   tent.stage,
+                  nowTick,
                 );
+                // Pending/failed reads must not masquerade as established
+                // absence or as data. Non-UUID ids (mock-fallback tents)
+                // are never queried — a uuid column cannot hold them, so
+                // their absence is established (parity with the Tents list).
+                const sensorReadStatus = isUuid(tent.id)
+                  ? (sensorStatusByTent[tent.id] ?? "loading")
+                  : "success";
                 const ariaParts = [
                   tent.name,
                   snapView.hasReading ? `source ${snapView.sourceLabel}` : null,
@@ -591,7 +608,21 @@ export default function Dashboard() {
                         </span>
                       )}
                     </div>
-                    {last && (
+                    {sensorReadStatus === "loading" ? (
+                      <p
+                        className="text-xs text-muted-foreground animate-pulse"
+                        data-testid={`dashboard-env-snapshot-loading-${tent.id}`}
+                      >
+                        Loading sensor data…
+                      </p>
+                    ) : sensorReadStatus === "error" ? (
+                      <p
+                        className="text-xs text-muted-foreground"
+                        data-testid={`dashboard-env-snapshot-unavailable-${tent.id}`}
+                      >
+                        Sensor data unavailable — readings couldn't be loaded.
+                      </p>
+                    ) : snapView.hasReading ? (
                       <div className="flex flex-wrap gap-1.5">
                         {snapView.metrics.map((m) => (
                           <div
@@ -623,6 +654,13 @@ export default function Dashboard() {
                           </div>
                         ))}
                       </div>
+                    ) : (
+                      <p
+                        className="text-xs text-muted-foreground"
+                        data-testid={`dashboard-env-snapshot-no-data-${tent.id}`}
+                      >
+                        No sensor data yet
+                      </p>
                     )}
                     <div className="mt-1.5">
                       <StabilityChipDrilldown

@@ -239,53 +239,72 @@ describe("buildTransitionPatch preserves [alert:<id>] back-pointer", () => {
   });
 });
 
-describe("ActionDetail — follow-up wiring (static)", () => {
-  it("imports the pure helper, not an inline mapping table", () => {
-    expect(ACTION_DETAIL).toMatch(/from "@\/lib\/actionFollowupRules"/);
-    expect(ACTION_DETAIL).toMatch(/buildActionFollowupDiaryDraft/);
-    expect(ACTION_DETAIL).toMatch(/followupMatchesAction/);
-    // No duplicated metric → note table inline.
-    expect(ACTION_DETAIL).not.toMatch(/Re-check RH in ~24h/);
-    expect(ACTION_DETAIL).not.toMatch(/Re-check VPD in ~24h/);
-    expect(ACTION_DETAIL).not.toMatch(/Re-check the root-zone reading/);
+describe("Completion → follow-up wiring (static, shared writer)", () => {
+  const FOLLOWUP_WRITER = readFileSync(
+    resolve(ROOT, "src/lib/writeActionFollowupDiaryEntry.ts"),
+    "utf8",
+  );
+
+  it("both completion surfaces route through the single shared writer", () => {
+    for (const src of [ACTION_DETAIL, ACTION_QUEUE]) {
+      expect(src).toMatch(/from "@\/lib\/writeActionFollowupDiaryEntry"/);
+      expect(src).toMatch(/maybeWriteActionFollowupDiaryEntry/);
+      // No duplicated inline writer or metric → note table.
+      expect(src).not.toMatch(/buildActionFollowupDiaryDraft/);
+      expect(src).not.toMatch(/Re-check RH in ~24h/);
+      expect(src).not.toMatch(/Re-check VPD in ~24h/);
+      expect(src).not.toMatch(/Re-check the root-zone reading/);
+    }
+  });
+
+  it("the shared writer builds via the pure helper, not an inline mapping table", () => {
+    expect(FOLLOWUP_WRITER).toMatch(/from "@\/lib\/actionFollowupRules"/);
+    expect(FOLLOWUP_WRITER).toMatch(/buildActionFollowupDiaryDraft/);
+    expect(FOLLOWUP_WRITER).toMatch(/followupMatchesAction/);
+    expect(FOLLOWUP_WRITER).not.toMatch(/Re-check RH in ~24h/);
   });
 
   it("only triggers follow-up creation when transitioning to completed", () => {
-    // The transition() function gates the call on new_status === "completed".
-    expect(ACTION_DETAIL).toMatch(
-      /if \(new_status === "completed"\)\s*\{\s*await maybeCreateFollowupDiaryEntry/,
-    );
-    // There is exactly one call site for the helper.
-    const calls = ACTION_DETAIL.match(/maybeCreateFollowupDiaryEntry\(/g) ?? [];
-    // One definition + one call = 2 occurrences.
-    expect(calls.length).toBe(2);
+    for (const src of [ACTION_DETAIL, ACTION_QUEUE]) {
+      // transition() gates the call on new_status === "completed".
+      expect(src).toMatch(
+        /if \(new_status === "completed"\)\s*\{[\s\S]{0,200}maybeWriteActionFollowupDiaryEntry\(/,
+      );
+      // Exactly one call site per surface (imports carry no paren).
+      const calls = src.match(/maybeWriteActionFollowupDiaryEntry\(/g) ?? [];
+      expect(calls.length).toBe(1);
+    }
   });
 
   it("never invokes the follow-up path from approve/reject/cancel/simulate dialogs", () => {
-    // The helper is only reachable through the new_status === "completed" gate.
-    // Sanity: the simulate toast is unchanged, and no direct diary insert sits
+    // The writer is only reachable through the new_status === "completed" gate.
+    // Sanity: the simulate toast is unchanged, and no follow-up call sits
     // next to it.
-    expect(ACTION_DETAIL).toMatch(/toast\.message\("Simulated/);
-    expect(ACTION_DETAIL).not.toMatch(/Simulated[\s\S]{0,400}maybeCreateFollowupDiaryEntry/);
+    for (const src of [ACTION_DETAIL, ACTION_QUEUE]) {
+      expect(src).toMatch(/(toast\.message\("Simulated|Simulated \(no device command sent\))/);
+      expect(src).not.toMatch(/Simulated[\s\S]{0,400}maybeWriteActionFollowupDiaryEntry/);
+    }
   });
 
   it("uses an idempotent contains() lookup before insert", () => {
-    expect(ACTION_DETAIL).toMatch(/\.contains\(\s*"details"/);
-    expect(ACTION_DETAIL).toMatch(/event_type: ACTION_FOLLOWUP_EVENT_TYPE/);
-    expect(ACTION_DETAIL).toMatch(/action_queue_id: completed\.id/);
+    expect(FOLLOWUP_WRITER).toMatch(/\.contains\(\s*"details"/);
+    expect(FOLLOWUP_WRITER).toMatch(/event_type: ACTION_FOLLOWUP_EVENT_TYPE/);
+    expect(FOLLOWUP_WRITER).toMatch(/action_queue_id: actionId/);
   });
 
   it("insert payload does NOT include user_id", () => {
-    const insertBlock = ACTION_DETAIL.match(
-      /\.from\("diary_entries"\)\s*\.insert\(\{([\s\S]*?)\}\)/,
+    const insertBlock = FOLLOWUP_WRITER.match(
+      /\.from\("diary_entries"\)\.insert\(\{([\s\S]*?)\}\)/,
     );
     expect(insertBlock).not.toBeNull();
     expect(insertBlock![1]).not.toMatch(/\buser_id\s*:/);
   });
 
   it("failure path is non-blocking (toast.warning, no rollback)", () => {
-    expect(ACTION_DETAIL).toMatch(/Action completed, but follow-up note could not be created\./);
-    expect(ACTION_DETAIL).not.toMatch(/maybeCreateFollowupDiaryEntry[\s\S]{0,400}rollback/i);
+    for (const src of [ACTION_DETAIL, ACTION_QUEUE]) {
+      expect(src).toMatch(/Action completed, but follow-up note could not be created\./);
+      expect(src).not.toMatch(/maybeWriteActionFollowupDiaryEntry[\s\S]{0,400}rollback/i);
+    }
   });
 
   it("preserves existing action_queue_events audit insert path", () => {

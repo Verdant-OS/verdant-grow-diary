@@ -60,19 +60,24 @@ describe("Environment alert persistence path", () => {
   });
 });
 
-describe("ActionDetail completion → follow-up wiring is idempotent and safe", () => {
-  const src = readFile("src/pages/ActionDetail.tsx");
+describe.each([
+  ["src/pages/ActionDetail.tsx"],
+  ["src/pages/ActionQueue.tsx"],
+])("%s completion → follow-up wiring is shared and safe", (rel) => {
+  const src = readFile(rel);
 
-  it("uses the pure helper to build the follow-up draft", () => {
-    expect(src).toContain("buildActionFollowupDiaryDraft");
-    expect(src).toContain("followupMatchesAction");
+  it("routes the follow-up through the single shared writer", () => {
+    // Both completion surfaces must use the one sanctioned writer so the
+    // detail page and the queue list can never drift apart again.
+    expect(src).toContain("maybeWriteActionFollowupDiaryEntry");
   });
 
-  it("guards the insert with an existence check (idempotency)", () => {
-    // The completion handler must look up existing action_followup rows
-    // before inserting a new one.
-    expect(src).toMatch(/action_followup/);
-    expect(src).toMatch(/event_type/);
+  it("gates the follow-up on the completed transition only", () => {
+    expect(src).toMatch(/new_status === "completed"[\s\S]{0,200}maybeWriteActionFollowupDiaryEntry/);
+  });
+
+  it("does not build follow-up drafts inline (no duplicated writer)", () => {
+    expect(src.includes("buildActionFollowupDiaryDraft")).toBe(false);
   });
 
   it("does not insert into action_queue during the completion path", () => {
@@ -82,6 +87,43 @@ describe("ActionDetail completion → follow-up wiring is idempotent and safe", 
   it("does not write to sensor_readings during the completion path", () => {
     expect(/from\(["']sensor_readings["']\)\s*\n?\s*\.(insert|upsert|update|delete)/.test(src))
       .toBe(false);
+  });
+});
+
+describe("writeActionFollowupDiaryEntry shared writer safety scan", () => {
+  const raw = readFile("src/lib/writeActionFollowupDiaryEntry.ts");
+  const src = raw
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  it("builds the draft via the pure helper and checks idempotency", () => {
+    expect(src).toContain("buildActionFollowupDiaryDraft");
+    expect(src).toContain("followupMatchesAction");
+    expect(src).toContain("ACTION_FOLLOWUP_EVENT_TYPE");
+  });
+
+  it("never sends user_id (auth.uid() default is the sole source)", () => {
+    expect(src.includes("user_id")).toBe(false);
+  });
+
+  it("only writes diary_entries — no other tables, no forbidden capabilities", () => {
+    expect(/from\(["']diary_entries["']\)/.test(src)).toBe(true);
+    for (const forbidden of [
+      'from("action_queue")',
+      'from("sensor_readings")',
+      "service_role",
+      "bridge_token",
+      "raw_payload",
+      "functions.invoke",
+      "ai-coach",
+      "ai_doctor",
+      ".rpc(",
+      ".update(",
+      ".delete(",
+      ".upsert(",
+    ]) {
+      expect(src.includes(forbidden), `must not contain ${forbidden}`).toBe(false);
+    }
   });
 });
 

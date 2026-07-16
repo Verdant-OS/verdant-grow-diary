@@ -345,6 +345,32 @@ describe("packet — missing-live-readings safety signal", () => {
     });
     expect(packet.missingLiveSensorReadings).toBe(false);
   });
+
+  it("an explicit caller live-telemetry signal clears the missing-live flag", () => {
+    // Real production path: fresh "usable" bridge-health classification
+    // passed by the plant-detail component.
+    const packet = buildAiDoctorReviewRequestPacket({
+      plant: PLANT,
+      timelineItems: [],
+      context: ctx(),
+      csvHistoryRows: [csvRow()],
+      hasFreshLiveSensorReadings: true,
+    });
+    expect(packet.missingLiveSensorReadings).toBe(false);
+  });
+
+  it("the live signal is downgrade-only: false/null/absent never clears the flag", () => {
+    for (const signal of [false, null, undefined]) {
+      const packet = buildAiDoctorReviewRequestPacket({
+        plant: PLANT,
+        timelineItems: [],
+        context: ctx(),
+        csvHistoryRows: [csvRow()],
+        hasFreshLiveSensorReadings: signal,
+      });
+      expect(packet.missingLiveSensorReadings).toBe(true);
+    }
+  });
 });
 
 describe("server prompt assembly (shared with the ai-doctor-review edge function)", () => {

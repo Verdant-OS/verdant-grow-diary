@@ -125,6 +125,14 @@ export interface BuildAiDoctorReviewPacketArgs {
    * the packet.
    */
   csvHistoryRows?: ReadonlyArray<CsvHistorySensorRowLike> | null;
+  /**
+   * Optional caller-supplied live-telemetry signal (e.g. a "usable"
+   * sensor-bridge health classification). Only an explicit `true`
+   * clears the missing-live flag — manual snapshots, CSV history, and
+   * unknown/absent signals never do. Downgrade-only, mirroring the
+   * compiler's live vocabulary.
+   */
+  hasFreshLiveSensorReadings?: boolean | null;
 }
 
 function cleanStringOrNull(v: unknown): string | null {
@@ -248,11 +256,15 @@ export function buildAiDoctorReviewRequestPacket(
     csvSorted.slice(0, AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP),
   );
 
-  // Live-availability mirrors the context compiler: only a fresh snapshot
-  // whose provenance resolved to "live" counts. Manual/CSV/demo/stale/
-  // invalid never satisfy it, so the prompt always requests fresh context
-  // when current conditions matter.
-  const missingLiveSensorReadings = !isFreshLiveSnapshotAnnotation(recentSensorSnapshotAnnotation);
+  // Live-availability mirrors the context compiler: a fresh snapshot whose
+  // provenance resolved to "live", or an explicit caller live-telemetry
+  // signal (fresh bridge ingest), counts. Manual/CSV/demo/stale/invalid
+  // never satisfy it, so the prompt always requests fresh context when
+  // current conditions matter.
+  const missingLiveSensorReadings = !(
+    isFreshLiveSnapshotAnnotation(recentSensorSnapshotAnnotation) ||
+    args.hasFreshLiveSensorReadings === true
+  );
 
   return {
     schemaVersion: AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION,

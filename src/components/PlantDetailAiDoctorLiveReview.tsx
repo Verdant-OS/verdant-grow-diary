@@ -81,7 +81,7 @@ export default function PlantDetailAiDoctorLiveReview({
   // Dashboard/Tents; non-UUID tent ids are never queried). Filtering happens
   // in the read query before the cap, so high-frequency current telemetry
   // cannot crowd older imported history out of the packet.
-  const { byTent: readingsByTent } = useSensorReadingsByTents(
+  const { byTent: readingsByTent, statusByTent: sensorStatusByTent } = useSensorReadingsByTents(
     isUuid(tentId) ? [tentId] : [],
     AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP,
     AI_DOCTOR_CSV_HISTORY_SOURCES,
@@ -89,6 +89,12 @@ export default function PlantDetailAiDoctorLiveReview({
   const tentSensorRows = tentId
     ? (readingsByTent[tentId] ?? NO_TENT_SENSOR_ROWS)
     : NO_TENT_SENSOR_ROWS;
+  // While the CSV-history read is in flight, hold the start gate so a
+  // click cannot send a packet that treats pending history as a confirmed
+  // empty result. A FAILED read proceeds without history (omission — the
+  // imported section is simply absent — never a fabricated summary).
+  const csvHistoryPending =
+    isUuid(tentId) && (sensorStatusByTent[tentId] ?? "loading") === "loading";
 
   const context = useMemo(
     () =>
@@ -100,19 +106,6 @@ export default function PlantDetailAiDoctorLiveReview({
   );
 
   const allowed = context.readiness === "partial" || context.readiness === "strong";
-
-  const packet = useMemo(
-    () =>
-      allowed
-        ? buildAiDoctorReviewRequestPacket({
-            plant,
-            timelineItems: items,
-            context,
-            csvHistoryRows: tentSensorRows,
-          })
-        : null,
-    [allowed, plant, items, context, tentSensorRows],
-  );
 
   // Real intake classification — never synthesized from presence.
   const sensorClassification = useMemo<Classification | null>(() => {
@@ -126,8 +119,27 @@ export default function PlantDetailAiDoctorLiveReview({
     });
   }, [bridgeHealth, sensorClassificationOverride]);
 
+  const packet = useMemo(
+    () =>
+      allowed
+        ? buildAiDoctorReviewRequestPacket({
+            plant,
+            timelineItems: items,
+            context,
+            csvHistoryRows: tentSensorRows,
+            // Real live-ingest signal: "usable" bridge health means fresh
+            // live telemetry exists for this grower right now. Manual
+            // snapshots and CSV history never set this.
+            hasFreshLiveSensorReadings: sensorClassification?.status === "usable",
+          })
+        : null,
+    [allowed, plant, items, context, tentSensorRows, sensorClassification],
+  );
+
   const review = useAiDoctorLiveReview({
-    enabled: allowed,
+    // Hold the gate while the CSV-history read is in flight so a click
+    // cannot send a packet that treats pending history as absent.
+    enabled: allowed && !csvHistoryPending,
     packet,
     invoke,
     growId: growId ?? null,

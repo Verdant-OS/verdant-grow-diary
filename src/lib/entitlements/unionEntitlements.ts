@@ -17,10 +17,7 @@
 import type { BillingSubscriptionRow, PlanId, SubscriptionStatus } from "./types";
 
 export type EntitlementSource =
-  | "free"
-  | "byo_paddle"
-  | "lovable_paddle_subscription"
-  | "lovable_paddle_lifetime";
+  "free" | "byo_paddle" | "lovable_paddle_subscription" | "lovable_paddle_lifetime";
 
 export interface PickStrongestResult {
   row: BillingSubscriptionRow | null;
@@ -29,10 +26,7 @@ export interface PickStrongestResult {
 
 const RECURRING_PLANS: ReadonlyArray<PlanId> = ["pro_monthly", "pro_annual"];
 
-function isActiveInPeriod(
-  row: BillingSubscriptionRow | null,
-  now: Date,
-): boolean {
+function isActiveInPeriod(row: BillingSubscriptionRow | null, now: Date): boolean {
   if (row == null) return false;
   if (row.status !== ("active" as SubscriptionStatus)) return false;
   if (row.current_period_end == null) return true; // e.g. founder_lifetime
@@ -42,11 +36,7 @@ function isActiveInPeriod(
 }
 
 function isLifetimeActive(row: BillingSubscriptionRow | null, now: Date): boolean {
-  return (
-    row != null &&
-    row.plan_id === "founder_lifetime" &&
-    isActiveInPeriod(row, now)
-  );
+  return row != null && row.plan_id === "founder_lifetime" && isActiveInPeriod(row, now);
 }
 
 function isRecurringActive(row: BillingSubscriptionRow | null, now: Date): boolean {
@@ -119,13 +109,92 @@ export interface ResolveUnionInput {
  * Does NOT read from Supabase or React. Callers (hook + server gates)
  * supply the two raw rows and the expected environment.
  */
-export function resolveUnionEntitlements(
-  input: ResolveUnionInput,
-): ResolvedEntitlement {
+export function resolveUnionEntitlements(input: ResolveUnionInput): ResolvedEntitlement {
   const mappedLovable = mapLovableSubscriptionRow(input.lovableRow, {
     expectedBillingEnvironment: input.expectedBillingEnvironment,
   });
   const picked = pickStrongestBilling(input.byoRow, mappedLovable, input.now);
   const resolved = resolveEntitlements(picked.row, input.now, input.opts);
   return { ...resolved, source: picked.source };
+}
+
+/**
+ * Bounded newest-first scan window for public.subscriptions reads.
+ *
+ * public.subscriptions is unique per paddle_subscription_id, NOT per user,
+ * so one account can hold several rows in one environment (e.g. an active
+ * Founder Lifetime row plus a newer canceled Pro row). A single-newest-row
+ * read lets the non-entitling newer row shadow the entitling older one, so
+ * readers scan a bounded window and apply any-entitling-row semantics — the
+ * same EXISTS shape the DB gates use. 20 comfortably exceeds any real
+ * per-user, per-environment row count.
+ *
+ * Mirrors SUBSCRIPTION_ROW_SCAN_LIMIT in
+ * supabase/functions/_shared/unionEntitlementLookup.ts.
+ */
+export const SUBSCRIPTION_ROW_SCAN_LIMIT = 20;
+
+// Resolve one Lovable row in isolation. No opts on purpose: caller-level
+// lifts (e.g. staff) must not make every row look entitling, or the picker
+// would degenerate back to newest-row-wins.
+function resolveLovableRowAlone(
+  row: LovableSubscriptionRow,
+  environment: LovableBillingEnvironment,
+  now: Date,
+): ResolvedEntitlement {
+  return resolveUnionEntitlements({
+    byoRow: null,
+    lovableRow: row,
+    expectedBillingEnvironment: environment,
+    now,
+  });
+}
+
+function isEntitling(resolved: ResolvedEntitlement): boolean {
+  return resolved.isActive && resolved.effectivePlanId !== "free";
+}
+
+/**
+ * Per-row entitlement probe. Shared with the server helper
+ * (supabase/functions/_shared/unionEntitlementLookup.ts) so both sides use
+ * identical row-level semantics.
+ */
+export function lovableRowEntitles(
+  row: LovableSubscriptionRow,
+  environment: LovableBillingEnvironment,
+  now: Date,
+): boolean {
+  return isEntitling(resolveLovableRowAlone(row, environment, now));
+}
+
+/**
+ * Any-entitling-row selection over a bounded window (matches the DB gates'
+ * EXISTS semantics). Shared by the client hook and the server helper
+ * (supabase/functions/_shared/unionEntitlementLookup.ts).
+ *
+ * Rows MUST arrive newest-first with a unique tiebreak (created_at desc,
+ * paddle_subscription_id desc — created_at alone is not unique, so without
+ * the tiebreak equal timestamps make the pick nondeterministic).
+ *
+ * Selection mirrors pickStrongestBilling's precedence:
+ *   1. Newest entitling founder_lifetime row — lifetime beats any recurring
+ *      plan regardless of recency, so a Founder who also holds a newer
+ *      active Pro row still displays as Founder.
+ *   2. Newest entitling recurring row.
+ *   3. Newest row (entitling or not), so the degraded-display resolution
+ *      behaves exactly as the previous single-newest-row read did.
+ */
+export function pickEntitlingLovableRow(
+  rows: ReadonlyArray<LovableSubscriptionRow>,
+  environment: LovableBillingEnvironment,
+  now: Date,
+): LovableSubscriptionRow | null {
+  let newestEntitlingRecurring: LovableSubscriptionRow | null = null;
+  for (const row of rows) {
+    const resolved = resolveLovableRowAlone(row, environment, now);
+    if (!isEntitling(resolved)) continue;
+    if (resolved.effectivePlanId === "founder_lifetime") return row;
+    if (newestEntitlingRecurring == null) newestEntitlingRecurring = row;
+  }
+  return newestEntitlingRecurring ?? (rows.length > 0 ? rows[0] : null);
 }

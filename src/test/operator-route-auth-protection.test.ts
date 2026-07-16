@@ -118,7 +118,13 @@ describe("Customer/public routes stay accessible without auth", () => {
 describe("AppShell protected boundary", () => {
   it("AppShell sends signed-out visitors to the public landing", () => {
     const shell = fs.readFileSync(path.resolve(__dirname, "../components/AppShell.tsx"), "utf8");
-    expect(shell).toMatch(/useRequireAuth\(\s*["']\/welcome["']\s*\)/);
+    // The destination is built by buildSignedOutRedirect, which always
+    // resolves to /welcome (with an optional manifest-validated redirectTo).
+    expect(shell).toMatch(
+      /const signedOutRedirect = buildSignedOutRedirect\(location\.pathname, location\.search\)/,
+    );
+    expect(shell).toMatch(/useRequireAuth\(\s*signedOutRedirect\s*\)/);
+    expect(shell).not.toMatch(/useRequireAuth\(\s*["']\/auth["']\s*\)/);
   });
 
   it("useRequireAuth navigates unauthenticated users to /auth (replace)", () => {

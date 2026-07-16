@@ -154,8 +154,15 @@ describe("landing subscriber funnel", () => {
   });
 
   it("sends every AppShell auth check to the public landing, never directly to auth", () => {
-    expect(APP_SHELL).toMatch(/useRequireAuth\("\/welcome"\)/);
-    expect(APP_SHELL).toMatch(/nav\("\/welcome"/);
+    // Both session checks share one signed-out destination built by
+    // buildSignedOutRedirect, which always lands on /welcome (optionally
+    // carrying a manifest-validated redirectTo for deep-link restore).
+    expect(APP_SHELL).toMatch(
+      /const signedOutRedirect = buildSignedOutRedirect\(location\.pathname, location\.search\)/,
+    );
+    expect(APP_SHELL).toMatch(/useRequireAuth\(signedOutRedirect\)/);
+    expect(APP_SHELL).toMatch(/nav\(signedOutRedirect/);
     expect(APP_SHELL).not.toMatch(/useRequireAuth\("\/auth"\)/);
+    expect(APP_SHELL).not.toMatch(/useRequireAuth\("\/welcome"\)/);
   });
 });

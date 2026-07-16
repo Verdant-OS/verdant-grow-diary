@@ -70,6 +70,7 @@ type UpsertRow = Extract<
   { kind: 'upsert_subscription' | 'record_lifetime' }
 >['row'];
 type UpdatePatch = Extract<Decision, { kind: 'update_subscription' }>['patch'];
+type CustomerRow = Extract<Decision, { kind: 'upsert_customer' }>['row'];
 
 export interface Deps {
   insertEventReceived(input: {
@@ -86,6 +87,13 @@ export interface Deps {
     patch: UpdatePatch,
     env: PaddleEnv,
   ): Promise<IoResult>;
+  /**
+   * Idempotent upsert of a Paddle-side customer mirror row. Called for
+   * verified `customer.created` / `customer.updated` events. Optional so
+   * pure unit tests that only cover subscription paths don't need to
+   * provide it.
+   */
+  upsertCustomer?(row: CustomerRow): Promise<IoResult>;
   markEvent(paddle_event_id: string, patch: MarkPatch): Promise<IoResult>;
   /**
    * Reverse-lookup a Paddle internal price id (`pri_...`) into the

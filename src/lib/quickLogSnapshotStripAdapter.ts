@@ -25,11 +25,7 @@ import {
   type SnapshotTrustBadgeView,
 } from "@/lib/sensorSnapshotTrustBadgeRules";
 
-export type QuickLogSnapshotStripStatus =
-  | "usable"
-  | "stale"
-  | "invalid"
-  | "no_data";
+export type QuickLogSnapshotStripStatus = "usable" | "stale" | "invalid" | "no_data";
 
 export type QuickLogSnapshotStripAction =
   | { kind: "none" }
@@ -98,8 +94,6 @@ function actionFor(status: QuickLogSnapshotStripStatus): QuickLogSnapshotStripAc
   }
 }
 
-
-
 function formatAge(capturedMs: number, nowMs: number): string {
   const diff = Math.max(0, nowMs - capturedMs);
   const sec = Math.floor(diff / 1000);
@@ -112,9 +106,7 @@ function formatAge(capturedMs: number, nowMs: number): string {
   return day === 1 ? "1 day ago" : `${day} days ago`;
 }
 
-function buildMetrics(
-  snapshot: SensorSnapshot,
-): ReadonlyArray<{ label: string; value: string }> {
+function buildMetrics(snapshot: SensorSnapshot): ReadonlyArray<{ label: string; value: string }> {
   const out: { label: string; value: string }[] = [];
   if (snapshot.temp !== null) out.push({ label: "Temp", value: `${snapshot.temp.toFixed(1)}°C` });
   if (snapshot.rh !== null) out.push({ label: "RH", value: `${snapshot.rh.toFixed(0)}%` });
@@ -153,21 +145,11 @@ export interface BuildQuickLogStripArgs {
 export function buildQuickLogSnapshotStrip(
   args: BuildQuickLogStripArgs,
 ): QuickLogSnapshotStripViewModel {
-  const {
-    snapshot,
-    loading = false,
-    hasTent = true,
-    attached = true,
-    now = new Date(),
-  } = args;
+  const { snapshot, loading = false, hasTent = true, attached = true, now = new Date() } = args;
 
   // No tent selected or loader still in flight or empty snapshot ⇒ no_data.
   const isEmpty =
-    !snapshot ||
-    !hasTent ||
-    loading ||
-    snapshot.source === "unavailable" ||
-    !snapshot.ts;
+    !snapshot || !hasTent || loading || snapshot.source === "unavailable" || !snapshot.ts;
 
   if (isEmpty) {
     const classification = classifyAuditRow(null, { now });
@@ -202,9 +184,7 @@ export function buildQuickLogSnapshotStrip(
 
   const status = narrowStatus(classification.status);
   const capturedMs = new Date(snapshot.ts).getTime();
-  const ageLabel = Number.isFinite(capturedMs)
-    ? formatAge(capturedMs, now.getTime())
-    : null;
+  const ageLabel = Number.isFinite(capturedMs) ? formatAge(capturedMs, now.getTime()) : null;
 
   // Resolve title/description/action with the attach-toggle override:
   // when a snapshot is technically usable but the grower has toggled
@@ -217,9 +197,7 @@ export function buildQuickLogSnapshotStrip(
     : DESCRIPTIONS[status];
   const action = usableButDetached ? actionFor("no_data" as const) : actionFor(status);
   // Detached usable still surfaces no nav button (toggle is the action).
-  const finalAction: QuickLogSnapshotStripAction = usableButDetached
-    ? { kind: "none" }
-    : action;
+  const finalAction: QuickLogSnapshotStripAction = usableButDetached ? { kind: "none" } : action;
 
   return {
     status,
@@ -260,13 +238,40 @@ import type {
 } from "@/lib/latestSensorSnapshotRules";
 import type { LatestTentSensorSnapshotStatus } from "@/lib/sensor";
 
+/**
+ * Which surface the strip copy is written for.
+ *
+ *  - `attach`  — legacy Quick Log, where an "Attach sensor snapshot" toggle
+ *                exists and a usable snapshot IS included in the saved log.
+ *                Copy may promise attachment. Default.
+ *  - `context` — surfaces that show the latest tent reading as read-only
+ *                context and never attach it to the save (Quick Log v2).
+ *                Copy must not promise attachment or reference the toggle;
+ *                the `attached` flag is ignored.
+ */
+export type QuickLogStripVariant = "attach" | "context";
+
 export interface BuildQuickLogStripFromTentStateArgs {
   status: LatestTentSensorSnapshotStatus;
   snapshot: StrictSensorSnapshot;
   hasTent: boolean;
   attached?: boolean;
+  variant?: QuickLogStripVariant;
   now?: Date;
 }
+
+/**
+ * Context-variant copy overrides. Only statuses whose attach-mode copy
+ * promises attachment (usable) or names attachment (no_data) differ;
+ * stale/invalid copy is already attachment-neutral and stays shared.
+ */
+const CONTEXT_TITLES: Partial<Record<QuickLogSnapshotStripStatus, string>> = {
+  no_data: "No sensor snapshot",
+};
+
+const CONTEXT_DESCRIPTIONS: Partial<Record<QuickLogSnapshotStripStatus, string>> = {
+  usable: "Latest tent reading, shown for context only.",
+};
 
 function narrowStrict(s: StrictSnapshotStatus): QuickLogSnapshotStripStatus {
   switch (s) {
@@ -283,10 +288,7 @@ function narrowStrict(s: StrictSnapshotStatus): QuickLogSnapshotStripStatus {
   }
 }
 
-function synthClassification(
-  status: QuickLogSnapshotStripStatus,
-  label: string,
-): Classification {
+function synthClassification(status: QuickLogSnapshotStripStatus, label: string): Classification {
   const reason =
     status === "usable"
       ? "fresh_accepted"
@@ -329,7 +331,14 @@ function buildStrictMetrics(
 export function buildQuickLogStripFromTentState(
   args: BuildQuickLogStripFromTentStateArgs,
 ): QuickLogSnapshotStripViewModel {
-  const { status: loaderStatus, snapshot, hasTent, attached = true, now = new Date() } = args;
+  const {
+    status: loaderStatus,
+    snapshot,
+    hasTent,
+    attached = true,
+    variant = "attach",
+    now = new Date(),
+  } = args;
 
   // Treat idle/loading/empty/error/no-tent as no_data (UI parity with the
   // legacy dashboard-shape adapter). The strict resolver never invents
@@ -346,8 +355,8 @@ export function buildQuickLogStripFromTentState(
   if (isEmpty) {
     return {
       status: "no_data",
-      title: TITLES.no_data,
-      description: DESCRIPTIONS.no_data,
+      title: (variant === "context" && CONTEXT_TITLES.no_data) || TITLES.no_data,
+      description: (variant === "context" && CONTEXT_DESCRIPTIONS.no_data) || DESCRIPTIONS.no_data,
       capturedAt: null,
       ageLabel: null,
       metrics: [],
@@ -360,15 +369,17 @@ export function buildQuickLogStripFromTentState(
 
   const status = narrowStrict(snapshot.status);
   const capturedMs = Date.parse(snapshot.captured_at);
-  const ageLabel = Number.isFinite(capturedMs)
-    ? formatAge(capturedMs, now.getTime())
-    : null;
+  const ageLabel = Number.isFinite(capturedMs) ? formatAge(capturedMs, now.getTime()) : null;
 
-  const usableButDetached = status === "usable" && !attached;
-  const title = usableButDetached ? "Sensor snapshot available" : TITLES[status];
+  // Context surfaces never attach, so the detached-toggle copy path is
+  // attach-variant only; context copy overrides apply instead.
+  const usableButDetached = variant === "attach" && status === "usable" && !attached;
+  const title = usableButDetached
+    ? "Sensor snapshot available"
+    : (variant === "context" && CONTEXT_TITLES[status]) || TITLES[status];
   const description = usableButDetached
     ? "Toggle “Attach sensor snapshot” to include it in this log."
-    : DESCRIPTIONS[status];
+    : (variant === "context" && CONTEXT_DESCRIPTIONS[status]) || DESCRIPTIONS[status];
   const action: QuickLogSnapshotStripAction = usableButDetached
     ? { kind: "none" }
     : actionFor(status);

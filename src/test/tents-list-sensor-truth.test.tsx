@@ -296,6 +296,47 @@ describe("Tents list sensor truth — intake quality flags are authoritative", (
     expect(metric(v, "temp").statusLabel).toBe("Stale");
   });
 
+  it("quality:'degraded' on a fresh live row is never healthy and never plain-ok", () => {
+    const rows = [
+      row({
+        ts: FRESH_TS,
+        metric: "temperature_c",
+        value: 21.78,
+        source: "live",
+        quality: "degraded",
+      }),
+      row({ ts: FRESH_TS, metric: "humidity_pct", value: 56, source: "live" }),
+    ];
+    const v = buildTentSnapshotView(rows, "veg", NOW);
+    const temp = metric(v, "temp");
+    expect(temp.status).toBe("degraded");
+    expect(temp.statusLabel).toBe("Degraded");
+    expect(temp.chipStatus).not.toBe("ok");
+    // Provenance is a separate axis: source stays truthful, but the
+    // flagged metric itself never presents as healthy.
+    const rh = metric(v, "rh");
+    expect(rh.status).toBe("ok");
+  });
+
+  it("chip color is capped by status — flagged metrics never render a green chip", () => {
+    // Plausible in-target values that would classify "ok" against stage
+    // targets, but explicitly flagged by intake.
+    const invalidView = buildTentSnapshotView(
+      [
+        row({ ts: FRESH_TS, metric: "temperature_c", value: 21.78, quality: "invalid" }),
+        row({ ts: FRESH_TS, metric: "humidity_pct", value: 56 }),
+      ],
+      "veg",
+      NOW,
+    );
+    expect(metric(invalidView, "temp").chipStatus).toBe("bad");
+
+    const staleView = buildTentSnapshotView(WALKTHROUGH_ROWS, "veg", NOW);
+    for (const m of staleView.metrics) {
+      if (m.status === "stale") expect(m.chipStatus).not.toBe("ok");
+    }
+  });
+
   it("an 'ok' quality flag grants nothing extra", () => {
     const rows = [
       row({ ts: FRESH_TS, metric: "temperature_c", value: 21.78, quality: "ok" }),

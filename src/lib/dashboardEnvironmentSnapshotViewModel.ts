@@ -28,7 +28,7 @@ import { tempFFromC } from "@/lib/temperatureUnits";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import type { SensorReadingSource } from "@/mock";
 
-export type MetricStatus = "ok" | "stale" | "invalid" | "unknown";
+export type MetricStatus = "ok" | "stale" | "invalid" | "degraded" | "unknown";
 
 export interface MetricView {
   key: "temp" | "rh" | "vpd";
@@ -36,9 +36,14 @@ export interface MetricView {
   /** Display value without unit; "—" when unknown. */
   display: string;
   unit: string;
+  /**
+   * Chip color, capped by metric status: an invalid metric renders "bad"
+   * and a stale/degraded metric never renders the healthy "ok" green,
+   * so a flagged value cannot look healthy beside its status label.
+   */
   chipStatus: "ok" | "warn" | "bad";
   status: MetricStatus;
-  /** "Stale" | "Invalid" | "Unknown" or null when ok. */
+  /** "Stale" | "Invalid" | "Degraded" | "Unknown" or null when ok. */
   statusLabel: string | null;
 }
 
@@ -68,14 +73,16 @@ export interface BuildTentSnapshotInput extends SensorReadingLike {
 }
 
 /**
- * Explicit per-row downgrade flag: intake `quality` wins, then a canonical
+ * Explicit per-row downgrade flag: intake `quality` wins ("ok" | "degraded"
+ * | "stale" | "invalid" is the persisted vocabulary), then a canonical
  * "invalid"/"stale" source value. Returns null when the row carries no
  * explicit flag. Only ever downgrades — an "ok"/unknown flag grants nothing.
  */
-function explicitRowFlag(r: BuildTentSnapshotInput): "invalid" | "stale" | null {
+function explicitRowFlag(r: BuildTentSnapshotInput): "invalid" | "stale" | "degraded" | null {
   const q = (r.quality ?? "").toString().toLowerCase().trim();
   if (q === "invalid") return "invalid";
   if (q === "stale") return "stale";
+  if (q === "degraded") return "degraded";
   const s = (r.source ?? "").toString().toLowerCase().trim();
   if (s === "invalid") return "invalid";
   if (s === "stale") return "stale";
@@ -258,13 +265,24 @@ export function buildTentSnapshotView(
     } else if (stale || rowFlag === "stale") {
       status = "stale";
       statusLabel = "Stale";
+    } else if (rowFlag === "degraded") {
+      status = "degraded";
+      statusLabel = "Degraded";
     }
+    // Cap the chip color by status so a flagged metric can never render
+    // as a healthy green chip beside an Invalid/Stale/Degraded label.
+    const cappedChipStatus: "ok" | "warn" | "bad" =
+      status === "invalid"
+        ? "bad"
+        : (status === "stale" || status === "degraded") && chipStatus === "ok"
+          ? "warn"
+          : chipStatus;
     return {
       key,
       label,
       display: formatNumber(value, digits),
       unit,
-      chipStatus,
+      chipStatus: cappedChipStatus,
       status,
       statusLabel,
     };

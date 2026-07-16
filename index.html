@@ -49,13 +49,26 @@
          build-time prerender pass (deferred) will bake per-route canonicals
          into static HTML for non-JS consumers. -->
 
-    <!-- Fonts -->
+    <!-- Fonts.
+         The Google Fonts stylesheet is loaded non-blocking so above-the-fold
+         text can paint with system fallbacks (font-display: swap on every
+         face) while the web font arrives. This unblocks LCP on the /welcome
+         hero paragraph flagged by the Lighthouse audit. The <noscript>
+         fallback keeps the stylesheet reachable for non-JS crawlers. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
-      rel="stylesheet"
+      onload="this.rel='stylesheet'"
     />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
 
     <!-- Open Graph -->
 

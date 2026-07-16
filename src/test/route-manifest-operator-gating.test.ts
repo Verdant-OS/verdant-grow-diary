@@ -57,12 +57,15 @@ const OPERATOR_PROTECTED_PATHS = new Set(
 );
 
 /**
- * Documented exceptions — internal-access routes that are intentionally
- * mounted outside the operator-role gate because they are read-only,
- * fixture-only presenters with NO Supabase / AI / auth / write surface.
- * These are linkable only by direct URL.
+ * Fixture-only demo presenters that are intentionally mounted outside the
+ * operator-role gate (and outside AppShell) because they are read-only with
+ * NO Supabase / AI / auth / write surface. These are linkable only by direct
+ * URL. Route Metadata Truth v1: the manifest now labels them `public` so the
+ * metadata matches their actual (publicly reachable) routing behavior —
+ * matching how the other fixture-only demos (/pheno-comparison,
+ * /pheno-expression-showcase) are declared.
  */
-const PUBLIC_FIXTURE_ONLY_INTERNAL_EXCEPTIONS = new Set<string>([
+const PUBLIC_FIXTURE_ONLY_DEMO_ROUTES = new Set<string>([
   "/internal/demo-proof-walkthrough",
   "/internal/contextual-pheno-comparison-demo",
 ]);
@@ -87,15 +90,14 @@ const PUBLIC_FIXTURE_ONLY_INTERNAL_EXCEPTIONS = new Set<string>([
 const DEFERRED_OPERATOR_PARITY = new Set<string>([]);
 
 describe("Route Guard Parity v1 — operator/internal manifest entries are role-gated", () => {
-  const gated = APP_ROUTES.filter(
-    (r) => r.access === "operator" || r.access === "internal",
-  );
+  const gated = APP_ROUTES.filter((r) => r.access === "operator" || r.access === "internal");
 
   for (const r of gated) {
-    if (PUBLIC_FIXTURE_ONLY_INTERNAL_EXCEPTIONS.has(r.path)) {
-      it(`${r.path} is a documented public fixture-only exception`, () => {
-        expect(r.access).toBe("internal");
-        expect(OPERATOR_PROTECTED_PATHS.has(r.path)).toBe(false);
+    if (PUBLIC_FIXTURE_ONLY_DEMO_ROUTES.has(r.path)) {
+      it(`${r.path} must not be labeled operator/internal — it is a public fixture-only demo`, () => {
+        // Route Metadata Truth v1: these routes are declared `public`.
+        // Reaching this branch means the manifest drifted back.
+        expect(r.access).toBe("public");
       });
     } else if (DEFERRED_OPERATOR_PARITY.has(r.path)) {
       it(`${r.path} is a documented deferred-parity entry (follow-up slice)`, () => {
@@ -108,13 +110,12 @@ describe("Route Guard Parity v1 — operator/internal manifest entries are role-
     }
   }
 
-  it("documented fixture exceptions do not import Supabase client", () => {
+  it("documented fixture-only demo routes do not import Supabase client", () => {
     const pages: Record<string, string> = {
       "/internal/demo-proof-walkthrough": "../pages/DemoProofWalkthrough.tsx",
-      "/internal/contextual-pheno-comparison-demo":
-        "../pages/ContextualPhenoComparisonDemo.tsx",
+      "/internal/contextual-pheno-comparison-demo": "../pages/ContextualPhenoComparisonDemo.tsx",
     };
-    for (const p of PUBLIC_FIXTURE_ONLY_INTERNAL_EXCEPTIONS) {
+    for (const p of PUBLIC_FIXTURE_ONLY_DEMO_ROUTES) {
       const file = pages[p];
       expect(file, `missing fixture-only page mapping for ${p}`).toBeTruthy();
       const src = fs.readFileSync(path.resolve(__dirname, file), "utf8");
@@ -122,6 +123,23 @@ describe("Route Guard Parity v1 — operator/internal manifest entries are role-
       expect(src).not.toMatch(/supabase\./);
     }
   });
+});
+
+describe("Route Metadata Truth v1 — fixture-only demo routes are labeled public", () => {
+  for (const p of PUBLIC_FIXTURE_ONLY_DEMO_ROUTES) {
+    const entry = APP_ROUTES.find((r) => r.path === p);
+
+    it(`${p} is present in the manifest and labeled public (matches its actual routing)`, () => {
+      expect(entry).toBeDefined();
+      expect(entry?.access).toBe("public");
+      // The description must keep declaring the fixture-only contract.
+      expect(entry?.description).toMatch(/fixture/i);
+    });
+
+    it(`${p} stays outside the operator-role gate (mounted as a public presenter)`, () => {
+      expect(OPERATOR_PROTECTED_PATHS.has(p)).toBe(false);
+    });
+  }
 });
 
 describe("Route Guard Parity v1 — required operator-gated routes", () => {

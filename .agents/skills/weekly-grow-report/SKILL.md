@@ -24,38 +24,203 @@ Scope defaults to the grower's **active grow** (single tent for Free tier; growe
   `Intl.DateTimeFormat().resolvedOptions().timeZone`, validate it, and pass it
   explicitly into pure window rules. Verdant does not currently persist a
   grower timezone. Never infer one from sensor timestamps, tent light-schedule
-  text, locale, or IP address.
+  text, locale, or IP address. The **report time preferences** slice below adds
+  an explicit, grower-set, device-local override; absent a valid saved
+  preference, the validated browser zone remains the only source.
 - Model both report windows as half-open instants: `[start, nextDayStart)`.
   Derive those instants from local calendar dates in the explicit timezone so
   daylight-saving transitions may produce 167- or 169-hour weeks without
   dropping or duplicating a local day.
+- Canonically, a window's upper bound is `min(boundaryInstant(D + 1), now)`:
+  for any fully closed end date the two are identical, and when the end date
+  is the still-open current report day the window is **explicitly partial**
+  (see report time preferences). This truncation is part of the one window
+  model — not an exception to it — so no implementation may ever include
+  future time. "7 local calendar days" describes the selected calendar span;
+  a partial final day never extends it.
 - Print the local date range, timezone name, and resolved UTC instants at the
   top of the report so the grower can verify the boundary.
+
+### Report time preferences (grower-facing setting — authorized slice)
+
+Two explicit preferences let the 7-day window align with the grower's actual
+day changes instead of the device's defaults. Both are selection inputs, never
+inference.
+
+- **Report timezone.** An explicit IANA zone picker (searchable select,
+  default "Use this browser's timezone"). Validate the zone with
+  `Intl.DateTimeFormat` at save time AND again at load time; an invalid or
+  unparseable stored zone is ignored with an honest inline notice ("Saved
+  timezone is no longer valid — using this browser's timezone") — never a
+  silent fallback and never a blocked report when the browser zone is valid.
+  The never-infer rule stands: no zone from sensor timestamps, light-schedule
+  text, locale, or IP.
+- **Effective report timezone.** One resolved zone — the validated saved
+  preference when present, else the validated browser zone — governs every
+  selection surface: date-picker defaults and bounds, the companion window
+  display, URL end-date resolution, day grouping, both comparison windows,
+  and the report key. No control may consult the raw browser zone directly
+  once a valid preference exists.
+- **Current report day.** With a non-midnight boundary, "today" is ambiguous:
+  before the boundary hour, the report day whose window contains now is
+  still the previous calendar date. Every "today" in selection rules — the
+  date-picker default and max bound, and relative preset rules like "ends
+  today" — resolves to the **current report day** (the local calendar date
+  whose boundary window contains now), never the raw calendar date, so a
+  selected window can never include report-day time that has not yet begun.
+- **Partial current windows, explicit and honest.** The current report day is
+  selectable, but its report-day window has not closed — so selecting it
+  yields an **explicitly partial window** whose upper bound is now, never a
+  boundary instant in the future. The header and companion display label the
+  final day "partial — through <local time>"; coverage and missing-data math
+  treat un-elapsed time as outside the window, never as missing data; and
+  week-over-week comparisons become **elapsed-matched**: the prior window
+  truncates to the same elapsed span (its start plus exactly the duration
+  the current window has covered), labeled "elapsed-matched — comparing the
+  first <span> of each week", so partial-week totals and excursion hours are
+  never compared against a full prior week as equals. Coverage floors still
+  apply within the matched span. Fully closed end dates resolve exactly as
+  before.
+- **Report day boundary.** The local hour at which a report "day" begins
+  (whole hours only, default `00:00`; e.g. `06:00` for a lights-on day).
+  Window instants become `[boundaryInstant(D), boundaryInstant(D + 1))`,
+  where `boundaryInstant(D)` is the instant at which local wall-clock time
+  reads the boundary hour on calendar date `D` in the effective zone — never
+  midnight-plus-elapsed-hours arithmetic, which lands on the wrong wall time
+  across a DST transition. If the boundary wall time does not exist on a
+  date (spring-forward gap), use the first instant after the gap; if it
+  occurs twice (fall-back overlap), use the earlier instant. Windows stay
+  half-open, and DST weeks may still be 167 or 169 hours. A record belongs
+  to the local calendar date whose boundary instant opened its window.
+- **One boundary everywhere.** Window derivation, equal-time-bucket math,
+  narrative day grouping, weekday alignment, and BOTH week-over-week windows
+  use the same zone + boundary in the same report. Mixed-boundary comparisons
+  are forbidden.
+- **Header transparency.** The header prints the zone, the boundary ("Days run
+  06:00 → 06:00 local"), and the resolved UTC instants so the grower can
+  verify exactly where their week starts.
+- **Selection, not history.** Zone and boundary are part of the report key;
+  changing a preference is a new selection, never a silent rewrite of a
+  previously generated report.
+- **Persistence (v1): device-local, per grower.** Stored in `localStorage`
+  under a versioned key **scoped to the signed-in user's ID** — on a shared
+  browser, another account's stored preferences are never read, rendered, or
+  applied. Stored values are validated on load exactly like fresh input;
+  unknown fields are discarded; the UI labels them "Saved on this device".
+  No emails, notes, tokens, raw payloads, or another grower's identifiers are
+  ever written to storage. An account-level (synced) preference is a separate
+  schema slice that requires its own explicit authorization and migration —
+  do not add tables for this slice.
+- **Read-only + accessible.** Changing preferences only re-resolves windows
+  and re-reads data; visible labels, keyboard operability, and an
+  `aria-live="polite"` announcement of the newly resolved window are required.
 
 ### Date-range selector (grower-facing control)
 
 A single control at the top of the report lets the grower generate a report for **the 7-day window ending on any chosen day**. Purpose: let the grower re-run the report against past weeks or a non-Sunday cadence without needing custom filters.
 
 - **Control shape:** a single "Report end date" date picker (shadcn `Calendar` inside a `Popover` — see the shadcn-datepicker pattern, including `pointer-events-auto` on the calendar wrapper). Report window is always **7 local calendar days**, ending on the selected local date and starting 6 calendar dates before it.
-- **Default:** today in the validated browser timezone. If a valid IANA zone is unavailable, block all report generation with an honest "Timezone needed" state; neither window nor its future/floor bounds are safe to resolve. Do not silently fall back to the server timezone.
-- **Companion display (read-only):** next to the picker, render the resolved window as `<startDate> → <endDate>` in the grower's local timezone so they can verify before generating. Also render the prior-week comparison window (`<priorStart> → <priorEnd>`) so the week-over-week math is transparent.
+- **Default:** the current report day in the **effective report timezone** — the validated report time preference when one is saved, else the validated browser zone (see report time preferences for both terms). If no valid IANA zone is available from either source, block all report generation with an honest "Timezone needed" state; neither window nor its future/floor bounds are safe to resolve. Do not silently fall back to the server timezone.
+- **Companion display (read-only):** next to the picker, render the resolved window as `<startDate> → <endDate>` in the effective report timezone so the grower can verify before generating. Also render the prior-week comparison window (`<priorStart> → <priorEnd>`) so the week-over-week math is transparent.
 - **Bounds:**
-  - Max selectable end date = **today** in the grower's local timezone. Future dates are disabled — never generate a report for a window that includes the future.
+  - Max selectable end date = the **current report day** in the effective report timezone, which resolves as an explicitly partial window truncated at now (see report time preferences). Future dates — and, with a non-midnight boundary, the calendar date whose report-day window has not yet begun — are disabled. Never generate a report for a window that includes time later than now.
   - Min selectable end date = the earliest activity returned by the audited,
     RLS-scoped source adapters (or a hard floor of 2 years back, whichever is
     later). Do not claim this bound until every enabled source adapter
     participates; otherwise use the 2-year floor and label it as a search
     limit, not "No grow data."
   - If the selected window contains zero source events (no diary entries, no sensor readings, no alerts), render the report with honest empty states in each section — never fabricate a baseline and never silently shift the window.
-- **Comparison window follows automatically.** Selecting an end date of `D` sets this-week local dates to `D−6 ... D` and prior-week local dates to `D−13 ... D−7`. Resolve each as its own half-open instant window in the same timezone.
-- **URL + deterministic selection.** Encode only the validated end-date value
-  as `?end=YYYY-MM-DD` on the private report route. The browser timezone is
-  displayed and is part of the report key; the URL alone is not evidence that
-  a different device used the same timezone. Do not put emails, notes, sensor
-  payloads, service tokens, or unvalidated query values in the URL.
+- **Comparison window follows automatically.** Selecting an end date of `D` sets this-week local dates to `D−6 ... D` and prior-week local dates to `D−13 ... D−7`. Resolve each as its own half-open instant window in the same timezone. When the current window is partial (ends on the current report day), the prior window truncates to the same elapsed span — the elapsed-matched comparison defined in report time preferences — never a full prior week against a partial current one.
+- **URL + deterministic selection.** Encode exactly the validated end-date
+  value as `?end=YYYY-MM-DD` plus, when a single plant is selected, the
+  validated plant scope as `?plant=<opaque owned id>` (see the plant scope
+  selector) on the private report route — nothing else, so a reloaded or
+  preset-applied URL can never silently drop the plant scope back to All
+  plants. The effective report
+  timezone is displayed and is part of the report key; the URL alone is not
+  evidence that a different device resolved the same timezone. Do not put
+  emails, notes, sensor payloads, service tokens, or unvalidated query values
+  in the URL.
 - **Accessibility.** The picker is keyboard-navigable, has a visible label ("Report end date"), announces the resolved window to screen readers via `aria-live="polite"` when the date changes, and the calendar hit targets meet the existing a11y CI bar.
 - **Read-only.** Changing the date only re-reads existing data; it never writes, never triggers an AI call, never inserts Action Queue items, and never sends device commands.
-- **No preset shortcuts that imply value judgment.** A small neutral set of shortcuts is allowed — "Today", "Yesterday", "Last Sunday" — rendered as plain buttons in muted tokens. No "best week", "worst week", or streak framing.
+- **No preset shortcuts that imply value judgment.** A small neutral set of shortcuts is allowed — "Today", "Yesterday", "Last Sunday" — rendered as plain buttons in muted tokens. No "best week", "worst week", or streak framing. Grower-defined saved presets (below) are additionally allowed; the system itself never generates a judgment-framed preset.
+
+### Plant scope selector (grower-facing control — authorized slice)
+
+A scope control next to the date picker: **All plants** (default, current
+behavior) or **one owned plant** in the selected grow/tent. Purpose: generate
+the same 7-day report for a single plant without changing any other rule.
+
+- **Control shape:** a labeled select ("Report scope") listing "All plants"
+  plus the grower's owned plants in the current grow/tent scope, by plant
+  name. Ownership is enforced by RLS-scoped reads; the control never lists or
+  accepts another grower's plant.
+- **What filters, honestly.** Plant-scoped sources (waterings, feedings,
+  observations, photos, training, AI Doctor sessions, and alerts/Action Queue
+  rows that carry a real plant back-pointer) filter to the selected plant on
+  BOTH comparison windows. Records without a plant assignment are **excluded
+  from the single-plant view and surfaced in "Missing this week"** ("N
+  waterings had no plant assignment and are not shown in this plant view") —
+  never silently attributed to the plant and never silently dropped.
+- **Environment stays tent-level.** Sensor readings belong to the tent, not
+  the plant. In single-plant scope, environment/VPD sections render with an
+  explicit label ("Tent environment — readings are tent-level, not
+  plant-specific"); they are never re-labeled as plant data.
+- **Report key + URL.** The plant scope is part of the report key. Encode it
+  only as the existing opaque owned plant ID on the private report route
+  (`?plant=<id>`), validated against RLS-scoped ownership before use, subject
+  to all existing URL rules (never in analytics, logs, copy, or share URLs).
+- **Scope coherence.** Ownership alone is not enough: a plant is accepted
+  only when it belongs to the currently selected grow/tent scope. An owned
+  plant from a different tent or grow (hand-edited URL, stale preset) is
+  rejected with an honest notice — never silently accepted, never silently
+  swapped for another plant, and never mixed with tent-level environment
+  from a scope it does not belong to.
+- **Empty plant windows are honest.** A plant with zero scoped events renders
+  the standard empty states; the report never borrows tent-level events to
+  fill a plant view.
+- **Deterministic + read-only + accessible** per the shared control rules
+  (visible label, keyboard operable, `aria-live` window/scope announcement).
+
+### Saved report presets (grower-facing control — authorized slice)
+
+Named, grower-created presets capture a report selection so common windows
+regenerate in one click without reselecting settings.
+
+- **What a preset stores — selection inputs only:** a grower-chosen name; an
+  end-date rule (**relative** — "ends today", "ends last <weekday>" — or a
+  **fixed** past date); the plant scope (all plants or one opaque owned plant
+  ID); a created-at timestamp (selection metadata used only for the
+  deterministic ordering below); nothing else. The report timezone and day boundary are **referenced
+  from the current report time preferences at apply time, never frozen into
+  the preset**, so a grower who changes zones keeps consistent semantics.
+  Never store emails, notes, sensor payloads, tokens, raw records, or another
+  grower's identifiers.
+- **Applying a preset** resolves the rule against the current report day in
+  the validated zone + boundary, shows the resolved window in the companion
+  display, and regenerates the report — a read-only selection change, exactly
+  as if the grower had set each control by hand. Bounds still apply: a resolved window
+  may not include the future, and a fixed-date preset older than the search
+  floor renders the floor-limit label, never fabricated data.
+- **Validation on load.** Presets persist device-locally (`localStorage`,
+  versioned key **scoped to the signed-in user's ID**, "Saved on this
+  device" label); on a shared browser, another account's presets are never
+  listed, rendered, or applied. Every stored preset is
+  re-validated on load like fresh input — unknown fields discarded, invalid
+  dates/rules/plant references mark the preset "needs review" with an honest
+  notice instead of applying partially. A plant reference that no longer
+  resolves to an owned plant in the currently selected grow/tent scope
+  renders the preset invalid; it never falls back to another plant.
+- **Neutral naming, grower's words.** The grower's own preset names render
+  verbatim in the picker but never appear in URLs, analytics, or logs. The
+  system never creates presets itself and never adds judgment framing
+  ("best week") to any preset UI.
+- **Cap and order.** At most 20 presets; deterministic ordering
+  (alphabetical by name, then created-at). Creating, renaming, and deleting
+  presets are device-local storage operations only — never a database write,
+  never an AI call, never an Action Queue insert.
+- **Account-level (synced) presets are a separate schema slice** requiring
+  explicit authorization and migration; do not add tables for this slice.
 
 ## Current implementation truth and source adapters
 
@@ -105,7 +270,10 @@ Sections in exactly this order:
 ### 1. Header
 
 - Grow name, tent name, plant count, stage/age (weeks in veg/flower).
-- Window start → end, validated IANA timezone, and resolved UTC instants.
+- Report scope: "All plants" or the selected plant's name.
+- Window start → end, validated IANA timezone, the report day boundary
+  ("Days run 06:00 → 06:00 local" when non-midnight), and resolved UTC
+  instants.
 - Generated-at timestamp.
 
 ### 2. At-a-glance stats
@@ -292,16 +460,20 @@ Cap at **5 items**, ordered by risk then evidence strength. Never a device comma
 ### 9. Footer
 
 - "This report reflects logged data only. Verdant did not act on your behalf."
-- **Report key:** stable hash of rules version + owned grow/tent scope + selected
-  end date + validated timezone. It identifies the requested selection, not an
-  immutable snapshot.
+- **Report key:** stable hash of rules version + owned grow/tent scope +
+  plant scope + selected end date + validated timezone + report day boundary.
+  It identifies the requested selection, not an immutable snapshot.
 - **Content version ID:** hash of the report key plus a canonical serialization
   of every sorted normalized, output-affecting contribution field and exclusion
   decision. References and timestamps alone are insufficient because mutable
   diary content may change without an `updated_at` field. Exclude raw payloads
   and unused private fields from the digest, but include every normalized value
   that can change a rendered number, label, note excerpt, source classification,
-  or omission. A late entry or corrected content changes this ID. Never claim
+  or omission — including the resolved window instants, so a partial
+  current-day report's as-of upper bound is part of its identity and two
+  partial reports generated at different times never share a content version
+  ID even when no new rows arrived (their coverage and missing-data math can
+  differ). A late entry or corrected content changes this ID. Never claim
   two reports with the same selection key have identical content when the
   underlying data changed.
 - Neither identifier exposes its raw hash inputs in rendered copy, URLs, or
@@ -312,7 +484,61 @@ Cap at **5 items**, ordered by risk then evidence strength. Never a device comma
 - Rendered as a single-column dashboard, print-optimized (A4/Letter safe, page-break hints between sections).
 - Colors from existing semantic HSL tokens in `index.css` — no hardcoded hex.
 - Charts rendered inline (SVG preferred) so print + PDF export work without JS.
-- A "Print" affordance uses `window.print()`; a "Save as PDF" hint tells the grower to use the browser's Save-as-PDF from the print dialog. No custom PDF pipeline added in this skill.
+- A "Print" affordance uses `window.print()`. The dedicated one-click PDF
+  export below is an authorized slice; no server-side PDF service is ever
+  added.
+
+### One-click PDF export (authorized slice)
+
+A single "Export PDF" button on the report produces a PDF of the generated
+report. It is a projection of the same data — never a second computation.
+
+- **Same source of truth.** The PDF renders from the exact same normalized
+  rules output, contribution ledger, and deterministic inline SVG charts as
+  the on-screen report — identical numbers, ordering, rounding, exclusions,
+  and honest empty states. It never recomputes with different rules and never
+  includes sections the grower cannot see on screen.
+- **Client-side only.** Export happens entirely in the grower's browser. No
+  server round-trip, no external rendering service, no upload of report
+  content, no analytics events carrying report content. The private report
+  never leaves the device unless the grower shares the file themselves.
+- **Implementation ladder.** First preference: the print pipeline — the
+  button drives `window.print()` against the print stylesheet (page-break
+  hints, A4/Letter-safe, `@page` title) with zero new dependencies. That
+  path opens the system print dialog, so it is one confirm away from a PDF,
+  not a one-click download — the affordance must say so honestly (e.g.
+  "Save as PDF…" with the ellipsis convention), never promising a download
+  the pipeline cannot deliver. A true one-click download requires the
+  library path: a bundled client-side PDF library, authorized only with
+  vector embedding of the same SVG charts (no canvas rasterization of any
+  chart that carries contribution drill-down), deterministic export (below),
+  and an explicit dependency review.
+- **Deterministic export — scoped to what the app controls.** On the print
+  path, the app guarantees deterministic print markup: the same generated
+  report renders identical DOM/print output every time, while the browser's
+  PDF writer and its file metadata are outside app control and carry no
+  byte-identity claim. On the library path, exporting the same generated
+  report twice yields byte-identical files: no random object IDs, no new
+  wall-clock reads during export. On both paths the report's own
+  generated-at renders as report content — regenerating the report is what
+  changes it, never re-exporting it. The content version ID identifies the
+  data content; the export inherits it and adds nothing of its own.
+- **Drill-down references in print form.** Per the print rules, contribution
+  drill-downs render as short human-readable contribution references and
+  counts — never raw URLs, internal IDs, or interactive-only affordances that
+  a PDF cannot honor. The footer's report key and content version ID render
+  in the PDF exactly as on screen.
+- **Honest filename.** Deterministic, content-safe, and
+  selection-distinguishing: grow name slug + plant name slug when a single
+  plant is selected (omitted for All plants) + window local dates + the
+  boundary hour when non-midnight + a partial marker for partial windows
+  (e.g. `verdant-weekly-blue-dream-plant-505-2026-07-10-to-2026-07-16-day06.pdf`),
+  so different selections of the same grow and dates can never overwrite
+  each other in a downloads folder. Slugs come from the grower's own
+  names, sanitized; never hashes, opaque IDs, emails, or grower notes in
+  the filename.
+- **Read-only.** Export never writes, never invokes AI, never touches the
+  Action Queue, never sends device commands.
 
 ## Hard rules
 
@@ -349,9 +575,28 @@ Keep this report scalable by landing narrow slices in this order:
 5. Print stylesheet and accessibility proof.
 6. Optional exact timeline-filter navigation only after its own route-parser
    slice is implemented and tested. Do not block the core report on it.
+7. **Report time preferences** — extend `weeklyReportWindowRules.ts` with the
+   day-boundary offset (test boundary + DST interactions, midnight vs
+   non-midnight parity, record-to-day assignment at the boundary instant),
+   then the device-local preference store with load-time validation, then the
+   settings UI. Land window math before UI.
+8. **Plant scope** — extend the source adapters with plant filtering + the
+   unassigned-records omission ledger, extend the report key, then the
+   selector UI. Test: unassigned exclusion surfaces in Missing this week,
+   both comparison windows share the filter, foreign plant IDs rejected.
+9. **Saved presets** — pure preset rules first (serialize/validate/resolve
+   relative rules against zone + boundary), then the device-local store,
+   then the picker UI. Test: corrupted/unknown-field storage, stale plant
+   references, future-date resolution clamping, cap + deterministic order.
+10. **One-click PDF export** — print-pipeline button + print stylesheet
+    proof first; a client-side PDF library only if fidelity demands it,
+    under the export slice's determinism and vector rules.
 
 Do not add schema, a new report route, entitlement gates, scheduled delivery,
-or a PDF service unless the task explicitly authorizes that slice. Run focused
+or a PDF service unless the task explicitly authorizes that slice. The report
+time preferences, plant scope, saved presets, and one-click PDF export slices
+above are explicitly authorized in their device-local, client-side forms;
+their account-synced or server-side variants remain unauthorized. Run focused
 tests, type-check, lint, format, and relevant browser coverage before calling a
 slice complete.
 

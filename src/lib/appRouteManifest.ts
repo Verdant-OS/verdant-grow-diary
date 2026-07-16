@@ -105,6 +105,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/checkout/cancel", access: "public", description: "Checkout cancellation return." },
   { path: "/checkout/success", access: "public", description: "Checkout success return." },
   { path: "/creator-beta", access: "public", description: "Creator beta landing page." },
+  { path: "/cultivars", access: "public", description: "Public cultivar guides index." },
+  {
+    path: "/cultivars/:slug",
+    access: "public",
+    description: "Public per-cultivar guide page (evergreen best-practice content).",
+  },
   {
     path: "/customer/:shareId",
     access: "public",
@@ -180,13 +186,15 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   {
     path: "/internal/contextual-pheno-comparison-demo",
-    access: "internal",
-    description: "Internal read-only Contextual Pheno Comparison v0.1 demo (fixture data only).",
+    access: "public",
+    description:
+      "Read-only Contextual Pheno Comparison v0.1 demo (fixture data only; mounted outside AppShell, unlinked / hidden by URL — no private data).",
   },
   {
     path: "/internal/demo-proof-walkthrough",
-    access: "internal",
-    description: "Read-only operator walkthrough of the V0 One-Tent Loop proof path.",
+    access: "public",
+    description:
+      "Read-only walkthrough of the V0 One-Tent Loop proof path (fixture-only presenter; mounted outside AppShell, unlinked / hidden by URL — no private data).",
   },
   {
     path: "/internal/one-tent-loop-proof",
@@ -347,6 +355,8 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Authenticated agent integrations settings.",
   },
   { path: "/signup", access: "redirect", description: "→ /auth" },
+  { path: "/strains", access: "redirect", description: "→ /cultivars" },
+  { path: "/strains/:slug", access: "redirect", description: "→ /cultivars/:slug" },
   { path: "/tasks", access: "auth" },
   { path: "/tents", access: "auth" },
   { path: "/tents/:id", access: "auth" },

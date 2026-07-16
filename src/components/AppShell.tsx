@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import LegalFooterLinks from "@/components/LegalFooterLinks";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { buildSignedOutRedirect } from "@/lib/authRedirectRules";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
@@ -15,17 +16,27 @@ import GlobalFastAddButton from "./GlobalFastAddButton";
 import AuthStatusIndicator from "./AuthStatusIndicator";
 import SignOutConfirmDialog from "./SignOutConfirmDialog";
 import VerificationPendingBanner from "./VerificationPendingBanner";
+import { SubscriptionPastDueBanner } from "./SubscriptionPastDueBanner";
 import GlobalSearchDialog from "./GlobalSearchDialog";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
 
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   // Protected-route boundary: re-validate session against the auth server.
   // Keep both session checks on the same signed-out destination. Sending the
   // server revalidation to /auth while the shell sent cached-session misses to
   // /welcome created a race at the public root and bypassed the landing page.
-  useRequireAuth("/welcome");
+  // The destination stays /welcome; buildSignedOutRedirect only appends a
+  // manifest-validated redirectTo so a signed-out deep link (e.g. a /plants
+  // bookmark) can be restored after sign-in instead of silently dropped.
+  const signedOutRedirect = buildSignedOutRedirect(
+    location.pathname,
+    location.search,
+    location.hash,
+  );
+  useRequireAuth(signedOutRedirect);
   // Real persisted alerts (open only). RLS-scoped to the signed-in user.
   // Replaces the prior mock badge to remove the demo-vs-live mismatch.
   // Gated on a resolved session: an unauthenticated load (about to redirect
@@ -63,8 +74,8 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // updated while AppShell is rendering (React update-during-render error,
   // asserted clean by the never-healthy E2E console check).
   useEffect(() => {
-    if (!loading && !user) nav("/welcome", { replace: true });
-  }, [loading, user, nav]);
+    if (!loading && !user) nav(signedOutRedirect, { replace: true });
+  }, [loading, user, nav, signedOutRedirect]);
 
   if (loading)
     return (
@@ -141,6 +152,8 @@ export default function AppShell({ children }: { children?: ReactNode }) {
               </div>
             </div>
           </header>
+
+          <SubscriptionPastDueBanner />
 
           <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">
             {isEmailVerificationPending(user) ? (

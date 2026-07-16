@@ -95,7 +95,11 @@ describe("Landing page renders the polished positioning", () => {
   });
 
   it("wires the primary CTA to /auth and the secondary CTA to the loop anchor", () => {
-    expect(LANDING).toMatch(/to="\/auth"/);
+    // Sign-in CTAs use the computed signInPath: plain "/auth" unless a
+    // manifest-validated deep-link redirectTo is being forwarded
+    // (see auth-deep-link-return-to.test.ts).
+    expect(LANDING).toMatch(/to=\{signInPath\}/);
+    expect(LANDING).toMatch(/const signInPath = returnTo \? [\s\S]{0,80}: "\/auth"/);
     expect(LANDING).toMatch(/href="#loop"/);
     // /demo is not primary-marketed here; App.tsx redirects it to /welcome.
     expect(LANDING).not.toMatch(/to="\/demo"/);

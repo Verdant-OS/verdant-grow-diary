@@ -26,6 +26,7 @@ import {
   resolvePaidAcquisitionSource,
 } from "@/lib/paidAcquisitionAttributionRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
+import { resolveKnownRouteReturnTo } from "@/lib/authRedirectRules";
 
 /**
  * Public landing page for https://verdantgrowdiary.com.
@@ -57,6 +58,14 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
     () => buildAttributedSignupPath({ source: acquisitionSource }),
     [acquisitionSource],
   );
+  // Deep-link return-to: AppShell bounces signed-out visits to
+  // /welcome?redirectTo=<intended path>. Forward it (manifest-validated,
+  // never a raw query value) to /auth so sign-in can restore the bookmark.
+  const returnTo = useMemo(
+    () => resolveKnownRouteReturnTo(searchParams.get("redirectTo")),
+    [searchParams],
+  );
+  const signInPath = returnTo ? `/auth?redirectTo=${encodeURIComponent(returnTo)}` : "/auth";
 
   usePageSeo({
     title: "Grow Diary & Grow Room Tracking App | Verdant Grow Diary",
@@ -111,7 +120,7 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
               </Button>
             </Link>
           ) : (
-            <Link to="/auth">
+            <Link to={signInPath} data-testid="landing-signin-cta-header">
               <Button variant="outline" size="sm">
                 Sign in
               </Button>
@@ -346,7 +355,7 @@ export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
               {VERDANT_HERO.pricingCtaLabel}
             </Button>
           </Link>
-          <Link to="/auth">
+          <Link to={signInPath} data-testid="landing-signin-cta-final">
             <Button size="lg" variant="outline">
               Sign in
             </Button>

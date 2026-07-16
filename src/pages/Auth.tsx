@@ -32,7 +32,7 @@ import {
   RESEND_VERIFICATION_GENERIC_SUCCESS,
   RESEND_VERIFICATION_GENERIC_FAILURE,
 } from "@/lib/authErrorRules";
-import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
+import { resolveKnownRouteReturnTo } from "@/lib/authRedirectRules";
 import {
   buildSignupEmailRedirectUrl,
   buildSignupUserMetadata,
@@ -56,6 +56,7 @@ import {
   getAuthTabTriggerClassName,
   type AuthMode,
 } from "@/lib/authModeTabRules";
+import { lovable } from "@/integrations/lovable/index";
 
 export default function Auth() {
   usePageSeo({
@@ -69,8 +70,9 @@ export default function Auth() {
   const nav = useNavigate();
   const [search] = useSearchParams();
   const explicitRedirect = useMemo(() => {
-    const raw = search.get("redirectTo");
-    return raw ? sanitizeAuthRedirect(raw) : null;
+    // Manifest-validated: only same-origin paths the app actually mounts are
+    // restored after sign-in (deep-link return-to; open-redirect safe).
+    return resolveKnownRouteReturnTo(search.get("redirectTo"));
   }, [search]);
   const redirectTo = explicitRedirect ?? "/";
   const signupSource = useMemo(() => resolveSignupAcquisitionSource(search), [search]);
@@ -100,6 +102,34 @@ export default function Auth() {
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+
+  async function signInWithGoogle() {
+    if (googleBusy) return;
+    setGoogleBusy(true);
+    setGoogleError(null);
+    try {
+      // redirect_uri MUST be a same-origin public URL, not a protected route.
+      // The intended post-auth destination lives in `redirectTo` (already
+      // manifest-validated) and is applied after Supabase reports a session.
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
+      if (result.error) {
+        setGoogleError("Google sign-in didn't complete. Please try again.");
+        return;
+      }
+      if (result.redirected) return; // browser redirects to Google
+      // Tokens returned and session set — route to intended destination.
+      nav(postSignInTarget(), { replace: true });
+    } catch {
+      setGoogleError("Google sign-in didn't complete. Please try again.");
+    } finally {
+      setGoogleBusy(false);
+    }
+  }
+
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotError, setForgotError] = useState<string | null>(null);
@@ -580,6 +610,32 @@ export default function Auth() {
                   ) : null}
                 </div>
               </form>
+              <div className="relative my-4" aria-hidden="true">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border/50" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-background px-2 text-[11px] uppercase tracking-widest text-muted-foreground">
+                    Or
+                  </span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={signInWithGoogle}
+                disabled={googleBusy}
+                aria-busy={googleBusy}
+                data-testid="auth-google-signin"
+                className="w-full"
+              >
+                {googleBusy ? "Opening Google…" : "Continue with Google"}
+              </Button>
+              {googleError ? (
+                <AuthInlineMessage role="alert" tone="error">
+                  {googleError}
+                </AuthInlineMessage>
+              ) : null}
             </TabsContent>
 
             <TabsContent value="signup">
@@ -712,6 +768,32 @@ export default function Auth() {
                       : "Create account"}
                 </Button>
               </form>
+              <div className="relative my-4" aria-hidden="true">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border/50" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-background px-2 text-[11px] uppercase tracking-widest text-muted-foreground">
+                    Or
+                  </span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={signInWithGoogle}
+                disabled={googleBusy}
+                aria-busy={googleBusy}
+                data-testid="auth-google-signup"
+                className="w-full"
+              >
+                {googleBusy ? "Opening Google…" : "Continue with Google"}
+              </Button>
+              {googleError ? (
+                <AuthInlineMessage role="alert" tone="error">
+                  {googleError}
+                </AuthInlineMessage>
+              ) : null}
             </TabsContent>
 
             <TabsContent value="forgot">

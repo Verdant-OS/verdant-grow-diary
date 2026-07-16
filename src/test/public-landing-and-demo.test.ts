@@ -60,7 +60,13 @@ describe("Landing has no demo CTAs", () => {
 
 describe("AppShell still protects real-data routes", () => {
   it("redirects unauthenticated users to /welcome", () => {
-    expect(SHELL).toMatch(/nav\("\/welcome"/);
+    // The shell navigates via buildSignedOutRedirect(...), which always
+    // resolves onto /welcome (optionally with a manifest-validated
+    // redirectTo for deep-link restore). See auth-deep-link-return-to.
+    expect(SHELL).toMatch(
+      /const signedOutRedirect = buildSignedOutRedirect\(\s*location\.pathname,\s*location\.search,\s*location\.hash,?\s*\)/,
+    );
+    expect(SHELL).toMatch(/nav\(signedOutRedirect/);
   });
   it("AppShell still reads useAuth (auth gate intact)", () => {
     expect(SHELL).toMatch(/useAuth\(\)/);

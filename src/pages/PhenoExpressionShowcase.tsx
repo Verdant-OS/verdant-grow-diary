@@ -78,7 +78,8 @@ export default function PhenoExpressionShowcase() {
         </ul>
       </fieldset>
 
-      <PhenoComparisonView inputs={selectedInputs} mode="demo" />
+      {/* headingLevel="h2": this page already renders its own H1 above. */}
+      <PhenoComparisonView inputs={selectedInputs} mode="demo" headingLevel="h2" />
     </div>
   );
 }

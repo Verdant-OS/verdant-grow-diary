@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,17 +27,17 @@ export default function BreedingProgramNew() {
     notes: "",
   });
 
-  const set = <K extends keyof typeof form>(k: K, v: string) =>
-    setForm((f) => ({ ...f, [k]: v }));
+  const set = <K extends keyof typeof form>(k: K, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   function applyDefaultCultivar(cv: DefaultCultivar) {
     setForm((f) => ({
       ...f,
       p1_maternal_label: cv.cultivarName,
       cross_pair_label: cv.lineage,
-      notes: f.notes && f.notes.trim().length > 0
-        ? `${f.notes}\n\n${formatCultivarNotes(cv)}`
-        : formatCultivarNotes(cv),
+      notes:
+        f.notes && f.notes.trim().length > 0
+          ? `${f.notes}\n\n${formatCultivarNotes(cv)}`
+          : formatCultivarNotes(cv),
     }));
     toast({ title: `Prefilled from ${cv.cultivarName}` });
   }
@@ -76,7 +76,10 @@ export default function BreedingProgramNew() {
     <div className="container mx-auto max-w-2xl px-4 py-6">
       <Card>
         <CardHeader>
-          <CardTitle>New breeding program</CardTitle>
+          {/* h1 (CardTitle renders an h3): this is the page's main title. */}
+          <h1 className="text-2xl font-semibold leading-none tracking-tight">
+            New breeding program
+          </h1>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
@@ -85,8 +88,8 @@ export default function BreedingProgramNew() {
                 Default cultivars
               </div>
               <p className="text-xs text-muted-foreground">
-                Prefills the maternal P1 label, lineage, and notes. You can edit every
-                field before saving.
+                Prefills the maternal P1 label, lineage, and notes. You can edit every field before
+                saving.
               </p>
               <div className="flex flex-wrap gap-2">
                 {DEFAULT_CULTIVARS.map((cv) => (
@@ -114,7 +117,6 @@ export default function BreedingProgramNew() {
                 required
               />
             </div>
-
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">

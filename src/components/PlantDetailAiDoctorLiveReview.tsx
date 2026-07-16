@@ -10,11 +10,8 @@
  *  - Failure / timeout / invalid / missing-config all render the same
  *    calm failure copy. Fail closed.
  */
-import { useMemo } from "react";
-import {
-  useTimelineMemory,
-  TIMELINE_MEMORY_DEFAULT_LIMIT,
-} from "@/hooks/useTimelineMemory";
+import { useEffect, useMemo } from "react";
+import { useTimelineMemory, TIMELINE_MEMORY_DEFAULT_LIMIT } from "@/hooks/useTimelineMemory";
 import {
   evaluateAiDoctorContextFromSources,
   type AiDoctorContextPlantSource,
@@ -24,26 +21,25 @@ import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
 
 import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
+import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import {
   classificationFromStatusResult,
   type Classification,
 } from "@/lib/sensorSnapshotStatusContract";
 
-export const AI_DOCTOR_LIVE_REVIEW_LOADING_COPY =
-  "Preparing cautious AI Doctor review…";
+export const AI_DOCTOR_LIVE_REVIEW_LOADING_COPY = "Preparing cautious AI Doctor review…";
 export const AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY =
   "AI Doctor review could not be safely displayed. Add more context or try again later.";
 export const AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY =
   "Context is partial — review may have limited confidence.";
-export const AI_DOCTOR_LIVE_REVIEW_STRONG_COPY =
-  "Context is strong enough for a cautious review.";
-export const AI_DOCTOR_LIVE_REVIEW_VALIDATED_LABEL =
-  "Validated AI Doctor review.";
-export const AI_DOCTOR_LIVE_REVIEW_START_LABEL =
-  "Run cautious AI Doctor review";
+export const AI_DOCTOR_LIVE_REVIEW_STRONG_COPY = "Context is strong enough for a cautious review.";
+export const AI_DOCTOR_LIVE_REVIEW_VALIDATED_LABEL = "Validated AI Doctor review.";
+export const AI_DOCTOR_LIVE_REVIEW_START_LABEL = "Run cautious AI Doctor review";
 export const AI_DOCTOR_LIVE_REVIEW_RETRY_LABEL = "Try once more";
 
 export interface PlantDetailAiDoctorLiveReviewProps {
@@ -69,10 +65,7 @@ export default function PlantDetailAiDoctorLiveReview({
   persist,
   sensorClassificationOverride,
 }: PlantDetailAiDoctorLiveReviewProps) {
-  const { items } = useTimelineMemory(
-    { kind: "plant", plantId },
-    TIMELINE_MEMORY_DEFAULT_LIMIT,
-  );
+  const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
   const { data: bridgeHealth } = useSensorBridgeHealth();
 
   const context = useMemo(
@@ -84,8 +77,7 @@ export default function PlantDetailAiDoctorLiveReview({
     [plant, items],
   );
 
-  const allowed =
-    context.readiness === "partial" || context.readiness === "strong";
+  const allowed = context.readiness === "partial" || context.readiness === "strong";
 
   const packet = useMemo(
     () =>
@@ -124,17 +116,38 @@ export default function PlantDetailAiDoctorLiveReview({
 
   const { entitlement } = useMyEntitlements();
 
+  // Construct the return target locally from a single encoded route segment.
+  // AiCreditLimitNotice validates it again before it reaches the pricing link.
+  const returnTo = useMemo(() => `/plants/${encodeURIComponent(plantId)}`, [plantId]);
+
+  // Keep funnel tracking aligned with the notice's server-plan + defensive
+  // entitlement rules. Paid, founder, and unknown denials must never register
+  // as an upgrade opportunity.
+  const creditNoticeKind = useMemo(() => {
+    if (review.status !== "error" || review.reason !== "credit_denied" || !review.credit) {
+      return null;
+    }
+
+    return buildAiCreditLimitNoticeViewModel({
+      credit: review.credit,
+      surface: "doctor",
+      returnTo,
+      viewerEntitlement: entitlement,
+    }).kind;
+  }, [entitlement, returnTo, review.credit, review.reason, review.status]);
+
+  useEffect(() => {
+    if (creditNoticeKind === "upsell") {
+      trackFunnelEvent("paywall_viewed", { surface: "ai_doctor_limit" });
+    }
+  }, [creditNoticeKind]);
+
   if (!allowed) return null;
 
   const confidenceCopy =
     context.readiness === "partial"
       ? AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY
       : AI_DOCTOR_LIVE_REVIEW_STRONG_COPY;
-
-  // currentPlanLabel intentionally unused: AI Doctor no longer surfaces a
-  // plan-specific paywall/upsell. Keep entitlement read for future neutral
-  // copy needs without referencing plan labels here.
-  void entitlement;
 
   return (
     <section
@@ -190,24 +203,12 @@ export default function PlantDetailAiDoctorLiveReview({
 
       {review.status === "error" ? (
         review.reason === "credit_denied" && review.credit ? (
-          // Plan-neutral denial notice. AI Doctor intentionally does NOT
-          // surface a premium/paywall upsell here — the grower sees a
-          // calm "limit reached, try later" message instead. Server-side
-          // metering and denial behavior are unchanged.
-          <section
+          <AiCreditLimitNotice
+            credit={review.credit}
+            surface="doctor"
+            returnTo={returnTo}
             data-testid="plant-ai-doctor-live-review-credit-denied"
-            data-kind="wait"
-            className="rounded-xl border border-border/60 bg-card/40 p-4"
-            role="status"
-            aria-live="polite"
-          >
-            <h3 className="text-base font-semibold tracking-tight">
-              You've reached an AI Doctor limit.
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              This request was not charged. Existing analyses stay available — please try again later.
-            </p>
-          </section>
+          />
         ) : review.reason === "upstream_credit_exhausted" ? (
           <AiCreditServiceDegradedNotice
             surface="doctor"
@@ -239,10 +240,7 @@ export default function PlantDetailAiDoctorLiveReview({
               data-testid="plant-ai-doctor-live-review-credit-remaining"
             />
           ) : null}
-          <AiDoctorReviewResultPreview
-            result={review.result}
-            testIdPrefix="plant-detail-live"
-          />
+          <AiDoctorReviewResultPreview result={review.result} testIdPrefix="plant-detail-live" />
         </div>
       ) : null}
     </section>

@@ -17,6 +17,8 @@ export interface AiCreditLimitNoticeProps {
   currentPlanLabel?: string;
   /** Defaults to "doctor". Pass "coach" for AI Coach surface copy. */
   surface?: AiCreditLimitNoticeSurface;
+  /** Optional same-origin route to restore after a confirmed checkout. */
+  returnTo?: string | null;
   "data-testid"?: string;
 }
 
@@ -24,6 +26,7 @@ export default function AiCreditLimitNotice({
   credit,
   currentPlanLabel,
   surface,
+  returnTo,
   ...rest
 }: AiCreditLimitNoticeProps) {
   const testId = rest["data-testid"] ?? "ai-credit-limit-notice";
@@ -35,9 +38,9 @@ export default function AiCreditLimitNotice({
     credit,
     currentPlanLabel,
     surface,
+    returnTo,
     viewerEntitlement: entitlement,
   });
-
 
   if (vm.kind === "upsell" && vm.paywallVm) {
     return (
@@ -48,18 +51,12 @@ export default function AiCreditLimitNotice({
         className="space-y-3"
       >
         <header>
-          <h3
-            id={`${testId}-title`}
-            className="text-base font-semibold tracking-tight"
-          >
+          <h3 id={`${testId}-title`} className="text-base font-semibold tracking-tight">
             {vm.title}
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">{vm.body}</p>
         </header>
-        <PaywallCta
-          vm={vm.paywallVm}
-          data-testid={`${testId}-paywall`}
-        />
+        <PaywallCta vm={vm.paywallVm} data-testid={`${testId}-paywall`} />
       </section>
     );
   }
@@ -71,10 +68,7 @@ export default function AiCreditLimitNotice({
       aria-labelledby={`${testId}-title`}
       className="rounded-xl border border-border/60 bg-card/40 p-4"
     >
-      <h3
-        id={`${testId}-title`}
-        className="text-base font-semibold tracking-tight"
-      >
+      <h3 id={`${testId}-title`} className="text-base font-semibold tracking-tight">
         {vm.title}
       </h3>
       <p className="mt-2 text-sm text-muted-foreground">{vm.body}</p>

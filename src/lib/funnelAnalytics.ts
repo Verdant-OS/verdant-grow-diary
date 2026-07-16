@@ -37,7 +37,7 @@ export type FunnelEventName = (typeof FUNNEL_EVENTS)[number];
  * dropped silently — call sites cannot widen this surface by accident.
  */
 export const FUNNEL_PARAM_KEYS = [
-  /** Which paywall rendered: "pricing" | "upgrade". */
+  /** Which paywall rendered: "pricing" | "upgrade" | "ai_doctor_limit". */
   "surface",
   /** Plan slug the grower acted on (enum like "pro-monthly"), never input. */
   "plan",
@@ -51,9 +51,7 @@ export const FUNNEL_PARAM_KEYS = [
 
 type FunnelParamKey = (typeof FUNNEL_PARAM_KEYS)[number];
 
-export type FunnelEventParams = Partial<
-  Record<FunnelParamKey, string | number | boolean>
->;
+export type FunnelEventParams = Partial<Record<FunnelParamKey, string | number | boolean>>;
 
 /**
  * Enum-like strings only: short, no whitespace. Anything that looks like
@@ -90,10 +88,7 @@ export function sanitizeFunnelParams(
   return out;
 }
 
-export function trackFunnelEvent(
-  name: FunnelEventName,
-  params?: FunnelEventParams,
-): void {
+export function trackFunnelEvent(name: FunnelEventName, params?: FunnelEventParams): void {
   if (typeof window === "undefined") return;
   const safe = sanitizeFunnelParams(params);
   try {

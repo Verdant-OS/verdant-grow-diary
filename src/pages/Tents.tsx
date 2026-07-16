@@ -18,6 +18,7 @@ import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { tentDetailPath, tentsPath } from "@/lib/routes";
+import { isUuid } from "@/lib/growRepo";
 import { loadTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { formatTentLightStatus } from "@/lib/lightScheduleFormat";
 import { deriveTentHealthChip } from "@/lib/tentHealthChip";
@@ -41,8 +42,11 @@ export default function Tents() {
   // fabricated 0 for missing metrics and could not carry per-metric truth.
   // statusByTent distinguishes "no rows" from "not loaded"/"failed" so a
   // pending or failed read is never presented as established absence.
+  // Mock-fallback tent ids ("t1"…) would 400 against the uuid tent_id
+  // column and mislabel every demo card "unavailable" — only query real
+  // UUIDs; a non-UUID id cannot have rows, so its absence is established.
   const { byTent: readingsByTent, statusByTent: sensorStatusByTent } = useSensorReadingsByTents(
-    tents.map((t) => t.id),
+    tents.map((t) => t.id).filter((id) => isUuid(id)),
   );
   const temperatureUnit = loadTemperatureUnitPreference();
   // Freshness is time-relative: re-evaluate the presenter's clock every
@@ -116,8 +120,12 @@ export default function Tents() {
               { temperatureUnit },
             );
             // Pending/failed reads must not masquerade as established
-            // absence ("No sensor data yet") or as data.
-            const sensorReadStatus = sensorStatusByTent[t.id] ?? "loading";
+            // absence ("No sensor data yet") or as data. Non-UUID ids
+            // (mock-fallback tents) are never queried — a uuid column
+            // cannot hold them, so their absence is established.
+            const sensorReadStatus = isUuid(t.id)
+              ? (sensorStatusByTent[t.id] ?? "loading")
+              : "success";
             const vpdMetric = snapView.metrics.find((m) => m.key === "vpd");
             const hasVpdValue = !!vpdMetric && vpdMetric.status !== "unknown";
             const plantCount = plants.filter((p) => p.tentId === t.id).length;

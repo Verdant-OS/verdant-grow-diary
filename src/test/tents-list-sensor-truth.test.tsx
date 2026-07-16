@@ -54,21 +54,36 @@ const H = vi.hoisted(() => {
     raw(oldestTs, "humidity_pct", 58),
     raw(oldestTs, "vpd_kpa", 0.9),
   ];
+  const makeTent = (id: string, name: string) => ({
+    id,
+    name,
+    brand: "Gorilla",
+    size: "4x4",
+    stage: "veg",
+    light: { on: true, schedule: "18/6", wattage: 240 },
+    alertCount: 0,
+    growId: null,
+  });
   // Mutable per-test hook state so render tests can drive pending/error/
-  // success outcomes through the same mock.
+  // success outcomes (and the tent set) through the same mocks.
   const hookState = {
+    tents: [makeTent(TENT_ID, "Walkthrough Tent")] as ReturnType<typeof makeTent>[],
     byTent: { [TENT_ID]: ROWS } as Record<string, unknown[]>,
     statusByTent: { [TENT_ID]: "success" } as Record<string, string>,
     isLoading: false,
     isError: false,
+    /** Tent ids the sensor hook was last called with (for UUID-guard pins). */
+    lastRequestedIds: [] as string[],
   };
   const resetHookState = () => {
+    hookState.tents = [makeTent(TENT_ID, "Walkthrough Tent")];
     hookState.byTent = { [TENT_ID]: ROWS };
     hookState.statusByTent = { [TENT_ID]: "success" };
     hookState.isLoading = false;
     hookState.isError = false;
+    hookState.lastRequestedIds = [];
   };
-  return { TENT_ID, newestTs, oldestTs, ROWS, raw, hookState, resetHookState };
+  return { TENT_ID, newestTs, oldestTs, ROWS, raw, makeTent, hookState, resetHookState };
 });
 
 vi.mock("@/hooks/useGrowData", async (importOriginal) => {
@@ -76,18 +91,7 @@ vi.mock("@/hooks/useGrowData", async (importOriginal) => {
   return {
     ...actual,
     useGrowTents: () => ({
-      data: [
-        {
-          id: H.TENT_ID,
-          name: "Walkthrough Tent",
-          brand: "Gorilla",
-          size: "4x4",
-          stage: "veg",
-          light: { on: true, schedule: "18/6", wattage: 240 },
-          alertCount: 0,
-          growId: null,
-        },
-      ],
+      data: H.hookState.tents,
       isLoading: false,
     }),
     useGrowPlants: () => ({ data: [] }),
@@ -100,12 +104,15 @@ vi.mock("@/hooks/useGrowData", async (importOriginal) => {
 });
 
 vi.mock("@/hooks/use-sensor-readings", () => ({
-  useSensorReadingsByTents: () => ({
-    byTent: H.hookState.byTent,
-    statusByTent: H.hookState.statusByTent,
-    isLoading: H.hookState.isLoading,
-    isError: H.hookState.isError,
-  }),
+  useSensorReadingsByTents: (tentIds: string[]) => {
+    H.hookState.lastRequestedIds = tentIds;
+    return {
+      byTent: H.hookState.byTent,
+      statusByTent: H.hookState.statusByTent,
+      isLoading: H.hookState.isLoading,
+      isError: H.hookState.isError,
+    };
+  },
 }));
 
 vi.mock("@/hooks/useScopedGrow", () => ({
@@ -489,6 +496,27 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
     expect(screen.queryByText(/No sensor data yet/)).toBeNull();
   });
 
+  it("mock-fallback tents (non-UUID ids) are never queried and render honest no-data", () => {
+    // Mock tent ids ("t1") cannot exist in the uuid tent_id column: querying
+    // them 400s, which would mislabel every demo card "unavailable".
+    H.hookState.tents = [H.makeTent("t1", "Demo Tent")];
+    H.hookState.byTent = {};
+    H.hookState.statusByTent = {};
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+    // The sensor hook must not receive the non-UUID id at all.
+    expect(H.hookState.lastRequestedIds).toEqual([]);
+    // Absence is established by construction — no loading, no error state.
+    expect(screen.getByTestId("tents-list-sensor-empty-t1")).toHaveTextContent(
+      /No sensor data yet/,
+    );
+    expect(screen.queryByTestId("tents-list-sensor-loading-t1")).toBeNull();
+    expect(screen.queryByTestId("tents-list-sensor-unavailable-t1")).toBeNull();
+  });
+
   it("an established empty result still renders 'No sensor data yet'", () => {
     H.hookState.byTent = { [H.TENT_ID]: [] };
     H.hookState.statusByTent = { [H.TENT_ID]: "success" };
@@ -597,6 +625,12 @@ describe("Tents list sensor truth — static wiring", () => {
     expect(TENTS_SRC).toMatch(/statusByTent/);
     expect(TENTS_SRC).toMatch(/tents-list-sensor-loading-/);
     expect(TENTS_SRC).toMatch(/tents-list-sensor-unavailable-/);
+  });
+
+  it("only queries real UUID tent ids (mock-fallback ids short-circuit)", () => {
+    expect(TENTS_SRC).toMatch(/from\s+["']@\/lib\/growRepo["']/);
+    expect(TENTS_SRC).toMatch(/\.filter\(\(id\) => isUuid\(id\)\)/);
+    expect(TENTS_SRC).toMatch(/isUuid\(t\.id\)/);
   });
 
   it("drives freshness from a ticking clock, not a render-time Date.now()", () => {

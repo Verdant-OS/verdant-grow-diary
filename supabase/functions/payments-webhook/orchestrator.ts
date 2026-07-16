@@ -320,6 +320,13 @@ export async function handleVerifiedEvent(
     }
   } else if (decision.kind === 'upsert_subscription') {
     writeRes = await deps.upsertSubscription(decision.row);
+  } else if (decision.kind === 'upsert_customer') {
+    // customer.created / customer.updated → paddle_customers mirror.
+    // If the runtime dep isn't wired (pure unit tests), treat as no-op
+    // success so the event is marked processed and Paddle stops retrying.
+    writeRes = deps.upsertCustomer
+      ? await deps.upsertCustomer(decision.row)
+      : { ok: true };
   } else {
     writeRes = await deps.updateSubscription(decision.paddleSubscriptionId, decision.patch, env);
   }

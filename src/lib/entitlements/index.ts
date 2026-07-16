@@ -24,6 +24,8 @@ export {
 export {
   pickStrongestBilling,
   resolveUnionEntitlements,
+  pickEntitlingLovableRow,
+  SUBSCRIPTION_ROW_SCAN_LIMIT,
   type EntitlementSource,
   type PickStrongestResult,
   type ResolveUnionInput,

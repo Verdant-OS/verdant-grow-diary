@@ -20,6 +20,8 @@ import { useAuth } from "@/store/auth";
 import {
   resolveUnionEntitlements,
   resolveEntitlements,
+  pickEntitlingLovableRow,
+  SUBSCRIPTION_ROW_SCAN_LIMIT,
   type BillingSubscriptionRow,
   type LovableSubscriptionRow,
   type ResolvedEntitlement,
@@ -61,6 +63,11 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
     }
     setLoading(true);
     // All three reads are RLS-protected (select-own) and PRESENTATION-ONLY.
+    // The subscriptions read is a bounded newest-first WINDOW, not limit(1):
+    // public.subscriptions is unique per paddle_subscription_id, so a newer
+    // canceled row (e.g. Pro) must not shadow an older entitling row (e.g.
+    // Founder Lifetime). Same semantics as the server helper
+    // supabase/functions/_shared/unionEntitlementLookup.ts.
     const [byoRes, lovableRes, rolesRes] = await Promise.all([
       supabase.from("billing_subscriptions").select("*").eq("user_id", user.id).maybeSingle(),
       supabase
@@ -69,8 +76,7 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
         .eq("user_id", user.id)
         .eq("environment", expectedBillingEnvironment)
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+        .limit(SUBSCRIPTION_ROW_SCAN_LIMIT),
       supabase
         .from("user_roles")
         .select("role")
@@ -79,11 +85,13 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
         .maybeSingle(),
     ]);
 
+    const now = new Date();
     const isStaff = !rolesRes.error && rolesRes.data != null;
     const byoRow = byoRes.error ? null : ((byoRes.data ?? null) as BillingSubscriptionRow | null);
-    const lovableRow = lovableRes.error
-      ? null
-      : ((lovableRes.data ?? null) as LovableSubscriptionRow | null);
+    const lovableRows = lovableRes.error
+      ? []
+      : ((lovableRes.data ?? []) as LovableSubscriptionRow[]);
+    const lovableRow = pickEntitlingLovableRow(lovableRows, expectedBillingEnvironment, now);
 
     if (!mountedRef.current) return;
     setEntitlement(
@@ -91,7 +99,7 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
         byoRow,
         lovableRow,
         expectedBillingEnvironment,
-        now: new Date(),
+        now,
         opts: { isStaff },
       }),
     );
@@ -105,7 +113,6 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
     if (authLoading) return;
     void doLoad();
   }, [authLoading, doLoad]);
-
 
   return { loading, entitlement, refetch: doLoad };
 }

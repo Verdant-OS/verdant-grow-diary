@@ -35,10 +35,28 @@ function latestMigrationBodyMentioning(fn: string): string {
   throw new Error(`No migration defines FUNCTION public.${fn}`);
 }
 
+/**
+ * Extract the SQL bounded by the `CREATE OR REPLACE FUNCTION public.<fn>`
+ * statement (including its trailing GRANT/REVOKE re-assertions) up to the
+ * next `CREATE OR REPLACE FUNCTION` or end-of-file. This lets the ID-leakage
+ * check ignore unrelated statements in the same migration (e.g. a one-time
+ * backfill INSERT that legitimately references provider_customer_id).
+ */
+function extractFunctionAndGrantsBlock(sql: string, fn: string): string {
+  const defRe = new RegExp(`CREATE\\s+OR\\s+REPLACE\\s+FUNCTION\\s+public\\.${fn}\\b`, "i");
+  const startMatch = defRe.exec(sql);
+  if (!startMatch) throw new Error(`No CREATE OR REPLACE FUNCTION for ${fn}`);
+  const startIdx = startMatch.index;
+  const nextDefRe = /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.[a-z_]+/gi;
+  nextDefRe.lastIndex = startIdx + startMatch[0].length;
+  const nextMatch = nextDefRe.exec(sql);
+  const endIdx = nextMatch ? nextMatch.index : sql.length;
+  return sql.slice(startIdx, endIdx);
+}
+
 describe("has_pheno_tracker_entitlement anti-oracle guard", () => {
-  const sql = latestMigrationBodyMentioning(
-    "has_pheno_tracker_entitlement",
-  );
+  const fullSql = latestMigrationBodyMentioning("has_pheno_tracker_entitlement");
+  const sql = extractFunctionAndGrantsBlock(fullSql, "has_pheno_tracker_entitlement");
 
   it("enforces auth.uid() = _user_id for non-service_role callers", () => {
     expect(sql).toMatch(/current_setting\(\s*'role'\s*,\s*true\s*\)/);

@@ -12,30 +12,35 @@ production step requires Matthew's explicit approval.
 | `bzatgtgjvuojpoxcknaa` | Personal dev sandbox — **never a deploy target** | Only project visible to the personal Supabase account; near-zero data (0 diary entries, 0 billing rows); schema drifted AHEAD of production (has `billing_customer_links` etc.) |
 | Who can touch production DB | Lovable deploys / Lovable cloud tooling only | The Supabase MCP in agent sessions sees only the personal account — it structurally cannot migrate production |
 
-## Canonical lane decision
+## Canonical lane decision (revised 2026-07-16)
 
-**Canonical for entitlements: the BYO lane** — `paddle-webhook` →
-`paddle_events` → `paddle_event_processing` → `apply_paddle_subscription_update_with_audit`
-/ `allocate_founder_lifetime_with_audit` → `billing_subscriptions`.
+**Canonical for entitlements: the Lovable lane** — `payments-webhook` →
+`lovable_paddle_events` → `public.subscriptions` (+ `allocate_lovable_founder_lifetime`
+for Founder). This matches what the client checkout actually drives and what
+Paddle's live + sandbox notification destinations point at today.
 
-Why: it is the only lane with raw-body signature verification + replay
-bounds, verified-link attribution (signed checkout `custom_data`, never
-email), guarded service-role-only RPCs, sanitized append-only audit, and a
-DB-level sandbox-only launch gate. `billing_subscriptions` remains the
-entitlement source of truth.
+The BYO lane (`paddle-webhook` → `paddle_events` → `paddle_event_processing`
+→ `apply_paddle_subscription_update_with_audit` /
+`allocate_founder_lifetime_with_audit` → `billing_subscriptions`) is now an
+**operator audit surface only**. It stays running so
+`OperatorPaddleProcessingAudit`, `OperatorBillingSubscriptionUpdateAudit`,
+and `OperatorBillingEntitlementResolutionAudit` continue to have data, but
+it no longer contributes to entitlement resolution.
 
-The Lovable lane (`payments-webhook` → `lovable_paddle_events` +
-`subscriptions`) keeps running for observability but must never write
-competing entitlements (it does not write `billing_subscriptions`).
-**At launch, the Paddle account's webhook destination is repointed to
-`paddle-webhook`.** No third lane exists.
+Residual live-union risk (previously "close before live"): **resolved**
+by the 2026-07-16 narrowing migration. `has_pheno_tracker_entitlement`,
+`ai_credit_spend`, `supabase/functions/_shared/unionEntitlementLookup.ts`,
+and `src/hooks/useMyEntitlements.ts` all read only from
+`public.subscriptions` now. Any currently-entitling `billing_subscriptions`
+row was backfilled into `public.subscriptions` in the same migration
+(synthetic `byo_backfill_*` / `lifetime_byo_backfill_*` paddle_subscription_id),
+so no live entitlement was lost.
 
-Known residual risk to close before live: server-side entitlement readers
-union `subscriptions(environment='live')` (e.g. `has_pheno_tracker_entitlement`,
-AI-credit gate). Until the union is narrowed to `billing_subscriptions`-only
-(follow-up migration, requires approval), the Lovable lane accepting a
-`?env=live` query param is a bypass surface — mitigated today by live webhook
-secrets not being configured.
+Consequence: any future operator BYO write to `billing_subscriptions` will
+**not** grant entitlement. New entitlements must arrive through
+`payments-webhook`. Refunds/corrections still happen as audited service-role
+writes; they now target `public.subscriptions` (status update + audit note),
+not `billing_subscriptions`.
 
 ## Migration order (file-only in this PR; apply requires approval)
 
@@ -87,22 +92,24 @@ webhook secret and `PADDLE_ENVIRONMENT`.
 ## Release gate — every box must be green before "ready"
 
 1. [ ] Production project confirmed = `knkwiiywfkbqznbxwqfh` (re-run identity checks above)
-2. [ ] Migrations 1–7 applied there, in order
-3. [ ] Canonical webhook URL registered in the Paddle dashboard: `https://knkwiiywfkbqznbxwqfh.functions.supabase.co/paddle-webhook` (sandbox notification destination first)
+2. [ ] Migrations 1–8 + the 2026-07-16 canonical-lane narrowing migration applied, in order
+3. [ ] Canonical (Lovable) webhook URL registered in the Paddle dashboard: points at `payments-webhook` for both `env=sandbox` and `env=live` — this is what Lovable's built-in Paddle integration configures automatically
 4. [ ] JWT settings deployed as pinned in config.toml
 5. [ ] All required secret NAMES present (list above)
 6. [ ] Price IDs configured for the matching Paddle environment
-7. [ ] Sandbox smoke green: one sandbox checkout → webhook → `billing_subscriptions` row; duplicate delivery → noop; proof harness passes (`bun run scripts/run-paid-launch-proof-harness.ts` against a disposable project)
-8. [ ] **Production stays blocked** — `PADDLE_ENVIRONMENT=sandbox` and the RPC-level sandbox gates remain until Matthew approves the live-enable migration + `PADDLE_ENVIRONMENT=live` + live secrets + live price IDs as one reviewed change
+7. [ ] Sandbox smoke green — see `docs/paddle-sandbox-smoke.md`: one sandbox checkout → `lovable_paddle_events` row `processed_ok=true` → `public.subscriptions` row `environment='sandbox' status='active'`; duplicate delivery → noop (23505); Founder Lifetime cap decrements; cancel-and-resubscribe leaves both rows and resolves to the newer active one
+8. [ ] **Production stays blocked** — until Matthew approves the live-enable change: live `VITE_PAYMENTS_CLIENT_TOKEN`, `PAYMENTS_LIVE_WEBHOOK_SECRET`, `PADDLE_LIVE_API_KEY`, live price IDs, and `PAYMENTS_ENVIRONMENT=live` land as one reviewed slice
 
 ## Business axis (refresh before every report)
 
-Target: ≥ 101 distinct ACTIVE paid users in `public.billing_subscriptions`
-by 2026-08-31. Count only that table (never profiles/leads/checkout
-opens/`profiles.tier`/browser state/`subscriptions` rows unless reconciled).
+Target: ≥ 101 distinct ACTIVE paid users in `public.subscriptions` (the
+canonical entitlement source since 2026-07-16) with `environment='live'` by
+2026-08-31. Count only that table with the environment filter. Do not count
+`profiles`/leads/checkout opens/`profiles.tier`/browser state; do not count
+`billing_subscriptions` (audit surface only, no longer grants access).
 Baseline 2026-07-14: **1 active `founder_lifetime` row of unverified
-provenance (likely sandbox/manual — 0 live Paddle events have ever been
-received) → 0 verified live paid users.**
+provenance → 0 verified live paid users.** The one legacy BYO row was
+backfilled into `public.subscriptions` on 2026-07-16.
 
 ## Rollback
 

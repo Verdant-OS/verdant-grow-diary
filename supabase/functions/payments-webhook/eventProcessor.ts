@@ -210,6 +210,8 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
         current_period_start: sub.currentBillingPeriod?.startsAt ?? null,
         current_period_end: sub.currentBillingPeriod?.endsAt ?? null,
         cancel_at_period_end: true,
+        scheduled_change_action: sub.scheduledChange?.action ?? 'cancel',
+        scheduled_change_at: sub.scheduledChange?.effectiveAt ?? null,
         environment: env,
         updated_at: nowIso,
       },

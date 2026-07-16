@@ -18,41 +18,45 @@
 import type { PlantContextPayload } from "./aiDoctorContextCompiler";
 
 /** Canonical AI Doctor required-output sections (rendered verbatim). */
-export const AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS: readonly string[] =
-  Object.freeze([
-    "Summary",
-    "Likely issue",
-    "Confidence",
-    "Evidence",
-    "Missing information",
-    "Possible causes",
-    "Immediate action",
-    "What not to do",
-    "24-hour follow-up",
-    "3-day recovery plan",
-    "Risk level",
-    "Action Queue suggestion, if appropriate",
-  ]);
+export const AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS: readonly string[] = Object.freeze([
+  "Summary",
+  "Likely issue",
+  "Confidence",
+  "Evidence",
+  "Missing information",
+  "Possible causes",
+  "Immediate action",
+  "What not to do",
+  "24-hour follow-up",
+  "3-day recovery plan",
+  "Risk level",
+  "Action Queue suggestion, if appropriate",
+]);
 
 /** Verbatim caveat strings AI Doctor prompts must include. */
 export const IMPORTED_HISTORY_PROMPT_STRINGS = Object.freeze({
   sectionLabel: "Imported sensor history",
   notLiveCaveat:
     "Imported sensor history is historical context only. Do not treat it as live telemetry.",
-  notProofOfCurrent:
-    "Imported history may show trends but is not proof of current conditions.",
-  noAlertsFromHistoryAlone:
-    "Do not create or recommend alerts solely from imported history.",
+  notProofOfCurrent: "Imported history may show trends but is not proof of current conditions.",
+  noAlertsFromHistoryAlone: "Do not create or recommend alerts solely from imported history.",
   noActionQueueFromHistoryAlone:
     "Do not create or recommend Action Queue items solely from imported history.",
   notHealthyFromHistoryAlone:
     "Do not state that the current environment is healthy based only on imported history.",
+  // Output-phrasing instructions must stay inside the review validator's
+  // vocabulary: the result contract REJECTS responses containing the
+  // banned words (live, imported, synced, connected, …), so the model is
+  // told to write "current sensor readings" / "historical context" — never
+  // the banned words themselves.
   evidenceSeparation:
-    "In Evidence, clearly distinguish 'Current evidence' from 'Imported historical context'.",
+    "In Evidence, clearly distinguish 'Current evidence' from 'Historical context'.",
   missingLiveReadings:
-    "Current/live sensor readings are missing or unavailable. State this clearly in Missing information.",
+    "Current sensor readings are missing or unavailable. State this clearly in Missing information.",
   missingInfoIncludeLive:
-    "In Missing information, include 'live sensor readings' when current/live readings are absent.",
+    "In Missing information, include 'current sensor readings' when no current reading is available.",
+  validatorSafeVocabulary:
+    "Never use these words anywhere in your response: confirmed, certain, cured, guaranteed, live, synced, connected, imported. Say 'current sensor readings' instead of 'live sensor readings' and 'historical context' instead of 'imported history'.",
   confidenceCap:
     "If only imported history is available (no current/live sensor readings), cap Confidence at 'low' or 'moderate' — never 'high'.",
 });
@@ -103,10 +107,7 @@ function formatMetrics(
  * Returns empty/null blocks when neither condition applies.
  */
 export function buildAiDoctorImportedHistoryPromptFragment(
-  ctx: Pick<
-    PlantContextPayload,
-    "imported_sensor_history" | "missingLiveSensorReadings"
-  >,
+  ctx: Pick<PlantContextPayload, "imported_sensor_history" | "missingLiveSensorReadings">,
 ): ImportedHistoryPromptFragment {
   const guidance: string[] = [];
   const s = IMPORTED_HISTORY_PROMPT_STRINGS;
@@ -122,9 +123,7 @@ export function buildAiDoctorImportedHistoryPromptFragment(
       s.noAlertsFromHistoryAlone,
       s.noActionQueueFromHistoryAlone,
     );
-    const dateRange = h.dateRange
-      ? `${h.dateRange.earliest} → ${h.dateRange.latest}`
-      : "unknown";
+    const dateRange = h.dateRange ? `${h.dateRange.earliest} → ${h.dateRange.latest}` : "unknown";
     importedHistoryBlock = [
       `[${s.sectionLabel}]`,
       `Source label: ${h.historicalLabel}`,
@@ -143,12 +142,13 @@ export function buildAiDoctorImportedHistoryPromptFragment(
     if (ctx.imported_sensor_history) {
       guidance.push(s.confidenceCap);
     }
-    missingLiveReadingsBlock =
-      "[Missing live readings] " + s.missingLiveReadings;
+    missingLiveReadingsBlock = "[Missing live readings] " + s.missingLiveReadings;
   }
 
-  // Always reinforce required output structure (kept as one line).
+  // Always reinforce validator-safe response vocabulary and the required
+  // output structure (kept as single lines).
   if (guidance.length > 0) {
+    guidance.push(s.validatorSafeVocabulary);
     guidance.push(
       "Preserve the AI Doctor required output structure: " +
         AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS.join(" | "),

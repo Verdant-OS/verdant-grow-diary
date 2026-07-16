@@ -66,12 +66,8 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     const frag = buildAiDoctorImportedHistoryPromptFragment(ctx);
     expect(frag.importedHistoryBlock).toContain("Imported sensor history");
     expect(frag.importedHistoryBlock).toContain("CSV history");
-    expect(frag.importedHistoryBlock).toContain(
-      "This is imported CSV history, not live telemetry",
-    );
-    expect(frag.guidance.join("\n")).toContain(
-      IMPORTED_HISTORY_PROMPT_STRINGS.notLiveCaveat,
-    );
+    expect(frag.importedHistoryBlock).toContain("This is imported CSV history, not live telemetry");
+    expect(frag.guidance.join("\n")).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notLiveCaveat);
   });
 
   it("includes missing-live-readings warning when missingLiveSensorReadings is true", () => {
@@ -83,12 +79,14 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     });
     expect(ctx.missingLiveSensorReadings).toBe(true);
     const frag = buildAiDoctorImportedHistoryPromptFragment(ctx);
-    expect(frag.missingLiveReadingsBlock).toContain(
-      "Current/live sensor readings are missing",
-    );
-    expect(frag.guidance.join(" ")).toContain(
-      "include 'live sensor readings'",
-    );
+    // Output-phrasing must stay inside the review validator's vocabulary:
+    // the result contract rejects responses containing "live"/"imported",
+    // so the model is told to write "current sensor readings" instead.
+    expect(frag.missingLiveReadingsBlock).toContain("Current sensor readings are missing");
+    expect(frag.guidance.join(" ")).toContain("include 'current sensor readings'");
+    expect(frag.guidance.join(" ")).toContain("Never use these words anywhere in your response");
+    // The model is never instructed to emit a banned word.
+    expect(frag.guidance.join(" ")).not.toContain("include 'live");
   });
 
   it("does NOT include missing-live warning when live readings exist", () => {
@@ -111,8 +109,10 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
       now: NOW,
     });
     const frag = buildAiDoctorImportedHistoryPromptFragment(ctx);
+    // "Historical context", not "Imported historical context" — the
+    // validator bans the word "imported" in model output.
     expect(frag.guidance.join("\n")).toContain(
-      "distinguish 'Current evidence' from 'Imported historical context'",
+      "distinguish 'Current evidence' from 'Historical context'",
     );
   });
 
@@ -138,9 +138,7 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     });
     const frag = buildAiDoctorImportedHistoryPromptFragment(ctx);
     const joined = frag.guidance.join(" ");
-    expect(joined).toContain(
-      "Do not create or recommend alerts solely from imported history",
-    );
+    expect(joined).toContain("Do not create or recommend alerts solely from imported history");
     expect(joined).toContain(
       "Do not create or recommend Action Queue items solely from imported history",
     );

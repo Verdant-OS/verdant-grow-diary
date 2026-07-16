@@ -74,9 +74,13 @@ inference.
   boundary instant in the future. The header and companion display label the
   final day "partial — through <local time>"; coverage and missing-data math
   treat un-elapsed time as outside the window, never as missing data; and
-  week-over-week comparisons involving the partial day follow the existing
-  coverage-floor rules rather than comparing a part-day against a full day
-  as equals. Fully closed end dates resolve exactly as before.
+  week-over-week comparisons become **elapsed-matched**: the prior window
+  truncates to the same elapsed span (its start plus exactly the duration
+  the current window has covered), labeled "elapsed-matched — comparing the
+  first <span> of each week", so partial-week totals and excursion hours are
+  never compared against a full prior week as equals. Coverage floors still
+  apply within the matched span. Fully closed end dates resolve exactly as
+  before.
 - **Report day boundary.** The local hour at which a report "day" begins
   (whole hours only, default `00:00`; e.g. `06:00` for a lights-on day).
   Window instants become `[boundaryInstant(D), boundaryInstant(D + 1))`,
@@ -126,7 +130,7 @@ A single control at the top of the report lets the grower generate a report for 
     participates; otherwise use the 2-year floor and label it as a search
     limit, not "No grow data."
   - If the selected window contains zero source events (no diary entries, no sensor readings, no alerts), render the report with honest empty states in each section — never fabricate a baseline and never silently shift the window.
-- **Comparison window follows automatically.** Selecting an end date of `D` sets this-week local dates to `D−6 ... D` and prior-week local dates to `D−13 ... D−7`. Resolve each as its own half-open instant window in the same timezone.
+- **Comparison window follows automatically.** Selecting an end date of `D` sets this-week local dates to `D−6 ... D` and prior-week local dates to `D−13 ... D−7`. Resolve each as its own half-open instant window in the same timezone. When the current window is partial (ends on the current report day), the prior window truncates to the same elapsed span — the elapsed-matched comparison defined in report time preferences — never a full prior week against a partial current one.
 - **URL + deterministic selection.** Encode exactly the validated end-date
   value as `?end=YYYY-MM-DD` plus, when a single plant is selected, the
   validated plant scope as `?plant=<opaque owned id>` (see the plant scope

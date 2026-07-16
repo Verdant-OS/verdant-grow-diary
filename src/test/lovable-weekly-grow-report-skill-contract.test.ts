@@ -115,6 +115,13 @@ describe("Lovable weekly grow report skill contract", () => {
     expect(SKILL).toMatch(/explicitly partial window\*\* whose upper bound is now/);
     expect(SKILL).toMatch(/"partial — through <local time>"/);
     expect(SKILL).toMatch(/un-elapsed time as outside the window, never as missing data/);
+    // Partial weeks compare elapsed-matched spans, never a full prior week
+    // against a partial current one (coverage floors alone don't fix the
+    // totals bias).
+    expect(SKILL).toMatch(/\*\*elapsed-matched\*\*/);
+    expect(SKILL).toMatch(/prior window\s+truncates to the same elapsed span/);
+    expect(SKILL).toMatch(/never compared against a full prior week as equals/);
+    expect(SKILL).toMatch(/never a full prior week against a partial current one/);
     expect(SKILL).toMatch(/Never generate a report for a window that includes time later than now/);
     // Shared-browser safety: stored preferences are partitioned per grower.
     expect(SKILL).toMatch(/scoped to the signed-in user's ID\*\*/);

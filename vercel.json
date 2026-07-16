@@ -13,8 +13,18 @@
       "master": false
     }
   },
+  "redirects": [
+    { "source": "/strains", "destination": "/cultivars", "permanent": true },
+    {
+      "source": "/strains/:slug",
+      "destination": "/cultivars/:slug",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/founder", "destination": "/founder.html" },
+    { "source": "/cultivars", "destination": "/cultivars.html" },
+    { "source": "/cultivars/:slug", "destination": "/cultivars/:slug.html" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ],
   "headers": [

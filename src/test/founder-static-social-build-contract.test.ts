@@ -17,14 +17,20 @@ describe("Founder static social document build contract", () => {
   });
 
   it("routes /founder to its static entry before the SPA fallback", () => {
-    expect(VERCEL.rewrites?.[0]).toEqual({
+    const rewrites = VERCEL.rewrites ?? [];
+    const founderIndex = rewrites.findIndex(({ source }) => source === "/founder");
+    const fallbackIndex = rewrites.findIndex(({ source }) => source === "/((?!assets/).*)");
+
+    expect(rewrites[founderIndex]).toEqual({
       source: "/founder",
       destination: "/founder.html",
     });
-    expect(VERCEL.rewrites?.[1]).toEqual({
+    expect(rewrites[fallbackIndex]).toEqual({
       source: "/((?!assets/).*)",
       destination: "/index.html",
     });
+    expect(founderIndex).toBeGreaterThanOrEqual(0);
+    expect(fallbackIndex).toBeGreaterThan(founderIndex);
   });
 
   it("introduces no redirect, external destination, or private route", () => {

@@ -44,10 +44,9 @@
          into every SPA route makes /welcome, /pricing, etc. declare themselves
          duplicates of the homepage (which de-indexes them). Per-route
          self-canonicals are set client-side by the usePageSeo hook
-         (src/hooks/usePageSeo.ts); non-JS crawlers fall back to the request
-         URL (the correct self-canonical). A
-         build-time prerender pass (deferred) will bake per-route canonicals
-         into static HTML for non-JS consumers. -->
+         (src/hooks/usePageSeo.ts). Founder and cultivar routes also receive
+         build-time route documents for non-JS crawlers; other public routes
+         continue to use this generic entry document. -->
 
     <!-- Fonts.
          The Google Fonts stylesheet is loaded non-blocking so above-the-fold

@@ -7,6 +7,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/store/auth";
 import { GrowsProvider } from "@/store/grows";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
+import { usePageSeo } from "@/hooks/usePageSeo";
+import { findCultivarBySlug } from "@/constants/verdantCultivars";
+import { buildLegacyStrainSeo } from "@/lib/cultivarSeoRules";
 import RootErrorBoundary from "@/components/RootErrorBoundary";
 import PhenoTrackerUpgradeGate from "@/components/PhenoTrackerUpgradeGate";
 import RequireOperatorRole from "./components/RequireOperatorRole";
@@ -162,7 +165,13 @@ function PageLoader() {
 function LegacyStrainSlugRedirect() {
   // Preserves the slug when redirecting /strains/:slug → /cultivars/:slug.
   const { slug } = useParams<{ slug: string }>();
+  usePageSeo(buildLegacyStrainSeo(findCultivarBySlug(slug)));
   return <Navigate to={`/cultivars/${slug ?? ""}`} replace />;
+}
+
+function LegacyStrainIndexRedirect() {
+  usePageSeo(buildLegacyStrainSeo());
+  return <Navigate to="/cultivars" replace />;
 }
 
 const App = () => (
@@ -216,7 +225,7 @@ const App = () => (
                   {/* Legacy "strain" URL aliases capture search intent for
                       "Oreoz strain" / "Do-Si-Dos" etc. and route to the
                       canonical /cultivars surface (vocab: cultivar, not strain). */}
-                  <Route path="/strains" element={<Navigate to="/cultivars" replace />} />
+                  <Route path="/strains" element={<LegacyStrainIndexRedirect />} />
                   <Route path="/strains/:slug" element={<LegacyStrainSlugRedirect />} />
                   <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />

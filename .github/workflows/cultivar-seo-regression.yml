@@ -1,0 +1,83 @@
+name: Cultivar SEO regression
+
+on:
+  pull_request:
+    branches: [verdant-grow-diary]
+    paths:
+      - ".github/workflows/cultivar-seo-*.yml"
+      - "e2e/cultivar-seo-metadata.spec.ts"
+      - "index.html"
+      - "package.json"
+      - "bun.lock"
+      - "package-lock.json"
+      - "public/robots.txt"
+      - "public/sitemap.xml"
+      - "scripts/seo/cultivar-post-deploy-smoke.ts"
+      - "scripts/seo/verify-cultivar-static-build.mjs"
+      - "src/App.tsx"
+      - "src/constants/verdantCultivars.ts"
+      - "src/hooks/usePageSeo.ts"
+      - "src/lib/build/cultivarOpenGraphImage.ts"
+      - "src/lib/build/cultivarStaticRouteManifest.ts"
+      - "src/lib/build/staticSocialRouteHtml.ts"
+      - "src/lib/cultivarSeoRules.ts"
+      - "src/pages/CultivarPage.tsx"
+      - "src/pages/CultivarsIndex.tsx"
+      - "src/test/cultivar-*.test.ts*"
+      - "vercel.json"
+      - "vite.config.ts"
+  push:
+    branches: [verdant-grow-diary]
+    paths:
+      - ".github/workflows/cultivar-seo-*.yml"
+      - "e2e/cultivar-seo-metadata.spec.ts"
+      - "index.html"
+      - "package.json"
+      - "bun.lock"
+      - "package-lock.json"
+      - "public/robots.txt"
+      - "public/sitemap.xml"
+      - "scripts/seo/cultivar-post-deploy-smoke.ts"
+      - "scripts/seo/verify-cultivar-static-build.mjs"
+      - "src/App.tsx"
+      - "src/constants/verdantCultivars.ts"
+      - "src/hooks/usePageSeo.ts"
+      - "src/lib/build/cultivarOpenGraphImage.ts"
+      - "src/lib/build/cultivarStaticRouteManifest.ts"
+      - "src/lib/build/staticSocialRouteHtml.ts"
+      - "src/lib/cultivarSeoRules.ts"
+      - "src/pages/CultivarPage.tsx"
+      - "src/pages/CultivarsIndex.tsx"
+      - "src/test/cultivar-*.test.ts*"
+      - "vercel.json"
+      - "vite.config.ts"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cultivar-seo-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cultivar-seo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Focused cultivar SEO contracts
+        run: bun run test:cultivar-seo
+      - name: Build static crawler documents and PNG cards
+        run: bun run build
+      - name: Verify raw non-JavaScript build output
+        run: bun run verify:cultivar-seo-build
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+      - name: Browser metadata regression
+        run: bun run test:cultivar-seo:e2e

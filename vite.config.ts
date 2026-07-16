@@ -3,10 +3,18 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
+import sharp from "sharp";
 import { PRICING } from "./src/constants/pricing";
+import { VERDANT_CULTIVARS } from "./src/constants/verdantCultivars";
 import { viteManualChunks } from "./src/lib/build/manualChunks";
 import { FOUNDER_SOCIAL_META } from "./src/constants/founderSocialMeta";
 import { buildStaticSocialRouteHtml } from "./src/lib/build/staticSocialRouteHtml";
+import { buildCultivarStaticRouteManifest } from "./src/lib/build/cultivarStaticRouteManifest";
+import {
+  buildCultivarOpenGraphCard,
+  buildCultivarOpenGraphSvg,
+  CULTIVARS_INDEX_OPEN_GRAPH_CARD,
+} from "./src/lib/build/cultivarOpenGraphImage";
 
 const SITE_ORIGIN = "https://verdantgrowdiary.com";
 
@@ -70,7 +78,7 @@ function staticSocialRouteDocuments(): Plugin {
     name: "verdant-static-social-route-documents",
     apply: "build",
     enforce: "post",
-    generateBundle(_options, bundle) {
+    async generateBundle(_options, bundle) {
       const indexAsset = bundle["index.html"];
       if (!indexAsset || indexAsset.type !== "asset" || typeof indexAsset.source !== "string") {
         this.error("Vite did not emit a string index.html asset");
@@ -80,6 +88,49 @@ function staticSocialRouteDocuments(): Plugin {
         type: "asset",
         fileName: "founder.html",
         source: buildStaticSocialRouteHtml(indexAsset.source, FOUNDER_SOCIAL_META),
+      });
+
+      const cultivarRoutes = buildCultivarStaticRouteManifest();
+      for (const route of cultivarRoutes) {
+        this.emitFile({
+          type: "asset",
+          fileName: route.fileName,
+          source: buildStaticSocialRouteHtml(indexAsset.source, route.metadata),
+        });
+      }
+
+      const cards = [
+        { slug: "index", card: CULTIVARS_INDEX_OPEN_GRAPH_CARD },
+        ...VERDANT_CULTIVARS.map((cultivar) => ({
+          slug: cultivar.slug,
+          card: buildCultivarOpenGraphCard(cultivar),
+        })),
+      ];
+      for (const { slug, card } of cards) {
+        const png = await sharp(Buffer.from(buildCultivarOpenGraphSvg(card)))
+          .png({ compressionLevel: 9, palette: true, quality: 100 })
+          .toBuffer();
+        this.emitFile({
+          type: "asset",
+          fileName: `og/cultivars/${slug}.png`,
+          source: png,
+        });
+      }
+      this.emitFile({
+        type: "asset",
+        fileName: "cultivar-seo-manifest.json",
+        source: JSON.stringify(
+          {
+            version: 1,
+            routes: cultivarRoutes,
+            images: cards.map(({ slug }) => ({
+              slug,
+              fileName: `og/cultivars/${slug}.png`,
+            })),
+          },
+          null,
+          2,
+        ),
       });
     },
   };

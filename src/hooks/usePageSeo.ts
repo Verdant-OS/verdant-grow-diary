@@ -10,8 +10,9 @@ import { useEffect } from "react";
  *
  * NOTE: this does NOT reach non-JS consumers (facebookexternalhit, Twitterbot,
  * LinkedIn/Slack link scrapers, and first-pass HTML crawlers). Fixing social
- * previews for those requires build-time route documents. The Founder route
- * now has one; other public routes still use the generic entry document.
+ * previews for those requires build-time route documents. Founder and curated
+ * cultivar routes now have them; other public routes use the generic entry
+ * document.
  * Zero-dependency by design.
  */
 const SITE_ORIGIN = "https://verdantgrowdiary.com";
@@ -28,6 +29,12 @@ export interface PageSeo {
   path: string;
   /** Absolute og:image URL. Defaults to the brand logo. */
   ogImage?: string;
+  /** Accessible description for the social image. */
+  ogImageAlt?: string;
+  ogImageWidth?: number;
+  ogImageHeight?: number;
+  ogImageType?: string;
+  ogType?: "website" | "article";
   /** When true, emit <meta name="robots" content="noindex, follow">. */
   noindex?: boolean;
 }
@@ -52,8 +59,23 @@ function upsertLink(rel: string, href: string) {
   el.setAttribute("href", href);
 }
 
+function removeMeta(selector: string) {
+  document.head.querySelector(selector)?.remove();
+}
+
 export function usePageSeo(seo: PageSeo): void {
-  const { title, description, path, ogImage = DEFAULT_OG_IMAGE, noindex = false } = seo;
+  const {
+    title,
+    description,
+    path,
+    ogImage = DEFAULT_OG_IMAGE,
+    ogImageAlt = SITE_NAME,
+    ogImageWidth,
+    ogImageHeight,
+    ogImageType,
+    ogType = "website",
+    noindex = false,
+  } = seo;
 
   useEffect(() => {
     const url = path.startsWith("http") ? path : `${SITE_ORIGIN}${path}`;
@@ -73,12 +95,39 @@ export function usePageSeo(seo: PageSeo): void {
     upsertMeta('meta[property="og:description"]', "property", "og:description", description);
     upsertMeta('meta[property="og:url"]', "property", "og:url", url);
     upsertMeta('meta[property="og:image"]', "property", "og:image", ogImage);
+    upsertMeta('meta[property="og:image:alt"]', "property", "og:image:alt", ogImageAlt);
     upsertMeta('meta[property="og:site_name"]', "property", "og:site_name", SITE_NAME);
-    upsertMeta('meta[property="og:type"]', "property", "og:type", "website");
+    upsertMeta('meta[property="og:type"]', "property", "og:type", ogType);
+    if (ogImageWidth !== undefined) {
+      upsertMeta(
+        'meta[property="og:image:width"]',
+        "property",
+        "og:image:width",
+        String(ogImageWidth),
+      );
+    } else {
+      removeMeta('meta[property="og:image:width"]');
+    }
+    if (ogImageHeight !== undefined) {
+      upsertMeta(
+        'meta[property="og:image:height"]',
+        "property",
+        "og:image:height",
+        String(ogImageHeight),
+      );
+    } else {
+      removeMeta('meta[property="og:image:height"]');
+    }
+    if (ogImageType !== undefined) {
+      upsertMeta('meta[property="og:image:type"]', "property", "og:image:type", ogImageType);
+    } else {
+      removeMeta('meta[property="og:image:type"]');
+    }
 
     upsertMeta('meta[name="twitter:title"]', "name", "twitter:title", title);
     upsertMeta('meta[name="twitter:description"]', "name", "twitter:description", description);
     upsertMeta('meta[name="twitter:image"]', "name", "twitter:image", ogImage);
+    upsertMeta('meta[name="twitter:image:alt"]', "name", "twitter:image:alt", ogImageAlt);
     upsertMeta('meta[name="twitter:card"]', "name", "twitter:card", "summary_large_image");
 
     return () => {
@@ -102,6 +151,11 @@ export function usePageSeo(seo: PageSeo): void {
       );
       upsertMeta('meta[property="og:url"]', "property", "og:url", SITE_ORIGIN);
       upsertMeta('meta[property="og:image"]', "property", "og:image", DEFAULT_OG_IMAGE);
+      upsertMeta('meta[property="og:image:alt"]', "property", "og:image:alt", SITE_NAME);
+      upsertMeta('meta[property="og:type"]', "property", "og:type", "website");
+      removeMeta('meta[property="og:image:width"]');
+      removeMeta('meta[property="og:image:height"]');
+      removeMeta('meta[property="og:image:type"]');
       upsertMeta('meta[name="twitter:title"]', "name", "twitter:title", SITE_NAME);
       upsertMeta(
         'meta[name="twitter:description"]',
@@ -110,7 +164,19 @@ export function usePageSeo(seo: PageSeo): void {
         DEFAULT_DESCRIPTION,
       );
       upsertMeta('meta[name="twitter:image"]', "name", "twitter:image", DEFAULT_OG_IMAGE);
+      upsertMeta('meta[name="twitter:image:alt"]', "name", "twitter:image:alt", SITE_NAME);
       void prevTitle;
     };
-  }, [title, description, path, ogImage, noindex]);
+  }, [
+    title,
+    description,
+    path,
+    ogImage,
+    ogImageAlt,
+    ogImageWidth,
+    ogImageHeight,
+    ogImageType,
+    ogType,
+    noindex,
+  ]);
 }

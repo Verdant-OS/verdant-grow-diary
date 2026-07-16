@@ -10,20 +10,16 @@ import BrandLogo from "@/components/BrandLogo";
 import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { findCultivarBySlug } from "@/constants/verdantCultivars";
+import { buildCultivarSeo, buildUnknownCultivarSeo } from "@/lib/cultivarSeoRules";
 
 export default function CultivarPage() {
   const { slug } = useParams<{ slug: string }>();
   const cultivar = findCultivarBySlug(slug);
+  usePageSeo(cultivar ? buildCultivarSeo(cultivar) : buildUnknownCultivarSeo());
 
   if (!cultivar) {
     return <Navigate to="/cultivars" replace />;
   }
-
-  usePageSeo({
-    title: `${cultivar.name} Cultivator Guide (${cultivar.searchAlias} info) | Verdant`,
-    description: `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`,
-    path: `/cultivars/${cultivar.slug}`,
-  });
 
   return (
     <main

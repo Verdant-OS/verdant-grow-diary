@@ -16,6 +16,7 @@ import {
   VERDANT_CULTIVARS,
   type VerdantCultivarProfile,
 } from "@/constants/verdantCultivars";
+import { buildCultivarsIndexSeo } from "@/lib/cultivarSeoRules";
 
 type DifficultyFilter = "all" | VerdantCultivarProfile["difficulty"];
 
@@ -42,14 +43,9 @@ function matchesQuery(c: VerdantCultivarProfile, q: string): boolean {
 }
 
 export default function CultivarsIndex() {
-  usePageSeo({
-    title: "Cannabis Cultivar Guides — Oreoz, Do-Si-Dos, Blue Cookies Strain Info | Verdant",
-    description:
-      "Evergreen cultivar profiles for serious home growers: environment ranges, flower windows, common issues, and what to compare when pheno-hunting.",
-    path: "/cultivars",
-  });
-
   const [searchParams, setSearchParams] = useSearchParams();
+  usePageSeo(buildCultivarsIndexSeo(searchParams));
+
   const rawQuery = searchParams.get("q") ?? "";
   const rawDifficulty = (searchParams.get("difficulty") ?? "all") as DifficultyFilter;
   const difficulty: DifficultyFilter = DIFFICULTY_OPTIONS.some((o) => o.value === rawDifficulty)

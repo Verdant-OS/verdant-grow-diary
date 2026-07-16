@@ -3,8 +3,18 @@
  *
  * Read-only. RLS-scoped through the caller's OAuth token. sensor_readings
  * is long-format (one row per tent/metric/timestamp), so a snapshot is the
- * latest row per metric. Preserves `source` and `quality` labels verbatim
- * so agents can never treat degraded/stale/invalid data as current.
+ * latest row per metric, queried per metric: a single global ORDER BY +
+ * LIMIT would let one bursty metric push another metric's latest row out
+ * of the scan window and silently drop it from the snapshot.
+ *
+ * Rows are ordered by capture time (captured_at) first — `ts` is ingest
+ * time, which bridge/CSV backfills and retries can reorder — with the
+ * ts DESC, created_at DESC tie-breakers the app's sensor loader uses
+ * (src/hooks/useLatestSensorSnapshot.ts), then id DESC so equal
+ * timestamps can never flip the snapshot between calls.
+ *
+ * Preserves `source` and `quality` labels verbatim so agents can never
+ * treat simulated/demo/degraded/stale/invalid data as current.
  * Never returns `raw_payload`.
  *
  * Verifies tent ownership first: tents policies are strictly owner-scoped,
@@ -15,8 +25,23 @@ import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser, unauthenticated } from "./_supabase";
 
-/** Newest rows to scan when reducing to one reading per metric. */
-const SCAN_LIMIT = 50;
+/**
+ * Long-format metrics accepted by the live schema. Mirrors the
+ * validate_sensor_reading() allow-list (supabase/migrations/
+ * 20260617164759_*.sql) — a metric missing here would silently vanish
+ * from snapshots, so keep this in sync when the trigger gains metrics.
+ */
+const KNOWN_METRICS = [
+  "temperature_c",
+  "humidity_pct",
+  "vpd_kpa",
+  "co2_ppm",
+  "soil_moisture_pct",
+  "soil_temp_c",
+  "ph",
+  "ec",
+  "ppfd",
+] as const;
 
 interface SensorRow {
   id: string;
@@ -34,11 +59,18 @@ export default defineTool({
   title: "Get latest sensor snapshot",
   description:
     "Fetch the most recent sensor reading per metric (temperature_c, " +
-    "humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct) for one of the " +
-    "signed-in grower's own tents. Every reading includes its `source` " +
-    "label (manual/pi_bridge/sim) and `quality` label " +
-    "(ok/degraded/stale/invalid). Never treat readings with quality " +
-    "other than `ok`, or source `sim`, as current live data. Read-only.",
+    "humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, " +
+    "ec, ppfd) for one of the signed-in grower's own tents, ordered by " +
+    "capture time (captured_at, falling back to ingest time). Every " +
+    "reading keeps its `source` and `quality` labels verbatim. `quality` " +
+    "is one of ok/degraded/stale/invalid. `source` is a canonical label " +
+    "(live/manual/csv/demo/stale/invalid) or a hardware-bridge label " +
+    "such as pi_bridge, esp32_*, home_assistant_bridge, ecowitt, mqtt " +
+    "or webhook. Treat a reading as current live data ONLY when its " +
+    "quality is `ok` AND its source is known-live (live, manual, csv, " +
+    "or a hardware-bridge label); sources sim, demo, stale and invalid, " +
+    "plus any source label you do not recognize, are never live. " +
+    "Read-only.",
   inputSchema: {
     tentId: z.string().uuid().describe("Tent id to fetch the latest readings for."),
   },
@@ -63,29 +95,41 @@ export default defineTool({
         isError: true,
       };
     }
-    const { data, error } = await supabase
-      .from("sensor_readings")
-      .select("id,tent_id,metric,value,quality,source,ts,captured_at")
-      .eq("tent_id", tentId)
-      .order("ts", { ascending: false })
-      .limit(SCAN_LIMIT);
-    if (error) {
+    // Latest row per metric. captured_at DESC NULLS LAST first (capture
+    // time beats ingest time), then the loader's ts/created_at convention,
+    // then id as a total-order tie-breaker.
+    const results = await Promise.all(
+      KNOWN_METRICS.map((metric) =>
+        supabase
+          .from("sensor_readings")
+          .select("id,tent_id,metric,value,quality,source,ts,captured_at")
+          .eq("tent_id", tentId)
+          .eq("metric", metric)
+          .order("captured_at", { ascending: false, nullsFirst: false })
+          .order("ts", { ascending: false })
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ),
+    );
+    const failed = results.find((r) => r.error);
+    if (failed?.error) {
       return {
-        content: [{ type: "text", text: `Error: ${error.message}` }],
+        content: [{ type: "text", text: `Error: ${failed.error.message}` }],
         isError: true,
       };
     }
-    const rows = (data ?? []) as SensorRow[];
-    if (rows.length === 0) {
+    const readings: Record<string, SensorRow> = {};
+    for (const result of results) {
+      const row = result.data as SensorRow | null;
+      if (row) readings[row.metric] = row;
+    }
+    if (Object.keys(readings).length === 0) {
       return {
         content: [{ type: "text", text: "No sensor readings found for that tent." }],
         structuredContent: { snapshot: null },
       };
-    }
-    // Rows arrive newest-first; keep the first row seen per metric.
-    const readings: Record<string, SensorRow> = {};
-    for (const row of rows) {
-      if (!(row.metric in readings)) readings[row.metric] = row;
     }
     const summary = Object.values(readings)
       .map(

@@ -9,7 +9,9 @@
  *     signed-in user.
  *   - No raw_payload or secret exposure.
  *   - No fabricated live data — sensor rows preserve their `source` and
- *     `quality` fields verbatim so sim/degraded/stale/invalid stay labeled.
+ *     `quality` fields verbatim, and source trust is deny-by-default:
+ *     only known-live labels count as live; sim/demo/stale/invalid and
+ *     unrecognized labels never do.
  *
  * The OAuth issuer must be the direct supabase.co host, built from the
  * project ref (VITE_SUPABASE_PROJECT_ID is inlined by Vite at build time).
@@ -31,9 +33,13 @@ export default defineMcp({
     "for recent log entries in a grow the caller owns, and " +
     "`get_latest_sensor_snapshot` for the most recent reading per " +
     "metric in a tent the caller owns. Sensor readings always include " +
-    "their `source` label (manual/pi_bridge/sim) and `quality` label " +
-    "(ok/degraded/stale/invalid) — never treat readings with quality " +
-    "other than `ok`, or source `sim`, as current live data. " +
+    "their `source` and `quality` labels verbatim. Source trust is " +
+    "deny-by-default: treat a reading as current live data ONLY when " +
+    "its quality is `ok` AND its source is known-live (live, manual, " +
+    "csv, or a hardware-bridge label such as pi_bridge, esp32_*, " +
+    "home_assistant_bridge, ecowitt, mqtt or webhook); sources sim, " +
+    "demo, stale and invalid, plus any source label you do not " +
+    "recognize, are never live. " +
     "This server never writes, never approves Action Queue items, and " +
     "never controls devices.",
   auth: auth.oauth.issuer({

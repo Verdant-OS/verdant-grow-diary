@@ -92,7 +92,8 @@ export const MCP_MANIFEST: MCPManifestView = Object.freeze({
     {
       name: "list_recent_diary_entries",
       title: "List recent diary entries",
-      description: "List recent diary entries for one of the signed-in grower's grows. Read-only.",
+      description:
+        "List recent diary entries for one of the signed-in grower's own grows. The grow must belong to the caller. Read-only.",
       readOnly: true,
       params: [
         {
@@ -114,14 +115,14 @@ export const MCP_MANIFEST: MCPManifestView = Object.freeze({
       name: "get_latest_sensor_snapshot",
       title: "Get latest sensor snapshot",
       description:
-        "Fetch the single most recent sensor reading for one of the signed-in grower's tents. Includes temperature/humidity/vpd/co2 fields when present and always includes the `source` label (live/manual/csv/demo/stale/invalid). Never treat non-live sources as current readings. Read-only.",
+        "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading keeps its `source` and `quality` labels verbatim. `quality` is one of ok/degraded/stale/invalid. `source` is a canonical label (live/manual/csv/demo/stale/invalid) or a hardware-bridge label such as pi_bridge, esp32_*, home_assistant_bridge, ecowitt, mqtt or webhook. Treat a reading as current live data ONLY when its quality is `ok` AND its source is known-live (live, manual, csv, or a hardware-bridge label); sources sim, demo, stale and invalid, plus any source label you do not recognize, are never live. Read-only.",
       readOnly: true,
       params: [
         {
           name: "tentId",
           type: "string (uuid)",
           required: true,
-          description: "Tent id to fetch the latest reading for.",
+          description: "Tent id to fetch the latest readings for.",
         },
       ],
     },

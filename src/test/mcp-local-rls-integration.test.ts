@@ -97,6 +97,27 @@ describe("MCP manifest tool contract (parameter allow-list)", () => {
     expect(hasPaginationOrFilterAxes(t!)).toBe(false);
   });
 
+  it("get_latest_sensor_snapshot guidance teaches deny-by-default source trust", () => {
+    const t = toolByName("get_latest_sensor_snapshot");
+    expect(t).toBeTruthy();
+    const description = t!.description;
+    // Quality gate: only `ok` readings may count as current.
+    expect(description).toContain("`ok`");
+    // Every never-live source label is called out by name…
+    for (const source of NEVER_LIVE_SOURCES) {
+      expect(description, `description must call out non-live source ${source}`).toMatch(
+        new RegExp(`\\b${source}\\b`),
+      );
+    }
+    expect(description).toMatch(/never live/i);
+    // …and unknown labels are denied by default, not silently trusted.
+    expect(description).toMatch(/do not recognize|unrecognized|unknown/i);
+    // The obsolete claim that manual/pi_bridge/sim is the whole source
+    // vocabulary (with only `sim` non-live) must not come back.
+    expect(description).not.toContain("manual/pi_bridge/sim");
+    expect(description).not.toMatch(/or source `sim`, as current live data/);
+  });
+
   it("manifest-driven case generation covers every tool without inventing params", () => {
     for (const t of manifest.mcp.tools) {
       const advertised = new Set(Object.keys(t.inputSchema.properties ?? {}));
@@ -176,9 +197,55 @@ function assertNoSecretLeakage(payload: unknown) {
   }
 }
 
-/** Real vocabularies from the live schema (long-format sensor_readings). */
-const ALLOWED_SENSOR_SOURCES = new Set(["manual", "pi_bridge", "sim"]);
+/**
+ * Real vocabularies from the live schema (long-format sensor_readings).
+ * Mirrors the validate_sensor_reading() allow-list in
+ * supabase/migrations/20260617164759_*.sql — NOT the historical
+ * manual/pi_bridge/sim trio.
+ */
+const ALLOWED_SENSOR_SOURCES = new Set([
+  // Canonical Verdant V0 source labels
+  "live",
+  "manual",
+  "csv",
+  "demo",
+  "stale",
+  "invalid",
+  // Back-compat + bridge/vendor ingest labels
+  "pi_bridge",
+  "sim",
+  "webhook_generic",
+  "node_red_bridge",
+  "esp32_arduino",
+  "esp32_arduino_sht31",
+  "esp32_esphome",
+  "esp32_mqtt_bridge",
+  "home_assistant_bridge",
+  "ha_forwarded",
+  "ecowitt",
+  "mqtt",
+  "webhook",
+]);
 const ALLOWED_SENSOR_QUALITIES = new Set(["ok", "degraded", "stale", "invalid"]);
+/**
+ * Sources an agent must never treat as live. Everything else is trusted
+ * only via the deny-by-default rule the tool description spells out
+ * (quality `ok` + known-live source; unrecognized labels are never live).
+ */
+const NEVER_LIVE_SOURCES = ["sim", "demo", "stale", "invalid"] as const;
+
+/**
+ * Exact source/quality expectations for the rows seedUser() plants on the
+ * primary tent. temperature_c omits quality at insert to also cover the
+ * column default ('ok').
+ */
+const SEEDED_READING_LABELS: Record<string, { source: string; quality: string }> = {
+  temperature_c: { source: "manual", quality: "ok" },
+  humidity_pct: { source: "live", quality: "ok" },
+  vpd_kpa: { source: "csv", quality: "ok" },
+  co2_ppm: { source: "ecowitt", quality: "ok" },
+  ph: { source: "sim", quality: "degraded" },
+};
 
 function isIsoTimestamp(v: unknown): boolean {
   return typeof v === "string" && !Number.isNaN(Date.parse(v));
@@ -337,6 +404,9 @@ describeIfHarness("MCP local RLS integration", () => {
     }));
 
     // Live schema: sensor_readings is long-format (one row per metric).
+    // Sources cover representative canonical (live/csv), human (manual),
+    // vendor-bridge (ecowitt), and simulated (sim) labels — the tool must
+    // hand every label through verbatim (see SEEDED_READING_LABELS).
     const { data: readings, error: readingsErr } = await admin
       .from("sensor_readings")
       .insert([
@@ -353,8 +423,36 @@ describeIfHarness("MCP local RLS integration", () => {
           tent_id: tentId,
           metric: "humidity_pct",
           value: 55,
-          source: "manual",
+          source: "live",
+          quality: "ok",
           ts: new Date(now - 15_000).toISOString(),
+        },
+        {
+          user_id: userId,
+          tent_id: tentId,
+          metric: "vpd_kpa",
+          value: 1.2,
+          source: "csv",
+          quality: "ok",
+          ts: new Date(now - 20_000).toISOString(),
+        },
+        {
+          user_id: userId,
+          tent_id: tentId,
+          metric: "co2_ppm",
+          value: 800,
+          source: "ecowitt",
+          quality: "ok",
+          ts: new Date(now - 25_000).toISOString(),
+        },
+        {
+          user_id: userId,
+          tent_id: tentId,
+          metric: "ph",
+          value: 6.1,
+          source: "sim",
+          quality: "degraded",
+          ts: new Date(now - 10_000).toISOString(),
         },
       ])
       .select("id");
@@ -620,15 +718,17 @@ describeIfHarness("MCP local RLS integration", () => {
       expect(snap.tentId).toBe(userA.tentId);
       const readings = snap.readings as Record<string, any>;
       expect(readings).toBeTruthy();
-      const metrics = Object.keys(readings);
-      expect(metrics).toContain("temperature_c");
-      expect(metrics).toContain("humidity_pct");
+      // Every seeded metric survives; canonical, vendor, and simulated
+      // source labels (and a non-ok quality) all pass through verbatim.
+      expect(Object.keys(readings).sort()).toEqual(Object.keys(SEEDED_READING_LABELS).sort());
       for (const [metric, row] of Object.entries(readings)) {
         expect(row.metric).toBe(metric);
         expect(row.tent_id).toBe(userA.tentId);
         expect(typeof row.value).toBe("number");
         expect(ALLOWED_SENSOR_SOURCES.has(row.source)).toBe(true);
         expect(ALLOWED_SENSOR_QUALITIES.has(row.quality)).toBe(true);
+        expect(row.source).toBe(SEEDED_READING_LABELS[metric].source);
+        expect(row.quality).toBe(SEEDED_READING_LABELS[metric].quality);
         expect(isIsoTimestamp(row.ts)).toBe(true);
         expect(userA.readingIds).toContain(row.id);
         // Contract: never exposes raw_payload.
@@ -671,6 +771,113 @@ describeIfHarness("MCP local RLS integration", () => {
         "explicit unauthenticated",
       );
       expect(res.isError).toBe(true);
+    });
+  });
+
+  // ---------- get_latest_sensor_snapshot burst/backfill boundaries ----------
+
+  describe("get_latest_sensor_snapshot burst/backfill boundaries", () => {
+    /** More rows on one metric than the old global 50-row scan window. */
+    const NOISY_ROWS = 60;
+    let burstTentId: string;
+    let burstBase: number;
+    let newestTempIso: string;
+    let oldHumidityIso: string;
+    let latestCaptureCo2Iso: string;
+
+    beforeAll(async () => {
+      // Dedicated tent so burst fixtures never disturb the shared seeds
+      // (cleanup still happens via the user_id-wide afterAll deletes).
+      const { data: tent, error: tentErr } = await admin
+        .from("tents")
+        .insert({ user_id: userA.id, name: `Tent-${userA.marker}-burst` })
+        .select("id")
+        .single();
+      if (tentErr || !tent) throw new Error(`seed burst tent: ${fmtDbError(tentErr)}`);
+      burstTentId = tent.id as string;
+
+      // Recent but safely in the past (validate_sensor_reading rejects
+      // captured_at more than 5 minutes in the future).
+      burstBase = Date.now() - 120_000;
+      newestTempIso = new Date(burstBase).toISOString();
+      oldHumidityIso = new Date(burstBase - 3_600_000).toISOString();
+      latestCaptureCo2Iso = new Date(burstBase - 60_000).toISOString();
+
+      const noisy = Array.from({ length: NOISY_ROWS }, (_, i) => ({
+        user_id: userA.id,
+        tent_id: burstTentId,
+        metric: "temperature_c",
+        value: 24 + (i % 10) / 10,
+        source: "ecowitt",
+        quality: "ok",
+        ts: new Date(burstBase - i * 1_000).toISOString(),
+        captured_at: new Date(burstBase - i * 1_000).toISOString(),
+      }));
+      const { error: rowsErr } = await admin.from("sensor_readings").insert([
+        ...noisy,
+        // Quiet metric whose latest row is older than every noisy row.
+        {
+          user_id: userA.id,
+          tent_id: burstTentId,
+          metric: "humidity_pct",
+          value: 51,
+          source: "live",
+          quality: "ok",
+          ts: oldHumidityIso,
+          captured_at: oldHumidityIso,
+        },
+        // Backfill pair: the row ingested last (newest ts) was captured
+        // FIRST — capture time must win over ingest time.
+        {
+          user_id: userA.id,
+          tent_id: burstTentId,
+          metric: "co2_ppm",
+          value: 900,
+          source: "csv",
+          quality: "ok",
+          ts: new Date(burstBase).toISOString(),
+          captured_at: new Date(burstBase - 600_000).toISOString(),
+        },
+        {
+          user_id: userA.id,
+          tent_id: burstTentId,
+          metric: "co2_ppm",
+          value: 650,
+          source: "csv",
+          quality: "ok",
+          ts: new Date(burstBase - 300_000).toISOString(),
+          captured_at: latestCaptureCo2Iso,
+        },
+      ]);
+      if (rowsErr) throw new Error(`seed burst readings: ${fmtDbError(rowsErr)}`);
+    }, 60_000);
+
+    async function snapshotReadings() {
+      const res = await callTool(
+        "get_latest_sensor_snapshot",
+        userA,
+        { tentId: burstTentId },
+        "burst boundary",
+      );
+      assertMcpEnvelope(res);
+      assertNoSecretLeakage(res);
+      expect(res.isError).toBeFalsy();
+      return ((res.structuredContent as any)?.snapshot?.readings ?? {}) as Record<string, any>;
+    }
+
+    it(`${NOISY_ROWS} newer rows on one metric cannot evict another metric's older latest row`, async () => {
+      const readings = await snapshotReadings();
+      expect(Object.keys(readings).sort()).toEqual(["co2_ppm", "humidity_pct", "temperature_c"]);
+      expect(readings.humidity_pct.value).toBe(51);
+      expect(Date.parse(readings.humidity_pct.captured_at)).toBe(Date.parse(oldHumidityIso));
+      expect(readings.temperature_c.value).toBe(24);
+      expect(Date.parse(readings.temperature_c.captured_at)).toBe(Date.parse(newestTempIso));
+    });
+
+    it("capture time beats ingest time: a backfilled newer-ts row never wins", async () => {
+      const readings = await snapshotReadings();
+      expect(readings.co2_ppm.value).toBe(650);
+      expect(Date.parse(readings.co2_ppm.captured_at)).toBe(Date.parse(latestCaptureCo2Iso));
     });
   });
 

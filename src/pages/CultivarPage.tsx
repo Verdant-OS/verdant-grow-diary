@@ -7,6 +7,7 @@
  */
 import { Link, Navigate, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
+import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { findCultivarBySlug } from "@/constants/verdantCultivars";
 

@@ -71,7 +71,24 @@ Deno.serve(async (req) => {
           status: string;
         }
       | undefined;
-    if (!sub) return json(404, { error: 'no_subscription' });
+    if (!sub) {
+      // Distinguish "Founder Lifetime — nothing to manage" from "no
+      // billing history at all" so the UI can render the right copy
+      // instead of a misleading generic error. Lifetime rows are
+      // recognised by the `lifetime_%` pseudo-subscription id shape
+      // written by the webhook's record_lifetime path.
+      const { data: lifetimeRows } = await admin
+        .from('subscriptions')
+        .select('paddle_subscription_id')
+        .eq('user_id', uid)
+        .like('paddle_subscription_id', 'lifetime_%')
+        .limit(1);
+      if ((lifetimeRows ?? []).length > 0) {
+        return json(404, { error: 'lifetime_only' });
+      }
+      return json(404, { error: 'no_subscription' });
+    }
+
 
     const paddle = getPaddleClient(sub.environment);
     let portal: { urls?: { general?: { overview?: string } } };

@@ -384,4 +384,60 @@ describe('decide — dedicated subscription lifecycle events', () => {
     const d = decide(ev, 'sandbox', NOW);
     expect(d).toEqual({ kind: 'skip', reason: 'unhandled_event_type' });
   });
+
+  describe('adjustment.* (Code #7) — record-only, no entitlement mutation', () => {
+    function adjustmentEvent(type: 'adjustment.created' | 'adjustment.updated') {
+      return {
+        eventId: `evt_adj_${type}`,
+        eventType: type,
+        data: {
+          id: 'adj_01abcd',
+          action: 'refund',
+          status: 'approved',
+          transactionId: 'txn_01abcd',
+          subscriptionId: 'sub_01abcd',
+          customerId: 'ctm_01abcd',
+          items: [{ amount: '1000', type: 'partial' }],
+        },
+      };
+    }
+
+    it('adjustment.created → skip with reason adjustment_audit_only (no upsert/update)', () => {
+      const d = decide(adjustmentEvent('adjustment.created'), 'sandbox', NOW);
+      expect(d).toEqual({ kind: 'skip', reason: 'adjustment_audit_only' });
+    });
+
+    it('adjustment.updated → skip with reason adjustment_audit_only', () => {
+      const d = decide(adjustmentEvent('adjustment.updated'), 'live', NOW);
+      expect(d).toEqual({ kind: 'skip', reason: 'adjustment_audit_only' });
+    });
+
+    it('regression: adjustment.* never returns upsert/update/record_lifetime', () => {
+      for (const t of ['adjustment.created', 'adjustment.updated'] as const) {
+        const d = decide(adjustmentEvent(t), 'sandbox', NOW);
+        expect(d.kind).toBe('skip');
+        // Belt-and-braces: guarantee no entitlement mutation escape hatch.
+        expect(['upsert_subscription', 'update_subscription', 'record_lifetime'])
+          .not.toContain((d as { kind: string }).kind);
+      }
+    });
+
+    it('audit fields extract cleanly for adjustment events (no crash on missing sub fields)', () => {
+      const ev = adjustmentEvent('adjustment.created');
+      const audit = auditFields(ev, 'live');
+      expect(audit.event_type).toBe('adjustment.created');
+      expect(audit.environment).toBe('live');
+      // Adjustment payload has no customData.userId — must not throw.
+      expect(audit.user_id).toBeNull();
+    });
+
+    it('unknown adjustment.* subtype still falls through to unhandled_event_type', () => {
+      const ev = adjustmentEvent('adjustment.created');
+      // deliberately unknown subtype
+      (ev as { eventType: string }).eventType = 'adjustment.mystery';
+      const d = decide(ev, 'sandbox', NOW);
+      expect(d).toEqual({ kind: 'skip', reason: 'unhandled_event_type' });
+    });
+  });
 });
+

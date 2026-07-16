@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useOpenCustomerPortalState } from "@/lib/customerPortal";
+import { usePaddleCancelNotice } from "@/hooks/usePaddleCancelNotice";
+
 import {
   DELETE_ACCOUNT_CONFIRMATION,
   requestAccountDeletion,
@@ -278,8 +280,10 @@ function TemperatureUnitTile() {
 function SubscriptionTile() {
   const { loading, entitlement } = useMyEntitlements();
   const { opening, error: portalError, open: openPortal, clearError } = useOpenCustomerPortalState();
+  const cancelNotice = usePaddleCancelNotice();
 
   const planId = entitlement?.displayPlanId ?? null;
+
   const tier = planId ? PRICING_TIERS.find((t) => t.id === planId) ?? null : null;
 
   const label = loading
@@ -333,6 +337,17 @@ function SubscriptionTile() {
               Canceled — access continues until the end of your paid period.
             </p>
           )}
+          {cancelNotice.visible && entitlement?.status !== "canceled" && (
+            <p
+              className="text-xs text-muted-foreground mt-1"
+              data-testid="settings-subscription-cancel-notice"
+            >
+              {cancelNotice.accessUntilLabel
+                ? `Cancellation scheduled — access continues until ${cancelNotice.accessUntilLabel}.`
+                : "Cancellation scheduled — access continues until the end of your current period."}
+            </p>
+          )}
+
           {!loading && !tier && (
             <p className="text-xs text-muted-foreground">
               We couldn't determine your plan right now. Your grow data is safe

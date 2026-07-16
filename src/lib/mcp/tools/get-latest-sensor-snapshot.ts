@@ -13,8 +13,11 @@
  * (src/hooks/useLatestSensorSnapshot.ts), then id DESC so equal
  * timestamps can never flip the snapshot between calls.
  *
- * Preserves `source` and `quality` labels verbatim so agents can never
- * treat simulated/demo/degraded/stale/invalid data as current.
+ * Preserves `source` and `quality` labels verbatim. Trust follows the
+ * canonical SENSOR TRUTH contract: only quality `ok` + source `live`
+ * (fresh validated connected telemetry) counts as current live data;
+ * manual stays manual, csv stays csv, demo stays demo, and
+ * sim/stale/invalid/unknown labels are never live.
  * Never returns `raw_payload`.
  *
  * Verifies tent ownership first: tents policies are strictly owner-scoped,
@@ -63,14 +66,15 @@ export default defineTool({
     "ec, ppfd) for one of the signed-in grower's own tents, ordered by " +
     "capture time (captured_at, falling back to ingest time). Every " +
     "reading keeps its `source` and `quality` labels verbatim. `quality` " +
-    "is one of ok/degraded/stale/invalid. `source` is a canonical label " +
-    "(live/manual/csv/demo/stale/invalid) or a hardware-bridge label " +
-    "such as pi_bridge, esp32_*, home_assistant_bridge, ecowitt or " +
-    "webhook. Treat a reading as current live data ONLY when its " +
-    "quality is `ok` AND its source is known-live (live, manual, csv, " +
-    "or a hardware-bridge label); sources sim, demo, stale and invalid, " +
-    "plus any source label you do not recognize, are never live. " +
-    "Read-only.",
+    "is one of ok/degraded/stale/invalid. Canonical `source` labels are " +
+    "exactly live/manual/csv/demo/stale/invalid, where `live` means " +
+    "fresh validated connected telemetry; legacy rows may carry other " +
+    "ingest labels such as sim or vendor bridge names. Treat a reading " +
+    "as current live telemetry ONLY when its quality is `ok` AND its " +
+    "source is `live`. Every other source or quality keeps its label " +
+    "and is never live: manual stays manual, csv stays csv, demo stays " +
+    "demo, and sim, stale, invalid, or unknown labels are never current " +
+    "or healthy. Read-only.",
   inputSchema: {
     tentId: z.string().uuid().describe("Tent id to fetch the latest readings for."),
   },

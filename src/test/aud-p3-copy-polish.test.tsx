@@ -22,7 +22,18 @@ vi.mock("@/integrations/supabase/client", () => {
   const makeQuery = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const q: any = {};
-    for (const m of ["select", "eq", "neq", "in", "order", "limit", "range", "gte", "lte"]) {
+    for (const m of [
+      "select",
+      "eq",
+      "neq",
+      "not",
+      "in",
+      "order",
+      "limit",
+      "range",
+      "gte",
+      "lte",
+    ]) {
       q[m] = () => q;
     }
     q.maybeSingle = async () => ({ data: null, error: null });

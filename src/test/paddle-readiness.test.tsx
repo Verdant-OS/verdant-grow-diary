@@ -196,6 +196,7 @@ describe(".env.example sandbox keys", () => {
       "PAYMENTS_SANDBOX_WEBHOOK_SECRET",
       "PAYMENTS_LIVE_WEBHOOK_SECRET",
       "PAYMENTS_ENVIRONMENT",
+      "LOVABLE_API_KEY",
     ]) {
       // Each server-only name is documented…
       expect(ENV_EXAMPLE).toContain(name);

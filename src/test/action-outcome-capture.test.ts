@@ -371,9 +371,11 @@ describe("ActionDetail — outcome does not mutate action_queue", () => {
 // 20. Existing Action Completion → Follow-Up tests still pass (covered by run)
 // ---------------------------------------------------------------------------
 describe("actionOutcomeRules — does not break followup rules", () => {
-  it("follow-up imports are still present in ActionDetail", () => {
-    expect(ACTION_DETAIL).toContain("buildActionFollowupDiaryDraft");
-    expect(ACTION_DETAIL).toContain("followupMatchesAction");
+  it("follow-up wiring is still present in ActionDetail (shared writer)", () => {
+    // The follow-up implementation lives in the shared writer module now;
+    // ActionDetail must still route completion through it.
+    expect(ACTION_DETAIL).toContain("maybeWriteActionFollowupDiaryEntry");
+    expect(ACTION_DETAIL).toContain("writeActionFollowupDiaryEntry");
   });
 });
 

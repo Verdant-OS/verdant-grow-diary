@@ -87,8 +87,15 @@ describe("ActionDetail — duplicate completion idempotency contract", () => {
     expect(ACTION_DETAIL).toMatch(/event_type:\s*ACTION_FOLLOWUP_EVENT_TYPE/);
     expect(ACTION_DETAIL).toMatch(/action_queue_id:\s*row\.id/);
   });
-  it("uses followupMatchesAction before inserting", () => {
-    expect(ACTION_DETAIL).toMatch(/followupMatchesAction\(/);
+  it("uses followupMatchesAction before inserting (via the shared writer)", () => {
+    // The idempotency check moved with the writer extraction; ActionDetail
+    // routes through it rather than re-implementing the lookup inline.
+    expect(ACTION_DETAIL).toMatch(/maybeWriteActionFollowupDiaryEntry\(/);
+    const writer = readFileSync(
+      resolve(__dirname, "../..", "src/lib/writeActionFollowupDiaryEntry.ts"),
+      "utf8",
+    );
+    expect(writer).toMatch(/followupMatchesAction\(/);
   });
   it("never includes user_id in the follow-up insert payload", () => {
     // Tighten to insert object literal only — comments mentioning user_id are fine.

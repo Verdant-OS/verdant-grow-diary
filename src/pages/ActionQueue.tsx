@@ -71,6 +71,7 @@ import {
   nextStatusFor,
   normalizeNote,
 } from "@/lib/actionQueueTransitions";
+import { maybeWriteActionFollowupDiaryEntry } from "@/lib/writeActionFollowupDiaryEntry";
 import {
   ACTION_QUEUE_SOURCE_VALUES,
   getActionQueueSourceLabel,
@@ -764,6 +765,22 @@ export default function ActionQueue() {
       return;
     }
     await logEvent(row, event_type, new_status, note);
+    // Follow-up diary entry: ONLY when this transition completes the action.
+    // Same shared writer + non-blocking contract as ActionDetail, so
+    // completing from the queue list writes the identical idempotent
+    // action_followup memory instead of silently skipping it.
+    if (new_status === "completed") {
+      const followup = await maybeWriteActionFollowupDiaryEntry({
+        ...row,
+        ...next,
+        status: "completed",
+      });
+      if (followup.ok === false) {
+        toast.warning("Action completed, but follow-up note could not be created.", {
+          description: followup.message,
+        });
+      }
+    }
     let traceKind: ActionQueueTraceKind | null = null;
     if (new_status === "approved") traceKind = "approved";
     else if (new_status === "rejected") traceKind = "rejected";

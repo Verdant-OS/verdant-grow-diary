@@ -59,9 +59,11 @@ export const IMPORTED_HISTORY_PROMPT_STRINGS = Object.freeze({
     "Never use these words anywhere in your response: confirmed, certain, cured, guaranteed, live, synced, connected, imported. Say 'current sensor readings' instead of 'live sensor readings' and 'historical context' instead of 'imported history'.",
   // Confidence levels named here must be members of the result contract's
   // accepted enum (low | medium | high) — 'moderate' would be rejected
-  // with confidence_enum.
+  // with confidence_enum. The model tends to echo this string when
+  // explaining its capped confidence, so it must also stay free of
+  // validator-banned words ('imported' → 'historical sensor context').
   confidenceCap:
-    "If only imported history is available (no current sensor readings), cap Confidence at 'low' or 'medium' — never 'high'.",
+    "If only historical sensor context is available (no current sensor readings), cap Confidence at 'low' or 'medium' — never 'high'.",
 });
 
 export interface ImportedHistoryPromptFragment {

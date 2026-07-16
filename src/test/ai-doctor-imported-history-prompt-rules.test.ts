@@ -10,7 +10,10 @@ import {
   compilePlantContextFromRows,
   type SensorReadingRowLike,
 } from "@/lib/aiDoctorContextCompiler";
-import { AI_DOCTOR_REVIEW_CONFIDENCE_VALUES } from "@/lib/aiDoctorReviewResultContract";
+import {
+  AI_DOCTOR_REVIEW_BANNED_WORDS,
+  AI_DOCTOR_REVIEW_CONFIDENCE_VALUES,
+} from "@/lib/aiDoctorReviewResultContract";
 
 const NOW = new Date("2026-06-04T12:00:00Z");
 const iso = (off: number) => new Date(NOW.getTime() - off).toISOString();
@@ -163,6 +166,24 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     expect(named.length).toBeGreaterThan(0);
     for (const level of named) {
       expect(AI_DOCTOR_REVIEW_CONFIDENCE_VALUES).toContain(level);
+    }
+  });
+
+  it("echo-prone guidance strings contain no validator-banned words", () => {
+    // The model tends to restate these strings in its response (e.g. when
+    // explaining a capped Confidence), so they must stay inside the result
+    // validator's vocabulary. The vocabulary-ban rule itself is exempt —
+    // a deny-list must name the words it bans — and the caveats about the
+    // context data are shown to the model as input labels, not phrasing
+    // it is told to reproduce.
+    const bannedRe = new RegExp(`\\b(${AI_DOCTOR_REVIEW_BANNED_WORDS.join("|")})\\b`, "i");
+    for (const key of [
+      "confidenceCap",
+      "missingLiveReadings",
+      "missingInfoIncludeLive",
+      "evidenceSeparation",
+    ] as const) {
+      expect(IMPORTED_HISTORY_PROMPT_STRINGS[key]).not.toMatch(bannedRe);
     }
   });
 

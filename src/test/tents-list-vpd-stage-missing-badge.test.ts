@@ -6,9 +6,7 @@ const SRC = readFileSync(resolve(__dirname, "../pages/Tents.tsx"), "utf8");
 
 describe("Tents list VPD stage-missing info badge", () => {
   it("still imports the canonical stage-aware VPD helper", () => {
-    expect(SRC).toMatch(
-      /classifyVpdAgainstStage[\s\S]*from\s+["']@\/lib\/vpdStageTargetRules["']/,
-    );
+    expect(SRC).toMatch(/normalizeVpdStage[\s\S]*from\s+["']@\/lib\/vpdStageTargetRules["']/);
   });
 
   it("uses the shared VpdStageMissingBadge component", () => {
@@ -21,15 +19,16 @@ describe("Tents list VPD stage-missing info badge", () => {
   });
 
   it("gates the badge on present VPD and unknown-normalized tent stage", () => {
+    // hasVpdValue is derived from the truth-filtered snapshot: the VPD
+    // metric exists and is not status "unknown" (i.e. a real value).
+    expect(SRC).toMatch(/const hasVpdValue = !!vpdMetric && vpdMetric\.status !== "unknown"/);
     expect(SRC).toMatch(
-      /last\?\.vpd\s*!=\s*null\s*&&\s*normalizeVpdStage\(t\.stage\)\s*===\s*"unknown"\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?tents-list-vpd-stage-missing-badge/,
+      /hasVpdValue\s*&&\s*normalizeVpdStage\(t\.stage\)\s*===\s*"unknown"\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?tents-list-vpd-stage-missing-badge/,
     );
   });
 
   it("badge branch performs no alert/queue/automation writes", () => {
-    const m = SRC.match(
-      /normalizeVpdStage\(t\.stage\)\s*===\s*"unknown"\s*&&\s*\(([\s\S]*?)\)\}/,
-    );
+    const m = SRC.match(/normalizeVpdStage\(t\.stage\)\s*===\s*"unknown"\s*&&\s*\(([\s\S]*?)\)\}/);
     expect(m).toBeTruthy();
     expect(m![1]).not.toMatch(
       /saveAlert|logAlertEvent|action_queue|service_role|automation|device.control|from\(['"]alerts['"]\)/i,
@@ -41,7 +40,8 @@ describe("Tents list VPD stage-missing info badge", () => {
     expect(SRC).not.toMatch(/action_queue/);
   });
 
-  it("preserves the existing stage-aware VPD MetricChip wiring", () => {
-    expect(SRC).toMatch(/vpdMetricChipStatus\(vpdClassification\)/);
+  it("preserves the stage-aware VPD MetricChip wiring via the shared presenter", () => {
+    expect(SRC).toMatch(/buildTentSnapshotView/);
+    expect(SRC).toMatch(/const vpdMetric = snapView\.metrics\.find\(\(m\) => m\.key === "vpd"\)/);
   });
 });

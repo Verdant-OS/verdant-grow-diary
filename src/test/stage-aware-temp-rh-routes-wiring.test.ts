@@ -12,19 +12,25 @@ const FORBIDDEN =
 const IMPORT_RE =
   /import\s+\{[\s\S]*classifyTempAgainstStage[\s\S]*classifyRhAgainstStage[\s\S]*environmentMetricChipStatus[\s\S]*\}\s+from\s+["']@\/lib\/environmentStageTargetRules["']/;
 
+// Tents list chips now flow through the shared Dashboard-strip presenter
+// (`buildTentSnapshotView`), which wires Temp/RH through the same canonical
+// stage-aware helpers. Assert the page uses the presenter and the presenter
+// uses the helpers — no inline JSX classification, no hardcoded thresholds.
+const SNAPSHOT_VM = readFileSync(
+  resolve(__dirname, "../lib/dashboardEnvironmentSnapshotViewModel.ts"),
+  "utf8",
+);
+
 describe("Tents list — stage-aware Temp/RH wiring", () => {
-  it("imports the helpers", () => {
-    expect(TENTS).toMatch(IMPORT_RE);
+  it("renders chips from the shared truth-filtered presenter", () => {
+    expect(TENTS).toMatch(/buildTentSnapshotView/);
+    expect(TENTS).toMatch(/value=\{m\.display\}/);
+    expect(TENTS).toMatch(/status=\{m\.chipStatus\}/);
   });
-  it("wires Temperature MetricChip through classifyTempAgainstStage", () => {
-    expect(TENTS).toMatch(
-      /label="T"[\s\S]*environmentMetricChipStatus\(classifyTempAgainstStage\(/,
-    );
-  });
-  it("wires RH MetricChip through classifyRhAgainstStage", () => {
-    expect(TENTS).toMatch(
-      /label="RH"[\s\S]*environmentMetricChipStatus\(classifyRhAgainstStage\(/,
-    );
+  it("presenter wires Temp/RH through the canonical stage-aware helpers", () => {
+    expect(SNAPSHOT_VM).toMatch(/from\s+["']@\/lib\/environmentStageTargetRules["']/);
+    expect(SNAPSHOT_VM).toMatch(/environmentMetricChipStatus\(\s*classifyTempAgainstStage\(/);
+    expect(SNAPSHOT_VM).toMatch(/environmentMetricChipStatus\(\s*classifyRhAgainstStage\(/);
   });
   it("removes hardcoded temp threshold expressions", () => {
     expect(TENTS).not.toMatch(/last\.temp\s*>\s*28/);

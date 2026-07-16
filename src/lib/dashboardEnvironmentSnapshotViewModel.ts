@@ -15,11 +15,7 @@
  * No I/O, no React, no automation, no device control.
  */
 import { format } from "date-fns";
-import {
-  isStale,
-  snapshotFromReadings,
-  type SensorReadingLike,
-} from "@/lib/sensorSnapshot";
+import { isStale, snapshotFromReadings, type SensorReadingLike } from "@/lib/sensorSnapshot";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
 import { resolveSensorSourceLabel } from "@/lib/sensorSourceLabelRules";
 import {
@@ -27,11 +23,9 @@ import {
   classifyTempAgainstStage,
   environmentMetricChipStatus,
 } from "@/lib/environmentStageTargetRules";
-import {
-  classifyVpdAgainstStage,
-  vpdMetricChipStatus,
-} from "@/lib/stageAwareVpdTargets";
+import { classifyVpdAgainstStage, vpdMetricChipStatus } from "@/lib/stageAwareVpdTargets";
 import { tempFFromC } from "@/lib/temperatureUnits";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import type { SensorReadingSource } from "@/mock";
 
 export type MetricStatus = "ok" | "stale" | "invalid" | "unknown";
@@ -115,10 +109,22 @@ function formatNumber(v: number | null, digits: number): string {
   return v.toFixed(digits);
 }
 
+export interface BuildTentSnapshotViewOptions {
+  /**
+   * Temperature display unit. Stored sensor values are canonical Celsius;
+   * the default ("fahrenheit") preserves the Dashboard strip's existing
+   * display. Callers honoring the grower's saved unit preference (e.g. the
+   * Tents list) resolve it themselves and pass it in — this module stays
+   * pure and never reads storage.
+   */
+  temperatureUnit?: TemperatureUnitPreference;
+}
+
 export function buildTentSnapshotView(
   rows: BuildTentSnapshotInput[] | null | undefined,
   stage: string | null | undefined,
   now: number = Date.now(),
+  options: BuildTentSnapshotViewOptions = {},
 ): TentSnapshotView {
   if (!rows || rows.length === 0) return EMPTY;
   const snap = snapshotFromReadings(rows);
@@ -154,7 +160,14 @@ export function buildTentSnapshotView(
   const capturedAt = resolveCapturedAt(latestRows, snap.ts);
   const stale = !!capturedAt && isStale(capturedAt, now);
   const quality = evaluateSensorQuality(snap, now);
-  const invalid = quality.suspiciousFields.length > 0;
+  // "Invalid" is reserved for present-but-implausible values.
+  // evaluateSensorQuality also flags an absent VPD as suspicious (review
+  // hint for the quality card), but a missing metric is unknown/no-data —
+  // it must not relabel an otherwise-honest Stale/Manual/CSV snapshot as
+  // Invalid.
+  const invalid = quality.suspiciousFields.some(
+    (f) => typeof snap[f as keyof typeof snap] === "number",
+  );
 
   // Stale/invalid override the source label per requirement #2/#6.
   let sourceLabel = resolved.label;
@@ -165,7 +178,10 @@ export function buildTentSnapshotView(
     ? format(new Date(capturedAt), "MMM d, yyyy, h:mm a")
     : "Unknown";
 
-  const tempF = tempFFromC(snap.temp);
+  const temperatureUnit = options.temperatureUnit ?? "fahrenheit";
+  const tempDisplayValue =
+    temperatureUnit === "celsius" ? (snap.temp ?? null) : tempFFromC(snap.temp);
+  const tempUnitSymbol = temperatureUnit === "celsius" ? "°C" : "°F";
 
   const mkMetric = (
     key: "temp" | "rh" | "vpd",
@@ -203,11 +219,9 @@ export function buildTentSnapshotView(
     mkMetric(
       "temp",
       "Temperature",
-      tempF,
-      "°F",
-      environmentMetricChipStatus(
-        classifyTempAgainstStage(snap.temp ?? null, { stage }),
-      ),
+      tempDisplayValue,
+      tempUnitSymbol,
+      environmentMetricChipStatus(classifyTempAgainstStage(snap.temp ?? null, { stage })),
       "temp",
       1,
     ),
@@ -216,9 +230,7 @@ export function buildTentSnapshotView(
       "Humidity",
       snap.rh,
       "%",
-      environmentMetricChipStatus(
-        classifyRhAgainstStage(snap.rh ?? null, { stage }),
-      ),
+      environmentMetricChipStatus(classifyRhAgainstStage(snap.rh ?? null, { stage })),
       "rh",
       1,
     ),
@@ -227,9 +239,7 @@ export function buildTentSnapshotView(
       "VPD",
       snap.vpd,
       " kPa",
-      vpdMetricChipStatus(
-        classifyVpdAgainstStage({ value: snap.vpd ?? null, stage }),
-      ),
+      vpdMetricChipStatus(classifyVpdAgainstStage({ value: snap.vpd ?? null, stage })),
       "vpd",
       2,
     ),

@@ -44,7 +44,9 @@ export type SkipReason =
   | 'unhandled_event_type'
   | 'lifetime_price_only_for_transactions'
   | 'non_lifetime_transaction'
-  | 'unknown_lifetime_price_id';
+  | 'unknown_lifetime_price_id'
+  | 'adjustment_audit_only';
+
 
 export interface SubscriptionUpsertRow {
   user_id: string;
@@ -289,8 +291,20 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
     };
   }
 
+  // Adjustment events (refunds / credits / chargebacks). RECORD-ONLY:
+  // insertEventReceived() has already persisted the raw payload to
+  // lovable_paddle_events for operator visibility. We deliberately do NOT
+  // mutate subscriptions, entitlements, or access rules here — refunds
+  // are handled operationally (see the runbook), not by silently flipping
+  // a user's plan. Distinct skip_reason so the audit surface can filter
+  // "recorded on purpose" from "unknown event type" noise.
+  if (type === 'adjustment.created' || type === 'adjustment.updated') {
+    return { kind: 'skip', reason: 'adjustment_audit_only' };
+  }
+
   return { kind: 'skip', reason: 'unhandled_event_type' };
 }
+
 
 /**
  * If this is a `transaction.completed` event with no subscriptionId and no

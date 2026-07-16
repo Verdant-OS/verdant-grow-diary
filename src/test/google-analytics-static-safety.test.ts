@@ -9,6 +9,7 @@ import path from "node:path";
 const ANALYTICS_FILES = [
   "src/constants/analytics.ts",
   "src/hooks/useGoogleAnalyticsPageViews.ts",
+  "src/lib/analyticsPageViewRules.ts",
   "src/App.tsx",
 ];
 
@@ -62,5 +63,12 @@ describe("Google Analytics static safety — no PII in path logic", () => {
     expect(content).not.toContain("tentId");
     expect(content).not.toContain("plantId");
     expect(content).not.toContain("auth.uid");
+  });
+
+  it("never forwards React Router search params or relies on GA's raw-location fallback", () => {
+    const hook = readFile("src/hooks/useGoogleAnalyticsPageViews.ts");
+    expect(hook).not.toContain("location.search");
+    expect(hook).toContain("page_location:");
+    expect(hook).toContain("buildSafeAnalyticsPageLocation");
   });
 });

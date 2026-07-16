@@ -23,6 +23,7 @@ import Tasks from "./pages/Tasks";
 import Alerts from "./pages/Alerts";
 import AlertDetail from "./pages/AlertDetail";
 import Settings from "./pages/Settings";
+import AgentIntegrations from "./pages/AgentIntegrations";
 import Timeline from "./pages/Timeline";
 import Grows from "./pages/Grows";
 import GrowDetail from "./pages/GrowDetail";
@@ -182,6 +183,7 @@ const App = () => (
                       />
 
                       <Route path="/settings" element={<Settings />} />
+                      <Route path="/settings/agent-integrations" element={<AgentIntegrations />} />
                       <Route path="/diagnostics" element={<Diagnostics />} />
                       <Route path="/operator/ecowitt" element={<OperatorEcowittCanary />} />
                       <Route

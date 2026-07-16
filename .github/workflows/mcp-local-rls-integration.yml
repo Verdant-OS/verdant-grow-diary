@@ -1,0 +1,225 @@
+name: MCP local RLS integration
+
+# Runs the Verdant MCP read-only RLS integration harness against a fresh
+# LOCAL Supabase started by the Supabase CLI on the runner. No hosted
+# Supabase, no production secrets — the "service role" used here is the
+# ephemeral local key printed by `supabase status`, used only for seeding
+# and cleanup. MCP tool execution itself always routes through per-user
+# anon tokens (`supabaseForUser(ctx)`).
+#
+# Hard lines (keep these):
+#   - No `supabase link`.
+#   - No remote `supabase db push`.
+#   - No hosted project refs / production URLs.
+#   - No repo secrets.
+#   - Local keys are masked and never echoed.
+#   - Debug artifacts upload ONLY on failure and are sanitized first.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_mcp_rls:
+        description: "Boot local Supabase and run the MCP RLS harness"
+        type: boolean
+        required: false
+        default: true
+  push:
+    branches: [main, verdant-grow-diary]
+    paths:
+      - "src/lib/mcp/**"
+      - "src/test/mcp-local-rls-integration.test.ts"
+      - "src/test/helpers/mcpRlsHarnessOps.ts"
+      - "scripts/sanitize-mcp-rls-artifacts.mjs"
+      - ".lovable/mcp/manifest.json"
+      - "supabase/migrations/**"
+      - ".github/workflows/mcp-local-rls-integration.yml"
+  pull_request:
+    branches: [main, verdant-grow-diary]
+    paths:
+      - "src/lib/mcp/**"
+      - "src/test/mcp-local-rls-integration.test.ts"
+      - "src/test/helpers/mcpRlsHarnessOps.ts"
+      - "scripts/sanitize-mcp-rls-artifacts.mjs"
+      - ".lovable/mcp/manifest.json"
+      - "supabase/migrations/**"
+      - ".github/workflows/mcp-local-rls-integration.yml"
+
+jobs:
+  mcp-local-rls:
+    name: MCP RLS harness (local Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # OPT-IN lane (mirrors security-db-local.yml): the harness needs a local
+    # Supabase container the shared runners cannot always provide. The
+    # job-level `if` makes disabled runs report as SKIPPED (visibly not-run,
+    # never a false green pass), and enabled runs are authoritative — no
+    # continue-on-error, so an isolation regression fails the workflow
+    # instead of being masked. Enable via workflow_dispatch input
+    # run_mcp_rls=true or repository variable ENABLE_MCP_RLS_LANE=true.
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_mcp_rls == true) || vars.ENABLE_MCP_RLS_LANE == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
+        with:
+          # Pinned: "latest" resolves through an unauthenticated GitHub API
+          # call that rate-limits on shared runners (see security-db-local.yml,
+          # two fast lane failures on 2026-07-09). Bump deliberately.
+          version: 2.109.1
+
+      - name: Start local Supabase
+        run: |
+          supabase start --exclude studio,inbucket,imgproxy,pgadmin-schema-diff,pgbouncer,realtime,edge-runtime,logflare,vector
+
+      - name: Extract local Supabase env (masked)
+        id: sb
+        run: |
+          set -euo pipefail
+          # Machine-readable key=value output from Supabase CLI.
+          eval "$(supabase status -o env)"
+          # Mask the ephemeral local keys so they never render in any log.
+          echo "::add-mask::${ANON_KEY}"
+          echo "::add-mask::${SERVICE_ROLE_KEY}"
+          {
+            echo "api_url=${API_URL}"
+            echo "anon_key=${ANON_KEY}"
+            echo "service_role_key=${SERVICE_ROLE_KEY}"
+            echo "db_url=${DB_URL}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Wait for local Supabase readiness
+        env:
+          LOCAL_URL: ${{ steps.sb.outputs.api_url }}
+          LOCAL_ANON: ${{ steps.sb.outputs.anon_key }}
+        run: |
+          set -euo pipefail
+          wait_ready() {
+            local label="$1" url="$2"
+            for i in $(seq 1 30); do
+              if curl -fsS -o /dev/null -H "apikey: ${LOCAL_ANON}" "$url"; then
+                echo "readiness: ${label} reachable (attempt ${i})"
+                return 0
+              fi
+              sleep 2
+            done
+            echo "::error::Local Supabase ${label} endpoint not reachable after 60s (${url})"
+            return 1
+          }
+          wait_ready "auth" "${LOCAL_URL}/auth/v1/health"
+          wait_ready "rest" "${LOCAL_URL}/rest/v1/"
+          # DB readiness proxy: the CLI reports status only when services run.
+          supabase status > /dev/null
+
+      - name: Apply and verify local migrations
+        run: |
+          set -euo pipefail
+          # Reset the LOCAL database and re-apply every repo migration
+          # deterministically. Fails the job clearly if any migration fails.
+          # This never touches a hosted project (no link, no remote push).
+          supabase db reset --local
+          echo "Applied local migrations:"
+          supabase migration list --local
+
+      - name: Grant hosted-parity API-role privileges (LOCAL database only)
+        env:
+          DB_URL: ${{ steps.sb.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          # The hosted (Lovable Cloud) migration runner grants API-role table
+          # privileges on new tables by default; the local CLI stack applies
+          # repo migrations without those grants, so every PostgREST request
+          # fails with 42501 regardless of RLS. Mirror hosted reality for
+          # exactly the tables this harness exercises — RLS remains the
+          # isolation boundary under test. This psql targets 127.0.0.1 only
+          # and never runs against a hosted project.
+          psql "${DB_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+          GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+          GRANT ALL ON TABLE
+            public.grows, public.tents, public.diary_entries, public.sensor_readings
+            TO service_role;
+          GRANT SELECT ON TABLE
+            public.grows, public.tents, public.diary_entries, public.sensor_readings
+            TO authenticated;
+          SQL
+
+      - name: Re-check readiness after migration reset
+        env:
+          LOCAL_URL: ${{ steps.sb.outputs.api_url }}
+          LOCAL_ANON: ${{ steps.sb.outputs.anon_key }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null -H "apikey: ${LOCAL_ANON}" "${LOCAL_URL}/rest/v1/"; then
+              echo "readiness: rest reachable after reset (attempt ${i})"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Local Supabase not reachable after db reset"
+          exit 1
+
+      - name: Diagnostic REST probes (no keys printed; error bodies only)
+        env:
+          LOCAL_URL: ${{ steps.sb.outputs.api_url }}
+          LOCAL_ANON: ${{ steps.sb.outputs.anon_key }}
+          LOCAL_SERVICE: ${{ steps.sb.outputs.service_role_key }}
+        run: |
+          set -euo pipefail
+          supabase --version
+          probe() {
+            local label="$1" key="$2"
+            local body code
+            body=$(mktemp)
+            code=$(curl -s -o "$body" -w "%{http_code}" \
+              "${LOCAL_URL}/rest/v1/grows?select=id&limit=1" \
+              -H "apikey: ${key}" -H "Authorization: Bearer ${key}")
+            echo "probe ${label}: HTTP ${code} body=$(head -c 300 "$body")"
+            rm -f "$body"
+          }
+          probe "service-role key" "${LOCAL_SERVICE}"
+          probe "anon key" "${LOCAL_ANON}"
+
+      - name: Run MCP local RLS integration test
+        env:
+          MCP_LOCAL_RLS_HARNESS: "1"
+          LOCAL_SUPABASE_URL: ${{ steps.sb.outputs.api_url }}
+          LOCAL_SUPABASE_ANON_KEY: ${{ steps.sb.outputs.anon_key }}
+          LOCAL_SUPABASE_SERVICE_ROLE_KEY: ${{ steps.sb.outputs.service_role_key }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mcp-local-rls
+          bunx vitest run src/test/mcp-local-rls-integration.test.ts --reporter=default 2>&1 \
+            | tee artifacts/mcp-local-rls/vitest-output.log
+
+      - name: Sanitize failure artifacts
+        if: failure()
+        env:
+          LOCAL_SUPABASE_ANON_KEY: ${{ steps.sb.outputs.anon_key }}
+          LOCAL_SUPABASE_SERVICE_ROLE_KEY: ${{ steps.sb.outputs.service_role_key }}
+        run: node scripts/sanitize-mcp-rls-artifacts.mjs artifacts/mcp-local-rls
+
+      - name: Upload sanitized failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mcp-local-rls-failure-artifacts
+          path: |
+            artifacts/mcp-local-rls/*.json
+            artifacts/mcp-local-rls/*.log
+            artifacts/mcp-local-rls/README.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup || true

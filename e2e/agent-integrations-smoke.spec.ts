@@ -159,16 +159,16 @@ test.describe("Agent Integrations settings smoke (mocked, 1280x800)", () => {
     await expect(manifestLink).toHaveAttribute("target", "_blank");
     await expect(manifestLink).toHaveAttribute("rel", /noopener/);
 
-    // Verify tool access section + default not_checked panel.
+    // Verify tool access section: no harness exists in this build, so the
+    // panel declares harness_unavailable statically and renders an
+    // "Unavailable in this build" badge in place of a Verify button —
+    // no clickable dead end, and never authorized without a harness.
     await expect(page.getByTestId("verify-tool-access")).toBeVisible();
     const panel = page.getByTestId("verify-tool-access-result");
-    await expect(panel).toHaveAttribute("data-status", "not_checked");
-    await expect(page.getByTestId("verify-tool-checked")).toContainText("list_grows");
-
-    // After clicking Verify with the default browser harness, we get
-    // harness_unavailable — never authorized without a harness.
-    await page.getByTestId("verify-tool-access-button").click();
     await expect(panel).toHaveAttribute("data-status", "harness_unavailable");
+    await expect(page.getByTestId("verify-tool-checked")).toContainText("list_grows");
+    await expect(page.getByTestId("verify-harness-unavailable-badge")).toBeVisible();
+    await expect(page.getByTestId("verify-tool-access-button")).toHaveCount(0);
     await expect(page.getByTestId("verify-next-step")).toContainText(/configured local harness/i);
 
     // Manifest summary modal opens + shows safe projection.

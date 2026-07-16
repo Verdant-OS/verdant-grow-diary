@@ -405,7 +405,113 @@ function SubscriptionTile() {
   );
 }
 
+/**
+ * DeleteAccountTile — destructive, self-serve account deletion.
+ *
+ * Guards:
+ *  - Typed confirmation ("DELETE") required before the request fires.
+ *  - The edge function re-verifies the caller JWT and requires the same
+ *    literal in the body; a click-through cannot silently delete.
+ *  - Rows in public.* cascade via existing FKs on auth.users(id).
+ */
+function DeleteAccountTile() {
+  const [open, setOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canConfirm = confirmation === DELETE_ACCOUNT_CONFIRMATION && !busy;
 
+  async function handleDelete() {
+    setBusy(true);
+    setError(null);
+    const result = await requestAccountDeletion(confirmation);
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error ?? "Something went wrong.");
+      return;
+    }
+    // On success the session is invalidated; redirect out.
+    window.location.replace("/welcome");
+  }
+
+  return (
+    <Tile name="Delete account" state="available">
+      <p className="text-sm text-muted-foreground mb-3">
+        Permanently delete your Verdant account and all associated grow data.
+        This cannot be undone.
+      </p>
+      <Button
+        size="sm"
+        variant="destructive"
+        data-testid="settings-delete-account"
+        onClick={() => {
+          setConfirmation("");
+          setError(null);
+          setOpen(true);
+        }}
+      >
+        Delete my account
+      </Button>
+      <Dialog
+        open={open}
+        onOpenChange={(o) => {
+          if (busy) return;
+          setOpen(o);
+        }}
+      >
+        <DialogContent data-testid="settings-delete-account-dialog">
+          <DialogHeader>
+            <DialogTitle>Delete your Verdant account?</DialogTitle>
+            <DialogDescription>
+              This permanently deletes your account, grows, tents, plants,
+              diary entries, photos, and sensor snapshots. This cannot be
+              undone. If you have an active paid subscription, cancel it in
+              the billing portal first — deletion does not automatically
+              cancel Paddle billing.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 py-2">
+            <label htmlFor="delete-confirm" className="text-xs text-muted-foreground">
+              Type <span className="font-mono font-semibold text-foreground">DELETE</span> to confirm.
+            </label>
+            <Input
+              id="delete-confirm"
+              value={confirmation}
+              onChange={(e) => setConfirmation(e.target.value)}
+              autoComplete="off"
+              data-testid="settings-delete-account-confirm-input"
+              disabled={busy}
+            />
+            {error ? (
+              <p role="alert" className="text-xs text-destructive">
+                {error}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={busy}
+              data-testid="settings-delete-account-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={!canConfirm}
+              aria-busy={busy}
+              data-testid="settings-delete-account-confirm"
+            >
+              {busy ? "Deleting…" : "Permanently delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Tile>
+  );
+}
 
 
 export default function Settings() {
@@ -473,7 +579,10 @@ export default function Settings() {
             <Link to="/settings/agent-integrations">Open agent integrations</Link>
           </Button>
         </Tile>
+
+        <DeleteAccountTile />
       </div>
     </div>
   );
 }
+

@@ -337,6 +337,7 @@ export default function OperatorSubscriberGrowth() {
                   label="VPD calculator signup"
                   value={acquisition.counts.vpdCalculator}
                 />
+                <MetricCard label="CSV history signup" value={acquisition.counts.csvHistory} />
               </CardContent>
             </Card>
           )}

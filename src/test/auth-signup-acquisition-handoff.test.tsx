@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   signUp: vi.fn(),
   track: vi.fn(),
+  oauth: vi.fn(),
 }));
 
 vi.mock("@/store/auth", () => ({
@@ -24,8 +25,16 @@ vi.mock("@/integrations/supabase/client", () => ({
     },
   },
 }));
+vi.mock("@/integrations/lovable/index", () => ({
+  lovable: {
+    auth: {
+      signInWithOAuth: (...args: unknown[]) => mocks.oauth(...args),
+    },
+  },
+}));
 
 import Auth from "@/pages/Auth";
+import { OAUTH_SIGNUP_ACQUISITION_STORAGE_KEY } from "@/lib/oauthSignupAcquisitionRules";
 
 const redirectTo =
   "/pricing?plan=pro_annual&utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch";
@@ -33,6 +42,9 @@ const redirectTo =
 beforeEach(() => {
   mocks.signUp.mockReset();
   mocks.track.mockReset();
+  mocks.oauth.mockReset();
+  mocks.oauth.mockResolvedValue({ error: null, redirected: true });
+  window.sessionStorage.clear();
   mocks.signUp.mockResolvedValue({
     data: { user: { id: "pending-user" }, session: null },
     error: null,
@@ -122,6 +134,21 @@ describe("Auth signup acquisition handoff", () => {
       }),
     );
     expect(screen.getByRole("status")).toHaveTextContent(/check your inbox/i);
+  });
+
+  it("retains the fixed signup source across a Google OAuth redirect without PII", async () => {
+    renderSignup();
+
+    fireEvent.click(screen.getByTestId("auth-google-signup"));
+
+    await waitFor(() => expect(mocks.oauth).toHaveBeenCalledTimes(1));
+    expect(mocks.oauth).toHaveBeenCalledWith("google", {
+      redirect_uri: window.location.origin,
+    });
+    const pending = window.sessionStorage.getItem(OAUTH_SIGNUP_ACQUISITION_STORAGE_KEY);
+    expect(pending).not.toBeNull();
+    expect(JSON.parse(pending ?? "{}")).toMatchObject({ source: "founder_share" });
+    expect(pending).not.toMatch(/email|token|user_?id|grower@example/i);
   });
 
   it("continues to the safe return path when signup immediately creates a session", async () => {

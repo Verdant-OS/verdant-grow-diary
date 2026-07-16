@@ -63,6 +63,7 @@ describe("SubscriberGrowthSprintBoard", () => {
             growerInvite: 2,
             contextCheck: 1,
             vpdCalculator: 3,
+            csvHistory: 4,
           }}
         />
       </MemoryRouter>,

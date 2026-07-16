@@ -9,7 +9,8 @@ export type PaidAcquisitionSource =
   | "operator_outreach"
   | "grower_invite"
   | "context_check"
-  | "vpd_calculator";
+  | "vpd_calculator"
+  | "csv_history";
 
 export type PaidInterestLeadSource =
   | "pricing_interest"
@@ -32,7 +33,8 @@ interface PaidAcquisitionAttribution {
     | "conversion_sprint"
     | "grower_invite"
     | "context_check"
-    | "vpd_calculator";
+    | "vpd_calculator"
+    | "csv_history";
   leadSource: PaidInterestLeadSource;
 }
 
@@ -92,6 +94,12 @@ export const PAID_ACQUISITION_ATTRIBUTIONS: Readonly<
     medium: "owned",
     campaign: "vpd_calculator",
     leadSource: "pricing_interest_vpd_calculator",
+  }),
+  csv_history: Object.freeze({
+    source: "csv_history",
+    medium: "owned",
+    campaign: "csv_history",
+    leadSource: "pricing_interest",
   }),
 });
 

@@ -43,9 +43,9 @@ describe("OperatorSubscriberGrowth", () => {
             ok: true,
             generated_at: "2026-07-14T05:00:00Z",
             counts: {
-              accounts_total: 20,
+              accounts_total: 24,
               active_paid_total: 10,
-              attributed_accounts_total: 12,
+              attributed_accounts_total: 16,
               attributed_active_paid_total: 8,
               unattributed_accounts_total: 8,
               unattributed_active_paid_total: 2,
@@ -53,6 +53,7 @@ describe("OperatorSubscriberGrowth", () => {
             sources: {
               landing_page: { accounts: 6, active_paid: 3 },
               grower_invite: { accounts: 6, active_paid: 5 },
+              csv_history: { accounts: 4, active_paid: 0 },
               unattributed: { accounts: 8, active_paid: 2 },
             },
           },
@@ -65,10 +66,10 @@ describe("OperatorSubscriberGrowth", () => {
             ok: true,
             generated_at: "2026-07-14T05:00:00Z",
             counts: {
-              accounts_total: 20,
-              accounts_7d: 8,
-              attributed_total: 12,
-              attributed_7d: 7,
+              accounts_total: 24,
+              accounts_7d: 12,
+              attributed_total: 16,
+              attributed_7d: 11,
               unattributed_total: 8,
               landing_page: 3,
               pricing_page: 2,
@@ -78,6 +79,7 @@ describe("OperatorSubscriberGrowth", () => {
               grower_invite: 2,
               context_check: 1,
               vpd_calculator: 3,
+              csv_history: 4,
             },
           },
           error: null,
@@ -148,6 +150,8 @@ describe("OperatorSubscriberGrowth", () => {
     expect(screen.getByText("Context check")).toBeInTheDocument();
     expect(screen.getAllByText("VPD calculator").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("VPD calculator signup")).toBeInTheDocument();
+    expect(screen.getByText("CSV history signup")).toBeInTheDocument();
+    expect(screen.getByText("CSV history")).toBeInTheDocument();
     expect(screen.getByText("Signup-to-active-paid cohorts")).toBeInTheDocument();
     expect(screen.getByTestId("paid-reconciliation")).toHaveTextContent("Paid total reconciled");
     expect(screen.getByText("Needs first contact")).toBeInTheDocument();

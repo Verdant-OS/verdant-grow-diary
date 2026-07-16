@@ -55,6 +55,7 @@ const ACQUISITION: SignupAcquisitionCounts = {
   growerInvite: 2,
   contextCheck: 1,
   vpdCalculator: 3,
+  csvHistory: 4,
 };
 
 describe("subscriber growth sprint rules", () => {

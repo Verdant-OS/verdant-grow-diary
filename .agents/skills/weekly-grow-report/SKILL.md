@@ -63,10 +63,15 @@ inference.
   selected window can never include report-day time that has not yet begun.
 - **Report day boundary.** The local hour at which a report "day" begins
   (whole hours only, default `00:00`; e.g. `06:00` for a lights-on day).
-  Window instants become `[dayStart + boundary, nextDayStart + boundary)` —
-  still half-open, still derived from local calendar dates in the explicit
-  zone, so DST weeks may still be 167 or 169 hours. A record belongs to the
-  local calendar date whose boundary hour opened its window.
+  Window instants become `[boundaryInstant(D), boundaryInstant(D + 1))`,
+  where `boundaryInstant(D)` is the instant at which local wall-clock time
+  reads the boundary hour on calendar date `D` in the effective zone — never
+  midnight-plus-elapsed-hours arithmetic, which lands on the wrong wall time
+  across a DST transition. If the boundary wall time does not exist on a
+  date (spring-forward gap), use the first instant after the gap; if it
+  occurs twice (fall-back overlap), use the earlier instant. Windows stay
+  half-open, and DST weeks may still be 167 or 169 hours. A record belongs
+  to the local calendar date whose boundary instant opened its window.
 - **One boundary everywhere.** Window derivation, equal-time-bucket math,
   narrative day grouping, weekday alignment, and BOTH week-over-week windows
   use the same zone + boundary in the same report. Mixed-boundary comparisons
@@ -155,7 +160,8 @@ regenerate in one click without reselecting settings.
 - **What a preset stores — selection inputs only:** a grower-chosen name; an
   end-date rule (**relative** — "ends today", "ends last <weekday>" — or a
   **fixed** past date); the plant scope (all plants or one opaque owned plant
-  ID); nothing else. The report timezone and day boundary are **referenced
+  ID); a created-at timestamp (selection metadata used only for the
+  deterministic ordering below); nothing else. The report timezone and day boundary are **referenced
   from the current report time preferences at apply time, never frozen into
   the preset**, so a grower who changes zones keeps consistent semantics.
   Never store emails, notes, sensor payloads, tokens, raw records, or another
@@ -464,13 +470,21 @@ report. It is a projection of the same data — never a second computation.
   never leaves the device unless the grower shares the file themselves.
 - **Implementation ladder.** First preference: the print pipeline — the
   button drives `window.print()` against the print stylesheet (page-break
-  hints, A4/Letter-safe, `@page` title) so the grower lands one confirm away
-  from a PDF with zero new dependencies. A bundled client-side PDF library is
-  authorized only if that pipeline cannot meet fidelity, and then only with:
+  hints, A4/Letter-safe, `@page` title) with zero new dependencies. That
+  path opens the system print dialog, so it is one confirm away from a PDF,
+  not a one-click download — the affordance must say so honestly (e.g.
+  "Save as PDF…" with the ellipsis convention), never promising a download
+  the pipeline cannot deliver. A true one-click download requires the
+  library path: a bundled client-side PDF library, authorized only with
   vector embedding of the same SVG charts (no canvas rasterization of any
-  chart that carries contribution drill-down), deterministic output for the
-  same content version ID (no random object IDs, no wall-clock timestamps
-  beyond the report's own generated-at), and an explicit dependency review.
+  chart that carries contribution drill-down), deterministic export (below),
+  and an explicit dependency review.
+- **Deterministic export.** Exporting the same generated report twice yields
+  byte-identical files: no random object IDs, no new wall-clock reads during
+  export. The report's own generated-at renders as report content —
+  regenerating the report is what changes it, never re-exporting it. The
+  content version ID identifies the data content; the export inherits it and
+  adds nothing of its own.
 - **Drill-down references in print form.** Per the print rules, contribution
   drill-downs render as short human-readable contribution references and
   counts — never raw URLs, internal IDs, or interactive-only affordances that

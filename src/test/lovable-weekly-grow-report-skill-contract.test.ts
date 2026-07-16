@@ -75,7 +75,11 @@ describe("Lovable weekly grow report skill contract", () => {
   it("keeps report time preferences explicit, validated, and uniformly applied", () => {
     expect(SKILL).toMatch(/Report time preferences \(grower-facing setting — authorized slice\)/);
     expect(SKILL).toMatch(/validated browser zone remains the only source/);
-    expect(SKILL).toMatch(/\[dayStart \+ boundary, nextDayStart \+ boundary\)/);
+    expect(SKILL).toMatch(/\[boundaryInstant\(D\), boundaryInstant\(D \+ 1\)\)/);
+    // DST-safe construction: wall-clock resolution, never elapsed-hours math.
+    expect(SKILL).toMatch(/never\s+midnight-plus-elapsed-hours arithmetic/);
+    expect(SKILL).toMatch(/first instant after the gap/);
+    expect(SKILL).toMatch(/occurs twice \(fall-back overlap\), use the earlier instant/);
     expect(SKILL).toMatch(/Mixed-boundary comparisons\s+are forbidden/);
     expect(SKILL).toMatch(/Days run\s+06:00 → 06:00 local/);
     expect(SKILL).toMatch(/never a\s+silent fallback/);
@@ -126,6 +130,10 @@ describe("Lovable weekly grow report skill contract", () => {
     expect(SKILL).toMatch(/never appear in URLs, analytics, or logs/);
     expect(SKILL).toMatch(/never a database write/);
     expect(SKILL).toMatch(/At most 20 presets/);
+    // The ordering's created-at is an explicitly stored selection field.
+    expect(SKILL).toMatch(
+      /created-at timestamp \(selection metadata used only for the\s+deterministic ordering/,
+    );
   });
 
   it("keeps PDF export a client-side projection of the same report", () => {
@@ -135,7 +143,15 @@ describe("Lovable weekly grow report skill contract", () => {
     expect(SKILL).toMatch(
       /no canvas rasterization of any\s+chart that carries contribution drill-down/,
     );
-    expect(SKILL).toMatch(/deterministic output for the\s+same content version ID/);
+    // Honest affordance: the print pipeline is one confirm away, not a
+    // one-click download; only the library path may claim one click.
+    expect(SKILL).toMatch(/one confirm away from a PDF,\s+not a one-click download/);
+    expect(SKILL).toMatch(/never promising a download\s+the pipeline cannot deliver/);
+    // Determinism is per generated report; generated-at is report content.
+    expect(SKILL).toMatch(
+      /Exporting the same generated report twice yields\s+byte-identical files/,
+    );
+    expect(SKILL).toMatch(/regenerating the report is what changes it, never re-exporting it/);
     expect(SKILL).toMatch(/no server-side PDF service is ever\s+added/);
     expect(SKILL).toMatch(/Never hashes, opaque IDs, emails, or grower notes in the filename/);
   });

@@ -2,7 +2,7 @@
  * verdantCultivars — evergreen cultivator-focused profiles for /cultivars.
  *
  * Pure data. No product claims about live grow diaries, no fake sensor data,
- * no "AI picks winners" phrasing. Content is horticultural best-practice
+ * no automated winner-selection phrasing. Content is horticultural best-practice
  * guidance for home growers researching specific cultivars, cross-linking
  * into Verdant's existing Pheno Hunt / Guides surfaces.
  *

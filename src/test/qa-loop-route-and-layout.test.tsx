@@ -66,11 +66,12 @@ describe("QA-LOOP-03 Settings mobile tile layout", () => {
     // tiles (adds Start screen / Units / Subscription / Agent integrations
     // variants depending on state), plus the Preferences tile added with the
     // account-preferences feature (735edc2a; covered by
-    // account-preferences.test.tsx). The layout contract under test is the
-    // badge positioning, not the tile inventory — pin the current count so
-    // silent tile additions still surface here deliberately.
+    // account-preferences.test.tsx), plus the Delete account tile added with
+    // the account-deletion feature (95cac1da6). The layout contract under
+    // test is the badge positioning, not the tile inventory — pin the
+    // current count so silent tile additions still surface here deliberately.
     const badges = screen.getAllByTestId("settings-tile-badge");
-    expect(badges).toHaveLength(7);
+    expect(badges).toHaveLength(8);
     for (const b of badges) {
       // Badge should be in-flow (no fixed/absolute) so the FAB cannot clip it.
       const cls = b.className;

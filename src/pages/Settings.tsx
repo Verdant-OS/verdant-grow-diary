@@ -337,6 +337,17 @@ function SubscriptionTile() {
               Canceled — access continues until the end of your paid period.
             </p>
           )}
+          {cancelNotice.visible && entitlement?.status !== "canceled" && (
+            <p
+              className="text-xs text-muted-foreground mt-1"
+              data-testid="settings-subscription-cancel-notice"
+            >
+              {cancelNotice.accessUntilLabel
+                ? `Cancellation scheduled — access continues until ${cancelNotice.accessUntilLabel}.`
+                : "Cancellation scheduled — access continues until the end of your current period."}
+            </p>
+          )}
+
           {!loading && !tier && (
             <p className="text-xs text-muted-foreground">
               We couldn't determine your plan right now. Your grow data is safe

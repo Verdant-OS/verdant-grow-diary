@@ -40,13 +40,9 @@ import {
   resolveServerBillingEnvironment,
 } from "../_shared/unionEntitlementLookup.ts";
 
-const ALLOWED_SURFACES = new Set<string>([
-  "live_sensor_stream",
-  "live_sensor_dashboard_widget",
-]);
+const ALLOWED_SURFACES = new Set<string>(["live_sensor_stream", "live_sensor_dashboard_widget"]);
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
@@ -178,11 +174,7 @@ Deno.serve(async (req) => {
     }
 
     async function ownsRow(table: string, id: string): Promise<boolean> {
-      const { data, error } = await supabase
-        .from(table)
-        .select("id")
-        .eq("id", id)
-        .maybeSingle();
+      const { data, error } = await supabase.from(table).select("id").eq("id", id).maybeSingle();
       if (error) return false;
       return !!data;
     }

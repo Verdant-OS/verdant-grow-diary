@@ -107,6 +107,26 @@ Comparison rules — non-negotiable:
 - **Deterministic.** Same two windows = same numbers, same ordering, same rendered chart.
 - **No causal claims.** The section shows *what changed*, never *why*. Causal reasoning is deferred to the grower and to AI Doctor.
 
+**Drill-down links to source diary entries — non-negotiable:**
+
+Every rendered week-over-week data point must be traceable back to the exact diary entries that produced it. The grower has to be able to click a bar, dot, weekday group, delta-table cell, or delta card and land on the source records — no "trust me" numbers.
+
+- **What is clickable:**
+  - Each **grouped bar** (feed EC/pH, daily watering ml) → opens the diary entries for that weekday within its window (this-week bar → this-week entries; last-week bar → last-week entries).
+  - Each **point/segment on the overlaid env/VPD line** → opens the diary entries (or sensor snapshots surfaced via diary) whose timestamps fall in that point's bucket, scoped to the correct window.
+  - Each **delta-table row's `this week` and `last week` cells** → opens the full list of contributing diary entries for that metric + window.
+  - Each **delta card's secondary line** (the `Δ` value) → opens a split view listing this-week vs last-week contributing entries side by side.
+- **Where it lands:** the existing diary timeline route, pre-filtered by grow_id + tent_id + the exact ISO datetime range for the clicked bucket + the event type(s) that fed the metric (e.g. `feeding_events` for EC/pH, `watering_events` for volume, `environment_events` + `sensor_readings` surfaced via `diary_entries.details.sensor_snapshot` for temp/RH/VPD). Never a new route; reuse the diary timeline filters already governed by `growDiaryTimelineRules`.
+- **URL shape:** deterministic, shareable within the grower's own session, and RLS-scoped. Encode `grow_id`, `tent_id`, `from`, `to`, and `event_types[]` as query params. Never encode emails, service tokens, other growers' IDs, or raw payloads. Never expose IDs from a grow the current user does not own.
+- **Provenance carries through.** The drill-down view inherits the same six-label provenance filter used in the chart — `demo | stale | invalid` entries excluded from the metric stay visually flagged (not hidden) on the destination page, so the grower can see *what was excluded and why*. If a card/bar was rendered as "insufficient prior data", its link opens the destination in an empty state that explains the exclusion, never a fabricated list.
+- **Print behavior.** When the report is printed or exported as PDF, drill-down anchors render as short human-readable references (e.g. "Diary · Tue Mar 12 · feedings") next to the chart, not as raw URLs. Interactive hit targets are preserved in the on-screen version only.
+- **Accessibility.** Every clickable chart element has a keyboard-focusable equivalent with an `aria-label` describing the destination (e.g. "Open 3 feeding entries from Tuesday, Mar 12"). Hit targets meet the existing a11y CI bar (min 44×44 CSS px on touch surfaces). No hover-only affordances.
+- **Read-only.** The drill-down is navigation only. It never triggers a write, an AI call, an Action Queue insert, or a device command. It never pre-selects an "act now" affordance on the destination.
+- **Deterministic.** Same rendered chart element = same URL every time; re-running the report yields identical anchors so a shared or printed reference stays valid.
+- **Empty/uncertain buckets.** A bucket with zero contributing entries is not clickable — render it as a non-interactive placeholder rather than a link to an empty page. A bucket built entirely from excluded provenance labels links through to the destination but opens with the exclusion notice as its primary content.
+
+
+
 ### 5. What happened (narrative)
 Deterministic bullet list, grouped by day (most recent first):
 - Day header (weekday + date).

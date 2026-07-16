@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useOpenCustomerPortalState } from "@/lib/customerPortal";
+import { usePaddleCancelNotice } from "@/hooks/usePaddleCancelNotice";
+
 import {
   DELETE_ACCOUNT_CONFIRMATION,
   requestAccountDeletion,

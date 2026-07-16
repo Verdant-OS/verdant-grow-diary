@@ -21,6 +21,23 @@ Scope defaults to the grower's **active grow** (single tent for Free tier; growe
 - Grower may override: "last week" (Mon–Sun of the previous ISO week), "last 14 days", or a specific date range.
 - The window's start/end timestamps are printed at the top of the report so the reader can verify.
 
+### Date-range selector (grower-facing control)
+
+A single control at the top of the report lets the grower generate a report for **the 7-day window ending on any chosen day**. Purpose: let the grower re-run the report against past weeks or a non-Sunday cadence without needing custom filters.
+
+- **Control shape:** a single "Report end date" date picker (shadcn `Calendar` inside a `Popover` — see the shadcn-datepicker pattern, including `pointer-events-auto` on the calendar wrapper). Report window is always **7 days**, ending inclusive on the selected date, starting exactly 6 days before it, aligned to the grower's local timezone day boundaries.
+- **Default:** today (in the grower's local timezone). Changing the date re-runs the report deterministically.
+- **Companion display (read-only):** next to the picker, render the resolved window as `<startDate> → <endDate>` in the grower's local timezone so they can verify before generating. Also render the prior-week comparison window (`<priorStart> → <priorEnd>`) so the week-over-week math is transparent.
+- **Bounds:**
+  - Max selectable end date = **today** in the grower's local timezone. Future dates are disabled — never generate a report for a window that includes the future.
+  - Min selectable end date = the grower's earliest diary/sensor activity (or a hard floor of 2 years back, whichever is later). Dates before that are disabled with a tooltip: "No grow data before <date>".
+  - If the selected window contains zero source events (no diary entries, no sensor readings, no alerts), render the report with honest empty states in each section — never fabricate a baseline and never silently shift the window.
+- **Comparison window follows automatically.** Selecting an end date of `D` sets this-week = `[D−6, D]` and last-week = `[D−13, D−7]`, both in the grower's local timezone. The week-over-week section (§4) uses these windows unchanged; all its existing rules (provenance parity, stage-change caveat, insufficient prior data) still apply.
+- **URL + deterministic Report ID.** The selected end date is encoded in the URL as a query param (e.g. `?end=YYYY-MM-DD`) so the report is shareable within the grower's own session and reproducible. Same `grow_id` + same end date = same Report ID (§9 footer). Never encode other growers' IDs.
+- **Accessibility.** The picker is keyboard-navigable, has a visible label ("Report end date"), announces the resolved window to screen readers via `aria-live="polite"` when the date changes, and the calendar hit targets meet the existing a11y CI bar.
+- **Read-only.** Changing the date only re-reads existing data; it never writes, never triggers an AI call, never inserts Action Queue items, and never sends device commands.
+- **No preset shortcuts that imply value judgment.** A small neutral set of shortcuts is allowed — "Today", "Yesterday", "Last Sunday" — rendered as plain buttons in muted tokens. No "best week", "worst week", or streak framing.
+
 ## Inputs (read-only, existing seams only)
 
 1. **Diary timeline** via `growDiaryTimelineRules` — normalized events across `watering_events`, `feeding_events`, `observation_events`, `photo_events`, `training_events`, `environment_events`, `grow_events`, `alerts` / `alert_events`, `ai_doctor_sessions`.

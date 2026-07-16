@@ -16,6 +16,7 @@ import GlobalFastAddButton from "./GlobalFastAddButton";
 import AuthStatusIndicator from "./AuthStatusIndicator";
 import SignOutConfirmDialog from "./SignOutConfirmDialog";
 import VerificationPendingBanner from "./VerificationPendingBanner";
+import { SubscriptionPastDueBanner } from "./SubscriptionPastDueBanner";
 import GlobalSearchDialog from "./GlobalSearchDialog";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
@@ -151,6 +152,8 @@ export default function AppShell({ children }: { children?: ReactNode }) {
               </div>
             </div>
           </header>
+
+          <SubscriptionPastDueBanner />
 
           <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">
             {isEmailVerificationPending(user) ? (

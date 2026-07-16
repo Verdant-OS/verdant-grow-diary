@@ -26,6 +26,9 @@ export function useSensorReadings(
   });
 }
 
+/** Per-tent fetch outcome so consumers can tell "no rows" from "not loaded". */
+export type TentSensorReadStatus = "loading" | "error" | "success";
+
 /**
  * Per-tent sensor reading fetch. Each tent gets its own `limit`-bounded
  * window so a busy tent cannot starve another tent's readings out of a
@@ -33,6 +36,9 @@ export function useSensorReadings(
  * report "unavailable" even when valid VPD rows existed for the tent).
  *
  * Returns a map keyed by tentId. Tents with no rows map to `[]`.
+ * `statusByTent` distinguishes a genuinely empty result ("success" + [])
+ * from a pending or failed request — SENSOR TRUTH: absence must be
+ * established, never assumed from an unset slot.
  * Read-only: no writes, no automation, no device control.
  */
 export function useSensorReadingsByTents(
@@ -40,6 +46,7 @@ export function useSensorReadingsByTents(
   perTentLimit = 200,
 ): {
   byTent: Record<string, SensorReadingRow[]>;
+  statusByTent: Record<string, TentSensorReadStatus>;
   isLoading: boolean;
   isError: boolean;
 } {
@@ -63,11 +70,18 @@ export function useSensorReadingsByTents(
     })),
   });
   const byTent: Record<string, SensorReadingRow[]> = {};
+  const statusByTent: Record<string, TentSensorReadStatus> = {};
   ids.forEach((id, i) => {
     byTent[id] = (results[i]?.data as SensorReadingRow[] | undefined) ?? [];
+    statusByTent[id] = results[i]?.isLoading
+      ? "loading"
+      : results[i]?.isError
+        ? "error"
+        : "success";
   });
   return {
     byTent,
+    statusByTent,
     isLoading: results.some((r) => r.isLoading),
     isError: results.some((r) => r.isError),
   };

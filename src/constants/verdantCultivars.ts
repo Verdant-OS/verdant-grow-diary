@@ -36,6 +36,20 @@ export interface VerdantCultivarProfile {
   commonIssues: Array<{ issue: string; mitigation: string }>;
   /** Pheno-hunt evidence points that matter for this cultivar. */
   phenoHuntFocus: string[];
+  /**
+   * Illustrative sample phenos for the public /cultivars page comparison
+   * module. NEVER real grower data. Presented alongside an explicit
+   * "Sample data" label in the UI; used purely to show what a Pheno Hunt
+   * side-by-side looks like inside Verdant.
+   */
+  samplePhenos: ReadonlyArray<{
+    label: string;
+    structure: string;
+    aroma: string;
+    resin: string;
+    yieldNote: string;
+    finishNote: string;
+  }>;
 }
 
 export const VERDANT_CULTIVARS: readonly VerdantCultivarProfile[] = [
@@ -77,6 +91,24 @@ export const VERDANT_CULTIVARS: readonly VerdantCultivarProfile[] = [
       "Bud density and stem strength under weight",
       "Finish uniformity across colas",
     ],
+    samplePhenos: [
+      {
+        label: "Oreoz #3 (gas-forward)",
+        structure: "Compact, thick main stem, short internodes",
+        aroma: "Loud gas, faint cookie backend",
+        resin: "Heavy — fully frosted sugar leaves by week 7",
+        yieldNote: "Moderate; dense golf-ball colas",
+        finishNote: "Even amber at ~68 days; no re-veg signs",
+      },
+      {
+        label: "Oreoz #7 (dessert-leaning)",
+        structure: "Slightly stretchier, secondary sites catch up late",
+        aroma: "Sweet cookie dominant, gas on grind",
+        resin: "Even coverage, less crystalline than #3",
+        yieldNote: "Higher; larger but airier colas",
+        finishNote: "Finishes 3–4 days later than #3",
+      },
+    ],
   },
   {
     slug: "do-si-dos",
@@ -116,6 +148,24 @@ export const VERDANT_CULTIVARS: readonly VerdantCultivarProfile[] = [
       "Stretch ratio (final height ÷ flip height)",
       "Nose retention through cure",
     ],
+    samplePhenos: [
+      {
+        label: "Do-Si-Dos A (floral)",
+        structure: "Balanced, moderate stretch (~1.8x)",
+        aroma: "Sweet floral, light gas after cure",
+        resin: "Even, glassy heads by week 6",
+        yieldNote: "Moderate, spear-shaped colas",
+        finishNote: "Chop at ~63 days on cloudy/amber mix",
+      },
+      {
+        label: "Do-Si-Dos B (earthy-gas)",
+        structure: "Shorter, thicker stems, tighter node spacing",
+        aroma: "Earthy cookie backbone, gas on grind",
+        resin: "Heavier trichome load, milky at week 8",
+        yieldNote: "Slightly lower; denser flower",
+        finishNote: "5–7 days later than pheno A",
+      },
+    ],
   },
   {
     slug: "blue-cookies",
@@ -148,6 +198,24 @@ export const VERDANT_CULTIVARS: readonly VerdantCultivarProfile[] = [
       "Color depth in late flower under matched night temps",
       "Fruit vs cookie terpene balance",
       "Yield vs bud-density trade-off between phenos",
+    ],
+    samplePhenos: [
+      {
+        label: "Blue Cookies Fruit (fruit-forward)",
+        structure: "Balanced, moderate branching",
+        aroma: "Ripe blueberry, cookie tail",
+        resin: "Even coverage, glassy heads",
+        yieldNote: "Moderate; uniform mid-density colas",
+        finishNote: "Chops at ~58 days; light purple hues with cool nights",
+      },
+      {
+        label: "Blue Cookies Dough (cookie-forward)",
+        structure: "Stockier, shorter internodes",
+        aroma: "Sweet cookie dominant, faint fruit",
+        resin: "Heavier late-flower resin, cloudier at chop",
+        yieldNote: "Slightly higher, denser flower",
+        finishNote: "Chops 3–5 days later than Fruit pheno",
+      },
     ],
   },
 ] as const;

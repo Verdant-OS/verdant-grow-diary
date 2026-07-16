@@ -1,4 +1,5 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Box, Lightbulb } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -38,8 +39,19 @@ export default function Tents() {
   // SENSOR TRUTH: per-tent raw reading windows (same hook as the Dashboard
   // Environment Snapshot strip) instead of the legacy grouped shape, which
   // fabricated 0 for missing metrics and could not carry per-metric truth.
-  const { byTent: readingsByTent } = useSensorReadingsByTents(tents.map((t) => t.id));
+  // statusByTent distinguishes "no rows" from "not loaded"/"failed" so a
+  // pending or failed read is never presented as established absence.
+  const { byTent: readingsByTent, statusByTent: sensorStatusByTent } = useSensorReadingsByTents(
+    tents.map((t) => t.id),
+  );
   const temperatureUnit = loadTemperatureUnitPreference();
+  // Freshness is time-relative: re-evaluate the presenter's clock every
+  // minute so an open tab cannot keep a fresh label past the stale boundary.
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
   // AUD-001 fix: use real plants (Supabase, RLS-scoped) instead of mock
   // so plant counts match the assigned-tent reality. Mock plants reference
   // mock tent ids ("t1"..) which never match real tent UUIDs.
@@ -100,9 +112,12 @@ export default function Tents() {
             const snapView = buildTentSnapshotView(
               (readingsByTent[t.id] ?? []) as BuildTentSnapshotInput[],
               t.stage,
-              undefined,
+              nowTick,
               { temperatureUnit },
             );
+            // Pending/failed reads must not masquerade as established
+            // absence ("No sensor data yet") or as data.
+            const sensorReadStatus = sensorStatusByTent[t.id] ?? "loading";
             const vpdMetric = snapView.metrics.find((m) => m.key === "vpd");
             const hasVpdValue = !!vpdMetric && vpdMetric.status !== "unknown";
             const plantCount = plants.filter((p) => p.tentId === t.id).length;
@@ -124,7 +139,21 @@ export default function Tents() {
                     <StageBadge stage={t.stage} />
                   </div>
 
-                  {snapView.hasReading ? (
+                  {sensorReadStatus === "loading" ? (
+                    <p
+                      className="text-xs text-muted-foreground animate-pulse"
+                      data-testid={`tents-list-sensor-loading-${t.id}`}
+                    >
+                      Loading sensor data…
+                    </p>
+                  ) : sensorReadStatus === "error" ? (
+                    <p
+                      className="text-xs text-muted-foreground"
+                      data-testid={`tents-list-sensor-unavailable-${t.id}`}
+                    >
+                      Sensor data unavailable — readings couldn't be loaded.
+                    </p>
+                  ) : snapView.hasReading ? (
                     <>
                       <div className="flex flex-wrap gap-1.5">
                         {snapView.metrics.map((m) => (

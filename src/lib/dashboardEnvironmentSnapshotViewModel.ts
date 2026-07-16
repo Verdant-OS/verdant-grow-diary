@@ -58,7 +58,36 @@ export interface TentSnapshotView {
 export interface BuildTentSnapshotInput extends SensorReadingLike {
   captured_at?: string | null;
   raw_payload?: unknown;
+  /**
+   * Raw `sensor_readings.quality` intake-validation flag. Authoritative
+   * downgrade signal: "invalid"/"stale" here must never render as
+   * OK/fresh (mirrors aiDoctorContextCompiler.classifySource — explicit
+   * flags win over value plausibility and age). Never an upgrade.
+   */
+  quality?: string | null;
 }
+
+/**
+ * Explicit per-row downgrade flag: intake `quality` wins, then a canonical
+ * "invalid"/"stale" source value. Returns null when the row carries no
+ * explicit flag. Only ever downgrades — an "ok"/unknown flag grants nothing.
+ */
+function explicitRowFlag(r: BuildTentSnapshotInput): "invalid" | "stale" | null {
+  const q = (r.quality ?? "").toString().toLowerCase().trim();
+  if (q === "invalid") return "invalid";
+  if (q === "stale") return "stale";
+  const s = (r.source ?? "").toString().toLowerCase().trim();
+  if (s === "invalid") return "invalid";
+  if (s === "stale") return "stale";
+  return null;
+}
+
+/** Reading metric key that feeds each MetricView slot. */
+const METRIC_READING_KEY: Record<"temp" | "rh" | "vpd", string> = {
+  temp: "temperature_c",
+  rh: "humidity_pct",
+  vpd: "vpd_kpa",
+};
 
 const EMPTY: TentSnapshotView = {
   hasReading: false,
@@ -139,7 +168,18 @@ export function buildTentSnapshotView(
   // at the latest timestamp carries that reservation — recognizing the tag
   // here routes it through that strict classification (parity with Tent
   // Detail) without widening trust for any other source string.
-  const RECOGNISED = new Set(["manual", "live", "csv", "import", "sim", "diary", "pi_bridge"]);
+  const RECOGNISED = new Set([
+    "manual",
+    "live",
+    "csv",
+    "import",
+    "sim",
+    "diary",
+    "pi_bridge",
+    "demo",
+    "stale",
+    "invalid",
+  ]);
   const hasRecognised = latestRows.some(
     (r) => typeof r.source === "string" && RECOGNISED.has(r.source),
   );
@@ -163,16 +203,22 @@ export function buildTentSnapshotView(
   });
 
   const capturedAt = resolveCapturedAt(latestRows, snap.ts);
-  const stale = !!capturedAt && isStale(capturedAt, now);
   const quality = evaluateSensorQuality(snap, now);
-  // "Invalid" is reserved for present-but-implausible values.
-  // evaluateSensorQuality also flags an absent VPD as suspicious (review
-  // hint for the quality card), but a missing metric is unknown/no-data —
-  // it must not relabel an otherwise-honest Stale/Manual/CSV snapshot as
-  // Invalid.
-  const invalid = quality.suspiciousFields.some(
-    (f) => typeof snap[f as keyof typeof snap] === "number",
-  );
+  // Explicit intake flags on the contributing rows are authoritative
+  // downgrades: flagged-invalid data must never render OK/Live and
+  // flagged-stale data must never render fresh, regardless of how
+  // plausible the values look or how recent the timestamp is.
+  const flaggedInvalid = latestRows.some((r) => explicitRowFlag(r) === "invalid");
+  const flaggedStale = latestRows.some((r) => explicitRowFlag(r) === "stale");
+  const stale = flaggedStale || (!!capturedAt && isStale(capturedAt, now));
+  // Beyond explicit flags, "Invalid" is reserved for present-but-implausible
+  // values. evaluateSensorQuality also marks an absent VPD as suspicious
+  // (review hint for the quality card), but a missing metric is
+  // unknown/no-data — it must not relabel an otherwise-honest
+  // Stale/Manual/CSV snapshot as Invalid.
+  const invalid =
+    flaggedInvalid ||
+    quality.suspiciousFields.some((f) => typeof snap[f as keyof typeof snap] === "number");
 
   // Stale/invalid override the source label per requirement #2/#6.
   let sourceLabel = resolved.label;
@@ -197,15 +243,19 @@ export function buildTentSnapshotView(
     suspiciousKey: string,
     digits: number,
   ): MetricView => {
+    // Explicit intake flag on the row that contributed this metric (same
+    // first-match-at-latest-ts selection as snapshotFromReadings).
+    const contributingRow = latestRows.find((r) => r.metric === METRIC_READING_KEY[key]);
+    const rowFlag = contributingRow ? explicitRowFlag(contributingRow) : null;
     let status: MetricStatus = "ok";
     let statusLabel: string | null = null;
     if (value === null) {
       status = "unknown";
       statusLabel = "Unknown";
-    } else if (quality.suspiciousFields.includes(suspiciousKey)) {
+    } else if (rowFlag === "invalid" || quality.suspiciousFields.includes(suspiciousKey)) {
       status = "invalid";
       statusLabel = "Invalid";
-    } else if (stale) {
+    } else if (stale || rowFlag === "stale") {
       status = "stale";
       statusLabel = "Stale";
     }

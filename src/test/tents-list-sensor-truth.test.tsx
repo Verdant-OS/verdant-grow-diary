@@ -18,10 +18,10 @@
  *     per-tent readings hook, renders source + last-updated context, and the
  *     legacy `.at(-1)` / `?? 0` fabrication shapes are gone.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import {
   buildTentSnapshotView,
@@ -45,20 +45,30 @@ const H = vi.hoisted(() => {
     source: "manual",
     captured_at: ts,
   });
-  return {
-    TENT_ID,
-    newestTs,
-    oldestTs,
-    // Walkthrough shape: newest group has temp+RH but NO VPD row; the
-    // oldest group has RH 58 (and no temperature). The legacy card showed
-    // the oldest group and fabricated temp 0 → "32.0°F".
-    ROWS: [
-      raw(newestTs, "temperature_c", 21.78),
-      raw(newestTs, "humidity_pct", 56),
-      raw(oldestTs, "humidity_pct", 58),
-      raw(oldestTs, "vpd_kpa", 0.9),
-    ],
+  // Walkthrough shape: newest group has temp+RH but NO VPD row; the
+  // oldest group has RH 58 (and no temperature). The legacy card showed
+  // the oldest group and fabricated temp 0 → "32.0°F".
+  const ROWS = [
+    raw(newestTs, "temperature_c", 21.78),
+    raw(newestTs, "humidity_pct", 56),
+    raw(oldestTs, "humidity_pct", 58),
+    raw(oldestTs, "vpd_kpa", 0.9),
+  ];
+  // Mutable per-test hook state so render tests can drive pending/error/
+  // success outcomes through the same mock.
+  const hookState = {
+    byTent: { [TENT_ID]: ROWS } as Record<string, unknown[]>,
+    statusByTent: { [TENT_ID]: "success" } as Record<string, string>,
+    isLoading: false,
+    isError: false,
   };
+  const resetHookState = () => {
+    hookState.byTent = { [TENT_ID]: ROWS };
+    hookState.statusByTent = { [TENT_ID]: "success" };
+    hookState.isLoading = false;
+    hookState.isError = false;
+  };
+  return { TENT_ID, newestTs, oldestTs, ROWS, raw, hookState, resetHookState };
 });
 
 vi.mock("@/hooks/useGrowData", async (importOriginal) => {
@@ -91,9 +101,10 @@ vi.mock("@/hooks/useGrowData", async (importOriginal) => {
 
 vi.mock("@/hooks/use-sensor-readings", () => ({
   useSensorReadingsByTents: () => ({
-    byTent: { [H.TENT_ID]: H.ROWS },
-    isLoading: false,
-    isError: false,
+    byTent: H.hookState.byTent,
+    statusByTent: H.hookState.statusByTent,
+    isLoading: H.hookState.isLoading,
+    isError: H.hookState.isError,
   }),
 }));
 
@@ -248,6 +259,89 @@ describe("Tents list sensor truth — stale labeling parity with Tent Detail", (
   });
 });
 
+describe("Tents list sensor truth — intake quality flags are authoritative", () => {
+  it("a plausible value flagged quality:'invalid' is never OK and never Live", () => {
+    const rows = [
+      row({
+        ts: FRESH_TS,
+        metric: "temperature_c",
+        value: 21.78,
+        source: "live",
+        quality: "invalid",
+      }),
+      row({ ts: FRESH_TS, metric: "humidity_pct", value: 56, source: "live" }),
+    ];
+    const v = buildTentSnapshotView(rows, "veg", NOW);
+    const temp = metric(v, "temp");
+    expect(temp.status).toBe("invalid");
+    expect(temp.statusLabel).toBe("Invalid");
+    expect(v.invalid).toBe(true);
+    expect(v.sourceLabel).toBe("Invalid");
+    expect(v.sourceLabel).not.toMatch(/live/i);
+  });
+
+  it("a fresh row flagged quality:'stale' never renders fresh", () => {
+    const rows = [
+      row({
+        ts: FRESH_TS,
+        metric: "temperature_c",
+        value: 21.78,
+        quality: "stale",
+      }),
+      row({ ts: FRESH_TS, metric: "humidity_pct", value: 56 }),
+    ];
+    const v = buildTentSnapshotView(rows, "veg", NOW);
+    expect(v.stale).toBe(true);
+    expect(v.sourceLabel).toBe("Stale");
+    expect(metric(v, "temp").statusLabel).toBe("Stale");
+  });
+
+  it("an 'ok' quality flag grants nothing extra", () => {
+    const rows = [
+      row({ ts: FRESH_TS, metric: "temperature_c", value: 21.78, quality: "ok" }),
+      row({ ts: FRESH_TS, metric: "humidity_pct", value: 56, quality: "ok" }),
+    ];
+    const v = buildTentSnapshotView(rows, "veg", NOW);
+    expect(v.invalid).toBe(false);
+    expect(v.stale).toBe(false);
+    // Default row() source is "manual" — an ok quality flag must not
+    // promote provenance.
+    expect(v.sourceLabel).toBe("Manual");
+  });
+});
+
+describe("Tents list sensor truth — canonical source vocabulary", () => {
+  it("all-demo readings label Demo, never Live", () => {
+    const rows = [
+      row({ ts: FRESH_TS, metric: "temperature_c", value: 21.78, source: "demo" }),
+      row({ ts: FRESH_TS, metric: "humidity_pct", value: 56, source: "demo" }),
+    ];
+    const v = buildTentSnapshotView(rows, "veg", NOW);
+    expect(v.sourceLabel).toBe("Demo");
+    expect(v.sourceLabel).not.toMatch(/live/i);
+  });
+
+  it("canonical source 'invalid' labels Invalid even when values look plausible and fresh", () => {
+    const rows = [
+      row({ ts: FRESH_TS, metric: "temperature_c", value: 21.78, source: "invalid" }),
+      row({ ts: FRESH_TS, metric: "humidity_pct", value: 56, source: "invalid" }),
+    ];
+    const v = buildTentSnapshotView(rows, "veg", NOW);
+    expect(v.invalid).toBe(true);
+    expect(v.sourceLabel).toBe("Invalid");
+  });
+
+  it("canonical source 'stale' labels Stale even when the timestamp is fresh", () => {
+    const rows = [
+      row({ ts: FRESH_TS, metric: "temperature_c", value: 21.78, source: "stale" }),
+      row({ ts: FRESH_TS, metric: "humidity_pct", value: 56, source: "stale" }),
+    ];
+    const v = buildTentSnapshotView(rows, "veg", NOW);
+    expect(v.stale).toBe(true);
+    expect(v.sourceLabel).toBe("Stale");
+  });
+});
+
 describe("Tents list sensor truth — pi_bridge provenance parity with Tent Detail", () => {
   const bridgeRow = (over: Partial<BuildTentSnapshotInput>): BuildTentSnapshotInput =>
     row({ source: "pi_bridge", ...over });
@@ -319,6 +413,83 @@ describe("Tents list sensor truth — temperature unit preference", () => {
 });
 
 describe("Tents list sensor truth — rendered page (walkthrough regression)", () => {
+  afterEach(() => {
+    H.resetHookState();
+    vi.useRealTimers();
+  });
+
+  it("pending reads render a loading state, never 'No sensor data yet'", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "loading" };
+    H.hookState.isLoading = true;
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId(`tents-list-sensor-loading-${H.TENT_ID}`)).toHaveTextContent(
+      /Loading sensor data/,
+    );
+    expect(screen.queryByText(/No sensor data yet/)).toBeNull();
+  });
+
+  it("failed reads render an unavailable state, never 'No sensor data yet'", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "error" };
+    H.hookState.isError = true;
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId(`tents-list-sensor-unavailable-${H.TENT_ID}`)).toHaveTextContent(
+      /Sensor data unavailable/,
+    );
+    expect(screen.queryByText(/No sensor data yet/)).toBeNull();
+  });
+
+  it("an established empty result still renders 'No sensor data yet'", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId(`tents-list-sensor-empty-${H.TENT_ID}`)).toHaveTextContent(
+      /No sensor data yet/,
+    );
+  });
+
+  it("an open tab flips fresh labels to Stale once the boundary passes", () => {
+    vi.useFakeTimers();
+    // 29 minutes old at first paint — inside the 30-minute fresh window.
+    const nearBoundaryTs = new Date(Date.now() - 29 * 60_000).toISOString();
+    H.hookState.byTent = {
+      [H.TENT_ID]: [
+        H.raw(nearBoundaryTs, "temperature_c", 21.78),
+        H.raw(nearBoundaryTs, "humidity_pct", 56),
+      ],
+    };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+    const source = screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`);
+    expect(source).toHaveTextContent("Manual");
+    expect(source).not.toHaveTextContent("Stale");
+
+    // Cross the 30-minute boundary with NO new data — the minute tick must
+    // re-evaluate freshness without a re-fetch.
+    act(() => {
+      vi.advanceTimersByTime(2 * 60_000);
+    });
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Stale");
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`)).toHaveTextContent("Stale");
+  });
+
   it("card shows the newest reading with honest stale/source/no-data labels — never 32.0°F", () => {
     render(
       <MemoryRouter>
@@ -379,6 +550,18 @@ describe("Tents list sensor truth — static wiring", () => {
   it("renders an honest no-data state instead of silence or zeros", () => {
     expect(TENTS_SRC).toMatch(/tents-list-sensor-empty-/);
     expect(TENTS_SRC).toMatch(/No sensor data yet/);
+  });
+
+  it("distinguishes pending/failed reads from established absence", () => {
+    expect(TENTS_SRC).toMatch(/statusByTent/);
+    expect(TENTS_SRC).toMatch(/tents-list-sensor-loading-/);
+    expect(TENTS_SRC).toMatch(/tents-list-sensor-unavailable-/);
+  });
+
+  it("drives freshness from a ticking clock, not a render-time Date.now()", () => {
+    expect(TENTS_SRC).toMatch(/setInterval/);
+    expect(TENTS_SRC).toMatch(/nowTick/);
+    expect(TENTS_SRC).toMatch(/buildTentSnapshotView\(\s*\(readingsByTent\[t\.id\][\s\S]*?nowTick/);
   });
 
   it("introduces no alert/queue/automation/device-control surfaces", () => {

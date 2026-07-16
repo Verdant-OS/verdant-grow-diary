@@ -11,6 +11,17 @@ export const CSV_IMPORT_DESCRIPTION =
 
 export const CSV_IMPORT_READING_COPY = "Reading your environment export…";
 
+/**
+ * Post-import completion note. Rendered verbatim: imported rows are
+ * historical background, never live telemetry, and AI Doctor still
+ * wants a fresh reading for current conditions.
+ */
+export const CSV_IMPORT_HISTORICAL_CONTEXT_NOTE =
+  "Imported readings are historical background, not live telemetry. Add a fresh reading before using AI Doctor for current conditions.";
+
+/** Post-import handoff CTA label. Navigation only — never runs AI. */
+export const CSV_IMPORT_VIEW_HISTORY_LABEL = "View imported history";
+
 export function formatCsvPreviewRow(row: ParsedEnvironmentRow): string {
   const parts = [new Date(row.captured_at).toLocaleString()];
   parts.push(row.temperature_c != null ? `${row.temperature_c.toFixed(1)}°C` : "—");

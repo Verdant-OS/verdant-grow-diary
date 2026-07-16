@@ -245,7 +245,10 @@ describe("CSV Persistence Reload Regression v2 — reload presenter", () => {
       screen.getByTestId("csv-import-done").textContent ?? ""
     ).toLowerCase();
     expect(done).toContain("csv");
-    expect(done).not.toMatch(/\blive\b/);
+    // The done note deliberately says "not live telemetry" — a negation,
+    // not a live claim. Strip that exact phrase, then keep banning any
+    // other live wording.
+    expect(done.replace(/not live telemetry/g, "")).not.toMatch(/\blive\b/);
     expect(done).not.toMatch(/\bhealthy\b/);
     cleanup();
   });

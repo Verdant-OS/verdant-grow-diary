@@ -22,6 +22,21 @@ export const AI_DOCTOR_CSV_HISTORY_LABEL = "CSV history";
 export const AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE =
   "This is imported CSV history, not live telemetry. Do not diagnose from CSV history alone.";
 
+/**
+ * Explicit database source labels that may enter AI Doctor's imported-history
+ * summary. Canonical imports use `csv`; the `csv_import_*` values are the
+ * bounded legacy sources emitted by the existing AC Infinity/TrolMaster
+ * importer. Raw payload flags never override an explicit non-CSV source.
+ */
+export const AI_DOCTOR_CSV_HISTORY_SOURCES = Object.freeze([
+  "csv",
+  "csv_import_ac_infinity",
+  "csv_import_trolmaster",
+  "csv_import_other",
+] as const);
+
+const AI_DOCTOR_CSV_HISTORY_SOURCE_SET = new Set<string>(AI_DOCTOR_CSV_HISTORY_SOURCES);
+
 /** Vendor display names AI Doctor is allowed to surface. */
 const VERDANT_XLSX_LABEL = "Verdant Genetics XLSX";
 
@@ -67,9 +82,7 @@ export interface AiDoctorCsvHistoryContext {
 }
 
 function asRecord(v: unknown): Record<string, unknown> | null {
-  return v && typeof v === "object" && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : null;
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 }
 
 function toFiniteNumber(v: unknown): number | null {
@@ -94,9 +107,7 @@ function vendorLabelFor(row: CsvHistorySensorRowLike): {
   // that the shared lineage helper does not enumerate (vendor-neutral file).
   const payload = asRecord(row.raw_payload);
   const sourceApp =
-    typeof payload?.source_app === "string"
-      ? payload.source_app.trim().toLowerCase()
-      : "";
+    typeof payload?.source_app === "string" ? payload.source_app.trim().toLowerCase() : "";
   if (sourceApp === "verdant_genetics_xlsx") {
     return {
       sourceApp: "verdant_genetics_xlsx",
@@ -115,10 +126,76 @@ function isSuspicious(row: CsvHistorySensorRowLike): boolean {
   return false;
 }
 
-function isCsvRow(row: CsvHistorySensorRowLike): boolean {
-  if (row.source === "csv") return true;
-  const payload = asRecord(row.raw_payload);
-  return payload?.csv_import === true;
+function capturedAtText(row: CsvHistorySensorRowLike): string {
+  return typeof row.captured_at === "string"
+    ? row.captured_at
+    : typeof row.ts === "string"
+      ? row.ts
+      : "";
+}
+
+function compareText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function nullableTextKey(value: unknown): string {
+  return typeof value === "string" ? `string:${value}` : "null:";
+}
+
+/**
+ * True only for rows whose explicit source is one of the supported imported
+ * history labels. Manual, demo, live, stale, invalid, unknown, and missing
+ * sources are never reinterpreted from untrusted raw_payload flags.
+ */
+export function isCsvHistoryRow(row: CsvHistorySensorRowLike): boolean {
+  const source = typeof row.source === "string" ? row.source.trim().toLowerCase() : "";
+  return AI_DOCTOR_CSV_HISTORY_SOURCE_SET.has(source);
+}
+
+const isCsvRow = isCsvHistoryRow;
+
+/**
+ * Total ordering over every row field that can change the bounded summary.
+ * Rows that still compare equal are summary-equivalent, so stable-sort input
+ * order cannot change the AI Doctor packet.
+ */
+export function compareCsvHistoryRowsForBoundedSummary(
+  a: CsvHistorySensorRowLike,
+  b: CsvHistorySensorRowLike,
+): number {
+  const atA = capturedAtText(a);
+  const atB = capturedAtText(b);
+  const timeA = Date.parse(atA) || 0;
+  const timeB = Date.parse(atB) || 0;
+  if (timeA !== timeB) return timeB - timeA;
+
+  const timestampTextOrder = compareText(atA, atB);
+  if (timestampTextOrder !== 0) return timestampTextOrder;
+
+  const metricOrder = compareText(
+    typeof a.metric === "string" ? a.metric : "",
+    typeof b.metric === "string" ? b.metric : "",
+  );
+  if (metricOrder !== 0) return metricOrder;
+
+  const valueA = toFiniteNumber(a.value);
+  const valueB = toFiniteNumber(b.value);
+  if (valueA === null && valueB !== null) return 1;
+  if (valueA !== null && valueB === null) return -1;
+  if (valueA !== null && valueB !== null && valueA !== valueB) {
+    return valueA - valueB;
+  }
+
+  const unitOrder = compareText(nullableTextKey(a.unit), nullableTextKey(b.unit));
+  if (unitOrder !== 0) return unitOrder;
+
+  const vendorOrder = compareText(
+    vendorLabelFor(a)?.sourceApp ?? "",
+    vendorLabelFor(b)?.sourceApp ?? "",
+  );
+  if (vendorOrder !== 0) return vendorOrder;
+
+  return Number(isSuspicious(a)) - Number(isSuspicious(b));
 }
 
 function round3(n: number): number {
@@ -156,14 +233,8 @@ export function buildAiDoctorCsvHistoryContext(
   let earliestIso: string | null = null;
   let latestIso: string | null = null;
 
-  const vendorCounts = new Map<
-    string,
-    { sourceApp: string; vendorLabel: string; count: number }
-  >();
-  const metricAccum = new Map<
-    string,
-    { metric: string; unit: string | null; values: number[] }
-  >();
+  const vendorCounts = new Map<string, { sourceApp: string; vendorLabel: string; count: number }>();
+  const metricAccum = new Map<string, { metric: string; unit: string | null; values: number[] }>();
 
   for (const row of rows) {
     if (!row || !isCsvRow(row)) continue;
@@ -214,11 +285,7 @@ export function buildAiDoctorCsvHistoryContext(
   const vendors: CsvHistoryVendorSummary[] = [...vendorCounts.values()].sort(
     (a, b) =>
       b.count - a.count ||
-      (a.vendorLabel < b.vendorLabel
-        ? -1
-        : a.vendorLabel > b.vendorLabel
-          ? 1
-          : 0),
+      (a.vendorLabel < b.vendorLabel ? -1 : a.vendorLabel > b.vendorLabel ? 1 : 0),
   );
 
   const metrics: CsvHistoryMetricSummary[] = [...metricAccum.values()]
@@ -240,10 +307,7 @@ export function buildAiDoctorCsvHistoryContext(
     historicalLabel: AI_DOCTOR_CSV_HISTORY_LABEL,
     notForLiveDiagnosis: AI_DOCTOR_CSV_HISTORY_NOT_LIVE_NOTE,
     totalReadings: total,
-    dateRange:
-      earliestIso && latestIso
-        ? { earliest: earliestIso, latest: latestIso }
-        : null,
+    dateRange: earliestIso && latestIso ? { earliest: earliestIso, latest: latestIso } : null,
     vendors: Object.freeze(vendors),
     metrics: Object.freeze(metrics),
     suspiciousFlagCount: suspicious,

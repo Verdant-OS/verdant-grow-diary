@@ -19,10 +19,25 @@ import {
   type AiSensorSnapshotSource as AiCoachSnapshotSource,
   type AiSensorSnapshotTrust as AiCoachSnapshotTrust,
 } from "@/lib/aiSensorSnapshotContextRules";
+import {
+  buildImportedSensorHistorySection,
+  isFreshLiveSnapshotAnnotation,
+  type ImportedSensorHistorySection,
+} from "@/lib/aiDoctorContextCompiler";
+import {
+  compareCsvHistoryRowsForBoundedSummary,
+  isCsvHistoryRow,
+  type CsvHistorySensorRowLike,
+} from "@/lib/aiDoctorCsvHistoryContextRules";
 
 export const AI_DOCTOR_REVIEW_PACKET_EVENT_CAP = 20;
+/**
+ * Hard cap on how many CSV-history rows may feed the sanitized summary.
+ * Matches the per-tent sensor hook's default fetch window so the packet
+ * can never aggregate more history than the read path already bounds.
+ */
+export const AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP = 200;
 export const AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION = 1 as const;
-
 
 export interface AiDoctorReviewRequestPlantProfile {
   strain: string | null;
@@ -75,9 +90,25 @@ export interface AiDoctorReviewRequestPacket {
    * safety notes, and never relabels.
    */
   recentSensorSnapshotAnnotation?: AiDoctorReviewRequestSnapshotAnnotation | null;
+  /**
+   * Additive: sanitized summary of imported CSV/XLSX sensor history for
+   * the plant's tent. Bounded, derived aggregates only — never raw rows,
+   * raw_payload, filenames, secrets, or database identifiers. Optional
+   * so older packets/fixtures stay valid. Field name intentionally
+   * matches PlantContextPayload so the shared server-side prompt
+   * assembly (`buildAiDoctorPromptMessages`) reads it without
+   * translation and applies its historical-not-live guidance.
+   */
+  imported_sensor_history?: ImportedSensorHistorySection | null;
+  /**
+   * Additive safety signal: true when the packet carries no fresh
+   * live-source sensor snapshot. Manual, CSV, demo, stale, and invalid
+   * readings never count as live (mirrors the context compiler's
+   * semantics), so AI Doctor is told to request fresh context whenever
+   * current conditions matter. Optional for back-compat.
+   */
+  missingLiveSensorReadings?: boolean;
 }
-
-
 
 export interface BuildAiDoctorReviewPacketArgs {
   plant: (AiDoctorContextPlantSource & { potSize?: string | null }) | null;
@@ -85,8 +116,24 @@ export interface BuildAiDoctorReviewPacketArgs {
   context: AiDoctorContextResult;
   /** Injectable clock for deterministic staleness annotation. */
   now?: Date;
+  /**
+   * Optional sensor-history rows for the plant's tent (already bounded
+   * by the caller's fetch window). Only rows the shared CSV rule
+   * explicitly identifies as imported history contribute; manual, demo,
+   * live, stale, and invalid rows are ignored here — never reinterpreted.
+   * Raw rows never leave this builder: only the sanitized summary enters
+   * the packet.
+   */
+  csvHistoryRows?: ReadonlyArray<CsvHistorySensorRowLike> | null;
+  /**
+   * Optional caller-supplied live-telemetry signal (e.g. a "usable"
+   * sensor-bridge health classification). Only an explicit `true`
+   * clears the missing-live flag — manual snapshots, CSV history, and
+   * unknown/absent signals never do. Downgrade-only, mirroring the
+   * compiler's live vocabulary.
+   */
+  hasFreshLiveSensorReadings?: boolean | null;
 }
-
 
 function cleanStringOrNull(v: unknown): string | null {
   if (typeof v !== "string") return null;
@@ -102,7 +149,6 @@ function pickEventCategory(item: TimelineMemoryItem): string {
   }
   return "other";
 }
-
 
 function pickMostRecentSnapshotItem(
   items: readonly TimelineMemoryItem[],
@@ -200,6 +246,26 @@ export function buildAiDoctorReviewRequestPacket(
     recentSensorSnapshotAnnotation = buildAnnotationFromCard(latest.card, args.now);
   }
 
+  // ---- imported CSV history (sanitized, bounded, deterministic) ----
+  // Filter first so non-CSV rows can never consume the cap; then sort
+  // newest-first with summary-complete tie-breakers so shuffled inputs
+  // always produce the same bounded evidence packet.
+  const csvRows = (args.csvHistoryRows ?? []).filter((r) => !!r && isCsvHistoryRow(r));
+  const csvSorted = [...csvRows].sort(compareCsvHistoryRowsForBoundedSummary);
+  const imported_sensor_history = buildImportedSensorHistorySection(
+    csvSorted.slice(0, AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP),
+  );
+
+  // Live-availability mirrors the context compiler: a fresh snapshot whose
+  // provenance resolved to "live", or an explicit caller live-telemetry
+  // signal (fresh bridge ingest), counts. Manual/CSV/demo/stale/invalid
+  // never satisfy it, so the prompt always requests fresh context when
+  // current conditions matter.
+  const missingLiveSensorReadings = !(
+    isFreshLiveSnapshotAnnotation(recentSensorSnapshotAnnotation) ||
+    args.hasFreshLiveSensorReadings === true
+  );
+
   return {
     schemaVersion: AI_DOCTOR_REVIEW_PACKET_SCHEMA_VERSION,
     plant: {
@@ -216,6 +282,7 @@ export function buildAiDoctorReviewRequestPacket(
     recentEvents,
     recentSensorSnapshot,
     recentSensorSnapshotAnnotation,
+    imported_sensor_history,
+    missingLiveSensorReadings,
   };
 }
-

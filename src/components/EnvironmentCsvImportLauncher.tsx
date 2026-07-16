@@ -35,6 +35,7 @@ import {
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
+import { plantDetailPath, tentDetailPath } from "@/lib/routes";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 
@@ -112,6 +113,17 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
 
   const ready = !!user?.id && !!growId && !!tentId;
 
+  // Post-import handoff target. Most specific TRUSTED destination only:
+  // the explicit plant this launcher was mounted with, else the selected
+  // tent's timeline surface. Never inferred from CSV contents. Pure
+  // navigation — never auto-navigates, never runs AI Doctor, never
+  // creates alerts or Action Queue items.
+  const viewHistoryHref = plantId
+    ? plantDetailPath(plantId, { tentId: tentId ?? null })
+    : tentId
+      ? tentDetailPath(tentId)
+      : null;
+
   const handleConfirm = useCallback(
     async (rows: readonly ParsedEnvironmentRow[]) => {
       if (!user?.id || !growId || !tentId) {
@@ -173,7 +185,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
         >
           <FileUp className="h-3.5 w-3.5" /> Import CSV
         </Button>
-        <EnvironmentCsvImportModal open={open} onOpenChange={setOpen} onConfirm={handleConfirm} />
+        <EnvironmentCsvImportModal open={open} onOpenChange={setOpen} onConfirm={handleConfirm} viewHistoryHref={viewHistoryHref} />
       </>
     );
   }
@@ -198,7 +210,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
           {label}
         </Button>
       </div>
-      <EnvironmentCsvImportModal open={open} onOpenChange={setOpen} onConfirm={handleConfirm} />
+      <EnvironmentCsvImportModal open={open} onOpenChange={setOpen} onConfirm={handleConfirm} viewHistoryHref={viewHistoryHref} />
     </section>
   );
 }

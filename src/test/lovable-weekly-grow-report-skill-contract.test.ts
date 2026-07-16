@@ -71,4 +71,52 @@ describe("Lovable weekly grow report skill contract", () => {
     expect(SKILL).toMatch(/late entry or corrected content changes this ID/);
     expect(SKILL).toMatch(/Foundation-first implementation sequence/);
   });
+
+  it("keeps report time preferences explicit, validated, and uniformly applied", () => {
+    expect(SKILL).toMatch(/Report time preferences \(grower-facing setting — authorized slice\)/);
+    expect(SKILL).toMatch(/validated browser zone remains the only source/);
+    expect(SKILL).toMatch(/\[dayStart \+ boundary, nextDayStart \+ boundary\)/);
+    expect(SKILL).toMatch(/Mixed-boundary comparisons\s+are forbidden/);
+    expect(SKILL).toMatch(/Days run\s+06:00 → 06:00 local/);
+    expect(SKILL).toMatch(/never a\s+silent fallback/);
+    // Device-local only; account-synced persistence stays a separate slice.
+    expect(SKILL).toMatch(/do not add tables for this slice/);
+    // The original never-infer + no-server-persistence truths must survive.
+    expect(SKILL).toMatch(/does not currently persist a\s+grower timezone/);
+  });
+
+  it("keeps plant scope honest about attribution and tent-level environment", () => {
+    expect(SKILL).toMatch(/Plant scope selector \(grower-facing control — authorized slice\)/);
+    expect(SKILL).toMatch(
+      /excluded\s+from the single-plant view and surfaced in "Missing this week"/,
+    );
+    expect(SKILL).toMatch(/never silently attributed to the plant/);
+    expect(SKILL).toMatch(/readings are tent-level, not\s+plant-specific/);
+    expect(SKILL).toMatch(/never borrows tent-level events/);
+    expect(SKILL).toMatch(/plant scope is part of the report key/);
+  });
+
+  it("keeps saved presets device-local, validated, and judgment-free", () => {
+    expect(SKILL).toMatch(/Saved report presets \(grower-facing control — authorized slice\)/);
+    expect(SKILL).toMatch(
+      /referenced\s+from the current report time preferences at apply time, never frozen/,
+    );
+    expect(SKILL).toMatch(/re-validated on load like fresh input/);
+    expect(SKILL).toMatch(/never falls back\s+to another plant/);
+    expect(SKILL).toMatch(/never appear in URLs, analytics, or logs/);
+    expect(SKILL).toMatch(/never a database write/);
+    expect(SKILL).toMatch(/At most 20 presets/);
+  });
+
+  it("keeps PDF export a client-side projection of the same report", () => {
+    expect(SKILL).toMatch(/One-click PDF export \(authorized slice\)/);
+    expect(SKILL).toMatch(/projection of the same data — never a second computation/);
+    expect(SKILL).toMatch(/No\s+server round-trip, no external rendering service/);
+    expect(SKILL).toMatch(
+      /no canvas rasterization of any\s+chart that carries contribution drill-down/,
+    );
+    expect(SKILL).toMatch(/deterministic output for the\s+same content version ID/);
+    expect(SKILL).toMatch(/no server-side PDF service is ever\s+added/);
+    expect(SKILL).toMatch(/Never hashes, opaque IDs, emails, or grower notes in the filename/);
+  });
 });

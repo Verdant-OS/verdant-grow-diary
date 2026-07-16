@@ -371,7 +371,7 @@ export default function Pricing() {
               <Button
                 size="lg"
                 variant="outline"
-                className="w-full"
+                className="w-full h-auto min-h-11 whitespace-normal"
                 onClick={() => trackPricingEvent("pricing_cta_free_clicked")}
               >
                 Start Free
@@ -395,7 +395,10 @@ export default function Pricing() {
           cta={
             <Button
               size="lg"
-              className="w-full"
+              // h-auto + whitespace-normal: the priced label ("Upgrade to
+              // Pro — $99/ year") must wrap instead of forcing the card
+              // wider than a ≤390px viewport (Button defaults to nowrap).
+              className="w-full h-auto min-h-11 whitespace-normal"
               disabled={checkoutLoading}
               data-testid={
                 billing === "annual" ? "pricing-cta-pro-annual" : "pricing-cta-pro-monthly"
@@ -445,7 +448,7 @@ export default function Pricing() {
           cta={
             <Button
               size="lg"
-              className="w-full"
+              className="w-full h-auto min-h-11 whitespace-normal"
               disabled={
                 checkoutLoading || (founderSlots.status === "ready" && founderSlots.soldOut)
               }

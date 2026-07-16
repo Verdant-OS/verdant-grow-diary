@@ -27,9 +27,10 @@ vi.mock("@/hooks/usePhenoEvidencePackets", () => ({
   }),
 }));
 
+const reloadMock = vi.fn();
 
-function renderAt(state: UsePhenoHuntCandidatesState) {
-  hookMock.mockReturnValue(state);
+function renderAt(state: Omit<UsePhenoHuntCandidatesState, "reload">) {
+  hookMock.mockReturnValue({ ...state, reload: reloadMock });
   return render(
     <MemoryRouter initialEntries={["/pheno-hunts/hunt-1/compare"]}>
       <Routes>
@@ -39,7 +40,10 @@ function renderAt(state: UsePhenoHuntCandidatesState) {
   );
 }
 
-beforeEach(() => hookMock.mockReset());
+beforeEach(() => {
+  hookMock.mockReset();
+  reloadMock.mockReset();
+});
 
 describe("PhenoHuntCompare (live)", () => {
   it("shows a loading state while the hunt loads", () => {
@@ -50,6 +54,24 @@ describe("PhenoHuntCompare (live)", () => {
   it("shows a read-only error state when the hunt cannot load", () => {
     renderAt({ status: "error", hunt: null, candidates: [], error: "Pheno hunt not found." });
     expect(screen.getByTestId("pheno-hunt-compare-error")).toHaveTextContent(/not found/i);
+  });
+
+  it("error state carries a primary heading, retry, and ways back", () => {
+    renderAt({ status: "error", hunt: null, candidates: [], error: "Pheno hunt not found." });
+    // Standard error-state anatomy: h1 + retry + back links, no bare error.
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toHaveTextContent(/Couldn't load this pheno hunt/i);
+    expect(screen.getByTestId("pheno-hunt-compare-error-workspace-link")).toHaveAttribute(
+      "href",
+      "/pheno-hunts/hunt-1/workspace",
+    );
+    expect(screen.getByTestId("pheno-hunt-compare-error-timeline-link")).toHaveAttribute(
+      "href",
+      "/timeline",
+    );
+    const retry = screen.getByTestId("pheno-hunt-compare-error-retry");
+    retry.click();
+    expect(reloadMock).toHaveBeenCalledTimes(1);
   });
 
   it("renders the live comparison (hunt name, no demo banner) with real candidates", () => {

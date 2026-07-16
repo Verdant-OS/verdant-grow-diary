@@ -66,12 +66,28 @@ test.describe("Auth redirect safety (mocked)", () => {
   });
 
   test("safe internal redirectTo is honored after sign-in", async ({ page, baseURL }) => {
-    await signInWith(page, "/dashboard");
-    await page.waitForURL((u) => u.pathname === "/dashboard" || u.pathname === "/", {
+    // Must be a route from appRouteManifest: /auth only restores return-to
+    // paths the app actually mounts (deep-link return-to, open-redirect safe).
+    await signInWith(page, "/plants");
+    await page.waitForURL((u) => u.pathname === "/plants", {
       timeout: 8000,
     });
     const origin = new URL(page.url()).origin;
     expect(origin).toBe(new URL(baseURL!).origin);
+  });
+
+  test("clean-looking but unknown path is not restored — stays on an internal surface", async ({
+    page,
+    baseURL,
+  }) => {
+    // "/dashboard" is not a mounted route (the dashboard lives at "/").
+    // The manifest allowlist drops it and sign-in proceeds to the normal
+    // post-auth target instead of a 404 deep link.
+    await signInWith(page, "/dashboard");
+    await page.waitForTimeout(800);
+    const url = new URL(page.url());
+    expect(url.origin).toBe(new URL(baseURL!).origin);
+    expect(url.pathname).not.toBe("/dashboard");
   });
 
   test("off-origin redirectTo is ignored — stays on app origin", async ({ page, baseURL }) => {
@@ -103,10 +119,7 @@ test.describe("Auth redirect safety (mocked)", () => {
     expect(new URL(page.url()).origin).toBe(new URL(baseURL!).origin);
   });
 
-  test("backslash variant /\\evil falls back to safe internal path", async ({
-    page,
-    baseURL,
-  }) => {
+  test("backslash variant /\\evil falls back to safe internal path", async ({ page, baseURL }) => {
     await signInWith(page, "/\\evil");
     await page.waitForTimeout(800);
     expect(new URL(page.url()).origin).toBe(new URL(baseURL!).origin);
@@ -147,7 +160,10 @@ test.describe("Auth redirect safety (mocked)", () => {
     );
     await page.goto("/reset-password?redirectTo=https://evil.example");
     const newPwd = page.getByLabel(/^new password$/i);
-    const ready = await newPwd.waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+    const ready = await newPwd
+      .waitFor({ timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
     test.skip(!ready, "Reset form did not render with synthetic session.");
     await newPwd.fill("verdantnoop1");
     await page.getByLabel(/^confirm new password$/i).fill("verdantnoop1");

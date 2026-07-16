@@ -18,10 +18,13 @@ function extractStringArray(src: string, name: string): string[] {
 
 const protectedListed = new Set(extractStringArray(spec, "PROTECTED_MOBILE_ROUTES"));
 const publicListed = new Set(extractStringArray(spec, "PUBLIC_MOBILE_ROUTES"));
-// Fixture-only internal demo surfaces deliberately mounted OUTSIDE AppShell
-// (render signed-out by design; asserted for zero private REST hits instead
-// of an /auth redirect). Pinned below to exactly these two routes so real
+// Fixture-only demo surfaces deliberately mounted OUTSIDE AppShell (render
+// signed-out by design; asserted for zero private REST hits instead of an
+// /auth redirect). Pinned below to exactly these two routes so real
 // operator/internal pages can never quietly migrate into this bucket.
+// Route Metadata Truth v1: the manifest now labels them `public` (matching
+// their actual routing); their mobile coverage stays in this dedicated
+// fixture bucket, not the generic public bucket.
 const ALLOWED_UNAUTH_FIXTURE_ROUTES = [
   "/internal/contextual-pheno-comparison-demo",
   "/internal/demo-proof-walkthrough",
@@ -33,7 +36,13 @@ const operatorInternal = APP_ROUTES.filter(
 ).map((r) => r.path);
 const publicManifest = APP_ROUTES.filter(
   (r) =>
-    r.access === "public" && !["/auth", "/reset-password", "/billing/:plan", "*"].includes(r.path),
+    r.access === "public" &&
+    !["/auth", "/reset-password", "/billing/:plan", "*"].includes(r.path) &&
+    // Covered by the pinned UNAUTH_FIXTURE_ROUTES bucket instead (zero
+    // private-REST assertion), never the generic public bucket.
+    !ALLOWED_UNAUTH_FIXTURE_ROUTES.includes(
+      r.path as (typeof ALLOWED_UNAUTH_FIXTURE_ROUTES)[number],
+    ),
 ).map((r) => r.path);
 
 describe("Mobile route-protection coverage guardrail", () => {

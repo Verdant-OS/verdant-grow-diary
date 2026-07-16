@@ -12,9 +12,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { Link, useSearchParams } from "react-router-dom";
-import { Stethoscope, Link2, Check, AlertCircle, Bookmark, Trash2, ShieldAlert, Info } from "lucide-react";
+import {
+  Stethoscope,
+  Link2,
+  Check,
+  AlertCircle,
+  Bookmark,
+  Trash2,
+  ShieldAlert,
+  Info,
+} from "lucide-react";
 import { format } from "date-fns";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   copyShareLink,
@@ -22,10 +31,7 @@ import {
   type CopyLinkStatus,
 } from "@/lib/aiDoctorSessionsShareLinkRules";
 import { Button } from "@/components/ui/button";
-import {
-  useAiDoctorSessionsIndex,
-  type AiDoctorSessionRow,
-} from "@/hooks/use-ai-doctor-sessions";
+import { useAiDoctorSessionsIndex, type AiDoctorSessionRow } from "@/hooks/use-ai-doctor-sessions";
 import {
   buildSessionRowCautionIndicator,
   isSessionLimitedContext,
@@ -253,12 +259,8 @@ function IndexRow({
         ) : null}
       </div>
 
-
       {d?.likelyIssue ? (
-        <p
-          className="font-medium leading-snug"
-          data-testid="ai-doctor-sessions-index-likely-issue"
-        >
+        <p className="font-medium leading-snug" data-testid="ai-doctor-sessions-index-likely-issue">
           {d.likelyIssue}
         </p>
       ) : null}
@@ -342,10 +344,7 @@ export default function AiDoctorSessionsIndex() {
   const filtersActive = isFiltersActive(filters);
   const activeLabels = formatActiveFilterLabels(filters);
   const needsAttentionActive = isNeedsAttentionPresetActive(filters);
-  const needsAttentionVisible = useMemo(
-    () => countNeedsAttentionVisible(rawRows),
-    [rawRows],
-  );
+  const needsAttentionVisible = useMemo(() => countNeedsAttentionVisible(rawRows), [rawRows]);
   const needsFollowUpVisible = useMemo(
     () => countNeedsFollowUpVisible(rawRows, reviewStateBySession),
     [rawRows, reviewStateBySession],
@@ -430,10 +429,7 @@ export default function AiDoctorSessionsIndex() {
 
   // Display list merges built-in (system) views in front of user views.
   // Built-in views are never persisted — see write effect below.
-  const displaySavedViews = useMemo(
-    () => mergeBuiltInSavedViews(savedViews),
-    [savedViews],
-  );
+  const displaySavedViews = useMemo(() => mergeBuiltInSavedViews(savedViews), [savedViews]);
 
   // Auto-select the matching built-in view when current filters/page match it,
   // so the saved-views select stays in sync with the preset button.
@@ -441,8 +437,7 @@ export default function AiDoctorSessionsIndex() {
     () => matchingBuiltInSavedViewId(filters, page),
     [filters, page],
   );
-  const effectiveSelectedSavedViewId =
-    selectedSavedViewId || autoSelectedBuiltInId || "";
+  const effectiveSelectedSavedViewId = selectedSavedViewId || autoSelectedBuiltInId || "";
 
   const applySavedView = (id: string) => {
     setSelectedSavedViewId(id);
@@ -476,9 +471,7 @@ export default function AiDoctorSessionsIndex() {
   };
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const pendingDeleteView = pendingDeleteId
-    ? findSavedView(savedViews, pendingDeleteId)
-    : null;
+  const pendingDeleteView = pendingDeleteId ? findSavedView(savedViews, pendingDeleteId) : null;
   const requestDeleteSavedView = (id: string) => {
     setPendingDeleteId(id);
   };
@@ -548,10 +541,6 @@ export default function AiDoctorSessionsIndex() {
     setImportText("");
   };
 
-
-
-
-
   return (
     <div data-testid="ai-doctor-sessions-index-page" className="space-y-4">
       <OneTentLoopNextStepCard
@@ -568,12 +557,14 @@ export default function AiDoctorSessionsIndex() {
       <Card>
         <CardHeader className="space-y-1">
           <div className="flex items-start justify-between gap-2">
-            <CardTitle
-              className="text-lg flex items-center gap-2"
+            {/* h1 (CardTitle renders an h3): this is the page's main title.
+                Classes mirror CardTitle's base look at the text-lg size. */}
+            <h1
+              className="text-lg font-semibold leading-none tracking-tight flex items-center gap-2"
               data-testid="ai-doctor-sessions-index-title"
             >
               <Stethoscope className="h-4 w-4" /> AI Doctor Sessions
-            </CardTitle>
+            </h1>
             <Button
               variant="outline"
               size="sm"
@@ -584,16 +575,12 @@ export default function AiDoctorSessionsIndex() {
               {copyStatus === "success" ? (
                 <>
                   <Check className="h-3.5 w-3.5" />
-                  <span data-testid="ai-doctor-sessions-index-copy-link-success">
-                    Copied
-                  </span>
+                  <span data-testid="ai-doctor-sessions-index-copy-link-success">Copied</span>
                 </>
               ) : copyStatus === "error" ? (
                 <>
                   <AlertCircle className="h-3.5 w-3.5" />
-                  <span data-testid="ai-doctor-sessions-index-copy-link-error">
-                    Copy failed
-                  </span>
+                  <span data-testid="ai-doctor-sessions-index-copy-link-error">Copy failed</span>
                 </>
               ) : (
                 <>
@@ -634,9 +621,7 @@ export default function AiDoctorSessionsIndex() {
               <span className="text-muted-foreground">Suggested actions</span>
               <select
                 value={filters.hasActions}
-                onChange={(e) =>
-                  updateFilter("hasActions", e.target.value as HasActionsFilter)
-                }
+                onChange={(e) => updateFilter("hasActions", e.target.value as HasActionsFilter)}
                 data-testid="ai-doctor-sessions-index-filter-has-actions"
                 className="rounded border bg-background px-2 py-1 text-sm"
               >
@@ -649,9 +634,7 @@ export default function AiDoctorSessionsIndex() {
               <span className="text-muted-foreground">Date range</span>
               <select
                 value={filters.dateRange}
-                onChange={(e) =>
-                  updateFilter("dateRange", e.target.value as DateRangeFilter)
-                }
+                onChange={(e) => updateFilter("dateRange", e.target.value as DateRangeFilter)}
                 data-testid="ai-doctor-sessions-index-filter-date-range"
                 className="rounded border bg-background px-2 py-1 text-sm"
               >
@@ -664,9 +647,7 @@ export default function AiDoctorSessionsIndex() {
               <span className="text-muted-foreground">Needs review</span>
               <select
                 value={filters.needsReview}
-                onChange={(e) =>
-                  updateFilter("needsReview", e.target.value as NeedsReviewFilter)
-                }
+                onChange={(e) => updateFilter("needsReview", e.target.value as NeedsReviewFilter)}
                 data-testid="ai-doctor-sessions-index-filter-needs-review"
                 className="rounded border bg-background px-2 py-1 text-sm"
               >
@@ -679,9 +660,7 @@ export default function AiDoctorSessionsIndex() {
               <span className="text-muted-foreground">Caution</span>
               <select
                 value={filters.caution}
-                onChange={(e) =>
-                  updateFilter("caution", e.target.value as CautionFilter)
-                }
+                onChange={(e) => updateFilter("caution", e.target.value as CautionFilter)}
                 data-testid="ai-doctor-sessions-index-filter-caution"
                 className="rounded border bg-background px-2 py-1 text-sm"
               >
@@ -694,9 +673,7 @@ export default function AiDoctorSessionsIndex() {
               <span className="text-muted-foreground">Review checklist</span>
               <select
                 value={filters.hasChecklist}
-                onChange={(e) =>
-                  updateFilter("hasChecklist", e.target.value as HasChecklistFilter)
-                }
+                onChange={(e) => updateFilter("hasChecklist", e.target.value as HasChecklistFilter)}
                 data-testid="ai-doctor-sessions-index-filter-has-checklist"
                 className="rounded border bg-background px-2 py-1 text-sm"
               >
@@ -709,16 +686,14 @@ export default function AiDoctorSessionsIndex() {
               <span className="text-muted-foreground">Confidence</span>
               <select
                 value={filters.confidence}
-                onChange={(e) =>
-                  updateFilter("confidence", e.target.value as ConfidenceFilter)
-                }
+                onChange={(e) => updateFilter("confidence", e.target.value as ConfidenceFilter)}
                 data-testid="ai-doctor-sessions-index-filter-confidence"
                 className="rounded border bg-background px-2 py-1 text-sm"
               >
                 <option value="all">All</option>
                 <option value="low">Low (≤60%)</option>
                 <option value="medium">Medium (61–80%)</option>
-                <option value="high">High ({'>'}80%)</option>
+                <option value="high">High ({">"}80%)</option>
                 <option value="unknown">Unknown</option>
               </select>
             </label>
@@ -727,10 +702,7 @@ export default function AiDoctorSessionsIndex() {
               <select
                 value={filters.reviewStatus}
                 onChange={(e) =>
-                  updateFilter(
-                    "reviewStatus",
-                    e.target.value as AiDoctorSessionReviewStatusFilter,
-                  )
+                  updateFilter("reviewStatus", e.target.value as AiDoctorSessionReviewStatusFilter)
                 }
                 data-testid="ai-doctor-sessions-index-filter-review-status"
                 className="rounded border bg-background px-2 py-1 text-sm"
@@ -746,9 +718,7 @@ export default function AiDoctorSessionsIndex() {
               <span className="text-muted-foreground">Sort</span>
               <select
                 value={filters.sort}
-                onChange={(e) =>
-                  updateFilter("sort", e.target.value as SortOption)
-                }
+                onChange={(e) => updateFilter("sort", e.target.value as SortOption)}
                 data-testid="ai-doctor-sessions-index-filter-sort"
                 className="rounded border bg-background px-2 py-1 text-sm"
                 title="Sort applies to the currently loaded page"
@@ -814,9 +784,7 @@ export default function AiDoctorSessionsIndex() {
                 disabled={displaySavedViews.length === 0}
               >
                 <option value="">
-                  {displaySavedViews.length === 0
-                    ? "No saved views"
-                    : "Apply a saved view…"}
+                  {displaySavedViews.length === 0 ? "No saved views" : "Apply a saved view…"}
                 </option>
                 {displaySavedViews.map((v) => {
                   const isBuiltIn = isBuiltInSavedViewId(v.id);
@@ -824,13 +792,9 @@ export default function AiDoctorSessionsIndex() {
                     <option
                       key={v.id}
                       value={v.id}
-                      title={
-                        isBuiltIn ? BUILTIN_SAVED_VIEW_TOOLTIP : undefined
-                      }
+                      title={isBuiltIn ? BUILTIN_SAVED_VIEW_TOOLTIP : undefined}
                       data-testid={
-                        isBuiltIn
-                          ? "ai-doctor-sessions-saved-views-builtin-option"
-                          : undefined
+                        isBuiltIn ? "ai-doctor-sessions-saved-views-builtin-option" : undefined
                       }
                     >
                       {isBuiltIn ? `★ ${v.label} (Built-in)` : v.label}
@@ -867,8 +831,7 @@ export default function AiDoctorSessionsIndex() {
                 </span>
               );
             })()}
-            {effectiveSelectedSavedViewId &&
-            !isBuiltInSavedViewId(effectiveSelectedSavedViewId) ? (
+            {effectiveSelectedSavedViewId && !isBuiltInSavedViewId(effectiveSelectedSavedViewId) ? (
               <Button
                 variant="ghost"
                 size="sm"
@@ -964,13 +927,9 @@ export default function AiDoctorSessionsIndex() {
               disabled={savedViews.length === 0 && exportStatus === "idle"}
             >
               {exportStatus === "success" ? (
-                <span data-testid="ai-doctor-sessions-saved-views-export-success">
-                  Copied
-                </span>
+                <span data-testid="ai-doctor-sessions-saved-views-export-success">Copied</span>
               ) : exportStatus === "error" ? (
-                <span data-testid="ai-doctor-sessions-saved-views-export-error">
-                  Export failed
-                </span>
+                <span data-testid="ai-doctor-sessions-saved-views-export-error">Export failed</span>
               ) : (
                 <span>Export views</span>
               )}
@@ -995,9 +954,7 @@ export default function AiDoctorSessionsIndex() {
               data-testid="ai-doctor-sessions-saved-views-import-panel"
             >
               <label className="flex flex-col gap-1 text-xs">
-                <span className="text-muted-foreground">
-                  Paste exported saved views JSON
-                </span>
+                <span className="text-muted-foreground">Paste exported saved views JSON</span>
                 <textarea
                   value={importText}
                   onChange={(e) => {
@@ -1051,18 +1008,11 @@ export default function AiDoctorSessionsIndex() {
                 >
                   Imported {importSummary.added} view
                   {importSummary.added === 1 ? "" : "s"}
-                  {importSummary.skipped > 0
-                    ? ` · skipped ${importSummary.skipped}`
-                    : ""}
-                  .
+                  {importSummary.skipped > 0 ? ` · skipped ${importSummary.skipped}` : ""}.
                 </span>
               ) : null}
             </div>
           ) : null}
-
-
-
-
 
           {filtersActive ? (
             <div
@@ -1102,10 +1052,7 @@ export default function AiDoctorSessionsIndex() {
               <p className="text-muted-foreground">Loading AI Doctor sessions…</p>
               <div className="space-y-2" aria-hidden="true">
                 {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="h-16 rounded-lg border bg-muted/30 animate-pulse"
-                  />
+                  <div key={i} className="h-16 rounded-lg border bg-muted/30 animate-pulse" />
                 ))}
               </div>
             </div>
@@ -1115,16 +1062,16 @@ export default function AiDoctorSessionsIndex() {
               className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm space-y-2"
               data-testid="ai-doctor-sessions-index-error"
             >
-              <p className="font-medium text-foreground">
-                Unable to load AI Doctor sessions.
-              </p>
+              <p className="font-medium text-foreground">Unable to load AI Doctor sessions.</p>
               <p className="text-xs text-muted-foreground">
                 Check your connection and try again. No changes were made.
               </p>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => { void refetch(); }}
+                onClick={() => {
+                  void refetch();
+                }}
                 disabled={isRefetching}
                 data-testid="ai-doctor-sessions-index-error-retry"
                 className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
@@ -1138,9 +1085,7 @@ export default function AiDoctorSessionsIndex() {
                 className="rounded-lg border bg-muted/20 p-4 text-sm space-y-2"
                 data-testid="ai-doctor-sessions-index-empty-filtered"
               >
-                <p className="font-medium text-foreground">
-                  No sessions match these filters.
-                </p>
+                <p className="font-medium text-foreground">No sessions match these filters.</p>
                 <p className="text-xs text-muted-foreground">
                   Try adjusting or clearing your filters to review more sessions.
                 </p>
@@ -1159,20 +1104,16 @@ export default function AiDoctorSessionsIndex() {
                 className="rounded-lg border bg-muted/20 p-4 text-sm space-y-1"
                 data-testid="ai-doctor-sessions-index-empty"
               >
-                <p className="font-medium text-foreground">
-                  No AI Doctor sessions yet.
-                </p>
+                <p className="font-medium text-foreground">No AI Doctor sessions yet.</p>
                 <p className="text-xs text-muted-foreground">
-                  Saved diagnosis snapshots will appear here for you to review. Opening a session never re-runs AI or creates actions.
+                  Saved diagnosis snapshots will appear here for you to review. Opening a session
+                  never re-runs AI or creates actions.
                 </p>
               </div>
             )
           ) : (
             <>
-              <ul
-                className="space-y-2"
-                data-testid="ai-doctor-sessions-index-list"
-              >
+              <ul className="space-y-2" data-testid="ai-doctor-sessions-index-list">
                 {rows.map((r) => (
                   <IndexRow
                     key={r.id}
@@ -1230,10 +1171,7 @@ export default function AiDoctorSessionsIndex() {
                   </span>
                   <br />
                   <span data-testid="ai-doctor-sessions-saved-views-delete-dialog-summary">
-                    {formatSavedViewSummary(
-                      pendingDeleteView.filters,
-                      pendingDeleteView.page,
-                    )}
+                    {formatSavedViewSummary(pendingDeleteView.filters, pendingDeleteView.page)}
                   </span>
                 </>
               ) : (

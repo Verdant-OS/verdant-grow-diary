@@ -32,7 +32,7 @@ import {
   RESEND_VERIFICATION_GENERIC_SUCCESS,
   RESEND_VERIFICATION_GENERIC_FAILURE,
 } from "@/lib/authErrorRules";
-import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
+import { resolveKnownRouteReturnTo } from "@/lib/authRedirectRules";
 import {
   buildSignupEmailRedirectUrl,
   buildSignupUserMetadata,
@@ -69,8 +69,9 @@ export default function Auth() {
   const nav = useNavigate();
   const [search] = useSearchParams();
   const explicitRedirect = useMemo(() => {
-    const raw = search.get("redirectTo");
-    return raw ? sanitizeAuthRedirect(raw) : null;
+    // Manifest-validated: only same-origin paths the app actually mounts are
+    // restored after sign-in (deep-link return-to; open-redirect safe).
+    return resolveKnownRouteReturnTo(search.get("redirectTo"));
   }, [search]);
   const redirectTo = explicitRedirect ?? "/";
   const signupSource = useMemo(() => resolveSignupAcquisitionSource(search), [search]);

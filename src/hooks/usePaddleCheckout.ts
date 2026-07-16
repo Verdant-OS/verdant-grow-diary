@@ -23,6 +23,7 @@ import type { PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
 import { buildCheckoutCancelPath } from "@/lib/checkoutCancelRecoveryRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { saveCheckoutReturnTo } from "@/lib/checkoutReturnToSession";
+import { clearCheckoutStarted, markCheckoutStarted } from "@/lib/checkoutContextRules";
 
 export interface OpenCheckoutOptions {
   priceId: string;
@@ -174,6 +175,11 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         // param; both branches call sanitizeCheckoutReturnTo.
         saveCheckoutReturnTo(new URLSearchParams(window.location.search).get("returnTo"));
 
+        // Same-device checkout-context marker so /checkout/success can show
+        // "confirming" vs "no checkout context". Grants nothing — see
+        // checkoutContextRules.
+        markCheckoutStarted(Date.now());
+
         // Slice D: register overlay session BEFORE calling
         // Paddle.Checkout.open so the module-level eventCallback (set at
         // Initialize) always has a target when checkout.completed /
@@ -183,6 +189,12 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
           returnTo: new URLSearchParams(location.search).get("returnTo"),
         });
         beginCheckoutSession(() => {
+          // Close-before-completion: no checkout happened, so the
+          // same-device marker must not linger (a fresh marker would make a
+          // later /checkout/success visit poll as "confirming"). The session
+          // tracker only fires this for closes WITHOUT a prior
+          // checkout.completed, so completed checkouts keep their marker.
+          clearCheckoutStarted();
           if (!mountedRef.current) return;
           navigate(cancelPath);
         });
@@ -198,6 +210,10 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
           },
         });
       } catch (err) {
+        // The open failed before a checkout could run — drop the
+        // same-device marker written above so /checkout/success cannot
+        // misread the failure as a checkout in progress.
+        clearCheckoutStarted();
         // The dedicated fail-closed error surfaces as an inline calm state,
         // never a destructive toast. Everything else keeps the existing
         // destructive toast so real Paddle/network failures stay visible.

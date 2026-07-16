@@ -75,7 +75,10 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/guides/:slug",
   "/guides/grow-stage-care-guide",
   "/cultivars",
+  // Template entry satisfies the manifest coverage guard; ":slug" resolves
+  // to the unknown-slug redirect, so also exercise a real detail page.
   "/cultivars/:slug",
+  "/cultivars/oreoz",
   "/ai-doctor-readiness-check",
   "/founder",
   "/how-ai-doctor-works",

@@ -89,14 +89,14 @@ export interface CustomerUpsertRow {
 // Loose shapes — the Paddle SDK returns camelCase but we defensively read.
 interface EventLike {
   eventType?: string;
-  data?: SubscriptionData | TransactionData;
+  data?: SubscriptionData | TransactionData | CustomerData;
 }
 interface SubscriptionData {
   id?: string;
   customerId?: string;
   status?: string;
   currentBillingPeriod?: { startsAt?: string; endsAt?: string } | null;
-  scheduledChange?: { action?: string } | null;
+  scheduledChange?: { action?: string; effectiveAt?: string } | null;
   customData?: { userId?: string } | null;
   items?: Array<{
     price?: { id?: string; importMeta?: { externalId?: string } | null };
@@ -116,6 +116,14 @@ interface TransactionData {
       importMeta?: { externalId?: string } | null;
     };
   }>;
+}
+// customer.created / customer.updated payload shape.
+interface CustomerData {
+  id?: string;
+  email?: string | null;
+  name?: string | null;
+  locale?: string | null;
+  status?: string | null;
 }
 
 function firstItem(data: SubscriptionData | TransactionData) {

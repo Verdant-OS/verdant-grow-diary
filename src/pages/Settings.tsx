@@ -271,7 +271,7 @@ function TemperatureUnitTile() {
  */
 function SubscriptionTile() {
   const { loading, entitlement } = useMyEntitlements();
-  const [dialog, setDialog] = useState<null | "manage" | "cancel">(null);
+  const { opening, error: portalError, open: openPortal, clearError } = useOpenCustomerPortalState();
 
   const planId = entitlement?.displayPlanId ?? null;
   const tier = planId ? PRICING_TIERS.find((t) => t.id === planId) ?? null : null;
@@ -284,7 +284,7 @@ function SubscriptionTile() {
 
   const isFree = !loading && (planId === "free" || (!tier && !planId));
   const isPaid = !loading && !!tier && planId !== "free";
-
+  const isLifetime = planId === "founder_lifetime";
   const isStaff = !!entitlement?.isStaff;
 
   return (
@@ -314,6 +314,19 @@ function SubscriptionTile() {
               Internal staff — Pro capabilities, 10,000 AI credits/month.
             </p>
           )}
+          {entitlement?.status === "past_due" && (
+            <p
+              className="text-xs text-amber-700 mt-1"
+              data-testid="settings-subscription-past-due"
+            >
+              Payment retry in progress — update your payment method to avoid interruption.
+            </p>
+          )}
+          {entitlement?.status === "canceled" && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Canceled — access continues until the end of your paid period.
+            </p>
+          )}
           {!loading && !tier && (
             <p className="text-xs text-muted-foreground">
               We couldn't determine your plan right now. Your grow data is safe
@@ -322,7 +335,6 @@ function SubscriptionTile() {
           )}
         </div>
       </div>
-
 
       {tier && (
         <ul
@@ -345,61 +357,48 @@ function SubscriptionTile() {
             <Link to="/pricing">Upgrade to Pro</Link>
           </Button>
         )}
-        {isPaid && (
-          <>
-            <Button
-              size="sm"
-              variant="outline"
-              data-testid="settings-subscription-manage"
-              onClick={() => setDialog("manage")}
-            >
-              Manage subscription
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              data-testid="settings-subscription-cancel"
-              onClick={() => setDialog("cancel")}
-            >
-              Cancel plan
-            </Button>
-          </>
+        {isPaid && !isLifetime && (
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="settings-subscription-manage"
+            onClick={() => {
+              clearError();
+              void openPortal();
+            }}
+            disabled={opening}
+            aria-busy={opening}
+          >
+            {opening ? "Opening…" : "Manage subscription"}
+          </Button>
+        )}
+        {isLifetime && (
+          <p className="text-xs text-muted-foreground">
+            Founder Lifetime is a one-time purchase — nothing to cancel or renew.
+          </p>
         )}
       </div>
 
-      <Dialog
-        open={dialog !== null}
-        onOpenChange={(o) => {
-          if (!o) setDialog(null);
-        }}
-      >
-        <DialogContent data-testid="settings-subscription-dialog">
-          <DialogHeader>
-            <DialogTitle>
-              {dialog === "cancel"
-                ? "Cancel plan"
-                : "Manage subscription"}
-            </DialogTitle>
-            <DialogDescription>
-              Billing management is coming soon. No changes have been made to
-              your account. For now, contact support if you need subscription
-              help.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDialog(null)}
-              data-testid="settings-subscription-dialog-close"
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {portalError ? (
+        <p
+          role="alert"
+          className="text-xs text-destructive mt-2"
+          data-testid="settings-subscription-portal-error"
+        >
+          {portalError}
+        </p>
+      ) : null}
+
+      {isPaid && !isLifetime ? (
+        <p className="text-[11px] text-muted-foreground mt-2">
+          Cancel, change payment method, or download invoices in the Paddle
+          customer portal. Opens in a new tab.
+        </p>
+      ) : null}
     </Tile>
   );
 }
+
 
 
 

@@ -15,20 +15,17 @@ function read(rel: string): string {
   return readFileSync(join(ROOT, rel), "utf8");
 }
 function stripped(rel: string): string {
-  return read(rel)
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/.*$/gm, "")
-    // Strip accessibility attributes so words like `aria-live` do not
-    // trip the forbidden-word scan.
-    .replace(/\baria-[a-z]+(?:=(?:"[^"]*"|'[^']*'|\{[^}]*\}))?/g, "");
+  return (
+    read(rel)
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "")
+      // Strip accessibility attributes so words like `aria-live` do not
+      // trip the forbidden-word scan.
+      .replace(/\baria-[a-z]+(?:=(?:"[^"]*"|'[^']*'|\{[^}]*\}))?/g, "")
+  );
 }
 
-const FORBIDDEN_WORDS = [
-  /\blive\b/i,
-  /\bsynced\b/i,
-  /\bconnected\b/i,
-  /\bimported\b/i,
-];
+const FORBIDDEN_WORDS = [/\blive\b/i, /\bsynced\b/i, /\bconnected\b/i, /\bimported\b/i];
 const DEVICE_WORDS = [
   /\bdevice control\b/i,
   /\bpump\b/i,
@@ -37,6 +34,13 @@ const DEVICE_WORDS = [
   /\bturn\s+off\b/i,
 ];
 const SCHEMA_MARKERS = [/CREATE\s+TABLE/i, /ALTER\s+TABLE/i, /DROP\s+TABLE/i];
+
+// Write-call detectors are whitespace-tolerant (`\s` spans newlines), so a
+// line-wrapped `supabase\n  .from(` cannot slip past the scan on formatting
+// alone. Kept honest by the fixture self-test below.
+const DIRECT_TABLE_CALL = /supabase\s*\.\s*from\s*\(/;
+const DIRECT_RPC_CALL = /supabase\s*\.\s*rpc\s*\(/;
+const EDGE_FUNCTION_CALL = /functions\s*\.\s*invoke/;
 
 const RULE = "lib/quickLogV2RefreshRules.ts";
 const SHEET = "components/QuickLogV2Sheet.tsx";
@@ -67,9 +71,9 @@ describe("QuickLog v2 refresh hardening — static safety", () => {
     const src = read(RULE);
     expect(src).not.toMatch(/from\s+["']react["']/);
     expect(src).not.toMatch(/from\s+["']@\/integrations\/supabase\/client["']/);
-    expect(src).not.toMatch(/\.rpc\(/);
-    expect(src).not.toMatch(/\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
-    expect(src).not.toMatch(/fetch\(|XMLHttpRequest/);
+    expect(src).not.toMatch(/\.\s*rpc\s*\(/);
+    expect(src).not.toMatch(/\.\s*insert\s*\(|\.\s*update\s*\(|\.\s*upsert\s*\(|\.\s*delete\s*\(/);
+    expect(src).not.toMatch(/fetch\s*\(|XMLHttpRequest/);
   });
 
   it("rule never emits keys for alerts/action_queue/ai_doctor_sessions", () => {
@@ -86,14 +90,32 @@ describe("QuickLog v2 refresh hardening — static safety", () => {
 
   it("sheet does not optimistically write fake timeline entries", () => {
     const src = stripped(SHEET);
-    expect(src).not.toMatch(/setQueryData\(/);
+    expect(src).not.toMatch(/setQueryData\s*\(/);
   });
 
   it("sheet introduces no new writes beyond the existing RPC save hook", () => {
     const src = stripped(SHEET);
-    expect(src).not.toMatch(/supabase\.from\(/);
-    expect(src).not.toMatch(/supabase\.rpc\(/);
-    expect(src).not.toMatch(/functions\.invoke/);
+    expect(src).not.toMatch(DIRECT_TABLE_CALL);
+    expect(src).not.toMatch(DIRECT_RPC_CALL);
+    expect(src).not.toMatch(EDGE_FUNCTION_CALL);
     expect(src).not.toMatch(/service_role/i);
+  });
+
+  it("write detectors catch multi-line formatted calls (guard self-test)", () => {
+    // A prettier-wrapped call must be caught: the single-line pattern this
+    // replaces (/supabase\.from\(/) let exactly this formatting through.
+    const multiLineFrom =
+      'const { error } = await supabase\n      .from("diary_entries")\n      .insert({});';
+    const multiLineRpc = 'await supabase\n      .rpc("quicklog_save_manual", {});';
+    const multiLineInvoke = 'await supabase.functions\n      .invoke("fn");';
+    expect(multiLineFrom).toMatch(DIRECT_TABLE_CALL);
+    expect(multiLineRpc).toMatch(DIRECT_RPC_CALL);
+    expect(multiLineInvoke).toMatch(EDGE_FUNCTION_CALL);
+    // Single-line forms stay caught.
+    expect('supabase.from("diary_entries")').toMatch(DIRECT_TABLE_CALL);
+    expect('supabase.rpc("fn")').toMatch(DIRECT_RPC_CALL);
+    // Storage buckets are a different surface (supabase.storage.from) and
+    // must not false-positive the table-write detector.
+    expect('supabase.storage\n      .from("diary-photos")').not.toMatch(DIRECT_TABLE_CALL);
   });
 });

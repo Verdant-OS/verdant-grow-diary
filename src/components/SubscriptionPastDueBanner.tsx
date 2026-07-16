@@ -11,7 +11,7 @@
  * subscription transitions to canceled.
  */
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
-import { openPaddleCustomerPortal, useOpenCustomerPortalState } from "@/lib/customerPortal";
+import { useOpenCustomerPortalState } from "@/lib/customerPortal";
 import { AlertTriangle } from "lucide-react";
 
 export function SubscriptionPastDueBanner() {

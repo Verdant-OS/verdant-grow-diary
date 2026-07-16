@@ -17,34 +17,84 @@ Scope defaults to the grower's **active grow** (single tent for Free tier; growe
 
 ## Time window
 
-- Default window: **rolling last 7 days**, ending at "now" in the grower's local timezone.
-- Grower may override: "last week" (Mon–Sun of the previous ISO week), "last 14 days", or a specific date range.
-- The window's start/end timestamps are printed at the top of the report so the reader can verify.
+- V1 is always **7 local calendar days**. The default ends today; "last week"
+  and specific-week requests resolve to a different end date. A 14-day or
+  arbitrary-length report is a future slice, not a hidden mode in this control.
+- Resolve the browser's current IANA timezone with
+  `Intl.DateTimeFormat().resolvedOptions().timeZone`, validate it, and pass it
+  explicitly into pure window rules. Verdant does not currently persist a
+  grower timezone. Never infer one from sensor timestamps, tent light-schedule
+  text, locale, or IP address.
+- Model both report windows as half-open instants: `[start, nextDayStart)`.
+  Derive those instants from local calendar dates in the explicit timezone so
+  daylight-saving transitions may produce 167- or 169-hour weeks without
+  dropping or duplicating a local day.
+- Print the local date range, timezone name, and resolved UTC instants at the
+  top of the report so the grower can verify the boundary.
 
 ### Date-range selector (grower-facing control)
 
 A single control at the top of the report lets the grower generate a report for **the 7-day window ending on any chosen day**. Purpose: let the grower re-run the report against past weeks or a non-Sunday cadence without needing custom filters.
 
-- **Control shape:** a single "Report end date" date picker (shadcn `Calendar` inside a `Popover` — see the shadcn-datepicker pattern, including `pointer-events-auto` on the calendar wrapper). Report window is always **7 days**, ending inclusive on the selected date, starting exactly 6 days before it, aligned to the grower's local timezone day boundaries.
-- **Default:** today (in the grower's local timezone). Changing the date re-runs the report deterministically.
+- **Control shape:** a single "Report end date" date picker (shadcn `Calendar` inside a `Popover` — see the shadcn-datepicker pattern, including `pointer-events-auto` on the calendar wrapper). Report window is always **7 local calendar days**, ending on the selected local date and starting 6 calendar dates before it.
+- **Default:** today in the validated browser timezone. If a valid IANA zone is unavailable, block all report generation with an honest "Timezone needed" state; neither window nor its future/floor bounds are safe to resolve. Do not silently fall back to the server timezone.
 - **Companion display (read-only):** next to the picker, render the resolved window as `<startDate> → <endDate>` in the grower's local timezone so they can verify before generating. Also render the prior-week comparison window (`<priorStart> → <priorEnd>`) so the week-over-week math is transparent.
 - **Bounds:**
   - Max selectable end date = **today** in the grower's local timezone. Future dates are disabled — never generate a report for a window that includes the future.
-  - Min selectable end date = the grower's earliest diary/sensor activity (or a hard floor of 2 years back, whichever is later). Dates before that are disabled with a tooltip: "No grow data before <date>".
+  - Min selectable end date = the earliest activity returned by the audited,
+    RLS-scoped source adapters (or a hard floor of 2 years back, whichever is
+    later). Do not claim this bound until every enabled source adapter
+    participates; otherwise use the 2-year floor and label it as a search
+    limit, not "No grow data."
   - If the selected window contains zero source events (no diary entries, no sensor readings, no alerts), render the report with honest empty states in each section — never fabricate a baseline and never silently shift the window.
-- **Comparison window follows automatically.** Selecting an end date of `D` sets this-week = `[D−6, D]` and last-week = `[D−13, D−7]`, both in the grower's local timezone. The week-over-week section (§4) uses these windows unchanged; all its existing rules (provenance parity, stage-change caveat, insufficient prior data) still apply.
-- **URL + deterministic Report ID.** The selected end date is encoded in the URL as a query param (e.g. `?end=YYYY-MM-DD`) so the report is shareable within the grower's own session and reproducible. Same `grow_id` + same end date = same Report ID (§9 footer). Never encode other growers' IDs.
+- **Comparison window follows automatically.** Selecting an end date of `D` sets this-week local dates to `D−6 ... D` and prior-week local dates to `D−13 ... D−7`. Resolve each as its own half-open instant window in the same timezone.
+- **URL + deterministic selection.** Encode only the validated end-date value
+  as `?end=YYYY-MM-DD` on the private report route. The browser timezone is
+  displayed and is part of the report key; the URL alone is not evidence that
+  a different device used the same timezone. Do not put emails, notes, sensor
+  payloads, service tokens, or unvalidated query values in the URL.
 - **Accessibility.** The picker is keyboard-navigable, has a visible label ("Report end date"), announces the resolved window to screen readers via `aria-live="polite"` when the date changes, and the calendar hit targets meet the existing a11y CI bar.
 - **Read-only.** Changing the date only re-reads existing data; it never writes, never triggers an AI call, never inserts Action Queue items, and never sends device commands.
 - **No preset shortcuts that imply value judgment.** A small neutral set of shortcuts is allowed — "Today", "Yesterday", "Last Sunday" — rendered as plain buttons in muted tokens. No "best week", "worst week", or streak framing.
 
-## Inputs (read-only, existing seams only)
+## Current implementation truth and source adapters
 
-1. **Diary timeline** via `growDiaryTimelineRules` — normalized events across `watering_events`, `feeding_events`, `observation_events`, `photo_events`, `training_events`, `environment_events`, `grow_events`, `alerts` / `alert_events`, `ai_doctor_sessions`.
-2. **Grow / tent / plant** records for names and stage/age.
-3. **Sensor snapshots** classified via `sensorSnapshot.ts` and labeled with the six-label provenance (`live | manual | csv | demo | stale | invalid`).
-4. **Grow targets** (`grow_targets`, `vpd_targets`) — for target bands only, never to fabricate a reading.
-5. **Action Queue** — count of pending/approved/dismissed items in the window (read via existing hook; never write).
+This skill is a build contract, not proof that a weekly-report page or unified
+report query already ships. Audit the current default branch before editing.
+As of this contract:
+
+- `growDiaryTimelineRules` normalizes supplied diary rows; it does not fetch or
+  union every event table.
+- `/timeline` understands canonical scope parameters such as `growId`,
+  `plantId`, and `tentId`, plus its existing audited special-purpose params. It
+  does **not** currently implement report date-range or multi-event-type URL
+  filters.
+- Verdant has no general weekly Action Queue aggregate hook and no persisted
+  grower timezone.
+- A raw sensor reading is not automatically a diary entry and may have no
+  timeline back-pointer.
+
+Build one typed, read-only adapter per enabled source and keep aggregation out
+of React:
+
+1. **Diary entries** — normalize supplied rows through
+   `growDiaryTimelineRules`; preserve row ID internally for contribution
+   tracing but never render raw payloads.
+2. **Grow events** — use the existing grow-event mapper before merging; never
+   pretend `grow_events` came from `growDiaryTimelineRules` directly.
+3. **Dedicated event tables** — watering, feeding, training, observation,
+   photo, environment, alert, AI Doctor, and Action Queue sources require
+   explicit RLS-scoped reads plus typed adapters. Enable a metric only after its
+   adapter and status semantics are verified against current schema.
+4. **Sensor readings/snapshots** — classify through the existing sensor-truth
+   rules and preserve source, timestamp, quality, and any real diary
+   back-pointer. A sensor-only record remains sensor-only.
+5. **Grow / tent / plant and targets** — use owned records for labels, stage,
+   and target bands; targets never fabricate observations.
+
+Every adapter returns normalized records plus a stable internal contribution
+reference. Missing or unavailable adapters become explicit report omissions;
+they never become zero counts.
 
 Anything missing = surfaced explicitly in a **Missing this week** section — never guessed.
 
@@ -53,12 +103,15 @@ Anything missing = surfaced explicitly in a **Missing this week** section — ne
 Sections in exactly this order:
 
 ### 1. Header
+
 - Grow name, tent name, plant count, stage/age (weeks in veg/flower).
-- Window start → end in grower's local timezone.
+- Window start → end, validated IANA timezone, and resolved UTC instants.
 - Generated-at timestamp.
 
 ### 2. At-a-glance stats
+
 Small stat tiles, each with its source count:
+
 - Waterings (count, total ml)
 - Feedings (count, avg EC/TDS, avg pH)
 - Observations
@@ -66,11 +119,15 @@ Small stat tiles, each with its source count:
 - Training events
 - AI Doctor sessions
 - Alerts triggered / resolved
-- Action Queue items: pending / approved / dismissed
+- Action Queue items: counts by the verified current lifecycle statuses
+  (`pending_approval | approved | rejected | simulated | completed | cancelled`).
+  Do not reuse the Alert-only `dismissed` status for Action Queue rows.
+
 Each tile shows "—" (not zero) if no source data exists.
 
 ### 3. Charts (printable, deterministic)
-Render as static SVG/canvas suitable for print (no interactive tooltips required). Every chart caption cites data provenance:
+
+Render as semantic inline SVG suitable for print and keyboard-equivalent trace controls (no interactive tooltip is required for meaning). Do not use canvas for a chart that needs accessible contribution drill-down. Every chart caption cites data provenance:
 
 - **Environment trend** — temp + RH lines over the 7 days, with target band shaded. Points colored by provenance label; `stale/demo/invalid` points rendered dashed/greyed with a legend note.
 - **VPD trend** — computed from same environment series; target band shaded.
@@ -81,7 +138,8 @@ Render as static SVG/canvas suitable for print (no interactive tooltips required
 If a chart has zero eligible data points, render an honest empty state ("No feeding events logged in this window") — never a fake baseline.
 
 ### 4. Week-over-week comparison
-Side-by-side visual + numeric diff of **this week** vs the **immediately prior 7-day window** of equal length, ending exactly where this week begins. Purpose: show how the environment and inputs *changed*, not whether they're "good".
+
+Side-by-side visual + numeric diff of **this week** vs the **immediately prior 7-day window** of equal length, ending exactly where this week begins. Purpose: show how the environment and inputs _changed_, not whether they're "good".
 
 Rendered as an **at-a-glance delta card strip** at the top of the section, then a **compare strip** above each existing chart (env trend, VPD, feed EC & pH, watering volume), then a small **stat-delta table**:
 
@@ -93,27 +151,46 @@ Rendered as an **at-a-glance delta card strip** at the top of the section, then 
   - Watering count
   - Avg feed EC (`mS/cm`)
   - Avg feed pH
-  - Hours outside target band (temp+RH+VPD combined)
-  Card rules — non-negotiable:
-  - Show `this week` as the primary value; show `Δ absolute (Δ %)` as a secondary line. If either window is empty, render "—" and label the card "insufficient prior data" — never "0%" and never a fabricated baseline.
-  - **No good/bad framing.** Neutral typography only — no red/green coloring, no up/down arrows implying value judgment, no emoji. A small neutral glyph (▲ ▼ —) is allowed *only* to indicate direction of change, styled in a muted token color, not success/destructive tokens.
-  - **Provenance-aware.** Cards exclude `demo | stale | invalid` readings from both sides identically, matching section 3/4 rules. If a card's math had to drop a provenance class, add a one-line footnote under the strip (e.g. "Temp/RH exclude 12 stale readings from last week").
-  - **Deterministic order and rounding.** Same inputs = same card values, same order, same rounding (1 decimal for temp/RH/VPD, integer ml, 2 decimals for EC, 1 decimal for pH).
-  - Colors, spacing, and typography come from existing semantic HSL tokens (`--muted`, `--muted-foreground`, `--border`, `--foreground`) — no hardcoded hex, no new tokens.
-  - Print-safe: cards render as static blocks that survive `window.print()` without clipping, and reflow to 2 columns on narrow print widths.
+  - Unique covered time outside any requested target band (temp/RH/VPD union;
+    never sum three overlapping hour counts)
+
+Card rules — non-negotiable:
+
+- Show `this week` as the primary value; show `Δ absolute (Δ %)` as a secondary line. Treat numeric zero as observed data, never as missing. If current data is unavailable, show `—` as the primary value and label it "current data unavailable." If current data exists but prior data is unavailable, preserve the current value, show `—` for both deltas, and label only the comparison "insufficient prior data." If the prior value is a verified zero, preserve both values and the absolute delta; percentage change alone is undefined and renders `—`.
+- **No good/bad framing.** Neutral typography only — no red/green coloring, no up/down arrows implying value judgment, no emoji. A small neutral glyph (▲ ▼ —) is allowed _only_ to indicate direction of change, styled in a muted token color, not success/destructive tokens.
+- **Provenance-aware.** Cards exclude `demo | stale | invalid` readings from both sides identically, matching section 3/4 rules. If a card's math had to drop a provenance class, add a one-line footnote under the strip (e.g. "Temp/RH exclude 12 stale readings from last week").
+- **Deterministic order and rounding.** Same inputs = same card values, same order, same rounding (1 decimal for temp/RH/VPD, integer ml, 2 decimals for EC, 1 decimal for pH).
+- **Cadence-safe environment math.** Within each source series, aggregate raw
+  eligible readings into one value per equal time bucket. Only then may a
+  cross-source headline combine the per-source bucket values with an explicit,
+  deterministic equal-source rule. A high-frequency device must never receive
+  more weight because it emitted more raw points. Report bucket size, included
+  sources, and coverage on both sides. Do not compare averages when the
+  configured coverage floor is not met.
+- **No double-counted excursion time.** Compute the outside-target card as
+  the union of covered time buckets where any requested metric is outside its
+  band. Keep the per-metric hour counts in the detailed table.
+- Colors, spacing, and typography come from existing semantic HSL tokens (`--muted`, `--muted-foreground`, `--border`, `--foreground`) — no hardcoded hex, no new tokens.
+- Print-safe: cards render as static blocks that survive `window.print()` without clipping, and reflow to 2 columns on narrow print widths.
+
+**Comparison charts:**
+
 - **Overlaid dual-series line** for env trend + VPD — this week solid, last week dashed and de-emphasized, same target band shaded. Same y-axis scale so eyeballing is honest.
 - **Grouped bars** for feed EC & pH and daily watering ml — this week vs last week per weekday (Mon..Sun), same y-axis.
 
-- **Delta table** with one row per metric:
-  - Waterings (count, total ml)
-  - Feedings (count, avg EC, avg pH)
-  - Avg temp / RH / VPD (per source, provenance-weighted)
-  - Hours outside temp/RH/VPD target band
-  - Observations, photos, training events
-  - Alerts triggered / resolved
-  - AI Doctor sessions
-  - Action Queue: pending / approved / dismissed
-  Each row shows: `this week | last week | Δ absolute | Δ %` (or "—" if either side is empty). No arrows/emoji urgency. No red/green good-vs-bad framing.
+**Delta table** — one row per metric:
+
+- Waterings (count, total ml)
+- Feedings (count, avg EC, avg pH)
+- Avg temp / RH / VPD (per source, equal-time-bucket aggregation)
+- Hours outside each temp/RH/VPD target band plus the unique union
+- Observations, photos, training events
+- Alerts triggered / resolved
+- AI Doctor sessions
+- Action Queue: current verified lifecycle-status counts; no invented
+  `dismissed` bucket
+
+Each row shows: `this week | last week | Δ absolute | Δ %`. Preserve every observed value, including numeric zero. Missing current data renders only the current value and deltas unavailable; missing prior data preserves current and renders prior/deltas unavailable; a verified zero prior value preserves both values and the absolute delta while only percentage renders `—`. No arrows/emoji urgency. No red/green good-vs-bad framing.
 
 Comparison rules — non-negotiable:
 
@@ -122,30 +199,55 @@ Comparison rules — non-negotiable:
 - **Missing last week.** If the prior window has < 3 days of coverage for a metric, render its delta as "insufficient prior data — showing this week only" and skip the % change. Never extrapolate.
 - **Timezone-consistent windows.** Both windows use the same grower-local weekday alignment; no UTC drift.
 - **Deterministic.** Same two windows = same numbers, same ordering, same rendered chart.
-- **No causal claims.** The section shows *what changed*, never *why*. Causal reasoning is deferred to the grower and to AI Doctor.
+- **No causal claims.** The section shows _what changed_, never _why_. Causal reasoning is deferred to the grower and to AI Doctor.
 
-**Drill-down links to source diary entries — non-negotiable:**
+**Contribution trace and drill-down — non-negotiable:**
 
-Every rendered week-over-week data point must be traceable back to the exact diary entries that produced it. The grower has to be able to click a bar, dot, weekday group, delta-table cell, or delta card and land on the source records — no "trust me" numbers.
+Every rendered aggregate must retain the exact normalized source references that
+contributed to it, plus excluded references and exclusion reasons. Build this
+as a typed contribution ledger in pure rules; a chart is never the source of
+truth.
 
-- **What is clickable:**
-  - Each **grouped bar** (feed EC/pH, daily watering ml) → opens the diary entries for that weekday within its window (this-week bar → this-week entries; last-week bar → last-week entries).
-  - Each **point/segment on the overlaid env/VPD line** → opens the diary entries (or sensor snapshots surfaced via diary) whose timestamps fall in that point's bucket, scoped to the correct window.
-  - Each **delta-table row's `this week` and `last week` cells** → opens the full list of contributing diary entries for that metric + window.
-  - Each **delta card's secondary line** (the `Δ` value) → opens a split view listing this-week vs last-week contributing entries side by side.
-- **Where it lands:** the existing diary timeline route, pre-filtered by grow_id + tent_id + the exact ISO datetime range for the clicked bucket + the event type(s) that fed the metric (e.g. `feeding_events` for EC/pH, `watering_events` for volume, `environment_events` + `sensor_readings` surfaced via `diary_entries.details.sensor_snapshot` for temp/RH/VPD). Never a new route; reuse the diary timeline filters already governed by `growDiaryTimelineRules`.
-- **URL shape:** deterministic, shareable within the grower's own session, and RLS-scoped. Encode `grow_id`, `tent_id`, `from`, `to`, and `event_types[]` as query params. Never encode emails, service tokens, other growers' IDs, or raw payloads. Never expose IDs from a grow the current user does not own.
-- **Provenance carries through.** The drill-down view inherits the same six-label provenance filter used in the chart — `demo | stale | invalid` entries excluded from the metric stay visually flagged (not hidden) on the destination page, so the grower can see *what was excluded and why*. If a card/bar was rendered as "insufficient prior data", its link opens the destination in an empty state that explains the exclusion, never a fabricated list.
-- **Print behavior.** When the report is printed or exported as PDF, drill-down anchors render as short human-readable references (e.g. "Diary · Tue Mar 12 · feedings") next to the chart, not as raw URLs. Interactive hit targets are preserved in the on-screen version only.
-- **Accessibility.** Every clickable chart element has a keyboard-focusable equivalent with an `aria-label` describing the destination (e.g. "Open 3 feeding entries from Tuesday, Mar 12"). Hit targets meet the existing a11y CI bar (min 44×44 CSS px on touch surfaces). No hover-only affordances.
-- **Read-only.** The drill-down is navigation only. It never triggers a write, an AI call, an Action Queue insert, or a device command. It never pre-selects an "act now" affordance on the destination.
-- **Deterministic.** Same rendered chart element = same URL every time; re-running the report yields identical anchors so a shared or printed reference stays valid.
-- **Empty/uncertain buckets.** A bucket with zero contributing entries is not clickable — render it as a non-interactive placeholder rather than a link to an empty page. A bucket built entirely from excluded provenance labels links through to the destination but opens with the exclusion notice as its primary content.
-
-
+- **In-report trace first.** Each card, table cell, bar, and line bucket opens a
+  read-only contribution drawer in the report. It lists source kind, captured
+  time, display-safe provenance, included/excluded status, and exclusion reason.
+  It does not expose raw payloads or another grower's records.
+- **Diary navigation only when real.** A contribution with a verified diary or
+  grow-event back-pointer may link through using the canonical route helpers and
+  currently supported scope parameters (`growId`, `plantId`, `tentId`, or an
+  existing audited highlight token). A raw sensor reading without that
+  back-pointer stays in the contribution drawer; never manufacture a diary row
+  or a timeline link for it.
+- **Do not claim nonexistent filters.** `/timeline` does not currently consume
+  report `from`/`to`/multi-event query filters. If exact pre-filtered timeline
+  navigation is requested, implement it as a separate slice: add a pure typed
+  route builder/parser, validate half-open ISO instants and allow-listed event
+  types, wire the page presenter, and add round-trip plus RLS-scope tests before
+  this skill calls the filters available.
+- **Private route IDs.** Opaque IDs already required by canonical private app
+  routes may appear in those routes after ownership is enforced by RLS. Never
+  put them in analytics properties, logs, copy, or public/share URLs. Never put
+  emails, notes, tokens, raw payloads, or unvalidated values in any URL.
+- **Provenance carries through.** Excluded `demo | stale | invalid` records stay
+  visible and flagged in the contribution drawer so the grower can see what was
+  excluded and why.
+- **Accessibility.** Use semantic buttons/links paired with SVG chart elements;
+  do not rely on canvas hit regions or hover alone. Each control describes the
+  metric, window, and contribution count. Touch targets meet the existing a11y
+  bar.
+- **Print behavior.** Print/PDF output renders short human-readable contribution
+  references and counts, never raw URLs or internal IDs.
+- **Empty/uncertain buckets.** A bucket with zero source references is
+  non-interactive. A bucket containing only excluded records opens the drawer
+  with the exclusion notice as its primary content.
+- **Read-only and deterministic.** Trace controls never write, invoke AI, add an
+  Action Queue item, or control a device. The same normalized inputs yield the
+  same contribution ordering and labels.
 
 ### 5. What happened (narrative)
+
 Deterministic bullet list, grouped by day (most recent first):
+
 - Day header (weekday + date).
 - One line per event, with time, event type, and a short factual detail (e.g. "Watering 500 ml, runoff pH 6.2").
 - Alerts and AI Doctor summaries quoted verbatim from the source record.
@@ -153,17 +255,22 @@ Deterministic bullet list, grouped by day (most recent first):
 No embellishment. No "you did great" language.
 
 ### 6. Signals worth noting
+
 Cautious pattern surface — only rule-based observations, never diagnoses:
+
 - Environment: hours outside target band (per source), longest continuous drift.
 - Feed drift: EC or pH trending across the week's feedings.
 - Watering cadence: gap analysis (longest gap, avg interval).
 - Photo cadence: days without a photo.
 - Any repeated alert type.
 - Notable week-over-week deltas from section 4 (e.g. "Avg VPD rose 0.3 kPa vs last week") — factual only, no cause attributed.
+
 Each item cites its evidence timestamps. Prefixed with "Signal — verify before acting."
 
 ### 7. Missing this week
-Explicit list of what the report *could not* include:
+
+Explicit list of what the report _could not_ include:
+
 - Sensor gaps (hours with no readings, per source).
 - Days without any diary entry.
 - Feedings without EC or pH recorded.
@@ -172,7 +279,9 @@ Explicit list of what the report *could not* include:
 - Metrics where prior-week coverage was too thin for a valid week-over-week delta.
 
 ### 8. Next-week focus areas
+
 Grower-decides suggestions only. Each item includes:
+
 - **Focus** — short label (e.g. "Log runoff EC after next feed").
 - **Why** — one sentence tied to a signal, week-over-week delta, or missing-info item above.
 - **How to capture it** — the exact Quick Log field or observation to add.
@@ -181,8 +290,22 @@ Grower-decides suggestions only. Each item includes:
 Cap at **5 items**, ordered by risk then evidence strength. Never a device command. Never a "we will do this for you" phrasing.
 
 ### 9. Footer
+
 - "This report reflects logged data only. Verdant did not act on your behalf."
-- Report ID (deterministic hash of grow_id + this-week window + prior-week window) so re-runs are idempotent.
+- **Report key:** stable hash of rules version + owned grow/tent scope + selected
+  end date + validated timezone. It identifies the requested selection, not an
+  immutable snapshot.
+- **Content version ID:** hash of the report key plus a canonical serialization
+  of every sorted normalized, output-affecting contribution field and exclusion
+  decision. References and timestamps alone are insufficient because mutable
+  diary content may change without an `updated_at` field. Exclude raw payloads
+  and unused private fields from the digest, but include every normalized value
+  that can change a rendered number, label, note excerpt, source classification,
+  or omission. A late entry or corrected content changes this ID. Never claim
+  two reports with the same selection key have identical content when the
+  underlying data changed.
+- Neither identifier exposes its raw hash inputs in rendered copy, URLs, or
+  analytics.
 
 ## Printable delivery
 
@@ -199,9 +322,38 @@ Cap at **5 items**, ordered by risk then evidence strength. Never a device comma
 - **No fabricated values.** Empty fields render "—", never 0.
 - **No motivational or urgency copy.** Calm, grower-first, factual. No "act now", no streak-shaming, no dark patterns.
 - **No cross-grower data.** RLS-scoped reads only; never surface another user's plants, tents, or sessions.
-- **No secrets in the rendered report.** No IDs in URLs, no emails, no raw payloads, no service_role usage.
-- **Deterministic.** Same inputs + same window = same report (same ordering, same Report ID).
+- **No secrets or grower content in URLs.** Canonical private routes may contain
+  opaque, RLS-owned IDs; analytics and public/share URLs may not. Never include
+  emails, notes, raw payloads, or service-role material.
+- **Deterministic.** Same normalized inputs + rules version + explicit timezone
+  and the same half-open windows = the same ordering, values, contribution
+  ledger, and content version ID.
 - **Reuse existing rules modules** — `growDiaryTimelineRules`, `sensorSnapshot`, `sensorSourceLabels`, VPD helpers. Do not duplicate their logic in the report component.
+
+## Foundation-first implementation sequence
+
+Keep this report scalable by landing narrow slices in this order:
+
+1. `weeklyReportWindowRules.ts` — validate end date/timezone, derive current and
+   prior half-open windows, enforce future/floor bounds, and build the stable
+   report key. Test DST start/end, invalid zones, leap day, future dates, and
+   deterministic repeatability.
+2. Typed source adapters — one source at a time, RLS-scoped and read-only. Pin
+   schema/status assumptions with tests. Missing adapters remain unavailable.
+3. `weeklyReportAggregationRules.ts` — equal-time-bucket environment math,
+   coverage floors, zero-denominator deltas, unique excursion unions, stable
+   sorting, and the contribution ledger. Test empty, partial, stale, invalid,
+   mixed-cadence, and overlapping-excursion cases.
+4. Presenter — header, stats, table, accessible SVG charts, contribution drawer,
+   and honest empty states. Keep queries and calculations out of JSX.
+5. Print stylesheet and accessibility proof.
+6. Optional exact timeline-filter navigation only after its own route-parser
+   slice is implemented and tested. Do not block the core report on it.
+
+Do not add schema, a new report route, entitlement gates, scheduled delivery,
+or a PDF service unless the task explicitly authorizes that slice. Run focused
+tests, type-check, lint, format, and relevant browser coverage before calling a
+slice complete.
 
 ## Non-goals
 

@@ -15,10 +15,7 @@ import {
   VERDANT_LOOP,
 } from "@/constants/verdantPositioningCopy";
 
-const LANDING = readFileSync(
-  resolve(__dirname, "..", "pages/Landing.tsx"),
-  "utf8",
-);
+const LANDING = readFileSync(resolve(__dirname, "..", "pages/Landing.tsx"), "utf8");
 
 describe("Verdant positioning copy constants", () => {
   it("hero uses the strong grower-facing headline", () => {
@@ -38,9 +35,10 @@ describe("Verdant positioning copy constants", () => {
     );
   });
 
-  it("exposes primary Start Free and secondary Explore Demo CTAs", () => {
+  it("exposes signup, pricing, and honest product-discovery CTAs", () => {
     expect(VERDANT_HERO.primaryCtaLabel).toBe("Start Free");
-    expect(VERDANT_HERO.secondaryCtaLabel).toBe("Explore Demo");
+    expect(VERDANT_HERO.pricingCtaLabel).toBe("See Pro & Founder plans");
+    expect(VERDANT_HERO.secondaryCtaLabel).toBe("Take the 60-second tour");
   });
 
   it("ships all five ranked value drivers in order", () => {

@@ -1,7 +1,4 @@
-import {
-  getCheckoutUnavailableMessage,
-  resolvePaddleCheckout,
-} from "@/lib/paddle";
+import { getCheckoutUnavailableMessage, resolvePaddleCheckout } from "@/lib/paddle";
 
 /**
  * Payments banner.
@@ -69,4 +66,3 @@ export function PaymentTestModeBanner() {
 }
 
 export default PaymentTestModeBanner;
-

@@ -1,14 +1,9 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useHasRole } from "@/hooks/useHasRole";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   parseBillingEntitlementResolutionAuditResponse,
@@ -24,7 +19,7 @@ type EntitlementAuditRpcClient = {
 };
 
 const LIMIT_OPTIONS = [25, 50, 100] as const;
-type LimitOption = typeof LIMIT_OPTIONS[number];
+type LimitOption = (typeof LIMIT_OPTIONS)[number];
 
 function StatePill({
   state,
@@ -34,15 +29,11 @@ function StatePill({
   label: string;
 }) {
   const cls: Record<BillingEntitlementResolutionAuditState, string> = {
-    active:
-      "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-    free_fallback:
-      "border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300",
-    expired_fallback:
-      "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    active: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    free_fallback: "border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+    expired_fallback: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
     blocked: "border-destructive/40 bg-destructive/10 text-destructive",
-    unknown:
-      "border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+    unknown: "border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300",
   };
   return (
     <span
@@ -67,13 +58,11 @@ function CountCard({ label, value }: { label: string; value: number }) {
 async function fetchEntitlementAudit(
   limit: number,
 ): Promise<BillingEntitlementResolutionAuditViewModel> {
-  const { data, error } = await (
-    supabase as unknown as EntitlementAuditRpcClient
-  ).rpc("billing_entitlement_resolution_operator_audit", { p_limit: limit });
-  if (error)
-    throw new Error(
-      error.message ?? "billing_entitlement_resolution_audit_failed",
-    );
+  const { data, error } = await (supabase as unknown as EntitlementAuditRpcClient).rpc(
+    "billing_entitlement_resolution_operator_audit",
+    { p_limit: limit },
+  );
+  if (error) throw new Error(error.message ?? "billing_entitlement_resolution_audit_failed");
   return parseBillingEntitlementResolutionAuditResponse(data);
 }
 
@@ -102,15 +91,14 @@ export default function OperatorBillingEntitlementResolutionAudit() {
               Billing Entitlement Resolution
             </h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              Sanitized operator audit. Provider IDs and webhook bodies are not
-              shown.
+              Sanitized operator audit. Provider IDs and webhook bodies are not shown.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <label
-              className="text-xs text-muted-foreground"
-              htmlFor="entitlement-audit-limit"
-            >
+            <Button asChild type="button" variant="outline">
+              <Link to="/operator/subscriber-growth">View growth goal</Link>
+            </Button>
+            <label className="text-xs text-muted-foreground" htmlFor="entitlement-audit-limit">
               Rows
             </label>
             <select
@@ -162,8 +150,8 @@ export default function OperatorBillingEntitlementResolutionAudit() {
           <CardHeader>
             <CardTitle>Operator access required</CardTitle>
             <CardDescription>
-              This audit surface is hidden from non-operator accounts. No
-              entitlement data was requested.
+              This audit surface is hidden from non-operator accounts. No entitlement data was
+              requested.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -174,8 +162,7 @@ export default function OperatorBillingEntitlementResolutionAudit() {
           <CardHeader>
             <CardTitle>Entitlement resolution audit unavailable.</CardTitle>
             <CardDescription>
-              The read-only entitlement resolution RPC failed. No entitlement
-              data was changed.
+              The read-only entitlement resolution RPC failed. No entitlement data was changed.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -193,10 +180,7 @@ export default function OperatorBillingEntitlementResolutionAudit() {
       )}
 
       {role.granted && audit?.ok && (
-        <section
-          className="space-y-4"
-          aria-label="Billing entitlement resolution audit"
-        >
+        <section className="space-y-4" aria-label="Billing entitlement resolution audit">
           <section
             className="grid gap-3 md:grid-cols-3 lg:grid-cols-6"
             aria-label="Entitlement resolution counts"
@@ -204,10 +188,7 @@ export default function OperatorBillingEntitlementResolutionAudit() {
             <CountCard label="Total" value={audit.counts.total} />
             <CountCard label="Active" value={audit.counts.active} />
             <CountCard label="Free fallback" value={audit.counts.free_fallback} />
-            <CountCard
-              label="Expired fallback"
-              value={audit.counts.expired_fallback}
-            />
+            <CountCard label="Expired fallback" value={audit.counts.expired_fallback} />
             <CountCard label="Blocked" value={audit.counts.blocked} />
             <CountCard label="Unknown" value={audit.counts.unknown} />
           </section>
@@ -216,10 +197,9 @@ export default function OperatorBillingEntitlementResolutionAudit() {
             <CardHeader>
               <CardTitle>Latest sanitized rows</CardTitle>
               <CardDescription>
-                Showing up to {audit.limit || limit} sanitized rows. Provider
-                customer identifiers, subscription identifiers, price
-                identifiers, address fields, and webhook bodies are not
-                displayed.
+                Showing up to {audit.limit || limit} sanitized rows. Provider customer identifiers,
+                subscription identifiers, price identifiers, address fields, and webhook bodies are
+                not displayed.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -250,9 +230,7 @@ export default function OperatorBillingEntitlementResolutionAudit() {
                           className="border-b last:border-0"
                         >
                           <td className="py-3 pr-3">{row.planLabel}</td>
-                          <td className="py-3 pr-3">
-                            {row.subscriptionStatusLabel}
-                          </td>
+                          <td className="py-3 pr-3">{row.subscriptionStatusLabel}</td>
                           <td className="py-3 pr-3">
                             <StatePill
                               state={row.entitlementState}
@@ -262,9 +240,7 @@ export default function OperatorBillingEntitlementResolutionAudit() {
                           <td className="max-w-[260px] py-3 pr-3 text-muted-foreground">
                             {row.fallbackReasonLabel}
                           </td>
-                          <td className="py-3 pr-3">
-                            {row.aiCreditsPerMonthLabel}
-                          </td>
+                          <td className="py-3 pr-3">{row.aiCreditsPerMonthLabel}</td>
                           <td className="py-3 pr-3 font-mono text-xs text-muted-foreground">
                             {row.updatedAtLabel}
                           </td>

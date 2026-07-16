@@ -14,6 +14,7 @@ import {
   Wrench,
   LineChart,
   ClipboardList,
+  Users,
   HelpCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -90,6 +91,7 @@ const growerGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { to: "/settings", label: "Settings", icon: Settings },
       { to: "/account/preferences", label: "Preferences", icon: UserCog },
+      { to: "/invite", label: "Invite a Grower", icon: Users },
     ],
   },
 ];

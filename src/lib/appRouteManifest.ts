@@ -65,14 +65,31 @@ export interface AppRouteEntry {
  */
 export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "*", access: "public", description: "NotFound catch-all." },
-  { path: "/", access: "auth", description: "Dashboard." },
-  { path: "/.lovable/oauth/consent", access: "public", description: "OAuth consent screen." },
-  { path: "/account/preferences", access: "auth" },
+  {
+    path: "/",
+    access: "public",
+    description: "Public landing when signed out; authenticated Dashboard when signed in.",
+  },
+  {
+    path: "/.lovable/oauth/consent",
+    access: "public",
+    description: "Lovable MCP OAuth consent page (public by protocol requirement).",
+  },
+  {
+    path: "/account/preferences",
+    access: "auth",
+    description: "Grower account preferences.",
+  },
   { path: "/action-queue", access: "redirect", description: "→ /actions" },
   { path: "/actions", access: "auth" },
   { path: "/actions/:actionId", access: "auth" },
   { path: "/admin/leads", access: "internal" },
   { path: "/ai-doctor", access: "redirect", description: "→ /doctor" },
+  {
+    path: "/ai-doctor-readiness-check",
+    access: "public",
+    description: "Private, no-diagnosis AI Doctor context coverage check.",
+  },
   { path: "/alerts", access: "auth" },
   { path: "/alerts/:alertId", access: "auth" },
   { path: "/auth", access: "public" },
@@ -82,11 +99,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout).",
   },
   { path: "/breeder-beta", access: "public", description: "Breeder beta landing page." },
-  { path: "/breeding", access: "auth" },
-  { path: "/breeding/:programId", access: "auth" },
+  { path: "/breeding", access: "auth", description: "Breeding programs index." },
+  { path: "/breeding/:programId", access: "auth", description: "Breeding program detail." },
   { path: "/breeding/new", access: "auth", description: "New breeding event entry." },
-  { path: "/checkout/cancel", access: "public", description: "Checkout cancelled landing page." },
-  { path: "/checkout/success", access: "public", description: "Checkout success landing page." },
+  { path: "/checkout/cancel", access: "public", description: "Checkout cancellation return." },
+  { path: "/checkout/success", access: "public", description: "Checkout success return." },
   { path: "/creator-beta", access: "public", description: "Creator beta landing page." },
   {
     path: "/customer/:shareId",
@@ -103,7 +120,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/demo/one-tent-live-proof",
     access: "operator",
-    description: "One-tent live proof page (legacy /demo path, operator-only).",
+    description: "Legacy operator one-tent live proof page.",
   },
   { path: "/diagnostics", access: "operator" },
   {
@@ -115,8 +132,19 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/doctor/sessions", access: "auth" },
   { path: "/doctor/sessions/:sessionId", access: "auth" },
   { path: "/features", access: "redirect", description: "→ /welcome" },
-  { path: "/glossary", access: "public" },
-  { path: "/grow-lineage", access: "auth" },
+  {
+    path: "/founder",
+    access: "public",
+    description: "Public Founder Lifetime acquisition and offer explainer.",
+  },
+  { path: "/glossary", access: "public", description: "Public grower glossary (SEO)." },
+  {
+    path: "/grow-lineage",
+    access: "auth",
+    label: "Lineage Repair",
+    description:
+      "Grower-facing repair tool for reassigning tents to grows (owner-scoped, RLS-protected).",
+  },
   { path: "/grow-room", access: "redirect", description: "→ /" },
   { path: "/grows", access: "auth" },
   { path: "/grows/:growId", access: "auth" },
@@ -133,8 +161,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Searchable grow-stage care guide with checklists.",
   },
   { path: "/hardware-integrations", access: "public" },
-  { path: "/health", access: "auth", description: "Health check page." },
-  { path: "/how-ai-doctor-works", access: "public", description: "AI Doctor explainer page." },
+  { path: "/health", access: "auth", description: "Authenticated app health page." },
+  {
+    path: "/how-ai-doctor-works",
+    access: "public",
+    description: "Public AI Doctor safety and workflow explainer.",
+  },
   { path: "/ingest-inspector", access: "operator" },
   {
     path: "/internal/ai-doctor-confidence-audit",
@@ -166,6 +198,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     access: "internal",
     description: "Sensor truth internal static audit.",
   },
+  {
+    path: "/invite",
+    access: "auth",
+    description: "Authenticated PII-free grower referral surface.",
+  },
   { path: "/leads", access: "internal" },
   { path: "/login", access: "redirect", description: "→ /auth" },
   { path: "/logs", access: "redirect", description: "→ /timeline" },
@@ -176,8 +213,8 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   },
   {
     path: "/one-tent-loop-proof",
-    access: "internal",
-    description: "Live one-tent loop proof page (operator-gated).",
+    access: "operator",
+    description: "Operator-only One-Tent Loop proof surface.",
   },
   {
     path: "/operator/ai-doctor-phase1",
@@ -197,7 +234,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/operator/demo-preview",
     access: "operator",
-    description: "Operator demo preview page (read-only).",
+    description: "Operator demo preview (read-only).",
   },
   { path: "/operator/ecowitt", access: "operator", description: "Cloud Canary preview." },
   {
@@ -253,7 +290,14 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/operator/release-readiness",
     access: "operator",
-    description: "Operator release readiness checklist (read-only).",
+    description:
+      "Read-only release readiness / validation status snapshot (static/manual, no live CI feed).",
+  },
+  {
+    path: "/operator/subscriber-growth",
+    access: "operator",
+    description:
+      "Operator subscriber-growth goal snapshot from authoritative billing counts (read-only).",
   },
   {
     path: "/pheno-comparison",
@@ -264,25 +308,21 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/pheno-expression-showcase",
     access: "public",
-    description: "Mix-and-match showcase of example phenos (fixture-only, network-free).",
+    description: "Fixture-only public pheno expression showcase.",
   },
   {
     path: "/pheno-hunts/:id/compare",
     access: "public",
-    description: "Per-hunt comparison (read-only, graceful without session).",
+    description: "Read-only per-hunt comparison with graceful unauthenticated state.",
   },
-  {
-    path: "/pheno-hunts/:id/keepers",
-    access: "auth",
-    description: "Pheno hunt keepers selection.",
-  },
+  { path: "/pheno-hunts/:id/keepers", access: "auth", description: "Pheno keeper selection." },
   { path: "/pheno-hunts/:id/workspace", access: "auth", description: "Pheno hunt workspace." },
   { path: "/pheno-hunts/new", access: "auth", description: "New pheno hunt entry." },
   { path: "/pi-ingest-status", access: "operator" },
   { path: "/plants", access: "auth" },
   { path: "/plants/:id", access: "auth" },
   { path: "/pricing", access: "public" },
-  { path: "/privacy", access: "public", description: "Privacy policy page." },
+  { path: "/privacy", access: "public", description: "Privacy policy." },
   { path: "/privacy-policy", access: "redirect", description: "→ /privacy" },
   {
     path: "/quick-log",
@@ -304,16 +344,25 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/settings/agent-integrations",
     access: "auth",
-    description: "Agent integrations settings.",
+    description: "Authenticated agent integrations settings.",
   },
   { path: "/signup", access: "redirect", description: "→ /auth" },
   { path: "/tasks", access: "auth" },
   { path: "/tents", access: "auth" },
   { path: "/tents/:id", access: "auth" },
-  { path: "/terms", access: "public", description: "Terms of service page." },
+  { path: "/terms", access: "public", description: "Terms of service." },
   { path: "/terms-of-service", access: "redirect", description: "→ /terms" },
   { path: "/timeline", access: "auth" },
-  { path: "/upgrade", access: "public", description: "Upgrade / pricing presenter page." },
+  {
+    path: "/tools/vpd-calculator",
+    access: "public",
+    description: "Public manual-input, stage-aware air VPD calculator.",
+  },
+  {
+    path: "/upgrade",
+    access: "redirect",
+    description: "→ /pricing with allowlisted plan, acquisition, and return intent.",
+  },
   { path: "/welcome", access: "public" },
 ];
 

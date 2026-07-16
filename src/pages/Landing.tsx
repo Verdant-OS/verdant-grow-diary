@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -11,21 +11,21 @@ import { useAuth } from "@/store/auth";
 import BrandLogo from "@/components/BrandLogo";
 import LeadCaptureForm from "@/components/LeadCaptureForm";
 import LandingAuthedOnboardingBridge from "@/components/LandingAuthedOnboardingBridge";
+import PublicOneTentTour from "@/components/PublicOneTentTour";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   VERDANT_HERO,
   VERDANT_VALUE_DRIVERS,
   VERDANT_TRUST,
-  VERDANT_LOOP,
 } from "@/constants/verdantPositioningCopy";
+import { VERDANT_SEO_LANDING_SECTIONS, VERDANT_LANDING_FAQ } from "@/constants/verdantSeoCopy";
+import { buildFaqPageJsonLd, safeJsonLdStringify } from "@/lib/seoStructuredData";
+import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import {
-  VERDANT_SEO_LANDING_SECTIONS,
-  VERDANT_LANDING_FAQ,
-} from "@/constants/verdantSeoCopy";
-import {
-  buildFaqPageJsonLd,
-  safeJsonLdStringify,
-} from "@/lib/seoStructuredData";
+  buildAttributedPricingPath,
+  resolvePaidAcquisitionSource,
+} from "@/lib/paidAcquisitionAttributionRules";
+import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
 
 /**
  * Public landing page for https://verdantgrowdiary.com.
@@ -41,20 +41,34 @@ import {
  * Copy lives in `src/constants/verdantPositioningCopy.ts`. This file is a
  * presenter only.
  */
-export default function Landing() {
+export interface LandingProps {
+  canonicalPath?: "/" | "/welcome";
+}
+
+export default function Landing({ canonicalPath = "/welcome" }: LandingProps) {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const acquisitionSource = resolvePaidAcquisitionSource(searchParams) ?? "landing_page";
+  const pricingPath = useMemo(
+    () => buildAttributedPricingPath({ source: acquisitionSource }),
+    [acquisitionSource],
+  );
+  const signupPath = useMemo(
+    () => buildAttributedSignupPath({ source: acquisitionSource }),
+    [acquisitionSource],
+  );
 
   usePageSeo({
     title: "Grow Diary & Grow Room Tracking App | Verdant Grow Diary",
     description:
       "See what changed in your grow and decide what to do next. Verdant turns logs, photos, and sensor readings from the gear you already own into one plant timeline.",
-    path: "/welcome",
+    path: canonicalPath,
   });
 
   // FAQPage JSON-LD — must mirror the visible FAQ below (same source constant).
   useEffect(() => {
     const faq = buildFaqPageJsonLd({
-      pageUrl: "https://verdantgrowdiary.com/welcome",
+      pageUrl: `https://verdantgrowdiary.com${canonicalPath}`,
       questions: VERDANT_LANDING_FAQ,
     });
     const s = document.createElement("script");
@@ -65,14 +79,31 @@ export default function Landing() {
     return () => {
       s.remove();
     };
-  }, []);
+  }, [canonicalPath]);
 
+  useEffect(() => {
+    trackPricingEvent("landing_page_view", { source: acquisitionSource });
+  }, [acquisitionSource]);
 
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="px-6 py-5 flex items-center justify-between max-w-6xl mx-auto">
         <BrandLogo size="md" showText />
         <div className="flex items-center gap-2">
+          <Link
+            to={pricingPath}
+            data-testid="landing-pricing-cta-header"
+            onClick={() =>
+              trackPricingEvent("landing_pricing_cta_clicked", {
+                source: "header",
+                item: acquisitionSource,
+              })
+            }
+          >
+            <Button variant="ghost" size="sm">
+              Pricing
+            </Button>
+          </Link>
           {user ? (
             <Link to="/">
               <Button variant="outline" size="sm">
@@ -115,28 +146,55 @@ export default function Landing() {
               </Button>
             </Link>
           ) : (
-            <Link to="/auth">
+            <Link
+              to={signupPath}
+              data-testid="landing-signup-cta-hero"
+              onClick={() =>
+                trackPricingEvent("landing_signup_cta_clicked", {
+                  source: "hero",
+                  item: acquisitionSource,
+                })
+              }
+            >
               <Button size="lg" className="font-semibold">
                 {VERDANT_HERO.primaryCtaLabel}
               </Button>
             </Link>
           )}
-          <a href="#loop">
+          <Link
+            to={pricingPath}
+            data-testid="landing-pricing-cta-hero"
+            onClick={() =>
+              trackPricingEvent("landing_pricing_cta_clicked", {
+                source: "hero",
+                item: acquisitionSource,
+              })
+            }
+          >
+            <Button size="lg" variant="outline" className="font-semibold">
+              {VERDANT_HERO.pricingCtaLabel}
+            </Button>
+          </Link>
+          <a
+            href="#loop"
+            data-testid="landing-loop-cta-hero"
+            onClick={() =>
+              trackPricingEvent("landing_loop_opened", {
+                source: "hero",
+                item: acquisitionSource,
+              })
+            }
+          >
             <Button size="lg" variant="outline">
               {VERDANT_HERO.secondaryCtaLabel}
             </Button>
           </a>
-          <Link to="/auth">
-            <Button size="lg" variant="ghost">
-              Sign in
-            </Button>
-          </Link>
         </div>
-        <p className="mt-6 text-xs text-muted-foreground">
-          {VERDANT_HERO.safetyLine}
-        </p>
+        <p className="mt-6 text-xs text-muted-foreground">{VERDANT_HERO.safetyLine}</p>
         {user && <LandingAuthedOnboardingBridge />}
       </section>
+
+      <PublicOneTentTour hasAccount={Boolean(user)} acquisitionSource={acquisitionSource} />
 
       {/* Value drivers */}
       <section id="features" className="px-6 py-14 max-w-5xl mx-auto">
@@ -144,37 +202,13 @@ export default function Landing() {
           Why growers use Verdant
         </h2>
         <p className="text-center text-muted-foreground max-w-2xl mx-auto mb-10">
-          A Grow OS for serious growers who already own hardware and do not
-          want another controller.
+          A Grow OS for serious growers who already own hardware and do not want another controller.
         </p>
         <div className="grid gap-6 md:grid-cols-2">
           {VERDANT_VALUE_DRIVERS.map((card) => (
             <FeatureCard key={card.title} title={card.title} body={card.body} />
           ))}
         </div>
-      </section>
-
-      {/* One-Tent Loop */}
-      <section id="loop" className="px-6 py-14 max-w-5xl mx-auto">
-        <h2 className="font-display text-2xl md:text-3xl font-semibold text-center">
-          {VERDANT_LOOP.heading}
-        </h2>
-        <p className="mt-3 text-center text-muted-foreground max-w-2xl mx-auto">
-          {VERDANT_LOOP.body}
-        </p>
-        <ol className="mt-8 flex flex-wrap items-stretch justify-center gap-2">
-          {VERDANT_LOOP.steps.map((step, i) => (
-            <li
-              key={step}
-              className="flex items-center gap-2 rounded-lg border border-border/50 bg-card/40 px-3 py-2 text-sm"
-            >
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <span className="font-medium">{step}</span>
-            </li>
-          ))}
-        </ol>
       </section>
 
       {/* SEO landing sections — grower-intent keyword clusters. */}
@@ -189,9 +223,7 @@ export default function Landing() {
             id={section.id}
             className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-6"
           >
-            <h2 className="font-display text-2xl md:text-3xl font-semibold">
-              {section.heading}
-            </h2>
+            <h2 className="font-display text-2xl md:text-3xl font-semibold">{section.heading}</h2>
             <p className="mt-3 text-sm md:text-base text-muted-foreground leading-relaxed">
               {section.body}
             </p>
@@ -212,14 +244,11 @@ export default function Landing() {
           {VERDANT_LANDING_FAQ.map((entry, i) => (
             <AccordionItem key={entry.question} value={`landing-faq-${i}`}>
               <AccordionTrigger>{entry.question}</AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
-                {entry.answer}
-              </AccordionContent>
+              <AccordionContent className="text-muted-foreground">{entry.answer}</AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
       </section>
-
 
       {/* Legacy anchor tokens preserved for downstream tests/consumers.
           These are the human-facing categories the loop delivers on. */}
@@ -249,9 +278,29 @@ export default function Landing() {
             ))}
           </ul>
           <p className="mt-5 text-xs text-muted-foreground">
-            No blind automation. The grower stays in control. Verdant cannot
-            touch your equipment.
+            No blind automation. The grower stays in control. Verdant cannot touch your equipment.
           </p>
+        </div>
+      </section>
+
+      {/* Public first-value utility */}
+      <section className="px-6 py-14 max-w-3xl mx-auto" data-testid="landing-context-check">
+        <div className="rounded-2xl border border-border/70 bg-card p-6 text-center md:p-8">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary/80">
+            Free 60-second check
+          </p>
+          <h2 className="mt-3 font-display text-2xl font-semibold md:text-3xl">
+            Is your grow context ready for AI Doctor?
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
+            Check plant stage, medium, pot size, recent care, photos, sensors, grow targets, and
+            plant history. Nothing is uploaded, and the result never pretends to diagnose a plant.
+          </p>
+          <Link to="/ai-doctor-readiness-check" data-testid="landing-context-check-cta">
+            <Button size="lg" variant="outline" className="mt-6">
+              Check my context
+            </Button>
+          </Link>
         </div>
       </section>
 
@@ -261,9 +310,8 @@ export default function Landing() {
           Start with your real grow
         </h2>
         <p className="mt-3 text-muted-foreground">
-          Create a free account to begin logging your tents, plants, and
-          sensor readings. Verdant tracks real grow data — there is no
-          synthetic preview mode.
+          Create a free account to begin logging your tents, plants, and sensor readings. Verdant
+          tracks real grow data — there is no synthetic preview mode.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           {user ? (
@@ -271,10 +319,33 @@ export default function Landing() {
               <Button size="lg">Open dashboard</Button>
             </Link>
           ) : (
-            <Link to="/auth">
+            <Link
+              to={signupPath}
+              data-testid="landing-signup-cta-final"
+              onClick={() =>
+                trackPricingEvent("landing_signup_cta_clicked", {
+                  source: "final_cta",
+                  item: acquisitionSource,
+                })
+              }
+            >
               <Button size="lg">{VERDANT_HERO.primaryCtaLabel}</Button>
             </Link>
           )}
+          <Link
+            to={pricingPath}
+            data-testid="landing-pricing-cta-final"
+            onClick={() =>
+              trackPricingEvent("landing_pricing_cta_clicked", {
+                source: "final_cta",
+                item: acquisitionSource,
+              })
+            }
+          >
+            <Button size="lg" variant="outline">
+              {VERDANT_HERO.pricingCtaLabel}
+            </Button>
+          </Link>
           <Link to="/auth">
             <Button size="lg" variant="outline">
               Sign in
@@ -285,11 +356,6 @@ export default function Landing() {
           <Link to="/hardware-integrations">
             <Button size="sm" variant="ghost">
               Hardware integrations
-            </Button>
-          </Link>
-          <Link to="/pricing">
-            <Button size="sm" variant="ghost">
-              Pricing
             </Button>
           </Link>
           <a href="#features">
@@ -323,13 +389,18 @@ export default function Landing() {
           </a>
         </p>
         <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-4 gap-y-1">
-          <Link to="/terms" className="hover:text-foreground">Terms of Service</Link>
-          <Link to="/privacy" className="hover:text-foreground">Privacy Policy</Link>
-          <Link to="/refund" className="hover:text-foreground">Refund Policy</Link>
+          <Link to="/terms" className="hover:text-foreground">
+            Terms of Service
+          </Link>
+          <Link to="/privacy" className="hover:text-foreground">
+            Privacy Policy
+          </Link>
+          <Link to="/refund" className="hover:text-foreground">
+            Refund Policy
+          </Link>
         </nav>
         <p className="text-xs">
-          Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as
-          Merchant of Record.
+          Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as Merchant of Record.
         </p>
       </footer>
     </main>

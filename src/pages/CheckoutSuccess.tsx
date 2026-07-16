@@ -6,6 +6,7 @@ import AccountPlanBadge from "@/components/AccountPlanBadge";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
+import { buildCheckoutActivationViewModel } from "@/lib/checkoutActivationRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
@@ -30,14 +31,12 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 30_000;
 
-
 export default function CheckoutSuccess() {
   const { loading, entitlement, refetch } = useMyEntitlements();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const confirmed =
-    !loading && entitlement.isActive && entitlement.effectivePlanId !== "free";
+  const confirmed = !loading && entitlement.isActive && entitlement.effectivePlanId !== "free";
 
   // Sanitize the returnTo query param. Never trust the raw value: only
   // same-origin absolute app paths are allowed (see checkoutReturnTo).
@@ -45,13 +44,16 @@ export default function CheckoutSuccess() {
     () => sanitizeCheckoutReturnTo(searchParams.get("returnTo")),
     [searchParams],
   );
+  const activation = useMemo(
+    () => buildCheckoutActivationViewModel(searchParams.get("returnTo")),
+    [searchParams],
+  );
 
   usePageSeo({
     title: confirmed
       ? "Verdant Pro is active | Verdant Grow Diary"
       : "Confirming your Verdant Pro access | Verdant Grow Diary",
-    description:
-      "Your Verdant Pro purchase is being confirmed by the billing webhook.",
+    description: "Your Verdant Pro purchase is being confirmed by the billing webhook.",
     path: "/checkout/success",
   });
 
@@ -131,6 +133,23 @@ export default function CheckoutSuccess() {
             <div className="mt-4 flex justify-center">
               <AccountPlanBadge entitlement={entitlement} />
             </div>
+            {!safeReturnTo && (
+              <div
+                className="mt-8 rounded-xl border border-primary/20 bg-primary/5 p-5 text-left"
+                data-testid="checkout-success-activation-handoff"
+              >
+                <h2 className="text-lg font-semibold">{activation.heading}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{activation.description}</p>
+                <ol className="mt-4 space-y-2 text-sm">
+                  {activation.steps.map((step, index) => (
+                    <li key={step} className="flex items-start gap-2">
+                      <span className="font-semibold text-primary">{index + 1}.</span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
           </>
         ) : (
           <>
@@ -141,16 +160,16 @@ export default function CheckoutSuccess() {
               Checkout completed.
             </h1>
             <p className="mt-4 text-muted-foreground">
-              We're confirming your Verdant Pro access. This usually takes a few
-              seconds while the billing webhook is processed.
+              We're confirming your Verdant Pro access. This usually takes a few seconds while the
+              billing webhook is processed.
             </p>
             {pollExhausted && (
               <p
                 className="mt-3 text-sm text-muted-foreground"
                 data-testid="checkout-success-poll-exhausted"
               >
-                Still working on it — tap Check status to refresh, or head to
-                Settings to see your plan.
+                Still working on it — tap Check status to refresh, or head to Settings to see your
+                plan.
               </p>
             )}
           </>
@@ -170,9 +189,12 @@ export default function CheckoutSuccess() {
               Check status
             </Button>
           )}
-          <Link to={safeReturnTo ?? "/"} data-testid="checkout-success-primary-link">
+          <Link
+            to={confirmed ? activation.primaryHref : (safeReturnTo ?? "/")}
+            data-testid="checkout-success-primary-link"
+          >
             <Button size="lg" variant={confirmed ? "default" : "outline"}>
-              {safeReturnTo ? "Continue" : "Go to my grow"}
+              {confirmed ? activation.primaryLabel : safeReturnTo ? "Continue" : "Go to my grow"}
             </Button>
           </Link>
           <Link to="/settings">

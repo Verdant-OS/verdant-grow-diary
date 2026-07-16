@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,17 +30,14 @@ import LeadPipelineHealthPanel from "@/components/LeadPipelineHealthPanel";
 import LeadCommandCenterGuidance from "@/components/LeadCommandCenterGuidance";
 import LeadExecutiveSummaryCard from "@/components/LeadExecutiveSummaryCard";
 import LeadSavedViewsMenu from "@/components/LeadSavedViewsMenu";
+import LeadConversionQueuePanel from "@/components/LeadConversionQueuePanel";
 import {
   LeadCommandCenterSection,
   useLeadCommandCenterLayout,
 } from "@/components/LeadCommandCenterLayoutControls";
 import { useLeadSavedViews } from "@/hooks/useLeadSavedViews";
 import type { LeadSavedView } from "@/lib/leadSavedViewsRules";
-import {
-  useLeadsList,
-  type LeadRow,
-  type LeadStatus,
-} from "@/hooks/useLeadsList";
+import { useLeadsList, type LeadRow, type LeadStatus } from "@/hooks/useLeadsList";
 import { useCreateLeadEvent } from "@/hooks/useCreateLeadEvent";
 import {
   QUICK_FILTERS,
@@ -48,38 +46,24 @@ import {
   summarizeLeads,
   type LeadQuickFilter,
 } from "@/lib/leadFollowupRules";
-import {
-  SORT_OPTIONS,
-  searchLeads,
-  sortLeads,
-  type LeadSortOption,
-} from "@/lib/leadSearchRules";
+import { SORT_OPTIONS, searchLeads, sortLeads, type LeadSortOption } from "@/lib/leadSearchRules";
 import {
   describeFollowUpChange,
   followUpDidChange,
   labelForEventType,
   type InteractionEventType,
 } from "@/lib/leadEventRules";
+import {
+  buildLeadConversionQueueSearchParams,
+  resolveLeadConversionQueueFocus,
+  type LeadConversionQueueFocus,
+} from "@/lib/leadConversionQueueRules";
 
-
-const LEAD_TYPES = [
-  "beta_user",
-  "hardware_partner",
-  "grower",
-  "investor",
-  "other",
-] as const;
+const LEAD_TYPES = ["beta_user", "hardware_partner", "grower", "investor", "other"] as const;
 
 const SOURCES = ["landing", "other"] as const;
 
-const STATUSES: LeadStatus[] = [
-  "new",
-  "reviewed",
-  "contacted",
-  "follow_up",
-  "closed",
-  "spam",
-];
+const STATUSES: LeadStatus[] = ["new", "reviewed", "contacted", "follow_up", "closed", "spam"];
 
 const STATUS_VARIANT: Record<LeadStatus, "default" | "secondary" | "outline" | "destructive"> = {
   new: "default",
@@ -101,6 +85,7 @@ const FOLLOW_UP_BADGE_MAP: Record<
 };
 
 export default function Leads() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [leadType, setLeadType] = useState<string>("all");
   const [source, setSource] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
@@ -122,6 +107,12 @@ export default function Leads() {
     setActivityNonce((m) => ({ ...m, [leadId]: (m[leadId] ?? 0) + 1 }));
 
   const lcc = useLeadCommandCenterLayout();
+  const conversionFocus = resolveLeadConversionQueueFocus(searchParams.get("conversion"));
+
+  function setConversionFocus(focus: LeadConversionQueueFocus) {
+    const next = buildLeadConversionQueueSearchParams(searchParams, focus);
+    setSearchParams(next, { replace: true });
+  }
 
   function applySavedView(v: LeadSavedView) {
     setSearch(v.search);
@@ -132,17 +123,13 @@ export default function Leads() {
     savedViews.saveView({ name, search, quickFilter, sort: sortOption });
   }
 
-
   const summary = useMemo(() => summarizeLeads(leads), [leads]);
 
   const filtered = useMemo(() => {
     const searched = searchLeads(leads, search);
     const filteredSorted = filterAndSortLeads(searched, quickFilter);
-    return sortOption === "default"
-      ? filteredSorted
-      : sortLeads(filteredSorted, sortOption);
+    return sortOption === "default" ? filteredSorted : sortLeads(filteredSorted, sortOption);
   }, [leads, search, quickFilter, sortOption]);
-
 
   const selectedLead = useMemo(
     () => leads.find((l) => l.id === selectedId) ?? null,
@@ -197,11 +184,7 @@ export default function Leads() {
     toast.success("Follow-up updated");
   }
 
-  async function logInteraction(
-    l: LeadRow,
-    eventType: InteractionEventType,
-    note: string,
-  ) {
+  async function logInteraction(l: LeadRow, eventType: InteractionEventType, note: string) {
     const { error: cErr } = await createEvent({
       leadId: l.id,
       eventType,
@@ -239,17 +222,24 @@ export default function Leads() {
               { label: "Upcoming follow-ups", value: summary.upcoming },
               { label: "Closed leads", value: summary.closed },
             ].map((c) => (
-              <div
-                key={c.label}
-                className="rounded-xl border border-border/50 bg-card/40 p-3"
-              >
+              <div key={c.label} className="rounded-xl border border-border/50 bg-card/40 p-3">
                 <div className="text-xs text-muted-foreground">{c.label}</div>
-                <div className="mt-1 font-display text-2xl font-semibold">
-                  {c.value}
-                </div>
+                <div className="mt-1 font-display text-2xl font-semibold">{c.value}</div>
               </div>
             ))}
           </div>
+
+          {!loading && (
+            <LeadConversionQueuePanel
+              leads={leads}
+              focus={conversionFocus}
+              onFocusChange={setConversionFocus}
+              onSelectLead={(id) => {
+                const lead = leads.find((candidate) => candidate.id === id);
+                if (lead) openLead(lead);
+              }}
+            />
+          )}
 
           <div className="flex flex-wrap gap-2" role="tablist" aria-label="Lead quick filters">
             {QUICK_FILTERS.map((f) => (
@@ -294,16 +284,19 @@ export default function Leads() {
             </div>
           </LeadCommandCenterSection>
 
-
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Status</label>
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
                   {STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -311,11 +304,15 @@ export default function Leads() {
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Lead type</label>
               <Select value={leadType} onValueChange={setLeadType}>
-                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All types</SelectItem>
                   {LEAD_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -323,11 +320,15 @@ export default function Leads() {
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Source</label>
               <Select value={source} onValueChange={setSource}>
-                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All sources</SelectItem>
                   {SOURCES.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -358,10 +359,7 @@ export default function Leads() {
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Sort by</label>
-              <Select
-                value={sortOption}
-                onValueChange={(v) => setSortOption(v as LeadSortOption)}
-              >
+              <Select value={sortOption} onValueChange={(v) => setSortOption(v as LeadSortOption)}>
                 <SelectTrigger className="w-52" data-testid="leads-sort-select">
                   <SelectValue />
                 </SelectTrigger>
@@ -383,10 +381,7 @@ export default function Leads() {
           )}
 
           {!loading && (
-            <div
-              className="text-xs text-muted-foreground"
-              data-testid="leads-result-count"
-            >
+            <div className="text-xs text-muted-foreground" data-testid="leads-result-count">
               Showing {filtered.length} of {leads.length} leads
             </div>
           )}
@@ -473,9 +468,6 @@ export default function Leads() {
             </LeadCommandCenterSection>
           )}
 
-
-
-
           {!loading && (
             <LeadCommandCenterSection
               id="analytics"
@@ -483,15 +475,9 @@ export default function Leads() {
               collapsed={lcc.isCollapsed("analytics")}
               onToggle={lcc.toggle}
             >
-              <LeadAnalyticsPanel
-                leads={filtered}
-                scopeLabel="current results"
-              />
+              <LeadAnalyticsPanel leads={filtered} scopeLabel="current results" />
             </LeadCommandCenterSection>
           )}
-
-
-
 
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading leads…</p>
@@ -500,11 +486,8 @@ export default function Leads() {
               className="rounded-xl border border-border/50 bg-card/40 p-8 text-center"
               data-testid="leads-empty-state"
             >
-              <p className="text-sm text-muted-foreground">
-                No leads match this search/filter.
-              </p>
+              <p className="text-sm text-muted-foreground">No leads match this search/filter.</p>
             </div>
-
           ) : (
             <div
               className="rounded-xl border border-border/50 overflow-x-auto"
@@ -543,15 +526,16 @@ export default function Leads() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {fu ? <Badge variant={fu.variant}>{fu.label}</Badge> : <span className="text-xs text-muted-foreground">—</span>}
+                          {fu ? (
+                            <Badge variant={fu.variant}>{fu.label}</Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                           {new Date(l.created_at).toLocaleDateString()}
                         </TableCell>
-                        <TableCell
-                          className="text-right"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-1">
                             {l.status === "new" && (
                               <Button
@@ -586,7 +570,7 @@ export default function Leads() {
         lead={selectedLead}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
-        activityNonce={selectedLead ? activityNonce[selectedLead.id] ?? 0 : 0}
+        activityNonce={selectedLead ? (activityNonce[selectedLead.id] ?? 0) : 0}
         creatingEvent={creatingEvent}
         onStatusChange={setLeadStatus}
         onSaveNotes={saveNotes}

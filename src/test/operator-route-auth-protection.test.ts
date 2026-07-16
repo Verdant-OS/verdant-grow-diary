@@ -12,10 +12,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
-const APP = fs.readFileSync(
-  path.resolve(__dirname, "../App.tsx"),
-  "utf8",
-);
+const APP = fs.readFileSync(path.resolve(__dirname, "../App.tsx"), "utf8");
 
 // Split the file on the AppShell element open/close so we can classify
 // each <Route path="..."/> as protected vs public.
@@ -77,13 +74,14 @@ const REQUIRED_PROTECTED = [
   "/operator/ecowitt",
   "/operator/one-tent-proof-record",
   "/operator/demo-preview",
+  "/operator/subscriber-growth",
   "/diagnostics",
   "/pi-ingest-status",
   "/ingest-inspector",
   "/sensors",
   "/sensors/ecowitt-audit",
   "/sensors/ingest-normalizer",
-  
+
   "/actions",
   "/admin/leads",
   "/leads",
@@ -118,19 +116,13 @@ describe("Customer/public routes stay accessible without auth", () => {
 });
 
 describe("AppShell protected boundary", () => {
-  it("AppShell uses useRequireAuth to redirect to /auth", () => {
-    const shell = fs.readFileSync(
-      path.resolve(__dirname, "../components/AppShell.tsx"),
-      "utf8",
-    );
-    expect(shell).toMatch(/useRequireAuth\(\s*["']\/auth["']\s*\)/);
+  it("AppShell sends signed-out visitors to the public landing", () => {
+    const shell = fs.readFileSync(path.resolve(__dirname, "../components/AppShell.tsx"), "utf8");
+    expect(shell).toMatch(/useRequireAuth\(\s*["']\/welcome["']\s*\)/);
   });
 
   it("useRequireAuth navigates unauthenticated users to /auth (replace)", () => {
-    const hook = fs.readFileSync(
-      path.resolve(__dirname, "../hooks/useRequireAuth.ts"),
-      "utf8",
-    );
+    const hook = fs.readFileSync(path.resolve(__dirname, "../hooks/useRequireAuth.ts"), "utf8");
     expect(hook).toMatch(/nav\(redirectTo,\s*\{\s*replace:\s*true\s*\}\)/);
     expect(hook).toMatch(/redirectTo:\s*string\s*=\s*"\/auth"/);
   });

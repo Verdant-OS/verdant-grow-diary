@@ -4,6 +4,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildLegacyBillingRedirect,
+  buildLegacyUpgradeRedirect,
   resolveLegacyPlanSlug,
 } from "@/lib/legacyCheckoutRedirect";
 
@@ -41,9 +42,7 @@ describe("buildLegacyBillingRedirect", () => {
     expect(buildLegacyBillingRedirect({ planSlug: "pro-monthly" })).toBe(
       "/pricing?plan=pro_monthly",
     );
-    expect(buildLegacyBillingRedirect({ planSlug: "pro-annual" })).toBe(
-      "/pricing?plan=pro_annual",
-    );
+    expect(buildLegacyBillingRedirect({ planSlug: "pro-annual" })).toBe("/pricing?plan=pro_annual");
     expect(buildLegacyBillingRedirect({ planSlug: "founder-lifetime" })).toBe(
       "/pricing?plan=founder_lifetime",
     );
@@ -58,9 +57,9 @@ describe("buildLegacyBillingRedirect", () => {
 
   it("preserves a safe same-origin returnTo (URLSearchParams input)", () => {
     const search = new URLSearchParams("returnTo=/pheno-hunts/new");
-    expect(
-      buildLegacyBillingRedirect({ planSlug: "pro-monthly", search }),
-    ).toBe("/pricing?plan=pro_monthly&returnTo=%2Fpheno-hunts%2Fnew");
+    expect(buildLegacyBillingRedirect({ planSlug: "pro-monthly", search })).toBe(
+      "/pricing?plan=pro_monthly&returnTo=%2Fpheno-hunts%2Fnew",
+    );
   });
 
   it("preserves returnTo when planSlug is missing (bare /pricing + returnTo)", () => {
@@ -79,9 +78,9 @@ describe("buildLegacyBillingRedirect", () => {
       "returnTo=javascript:alert(1)",
       "returnTo=/\\\\evil",
     ]) {
-      expect(
-        buildLegacyBillingRedirect({ planSlug: "pro-monthly", search: bad }),
-      ).toBe("/pricing?plan=pro_monthly");
+      expect(buildLegacyBillingRedirect({ planSlug: "pro-monthly", search: bad })).toBe(
+        "/pricing?plan=pro_monthly",
+      );
     }
   });
 
@@ -108,5 +107,55 @@ describe("buildLegacyBillingRedirect", () => {
       expect(out.startsWith("/pricing")).toBe(true);
       expect(out.includes("://")).toBe(false);
     }
+  });
+});
+
+describe("buildLegacyUpgradeRedirect", () => {
+  it("preserves canonical or legacy paid plan selection", () => {
+    expect(buildLegacyUpgradeRedirect({ search: "plan=pro_monthly" })).toBe(
+      "/pricing?plan=pro_monthly",
+    );
+    expect(buildLegacyUpgradeRedirect({ search: "plan=pro-annual" })).toBe(
+      "/pricing?plan=pro_annual",
+    );
+    expect(buildLegacyUpgradeRedirect({ search: "plan=founder_lifetime" })).toBe(
+      "/pricing?plan=founder_lifetime",
+    );
+  });
+
+  it("preserves only a safe same-origin return path", () => {
+    expect(
+      buildLegacyUpgradeRedirect({
+        search: "plan=pro_monthly&returnTo=/pheno-hunts/new?growId=abc",
+      }),
+    ).toBe("/pricing?plan=pro_monthly&returnTo=%2Fpheno-hunts%2Fnew%3FgrowId%3Dabc");
+
+    for (const value of ["https://evil.example", "//evil.example", "javascript:alert(1)"]) {
+      expect(
+        buildLegacyUpgradeRedirect({
+          search: new URLSearchParams({ plan: "pro_monthly", returnTo: value }),
+        }),
+      ).toBe("/pricing?plan=pro_monthly");
+    }
+  });
+
+  it("preserves an exact allowlisted acquisition tuple", () => {
+    expect(
+      buildLegacyUpgradeRedirect({
+        search:
+          "plan=founder-lifetime&utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch&returnTo=/dashboard",
+      }),
+    ).toBe(
+      "/pricing?plan=founder_lifetime&utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch&returnTo=%2Fdashboard",
+    );
+  });
+
+  it("drops partial, forged, free, and unrelated query data", () => {
+    expect(
+      buildLegacyUpgradeRedirect({
+        search:
+          "plan=free&utm_source=grower_invite&utm_medium=owned&utm_campaign=grower_invite&role=operator&credit=999",
+      }),
+    ).toBe("/pricing");
   });
 });

@@ -2,6 +2,7 @@
 // Verifies (1) no uncaught/init-order errors from the manualChunks split and
 // (2) usePageSeo actually sets per-route <title> + self-canonical at runtime.
 import { chromium } from "playwright";
+import { readFile } from "node:fs/promises";
 
 const BASE = process.env.SMOKE_BASE ?? "http://localhost:4180";
 const ORIGIN = "https://verdantgrowdiary.com";
@@ -18,6 +19,21 @@ const ROUTES = [
     canonical: `${ORIGIN}/pricing`,
   },
   {
+    path: "/founder",
+    expectTitle: /Founder Lifetime — Support Verdant Early/,
+    canonical: `${ORIGIN}/founder`,
+  },
+  {
+    path: "/ai-doctor-readiness-check",
+    expectTitle: /Free AI Doctor Context Check/,
+    canonical: `${ORIGIN}/ai-doctor-readiness-check`,
+  },
+  {
+    path: "/tools/vpd-calculator",
+    expectTitle: /Free Cannabis VPD Calculator by Growth Stage/,
+    canonical: `${ORIGIN}/tools/vpd-calculator`,
+  },
+  {
     path: "/hardware-integrations",
     expectTitle: /Sensor & Hardware Integrations/,
     canonical: `${ORIGIN}/hardware-integrations`,
@@ -28,6 +44,30 @@ const ROUTES = [
 
 const browser = await chromium.launch();
 let failed = 0;
+
+// Vercel serves this entry to non-JavaScript social crawlers before the SPA
+// fallback. Check the emitted document directly because Vite preview does not
+// apply vercel.json rewrites.
+{
+  const html = await readFile(new URL("../dist/founder.html", import.meta.url), "utf8");
+  const expected = {
+    title: "Founder Lifetime — Support Verdant Early | Verdant Grow Diary",
+    url: `${ORIGIN}/founder`,
+  };
+  const problems = [];
+  if (!html.includes(`<title>${expected.title}</title>`)) problems.push("Founder title missing");
+  if (!html.includes(`property="og:url" content="${expected.url}"`))
+    problems.push("Founder og:url missing");
+  if (!html.includes(`name="twitter:title" content="${expected.title}"`))
+    problems.push("Founder twitter:title missing");
+  if (!html.includes(`rel="canonical" href="${expected.url}"`))
+    problems.push("Founder canonical missing");
+  if (!html.includes('id="root"')) problems.push("Founder app root missing");
+  const ok = problems.length === 0;
+  if (!ok) failed++;
+  console.log(`${ok ? "PASS" : "FAIL"} static /founder social entry`);
+  for (const problem of problems) console.log(`   ✗ ${problem}`);
+}
 
 for (const r of ROUTES) {
   const page = await browser.newPage();

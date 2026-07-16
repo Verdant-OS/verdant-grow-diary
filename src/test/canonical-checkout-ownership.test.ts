@@ -1,11 +1,11 @@
 /**
  * Static ownership guard: proves the canonical checkout topology stays intact.
  *
- *   - The ONLY user-facing callers of `usePaddleCheckout` are the two
- *     checkout surfaces trunk ships today: Pricing.tsx and Upgrade.tsx.
- *     Everything else stays checkout-free, and no page ever opens Paddle
- *     directly (`Paddle.Checkout`) — the hook is the single canonical path.
- *   - `LegacyBillingRedirect.tsx` only navigates (no Paddle imports).
+ *   - `/pricing` (Pricing.tsx) is the sole routed user-facing caller of
+ *     `usePaddleCheckout`; the retired Upgrade presenter may delegate to the
+ *     same hook but is not mounted by App.tsx.
+ *   - `/upgrade` and `/billing/:plan` are compatibility redirects to
+ *     canonical `/pricing` and never mount a second checkout surface.
  *   - `PhenoTrackerUpgradeGate`, `StartPhenoHuntButton`, and the auth
  *     intent/resume machinery continue targeting `/pricing`, never
  *     `/upgrade` and never `/billing/*`.
@@ -18,6 +18,10 @@ import { resolve } from "node:path";
 
 const SRC = resolve(__dirname, "..");
 
+function normalizePath(path: string): string {
+  return path.split("\\").join("/");
+}
+
 function readAllSource(): { file: string; text: string }[] {
   const out: { file: string; text: string }[] = [];
   const walk = (dir: string) => {
@@ -25,11 +29,8 @@ function readAllSource(): { file: string; text: string }[] {
       const full = resolve(dir, entry);
       const st = statSync(full);
       if (st.isDirectory()) walk(full);
-      else if (
-        /\.(t|j)sx?$/.test(entry) &&
-        !/\.test\.(t|j)sx?$/.test(entry)
-      ) {
-        out.push({ file: full, text: readFileSync(full, "utf8") });
+      else if (/\.(t|j)sx?$/.test(entry) && !/\.test\.(t|j)sx?$/.test(entry)) {
+        out.push({ file: normalizePath(full), text: readFileSync(full, "utf8") });
       }
     }
   };
@@ -39,8 +40,8 @@ function readAllSource(): { file: string; text: string }[] {
 
 const ALL = readAllSource();
 
-const RUNTIME_ROOTS = ["pages", "components", "hooks", "lib", "store"].map(
-  (r) => resolve(SRC, r),
+const RUNTIME_ROOTS = ["pages", "components", "hooks", "lib", "store"].map((r) =>
+  normalizePath(resolve(SRC, r)),
 );
 
 function isRuntime(file: string): boolean {
@@ -48,26 +49,34 @@ function isRuntime(file: string): boolean {
 }
 
 describe("Canonical checkout ownership — static guard", () => {
-  it("only the two shipped checkout surfaces call usePaddleCheckout", () => {
-    // Trunk deliberately wired Upgrade.tsx to the same canonical hook
-    // Pricing uses. The guard now pins the exact caller set so any NEW
-    // checkout surface still fails loudly.
-    const ALLOWED = [
-      /pages[\\/]+Pricing\.tsx$/,
-      /pages[\\/]+Upgrade\.tsx$/,
-    ];
+  it("keeps checkout opening in the canonical hook across approved presenters", () => {
     const callers = ALL.filter(
-      (f) =>
-        isRuntime(f.file) &&
-        /from\s+["']@\/hooks\/usePaddleCheckout["']/.test(f.text),
-    ).map((f) => f.file);
-    const filtered = callers.filter((c) => !c.endsWith("usePaddleCheckout.ts"));
-    expect(filtered.length).toBe(ALLOWED.length);
-    for (const caller of filtered) {
-      expect(
-        ALLOWED.some((rx) => rx.test(caller)),
-        `unexpected usePaddleCheckout caller: ${caller}`,
-      ).toBe(true);
+      (f) => isRuntime(f.file) && /from\s+["']@\/hooks\/usePaddleCheckout["']/.test(f.text),
+    )
+      .map((f) => f.file)
+      .filter((file) => !file.endsWith("usePaddleCheckout.ts"))
+      .map((file) => file.slice(file.lastIndexOf("/src/") + 5))
+      .sort();
+
+    expect(callers).toEqual(["pages/Pricing.tsx", "pages/Upgrade.tsx"]);
+
+    const app = ALL.find((entry) => entry.file.endsWith("/src/App.tsx"));
+    const retiredUpgrade = ALL.find((entry) => entry.file.endsWith("/src/pages/Upgrade.tsx"));
+    expect(app).toBeDefined();
+    expect(retiredUpgrade).toBeDefined();
+    expect(app!.text).not.toMatch(/import\(["']\.\/pages\/Upgrade["']\)/);
+    expect(app!.text).toMatch(/path="\/upgrade"\s+element=\{<LegacyUpgradeRedirect\s*\/>\}/);
+    expect(retiredUpgrade!.text).not.toMatch(/Paddle\.Checkout\.open\s*\(/);
+  });
+
+  it("legacy checkout routes only navigate — no Paddle or plan presenter", () => {
+    for (const filename of ["LegacyBillingRedirect.tsx", "LegacyUpgradeRedirect.tsx"]) {
+      const f = ALL.find((x) => x.file.endsWith(`pages/${filename}`));
+      expect(f, `${filename} must exist`).toBeDefined();
+      expect(f!.text).not.toMatch(/usePaddleCheckout/);
+      expect(f!.text).not.toMatch(/Paddle\.Checkout/);
+      expect(f!.text).not.toMatch(/openCheckout/);
+      expect(f!.text).toMatch(/<Navigate\s/);
     }
   });
 
@@ -82,19 +91,8 @@ describe("Canonical checkout ownership — static guard", () => {
     }
   });
 
-  it("LegacyBillingRedirect.tsx only navigates — no Paddle surface", () => {
-    const f = ALL.find((x) => x.file.endsWith("pages/LegacyBillingRedirect.tsx"));
-    expect(f).toBeDefined();
-    expect(f!.text).not.toMatch(/usePaddleCheckout/);
-    expect(f!.text).not.toMatch(/Paddle\.Checkout/);
-    expect(f!.text).not.toMatch(/openCheckout/);
-    expect(f!.text).toMatch(/<Navigate\s/);
-  });
-
   it("PhenoTrackerUpgradeGate targets /pricing (never /upgrade or /billing)", () => {
-    const f = ALL.find((x) =>
-      x.file.endsWith("components/PhenoTrackerUpgradeGate.tsx"),
-    );
+    const f = ALL.find((x) => x.file.endsWith("components/PhenoTrackerUpgradeGate.tsx"));
     expect(f).toBeDefined();
     expect(f!.text).toMatch(/["']\/pricing/);
     expect(f!.text).not.toMatch(/["']\/upgrade["'`?]/);
@@ -102,9 +100,7 @@ describe("Canonical checkout ownership — static guard", () => {
   });
 
   it("StartPhenoHuntButton targets /pricing (never /upgrade or /billing)", () => {
-    const f = ALL.find((x) =>
-      x.file.endsWith("components/StartPhenoHuntButton.tsx"),
-    );
+    const f = ALL.find((x) => x.file.endsWith("components/StartPhenoHuntButton.tsx"));
     expect(f).toBeDefined();
     expect(f!.text).toMatch(/\/pricing\?returnTo=/);
     expect(f!.text).not.toMatch(/\/upgrade\?returnTo=/);
@@ -132,9 +128,7 @@ describe("Canonical checkout ownership — static guard", () => {
 
   it("no runtime file imports the retired BillingPlaceholder module", () => {
     const offenders = ALL.filter(
-      (f) =>
-        isRuntime(f.file) &&
-        /from\s+["']@\/pages\/BillingPlaceholder["']/.test(f.text),
+      (f) => isRuntime(f.file) && /from\s+["']@\/pages\/BillingPlaceholder["']/.test(f.text),
     ).map((f) => f.file);
     expect(offenders).toEqual([]);
   });

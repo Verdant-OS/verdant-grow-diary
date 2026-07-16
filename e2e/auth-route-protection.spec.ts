@@ -78,14 +78,27 @@ async function mockAllSupabase(page: Page, opts: { signedIn?: boolean } = {}) {
 test.describe("Auth route-protection (mocked, 1280x800)", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
+  test.beforeAll(async ({ browser, baseURL }, testInfo) => {
+    // Keep cold Vite compilation outside the route assertions so startup time
+    // cannot masquerade as an auth-redirect regression.
+    testInfo.setTimeout(120_000);
+    const page = await browser.newPage({ baseURL });
+    try {
+      await mockAllSupabase(page);
+      await page.goto("/welcome", { waitUntil: "domcontentloaded", timeout: 110_000 });
+    } finally {
+      await page.close();
+    }
+  });
+
   test.beforeEach(async ({ page }) => {
     await mockAllSupabase(page);
   });
 
   for (const path of ["/sensors", "/actions", "/settings", "/operator/ecowitt"]) {
-    test(`signed-out → ${path} redirects to /auth`, async ({ page, baseURL }) => {
+    test(`signed-out → ${path} redirects to /welcome`, async ({ page, baseURL }) => {
       await page.goto(path);
-      await page.waitForURL((u) => u.pathname === "/auth", { timeout: 8000 });
+      await page.waitForURL((u) => u.pathname === "/welcome", { timeout: 8000 });
       const url = new URL(page.url());
       expect(url.origin).toBe(new URL(baseURL!).origin);
       const redirectTo = url.searchParams.get("redirectTo");
@@ -120,6 +133,7 @@ test.describe("Auth route-protection (mocked, 1280x800)", () => {
   });
 
   for (const path of [
+    "/",
     "/welcome",
     "/pricing",
     "/hardware-integrations",
@@ -147,7 +161,10 @@ test.describe("Auth route-protection (mocked, 1280x800)", () => {
       const origin = new URL(page.url()).origin;
       expect(origin).toBe(new URL(baseURL!).origin);
       // Public pages must not query any private grow table while signed out.
-      expect(privateHits, `Private-table hits while signed out: ${privateHits.join(", ")}`).toHaveLength(0);
+      expect(
+        privateHits,
+        `Private-table hits while signed out: ${privateHits.join(", ")}`,
+      ).toHaveLength(0);
       // No fake-live wording allowed on public pages.
       const body = ((await page.locator("body").textContent()) ?? "").toLowerCase();
       expect(body).not.toContain("live reading");

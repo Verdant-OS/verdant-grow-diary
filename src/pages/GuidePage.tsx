@@ -27,8 +27,8 @@ import {
   buildFaqPageJsonLd,
   safeJsonLdStringify,
 } from "@/lib/seoStructuredData";
-import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
 import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
+import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
 
 export default function GuidePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -37,9 +37,7 @@ export default function GuidePage() {
   const initialResolved = resolveGuideFaqFromHash(guide, location.hash);
   const initialFaqValue = initialResolved?.value;
   const [openFaq, setOpenFaq] = useState<string>(initialFaqValue ?? "");
-  const [highlightedFaq, setHighlightedFaq] = useState<string | undefined>(
-    initialFaqValue,
-  );
+  const [highlightedFaq, setHighlightedFaq] = useState<string | undefined>(initialFaqValue);
   const faqItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
@@ -69,10 +67,6 @@ export default function GuidePage() {
       window.clearTimeout(scrollT);
     };
   }, [location.hash, guide]);
-
-
-
-
   // Always call hooks before conditional returns.
   usePageSeo({
     title: guide?.title ?? "Grower Guide | Verdant Grow Diary",
@@ -190,17 +184,33 @@ export default function GuidePage() {
                         : "motion-safe:transition-colors motion-safe:duration-500 scroll-mt-24 outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     }
                   >
-                    <AccordionTrigger className="text-left px-2">
-                      {entry.question}
-                    </AccordionTrigger>
-                    <AccordionContent className="px-2">
-                      {entry.answer}
-                    </AccordionContent>
+                    <AccordionTrigger className="text-left px-2">{entry.question}</AccordionTrigger>
+                    <AccordionContent className="px-2">{entry.answer}</AccordionContent>
                   </AccordionItem>
                 );
               })}
             </Accordion>
+          </section>
+        )}
 
+        {guide.slug === "grow-room-vpd-tracker" && (
+          <section className="mt-12 rounded-xl border border-primary/30 bg-primary/5 p-5">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+              Put the guide into practice
+            </p>
+            <h2 className="mt-2 font-display text-xl font-semibold">
+              Calculate air VPD from a manual reading
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Verdant's free calculator keeps the source honest: manual inputs, derived air VPD, no
+              upload, no diagnosis, and no device control.
+            </p>
+            <Link
+              to="/tools/vpd-calculator"
+              className="mt-4 inline-flex text-sm font-semibold text-primary hover:underline"
+            >
+              Open the stage-aware VPD calculator
+            </Link>
           </section>
         )}
 

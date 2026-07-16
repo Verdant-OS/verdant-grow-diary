@@ -13,11 +13,7 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  APP_ROUTES,
-  type AppRouteAccess,
-  type AppRouteEntry,
-} from "@/lib/appRouteManifest";
+import { APP_ROUTES, type AppRouteAccess, type AppRouteEntry } from "@/lib/appRouteManifest";
 
 const REPO_ROOT = resolve(__dirname, "..", "..", "..");
 const APP_TSX_PATH = resolve(REPO_ROOT, "src/App.tsx");
@@ -46,19 +42,13 @@ export interface RouteManifestDiff {
  * Compute the bidirectional diff between mounted App routes and the manifest.
  * All arrays are sorted ascending for deterministic snapshots.
  */
-export function diffAppRoutesAgainstManifest(
-  appSource?: string,
-): RouteManifestDiff {
+export function diffAppRoutesAgainstManifest(appSource?: string): RouteManifestDiff {
   const appPaths = extractMountedAppRoutePaths(appSource);
   const appSet = new Set(appPaths);
   const manifestSet = new Set(APP_ROUTES.map((r) => r.path));
 
-  const missingFromManifest = [...appSet]
-    .filter((p) => !manifestSet.has(p))
-    .sort();
-  const missingFromApp = [...manifestSet]
-    .filter((p) => !appSet.has(p))
-    .sort();
+  const missingFromManifest = [...appSet].filter((p) => !manifestSet.has(p)).sort();
+  const missingFromApp = [...manifestSet].filter((p) => !appSet.has(p)).sort();
 
   const seen = new Set<string>();
   const dupes = new Set<string>();
@@ -114,6 +104,7 @@ export function getPricingManifestSnapshot(): ReadonlyArray<AppRouteEntry> {
   const PRICING_PATHS = new Set<string>([
     "/pricing",
     "/billing/:plan",
+    "/founder",
     "/welcome",
     "/hardware-integrations",
   ]);
@@ -124,7 +115,5 @@ export function getPricingManifestSnapshot(): ReadonlyArray<AppRouteEntry> {
 
 /** Mounted operator routes — used by the operator smoke test. */
 export function getMountedOperatorPaths(appSource?: string): string[] {
-  return extractMountedAppRoutePaths(appSource)
-    .filter(isOperatorShapedPath)
-    .sort();
+  return extractMountedAppRoutePaths(appSource).filter(isOperatorShapedPath).sort();
 }

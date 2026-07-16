@@ -42,6 +42,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/operator/paddle-processing-audit",
   "/operator/post-grow-reflection-dry-run",
   "/operator/release-readiness",
+  "/operator/subscriber-growth",
   "/operator/demo-preview",
 
   "/pi-ingest-status",
@@ -57,7 +58,6 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/leads",
   "/one-tent-loop-proof",
   // representative auth-gated surfaces
-  "/",
   "/actions",
   "/sensors",
   "/settings",
@@ -67,12 +67,15 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
 ];
 
 const PUBLIC_MOBILE_ROUTES: string[] = [
+  "/",
   "/welcome",
   "/pricing",
   "/hardware-integrations",
   "/guides",
   "/guides/:slug",
   "/guides/grow-stage-care-guide",
+  "/ai-doctor-readiness-check",
+  "/founder",
   "/how-ai-doctor-works",
   "/partners/csv-preview",
   "/customer/:shareId",
@@ -93,6 +96,7 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/terms",
   "/privacy",
   "/refund",
+  "/tools/vpd-calculator",
   // Public 30-second Quick Log starter: local draft only, mounted outside
   // AppShell — must render signed-out with zero private-table fetches.
   "/quick-log",
@@ -177,12 +181,26 @@ test.use({
 });
 
 test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
+  test.beforeAll(async ({ browser, baseURL }, testInfo) => {
+    // Vite's first browser-driven module graph compile can exceed the normal
+    // assertion budget on a cold Windows checkout. Warm the mocked app once;
+    // every actual route test keeps the standard 60-second timeout.
+    testInfo.setTimeout(120_000);
+    const page = await browser.newPage({ baseURL });
+    try {
+      await mockAllSupabase(page);
+      await page.goto("/welcome", { waitUntil: "domcontentloaded", timeout: 110_000 });
+    } finally {
+      await page.close();
+    }
+  });
+
   test.beforeEach(async ({ page }) => {
     await mockAllSupabase(page);
   });
 
   for (const path of PROTECTED_MOBILE_ROUTES) {
-    test(`mobile signed-out → ${path} redirects to /auth and makes no private REST hits`, async ({
+    test(`mobile signed-out → ${path} redirects to /welcome and makes no private REST hits`, async ({
       page,
       baseURL,
     }) => {
@@ -203,7 +221,7 @@ test.describe("Auth route-protection MOBILE (mocked, 390x844)", () => {
       // flake). Use domcontentloaded for the navigation and a polling URL
       // assertion for the auth-gate redirect with a generous timeout.
       await page.goto(path, { waitUntil: "domcontentloaded" });
-      await expect(page).toHaveURL(/\/auth(\?|$)/, { timeout: 20_000 });
+      await expect(page).toHaveURL(/\/welcome(\?|$)/, { timeout: 20_000 });
       const url = new URL(page.url());
       expect(url.origin).toBe(new URL(baseURL!).origin);
       const redirectTo = url.searchParams.get("redirectTo");

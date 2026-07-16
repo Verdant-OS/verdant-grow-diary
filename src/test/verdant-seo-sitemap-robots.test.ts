@@ -31,7 +31,7 @@ const DISALLOW_RULES = ROBOTS.split(/\r?\n/)
   .map((l) => l.replace(/^Disallow:\s*/i, "").trim())
   .filter((rule) => rule.length > 0);
 
-/** The 10 required guide URLs, pinned literally per the SEO plan. */
+/** The 16 required guide URLs, pinned literally per the SEO plan. */
 const REQUIRED_GUIDE_URLS = [
   "https://verdantgrowdiary.com/guides",
   "https://verdantgrowdiary.com/guides/grow-diary-app",
@@ -41,14 +41,14 @@ const REQUIRED_GUIDE_URLS = [
   "https://verdantgrowdiary.com/guides/spider-farmer-data-logging",
   "https://verdantgrowdiary.com/guides/sensor-truth-grow-room",
   "https://verdantgrowdiary.com/guides/ai-grow-doctor",
-  "https://verdantgrowdiary.com/guides/cannabis-plant-care",
-  "https://verdantgrowdiary.com/guides/grow-stage-care-guide",
   "https://verdantgrowdiary.com/guides/how-to-start-a-grow-journal",
   "https://verdantgrowdiary.com/guides/what-to-log-in-a-grow-journal",
   "https://verdantgrowdiary.com/guides/grow-journal-template",
   "https://verdantgrowdiary.com/guides/plant-watering-log",
   "https://verdantgrowdiary.com/guides/grow-journal-app-without-account",
   "https://verdantgrowdiary.com/guides/daily-grow-log-checklist",
+  "https://verdantgrowdiary.com/guides/cannabis-plant-care",
+  "https://verdantgrowdiary.com/guides/grow-stage-care-guide",
 ];
 
 /** Custom interactive guide pages that are not in the generic SEO guide slug list. */
@@ -68,6 +68,10 @@ function manifestEntryFor(pathname: string) {
 }
 
 describe("sitemap.xml exposes the /guides surface", () => {
+  it("contains each canonical URL exactly once", () => {
+    expect(new Set(SITEMAP_LOCS).size).toBe(SITEMAP_LOCS.length);
+  });
+
   it("contains every required guide URL (literal contract)", () => {
     for (const url of REQUIRED_GUIDE_URLS) {
       expect(SITEMAP_LOCS, `sitemap missing ${url}`).toContain(url);

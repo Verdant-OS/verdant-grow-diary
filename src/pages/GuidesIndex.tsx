@@ -95,6 +95,24 @@ export default function GuidesIndex() {
 
       <section className="px-6 pb-16 max-w-3xl mx-auto">
         <h2 className="font-display text-2xl font-semibold mb-6">Start here</h2>
+        <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-5">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+            Free grow-room tool
+          </p>
+          <h3 className="mt-2 font-display text-xl font-semibold">
+            Stage-aware air VPD calculator
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Calculate air VPD from manual temperature and humidity inputs. Nothing is uploaded,
+            saved, or treated as live telemetry.
+          </p>
+          <Link
+            to="/tools/vpd-calculator"
+            className="mt-4 inline-flex text-sm font-semibold text-primary hover:underline"
+          >
+            Open the free VPD calculator
+          </Link>
+        </div>
         <ul className="space-y-4">
           {VERDANT_SEO_GUIDES.map((g) => (
             <li
@@ -150,6 +168,5 @@ export default function GuidesIndex() {
         <DiaryFaqLinkStatsPanel className="mt-10" />
       </section>
     </main>
-
   );
 }

@@ -12,6 +12,7 @@ import PhenoTrackerUpgradeGate from "@/components/PhenoTrackerUpgradeGate";
 import RequireOperatorRole from "./components/RequireOperatorRole";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
+import RootEntry from "@/components/RootEntry";
 
 // Route pages and the authenticated AppShell are code-split so the public
 // marketing / auth entry paths (/welcome, /pricing, /hardware-integrations,
@@ -23,7 +24,6 @@ const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Tents = lazy(() => import("./pages/Tents"));
 const TentDetail = lazy(() => import("./pages/TentDetail"));
 const Plants = lazy(() => import("./pages/Plants"));
@@ -37,6 +37,7 @@ const Alerts = lazy(() => import("./pages/Alerts"));
 const AlertDetail = lazy(() => import("./pages/AlertDetail"));
 const Settings = lazy(() => import("./pages/Settings"));
 const AccountPreferences = lazy(() => import("./pages/AccountPreferences"));
+const GrowerInvite = lazy(() => import("./pages/GrowerInvite"));
 const AgentIntegrations = lazy(() => import("./pages/AgentIntegrations"));
 const Timeline = lazy(() => import("./pages/Timeline"));
 const Grows = lazy(() => import("./pages/Grows"));
@@ -67,6 +68,7 @@ const OperatorBillingSubscriptionUpdateAudit = lazy(
 const OperatorBillingEntitlementResolutionAudit = lazy(
   () => import("./pages/OperatorBillingEntitlementResolutionAudit"),
 );
+const OperatorSubscriberGrowth = lazy(() => import("./pages/OperatorSubscriberGrowth"));
 
 const EcowittBridgeStatus = lazy(() => import("./pages/EcowittBridgeStatus"));
 const EcowittBridgeDebug = lazy(() => import("./pages/EcowittBridgeDebug"));
@@ -81,13 +83,16 @@ const HardwareIntegrations = lazy(() => import("./pages/HardwareIntegrations"));
 const CreatorBeta = lazy(() => import("./pages/CreatorBeta"));
 const BreederBeta = lazy(() => import("./pages/BreederBeta"));
 const Pricing = lazy(() => import("./pages/Pricing"));
-const Upgrade = lazy(() => import("./pages/Upgrade"));
+const Founder = lazy(() => import("./pages/Founder"));
 const GuidesIndex = lazy(() => import("./pages/GuidesIndex"));
 const GuidePage = lazy(() => import("./pages/GuidePage"));
 const GrowStageCareGuide = lazy(() => import("./pages/GrowStageCareGuide"));
 const Glossary = lazy(() => import("./pages/Glossary"));
 const HowAiDoctorWorks = lazy(() => import("./pages/HowAiDoctorWorks"));
+const AiDoctorContextCheck = lazy(() => import("./pages/AiDoctorContextCheck"));
+const PublicVpdCalculator = lazy(() => import("./pages/PublicVpdCalculator"));
 const LegacyBillingRedirect = lazy(() => import("./pages/LegacyBillingRedirect"));
+const LegacyUpgradeRedirect = lazy(() => import("./pages/LegacyUpgradeRedirect"));
 const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
 const CheckoutCancel = lazy(() => import("./pages/CheckoutCancel"));
 const Terms = lazy(() => import("./pages/TermsOfService"));
@@ -179,6 +184,10 @@ const App = () => (
 
                   <Route path="/features" element={<Navigate to="/welcome" replace />} />
 
+                  {/* Session-aware apex: signed-out visitors receive the public
+                      landing directly; signed-in growers retain Dashboard in
+                      the authenticated AppShell. */}
+                  <Route path="/" element={<RootEntry />} />
                   <Route path="/welcome" element={<Landing />} />
                   {/* /demo route removed — Verdant tracks real grow data only.
                       Old bookmarks redirect to the landing page. */}
@@ -187,14 +196,19 @@ const App = () => (
                   <Route path="/creator-beta" element={<CreatorBeta />} />
                   <Route path="/breeder-beta" element={<BreederBeta />} />
                   <Route path="/pricing" element={<Pricing />} />
-                  <Route path="/upgrade" element={<Upgrade />} />
+                  <Route path="/founder" element={<Founder />} />
+                  {/* Retired duplicate plan surface — preserve known paid
+                      intent and route every old link to live `/pricing`. */}
+                  <Route path="/upgrade" element={<LegacyUpgradeRedirect />} />
                   <Route path="/guides" element={<GuidesIndex />} />
                   <Route path="/guides/grow-stage-care-guide" element={<GrowStageCareGuide />} />
                   <Route path="/guides/:slug" element={<GuidePage />} />
                   <Route path="/glossary" element={<Glossary />} />
                   <Route path="/how-ai-doctor-works" element={<HowAiDoctorWorks />} />
-                  {/* Legacy `/billing/:plan` entry — Slice E: redirect to
-                      canonical `/upgrade` with plan preselect + safe returnTo. */}
+                  <Route path="/ai-doctor-readiness-check" element={<AiDoctorContextCheck />} />
+                  <Route path="/tools/vpd-calculator" element={<PublicVpdCalculator />} />
+                  {/* Legacy `/billing/:plan` entry — redirect to canonical
+                      `/pricing` with plan preselect + safe returnTo. */}
                   <Route path="/billing/:plan" element={<LegacyBillingRedirect />} />
                   <Route path="/checkout/success" element={<CheckoutSuccess />} />
                   <Route path="/checkout/cancel" element={<CheckoutCancel />} />
@@ -251,7 +265,6 @@ const App = () => (
                   <Route path="/quick-log" element={<QuickLogStarter />} />
 
                   <Route element={<AppShell />}>
-                    <Route path="/" element={<Dashboard />} />
                     <Route path="/onboarding" element={<Onboarding />} />
                     {/* Legacy Live Dashboard route — consolidated into the
                         main Dashboard. Redirect preserves old bookmarks. */}
@@ -329,6 +342,7 @@ const App = () => (
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/settings/agent-integrations" element={<AgentIntegrations />} />
                     <Route path="/account/preferences" element={<AccountPreferences />} />
+                    <Route path="/invite" element={<GrowerInvite />} />
                     <Route path="/health" element={<HealthCheck />} />
                     {/* Operator-only routes. Authenticated via AppShell's useRequireAuth,
                         then gated by server-side has_role('operator') via RequireOperatorRole.
@@ -355,6 +369,10 @@ const App = () => (
                       <Route
                         path="/operator/billing-entitlement-resolution"
                         element={<OperatorBillingEntitlementResolutionAudit />}
+                      />
+                      <Route
+                        path="/operator/subscriber-growth"
+                        element={<OperatorSubscriberGrowth />}
                       />
                       <Route
                         path="/operator/one-tent-proof-record"

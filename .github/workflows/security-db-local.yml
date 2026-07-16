@@ -108,6 +108,11 @@ jobs:
         id: customer-mode-db
         run: bun run test:customer-mode-db-security 2>&1 | tee customer-mode-db.log
 
+      - name: Subscriber interest RLS
+        if: env.ENABLED == 'true'
+        id: subscriber-interest-db
+        run: bun run test:subscriber-interest-db-security 2>&1 | tee subscriber-interest-db.log
+
       - name: Aggregate DB security lane
         if: env.ENABLED == 'true'
         id: aggregate
@@ -124,6 +129,7 @@ jobs:
             supabase-db-reset.log
             profiles-db.log
             customer-mode-db.log
+            subscriber-interest-db.log
             security-db-local.log
             test-results/**
             artifacts/security-db/**
@@ -157,12 +163,13 @@ jobs:
               echo "**Tests requested:**"
               echo "- profiles DB security (\`test:profiles-db-security\`)"
               echo "- customer mode isolation (\`test:customer-mode-db-security\`)"
+              echo "- subscriber interest RLS (\`test:subscriber-interest-db-security\`)"
               echo "- aggregate lane (\`test:security-db-local\`)"
               echo ""
               echo "**Artifact:** \`security-db-local-artifacts\` (uploaded on failure only, 14-day retention)"
               echo ""
               echo "Artifact paths (when uploaded):"
-              echo "- \`profiles-db.log\`, \`customer-mode-db.log\`, \`security-db-local.log\`"
+              echo "- \`profiles-db.log\`, \`customer-mode-db.log\`, \`subscriber-interest-db.log\`, \`security-db-local.log\`"
               echo "- \`supabase-start.log\`, \`supabase-db-reset.log\` (sanitized)"
               echo "- \`test-results/\`, \`artifacts/security-db/\` (if produced)"
               echo ""

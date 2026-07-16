@@ -5,6 +5,8 @@ import { componentTagger } from "lovable-tagger";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
 import { PRICING } from "./src/constants/pricing";
 import { viteManualChunks } from "./src/lib/build/manualChunks";
+import { FOUNDER_SOCIAL_META } from "./src/constants/founderSocialMeta";
+import { buildStaticSocialRouteHtml } from "./src/lib/build/staticSocialRouteHtml";
 
 const SITE_ORIGIN = "https://verdantgrowdiary.com";
 
@@ -63,6 +65,26 @@ function softwareApplicationJsonLd(): Plugin {
   };
 }
 
+function staticSocialRouteDocuments(): Plugin {
+  return {
+    name: "verdant-static-social-route-documents",
+    apply: "build",
+    enforce: "post",
+    generateBundle(_options, bundle) {
+      const indexAsset = bundle["index.html"];
+      if (!indexAsset || indexAsset.type !== "asset" || typeof indexAsset.source !== "string") {
+        this.error("Vite did not emit a string index.html asset");
+        return;
+      }
+      this.emitFile({
+        type: "asset",
+        fileName: "founder.html",
+        source: buildStaticSocialRouteHtml(indexAsset.source, FOUNDER_SOCIAL_META),
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -76,6 +98,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     mode === "development" && componentTagger(),
     softwareApplicationJsonLd(),
+    staticSocialRouteDocuments(),
     mcpPlugin(),
   ].filter(Boolean),
   resolve: {

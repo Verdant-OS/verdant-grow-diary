@@ -1,19 +1,33 @@
 ---
 name: nutrient-schedule-assistant
-description: Turn Verdant diary entries (feeding, watering, pH/EC/TDS, runoff) into a weekly feeding log summary and next-step reminders. Use when the user asks to review their feeding schedule, build a weekly nutrient log, spot chart-adherence drift (e.g. "am I following Fox Farm correctly?"), or generate the next feeding reminder from recent diary data.
+description: Turn Verdant diary entries (feeding, watering, pH/EC/TDS, runoff) into a weekly feeding log summary and next-step reminders. Use when the user asks to review their feeding schedule, build a weekly nutrient log, spot chart-adherence drift (especially the operator's consistently used Cronk Nutrients program), or generate the next feeding reminder from recent diary data.
 ---
 
 # Nutrient Schedule Assistant
 
-Helps the grower convert existing Verdant diary data into (1) a **weekly feeding log** and (2) **next-step reminders** — without inventing a schedule or auto-writing to the Action Queue. Positioning: chart-adherence + evaluation, not chart-authoring. Growers already follow a brand chart (Fox Farm, GH Flora, Jack's 321, Canna Coco); this skill tells them whether *their plant* is actually responding to it.
+Helps the grower convert existing Verdant diary data into (1) a **weekly feeding log** and (2) **next-step reminders** — without inventing a schedule or auto-writing to the Action Queue. Positioning: chart-adherence + evaluation, not chart-authoring. Growers already follow a brand chart (Cronk Nutrients, Fox Farm, GH Flora, Jack's 3-2-1, Canna Coco); this skill tells them whether _their plant_ is actually responding to it.
 
 ## When to trigger
 
 - "Summarize my feeding this week / last 7 days."
-- "Am I following [Fox Farm / Jack's / GH] correctly?"
+- "Am I following [Cronk Nutrients / Fox Farm / Jack's / GH / Canna] correctly?"
 - "What should I feed next?" / "When's my next feeding?"
 - "Build a weekly nutrient log for grow X."
 - "Is my EC/pH trending in the right direction?"
+
+## Brand priority
+
+Cronk Nutrients is the first brand-specific case-study priority because the
+Verdant operator runs it consistently. Prefer real Cronk diary examples when
+the grower has recorded the exact product line, recipe or chart step, medium,
+stage, input pH/EC, runoff pH/EC, and plant response. This creates stronger
+first-party plant-memory evidence; it does **not** make Cronk a universal
+recommendation for every grower, cultivar, or medium.
+
+For the schedule itself, point to the current manufacturer source the grower
+selected. Never reproduce or reconstruct a proprietary chart from memory. If
+the Cronk product line or chart version is missing, ask for it or list it under
+Missing information instead of guessing. Do not invent Cronk search volume.
 
 ## Data sources (read-only)
 
@@ -71,6 +85,7 @@ This is a reminder, not an approved action. Nothing is written to the Action Que
 - **Never** write to `action_queue`, `alerts`, `feeding_events`, `diary_entries`, or any table. Read-only.
 - **Never** call device control or "execute" anything.
 - **Never** invent a nutrient schedule the grower didn't provide. Chart-adherence only.
+- **Never** assume all Cronk product lines share one recipe or chart. Preserve the logged product line and chart version.
 - **Never** treat `demo | stale | invalid | sim` data, or sensor readings with `quality !== "ok"`, as healthy/current.
 - **Never** claim certainty from one feeding or one runoff sample. Require ≥3 comparable data points before calling something a "trend"; otherwise say "not enough data".
 - If `grow_targets` band is missing, report the observed value and say "no target band on file" — do not guess the band.
@@ -84,4 +99,5 @@ This is a reminder, not an approved action. Nothing is written to the Action Que
 - Do not recommend aggressive flush/reset from weak evidence.
 - Do not translate a reminder into an Action Queue item automatically.
 - Do not fabricate missing runoff/EC/pH values.
+- Do not present Cronk's consistent use in Verdant's own grows as a universal endorsement.
 - Do not rewrite `diary_entries.details` shape.

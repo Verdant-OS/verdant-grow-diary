@@ -27,20 +27,9 @@ import {
   stripBackPointerTokens,
 } from "@/lib/actionQueueProvenanceRules";
 
-// Slow-runner guard: these action-detail tests await an async load whose
-// resolution can exceed BOTH testing-library's default 5s findBy timeout
-// AND vitest's default 5s per-test timeout on loaded shared CI runners
-// (observed repeatedly across full-suite batches; passes locally in <3s).
-// Raise the per-test budget for this file and give the async-load awaits
-// a generous findBy timeout beneath it.
-vi.setConfig({ testTimeout: 30_000 });
-const FIND_TIMEOUT = { timeout: 15_000 };
-
 describe("actionQueueProvenanceRules — AI Doctor helpers", () => {
   it("extracts a session id from [session:<id>]", () => {
-    expect(
-      extractSourceAiDoctorSessionId("Reduce heat. [session:sess-1]"),
-    ).toBe("sess-1");
+    expect(extractSourceAiDoctorSessionId("Reduce heat. [session:sess-1]")).toBe("sess-1");
   });
   it("returns null for missing/malformed tokens", () => {
     expect(extractSourceAiDoctorSessionId(null)).toBeNull();
@@ -54,9 +43,9 @@ describe("actionQueueProvenanceRules — AI Doctor helpers", () => {
     expect(isAiDoctorDerived(null)).toBe(false);
   });
   it("strips both alert and session back-pointers", () => {
-    expect(
-      stripBackPointerTokens("Mold risk. [session:s1] [alert:a1] check soon."),
-    ).toBe("Mold risk. check soon.");
+    expect(stripBackPointerTokens("Mold risk. [session:s1] [alert:a1] check soon.")).toBe(
+      "Mold risk. check soon.",
+    );
   });
 });
 
@@ -124,8 +113,7 @@ vi.mock("@/integrations/supabase/client", () => {
       limit: () => chain,
       eq: (_col: string, _val: unknown) => {
         const c2: Record<string, unknown> = {
-          maybeSingle: () =>
-            Promise.resolve({ data: detailRow, error: null }),
+          maybeSingle: () => Promise.resolve({ data: detailRow, error: null }),
           then: (resolve: (r: { data: unknown; error: null }) => unknown) =>
             resolve({ data: listRows, error: null }),
         };
@@ -183,8 +171,12 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
+const AUTH_STATE = { user: { id: "u1", email: "u@example.com" } };
+
 vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "u1", email: "u@example.com" } }),
+  // ActionDetail's loader depends on `user`. Keep this mock referentially
+  // stable so rerenders do not create an artificial reload loop.
+  useAuth: () => AUTH_STATE,
 }));
 
 vi.mock("@/store/grows", () => ({
@@ -203,7 +195,9 @@ vi.mock("@/hooks/useScopedGrow", () => ({
   }),
 }));
 
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), message: vi.fn() } }));
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn(), message: vi.fn() },
+}));
 
 beforeEach(() => {
   insertSpy.mockClear();
@@ -235,22 +229,16 @@ describe("ActionQueue list — AI Doctor provenance badges", () => {
     await waitFor(() =>
       expect(screen.getAllByTestId("action-queue-row").length).toBeGreaterThan(0),
     );
-    const aiRow = document.querySelector(
-      '[data-action-id="aq-ai-1"]',
-    ) as HTMLElement;
+    const aiRow = document.querySelector('[data-action-id="aq-ai-1"]') as HTMLElement;
     expect(aiRow).toBeTruthy();
-    expect(
-      aiRow.querySelector('[data-testid="action-queue-row-ai-doctor-badge"]'),
-    ).toBeTruthy();
+    expect(aiRow.querySelector('[data-testid="action-queue-row-ai-doctor-badge"]')).toBeTruthy();
   });
 
   it("AI Doctor row shows 'Review required' helper", async () => {
     renderList();
     await waitFor(() =>
       expect(
-        document.querySelector(
-          '[data-testid="action-queue-row-review-required-badge"]',
-        ),
+        document.querySelector('[data-testid="action-queue-row-review-required-badge"]'),
       ).toBeTruthy(),
     );
     const badge = document.querySelector(
@@ -261,20 +249,12 @@ describe("ActionQueue list — AI Doctor provenance badges", () => {
 
   it("non-AI-Doctor row does not show AI Doctor badge", async () => {
     renderList();
-    await waitFor(() =>
-      expect(screen.getAllByTestId("action-queue-row").length).toBe(2),
-    );
-    const coachRow = document.querySelector(
-      '[data-action-id="aq-coach-1"]',
-    ) as HTMLElement;
+    await waitFor(() => expect(screen.getAllByTestId("action-queue-row").length).toBe(2));
+    const coachRow = document.querySelector('[data-action-id="aq-coach-1"]') as HTMLElement;
     expect(coachRow).toBeTruthy();
+    expect(coachRow.querySelector('[data-testid="action-queue-row-ai-doctor-badge"]')).toBeNull();
     expect(
-      coachRow.querySelector('[data-testid="action-queue-row-ai-doctor-badge"]'),
-    ).toBeNull();
-    expect(
-      coachRow.querySelector(
-        '[data-testid="action-queue-row-review-required-badge"]',
-      ),
+      coachRow.querySelector('[data-testid="action-queue-row-review-required-badge"]'),
     ).toBeNull();
   });
 
@@ -290,11 +270,7 @@ describe("ActionQueue list — AI Doctor provenance badges", () => {
 describe("ActionDetail — AI Doctor provenance panel", () => {
   it("shows 'Suggestion origin' panel for source=ai_doctor", async () => {
     renderDetail();
-    const panel = await screen.findByTestId(
-      "action-detail-ai-doctor-provenance",
-      undefined,
-      FIND_TIMEOUT,
-    );
+    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance");
     expect(panel.textContent ?? "").toContain("Suggestion origin");
     expect(panel.textContent ?? "").toContain("Source: AI Doctor");
     expect(panel.textContent ?? "").toMatch(/grower (review|approval)/i);
@@ -304,8 +280,6 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
     renderDetail();
     const link = (await screen.findByTestId(
       "action-detail-ai-doctor-session-link",
-      undefined,
-      FIND_TIMEOUT,
     )) as HTMLAnchorElement;
     expect(link.textContent ?? "").toBe("View saved AI Doctor session");
     expect(link.getAttribute("href")).toBe("/doctor/sessions/sess-abc");
@@ -314,44 +288,32 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
   it("does NOT render a session link when no session id is present", async () => {
     detailRow = AI_DOCTOR_ROW_NO_SESSION;
     renderDetail("aq-ai-2");
-    await screen.findByTestId("action-detail-ai-doctor-provenance", undefined, FIND_TIMEOUT);
-    expect(
-      screen.queryByTestId("action-detail-ai-doctor-session-link"),
-    ).toBeNull();
+    await screen.findByTestId("action-detail-ai-doctor-provenance");
+    expect(screen.queryByTestId("action-detail-ai-doctor-session-link")).toBeNull();
   });
 
   it("does NOT render the panel for non-AI-Doctor sources", async () => {
     detailRow = COACH_ROW;
     renderDetail("aq-coach-1");
-    await screen.findByText("Lower humidity to 55%", undefined, FIND_TIMEOUT);
-    expect(
-      screen.queryByTestId("action-detail-ai-doctor-provenance"),
-    ).toBeNull();
+    await screen.findByText("Lower humidity to 55%");
+    expect(screen.queryByTestId("action-detail-ai-doctor-provenance")).toBeNull();
   });
 
   it("never renders [session:<id>] token anywhere on the detail page", async () => {
     renderDetail();
-    await screen.findByTestId("action-detail-ai-doctor-provenance", undefined, FIND_TIMEOUT);
+    await screen.findByTestId("action-detail-ai-doctor-provenance");
     expect(document.body.innerHTML).not.toContain("[session:");
   });
 
   it("does not render target_device inside the provenance panel", async () => {
     renderDetail();
-    const panel = await screen.findByTestId(
-      "action-detail-ai-doctor-provenance",
-      undefined,
-      FIND_TIMEOUT,
-    );
+    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance");
     expect(panel.textContent ?? "").not.toContain("secret-device-name");
   });
 
   it("provenance copy does not imply execution/automation/device control", async () => {
     renderDetail();
-    const panel = await screen.findByTestId(
-      "action-detail-ai-doctor-provenance",
-      undefined,
-      FIND_TIMEOUT,
-    );
+    const panel = await screen.findByTestId("action-detail-ai-doctor-provenance");
     const txt = (panel.textContent ?? "").toLowerCase();
     for (const banned of [
       "auto-execute",
@@ -368,18 +330,10 @@ describe("ActionDetail — AI Doctor provenance panel", () => {
   });
 });
 
-
-
 // --- Static safety scans ----------------------------------------------------
 
-const QUEUE_SRC = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"),
-  "utf8",
-);
-const DETAIL_SRC = readFileSync(
-  resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"),
-  "utf8",
-);
+const QUEUE_SRC = readFileSync(resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"), "utf8");
+const DETAIL_SRC = readFileSync(resolve(__dirname, "../..", "src/pages/ActionDetail.tsx"), "utf8");
 const RULES_SRC = readFileSync(
   resolve(__dirname, "../..", "src/lib/actionQueueProvenanceRules.ts"),
   "utf8",

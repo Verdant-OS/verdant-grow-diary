@@ -7,18 +7,22 @@ import {
   PaddleCheckoutUnavailableError,
 } from "@/lib/paddle";
 import { useAuth } from "@/store/auth";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import {
+  buildCheckoutPlanReturnPath,
   consumePlanIntent,
   isKnownPlanIntent,
   savePlanIntent,
 } from "@/lib/checkoutPlanIntent";
 import { beginCheckoutSession } from "@/lib/checkoutOverlaySession";
+import { resolvePaidAcquisitionSource } from "@/lib/paidAcquisitionAttributionRules";
+import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
+import type { PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
+import { buildCheckoutCancelPath } from "@/lib/checkoutCancelRecoveryRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { saveCheckoutReturnTo } from "@/lib/checkoutReturnToSession";
-
 
 export interface OpenCheckoutOptions {
   priceId: string;
@@ -29,6 +33,8 @@ export interface OpenCheckoutOptions {
 export interface UsePaddleCheckoutResult {
   openCheckout: (options: OpenCheckoutOptions) => Promise<void>;
   loading: boolean;
+  /** The token/host environment decision that also gates checkout. */
+  environment: PaddleCheckoutEnvironment;
   /**
    * True when the client-side environment gate has blocked checkout
    * (missing/malformed token, or live token on a loopback host). Derived
@@ -41,14 +47,17 @@ export interface UsePaddleCheckoutResult {
    */
   unavailableMessage: string | null;
   /**
-   * Set when `openCheckout` was called against an unavailable environment
-   * (or when Paddle initialization threw `PaddleCheckoutUnavailableError`).
-   * Callers can render an inline calm state instead of crashing. Cleared
+   * Set when checkout cannot open, including unavailable environments,
+   * resolver/network failures, and Paddle initialization errors. Callers can
+   * render an inline recovery path instead of losing the paid intent. Cleared
    * by `dismissBlocked()`.
    */
   blockedReason: string | null;
   dismissBlocked: () => void;
 }
+
+export const CHECKOUT_RECOVERY_MESSAGE =
+  "Checkout couldn't open. You can leave your email for one availability notice instead.";
 
 /**
  * Default post-checkout landing. When the current page carries a sanitized
@@ -83,6 +92,7 @@ function defaultSuccessUrl(): string {
 export function usePaddleCheckout(): UsePaddleCheckoutResult {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
 
@@ -100,14 +110,15 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
   // Derived at every render so a hot-reload / rerender after the token
   // becomes available flips `unavailable` back to false without needing
   // to remount. Cheap — pure string/hostname checks.
-  const unavailable = useMemo(
-    () => resolvePaddleCheckout() === "unavailable",
+  const environment = useMemo(
+    () => resolvePaddleCheckout(),
     // resolvePaddleCheckout reads module-scope + window.location.hostname;
     // both are stable across renders in production. This memo is a
     // per-render read, not a subscription — that is intentional.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     [],
   );
+  const unavailable = environment === "unavailable";
   const unavailableMessage = useMemo(
     () => (unavailable ? getCheckoutUnavailableMessage() : null),
     [unavailable],
@@ -131,9 +142,17 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         if (isKnownPlanIntent(options.priceId)) {
           savePlanIntent(options.priceId);
         }
-        const back =
-          `${window.location.pathname}${window.location.search}` || "/pricing";
-        navigate(`/auth?redirectTo=${encodeURIComponent(back)}`);
+        const back = buildCheckoutPlanReturnPath({
+          pathname: location.pathname,
+          search: location.search,
+          plan: options.priceId,
+        });
+        navigate(
+          buildAttributedSignupPath({
+            source: resolvePaidAcquisitionSource(window.location.search) ?? "pricing_page",
+            redirectTo: back,
+          }),
+        );
         return;
       }
 
@@ -153,20 +172,20 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         // buyer to the gated surface they came from. Consumed one-shot on
         // the cancel page. Success path still uses the successUrl query
         // param; both branches call sanitizeCheckoutReturnTo.
-        saveCheckoutReturnTo(
-          new URLSearchParams(window.location.search).get("returnTo"),
-        );
+        saveCheckoutReturnTo(new URLSearchParams(window.location.search).get("returnTo"));
 
         // Slice D: register overlay session BEFORE calling
         // Paddle.Checkout.open so the module-level eventCallback (set at
         // Initialize) always has a target when checkout.completed /
         // checkout.closed fire.
+        const cancelPath = buildCheckoutCancelPath({
+          planId: options.priceId,
+          returnTo: new URLSearchParams(location.search).get("returnTo"),
+        });
         beginCheckoutSession(() => {
           if (!mountedRef.current) return;
-          navigate("/checkout/cancel");
+          navigate(cancelPath);
         });
-
-
         (window as any).Paddle.Checkout.open({
           items: [{ priceId: paddlePriceId, quantity: options.quantity ?? 1 }],
           customer: user.email ? { email: user.email } : undefined,
@@ -185,10 +204,10 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         if (err instanceof PaddleCheckoutUnavailableError) {
           setBlockedReason(err.message);
         } else {
+          setBlockedReason(CHECKOUT_RECOVERY_MESSAGE);
           toast({
             title: "Checkout unavailable",
-            description:
-              err instanceof Error ? err.message : "Please try again in a moment.",
+            description: err instanceof Error ? err.message : "Please try again in a moment.",
             variant: "destructive",
           });
         }
@@ -196,7 +215,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
         setLoading(false);
       }
     },
-    [navigate, user],
+    [location.pathname, location.search, navigate, user],
   );
 
   // Slice C: auto-resume a pending plan intent EXACTLY ONCE after auth.
@@ -218,6 +237,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
   return {
     openCheckout,
     loading,
+    environment,
     unavailable,
     unavailableMessage,
     blockedReason,

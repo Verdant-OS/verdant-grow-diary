@@ -199,9 +199,7 @@ describe("capability-truth: cluster copy never overpromises", () => {
         ...g.sections.map(
           (s, i) => [`section[${i}]`, `${s.heading} ${s.body}`] as [string, string],
         ),
-        ...g.faq.map(
-          (f, i) => [`faq[${i}]`, `${f.question} ${f.answer}`] as [string, string],
-        ),
+        ...g.faq.map((f, i) => [`faq[${i}]`, `${f.question} ${f.answer}`] as [string, string]),
       ];
       for (const [label, raw] of passages) {
         const text = raw.toLowerCase();

@@ -33,9 +33,16 @@ import {
   RESEND_VERIFICATION_GENERIC_FAILURE,
 } from "@/lib/authErrorRules";
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
+import {
+  buildSignupEmailRedirectUrl,
+  buildSignupUserMetadata,
+  resolveSignupAcquisitionSource,
+} from "@/lib/signupAcquisitionRules";
+import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
 import { buildAcceptanceRows } from "@/lib/agreementConsent";
+import { resolveSignupCompletionDisposition } from "@/lib/signupCompletionRules";
 import {
   DEFAULT_VERIFICATION_COOLDOWN_MS,
   VERIFICATION_COOLDOWN_HINT,
@@ -66,6 +73,8 @@ export default function Auth() {
     return raw ? sanitizeAuthRedirect(raw) : null;
   }, [search]);
   const redirectTo = explicitRedirect ?? "/";
+  const signupSource = useMemo(() => resolveSignupAcquisitionSource(search), [search]);
+  const signupUserMetadata = useMemo(() => buildSignupUserMetadata(search), [search]);
   const initialMode: AuthMode = (() => {
     const raw = search.get("mode");
     if (raw === "signup" || raw === "forgot" || raw === "signin") return raw;
@@ -117,6 +126,11 @@ export default function Auth() {
     if (user) nav(postSignInTarget(), { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, nav]);
+
+  useEffect(() => {
+    if (mode !== "signup") return;
+    trackPricingEvent("signup_page_view", { source: signupSource ?? "direct" });
+  }, [mode, signupSource]);
 
   // While a verification-resend cooldown is active, tick once a second so
   // the countdown label updates and the button re-enables on its own.
@@ -242,13 +256,25 @@ export default function Auth() {
       return;
     }
     setBusy(true);
+    trackPricingEvent("signup_started", { source: signupSource ?? "direct" });
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: window.location.origin },
+      options: {
+        emailRedirectTo: buildSignupEmailRedirectUrl(window.location.origin, explicitRedirect),
+        // Analytics-only first touch. raw_user_meta_data is user-editable and
+        // must never be used for roles, billing, credits, or entitlements.
+        // The explicit boolean opt-in is copied by the auth trigger so it also
+        // survives confirmation-required signups that have no session yet.
+        data: { ...signupUserMetadata, marketing_opt_in: marketingOptIn },
+      },
     });
     if (error) {
       setBusy(false);
+      trackPricingEvent("signup_failed", {
+        source: signupSource ?? "direct",
+        reason: "auth_rejected",
+      });
       setSignUpError(sanitizeAuthError("signUp", error));
       signUpEmailRef.current?.focus();
       return;
@@ -258,7 +284,11 @@ export default function Auth() {
     // session yet, in which case the insert is skipped and the re-consent
     // gate will prompt on first authenticated load. Signup itself must not
     // fail on a consent-log write error.
-    if (data.user?.id) {
+    // Confirmation-required signups have a user id but no authenticated
+    // session, so protected writes would only add RLS-denied round trips before
+    // the inbox prompt appears. The auth trigger already copied the explicit
+    // marketing choice from metadata; the write below is a session-path backup.
+    if (data?.user?.id && data.session) {
       try {
         const rows = buildAcceptanceRows(data.user.id).map((r) => ({
           ...r,
@@ -289,8 +319,19 @@ export default function Auth() {
       }
     }
     setBusy(false);
+    trackPricingEvent("signup_completed", { source: signupSource ?? "direct" });
     trackFunnelEvent("signup", { method: "email" });
-    setSignUpSuccess("Welcome to Verdant. Check your inbox if confirmation is required.");
+    setPassword("");
+    if (resolveSignupCompletionDisposition(data) === "verification_required") {
+      trackPricingEvent("signup_verification_required", {
+        source: signupSource ?? "direct",
+      });
+      setSignUpSuccess(
+        "Account created. Check your inbox and open the verification link to continue.",
+      );
+      return;
+    }
+    setSignUpSuccess("Welcome to Verdant. Your account is ready.");
     nav(postSignInTarget(), { replace: true });
   }
 
@@ -660,11 +701,15 @@ export default function Auth() {
                 ) : null}
                 <Button
                   type="submit"
-                  disabled={busy}
+                  disabled={busy || !!signUpSuccess}
                   aria-busy={busy}
                   className="gradient-leaf text-primary-foreground"
                 >
-                  {busy ? "Creating account…" : "Create account"}
+                  {busy
+                    ? "Creating account…"
+                    : signUpSuccess
+                      ? "Account created"
+                      : "Create account"}
                 </Button>
               </form>
             </TabsContent>

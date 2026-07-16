@@ -23,7 +23,7 @@ review.
 
 ## 2. Public surfaces
 
-- [ ] Landing page renders at `/welcome` with Verdant branding, hero
+- [ ] Landing page renders at `/` and `/welcome` with Verdant branding, hero
       logo, and the Sign in / Open dashboard / Learn more CTAs.
 - [ ] Brand logo (`/brand/verdant-logo.png`) loads without 404 or
       stretching, on both the landing page and the auth screen.
@@ -35,14 +35,18 @@ review.
       data appears on any public page.
 - [ ] No private Supabase table queries (`grows`, `plants`, `tents`,
       `sensor_readings`, `alerts`, `alert_events`, `action_queue`,
-      `action_queue_events`, `diary_entries`) run from `/welcome`.
+      `action_queue_events`, `diary_entries`) run from signed-out `/` or
+      `/welcome`.
 
 ## 3. Auth-gated surfaces
 
-- [ ] Private routes require authentication. Visiting `/`, `/grows`,
+- [ ] Private routes require authentication. Visiting `/grows`,
       `/plants`, `/tents`, `/sensors`, `/logs`, `/timeline`, `/tasks`,
       `/cameras`, `/alerts`, `/actions`, `/doctor`, `/settings`, and
-      `/diagnostics` while signed out redirects to `/auth`.
+      `/diagnostics` while signed out redirects to the public `/welcome`
+      landing without fetching private grow data.
+- [ ] `/` is session-aware: signed-out visitors see the public landing with no
+      private-table reads; signed-in growers see the authenticated Dashboard.
 - [ ] RLS still enforces `auth.uid()` ownership on every user-owned
       table (verified via the existing test suite + Supabase linter).
 - [ ] AI Coach remains read-only and suggest-only. No new actuator
@@ -77,9 +81,9 @@ review.
 - [ ] [`docs/security-checklist.md`](./security-checklist.md) reviewed
       against the most recent migrations and any new alerting,
       audit-trail, or coach work.
-- [ ] [`docs/architecture.md`](./architecture.md) public-route notes
-      still accurate (only `/welcome` is public; all other routes are
-      auth-gated).
+- [ ] [`docs/architecture.md`](./architecture.md) public-route notes remain
+      accurate (`/` is session-aware, `/welcome` is always public, and private
+      product routes stay auth-gated).
 
 ## 6. Rollback
 

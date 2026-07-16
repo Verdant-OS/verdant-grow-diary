@@ -215,13 +215,14 @@ describe("CTAs", () => {
     expect(PAGE).toMatch(/Claim Founder Lifetime/);
   });
 
-  it("wires CTAs to /auth and Paddle checkout price keys", () => {
-    // Free CTA stays a plain /auth link; paid CTAs open the Paddle overlay
+  it("wires CTAs to attributed signup and Paddle checkout price keys", () => {
+    // Free CTA opens signup with a fixed source; paid CTAs open the Paddle overlay
     // via usePaddleCheckout (which itself bounces signed-out users to
     // /auth). The old /billing/:plan placeholder links are retired from
     // this page — the placeholder route itself stays mounted for legacy
     // deep links.
-    expect(PAGE).toMatch(/to="\/auth"/);
+    expect(PAGE).toMatch(/to=\{freeSignupPath\}/);
+    expect(PAGE).toMatch(/buildAttributedSignupPath/);
     expect(PAGE).toMatch(/usePaddleCheckout/);
     expect(PAGE).toMatch(/openCheckout\(/);
     expect(PAGE).toMatch(/pro_monthly/);
@@ -336,14 +337,15 @@ describe("Safety: no private data on public page", () => {
     expect(CHECKOUT_HOOK).not.toMatch(/service_role/);
     // The founder-slots hook may invoke ONLY its public edge function —
     // no table reads, no service_role, no other function invocations.
-    const SLOTS_HOOK = readSrc("hooks/useFounderSlotsRemaining.ts");
-    expect(SLOTS_HOOK).not.toMatch(/supabase\s*\.\s*from\(/);
-    expect(SLOTS_HOOK).not.toMatch(/service_role/);
-    const invokes =
-      SLOTS_HOOK.match(/functions\.invoke\(\s*["']([^"']+)["']/g) ?? [];
-    expect(invokes.length).toBeGreaterThan(0);
-    for (const inv of invokes) {
-      expect(inv).toMatch(/founder-slots-remaining/);
+    const slotsHook = readSrc("hooks/useFounderSlotsRemaining.ts");
+    const invokes = [...slotsHook.matchAll(/functions\.invoke\(\s*["']([^"']+)["']/g)].map(
+      (match) => match[1],
+    );
+    expect(invokes).toEqual(["founder-slots-remaining"]);
+    expect(slotsHook).not.toMatch(/supabase\s*\.\s*from\(/);
+    expect(slotsHook).not.toMatch(/service_role/);
+    for (const table of PRIVATE_TABLES) {
+      expect(slotsHook).not.toMatch(new RegExp(`\\.from\\(["']${table}["']`));
     }
   });
 
@@ -359,8 +361,9 @@ describe("Safety: no private data on public page", () => {
 // for the replacement coverage.
 
 describe("Landing links to /pricing", () => {
-  it("Landing page links to the public pricing route", () => {
-    expect(LANDING).toMatch(/to="\/pricing"/);
+  it("Landing page links to the centralized attributed public pricing route", () => {
+    expect(LANDING).toContain("buildAttributedPricingPath({ source: acquisitionSource })");
+    expect(LANDING).toContain("to={pricingPath}");
   });
 });
 
@@ -414,7 +417,17 @@ describe("Pricing manifest snapshot (narrow)", () => {
     // Intentionally narrow: only pricing / public billing-relevant routes so
     // unrelated route changes do not create noisy snapshot diffs here.
     expect(getPricingManifestSnapshot()).toEqual([
-      { path: "/billing/:plan", access: "redirect", description: "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout)." },
+      {
+        path: "/billing/:plan",
+        access: "redirect",
+        description:
+          "→ /pricing?plan=<canonical> (legacy billing entry; /pricing owns live checkout).",
+      },
+      {
+        path: "/founder",
+        access: "public",
+        description: "Public Founder Lifetime acquisition and offer explainer.",
+      },
       { path: "/hardware-integrations", access: "public" },
       { path: "/pricing", access: "public" },
       { path: "/welcome", access: "public" },

@@ -2,6 +2,24 @@
 
 ## A. Keyword strategy summary
 
+- **Separate navigational from tool-seeking demand.** In the Semrush US
+  snapshot supplied on 2026-07-15, the `growdiaries` term (2,400/mo) and the
+  `grow diaries` term (1,300/mo) primarily navigate to the incumbent community
+  site. Do not spend this plan competing for those low-conversion visits.
+- **Own the winnable diary/tool cluster.** Prioritize the terms `grow diary`,
+  `grow journal`, and `growth diary` (740/mo combined, KDI 16 in the supplied
+  snapshot), then earn the higher-intent long tails already scheduled below:
+  `grow diary app`, `grow log app`, `cannabis grow journal`, and the
+  `autoflower grow diary` term.
+- **Treat nutrient schedules as brand-chart evaluation, not a generic FAQ.**
+  The supplied Semrush US snapshot shows brand-anchored demand: `fox farm
+feeding schedule` (1,900/mo), `fox farm soil feeding schedule` (1,600/mo),
+  `general hydroponics flora series` (1,300/mo), `canna coco` (1,000/mo), and
+  `jacks 321` (590/mo). Question-form demand for an abstract "nutrient
+  schedule" is too thin for a dedicated FAQ. Do not compete with manufacturers
+  by republishing their charts. Target the Verdant-shaped follow-up instead:
+  is the grower following the selected chart, what did the input and runoff
+  meters report, and how did this plant respond over time?
 - **Do not chase ERP/compliance head terms first.** Semrush US data shows
   the visible volume around "cannabis cultivation software" (~70/mo) is
   small, and the larger adjacent volume clusters (Metrc, Distru, Trym,
@@ -22,45 +40,69 @@
   SERP is B2B ERP procurement.
 - **Do not chase:** Metrc, seed-to-sale ERP, cannabis compliance
   software, cannabis ERP, dispensary POS, commercial inventory
-  tracking, state compliance tracking.
+  tracking, state compliance tracking, manufacturer feeding-chart head terms,
+  or a generic nutrient-schedule FAQ.
+
+### Brand-chart evaluation queue
+
+These are grow-diary companion posts, not substitute feeding charts. Link to
+the manufacturer's current instructions for the schedule itself, avoid copying
+proprietary chart artwork, and keep changes cautious when evidence is weak.
+Cronk Nutrients is the first publishing priority because it is the product line
+used consistently in Verdant's own documented grows. That makes it the strongest
+source of real, attributable plant-memory examples; it does not make Cronk a
+universal recommendation for every grower, medium, or cultivar.
+
+| Priority | Working title                                                                              | Evaluation intent                                            | Verdant evidence to log                            |
+| -------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------- |
+| 1        | Using Cronk Nutrients with a grow diary: verify the chart against this plant's response    | Is the selected Cronk line and chart step working here?      | Product line, recipe, medium, EC/pH, runoff, stage |
+| 2        | Using Fox Farm's schedule with a grow diary: what to log so you can tell if it is working  | Is Fox Farm burning my plants, or did something else change? | Product/dose, input EC/pH, runoff, photos, stage   |
+| 3        | GH Flora Series and plant response: a diary-first way to evaluate the chart                | Is this Flora Series step working for this plant and medium? | Mix, medium, input/runoff EC and pH, symptoms      |
+| 4        | Following a Canna Coco chart without losing the plant-level story                          | How should I evaluate a chart adjustment in coco?            | Coco context, irrigation event, runoff, trend      |
+| 5        | Jack's 3-2-1 grow log: record the mix, meter readings, and response before changing course | Is the current recipe producing the expected response?       | Mix record, input EC/pH, runoff, photos, timeline  |
+
+Do not publish a thin FAQ for "nutrient schedules." Use Day 20 as the pillar
+and interlink these brand companions to it. For harvest-transition or flushing
+queries, explain what to record and how to verify the current manufacturer and
+medium guidance; do not present a universal stop-feeding date.
 
 ## B. 30-day plan
 
 Each entry: content type, working title, target keyword, target
 question, intent, internal link target, and Verdant value driver.
 
-| Day | Type | Title | Keyword | Question | Intent | Internal link | Value driver |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Blog | Best grow diary app for serious growers who track more than notes | grow diary app | What should a serious grow diary app track? | Informational | /welcome#seo-grow-diary | One plant timeline |
-| 2 | Blog | Grow log app vs grow journal: what serious growers actually need | grow log app | What is the difference between a grow log and a grow journal? | Comparison | /welcome#seo-grow-diary | Plant memory |
-| 3 | Blog | How to track VPD in a grow room without fake live data | grow room VPD tracker | How should growers track VPD safely? | Informational | /welcome#seo-vpd-tracker | Sensor truth |
-| 4 | Blog | AC Infinity data logging: how to turn controller readings into grow history | AC Infinity data logging | Can I use AC Infinity data in a grow diary? | Informational | /hardware-integrations | Gear you already own |
-| 5 | Blog | Spider Farmer data logging for grow-room decisions | Spider Farmer data logging | How can Spider Farmer readings improve grow logs? | Informational | /hardware-integrations | Hardware-neutral data context |
-| 6 | Blog | What is sensor truth in a grow room? | grow room sensor log | Why should grow sensor readings be source-labeled? | Informational | /welcome#seo-vpd-tracker | Sensor truth |
-| 7 | Blog | AI grow doctor: why good diagnosis needs logs, photos, and sensors | AI grow doctor | Can AI diagnose a plant from one photo? | Informational | /welcome#seo-ai-doctor | Evidence-cited AI |
-| 8 | Blog | TrolMaster data logging: getting more from your controller history | TrolMaster data logging | How do I keep TrolMaster history for later review? | Informational | /hardware-integrations | Gear you already own |
-| 9 | Blog | Grow tent monitoring app buyer's guide for DIY growers | grow tent monitoring app | What should a grow tent monitoring app do? | Comparison | /welcome#seo-vpd-tracker | Sensor truth |
-| 10 | Blog | Cannabis plant tracker: mapping each plant across a full run | cannabis plant tracker | How do I track each cannabis plant individually? | Informational | /welcome#seo-plant-memory | Plant memory |
-| 11 | Blog | Autoflower grow diary: what to log without over-stressing the plant | autoflower grow diary | What should I log during an autoflower grow? | Informational | /welcome#seo-grow-diary | One plant timeline |
-| 12 | Blog | Plant symptom tracker: turning "something's off" into evidence | plant symptom tracker | How do I document plant symptoms usefully? | Informational | /welcome#seo-ai-doctor | Evidence-cited AI |
-| 13 | Blog | Grow room alert app: catching problems before they become losses | grow room alert app | What alerts matter most in a grow room? | Informational | /welcome#seo-ai-doctor | Cautious alerting |
-| 14 | Blog | Grow room timeline: seeing what changed and when | grow room timeline | How do I visualize changes across a grow? | Informational | /welcome#seo-plant-memory | Plant memory |
-| 15 | Blog | Grow room logbook: from paper notebook to searchable history | grow room logbook | How do I move my grow notes off paper? | Informational | /welcome#seo-grow-diary | One plant timeline |
-| 16 | Blog | Cannabis grow journal: keeping useful notes across cycles | cannabis grow journal | What should stay in my grow journal? | Informational | /welcome#seo-grow-diary | Plant memory |
-| 17 | Blog | VPD tracker for grow room: understanding the number, not just seeing it | VPD tracker for grow room | How do I use VPD to make grow decisions? | Informational | /welcome#seo-vpd-tracker | Sensor truth |
-| 18 | Blog | Soil moisture grow log: turning readings into watering decisions | soil moisture grow log | How should I log soil moisture in a grow? | Informational | /welcome#seo-vpd-tracker | Sensor truth |
-| 19 | Blog | CO₂ grow room tracking without pretending the reading is always live | CO₂ grow room tracking | How do I track CO₂ safely across a grow? | Informational | /welcome#seo-vpd-tracker | Sensor truth |
-| 20 | Blog | pH and EC grow log: writing down what your meter actually said | pH and EC grow log | How should I record pH and EC readings? | Informational | /welcome#seo-grow-diary | Plant memory |
-| 21 | Blog | Grow diary with photos: what to shoot and how often | grow diary with photos | How often should I photograph my plants? | Informational | /welcome#seo-grow-diary | One plant timeline |
-| 22 | Blog | Grow diary with sensors: pairing readings to observations | grow diary with sensors | How do I connect sensor data to my grow diary? | Informational | /welcome#seo-vpd-tracker | Sensor truth |
-| 23 | Blog | Approval-required grow actions: suggestions vs commands | approval-required grow actions | Why should AI grow advice stay approval-required? | Informational | /welcome#seo-ai-doctor | Grower stays in control |
-| 24 | Blog | No-autopilot grow software: keeping the grower in control | no-autopilot grow software | Why avoid grow software that runs my equipment? | Informational | /welcome#seo-hardware-neutral | Grower stays in control |
-| 25 | Blog | Historical CSV grow data: importing old readings without losing lineage | historical CSV grow data | Can I import CSV history from my old grow app? | Informational | /hardware-integrations | Gear you already own |
-| 26 | Blog | Grow room operating system: what a Grow OS actually is | grow room operating system | What is a grow room operating system? | Informational | /welcome#loop | One-Tent Loop |
-| 27 | Blog | Plant memory across cycles: what to keep from run to run | plant memory across cycles | What should I carry from one grow to the next? | Informational | /welcome#seo-plant-memory | Plant memory |
-| 28 | Blog | Harvest review: a post-grow report that teaches the next run | post-grow report | How should I review a finished grow? | Informational | /pricing | Plant memory |
-| 29 | Blog | Serious home grower software: what actually matters | serious home grower software | What software should a serious home grower use? | Comparison | /welcome | All five |
-| 30 | Blog | Cannabis plant diagnosis app: what a cautious diagnosis looks like | cannabis plant diagnosis app | What does a cautious plant diagnosis look like? | Informational | /welcome#seo-ai-doctor | Evidence-cited AI |
+| Day | Type | Title                                                                       | Keyword                        | Question                                                      | Intent        | Internal link                 | Value driver                  |
+| --- | ---- | --------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------- | ------------- | ----------------------------- | ----------------------------- |
+| 1   | Blog | Best grow diary app for serious growers who track more than notes           | grow diary app                 | What should a serious grow diary app track?                   | Informational | /welcome#seo-grow-diary       | One plant timeline            |
+| 2   | Blog | Grow log app vs grow journal: what serious growers actually need            | grow log app                   | What is the difference between a grow log and a grow journal? | Comparison    | /welcome#seo-grow-diary       | Plant memory                  |
+| 3   | Blog | How to track VPD in a grow room without fake live data                      | grow room VPD tracker          | How should growers track VPD safely?                          | Informational | /welcome#seo-vpd-tracker      | Sensor truth                  |
+| 4   | Blog | AC Infinity data logging: how to turn controller readings into grow history | AC Infinity data logging       | Can I use AC Infinity data in a grow diary?                   | Informational | /hardware-integrations        | Gear you already own          |
+| 5   | Blog | Spider Farmer data logging for grow-room decisions                          | Spider Farmer data logging     | How can Spider Farmer readings improve grow logs?             | Informational | /hardware-integrations        | Hardware-neutral data context |
+| 6   | Blog | What is sensor truth in a grow room?                                        | grow room sensor log           | Why should grow sensor readings be source-labeled?            | Informational | /welcome#seo-vpd-tracker      | Sensor truth                  |
+| 7   | Blog | AI grow doctor: why good diagnosis needs logs, photos, and sensors          | AI grow doctor                 | Can AI diagnose a plant from one photo?                       | Informational | /welcome#seo-ai-doctor        | Evidence-cited AI             |
+| 8   | Blog | TrolMaster data logging: getting more from your controller history          | TrolMaster data logging        | How do I keep TrolMaster history for later review?            | Informational | /hardware-integrations        | Gear you already own          |
+| 9   | Blog | Grow tent monitoring app buyer's guide for DIY growers                      | grow tent monitoring app       | What should a grow tent monitoring app do?                    | Comparison    | /welcome#seo-vpd-tracker      | Sensor truth                  |
+| 10  | Blog | Cannabis plant tracker: mapping each plant across a full run                | cannabis plant tracker         | How do I track each cannabis plant individually?              | Informational | /welcome#seo-plant-memory     | Plant memory                  |
+| 11  | Blog | Autoflower grow diary: what to log without over-stressing the plant         | autoflower grow diary          | What should I log during an autoflower grow?                  | Informational | /welcome#seo-grow-diary       | One plant timeline            |
+| 12  | Blog | Plant symptom tracker: turning "something's off" into evidence              | plant symptom tracker          | How do I document plant symptoms usefully?                    | Informational | /welcome#seo-ai-doctor        | Evidence-cited AI             |
+| 13  | Blog | Grow room alert app: catching problems before they become losses            | grow room alert app            | What alerts matter most in a grow room?                       | Informational | /welcome#seo-ai-doctor        | Cautious alerting             |
+| 14  | Blog | Grow room timeline: seeing what changed and when                            | grow room timeline             | How do I visualize changes across a grow?                     | Informational | /welcome#seo-plant-memory     | Plant memory                  |
+| 15  | Blog | Grow room logbook: from paper notebook to searchable history                | grow room logbook              | How do I move my grow notes off paper?                        | Informational | /welcome#seo-grow-diary       | One plant timeline            |
+| 16  | Blog | Cannabis grow journal: keeping useful notes across cycles                   | cannabis grow journal          | What should stay in my grow journal?                          | Informational | /welcome#seo-grow-diary       | Plant memory                  |
+| 17  | Blog | VPD tracker for grow room: understanding the number, not just seeing it     | VPD tracker for grow room      | How do I use VPD to make grow decisions?                      | Informational | /welcome#seo-vpd-tracker      | Sensor truth                  |
+| 18  | Blog | Soil moisture grow log: turning readings into watering decisions            | soil moisture grow log         | How should I log soil moisture in a grow?                     | Informational | /welcome#seo-vpd-tracker      | Sensor truth                  |
+| 19  | Blog | CO₂ grow room tracking without pretending the reading is always live        | CO₂ grow room tracking         | How do I track CO₂ safely across a grow?                      | Informational | /welcome#seo-vpd-tracker      | Sensor truth                  |
+| 20  | Blog | pH and EC grow log: writing down what your meter actually said              | pH and EC grow log             | How should I record pH and EC readings?                       | Informational | /welcome#seo-grow-diary       | Plant memory                  |
+| 21  | Blog | Grow diary with photos: what to shoot and how often                         | grow diary with photos         | How often should I photograph my plants?                      | Informational | /welcome#seo-grow-diary       | One plant timeline            |
+| 22  | Blog | Grow diary with sensors: pairing readings to observations                   | grow diary with sensors        | How do I connect sensor data to my grow diary?                | Informational | /welcome#seo-vpd-tracker      | Sensor truth                  |
+| 23  | Blog | Approval-required grow actions: suggestions vs commands                     | approval-required grow actions | Why should AI grow advice stay approval-required?             | Informational | /welcome#seo-ai-doctor        | Grower stays in control       |
+| 24  | Blog | No-autopilot grow software: keeping the grower in control                   | no-autopilot grow software     | Why avoid grow software that runs my equipment?               | Informational | /welcome#seo-hardware-neutral | Grower stays in control       |
+| 25  | Blog | Historical CSV grow data: importing old readings without losing lineage     | historical CSV grow data       | Can I import CSV history from my old grow app?                | Informational | /hardware-integrations        | Gear you already own          |
+| 26  | Blog | Grow room operating system: what a Grow OS actually is                      | grow room operating system     | What is a grow room operating system?                         | Informational | /welcome#loop                 | One-Tent Loop                 |
+| 27  | Blog | Plant memory across cycles: what to keep from run to run                    | plant memory across cycles     | What should I carry from one grow to the next?                | Informational | /welcome#seo-plant-memory     | Plant memory                  |
+| 28  | Blog | Harvest review: a post-grow report that teaches the next run                | post-grow report               | How should I review a finished grow?                          | Informational | /pricing                      | Plant memory                  |
+| 29  | Blog | Serious home grower software: what actually matters                         | serious home grower software   | What software should a serious home grower use?               | Comparison    | /welcome                      | All five                      |
+| 30  | Blog | Cannabis plant diagnosis app: what a cautious diagnosis looks like          | cannabis plant diagnosis app   | What does a cautious plant diagnosis look like?               | Informational | /welcome#seo-ai-doctor        | Evidence-cited AI             |
 
 ## C. Implementation notes
 

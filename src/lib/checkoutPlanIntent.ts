@@ -28,6 +28,8 @@
  *     browsers get graceful no-ops, never exceptions.
  */
 
+import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
+
 export type PlanIntentId = "pro_monthly" | "pro_annual" | "founder_lifetime";
 
 const KNOWN_PLAN_INTENTS: ReadonlyArray<PlanIntentId> = [
@@ -37,10 +39,32 @@ const KNOWN_PLAN_INTENTS: ReadonlyArray<PlanIntentId> = [
 ];
 
 export function isKnownPlanIntent(value: unknown): value is PlanIntentId {
-  return (
-    typeof value === "string" &&
-    (KNOWN_PLAN_INTENTS as ReadonlyArray<string>).includes(value)
-  );
+  return typeof value === "string" && (KNOWN_PLAN_INTENTS as ReadonlyArray<string>).includes(value);
+}
+
+/**
+ * Preserve the selected plan in the signed-in return URL as well as
+ * sessionStorage. Email confirmation commonly opens a new tab, where the
+ * original tab's sessionStorage is unavailable; the allowlisted `?plan=`
+ * value keeps Pricing preselected without auto-opening checkout.
+ */
+export function buildCheckoutPlanReturnPath(input: {
+  pathname: unknown;
+  search: unknown;
+  plan: unknown;
+}): string {
+  const pathname = typeof input.pathname === "string" ? input.pathname : "/pricing";
+  const search = typeof input.search === "string" ? input.search : "";
+  const safeCurrentPath = sanitizeAuthRedirect(`${pathname}${search}`, "/pricing");
+  const queryIndex = safeCurrentPath.indexOf("?");
+  const safePath = queryIndex >= 0 ? safeCurrentPath.slice(0, queryIndex) : safeCurrentPath;
+  const params = new URLSearchParams(queryIndex >= 0 ? safeCurrentPath.slice(queryIndex + 1) : "");
+
+  if (isKnownPlanIntent(input.plan)) params.set("plan", input.plan);
+  else params.delete("plan");
+
+  const query = params.toString();
+  return query ? `${safePath}?${query}` : safePath;
 }
 
 export interface PlanIntentRecord {
@@ -49,8 +73,7 @@ export interface PlanIntentRecord {
   savedAt: number;
 }
 
-export const CHECKOUT_PLAN_INTENT_STORAGE_KEY =
-  "verdant.checkout.planIntent.v1";
+export const CHECKOUT_PLAN_INTENT_STORAGE_KEY = "verdant.checkout.planIntent.v1";
 
 /** Default freshness window — 15 minutes is long enough for email verify
  * / password reset, short enough that a stale tab cannot resurrect a plan
@@ -86,8 +109,7 @@ export function savePlanIntent(
   opts?: { storage?: PlanIntentStorage | null; now?: number },
 ): boolean {
   if (!isKnownPlanIntent(plan)) return false;
-  const storage =
-    opts && "storage" in opts ? opts.storage : safeStorage();
+  const storage = opts && "storage" in opts ? opts.storage : safeStorage();
   if (!storage) return false;
   const record: PlanIntentRecord = {
     plan,
@@ -115,8 +137,7 @@ export function consumePlanIntent(opts?: {
   now?: number;
   maxAgeMs?: number;
 }): PlanIntentId | null {
-  const storage =
-    opts && "storage" in opts ? opts.storage : safeStorage();
+  const storage = opts && "storage" in opts ? opts.storage : safeStorage();
   if (!storage) return null;
   let raw: string | null;
   try {
@@ -151,9 +172,7 @@ export function consumePlanIntent(opts?: {
 }
 
 /** Read-only helper. Not used in production paths; kept for diagnostics/tests. */
-export function peekPlanIntent(opts?: {
-  storage?: PlanIntentStorage | null;
-}): PlanIntentId | null {
+export function peekPlanIntent(opts?: { storage?: PlanIntentStorage | null }): PlanIntentId | null {
   const storage = opts?.storage ?? safeStorage();
   if (!storage) return null;
   try {
@@ -167,9 +186,7 @@ export function peekPlanIntent(opts?: {
 }
 
 /** Explicit clear — used when the user cancels or leaves the checkout flow. */
-export function clearPlanIntent(opts?: {
-  storage?: PlanIntentStorage | null;
-}): void {
+export function clearPlanIntent(opts?: { storage?: PlanIntentStorage | null }): void {
   const storage = opts?.storage ?? safeStorage();
   if (!storage) return;
   try {

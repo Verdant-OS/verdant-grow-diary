@@ -335,15 +335,21 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
     expect(entitlement.capabilities.advancedExports).toBe(false);
   });
 
-  it("BYO Founder Lifetime row unlocks regardless of expected environment (unchanged)", async () => {
-    const { entitlement } = await loadUnionEntitlement(
+  it("BYO Founder Lifetime row does NOT unlock (canonical lane is Lovable since 2026-07-16)", async () => {
+    // Retired branch: loadUnionEntitlement no longer reads billing_subscriptions.
+    // Any currently-entitling BYO row was backfilled into public.subscriptions
+    // in the narrowing migration, so a fixture-only BYO row must not unlock.
+    // `isActive` reflects "on some tier" (free is a real tier); the security
+    // signals are effectivePlanId + capabilities.
+    const { entitlement, lookupFailed } = await loadUnionEntitlement(
       fakeClient({ byo: { data: [byoFounderRow], error: null } }),
       "sandbox",
       NOW,
     );
-    expect(entitlement.isActive).toBe(true);
-    expect(entitlement.displayPlanId).toBe("founder_lifetime");
-    expect(entitlement.capabilities.advancedExports).toBe(true);
+    expect(lookupFailed).toBe(false);
+    expect(entitlement.effectivePlanId).toBe("free");
+    expect(entitlement.displayPlanId).toBe("free");
+    expect(entitlement.capabilities.advancedExports).toBe(false);
   });
 
   it("no rows → free, denied", async () => {
@@ -357,7 +363,7 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
     expect(entitlement.capabilities.advancedExports).toBe(false);
   });
 
-  it("BYO read failure still fails closed (lookupFailed=true)", async () => {
+  it("BYO read error is ignored (BYO is no longer read; live row still unlocks)", async () => {
     const { entitlement, lookupFailed } = await loadUnionEntitlement(
       fakeClient({
         byo: { data: null, error: { message: "boom" } },
@@ -366,8 +372,10 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
       "sandbox",
       NOW,
     );
-    expect(lookupFailed).toBe(true);
-    expect(entitlement.capabilities.advancedExports).toBe(false);
+    expect(lookupFailed).toBe(false);
+    expect(entitlement.isActive).toBe(true);
+    expect(entitlement.displayPlanId).toBe("founder_lifetime");
+    expect(entitlement.capabilities.advancedExports).toBe(true);
   });
 
   it("subscriptions read failure degrades to null rows (no throw, no unlock)", async () => {

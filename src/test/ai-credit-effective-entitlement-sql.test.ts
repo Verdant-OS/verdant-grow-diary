@@ -93,19 +93,25 @@ describe("AI credit SQL effective entitlement hardening", () => {
 });
 
 describe("ai_credit_spend FINAL migration state (regression-proof)", () => {
-  it("reads BOTH billing sources — BYO billing_subscriptions AND Lovable subscriptions", () => {
-    expect(FINAL).toMatch(/FROM\s+public\.billing_subscriptions/i);
+  it("reads plan only from the canonical Lovable subscriptions table (BYO branch retired 2026-07-16)", () => {
+    // Canonical lane: BYO billing_subscriptions is no longer a plan source in
+    // the LATEST ai_credit_spend definition. Any prior entitling BYO row was
+    // backfilled into public.subscriptions in the narrowing migration.
     expect(FINAL).toMatch(/FROM\s+public\.subscriptions/i);
     expect(FINAL).toContain("s.environment = 'live'");
+    // Function body must not read billing_subscriptions.
+    const bodyMatch = FINAL.match(
+      /CREATE OR REPLACE FUNCTION public\.ai_credit_spend[\s\S]*?LANGUAGE plpgsql[\s\S]*?\$function\$;/,
+    );
+    expect(bodyMatch).not.toBeNull();
+    expect(bodyMatch![0]).not.toMatch(/FROM\s+public\.billing_subscriptions/i);
   });
 
-  it("keeps the status/period hardening on both sources (no raw plan_id trust)", () => {
-    // BYO row goes through the effective-plan helper…
-    expect(FINAL).toContain("public.ai_credit_effective_credit_plan_id");
-    // …and the Lovable row carries the same strictness inline.
+  it("keeps the Lovable-source status/period hardening (no raw plan_id trust)", () => {
     expect(FINAL).toContain("s.status = 'active'");
     expect(FINAL).toMatch(/current_period_end IS NULL OR s\.current_period_end > now\(\)/);
-    // The regression signature: a bare plan_id read feeding the allowance.
+    // The regression signature: a bare plan_id read feeding the allowance
+    // from billing_subscriptions.
     expect(FINAL).not.toMatch(/SELECT\s+plan_id\s+INTO\s+v_plan_id\s+FROM\s+public\.billing_subscriptions/i);
   });
 

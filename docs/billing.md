@@ -46,36 +46,48 @@ are not live yet.
 
 ## Configuration
 
-Sandbox config is read from `VITE_PADDLE_*` env vars (see `.env.example`).
-If any required value is missing, or if `VITE_PADDLE_ENVIRONMENT` is set to
-`live` or `production`, the billing page renders a safe "checkout
-unavailable" state. The client-side checkout helper refuses to initialize
-against live Paddle.
+The **canonical** client env var is `VITE_PAYMENTS_CLIENT_TOKEN` (Lovable
+built-in Paddle integration). Its prefix (`test_` → sandbox, `live_` → live)
+is the single source of truth for the client environment. On loopback hosts
+a `live_` token fails closed and the checkout button renders as unavailable.
+
+Legacy BYO client env vars (`VITE_PADDLE_ENVIRONMENT`,
+`VITE_PADDLE_CLIENT_TOKEN`, `VITE_PADDLE_PRICE_*`) are `@deprecated` and only
+read by the operator audit surfaces / legacy `Upgrade.tsx` presenter. New
+code should not reference them.
 
 Server-only secrets (configured via Lovable Cloud → Secrets, never in
 `.env`):
 
-- `PADDLE_ENVIRONMENT` — must be `sandbox` for now
-- `PADDLE_WEBHOOK_SECRET` — used by the `paddle-webhook` edge function
-  to verify Paddle signatures against the raw request body
+- `PAYMENTS_ENVIRONMENT` — server-controlled selector for the Lovable lane
+  (`sandbox` or `live`; ignored client-supplied `env`)
+- `PAYMENTS_SANDBOX_WEBHOOK_SECRET` / `PAYMENTS_LIVE_WEBHOOK_SECRET` — used
+  by `payments-webhook` to verify Paddle signatures
+- `PADDLE_SANDBOX_API_KEY` / `PADDLE_LIVE_API_KEY` — gateway connection keys
+  for `get-paddle-price` and any server-side Paddle API calls
+- `LOVABLE_API_KEY` — project-level gateway auth
+- (Legacy, still read by the BYO audit sink) `PADDLE_ENVIRONMENT`,
+  `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRICE_PRO_MONTHLY`/`_PRO_ANNUAL`/
+  `_FOUNDER_LIFETIME`
 
 ## Webhook
 
-The `paddle-webhook` edge function:
+Canonical: `payments-webhook` (Lovable lane). Verifies the signature via
+the shared `verifyWebhook` helper, records into `public.lovable_paddle_events`
+idempotently on `paddle_event_id` (23505 = duplicate no-op), and writes
+`public.subscriptions` directly for recurring plans + calls
+`allocate_lovable_founder_lifetime` for Founder Lifetime.
 
-1. Reads the raw request body before any parsing.
-2. Verifies the `Paddle-Signature` header via HMAC-SHA256 in constant time.
-3. Refuses requests unless `PADDLE_ENVIRONMENT=sandbox`.
-4. Records the event in `public.paddle_events` idempotently (unique
-   `event_id`).
-5. Does **not** change any user entitlement. Entitlement flips are
-   intentionally deferred to a separate, reviewed change.
+Audit-only: `paddle-webhook` (BYO lane). Sandbox-only. Still verifies
+signatures and writes `paddle_events` / `paddle_event_processing` /
+`billing_subscriptions` for operator audit pages, but no longer contributes
+to entitlement resolution as of 2026-07-16.
 
 ## Pro entitlement rule
 
 Pro access must only be granted server-side after a verified Paddle webhook
-event is recorded. It must never be granted from a client checkout success:
-
+event has written `public.subscriptions` (canonical Lovable lane). It must
+never be granted from any client trust surface:
 
 - A client-side checkout success callback
 - A query string on a return URL
@@ -87,12 +99,15 @@ Before flipping to live Paddle:
 
 - [ ] Complete Paddle live verification (merchant of record onboarding).
 - [ ] Confirm acceptable use policy fit for Verdant (software-only).
-- [ ] Add server-side entitlement updater that consumes verified events
-      from `paddle_events` and writes to `public.billing_subscriptions`
-      with service role.
-- [ ] Add end-to-end sandbox checkout test through Paddle.js.
-- [ ] Add refund / chargeback / cancellation event handling.
-- [ ] Add billing portal / "manage subscription" surface for the grower.
-- [ ] Add tax / receipt copy reviewed for software-only positioning.
-- [ ] Replace `VITE_PADDLE_ENVIRONMENT=sandbox` and `PADDLE_ENVIRONMENT=
-      sandbox` with `live` in environment config, only after the above.
+- [ ] Refund / chargeback / adjustment handling beyond "record and ignore"
+      (currently `adjustment.created/updated` events are stored but not
+      auto-acted on; operator-manual only).
+- [ ] Customer portal / "manage subscription" surface for the grower
+      (Settings currently shows a placeholder dialog).
+- [ ] Tax / receipt copy reviewed for software-only positioning.
+- [ ] Sandbox smoke green per `docs/paddle-sandbox-smoke.md` (Pro Monthly,
+      Pro Annual, Founder Lifetime, duplicate-delivery idempotency,
+      cancel-and-resubscribe).
+- [ ] Set `PAYMENTS_ENVIRONMENT=live` and install live `VITE_PAYMENTS_CLIENT_TOKEN`
+      + live webhook secret + live API key + live price IDs as one reviewed
+      change.

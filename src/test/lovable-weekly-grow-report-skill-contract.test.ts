@@ -147,11 +147,14 @@ describe("Lovable weekly grow report skill contract", () => {
     // one-click download; only the library path may claim one click.
     expect(SKILL).toMatch(/one confirm away from a PDF,\s+not a one-click download/);
     expect(SKILL).toMatch(/never promising a download\s+the pipeline cannot deliver/);
-    // Determinism is per generated report; generated-at is report content.
+    // Determinism is per generated report and scoped to what the app
+    // controls: markup on the print path, bytes on the library path.
+    expect(SKILL).toMatch(/deterministic print markup/);
+    expect(SKILL).toMatch(/outside app control and carry no\s+byte-identity claim/);
     expect(SKILL).toMatch(
-      /Exporting the same generated report twice yields\s+byte-identical files/,
+      /On the library path, exporting the same generated\s+report twice yields byte-identical files/,
     );
-    expect(SKILL).toMatch(/regenerating the report is what changes it, never re-exporting it/);
+    expect(SKILL).toMatch(/regenerating the report is what\s+changes it, never re-exporting it/);
     expect(SKILL).toMatch(/no server-side PDF service is ever\s+added/);
     expect(SKILL).toMatch(/Never hashes, opaque IDs, emails, or grower notes in the filename/);
   });

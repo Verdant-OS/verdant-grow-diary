@@ -479,12 +479,16 @@ report. It is a projection of the same data — never a second computation.
   vector embedding of the same SVG charts (no canvas rasterization of any
   chart that carries contribution drill-down), deterministic export (below),
   and an explicit dependency review.
-- **Deterministic export.** Exporting the same generated report twice yields
-  byte-identical files: no random object IDs, no new wall-clock reads during
-  export. The report's own generated-at renders as report content —
-  regenerating the report is what changes it, never re-exporting it. The
-  content version ID identifies the data content; the export inherits it and
-  adds nothing of its own.
+- **Deterministic export — scoped to what the app controls.** On the print
+  path, the app guarantees deterministic print markup: the same generated
+  report renders identical DOM/print output every time, while the browser's
+  PDF writer and its file metadata are outside app control and carry no
+  byte-identity claim. On the library path, exporting the same generated
+  report twice yields byte-identical files: no random object IDs, no new
+  wall-clock reads during export. On both paths the report's own
+  generated-at renders as report content — regenerating the report is what
+  changes it, never re-exporting it. The content version ID identifies the
+  data content; the export inherits it and adds nothing of its own.
 - **Drill-down references in print form.** Per the print rules, contribution
   drill-downs render as short human-readable contribution references and
   counts — never raw URLs, internal IDs, or interactive-only affordances that

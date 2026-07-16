@@ -92,7 +92,8 @@ export const MCP_MANIFEST: MCPManifestView = Object.freeze({
     {
       name: "list_recent_diary_entries",
       title: "List recent diary entries",
-      description: "List recent diary entries for one of the signed-in grower's grows. Read-only.",
+      description:
+        "List recent diary entries for one of the signed-in grower's own grows. The grow must belong to the caller. Read-only.",
       readOnly: true,
       params: [
         {
@@ -114,14 +115,14 @@ export const MCP_MANIFEST: MCPManifestView = Object.freeze({
       name: "get_latest_sensor_snapshot",
       title: "Get latest sensor snapshot",
       description:
-        "Fetch the single most recent sensor reading for one of the signed-in grower's tents. Includes temperature/humidity/vpd/co2 fields when present and always includes the `source` label (live/manual/csv/demo/stale/invalid). Never treat non-live sources as current readings. Read-only.",
+        "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading keeps its `source` and `quality` labels verbatim. `quality` is one of ok/degraded/stale/invalid. Canonical `source` labels are exactly live/manual/csv/demo/stale/invalid, where `live` means fresh validated connected telemetry; legacy rows may carry other ingest labels such as sim or vendor bridge names. Treat a reading as current live telemetry ONLY when its quality is `ok` AND its source is `live`. Every other source or quality keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. Read-only.",
       readOnly: true,
       params: [
         {
           name: "tentId",
           type: "string (uuid)",
           required: true,
-          description: "Tent id to fetch the latest reading for.",
+          description: "Tent id to fetch the latest readings for.",
         },
       ],
     },

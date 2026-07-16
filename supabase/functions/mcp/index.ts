@@ -117,11 +117,34 @@ ${JSON.stringify(rows, null, 2)}`
 // src/lib/mcp/tools/get-latest-sensor-snapshot.ts
 import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.20.0";
 import { z as z3 } from "npm:zod@^4.4.3";
-var SCAN_LIMIT = 50;
+var KNOWN_METRICS = [
+  "temperature_c",
+  "humidity_pct",
+  "vpd_kpa",
+  "co2_ppm",
+  "soil_moisture_pct",
+  "soil_temp_c",
+  "ph",
+  "ec",
+  "ppfd"
+];
+var SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at";
+function effectiveCaptureMs(row) {
+  return Date.parse(row.captured_at ?? row.ts);
+}
+function newerReading(a, b) {
+  const ea = effectiveCaptureMs(a);
+  const eb = effectiveCaptureMs(b);
+  if (ea !== eb) return ea > eb ? a : b;
+  const ta = Date.parse(a.ts);
+  const tb = Date.parse(b.ts);
+  if (ta !== tb) return ta > tb ? a : b;
+  return a.id > b.id ? a : b;
+}
 var get_latest_sensor_snapshot_default = defineTool3({
   name: "get_latest_sensor_snapshot",
   title: "Get latest sensor snapshot",
-  description: "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct) for one of the signed-in grower's own tents. Every reading includes its `source` label (manual/pi_bridge/sim) and `quality` label (ok/degraded/stale/invalid). Never treat readings with quality other than `ok`, or source `sim`, as current live data. Read-only.",
+  description: "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading keeps its `source` and `quality` labels verbatim. `quality` is one of ok/degraded/stale/invalid. Canonical `source` labels are exactly live/manual/csv/demo/stale/invalid, where `live` means fresh validated connected telemetry; legacy rows may carry other ingest labels such as sim or vendor bridge names. Treat a reading as current live telemetry ONLY when its quality is `ok` AND its source is `live`. Every other source or quality keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. Read-only.",
   inputSchema: {
     tentId: z3.string().uuid().describe("Tent id to fetch the latest readings for.")
   },
@@ -142,23 +165,31 @@ var get_latest_sensor_snapshot_default = defineTool3({
         isError: true
       };
     }
-    const { data, error } = await supabase.from("sensor_readings").select("id,tent_id,metric,value,quality,source,ts,captured_at").eq("tent_id", tentId).order("ts", { ascending: false }).limit(SCAN_LIMIT);
-    if (error) {
+    const results = await Promise.all(
+      KNOWN_METRICS.flatMap((metric) => [
+        supabase.from("sensor_readings").select(SENSOR_COLUMNS).eq("tent_id", tentId).eq("metric", metric).not("captured_at", "is", null).order("captured_at", { ascending: false }).order("ts", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("sensor_readings").select(SENSOR_COLUMNS).eq("tent_id", tentId).eq("metric", metric).is("captured_at", null).order("ts", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(1).maybeSingle()
+      ])
+    );
+    const failed = results.find((r) => r.error);
+    if (failed?.error) {
       return {
-        content: [{ type: "text", text: `Error: ${error.message}` }],
+        content: [{ type: "text", text: `Error: ${failed.error.message}` }],
         isError: true
       };
     }
-    const rows = data ?? [];
-    if (rows.length === 0) {
+    const readings = {};
+    for (const result of results) {
+      const row = result.data;
+      if (!row) continue;
+      const current = readings[row.metric];
+      readings[row.metric] = current ? newerReading(current, row) : row;
+    }
+    if (Object.keys(readings).length === 0) {
       return {
         content: [{ type: "text", text: "No sensor readings found for that tent." }],
         structuredContent: { snapshot: null }
       };
-    }
-    const readings = {};
-    for (const row of rows) {
-      if (!(row.metric in readings)) readings[row.metric] = row;
     }
     const summary = Object.values(readings).map(
       (r) => `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, at: ${r.captured_at ?? r.ts})`
@@ -182,7 +213,7 @@ var mcp_default = defineMcp({
   name: "verdant-grow-os-mcp",
   title: "Verdant Grow OS",
   version: "0.1.0",
-  instructions: "Read-only access to the signed-in Verdant grower's own data. Use `list_grows` to enumerate grows, `list_recent_diary_entries` for recent log entries in a grow the caller owns, and `get_latest_sensor_snapshot` for the most recent reading per metric in a tent the caller owns. Sensor readings always include their `source` label (manual/pi_bridge/sim) and `quality` label (ok/degraded/stale/invalid) \u2014 never treat readings with quality other than `ok`, or source `sim`, as current live data. This server never writes, never approves Action Queue items, and never controls devices.",
+  instructions: "Read-only access to the signed-in Verdant grower's own data. Use `list_grows` to enumerate grows, `list_recent_diary_entries` for recent log entries in a grow the caller owns, and `get_latest_sensor_snapshot` for the most recent reading per metric in a tent the caller owns. Sensor readings always include their `source` and `quality` labels verbatim. Trust is deny-by-default: a reading is current live telemetry ONLY when its quality is `ok` AND its source is `live` (fresh validated connected telemetry). Every other source or quality keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. This server never writes, never approves Action Queue items, and never controls devices.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"

@@ -22,6 +22,7 @@ describe("signup-to-paid snapshot rules", () => {
       sources: {
         grower_invite: { accounts: 6, active_paid: 3, user_id: "must-not-survive" },
         landing_page: { accounts: 6, active_paid: 2 },
+        csv_history: { accounts: 5, active_paid: 1 },
         attacker_source: { accounts: 999, active_paid: 999 },
         unattributed: { accounts: 8, active_paid: 1 },
       },
@@ -37,6 +38,7 @@ describe("signup-to-paid snapshot rules", () => {
       unattributedActivePaidTotal: 1,
     });
     expect(parsed.sources.grower_invite).toEqual({ accounts: 6, activePaid: 3 });
+    expect(parsed.sources.csv_history).toEqual({ accounts: 5, activePaid: 1 });
     expect(parsed.sources.pricing_page).toEqual({ accounts: 0, activePaid: 0 });
     expect(JSON.stringify(parsed)).not.toContain("must-not-survive");
     expect(JSON.stringify(parsed)).not.toContain("attacker_source");

@@ -57,6 +57,10 @@ import {
   type AuthMode,
 } from "@/lib/authModeTabRules";
 import { lovable } from "@/integrations/lovable/index";
+import {
+  clearPendingOAuthSignupAcquisition,
+  savePendingOAuthSignupAcquisition,
+} from "@/lib/oauthSignupAcquisitionRules";
 
 export default function Auth() {
   usePageSeo({
@@ -107,6 +111,12 @@ export default function Auth() {
 
   async function signInWithGoogle() {
     if (googleBusy) return;
+    const shouldRecordSignupSource = mode === "signup" && signupSource !== null;
+    if (shouldRecordSignupSource) {
+      savePendingOAuthSignupAcquisition(signupSource);
+    } else {
+      clearPendingOAuthSignupAcquisition();
+    }
     setGoogleBusy(true);
     setGoogleError(null);
     try {
@@ -117,6 +127,7 @@ export default function Auth() {
         redirect_uri: window.location.origin,
       });
       if (result.error) {
+        if (shouldRecordSignupSource) clearPendingOAuthSignupAcquisition();
         setGoogleError("Google sign-in didn't complete. Please try again.");
         return;
       }
@@ -124,12 +135,12 @@ export default function Auth() {
       // Tokens returned and session set — route to intended destination.
       nav(postSignInTarget(), { replace: true });
     } catch {
+      if (shouldRecordSignupSource) clearPendingOAuthSignupAcquisition();
       setGoogleError("Google sign-in didn't complete. Please try again.");
     } finally {
       setGoogleBusy(false);
     }
   }
-
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotError, setForgotError] = useState<string | null>(null);

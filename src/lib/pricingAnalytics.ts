@@ -28,6 +28,8 @@ export type PricingAnalyticsName =
   | "vpd_calculator_share_clicked"
   | "vpd_calculator_share_completed"
   | "vpd_calculator_share_failed"
+  | "csv_history_page_view"
+  | "csv_history_signup_clicked"
   | "grower_invite_page_view"
   | "grower_invite_share_clicked"
   | "grower_invite_share_completed"

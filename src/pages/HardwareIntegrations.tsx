@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import LegalFooterLinks from "@/components/LegalFooterLinks";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,10 @@ import {
   SENSOR_SOURCE_LEGEND,
   SENSOR_SOURCE_SHORT_LABEL,
 } from "@/constants/sensorSourceLabels";
+import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
+import { trackPricingEvent } from "@/lib/pricingAnalytics";
+
+const CSV_HISTORY_SIGNUP_PATH = buildAttributedSignupPath({ source: "csv_history" });
 
 /**
  * Public hardware-neutral integration page.
@@ -24,6 +29,10 @@ export default function HardwareIntegrations() {
       "Hardware-neutral Grow OS. Connect Ecowitt, ESP32, MQTT, webhook, or Raspberry Pi sensors read-only, or import CSVs. Bring your own gear — the grower stays in control.",
     path: "/hardware-integrations",
   });
+
+  useEffect(() => {
+    trackPricingEvent("csv_history_page_view", { source: "csv_history" });
+  }, []);
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -58,21 +67,28 @@ export default function HardwareIntegrations() {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <a href="#partner">
-            <Button size="lg">Hardware partner? Contact Verdant</Button>
-          </a>
-          <Link to="/welcome">
-            <Button size="lg" variant="outline">
-              About Verdant
-            </Button>
+          <Link
+            to={CSV_HISTORY_SIGNUP_PATH}
+            data-testid="csv-history-signup-cta-hero"
+            onClick={() =>
+              trackPricingEvent("csv_history_signup_clicked", {
+                source: "csv_history",
+                item: "hero",
+              })
+            }
+          >
+            <Button size="lg">Bring in my grow history</Button>
           </Link>
+          <a href="#partner">
+            <Button size="lg" variant="outline">
+              Hardware partner? Contact Verdant
+            </Button>
+          </a>
         </div>
       </section>
 
       <section className="px-6 pt-2 max-w-5xl mx-auto text-center">
-        <h2 className="font-display text-2xl md:text-3xl font-semibold">
-          Integration benefits
-        </h2>
+        <h2 className="font-display text-2xl md:text-3xl font-semibold">Integration benefits</h2>
       </section>
 
       <section className="px-6 py-10 max-w-5xl mx-auto grid gap-6 md:grid-cols-2">
@@ -119,6 +135,69 @@ export default function HardwareIntegrations() {
         </div>
       </section>
 
+      <section id="csv-history" className="px-6 py-12 max-w-5xl mx-auto">
+        <div className="rounded-2xl border border-primary/30 bg-primary/5 px-6 py-8 md:px-10 md:py-10">
+          <p className="text-xs uppercase tracking-widest text-primary font-medium">
+            For growers with data already
+          </p>
+          <h2 className="mt-3 font-display text-2xl md:text-3xl font-semibold">
+            Your grow history should not stay trapped in another app
+          </h2>
+          <p className="mt-4 max-w-3xl text-muted-foreground leading-relaxed">
+            Create a free account, set up one grow and tent, then import an AC Infinity export or
+            another environment CSV from Sensor Data. CSV import and basic logging are free.
+          </p>
+          <p className="mt-3 max-w-3xl text-muted-foreground leading-relaxed">
+            Verdant keeps every imported reading source-labeled as CSV history — never live
+            telemetry — and places it alongside your diary and photos. AI Doctor can use that
+            history as read-only background context while still distinguishing it from current
+            manual or live readings. It never creates an action automatically.
+          </p>
+          <ol
+            className="mt-6 grid gap-3 text-sm sm:grid-cols-3"
+            aria-label="CSV history setup steps"
+          >
+            <li className="rounded-xl border border-border/60 bg-background/70 p-4">
+              <span className="font-semibold text-foreground">1. Create your free account</span>
+              <span className="mt-1 block text-muted-foreground">
+                No hardware replacement required.
+              </span>
+            </li>
+            <li className="rounded-xl border border-border/60 bg-background/70 p-4">
+              <span className="font-semibold text-foreground">2. Add one grow and tent</span>
+              <span className="mt-1 block text-muted-foreground">
+                Give the history a truthful home.
+              </span>
+            </li>
+            <li className="rounded-xl border border-border/60 bg-background/70 p-4">
+              <span className="font-semibold text-foreground">3. Import from Sensor Data</span>
+              <span className="mt-1 block text-muted-foreground">
+                Review rows before anything is saved.
+              </span>
+            </li>
+          </ol>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link
+              to={CSV_HISTORY_SIGNUP_PATH}
+              data-testid="csv-history-signup-cta-section"
+              onClick={() =>
+                trackPricingEvent("csv_history_signup_clicked", {
+                  source: "csv_history",
+                  item: "csv_history_section",
+                })
+              }
+            >
+              <Button size="lg">Create a free account</Button>
+            </Link>
+            <Link to="/how-ai-doctor-works">
+              <Button size="lg" variant="outline">
+                See how AI Doctor uses context
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <section
         id="sensor-source-labels"
         data-testid="sensor-source-legend"
@@ -128,10 +207,9 @@ export default function HardwareIntegrations() {
           Sensor source labels
         </h2>
         <p className="mt-3 text-center text-muted-foreground max-w-2xl mx-auto">
-          Verdant uses source labels on every reading so growers always know what
-          data they are looking at. CSV and historical imports are never promoted
-          to live. Demo data is never shown as live. Stale or invalid telemetry
-          is never treated as healthy or current.
+          Verdant uses source labels on every reading so growers always know what data they are
+          looking at. CSV and historical imports are never promoted to live. Demo data is never
+          shown as live. Stale or invalid telemetry is never treated as healthy or current.
         </p>
         <dl className="mt-8 grid gap-4 sm:grid-cols-2">
           {SENSOR_SOURCE_KINDS.map((kind) => (
@@ -155,8 +233,6 @@ export default function HardwareIntegrations() {
           </Link>
         </p>
       </section>
-
-
 
       <section className="px-6 py-12 max-w-3xl mx-auto text-center">
         <h2 className="font-display text-2xl md:text-3xl font-semibold">Partner value</h2>

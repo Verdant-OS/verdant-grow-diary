@@ -37,7 +37,7 @@ export default defineMcp({
     "deny-by-default: treat a reading as current live data ONLY when " +
     "its quality is `ok` AND its source is known-live (live, manual, " +
     "csv, or a hardware-bridge label such as pi_bridge, esp32_*, " +
-    "home_assistant_bridge, ecowitt, mqtt or webhook); sources sim, " +
+    "home_assistant_bridge, ecowitt or webhook); sources sim, " +
     "demo, stale and invalid, plus any source label you do not " +
     "recognize, are never live. " +
     "This server never writes, never approves Action Queue items, and " +

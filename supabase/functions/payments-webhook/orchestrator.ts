@@ -27,12 +27,14 @@ import {
   transactionPriceIdNeedingLookup,
   type Decision,
   type PaddleEnv,
-} from "./eventProcessor.ts";
+} from './eventProcessor.ts';
 
-export type ProcessingStatus = "received" | "processed" | "skipped" | "failed";
+export type ProcessingStatus = 'received' | 'processed' | 'skipped' | 'failed';
 
 export type IoResult = { ok: true } | { ok: false; error: string };
-export type InsertResult = { ok: true; duplicate?: boolean } | { ok: false; error: string };
+export type InsertResult =
+  | { ok: true; duplicate?: boolean }
+  | { ok: false; error: string };
 
 /**
  * Result of allocate_lovable_founder_lifetime. `ok=true, reason='allocated'`
@@ -43,8 +45,8 @@ export type InsertResult = { ok: true; duplicate?: boolean } | { ok: false; erro
  * a transient failure so Paddle retries.
  */
 export type FounderAllocationResult =
-  | { ok: true; reason: "allocated" | "idempotent" }
-  | { ok: false; reason: "cap_reached" | "invalid_input" | string };
+  | { ok: true; reason: 'allocated' | 'idempotent' }
+  | { ok: false; reason: 'cap_reached' | 'invalid_input' | string };
 
 export interface ExistingEventRow {
   processing_status: ProcessingStatus;
@@ -63,9 +65,12 @@ export interface MarkPatch {
   last_error: string | null;
 }
 
-type UpsertRow = Extract<Decision, { kind: "upsert_subscription" | "record_lifetime" }>["row"];
-type UpdatePatch = Extract<Decision, { kind: "update_subscription" }>["patch"];
-type CustomerRow = Extract<Decision, { kind: "upsert_customer" }>["row"];
+type UpsertRow = Extract<
+  Decision,
+  { kind: 'upsert_subscription' | 'record_lifetime' }
+>['row'];
+type UpdatePatch = Extract<Decision, { kind: 'update_subscription' }>['patch'];
+type CustomerRow = Extract<Decision, { kind: 'upsert_customer' }>['row'];
 
 export interface Deps {
   insertEventReceived(input: {
@@ -149,6 +154,7 @@ export interface Deps {
   }): Promise<{ ok: true; canceled: number } | { ok: false; error: string }>;
 }
 
+
 export interface HandleResult {
   httpStatus: 200 | 500;
   reason: string;
@@ -162,15 +168,15 @@ export interface HandleResult {
  */
 export function redactError(e: string): string {
   return e
-    .replace(/(?:api[_-]?key|service[_-]?role|secret|token|password|bearer)[^\s]*/gi, "[redacted]")
+    .replace(/(?:api[_-]?key|service[_-]?role|secret|token|password|bearer)[^\s]*/gi, '[redacted]')
     .slice(0, 500);
 }
 
 function resolvePaddleEventId(event: EventLikeWithId, env: PaddleEnv, now: Date): string {
-  if (typeof event.eventId === "string" && event.eventId.length > 0) return event.eventId;
+  if (typeof event.eventId === 'string' && event.eventId.length > 0) return event.eventId;
   // Synthetic id lets us still record the event durably; deterministic on
   // (env, type, timestamp) so a same-instant retry stays idempotent.
-  return `synthetic_${env}_${event.eventType ?? "unknown"}_${now.toISOString()}`;
+  return `synthetic_${env}_${event.eventType ?? 'unknown'}_${now.toISOString()}`;
 }
 
 export async function handleVerifiedEvent(
@@ -190,18 +196,18 @@ export async function handleVerifiedEvent(
     payload: rawPayload,
   });
 
-  if ("error" in insertRes) {
+  if ('error' in insertRes) {
     // Cannot even record the event — refuse to acknowledge so Paddle retries.
     return { httpStatus: 500, reason: `event_log_insert_failed:${redactError(insertRes.error)}` };
   }
 
   if (insertRes.duplicate) {
     const existing = await deps.getExistingEvent(paddleEventId);
-    if ("error" in existing) {
+    if ('error' in existing) {
       return { httpStatus: 500, reason: `event_log_lookup_failed:${redactError(existing.error)}` };
     }
     const prior = existing.row?.processing_status;
-    if (prior === "processed" || prior === "skipped") {
+    if (prior === 'processed' || prior === 'skipped') {
       return { httpStatus: 200, reason: `duplicate_${prior}` };
     }
     // prior is 'received' or 'failed' (or row somehow missing) → reprocess.
@@ -214,7 +220,7 @@ export async function handleVerifiedEvent(
   const priceIdToResolve = transactionPriceIdNeedingLookup(event);
   if (priceIdToResolve && deps.resolvePriceExternalIdByPaddleId) {
     const resolved = await deps.resolvePriceExternalIdByPaddleId(env, priceIdToResolve);
-    if ("error" in resolved) {
+    if ('error' in resolved) {
       return {
         httpStatus: 500,
         reason: `price_lookup_failed:${redactError(resolved.error)}`,
@@ -226,14 +232,14 @@ export async function handleVerifiedEvent(
   // 3) Decide.
   const decision = decide(event, env, now);
 
-  if (decision.kind === "skip") {
+  if (decision.kind === 'skip') {
     const mark = await deps.markEvent(paddleEventId, {
-      processing_status: "skipped",
+      processing_status: 'skipped',
       processed_ok: false,
       skip_reason: decision.reason,
       last_error: null,
     });
-    if ("error" in mark) {
+    if ('error' in mark) {
       return { httpStatus: 500, reason: `mark_skipped_failed:${redactError(mark.error)}` };
     }
     return { httpStatus: 200, reason: `skipped:${decision.reason}` };
@@ -245,7 +251,7 @@ export async function handleVerifiedEvent(
   // processed mark's last_error for operator reconciliation. Never blocks
   // the grant or the 200.
   let providerCancelError: string | null = null;
-  if (decision.kind === "record_lifetime") {
+  if (decision.kind === 'record_lifetime') {
     // H3 (audit fix): the raw upsert path used to write the founder row
     // directly, bypassing the 75-slot cap. Route through the atomic
     // service-role RPC instead. If the allocator dep is not wired (pure
@@ -256,8 +262,8 @@ export async function handleVerifiedEvent(
       // The pseudo-subscription id is `lifetime_<paddle_transaction_id>`
       // (see eventProcessor.decide). Recover the transaction id so the
       // RPC can rebuild it identically for idempotency.
-      const txId = row.paddle_subscription_id.startsWith("lifetime_")
-        ? row.paddle_subscription_id.slice("lifetime_".length)
+      const txId = row.paddle_subscription_id.startsWith('lifetime_')
+        ? row.paddle_subscription_id.slice('lifetime_'.length)
         : row.paddle_subscription_id;
       const alloc = await deps.allocateFounderLifetime({
         user_id: row.user_id,
@@ -267,29 +273,29 @@ export async function handleVerifiedEvent(
         now,
       });
       if (!alloc.ok) {
-        if (alloc.reason === "cap_reached") {
+        if (alloc.reason === 'cap_reached') {
           // Cap enforcement is not a webhook failure — the buyer's payment
           // needs an operator refund per the runbook, but Paddle should
           // stop retrying. Mark as skipped and 200.
           const mark = await deps.markEvent(paddleEventId, {
-            processing_status: "skipped",
+            processing_status: 'skipped',
             processed_ok: false,
-            skip_reason: "founder_cap_reached",
+            skip_reason: 'founder_cap_reached',
             last_error: null,
           });
-          if ("error" in mark) {
+          if ('error' in mark) {
             return {
               httpStatus: 500,
               reason: `mark_skipped_failed:${redactError(mark.error)}`,
             };
           }
-          return { httpStatus: 200, reason: "skipped:founder_cap_reached" };
+          return { httpStatus: 200, reason: 'skipped:founder_cap_reached' };
         }
         // Any other allocator failure is transient — surface as 500 so
         // Paddle retries (allocator is idempotent by paddle_subscription_id).
         const err = `founder_allocator_failed:${alloc.reason}`;
         await deps.markEvent(paddleEventId, {
-          processing_status: "failed",
+          processing_status: 'failed',
           processed_ok: false,
           skip_reason: null,
           last_error: redactError(err),
@@ -306,28 +312,30 @@ export async function handleVerifiedEvent(
           environment: env,
           exceptPaddleSubscriptionId: decision.row.paddle_subscription_id,
         });
-        if ("error" in cancelRes) providerCancelError = cancelRes.error;
+        if ('error' in cancelRes) providerCancelError = cancelRes.error;
       }
       writeRes = { ok: true };
     } else {
       writeRes = await deps.upsertSubscription(decision.row);
     }
-  } else if (decision.kind === "upsert_subscription") {
+  } else if (decision.kind === 'upsert_subscription') {
     writeRes = await deps.upsertSubscription(decision.row);
-  } else if (decision.kind === "upsert_customer") {
+  } else if (decision.kind === 'upsert_customer') {
     // customer.created / customer.updated → paddle_customers mirror.
     // If the runtime dep isn't wired (pure unit tests), treat as no-op
     // success so the event is marked processed and Paddle stops retrying.
-    writeRes = deps.upsertCustomer ? await deps.upsertCustomer(decision.row) : { ok: true };
+    writeRes = deps.upsertCustomer
+      ? await deps.upsertCustomer(decision.row)
+      : { ok: true };
   } else {
     writeRes = await deps.updateSubscription(decision.paddleSubscriptionId, decision.patch, env);
   }
 
-  if ("error" in writeRes) {
+  if ('error' in writeRes) {
     const err = writeRes.error;
     // Best-effort mark 'failed'; the 500 is what guarantees Paddle retry.
     await deps.markEvent(paddleEventId, {
-      processing_status: "failed",
+      processing_status: 'failed',
       processed_ok: false,
       skip_reason: null,
       last_error: redactError(err),
@@ -335,18 +343,19 @@ export async function handleVerifiedEvent(
     return { httpStatus: 500, reason: `write_failed:${redactError(err)}` };
   }
 
+
   // 4) Mark processed. A failed post-grant provider cancellation rides on
   // last_error (processed_ok stays true — the grant itself succeeded) so
   // the operator audit surface can reconcile the double-bill risk.
   const mark = await deps.markEvent(paddleEventId, {
-    processing_status: "processed",
+    processing_status: 'processed',
     processed_ok: true,
     skip_reason: null,
     last_error: providerCancelError
       ? redactError(`provider_cancel_failed:${providerCancelError}`)
       : null,
   });
-  if ("error" in mark) {
+  if ('error' in mark) {
     // Subscription upsert is idempotent (unique paddle_subscription_id), so
     // a Paddle retry re-applies the same row and re-attempts this mark.
     return { httpStatus: 500, reason: `mark_processed_failed:${redactError(mark.error)}` };
@@ -359,3 +368,4 @@ export async function handleVerifiedEvent(
       : `processed:${decision.kind}`,
   };
 }
+

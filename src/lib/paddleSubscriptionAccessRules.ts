@@ -32,7 +32,7 @@ export interface SubscriptionAccessInput {
   current_period_end?: string | Date | null;
 }
 
-const GRANTS_WITHOUT_PERIOD_CHECK = new Set(["active", "trialing", "past_due"]);
+const GRANTS_WITHOUT_PERIOD_CHECK = new Set(['active', 'trialing', 'past_due']);
 
 function toDateOrNull(value: string | Date | null | undefined): Date | null {
   if (value == null) return null;
@@ -55,7 +55,7 @@ export function subscriptionGrantsAccess(
 
   if (GRANTS_WITHOUT_PERIOD_CHECK.has(status)) return true;
 
-  if (status === "canceled") {
+  if (status === 'canceled') {
     const end = toDateOrNull(row.current_period_end);
     // No end date on a canceled row = ended immediately. Only extend
     // access while the paid-for period is still in the future.

@@ -20,6 +20,7 @@
  */
 
 import type { FeedingTypedEventInput } from "./writeFeedingTypedEvent";
+import { resolveEcPpm500Pair } from "./ecPpm500PairRules";
 
 // ---------------------------------------------------------------------------
 // Form state
@@ -36,10 +37,13 @@ export interface QuickLogFeedingFormState {
   products: QuickLogFeedingFormProductRow[];
   ph: string;
   ecIn: string;
+  ppmIn: string;
   ecOut: string;
+  ppmOut: string;
   runoffMl: string;
   runoffPh: string;
   runoffEc: string;
+  runoffPpm: string;
   waterTempC: string;
   note: string;
 }
@@ -57,10 +61,13 @@ export const EMPTY_QUICKLOG_FEEDING_FORM: QuickLogFeedingFormState = {
   products: [{ ...EMPTY_FEEDING_PRODUCT_ROW }],
   ph: "",
   ecIn: "",
+  ppmIn: "",
   ecOut: "",
+  ppmOut: "",
   runoffMl: "",
   runoffPh: "",
   runoffEc: "",
+  runoffPpm: "",
   waterTempC: "",
   note: "",
 };
@@ -75,6 +82,7 @@ export type FeedingFormFailureReason =
   | "products:empty"
   | "products:invalid_amount"
   | "products:contains_secret"
+  | "ec_ppm:mismatch"
   | "numeric:invalid";
 
 export interface FeedingFormMapInput {
@@ -157,19 +165,13 @@ export function buildFeedingFormPayload(
     keyof Pick<
       FeedingTypedEventInput,
       | "ph"
-      | "ec_in"
-      | "ec_out"
       | "runoff_ml"
       | "runoff_ph"
-      | "runoff_ec"
       | "water_temp_c"
     >]> = [
     ["ph", "ph"],
-    ["ecIn", "ec_in"],
-    ["ecOut", "ec_out"],
     ["runoffMl", "runoff_ml"],
     ["runoffPh", "runoff_ph"],
-    ["runoffEc", "runoff_ec"],
     ["waterTempC", "water_temp_c"],
   ];
 
@@ -179,6 +181,20 @@ export function buildFeedingFormPayload(
     if (!parsed.ok) return { ok: false, reason: "numeric:invalid" };
     if (parsed.value !== null) {
       (parsedNumerics as Record<string, number>)[payloadKey] = parsed.value;
+    }
+  }
+
+  const ecPairs = [
+    ["ecIn", "ppmIn", "ec_in"],
+    ["ecOut", "ppmOut", "ec_out"],
+    ["runoffEc", "runoffPpm", "runoff_ec"],
+  ] as const;
+  for (const [ecKey, ppmKey, payloadKey] of ecPairs) {
+    const resolved = resolveEcPpm500Pair(input.form[ecKey], input.form[ppmKey]);
+    if (resolved.status === "invalid") return { ok: false, reason: "numeric:invalid" };
+    if (resolved.status === "mismatch") return { ok: false, reason: "ec_ppm:mismatch" };
+    if (resolved.status === "valid") {
+      (parsedNumerics as Record<string, number>)[payloadKey] = resolved.ec;
     }
   }
 
@@ -221,6 +237,8 @@ export function feedingFormReasonToHelper(
       return "Product entries must not contain tokens or secrets.";
     case "numeric:invalid":
       return "Optional metrics must be valid numbers or left blank.";
+    case "ec_ppm:mismatch":
+      return "EC and PPM must match the 500 scale. Re-enter either value.";
     default:
       return FEEDING_SAVE_FAILURE_MESSAGE;
   }

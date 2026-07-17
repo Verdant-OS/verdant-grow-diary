@@ -139,6 +139,15 @@ describe("buildFeedingReview — optional metrics", () => {
     expect(r.optionalMetrics).toContainEqual({ label: "EC out", value: "1.9" });
   });
 
+  it("includes paired PPM-500 values when present", () => {
+    const r = buildFeedingReview(
+      withForm({ ecIn: "2", ppmIn: "1000", runoffEc: "1.7", runoffPpm: "850" }),
+      false,
+    );
+    expect(r.optionalMetrics).toContainEqual({ label: "PPM in (500)", value: "1000" });
+    expect(r.optionalMetrics).toContainEqual({ label: "Runoff PPM (500)", value: "850" });
+  });
+
   it("includes runoff values when entered", () => {
     const r = buildFeedingReview(
       withForm({

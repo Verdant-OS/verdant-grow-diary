@@ -9,8 +9,10 @@
 //   - never mutates the original measurement
 //   - never retains references to the raw provider response or any sub-object
 //   - never recursively searches into nested fields (no throwing-getter trip)
-//   - the runtime wiring does NOT introduce persistence, capture, budget,
-//     back-pressure, alerts, action_queue writes, or service-role usage.
+//   - the runtime wiring does NOT introduce direct persistence, capture,
+//     budget, back-pressure, alerts, or action_queue writes. Its only
+//     additional server persistence is a protected service-role completion RPC
+//     after a fresh validated review succeeds.
 //
 // Runtime safety: this is a LOCAL/UNIT test file only.
 //   * No provider API call is made.
@@ -49,10 +51,9 @@ Deno.test("attaches providerReportedTokens for top-level usage", () => {
 });
 
 Deno.test("attaches providerReportedTokens for response.usage", () => {
-  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-    freshMeasurement(),
-    { response: { usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 } } },
-  );
+  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(freshMeasurement(), {
+    response: { usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 } },
+  });
   assertEquals(out.providerReportedTokens, {
     promptTokens: 1,
     completionTokens: 2,
@@ -61,10 +62,9 @@ Deno.test("attaches providerReportedTokens for response.usage", () => {
 });
 
 Deno.test("attaches providerReportedTokens for data.usage", () => {
-  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-    freshMeasurement(),
-    { data: { usage: { prompt_tokens: 7, completion_tokens: 8, total_tokens: 15 } } },
-  );
+  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(freshMeasurement(), {
+    data: { usage: { prompt_tokens: 7, completion_tokens: 8, total_tokens: 15 } },
+  });
   assertEquals(out.providerReportedTokens, {
     promptTokens: 7,
     completionTokens: 8,
@@ -73,18 +73,18 @@ Deno.test("attaches providerReportedTokens for data.usage", () => {
 });
 
 Deno.test("malformed usage → providerReportedTokens null", () => {
-  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-    freshMeasurement(),
-    { usage: { prompt_tokens: "ten", completion_tokens: null } },
-  );
+  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(freshMeasurement(), {
+    usage: { prompt_tokens: "ten", completion_tokens: null },
+  });
   assertEquals(out.providerReportedTokens, null);
 });
 
 Deno.test("missing usage → providerReportedTokens null", () => {
-  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-    freshMeasurement(),
-    { id: "x", model: "y", choices: [] },
-  );
+  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(freshMeasurement(), {
+    id: "x",
+    model: "y",
+    choices: [],
+  });
   assertEquals(out.providerReportedTokens, null);
 });
 
@@ -119,10 +119,7 @@ Deno.test("does not retain raw provider response references", () => {
   const response = { usage };
   const data = { usage };
   const root = { id: "x", model: "y", usage, response, data, choices, headers, metadata };
-  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-    freshMeasurement(),
-    root,
-  );
+  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(freshMeasurement(), root);
   const reported = out.providerReportedTokens!;
   assertNotStrictEquals(reported as unknown, root);
   assertNotStrictEquals(reported as unknown, usage);
@@ -135,11 +132,7 @@ Deno.test("does not retain raw provider response references", () => {
   assertNotStrictEquals(reported as unknown, metadata);
   assertNotStrictEquals(reported as unknown, nestedMsg);
   // Only the normalized numeric fields are present.
-  assertEquals(Object.keys(reported).sort(), [
-    "completionTokens",
-    "promptTokens",
-    "totalTokens",
-  ]);
+  assertEquals(Object.keys(reported).sort(), ["completionTokens", "promptTokens", "totalTokens"]);
 });
 
 Deno.test("does not recursively walk into unexpected nested fields (throwing getters)", () => {
@@ -161,48 +154,66 @@ Deno.test("does not recursively walk into unexpected nested fields (throwing get
     metadata,
     payload: { debug: payloadDebug },
   };
-  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-    freshMeasurement(),
-    root,
-  );
+  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(freshMeasurement(), root);
   assertEquals(out.providerReportedTokens, null);
 });
 
-Deno.test("structural safety: edge function wiring contains no forbidden writes", async () => {
-  const raw = await Deno.readTextFile(
-    new URL("./index.ts", import.meta.url),
-  );
-  // Strip line + block comments so safety assertions only see executable code.
-  const src = raw
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
-  // No new persistence / writes introduced by the wiring slice.
-  assert(!/action_queue/i.test(src), "must not write action_queue");
-  assert(!/\.from\(\s*['"]alerts['"]/i.test(src), "must not write alerts");
-  assert(!/ai_doctor_sessions/i.test(src), "must not write ai_doctor_sessions");
-  assert(!/SERVICE_ROLE/i.test(src), "must not use service role key");
-  // No raw upstream payload logging.
-  assert(
-    !/console\.log\([^)]*payload/i.test(src),
-    "must not log raw provider payload",
-  );
-  // No capture-store / CSV export wiring in the edge function.
-  assert(!/captureStore|csvExport/i.test(src), "no capture/export wiring");
-  // No threshold/budget enforcement constants added at this boundary.
-  assert(
-    !/TOKEN_BUDGET|COST_THRESHOLD|BACK_PRESSURE/.test(src),
-    "no budgets/thresholds/back-pressure",
-  );
-  // Composer is invoked exactly at the provider response boundary.
-  assert(
-    /attachProviderResponseUsageToAiDoctorPromptMeasurement/.test(src),
-    "composer must be wired",
-  );
-  assert(
-    /measurementWithProviderUsage/.test(src),
-    "must use the named local variable",
-  );
-});
+Deno.test(
+  "structural safety: edge function wiring keeps completion persistence protected",
+  async () => {
+    const raw = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+    // Strip line + block comments so safety assertions only see executable code.
+    const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+    // No direct persistence / writes introduced by the wiring slice.
+    assert(!/action_queue/i.test(src), "must not write action_queue");
+    assert(!/\.from\(\s*['"]alerts['"]/i.test(src), "must not write alerts");
+    assert(!/ai_doctor_sessions/i.test(src), "must not write ai_doctor_sessions");
+    assert(!/\.insert\(/i.test(src), "must not insert directly");
+    assert(!/\.upsert\(/i.test(src), "must not upsert directly");
+    assert(!/\.update\(/i.test(src), "must not update directly");
+    assert(!/\.delete\(/i.test(src), "must not delete directly");
+    const rpcCalls = [...src.matchAll(/\.rpc\(\s*["']([a-z_]+)["']/g)].map((m) => m[1]);
+    assertEquals(
+      rpcCalls.sort(),
+      ["ai_credit_refund", "ai_credit_spend", "record_ai_doctor_review_completion"].sort(),
+    );
+    assert(/SUPABASE_SERVICE_ROLE_KEY/.test(src), "completion writer must stay server-only");
+    const validationIndex = src.indexOf("const v = validateAiDoctorReviewResult(candidate)");
+    const completionCallIndex = src.lastIndexOf(
+      "recordFreshAiDoctorReviewCompletion(u.user.id, spendId)",
+    );
+    assert(
+      validationIndex >= 0 && completionCallIndex > validationIndex,
+      "completion must be recorded only after fresh result validation",
+    );
+    assert(
+      src.includes('if (spendObj.status === "spent" && spendId)'),
+      "only a newly spent credit row may count as a fresh completion",
+    );
+    const replayStart = src.indexOf('if (spendObj.status === "replayed"');
+    const replayEnd = src.indexOf("const spendId", replayStart);
+    assert(replayStart >= 0 && replayEnd > replayStart, "replay boundary must remain explicit");
+    assert(
+      !src.slice(replayStart, replayEnd).includes("recordFreshAiDoctorReviewCompletion"),
+      "cached replays must not count as fresh completions",
+    );
+    // No raw upstream payload logging.
+    assert(!/console\.log\([^)]*payload/i.test(src), "must not log raw provider payload");
+    // No capture-store / CSV export wiring in the edge function.
+    assert(!/captureStore|csvExport/i.test(src), "no capture/export wiring");
+    // No threshold/budget enforcement constants added at this boundary.
+    assert(
+      !/TOKEN_BUDGET|COST_THRESHOLD|BACK_PRESSURE/.test(src),
+      "no budgets/thresholds/back-pressure",
+    );
+    // Composer is invoked exactly at the provider response boundary.
+    assert(
+      /attachProviderResponseUsageToAiDoctorPromptMeasurement/.test(src),
+      "composer must be wired",
+    );
+    assert(/measurementWithProviderUsage/.test(src), "must use the named local variable");
+  },
+);
 
 // --- Uncommon provider-response shape coverage --------------------------
 // All of these MUST clear providerReportedTokens to null without throwing
@@ -211,10 +222,7 @@ Deno.test("structural safety: edge function wiring contains no forbidden writes"
 function expectsNull(name: string, providerResponse: unknown) {
   Deno.test(`uncommon shape clears to null: ${name}`, () => {
     const m = freshMeasurement();
-    const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-      m,
-      providerResponse,
-    );
+    const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(m, providerResponse);
     assertEquals(out.providerReportedTokens, null);
     // Original measurement fields preserved.
     assertEquals(out.promptName, m.promptName);
@@ -307,10 +315,7 @@ Deno.test("returned measurement retains no raw provider-response refs (recursive
     headers,
     metadata,
   };
-  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(
-    freshMeasurement(),
-    root,
-  );
+  const out = attachProviderResponseUsageToAiDoctorPromptMeasurement(freshMeasurement(), root);
   const refs = collectObjectRefs(out);
   const forbidden: Array<[string, unknown]> = [
     ["root", root],

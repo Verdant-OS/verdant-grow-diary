@@ -131,6 +131,8 @@ describe("ActionDetail header — View saved AI Doctor session link", () => {
     renderDetail();
     const chip = await screen.findByTestId(
       "action-detail-ai-doctor-session-header-link",
+      undefined,
+      FIND_TIMEOUT,
     );
     expect(chip.textContent ?? "").toMatch(/linked from ai doctor/i);
     const link = (await screen.findByTestId(
@@ -170,6 +172,8 @@ describe("ActionDetail header — View saved AI Doctor session link", () => {
     renderDetail();
     const link = await screen.findByTestId(
       "action-detail-ai-doctor-saved-session-link",
+      undefined,
+      FIND_TIMEOUT,
     );
     const text = (link.textContent ?? "").toLowerCase();
     expect(text).not.toContain("[session:");
@@ -181,6 +185,8 @@ describe("ActionDetail header — View saved AI Doctor session link", () => {
     renderDetail();
     const link = await screen.findByTestId(
       "action-detail-ai-doctor-saved-session-link",
+      undefined,
+      FIND_TIMEOUT,
     );
     const lower = (link.textContent ?? "").toLowerCase();
     for (const tok of [

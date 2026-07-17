@@ -40,3 +40,12 @@ project_id = "knkwiiywfkbqznbxwqfh"
   # write; service_role is only used after that check succeeds.
   [functions.delete-account]
     verify_jwt = false
+  # ECOWITT bridge requests use a tent-scoped `vbt_...` bearer rather than a
+  # platform JWT. The handler still strictly verifies either that bearer or a
+  # Supabase JWT and enforces its tent scope before accepting any reading.
+  [functions.sensor-ingest-webhook]
+    verify_jwt = false
+  # The direct ECOWITT canary has the same handler-level bearer verification;
+  # disabling platform JWT verification only lets that strict verifier run.
+  [functions.ecowitt-ingest]
+    verify_jwt = false

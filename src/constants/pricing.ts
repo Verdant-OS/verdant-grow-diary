@@ -23,6 +23,7 @@ export const PRICING = {
       "Manual sensor entries",
       "CSV sensor import",
       "Plant diary and timeline",
+      "Cultivation calendar (history-aware)",
       "Basic photo logs",
     ],
   },

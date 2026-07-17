@@ -65,6 +65,7 @@ const COMPARISON_ROWS: Row[] = [
   { label: "Photo logs", free: true, pro: true, founder: true },
   { label: "Manual sensor snapshots", free: true, pro: true, founder: true },
   { label: "Timeline history", free: "Basic", pro: "Extended", founder: "Extended" },
+  { label: "Cultivation calendar (history-aware)", free: true, pro: true, founder: true },
   { label: "Date-range diary report (Print / Save PDF)", free: false, pro: true, founder: true },
   { label: "Multi-tent support", free: false, pro: true, founder: true },
   { label: "Exports", free: "Limited", pro: "Advanced", founder: "Advanced" },

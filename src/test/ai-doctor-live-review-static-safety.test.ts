@@ -16,6 +16,7 @@ const read = (p: string) => stripSourceComments(readFileSync(resolve(ROOT, p), "
 
 const FRONTEND_FILES = [
   "src/lib/aiDoctorReviewRequestPacket.ts",
+  "src/lib/aiDoctorReviewRequestTransportRules.ts",
   "src/lib/aiCreditedResponseAdapter.ts",
   "src/hooks/useAiDoctorLiveReview.ts",
   "src/components/PlantDetailAiDoctorLiveReview.tsx",
@@ -108,6 +109,9 @@ describe("ai doctor live review — edge static safety", () => {
         expect(src.slice(replayStart, replayEnd)).not.toContain(
           "recordFreshAiDoctorReviewCompletion",
         );
+        expect(src).toContain("parseAiDoctorReviewRequestEnvelope");
+        expect(src).toContain("buildAiDoctorPromptMessages(request.packet)");
+        expect(src).not.toContain("buildAiDoctorPromptMessages(requestBody)");
       }
       for (const re of [
         /action_queue/i,

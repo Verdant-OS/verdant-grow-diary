@@ -43,9 +43,7 @@ describe("ai-coach edge — 200-envelope credit transport", () => {
   });
 
   it("does not introduce new RPCs, action_queue writes, device control, or service_role", () => {
-    const rpcCalls = [
-      ...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g),
-    ].map((m) => m[1]);
+    const rpcCalls = [...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g)].map((m) => m[1]);
     for (const name of rpcCalls) {
       expect(["ai_credit_spend", "ai_credit_refund"]).toContain(name);
     }
@@ -63,9 +61,7 @@ describe("ai-doctor-review edge — credit_denied envelope unchanged", () => {
       /spendObj\.ok\s*!==\s*true[\s\S]{0,300}return\s+calmFailure\(\s*"credit_denied"\s*,\s*\{\s*credit:\s*spendObj\s*\}\s*\)/,
     );
     // calmFailure returns 200.
-    expect(src).toMatch(
-      /function\s+calmFailure[\s\S]{0,200}status:\s*200/,
-    );
+    expect(src).toMatch(/function\s+calmFailure[\s\S]{0,200}status:\s*200/);
   });
 });
 
@@ -88,6 +84,23 @@ describe("shared adapter — adaptCreditedAiResponse", () => {
     if (out.ok === false) {
       expect(out.reason).toBe("credit_denied");
       expect(out.credit).toEqual(credit);
+    }
+  });
+
+  it("downgrades a missing or unowned grow scope to generic recovery, never a false upsell", () => {
+    for (const reason of ["grow_id_required_for_plan", "grow_not_owned"]) {
+      const out = adaptCreditedAiResponse({
+        ok: false,
+        reason: "credit_denied",
+        credit: {
+          ok: false,
+          status: "invalid",
+          reason,
+          scope: "per_grow",
+          plan_id: "free",
+        },
+      });
+      expect(out).toEqual({ ok: false, reason: "invalid" });
     }
   });
 
@@ -166,9 +179,7 @@ describe("Coach client — credit transport wiring", () => {
   });
 
   it("credit_denied path sets denial state and short-circuits", () => {
-    expect(src).toMatch(
-      /outcome\.reason\s*===\s*"credit_denied"[\s\S]{0,200}setCreditDenial\(/,
-    );
+    expect(src).toMatch(/outcome\.reason\s*===\s*"credit_denied"[\s\S]{0,200}setCreditDenial\(/);
   });
 
   it("upstream_credit_exhausted sets a degraded state (no paywall)", () => {
@@ -176,16 +187,13 @@ describe("Coach client — credit transport wiring", () => {
       /outcome\.reason\s*===\s*"upstream_credit_exhausted"[\s\S]{0,200}setUpstreamCreditExhausted\(\s*true\s*\)/,
     );
     // Render block exists and is not the paywall/credit-limit notice.
-    expect(src).toMatch(
-      /data-testid=["']coach-upstream-credit-exhausted-notice["']/,
-    );
+    expect(src).toMatch(/data-testid=["']coach-upstream-credit-exhausted-notice["']/);
   });
 
   it("upstream_credit_exhausted render does not mount AiCreditLimitNotice", () => {
     const block =
-      src
-        .split('data-testid="coach-upstream-credit-exhausted-notice"')[1]
-        ?.split("</div>")[0] ?? "";
+      src.split('data-testid="coach-upstream-credit-exhausted-notice"')[1]?.split("</div>")[0] ??
+      "";
     expect(block).not.toMatch(/AiCreditLimitNotice/);
     // No upsell/CTA language inside the degraded notice.
     expect(block).not.toMatch(/upgrade|add credits|buy|subscribe/i);

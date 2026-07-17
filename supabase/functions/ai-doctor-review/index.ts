@@ -17,6 +17,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateAiDoctorReviewResult } from "./contract.ts";
 import { buildAiDoctorPromptMessages } from "../../../src/lib/aiDoctorPromptAssembly.ts";
+import { parseAiDoctorReviewRequestEnvelope } from "../../../src/lib/aiDoctorReviewRequestTransportRules.ts";
 // Measurement-only cost wiring. Pure helpers; no persistence, no I/O.
 import {
   attachProviderResponseUsageToAiDoctorPromptMeasurement,
@@ -97,11 +98,6 @@ function isUuid(s: unknown): s is string {
   );
 }
 
-function readPacketField(packet: unknown, key: string): unknown {
-  if (!packet || typeof packet !== "object") return undefined;
-  return (packet as Record<string, unknown>)[key];
-}
-
 /**
  * Records only the fact that a freshly generated, contract-validated review
  * completed. It deliberately runs after the provider/result boundary and
@@ -176,23 +172,22 @@ Deno.serve(async (req) => {
       return calmFailure("config");
     }
 
-    let packet: unknown;
+    let requestBody: unknown;
     try {
-      packet = await req.json();
+      requestBody = await req.json();
     } catch {
       return calmFailure("parse");
     }
-    if (!packet || typeof packet !== "object") {
+    const request = parseAiDoctorReviewRequestEnvelope(requestBody);
+    if (!request) {
       return calmFailure("shape");
     }
 
-    // S2: server resolves grow scope from client-supplied grow_id (validated as
-    // UUID; ownership is re-verified inside ai_credit_spend). Client may
-    // supply idempotency_key for safe retries; we generate one otherwise.
-    const rawGrowId = readPacketField(packet, "grow_id") ?? readPacketField(packet, "growId");
-    const growId = isUuid(rawGrowId) ? rawGrowId : null;
-    const rawKey =
-      readPacketField(packet, "idempotency_key") ?? readPacketField(packet, "idempotencyKey");
+    // Server resolves grow scope from an untrusted transport envelope; the
+    // atomic credit RPC re-checks ownership. `request.packet` is deliberately
+    // separate and is the only data allowed into model prompt assembly.
+    const growId = isUuid(request.growId) ? request.growId : null;
+    const rawKey = request.idempotencyKey;
     const idempotencyKey =
       typeof rawKey === "string" && rawKey.length >= 8 && rawKey.length <= 200
         ? rawKey
@@ -254,7 +249,7 @@ Deno.serve(async (req) => {
     // Build the prompt once so the assembled text can feed both the upstream
     // call AND an in-memory cost measurement. Measurement is local-only;
     // never persisted, logged, or returned to the client.
-    const promptMessages = buildAiDoctorPromptMessages(packet);
+    const promptMessages = buildAiDoctorPromptMessages(request.packet);
     const promptMeasurement = buildAiDoctorPromptMeasurement({
       promptName: FEATURE,
       recordedAt: new Date().toISOString(),

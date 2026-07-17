@@ -23,6 +23,7 @@ import {
   buildValidatorSafeAiDoctorPromptValue,
   sanitizeAiDoctorPromptText,
 } from "./aiDoctorPromptVocabularyRules";
+import { stripAiDoctorReviewRequestTransportFields } from "./aiDoctorReviewRequestTransportRules";
 
 export const AI_DOCTOR_BASE_SYSTEM_PROMPT =
   "You are a cautious cannabis grow assistant. Reply ONLY through the " +
@@ -65,7 +66,12 @@ export function buildAiDoctorPromptMessages(packet: unknown): AiDoctorPromptMess
     missingLiveSensorReadings,
   });
   const guidance = Object.freeze(fragment.guidance.map(sanitizeAiDoctorPromptText));
-  const safePacket = buildValidatorSafeAiDoctorPromptValue(packet ?? null);
+  // Scope and idempotency fields are operational transport metadata, not
+  // grower context. Defense in depth: omit them here even if an Edge caller
+  // accidentally passes a flat legacy request to prompt assembly.
+  const safePacket = buildValidatorSafeAiDoctorPromptValue(
+    stripAiDoctorReviewRequestTransportFields(packet ?? null),
+  );
 
   const systemSections: string[] = [AI_DOCTOR_BASE_SYSTEM_PROMPT];
   if (guidance.length > 0) {

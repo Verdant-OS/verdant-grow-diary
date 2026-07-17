@@ -54,10 +54,22 @@ const VIRTUAL_PATTERNS = [
 ];
 
 export function detectIpCandidates(
-  ifaces: ReturnType<typeof networkInterfaces> = networkInterfaces(),
+  ifaces?: ReturnType<typeof networkInterfaces>,
+  probe: () => ReturnType<typeof networkInterfaces> = networkInterfaces,
 ): IpCandidate[] {
+  let availableIfaces = ifaces;
+  if (!availableIfaces) {
+    try {
+      availableIfaces = probe();
+    } catch {
+      // OS interface discovery can be unavailable in restricted shells. The
+      // doctor must fall back to its explicit placeholder instead of crashing.
+      return [];
+    }
+  }
+
   const out: IpCandidate[] = [];
-  for (const [name, addrs] of Object.entries(ifaces)) {
+  for (const [name, addrs] of Object.entries(availableIfaces)) {
     if (!addrs) continue;
     for (const a of addrs) {
       if (a.family !== "IPv4") continue;

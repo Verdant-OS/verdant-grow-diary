@@ -35,7 +35,7 @@ import {
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
-import { plantDetailPath, tentDetailPath } from "@/lib/routes";
+import { plantDetailPath, sensorsPath, tentDetailPath } from "@/lib/routes";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 
@@ -123,6 +123,10 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
     : tentId
       ? tentDetailPath(tentId)
       : null;
+  // Current-condition handoff stays on the existing manual sensor form.
+  // The grower still enters, reviews, and confirms every value; this link
+  // performs no write and never invokes AI Doctor by itself.
+  const addCurrentReadingHref = growId ? `${sensorsPath(growId)}#manual-reading` : null;
 
   const handleConfirm = useCallback(
     async (rows: readonly ParsedEnvironmentRow[]) => {
@@ -185,7 +189,13 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
         >
           <FileUp className="h-3.5 w-3.5" /> Import CSV
         </Button>
-        <EnvironmentCsvImportModal open={open} onOpenChange={setOpen} onConfirm={handleConfirm} viewHistoryHref={viewHistoryHref} />
+        <EnvironmentCsvImportModal
+          open={open}
+          onOpenChange={setOpen}
+          onConfirm={handleConfirm}
+          viewHistoryHref={viewHistoryHref}
+          addCurrentReadingHref={addCurrentReadingHref}
+        />
       </>
     );
   }
@@ -210,7 +220,13 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
           {label}
         </Button>
       </div>
-      <EnvironmentCsvImportModal open={open} onOpenChange={setOpen} onConfirm={handleConfirm} viewHistoryHref={viewHistoryHref} />
+      <EnvironmentCsvImportModal
+        open={open}
+        onOpenChange={setOpen}
+        onConfirm={handleConfirm}
+        viewHistoryHref={viewHistoryHref}
+        addCurrentReadingHref={addCurrentReadingHref}
+      />
     </section>
   );
 }

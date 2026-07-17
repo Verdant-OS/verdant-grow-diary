@@ -1,8 +1,8 @@
 /**
- * PlantDetailAiDoctorLiveReview — CSV-history pending/error gating.
+ * PlantDetailAiDoctorLiveReview — CSV/current sensor pending/error gating.
  *
- * Review findings (PR #269): a still-loading or failed CSV-history read
- * must never be treated as a confirmed empty list.
+ * Review findings: still-loading CSV history or current tent rows must never
+ * be treated as a confirmed empty list.
  *
  * Pins:
  *  - while the tent's CSV-history read is in flight, the start button is
@@ -10,8 +10,8 @@
  *    history exists);
  *  - once rows arrive, the packet sent to the edge invoke carries the
  *    sanitized imported_sensor_history built from those rows;
- *  - a FAILED read proceeds without history (omission — imported section
- *    null — never a fabricated summary).
+ *  - a FAILED read proceeds by omission, never a fabricated summary/value;
+ *  - fresh live temp/RH/soil rows reach the packet with no raw payload.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render as rtlRender, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
@@ -40,24 +40,33 @@ vi.mock("@/hooks/useTimelineMemory", () => ({
   TIMELINE_MEMORY_DEFAULT_LIMIT: 100,
 }));
 
-// Mutable per-test CSV-history query state.
-const csvQueryState = vi.hoisted(() => ({
-  rows: [] as unknown[],
-  status: "success" as "loading" | "error" | "success",
+// Mutable per-test state for the two separately bounded source reads.
+const sensorQueryState = vi.hoisted(() => ({
+  csvRows: [] as unknown[],
+  csvStatus: "success" as "loading" | "error" | "success",
+  currentRows: [] as unknown[],
+  currentStatus: "success" as "loading" | "error" | "success",
 }));
 vi.mock("@/hooks/use-sensor-readings", () => ({
-  useSensorReadingsByTents: (tentIds: string[]) => {
+  useSensorReadingsByTents: (
+    tentIds: string[],
+    _limit: number,
+    sourceFilter?: readonly string[] | null,
+  ) => {
+    const current = sourceFilter?.includes("live") === true;
+    const rows = current ? sensorQueryState.currentRows : sensorQueryState.csvRows;
+    const status = current ? sensorQueryState.currentStatus : sensorQueryState.csvStatus;
     const byTent: Record<string, unknown[]> = {};
     const statusByTent: Record<string, string> = {};
     for (const id of tentIds) {
-      byTent[id] = csvQueryState.status === "success" ? csvQueryState.rows : [];
-      statusByTent[id] = csvQueryState.status;
+      byTent[id] = status === "success" ? rows : [];
+      statusByTent[id] = status;
     }
     return {
       byTent,
       statusByTent,
-      isLoading: csvQueryState.status === "loading",
-      isError: csvQueryState.status === "error",
+      isLoading: status === "loading",
+      isError: status === "error",
     };
   },
 }));
@@ -171,20 +180,22 @@ function mount(
 beforeEach(() => {
   cleanup();
   itemsRef.current = strongTimeline();
-  csvQueryState.rows = [];
-  csvQueryState.status = "success";
+  sensorQueryState.csvRows = [];
+  sensorQueryState.csvStatus = "success";
+  sensorQueryState.currentRows = [];
+  sensorQueryState.currentStatus = "success";
 });
 
 describe("CSV history pending/error gating", () => {
   it("holds the start button while the CSV-history read is in flight", () => {
-    csvQueryState.status = "loading";
+    sensorQueryState.csvStatus = "loading";
     mount();
     const start = screen.getByTestId("plant-ai-doctor-live-review-start") as HTMLButtonElement;
     expect(start.disabled).toBe(true);
   });
 
   it("sends the sanitized imported-history summary once rows arrive", async () => {
-    csvQueryState.rows = csvRows;
+    sensorQueryState.csvRows = csvRows;
     const invoke = mount();
     const start = screen.getByTestId("plant-ai-doctor-live-review-start") as HTMLButtonElement;
     expect(start.disabled).toBe(false);
@@ -204,7 +215,7 @@ describe("CSV history pending/error gating", () => {
   });
 
   it("a failed read proceeds WITHOUT history — omission, not fabrication", async () => {
-    csvQueryState.status = "error";
+    sensorQueryState.csvStatus = "error";
     const invoke = mount();
     const start = screen.getByTestId("plant-ai-doctor-live-review-start") as HTMLButtonElement;
     expect(start.disabled).toBe(false);
@@ -214,5 +225,64 @@ describe("CSV history pending/error gating", () => {
       imported_sensor_history: unknown;
     };
     expect(packet.imported_sensor_history).toBeNull();
+  });
+
+  it("also holds the start button while current sensor truth is still loading", () => {
+    sensorQueryState.currentStatus = "loading";
+    mount();
+    const start = screen.getByTestId("plant-ai-doctor-live-review-start") as HTMLButtonElement;
+    expect(start.disabled).toBe(true);
+  });
+
+  it("sends fresh live temperature, humidity, and soil values without raw payload", async () => {
+    const capturedAt = new Date(Date.now() - 60_000).toISOString();
+    sensorQueryState.currentRows = [
+      {
+        metric: "temperature_c",
+        value: 25,
+        captured_at: capturedAt,
+        source: "live",
+        raw_payload: { bridge_token: "vbt_do_not_send" },
+      },
+      {
+        metric: "humidity_pct",
+        value: 58,
+        captured_at: capturedAt,
+        source: "live",
+        raw_payload: { bridge_token: "vbt_do_not_send" },
+      },
+      {
+        metric: "soil_moisture_pct",
+        value: 41,
+        captured_at: capturedAt,
+        source: "live",
+        raw_payload: { bridge_token: "vbt_do_not_send" },
+      },
+    ];
+    const invoke = mount();
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    const packet = invoke.mock.calls[0][1].body.packet;
+    expect(packet.recentSensorSnapshot?.readings).toEqual([
+      { field: "humidity_pct", value: 58, unit: "%" },
+      { field: "soil_moisture_pct", value: 41, unit: "%" },
+      { field: "temperature_c", value: 25, unit: "°C" },
+    ]);
+    expect(packet.recentSensorSnapshotAnnotation?.source).toBe("live");
+    expect(packet.missingLiveSensorReadings).toBe(false);
+    expect(JSON.stringify(packet)).not.toContain("raw_payload");
+    expect(JSON.stringify(packet)).not.toContain("vbt_do_not_send");
+  });
+
+  it("a failed current read proceeds without inventing a current snapshot", async () => {
+    sensorQueryState.currentStatus = "error";
+    const invoke = mount();
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    const packet = invoke.mock.calls[0][1].body.packet;
+    // The existing two-hour diary snapshot remains; no direct current row
+    // was fabricated to replace it.
+    expect(packet.recentSensorSnapshotAnnotation?.source).toBe("manual");
+    expect(packet.missingLiveSensorReadings).toBe(true);
   });
 });

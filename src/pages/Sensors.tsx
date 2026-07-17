@@ -2,7 +2,7 @@ import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { decodeManualCorrectionHash } from "@/lib/manualSensorCorrectionContext";
 import { Activity } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 import SensorSourceInlineLegend from "@/components/SensorSourceInlineLegend";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { SENSOR_SOURCES_PARAM, parseSensorSourcesParam } from "@/lib/sensorSourceUrlRules";
 import { classifySensorMetricState, type SensorMetricKey } from "@/lib/sensorMetricStateRules";
 import {
@@ -58,6 +58,7 @@ const METRICS = [
 ] as const;
 
 export default function Sensors() {
+  const location = useLocation();
   const { data: tents = [] } = useGrowTents();
   const { data: readings = [] } = useGrowSensorReadings();
   // Real DB tents (uuid-backed) for the manual entry form — only these can
@@ -65,13 +66,18 @@ export default function Sensors() {
   const { data: realTents = [] } = useTentRows();
   const [tentId, setTentId] = useState<string>(tents[0]?.id ?? "t1");
   const [searchParams, setSearchParams] = useSearchParams();
-  const correctionCtx = useMemo(
-    () => (typeof window !== "undefined" ? decodeManualCorrectionHash(window.location.hash) : null),
-    // Re-parse whenever the search string changes so nav updates flow through.
-    // Hash changes still require a route change to re-render; that's fine for
-    // the deep-link flow (external navigation from Timeline).
-    [searchParams],
-  );
+
+  // React Router updates hashes without a full browser navigation, so make
+  // the existing manual-reading deep link deterministic for same-page CSV
+  // handoffs as well as cross-page links.
+  useEffect(() => {
+    if (!location.hash.startsWith("#manual-reading")) return;
+    const target = document.getElementById("manual-reading");
+    if (!target) return;
+    target.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    target.focus?.({ preventScroll: true });
+  }, [location.hash]);
+  const correctionCtx = useMemo(() => decodeManualCorrectionHash(location.hash), [location.hash]);
   const urlSensorSources = parseSensorSourcesParam(searchParams.get(SENSOR_SOURCES_PARAM));
   const filtered = readings.filter((r) => r.tentId === tentId);
   const latest = filtered.length > 0 ? filtered[filtered.length - 1] : null;
@@ -96,9 +102,7 @@ export default function Sensors() {
   // never re-label it as demo just because it exists.
   const latestSourceRaw = (latest as unknown as { source?: string | null } | null)?.source ?? null;
   const latestSource =
-    typeof latestSourceRaw === "string" && latestSourceRaw.length > 0
-      ? latestSourceRaw
-      : null;
+    typeof latestSourceRaw === "string" && latestSourceRaw.length > 0 ? latestSourceRaw : null;
   const classification = classifyGrowDataSource(
     latest
       ? { source: latestSource, value: latest.temp, timestamp: latest.ts }
@@ -117,19 +121,13 @@ export default function Sensors() {
   // Uses the existing tent-scoped sensor_readings hook (no new query,
   // no writes). Bound to the same tent the manual reading form targets
   // so PPFD + temperature/humidity/VPD lines up.
-  const { data: trendReadings = [] } = useSensorReadings(
-    defaultManualTentId,
-    60,
-  );
+  const { data: trendReadings = [] } = useSensorReadings(defaultManualTentId, 60);
 
   const operatorMode = searchParams.get("operator") === "1";
   const ecowittIngestAuditProof = useEcowittIngestAuditProofRows({
     tentId: defaultManualTentId ?? null,
     enabled: operatorMode && Boolean(defaultManualTentId),
   });
-
-
-
 
   return (
     <div>
@@ -383,6 +381,7 @@ export default function Sensors() {
       </div>
       <div
         id="manual-reading"
+        tabIndex={-1}
         className="mt-4 max-w-xl scroll-mt-24"
         data-testid="sensors-manual-reading-anchor"
       >
@@ -458,8 +457,8 @@ export default function Sensors() {
           <header>
             <h2 className="text-sm font-semibold">Operator diagnostics — read-only</h2>
             <p className="text-[11px] text-muted-foreground">
-              Use this panel after dry-run and one ingest probe. It does not start the
-              bridge or verify the local message broker by itself.
+              Use this panel after dry-run and one ingest probe. It does not start the bridge or
+              verify the local message broker by itself.
             </p>
           </header>
           <EcowittBridgeTroubleshootingPanel
@@ -479,8 +478,7 @@ export default function Sensors() {
                     provider: null,
                     transport: null,
                     humidityPct: (latest as unknown as { rh?: number | null }).rh ?? null,
-                    soilMoisturePct:
-                      (latest as unknown as { soil?: number | null }).soil ?? null,
+                    soilMoisturePct: (latest as unknown as { soil?: number | null }).soil ?? null,
                     airTempC: (latest as unknown as { temp?: number | null }).temp ?? null,
                     vpdKpa: (latest as unknown as { vpd?: number | null }).vpd ?? null,
                   }
@@ -498,26 +496,22 @@ export default function Sensors() {
                 filtered.map((r) => ({
                   id: (r as unknown as { id?: string }).id,
                   ts: r.ts,
-                  captured_at: (r as unknown as { captured_at?: string | null }).captured_at ?? null,
+                  captured_at:
+                    (r as unknown as { captured_at?: string | null }).captured_at ?? null,
                   source: (r as unknown as { source?: string | null }).source ?? null,
                 })),
                 tentId,
               ),
             }}
           />
-          <div
-            data-testid="sensors-ecowitt-live-proof-wiring"
-            className="flex flex-col gap-2"
-          >
+          <div data-testid="sensors-ecowitt-live-proof-wiring" className="flex flex-col gap-2">
             <p className="text-[11px] text-muted-foreground">
               Read-only EcoWitt proof from currently loaded sensor rows.
             </p>
             <EcowittLiveProofPanel
               tentId={defaultManualTentId ?? null}
               rows={
-                defaultManualTentId
-                  ? (trendReadings as unknown as readonly EcowittProofRow[])
-                  : []
+                defaultManualTentId ? (trendReadings as unknown as readonly EcowittProofRow[]) : []
               }
             />
             <EcowittIngestAuditProofPanel

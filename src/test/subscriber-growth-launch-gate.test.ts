@@ -4,7 +4,11 @@ import {
   buildSubscriberGrowthReleaseReceipt,
   evaluateSubscriberGrowthLaunchGate,
   formatSubscriberGrowthLaunchGate,
+  migrationContractPassed,
+  SUBSCRIBER_GROWTH_EXPECTED_MIGRATION_COUNT,
+  SUBSCRIBER_GROWTH_RECEIPT_VERSION,
 } from "../../scripts/releases/subscriber-growth-launch-gate-rules.mjs";
+import { SUBSCRIBER_GROWTH_MIGRATION_CONTRACT } from "../../scripts/releases/subscriber-growth-migration-contract.mjs";
 import {
   buildChangedE2eCommandArgs,
   buildTargetedTestCommandArgs,
@@ -34,17 +38,30 @@ const commands = [
     ? { testsPassed: 321, testsFailed: 0, testsSkipped: 0, testsTotal: 321 }
     : {}),
   ...(id === "changed_e2e" ? { specFiles: 2 } : {}),
-  ...(id === "migration_contract" ? { migrationsPassed: 4, migrationsTotal: 4 } : {}),
+  ...(id === "migration_contract"
+    ? {
+        migrationsPassed: SUBSCRIBER_GROWTH_EXPECTED_MIGRATION_COUNT,
+        migrationsTotal: SUBSCRIBER_GROWTH_EXPECTED_MIGRATION_COUNT,
+      }
+    : {}),
 }));
 
 const source = {
   repositoryVerified: true,
   remote: "https://github.com/Verdant-OS/verdant-grow-diary.git",
   branch: "codex/subscriber-growth-maneuver",
+  detachedHead: true,
+  releaseTargetRef: "origin/verdant-grow-diary",
+  headMergedToTarget: true,
   head: "a".repeat(40),
+  releaseHead: "a".repeat(40),
+  releaseHeadMatches: true,
+  liveOrigin: "https://verdantgrowdiary.com",
+  liveOriginVerified: true,
   baseRef: "origin/verdant-grow-diary",
   baseCommit: "b".repeat(40),
   baseAncestor: true,
+  baseIsHeadParent: true,
   worktreeClean: true,
   releaseScopeClean: true,
   dirtyPaths: [],
@@ -70,7 +87,31 @@ const liveParity = {
   deploymentId: "deployment-123",
 };
 
+const backendRemoteVerification = {
+  kind: "authenticated_supabase_remote_check",
+  projectLinked: true,
+  migrationsVerified: true,
+  completionRecorderSecretVerified: true,
+  temporaryArtifactsRemoved: true,
+  functionSourceVerified: true,
+  verified: true,
+};
+
 describe("subscriber growth launch gate", () => {
+  it("derives its required migration count from the source contract", () => {
+    expect(SUBSCRIBER_GROWTH_EXPECTED_MIGRATION_COUNT).toBe(
+      SUBSCRIBER_GROWTH_MIGRATION_CONTRACT.length,
+    );
+  });
+
+  it("uses receipt schema v2 so legacy evidence cannot stand in for remote backend verification", () => {
+    expect(SUBSCRIBER_GROWTH_RECEIPT_VERSION).toBe(2);
+  });
+
+  it("fails closed instead of accepting an empty migration contract as 0/0", () => {
+    expect(migrationContractPassed({ migrationsPassed: 0, migrationsTotal: 0 }, 0)).toBe(false);
+  });
+
   it("uses controlled worker counts without relaxing per-test timeouts", () => {
     expect(buildTargetedTestCommandArgs(["src/test/a.test.ts", "src/test/b.test.ts"])).toEqual([
       "vitest",
@@ -248,7 +289,11 @@ describe("subscriber growth launch gate", () => {
       source,
       commands: commands.map((command) =>
         command.id === "migration_contract"
-          ? { ...command, migrationsPassed: 3, migrationsTotal: 3 }
+          ? {
+              ...command,
+              migrationsPassed: SUBSCRIBER_GROWTH_EXPECTED_MIGRATION_COUNT - 1,
+              migrationsTotal: SUBSCRIBER_GROWTH_EXPECTED_MIGRATION_COUNT - 1,
+            }
           : command,
       ),
       localParity,
@@ -258,21 +303,35 @@ describe("subscriber growth launch gate", () => {
     expect(result.problems).toContain("migration_contract did not pass");
   });
 
-  it("requires identified live-deployment parity before reporting LIVE_VERIFIED", () => {
+  it("requires identified live-deployment parity and authenticated backend verification before LIVE_VERIFIED", () => {
     const missingIdentity = evaluateSubscriberGrowthLaunchGate({
       source,
       commands,
       localParity,
       liveParity: { ...liveParity, deploymentId: null },
+      backendRemoteVerification,
       liveRequired: true,
     });
     expect(missingIdentity.status).toBe("HOLD");
+
+    const missingBackendEvidence = evaluateSubscriberGrowthLaunchGate({
+      source,
+      commands,
+      localParity,
+      liveParity,
+      liveRequired: true,
+    });
+    expect(missingBackendEvidence.status).toBe("HOLD");
+    expect(missingBackendEvidence.problems).toContain(
+      "paid-return backend is not verified by an authenticated Supabase remote check",
+    );
 
     const verified = evaluateSubscriberGrowthLaunchGate({
       source,
       commands,
       localParity,
       liveParity,
+      backendRemoteVerification,
       liveRequired: true,
     });
     expect(verified).toMatchObject({
@@ -283,6 +342,60 @@ describe("subscriber growth launch gate", () => {
     });
   });
 
+  it("requires the full gate base to be the canonical release commit's first parent", () => {
+    const result = evaluateSubscriberGrowthLaunchGate({
+      source: { ...source, baseIsHeadParent: false },
+      commands,
+      localParity,
+      liveParity,
+      backendRemoteVerification,
+      liveRequired: true,
+    });
+
+    expect(result.status).toBe("HOLD");
+    expect(result.problems).toContain(
+      "full gate base must be the canonical release commit's first parent",
+    );
+  });
+
+  it("requires a detached release commit already merged to the expected target in full mode", () => {
+    const result = evaluateSubscriberGrowthLaunchGate({
+      source: { ...source, detachedHead: false, headMergedToTarget: false },
+      commands,
+      localParity,
+      liveParity,
+      backendRemoteVerification,
+      liveRequired: true,
+    });
+
+    expect(result.status).toBe("HOLD");
+    expect(result.problems).toEqual(
+      expect.arrayContaining([
+        "full gate must run from a detached canonical release commit",
+        "full gate release head is not confirmed on the expected remote target",
+      ]),
+    );
+  });
+
+  it("requires the declared immutable release commit and canonical production origin in full mode", () => {
+    const result = evaluateSubscriberGrowthLaunchGate({
+      source: { ...source, releaseHeadMatches: false, liveOriginVerified: false },
+      commands,
+      localParity,
+      liveParity,
+      backendRemoteVerification,
+      liveRequired: true,
+    });
+
+    expect(result.status).toBe("HOLD");
+    expect(result.problems).toEqual(
+      expect.arrayContaining([
+        "full gate release head does not match the required immutable commit",
+        "full gate live parity origin is not the canonical production origin",
+      ]),
+    );
+  });
+
   it("never turns a receipt into deployment authorization or subscriber-goal proof", () => {
     const receipt = buildSubscriberGrowthReleaseReceipt({
       generatedAt: "2026-07-15T00:00:00.000Z",
@@ -290,12 +403,18 @@ describe("subscriber growth launch gate", () => {
       commands,
       localParity,
       liveParity,
+      backendRemoteVerification,
       liveRequired: true,
     });
 
     expect(receipt.status).toBe("LIVE_VERIFIED");
     expect(receipt.releaseAuthorized).toBe(false);
     expect(receipt.subscriberGoalVerified).toBe(false);
+    expect(receipt.backendRemoteVerification).toMatchObject({
+      attempted: true,
+      verified: true,
+      completionRecorderSecretVerified: true,
+    });
     expect(receipt.decision.note).toContain("never authorizes");
     expect(formatSubscriberGrowthLaunchGate(receipt)).toContain("Authorization: NONE");
     expect(formatSubscriberGrowthLaunchGate(receipt)).toContain("Subscriber goal verified: NO");
@@ -307,17 +426,25 @@ describe("subscriber growth launch gate", () => {
         "--local-only",
         "--base-ref=origin/main",
         "--origin=https://example.test",
+        `--release-head=${"b".repeat(40)}`,
         "--port=4199",
       ]),
     ).toMatchObject({
       localOnly: true,
       baseRef: "origin/main",
       liveOrigin: "https://example.test",
+      releaseHead: "b".repeat(40),
       port: 4199,
     });
     expect(() => parseSubscriberGrowthGateArgs(["--port=80"])).toThrow("invalid_preview_port");
     expect(() => parseSubscriberGrowthGateArgs(["--surprise"])).toThrow(
       "unknown_argument:--surprise",
+    );
+    expect(() => parseSubscriberGrowthGateArgs(["--release-head=not-a-commit"])).toThrow(
+      "invalid_release_head",
+    );
+    expect(() => parseSubscriberGrowthGateArgs(["--origin=https://staging.example.test"])).toThrow(
+      "invalid_live_origin",
     );
     expect(
       parseVitestTotals(
@@ -333,6 +460,23 @@ describe("subscriber growth launch gate", () => {
     expect(
       parseGitPorcelainPaths(" M supabase/functions/mcp/index.ts\r\n?? docs/release note.md\r\n"),
     ).toEqual(["supabase/functions/mcp/index.ts", "docs/release note.md"]);
+  });
+
+  it("fails closed when the authenticated backend verification is missing or incomplete", () => {
+    const invalid = evaluateSubscriberGrowthLaunchGate({
+      source,
+      commands,
+      localParity,
+      liveParity,
+      backendRemoteVerification: { ...backendRemoteVerification, functionSourceVerified: false },
+      liveRequired: true,
+    });
+    expect(invalid.status).toBe("HOLD");
+    expect(invalid.backendRemoteVerification).toMatchObject({
+      attempted: true,
+      functionSourceVerified: false,
+      verified: false,
+    });
   });
 
   it("format-checks the complete base-relative release diff instead of only the tip commit", () => {

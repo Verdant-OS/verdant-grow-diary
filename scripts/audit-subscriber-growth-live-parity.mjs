@@ -29,7 +29,7 @@ export const SUBSCRIBER_GROWTH_ASSET_CHECKS = Object.freeze([
   }),
   Object.freeze({
     id: "referral-attribution",
-    assetPrefix: "paidAcquisitionAttributionRules-",
+    entryAsset: true,
     markers: Object.freeze(["grower_invite", "utm_campaign"]),
   }),
   Object.freeze({
@@ -72,16 +72,22 @@ export function extractJavaScriptAssetPaths(source) {
   ].sort();
 }
 
-export function selectSubscriberGrowthAssets(paths) {
+export function selectSubscriberGrowthAssets(paths, entryAssetPath = null) {
   const safePaths = Array.isArray(paths)
     ? paths.filter((path) => typeof path === "string" && path.startsWith("/assets/"))
     : [];
+  const safeEntryAssetPath =
+    typeof entryAssetPath === "string" && entryAssetPath.startsWith("/assets/")
+      ? entryAssetPath
+      : null;
 
   return Object.fromEntries(
     SUBSCRIBER_GROWTH_ASSET_CHECKS.map((check) => {
-      const matches = safePaths.filter((path) =>
-        path.split("/").at(-1)?.startsWith(check.assetPrefix),
-      );
+      const matches = check.entryAsset
+        ? safeEntryAssetPath
+          ? [safeEntryAssetPath]
+          : []
+        : safePaths.filter((path) => path.split("/").at(-1)?.startsWith(check.assetPrefix));
       return [check.id, matches.length === 1 ? matches[0] : null];
     }),
   );
@@ -130,23 +136,33 @@ export async function auditSubscriberGrowthLiveParity({
   const modulePath = root ? extractModuleScriptPath(root.text) : null;
   let moduleSource = null;
   let moduleError = null;
+  let entryAssetPath = null;
 
   if (!modulePath) {
     moduleError = "module_script_not_found";
   } else {
     try {
-      const response = await fetchImpl(new URL(modulePath, `${normalizedOrigin}/`), {
-        headers: { "user-agent": "VerdantSubscriberGrowthParity/1.0" },
-      });
-      const parsed = await readResponse(response);
-      if (!parsed.ok) moduleError = `module_fetch_${parsed.status}`;
-      else moduleSource = parsed.text;
+      const moduleUrl = new URL(modulePath, `${normalizedOrigin}/`);
+      if (moduleUrl.origin !== new URL(normalizedOrigin).origin) {
+        moduleError = "module_origin_mismatch";
+      } else {
+        entryAssetPath = moduleUrl.pathname;
+        const response = await fetchImpl(moduleUrl, {
+          headers: { "user-agent": "VerdantSubscriberGrowthParity/1.0" },
+        });
+        const parsed = await readResponse(response);
+        if (!parsed.ok) moduleError = `module_fetch_${parsed.status}`;
+        else moduleSource = parsed.text;
+      }
     } catch (error) {
       moduleError = error instanceof Error ? error.message : "module_fetch_failed";
     }
   }
 
-  const assetPaths = selectSubscriberGrowthAssets(extractJavaScriptAssetPaths(moduleSource));
+  const assetPaths = selectSubscriberGrowthAssets(
+    extractJavaScriptAssetPaths(moduleSource),
+    entryAssetPath,
+  );
   const capabilityResults = await Promise.all(
     SUBSCRIBER_GROWTH_ASSET_CHECKS.map(async (check) => {
       const path = assetPaths[check.id];

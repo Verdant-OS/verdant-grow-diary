@@ -5,8 +5,9 @@ evidence. It checks the repository identity and base ancestry, requires a
 clean release scope, runs every changed targeted test and all changed Playwright
 specs plus type-check/build/lint/
 diff integrity, verifies formatting across the complete base-relative release
-diff, audits the production build through a local Vite preview, and optionally compares the
-live site with the same capability contract.
+diff, audits the production build through a local Vite preview, and compares the
+live site with the same capability contract. The full live gate also requires an
+authenticated, read-only Supabase verification of the paid-return measurement path.
 
 Use `subscriber-growth-publication-handoff.md` for the ordered reviewer,
 database, deployment, live-verification, and first-24-hour workflow.
@@ -35,7 +36,7 @@ bun run release:subscriber-growth:gate:local
 5. Type-check, production build, branch-wide changed-code ESLint, base-relative
    changed-file Prettier, and branch diff integrity passing. A merge commit must
    not substitute newly arrived default-branch files for the release diff.
-6. All four fixed subscriber-growth migrations passing the source, RLS,
+6. All five fixed subscriber-growth migrations passing the source, RLS,
    operator-only aggregate, active-paid, attribution, and activation contract.
 7. All public subscriber-growth routes and all fixed capability markers
    present in the local production preview.
@@ -45,12 +46,38 @@ bun run release:subscriber-growth:gate:local
 The command writes a redacted JSON receipt to:
 
 ```text
-artifacts/release-readiness/subscriber-growth/launch-gate.v1.json
+artifacts/release-readiness/subscriber-growth/launch-gate.v2.json
 ```
+
+Receipt schema v2 is required for this release. A v1 receipt predates the
+authenticated paid-return backend check and cannot support a `LIVE_VERIFIED`
+claim.
 
 The artifact records paths (including any explicitly ignored generated path), counts, statuses, commit identity, and deployment
 identity only. It does not store command output, environment values, account
 data, lead data, or subscriber identities.
+
+## Pin the canonical release commit
+
+After the reviewed pull request merges, work from its immutable canonical
+commit—not a moving default-branch checkout or the pre-merge feature-branch
+SHA. Record the merged release commit and its first parent, then check out the
+release commit detached:
+
+```bash
+git fetch origin
+git checkout --detach <release-head-commit>
+git rev-parse HEAD
+git rev-parse HEAD^
+```
+
+`<release-head-commit>` is the canonical merge, squash, or rebase commit that
+contains this release. Its first parent is `<release-base-commit>`. Use those
+two immutable commits for the deployment, backend check, and full gate. This
+keeps unrelated default-branch commits out of the release diff and makes the
+authenticated backend check inspect the same reviewed source revision. Full
+mode rejects a non-detached checkout or a release head that is not already
+reachable from `origin/verdant-grow-diary`.
 
 ## Before an authorized deployment
 
@@ -69,25 +96,55 @@ Confirm the dry run contains these migrations, in order:
 2. `20260714193000_subscriber_growth_operator_snapshot.sql`
 3. `20260714231627_signup_acquisition_attribution.sql`
 4. `20260715002000_signup_to_paid_operator_snapshot.sql`
+5. `20260717010000_paid_return_cohort_measurement.sql`
 
-Only after explicit deployment authorization: apply the four migrations, then
-deploy the frontend. Do not deploy edge functions for this release; none are
-changed by this handoff. Stop if the
-ledger is linked to the wrong project, any migration is unexpectedly remote-
-only, the dry run is empty when these migrations are absent, or the contract
-gate is not `LOCAL_READY`. Do not infer migration state from frontend assets.
+Only after explicit deployment authorization: apply the five migrations, then
+deploy the `ai-doctor-review` Edge Function and frontend from
+`<release-head-commit>`. Before deploying the function, confirm its existing
+server-side `SUPABASE_SERVICE_ROLE_KEY` secret is configured in the linked environment;
+never print, copy, or expose that secret. Do not deploy unrelated Edge Functions
+for this release. Stop if the ledger is linked to the wrong project, any
+migration is unexpectedly remote-only, the dry run is empty when these
+migrations are absent, or the contract gate is not `LOCAL_READY`. Do not infer
+migration state from frontend assets.
+
+The full gate performs an authenticated, read-only Supabase remote check after
+deployment. It requires the linked project reference, the five remote migration
+IDs, the **name** `SUPABASE_SERVICE_ROLE_KEY` from the remote secret list, and
+the downloaded remote `ai-doctor-review` source to match the checked-out
+reviewed source after line-ending normalization and contain the reviewed
+completion-recorder markers. It never prints or stores secret values, CLI
+output, downloaded source, account data, or deployment credentials in the
+release receipt. Downloaded source exists only in a temporary directory, and
+a cleanup failure returns `HOLD`. A missing CLI login, wrong linked project,
+unavailable remote source, or incomplete check also returns `HOLD`.
 
 ## After an authorized deployment
 
-Run the full gate against the canonical production origin:
+Run the full gate against the canonical production origin from the detached
+`<release-head-commit>` checkout:
 
 ```bash
-bun run release:subscriber-growth:gate
+bun run release:subscriber-growth:gate -- \
+  --base-ref=<release-base-commit> \
+  --release-head=<release-head-commit>
 ```
 
 `LIVE_VERIFIED` additionally requires all fixed live routes and capabilities
-to pass on a deployment that returns a non-empty deployment identifier.
-Reachability alone is insufficient.
+to pass on a deployment that returns a non-empty deployment identifier, plus
+an authenticated Supabase check of the exact five applied migrations, the
+server-side completion-recorder secret name, and the reviewed
+`ai-doctor-review` source parity and recorder markers. Reachability alone is
+insufficient.
+
+Do not replace `<release-head-commit>` with a later production head or
+`<release-base-commit>` with the feature branch's original base. Either would
+mix releases or yield a zero-file diff, and the gate intentionally returns
+`HOLD` rather than treating zero targeted tests as release evidence. In full
+mode it also rejects a base commit that is not the checked-out release head's
+first parent, a release head that differs from the immutable
+`--release-head` value, or a live parity origin other than
+`https://verdantgrowdiary.com`.
 
 The current capabilities are deliberately fixed and fail closed:
 
@@ -105,7 +162,7 @@ Missing, renamed, duplicated, or marker-incomplete assets produce `HOLD`.
 | --------------- | ---------------------------------------------------------------------------------------------------------- |
 | `HOLD`          | Source, validation, local parity, or required live parity is incomplete.                                   |
 | `LOCAL_READY`   | Clean committed source passes the local release contract; live deployment was intentionally not evaluated. |
-| `LIVE_VERIFIED` | Local release contract and identified live capability parity pass.                                         |
+| `LIVE_VERIFIED` | Local contract, identified live capability parity, and authenticated paid-return backend check pass.       |
 
 None of these statuses authorizes a push, deployment, merge, billing change,
 or outreach. `LIVE_VERIFIED` also does not prove subscriber count; the

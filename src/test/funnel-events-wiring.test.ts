@@ -9,7 +9,7 @@
  *   plant_created           → CreatePlantDialog.tsx (after insert succeeds)
  *   quick_log_saved         → useQuickLogV2Save.ts (after the RPC confirms)
  *   csv_import_completed    → EnvironmentCsvImportLauncher.tsx (success block)
- *   paywall_viewed          → Pricing.tsx + Upgrade.tsx (mount effects)
+ *   paywall_viewed          → Pricing.tsx + Upgrade.tsx + AI Doctor limit (mount effects)
  *   checkout_started        → usePaddleCheckout.ts (authenticated openCheckout)
  *   subscription_activated  → CheckoutSuccess.tsx (server-confirmed flip)
  *
@@ -60,22 +60,24 @@ describe("each funnel event fires from its canonical seam", () => {
   for (const seam of SEAMS) {
     it(`${seam.event} → ${seam.file}`, () => {
       const src = read(seam.file);
-      expect(src).toMatch(
-        new RegExp(`trackFunnelEvent\\(\\s*"${seam.event}"`),
-      );
+      expect(src).toMatch(new RegExp(`trackFunnelEvent\\(\\s*"${seam.event}"`));
       expect(src).toMatch(/from\s+["']@\/lib\/funnelAnalytics["']/);
       for (const rx of seam.extra ?? []) expect(src).toMatch(rx);
     });
   }
 
-  it("paywall_viewed fires from BOTH paywall surfaces with a surface param", () => {
+  it("paywall_viewed fires from each paywall surface with a privacy-safe surface param", () => {
     const pricing = read("src/pages/Pricing.tsx");
     const upgrade = read("src/pages/Upgrade.tsx");
+    const aiDoctor = read("src/components/PlantDetailAiDoctorLiveReview.tsx");
     expect(pricing).toMatch(
       /trackFunnelEvent\("paywall_viewed",\s*\{\s*surface:\s*"pricing"\s*\}\)/,
     );
     expect(upgrade).toMatch(
       /trackFunnelEvent\("paywall_viewed",\s*\{\s*surface:\s*"upgrade"\s*\}\)/,
+    );
+    expect(aiDoctor).toMatch(
+      /trackFunnelEvent\("paywall_viewed",\s*\{\s*surface:\s*"ai_doctor_limit"\s*\}\)/,
     );
   });
 });
@@ -112,9 +114,7 @@ describe("funnelAnalytics module — privacy fences", () => {
   it("never allowlists grower-content param keys", () => {
     const keys = [...FUNNEL_PARAM_KEYS] as string[];
     for (const banned of ["note", "nickname", "email", "strain", "photo", "name"]) {
-      expect(keys, `param allowlist must not include "${banned}"`).not.toContain(
-        banned,
-      );
+      expect(keys, `param allowlist must not include "${banned}"`).not.toContain(banned);
     }
   });
 

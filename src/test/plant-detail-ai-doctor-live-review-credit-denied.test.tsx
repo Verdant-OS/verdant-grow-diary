@@ -129,6 +129,7 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
     expect(
       screen.getByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"),
     ).toHaveAttribute("href", "/pricing?returnTo=%2Fplants%2Fp1");
+    expect(trackFunnelEvent).toHaveBeenCalledTimes(1);
     expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_viewed", {
       surface: "ai_doctor_limit",
     });

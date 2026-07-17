@@ -80,6 +80,7 @@ function renderAt(url: string) {
           path="/pheno-hunts/:id/keepers"
           element={<div data-testid="landed-keepers">keepers</div>}
         />
+        <Route path="/plants/:id" element={<div data-testid="landed-plant">plant</div>} />
         <Route path="/" element={<div data-testid="landed-home">home</div>} />
       </Routes>
     </MemoryRouter>,
@@ -110,6 +111,14 @@ describe("CheckoutSuccess returnTo handling", () => {
     renderAt("/checkout/success?returnTo=%2Fpheno-hunts%2Fabc%2Fkeepers");
     await waitFor(() => {
       expect(screen.getByTestId("landed-keepers")).toBeDefined();
+    });
+  });
+
+  it("returns an AI Doctor upgrade to the originating plant once entitlement is confirmed", async () => {
+    mode.current = "confirmed";
+    renderAt("/checkout/success?returnTo=%2Fplants%2Fplant-123");
+    await waitFor(() => {
+      expect(screen.getByTestId("landed-plant")).toBeDefined();
     });
   });
 

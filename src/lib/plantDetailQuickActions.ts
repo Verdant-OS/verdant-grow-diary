@@ -6,8 +6,9 @@
  * keys, Builds entries that either:
  *   - dispatch the existing `verdant:open-quicklog` event with already-known
  *     plant/tent/grow context as the event detail (PLANT_QUICKLOG_PREFILL_EVENT),
- *   - link to an existing route (`/sensors`, `/doctor`), or
- *   - scroll to an in-page section anchor (Plant Relative Timeline).
+ *   - link to an existing route (`/sensors`), or
+ *   - scroll to an in-page section anchor (Plant Relative Timeline or the
+ *     existing scoped AI Doctor review).
  *
  * The helper never invents context. Missing context surfaces as a disabled
  * entry with a short observational reason (kept visible — never silently
@@ -71,6 +72,8 @@ export interface PlantDetailQuickActionsInput {
 
 export const PLANT_RELATIVE_TIMELINE_ANCHOR_ID = "plant-relative-timeline" as const;
 export const PLANT_PHOTOS_ANCHOR_ID = "plant-photos" as const;
+export const PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID =
+  "plant-ai-doctor-review" as const;
 
 const LABELS: Record<
   PlantDetailQuickActionKind,
@@ -129,12 +132,6 @@ export function buildPlantDetailQuickActions(
       }
     : null;
 
-  // Ask Doctor: route to existing /doctor; only attach plantId as a hint
-  // when available. Unknown params are ignored safely by the route.
-  const doctorHref = plantId
-    ? `/doctor?plantId=${encodeURIComponent(plantId)}`
-    : "/doctor";
-
   return [
     {
       kind: "quicklog",
@@ -174,7 +171,11 @@ export function buildPlantDetailQuickActions(
     {
       kind: "ask_doctor",
       ...LABELS.ask_doctor,
-      href: doctorHref,
+      // Keep the grower on the existing Plant Detail review surface, where
+      // plant/grow/tent context is already scoped. This action never calls AI.
+      scrollTargetId: plantId
+        ? PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID
+        : undefined,
       testId: "plant-detail-quick-action-ask-doctor",
       disabled: !plantId,
       disabledReason: plantId

@@ -34,6 +34,7 @@ vi.mock("@/hooks/useLogAiDoctorReadinessToDiary", () => ({
 import PlantDetailDoctorLaunchDialog, {
   DOCTOR_LAUNCH_HELPER_LINES,
 } from "@/components/PlantDetailDoctorLaunchDialog";
+import { PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import type { PlantRecentActivityRow } from "@/lib/plantRecentActivityRules";
 
 const ROOT = resolve(__dirname, "../..");
@@ -148,20 +149,24 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     { kind: "diary", key: "d2", occurredAt: FRESH, eventType: "note", hasPhoto: false, note: "ok" },
   ];
 
-  it("Continue to AI Doctor routes safely with plant context", () => {
+  it("Continue to AI Doctor routes to the scoped plant review", () => {
     useTimelineMemoryMock.mockReturnValue({ items: passingTimelineItems() });
     renderDialog();
     fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
     const cont = screen.getByTestId("plant-detail-doctor-launch-continue");
-    expect(cont.getAttribute("href")).toBe("/doctor?plantId=p1");
+    expect(cont.getAttribute("href")).toBe(
+      `/plants/p1#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`,
+    );
   });
 
-  it("encodes special characters in the plant id for the route param", () => {
+  it("encodes special characters in the plant id for the route segment", () => {
     useTimelineMemoryMock.mockReturnValue({ items: passingTimelineItems() });
     renderDialog({ plantId: "p 1/2" });
     fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
     const cont = screen.getByTestId("plant-detail-doctor-launch-continue");
-    expect(cont.getAttribute("href")).toBe("/doctor?plantId=p%201%2F2");
+    expect(cont.getAttribute("href")).toBe(
+      `/plants/p%201%2F2#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`,
+    );
   });
 
   it("Add context first dispatches the existing QuickLog event and closes the dialog", () => {
@@ -266,7 +271,7 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     expect(explanation.getAttribute("role")).toBe("status");
   });
 
-  it("gate allows Continue when readiness reaches partial (existing route behavior preserved, no blocked explanation)", () => {
+  it("gate allows Continue when readiness reaches partial (scoped review path, no blocked explanation)", () => {
     useTimelineMemoryMock.mockReturnValue({ items: passingTimelineItems() });
     renderDialog();
     fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
@@ -275,7 +280,9 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
       screen.queryByTestId("plant-detail-doctor-launch-blocked-explanation"),
     ).toBeNull();
     const cont = screen.getByTestId("plant-detail-doctor-launch-continue");
-    expect(cont.getAttribute("href")).toBe("/doctor?plantId=p1");
+    expect(cont.getAttribute("href")).toBe(
+      `/plants/p1#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`,
+    );
     const notice = screen.getByTestId("plant-detail-doctor-launch-readiness-notice");
     expect(["partial", "strong"]).toContain(notice.getAttribute("data-readiness"));
   });

@@ -1,4 +1,8 @@
-export const SUBSCRIBER_GROWTH_RECEIPT_VERSION = 1;
+import { SUBSCRIBER_GROWTH_MIGRATION_CONTRACT } from "./subscriber-growth-migration-contract.mjs";
+
+export const SUBSCRIBER_GROWTH_RECEIPT_VERSION = 2;
+export const SUBSCRIBER_GROWTH_SUPABASE_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
+export const SUBSCRIBER_GROWTH_RECORDED_FUNCTION_NAME = "ai-doctor-review";
 
 export const SUBSCRIBER_GROWTH_RELEASE_STATUSES = Object.freeze({
   hold: "HOLD",
@@ -20,10 +24,52 @@ export const SUBSCRIBER_GROWTH_REQUIRED_COMMAND_IDS = Object.freeze([
 
 const EXPECTED_ROUTE_COUNT = 4;
 const EXPECTED_CAPABILITY_COUNT = 5;
-const EXPECTED_MIGRATION_COUNT = 4;
+export const SUBSCRIBER_GROWTH_EXPECTED_MIGRATION_COUNT =
+  SUBSCRIBER_GROWTH_MIGRATION_CONTRACT.length;
 
 function finiteNonNegative(value) {
   return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+function isRecord(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+export function migrationContractPassed(
+  command,
+  expectedMigrationCount = SUBSCRIBER_GROWTH_EXPECTED_MIGRATION_COUNT,
+) {
+  return (
+    Number.isInteger(expectedMigrationCount) &&
+    expectedMigrationCount > 0 &&
+    command?.migrationsTotal === expectedMigrationCount &&
+    command?.migrationsPassed === expectedMigrationCount
+  );
+}
+
+export function summarizeSubscriberGrowthBackendRemoteVerification(backendRemoteVerification) {
+  const record = isRecord(backendRemoteVerification) ? backendRemoteVerification : null;
+  const projectLinked = record?.projectLinked === true;
+  const migrationsVerified = record?.migrationsVerified === true;
+  const completionRecorderSecretVerified = record?.completionRecorderSecretVerified === true;
+  const temporaryArtifactsRemoved = record?.temporaryArtifactsRemoved === true;
+  const functionSourceVerified = record?.functionSourceVerified === true;
+  return {
+    attempted: record !== null,
+    projectLinked,
+    migrationsVerified,
+    completionRecorderSecretVerified,
+    temporaryArtifactsRemoved,
+    functionSourceVerified,
+    verified:
+      record?.kind === "authenticated_supabase_remote_check" &&
+      record?.verified === true &&
+      projectLinked &&
+      migrationsVerified &&
+      completionRecorderSecretVerified &&
+      temporaryArtifactsRemoved &&
+      functionSourceVerified,
+  };
 }
 
 function commandPassed(command, source, liveRequired) {
@@ -39,10 +85,7 @@ function commandPassed(command, source, liveRequired) {
     );
   }
   if (command.id === "migration_contract") {
-    return (
-      command.migrationsTotal === EXPECTED_MIGRATION_COUNT &&
-      command.migrationsPassed === EXPECTED_MIGRATION_COUNT
-    );
+    return migrationContractPassed(command);
   }
   if (command.id !== "targeted_tests") return true;
   return (
@@ -71,12 +114,28 @@ function parityPassed(parity, requireDeploymentId) {
 }
 
 export function evaluateSubscriberGrowthLaunchGate(input) {
+  const liveRequired = input?.liveRequired !== false;
   const sourceProblems = [];
   if (input?.source?.repositoryVerified !== true) {
     sourceProblems.push("repository identity is not verified");
   }
   if (input?.source?.baseAncestor !== true) {
     sourceProblems.push("required base is not an ancestor of HEAD");
+  }
+  if (liveRequired && input?.source?.baseIsHeadParent !== true) {
+    sourceProblems.push("full gate base must be the canonical release commit's first parent");
+  }
+  if (liveRequired && input?.source?.detachedHead !== true) {
+    sourceProblems.push("full gate must run from a detached canonical release commit");
+  }
+  if (liveRequired && input?.source?.headMergedToTarget !== true) {
+    sourceProblems.push("full gate release head is not confirmed on the expected remote target");
+  }
+  if (liveRequired && input?.source?.releaseHeadMatches !== true) {
+    sourceProblems.push("full gate release head does not match the required immutable commit");
+  }
+  if (liveRequired && input?.source?.liveOriginVerified !== true) {
+    sourceProblems.push("full gate live parity origin is not the canonical production origin");
   }
   if (input?.source?.releaseScopeClean !== true) {
     sourceProblems.push("release scope is not clean");
@@ -100,21 +159,32 @@ export function evaluateSubscriberGrowthLaunchGate(input) {
   const localProblems = localParityPass ? [] : ["local production preview parity did not pass"];
   const localReady = sourceProblems.length === 0 && commandProblems.length === 0 && localParityPass;
 
-  const liveRequired = input?.liveRequired !== false;
   const liveParityPass = liveRequired ? parityPassed(input?.liveParity, true) : false;
+  const backendRemoteVerification = summarizeSubscriberGrowthBackendRemoteVerification(
+    input?.backendRemoteVerification,
+  );
+  const backendRemoteVerificationPass = liveRequired ? backendRemoteVerification.verified : false;
   const liveProblems = [];
   if (liveRequired && !liveParityPass) {
     liveProblems.push("live growth parity is not verified on an identified deployment");
   }
+  if (liveRequired && !backendRemoteVerificationPass) {
+    liveProblems.push(
+      "paid-return backend is not verified by an authenticated Supabase remote check",
+    );
+  }
 
   let status = SUBSCRIBER_GROWTH_RELEASE_STATUSES.hold;
   if (localReady && !liveRequired) status = SUBSCRIBER_GROWTH_RELEASE_STATUSES.localReady;
-  if (localReady && liveParityPass) status = SUBSCRIBER_GROWTH_RELEASE_STATUSES.liveVerified;
+  if (localReady && liveParityPass && backendRemoteVerificationPass) {
+    status = SUBSCRIBER_GROWTH_RELEASE_STATUSES.liveVerified;
+  }
 
   return {
     status,
     localReady,
     liveVerified: status === SUBSCRIBER_GROWTH_RELEASE_STATUSES.liveVerified,
+    backendRemoteVerification,
     problems: [...sourceProblems, ...commandProblems, ...localProblems, ...liveProblems],
   };
 }
@@ -132,9 +202,12 @@ export function buildSubscriberGrowthReleaseReceipt(input) {
     commands: input.commands,
     localParity: input.localParity,
     liveParity: input.liveRequired === false ? null : input.liveParity,
+    backendRemoteVerification:
+      input.liveRequired === false ? null : decision.backendRemoteVerification,
     decision: {
       localReady: decision.localReady,
       liveVerified: decision.liveVerified,
+      backendRemoteVerificationVerified: decision.backendRemoteVerification.verified,
       problems: decision.problems,
       note: "Evidence only. This receipt never authorizes a push, deploy, merge, billing mutation, or subscriber-count claim.",
     },
@@ -168,6 +241,13 @@ export function formatSubscriberGrowthLaunchGate(receipt) {
     );
   } else {
     lines.push("Live parity: skipped by local-only mode");
+  }
+  if (receipt.backendRemoteVerification) {
+    lines.push(
+      `Paid-return backend remote verification: ${receipt.backendRemoteVerification.verified ? "verified" : "unverified"}`,
+    );
+  } else {
+    lines.push("Paid-return backend remote verification: skipped by local-only mode");
   }
   for (const problem of receipt.decision.problems) lines.push(`HOLD: ${problem}`);
   lines.push("Authorization: NONE (evidence only)");

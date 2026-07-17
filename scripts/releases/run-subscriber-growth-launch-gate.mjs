@@ -13,12 +13,13 @@ import {
   buildSubscriberGrowthReleaseReceipt,
   formatSubscriberGrowthLaunchGate,
 } from "./subscriber-growth-launch-gate-rules.mjs";
+import { verifySubscriberGrowthBackendRelease } from "./subscriber-growth-backend-remote-verification.mjs";
 import { auditSubscriberGrowthMigrationContract } from "./subscriber-growth-migration-contract.mjs";
 
 const EXPECTED_REMOTE = "https://github.com/Verdant-OS/verdant-grow-diary.git";
 const DEFAULT_BASE_REF = "origin/verdant-grow-diary";
 const DEFAULT_OUT = path.resolve(
-  "artifacts/release-readiness/subscriber-growth/launch-gate.v1.json",
+  "artifacts/release-readiness/subscriber-growth/launch-gate.v2.json",
 );
 const DEFAULT_PORT = 4187;
 const ANSI_PATTERN = /\u001b\[[0-9;]*m/g;
@@ -29,6 +30,7 @@ export function parseSubscriberGrowthGateArgs(argv) {
     baseRef: DEFAULT_BASE_REF,
     expectedRemote: EXPECTED_REMOTE,
     liveOrigin: DEFAULT_SUBSCRIBER_GROWTH_ORIGIN,
+    releaseHead: null,
     localOnly: false,
     out: DEFAULT_OUT,
     port: DEFAULT_PORT,
@@ -40,12 +42,23 @@ export function parseSubscriberGrowthGateArgs(argv) {
     else if (arg.startsWith("--expected-remote=")) {
       args.expectedRemote = arg.slice("--expected-remote=".length);
     } else if (arg.startsWith("--origin=")) args.liveOrigin = arg.slice("--origin=".length);
-    else if (arg.startsWith("--out=")) args.out = path.resolve(arg.slice("--out=".length));
+    else if (arg.startsWith("--release-head=")) {
+      args.releaseHead = arg.slice("--release-head=".length);
+    } else if (arg.startsWith("--out=")) args.out = path.resolve(arg.slice("--out=".length));
     else if (arg.startsWith("--port=")) args.port = Number(arg.slice("--port=".length));
     else throw new Error(`unknown_argument:${arg}`);
   }
   if (!Number.isInteger(args.port) || args.port < 1024 || args.port > 65535) {
     throw new Error("invalid_preview_port");
+  }
+  if (args.releaseHead !== null && !/^[a-f0-9]{40}$/i.test(args.releaseHead)) {
+    throw new Error("invalid_release_head");
+  }
+  if (
+    !args.localOnly &&
+    normalizeOrigin(args.liveOrigin) !== normalizeOrigin(DEFAULT_SUBSCRIBER_GROWTH_ORIGIN)
+  ) {
+    throw new Error("invalid_live_origin");
   }
   return args;
 }
@@ -80,6 +93,14 @@ function normalizeRemote(value) {
     .replace(/^git@github\.com:/, "https://github.com/")
     .replace(/\.git$/, "")
     .toLowerCase();
+}
+
+function normalizeOrigin(value) {
+  try {
+    return new URL(String(value ?? "")).origin.toLowerCase();
+  } catch {
+    return "";
+  }
 }
 
 function changedFiles(baseRef) {
@@ -233,22 +254,52 @@ function inspectSource(args, files, tests, e2eSpecs, formattable) {
   } catch {
     baseAncestor = false;
   }
+  let headMergedToTarget = false;
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", "HEAD", DEFAULT_BASE_REF], {
+      cwd: process.cwd(),
+      stdio: "ignore",
+    });
+    headMergedToTarget = true;
+  } catch {
+    headMergedToTarget = false;
+  }
   const dirtyPaths = parseGitPorcelainPaths(gitRaw(["status", "--porcelain"]));
   const branchFiles = new Set(files);
   const ignoredDirtyPaths = dirtyPaths.filter(
     (file) => AUTO_MANAGED_OUT_OF_SCOPE_PATHS.has(file) && !branchFiles.has(file),
   );
   const releaseDirtyPaths = dirtyPaths.filter((file) => !ignoredDirtyPaths.includes(file));
+  const head = git(["rev-parse", "HEAD"]);
+  const baseCommit = git(["rev-parse", args.baseRef]);
+  const branchName = git(["branch", "--show-current"]);
+  let headParent = null;
+  try {
+    headParent = git(["rev-parse", "HEAD^"]);
+  } catch {
+    headParent = null;
+  }
   return {
     repositoryVerified:
       normalizeRemote(remote) === normalizeRemote(args.expectedRemote) &&
       path.resolve(git(["rev-parse", "--show-toplevel"])) === path.resolve(process.cwd()),
     remote,
-    branch: git(["branch", "--show-current"]) || "detached",
-    head: git(["rev-parse", "HEAD"]),
+    branch: branchName || "detached",
+    detachedHead: branchName.length === 0,
+    releaseTargetRef: DEFAULT_BASE_REF,
+    headMergedToTarget,
+    head,
     baseRef: args.baseRef,
-    baseCommit: git(["rev-parse", args.baseRef]),
+    baseCommit,
     baseAncestor,
+    headParent,
+    baseIsHeadParent: headParent === baseCommit,
+    releaseHead: args.releaseHead,
+    releaseHeadMatches:
+      typeof args.releaseHead === "string" && head.toLowerCase() === args.releaseHead.toLowerCase(),
+    liveOrigin: args.liveOrigin,
+    liveOriginVerified:
+      normalizeOrigin(args.liveOrigin) === normalizeOrigin(DEFAULT_SUBSCRIBER_GROWTH_ORIGIN),
     worktreeClean: dirtyPaths.length === 0,
     releaseScopeClean: releaseDirtyPaths.length === 0,
     dirtyPaths,
@@ -335,6 +386,8 @@ export async function runSubscriberGrowthLaunchGate(args) {
     }
   }
 
+  const backendRemoteVerification = args.localOnly ? null : verifySubscriberGrowthBackendRelease();
+
   const receipt = buildSubscriberGrowthReleaseReceipt({
     generatedAt: new Date().toISOString(),
     liveRequired: !args.localOnly,
@@ -342,6 +395,7 @@ export async function runSubscriberGrowthLaunchGate(args) {
     commands,
     localParity,
     liveParity,
+    backendRemoteVerification,
   });
   writeReceipt(args.out, receipt);
   return receipt;

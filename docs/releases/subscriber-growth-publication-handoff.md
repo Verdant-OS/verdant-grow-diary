@@ -20,9 +20,13 @@ The release is additive and spans:
 - operator-reviewed checkout outreach drafts and a conversion worklist;
 - deterministic launch and live-parity evidence.
 
-There are **no changed Supabase Edge Function sources in this release**. Do not
-redeploy unrelated functions merely because the frontend or database changes.
-The database release consists of exactly four migrations.
+The subscriber-growth release requires the reviewed `ai-doctor-review` Edge
+Function version containing the server-side completion recorder. Its source
+change landed with the paid-return cohort; source parity alone does not prove
+that version is deployed. Deploy only that function after the reviewed database
+migration, and do not redeploy unrelated functions merely because the frontend
+or database changes.
+The database release consists of exactly five migrations.
 
 ## Reviewer order
 
@@ -59,6 +63,7 @@ The dry run must contain these migrations in this order:
 2. `20260714193000_subscriber_growth_operator_snapshot.sql`
 3. `20260714231627_signup_acquisition_attribution.sql`
 4. `20260715002000_signup_to_paid_operator_snapshot.sql`
+5. `20260717010000_paid_return_cohort_measurement.sql`
 
 Stop if the linked project is not production, the remote ledger contains an
 unexpected migration, a required migration is missing, or the dry run is empty
@@ -74,16 +79,40 @@ Only an authorized operator should perform these steps:
    committed branch.
 3. Push the branch and open a pull request into `verdant-grow-diary`.
 4. Require human review of the six areas above and require repository CI.
-5. Re-run the linked migration ledger inspection and database dry run.
-6. Apply exactly the reviewed database migrations.
-7. Do **not** deploy an Edge Function for this release; none changed.
-8. Merge through the normal reviewed path and deploy the frontend.
-9. Run `bun run release:subscriber-growth:gate` against the canonical origin.
-10. Require an identified deployment and `LIVE_VERIFIED` before operating the
+5. Merge through the normal reviewed path, then identify its immutable
+   canonical `<release-head-commit>` and check it out detached. Record its
+   first parent as `<release-base-commit>`; do not use a later default-branch
+   head or the pre-merge feature-branch SHA.
+6. Re-run the linked migration ledger inspection and database dry run from that
+   checked-out release commit.
+7. Apply exactly the reviewed database migrations.
+8. Confirm the existing server-side `SUPABASE_SERVICE_ROLE_KEY` secret is
+   configured for the linked `ai-doctor-review` Edge Function without printing,
+   copying, or exposing it; then deploy only that reviewed function from the
+   exact canonical `<release-head-commit>`.
+9. Deploy the frontend from that same `<release-head-commit>`.
+10. Run the authenticated remote check through the full gate from the detached
+    `<release-head-commit>` checkout against the canonical origin:
+
+    ```bash
+    bun run release:subscriber-growth:gate -- \
+      --base-ref=<release-base-commit> \
+      --release-head=<release-head-commit>
+    ```
+
+    The gate reads only the linked project identity, remote migration IDs,
+    secret names, and downloaded function source parity plus recorder markers.
+    It never logs secret values or stores remote command output in the receipt.
+    Downloaded source is temporary only; failed cleanup returns `HOLD`.
+
+11. Require an identified deployment and `LIVE_VERIFIED` before operating the
     new funnel.
 
 Any failure returns the release to `HOLD`. A local or live receipt remains
 evidence only; it is not deployment authorization.
+The recorded base commit must be the canonical release commit's first parent
+for the full gate; do not replace it with a later default-branch head or the
+feature branch's original base.
 
 ## Pull request description
 
@@ -104,8 +133,8 @@ Safety boundaries:
 - public leads remain insert-only with a fixed source allowlist;
 - operator reports are aggregate-only;
 - no automatic outreach, Action Queue creation, device control, or entitlement grant;
-- no Edge Function source changes;
-- database changes are four fixed, ordered migrations.
+- only `ai-doctor-review` receives the reviewed server-side completion recorder;
+- database changes are five fixed, ordered migrations.
 
 Validation evidence is produced by:
 bun run release:subscriber-growth:gate:local
@@ -114,13 +143,23 @@ bun run release:subscriber-growth:gate:local
 ## Post-deploy verification
 
 The full gate must verify all five capabilities on the identified production
-deployment:
+deployment and an authenticated, read-only Supabase check for the paid-return
+backend release:
 
 1. landing attribution;
 2. signup verification state;
 3. signup intent preservation;
 4. referral attribution;
 5. checkout recovery.
+
+The authenticated backend check requires the linked production project, all
+five applied migrations, the `SUPABASE_SERVICE_ROLE_KEY` secret name, and the
+reviewed completion-recorder markers and source parity in the downloaded remote
+AI Doctor source. This protects against calling a frontend-only deployment
+`LIVE_VERIFIED` while the completion recorder is absent, does not match the
+reviewed source, or has no configured server-side secret name. It does not
+validate or expose the secret value; that would require a separately authorized
+runtime exercise.
 
 Then an authorized operator should open the subscriber-growth page and record
 the authoritative aggregate baseline:

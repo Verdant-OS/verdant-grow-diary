@@ -65,7 +65,8 @@ const COMPARISON_ROWS: Row[] = [
   { label: "Photo logs", free: true, pro: true, founder: true },
   { label: "Manual sensor snapshots", free: true, pro: true, founder: true },
   { label: "Timeline history", free: "Basic", pro: "Extended", founder: "Extended" },
-  { label: "Cloud sync & automatic backups", free: false, pro: true, founder: true },
+  { label: "Cultivation calendar (history-aware)", free: true, pro: true, founder: true },
+  { label: "Date-range diary report (Print / Save PDF)", free: false, pro: true, founder: true },
   { label: "Multi-tent support", free: false, pro: true, founder: true },
   { label: "Exports", free: "Limited", pro: "Advanced", founder: "Advanced" },
   { label: "Post-Grow Learning Report (Print / Save PDF)", free: false, pro: true, founder: true },
@@ -130,7 +131,7 @@ export default function Pricing() {
   usePageSeo({
     title: "Pricing — Free, Pro & Founder Lifetime | Verdant Grow Diary",
     description:
-      "Free grow diary forever. Pro adds cloud sync, multi-tent support, sensor history and exports. Founder Lifetime is a one-time plan for early supporters.",
+      "Free grow diary forever. Pro adds multi-tent support, sensor history and advanced exports. Founder Lifetime is a one-time plan for early supporters.",
     path: "/pricing",
   });
 
@@ -165,7 +166,7 @@ export default function Pricing() {
       ],
       [
         "What do I actually get with Pro?",
-        "Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot history, longer grow history, better timeline filtering, priority support, and early access to advanced grow reports.",
+        "Multi-tent support, advanced exports including date-range diary reports, sensor snapshot history, longer grow history, advanced timeline filtering, priority support, and early access to advanced grow reports.",
       ],
       [
         "How does the Founder Lifetime Offer work?",
@@ -204,7 +205,7 @@ export default function Pricing() {
           "@type": "Product",
           name: "Verdant Pro",
           description:
-            "Cloud sync, multi-tent grow memory, 100 AI Doctor credits/month, advanced exports, and sensor snapshot history.",
+            "Multi-tent grow memory, 100 AI Doctor credits/month, advanced exports, and sensor snapshot history.",
           brand: { "@type": "Brand", name: "Verdant Grow Diary" },
           offers: [
             {
@@ -619,9 +620,9 @@ export default function Pricing() {
           Compare Free, Pro, and Founder Lifetime
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
-          Free is genuinely useful for starting a grow diary. Pro adds cloud sync, deeper history,
-          and multi-tent support. Founder Lifetime is a limited early-supporter offer that includes
-          full Pro access.
+          Free is genuinely useful for starting a grow diary. Pro adds deeper history, advanced
+          exports, and multi-tent support. Founder Lifetime is a limited early-supporter offer that
+          includes full Pro access.
         </p>
 
         <div className="mt-8 overflow-x-auto rounded-xl border border-border/60">
@@ -713,9 +714,10 @@ export default function Pricing() {
           <AccordionItem value="pro-what">
             <AccordionTrigger>What do I actually get with Pro?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot
-              history, longer grow history, better timeline filtering, priority support, and early
-              access to advanced grow reports. Pro features ship over time, only as they stabilize.
+              Multi-tent support, advanced exports including date-range diary reports, sensor
+              snapshot history, longer grow history, advanced timeline filtering, priority support,
+              and early access to advanced grow reports. Pro features ship over time, only as they
+              stabilize.
             </AccordionContent>
           </AccordionItem>
 

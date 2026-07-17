@@ -27,6 +27,8 @@ export const sensorsPath = (growId?: string | null): string => withGrowId("/sens
 export const postGrowLearningReportPath = (growId: string): string =>
   `/reports/post-grow/${encodeURIComponent(growId)}`;
 
+export const diaryRangeReportPath = (): string => "/reports/diary-range";
+
 export const actionDetailPath = (actionId: string): string =>
   `/actions/${encodeURIComponent(actionId)}`;
 

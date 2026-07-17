@@ -98,6 +98,7 @@ function baseState(overrides: Partial<UsePhenoHuntWorkspaceState>): UsePhenoHunt
     decisionHistoryByPlant: {},
     sexByPlant: {},
     reversedPlantIds: new Set<string>(),
+    clonedPlantIds: new Set<string>(),
     smokeByPlant: {},
     labByKey: {},
     error: null,

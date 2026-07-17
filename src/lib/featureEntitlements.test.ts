@@ -35,8 +35,8 @@ function row(overrides: Partial<BillingSubscriptionRow>): BillingSubscriptionRow
 const FK: FeatureKey = "pheno_tracker";
 
 describe("featureEntitlements", () => {
-  it("exports a deterministic, typed pheno_tracker key", () => {
-    expect(FEATURE_KEYS).toEqual(["pheno_tracker"]);
+  it("exports the deterministic, typed feature key registry", () => {
+    expect(FEATURE_KEYS).toEqual(["pheno_tracker", "advanced_timeline_filters"]);
   });
 
   it("active pro_monthly can read and write", () => {

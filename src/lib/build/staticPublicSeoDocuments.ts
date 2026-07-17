@@ -71,7 +71,7 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
   publicDocument("/pricing", {
     title: "Pricing — Free, Pro & Founder Lifetime | Verdant Grow Diary",
     description:
-      "Free grow diary forever. Pro adds cloud sync, multi-tent support, sensor history and exports. Founder Lifetime is a one-time plan for early supporters.",
+      "Free grow diary forever. Pro adds multi-tent support, sensor history and advanced exports. Founder Lifetime is a one-time plan for early supporters.",
     imageAlt: "Verdant pricing",
   }),
   publicDocument("/guides/grow-stage-care-guide", {

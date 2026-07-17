@@ -70,6 +70,11 @@ import {
   type PhenoReadinessExtras,
 } from "@/lib/phenoCandidateReadiness";
 import {
+  CLONE_INSURANCE_CAVEAT,
+  cloneInsuranceBannerCopy,
+  summarizeCloneInsurance,
+} from "@/lib/phenoCloneInsuranceRules";
+import {
   toggleCohortMember,
   buildPhenoCompareHref,
   isValidCohortSize,
@@ -111,6 +116,7 @@ function readinessExtras(
   sex: SexObservationRow | undefined,
   smoke: SmokeTestRow | undefined,
   lab: LabResultRow | undefined,
+  cloneInsured: boolean,
 ): PhenoReadinessExtras {
   return {
     hasTraitScore: !!score && Object.keys(score.traits ?? {}).length > 0,
@@ -120,6 +126,7 @@ function readinessExtras(
     hasPostCureSmokeTest: smokeHasContent(smoke),
     hasLabResult: !!lab,
     labSource: lab?.source ?? null,
+    cloneReadinessRecorded: cloneInsured,
   };
 }
 
@@ -130,11 +137,12 @@ function candidateReadiness(
   sex: SexObservationRow | undefined,
   smoke: SmokeTestRow | undefined,
   lab: LabResultRow | undefined,
+  cloneInsured: boolean,
 ): PhenoCandidateReadiness {
   return evaluatePhenoCandidateReadiness(
     readinessEvidenceFromCandidateInput(
       candidate,
-      readinessExtras(candidate.candidateId, score, decision, sex, smoke, lab),
+      readinessExtras(candidate.candidateId, score, decision, sex, smoke, lab, cloneInsured),
     ),
   );
 }
@@ -572,6 +580,8 @@ interface EditorProps {
   sexRow: SexObservationRow | undefined;
   /** This candidate's keeper has a recorded chemical reversal (expected pollen). */
   reversed: boolean;
+  /** True when this candidate has >=1 recorded clone (clone insurance). */
+  cloneInsured: boolean;
   onSaveSex: (plantId: string, sex: PhenoSexObservation) => Promise<boolean>;
   growId: string | null;
   tentId: string | null;
@@ -632,6 +642,7 @@ const CandidateEditor = memo(function CandidateEditor({
   onLoadHistory,
   sexRow,
   reversed,
+  cloneInsured,
   onSaveSex,
   growId,
   tentId,
@@ -663,8 +674,8 @@ const CandidateEditor = memo(function CandidateEditor({
   // Readiness is derived from THIS card's evidence props, so it only recomputes
   // when this candidate's data changes — one save never re-renders every card.
   const readiness = useMemo(
-    () => candidateReadiness(candidate, score, decision, sexRow, smokeRow, labRow),
-    [candidate, score, decision, sexRow, smokeRow, labRow],
+    () => candidateReadiness(candidate, score, decision, sexRow, smokeRow, labRow, cloneInsured),
+    [candidate, score, decision, sexRow, smokeRow, labRow, cloneInsured],
   );
 
   const setTrait = (key: string, raw: string) => {
@@ -1121,6 +1132,7 @@ export default function PhenoHuntWorkspace() {
           ws.sexByPlant[c.candidateId],
           ws.smokeByPlant[c.candidateId],
           ws.labByKey[`${c.candidateId}:coa`],
+          ws.clonedPlantIds.has(c.candidateId),
         ).readiness,
       );
     }
@@ -1132,12 +1144,32 @@ export default function PhenoHuntWorkspace() {
     ws.sexByPlant,
     ws.smokeByPlant,
     ws.labByKey,
+    ws.clonedPlantIds,
   ]);
 
   const visibleCandidates = useMemo(() => {
     if (readinessFilter === "all") return candidates;
     return candidates.filter((c) => readinessLevelByPlant.get(c.candidateId) === readinessFilter);
   }, [candidates, readinessFilter, readinessLevelByPlant]);
+
+  // Clone insurance — which LOADED candidates have no recorded clone while
+  // flowering is imminent/underway or a keep/hold decision is on record.
+  // Records-only and suggestion-only: Verdant never acts on a plant.
+  const cloneInsurance = useMemo(
+    () =>
+      summarizeCloneInsurance(
+        candidates.map((c) => ({
+          candidateId: c.candidateId,
+          candidateNumber: c.candidateNumber ?? null,
+          candidateLabel: c.candidateLabel ?? null,
+          plantLabel: c.plantLabel ?? null,
+          stage: c.stage ?? null,
+          hasPreservedClone: ws.clonedPlantIds.has(c.candidateId),
+          keeperDecision: ws.decisionsByPlant[c.candidateId]?.decision ?? null,
+        })),
+      ),
+    [candidates, ws.clonedPlantIds, ws.decisionsByPlant],
+  );
 
   const onToggleSelect = useCallback((plantId: string) => {
     setSelectedIds((prev) => toggleCohortMember(prev, plantId).ids);
@@ -1165,6 +1197,7 @@ export default function PhenoHuntWorkspace() {
         ws.sexByPlant[c.candidateId],
         ws.smokeByPlant[c.candidateId],
         ws.labByKey[`${c.candidateId}:coa`],
+        ws.clonedPlantIds.has(c.candidateId),
       );
       readinessByPlant[c.candidateId] = {
         readiness: r.readiness,
@@ -1289,6 +1322,44 @@ export default function PhenoHuntWorkspace() {
         ) : null}
 
         {ws.hunt ? <PhenoCompareCandidatesAction state={comparisonState} /> : null}
+
+        {/* Clone insurance — the one irreversible hunt mistake is harvesting a
+            candidate with no clone on record. Suggestion-only: reads the
+            grower's own records and changes nothing on its own. */}
+        {ws.hunt && cloneInsurance.hasActionable ? (
+          <section
+            className="glass rounded-2xl border border-amber-500/40 bg-amber-500/5 p-4 space-y-2"
+            data-testid="pheno-clone-insurance-banner"
+            role="status"
+            aria-label="Clone insurance"
+          >
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-amber-300">
+              Clone insurance
+            </h2>
+            <p className="text-sm" data-testid="pheno-clone-insurance-summary">
+              {cloneInsuranceBannerCopy(cloneInsurance)}
+            </p>
+            <ul className="space-y-1.5">
+              {cloneInsurance.actionable.slice(0, 5).map((e) => (
+                <li
+                  key={e.candidateId}
+                  className="text-sm"
+                  data-testid={`pheno-clone-insurance-item-${e.candidateId}`}
+                  data-insurance-status={e.status}
+                >
+                  <span className="font-medium">{e.headline}</span>
+                  <span className="text-muted-foreground"> — {e.detail}</span>
+                </li>
+              ))}
+            </ul>
+            {cloneInsurance.actionable.length > 5 && (
+              <p className="text-xs text-muted-foreground">
+                and {cloneInsurance.actionable.length - 5} more in this hunt.
+              </p>
+            )}
+            <p className="text-[11px] text-muted-foreground">{CLONE_INSURANCE_CAVEAT}</p>
+          </section>
+        ) : null}
 
         {/* Stable anchor targets for missing-evidence next-step links. Each id
             corresponds to a real in-workspace surface (scoring notes,
@@ -1507,6 +1578,7 @@ export default function PhenoHuntWorkspace() {
                     onLoadHistory={ws.loadDecisionHistory}
                     sexRow={ws.sexByPlant[c.candidateId]}
                     reversed={ws.reversedPlantIds.has(c.candidateId)}
+                    cloneInsured={ws.clonedPlantIds.has(c.candidateId)}
                     onSaveSex={ws.saveSex}
                     growId={ws.hunt?.growId ?? null}
                     tentId={ws.hunt?.tentId ?? null}

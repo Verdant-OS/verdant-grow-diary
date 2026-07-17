@@ -28,7 +28,9 @@ import { supabase } from "@/integrations/supabase/client";
 export type PremiumExportFeature =
   | "ai_doctor_report"
   | "ai_doctor_evidence_csv"
-  | "ai_doctor_report_package";
+  | "ai_doctor_report_package"
+  | "diary_range_report"
+  | "post_grow_report";
 
 export type PremiumExportGateState =
   | "allowed"

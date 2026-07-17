@@ -137,7 +137,7 @@ describe("Doctor launch dialog — freshness a11y", () => {
     expect(screen.queryByTestId("plant-detail-doctor-launch-continue-blocked")).toBeNull();
     const cont = screen.getByTestId("plant-detail-doctor-launch-continue");
     expect(cont).toHaveAccessibleName("Continue to AI Doctor with plant context");
-    expect(cont.getAttribute("href")).toBe("/doctor?plantId=p1");
+    expect(cont.getAttribute("href")).toBe("/plants/p1#plant-ai-doctor-review");
     expect(
       screen
         .getByTestId("plant-detail-doctor-launch-log-readiness-to-diary")

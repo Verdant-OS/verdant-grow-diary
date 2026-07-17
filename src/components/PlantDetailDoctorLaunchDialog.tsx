@@ -10,9 +10,8 @@
  *   - Trigger renders the "Ask Doctor" button.
  *   - Opening the dialog shows a deterministic Available / Missing /
  *     Stale summary of context AI Doctor would have for this plant.
- *   - "Continue to AI Doctor" routes to /doctor with the plant context
- *     as a query parameter (existing /doctor route ignores unknown
- *     params safely).
+ *   - "Continue to AI Doctor" routes to the existing scoped Plant Detail
+ *     review anchor, where the loaded plant/grow/tent context is preserved.
  *   - "Add context first" dispatches the existing
  *     `verdant:open-quicklog` event so the grower can add notes/photo
  *     /sensor data without leaving the page.
@@ -64,6 +63,8 @@ import {
   AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
 } from "@/lib/aiDoctorReadinessGateViewModel";
 import { buildAiDoctorSnapshotStalenessExplanation } from "@/lib/aiDoctorSnapshotStalenessExplanationViewModel";
+import { PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
+import { plantDetailPath } from "@/lib/routes";
 
 interface Props {
   plantId: string | null | undefined;
@@ -287,7 +288,7 @@ export default function PlantDetailDoctorLaunchDialog({
 
   if (!plantId) return null;
 
-  const doctorHref = `/doctor?plantId=${encodeURIComponent(plantId)}`;
+  const plantReviewHref = `${plantDetailPath(plantId)}#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`;
   const missingOrStale = preview.missingCount + preview.staleCount;
   const summaryNote =
     missingOrStale === 0
@@ -516,7 +517,11 @@ export default function PlantDetailDoctorLaunchDialog({
               data-testid="plant-detail-doctor-launch-continue"
               data-readiness={readinessResult.readiness}
             >
-              <Link to={doctorHref} aria-label="Continue to AI Doctor with plant context">
+              <Link
+                to={plantReviewHref}
+                aria-label="Continue to AI Doctor with plant context"
+                onClick={() => setOpen(false)}
+              >
                 Continue to AI Doctor <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </Button>

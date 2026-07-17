@@ -41,7 +41,11 @@ import PlantProfileContextCard from "@/components/PlantProfileContextCard";
 import { updatePlantProfileMetadata } from "@/lib/plantProfileMetadataUpdate";
 import PlantDetailTimelineEvidenceReadinessLaunch from "@/components/PlantDetailTimelineEvidenceReadinessLaunch";
 import PlantDetailAskDoctorHelper from "@/components/PlantDetailAskDoctorHelper";
-import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID, PLANT_PHOTOS_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
+import {
+  PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID,
+  PLANT_PHOTOS_ANCHOR_ID,
+  PLANT_RELATIVE_TIMELINE_ANCHOR_ID,
+} from "@/lib/plantDetailQuickActions";
 import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
 import { PLANT_DETAIL_SECTION_ANCHORS } from "@/lib/plantDetailSectionAnchors";
 
@@ -507,24 +511,31 @@ export default function PlantDetail() {
         plantName={plant.name}
         tentName={tent?.name ?? null}
       />
-      <PlantDetailAiDoctorReadinessGate
-        plantId={plant.id}
-        plant={plant}
-        hasSafeAiDoctorFlow
-      />
-      <PlantDetailAiDoctorSafeReviewStart
-        plantId={plant.id}
-        plant={plant}
-      />
-      <AiDoctorReviewResultPreview
-        testIdPrefix="plant-detail"
-      />
-      <PlantDetailAiDoctorLiveReview
-        plantId={plant.id}
-        plant={plant}
-        growId={plant.growId ?? null}
-        tentId={plant.tentId ?? null}
-      />
+      <section
+        id={PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}
+        tabIndex={-1}
+        aria-label="Plant AI Doctor review"
+        className="scroll-mt-16 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <PlantDetailAiDoctorReadinessGate
+          plantId={plant.id}
+          plant={plant}
+          hasSafeAiDoctorFlow
+        />
+        <PlantDetailAiDoctorSafeReviewStart
+          plantId={plant.id}
+          plant={plant}
+        />
+        <AiDoctorReviewResultPreview
+          testIdPrefix="plant-detail"
+        />
+        <PlantDetailAiDoctorLiveReview
+          plantId={plant.id}
+          plant={plant}
+          growId={plant.growId ?? null}
+          tentId={plant.tentId ?? null}
+        />
+      </section>
 
       <div id="plant-ai-doctor-context-panel" tabIndex={-1} className="scroll-mt-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
         <PlantDetailAiDoctorContextPanel

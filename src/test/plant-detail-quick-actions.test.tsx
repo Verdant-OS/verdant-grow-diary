@@ -30,6 +30,7 @@ vi.mock("react-router-dom", () => ({
 
 import {
   buildPlantDetailQuickActions,
+  PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID,
   PLANT_RELATIVE_TIMELINE_ANCHOR_ID,
 } from "@/lib/plantDetailQuickActions";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
@@ -158,18 +159,22 @@ describe("buildPlantDetailQuickActions · payloads and routes", () => {
     expect(e.href).toBe("/sensors");
   });
 
-  it("Ask Doctor links to /doctor with plantId hint when available", () => {
+  it("Ask Doctor targets the scoped plant review when context is available", () => {
     const e = buildPlantDetailQuickActions({ plantId: "p1" }).find(
       (e) => e.kind === "ask_doctor",
     )!;
-    expect(e.href).toBe("/doctor?plantId=p1");
+    expect(e.scrollTargetId).toBe(PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID);
+    expect(e.href).toBeUndefined();
+    expect(e.event).toBeUndefined();
+    expect(e.disabled).toBeFalsy();
   });
 
-  it("Ask Doctor falls back to /doctor and is disabled with reason when plantId missing", () => {
+  it("Ask Doctor is disabled with no navigation target when plantId is missing", () => {
     const e = buildPlantDetailQuickActions({ plantId: null }).find(
       (e) => e.kind === "ask_doctor",
     )!;
-    expect(e.href).toBe("/doctor");
+    expect(e.href).toBeUndefined();
+    expect(e.scrollTargetId).toBeUndefined();
     expect(e.disabled).toBe(true);
     expect(e.disabledReason).toMatch(/plant context/i);
   });
@@ -335,12 +340,22 @@ describe("PlantDetailQuickActions · render", () => {
     expect(link?.getAttribute("href")).toBe("/sensors");
   });
 
-  it("Ask Doctor links to /doctor with plantId hint", () => {
-    const { container } = render(<PlantDetailQuickActions plantId="p1" />);
-    const link = container.querySelector(
-      'a[data-testid="plant-detail-quick-action-ask-doctor"], [data-testid="plant-detail-quick-action-ask-doctor"] a',
-    ) as HTMLAnchorElement | null;
-    expect(link?.getAttribute("href")).toBe("/doctor?plantId=p1");
+  it("Ask Doctor click scrolls to and focuses the scoped review anchor", () => {
+    const anchor = document.createElement("section");
+    anchor.id = PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID;
+    document.body.appendChild(anchor);
+    const scrollSpy = vi.fn();
+    anchor.scrollIntoView = scrollSpy as unknown as Element["scrollIntoView"];
+
+    render(<PlantDetailQuickActions plantId="p1" />);
+    const button = screen.getByTestId("plant-detail-quick-action-ask-doctor");
+    expect(button.tagName.toLowerCase()).toBe("button");
+    fireEvent.click(button);
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    expect(anchor.getAttribute("tabindex")).toBe("-1");
+    expect(document.activeElement).toBe(anchor);
+
+    document.body.removeChild(anchor);
   });
 
 
@@ -604,18 +619,17 @@ describe("PlantDetailQuickActions · keyboard and ARIA", () => {
     window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, handler);
   });
 
-  it("navigation actions render as semantic <a> links", () => {
+  it("route-based actions render as semantic <a> links", () => {
     const { container } = render(
       <PlantDetailQuickActions plantId="p1" growId="g1" />,
     );
     const sensorLink = container.querySelector(
       'a[data-testid="plant-detail-quick-action-manual-sensor-snapshot"]',
     ) as HTMLAnchorElement | null;
-    const doctorLink = container.querySelector(
-      'a[data-testid="plant-detail-quick-action-ask-doctor"]',
-    ) as HTMLAnchorElement | null;
     expect(sensorLink?.tagName.toLowerCase()).toBe("a");
-    expect(doctorLink?.tagName.toLowerCase()).toBe("a");
+    expect(
+      container.querySelector('a[data-testid="plant-detail-quick-action-ask-doctor"]'),
+    ).toBeNull();
   });
 
   it("disabled actions are skipped by native tab order (disabled attribute set)", () => {
@@ -930,5 +944,7 @@ describe("PlantDetailQuickActions · static safety", () => {
     expect(PAGE).toMatch(/<PlantDetailQuickActions\b/);
     // The page wraps the existing timeline section with the anchor id.
     expect(PAGE).toMatch(/PLANT_RELATIVE_TIMELINE_ANCHOR_ID/);
+    // The scoped Doctor review anchor is shared with all Plant Detail entry points.
+    expect(PAGE).toMatch(/PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID/);
   });
 });

@@ -131,7 +131,7 @@ export default function Pricing() {
   usePageSeo({
     title: "Pricing — Free, Pro & Founder Lifetime | Verdant Grow Diary",
     description:
-      "Free grow diary forever. Pro adds cloud sync, multi-tent support, sensor history and exports. Founder Lifetime is a one-time plan for early supporters.",
+      "Free grow diary forever. Pro adds multi-tent support, sensor history and advanced exports. Founder Lifetime is a one-time plan for early supporters.",
     path: "/pricing",
   });
 
@@ -620,9 +620,9 @@ export default function Pricing() {
           Compare Free, Pro, and Founder Lifetime
         </h2>
         <p className="mt-3 text-sm text-muted-foreground text-center max-w-2xl mx-auto">
-          Free is genuinely useful for starting a grow diary. Pro adds cloud sync, deeper history,
-          and multi-tent support. Founder Lifetime is a limited early-supporter offer that includes
-          full Pro access.
+          Free is genuinely useful for starting a grow diary. Pro adds deeper history, advanced
+          exports, and multi-tent support. Founder Lifetime is a limited early-supporter offer that
+          includes full Pro access.
         </p>
 
         <div className="mt-8 overflow-x-auto rounded-xl border border-border/60">

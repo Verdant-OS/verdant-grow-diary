@@ -105,9 +105,12 @@ describe("Settings — Subscription tile", () => {
     // No client-side cancel control — cancel lives inside the Paddle portal.
     expect(screen.queryByTestId("settings-subscription-cancel")).toBeNull();
     expect(document.body.textContent).toMatch(/Paddle\s+customer portal/i);
-    // Features from PRICING_TIERS surface (not hardcoded here).
+    // Features from PRICING_TIERS surface (not hardcoded here). "Cloud
+    // sync" was removed as a Pro differentiator — free accounts store to
+    // the same cloud — so the tile must show the truthful replacement.
     const features = screen.getByTestId("settings-subscription-features");
-    expect(features.textContent?.toLowerCase()).toContain("cloud sync");
+    expect(features.textContent?.toLowerCase()).toContain("date-range diary reports");
+    expect(features.textContent?.toLowerCase()).not.toContain("cloud sync");
   });
 
   it("Manage mints a portal URL via the edge function only — no Paddle SDK, no direct fetch", async () => {

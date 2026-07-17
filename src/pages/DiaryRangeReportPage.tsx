@@ -39,6 +39,7 @@ import {
   defaultDiaryRangeReportRange,
   isValidDiaryRangeReportRange,
 } from "@/lib/diaryRangeReportNavigationRules";
+import { timelinePath } from "@/lib/routes";
 
 type ServerGateStatus = "loading" | "allowed" | "denied" | "error";
 
@@ -154,7 +155,7 @@ export default function DiaryRangeReportPage() {
           Pick a grow first — the report covers one grow at a time.
         </p>
         <Button asChild variant="outline">
-          <Link to="/timeline">Open the timeline</Link>
+          <Link to={timelinePath()}>Open the timeline</Link>
         </Button>
       </div>
     );

@@ -256,7 +256,7 @@ describe("subscriber growth backend remote verification", () => {
       SUPABASE_ACCESS_TOKEN: "access-token",
       SUPABASE_SERVICE_ROLE_KEY: "must-not-pass",
       VITE_SUPABASE_ANON_KEY: "must-not-pass",
-      PADDLE_API_KEY: "must-not-pass",
+      PRIVATE_TEST_KEY: "must-not-pass",
     });
 
     expect(environment).toEqual({

@@ -7,7 +7,9 @@
  *
  * Rules (confirmed with the operator, 2026-07-16):
  *
- *   - `active` / `trialing`    → access
+ *   - `active` / `trialing`    → access while the reported billing period is
+ *                                still current (or has no end for a valid
+ *                                lifetime entitlement)
  *   - `past_due`               → access (Paddle is retrying payment;
  *                                treat as standard dunning, surface a
  *                                banner, do not revoke)
@@ -28,16 +30,21 @@
  */
 
 export interface SubscriptionAccessInput {
+  /** Known paid plans receive stricter period-shape validation. */
+  plan_id?: string | null;
   status: string;
   current_period_end?: string | Date | null;
 }
 
-const GRANTS_WITHOUT_PERIOD_CHECK = new Set(['active', 'trialing', 'past_due']);
+const CURRENT_PERIOD_STATUSES = new Set(["active", "trialing"]);
+const RECURRING_PLAN_IDS = new Set(["pro_monthly", "pro_annual"]);
 
-function toDateOrNull(value: string | Date | null | undefined): Date | null {
-  if (value == null) return null;
+/** `null` means intentionally absent; `undefined` means malformed. */
+function toDateOrInvalid(value: string | Date | null | undefined): Date | null | undefined {
+  if (value === null) return null;
+  if (value === undefined) return undefined;
   const d = value instanceof Date ? value : new Date(value);
-  return Number.isFinite(d.getTime()) ? d : null;
+  return Number.isFinite(d.getTime()) ? d : undefined;
 }
 
 /**
@@ -52,11 +59,43 @@ export function subscriptionGrantsAccess(
 ): boolean {
   if (!row) return false;
   const status = row.status;
+  const end = toDateOrInvalid(row.current_period_end);
 
-  if (GRANTS_WITHOUT_PERIOD_CHECK.has(status)) return true;
+  // An invalid timestamp must never be treated like a valid no-expiry
+  // lifetime row. It is neither current telemetry nor a safe entitlement.
+  if (end === undefined) return false;
 
-  if (status === 'canceled') {
-    const end = toDateOrNull(row.current_period_end);
+  // Founder lifetime rows are a separately-normalized product. Raw Paddle ID
+  // prefix validation happens in the adapter/server before a row reaches this
+  // helper; the access rule here still requires its exact active/no-end shape.
+  if (row.plan_id === "founder_lifetime") {
+    return status === "active" && end === null;
+  }
+
+  // Recurring products always carry a billing-period end. Reject a missing
+  // value rather than accidentally turning a malformed row into lifetime
+  // access. During dunning, that end may already be in the past.
+  if (RECURRING_PLAN_IDS.has(row.plan_id ?? "")) {
+    if (end === null) return false;
+    if (status === "past_due") return true;
+    if (CURRENT_PERIOD_STATUSES.has(status)) return end.getTime() > now.getTime();
+    if (status === "canceled") return end.getTime() > now.getTime();
+    return false;
+  }
+
+  // Paddle continues retrying payment during dunning. Its current period can
+  // already have elapsed by then, so a period check here would contradict the
+  // no-interruption policy and incorrectly revoke paid access.
+  if (status === "past_due") return true;
+
+  if (CURRENT_PERIOD_STATUSES.has(status)) {
+    // `null` is valid only for a properly-normalized lifetime entitlement.
+    // Recurring Paddle rows are rejected by the adapter before they reach
+    // this helper when they lack an explicit period end.
+    return end === null || end.getTime() > now.getTime();
+  }
+
+  if (status === "canceled") {
     // No end date on a canceled row = ended immediately. Only extend
     // access while the paid-for period is still in the future.
     return end !== null && end.getTime() > now.getTime();

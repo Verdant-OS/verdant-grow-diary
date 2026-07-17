@@ -95,6 +95,32 @@ describe("pickStrongestBilling", () => {
     expect(r.source).toBe("lovable_paddle_subscription");
   });
 
+  it("past-due BYO remains entitling during dunning", () => {
+    const r = pickStrongestBilling(
+      byo({ status: "past_due", current_period_end: PAST }),
+      null,
+      NOW,
+    );
+    expect(r.source).toBe("byo_paddle");
+    expect(r.row?.status).toBe("past_due");
+  });
+
+  it("canceled BYO remains entitling only before its paid-through end", () => {
+    const grace = pickStrongestBilling(
+      byo({ status: "canceled", current_period_end: FUTURE }),
+      null,
+      NOW,
+    );
+    expect(grace.source).toBe("byo_paddle");
+
+    const elapsed = pickStrongestBilling(
+      byo({ status: "canceled", current_period_end: PAST }),
+      null,
+      NOW,
+    );
+    expect(elapsed.row?.status).toBe("canceled");
+  });
+
   it("deterministic on repeated calls with same inputs", () => {
     const a = byo();
     const b = byo({ id: "lovable" });
@@ -214,6 +240,37 @@ describe("resolveUnionEntitlements", () => {
       now: NOW,
     });
     expect(r.isActive).toBe(false);
+  });
+
+  it("Lovable past_due retains Pro during dunning", () => {
+    const r = resolveUnionEntitlements({
+      byoRow: null,
+      lovableRow: lovable({ status: "past_due", current_period_end: PAST }),
+      expectedBillingEnvironment: "sandbox",
+      now: NOW,
+    });
+    expect(r.effectivePlanId).toBe("pro_monthly");
+    expect(r.isActive).toBe(true);
+  });
+
+  it("Lovable canceled subscription retains Pro only during cancellation grace", () => {
+    const grace = resolveUnionEntitlements({
+      byoRow: null,
+      lovableRow: lovable({ status: "canceled", current_period_end: FUTURE }),
+      expectedBillingEnvironment: "sandbox",
+      now: NOW,
+    });
+    expect(grace.effectivePlanId).toBe("pro_monthly");
+    expect(grace.isActive).toBe(true);
+
+    const elapsed = resolveUnionEntitlements({
+      byoRow: null,
+      lovableRow: lovable({ status: "canceled", current_period_end: PAST }),
+      expectedBillingEnvironment: "sandbox",
+      now: NOW,
+    });
+    expect(elapsed.effectivePlanId).toBe("free");
+    expect(elapsed.isActive).toBe(false);
   });
 
   it("deterministic output for identical inputs", () => {

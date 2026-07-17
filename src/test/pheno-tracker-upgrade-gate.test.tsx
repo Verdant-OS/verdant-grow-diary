@@ -12,30 +12,40 @@ import { resolveEntitlements } from "@/lib/entitlements/resolveEntitlements";
 import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
 
 const NOW = new Date("2026-08-01T00:00:00Z");
-const mode = vi.hoisted(() => ({ current: "free" as
-  | "free"
-  | "pro"
-  | "founder"
-  | "canceled"
-  | "loading" }));
+const PAST = new Date(NOW.getTime() - 60_000).toISOString();
+const mode = vi.hoisted(() => ({
+  current: "free" as "free" | "pro" | "founder" | "canceled" | "loading",
+}));
 
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => {
     if (mode.current === "loading") {
-      return { loading: true, entitlement: resolveEntitlements(null, NOW), refetch: async () => {} };
+      return {
+        loading: true,
+        entitlement: resolveEntitlements(null, NOW),
+        refetch: async () => {},
+      };
     }
     const base: BillingSubscriptionRow = {
-      id: "r", user_id: "u",
-      plan_id: "pro_monthly", status: "active",
+      id: "r",
+      user_id: "u",
+      plan_id: "pro_monthly",
+      status: "active",
       provider: "paddle",
-      provider_customer_id: null, provider_subscription_id: null,
-      current_period_end: "2027-01-01T00:00:00Z", cancel_at_period_end: false,
-      founder_number: null, created_at: "", updated_at: "",
+      provider_customer_id: null,
+      provider_subscription_id: null,
+      current_period_end: "2027-01-01T00:00:00Z",
+      cancel_at_period_end: false,
+      founder_number: null,
+      created_at: "",
+      updated_at: "",
     };
     let row: BillingSubscriptionRow | null = null;
     if (mode.current === "pro") row = base;
-    if (mode.current === "founder") row = { ...base, plan_id: "founder_lifetime" };
-    if (mode.current === "canceled") row = { ...base, status: "canceled" };
+    if (mode.current === "founder")
+      row = { ...base, plan_id: "founder_lifetime", current_period_end: null };
+    if (mode.current === "canceled")
+      row = { ...base, status: "canceled", current_period_end: PAST };
     return {
       loading: false,
       entitlement: resolveEntitlements(row, NOW),
@@ -98,9 +108,7 @@ describe("PhenoTrackerUpgradeGate", () => {
     // returnTo carried into the upgrade href for the gated Pheno route.
     // Destination is /pricing — the page with LIVE checkout (/upgrade is a
     // dead end: every paddlePriceId there is null).
-    expect(upgradeLinks[0].getAttribute("href")).toBe(
-      "/pricing?returnTo=%2Fpheno-hunts%2Fnew",
-    );
+    expect(upgradeLinks[0].getAttribute("href")).toBe("/pricing?returnTo=%2Fpheno-hunts%2Fnew");
 
     const demo = screen.getByTestId("pheno-tracker-upgrade-gate-demo-link");
     expect(demo.getAttribute("href")).toBe("/pheno-comparison");
@@ -115,9 +123,7 @@ describe("PhenoTrackerUpgradeGate", () => {
     mode.current = "free";
     renderGate({}, "/pheno-hunts/abc/workspace");
     const upgrade = screen.getByRole("link", { name: /upgrade to pro/i });
-    expect(upgrade.getAttribute("href")).toBe(
-      "/pricing?returnTo=%2Fpheno-hunts%2Fabc%2Fworkspace",
-    );
+    expect(upgrade.getAttribute("href")).toBe("/pricing?returnTo=%2Fpheno-hunts%2Fabc%2Fworkspace");
   });
 
   it("returnTo preserves the query context of a deep-linked gated route", () => {

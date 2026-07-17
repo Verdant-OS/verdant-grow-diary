@@ -41,7 +41,8 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
     };
     let row: BillingSubscriptionRow | null = null;
     if (mode.current === "pro") row = base;
-    if (mode.current === "founder") row = { ...base, plan_id: "founder_lifetime" };
+    if (mode.current === "founder")
+      row = { ...base, plan_id: "founder_lifetime", current_period_end: null };
     return {
       loading: false,
       entitlement: resolveEntitlements(row, NOW),
@@ -77,12 +78,12 @@ describe("PhenoTrackerPreviewCard", () => {
     renderCard();
     const card = screen.getByTestId("pheno-tracker-preview-card");
     expect(card.getAttribute("data-entitled")).toBe("false");
-    expect(
-      screen.getByTestId("pheno-tracker-preview-card-upgrade-link").getAttribute("href"),
-    ).toBe("/pricing");
-    expect(
-      screen.getByTestId("pheno-tracker-preview-card-demo-link").getAttribute("href"),
-    ).toBe("/pheno-comparison");
+    expect(screen.getByTestId("pheno-tracker-preview-card-upgrade-link").getAttribute("href")).toBe(
+      "/pricing",
+    );
+    expect(screen.getByTestId("pheno-tracker-preview-card-demo-link").getAttribute("href")).toBe(
+      "/pheno-comparison",
+    );
     expect(screen.queryByTestId("pheno-tracker-preview-card-start-link")).toBeNull();
     const body = document.body.textContent ?? "";
     for (const rx of FORBIDDEN) expect(body).not.toMatch(rx);
@@ -105,11 +106,9 @@ describe("PhenoTrackerPreviewCard", () => {
     renderCard();
     const card = screen.getByTestId("pheno-tracker-preview-card");
     expect(card.getAttribute("data-entitled")).toBe("true");
-    expect(
-      screen
-        .getByTestId("pheno-tracker-preview-card-start-link")
-        .getAttribute("href"),
-    ).toBe("/pheno-hunts/new");
+    expect(screen.getByTestId("pheno-tracker-preview-card-start-link").getAttribute("href")).toBe(
+      "/pheno-hunts/new",
+    );
     expect(screen.queryByTestId("pheno-tracker-preview-card-upgrade-link")).toBeNull();
     expect(screen.queryByTestId("pheno-tracker-preview-card-demo-link")).toBeNull();
   });
@@ -117,10 +116,8 @@ describe("PhenoTrackerPreviewCard", () => {
   it("Founder Lifetime user sees Start Pheno Hunt CTA", () => {
     mode.current = "founder";
     renderCard();
-    expect(
-      screen
-        .getByTestId("pheno-tracker-preview-card-start-link")
-        .getAttribute("href"),
-    ).toBe("/pheno-hunts/new");
+    expect(screen.getByTestId("pheno-tracker-preview-card-start-link").getAttribute("href")).toBe(
+      "/pheno-hunts/new",
+    );
   });
 });

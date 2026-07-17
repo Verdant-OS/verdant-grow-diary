@@ -33,7 +33,9 @@ const FINAL = latestMigrationDefining("public.ai_credit_spend");
 
 describe("AI credit SQL effective entitlement hardening", () => {
   it("adds a deterministic SQL helper for effective credit plan resolution", () => {
-    expect(MIGRATION).toContain("CREATE OR REPLACE FUNCTION public.ai_credit_effective_credit_plan_id");
+    expect(MIGRATION).toContain(
+      "CREATE OR REPLACE FUNCTION public.ai_credit_effective_credit_plan_id",
+    );
     expect(MIGRATION).toContain("p_plan_id text");
     expect(MIGRATION).toContain("p_status text");
     expect(MIGRATION).toContain("p_current_period_end timestamptz");
@@ -43,9 +45,13 @@ describe("AI credit SQL effective entitlement hardening", () => {
   });
 
   it("degrades inactive, unknown, null, and elapsed billing rows to free", () => {
-    expect(MIGRATION).toContain("p_plan_id IS NULL OR p_plan_id NOT IN ('free','pro_monthly','pro_annual','founder_lifetime') THEN 'free'");
+    expect(MIGRATION).toContain(
+      "p_plan_id IS NULL OR p_plan_id NOT IN ('free','pro_monthly','pro_annual','founder_lifetime') THEN 'free'",
+    );
     expect(MIGRATION).toContain("p_status IS DISTINCT FROM 'active' THEN 'free'");
-    expect(MIGRATION).toContain("p_current_period_end IS NOT NULL AND p_current_period_end <= p_now THEN 'free'");
+    expect(MIGRATION).toContain(
+      "p_current_period_end IS NOT NULL AND p_current_period_end <= p_now THEN 'free'",
+    );
   });
 
   it("rewires ai_credit_spend to read status and period, not raw plan alone", () => {
@@ -107,16 +113,25 @@ describe("ai_credit_spend FINAL migration state (regression-proof)", () => {
     expect(bodyMatch![0]).not.toMatch(/FROM\s+public\.billing_subscriptions/i);
   });
 
-  it("keeps the Lovable-source status/period hardening (no raw plan_id trust)", () => {
-    expect(FINAL).toContain("s.status = 'active'");
-    expect(FINAL).toMatch(/current_period_end IS NULL OR s\.current_period_end > now\(\)/);
+  it("keeps the Lovable-source status/period policy aligned with dunning and cancellation grace", () => {
+    expect(FINAL).toContain("s.price_id IN ('pro_monthly','pro_annual')");
+    expect(FINAL).toContain("s.current_period_end IS NOT NULL");
+    expect(FINAL).toContain("s.status IN ('active','trialing') AND s.current_period_end > now()");
+    expect(FINAL).toContain("OR s.status = 'past_due'");
+    expect(FINAL).toContain("(s.status = 'canceled' AND s.current_period_end > now())");
+    expect(FINAL).toContain("s.price_id = 'founder_lifetime'");
+    // `_` is a SQL LIKE wildcard; a literal Founder prefix is required.
+    expect(FINAL).toContain("left(s.paddle_subscription_id, 9) = 'lifetime_'");
+    expect(FINAL).not.toContain("s.paddle_subscription_id LIKE 'lifetime_%'");
     // The regression signature: a bare plan_id read feeding the allowance
     // from billing_subscriptions.
-    expect(FINAL).not.toMatch(/SELECT\s+plan_id\s+INTO\s+v_plan_id\s+FROM\s+public\.billing_subscriptions/i);
+    expect(FINAL).not.toMatch(
+      /SELECT\s+plan_id\s+INTO\s+v_plan_id\s+FROM\s+public\.billing_subscriptions/i,
+    );
   });
 
-  it("only known plan ids can be unlocked from the Lovable source", () => {
-    expect(FINAL).toContain("s.price_id IN ('pro_monthly','pro_annual','founder_lifetime')");
+  it("fails closed for paused or expired recurring statuses", () => {
+    expect(FINAL).not.toMatch(/s\.status\s*=\s*'(?:paused|expired)'/i);
   });
 
   it("preserves the ledger contract: idempotent replay, advisory lock, append-only", () => {

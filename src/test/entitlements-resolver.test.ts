@@ -55,8 +55,14 @@ describe("resolveEntitlements — absence and free", () => {
 
 describe("resolveEntitlements — each plan resolves to catalog caps", () => {
   for (const plan of ["pro_monthly", "pro_annual", "founder_lifetime"] as const) {
-    it(`${plan} active+future → catalog caps, active`, () => {
-      const r = resolveEntitlements(row({ plan_id: plan }), NOW);
+    it(`${plan} active+valid shape → catalog caps, active`, () => {
+      const r = resolveEntitlements(
+        row({
+          plan_id: plan,
+          current_period_end: plan === "founder_lifetime" ? null : FUTURE,
+        }),
+        NOW,
+      );
       expect(r.effectivePlanId).toBe(plan);
       expect(r.isActive).toBe(true);
       expect(r.capabilities).toEqual(PLAN_CATALOG[plan]);
@@ -83,7 +89,7 @@ describe("resolveEntitlements — each plan resolves to catalog caps", () => {
   });
 });
 
-describe("resolveEntitlements — degraded statuses fall back to free", () => {
+describe("resolveEntitlements — status policy", () => {
   it("expired → free, degraded, displayPlanId retained", () => {
     const r = resolveEntitlements(row({ status: "expired" }), NOW);
     expect(r.effectivePlanId).toBe("free");
@@ -93,17 +99,35 @@ describe("resolveEntitlements — degraded statuses fall back to free", () => {
     expect(r.degradedReason).toBe("expired");
   });
 
-  it("canceled → free, degraded", () => {
-    const r = resolveEntitlements(row({ status: "canceled" }), NOW);
-    expect(r.effectivePlanId).toBe("free");
-    expect(r.degradedReason).toBe("canceled");
+  it("trialing + future period → paid capabilities", () => {
+    const r = resolveEntitlements(row({ status: "trialing" }), NOW);
+    expect(r.effectivePlanId).toBe("pro_monthly");
+    expect(r.isActive).toBe(true);
+    expect(r.degraded).toBe(false);
   });
 
-  it("past_due → free, degraded", () => {
-    const r = resolveEntitlements(row({ status: "past_due" }), NOW);
+  it("past_due retains paid capabilities during dunning even after period end", () => {
+    const r = resolveEntitlements(row({ status: "past_due", current_period_end: PAST }), NOW);
+    expect(r.effectivePlanId).toBe("pro_monthly");
+    expect(r.isActive).toBe(true);
+    expect(r.degraded).toBe(false);
+  });
+
+  it("canceled retains paid capabilities until the paid-through period ends", () => {
+    const r = resolveEntitlements(row({ status: "canceled", current_period_end: FUTURE }), NOW);
+    expect(r.effectivePlanId).toBe("pro_monthly");
+    expect(r.isActive).toBe(true);
+    expect(r.degraded).toBe(false);
+  });
+
+  it("canceled at or after its period end → free, degraded", () => {
+    const r = resolveEntitlements(
+      row({ status: "canceled", current_period_end: NOW.toISOString() }),
+      NOW,
+    );
     expect(r.effectivePlanId).toBe("free");
     expect(r.isActive).toBe(false);
-    expect(r.degradedReason).toBe("past_due");
+    expect(r.degradedReason).toBe("canceled");
   });
 
   it("paused → free caps but plan_id retained in displayPlanId", () => {
@@ -130,10 +154,7 @@ describe("resolveEntitlements — period boundary", () => {
   });
 
   it("active + period exactly equal to now → treated as elapsed", () => {
-    const r = resolveEntitlements(
-      row({ current_period_end: NOW.toISOString() }),
-      NOW,
-    );
+    const r = resolveEntitlements(row({ current_period_end: NOW.toISOString() }), NOW);
     expect(r.isActive).toBe(false);
   });
 
@@ -151,6 +172,12 @@ describe("resolveEntitlements — period boundary", () => {
       NOW,
     );
     expect(r.isActive).toBe(false);
+  });
+
+  it("recurring row without current_period_end → fails closed", () => {
+    const r = resolveEntitlements(row({ current_period_end: null }), NOW);
+    expect(r.isActive).toBe(false);
+    expect(r.effectivePlanId).toBe("free");
   });
 });
 

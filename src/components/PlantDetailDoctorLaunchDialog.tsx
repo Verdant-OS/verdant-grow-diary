@@ -517,7 +517,11 @@ export default function PlantDetailDoctorLaunchDialog({
               data-testid="plant-detail-doctor-launch-continue"
               data-readiness={readinessResult.readiness}
             >
-              <Link to={plantReviewHref} aria-label="Continue to AI Doctor with plant context">
+              <Link
+                to={plantReviewHref}
+                aria-label="Continue to AI Doctor with plant context"
+                onClick={() => setOpen(false)}
+              >
                 Continue to AI Doctor <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </Button>

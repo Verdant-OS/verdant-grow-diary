@@ -149,7 +149,7 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     { kind: "diary", key: "d2", occurredAt: FRESH, eventType: "note", hasPhoto: false, note: "ok" },
   ];
 
-  it("Continue to AI Doctor routes to the scoped plant review", () => {
+  it("Continue to AI Doctor routes to the scoped plant review and closes the dialog", () => {
     useTimelineMemoryMock.mockReturnValue({ items: passingTimelineItems() });
     renderDialog();
     fireEvent.click(screen.getByTestId("plant-detail-doctor-launch-trigger"));
@@ -157,6 +157,8 @@ describe("<PlantDetailDoctorLaunchDialog />", () => {
     expect(cont.getAttribute("href")).toBe(
       `/plants/p1#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`,
     );
+    fireEvent.click(cont);
+    expect(screen.queryByTestId("plant-detail-doctor-launch-dialog")).toBeNull();
   });
 
   it("encodes special characters in the plant id for the route segment", () => {

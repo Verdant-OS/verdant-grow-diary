@@ -1,7 +1,7 @@
 /**
  * verdant-seo-guides.test.ts
  *
- * Static scanner for the /guides hub, the thirteen grower-intent guide pages,
+ * Static scanner for the /guides hub and the grower-intent guide pages,
  * sitemap discoverability, robots.txt safety, and forbidden-language rules.
  *
  * No React render, no Supabase, no network. Reads project files at test time.
@@ -55,6 +55,7 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "plant-watering-log",
   "grow-journal-app-without-account",
   "daily-grow-log-checklist",
+  "cronk-nutrients-grow-diary",
 ];
 
 describe("Verdant grower guide FAQ (/guides)", () => {
@@ -106,8 +107,8 @@ describe("Verdant grower guide FAQ (/guides)", () => {
   });
 });
 
-describe("Verdant SEO guide pages (14)", () => {
-  it("defines exactly the fourteen expected slugs, in order", () => {
+describe("Verdant SEO guide pages (15)", () => {
+  it("defines exactly the fifteen expected slugs, in order", () => {
     expect(VERDANT_GUIDE_SLUGS).toEqual(EXPECTED_SLUGS);
   });
 
@@ -184,7 +185,7 @@ describe("Verdant SEO guide pages (14)", () => {
 });
 
 describe("Sitemap and robots discoverability", () => {
-  it("sitemap includes /welcome, /pricing, /guides, and all 13 guide URLs", () => {
+  it("sitemap includes /welcome, /pricing, /guides, and every guide URL", () => {
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/welcome");
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/pricing");
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/guides");

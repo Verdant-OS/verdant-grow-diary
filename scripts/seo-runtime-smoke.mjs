@@ -38,6 +38,11 @@ const ROUTES = [
     expectTitle: /Sensor & Hardware Integrations/,
     canonical: `${ORIGIN}/hardware-integrations`,
   },
+  {
+    path: "/guides/cronk-nutrients-grow-diary",
+    expectTitle: /Using Cronk Nutrients with a grow diary/,
+    canonical: `${ORIGIN}/guides/cronk-nutrients-grow-diary`,
+  },
   // /pheno-comparison intentionally keeps the sitewide default title + no canonical.
   { path: "/pheno-comparison", expectTitle: /Verdant Grow Diary/, canonical: null },
 ];

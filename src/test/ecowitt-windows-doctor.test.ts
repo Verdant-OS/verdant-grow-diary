@@ -15,6 +15,8 @@ import { join, resolve } from "node:path";
 import {
   buildDoctorReport,
   buildLauncherFiles,
+  CANONICAL_DRY_RUN_COMMAND,
+  CANONICAL_DRY_RUN_REQUIREMENTS,
   detectIpCandidates,
   recommendedIp,
   writeLaunchers,
@@ -99,7 +101,9 @@ describe("buildDoctorReport", () => {
     expect(r.mosquittoHints.some((h) => h.includes("mosquitto_sub.exe"))).toBe(true);
     expect(r.nextCommands).toHaveLength(4);
     expect(r.nextCommands[1]).toMatch(/dev:ecowitt-http-bridge/);
-    expect(r.nextCommands[3]).toMatch(/dev:ecowitt-mqtt:dry-run/);
+    expect(r.nextCommands[3]).toContain(CANONICAL_DRY_RUN_COMMAND);
+    expect(r.nextCommands[3]).toContain(CANONICAL_DRY_RUN_REQUIREMENTS);
+    expect(r.nextCommands[3]).not.toMatch(/dev:ecowitt-mqtt:dry-run/);
   });
 
   it("does not include VERDANT_BRIDGE_TOKEN, service_role, or Supabase env values", () => {
@@ -124,7 +128,7 @@ describe("buildLauncherFiles", () => {
       "01-watch-mqtt.cmd",
       "02-start-http-bridge.cmd",
       "03-test-http-bridge.cmd",
-      "04-run-mqtt-dry-run.cmd",
+      "04-run-verdant-dry-run.cmd",
       "README.txt",
     ]);
   });
@@ -134,8 +138,8 @@ describe("buildLauncherFiles", () => {
     expect(m["02-start-http-bridge.cmd"]).toMatch(
       /cd \/d "C:\\repo"[\s\S]*bun run dev:ecowitt-http-bridge/,
     );
-    expect(m["04-run-mqtt-dry-run.cmd"]).toMatch(
-      /cd \/d "C:\\repo"[\s\S]*bun run dev:ecowitt-mqtt:dry-run/,
+    expect(m["04-run-verdant-dry-run.cmd"]).toMatch(
+      /cd \/d "C:\\repo"[\s\S]*bun run scripts\/ecowitt-live-soil-bridge\.ts --dry-run --once/,
     );
   });
 
@@ -157,7 +161,16 @@ describe("buildLauncherFiles", () => {
       expect(body, name).not.toMatch(/sensor-ingest-webhook/);
       expect(body, name).not.toMatch(/supabase\.co/i);
       expect(body, name).not.toMatch(/dev:send-ecowitt/);
+      expect(body, name).not.toMatch(/dev:ecowitt-mqtt:dry-run/);
     }
+  });
+
+  it("asks for one tent plus a same-tent soil channel map before the canonical dry-run", () => {
+    const launcher = buildLauncherFiles("C:\\repo")["04-run-verdant-dry-run.cmd"];
+    expect(launcher).toContain("VERDANT_TENT_ID");
+    expect(launcher).toContain("ECOWITT_SOIL_CHANNEL_MAP_JSON");
+    expect(launcher).toMatch(/same tent/i);
+    expect(launcher).toContain(CANONICAL_DRY_RUN_COMMAND);
   });
 });
 

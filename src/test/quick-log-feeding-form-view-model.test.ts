@@ -64,6 +64,28 @@ describe("buildFeedingFormPayload — happy path", () => {
     expect(r.payload.note).toBe("thirsty plant");
   });
 
+  it("maps a PPM-500-only value to canonical EC", () => {
+    const r = buildFeedingFormPayload({
+      growId: "grow-1",
+      form: withForm({ ppmIn: "1000", runoffPpm: "850" }),
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.ec_in).toBe(2);
+    expect(r.payload.runoff_ec).toBe(1.7);
+    expect(r.payload).not.toHaveProperty("ppm_in");
+    expect(r.payload).not.toHaveProperty("runoff_ppm");
+  });
+
+  it("fails closed when EC and PPM do not match the 500 scale", () => {
+    const r = buildFeedingFormPayload({
+      growId: "grow-1",
+      form: withForm({ ecIn: "2", ppmIn: "700" }),
+    });
+    expect(r).toEqual({ ok: false, reason: "ec_ppm:mismatch" });
+    expect(feedingFormReasonToHelper("ec_ppm:mismatch")).toMatch(/match the 500 scale/);
+  });
+
   it("drops empty optional fields rather than zeroing them", () => {
     const r = buildFeedingFormPayload({
       growId: "grow-1",

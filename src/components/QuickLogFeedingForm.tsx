@@ -20,6 +20,10 @@ import {
   buildEcCompensationPreview,
   EC_COMPENSATION_PREVIEW_DISCLAIMER,
 } from "@/lib/ecCompensationPreviewViewModel";
+import {
+  updateEcPpm500Pair,
+  type EcPpm500EditSource,
+} from "@/lib/ecPpm500PairRules";
 
 interface Props {
   value: QuickLogFeedingFormState;
@@ -47,6 +51,16 @@ export default function QuickLogFeedingForm({
       i === idx ? { ...row, ...patch } : row,
     );
     onChange({ ...value, products: next });
+  };
+
+  const setEcPpmPair = (
+    ecKey: "ecIn" | "ecOut" | "runoffEc",
+    ppmKey: "ppmIn" | "ppmOut" | "runoffPpm",
+    source: EcPpm500EditSource,
+    raw: string,
+  ) => {
+    const pair = updateEcPpm500Pair(source, raw);
+    onChange({ ...value, [ecKey]: pair.ec, [ppmKey]: pair.ppm });
   };
 
   const review = buildFeedingReview(value, defaultsApplied);
@@ -113,7 +127,11 @@ export default function QuickLogFeedingForm({
         <summary className="cursor-pointer text-sm font-medium">
           Optional metrics
         </summary>
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        <p id="qlv2-feed-ec-ppm-help" className="mt-2 text-xs text-muted-foreground">
+          PPM uses the 500 scale. Enter either value and Verdant fills the other:
+          PPM ÷ 500 = EC; EC × 500 = PPM. Canonical EC is saved in mS/cm.
+        </p>
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <Label htmlFor="qlv2-feed-ph">pH</Label>
             <Input
@@ -131,7 +149,19 @@ export default function QuickLogFeedingForm({
               inputMode="decimal"
               value={value.ecIn}
               disabled={disabled}
-              onChange={(e) => setField("ecIn", e.target.value)}
+              aria-describedby="qlv2-feed-ec-ppm-help"
+              onChange={(e) => setEcPpmPair("ecIn", "ppmIn", "ec", e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="qlv2-feed-ppm-in">PPM in (500 scale)</Label>
+            <Input
+              id="qlv2-feed-ppm-in"
+              inputMode="decimal"
+              value={value.ppmIn}
+              disabled={disabled}
+              aria-describedby="qlv2-feed-ec-ppm-help"
+              onChange={(e) => setEcPpmPair("ecIn", "ppmIn", "ppm", e.target.value)}
             />
           </div>
           <div>
@@ -141,7 +171,19 @@ export default function QuickLogFeedingForm({
               inputMode="decimal"
               value={value.ecOut}
               disabled={disabled}
-              onChange={(e) => setField("ecOut", e.target.value)}
+              aria-describedby="qlv2-feed-ec-ppm-help"
+              onChange={(e) => setEcPpmPair("ecOut", "ppmOut", "ec", e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="qlv2-feed-ppm-out">PPM out (500 scale)</Label>
+            <Input
+              id="qlv2-feed-ppm-out"
+              inputMode="decimal"
+              value={value.ppmOut}
+              disabled={disabled}
+              aria-describedby="qlv2-feed-ec-ppm-help"
+              onChange={(e) => setEcPpmPair("ecOut", "ppmOut", "ppm", e.target.value)}
             />
           </div>
           <div>
@@ -171,7 +213,23 @@ export default function QuickLogFeedingForm({
               inputMode="decimal"
               value={value.runoffEc}
               disabled={disabled}
-              onChange={(e) => setField("runoffEc", e.target.value)}
+              aria-describedby="qlv2-feed-ec-ppm-help"
+              onChange={(e) =>
+                setEcPpmPair("runoffEc", "runoffPpm", "ec", e.target.value)
+              }
+            />
+          </div>
+          <div>
+            <Label htmlFor="qlv2-feed-runoff-ppm">Runoff PPM (500 scale)</Label>
+            <Input
+              id="qlv2-feed-runoff-ppm"
+              inputMode="decimal"
+              value={value.runoffPpm}
+              disabled={disabled}
+              aria-describedby="qlv2-feed-ec-ppm-help"
+              onChange={(e) =>
+                setEcPpmPair("runoffEc", "runoffPpm", "ppm", e.target.value)
+              }
             />
           </div>
           <div>

@@ -607,6 +607,62 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     ],
     related: ["plant-watering-log", "how-to-start-a-grow-journal", "sensor-truth-grow-room"],
   },
+  {
+    slug: "cronk-nutrients-grow-diary",
+    title: "Using Cronk Nutrients with a grow diary | Verdant Grow Diary",
+    h1: "Using Cronk Nutrients with a grow diary: what to log so you can tell if the chart is working",
+    description:
+      "Use a Cronk Nutrients grow diary to track the official chart step, product line, medium, stage, input pH/EC, runoff trends, photos, and plant response.",
+    targetKeyword: "Cronk Nutrients grow diary",
+    intro:
+      "A Cronk Nutrients grow diary should answer a practical question: did you follow the current manufacturer chart, and how did this plant respond in this medium and environment? Verdant treats Cronk Nutrients as its first brand-specific case study because it is used consistently in real grows. That makes it useful for repeatable plant memory, not a universal recommendation for every grower.",
+    sections: [
+      {
+        heading: "Start with the exact chart you actually followed",
+        body: "Record the Cronk product line, the current official chart or revision you referenced, the plant stage, and the medium. Verdant does not reproduce or rewrite a manufacturer feeding chart. Keeping the source and version beside the log prevents a later chart update—or a different product line—from quietly changing what your history means.",
+      },
+      {
+        heading: "Log what went into the feed, not what the chart intended",
+        body: "For each feeding, capture the date, product names, actual amounts used, total mixed volume, water source, input pH, and input EC or PPM. If a field was not measured, leave it unknown instead of inventing a value. The goal is an honest record of the feed the plant received, not a perfect-looking checklist.",
+      },
+      {
+        heading: "Pair the input with root-zone and room context",
+        body: "Where the medium and routine make it useful, add runoff or drain pH and EC, pot weight or soil-moisture context, temperature, humidity, VPD, and a photo. Keep every sensor reading source-labeled and time-stamped. One runoff number or leaf photo does not prove nutrient burn; trends and surrounding conditions are what make the reading interpretable.",
+      },
+      {
+        heading: "Compare chart adherence with the plant's response",
+        body: "Check the plant again over the next day and the next few days: leaf posture, tip color, new growth, water use, and any visible change. Compare that response with the feed and environment already on the timeline. AI Doctor can review this history cautiously and identify missing context, but it should not turn one symptom into an aggressive nutrient change or an automatic action.",
+      },
+    ],
+    faq: [
+      {
+        question: "Does Verdant provide a Cronk Nutrients feeding chart?",
+        answer:
+          "No. Use Cronk Nutrients' current official chart for the product line and medium you run. Verdant records which chart step you followed, what you actually mixed, and how the plant responded; it does not copy, reconstruct, or replace the manufacturer's chart.",
+      },
+      {
+        question: "What should I log when using Cronk Nutrients?",
+        answer:
+          "Log the product line, chart or revision, plant stage, medium, product names and actual amounts, total feed volume, water source, input pH, input EC or PPM, and—when useful—runoff or drain pH and EC. Add a consistent photo and room conditions so the plant response has context.",
+      },
+      {
+        question: "Can one runoff reading prove Cronk Nutrients is burning my plant?",
+        answer:
+          "No. A single runoff value can be affected by medium, sampling method, irrigation history, and measurement quality. Look for a repeatable trend alongside leaf-tip changes, plant posture, water use, input readings, and environment before drawing a conclusion.",
+      },
+      {
+        question: "Should I change the feeding chart after one symptom?",
+        answer:
+          "Not from one weak signal. Confirm the chart and mix, check meter quality and environment, add a fresh photo, and compare the plant over time. Make nutrient changes cautiously and keep the grower—not software—in control of the decision.",
+      },
+    ],
+    related: [
+      "what-to-log-in-a-grow-journal",
+      "plant-watering-log",
+      "grow-room-vpd-tracker",
+      "ai-grow-doctor",
+    ],
+  },
 ];
 
 /** Return the full published guide slugs, in the same order rendered on /guides. */

@@ -12,7 +12,7 @@ describe("subscriber growth migration contract", () => {
     const audit = auditSubscriberGrowthMigrationContract((file: string) =>
       readFileSync(resolve(process.cwd(), file), "utf8"),
     );
-    expect(audit).toMatchObject({ ok: true, migrationsPassed: 4, migrationsTotal: 4 });
+    expect(audit).toMatchObject({ ok: true, migrationsPassed: 5, migrationsTotal: 5 });
     expect(audit.issues).toEqual([]);
   });
 
@@ -34,7 +34,7 @@ describe("subscriber growth migration contract", () => {
     });
 
     expect(audit.ok).toBe(false);
-    expect(audit.migrationsPassed).toBe(1);
+    expect(audit.migrationsPassed).toBe(2);
     expect(audit.issues).toEqual(
       expect.arrayContaining([
         expect.stringContaining("missing_file"),

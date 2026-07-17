@@ -13,10 +13,16 @@ const TENTS = readFileSync(resolve(ROOT, "src/pages/Tents.tsx"), "utf8");
 const CREATE_PLANT = readFileSync(resolve(ROOT, "src/components/CreatePlantDialog.tsx"), "utf8");
 const CREATE_TENT = readFileSync(resolve(ROOT, "src/components/CreateTentDialog.tsx"), "utf8");
 
+// Same expression with or without Prettier's parentheses around the nullish
+// coalescing — the wiring pinned here (URL growId validated against the
+// RLS-loaded grows via useScopedGrow) is identical in both shapes.
+const VALID_GROW_ID_RE =
+  /validGrowId\s*=\s*isValidScopedGrow\s*\?\s*\(?\s*urlGrowId\s*\?\?\s*undefined\s*\)?\s*:\s*undefined/;
+
 describe("Plants/Tents — preselect grow on create", () => {
   it("Plants validates URL growId against the user's RLS-loaded grows via useScopedGrow", () => {
     expect(PLANTS).toMatch(/useScopedGrow\(\)/);
-    expect(PLANTS).toMatch(/validGrowId\s*=\s*isValidScopedGrow\s*\?\s*urlGrowId\s*\?\?\s*undefined\s*:\s*undefined/);
+    expect(PLANTS).toMatch(VALID_GROW_ID_RE);
   });
 
   it("Plants passes validGrowId into CreatePlantDialog", () => {
@@ -25,7 +31,7 @@ describe("Plants/Tents — preselect grow on create", () => {
 
   it("Tents validates URL growId against the user's RLS-loaded grows via useScopedGrow", () => {
     expect(TENTS).toMatch(/useScopedGrow\(\)/);
-    expect(TENTS).toMatch(/validGrowId\s*=\s*isValidScopedGrow\s*\?\s*urlGrowId\s*\?\?\s*undefined\s*:\s*undefined/);
+    expect(TENTS).toMatch(VALID_GROW_ID_RE);
   });
 
   it("Tents passes validGrowId into CreateTentDialog", () => {
@@ -38,7 +44,9 @@ describe("Plants/Tents — preselect grow on create", () => {
   });
 
   it("CreatePlantDialog scopes tent options to the preselected grow", () => {
-    expect(CREATE_PLANT).toMatch(/allTents[\s\S]*?\.filter\([\s\S]*?t\.grow_id\s*===\s*defaultGrowId/);
+    expect(CREATE_PLANT).toMatch(
+      /allTents[\s\S]*?\.filter\([\s\S]*?t\.grow_id\s*===\s*defaultGrowId/,
+    );
   });
 
   it("CreateTentDialog accepts defaultGrowId and writes grow_id on insert", () => {
@@ -61,7 +69,9 @@ describe("Plants/Tents — preselect grow on create", () => {
   it("does not introduce ai-coach, device-control, or service_role surface", () => {
     for (const src of [PLANTS, TENTS, CREATE_PLANT, CREATE_TENT]) {
       expect(src).not.toMatch(/ai-coach|ai_coach/);
-      expect(src).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i);
+      expect(src).not.toMatch(
+        /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|\brelay\b|\bactuator\b|service_role/i,
+      );
     }
   });
 });

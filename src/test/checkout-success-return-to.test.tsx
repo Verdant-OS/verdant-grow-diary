@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import { resolveEntitlements } from "@/lib/entitlements/resolveEntitlements";
 import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
 
@@ -63,6 +63,11 @@ vi.mock("@/hooks/usePageSeo", () => ({
 
 import CheckoutSuccess from "@/pages/CheckoutSuccess";
 
+function PlantDestination() {
+  const { id } = useParams();
+  return <div data-testid="landed-plant">plant:{id}</div>;
+}
+
 function renderAt(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
@@ -80,6 +85,7 @@ function renderAt(url: string) {
           path="/pheno-hunts/:id/keepers"
           element={<div data-testid="landed-keepers">keepers</div>}
         />
+        <Route path="/plants/:id" element={<PlantDestination />} />
         <Route path="/" element={<div data-testid="landed-home">home</div>} />
       </Routes>
     </MemoryRouter>,
@@ -110,6 +116,14 @@ describe("CheckoutSuccess returnTo handling", () => {
     renderAt("/checkout/success?returnTo=%2Fpheno-hunts%2Fabc%2Fkeepers");
     await waitFor(() => {
       expect(screen.getByTestId("landed-keepers")).toBeDefined();
+    });
+  });
+
+  it("returns an AI Doctor upgrade to the originating plant once entitlement is confirmed", async () => {
+    mode.current = "confirmed";
+    renderAt("/checkout/success?returnTo=%2Fplants%2Fplant-123");
+    await waitFor(() => {
+      expect(screen.getByTestId("landed-plant")).toHaveTextContent("plant:plant-123");
     });
   });
 

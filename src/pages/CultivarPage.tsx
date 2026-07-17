@@ -9,28 +9,28 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
 import { usePageSeo } from "@/hooks/usePageSeo";
-import {
-  findCultivarBySlug,
-  type VerdantCultivarProfile,
-} from "@/constants/verdantCultivars";
+import { findCultivarBySlug } from "@/constants/verdantCultivars";
 
 export default function CultivarPage() {
   const { slug } = useParams<{ slug: string }>();
   const cultivar = findCultivarBySlug(slug);
 
+  // Hooks must run unconditionally (rules-of-hooks): call before the
+  // unknown-slug redirect, falling back to the index metadata for the
+  // momentary render before <Navigate> unmounts this page.
+  usePageSeo({
+    title: cultivar
+      ? `${cultivar.name} Cultivator Guide (${cultivar.searchAlias} info) | Verdant`
+      : "Cultivar Guides | Verdant",
+    description: cultivar
+      ? `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`
+      : "Cultivator-focused grow guides for popular cultivars.",
+    path: cultivar ? `/cultivars/${cultivar.slug}` : "/cultivars",
+  });
+
   if (!cultivar) {
     return <Navigate to="/cultivars" replace />;
   }
-
-  return <CultivarDetails cultivar={cultivar} />;
-}
-
-function CultivarDetails({ cultivar }: { cultivar: VerdantCultivarProfile }) {
-  usePageSeo({
-    title: `${cultivar.name} Cultivator Guide (${cultivar.searchAlias} info) | Verdant`,
-    description: `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`,
-    path: `/cultivars/${cultivar.slug}`,
-  });
 
   return (
     <main
@@ -86,9 +86,9 @@ function CultivarDetails({ cultivar }: { cultivar: VerdantCultivarProfile }) {
         <section className="mt-10">
           <h2 className="font-display text-2xl font-semibold">Environment by stage</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Ranges reflect common horticultural best practice. Use your own
-            source-labeled sensor snapshots to confirm what your tent is actually doing —
-            Verdant records the data; the grower decides.
+            Ranges reflect common horticultural best practice. Use your own source-labeled sensor
+            snapshots to confirm what your tent is actually doing — Verdant records the data; the
+            grower decides.
           </p>
           <ul className="mt-4 space-y-3 text-sm">
             <li>
@@ -104,9 +104,7 @@ function CultivarDetails({ cultivar }: { cultivar: VerdantCultivarProfile }) {
         </section>
 
         <section className="mt-10">
-          <h2 className="font-display text-2xl font-semibold">
-            Common issues growers report
-          </h2>
+          <h2 className="font-display text-2xl font-semibold">Common issues growers report</h2>
           <ul className="mt-4 space-y-4">
             {cultivar.commonIssues.map((it) => (
               <li key={it.issue} className="rounded-lg border border-border/60 p-4">
@@ -127,8 +125,7 @@ function CultivarDetails({ cultivar }: { cultivar: VerdantCultivarProfile }) {
             ))}
           </ul>
           <p className="mt-4 text-sm text-muted-foreground">
-            Verdant organizes the evidence; the breeder decides the keeper.
-            See{" "}
+            Verdant organizes the evidence; the breeder decides the keeper. See{" "}
             <Link to="/pheno-comparison" className="underline hover:text-foreground">
               Pheno comparison
             </Link>{" "}
@@ -138,14 +135,11 @@ function CultivarDetails({ cultivar }: { cultivar: VerdantCultivarProfile }) {
 
         <CultivarPhenoSampleModule cultivar={cultivar} />
 
-
-
         <section className="mt-10 rounded-xl border border-primary/30 bg-primary/5 p-5">
           <h2 className="font-display text-xl font-semibold">Log your own {cultivar.name} run</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Verdant turns waterings, feedings, photos, and source-labeled sensor
-            snapshots into a plant timeline you can look back on next run — no
-            device control, no automatic actions.
+            Verdant turns waterings, feedings, photos, and source-labeled sensor snapshots into a
+            plant timeline you can look back on next run — no device control, no automatic actions.
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
             <Link

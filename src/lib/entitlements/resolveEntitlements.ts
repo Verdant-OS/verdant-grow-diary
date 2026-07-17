@@ -23,6 +23,7 @@ import type {
 } from "./types";
 import { FREE_CAPABILITIES } from "./capabilities";
 import { PLAN_CATALOG, isKnownPlanId } from "./planCatalog";
+import { subscriptionGrantsAccess } from "../paddleSubscriptionAccessRules";
 
 const KNOWN_STATUSES: ReadonlyArray<SubscriptionStatus> = [
   "active",
@@ -33,10 +34,8 @@ const KNOWN_STATUSES: ReadonlyArray<SubscriptionStatus> = [
   "expired",
 ];
 
-
 function isKnownStatus(value: unknown): value is SubscriptionStatus {
-  return typeof value === "string" &&
-    (KNOWN_STATUSES as ReadonlyArray<string>).includes(value);
+  return typeof value === "string" && (KNOWN_STATUSES as ReadonlyArray<string>).includes(value);
 }
 
 export interface ResolveEntitlementsOptions {
@@ -47,10 +46,7 @@ export interface ResolveEntitlementsOptions {
   isStaff?: boolean;
 }
 
-function applyStaffLift(
-  base: ResolvedEntitlement,
-  isStaff: boolean,
-): ResolvedEntitlement {
+function applyStaffLift(base: ResolvedEntitlement, isStaff: boolean): ResolvedEntitlement {
   if (!isStaff) return base;
   // If the caller already has an active paid plan, keep its display identity
   // and capabilities — staff never downgrades a real subscription.
@@ -64,8 +60,7 @@ function applyStaffLift(
     // Preserve any real displayPlanId (e.g. "pro_monthly" paused) so
     // messaging like "Pro — paused" still reads correctly. Fall back to
     // pro_monthly if there was no plan identity to preserve.
-    displayPlanId:
-      base.displayPlanId !== "free" ? base.displayPlanId : "pro_monthly",
+    displayPlanId: base.displayPlanId !== "free" ? base.displayPlanId : "pro_monthly",
     isActive: true,
     capabilities: PLAN_CATALOG.pro_monthly,
     isStaff: true,
@@ -98,16 +93,19 @@ export function resolveEntitlements(
 
   // Absence = free.
   if (row == null) {
-    return applyStaffLift({
-      effectivePlanId: "free",
-      displayPlanId: "free",
-      status: "active",
-      isActive: true,
-      capabilities: FREE_CAPABILITIES,
-      degraded: false,
-      degradedReason: "null_row_free",
-      isStaff: false,
-    }, isStaff);
+    return applyStaffLift(
+      {
+        effectivePlanId: "free",
+        displayPlanId: "free",
+        status: "active",
+        isActive: true,
+        capabilities: FREE_CAPABILITIES,
+        degraded: false,
+        degradedReason: "null_row_free",
+        isStaff: false,
+      },
+      isStaff,
+    );
   }
 
   // Defensive: DB CHECKs prevent these but the client type is widened.
@@ -121,49 +119,54 @@ export function resolveEntitlements(
   const planId = row.plan_id as PlanId;
   const status = row.status as SubscriptionStatus;
 
-  // Period expiry check (NULL = no expiry: free or founder_lifetime).
-  let periodElapsed = false;
-  if (row.current_period_end != null) {
-    const end = new Date(row.current_period_end);
-    if (Number.isNaN(end.getTime()) || end.getTime() <= now.getTime()) {
-      periodElapsed = true;
-    }
-  }
-
-  // M6 (audit fix): treat 'trialing' as active-in-period so a Paddle-issued
-  // trial row unlocks the same capabilities as a paid active row until the
-  // trial's current_period_end. This matches the partial index
-  // idx_subscriptions_user_env_active which already includes 'trialing'.
-  if ((status === "active" || status === "trialing") && !periodElapsed) {
-    return applyStaffLift({
-      effectivePlanId: planId,
-      displayPlanId: planId,
-      status,
-      isActive: true,
-      capabilities: PLAN_CATALOG[planId],
-      degraded: false,
-      degradedReason: null,
-      isStaff: false,
-    }, isStaff);
+  // One shared status policy governs browser presentation and server-side
+  // callers: active/trialing rows are valid in-period, past_due preserves
+  // access during Paddle dunning, and canceled rows retain access only until
+  // the paid-through period ends. Unknown/invalid dates fail closed.
+  if (
+    subscriptionGrantsAccess(
+      { plan_id: planId, status, current_period_end: row.current_period_end },
+      now,
+    )
+  ) {
+    return applyStaffLift(
+      {
+        effectivePlanId: planId,
+        displayPlanId: planId,
+        status,
+        isActive: true,
+        capabilities: PLAN_CATALOG[planId],
+        degraded: false,
+        degradedReason: null,
+        isStaff: false,
+      },
+      isStaff,
+    );
   }
 
   // Degraded paths — retain displayPlanId for UX messaging.
   const reason: ResolvedEntitlement["degradedReason"] =
-    status === "past_due" ? "past_due"
-    : status === "canceled" ? "canceled"
-    : status === "paused" ? "paused"
-    : status === "expired" ? "expired"
-    : "expired"; // active/trialing + periodElapsed
+    status === "past_due"
+      ? "past_due"
+      : status === "canceled"
+        ? "canceled"
+        : status === "paused"
+          ? "paused"
+          : status === "expired"
+            ? "expired"
+            : "expired"; // active/trialing + elapsed or invalid period
 
-
-  return applyStaffLift({
-    effectivePlanId: "free",
-    displayPlanId: planId,
-    status,
-    isActive: false,
-    capabilities: FREE_CAPABILITIES,
-    degraded: true,
-    degradedReason: reason,
-    isStaff: false,
-  }, isStaff);
+  return applyStaffLift(
+    {
+      effectivePlanId: "free",
+      displayPlanId: planId,
+      status,
+      isActive: false,
+      capabilities: FREE_CAPABILITIES,
+      degraded: true,
+      degradedReason: reason,
+      isStaff: false,
+    },
+    isStaff,
+  );
 }

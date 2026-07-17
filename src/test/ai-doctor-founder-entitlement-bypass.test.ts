@@ -26,11 +26,7 @@ import {
   type AiCreditDenial,
 } from "@/lib/aiCreditLimitNoticeViewModel";
 import { resolveEntitlements } from "@/lib/entitlements";
-import type {
-  BillingSubscriptionRow,
-  PlanId,
-  ResolvedEntitlement,
-} from "@/lib/entitlements/types";
+import type { BillingSubscriptionRow, PlanId, ResolvedEntitlement } from "@/lib/entitlements/types";
 
 const at = new Date("2026-06-19T00:00:00Z");
 
@@ -43,7 +39,7 @@ function rowFor(plan: PlanId): BillingSubscriptionRow {
     provider: "stripe",
     provider_customer_id: null,
     provider_subscription_id: null,
-    current_period_end: "2099-01-01T00:00:00Z",
+    current_period_end: plan === "founder_lifetime" ? null : "2099-01-01T00:00:00Z",
     cancel_at_period_end: false,
     founder_number: plan === "founder_lifetime" ? 1 : null,
     created_at: "2025-01-01T00:00:00Z",
@@ -64,14 +60,8 @@ function denial(planId: string | null): AiCreditDenial {
   };
 }
 
-const founderEnt: ResolvedEntitlement = resolveEntitlements(
-  rowFor("founder_lifetime"),
-  at,
-);
-const proEnt: ResolvedEntitlement = resolveEntitlements(
-  rowFor("pro_monthly"),
-  at,
-);
+const founderEnt: ResolvedEntitlement = resolveEntitlements(rowFor("founder_lifetime"), at);
+const proEnt: ResolvedEntitlement = resolveEntitlements(rowFor("pro_monthly"), at);
 const freeEnt: ResolvedEntitlement = resolveEntitlements(null, at);
 
 describe("resolveAiDoctorEntitlementView", () => {
@@ -102,14 +92,11 @@ describe("resolveAiDoctorEntitlementView", () => {
     expect(v.reason).toBe("free_or_unknown_viewer");
   });
 
-  it.each([null, undefined])(
-    "missing entitlement (%p) → no bypass (fail-closed)",
-    (ent) => {
-      const v = resolveAiDoctorEntitlementView({ entitlement: ent });
-      expect(v.bypassesUpsell).toBe(false);
-      expect(v.isFounder).toBe(false);
-    },
-  );
+  it.each([null, undefined])("missing entitlement (%p) → no bypass (fail-closed)", (ent) => {
+    const v = resolveAiDoctorEntitlementView({ entitlement: ent });
+    expect(v.bypassesUpsell).toBe(false);
+    expect(v.isFounder).toBe(false);
+  });
 
   it("reasons contain NO raw user IDs, emails, JWTs, or secrets", () => {
     for (const ent of [founderEnt, proEnt, freeEnt, null]) {
@@ -122,23 +109,17 @@ describe("resolveAiDoctorEntitlementView", () => {
 describe("reconcileAiCreditDenialPlanId", () => {
   it("founder + denial.plan_id='free' → reclassified to founder_lifetime", () => {
     const view = resolveAiDoctorEntitlementView({ entitlement: founderEnt });
-    expect(
-      reconcileAiCreditDenialPlanId({ denialPlanId: "free", view }),
-    ).toBe("founder_lifetime");
+    expect(reconcileAiCreditDenialPlanId({ denialPlanId: "free", view })).toBe("founder_lifetime");
   });
 
   it("pro + denial.plan_id='free' → reclassified to pro_monthly", () => {
     const view = resolveAiDoctorEntitlementView({ entitlement: proEnt });
-    expect(
-      reconcileAiCreditDenialPlanId({ denialPlanId: "free", view }),
-    ).toBe("pro_monthly");
+    expect(reconcileAiCreditDenialPlanId({ denialPlanId: "free", view })).toBe("pro_monthly");
   });
 
   it("free viewer + denial.plan_id='free' → unchanged (upsell still shown)", () => {
     const view = resolveAiDoctorEntitlementView({ entitlement: freeEnt });
-    expect(
-      reconcileAiCreditDenialPlanId({ denialPlanId: "free", view }),
-    ).toBe("free");
+    expect(reconcileAiCreditDenialPlanId({ denialPlanId: "free", view })).toBe("free");
   });
 
   it("non-free denial is never rewritten", () => {

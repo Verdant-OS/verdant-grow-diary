@@ -16,6 +16,7 @@ import {
   handleMqttMessage,
   forwardWithBackoff,
   readBridgeEnv,
+  shouldCompleteOnceBridge,
 } from "../../scripts/ecowitt-live-soil-bridge";
 
 const TENT = "11111111-1111-1111-1111-111111111111";
@@ -426,6 +427,22 @@ describe("handleMqttMessage (bridge orchestration)", () => {
       const dump = JSON.stringify(call);
       expect(dump).not.toContain("vbt_test_token_xxxxxxxxxx");
     }
+  });
+});
+
+describe("one-shot bridge proof mode", () => {
+  it("is opt-in and supports dry-run inspection without posting", () => {
+    const env = readBridgeEnv({ ECOWITT_BRIDGE_DRY_RUN: "1" } as NodeJS.ProcessEnv, ["--once"]);
+    expect(env.once).toBe(true);
+    expect(env.dryRun).toBe(true);
+  });
+
+  it("stops only after an MQTT message is fully accepted", () => {
+    const onceEnv = { once: true };
+    expect(shouldCompleteOnceBridge(onceEnv, { accepted: 1, rejected: 0, reasons: [] })).toBe(true);
+    expect(shouldCompleteOnceBridge(onceEnv, { accepted: 0, rejected: 1, reasons: ["malformed_payload"] })).toBe(false);
+    expect(shouldCompleteOnceBridge(onceEnv, { accepted: 1, rejected: 1, reasons: [] })).toBe(false);
+    expect(shouldCompleteOnceBridge({ once: false }, { accepted: 1, rejected: 0, reasons: [] })).toBe(false);
   });
 });
 

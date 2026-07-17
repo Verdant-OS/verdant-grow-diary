@@ -108,9 +108,12 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
-vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "u1", email: "u@example.com" } }),
-}));
+vi.mock("@/store/auth", () => {
+  const authState = { user: { id: "u1", email: "u@example.com" } };
+  return {
+    useAuth: () => authState,
+  };
+});
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
     grows: [{ id: "g1", name: "G1" }],

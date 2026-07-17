@@ -30,7 +30,8 @@ export type Decision =
   | { kind: 'skip'; reason: SkipReason }
   | { kind: 'upsert_subscription'; row: SubscriptionUpsertRow }
   | { kind: 'update_subscription'; paddleSubscriptionId: string; patch: SubscriptionPatch }
-  | { kind: 'record_lifetime'; row: SubscriptionUpsertRow };
+  | { kind: 'record_lifetime'; row: SubscriptionUpsertRow }
+  | { kind: 'upsert_customer'; row: CustomerUpsertRow };
 
 export type SkipReason =
   | 'missing_user_id'
@@ -39,10 +40,13 @@ export type SkipReason =
   | 'unknown_price_id'
   | 'missing_subscription_id'
   | 'missing_transaction_id'
+  | 'missing_customer_id'
   | 'unhandled_event_type'
   | 'lifetime_price_only_for_transactions'
   | 'non_lifetime_transaction'
-  | 'unknown_lifetime_price_id';
+  | 'unknown_lifetime_price_id'
+  | 'adjustment_audit_only';
+
 
 export interface SubscriptionUpsertRow {
   user_id: string;
@@ -54,6 +58,8 @@ export interface SubscriptionUpsertRow {
   current_period_start: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  scheduled_change_action: string | null;
+  scheduled_change_at: string | null;
   environment: PaddleEnv;
   updated_at: string;
 }
@@ -63,21 +69,36 @@ export interface SubscriptionPatch {
   current_period_start: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  scheduled_change_action: string | null;
+  scheduled_change_at: string | null;
   environment: PaddleEnv;
+  updated_at: string;
+}
+
+// Mirror row for the paddle_customers table (customer.created /
+// customer.updated events). Not tied to auth.users — mapping to the
+// app user happens via subscriptions.paddle_customer_id.
+export interface CustomerUpsertRow {
+  paddle_customer_id: string;
+  environment: PaddleEnv;
+  email: string | null;
+  name: string | null;
+  locale: string | null;
+  status: string | null;
   updated_at: string;
 }
 
 // Loose shapes — the Paddle SDK returns camelCase but we defensively read.
 interface EventLike {
   eventType?: string;
-  data?: SubscriptionData | TransactionData;
+  data?: SubscriptionData | TransactionData | CustomerData;
 }
 interface SubscriptionData {
   id?: string;
   customerId?: string;
   status?: string;
   currentBillingPeriod?: { startsAt?: string; endsAt?: string } | null;
-  scheduledChange?: { action?: string } | null;
+  scheduledChange?: { action?: string; effectiveAt?: string } | null;
   customData?: { userId?: string } | null;
   items?: Array<{
     price?: { id?: string; importMeta?: { externalId?: string } | null };
@@ -98,9 +119,18 @@ interface TransactionData {
     };
   }>;
 }
+// customer.created / customer.updated payload shape.
+interface CustomerData {
+  id?: string;
+  email?: string | null;
+  name?: string | null;
+  locale?: string | null;
+  status?: string | null;
+}
 
-function firstItem(data: SubscriptionData | TransactionData) {
-  return Array.isArray(data.items) && data.items.length > 0 ? data.items[0] : null;
+function firstItem(data: SubscriptionData | TransactionData | CustomerData) {
+  const items = (data as SubscriptionData | TransactionData).items;
+  return Array.isArray(items) && items.length > 0 ? items[0] : null;
 }
 
 export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
@@ -108,11 +138,46 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
   const data = event.data ?? {};
   const nowIso = now.toISOString();
 
+  // Customer mirror events → paddle_customers table upsert.
+  if (type === 'customer.created' || type === 'customer.updated') {
+    const c = data as CustomerData;
+    if (!c.id) return { kind: 'skip', reason: 'missing_customer_id' };
+    return {
+      kind: 'upsert_customer',
+      row: {
+        paddle_customer_id: c.id,
+        environment: env,
+        email: c.email ?? null,
+        name: c.name ?? null,
+        locale: c.locale ?? null,
+        status: c.status ?? null,
+        updated_at: nowIso,
+      },
+    };
+  }
+
   // Subscription events → subscriptions table upsert / update.
+  //
+  // Paddle emits both the umbrella `subscription.updated` AND dedicated
+  // lifecycle events (`subscription.past_due`, `subscription.paused`,
+  // `subscription.resumed`, `subscription.trialing`, `subscription.activated`)
+  // for the same state transitions. They all carry the full SubscriptionData
+  // payload with an accurate `status` field, so we route them through the
+  // same upsert (idempotent via onConflict=paddle_subscription_id). This
+  // guarantees mirror state reflects dunning / pause / resume / trial
+  // transitions even when the umbrella `subscription.updated` is delayed or
+  // absent, and preserves the access-rule semantics in
+  // src/lib/paddleSubscriptionAccessRules.ts (active/trialing/past_due
+  // grant; paused revokes; canceled grants until period end — handled in
+  // its own branch below).
   if (
     type === 'subscription.created' ||
     type === 'subscription.updated' ||
-    type === 'subscription.activated'
+    type === 'subscription.activated' ||
+    type === 'subscription.resumed' ||
+    type === 'subscription.trialing' ||
+    type === 'subscription.past_due' ||
+    type === 'subscription.paused'
   ) {
     const sub = data as SubscriptionData;
     const userId = sub.customData?.userId;
@@ -130,6 +195,9 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
       return { kind: 'skip', reason: 'unknown_price_id' };
     }
 
+    const scheduledAction = sub.scheduledChange?.action ?? null;
+    const scheduledAt = sub.scheduledChange?.effectiveAt ?? null;
+
     return {
       kind: 'upsert_subscription',
       row: {
@@ -141,7 +209,9 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
         status: sub.status ?? 'active',
         current_period_start: sub.currentBillingPeriod?.startsAt ?? null,
         current_period_end: sub.currentBillingPeriod?.endsAt ?? null,
-        cancel_at_period_end: sub.scheduledChange?.action === 'cancel',
+        cancel_at_period_end: scheduledAction === 'cancel',
+        scheduled_change_action: scheduledAction,
+        scheduled_change_at: scheduledAt,
         environment: env,
         updated_at: nowIso,
       },
@@ -159,6 +229,8 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
         current_period_start: sub.currentBillingPeriod?.startsAt ?? null,
         current_period_end: sub.currentBillingPeriod?.endsAt ?? null,
         cancel_at_period_end: true,
+        scheduled_change_action: sub.scheduledChange?.action ?? 'cancel',
+        scheduled_change_at: sub.scheduledChange?.effectiveAt ?? null,
         environment: env,
         updated_at: nowIso,
       },
@@ -211,14 +283,28 @@ export function decide(event: EventLike, env: PaddleEnv, now: Date): Decision {
         // "founder lifetime never expires" treatment.
         current_period_end: null,
         cancel_at_period_end: false,
+        scheduled_change_action: null,
+        scheduled_change_at: null,
         environment: env,
         updated_at: nowIso,
       },
     };
   }
 
+  // Adjustment events (refunds / credits / chargebacks). RECORD-ONLY:
+  // insertEventReceived() has already persisted the raw payload to
+  // lovable_paddle_events for operator visibility. We deliberately do NOT
+  // mutate subscriptions, entitlements, or access rules here — refunds
+  // are handled operationally (see the runbook), not by silently flipping
+  // a user's plan. Distinct skip_reason so the audit surface can filter
+  // "recorded on purpose" from "unknown event type" noise.
+  if (type === 'adjustment.created' || type === 'adjustment.updated') {
+    return { kind: 'skip', reason: 'adjustment_audit_only' };
+  }
+
   return { kind: 'skip', reason: 'unhandled_event_type' };
 }
+
 
 /**
  * If this is a `transaction.completed` event with no subscriptionId and no

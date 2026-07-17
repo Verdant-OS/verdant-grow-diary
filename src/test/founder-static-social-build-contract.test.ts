@@ -5,25 +5,25 @@ import { resolve } from "node:path";
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 const VITE = read("vite.config.ts");
 const VERCEL = JSON.parse(read("vercel.json")) as {
+  cleanUrls?: boolean;
   rewrites?: Array<{ source?: string; destination?: string }>;
 };
 
 describe("Founder static social document build contract", () => {
-  it("emits founder.html from the Vite-built index asset", () => {
+  it("emits every static SEO document, including founder.html, from the Vite-built index asset", () => {
     expect(VITE).toContain("staticSocialRouteDocuments()");
-    expect(VITE).toContain("buildStaticSocialRouteHtml(indexAsset.source, FOUNDER_SOCIAL_META)");
-    expect(VITE).toContain('fileName: "founder.html"');
+    expect(VITE).toContain("STATIC_PUBLIC_SEO_DOCUMENTS");
+    expect(VITE).toContain("for (const document of STATIC_PUBLIC_SEO_DOCUMENTS)");
+    expect(VITE).toContain("buildStaticSocialRouteHtml(indexAsset.source, document.metadata)");
+    expect(VITE).toContain("fileName: document.fileName");
     expect(VITE).toContain('apply: "build"');
   });
 
-  it("routes /founder to its static entry before the SPA fallback", () => {
+  it("routes /founder to its clean static entry before the SPA fallback", () => {
+    expect(VERCEL.cleanUrls).toBe(true);
     expect(VERCEL.rewrites?.[0]).toEqual({
-      source: "/founder",
-      destination: "/founder.html",
-    });
-    expect(VERCEL.rewrites?.[1]).toEqual({
       source: "/((?!assets/).*)",
-      destination: "/index.html",
+      destination: "/",
     });
   });
 

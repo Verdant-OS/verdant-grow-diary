@@ -12,15 +12,13 @@
  *
  * Pure: no React, no Supabase, no I/O.
  */
-import {
-  buildPaywallCtaViewModel,
-  type PaywallCtaViewModel,
-} from "@/lib/paywallCtaViewModel";
+import { buildPaywallCtaViewModel, type PaywallCtaViewModel } from "@/lib/paywallCtaViewModel";
 import {
   reconcileAiCreditDenialPlanId,
   resolveAiDoctorEntitlementView,
   type AiDoctorEntitlementView,
 } from "@/lib/aiDoctorEntitlementRules";
+import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import type { ResolvedEntitlement } from "@/lib/entitlements/types";
 
 export type AiCreditDenialScope = "per_grow" | "per_month" | string;
@@ -51,11 +49,7 @@ export interface AiCreditLimitNoticeViewModel {
   paywallVm?: PaywallCtaViewModel;
 }
 
-const PAID_PLAN_IDS = new Set([
-  "pro_monthly",
-  "pro_annual",
-  "founder_lifetime",
-]);
+const PAID_PLAN_IDS = new Set(["pro_monthly", "pro_annual", "founder_lifetime"]);
 
 interface SurfaceCopy {
   featureTitle: string;
@@ -95,12 +89,16 @@ function copyFor(surface: AiCreditLimitNoticeSurface): SurfaceCopy {
   return surface === "coach" ? COACH_COPY : DOCTOR_COPY;
 }
 
-
 export interface AiCreditLimitNoticeInput {
   credit: AiCreditDenial;
   currentPlanLabel?: string;
   /** Defaults to "doctor" to preserve S3.0 behavior. */
   surface?: AiCreditLimitNoticeSurface;
+  /**
+   * Optional same-origin route to restore after a confirmed checkout.
+   * Invalid or external paths deliberately fall back to the plain pricing page.
+   */
+  returnTo?: string | null;
   /**
    * Optional viewer entitlement. When provided, paid/founder viewers
    * bypass the "free → upsell" branch defensively, even if the server
@@ -108,6 +106,13 @@ export interface AiCreditLimitNoticeInput {
    * downgrades upsell copy to plan-neutral "wait" copy.
    */
   viewerEntitlement?: ResolvedEntitlement | null;
+}
+
+function buildPricingHref(returnTo: string | null | undefined): string {
+  const safeReturnTo = sanitizeCheckoutReturnTo(returnTo);
+  return safeReturnTo
+    ? `/pricing?${new URLSearchParams({ returnTo: safeReturnTo }).toString()}`
+    : "/pricing";
 }
 
 export function buildAiCreditLimitNoticeViewModel(
@@ -129,7 +134,7 @@ export function buildAiCreditLimitNoticeViewModel(
       requiredPlanLabel: "Pro",
       currentPlanLabel: input.currentPlanLabel,
       primaryCtaLabel: "See plans",
-      pricingHref: "/pricing",
+      pricingHref: buildPricingHref(input.returnTo),
       unlockBullets: [
         "100 AI Doctor checks per month across every grow",
         "Unlimited grows and full grow history",

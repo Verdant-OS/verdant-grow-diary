@@ -11,6 +11,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  CANONICAL_DRY_RUN_COMMAND,
+  CANONICAL_DRY_RUN_REQUIREMENTS,
   FAKE_BODY,
   FAKE_TEST_LABEL,
   buildFakePostInit,
@@ -43,6 +45,16 @@ describe("ecowitt-local-bridge-smoke — static safety", () => {
   it("labels its test payload as FAKE LOCAL TEST", () => {
     expect(FAKE_TEST_LABEL).toBe("FAKE LOCAL TEST");
     expect(SRC).toMatch(/FAKE LOCAL TEST/);
+  });
+
+  it("points successful local checks to the canonical one-tent dry-run path", () => {
+    expect(CANONICAL_DRY_RUN_COMMAND).toBe(
+      "bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once",
+    );
+    expect(CANONICAL_DRY_RUN_REQUIREMENTS).toMatch(/VERDANT_TENT_ID/);
+    expect(CANONICAL_DRY_RUN_REQUIREMENTS).toMatch(/ECOWITT_SOIL_CHANNEL_MAP_JSON/);
+    expect(CANONICAL_DRY_RUN_REQUIREMENTS).toMatch(/same one tent/i);
+    expect(SRC).not.toMatch(/dev:ecowitt-mqtt:dry-run/);
   });
 });
 

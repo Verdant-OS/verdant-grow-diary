@@ -5,8 +5,8 @@
  * Presentation-only. Does NOT call AI, does NOT write, does NOT trigger
  * automation or any hardware steering. Renders deterministic Available
  * / Missing / Stale chips from a pure view-model, plus a safe "Ask
- * Doctor" CTA that routes to the existing /doctor flow with plant
- * context as a query parameter.
+ * Doctor" CTA that opens the existing plant-scoped review flow with
+ * plant, grow, and tent context already loaded.
  */
 import { useMemo } from "react";
 import { Stethoscope, CheckCircle2, MinusCircle, Clock } from "lucide-react";

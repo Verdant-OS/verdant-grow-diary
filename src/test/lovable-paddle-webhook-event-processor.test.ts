@@ -287,3 +287,157 @@ describe('attachResolvedPriceExternalId', () => {
     expect(d).toEqual({ kind: 'skip', reason: 'unknown_lifetime_price_id' });
   });
 });
+
+/**
+ * Dedicated Paddle subscription lifecycle events (past_due, paused,
+ * resumed, trialing). Paddle emits these alongside the umbrella
+ * `subscription.updated`; the mapper must not drop them to
+ * `unhandled_event_type`. Each is routed through the same idempotent
+ * upsert as `subscription.updated` and must preserve the payload's
+ * `status` field verbatim so the access rules in
+ * src/lib/paddleSubscriptionAccessRules.ts (active/trialing/past_due
+ * grant; paused revokes) see the correct value.
+ */
+describe('decide — dedicated subscription lifecycle events', () => {
+  const CASES: Array<{ eventType: string; status: string }> = [
+    { eventType: 'subscription.past_due', status: 'past_due' },
+    { eventType: 'subscription.paused', status: 'paused' },
+    { eventType: 'subscription.resumed', status: 'active' },
+    { eventType: 'subscription.trialing', status: 'trialing' },
+  ];
+
+  for (const { eventType, status } of CASES) {
+    it(`maps ${eventType} to an upsert_subscription with status='${status}'`, () => {
+      const ev = subEvent({ status });
+      ev.eventType = eventType;
+      const d = decide(ev, 'sandbox', NOW);
+      expect(d.kind).toBe('upsert_subscription');
+      if (d.kind !== 'upsert_subscription') return;
+      expect(d.row.status).toBe(status);
+      expect(d.row.paddle_subscription_id).toBe('sub_abc');
+      expect(d.row.user_id).toBe('user-uuid-1');
+      expect(d.row.price_id).toBe('pro_monthly');
+      expect(d.row.environment).toBe('sandbox');
+      // Not a cancel — cancel_at_period_end must stay false unless a
+      // scheduledChange.action='cancel' is explicitly present.
+      expect(d.row.cancel_at_period_end).toBe(false);
+    });
+
+    it(`${eventType} still respects missing_user_id skip`, () => {
+      const ev = subEvent({ status, customData: {} });
+      ev.eventType = eventType;
+      const d = decide(ev, 'sandbox', NOW);
+      expect(d).toEqual({ kind: 'skip', reason: 'missing_user_id' });
+    });
+
+    it(`${eventType} still respects unknown_price_id skip`, () => {
+      const ev = subEvent({
+        status,
+        items: [
+          {
+            price: { id: 'pri_x', importMeta: { externalId: 'mystery_plan' } },
+            product: { id: 'pro_x', importMeta: { externalId: 'verdant_pro' } },
+          },
+        ],
+      });
+      ev.eventType = eventType;
+      const d = decide(ev, 'sandbox', NOW);
+      expect(d).toEqual({ kind: 'skip', reason: 'unknown_price_id' });
+    });
+
+    it(`${eventType} is idempotent — same event decides identically twice`, () => {
+      const ev1 = subEvent({ status });
+      ev1.eventType = eventType;
+      const ev2 = subEvent({ status });
+      ev2.eventType = eventType;
+      expect(decide(ev1, 'sandbox', NOW)).toEqual(decide(ev2, 'sandbox', NOW));
+    });
+  }
+
+  it('subscription.paused carries paused status through — access rules will revoke', () => {
+    const ev = subEvent({ status: 'paused' });
+    ev.eventType = 'subscription.paused';
+    const d = decide(ev, 'live', NOW);
+    expect(d.kind).toBe('upsert_subscription');
+    if (d.kind !== 'upsert_subscription') return;
+    expect(d.row.status).toBe('paused');
+    expect(d.row.environment).toBe('live');
+  });
+
+  it('regression: subscription.updated still routes through the same branch', () => {
+    const ev = subEvent({ status: 'active' });
+    ev.eventType = 'subscription.updated';
+    const d = decide(ev, 'sandbox', NOW);
+    expect(d.kind).toBe('upsert_subscription');
+  });
+
+  it('regression: subscription.canceled still maps to update_subscription, not upsert', () => {
+    const ev = subEvent({ status: 'canceled' });
+    ev.eventType = 'subscription.canceled';
+    const d = decide(ev, 'sandbox', NOW);
+    expect(d.kind).toBe('update_subscription');
+  });
+
+  it('regression: unknown subscription.* event still falls through to unhandled_event_type', () => {
+    const ev = subEvent({ status: 'active' });
+    ev.eventType = 'subscription.mystery_new_event';
+    const d = decide(ev, 'sandbox', NOW);
+    expect(d).toEqual({ kind: 'skip', reason: 'unhandled_event_type' });
+  });
+
+  describe('adjustment.* (Code #7) — record-only, no entitlement mutation', () => {
+    function adjustmentEvent(type: 'adjustment.created' | 'adjustment.updated') {
+      return {
+        eventId: `evt_adj_${type}`,
+        eventType: type,
+        data: {
+          id: 'adj_01abcd',
+          action: 'refund',
+          status: 'approved',
+          transactionId: 'txn_01abcd',
+          subscriptionId: 'sub_01abcd',
+          customerId: 'ctm_01abcd',
+          items: [{ amount: '1000', type: 'partial' }],
+        },
+      };
+    }
+
+    it('adjustment.created → skip with reason adjustment_audit_only (no upsert/update)', () => {
+      const d = decide(adjustmentEvent('adjustment.created'), 'sandbox', NOW);
+      expect(d).toEqual({ kind: 'skip', reason: 'adjustment_audit_only' });
+    });
+
+    it('adjustment.updated → skip with reason adjustment_audit_only', () => {
+      const d = decide(adjustmentEvent('adjustment.updated'), 'live', NOW);
+      expect(d).toEqual({ kind: 'skip', reason: 'adjustment_audit_only' });
+    });
+
+    it('regression: adjustment.* never returns upsert/update/record_lifetime', () => {
+      for (const t of ['adjustment.created', 'adjustment.updated'] as const) {
+        const d = decide(adjustmentEvent(t), 'sandbox', NOW);
+        expect(d.kind).toBe('skip');
+        // Belt-and-braces: guarantee no entitlement mutation escape hatch.
+        expect(['upsert_subscription', 'update_subscription', 'record_lifetime'])
+          .not.toContain((d as { kind: string }).kind);
+      }
+    });
+
+    it('audit fields extract cleanly for adjustment events (no crash on missing sub fields)', () => {
+      const ev = adjustmentEvent('adjustment.created');
+      const audit = auditFields(ev, 'live');
+      expect(audit.event_type).toBe('adjustment.created');
+      expect(audit.environment).toBe('live');
+      // Adjustment payload has no customData.userId — must not throw.
+      expect(audit.user_id).toBeNull();
+    });
+
+    it('unknown adjustment.* subtype still falls through to unhandled_event_type', () => {
+      const ev = adjustmentEvent('adjustment.created');
+      // deliberately unknown subtype
+      (ev as { eventType: string }).eventType = 'adjustment.mystery';
+      const d = decide(ev, 'sandbox', NOW);
+      expect(d).toEqual({ kind: 'skip', reason: 'unhandled_event_type' });
+    });
+  });
+});
+

@@ -49,6 +49,7 @@ const ATTRIBUTED_SOURCES = [
   "grower_invite",
   "context_check",
   "vpd_calculator",
+  "csv_history",
 ] as const satisfies readonly PaidAcquisitionSource[];
 
 export const SIGNUP_TO_PAID_SOURCES = [
@@ -67,6 +68,7 @@ export const SIGNUP_TO_PAID_SOURCE_LABELS: Readonly<Record<SignupToPaidSource, s
     grower_invite: "Grower invites",
     context_check: "AI Doctor context check",
     vpd_calculator: "VPD calculator",
+    csv_history: "CSV history",
     unattributed: "Source unavailable",
   });
 

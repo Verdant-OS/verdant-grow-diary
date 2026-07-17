@@ -16,10 +16,7 @@ import {
   getTemperatureUnitSymbol,
   convertCelsiusForDisplay,
 } from "@/lib/temperatureUnitPreference";
-import {
-  formatSensorValue,
-  sensorFieldUnit,
-} from "@/lib/sensorFormat";
+import { formatSensorValue, sensorFieldUnit } from "@/lib/sensorFormat";
 import { applyTemperatureUnitToSnapshotMetrics } from "@/lib/sensorSnapshotTemperatureUnitView";
 import SensorSnapshotCard from "@/components/SensorSnapshotCard";
 
@@ -93,9 +90,7 @@ describe("snapshot temperature unit view (pure helper)", () => {
 
   it("F input + celsius preference converts back to °C exactly once", () => {
     saveTemperatureUnitPreference("celsius");
-    const out = applyTemperatureUnitToSnapshotMetrics([
-      { key: "temp", display: "68", unit: "°F" },
-    ]);
+    const out = applyTemperatureUnitToSnapshotMetrics([{ key: "temp", display: "68", unit: "°F" }]);
     expect(out[0].unit).toBe("°C");
     expect(Number(out[0].display)).toBeCloseTo(20, 5);
   });
@@ -172,15 +167,11 @@ describe("SensorSnapshotCard renders the preferred temperature unit", () => {
   });
 
   it("leaves RH untouched on both preferences", () => {
-    const { getByTestId, unmount } = render(
-      <SensorSnapshotCard snapshot={snapshot} />,
-    );
+    const { getByTestId, unmount } = render(<SensorSnapshotCard snapshot={snapshot} />);
     expect(getByTestId("sensor-snapshot-card-metric-rh").textContent).toContain("%");
     unmount();
     saveTemperatureUnitPreference("celsius");
-    const { getByTestId: get2 } = render(
-      <SensorSnapshotCard snapshot={snapshot} />,
-    );
+    const { getByTestId: get2 } = render(<SensorSnapshotCard snapshot={snapshot} />);
     expect(get2("sensor-snapshot-card-metric-rh").textContent).toContain("%");
   });
 
@@ -221,8 +212,11 @@ describe("Tent surfaces (TentDetail + Tents) render preferred unit on chips", ()
   });
 
   it("Tents list metric chip uses centralized symbol+conversion", () => {
-    expect(TENTS).toContain("convertCelsiusForDisplay(last.temp)");
-    expect(TENTS).toContain("getTemperatureUnitSymbol()");
+    // Chips now come from the shared Dashboard-strip presenter; the page
+    // resolves the saved preference once and passes it through, so the
+    // temp chip still flips °F/°C with the grower's setting.
+    expect(TENTS).toContain("loadTemperatureUnitPreference()");
+    expect(TENTS).toContain("{ temperatureUnit }");
     expect(TENTS).not.toContain('unit="°F"');
   });
 

@@ -13,17 +13,14 @@ function fail(scope: string, error: { message?: string } | null): never {
 // Guard against legacy/mock string ids (e.g. "t1", "p1") which would cause
 // Postgres uuid columns to 400. When a non-UUID is passed, repo callers
 // short-circuit and let the useGrowData fallback layer serve mock data.
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const isUuid = (v: string | undefined | null): v is string =>
-  !!v && UUID_RE.test(v);
+// Exported for UI callers with the same problem (e.g. per-tent sensor
+// queries fed by the mock-fallback tent list).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isUuid = (v: string | undefined | null): v is string => !!v && UUID_RE.test(v);
 
 export async function fetchTents(growId?: string): Promise<Tent[]> {
   if (growId !== undefined && !isUuid(growId)) return [];
-  let q = supabase
-    .from("tents")
-    .select("*")
-    .eq("is_archived", false);
+  let q = supabase.from("tents").select("*").eq("is_archived", false);
   if (growId) q = q.eq("grow_id", growId);
   const { data, error } = await q.order("created_at", { ascending: false });
   if (error) fail("fetchTents", error);
@@ -79,9 +76,7 @@ export async function fetchSensorReadings(tentId?: string): Promise<SensorReadin
   return groupSensorReadingRows(data ?? []);
 }
 
-export async function insertSensorReading(
-  row: SensorReadingInsert,
-): Promise<void> {
+export async function insertSensorReading(row: SensorReadingInsert): Promise<void> {
   const { error } = await supabase.from("sensor_readings").insert(row);
   if (error) fail("insertSensorReading", error);
 }
@@ -96,9 +91,7 @@ export async function insertSensorReading(
  * action_queue, devices, or any other table. Does not derive snapshots or
  * alerts as a side effect.
  */
-export async function insertSensorReadingsBatch(
-  rows: SensorReadingInsert[],
-): Promise<void> {
+export async function insertSensorReadingsBatch(rows: SensorReadingInsert[]): Promise<void> {
   if (!rows || rows.length === 0) return;
   const { error } = await supabase.from("sensor_readings").insert(rows);
   if (error) fail("insertSensorReadingsBatch", error);

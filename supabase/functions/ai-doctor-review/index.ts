@@ -1,10 +1,12 @@
-// ai-doctor-review — first live AI review slice. Server-side validated,
-// non-persistent. Never returns raw model text. Fails closed.
+// ai-doctor-review — first live AI review slice. Server-side validated.
+// Never returns raw model text. A private completion fact is recorded only
+// after a fresh response passes the contract. Fails closed.
 //
 // Hard constraints:
-//  - No DB writes beyond the ai_credit_spends ledger via ai_credit_spend /
-//    ai_credit_refund RPCs (S2). No ai_doctor_sessions / alerts /
-//    action_queue / sensor_readings writes. No equipment / device control.
+//  - No direct DB writes. Credit spending/refunds and one protected,
+//    service-only fresh-review completion RPC are the only persistence. No
+//    ai_doctor_sessions / alerts / action_queue / sensor_readings writes. No
+//    equipment / device control.
 //  - LOVABLE_API_KEY stays server-only. Never echoed to client.
 //  - Response is always { ok: true, result, credit? } or
 //    { ok: false, reason, credit? }.
@@ -15,6 +17,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { validateAiDoctorReviewResult } from "./contract.ts";
 import { buildAiDoctorPromptMessages } from "../../../src/lib/aiDoctorPromptAssembly.ts";
+import { parseAiDoctorReviewRequestEnvelope } from "../../../src/lib/aiDoctorReviewRequestTransportRules.ts";
 // Measurement-only cost wiring. Pure helpers; no persistence, no I/O.
 import {
   attachProviderResponseUsageToAiDoctorPromptMeasurement,
@@ -27,6 +30,7 @@ const MODEL = "google/gemini-3-flash-preview";
 // S2: server-pinned tier/feature. Escalation is deferred.
 const FEATURE = "ai_doctor_review";
 const MODEL_TIER = "standard";
+const COMPLETION_WRITE_TIMEOUT_MS = 1_500;
 
 // Base system prompt is composed inside buildAiDoctorPromptMessages so
 // imported CSV/XLSX history guidance and missing-live-readings notes can
@@ -88,13 +92,59 @@ function safeOk(result: unknown, credit?: Record<string, unknown>): Response {
 }
 
 function isUuid(s: unknown): s is string {
-  return typeof s === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  return (
+    typeof s === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+  );
 }
 
-function readPacketField(packet: unknown, key: string): unknown {
-  if (!packet || typeof packet !== "object") return undefined;
-  return (packet as Record<string, unknown>)[key];
+/**
+ * Records only the fact that a freshly generated, contract-validated review
+ * completed. It deliberately runs after the provider/result boundary and
+ * never changes the grower's response if measurement storage is unavailable.
+ */
+async function recordFreshAiDoctorReviewCompletion(userId: string, spendId: string): Promise<void> {
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  if (!serviceRoleKey || !supabaseUrl) {
+    console.log("ai-doctor-review completion=unavailable");
+    return;
+  }
+
+  try {
+    const serviceSupabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    let timeoutId: number | undefined;
+    try {
+      const { data, error } = await Promise.race([
+        serviceSupabase.rpc("record_ai_doctor_review_completion", {
+          p_spend_id: spendId,
+          p_expected_user_id: userId,
+        }),
+        new Promise<never>((_resolve, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error("completion_timeout")),
+            COMPLETION_WRITE_TIMEOUT_MS,
+          );
+        }),
+      ]);
+      if (
+        error ||
+        !data ||
+        typeof data !== "object" ||
+        (data as Record<string, unknown>).ok !== true
+      ) {
+        console.log("ai-doctor-review completion=not_recorded");
+        return;
+      }
+      console.log("ai-doctor-review completion=recorded");
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    }
+  } catch {
+    console.log("ai-doctor-review completion=not_recorded");
+  }
 }
 
 Deno.serve(async (req) => {
@@ -122,50 +172,50 @@ Deno.serve(async (req) => {
       return calmFailure("config");
     }
 
-    let packet: unknown;
+    let requestBody: unknown;
     try {
-      packet = await req.json();
+      requestBody = await req.json();
     } catch {
       return calmFailure("parse");
     }
-    if (!packet || typeof packet !== "object") {
+    const request = parseAiDoctorReviewRequestEnvelope(requestBody);
+    if (!request) {
       return calmFailure("shape");
     }
 
-    // S2: server resolves grow scope from client-supplied grow_id (validated as
-    // UUID; ownership is re-verified inside ai_credit_spend). Client may
-    // supply idempotency_key for safe retries; we generate one otherwise.
-    const rawGrowId = readPacketField(packet, "grow_id") ??
-      readPacketField(packet, "growId");
-    const growId = isUuid(rawGrowId) ? rawGrowId : null;
-    const rawKey = readPacketField(packet, "idempotency_key") ??
-      readPacketField(packet, "idempotencyKey");
-    const idempotencyKey = (typeof rawKey === "string" &&
-        rawKey.length >= 8 && rawKey.length <= 200)
-      ? rawKey
-      : crypto.randomUUID();
+    // Server resolves grow scope from an untrusted transport envelope; the
+    // atomic credit RPC re-checks ownership. `request.packet` is deliberately
+    // separate and is the only data allowed into model prompt assembly.
+    const growId = isUuid(request.growId) ? request.growId : null;
+    const rawKey = request.idempotencyKey;
+    const idempotencyKey =
+      typeof rawKey === "string" && rawKey.length >= 8 && rawKey.length <= 200
+        ? rawKey
+        : crypto.randomUUID();
 
     // ---- ai_credit_spend (atomic check-and-spend) ---------------------------
-    const { data: spend, error: spendErr } = await supabase.rpc(
-      "ai_credit_spend",
-      {
-        p_feature: FEATURE,
-        p_grow_id: growId,
-        p_model_tier: MODEL_TIER,
-        p_idempotency_key: idempotencyKey,
-        p_result: null,
-      },
-    );
+    const { data: spend, error: spendErr } = await supabase.rpc("ai_credit_spend", {
+      p_feature: FEATURE,
+      p_grow_id: growId,
+      p_model_tier: MODEL_TIER,
+      p_idempotency_key: idempotencyKey,
+      p_result: null,
+    });
     if (spendErr || !spend || typeof spend !== "object") {
       console.log(`ai-doctor-review status=credit_rpc_error`);
       return calmFailure("credit_rpc");
     }
     const spendObj = spend as Record<string, unknown>;
     if (spendObj.ok !== true) {
-      console.log(
-        `ai-doctor-review status=credit_denied reason=${String(spendObj.reason ?? "")}`,
-      );
+      console.log(`ai-doctor-review status=credit_denied reason=${String(spendObj.reason ?? "")}`);
       return calmFailure("credit_denied", { credit: spendObj });
+    }
+    // The spend RPC is authenticated but accepts a feature/tier input. Keep
+    // this edge's pinned review scope authoritative before accepting a replay
+    // or spending result from that generic RPC.
+    if (spendObj.feature !== FEATURE || spendObj.model_tier !== MODEL_TIER) {
+      console.log("ai-doctor-review status=credit_scope_mismatch");
+      return calmFailure("credit_rpc");
     }
     // Replayed prior result → return cached result without calling the model.
     if (spendObj.status === "replayed" && spendObj.result) {
@@ -178,7 +228,7 @@ Deno.serve(async (req) => {
       // row is already recorded so we do not double-charge.
     }
 
-    const spendId = typeof spendObj.spend_id === "string" ? spendObj.spend_id : null;
+    const spendId = isUuid(spendObj.spend_id) ? spendObj.spend_id : null;
     const refundKey = "refund:" + (spendId ?? idempotencyKey);
 
     async function refund(reason: string): Promise<void> {
@@ -199,7 +249,7 @@ Deno.serve(async (req) => {
     // Build the prompt once so the assembled text can feed both the upstream
     // call AND an in-memory cost measurement. Measurement is local-only;
     // never persisted, logged, or returned to the client.
-    const promptMessages = buildAiDoctorPromptMessages(packet);
+    const promptMessages = buildAiDoctorPromptMessages(request.packet);
     const promptMeasurement = buildAiDoctorPromptMeasurement({
       promptName: FEATURE,
       recordedAt: new Date().toISOString(),
@@ -237,7 +287,11 @@ Deno.serve(async (req) => {
 
     if (!upstream.ok) {
       console.log(`ai-doctor-review status=http_${upstream.status}`);
-      try { await upstream.text(); } catch { /* ignore */ }
+      try {
+        await upstream.text();
+      } catch {
+        /* ignore */
+      }
       await refund(`upstream_http_${upstream.status}`);
       return calmFailure("http");
     }
@@ -254,16 +308,13 @@ Deno.serve(async (req) => {
     // Provider response boundary: attach provider-reported token usage to the
     // in-memory prompt measurement. Pure, immutable; never persisted, never
     // logged, never returned. Raw `payload` is NOT stored anywhere downstream.
-    const measurementWithProviderUsage =
-      attachProviderResponseUsageToAiDoctorPromptMeasurement(
-        promptMeasurement,
-        payload,
-      );
+    const measurementWithProviderUsage = attachProviderResponseUsageToAiDoctorPromptMeasurement(
+      promptMeasurement,
+      payload,
+    );
     // Reference the result so future safe consumers (none yet) can extend
     // this boundary without changing the call site. No persistence here.
     void measurementWithProviderUsage;
-
-
 
     const toolArgsStr = readToolArguments(payload);
     if (!toolArgsStr) {
@@ -285,6 +336,14 @@ Deno.serve(async (req) => {
       console.log(`ai-doctor-review status=invalid reason=${v.reason}`);
       await refund(`invalid_${v.reason}`);
       return calmFailure("invalid");
+    }
+
+    if (spendObj.status === "spent" && spendId) {
+      // Fresh success only: do not record replays, denied requests, malformed
+      // output, or refund paths as a completed AI Doctor review.
+      await recordFreshAiDoctorReviewCompletion(u.user.id, spendId);
+    } else if (spendObj.status === "spent") {
+      console.log("ai-doctor-review completion=unavailable");
     }
 
     console.log("ai-doctor-review status=ok");

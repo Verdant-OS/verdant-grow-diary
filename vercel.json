@@ -7,16 +7,18 @@
     "installCommand": "npm install",
     "devCommand": "npm run dev"
   },
+  "cleanUrls": true,
   "git": {
     "deploymentEnabled": {
       "main": false,
       "master": false
     }
   },
-  "rewrites": [
-    { "source": "/founder", "destination": "/founder.html" },
-    { "source": "/((?!assets/).*)", "destination": "/index.html" }
+  "redirects": [
+    { "source": "/strains", "destination": "/cultivars", "permanent": true },
+    { "source": "/strains/:slug", "destination": "/cultivars/:slug", "permanent": true }
   ],
+  "rewrites": [{ "source": "/((?!assets/).*)", "destination": "/" }],
   "headers": [
     {
       "source": "/(.*)",

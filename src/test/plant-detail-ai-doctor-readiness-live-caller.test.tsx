@@ -119,6 +119,15 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
     });
   });
 
+  it("keeps the plant-scoped Ask Doctor CTA on the existing review anchor", () => {
+    setBridge(null, null);
+    renderCard();
+
+    expect(
+      screen.getByTestId("plant-detail-ai-doctor-readiness-cta"),
+    ).toHaveAttribute("href", "/plants/plant-1#plant-ai-doctor-review");
+  });
+
   describe("UI panel reflects real intake classification", () => {
     const cases: Array<{
       status: SensorSnapshotStatus;

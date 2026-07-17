@@ -12,6 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useOpenCustomerPortalState } from "@/lib/customerPortal";
+import { usePaddleCancelNotice } from "@/hooks/usePaddleCancelNotice";
+
+import {
+  DELETE_ACCOUNT_CONFIRMATION,
+  requestAccountDeletion,
+} from "@/lib/accountDeletion";
 import { useAuth } from "@/store/auth";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import AccountPlanBadge from "@/components/AccountPlanBadge";
@@ -271,9 +279,11 @@ function TemperatureUnitTile() {
  */
 function SubscriptionTile() {
   const { loading, entitlement } = useMyEntitlements();
-  const [dialog, setDialog] = useState<null | "manage" | "cancel">(null);
+  const { opening, error: portalError, open: openPortal, clearError } = useOpenCustomerPortalState();
+  const cancelNotice = usePaddleCancelNotice();
 
   const planId = entitlement?.displayPlanId ?? null;
+
   const tier = planId ? PRICING_TIERS.find((t) => t.id === planId) ?? null : null;
 
   const label = loading
@@ -284,7 +294,7 @@ function SubscriptionTile() {
 
   const isFree = !loading && (planId === "free" || (!tier && !planId));
   const isPaid = !loading && !!tier && planId !== "free";
-
+  const isLifetime = planId === "founder_lifetime";
   const isStaff = !!entitlement?.isStaff;
 
   return (
@@ -314,6 +324,30 @@ function SubscriptionTile() {
               Internal staff — Pro capabilities, 10,000 AI credits/month.
             </p>
           )}
+          {entitlement?.status === "past_due" && (
+            <p
+              className="text-xs text-amber-700 mt-1"
+              data-testid="settings-subscription-past-due"
+            >
+              Payment retry in progress — update your payment method to avoid interruption.
+            </p>
+          )}
+          {entitlement?.status === "canceled" && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Canceled — access continues until the end of your paid period.
+            </p>
+          )}
+          {cancelNotice.visible && entitlement?.status !== "canceled" && (
+            <p
+              className="text-xs text-muted-foreground mt-1"
+              data-testid="settings-subscription-cancel-notice"
+            >
+              {cancelNotice.accessUntilLabel
+                ? `Cancellation scheduled — access continues until ${cancelNotice.accessUntilLabel}.`
+                : "Cancellation scheduled — access continues until the end of your current period."}
+            </p>
+          )}
+
           {!loading && !tier && (
             <p className="text-xs text-muted-foreground">
               We couldn't determine your plan right now. Your grow data is safe
@@ -322,7 +356,6 @@ function SubscriptionTile() {
           )}
         </div>
       </div>
-
 
       {tier && (
         <ul
@@ -345,54 +378,150 @@ function SubscriptionTile() {
             <Link to="/pricing">Upgrade to Pro</Link>
           </Button>
         )}
-        {isPaid && (
-          <>
-            <Button
-              size="sm"
-              variant="outline"
-              data-testid="settings-subscription-manage"
-              onClick={() => setDialog("manage")}
-            >
-              Manage subscription
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              data-testid="settings-subscription-cancel"
-              onClick={() => setDialog("cancel")}
-            >
-              Cancel plan
-            </Button>
-          </>
+        {isPaid && !isLifetime && (
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="settings-subscription-manage"
+            onClick={() => {
+              clearError();
+              void openPortal();
+            }}
+            disabled={opening}
+            aria-busy={opening}
+          >
+            {opening ? "Opening…" : "Manage subscription"}
+          </Button>
+        )}
+        {isLifetime && (
+          <p className="text-xs text-muted-foreground">
+            Founder Lifetime is a one-time purchase — nothing to cancel or renew.
+          </p>
         )}
       </div>
 
-      <Dialog
-        open={dialog !== null}
-        onOpenChange={(o) => {
-          if (!o) setDialog(null);
+      {portalError ? (
+        <p
+          role="alert"
+          className="text-xs text-destructive mt-2"
+          data-testid="settings-subscription-portal-error"
+        >
+          {portalError}
+        </p>
+      ) : null}
+
+      {isPaid && !isLifetime ? (
+        <p className="text-[11px] text-muted-foreground mt-2">
+          Cancel, change payment method, or download invoices in the Paddle
+          customer portal. Opens in a new tab.
+        </p>
+      ) : null}
+    </Tile>
+  );
+}
+
+/**
+ * DeleteAccountTile — destructive, self-serve account deletion.
+ *
+ * Guards:
+ *  - Typed confirmation ("DELETE") required before the request fires.
+ *  - The edge function re-verifies the caller JWT and requires the same
+ *    literal in the body; a click-through cannot silently delete.
+ *  - Recurring Paddle billing is canceled immediately server-side before
+ *    any Verdant data is removed. Provider failure leaves the account intact.
+ *  - Rows in public.* cascade via existing FKs on auth.users(id).
+ */
+function DeleteAccountTile() {
+  const [open, setOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canConfirm = confirmation === DELETE_ACCOUNT_CONFIRMATION && !busy;
+
+  async function handleDelete() {
+    setBusy(true);
+    setError(null);
+    const result = await requestAccountDeletion(confirmation);
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error ?? "Something went wrong.");
+      return;
+    }
+    // On success the session is invalidated; redirect out.
+    window.location.replace("/welcome");
+  }
+
+  return (
+    <Tile name="Delete account" state="available">
+      <p className="text-sm text-muted-foreground mb-3">
+        Permanently delete your Verdant account and all associated grow data.
+        This cannot be undone.
+      </p>
+      <Button
+        size="sm"
+        variant="destructive"
+        data-testid="settings-delete-account"
+        onClick={() => {
+          setConfirmation("");
+          setError(null);
+          setOpen(true);
         }}
       >
-        <DialogContent data-testid="settings-subscription-dialog">
+        Delete my account
+      </Button>
+      <Dialog
+        open={open}
+        onOpenChange={(o) => {
+          if (busy) return;
+          setOpen(o);
+        }}
+      >
+        <DialogContent data-testid="settings-delete-account-dialog">
           <DialogHeader>
-            <DialogTitle>
-              {dialog === "cancel"
-                ? "Cancel plan"
-                : "Manage subscription"}
-            </DialogTitle>
+            <DialogTitle>Delete your Verdant account?</DialogTitle>
             <DialogDescription>
-              Billing management is coming soon. No changes have been made to
-              your account. For now, contact support if you need subscription
-              help.
+              This permanently deletes your account, grows, tents, plants,
+              diary entries, photos, and sensor snapshots. This cannot be
+              undone. Any recurring Paddle subscription is canceled
+              immediately before deletion. Deletion does not automatically
+              issue a refund.
             </DialogDescription>
           </DialogHeader>
+          <div className="grid gap-2 py-2">
+            <label htmlFor="delete-confirm" className="text-xs text-muted-foreground">
+              Type <span className="font-mono font-semibold text-foreground">DELETE</span> to confirm.
+            </label>
+            <Input
+              id="delete-confirm"
+              value={confirmation}
+              onChange={(e) => setConfirmation(e.target.value)}
+              autoComplete="off"
+              data-testid="settings-delete-account-confirm-input"
+              disabled={busy}
+            />
+            {error ? (
+              <p role="alert" className="text-xs text-destructive">
+                {error}
+              </p>
+            ) : null}
+          </div>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setDialog(null)}
-              data-testid="settings-subscription-dialog-close"
+              onClick={() => setOpen(false)}
+              disabled={busy}
+              data-testid="settings-delete-account-cancel"
             >
-              Close
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={!canConfirm}
+              aria-busy={busy}
+              data-testid="settings-delete-account-confirm"
+            >
+              {busy ? "Canceling billing and deleting…" : "Cancel billing and delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -400,7 +529,6 @@ function SubscriptionTile() {
     </Tile>
   );
 }
-
 
 
 export default function Settings() {
@@ -468,6 +596,8 @@ export default function Settings() {
             <Link to="/settings/agent-integrations">Open agent integrations</Link>
           </Button>
         </Tile>
+
+        <DeleteAccountTile />
       </div>
     </div>
   );

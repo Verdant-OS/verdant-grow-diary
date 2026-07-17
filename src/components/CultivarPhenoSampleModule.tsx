@@ -3,8 +3,9 @@
  *
  * Presenter only. Renders 2 illustrative phenos side-by-side with a loud
  * "Sample data" label. Never real grower diary rows, never sensor readings,
- * never delegates keeper selection to AI. Cross-links to Verdant's real diary-first
- * features (Pheno comparison, Pheno expression showcase, start a diary).
+ * never automated winner-selection claims (the breeder decides).
+ * Cross-links to Verdant's real diary-first features (Pheno comparison,
+ * Pheno expression showcase, start a diary).
  */
 import { Link } from "react-router-dom";
 import type { VerdantCultivarProfile } from "@/constants/verdantCultivars";
@@ -37,10 +38,9 @@ export default function CultivarPhenoSampleModule({ cultivar }: Props) {
       </div>
 
       <p className="mt-2 text-sm text-muted-foreground">
-        Illustrative side-by-side of two {cultivar.name} phenos to show how
-        Verdant lays evidence out during a Pheno Hunt. Real runs use your own
-        source-labeled logs, photos, and sensor snapshots — Verdant organizes
-        the evidence; the breeder decides the keeper.
+        Illustrative side-by-side of two {cultivar.name} phenos to show how Verdant lays evidence
+        out during a Pheno Hunt. Real runs use your own source-labeled logs, photos, and sensor
+        snapshots — Verdant organizes the evidence; the breeder decides the keeper.
       </p>
 
       <div
@@ -50,15 +50,14 @@ export default function CultivarPhenoSampleModule({ cultivar }: Props) {
       >
         <div role="rowgroup">
           <div role="row" className="grid grid-cols-3 border-b border-border/60 bg-muted/40">
-            <div role="columnheader" className="p-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <div
+              role="columnheader"
+              className="p-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+            >
               Evidence point
             </div>
             {cultivar.samplePhenos.map((p) => (
-              <div
-                key={p.label}
-                role="columnheader"
-                className="p-3 text-sm font-semibold"
-              >
+              <div key={p.label} role="columnheader" className="p-3 text-sm font-semibold">
                 {p.label}
               </div>
             ))}
@@ -101,9 +100,8 @@ export default function CultivarPhenoSampleModule({ cultivar }: Props) {
           Run this as a real Pheno Hunt in Verdant
         </h3>
         <p className="mt-2 text-sm text-muted-foreground">
-          Diary each pheno day-by-day, attach source-labeled sensor snapshots,
-          and let Verdant surface the differences. Nothing is auto-selected;
-          nothing touches your equipment.
+          Diary each pheno day-by-day, attach source-labeled sensor snapshots, and let Verdant
+          surface the differences. Nothing is auto-selected; nothing touches your equipment.
         </p>
         <div className="mt-4 flex flex-wrap gap-3 text-sm">
           <Link

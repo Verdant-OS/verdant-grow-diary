@@ -20,6 +20,10 @@ export const DEFAULT_BRIDGE_URL = "http://127.0.0.1:8080/data/report";
 export const DEFAULT_MQTT_URL = "mqtt://127.0.0.1:1883";
 export const DEFAULT_MQTT_TOPIC = "ecowitt/grow";
 export const FAKE_BODY = "temp1f=77.4&humidity1=58&soilmoisture1=33&co2=721";
+export const CANONICAL_DRY_RUN_COMMAND =
+  "bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once";
+export const CANONICAL_DRY_RUN_REQUIREMENTS =
+  "set VERDANT_TENT_ID and ECOWITT_SOIL_CHANNEL_MAP_JSON for the same one tent";
 
 export const START_BRIDGE_HINT = "bun run dev:ecowitt-http-bridge";
 
@@ -163,7 +167,9 @@ async function main(): Promise<void> {
     // eslint-disable-next-line no-console
     console.log("[ecowitt-bridge-smoke] PASS:", result.reason);
     // eslint-disable-next-line no-console
-    console.log("[ecowitt-bridge-smoke] next: bun run dev:ecowitt-mqtt:dry-run -- --once --write-report");
+    console.log(
+      `[ecowitt-bridge-smoke] next: ${CANONICAL_DRY_RUN_REQUIREMENTS}, then run: ${CANONICAL_DRY_RUN_COMMAND}`,
+    );
     process.exit(0);
   } else {
     // eslint-disable-next-line no-console

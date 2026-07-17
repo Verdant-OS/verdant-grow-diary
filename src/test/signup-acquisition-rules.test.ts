@@ -20,6 +20,18 @@ describe("signup acquisition rules", () => {
     expect(resolveSignupAcquisitionSource(first.split("?")[1])).toBe("landing_page");
   });
 
+  it("builds and resolves the fixed CSV-history acquisition handoff", () => {
+    const path = buildAttributedSignupPath({ source: "csv_history" });
+
+    expect(path).toBe(
+      "/auth?mode=signup&utm_source=csv_history&utm_medium=owned&utm_campaign=csv_history",
+    );
+    expect(resolveSignupAcquisitionSource(path.split("?")[1])).toBe("csv_history");
+    expect(buildSignupUserMetadata(path.split("?")[1])).toEqual({
+      [SIGNUP_ACQUISITION_METADATA_KEY]: "csv_history",
+    });
+  });
+
   it("preserves a safe paid-plan return path and resolves nested attribution", () => {
     const redirectTo =
       "/pricing?plan=founder_lifetime&utm_source=founder_share&utm_medium=referral&utm_campaign=founder_launch";

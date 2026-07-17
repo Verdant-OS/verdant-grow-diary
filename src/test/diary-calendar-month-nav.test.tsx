@@ -78,7 +78,7 @@ describe("month-nav pure helpers", () => {
       /No watering events logged for June 2026\./,
     );
     expect(diaryCalendarMonthEmptyTitle("2026-06", "all")).toMatch(
-      /No watering, feeding, or diagnosis events logged for June 2026\./,
+      /No watering, feeding, training, diagnosis, or environment check events logged for June 2026\./,
     );
   });
 });

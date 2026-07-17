@@ -343,6 +343,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   { path: "/refunds", access: "redirect", description: "→ /refund" },
   { path: "/register", access: "redirect", description: "→ /auth" },
   { path: "/reports", access: "auth" },
+  { path: "/reports/diary-range", access: "auth", description: "Date-range diary report (Print / Save PDF)." },
   { path: "/reports/post-grow/:growId", access: "auth", description: "Post-grow learning report." },
   { path: "/reset-password", access: "public", description: "Password reset landing page." },
   { path: "/sensors", access: "auth" },

@@ -74,6 +74,11 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/guides",
   "/guides/:slug",
   "/guides/grow-stage-care-guide",
+  "/cultivars",
+  // Template entry satisfies the manifest coverage guard; ":slug" resolves
+  // to the unknown-slug redirect, so also exercise a real detail page.
+  "/cultivars/:slug",
+  "/cultivars/oreoz",
   "/ai-doctor-readiness-check",
   "/founder",
   "/how-ai-doctor-works",
@@ -88,8 +93,6 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/.lovable/oauth/consent",
   "/breeder-beta",
   "/creator-beta",
-  "/cultivars",
-  "/cultivars/:slug",
   "/glossary",
   "/pheno-expression-showcase",
   "/upgrade",

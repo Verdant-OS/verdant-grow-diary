@@ -46,7 +46,7 @@ export interface PricingTier {
 }
 
 const PRO_UNLOCKED_FEATURES = [
-  "Cloud sync & backup",
+  "Date-range diary reports (PDF)",
   "Multi-tent tracking",
   "Exports & data ownership",
   "Full grow history",
@@ -170,12 +170,12 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
     },
   },
   {
-    label: "Cloud sync & backup",
+    label: "Date-range diary report (PDF)",
     values: { free: false, pro_monthly: true, pro_annual: true, founder_lifetime: true },
   },
   {
     label: "Exports (CSV / PDF)",
-    values: { free: false, pro_monthly: true, pro_annual: true, founder_lifetime: true },
+    values: { free: "Limited", pro_monthly: true, pro_annual: true, founder_lifetime: true },
   },
   {
     label: "Priority support",
@@ -336,7 +336,7 @@ export const UPGRADE_FAQ: UpgradeFaqItem[] = [
   },
   {
     q: "Do I own my grow data?",
-    a: "Yes. Your grow history, diary entries, photos, and sensor snapshots stay yours. Verdant does not sell grower data. Pro adds cloud sync, backups, and exports so you can take your history with you.",
+    a: "Yes. Your grow history, diary entries, photos, and sensor snapshots stay yours. Verdant does not sell grower data. Pro adds advanced exports and date-range reports so you can take your history with you.",
   },
   {
     q: "What do Founder Lifetime supporters get?",
@@ -344,7 +344,7 @@ export const UPGRADE_FAQ: UpgradeFaqItem[] = [
   },
   {
     q: "What happens if I cancel Pro?",
-    a: "You keep your account and your grow history stays intact on the Free tier. Pro-only features (cloud sync, advanced exports, priority support) simply stop when your billing access ends.",
+    a: "You keep your account and your grow history stays intact on the Free tier. Pro-only features (advanced exports, date-range reports, priority support) simply stop when your billing access ends.",
   },
   {
     q: "Does Verdant control my equipment?",

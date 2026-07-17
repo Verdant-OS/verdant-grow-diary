@@ -37,15 +37,32 @@ describe("OperatorSubscriberGrowth", () => {
   it("renders authoritative paid progress and labels interest separately", async () => {
     vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-07-14T05:00:00.000Z"));
     rpcMock.mockImplementation((fn: string) => {
+      if (fn === "paid_return_operator_snapshot") {
+        return Promise.resolve({
+          data: {
+            ok: true,
+            generated_at: "2026-07-14T05:00:00Z",
+            counts: {
+              tracked_paid_activations: 12,
+              in_flight_paid_activations: 4,
+              matured_paid_activations_60d: 8,
+              manual_grow_returned_60d: 5,
+              server_completed_ai_doctor_returned_60d: 1,
+              paid_returned_60d: 5,
+            },
+          },
+          error: null,
+        });
+      }
       if (fn === "signup_to_paid_operator_snapshot") {
         return Promise.resolve({
           data: {
             ok: true,
             generated_at: "2026-07-14T05:00:00Z",
             counts: {
-              accounts_total: 20,
+              accounts_total: 24,
               active_paid_total: 10,
-              attributed_accounts_total: 12,
+              attributed_accounts_total: 16,
               attributed_active_paid_total: 8,
               unattributed_accounts_total: 8,
               unattributed_active_paid_total: 2,
@@ -53,6 +70,7 @@ describe("OperatorSubscriberGrowth", () => {
             sources: {
               landing_page: { accounts: 6, active_paid: 3 },
               grower_invite: { accounts: 6, active_paid: 5 },
+              csv_history: { accounts: 4, active_paid: 0 },
               unattributed: { accounts: 8, active_paid: 2 },
             },
           },
@@ -65,10 +83,10 @@ describe("OperatorSubscriberGrowth", () => {
             ok: true,
             generated_at: "2026-07-14T05:00:00Z",
             counts: {
-              accounts_total: 20,
-              accounts_7d: 8,
-              attributed_total: 12,
-              attributed_7d: 7,
+              accounts_total: 24,
+              accounts_7d: 12,
+              attributed_total: 16,
+              attributed_7d: 11,
               unattributed_total: 8,
               landing_page: 3,
               pricing_page: 2,
@@ -78,6 +96,7 @@ describe("OperatorSubscriberGrowth", () => {
               grower_invite: 2,
               context_check: 1,
               vpd_calculator: 3,
+              csv_history: 4,
             },
           },
           error: null,
@@ -128,6 +147,7 @@ describe("OperatorSubscriberGrowth", () => {
     expect(rpcMock).toHaveBeenCalledWith("subscriber_growth_operator_snapshot");
     expect(rpcMock).toHaveBeenCalledWith("signup_acquisition_operator_snapshot");
     expect(rpcMock).toHaveBeenCalledWith("signup_to_paid_operator_snapshot");
+    expect(rpcMock).toHaveBeenCalledWith("paid_return_operator_snapshot");
     expect(screen.getByText("49")).toBeInTheDocument();
     expect(screen.getByText("1.9/day")).toBeInTheDocument();
     expect(screen.getByTestId("subscriber-growth-sprint-board")).toBeInTheDocument();
@@ -148,8 +168,15 @@ describe("OperatorSubscriberGrowth", () => {
     expect(screen.getByText("Context check")).toBeInTheDocument();
     expect(screen.getAllByText("VPD calculator").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("VPD calculator signup")).toBeInTheDocument();
+    expect(screen.getByText("CSV history signup")).toBeInTheDocument();
+    expect(screen.getByText("CSV history")).toBeInTheDocument();
     expect(screen.getByText("Signup-to-active-paid cohorts")).toBeInTheDocument();
     expect(screen.getByTestId("paid-reconciliation")).toHaveTextContent("Paid total reconciled");
+    expect(screen.getByTestId("paid-return-cohort-card")).toHaveAttribute(
+      "data-status",
+      "return_observed",
+    );
+    expect(screen.getByText("60-day paid return — forward cohort")).toBeInTheDocument();
     expect(screen.getByText("Needs first contact")).toBeInTheDocument();
     expect(screen.getByText("Follow-up due")).toBeInTheDocument();
     expect(screen.getByText("Contacted — 7 days")).toBeInTheDocument();
@@ -209,5 +236,31 @@ describe("OperatorSubscriberGrowth", () => {
     );
     expect(screen.getByText("Active paid subscribers")).toBeInTheDocument();
     expect(screen.queryByTestId("signup-to-paid-conversion-card")).not.toBeInTheDocument();
+  });
+
+  it("keeps paid progress visible when the paid-return cohort RPC is unavailable", async () => {
+    rpcMock.mockImplementation((fn: string) => {
+      if (fn === "paid_return_operator_snapshot") {
+        return Promise.resolve({ data: null, error: { message: "migration unavailable" } });
+      }
+      if (fn === "signup_acquisition_operator_snapshot") {
+        return Promise.resolve({ data: { ok: true, counts: {} }, error: null });
+      }
+      if (fn === "signup_to_paid_operator_snapshot") {
+        return Promise.resolve({ data: { ok: true, counts: {}, sources: {} }, error: null });
+      }
+      return Promise.resolve({
+        data: { ok: true, counts: { active_paid: 3 } },
+        error: null,
+      });
+    });
+
+    renderPage();
+
+    expect(await screen.findByTestId("paid-return-cohort-error")).toHaveTextContent(
+      "Paid-return cohort unavailable.",
+    );
+    expect(screen.getByText("Active paid subscribers")).toBeInTheDocument();
+    expect(screen.queryByTestId("paid-return-cohort-card")).not.toBeInTheDocument();
   });
 });

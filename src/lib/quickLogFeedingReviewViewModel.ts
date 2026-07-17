@@ -87,10 +87,13 @@ function collectOptionalMetrics(
 
   push("pH", form.ph);
   push("EC in", form.ecIn);
+  push("PPM in (500)", form.ppmIn);
   push("EC out", form.ecOut);
+  push("PPM out (500)", form.ppmOut);
   push("Runoff (ml)", form.runoffMl);
   push("Runoff pH", form.runoffPh);
   push("Runoff EC", form.runoffEc);
+  push("Runoff PPM (500)", form.runoffPpm);
   push("Water (°C)", form.waterTempC);
 
   return metrics;

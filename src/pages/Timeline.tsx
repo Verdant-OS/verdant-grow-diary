@@ -56,6 +56,10 @@ import {
   buildEnvironmentSummaryReportUrl,
   defaultEnvironmentSummaryRange,
 } from "@/lib/environmentSummaryNavigationRules";
+import {
+  buildDiaryRangeReportUrl,
+  defaultDiaryRangeReportRange,
+} from "@/lib/diaryRangeReportNavigationRules";
 import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
 import PhenoHuntTimelineSection from "@/components/PhenoHuntTimelineSection";
 import { cn } from "@/lib/utils";
@@ -73,11 +77,23 @@ import {
   deriveTimelinePlantOptions,
   deriveTimelineTentOptions,
   filterTimelineEvidenceRows,
+  isTimelineDateFilterValue,
   isTimelineEvidenceFilterActive,
   TIMELINE_EVIDENCE_EMPTY_DESC,
   TIMELINE_EVIDENCE_EMPTY_TITLE,
   TIMELINE_EVIDENCE_SEARCH_PLACEHOLDER,
 } from "@/lib/timelineEvidenceFilterRules";
+import {
+  buildMissingActionCopy,
+  findNewestEntryIdForCategory,
+  findNextMissingAction,
+  MISSING_ACTION_DISCLAIMER_COPY,
+  MISSING_ACTION_NOT_ENOUGH_HISTORY_COPY,
+  MISSING_ACTION_NOTHING_MISSING_COPY,
+  type MissingActionResult,
+} from "@/lib/timelineMissingActionRules";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { canUseFeature } from "@/lib/featureEntitlements";
 import {
   buildTimelinePhotoLightboxList,
   findTimelinePhotoIndexById,
@@ -131,6 +147,11 @@ import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoSc
 
 
 const TIMELINE_SNAPSHOT_STALE_MS = 30 * 60 * 1000;
+
+// URL query params mirroring the Pro date-range filter, matching the
+// ?start/?end convention of the environment summary report.
+const TIMELINE_START_DATE_PARAM = "start";
+const TIMELINE_END_DATE_PARAM = "end";
 
 interface Entry {
   id: string; note: string; photo_url: string | null; stage: string | null;
@@ -289,6 +310,54 @@ export default function Timeline() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sensorSourceFilter]);
 
+  // Pro date-range filter (advanced timeline filtering). Client hint via
+  // canUseFeature — presentation-only convenience over the grower's own
+  // already-authorized diary rows, so no server gate is involved.
+  const { entitlement } = useMyEntitlements();
+  const advancedTimelineUnlocked = canUseFeature(
+    entitlement,
+    "advanced_timeline_filters",
+  );
+  const [startDateFilter, setStartDateFilter] = useState<string>(() => {
+    const v = searchParams.get(TIMELINE_START_DATE_PARAM);
+    return isTimelineDateFilterValue(v) ? v : "";
+  });
+  const [endDateFilter, setEndDateFilter] = useState<string>(() => {
+    const v = searchParams.get(TIMELINE_END_DATE_PARAM);
+    return isTimelineDateFilterValue(v) ? v : "";
+  });
+  const [missingAction, setMissingAction] = useState<MissingActionResult | null>(null);
+
+  // Push date-range state → URL whenever it diverges (mirrors the
+  // sensorSources param sync above).
+  useEffect(() => {
+    const urlStart = searchParams.get(TIMELINE_START_DATE_PARAM) ?? "";
+    const urlEnd = searchParams.get(TIMELINE_END_DATE_PARAM) ?? "";
+    if (urlStart === startDateFilter && urlEnd === endDateFilter) return;
+    const next = new URLSearchParams(searchParams);
+    if (isTimelineDateFilterValue(startDateFilter)) next.set(TIMELINE_START_DATE_PARAM, startDateFilter);
+    else next.delete(TIMELINE_START_DATE_PARAM);
+    if (isTimelineDateFilterValue(endDateFilter)) next.set(TIMELINE_END_DATE_PARAM, endDateFilter);
+    else next.delete(TIMELINE_END_DATE_PARAM);
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDateFilter, endDateFilter]);
+
+  // Applied bounds: only when the Pro gate is open and values are valid
+  // ISO dates. An inverted range applies nothing (honest no-op + notice).
+  const appliedStartDate =
+    advancedTimelineUnlocked && isTimelineDateFilterValue(startDateFilter)
+      ? startDateFilter
+      : null;
+  const appliedEndDate =
+    advancedTimelineUnlocked && isTimelineDateFilterValue(endDateFilter)
+      ? endDateFilter
+      : null;
+  const dateRangeInvalid =
+    appliedStartDate !== null && appliedEndDate !== null && appliedStartDate > appliedEndDate;
+  const effectiveStartDate = dateRangeInvalid ? null : appliedStartDate;
+  const effectiveEndDate = dateRangeInvalid ? null : appliedEndDate;
+
   // One-shot seed of plant/tent filters from URL params written by the
   // Quick Log → Timeline continuity link. Never overwrites later edits.
   useEffect(() => {
@@ -313,9 +382,15 @@ export default function Timeline() {
     }
 
     setLoading(true);
-    const { data, count } = await supabase.from("diary_entries")
+    // Read-only select. When the Pro date-range filter is applied the
+    // bounds also scope the query (and the exact count), so the range is
+    // honest against the whole diary — not just the loaded page.
+    let entriesQuery = supabase.from("diary_entries")
       .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id", { count: "exact" })
       .eq("grow_id", activeGrowId).order("entry_at", { ascending: false }).limit(100);
+    if (effectiveStartDate) entriesQuery = entriesQuery.gte("entry_at", `${effectiveStartDate}T00:00:00.000Z`);
+    if (effectiveEndDate) entriesQuery = entriesQuery.lte("entry_at", `${effectiveEndDate}T23:59:59.999Z`);
+    const { data, count } = await entriesQuery;
     setEntriesTotal(typeof count === "number" ? count : null);
     const rows = (data as Entry[]) || [];
     const paths = rows.map((r) => r.photo_url).filter((p): p is string => !!p && !p.startsWith("http"));
@@ -372,12 +447,17 @@ export default function Timeline() {
     if (!cursor) return;
     setLoadingOlder(true);
     try {
-      const { data } = await supabase.from("diary_entries")
+      // Keyset page stays inside the applied date bounds so pagination
+      // never walks out of the filtered range.
+      let olderQuery = supabase.from("diary_entries")
         .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
         .eq("grow_id", activeGrowId)
         .lt("entry_at", cursor)
         .order("entry_at", { ascending: false })
         .limit(100);
+      if (effectiveStartDate) olderQuery = olderQuery.gte("entry_at", `${effectiveStartDate}T00:00:00.000Z`);
+      if (effectiveEndDate) olderQuery = olderQuery.lte("entry_at", `${effectiveEndDate}T23:59:59.999Z`);
+      const { data } = await olderQuery;
       const older = (data as Entry[]) || [];
       const paths = older
         .map((r) => r.photo_url)
@@ -403,7 +483,7 @@ export default function Timeline() {
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [activeGrowId, user]);
+  useEffect(() => { load(); }, [activeGrowId, user, effectiveStartDate, effectiveEndDate]);
   useEffect(() => {
     const h = () => load();
     window.addEventListener("verdant:entry-created", h);
@@ -452,6 +532,8 @@ export default function Timeline() {
     tentId: tentFilter,
     eventType: eventTypeFilter,
     sensorSources: sensorSourceFilter,
+    startDate: effectiveStartDate,
+    endDate: effectiveEndDate,
   };
   const evidenceActive = isTimelineEvidenceFilterActive(evidenceFilterInput);
 
@@ -471,6 +553,8 @@ export default function Timeline() {
     tentFilter,
     eventTypeFilter,
     sensorSourceFilter,
+    effectiveStartDate,
+    effectiveEndDate,
   ]);
 
   function clearEvidenceFilters() {
@@ -479,6 +563,28 @@ export default function Timeline() {
     setTentFilter("");
     setEventTypeFilter("");
     setSensorSourceFilter([]);
+    setStartDateFilter("");
+    setEndDateFilter("");
+  }
+
+  // "Next missing action": infer per-category logging rhythm from the
+  // merged diary + Quick Log rows and surface the category most behind
+  // its own logged rhythm. Suggestion-only — the grower decides; Verdant
+  // only points at the grower's own history.
+  function handleFindMissingAction() {
+    const result = findNextMissingAction(recentLaneRawEntries, new Date());
+    setMissingAction(result);
+    if (result.status === "found") {
+      const targetId = findNewestEntryIdForCategory(entries, result.suggestion.category);
+      if (targetId && typeof document !== "undefined") {
+        const node = document.getElementById(`timeline-entry-${targetId}`);
+        const prefersReduced =
+          typeof window !== "undefined" &&
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        node?.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "center" });
+      }
+    }
   }
 
   function toggleSensorSource(kind: TimelineSensorSourceKind) {
@@ -755,6 +861,86 @@ export default function Timeline() {
             Clear filters
           </Button>
         </div>
+        {/* Pro advanced filtering: inclusive date range + next-missing-action jump. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Date range
+          </span>
+          <input
+            type="date"
+            value={startDateFilter}
+            onChange={(e) => setStartDateFilter(e.target.value)}
+            disabled={!advancedTimelineUnlocked}
+            aria-label="Filter from date"
+            data-testid="timeline-start-date"
+            className="rounded-md border border-border/50 bg-background/60 px-2 py-1 text-sm disabled:opacity-50"
+          />
+          <span className="text-xs text-muted-foreground">to</span>
+          <input
+            type="date"
+            value={endDateFilter}
+            onChange={(e) => setEndDateFilter(e.target.value)}
+            disabled={!advancedTimelineUnlocked}
+            aria-label="Filter to date"
+            data-testid="timeline-end-date"
+            className="rounded-md border border-border/50 bg-background/60 px-2 py-1 text-sm disabled:opacity-50"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleFindMissingAction}
+            disabled={!advancedTimelineUnlocked}
+            data-testid="timeline-next-missing-action"
+            aria-label="Jump to next missing action"
+          >
+            Next missing action
+          </Button>
+        </div>
+        {dateRangeInvalid && (
+          <p className="text-xs text-destructive" data-testid="timeline-date-range-error">
+            Start date must be on or before end date. The range is not applied until it is.
+          </p>
+        )}
+        {!advancedTimelineUnlocked && (
+          <p
+            className="text-[11px] text-muted-foreground"
+            data-testid="timeline-advanced-filters-locked"
+          >
+            Date-range filtering and the next-missing-action jump are part of
+            Advanced timeline filtering, a Pro feature.{" "}
+            <Link to="/pricing" className="text-primary hover:underline">
+              See plans
+            </Link>
+          </p>
+        )}
+        {missingAction && (
+          <div
+            role="status"
+            data-testid="timeline-missing-action-banner"
+            className="rounded-xl border border-border/50 bg-secondary/30 p-3 space-y-1"
+          >
+            <p className="text-sm">
+              {missingAction.status === "found"
+                ? buildMissingActionCopy(missingAction.suggestion)
+                : missingAction.status === "nothing_missing"
+                  ? MISSING_ACTION_NOTHING_MISSING_COPY
+                  : MISSING_ACTION_NOT_ENOUGH_HISTORY_COPY}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {MISSING_ACTION_DISCLAIMER_COPY}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setMissingAction(null)}
+              data-testid="timeline-missing-action-dismiss"
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
         <div
           className="flex flex-wrap items-center gap-1.5"
           data-testid="timeline-sensor-source-filter"
@@ -917,6 +1103,22 @@ export default function Timeline() {
 
       <div className="mb-4 flex items-center justify-end gap-2 flex-wrap">
         <Link
+          to={(() => {
+            // One-tap report entry: carry the active grow and, when the
+            // Pro date-range filter is applied, the exact filtered range.
+            const range =
+              effectiveStartDate && effectiveEndDate
+                ? { startDate: effectiveStartDate, endDate: effectiveEndDate }
+                : defaultDiaryRangeReportRange();
+            return buildDiaryRangeReportUrl({ growId: activeGrowId, ...range });
+          })()}
+          className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-secondary/40 px-3 py-1.5 text-xs font-medium hover:bg-secondary/60"
+          data-testid="timeline-range-report-link"
+          aria-label="Open date-range diary report"
+        >
+          Range report (PDF)
+        </Link>
+        <Link
           to={buildEnvironmentSummaryReportUrl(defaultEnvironmentSummaryRange())}
           className="hidden sm:inline-flex items-center gap-1 rounded-md border border-border/50 bg-secondary/40 px-3 py-1.5 text-xs font-medium hover:bg-secondary/60"
           data-testid="timeline-env-summary-link"
@@ -950,7 +1152,10 @@ export default function Timeline() {
       </div>
 
       <div className="mt-4">
-        <DiaryCalendarSection rawEntries={entries} />
+        <DiaryCalendarSection
+          rawEntries={recentLaneRawEntries}
+          activeStage={activeGrow?.stage ?? null}
+        />
       </div>
 
       <div className="mt-4">

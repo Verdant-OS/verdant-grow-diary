@@ -10,6 +10,10 @@ import {
   compilePlantContextFromRows,
   type SensorReadingRowLike,
 } from "@/lib/aiDoctorContextCompiler";
+import {
+  AI_DOCTOR_REVIEW_BANNED_WORDS,
+  AI_DOCTOR_REVIEW_CONFIDENCE_VALUES,
+} from "@/lib/aiDoctorReviewResultContract";
 
 const NOW = new Date("2026-06-04T12:00:00Z");
 const iso = (off: number) => new Date(NOW.getTime() - off).toISOString();
@@ -64,14 +68,12 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
       now: NOW,
     });
     const frag = buildAiDoctorImportedHistoryPromptFragment(ctx);
-    expect(frag.importedHistoryBlock).toContain("Imported sensor history");
+    expect(frag.importedHistoryBlock).toContain("Historical sensor context");
     expect(frag.importedHistoryBlock).toContain("CSV history");
     expect(frag.importedHistoryBlock).toContain(
-      "This is imported CSV history, not live telemetry",
+      "This is historical CSV history, not current telemetry",
     );
-    expect(frag.guidance.join("\n")).toContain(
-      IMPORTED_HISTORY_PROMPT_STRINGS.notLiveCaveat,
-    );
+    expect(frag.guidance.join("\n")).toContain(IMPORTED_HISTORY_PROMPT_STRINGS.notLiveCaveat);
   });
 
   it("includes missing-live-readings warning when missingLiveSensorReadings is true", () => {
@@ -83,12 +85,14 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     });
     expect(ctx.missingLiveSensorReadings).toBe(true);
     const frag = buildAiDoctorImportedHistoryPromptFragment(ctx);
-    expect(frag.missingLiveReadingsBlock).toContain(
-      "Current/live sensor readings are missing",
-    );
-    expect(frag.guidance.join(" ")).toContain(
-      "include 'live sensor readings'",
-    );
+    // Output-phrasing must stay inside the review validator's vocabulary:
+    // the result contract rejects responses containing "live"/"imported",
+    // so the model is told to write "current sensor readings" instead.
+    expect(frag.missingLiveReadingsBlock).toContain("Current sensor readings are missing");
+    expect(frag.guidance.join(" ")).toContain("include 'current sensor readings'");
+    expect(frag.guidance.join(" ")).toContain("refer to telemetry as 'current sensor readings'");
+    // The model is never instructed to emit a banned word.
+    expect(frag.guidance.join(" ")).not.toContain("include 'live");
   });
 
   it("does NOT include missing-live warning when live readings exist", () => {
@@ -111,8 +115,10 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
       now: NOW,
     });
     const frag = buildAiDoctorImportedHistoryPromptFragment(ctx);
+    // "Historical context", not "Imported historical context" — the
+    // validator bans the word "imported" in model output.
     expect(frag.guidance.join("\n")).toContain(
-      "distinguish 'Current evidence' from 'Imported historical context'",
+      "distinguish 'Current evidence' from 'Historical context'",
     );
   });
 
@@ -129,7 +135,7 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     );
   });
 
-  it("tells model not to create alerts or Action Queue items solely from imported history", () => {
+  it("tells model not to create alerts or Action Queue items solely from historical data", () => {
     const ctx = compilePlantContextFromRows({
       plant,
       growEvents: [],
@@ -139,10 +145,10 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
     const frag = buildAiDoctorImportedHistoryPromptFragment(ctx);
     const joined = frag.guidance.join(" ");
     expect(joined).toContain(
-      "Do not create or recommend alerts solely from imported history",
+      "Do not create or recommend alerts solely from historical sensor data",
     );
     expect(joined).toContain(
-      "Do not create or recommend Action Queue items solely from imported history",
+      "Do not create or recommend Action Queue items solely from historical sensor data",
     );
   });
 
@@ -154,7 +160,29 @@ describe("aiDoctorImportedHistoryPromptRules", () => {
       now: NOW,
     });
     const frag = buildAiDoctorImportedHistoryPromptFragment(ctx);
-    expect(frag.guidance.join(" ")).toContain("cap Confidence at 'low' or 'moderate'");
+    expect(frag.guidance.join(" ")).toContain("cap Confidence at 'low' or 'medium'");
+    // Every confidence level the guidance names must be one the result
+    // contract accepts — 'moderate' is not in the enum and an obedient
+    // response using it is rejected with confidence_enum.
+    const named = [...IMPORTED_HISTORY_PROMPT_STRINGS.confidenceCap.matchAll(/'(\w+)'/g)].map(
+      (m) => m[1],
+    );
+    expect(named.length).toBeGreaterThan(0);
+    for (const level of named) {
+      expect(AI_DOCTOR_REVIEW_CONFIDENCE_VALUES).toContain(level);
+    }
+  });
+
+  it("every guidance string contains no validator-banned words", () => {
+    // Guidance strings are rendered as an explicit rule list in the
+    // system prompt, and models restate rules in their responses (e.g.
+    // in "What not to do") — a banned word here becomes a banned word
+    // in the response and a refunded review. Prompt labels must follow
+    // the same boundary because models can restate input-data headers.
+    const bannedRe = new RegExp(`\\b(${AI_DOCTOR_REVIEW_BANNED_WORDS.join("|")})\\b`, "i");
+    for (const [key, value] of Object.entries(IMPORTED_HISTORY_PROMPT_STRINGS)) {
+      expect(value, `IMPORTED_HISTORY_PROMPT_STRINGS.${key}`).not.toMatch(bannedRe);
+    }
   });
 
   it("preserves required AI Doctor output structure", () => {

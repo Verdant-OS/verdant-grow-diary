@@ -26,6 +26,11 @@ import { networkInterfaces } from "node:os";
 import { mkdirSync, writeFileSync, readFileSync, existsSync, realpathSync } from "node:fs";
 import { resolve, join, dirname, basename, sep, isAbsolute } from "node:path";
 
+export const CANONICAL_DRY_RUN_COMMAND =
+  "bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once";
+export const CANONICAL_DRY_RUN_REQUIREMENTS =
+  "set VERDANT_TENT_ID and ECOWITT_SOIL_CHANNEL_MAP_JSON for the same one tent";
+
 export interface IpCandidate {
   iface: string;
   address: string;
@@ -147,7 +152,7 @@ export function buildDoctorReport(opts: {
       '1) confirm/start Mosquitto: "C:\\Program Files\\mosquitto\\mosquitto.exe" -v',
       "2) start Verdant HTTP bridge: bun run dev:ecowitt-http-bridge",
       '3) fake POST test: curl.exe -X POST "http://127.0.0.1:8080/data/report" -d "temp1f=77.4&humidity1=58&soilmoisture1=33&co2=721"',
-      "4) MQTT dry-run report: bun run dev:ecowitt-mqtt:dry-run -- --once --write-report",
+      `4) ${CANONICAL_DRY_RUN_REQUIREMENTS}, then run: ${CANONICAL_DRY_RUN_COMMAND}`,
     ],
   };
 }
@@ -169,13 +174,22 @@ export function buildLauncherFiles(repoRoot: string): Record<string, string> {
       `echo FAKE LOCAL TEST PAYLOAD -- not live data\r\n` +
       `curl.exe -X POST "http://127.0.0.1:8080/data/report" -d "temp1f=77.4&humidity1=58&soilmoisture1=33&co2=721"\r\n` +
       footer,
-    "04-run-mqtt-dry-run.cmd":
+    "04-run-verdant-dry-run.cmd":
       header +
       `${cd}\r\n` +
-      `set ECOWITT_MQTT_URL=mqtt://127.0.0.1:1883\r\n` +
-      `set ECOWITT_MQTT_TOPIC=ecowitt/grow\r\n` +
-      `bun run dev:ecowitt-mqtt:dry-run -- --once --write-report\r\n` +
-      `start "" tmp\\ecowitt-last-ingest-report.json\r\n` +
+      `set "VERDANT_TENT_ID="\r\n` +
+      `set "ECOWITT_SOIL_CHANNEL_MAP_JSON="\r\n` +
+      `set /p "VERDANT_TENT_ID=Verdant tent UUID (one tent only): "\r\n` +
+      `set /p "ECOWITT_SOIL_CHANNEL_MAP_JSON=Soil channel map JSON (every entry must use that same tent): "\r\n` +
+      `if not defined VERDANT_TENT_ID (\r\n` +
+      `  echo Missing VERDANT_TENT_ID.\r\n` +
+      `  exit /b 2\r\n` +
+      `)\r\n` +
+      `if not defined ECOWITT_SOIL_CHANNEL_MAP_JSON (\r\n` +
+      `  echo Missing ECOWITT_SOIL_CHANNEL_MAP_JSON.\r\n` +
+      `  exit /b 2\r\n` +
+      `)\r\n` +
+      `bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once\r\n` +
       footer,
     "README.txt":
       "EcoWitt Windows local pipeline\r\n" +
@@ -186,8 +200,9 @@ export function buildLauncherFiles(repoRoot: string): Record<string, string> {
       "4. Run 03-test-http-bridge.cmd\r\n" +
       "5. Confirm a message appears on topic 'ecowitt/grow'.\r\n" +
       "6. Point the Ecowitt app to the RECOMMENDED IPv4 / port 8080 / path /data/report.\r\n" +
-      "7. Run 04-run-mqtt-dry-run.cmd\r\n" +
-      "8. Review the dry-run report BEFORE any live send.\r\n\r\n" +
+      "7. Run 04-run-verdant-dry-run.cmd and enter one tent UUID plus a same-tent soil channel map.\r\n" +
+      "8. Review the one-message dry-run output BEFORE any live send.\r\n" +
+      "9. For the canonical map format and live-send gate, read docs/ecowitt-live-soil-bridge.md.\r\n\r\n" +
       "WARNINGS\r\n" +
       "  - Never paste bridge tokens into these launchers.\r\n" +
       "  - Never paste service-role keys anywhere.\r\n" +

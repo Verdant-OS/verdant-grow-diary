@@ -18,18 +18,21 @@ import {
 } from "@/lib/signupAcquisitionSnapshotRules";
 import SubscriberGrowthSprintBoard from "@/components/SubscriberGrowthSprintBoard";
 import SignupToPaidConversionCard from "@/components/SignupToPaidConversionCard";
+import PaidReturnCohortCard from "@/components/PaidReturnCohortCard";
 import SubscriberActivationCard from "@/components/SubscriberActivationCard";
 import {
   parseSignupToPaidSnapshot,
   type SignupToPaidSnapshot,
 } from "@/lib/signupToPaidSnapshotRules";
+import { parsePaidReturnSnapshot, type PaidReturnSnapshot } from "@/lib/paidReturnSnapshotRules";
 
 type SubscriberGrowthRpcClient = {
   rpc(
     fn:
       | "subscriber_growth_operator_snapshot"
       | "signup_acquisition_operator_snapshot"
-      | "signup_to_paid_operator_snapshot",
+      | "signup_to_paid_operator_snapshot"
+      | "paid_return_operator_snapshot",
   ): Promise<{ data: unknown; error: { message?: string } | null }>;
 };
 
@@ -61,6 +64,16 @@ async function fetchSignupToPaid(): Promise<SignupToPaidSnapshot> {
     throw new Error(error.message ?? "signup_to_paid_snapshot_failed");
   }
   return parseSignupToPaidSnapshot(data);
+}
+
+async function fetchPaidReturn(): Promise<PaidReturnSnapshot> {
+  const { data, error } = await (supabase as unknown as SubscriberGrowthRpcClient).rpc(
+    "paid_return_operator_snapshot",
+  );
+  if (error) {
+    throw new Error(error.message ?? "paid_return_snapshot_failed");
+  }
+  return parsePaidReturnSnapshot(data);
 }
 
 function MetricCard({
@@ -105,12 +118,22 @@ export default function OperatorSubscriberGrowth() {
     enabled: role.granted,
     staleTime: 30_000,
   });
+  const paidReturnQuery = useQuery({
+    queryKey: ["operator", "paid-return"],
+    queryFn: fetchPaidReturn,
+    enabled: role.granted,
+    staleTime: 30_000,
+  });
 
   const snapshot = snapshotQuery.data;
   const acquisition = acquisitionQuery.data;
   const conversion = conversionQuery.data;
+  const paidReturn = paidReturnQuery.data;
   const refreshing =
-    snapshotQuery.isFetching || acquisitionQuery.isFetching || conversionQuery.isFetching;
+    snapshotQuery.isFetching ||
+    acquisitionQuery.isFetching ||
+    conversionQuery.isFetching ||
+    paidReturnQuery.isFetching;
   const progress = useMemo(
     () => buildSubscriberGrowthProgress(snapshot?.counts.activePaid ?? 0, Date.now()),
     [snapshot?.counts.activePaid],
@@ -144,6 +167,7 @@ export default function OperatorSubscriberGrowth() {
                 void snapshotQuery.refetch();
                 void acquisitionQuery.refetch();
                 void conversionQuery.refetch();
+                void paidReturnQuery.refetch();
               }}
               disabled={!role.granted || refreshing}
             >
@@ -229,6 +253,29 @@ export default function OperatorSubscriberGrowth() {
         </Card>
       )}
 
+      {role.granted && paidReturnQuery.isError && (
+        <Card data-testid="paid-return-cohort-error">
+          <CardHeader>
+            <CardTitle>Paid-return cohort unavailable.</CardTitle>
+            <CardDescription>
+              Subscriber totals remain available. The read-only return report failed and no billing,
+              entitlement, or grow data was changed.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
+      {role.granted && paidReturn && !paidReturn.ok && (
+        <Card data-testid="paid-return-cohort-denied">
+          <CardHeader>
+            <CardTitle>Paid-return cohort unavailable.</CardTitle>
+            <CardDescription>
+              {paidReturn.reasonLabel ?? "Paid-return cohort data is not available."}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
       {role.granted && snapshot?.ok && (
         <>
           <section
@@ -268,6 +315,8 @@ export default function OperatorSubscriberGrowth() {
               authoritativeActivePaid={snapshot.counts.activePaid}
             />
           )}
+
+          {paidReturn?.ok && <PaidReturnCohortCard snapshot={paidReturn} />}
 
           <Card>
             <CardHeader>
@@ -337,6 +386,7 @@ export default function OperatorSubscriberGrowth() {
                   label="VPD calculator signup"
                   value={acquisition.counts.vpdCalculator}
                 />
+                <MetricCard label="CSV history signup" value={acquisition.counts.csvHistory} />
               </CardContent>
             </Card>
           )}

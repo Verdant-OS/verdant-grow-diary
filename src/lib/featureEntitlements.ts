@@ -24,7 +24,13 @@ import type {
   ResolvedEntitlement,
 } from "@/lib/entitlements/types";
 
-export type FeatureKey = "pheno_tracker";
+/**
+ * `advanced_timeline_filters` gates the Pro timeline conveniences
+ * (date-range filtering, next-missing-action jump). Presentation-only:
+ * it never gates access to the grower's own diary data, only the
+ * advanced view tooling — so no server-side enforcement is required.
+ */
+export type FeatureKey = "pheno_tracker" | "advanced_timeline_filters";
 
 const PRO_PLAN_IDS: ReadonlyArray<PlanId> = [
   "pro_monthly",
@@ -77,4 +83,7 @@ export function canWriteFeatureData(
 }
 
 /** All supported feature keys, exported for deterministic-typing tests. */
-export const FEATURE_KEYS: ReadonlyArray<FeatureKey> = ["pheno_tracker"];
+export const FEATURE_KEYS: ReadonlyArray<FeatureKey> = [
+  "pheno_tracker",
+  "advanced_timeline_filters",
+];

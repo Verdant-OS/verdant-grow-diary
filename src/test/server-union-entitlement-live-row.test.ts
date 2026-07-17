@@ -23,6 +23,7 @@ import type { BillingSubscriptionRow, LovableSubscriptionRow } from "@/lib/entit
 
 const NOW = new Date("2026-07-16T12:00:00.000Z");
 const FUTURE = new Date(NOW.getTime() + 30 * 86400_000).toISOString();
+const PAST = new Date(NOW.getTime() - 60_000).toISOString();
 
 /** Exactly the shape allocate_lovable_founder_lifetime INSERTs. */
 function liveFounderRow(over: Partial<LovableSubscriptionRow> = {}): LovableSubscriptionRow {
@@ -200,6 +201,40 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
     expect(entitlement.capabilities.advancedExports).toBe(true);
   });
 
+  it("live past_due Pro row keeps paid capabilities during dunning", async () => {
+    const { entitlement } = await loadUnionEntitlement(
+      fakeClient({
+        subsByEnv: { live: [proRow({ status: "past_due", current_period_end: PAST })] },
+      }),
+      "sandbox",
+      NOW,
+    );
+    expect(entitlement.effectivePlanId).toBe("pro_monthly");
+    expect(entitlement.capabilities.advancedExports).toBe(true);
+  });
+
+  it("live canceled Pro row keeps paid capabilities only through its paid-through end", async () => {
+    const grace = await loadUnionEntitlement(
+      fakeClient({
+        subsByEnv: { live: [proRow({ status: "canceled", current_period_end: FUTURE })] },
+      }),
+      "sandbox",
+      NOW,
+    );
+    expect(grace.entitlement.effectivePlanId).toBe("pro_monthly");
+    expect(grace.entitlement.capabilities.advancedExports).toBe(true);
+
+    const elapsed = await loadUnionEntitlement(
+      fakeClient({
+        subsByEnv: { live: [proRow({ status: "canceled", current_period_end: PAST })] },
+      }),
+      "sandbox",
+      NOW,
+    );
+    expect(elapsed.entitlement.effectivePlanId).toBe("free");
+    expect(elapsed.entitlement.capabilities.advancedExports).toBe(false);
+  });
+
   it("degraded live row does not unlock and does not block the sandbox row", async () => {
     const canceledLive = liveFounderRow({ status: "canceled" });
     const denied = await loadUnionEntitlement(
@@ -224,15 +259,19 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
 
   it("REGRESSION: active Founder row + NEWER canceled Pro row → still Founder (expects sandbox)", async () => {
     // public.subscriptions is unique per paddle_subscription_id, not per
-    // user: a Founder who later started (and canceled) a Pro subscription
-    // holds both rows. The newer non-entitling row must not shadow the
+    // user: a Founder who later started (and canceled after its paid period) a
+    // Pro subscription holds both rows. The newer non-entitling row must not shadow the
     // entitling one.
     const { entitlement } = await loadUnionEntitlement(
       fakeClient({
         subsByEnv: {
           live: [
             liveFounderRow({ created_at: "2026-07-01T00:00:00Z" }),
-            proRow({ status: "canceled", created_at: "2026-07-10T00:00:00Z" }),
+            proRow({
+              status: "canceled",
+              current_period_end: PAST,
+              created_at: "2026-07-10T00:00:00Z",
+            }),
           ],
         },
       }),
@@ -251,7 +290,11 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
         subsByEnv: {
           live: [
             liveFounderRow({ created_at: "2026-07-01T00:00:00Z" }),
-            proRow({ status: "canceled", created_at: "2026-07-10T00:00:00Z" }),
+            proRow({
+              status: "canceled",
+              current_period_end: PAST,
+              created_at: "2026-07-10T00:00:00Z",
+            }),
           ],
         },
       }),
@@ -297,12 +340,14 @@ describe("loadUnionEntitlement — live-row environment rule", () => {
           live: [
             proRow({
               status: "canceled",
+              current_period_end: PAST,
               price_id: "pro_annual",
               paddle_subscription_id: "sub_01aaa",
               created_at: "2026-07-10T00:00:00Z",
             }),
             proRow({
               status: "canceled",
+              current_period_end: PAST,
               price_id: "pro_monthly",
               paddle_subscription_id: "sub_01zzz",
               created_at: "2026-07-10T00:00:00Z",

@@ -33,6 +33,7 @@ import type { AiDoctorSensorContext } from "./aiDoctorSensorContextRules";
 import {
   buildAiDoctorCsvHistoryContext,
   type AiDoctorCsvHistoryContext,
+  type CsvHistorySensorRowLike,
 } from "./aiDoctorCsvHistoryContextRules";
 import {
   buildEarlyStageAiDoctorContext,
@@ -48,6 +49,49 @@ export interface ImportedSensorHistorySection extends AiDoctorCsvHistoryContext 
   sectionLabel: typeof AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL;
   /** Cautionary guidance the AI Doctor consumer renders verbatim. */
   guidance: readonly string[];
+}
+
+/**
+ * Build the imported-sensor-history section from raw reading rows.
+ * Sanitized + bounded: only rows explicitly identified as CSV history
+ * contribute (via the shared summarizer's own rule), and the output
+ * carries derived aggregates only — never raw rows, raw_payload,
+ * filenames, or identifiers. Returns null when no CSV rows contribute.
+ *
+ * Exported so the AI Doctor review request packet can attach the exact
+ * same section shape the row compiler produces (single source of truth;
+ * the shared prompt assembly reads either without translation).
+ */
+/**
+ * True only when a snapshot annotation carries FRESH live-source
+ * provenance. Manual, CSV, demo, stale, invalid, and unknown sources
+ * never satisfy it — mirroring `classifySource`'s live vocabulary — so
+ * consumers can derive an honest missing-live-readings signal without
+ * restating source labels. Lives here (not in the request packet) so
+ * the live-review static-safety scanner can keep banning live-labeling
+ * literals from packet copy.
+ */
+export function isFreshLiveSnapshotAnnotation(
+  annotation: { source: string; stale: boolean } | null | undefined,
+): boolean {
+  return (
+    !!annotation && annotation.source === "live" && annotation.stale === false
+  );
+}
+
+export function buildImportedSensorHistorySection(
+  rows: ReadonlyArray<CsvHistorySensorRowLike> | null | undefined,
+): ImportedSensorHistorySection | null {
+  const csvHistory = buildAiDoctorCsvHistoryContext({ rows: rows ?? [] });
+  if (!csvHistory.hasCsvHistory) return null;
+  return {
+    ...csvHistory,
+    sectionLabel: AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL,
+    guidance: Object.freeze([
+      csvHistory.notForLiveDiagnosis,
+      "Imported history may show trends but is not proof of current conditions.",
+    ]),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -429,20 +473,8 @@ export function compilePlantContextFromRows(
   }
 
   // ----- imported CSV/XLSX sensor history (read-only, never live) -----
-  const csvHistory = buildAiDoctorCsvHistoryContext({
-    rows: input.sensorReadings ?? [],
-  });
   const imported_sensor_history: ImportedSensorHistorySection | null =
-    csvHistory.hasCsvHistory
-      ? {
-          ...csvHistory,
-          sectionLabel: AI_DOCTOR_IMPORTED_SENSOR_HISTORY_SECTION_LABEL,
-          guidance: Object.freeze([
-            csvHistory.notForLiveDiagnosis,
-            "Imported history may show trends but is not proof of current conditions.",
-          ]),
-        }
-      : null;
+    buildImportedSensorHistorySection(input.sensorReadings ?? []);
 
   // Live-sensor presence is computed from the trustworthy "live" bucket
   // only. CSV/manual/demo/stale/invalid never satisfy live-availability.

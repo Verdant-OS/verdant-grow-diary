@@ -5,15 +5,21 @@ on:
     branches: [main]
     paths:
       - "supabase/functions/sensor-ingest-webhook/**"
+      - "supabase/functions/ecowitt-ingest/**"
+      - "supabase/config.toml"
       - "src/lib/sensorIngestTestResultRules.ts"
       - "src/test/sensor-ingest-webhook*.test.ts"
+      - "src/test/ecowitt-bridge-auth-config.test.ts"
       - "package.json"
       - ".github/workflows/sensor-ingest-webhook-edge-tests.yml"
   pull_request:
     paths:
       - "supabase/functions/sensor-ingest-webhook/**"
+      - "supabase/functions/ecowitt-ingest/**"
+      - "supabase/config.toml"
       - "src/lib/sensorIngestTestResultRules.ts"
       - "src/test/sensor-ingest-webhook*.test.ts"
+      - "src/test/ecowitt-bridge-auth-config.test.ts"
       - "package.json"
       - ".github/workflows/sensor-ingest-webhook-edge-tests.yml"
 

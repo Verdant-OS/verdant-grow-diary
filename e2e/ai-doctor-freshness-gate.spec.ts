@@ -45,6 +45,7 @@ const FAKE_USER = {
 // Bundled mock plant (non-UUID id → served without any plants stub).
 const PLANT_ID = "p1";
 const TENT_ID = "t1";
+const PLANT_REVIEW_HREF = `/plants/${PLANT_ID}#plant-ai-doctor-review`;
 
 const HOUR_MS = 3_600_000;
 const FRESH_WINDOW_MS = 48 * HOUR_MS;
@@ -242,7 +243,7 @@ test.describe("AI Doctor snapshot freshness gate (mocked, 48h boundary)", () => 
 
     const cont = page.getByTestId("plant-detail-doctor-launch-continue");
     await expect(cont).toBeVisible();
-    await expect(cont).toHaveAttribute("href", `/doctor?plantId=${PLANT_ID}`);
+    await expect(cont).toHaveAttribute("href", PLANT_REVIEW_HREF);
     await expect(
       page.getByTestId("plant-detail-doctor-launch-log-readiness-to-diary"),
     ).toHaveAttribute("data-snapshot-freshness", "fresh");
@@ -296,7 +297,7 @@ test.describe("AI Doctor snapshot freshness gate (mocked, 48h boundary)", () => 
     ).toHaveCount(0);
     const cont = page.getByTestId("plant-detail-doctor-launch-continue");
     await expect(cont).toBeVisible();
-    await expect(cont).toHaveAttribute("href", `/doctor?plantId=${PLANT_ID}`);
+    await expect(cont).toHaveAttribute("href", PLANT_REVIEW_HREF);
     await expect(
       page.getByTestId("plant-detail-doctor-launch-log-readiness-to-diary"),
     ).toHaveAttribute("data-snapshot-freshness", "stale");

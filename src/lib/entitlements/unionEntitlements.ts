@@ -2,22 +2,26 @@
  * unionEntitlements — pure union of BYO Paddle and Lovable Paddle rows.
  *
  * Selects the STRONGEST entitlement source deterministically:
- *   1. Active founder_lifetime (from Lovable Paddle) — beats everything.
- *   2. Active paid recurring subscription (BYO or Lovable, whichever is
- *      currently active-and-in-period). If both are simultaneously active,
- *      BYO wins as the incumbent source of truth for existing customers.
- *   3. Any non-null row that is degraded (past_due / paused / canceled /
- *      expired) — BYO preferred, so existing operator audit surfaces keep
- *      their signal.
+ *   1. Entitling founder_lifetime (from Lovable Paddle) — beats everything.
+ *   2. Entitling paid recurring subscription (BYO or Lovable, whichever is
+ *      active, trialing, in dunning, or within cancellation grace). If both
+ *      are simultaneously entitling, BYO wins as the incumbent source of
+ *      truth for existing customers.
+ *   3. Any non-null row that is not currently entitled — BYO preferred, so
+ *      existing operator audit surfaces keep their signal.
  *   4. null → free.
  *
  * Pure. No React, no Supabase, no fetch. Time is injected.
  */
 
-import type { BillingSubscriptionRow, PlanId, SubscriptionStatus } from "./types";
+import type { BillingSubscriptionRow, PlanId } from "./types";
+import { subscriptionGrantsAccess } from "../paddleSubscriptionAccessRules";
 
 export type EntitlementSource =
-  "free" | "byo_paddle" | "lovable_paddle_subscription" | "lovable_paddle_lifetime";
+  | "free"
+  | "byo_paddle"
+  | "lovable_paddle_subscription"
+  | "lovable_paddle_lifetime";
 
 export interface PickStrongestResult {
   row: BillingSubscriptionRow | null;
@@ -26,24 +30,20 @@ export interface PickStrongestResult {
 
 const RECURRING_PLANS: ReadonlyArray<PlanId> = ["pro_monthly", "pro_annual"];
 
-function isActiveInPeriod(row: BillingSubscriptionRow | null, now: Date): boolean {
+function rowGrantsPaidAccess(row: BillingSubscriptionRow | null, now: Date): boolean {
   if (row == null) return false;
-  if (row.status !== ("active" as SubscriptionStatus)) return false;
-  if (row.current_period_end == null) return true; // e.g. founder_lifetime
-  const end = new Date(row.current_period_end);
-  if (Number.isNaN(end.getTime())) return false;
-  return end.getTime() > now.getTime();
+  return subscriptionGrantsAccess(row, now);
 }
 
-function isLifetimeActive(row: BillingSubscriptionRow | null, now: Date): boolean {
-  return row != null && row.plan_id === "founder_lifetime" && isActiveInPeriod(row, now);
+function isEntitlingLifetime(row: BillingSubscriptionRow | null, now: Date): boolean {
+  return row != null && row.plan_id === "founder_lifetime" && rowGrantsPaidAccess(row, now);
 }
 
-function isRecurringActive(row: BillingSubscriptionRow | null, now: Date): boolean {
+function isEntitlingRecurring(row: BillingSubscriptionRow | null, now: Date): boolean {
   return (
     row != null &&
     (RECURRING_PLANS as ReadonlyArray<string>).includes(row.plan_id) &&
-    isActiveInPeriod(row, now)
+    rowGrantsPaidAccess(row, now)
   );
 }
 
@@ -53,19 +53,20 @@ export function pickStrongestBilling(
   now: Date,
 ): PickStrongestResult {
   // 1. Lifetime wins over everything.
-  if (isLifetimeActive(lovableRow, now)) {
+  if (isEntitlingLifetime(lovableRow, now)) {
     return { row: lovableRow, source: "lovable_paddle_lifetime" };
   }
   // (BYO lifetime, should it ever exist, folds into byo_paddle branch below.)
-  if (isLifetimeActive(byoRow, now)) {
+  if (isEntitlingLifetime(byoRow, now)) {
     return { row: byoRow, source: "byo_paddle" };
   }
 
-  // 2. Active recurring subscription. BYO is incumbent → tie goes to BYO.
-  const byoActive = isRecurringActive(byoRow, now);
-  const lovableActive = isRecurringActive(lovableRow, now);
-  if (byoActive) return { row: byoRow, source: "byo_paddle" };
-  if (lovableActive) {
+  // 2. Any entitlement-granting recurring subscription. BYO is incumbent →
+  // tie goes to BYO, including a customer in dunning or cancellation grace.
+  const byoEntitles = isEntitlingRecurring(byoRow, now);
+  const lovableEntitles = isEntitlingRecurring(lovableRow, now);
+  if (byoEntitles) return { row: byoRow, source: "byo_paddle" };
+  if (lovableEntitles) {
     return { row: lovableRow, source: "lovable_paddle_subscription" };
   }
 

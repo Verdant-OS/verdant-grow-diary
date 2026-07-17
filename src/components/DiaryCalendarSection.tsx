@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Droplets,
   Utensils,
+  Scissors,
   Stethoscope,
   Thermometer,
   CalendarDays,
@@ -35,6 +36,12 @@ import {
 } from "@/lib/diaryCalendarEventDrawerViewModel";
 import DiaryCalendarEventDrawer from "@/components/DiaryCalendarEventDrawer";
 import EnvironmentCheckInsightsPanel from "@/components/EnvironmentCheckInsightsPanel";
+import CultivationCalendarMonthGrid from "@/components/CultivationCalendarMonthGrid";
+import {
+  buildCultivationCalendarProjectedReviewBlocks,
+  resolveCultivationCalendarStagePalette,
+  type CultivationCalendarHistoryFact,
+} from "@/lib/cultivationCalendarProjectionRules";
 import {
   readPersistedDiaryCalendarFilter,
   writePersistedDiaryCalendarFilter,
@@ -51,6 +58,7 @@ export const ENVIRONMENT_CHECK_NO_VALUES_LABEL = "No environment values captured
 const KIND_TONE: Record<DiaryCalendarEventKind, string> = {
   watering: "bg-sky-500/15 text-sky-300 border-sky-500/30",
   feeding: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  training: "bg-violet-500/15 text-violet-300 border-violet-500/30",
   diagnosis: "bg-rose-500/15 text-rose-300 border-rose-500/30",
   environment: "bg-amber-500/15 text-amber-300 border-amber-500/30",
 };
@@ -58,6 +66,7 @@ const KIND_TONE: Record<DiaryCalendarEventKind, string> = {
 const KIND_ICON: Record<DiaryCalendarEventKind, typeof Droplets> = {
   watering: Droplets,
   feeding: Utensils,
+  training: Scissors,
   diagnosis: Stethoscope,
   environment: Thermometer,
 };
@@ -65,10 +74,10 @@ const KIND_ICON: Record<DiaryCalendarEventKind, typeof Droplets> = {
 const KIND_ORDER: readonly DiaryCalendarEventKind[] = [
   "watering",
   "feeding",
+  "training",
   "diagnosis",
   "environment",
 ];
-
 
 function formatDateHeader(dateKey: string): string {
   const [y, m, d] = dateKey.split("-").map((n) => Number(n));
@@ -84,6 +93,12 @@ function formatDateHeader(dateKey: string): string {
 
 export interface DiaryCalendarSectionProps {
   rawEntries: readonly DiaryCalendarRawEntry[] | null | undefined;
+  /**
+   * The grower's currently selected manual stage, shown in the current-stage
+   * badge and legend. Historical event colors use each entry's own stage;
+   * the calendar never changes stage itself.
+   */
+  activeStage?: string | null;
   /** Optional limit on number of days shown. Default 12. */
   dayLimit?: number;
   /** Injectable "today" for deterministic tests. Defaults to new Date(). */
@@ -92,20 +107,43 @@ export interface DiaryCalendarSectionProps {
 
 export default function DiaryCalendarSection({
   rawEntries,
+  activeStage = null,
   dayLimit = 12,
   now,
 }: DiaryCalendarSectionProps) {
-
-  const allGroups = useMemo(
-    () => buildDiaryCalendarViewModel(rawEntries ?? []),
-    [rawEntries],
+  // Preserve one stable clock for normal app renders, while allowing tests to
+  // inject a precise instant. The history projector never reads ambient time.
+  const internalNowRef = useRef(new Date());
+  const calendarNow = now ?? internalNowRef.current;
+  const allGroups = useMemo(() => buildDiaryCalendarViewModel(rawEntries ?? []), [rawEntries]);
+  const historyFacts = useMemo<CultivationCalendarHistoryFact[]>(() => {
+    const facts: CultivationCalendarHistoryFact[] = [];
+    for (const group of allGroups) {
+      for (const event of group.events) {
+        if (
+          event.kind === "watering" ||
+          event.kind === "feeding" ||
+          event.kind === "training" ||
+          event.kind === "environment"
+        ) {
+          facts.push({
+            category: event.kind,
+            occurredAt: event.occurredAt,
+            id: event.id,
+          });
+        }
+      }
+    }
+    return facts;
+  }, [allGroups]);
+  const projectedReviews = useMemo(
+    () => buildCultivationCalendarProjectedReviewBlocks(historyFacts, calendarNow),
+    [historyFacts, calendarNow],
   );
   const [filter, setFilterState] = useState<DiaryCalendarFilter>(
     () => readPersistedDiaryCalendarFilter() ?? "all",
   );
-  const [expandedEnvIds, setExpandedEnvIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [expandedEnvIds, setExpandedEnvIds] = useState<Set<string>>(() => new Set());
   const toggleEnvExpanded = (id: string) => {
     setExpandedEnvIds((prev) => {
       const next = new Set(prev);
@@ -114,9 +152,9 @@ export default function DiaryCalendarSection({
       return next;
     });
   };
-  const [visibleMonth, setVisibleMonth] = useState<string | null>(() =>
-    defaultDiaryCalendarMonth(allGroups, filter)
-      ?? defaultDiaryCalendarMonth(allGroups, "all"),
+  const [visibleMonth, setVisibleMonth] = useState<string | null>(
+    () =>
+      defaultDiaryCalendarMonth(allGroups, filter) ?? defaultDiaryCalendarMonth(allGroups, "all"),
   );
 
   // If the parent dataset changes and the current month no longer exists,
@@ -149,10 +187,14 @@ export default function DiaryCalendarSection({
     () => filterDiaryCalendarGroups(monthGroupsAll, filter),
     [monthGroupsAll, filter],
   );
-  const visibleGroups = useMemo(
-    () => groups.slice(0, Math.max(1, dayLimit)),
-    [groups, dayLimit],
+  const visibleProjectedReviews = useMemo(
+    () =>
+      filter === "all"
+        ? projectedReviews
+        : projectedReviews.filter((review) => review.category === filter),
+    [filter, projectedReviews],
   );
+  const visibleGroups = useMemo(() => groups.slice(0, Math.max(1, dayLimit)), [groups, dayLimit]);
   const summary = useMemo(() => summarizeDiaryCalendar(groups), [groups]);
   const rawDetailsById = useMemo(() => {
     const map = new Map<string, unknown>();
@@ -161,16 +203,11 @@ export default function DiaryCalendarSection({
     }
     return map;
   }, [rawEntries]);
-  const [drawerEvent, setDrawerEvent] =
-    useState<DiaryCalendarEventDrawerViewModel | null>(null);
+  const [drawerEvent, setDrawerEvent] = useState<DiaryCalendarEventDrawerViewModel | null>(null);
   const openEventDrawer = (ev: DiaryCalendarEvent) => {
-    setDrawerEvent(
-      buildDiaryCalendarEventDrawerViewModel(ev, rawDetailsById.get(ev.id) ?? null),
-    );
+    setDrawerEvent(buildDiaryCalendarEventDrawerViewModel(ev, rawDetailsById.get(ev.id) ?? null));
   };
-  const [openDay, setOpenDay] = useState<string | null>(
-    visibleGroups[0]?.dateKey ?? null,
-  );
+  const [openDay, setOpenDay] = useState<string | null>(visibleGroups[0]?.dateKey ?? null);
 
   // Switching filter: jump to the newest month with matching events under
   // the new filter so the user sees results immediately, and reset the
@@ -210,19 +247,25 @@ export default function DiaryCalendarSection({
     setOpenDay(newestMatchingDateKeyInMonth(allGroups, todayMonth, filter));
   };
 
-
   // Belt-and-braces: never render stale details if the open day was removed
   // (e.g. raw entries changed asynchronously, or month/filter shifted).
-  const openDayStillVisible =
-    openDay !== null && visibleGroups.some((g) => g.dateKey === openDay);
-  const effectiveOpenDay =
-    openDay === null || openDayStillVisible ? openDay : null;
+  const openDayStillVisible = openDay !== null && visibleGroups.some((g) => g.dateKey === openDay);
+  const effectiveOpenDay = openDay === null || openDayStillVisible ? openDay : null;
 
   const hasAnyEntries = allGroups.length > 0;
-  const monthLabel = visibleMonth
-    ? formatDiaryCalendarMonthLabel(visibleMonth)
-    : "";
-
+  const monthLabel = visibleMonth ? formatDiaryCalendarMonthLabel(visibleMonth) : "";
+  const activeStagePalette = resolveCultivationCalendarStagePalette(activeStage);
+  const nextProjectedReview = visibleProjectedReviews[0] ?? null;
+  const openManualStagePicker = () => {
+    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+    // Reuse the one existing manual stage writer in Quick Log. This calendar
+    // intentionally does not add a second persistence path for grow stages.
+    window.dispatchEvent(
+      new CustomEvent("verdant:open-quicklog", {
+        detail: { source: "cultivation-calendar-stage" },
+      }),
+    );
+  };
 
   return (
     <section
@@ -230,16 +273,54 @@ export default function DiaryCalendarSection({
       aria-label="Diary calendar"
       data-testid="diary-calendar-section"
     >
-      <header className="flex items-center gap-2 mb-3">
+      <header className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-3">
         <CalendarDays className="h-3.5 w-3.5 text-primary" aria-hidden />
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Calendar
+          Cultivation calendar
         </h2>
         <span className="text-[11px] text-muted-foreground">
-          Watering · Feeding · Diagnosis · Environment · read-only
+          Watering · Feeding · Training · Diagnosis · Environment · read-only
         </span>
-
       </header>
+
+      <div
+        className="mb-3 rounded-xl border border-border/50 bg-secondary/20 px-3 py-2 sm:flex sm:items-center sm:justify-between sm:gap-3"
+        data-testid="cultivation-calendar-stage-control"
+      >
+        <p className="text-[11px] text-muted-foreground">
+          <span className="font-medium text-foreground">
+            {activeStagePalette
+              ? `Current manual stage: ${activeStagePalette.label}.`
+              : "Choose a manual grow stage."}
+          </span>{" "}
+          Calendar block colors follow the stage you log in Quick Log.
+        </p>
+        <button
+          type="button"
+          onClick={openManualStagePicker}
+          data-testid="cultivation-calendar-set-stage"
+          className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-primary/40 bg-primary/10 px-2.5 text-[11px] font-medium text-primary transition hover:bg-primary/20 sm:mt-0 shrink-0"
+        >
+          Set stage in Quick Log
+        </button>
+      </div>
+
+      {nextProjectedReview && (
+        <div
+          className="mb-3 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3 py-2"
+          data-testid="cultivation-calendar-upcoming-review"
+          role="status"
+        >
+          <p className="text-[11px] font-medium text-foreground">
+            Upcoming suggested review ·{" "}
+            {formatDateHeader(nextProjectedReview.scheduledAt.slice(0, 10))}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {nextProjectedReview.advisoryText} This is based on your recent logs, not an automatic
+            task.
+          </p>
+        </div>
+      )}
 
       {hasAnyEntries && visibleMonth && (
         <div
@@ -282,13 +363,10 @@ export default function DiaryCalendarSection({
               <ChevronRight className="h-4 w-4" aria-hidden />
             </button>
           </div>
-
         </div>
       )}
 
-      {hasAnyEntries && (
-        <EnvironmentCheckInsightsPanel rawEntries={rawEntries} />
-      )}
+      {hasAnyEntries && <EnvironmentCheckInsightsPanel rawEntries={rawEntries} />}
 
       {hasAnyEntries && (
         <div
@@ -342,6 +420,19 @@ export default function DiaryCalendarSection({
         </div>
       )}
 
+      {hasAnyEntries && visibleMonth && (
+        <div className="mb-4" data-testid="cultivation-calendar-overview">
+          <CultivationCalendarMonthGrid
+            monthKey={visibleMonth}
+            groups={groups}
+            projectedReviews={visibleProjectedReviews}
+            activeStage={activeStage}
+            now={calendarNow}
+            onOpenEvent={openEventDrawer}
+          />
+        </div>
+      )}
+
       {groups.length === 0 ? (
         filter === "environment" ? (
           <EnvironmentCheckEmptyState />
@@ -355,11 +446,11 @@ export default function DiaryCalendarSection({
           </div>
         )
       ) : (
-
         <>
           <div className="mb-3 flex flex-wrap gap-1.5 text-[11px]">
             <SummaryChip kind="watering" count={summary.counts.watering} />
             <SummaryChip kind="feeding" count={summary.counts.feeding} />
+            <SummaryChip kind="training" count={summary.counts.training} />
             <SummaryChip kind="diagnosis" count={summary.counts.diagnosis} />
             <SummaryChip kind="environment" count={summary.counts.environment} />
             <span className="ml-auto text-muted-foreground">
@@ -367,8 +458,9 @@ export default function DiaryCalendarSection({
             </span>
           </div>
 
-
-
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Detailed log history
+          </h3>
           <ul className="space-y-2" role="list">
             {visibleGroups.map((group) => {
               const isOpen = effectiveOpenDay === group.dateKey;
@@ -402,7 +494,6 @@ export default function DiaryCalendarSection({
                           <KindChip key={k} kind={k} count={group.counts[k]} compact />
                         ) : null,
                       )}
-
                     </div>
                   </button>
 
@@ -436,9 +527,7 @@ export default function DiaryCalendarSection({
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                                 <span>{time}</span>
-                                {ev.plantName && (
-                                  <span className="truncate">· {ev.plantName}</span>
-                                )}
+                                {ev.plantName && <span className="truncate">· {ev.plantName}</span>}
                               </div>
                               {ev.noteSnippet && (
                                 <p className="text-xs mt-1 whitespace-pre-wrap break-words">
@@ -656,8 +745,7 @@ export const ENVIRONMENT_CHECK_EMPTY_CTA_FALLBACK = "Open Quick Log to add one."
 function EnvironmentCheckEmptyState() {
   // Dispatches the existing window event handled by Quick Log / Global Fast
   // Add. No Supabase, no write helpers, no telemetry rows created here.
-  const canDispatch =
-    typeof window !== "undefined" && typeof window.dispatchEvent === "function";
+  const canDispatch = typeof window !== "undefined" && typeof window.dispatchEvent === "function";
   const onClick = () => {
     if (!canDispatch) return;
     window.dispatchEvent(
@@ -667,14 +755,8 @@ function EnvironmentCheckEmptyState() {
     );
   };
   return (
-    <div
-      className="py-8 px-4 text-center"
-      data-testid="diary-calendar-empty"
-      role="status"
-    >
-      <p className="text-sm font-medium text-foreground">
-        {ENVIRONMENT_CHECK_EMPTY_TITLE}
-      </p>
+    <div className="py-8 px-4 text-center" data-testid="diary-calendar-empty" role="status">
+      <p className="text-sm font-medium text-foreground">{ENVIRONMENT_CHECK_EMPTY_TITLE}</p>
       <p
         className="mt-2 text-xs text-muted-foreground max-w-md mx-auto"
         data-testid="diary-calendar-environment-empty-body"
@@ -687,9 +769,7 @@ function EnvironmentCheckEmptyState() {
         disabled={!canDispatch}
         data-testid="diary-calendar-environment-empty-cta"
         aria-label={
-          canDispatch
-            ? ENVIRONMENT_CHECK_EMPTY_CTA
-            : ENVIRONMENT_CHECK_EMPTY_CTA_FALLBACK
+          canDispatch ? ENVIRONMENT_CHECK_EMPTY_CTA : ENVIRONMENT_CHECK_EMPTY_CTA_FALLBACK
         }
         className={cn(
           "mt-4 inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium min-h-[40px] transition",
@@ -699,11 +779,8 @@ function EnvironmentCheckEmptyState() {
         )}
       >
         <Thermometer className="h-3.5 w-3.5" aria-hidden />
-        {canDispatch
-          ? ENVIRONMENT_CHECK_EMPTY_CTA
-          : ENVIRONMENT_CHECK_EMPTY_CTA_FALLBACK}
+        {canDispatch ? ENVIRONMENT_CHECK_EMPTY_CTA : ENVIRONMENT_CHECK_EMPTY_CTA_FALLBACK}
       </button>
     </div>
   );
 }
-

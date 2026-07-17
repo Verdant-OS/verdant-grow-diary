@@ -52,7 +52,10 @@ describe("featureEntitlements", () => {
   });
 
   it("active founder_lifetime can read and write", () => {
-    const e = resolveEntitlements(row({ plan_id: "founder_lifetime" }), NOW);
+    const e = resolveEntitlements(
+      row({ plan_id: "founder_lifetime", current_period_end: null }),
+      NOW,
+    );
     expect(canWriteFeatureData(e, FK)).toBe(true);
     expect(canUseFeature(e, FK)).toBe(true);
   });
@@ -64,9 +67,13 @@ describe("featureEntitlements", () => {
     expect(canReadExistingFeatureData(e, FK)).toBe(false);
   });
 
-  it("canceled pro can read existing but cannot write", () => {
+  it("canceled Pro after its paid-through end can read existing but cannot write", () => {
     const e = resolveEntitlements(
-      row({ plan_id: "pro_monthly", status: "canceled" }),
+      row({
+        plan_id: "pro_monthly",
+        status: "canceled",
+        current_period_end: "2026-07-31T23:59:59Z",
+      }),
       NOW,
     );
     expect(canWriteFeatureData(e, FK)).toBe(false);
@@ -74,10 +81,7 @@ describe("featureEntitlements", () => {
   });
 
   it("expired pro cannot write; read-existing follows displayPlanId", () => {
-    const e = resolveEntitlements(
-      row({ plan_id: "pro_monthly", status: "expired" }),
-      NOW,
-    );
+    const e = resolveEntitlements(row({ plan_id: "pro_monthly", status: "expired" }), NOW);
     expect(canWriteFeatureData(e, FK)).toBe(false);
     expect(canReadExistingFeatureData(e, FK)).toBe(true);
   });
@@ -98,9 +102,7 @@ describe("featureEntitlements", () => {
     // Strip block + line comments so a docstring mention of the forbidden
     // globals does not falsely fail the test. Only executable references
     // should be forbidden.
-    const code = src
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
     expect(code).not.toMatch(/localStorage/);
     expect(code).not.toMatch(/sessionStorage/);
   });

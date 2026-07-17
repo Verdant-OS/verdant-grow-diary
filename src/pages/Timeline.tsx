@@ -1152,7 +1152,10 @@ export default function Timeline() {
       </div>
 
       <div className="mt-4">
-        <DiaryCalendarSection rawEntries={entries} />
+        <DiaryCalendarSection
+          rawEntries={recentLaneRawEntries}
+          activeStage={activeGrow?.stage ?? null}
+        />
       </div>
 
       <div className="mt-4">

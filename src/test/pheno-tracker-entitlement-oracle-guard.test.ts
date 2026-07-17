@@ -69,11 +69,12 @@ describe("has_pheno_tracker_entitlement anti-oracle guard", () => {
     expect(sql).toMatch(
       /FUNCTION\s+public\.has_pheno_tracker_entitlement\(\s*_user_id\s+uuid\s*\)\s*\n?\s*RETURNS\s+boolean/i,
     );
-    // No provider identifiers surfaced in the function body.
+    // Provider/customer identifiers are never returned. The subscription ID
+    // may appear only as a lifetime-row validity predicate inside EXISTS.
     expect(sql).not.toMatch(/provider_customer_id/);
     expect(sql).not.toMatch(/provider_subscription_id/);
     expect(sql).not.toMatch(/paddle_customer_id/);
-    expect(sql).not.toMatch(/paddle_subscription_id/);
+    expect(sql).not.toMatch(/SELECT\s+(?:s\.)?paddle_subscription_id/i);
   });
 
   it("revokes anon/PUBLIC and grants only authenticated + service_role", () => {
@@ -95,5 +96,19 @@ describe("has_pheno_tracker_entitlement anti-oracle guard", () => {
     expect(sql).toMatch(/SECURITY\s+DEFINER/i);
     expect(sql).toMatch(/STABLE/i);
     expect(sql).toMatch(/SET\s+search_path\s+TO\s+'public',\s*'pg_temp'/i);
+  });
+
+  it("matches the customer status policy without accepting malformed paid rows", () => {
+    expect(sql).toContain("s.price_id IN ('pro_monthly','pro_annual')");
+    expect(sql).toContain("s.current_period_end IS NOT NULL");
+    expect(sql).toContain("s.status IN ('active','trialing') AND s.current_period_end > now()");
+    expect(sql).toContain("OR s.status = 'past_due'");
+    expect(sql).toContain("(s.status = 'canceled' AND s.current_period_end > now())");
+    expect(sql).toContain("s.price_id = 'founder_lifetime'");
+    // `_` is a LIKE wildcard. Require the literal 9-character prefix so a
+    // malformed ID such as lifetimeXabc cannot impersonate a Founder row.
+    expect(sql).toContain("left(s.paddle_subscription_id, 9) = 'lifetime_'");
+    expect(sql).not.toContain("s.paddle_subscription_id LIKE 'lifetime_%'");
+    expect(sql).not.toMatch(/s\.status\s*=\s*'(?:paused|expired)'/i);
   });
 });

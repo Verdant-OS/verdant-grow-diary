@@ -48,10 +48,9 @@ describe("mapLovableSubscriptionRow", () => {
   });
 
   it("maps pro_annual active → pro_annual", () => {
-    const r = mapLovableSubscriptionRow(
-      baseRow({ price_id: "pro_annual" }),
-      { expectedBillingEnvironment: "sandbox" },
-    );
+    const r = mapLovableSubscriptionRow(baseRow({ price_id: "pro_annual" }), {
+      expectedBillingEnvironment: "sandbox",
+    });
     expect(r!.plan_id).toBe("pro_annual");
   });
 
@@ -70,18 +69,16 @@ describe("mapLovableSubscriptionRow", () => {
   });
 
   it("returns null for unknown price_id", () => {
-    const r = mapLovableSubscriptionRow(
-      baseRow({ price_id: "some_unknown_price" }),
-      { expectedBillingEnvironment: "sandbox" },
-    );
+    const r = mapLovableSubscriptionRow(baseRow({ price_id: "some_unknown_price" }), {
+      expectedBillingEnvironment: "sandbox",
+    });
     expect(r).toBeNull();
   });
 
   it("current_period_end NULL rejected for pro_monthly", () => {
-    const r = mapLovableSubscriptionRow(
-      baseRow({ current_period_end: null }),
-      { expectedBillingEnvironment: "sandbox" },
-    );
+    const r = mapLovableSubscriptionRow(baseRow({ current_period_end: null }), {
+      expectedBillingEnvironment: "sandbox",
+    });
     expect(r).toBeNull();
   });
 
@@ -117,21 +114,44 @@ describe("mapLovableSubscriptionRow", () => {
     expect(r).toBeNull();
   });
 
-  it("expired-status pro_monthly still maps (union resolver decides activeness)", () => {
-    // Adapter shape-only; period elapsed / expired handling is downstream.
+  it("founder_lifetime rejects a lookalike ID without the literal underscore", () => {
     const r = mapLovableSubscriptionRow(
-      baseRow({ status: "expired", current_period_end: PAST }),
+      baseRow({
+        price_id: "founder_lifetime",
+        paddle_subscription_id: "lifetimeXabc",
+        current_period_end: null,
+      }),
       { expectedBillingEnvironment: "sandbox" },
     );
+    expect(r).toBeNull();
+  });
+
+  it("founder_lifetime rejected when current_period_end is missing", () => {
+    const raw = baseRow({
+      price_id: "founder_lifetime",
+      paddle_subscription_id: "lifetime_x",
+      current_period_end: null,
+    });
+    const r = mapLovableSubscriptionRow(
+      { ...raw, current_period_end: undefined } as unknown as LovableSubscriptionRow,
+      { expectedBillingEnvironment: "sandbox" },
+    );
+    expect(r).toBeNull();
+  });
+
+  it("expired-status pro_monthly still maps (union resolver decides activeness)", () => {
+    // Adapter shape-only; period elapsed / expired handling is downstream.
+    const r = mapLovableSubscriptionRow(baseRow({ status: "expired", current_period_end: PAST }), {
+      expectedBillingEnvironment: "sandbox",
+    });
     expect(r).not.toBeNull();
     expect(r!.status).toBe("expired");
   });
 
   it("unknown status → null (defense-in-depth)", () => {
-    const r = mapLovableSubscriptionRow(
-      baseRow({ status: "banana" }),
-      { expectedBillingEnvironment: "sandbox" },
-    );
+    const r = mapLovableSubscriptionRow(baseRow({ status: "banana" }), {
+      expectedBillingEnvironment: "sandbox",
+    });
     expect(r).toBeNull();
   });
 
@@ -160,8 +180,6 @@ describe("mapLovableSubscriptionRow", () => {
   });
 
   it("null row → null", () => {
-    expect(
-      mapLovableSubscriptionRow(null, { expectedBillingEnvironment: "sandbox" }),
-    ).toBeNull();
+    expect(mapLovableSubscriptionRow(null, { expectedBillingEnvironment: "sandbox" })).toBeNull();
   });
 });

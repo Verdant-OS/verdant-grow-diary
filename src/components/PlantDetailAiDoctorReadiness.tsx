@@ -41,6 +41,8 @@ import {
 } from "@/lib/sensorSnapshotStatusContract";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
+import { PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
+import { plantDetailPath } from "@/lib/routes";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import { classifyTimelineEntry } from "@/lib/timelineEntryClassification";
 import { Button } from "@/components/ui/button";
@@ -200,7 +202,7 @@ export default function PlantDetailAiDoctorReadiness({
   }, [stage, signals, sensorSnapshot]);
 
   const doctorHref = plantId
-    ? `/doctor?plantId=${encodeURIComponent(plantId)}`
+    ? `${plantDetailPath(plantId)}#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`
     : "/doctor";
 
   const sensor = result.sensorEvidence;

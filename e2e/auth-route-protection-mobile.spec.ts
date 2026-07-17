@@ -88,6 +88,8 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/.lovable/oauth/consent",
   "/breeder-beta",
   "/creator-beta",
+  "/cultivars",
+  "/cultivars/:slug",
   "/glossary",
   "/pheno-expression-showcase",
   "/upgrade",

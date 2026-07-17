@@ -78,6 +78,13 @@ describe("detectIpCandidates", () => {
     const c = detectIpCandidates(fakeIfaces());
     expect(recommendedIp(c)).toBe("192.168.1.42");
   });
+
+  it("fails closed when OS network interface discovery is unavailable", () => {
+    const c = detectIpCandidates(undefined, () => {
+      throw new Error("network interface discovery unavailable");
+    });
+    expect(c).toEqual([]);
+  });
 });
 
 describe("buildDoctorReport", () => {

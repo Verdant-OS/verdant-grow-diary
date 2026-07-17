@@ -9,7 +9,10 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
 import { usePageSeo } from "@/hooks/usePageSeo";
-import { findCultivarBySlug } from "@/constants/verdantCultivars";
+import {
+  findCultivarBySlug,
+  type VerdantCultivarProfile,
+} from "@/constants/verdantCultivars";
 
 export default function CultivarPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -19,6 +22,10 @@ export default function CultivarPage() {
     return <Navigate to="/cultivars" replace />;
   }
 
+  return <CultivarDetails cultivar={cultivar} />;
+}
+
+function CultivarDetails({ cultivar }: { cultivar: VerdantCultivarProfile }) {
   usePageSeo({
     title: `${cultivar.name} Cultivator Guide (${cultivar.searchAlias} info) | Verdant`,
     description: `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`,

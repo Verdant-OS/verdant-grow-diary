@@ -3,7 +3,7 @@
  *
  * Presenter only. Renders 2 illustrative phenos side-by-side with a loud
  * "Sample data" label. Never real grower diary rows, never sensor readings,
- * never "AI picks winners". Cross-links to Verdant's real diary-first
+ * never delegates keeper selection to AI. Cross-links to Verdant's real diary-first
  * features (Pheno comparison, Pheno expression showcase, start a diary).
  */
 import { Link } from "react-router-dom";

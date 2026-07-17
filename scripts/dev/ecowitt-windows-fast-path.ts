@@ -41,9 +41,10 @@ export const NEXT_DRY_RUN_LINES = [
   "Next dry-run step:",
   '$env:ECOWITT_MQTT_URL="mqtt://127.0.0.1:1883"',
   '$env:ECOWITT_MQTT_TOPIC="ecowitt/grow"',
-  "bun run dev:ecowitt-mqtt:dry-run -- --once --write-report",
+  "Set VERDANT_TENT_ID and ECOWITT_SOIL_CHANNEL_MAP_JSON for the same one tent.",
+  "bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once",
 ];
-export const NEXT_DRY_RUN_COMMAND = "bun run dev:ecowitt-mqtt:dry-run -- --once --write-report";
+export const NEXT_DRY_RUN_COMMAND = "bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once";
 
 export const BRIDGE_DOWN_LINES = [
   "HTTP bridge is not running.",

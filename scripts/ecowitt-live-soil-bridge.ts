@@ -32,6 +32,7 @@
  *
  * Flags:
  *   --dry-run   parse + normalize + log, never POST
+ *   --once      stop after one fully accepted MQTT message (safe proof mode)
  */
 
 import {
@@ -53,6 +54,8 @@ export interface BridgeEnv {
   defaultPlantId: string | null;
   channelMap: EcowittSoilChannelMap;
   dryRun: boolean;
+  /** Missing in older callers means continuous bridge mode. */
+  once?: boolean;
 }
 
 export function readBridgeEnv(env: NodeJS.ProcessEnv, argv: string[]): BridgeEnv {
@@ -65,6 +68,7 @@ export function readBridgeEnv(env: NodeJS.ProcessEnv, argv: string[]): BridgeEnv
     defaultPlantId: env.VERDANT_PLANT_ID ?? null,
     channelMap: parseEcowittSoilChannelMap(env.ECOWITT_SOIL_CHANNEL_MAP_JSON),
     dryRun,
+    once: argv.includes("--once"),
   };
 }
 
@@ -81,6 +85,18 @@ export interface HandleMessageResult {
   accepted: number;
   rejected: number;
   reasons: string[];
+}
+
+/**
+ * A one-shot bridge run is complete only when every canonical payload derived
+ * from one MQTT message was accepted. Invalid, malformed, or partly rejected
+ * messages keep the bridge listening for the next reading.
+ */
+export function shouldCompleteOnceBridge(
+  env: Pick<BridgeEnv, "once">,
+  result: HandleMessageResult,
+): boolean {
+  return env.once === true && result.accepted > 0 && result.rejected === 0;
 }
 
 /**
@@ -240,6 +256,7 @@ async function runCli(): Promise<void> {
   }
   log("info", "starting", {
     dryRun: env.dryRun,
+    once: env.once,
     topic: process.env.ECOWITT_MQTT_TOPIC ?? "ecowitt/grow",
     ingestUrl: env.ingestUrl,
     bridgeAuth: maskBridgeToken(env.bridgeToken),
@@ -251,6 +268,7 @@ async function runCli(): Promise<void> {
     connect: (url: string, opts: Record<string, unknown>) => {
       on: (event: string, cb: (...args: unknown[]) => void) => void;
       subscribe: (topic: string, cb: (err: Error | null) => void) => void;
+      end: (force?: boolean) => void;
     };
   }
   let mqttMod: MqttLike;
@@ -275,6 +293,8 @@ async function runCli(): Promise<void> {
   });
 
   const soilHistory = new Map<string, number[]>();
+  let onceMessageInFlight = false;
+  let onceComplete = false;
 
   client.on("connect", () => {
     log("info", "mqtt_connected", { url, topic });
@@ -286,17 +306,35 @@ async function runCli(): Promise<void> {
     log("error", "mqtt_error", { message: (err as Error)?.message ?? String(err) }),
   );
   client.on("message", async (...args: unknown[]) => {
+    if (env.once && (onceMessageInFlight || onceComplete)) return;
+    onceMessageInFlight = env.once;
     const msg = args[1] as { toString: (enc: string) => string };
-    await handleMqttMessage(msg.toString("utf8"), {
-      env,
-      forward: (p) =>
-        forwardWithBackoff(p, {
-          url: env.ingestUrl!,
-          bridgeToken: env.bridgeToken!,
-        }),
-      log,
-      soilHistory,
-    });
+    try {
+      const result = await handleMqttMessage(msg.toString("utf8"), {
+        env,
+        forward: (p) =>
+          forwardWithBackoff(p, {
+            url: env.ingestUrl!,
+            bridgeToken: env.bridgeToken!,
+          }),
+        log,
+        soilHistory,
+      });
+      if (shouldCompleteOnceBridge(env, result)) {
+        onceComplete = true;
+        log("info", "once_complete", {
+          accepted: result.accepted,
+          rejected: result.rejected,
+        });
+        client.end(true);
+      }
+    } catch (error) {
+      log("error", "message_processing_error", {
+        message: (error as Error)?.message ?? String(error),
+      });
+    } finally {
+      onceMessageInFlight = false;
+    }
   });
 }
 

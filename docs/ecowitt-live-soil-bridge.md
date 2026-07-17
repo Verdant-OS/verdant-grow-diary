@@ -20,7 +20,7 @@ The bridge:
 - normalizes raw EcoWitt MQTT payloads with the pure rules in
   `src/lib/ecowittLiveSoilIngestRules.ts`
 - derives `vpd_kpa` from valid air temperature + RH only
-- supports multi-channel soil probes via a channel map
+- supports multiple soil channels for one tent via a tent-scoped channel map
 - redacts `PASSKEY` / `MAC` / `password` / `token` / private IPs before
   logging and before forwarding inside `raw_payload`
 - retries network errors with Full-Jitter exponential backoff
@@ -46,22 +46,39 @@ The bridge:
 | `ECOWITT_MQTT_USERNAME` / `ECOWITT_MQTT_PASSWORD` | Optional broker auth. |
 | `ECOWITT_MQTT_TOPIC` | Default `ecowitt/grow`. |
 | `VERDANT_INGEST_URL` | Verdant `sensor-ingest-webhook` URL. Required unless dry-run. |
-| `VERDANT_BRIDGE_TOKEN` | `vbt_…` bridge token. Required unless dry-run. Never paste it into chat / logs / commits. |
-| `VERDANT_TENT_ID` | Fallback tent UUID for air/CO₂/VPD metrics. |
+| `VERDANT_BRIDGE_TOKEN` | `vbt_…` bridge token, scoped to one tent. Required unless dry-run. Never paste it into chat / logs / commits. |
+| `VERDANT_TENT_ID` | Fallback tent UUID for air/CO₂/VPD metrics. When set, it must be the tent scoped to the bridge token. |
 | `VERDANT_PLANT_ID` | Optional fallback plant UUID. |
-| `ECOWITT_SOIL_CHANNEL_MAP_JSON` | JSON map per soil probe (see below). |
+| `ECOWITT_SOIL_CHANNEL_MAP_JSON` | JSON map per soil probe for the same token-scoped tent only (see below). |
 | `ECOWITT_BRIDGE_DRY_RUN` | `"1"` to force dry-run. |
 
 ### Channel map
 
 ```json
 {
-  "soilmoisture1": { "tent_id": "TENT_UUID_A", "plant_id": "PLANT_UUID", "label": "front_left_pot" },
-  "soilmoisture2": { "tent_id": "TENT_UUID_B", "label": "front_right_pot" }
+  "soilmoisture1": { "tent_id": "TENT_UUID", "plant_id": "PLANT_UUID", "label": "front_left_pot" },
+  "soilmoisture2": { "tent_id": "TENT_UUID", "label": "front_right_pot" }
 }
 ```
 
+**One `VERDANT_BRIDGE_TOKEN` is tent-scoped.** Every mapped soil channel
+must use that one token-bound `tent_id`; a map must never mix tent IDs.
+Do not fan a single bridge run out to multiple tents. Configure another
+tent separately with its own authorization.
+
 Probes without a mapping are **dropped** (we never invent routing).
+
+## Tonight's one-tent safe path
+
+The fastest safe path tonight is local: EcoWitt gateway → `ecowitt2mqtt`
+→ LAN Mosquitto → this bridge → outbound HTTPS to the existing
+`sensor-ingest-webhook`. A direct `ecowitt-ingest` call is **not** the
+fast path for this rollout; it is a separate, gated ingest route and
+does not replace the local bridge proof.
+
+**No public port forwarding.** Keep `ecowitt2mqtt`, Mosquitto, and the
+bridge private to the LAN. The bridge makes the only remote connection
+as an outbound HTTPS request; it does not need an inbound public port.
 
 ## Run modes
 
@@ -77,11 +94,48 @@ bun run scripts/ecowitt-live-soil-bridge.ts --dry-run
 
 The bridge will log each normalized, redacted payload it *would* POST.
 
-### Send one valid reading
+### One-message `--once` proof (no network writes)
 
-Once dry-run looks correct, drop the `--dry-run` flag and start the bridge
-with `VERDANT_INGEST_URL` and `VERDANT_BRIDGE_TOKEN` set. The first valid
-MQTT message will be forwarded once.
+After the continuous dry-run looks sensible, use the available `--once`
+mode to inspect one real local MQTT message and exit:
+
+```bash
+ECOWITT_MQTT_URL=mqtt://127.0.0.1:1883 \
+ECOWITT_MQTT_TOPIC=ecowitt/grow \
+VERDANT_TENT_ID=<token-scoped-tent-uuid> \
+bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once
+```
+
+This mode waits for MQTT traffic and exits only after the first fully
+accepted MQTT message. Invalid, stale, malformed, or partly rejected
+messages do not count toward the proof. In dry-run, “accepted” means
+accepted for the redacted local preview — nothing is posted to Verdant.
+
+### Windows PowerShell one-message preview
+
+On the home PC, use the same tent UUID for the fallback and every mapped
+soil probe. Replace labels only after physically labeling the probes; do
+not paste a bridge token, gateway passkey, MAC, or private IP into this
+file or a chat.
+
+```powershell
+$env:ECOWITT_MQTT_URL = "mqtt://127.0.0.1:1883"
+$env:ECOWITT_MQTT_TOPIC = "ecowitt/grow"
+$env:VERDANT_TENT_ID = "<one-tent-uuid>"
+$env:ECOWITT_SOIL_CHANNEL_MAP_JSON = '{"soilmoisture1":{"tent_id":"<one-tent-uuid>","label":"front-left"},"soilmoisture2":{"tent_id":"<one-tent-uuid>","label":"front-right"}}'
+bun run scripts/ecowitt-live-soil-bridge.ts --dry-run --once
+```
+
+Confirm the emitted temperature, humidity, and each mapped soil probe
+against the physical labels before moving to a live one-message proof.
+
+### Send one controlled live MQTT message
+
+Only after the one-message dry-run is correct, drop `--dry-run`, set
+`VERDANT_INGEST_URL` and the same tent-scoped `VERDANT_BRIDGE_TOKEN`, and
+use `--once`. The bridge forwards every canonical payload from the first
+fully accepted MQTT message for that tent, then exits. It must not be used
+to route another tent.
 
 ### Send one invalid reading (safety check)
 
@@ -92,8 +146,8 @@ Verdant's live sensor view.
 ## How to confirm inside Verdant
 
 - Open the affected tent's Sensor Data view.
-- A fresh, valid EcoWitt reading appears with source `ecowitt` /
-  transport `mqtt`.
+- A fresh, valid EcoWitt reading appears with source `live`, provider
+  `ecowitt`, and transport `mqtt`.
 - VPD is populated from temp + humidity (look for `derived_vpd: true` in
   the row's metadata if you inspect it via diagnostics).
 - Invalid readings never appear as healthy live data.
@@ -137,7 +191,9 @@ auditable from `scripts/ecowitt-live-soil-bridge.ts`.
    canonical payload, derived `vpd_kpa`, soil channels, and source label
    look correct **before** sending anything to Verdant.
 3. **Send to the Verdant ingest webhook with the Verdant bridge token.**
-   Run the bridge without `--dry-run` and post exactly one reading.
+   After the local `--once` dry-run proof, run the bridge without
+   `--dry-run` and with `--once` to process exactly one fully accepted MQTT
+   message for that token-scoped tent.
 4. **Confirm in Verdant.** Open the affected tent and verify: live
    reading appears, source is labeled correctly, charts render, and VPD
    is derived from valid temp + RH.
@@ -170,10 +226,10 @@ auditable from `scripts/ecowitt-live-soil-bridge.ts`.
 | Var | Required | Purpose |
 | --- | --- | --- |
 | `VERDANT_INGEST_URL` | Required (non dry-run) | Verdant `sensor-ingest-webhook` URL. |
-| `VERDANT_BRIDGE_TOKEN` | Required (non dry-run) | `vbt_…` bridge token issued for this bridge. |
-| `VERDANT_TENT_ID` | Required for air/env metrics | Fallback tent UUID when no channel map covers a metric. |
+| `VERDANT_BRIDGE_TOKEN` | Required (non dry-run) | `vbt_…` bridge token issued for one tent; do not use it to route another tent. |
+| `VERDANT_TENT_ID` | Required for air/env metrics | Fallback tent UUID when no channel map covers a metric; it must match the token-scoped tent. |
 | `VERDANT_PLANT_ID` | Optional | Fallback plant UUID. |
-| `ECOWITT_SOIL_CHANNEL_MAP_JSON` | Optional | Per-probe tent/plant routing. Unmapped probes are dropped. |
+| `ECOWITT_SOIL_CHANNEL_MAP_JSON` | Optional | Per-probe plant routing within the one token-scoped tent. Unmapped probes are dropped. |
 
 ### Dry-run command (no network, no Supabase)
 

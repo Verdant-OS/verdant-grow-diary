@@ -29,10 +29,16 @@ const baseImportedHistory = {
 
 describe("buildAiDoctorPromptMessages — imported-history injection", () => {
   it("returns base system prompt and JSON packet user prompt when no history / live readings", () => {
-    const out = buildAiDoctorPromptMessages({ grow_id: "g1" });
+    const growId = "11111111-1111-4111-8111-111111111111";
+    const idempotencyKey = "request-key-123";
+    const out = buildAiDoctorPromptMessages({
+      grow_id: growId,
+      idempotency_key: idempotencyKey,
+    });
     expect(out.system).toContain(AI_DOCTOR_BASE_SYSTEM_PROMPT);
     expect(out.user).toContain("Grower context packet (JSON):");
-    expect(out.user).toContain('"grow_id":"g1"');
+    expect(out.user).not.toContain(growId);
+    expect(out.user).not.toContain(idempotencyKey);
     expect(out.importedHistoryBlock).toBeNull();
     expect(out.missingLiveReadingsBlock).toBeNull();
     expect(out.guidance).toEqual([]);
@@ -40,6 +46,23 @@ describe("buildAiDoctorPromptMessages — imported-history injection", () => {
     for (const section of AI_DOCTOR_REQUIRED_OUTPUT_SECTIONS) {
       expect(out.system).toContain(section);
     }
+  });
+
+  it("redacts operational scope fields even when a caller nests them in context", () => {
+    const outerGrowId = "11111111-1111-4111-8111-111111111111";
+    const injectedGrowId = "22222222-2222-4222-8222-222222222222";
+    const idempotencyKey = "request-key-123";
+    const out = buildAiDoctorPromptMessages({
+      grow_id: outerGrowId,
+      plant: {
+        growId: injectedGrowId,
+        sensorHistory: [{ idempotencyKey }],
+      },
+    });
+
+    expect(out.user).not.toContain(outerGrowId);
+    expect(out.user).not.toContain(injectedGrowId);
+    expect(out.user).not.toContain(idempotencyKey);
   });
 
   it("injects imported-history guidance and block when packet has imported_sensor_history", () => {

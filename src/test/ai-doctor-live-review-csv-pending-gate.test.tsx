@@ -65,6 +65,7 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
 import PlantDetailAiDoctorLiveReview from "@/components/PlantDetailAiDoctorLiveReview";
 
 const TENT_ID = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e77";
+const GROW_ID = "11111111-1111-4111-8111-111111111111";
 
 const snapshotCard = (when: string): ManualSnapshotTimelineCard =>
   ({
@@ -141,7 +142,11 @@ const csvRows = [
 
 type InvokeFn = (
   name: string,
-  init: { body: import("@/lib/aiDoctorReviewRequestPacket").AiDoctorReviewRequestPacket },
+  init: {
+    body: import("@/lib/aiDoctorReviewRequestTransportRules").AiDoctorReviewRequestEnvelope<
+      import("@/lib/aiDoctorReviewRequestPacket").AiDoctorReviewRequestPacket
+    >;
+  },
 ) => Promise<{ data: unknown; error: unknown }>;
 
 function mount(
@@ -154,6 +159,7 @@ function mount(
     <PlantDetailAiDoctorLiveReview
       plantId="p1"
       plant={strongPlant}
+      growId={GROW_ID}
       tentId={TENT_ID}
       invoke={invoke}
       sensorClassificationOverride={null}
@@ -184,7 +190,9 @@ describe("CSV history pending/error gating", () => {
     expect(start.disabled).toBe(false);
     fireEvent.click(start);
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
-    const packet = invoke.mock.calls[0][1].body as {
+    const request = invoke.mock.calls[0][1].body;
+    expect(request.grow_id).toBe(GROW_ID);
+    const packet = request.packet as {
       imported_sensor_history: { totalReadings: number } | null;
       missingLiveSensorReadings?: boolean;
     };
@@ -202,7 +210,7 @@ describe("CSV history pending/error gating", () => {
     expect(start.disabled).toBe(false);
     fireEvent.click(start);
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
-    const packet = invoke.mock.calls[0][1].body as {
+    const packet = invoke.mock.calls[0][1].body.packet as {
       imported_sensor_history: unknown;
     };
     expect(packet.imported_sensor_history).toBeNull();

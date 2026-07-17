@@ -4,9 +4,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import {
-  useAiDoctorLiveReview,
-} from "@/hooks/useAiDoctorLiveReview";
+import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import type { AiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
 
 const packet: AiDoctorReviewRequestPacket = {
@@ -16,6 +14,8 @@ const packet: AiDoctorReviewRequestPacket = {
   recentEvents: [],
   recentSensorSnapshot: null,
 };
+
+const GROW_ID = "11111111-1111-4111-8111-111111111111";
 
 const validResult = () => ({
   summary: "Plant shows mild leaf curl on lower fan leaves.",
@@ -34,9 +34,7 @@ const validResult = () => ({
 describe("useAiDoctorLiveReview", () => {
   it("never auto-fires; status stays idle until start()", async () => {
     const invoke = vi.fn();
-    renderHook(() =>
-      useAiDoctorLiveReview({ enabled: true, packet, invoke }),
-    );
+    renderHook(() => useAiDoctorLiveReview({ enabled: true, packet, invoke }));
     await new Promise((r) => setTimeout(r, 20));
     expect(invoke).not.toHaveBeenCalled();
   });
@@ -46,13 +44,28 @@ describe("useAiDoctorLiveReview", () => {
       data: { ok: true, result: validResult() },
       error: null,
     });
-    const { result } = renderHook(() =>
-      useAiDoctorLiveReview({ enabled: true, packet, invoke }),
-    );
+    const { result } = renderHook(() => useAiDoctorLiveReview({ enabled: true, packet, invoke }));
     act(() => result.current.start());
     await waitFor(() => expect(result.current.status).toBe("result"));
     expect(result.current.result?.confidence).toBe("medium");
     expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends valid grow scope in a transport envelope, not in model context", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      data: { ok: true, result: validResult() },
+      error: null,
+    });
+    const { result } = renderHook(() =>
+      useAiDoctorLiveReview({ enabled: true, packet, growId: GROW_ID, invoke }),
+    );
+
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.status).toBe("result"));
+    expect(invoke).toHaveBeenCalledWith("ai-doctor-review", {
+      body: { packet, grow_id: GROW_ID },
+    });
+    expect(packet).not.toHaveProperty("grow_id");
   });
 
   it("fails closed on HTTP error (no raw error exposed)", async () => {
@@ -60,9 +73,7 @@ describe("useAiDoctorLiveReview", () => {
       data: null,
       error: { message: "boom" },
     });
-    const { result } = renderHook(() =>
-      useAiDoctorLiveReview({ enabled: true, packet, invoke }),
-    );
+    const { result } = renderHook(() => useAiDoctorLiveReview({ enabled: true, packet, invoke }));
     act(() => result.current.start());
     await waitFor(() => expect(result.current.status).toBe("error"));
     expect(result.current.reason).toBe("http");
@@ -80,9 +91,7 @@ describe("useAiDoctorLiveReview", () => {
       },
       error: null,
     });
-    const { result } = renderHook(() =>
-      useAiDoctorLiveReview({ enabled: true, packet, invoke }),
-    );
+    const { result } = renderHook(() => useAiDoctorLiveReview({ enabled: true, packet, invoke }));
     act(() => result.current.start());
     await waitFor(() => expect(result.current.status).toBe("error"));
     expect(result.current.reason).toBe("invalid");
@@ -92,21 +101,15 @@ describe("useAiDoctorLiveReview", () => {
     const invoke = vi
       .fn()
       .mockResolvedValue({ data: { ok: false, reason: "config" }, error: null });
-    const { result } = renderHook(() =>
-      useAiDoctorLiveReview({ enabled: true, packet, invoke }),
-    );
+    const { result } = renderHook(() => useAiDoctorLiveReview({ enabled: true, packet, invoke }));
     act(() => result.current.start());
     await waitFor(() => expect(result.current.status).toBe("error"));
     expect(result.current.reason).toBe("config");
   });
 
   it("retry() runs once per call — no auto-retry loop", async () => {
-    const invoke = vi
-      .fn()
-      .mockResolvedValue({ data: null, error: { message: "boom" } });
-    const { result } = renderHook(() =>
-      useAiDoctorLiveReview({ enabled: true, packet, invoke }),
-    );
+    const invoke = vi.fn().mockResolvedValue({ data: null, error: { message: "boom" } });
+    const { result } = renderHook(() => useAiDoctorLiveReview({ enabled: true, packet, invoke }));
     act(() => result.current.start());
     await waitFor(() => expect(result.current.status).toBe("error"));
     expect(invoke).toHaveBeenCalledTimes(1);

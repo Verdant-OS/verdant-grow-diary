@@ -23,6 +23,10 @@ import { useCallback, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { AiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
 import {
+  buildAiDoctorReviewRequestEnvelope,
+  type AiDoctorReviewRequestEnvelope,
+} from "@/lib/aiDoctorReviewRequestTransportRules";
+import {
   adaptCreditedAiResponse,
   type AiCreditedFailureReason,
 } from "@/lib/aiCreditedResponseAdapter";
@@ -37,11 +41,7 @@ import {
   type PersistAiDoctorSessionResult,
 } from "@/lib/aiDoctorSessionPersistence";
 
-export type AiDoctorLiveReviewStatus =
-  | "idle"
-  | "loading"
-  | "result"
-  | "error";
+export type AiDoctorLiveReviewStatus = "idle" | "loading" | "result" | "error";
 
 export interface AiDoctorLiveReviewState {
   status: AiDoctorLiveReviewStatus;
@@ -53,7 +53,6 @@ export interface AiDoctorLiveReviewState {
   creditRemaining?: AiCreditRemainingInput;
 }
 
-
 export interface UseAiDoctorLiveReviewOptions {
   /** Hook is inert until a packet is provided AND `enabled` is true. */
   enabled: boolean;
@@ -61,7 +60,7 @@ export interface UseAiDoctorLiveReviewOptions {
   /** Override for tests — defaults to supabase.functions.invoke. */
   invoke?: (
     name: string,
-    init: { body: AiDoctorReviewRequestPacket },
+    init: { body: AiDoctorReviewRequestEnvelope<AiDoctorReviewRequestPacket> },
   ) => Promise<{ data: unknown; error: unknown }>;
   /** Scope IDs used for the audit-trail row. Optional for back-compat. */
   growId?: string | null;
@@ -76,9 +75,7 @@ export interface UseAiDoctorLiveReviewOptions {
    */
   sensorClassification?: Classification | null;
   /** Override for tests — defaults to `persistAiDoctorSession(supabase, ...)`. */
-  persist?: (
-    input: AiDoctorSessionInput,
-  ) => Promise<PersistAiDoctorSessionResult>;
+  persist?: (input: AiDoctorSessionInput) => Promise<PersistAiDoctorSessionResult>;
 }
 
 export interface UseAiDoctorLiveReviewApi extends AiDoctorLiveReviewState {
@@ -118,7 +115,9 @@ export function useAiDoctorLiveReview(
 
     try {
       const { data, error } = await invoke("ai-doctor-review", {
-        body: packet,
+        // Grow scope stays outside the model context packet. The Edge Function
+        // validates ownership before spending a Free per-grow credit.
+        body: buildAiDoctorReviewRequestEnvelope(packet, opts.growId),
       });
       if (error) {
         setState({ status: "error", result: null, reason: "http" });
@@ -131,8 +130,7 @@ export function useAiDoctorLiveReview(
           result: null,
           reason: outcome.reason,
           credit:
-            outcome.reason === "credit_denied" ||
-            outcome.reason === "upstream_credit_exhausted"
+            outcome.reason === "credit_denied" || outcome.reason === "upstream_credit_exhausted"
               ? outcome.credit
               : undefined,
         });
@@ -151,8 +149,7 @@ export function useAiDoctorLiveReview(
       if (opts.growId) {
         const persist =
           opts.persist ??
-          ((input: AiDoctorSessionInput) =>
-            persistAiDoctorSession(supabase, input));
+          ((input: AiDoctorSessionInput) => persistAiDoctorSession(supabase, input));
         try {
           await persist({
             growId: opts.growId,

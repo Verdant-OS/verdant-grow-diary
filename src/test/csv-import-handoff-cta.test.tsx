@@ -16,8 +16,9 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
-import { plantDetailPath, tentDetailPath } from "@/lib/routes";
+import { plantDetailPath, sensorsPath, tentDetailPath } from "@/lib/routes";
 import {
+  CSV_IMPORT_ADD_CURRENT_READING_LABEL,
   CSV_IMPORT_HISTORICAL_CONTEXT_NOTE,
   CSV_IMPORT_VIEW_HISTORY_LABEL,
 } from "@/lib/environmentCsvPreviewCopyRules";
@@ -78,11 +79,9 @@ function makeQueryWrapper() {
 
 async function uploadAndConfirm() {
   const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
-  const file = new File(
-    ["Timestamp,Temp(°C),RH\n2026-06-01T10:00:00Z,25,50\n"],
-    "export.csv",
-    { type: "text/csv" },
-  );
+  const file = new File(["Timestamp,Temp(°C),RH\n2026-06-01T10:00:00Z,25,50\n"], "export.csv", {
+    type: "text/csv",
+  });
   Object.defineProperty(input, "files", { value: [file] });
   fireEvent.change(input);
   await waitFor(() => expect(screen.queryByTestId("csv-import-preview")).toBeTruthy());
@@ -103,11 +102,7 @@ describe("launcher → modal handoff", () => {
     const Wrapper = makeQueryWrapper();
     render(
       <Wrapper>
-        <EnvironmentCsvImportLauncher
-          growId={GROW_ID}
-          tentId={TENT_ID}
-          plantId={PLANT_ID}
-        />
+        <EnvironmentCsvImportLauncher growId={GROW_ID} tentId={TENT_ID} plantId={PLANT_ID} />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId("csv-launcher-button"));
@@ -118,9 +113,10 @@ describe("launcher → modal handoff", () => {
 
     const cta = screen.getByTestId("csv-import-view-history");
     expect(cta.textContent).toContain(CSV_IMPORT_VIEW_HISTORY_LABEL);
-    expect(cta.getAttribute("href")).toBe(
-      plantDetailPath(PLANT_ID, { tentId: TENT_ID }),
-    );
+    expect(cta.getAttribute("href")).toBe(plantDetailPath(PLANT_ID, { tentId: TENT_ID }));
+    const current = screen.getByTestId("csv-import-add-current-reading");
+    expect(current.textContent).toContain(CSV_IMPORT_ADD_CURRENT_READING_LABEL);
+    expect(current.getAttribute("href")).toBe(`${sensorsPath(GROW_ID)}#manual-reading`);
   });
 
   it("without a plant target the CTA falls back to the selected tent", async () => {
@@ -132,9 +128,12 @@ describe("launcher → modal handoff", () => {
     );
     fireEvent.click(screen.getByTestId("csv-launcher-button"));
     await uploadAndConfirm();
-    expect(
-      screen.getByTestId("csv-import-view-history").getAttribute("href"),
-    ).toBe(tentDetailPath(TENT_ID));
+    expect(screen.getByTestId("csv-import-view-history").getAttribute("href")).toBe(
+      tentDetailPath(TENT_ID),
+    );
+    expect(screen.getByTestId("csv-import-add-current-reading").getAttribute("href")).toBe(
+      `${sensorsPath(GROW_ID)}#manual-reading`,
+    );
   });
 
   it("no trustworthy context at all falls back safely to the needs-context state", () => {
@@ -146,17 +145,14 @@ describe("launcher → modal handoff", () => {
     );
     expect(screen.getByTestId("csv-launcher-needs-context")).toBeTruthy();
     expect(screen.queryByTestId("csv-import-view-history")).toBeNull();
+    expect(screen.queryByTestId("csv-import-add-current-reading")).toBeNull();
   });
 
   it("import completion never invokes AI Doctor, alerts, or Action Queue", async () => {
     const Wrapper = makeQueryWrapper();
     render(
       <Wrapper>
-        <EnvironmentCsvImportLauncher
-          growId={GROW_ID}
-          tentId={TENT_ID}
-          plantId={PLANT_ID}
-        />
+        <EnvironmentCsvImportLauncher growId={GROW_ID} tentId={TENT_ID} plantId={PLANT_ID} />
       </Wrapper>,
     );
     fireEvent.click(screen.getByTestId("csv-launcher-button"));
@@ -209,11 +205,10 @@ describe("modal — completion copy and back-compat", () => {
       duplicateCount: 0,
       error: null,
     }));
-    render(
-      <EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={onConfirm} />,
-    );
+    render(<EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={onConfirm} />);
     await uploadAndConfirm();
     expect(screen.queryByTestId("csv-import-view-history")).toBeNull();
+    expect(screen.queryByTestId("csv-import-add-current-reading")).toBeNull();
     // The truthful historical note still renders.
     expect(screen.getByTestId("csv-import-historical-note")).toBeTruthy();
   });

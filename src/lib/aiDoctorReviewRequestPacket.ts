@@ -29,6 +29,10 @@ import {
   isCsvHistoryRow,
   type CsvHistorySensorRowLike,
 } from "@/lib/aiDoctorCsvHistoryContextRules";
+import {
+  buildAiDoctorCurrentSensorSnapshot,
+  type AiDoctorCurrentSensorRowLike,
+} from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 
 export const AI_DOCTOR_REVIEW_PACKET_EVENT_CAP = 20;
 /**
@@ -125,6 +129,12 @@ export interface BuildAiDoctorReviewPacketArgs {
    * the packet.
    */
   csvHistoryRows?: ReadonlyArray<CsvHistorySensorRowLike> | null;
+  /**
+   * Optional recent tent rows from the canonical current-source read.
+   * Only source=live/manual rows can contribute, and the pure projection
+   * strips raw payloads, ids, device metadata, and incoherent old values.
+   */
+  currentSensorRows?: ReadonlyArray<AiDoctorCurrentSensorRowLike> | null;
   /**
    * Optional caller-supplied live-telemetry signal (e.g. a "usable"
    * sensor-bridge health classification). Only an explicit `true`
@@ -244,6 +254,32 @@ export function buildAiDoctorReviewRequestPacket(
       readings,
     };
     recentSensorSnapshotAnnotation = buildAnnotationFromCard(latest.card, args.now);
+  }
+
+  // Direct current sensor truth from the plant's assigned tent. Prefer it
+  // only when it is at least as recent as a diary-attached manual snapshot;
+  // otherwise preserve the newer diary evidence. Source and plausibility
+  // decisions live in the pure helper, never in React.
+  const currentSnapshot = buildAiDoctorCurrentSensorSnapshot(args.currentSensorRows, {
+    now: args.now,
+  });
+  const timelineSnapshotMs = recentSensorSnapshot
+    ? Date.parse(recentSensorSnapshot.capturedAt)
+    : Number.NEGATIVE_INFINITY;
+  const currentSnapshotMs = currentSnapshot
+    ? Date.parse(currentSnapshot.capturedAt)
+    : Number.NEGATIVE_INFINITY;
+  if (currentSnapshot && currentSnapshotMs >= timelineSnapshotMs) {
+    recentSensorSnapshot = {
+      capturedAt: currentSnapshot.capturedAt,
+      severity: currentSnapshot.severity,
+      readings: [...currentSnapshot.readings],
+    };
+    recentSensorSnapshotAnnotation = {
+      ...currentSnapshot.annotation,
+      safetyNotes: [...currentSnapshot.annotation.safetyNotes],
+      missingInformationHints: [...currentSnapshot.annotation.missingInformationHints],
+    };
   }
 
   // ---- imported CSV history (sanitized, bounded, deterministic) ----

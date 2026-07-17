@@ -21,6 +21,7 @@ export const CSV_IMPORT_HISTORICAL_CONTEXT_NOTE =
 
 /** Post-import handoff CTA label. Navigation only — never runs AI. */
 export const CSV_IMPORT_VIEW_HISTORY_LABEL = "View imported history";
+export const CSV_IMPORT_ADD_CURRENT_READING_LABEL = "Add current reading";
 
 export function formatCsvPreviewRow(row: ParsedEnvironmentRow): string {
   const parts = [new Date(row.captured_at).toLocaleString()];

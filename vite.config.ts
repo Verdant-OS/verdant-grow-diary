@@ -5,8 +5,8 @@ import { componentTagger } from "lovable-tagger";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
 import { PRICING } from "./src/constants/pricing";
 import { viteManualChunks } from "./src/lib/build/manualChunks";
-import { FOUNDER_SOCIAL_META } from "./src/constants/founderSocialMeta";
 import { buildStaticSocialRouteHtml } from "./src/lib/build/staticSocialRouteHtml";
+import { STATIC_PUBLIC_SEO_DOCUMENTS } from "./src/lib/build/staticPublicSeoDocuments";
 
 const SITE_ORIGIN = "https://verdantgrowdiary.com";
 
@@ -76,11 +76,19 @@ function staticSocialRouteDocuments(): Plugin {
         this.error("Vite did not emit a string index.html asset");
         return;
       }
-      this.emitFile({
-        type: "asset",
-        fileName: "founder.html",
-        source: buildStaticSocialRouteHtml(indexAsset.source, FOUNDER_SOCIAL_META),
-      });
+      const fileNames = new Set<string>();
+      for (const document of STATIC_PUBLIC_SEO_DOCUMENTS) {
+        if (fileNames.has(document.fileName)) {
+          this.error(`Duplicate static SEO output path: ${document.fileName}`);
+          return;
+        }
+        fileNames.add(document.fileName);
+        this.emitFile({
+          type: "asset",
+          fileName: document.fileName,
+          source: buildStaticSocialRouteHtml(indexAsset.source, document.metadata),
+        });
+      }
     },
   };
 }

@@ -13,8 +13,8 @@
  *   - Source labels named where relevant: live, manual, csv, demo, stale, invalid.
  */
 
-import type { FaqEntry } from "@/constants/verdantSeoCopy";
-import { CANNABIS_PLANT_CARE_FAQ } from "@/constants/cannabisPlantCareFaq";
+import type { FaqEntry } from "./verdantSeoCopy";
+import { CANNABIS_PLANT_CARE_FAQ } from "./cannabisPlantCareFaq";
 
 export interface GuideSection {
   readonly heading: string;

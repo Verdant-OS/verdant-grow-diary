@@ -31,6 +31,10 @@ import { usePostGrowLearningReportData } from "@/hooks/usePostGrowLearningReport
 import { usePlantMemoryEpisodes } from "@/hooks/usePlantMemoryEpisodes";
 import { buildPostGrowLearningLoopSummary } from "@/lib/postGrowLearningLoopSummaryRules";
 import { growDetailPath } from "@/lib/routes";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { checkPremiumExportEntitlement } from "@/hooks/usePremiumExportServerGate";
+import PaywallCta from "@/components/PaywallCta";
+import { buildPaywallCtaViewModel } from "@/lib/paywallCtaViewModel";
 
 function resultMessage(result: unknown, fallback: string): string {
   if (typeof result !== "object" || result === null || !("message" in result)) return fallback;
@@ -56,6 +60,29 @@ export default function PostGrowLearningReport() {
   const [lesson, setLesson] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Pro gate. Pricing has always sold this report as Pro-only; the page
+  // now enforces it: client hint avoids a content flash, and the
+  // fail-closed `post_grow_report` server check is authoritative.
+  const { entitlement, loading: entitlementLoading } = useMyEntitlements();
+  const clientIsPremium = entitlement.capabilities.advancedExports === true;
+  const [gateStatus, setGateStatus] = useState<"loading" | "allowed" | "denied" | "error">(
+    "loading",
+  );
+  useEffect(() => {
+    let cancelled = false;
+    if (!growId) return;
+    setGateStatus("loading");
+    checkPremiumExportEntitlement("post_grow_report", { growId }).then((res) => {
+      if (cancelled) return;
+      if (res.ok) setGateStatus("allowed");
+      else if (res.state === "network_error") setGateStatus("error");
+      else setGateStatus("denied");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [growId]);
+
   useEffect(() => {
     if (report) setLesson(report.lesson.text);
   }, [report?.lesson.entryId, report?.lesson.text]);
@@ -76,7 +103,43 @@ export default function PostGrowLearningReport() {
     else toast.error(resultMessage(result, "Lesson could not be added to the Action Queue."));
   }
 
-  if (status === "loading" || status === "idle") {
+  const serverDecided = gateStatus !== "loading";
+  const showLocked = serverDecided
+    ? gateStatus !== "allowed"
+    : // While the server decides, the non-authoritative client hint
+      // prevents a flash of report content for free users.
+      !entitlementLoading && !clientIsPremium;
+
+  if (showLocked) {
+    const paywallVm = buildPaywallCtaViewModel({
+      featureTitle: "Unlock the Post-Grow Learning Report",
+      requiredPlanLabel: "Pro",
+    });
+    return (
+      <div
+        className="mx-auto max-w-5xl"
+        data-testid="post-grow-report-locked"
+        data-server-gate-status={gateStatus}
+      >
+        <PageHeader
+          title="Post-Grow Learning Report"
+          description="Plant memory, sensor truth, and lessons for the next run."
+          icon={<Leaf className="h-5 w-5" />}
+        />
+        <p
+          className="text-sm text-muted-foreground mb-4"
+          data-testid="post-grow-report-gate-message"
+        >
+          {gateStatus === "error"
+            ? "The report entitlement check did not complete. Nothing was generated."
+            : "The Post-Grow Learning Report is a Pro feature."}
+        </p>
+        <PaywallCta vm={paywallVm} data-testid="post-grow-report-paywall" />
+      </div>
+    );
+  }
+
+  if (status === "loading" || status === "idle" || gateStatus === "loading") {
     return (
       <div className="mx-auto max-w-5xl" data-testid="post-grow-report-loading">
         <EmptyState

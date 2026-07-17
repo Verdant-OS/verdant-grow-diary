@@ -53,6 +53,7 @@ const BreedingProgramNew = lazy(() => import("./pages/BreedingProgramNew"));
 const BreedingProgramDetail = lazy(() => import("./pages/BreedingProgramDetail"));
 const Reports = lazy(() => import("./pages/Reports"));
 const PostGrowLearningReport = lazy(() => import("./pages/PostGrowLearningReport"));
+const DiaryRangeReportPage = lazy(() => import("./pages/DiaryRangeReportPage"));
 
 const Coach = lazy(() => import("./pages/Coach"));
 const AiDoctorSessionDetail = lazy(() => import("./pages/AiDoctorSessionDetail"));
@@ -348,6 +349,7 @@ const App = () => (
                     <Route path="/breeding/new" element={<BreedingProgramNew />} />
                     <Route path="/breeding/:programId" element={<BreedingProgramDetail />} />
                     <Route path="/reports" element={<Reports />} />
+                    <Route path="/reports/diary-range" element={<DiaryRangeReportPage />} />
                     <Route path="/reports/post-grow/:growId" element={<PostGrowLearningReport />} />
                     <Route
                       path="/diary/environment-summary"

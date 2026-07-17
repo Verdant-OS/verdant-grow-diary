@@ -56,6 +56,10 @@ import {
   buildEnvironmentSummaryReportUrl,
   defaultEnvironmentSummaryRange,
 } from "@/lib/environmentSummaryNavigationRules";
+import {
+  buildDiaryRangeReportUrl,
+  defaultDiaryRangeReportRange,
+} from "@/lib/diaryRangeReportNavigationRules";
 import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
 import PhenoHuntTimelineSection from "@/components/PhenoHuntTimelineSection";
 import { cn } from "@/lib/utils";
@@ -1098,6 +1102,22 @@ export default function Timeline() {
 
 
       <div className="mb-4 flex items-center justify-end gap-2 flex-wrap">
+        <Link
+          to={(() => {
+            // One-tap report entry: carry the active grow and, when the
+            // Pro date-range filter is applied, the exact filtered range.
+            const range =
+              effectiveStartDate && effectiveEndDate
+                ? { startDate: effectiveStartDate, endDate: effectiveEndDate }
+                : defaultDiaryRangeReportRange();
+            return buildDiaryRangeReportUrl({ growId: activeGrowId, ...range });
+          })()}
+          className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-secondary/40 px-3 py-1.5 text-xs font-medium hover:bg-secondary/60"
+          data-testid="timeline-range-report-link"
+          aria-label="Open date-range diary report"
+        >
+          Range report (PDF)
+        </Link>
         <Link
           to={buildEnvironmentSummaryReportUrl(defaultEnvironmentSummaryRange())}
           className="hidden sm:inline-flex items-center gap-1 rounded-md border border-border/50 bg-secondary/40 px-3 py-1.5 text-xs font-medium hover:bg-secondary/60"

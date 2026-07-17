@@ -46,7 +46,7 @@ export interface PricingTier {
 }
 
 const PRO_UNLOCKED_FEATURES = [
-  "Cloud sync & backup",
+  "Date-range diary reports (PDF)",
   "Multi-tent tracking",
   "Exports & data ownership",
   "Full grow history",
@@ -170,12 +170,12 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
     },
   },
   {
-    label: "Cloud sync & backup",
+    label: "Date-range diary report (PDF)",
     values: { free: false, pro_monthly: true, pro_annual: true, founder_lifetime: true },
   },
   {
     label: "Exports (CSV / PDF)",
-    values: { free: false, pro_monthly: true, pro_annual: true, founder_lifetime: true },
+    values: { free: "Limited", pro_monthly: true, pro_annual: true, founder_lifetime: true },
   },
   {
     label: "Priority support",

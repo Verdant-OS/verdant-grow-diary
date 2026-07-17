@@ -4,7 +4,7 @@ exports[`Upgrade page — success panel feature order snapshots > locks feature 
 [
   {
     "key": "feat-3",
-    "text": "Cloud sync & backup",
+    "text": "Date-range diary reports (PDF)",
   },
   {
     "key": "feat-4",
@@ -37,7 +37,7 @@ exports[`Upgrade page — success panel feature order snapshots > locks feature 
 [
   {
     "key": "feat-3",
-    "text": "Cloud sync & backup",
+    "text": "Date-range diary reports (PDF)",
   },
   {
     "key": "feat-4",
@@ -66,7 +66,7 @@ exports[`Upgrade page — success panel feature order snapshots > locks feature 
 [
   {
     "key": "feat-3",
-    "text": "Cloud sync & backup",
+    "text": "Date-range diary reports (PDF)",
   },
   {
     "key": "feat-4",

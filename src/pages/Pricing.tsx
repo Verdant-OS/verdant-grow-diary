@@ -65,7 +65,7 @@ const COMPARISON_ROWS: Row[] = [
   { label: "Photo logs", free: true, pro: true, founder: true },
   { label: "Manual sensor snapshots", free: true, pro: true, founder: true },
   { label: "Timeline history", free: "Basic", pro: "Extended", founder: "Extended" },
-  { label: "Cloud sync & automatic backups", free: false, pro: true, founder: true },
+  { label: "Date-range diary report (Print / Save PDF)", free: false, pro: true, founder: true },
   { label: "Multi-tent support", free: false, pro: true, founder: true },
   { label: "Exports", free: "Limited", pro: "Advanced", founder: "Advanced" },
   { label: "Post-Grow Learning Report (Print / Save PDF)", free: false, pro: true, founder: true },
@@ -165,7 +165,7 @@ export default function Pricing() {
       ],
       [
         "What do I actually get with Pro?",
-        "Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot history, longer grow history, better timeline filtering, priority support, and early access to advanced grow reports.",
+        "Multi-tent support, advanced exports including date-range diary reports, sensor snapshot history, longer grow history, advanced timeline filtering, priority support, and early access to advanced grow reports.",
       ],
       [
         "How does the Founder Lifetime Offer work?",
@@ -204,7 +204,7 @@ export default function Pricing() {
           "@type": "Product",
           name: "Verdant Pro",
           description:
-            "Cloud sync, multi-tent grow memory, 100 AI Doctor credits/month, advanced exports, and sensor snapshot history.",
+            "Multi-tent grow memory, 100 AI Doctor credits/month, advanced exports, and sensor snapshot history.",
           brand: { "@type": "Brand", name: "Verdant Grow Diary" },
           offers: [
             {
@@ -713,9 +713,10 @@ export default function Pricing() {
           <AccordionItem value="pro-what">
             <AccordionTrigger>What do I actually get with Pro?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              Cloud sync, automatic backups, multi-tent support, advanced exports, sensor snapshot
-              history, longer grow history, better timeline filtering, priority support, and early
-              access to advanced grow reports. Pro features ship over time, only as they stabilize.
+              Multi-tent support, advanced exports including date-range diary reports, sensor
+              snapshot history, longer grow history, advanced timeline filtering, priority support,
+              and early access to advanced grow reports. Pro features ship over time, only as they
+              stabilize.
             </AccordionContent>
           </AccordionItem>
 

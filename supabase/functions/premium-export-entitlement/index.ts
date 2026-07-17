@@ -38,6 +38,8 @@ const ALLOWED_FEATURES = new Set<string>([
   "ai_doctor_report",
   "ai_doctor_evidence_csv",
   "ai_doctor_report_package",
+  "diary_range_report",
+  "post_grow_report",
 ]);
 
 const UUID_RE =

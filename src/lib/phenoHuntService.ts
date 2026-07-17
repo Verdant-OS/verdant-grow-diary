@@ -6,6 +6,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase as defaultClient } from "@/integrations/supabase/client";
+import { sanitizeBreedingObjectiveTargets } from "@/lib/phenoBreedingObjectiveRules";
 
 export interface CreatePhenoHuntInput {
   growId: string;
@@ -273,6 +274,11 @@ export interface UpdatePhenoHuntSetupInput {
   notes?: string | null;
   /** When true, stamps setup_completed_at=now(). When false, clears it. */
   markSetupComplete?: boolean;
+  /**
+   * New breeding-objective target list (sanitized before write). This is
+   * the hunt's own bar — editable any time, not just during setup.
+   */
+  breedingObjective?: readonly unknown[];
 }
 
 /**
@@ -297,6 +303,9 @@ export async function updatePhenoHuntSetup(
     patch.setup_completed_at = new Date().toISOString();
   } else if (input.markSetupComplete === false) {
     patch.setup_completed_at = null;
+  }
+  if (input.breedingObjective !== undefined) {
+    patch.breeding_objective = sanitizeBreedingObjectiveTargets(input.breedingObjective);
   }
   if (Object.keys(patch).length === 0) return;
   // Read the row back: RLS (owner + RESTRICTIVE Pro entitlement) filters

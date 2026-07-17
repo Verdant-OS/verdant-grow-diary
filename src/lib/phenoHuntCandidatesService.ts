@@ -18,6 +18,10 @@ import {
 import { phenoDb } from "@/integrations/supabase/phenoTables";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
 import { listLatestSexObservationsForHunt } from "@/lib/phenoSexObservationService";
+import {
+  sanitizeBreedingObjectiveTargets,
+  type BreedingObjectiveTarget,
+} from "@/lib/phenoBreedingObjectiveRules";
 
 export interface PhenoHuntSummary {
   id: string;
@@ -29,6 +33,9 @@ export interface PhenoHuntSummary {
   evidenceGoals?: string[];
   notes?: string | null;
   setupCompletedAt?: string | null;
+  /** Grower-authored target trait axes + acceptance thresholds. Re-sanitized
+   * on every read (defense in depth against a stale or manually-edited row). */
+  breedingObjective?: BreedingObjectiveTarget[];
 }
 
 export type LoadPhenoHuntCandidatesResult =
@@ -114,6 +121,9 @@ function mapHuntSummary(huntRow: {
   const notes = typeof huntRow.notes === "string" ? huntRow.notes : null;
   const setupCompletedAt =
     typeof huntRow.setup_completed_at === "string" ? huntRow.setup_completed_at : null;
+  const breedingObjective = sanitizeBreedingObjectiveTargets(
+    Array.isArray(huntRow.breeding_objective) ? (huntRow.breeding_objective as unknown[]) : null,
+  );
   return {
     id: huntRow.id,
     name: huntRow.name,
@@ -122,6 +132,7 @@ function mapHuntSummary(huntRow: {
     evidenceGoals,
     notes,
     setupCompletedAt,
+    breedingObjective,
   };
 }
 

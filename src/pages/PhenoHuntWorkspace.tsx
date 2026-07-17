@@ -19,6 +19,12 @@ import { Link, useParams } from "react-router-dom";
 import { usePhenoHuntWorkspace, CANDIDATE_PAGE_SIZE } from "@/hooks/usePhenoHuntWorkspace";
 import { buildPhenoHuntCsv, phenoHuntCsvFilename } from "@/lib/phenoHuntCsvExport";
 import { LOUD_TRAIT_AXES } from "@/lib/phenoExpressionRules";
+import PhenoBreedingObjectiveEditor from "@/components/PhenoBreedingObjectiveEditor";
+import {
+  candidateObjectiveCopy,
+  summarizeCandidateObjective,
+  type BreedingObjectiveTarget,
+} from "@/lib/phenoBreedingObjectiveRules";
 import {
   PHENO_KEEPER_DECISIONS,
   PHENO_KEEPER_DECISION_LABELS,
@@ -582,6 +588,8 @@ interface EditorProps {
   reversed: boolean;
   /** True when this candidate has >=1 recorded clone (clone insurance). */
   cloneInsured: boolean;
+  /** This hunt's own stated target axes — read-only display, never mutated here. */
+  breedingObjective: readonly BreedingObjectiveTarget[];
   onSaveSex: (plantId: string, sex: PhenoSexObservation) => Promise<boolean>;
   growId: string | null;
   tentId: string | null;
@@ -653,6 +661,7 @@ const CandidateEditor = memo(function CandidateEditor({
   onSaveSmokeTest,
   labRow,
   onSaveLabResult,
+  breedingObjective,
 }: EditorProps) {
   const plantId = candidate.candidateId;
   const displayLabel = phenoCandidateDisplayLabel(candidate);
@@ -676,6 +685,14 @@ const CandidateEditor = memo(function CandidateEditor({
   const readiness = useMemo(
     () => candidateReadiness(candidate, score, decision, sexRow, smokeRow, labRow, cloneInsured),
     [candidate, score, decision, sexRow, smokeRow, labRow, cloneInsured],
+  );
+
+  // Read-only standing against the hunt's OWN targets — never threaded into
+  // readiness (a different axis: "did you record enough" vs. "does what you
+  // recorded clear the bar you set"), and never compared to other candidates.
+  const objectiveSummary = useMemo(
+    () => summarizeCandidateObjective(breedingObjective, score?.traits),
+    [breedingObjective, score],
   );
 
   const setTrait = (key: string, raw: string) => {
@@ -745,6 +762,14 @@ const CandidateEditor = memo(function CandidateEditor({
           </div>
           <CandidateReadinessBadge readiness={readiness} />
         </div>
+        {objectiveSummary.targetCount > 0 && (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid={`workspace-objective-${plantId}`}
+          >
+            {candidateObjectiveCopy(objectiveSummary)}
+          </p>
+        )}
         <CandidateNumberAssign
           plantId={plantId}
           candidateNumber={candidate.candidateNumber ?? null}
@@ -1039,6 +1064,14 @@ export default function PhenoHuntWorkspace() {
   // Optimistic override so the card flips to "setup complete" instantly
   // after the grower confirms — the persisted hunt row is still authoritative.
   const [setupCompletedLocal, setSetupCompletedLocal] = useState<string | null>(null);
+  // Same optimistic-override pattern for the breeding objective: the grower's
+  // save should reflect instantly without waiting on a full hunt refetch.
+  const [breedingObjectiveLocal, setBreedingObjectiveLocal] = useState<
+    BreedingObjectiveTarget[] | null
+  >(null);
+  const [objectiveSaving, setObjectiveSaving] = useState(false);
+  const effectiveBreedingObjective: BreedingObjectiveTarget[] =
+    breedingObjectiveLocal ?? ws.hunt?.breedingObjective ?? [];
 
   const { setFilter } = ws;
 
@@ -1053,6 +1086,25 @@ export default function PhenoHuntWorkspace() {
       // network errors elsewhere. Grower can retry.
     } finally {
       setSetupSaving(false);
+    }
+  };
+
+  // Persists the hunt's own bar. Returns success/failure so the editor can
+  // show an inline retry prompt — unlike markSetupComplete this is a form
+  // save, not a one-shot confirmation, so silent failure would be confusing.
+  const handleSaveBreedingObjective = async (
+    targets: readonly BreedingObjectiveTarget[],
+  ): Promise<boolean> => {
+    if (!ws.hunt?.id) return false;
+    setObjectiveSaving(true);
+    try {
+      await updatePhenoHuntSetup({ huntId: ws.hunt.id, breedingObjective: targets });
+      setBreedingObjectiveLocal([...targets]);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setObjectiveSaving(false);
     }
   };
 
@@ -1321,6 +1373,14 @@ export default function PhenoHuntWorkspace() {
           </div>
         ) : null}
 
+        {ws.hunt ? (
+          <PhenoBreedingObjectiveEditor
+            targets={effectiveBreedingObjective}
+            onSave={handleSaveBreedingObjective}
+            saving={objectiveSaving}
+          />
+        ) : null}
+
         {ws.hunt ? <PhenoCompareCandidatesAction state={comparisonState} /> : null}
 
         {/* Clone insurance — the one irreversible hunt mistake is harvesting a
@@ -1579,6 +1639,7 @@ export default function PhenoHuntWorkspace() {
                     sexRow={ws.sexByPlant[c.candidateId]}
                     reversed={ws.reversedPlantIds.has(c.candidateId)}
                     cloneInsured={ws.clonedPlantIds.has(c.candidateId)}
+                    breedingObjective={effectiveBreedingObjective}
                     onSaveSex={ws.saveSex}
                     growId={ws.hunt?.growId ?? null}
                     tentId={ws.hunt?.tentId ?? null}

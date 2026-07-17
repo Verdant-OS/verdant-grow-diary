@@ -12,8 +12,7 @@ import { resolve } from "node:path";
 import { stripSourceComments } from "@/test/utils/stripSourceComments";
 
 const ROOT = resolve(__dirname, "../..");
-const read = (p: string) =>
-  stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
+const read = (p: string) => stripSourceComments(readFileSync(resolve(ROOT, p), "utf8"));
 
 const FRONTEND_FILES = [
   "src/lib/aiDoctorReviewRequestPacket.ts",
@@ -57,9 +56,7 @@ describe("ai doctor live review — frontend static safety", () => {
     it(`${path}: no banned wording / device-control imperatives in copy`, () => {
       expect(src).not.toMatch(/\b(confirmed|certain|cured|guaranteed)\b/i);
       expect(src).not.toMatch(/['"](live|synced|connected|imported)['"]/);
-      expect(src).not.toMatch(
-        /\b(turn on|switch off|power the|toggle the)\b/i,
-      );
+      expect(src).not.toMatch(/\b(turn on|switch off|power the|toggle the)\b/i);
     });
 
     it(`${path}: never logs raw packets, responses, or secrets`, () => {
@@ -73,24 +70,44 @@ describe("ai doctor live review — edge static safety", () => {
   for (const path of EDGE_FILES) {
     const src = read(path);
 
-    it(`${path}: no DB writes; only approved credit-metering RPCs`, () => {
+    it(`${path}: no DB writes; only approved credit and fresh-completion RPCs`, () => {
       expect(src).not.toMatch(/\.insert\(/);
       expect(src).not.toMatch(/\.upsert\(/);
       expect(src).not.toMatch(/\.update\(/);
       expect(src).not.toMatch(/\.delete\(/);
-      // RPC allow-list: live-review edge may ONLY call the approved
-      // credit-metering RPCs (atomic spend + matching refund on
-      // upstream failure). Mirrors the allow-list pattern enforced for
-      // ai-coach in action-queue-safety.test.ts.
-      const APPROVED_RPCS = new Set(["ai_credit_spend", "ai_credit_refund"]);
-      const rpcCalls = [
-        ...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g),
-      ].map((m) => m[1]);
+      // RPC allow-list: live-review edge may only call atomic credit spend,
+      // matching refund, and the service-only completion recorder after a
+      // fresh validated result. It must never persist model data directly.
+      const APPROVED_RPCS = new Set([
+        "ai_credit_spend",
+        "ai_credit_refund",
+        "record_ai_doctor_review_completion",
+      ]);
+      const rpcCalls = [...src.matchAll(/\.rpc\s*\(\s*["'`]([a-zA-Z0-9_]+)["'`]/g)].map(
+        (m) => m[1],
+      );
       for (const name of rpcCalls) {
         expect(
           APPROVED_RPCS.has(name),
-          `${path} called unapproved RPC: ${name}. Only credit-metering RPCs are allowed.`,
+          `${path} called unapproved RPC: ${name}. Only credit and protected completion RPCs are allowed.`,
         ).toBe(true);
+      }
+
+      if (path.endsWith("index.ts")) {
+        expect(src).toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
+        const validationIndex = src.indexOf("const v = validateAiDoctorReviewResult(candidate)");
+        const completionCallIndex = src.lastIndexOf(
+          "recordFreshAiDoctorReviewCompletion(u.user.id, spendId)",
+        );
+        expect(completionCallIndex).toBeGreaterThan(validationIndex);
+        expect(src).toContain('if (spendObj.status === "spent" && spendId)');
+        const replayStart = src.indexOf('if (spendObj.status === "replayed"');
+        const replayEnd = src.indexOf("const spendId", replayStart);
+        expect(replayStart).toBeGreaterThanOrEqual(0);
+        expect(replayEnd).toBeGreaterThan(replayStart);
+        expect(src.slice(replayStart, replayEnd)).not.toContain(
+          "recordFreshAiDoctorReviewCompletion",
+        );
       }
       for (const re of [
         /action_queue/i,

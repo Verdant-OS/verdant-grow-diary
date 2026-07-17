@@ -4,6 +4,8 @@ export interface StaticSocialRouteMetadata {
   url: string;
   image: string;
   imageAlt: string;
+  /** Defaults to index, follow for canonical public documents. */
+  robots?: "index, follow" | "noindex, follow";
 }
 
 function escapeHtml(value: string): string {
@@ -64,6 +66,7 @@ export function buildStaticSocialRouteHtml(
   html = replaceMeta(html, "name", "twitter:title", metadata.title);
   html = replaceMeta(html, "name", "twitter:description", metadata.description);
   html = replaceMeta(html, "name", "twitter:image", metadata.image);
+  html = replaceMeta(html, "name", "robots", metadata.robots ?? "index, follow");
 
   const canonicalPattern = /<link\b(?=[^>]*rel=["']canonical["'])[^>]*>/i;
   const canonicalTag = `<link rel="canonical" href="${escapeHtml(metadata.url)}" />`;

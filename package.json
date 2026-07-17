@@ -40,7 +40,7 @@
     "test:vitest:verify-artifacts": "node scripts/vitest-controlled/verify-artifacts.mjs",
     "test:vitest:report-ci": "node scripts/vitest-controlled/report-ci-artifacts.mjs",
     "test:vitest:windows-matrix": "powershell -ExecutionPolicy Bypass -File scripts/vitest-controlled/run-windows-validation.ps1",
-    "test:legal-seo": "vitest run src/test/legal-pages-structured-data.test.tsx",
+    "test:legal-seo": "vitest run src/test/legal-pages-structured-data.test.tsx src/test/static-social-route-html.test.ts src/test/static-public-seo-documents.test.ts src/test/founder-static-social-build-contract.test.ts",
     "test:reconsent-a11y": "vitest run src/test/agreement-reconsent-gate-a11y.test.tsx --pool=forks --isolate --reporter=dot --testTimeout=10000 --hookTimeout=10000",
     "test:legal-seo:e2e": "playwright test --project=chromium-mocked e2e/legal-seo-metadata.spec.ts --reporter=list,html",
     "test:pheno-disabled-compare-e2e": "node scripts/e2e/run-pheno-disabled-compare-e2e.mjs",

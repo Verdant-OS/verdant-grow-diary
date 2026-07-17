@@ -29,6 +29,7 @@ describe("static social route HTML", () => {
     expect(meta(html, "name", "twitter:title")).toBe(FOUNDER_SOCIAL_META.title);
     expect(meta(html, "name", "twitter:description")).toBe(FOUNDER_SOCIAL_META.description);
     expect(meta(html, "name", "twitter:image")).toBe(FOUNDER_SOCIAL_META.image);
+    expect(meta(html, "name", "robots")).toBe("index, follow");
     expect(html).toContain(`<link rel="canonical" href="${FOUNDER_SOCIAL_META.url}" />`);
     expect(html).toContain('<div id="root"></div>');
     expect(html).toContain('src="/src/main.tsx"');
@@ -50,5 +51,15 @@ describe("static social route HTML", () => {
     const second = buildStaticSocialRouteHtml(first, FOUNDER_SOCIAL_META);
     expect(second).toBe(first);
     expect(second.match(/rel="canonical"/g)).toHaveLength(1);
+  });
+
+  it("can preserve a noindex redirect document without conflicting canonical signals", () => {
+    const html = buildStaticSocialRouteHtml(INDEX_HTML, {
+      ...FOUNDER_SOCIAL_META,
+      url: "https://verdantgrowdiary.com/cultivars",
+      robots: "noindex, follow",
+    });
+    expect(meta(html, "name", "robots")).toBe("noindex, follow");
+    expect(html).toContain('rel="canonical" href="https://verdantgrowdiary.com/cultivars"');
   });
 });

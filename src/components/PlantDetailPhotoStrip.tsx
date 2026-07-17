@@ -8,15 +8,23 @@
  * strip. No uploads or writes.
  */
 import { Link } from "react-router-dom";
-import { Image as ImageIcon, Upload, AlertCircle } from "lucide-react";
+import { Image as ImageIcon, Upload, AlertCircle, ClipboardCheck } from "lucide-react";
 
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
+import {
+  useDiaryPhotoDisplayRows,
+  type DiaryPhotoDisplayRow,
+} from "@/hooks/useDiaryPhotoDisplayRows";
 import { normalizeDiaryEntries } from "@/lib/diaryEntryRules";
 import { buildPhotoHistory } from "@/lib/photoHistoryRules";
 import {
-  buildPlantPhotoStripItems,
+  buildPlantPhotoStripItemsWithSource,
   PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
 } from "@/lib/plantPhotoPreviewStrip";
+import {
+  projectLatestPhotoDiagnosisReviewsByPhoto,
+  type PhotoDiagnosisLatestReview,
+} from "@/lib/photoDiagnosisNoteRules";
 import { Button } from "@/components/ui/button";
 import { logsPath } from "@/lib/routes";
 import { useMemo } from "react";
@@ -32,6 +40,17 @@ interface PlantDetailPhotoStripProps {
    * a last resort (preserves the selected grow context).
    */
   onUploadPhoto?: () => void;
+  /**
+   * Opens a parent-owned manual grower review surface for this photo. The
+   * strip remains read-only and never writes a diary record itself.
+   */
+  onReviewPhoto?: (target: PlantDetailPhotoReviewTarget) => void;
+}
+
+export interface PlantDetailPhotoReviewTarget {
+  photoId: string;
+  dateLabel: string;
+  latestReview: PhotoDiagnosisLatestReview | null;
 }
 
 const HEADING_ID = "plant-detail-photo-strip-heading";
@@ -40,32 +59,47 @@ export default function PlantDetailPhotoStrip({
   plantId,
   growId,
   onUploadPhoto,
+  onReviewPhoto,
 }: PlantDetailPhotoStripProps) {
   const { data: rawDiary, isLoading, isError, refetch } = useDiaryEntries();
+  const {
+    rows: diaryRowsForDisplay,
+    isResolvingPrivatePhotos,
+    hasPrivatePhotoError,
+    hasPhotoReference,
+  } = useDiaryPhotoDisplayRows(rawDiary as ReadonlyArray<DiaryPhotoDisplayRow> | null | undefined);
+
+  const latestReviewsByPhotoId = useMemo(
+    () => projectLatestPhotoDiagnosisReviewsByPhoto(rawDiary),
+    [rawDiary],
+  );
 
   const items = useMemo(() => {
-    if (!plantId || !rawDiary || rawDiary.length === 0) return [];
+    if (!plantId || diaryRowsForDisplay.length === 0) return [];
     // Lift details.event_type for normalization parity with PhotoHistoryPanel.
-    const lifted = rawDiary.map((raw) => {
+    const lifted = diaryRowsForDisplay.map((raw) => {
       const r = (raw ?? {}) as Record<string, unknown>;
       if (r.entry_type || r.entryType || r.event_type || r.eventType) return r;
       const det = (r.details ?? null) as Record<string, unknown> | null;
-      const liftedType =
-        det && typeof det === "object" ? det.event_type : undefined;
+      const liftedType = det && typeof det === "object" ? det.event_type : undefined;
       return typeof liftedType === "string" && liftedType.length > 0
         ? { ...r, entry_type: liftedType }
         : r;
     });
     const normalized = normalizeDiaryEntries({ rawEntries: lifted });
     const photoRows = buildPhotoHistory(normalized);
-    return buildPlantPhotoStripItems({
+    return buildPlantPhotoStripItemsWithSource({
       plantId,
       rows: photoRows,
       limit: PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
-    });
-  }, [plantId, rawDiary]);
+    }).map((item) => ({
+      ...item,
+      latestReview: latestReviewsByPhotoId.get(item.sourcePhotoId) ?? null,
+    }));
+  }, [diaryRowsForDisplay, latestReviewsByPhotoId, plantId]);
 
   const hasPlantContext = !!(plantId && plantId.trim());
+  const canReviewPhotos = hasPlantContext && !!growId?.trim() && !!onReviewPhoto;
   const uploadHref = logsPath(growId ?? null);
 
   return (
@@ -124,7 +158,7 @@ export default function PlantDetailPhotoStrip({
         )}
       </header>
 
-      {isLoading ? (
+      {isLoading || isResolvingPrivatePhotos ? (
         <div
           data-testid="plant-detail-photo-strip-loading"
           role="status"
@@ -140,14 +174,14 @@ export default function PlantDetailPhotoStrip({
           ))}
           <span className="sr-only">Loading recent photos…</span>
         </div>
-      ) : isError ? (
+      ) : isError || (hasPrivatePhotoError && items.length === 0) ? (
         <div
           data-testid="plant-detail-photo-strip-error"
           className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-3 text-sm text-muted-foreground flex items-center justify-between gap-3"
         >
           <span className="inline-flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-[hsl(var(--warning))]" />
-            Recent photos are unavailable right now.
+            Recent photo previews are unavailable right now.
           </span>
           <Button
             type="button"
@@ -167,10 +201,21 @@ export default function PlantDetailPhotoStrip({
           data-testid="plant-detail-photo-strip-empty"
           className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-4 text-center"
         >
-          <p className="text-sm text-muted-foreground">No photos yet.</p>
-          <p className="text-[11px] text-muted-foreground/80 mt-1">
-            Add a photo to start building visual plant memory.
-          </p>
+          {hasPhotoReference ? (
+            <>
+              <p className="text-sm text-muted-foreground">Photo previews are not ready yet.</p>
+              <p className="text-[11px] text-muted-foreground/80 mt-1">
+                Your original photo record is unchanged. Try refreshing this section.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">No photos yet.</p>
+              <p className="text-[11px] text-muted-foreground/80 mt-1">
+                Add a photo to start building visual plant memory.
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <ul
@@ -199,15 +244,45 @@ export default function PlantDetailPhotoStrip({
               </div>
               <div className="px-1.5 py-1">
                 {item.dateLabel && (
-                  <div className="text-[10px] text-muted-foreground truncate">
-                    {item.dateLabel}
-                  </div>
+                  <div className="text-[10px] text-muted-foreground truncate">{item.dateLabel}</div>
                 )}
                 {item.categoryLabel && (
                   <div className="text-[10px] text-foreground/70 truncate">
                     {item.categoryLabel}
                   </div>
                 )}
+                {canReviewPhotos ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="mt-1 h-auto min-h-6 w-full justify-start px-0.5 py-0 text-left text-[10px] leading-tight text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                    onClick={() => {
+                      onReviewPhoto({
+                        photoId: item.sourcePhotoId,
+                        dateLabel: item.dateLabel,
+                        latestReview: item.latestReview,
+                      });
+                    }}
+                    data-testid="plant-detail-photo-strip-review"
+                    aria-label={
+                      item.latestReview
+                        ? `Update grower review for photo from ${item.dateLabel || "this date"}`
+                        : `Add a grower review for photo from ${item.dateLabel || "this date"}`
+                    }
+                  >
+                    <ClipboardCheck className="mr-1 h-3 w-3 shrink-0" aria-hidden />
+                    <span className="truncate">
+                      {item.latestReview
+                        ? item.latestReview.reviewStatus === "needs_follow_up"
+                          ? "Needs follow-up"
+                          : item.latestReview.reviewStatus === "cleared"
+                            ? "Cleared"
+                            : "Reviewed"
+                        : "No grower review yet"}
+                    </span>
+                  </Button>
+                ) : null}
               </div>
             </li>
           ))}

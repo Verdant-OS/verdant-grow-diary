@@ -19,6 +19,7 @@ import { SUBSCRIPTION_ROW_SCAN_LIMIT, type LovableSubscriptionRow } from "@/lib/
 // The hook resolves against real time (new Date() internally), so period
 // ends are computed relative to now — frozen dates would rot.
 const FUTURE = new Date(Date.now() + 30 * 86400_000).toISOString();
+const PAST = new Date(Date.now() - 60_000).toISOString();
 
 /** Exactly the shape allocate_lovable_founder_lifetime INSERTs. */
 function liveFounderRow(over: Partial<LovableSubscriptionRow> = {}): LovableSubscriptionRow {
@@ -155,10 +156,10 @@ beforeEach(() => {
 });
 
 describe("useMyEntitlements · bounded window, any-entitling-row wins", () => {
-  it("REGRESSION: active Founder Lifetime row + NEWER canceled Pro row → displays Founder", async () => {
+  it("REGRESSION: active Founder Lifetime row + NEWER elapsed canceled Pro row → displays Founder", async () => {
     db.lovableRows = [
       liveFounderRow({ created_at: "2026-07-01T00:00:00Z" }),
-      proRow({ status: "canceled", created_at: "2026-07-10T00:00:00Z" }),
+      proRow({ status: "canceled", current_period_end: PAST, created_at: "2026-07-10T00:00:00Z" }),
     ];
     const e = await renderEntitlement();
     expect(e.isActive).toBe(true);
@@ -202,12 +203,14 @@ describe("useMyEntitlements · bounded window, any-entitling-row wins", () => {
     db.lovableRows = [
       proRow({
         status: "canceled",
+        current_period_end: PAST,
         price_id: "pro_annual",
         paddle_subscription_id: "sub_01aaa",
         created_at: "2026-07-10T00:00:00Z",
       }),
       proRow({
         status: "canceled",
+        current_period_end: PAST,
         price_id: "pro_monthly",
         paddle_subscription_id: "sub_01zzz",
         created_at: "2026-07-10T00:00:00Z",
@@ -225,6 +228,20 @@ describe("useMyEntitlements · bounded window, any-entitling-row wins", () => {
     expect(e.isActive).toBe(true);
     expect(e.effectivePlanId).toBe("pro_monthly");
     expect(e.source).toBe("lovable_paddle_subscription");
+  });
+
+  it("past_due retains paid capabilities in the client window", async () => {
+    db.lovableRows = [proRow({ status: "past_due", current_period_end: PAST })];
+    const dunning = await renderEntitlement();
+    expect(dunning.effectivePlanId).toBe("pro_monthly");
+    expect(dunning.capabilities.advancedExports).toBe(true);
+  });
+
+  it("cancellation grace retains paid capabilities in the client window", async () => {
+    db.lovableRows = [proRow({ status: "canceled", current_period_end: FUTURE })];
+    const grace = await renderEntitlement();
+    expect(grace.effectivePlanId).toBe("pro_monthly");
+    expect(grace.capabilities.advancedExports).toBe(true);
   });
 
   it("rows in the other environment never resolve (env filter preserved)", async () => {

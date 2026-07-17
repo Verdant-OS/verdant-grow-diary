@@ -23,10 +23,17 @@ const entMode = vi.hoisted(() => ({
 }));
 
 const createPhenoHuntMock = vi.hoisted(() =>
-  vi.fn(async (_input: { growId: string; plantIds: string[]; name: string; tentId?: string | null }) => ({
-    huntId: "hunt-1",
-    taggedPlantIds: ["p1", "p2"],
-  })),
+  vi.fn(
+    async (_input: {
+      growId: string;
+      plantIds: string[];
+      name: string;
+      tentId?: string | null;
+    }) => ({
+      huntId: "hunt-1",
+      taggedPlantIds: ["p1", "p2"],
+    }),
+  ),
 );
 
 const supabaseMock = vi.hoisted(() => {
@@ -68,17 +75,27 @@ vi.mock("@/store/auth", () => ({
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => {
     const base: BillingSubscriptionRow = {
-      id: "r", user_id: "u1",
-      plan_id: "pro_monthly", status: "active",
+      id: "r",
+      user_id: "u1",
+      plan_id: "pro_monthly",
+      status: "active",
       provider: "paddle",
-      provider_customer_id: null, provider_subscription_id: null,
-      current_period_end: "2027-01-01T00:00:00Z", cancel_at_period_end: false,
-      founder_number: null, created_at: "", updated_at: "",
+      provider_customer_id: null,
+      provider_subscription_id: null,
+      current_period_end: "2027-01-01T00:00:00Z",
+      cancel_at_period_end: false,
+      founder_number: null,
+      created_at: "",
+      updated_at: "",
     };
     let row: BillingSubscriptionRow | null = null;
     if (entMode.current === "pro") row = base;
-    if (entMode.current === "founder") row = { ...base, plan_id: "founder_lifetime" };
-    if (entMode.current === "canceled") row = { ...base, status: "canceled" };
+    if (entMode.current === "founder") {
+      row = { ...base, plan_id: "founder_lifetime", current_period_end: null };
+    }
+    if (entMode.current === "canceled") {
+      row = { ...base, status: "canceled", current_period_end: "2026-07-01T00:00:00Z" };
+    }
     return {
       loading: false,
       entitlement: resolveEntitlements(row, NOW),
@@ -88,9 +105,8 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
 }));
 
 vi.mock("@/lib/phenoHuntService", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/phenoHuntService")>(
-    "@/lib/phenoHuntService",
-  );
+  const actual =
+    await vi.importActual<typeof import("@/lib/phenoHuntService")>("@/lib/phenoHuntService");
   return {
     ...actual,
     createPhenoHunt: createPhenoHuntMock,
@@ -131,9 +147,7 @@ describe("PhenoHuntNew onboarding flow", () => {
   it("Pro user sees the stepper starting on the basics step", async () => {
     entMode.current = "pro";
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByTestId("pheno-hunt-onboarding")).toBeDefined(),
-    );
+    await waitFor(() => expect(screen.getByTestId("pheno-hunt-onboarding")).toBeDefined());
     expect(screen.getByTestId("pheno-onboarding-stepper")).toBeDefined();
     expect(screen.getByTestId("pheno-step-basics")).toBeDefined();
     const body = document.body.textContent ?? "";
@@ -143,9 +157,7 @@ describe("PhenoHuntNew onboarding flow", () => {
   it("Founder Lifetime user sees the same flow", async () => {
     entMode.current = "founder";
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByTestId("pheno-hunt-onboarding")).toBeDefined(),
-    );
+    await waitFor(() => expect(screen.getByTestId("pheno-hunt-onboarding")).toBeDefined());
     expect(screen.getByTestId("pheno-onboarding-stepper")).toBeDefined();
   });
 
@@ -162,9 +174,7 @@ describe("PhenoHuntNew onboarding flow", () => {
     expect(screen.getByTestId("ph-toggle-p3")).toBeDefined();
     // 0 → 1 → tracking only
     fireEvent.click(screen.getByTestId("ph-toggle-p1"));
-    expect(screen.getByTestId("pheno-candidate-status").textContent).toMatch(
-      /tracking only/i,
-    );
+    expect(screen.getByTestId("pheno-candidate-status").textContent).toMatch(/tracking only/i);
     // 2 → comparison-eligible
     fireEvent.click(screen.getByTestId("ph-toggle-p2"));
     expect(screen.getByTestId("pheno-candidate-status").textContent).toMatch(

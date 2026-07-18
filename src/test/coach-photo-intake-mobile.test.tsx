@@ -57,12 +57,23 @@ describe("Coach AI Doctor photo intake — mobile take + upload", () => {
     expect(uploadBlock).toMatch(/handleFile\(/);
   });
 
-  it("allows only local blob URLs into the photo preview sink", () => {
+  it("decodes validated photos to a canvas instead of sending DOM file data to an HTML sink", () => {
+    expect(SOURCE).toMatch(/validatePlantProfilePhotoFile\(f\)/);
     expect(SOURCE).toMatch(
-      /const safePreview = preview\?\.startsWith\("blob:"\) \? preview : null/,
+      /createImageBitmap\(photoFile,\s*\{[\s\S]*?resizeWidth:\s*AI_DOCTOR_PHOTO_PREVIEW_WIDTH/,
     );
-    expect(SOURCE).toMatch(/src=\{safePreview\}/);
-    expect(SOURCE).not.toMatch(/src=\{preview\}/);
+    expect(SOURCE).toMatch(
+      /isRasterPhotoPreviewBitmapWithinBounds\(bitmap\.width, bitmap\.height\)/,
+    );
+    expect(SOURCE).toMatch(/<canvas/);
+    expect(SOURCE).not.toMatch(/URL\.createObjectURL/);
+    expect(SOURCE).not.toMatch(/src=\{(?:safe)?[Pp]review\}/);
+  });
+
+  it("revalidates the photo before upload and uses normalized type metadata", () => {
+    expect(SOURCE).toMatch(/validatePlantProfilePhotoFile\(photoFile\)/);
+    expect(SOURCE).toMatch(/photoValidation\.extension/);
+    expect(SOURCE).toMatch(/contentType:\s*photoValidation\.mime/);
   });
 
   it("keeps cautious diagnosis copy — no 'confirmed diagnosis' wording added", () => {

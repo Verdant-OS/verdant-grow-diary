@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,8 +31,16 @@ import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedN
 import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 import { buildLegacyAiSensorEvidence } from "@/lib/growSensorEvidenceRules";
+import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
+import {
+  AI_DOCTOR_PHOTO_PREVIEW_HEIGHT,
+  AI_DOCTOR_PHOTO_PREVIEW_WIDTH,
+  calculateRasterPhotoCoverCrop,
+  isRasterPhotoPreviewBitmapWithinBounds,
+} from "@/lib/rasterPhotoPreviewRules";
 
 type Mode = "diagnose" | "next_steps";
+type PhotoPreviewStatus = "empty" | "loading" | "ready" | "unavailable";
 
 interface Analysis {
   summary: string;
@@ -68,13 +76,14 @@ export default function Coach() {
 
   const { activeGrow, activeGrowId } = useGrows();
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [photoPreviewStatus, setPhotoPreviewStatus] = useState<PhotoPreviewStatus>("empty");
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CoachResponse | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const photoPreviewCanvasRef = useRef<HTMLCanvasElement>(null);
   const [queuedIdx, setQueuedIdx] = useState<Set<number>>(new Set());
   const [queuingIdx, setQueuingIdx] = useState<number | null>(null);
   // Persisted AI Doctor session id for the *currently rendered* diagnosis.
@@ -255,11 +264,16 @@ export default function Coach() {
     try {
       let photoUrl: string | undefined;
       if (mode === "diagnose" && photoFile) {
-        const ext = photoFile.name.split(".").pop() || "jpg";
-        const path = `${user.id}/coach/${Date.now()}.${ext}`;
+        const photoValidation = validatePlantProfilePhotoFile(photoFile);
+        if (photoValidation.ok === false) {
+          setPhotoFile(null);
+          setPhotoPreviewStatus("empty");
+          throw new Error(photoValidation.message);
+        }
+        const path = `${user.id}/coach/${Date.now()}.${photoValidation.extension}`;
         const { error } = await supabase.storage
           .from("diary-photos")
-          .upload(path, photoFile, { contentType: photoFile.type });
+          .upload(path, photoFile, { contentType: photoValidation.mime });
         if (error) throw error;
         const { data: signed, error: sErr } = await supabase.storage
           .from("diary-photos")
@@ -341,15 +355,79 @@ export default function Coach() {
   }
 
   function handleFile(f: File | null) {
+    if (!f) return;
+    const validation = validatePlantProfilePhotoFile(f);
+    if (validation.ok === false) {
+      toast.error(validation.message);
+      return;
+    }
     setPhotoFile(f);
-    setPreview(f ? URL.createObjectURL(f) : null);
+    setPhotoPreviewStatus("loading");
   }
 
+  useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreviewStatus("empty");
+      return;
+    }
+
+    let cancelled = false;
+    setPhotoPreviewStatus("loading");
+
+    if (typeof createImageBitmap !== "function") {
+      setPhotoPreviewStatus("unavailable");
+      return;
+    }
+
+    void createImageBitmap(photoFile, {
+      imageOrientation: "from-image",
+      resizeWidth: AI_DOCTOR_PHOTO_PREVIEW_WIDTH,
+      resizeQuality: "high",
+    })
+      .then((bitmap) => {
+        try {
+          if (cancelled) return;
+          if (!isRasterPhotoPreviewBitmapWithinBounds(bitmap.width, bitmap.height)) {
+            setPhotoPreviewStatus("unavailable");
+            return;
+          }
+          const canvas = photoPreviewCanvasRef.current;
+          const crop = calculateRasterPhotoCoverCrop(bitmap.width, bitmap.height);
+          const context = canvas?.getContext("2d", { alpha: false });
+          if (!canvas || !crop || !context) {
+            setPhotoPreviewStatus("unavailable");
+            return;
+          }
+
+          canvas.width = crop.targetWidth;
+          canvas.height = crop.targetHeight;
+          context.clearRect(0, 0, crop.targetWidth, crop.targetHeight);
+          context.drawImage(
+            bitmap,
+            crop.sourceX,
+            crop.sourceY,
+            crop.sourceWidth,
+            crop.sourceHeight,
+            0,
+            0,
+            crop.targetWidth,
+            crop.targetHeight,
+          );
+          setPhotoPreviewStatus("ready");
+        } finally {
+          bitmap.close();
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPhotoPreviewStatus("unavailable");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [photoFile]);
+
   const analysis = result?.analysis;
-  // A file picker is DOM-controlled input. Keep its object URL on the local
-  // blob scheme before assigning it to an image URL sink; all other schemes
-  // fail closed to the empty state.
-  const safePreview = preview?.startsWith("blob:") ? preview : null;
 
   return (
     <div>
@@ -407,12 +485,35 @@ export default function Coach() {
           aria-label="Add or replace plant photo"
           className="relative aspect-video w-full rounded-xl border-2 border-dashed border-border/60 overflow-hidden bg-secondary/40 hover:border-primary/60 transition"
         >
-          {safePreview ? (
-            <img
-              src={safePreview}
-              className="h-full w-full object-cover"
-              alt="Selected plant photo preview"
-            />
+          {photoFile ? (
+            <>
+              <canvas
+                ref={photoPreviewCanvasRef}
+                width={AI_DOCTOR_PHOTO_PREVIEW_WIDTH}
+                height={AI_DOCTOR_PHOTO_PREVIEW_HEIGHT}
+                role="img"
+                aria-label="Selected plant photo preview"
+                aria-hidden={photoPreviewStatus !== "ready"}
+                data-testid="coach-photo-preview-canvas"
+                className={`h-full w-full transition-opacity ${
+                  photoPreviewStatus === "ready" ? "opacity-100" : "opacity-0"
+                }`}
+              />
+              {photoPreviewStatus !== "ready" ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-2">
+                  {photoPreviewStatus === "loading" ? (
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  ) : (
+                    <Camera className="h-8 w-8" />
+                  )}
+                  <span className="text-sm">
+                    {photoPreviewStatus === "loading"
+                      ? "Preparing safe preview…"
+                      : "Photo selected · preview unavailable"}
+                  </span>
+                </div>
+              ) : null}
+            </>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
               <Camera className="h-8 w-8" />

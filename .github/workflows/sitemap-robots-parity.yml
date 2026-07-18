@@ -1,0 +1,26 @@
+name: sitemap-robots-parity
+
+on:
+  pull_request:
+    paths:
+      - "public/sitemap.xml"
+      - "public/robots.txt"
+      - "scripts/check-sitemap-robots-parity.mjs"
+      - ".github/workflows/sitemap-robots-parity.yml"
+  push:
+    branches: [main]
+    paths:
+      - "public/sitemap.xml"
+      - "public/robots.txt"
+      - "scripts/check-sitemap-robots-parity.mjs"
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Verify sitemap ↔ robots.txt parity
+        run: node scripts/check-sitemap-robots-parity.mjs

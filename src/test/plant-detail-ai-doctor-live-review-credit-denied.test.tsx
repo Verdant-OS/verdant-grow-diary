@@ -14,6 +14,18 @@ const { trackFunnelEvent } = vi.hoisted(() => ({
   trackFunnelEvent: vi.fn(),
 }));
 
+const entitlementState = vi.hoisted(() => ({
+  current: {
+    displayPlanId: "free",
+    effectivePlanId: "free",
+    status: "unknown",
+    isActive: false,
+    capabilities: {},
+    degraded: false,
+    degradedReason: null as string | null,
+  },
+}));
+
 function render(ui: ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -41,15 +53,7 @@ vi.mock("@/hooks/useTimelineMemory", () => ({
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
     loading: false,
-    entitlement: {
-      displayPlanId: "free",
-      effectivePlanId: "free",
-      status: "unknown",
-      isActive: false,
-      capabilities: {},
-      degraded: false,
-      degradedReason: null,
-    },
+    entitlement: entitlementState.current,
   }),
 }));
 
@@ -88,6 +92,15 @@ function strongTimeline(): TimelineMemoryItem[] {
 describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
   beforeEach(() => {
     trackFunnelEvent.mockClear();
+    entitlementState.current = {
+      displayPlanId: "free",
+      effectivePlanId: "free",
+      status: "unknown",
+      isActive: false,
+      capabilities: {},
+      degraded: false,
+      degradedReason: null,
+    };
   });
 
   function denial(planId: string | null) {
@@ -135,6 +148,32 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
     });
     // Generic failure pane must NOT render.
     expect(screen.queryByTestId("plant-ai-doctor-live-review-failure")).toBeNull();
+  });
+
+  it("offers a lapsed Pro grower the same return-safe reactivation path", async () => {
+    entitlementState.current = {
+      displayPlanId: "pro_monthly",
+      effectivePlanId: "free",
+      status: "expired",
+      isActive: false,
+      capabilities: {},
+      degraded: true,
+      degradedReason: "expired",
+    };
+
+    await mountAndDeny("free");
+
+    expect(screen.getByTestId("plant-ai-doctor-live-review-credit-denied")).toHaveAttribute(
+      "data-kind",
+      "upsell",
+    );
+    expect(
+      screen.getByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"),
+    ).toHaveAttribute("href", "/pricing?returnTo=%2Fplants%2Fp1");
+    expect(trackFunnelEvent).toHaveBeenCalledTimes(1);
+    expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_viewed", {
+      surface: "ai_doctor_limit",
+    });
   });
 
   it.each(["pro_monthly", "founder_lifetime", null])(

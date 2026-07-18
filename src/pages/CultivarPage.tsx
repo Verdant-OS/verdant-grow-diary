@@ -5,11 +5,17 @@
  * If the slug is unknown, redirects to the index rather than 404-ing —
  * keeps the SEO surface predictable without shipping a thin page.
  */
+import { useEffect } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
 import CultivarPhenoSampleModule from "@/components/CultivarPhenoSampleModule";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { findCultivarBySlug } from "@/constants/verdantCultivars";
+import { VERDANT_SITE_ORIGIN } from "@/constants/verdantSeoContent";
+import {
+  buildCultivarCollectionJsonLd,
+  safeJsonLdStringify,
+} from "@/lib/seoStructuredData";
 
 export default function CultivarPage() {
   const { slug } = useParams<{ slug: string }>();

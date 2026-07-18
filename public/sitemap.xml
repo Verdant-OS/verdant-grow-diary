@@ -55,6 +55,36 @@
     <priority>0.9</priority>
   </url>
   <url>
+    <loc>https://verdantgrowdiary.com/glossary</loc>
+    <lastmod>2026-07-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/breeder-beta</loc>
+    <lastmod>2026-07-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/creator-beta</loc>
+    <lastmod>2026-07-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/pheno-comparison</loc>
+    <lastmod>2026-07-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://verdantgrowdiary.com/pheno-expression-showcase</loc>
+    <lastmod>2026-07-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://verdantgrowdiary.com/guides</loc>
     <lastmod>2026-07-03</lastmod>
     <changefreq>weekly</changefreq>

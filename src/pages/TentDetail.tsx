@@ -30,12 +30,14 @@ import TimelineMemorySection from "@/components/TimelineMemorySection";
 import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
 
 import ImportedSensorHistoryPanel from "@/components/ImportedSensorHistoryPanel";
+import { resolveImportedSensorHistoryReadStatus } from "@/lib/importedSensorHistoryViewModel";
 import TentSensorWebhookSettingsCard from "@/components/TentSensorWebhookSettingsCard";
 import TentBridgeTokensCard from "@/components/TentBridgeTokensCard";
 import TentSensorSourceHealthCard from "@/components/TentSensorSourceHealthCard";
 import SensorSnapshotTruthStrip from "@/components/SensorSnapshotTruthStrip";
 import { buildSensorSnapshotReadModel } from "@/lib/sensors/sensorSnapshotReadModel";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { useImportedSensorHistory } from "@/hooks/useImportedSensorHistory";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
 import {
   buildTentSensorChartSeries,
@@ -134,6 +136,7 @@ export default function TentDetail() {
   const { data: activePlants = [] } = useGrowPlants(id);
   const { data: allPlants = [] } = useGrowPlants(id, undefined, { includeArchived: true });
   const { data: readings = [] } = useSensorReadings(id);
+  const importedHistory = useImportedSensorHistory(id);
   const series = buildTentSensorChartSeries(readings);
   const header = buildTentSensorHeaderView(readings);
   const snap = header.snapshot;
@@ -450,7 +453,18 @@ export default function TentDetail() {
       <TimelineMemorySection scope="tent" tentId={id ?? null} />
 
 
-      <ImportedSensorHistoryPanel tentId={id ?? null} readings={readings} />
+      <ImportedSensorHistoryPanel
+        tentId={id ?? null}
+        readings={importedHistory.data ?? []}
+        readStatus={resolveImportedSensorHistoryReadStatus({
+          isError: importedHistory.isError,
+          isFetching: importedHistory.isFetching,
+          hasRows: (importedHistory.data?.length ?? 0) > 0,
+        })}
+        onRetry={() => {
+          void importedHistory.refetch();
+        }}
+      />
 
       {id && <TentSensorWebhookSettingsCard tentId={id} />}
       {id && <TentBridgeTokensCard tentId={id} />}

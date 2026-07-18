@@ -16,9 +16,13 @@ import PageHeader from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import PhenoFamilyTree from "@/components/PhenoFamilyTree";
 import PhenoContendersBoard from "@/components/PhenoContendersBoard";
-import { buildContenders } from "@/lib/phenoContendersViewModel";
+import PhenoRadar from "@/components/PhenoRadar";
+import {
+  buildContenders,
+  contenderScore,
+  type ContenderInput,
+} from "@/lib/phenoContendersViewModel";
 import PhenoFightNight from "@/components/PhenoFightNight";
-import { buildFight } from "@/lib/phenoFightViewModel";
 import { Sprout } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buildPhenoPedigree } from "@/lib/phenoPedigreeViewModel";
@@ -32,21 +36,6 @@ import {
   type DemoCandidate,
   type DemoVerdict,
 } from "@/lib/demo/phenoHuntDemoFixture";
-
-/**
- * James Loud scorecard weights: 0–10 axes → a 0–100 composite. This is a fast
- * SHORTLIST number to sort the pack, never a verdict on its own (see caveat).
- */
-const LOUD_WEIGHTS = { nose: 3, resin: 2.5, structure: 1.5, yield: 1.5, breeding: 1.5 } as const;
-function loudScore(loud: DemoCandidate["loud"]): number {
-  return (
-    loud.nose * LOUD_WEIGHTS.nose +
-    loud.resin * LOUD_WEIGHTS.resin +
-    loud.structure * LOUD_WEIGHTS.structure +
-    loud.yield * LOUD_WEIGHTS.yield +
-    loud.breeding * LOUD_WEIGHTS.breeding
-  );
-}
 
 const VERDICT_TONE: Record<DemoVerdict, string> = {
   keep: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
@@ -98,7 +87,7 @@ function tagTone(tag: string): string {
 }
 
 function CandidateCard({ c }: { c: DemoCandidate }) {
-  const score = loudScore(c.loud);
+  const score = contenderScore(c.loud);
   const cured = c.rounds.includes("post_cure");
   const isKeeper = c.verdict === "keep";
   return (
@@ -106,67 +95,85 @@ function CandidateCard({ c }: { c: DemoCandidate }) {
       data-testid={`pheno-hunt-demo-candidate-${c.candidateNumber}`}
       className={cn("rounded-xl border p-3 transition-colors", CARD_TONE[c.verdict])}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-foreground">
-          {isKeeper && <Sprout className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden />}
-          <span className="truncate">
-            <span className="text-muted-foreground">#{c.candidateNumber}</span> {c.name}
-          </span>
-        </span>
-        <Badge
-          variant="outline"
-          className={cn("shrink-0 text-[10px] uppercase tracking-wide", VERDICT_TONE[c.verdict])}
-        >
-          {c.verdict}
-        </Badge>
-      </div>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-foreground">
+              {isKeeper && <Sprout className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden />}
+              <span className="truncate">
+                <span className="text-muted-foreground">#{c.candidateNumber}</span> {c.name}
+              </span>
+            </span>
+            <Badge
+              variant="outline"
+              className={cn(
+                "shrink-0 text-[10px] uppercase tracking-wide",
+                VERDICT_TONE[c.verdict],
+              )}
+            >
+              {c.verdict}
+            </Badge>
+          </div>
 
-      <div className="mt-1.5 flex flex-wrap gap-1">
-        {c.aroma.map((a) => (
-          <span
-            key={a}
-            className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", aromaTone(a))}
-          >
-            {a}
-          </span>
-        ))}
-        {c.tags.map((t) => (
-          <span
-            key={t}
-            className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", tagTone(t))}
-          >
-            {t}
-          </span>
-        ))}
-      </div>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {c.aroma.map((a) => (
+              <span
+                key={a}
+                className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", aromaTone(a))}
+              >
+                {a}
+              </span>
+            ))}
+            {c.tags.map((t) => (
+              <span
+                key={t}
+                className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", tagTone(t))}
+              >
+                {t}
+              </span>
+            ))}
+          </div>
 
-      {/* Loud score as a strength bar — a shortlist gauge, not the verdict. */}
-      <div className="mt-2">
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-          <span>
-            Loud score <span className="font-semibold text-foreground">{score}</span>
-            <span className="opacity-70"> · shortlist</span>
-          </span>
-          <span>
-            nose {c.loud.nose}/10 · {c.rounds.length} round{c.rounds.length === 1 ? "" : "s"}
-            {cured && (
-              <span className="font-medium text-emerald-600 dark:text-emerald-400"> · cured</span>
-            )}
-          </span>
+          {/* Loud score as a strength bar — a shortlist gauge, not the verdict. */}
+          <div className="mt-2">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>
+                Loud score <span className="font-semibold text-foreground">{score}</span>
+                <span className="opacity-70"> · shortlist</span>
+              </span>
+              <span>
+                nose {c.loud.nose}/10 · {c.rounds.length} round{c.rounds.length === 1 ? "" : "s"}
+                {cured && (
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                    {" "}
+                    · cured
+                  </span>
+                )}
+              </span>
+            </div>
+            <div
+              className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-secondary"
+              role="meter"
+              aria-valuenow={score}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Loud shortlist score ${score} of 100`}
+            >
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-sky-400 via-teal-400 to-emerald-400"
+                style={{ width: `${score}%` }}
+              />
+            </div>
+          </div>
         </div>
-        <div
-          className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-secondary"
-          role="meter"
-          aria-valuenow={score}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={`Loud shortlist score ${score} of 100`}
-        >
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-sky-400 via-teal-400 to-emerald-400"
-            style={{ width: `${score}%` }}
-          />
-        </div>
+
+        {/* Scorecard as a shape — keepers fill emerald, the rest a calm sky. */}
+        <PhenoRadar
+          values={c.loud}
+          size={64}
+          tone={isKeeper ? "keeper" : "muted"}
+          className="mt-0.5"
+        />
       </div>
 
       <p className="mt-1.5 text-[11px] text-muted-foreground">{c.note}</p>
@@ -197,17 +204,21 @@ export default function PhenoHuntDemo() {
       ),
     [],
   );
-  const fight = useMemo(() => {
-    const keepers = DEMO_CANDIDATES.filter((c) => c.verdict === "keep");
-    const toInput = (c: DemoCandidate) => ({
-      id: c.candidateNumber,
-      name: c.name,
-      verdict: c.verdict,
-      aroma: c.aroma,
-      axes: c.loud,
-    });
-    return keepers.length >= 2 ? buildFight(toInput(keepers[0]), toInput(keepers[1])) : null;
-  }, []);
+  const fightPool = useMemo<ContenderInput[]>(
+    () =>
+      DEMO_CANDIDATES.filter((c) => c.verdict !== "cull").map((c) => ({
+        id: c.candidateNumber,
+        name: c.name,
+        verdict: c.verdict,
+        aroma: c.aroma,
+        axes: c.loud,
+      })),
+    [],
+  );
+  const keeperIds = useMemo(
+    () => DEMO_CANDIDATES.filter((c) => c.verdict === "keep").map((c) => c.candidateNumber),
+    [],
+  );
 
   return (
     <div data-testid="pheno-hunt-demo-page" className="container mx-auto max-w-5xl px-4 py-6">
@@ -242,6 +253,13 @@ export default function PhenoHuntDemo() {
           The Loud score is a fast shortlist to sort the pack — not the verdict. The keeper
           decision, earned through the cure and re-grow stability, is what counts.
         </p>
+        <p className="mt-1.5 text-[10px] text-muted-foreground/80">
+          Radar axes — <span className="text-foreground/70">N</span> nose ·{" "}
+          <span className="text-foreground/70">R</span> resin ·{" "}
+          <span className="text-foreground/70">S</span> structure ·{" "}
+          <span className="text-foreground/70">Y</span> yield ·{" "}
+          <span className="text-foreground/70">B</span> breeding
+        </p>
       </section>
 
       {/* Contenders — the shortlist compared on the merits, before the tree. */}
@@ -253,14 +271,18 @@ export default function PhenoHuntDemo() {
         <PhenoContendersBoard board={contenders} />
       </section>
 
-      {/* Fight night — the final two, head to head. */}
-      {fight && (
+      {/* Fight night — pit any two contenders, head to head. */}
+      {fightPool.length >= 2 && (
         <section aria-label="Fight night" className="mb-8">
           <div className="mb-3 flex items-center gap-2">
             <h2 className="text-sm font-semibold text-foreground">Fight night</h2>
             <span className="h-px flex-1 bg-gradient-to-r from-emerald-500/40 to-transparent" />
           </div>
-          <PhenoFightNight fight={fight} />
+          <PhenoFightNight
+            pool={fightPool}
+            defaultAId={keeperIds[0] ?? fightPool[0].id}
+            defaultBId={keeperIds[1] ?? fightPool[1].id}
+          />
         </section>
       )}
 

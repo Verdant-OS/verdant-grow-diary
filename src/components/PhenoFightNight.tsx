@@ -1,9 +1,10 @@
 /**
  * PhenoFightNight — presenter for the pure phenoFightViewModel.
  *
- * Two keepers head to head, trait by trait, as a diverging tug-of-war: side A
- * (emerald) reaches out to the left, side B (fuchsia) to the right, and the
- * longer bar has the edge on that trait. A tally sums the trait edges.
+ * Pit any two contenders head to head, trait by trait, as a diverging tug-of-war:
+ * side A (emerald) reaches out to the left, side B (fuchsia) to the right, and
+ * the longer bar has the edge on that trait. Each corner is a picker, so the
+ * grower chooses the matchup; a tally sums the trait edges.
  *
  * Ethos: it stages the duel; it does NOT crown a winner. "The call" is a local,
  * unsaved control — in a live hunt the app records the grower's decision, it
@@ -12,28 +13,62 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import type { PhenoFight, FightSide, FightAxis } from "@/lib/phenoFightViewModel";
+import { buildFight, type FightSide, type FightAxis } from "@/lib/phenoFightViewModel";
+import type { ContenderInput } from "@/lib/phenoContendersViewModel";
 
 export interface PhenoFightNightProps {
-  readonly fight: PhenoFight;
+  /** The pickable pool (typically the hunt's non-culls). */
+  readonly pool: readonly ContenderInput[];
+  readonly defaultAId?: string | number;
+  readonly defaultBId?: string | number;
   readonly className?: string;
 }
 
 type Call = "a" | "b" | "tie" | null;
 
-function SideHeader({ side, align }: { side: FightSide; align: "left" | "right" }) {
+function SidePicker({
+  pool,
+  side,
+  value,
+  otherValue,
+  onChange,
+  align,
+}: {
+  pool: readonly ContenderInput[];
+  side: FightSide;
+  value: string;
+  otherValue: string;
+  onChange: (id: string) => void;
+  align: "left" | "right";
+}) {
   const accent =
     align === "left"
       ? "text-emerald-600 dark:text-emerald-400"
       : "text-fuchsia-600 dark:text-fuchsia-400";
   const testid = align === "left" ? "pheno-fight-side-a" : "pheno-fight-side-b";
   return (
-    <div
-      className={cn("min-w-0", align === "left" ? "text-left" : "text-right")}
-      data-testid={testid}
-    >
-      <div className={cn("truncate text-sm font-semibold", accent)}>{side.name}</div>
-      <div className={cn("mt-0.5 flex items-center gap-1.5", align === "right" && "justify-end")}>
+    <div className={cn("min-w-0", align === "right" && "text-right")} data-testid={testid}>
+      <select
+        aria-label={align === "left" ? "Side A" : "Side B"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          "max-w-full cursor-pointer truncate rounded-md border border-border bg-card px-2 py-1 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring",
+          accent,
+        )}
+      >
+        {pool.map((p) => (
+          <option
+            key={p.id}
+            value={String(p.id)}
+            disabled={String(p.id) === otherValue}
+            className="bg-background text-foreground"
+          >
+            {p.name}
+          </option>
+        ))}
+      </select>
+      <div className={cn("mt-1 flex items-center gap-1.5", align === "right" && "justify-end")}>
         <Badge
           variant="outline"
           className="border-border bg-secondary text-[9px] uppercase text-muted-foreground"
@@ -113,15 +148,40 @@ function AxisRow({ axis }: { axis: FightAxis }) {
   );
 }
 
-const CALL_LABEL: Record<Exclude<Call, null>, string> = {
-  a: "wins",
-  tie: "Too close",
-  b: "wins",
-};
+function firstTwoIds(
+  pool: readonly ContenderInput[],
+  defaultAId?: string | number,
+  defaultBId?: string | number,
+): [string, string] {
+  const ids = pool.map((p) => String(p.id));
+  const a = defaultAId != null && ids.includes(String(defaultAId)) ? String(defaultAId) : ids[0];
+  let b = defaultBId != null && ids.includes(String(defaultBId)) ? String(defaultBId) : ids[1];
+  if (b === a) b = ids.find((id) => id !== a) ?? ids[1];
+  return [a, b];
+}
 
-export default function PhenoFightNight({ fight, className }: PhenoFightNightProps) {
+export default function PhenoFightNight({
+  pool,
+  defaultAId,
+  defaultBId,
+  className,
+}: PhenoFightNightProps) {
+  const [initialA, initialB] = firstTwoIds(pool, defaultAId, defaultBId);
+  const [aId, setAId] = useState(initialA);
+  const [bId, setBId] = useState(initialB);
   const [call, setCall] = useState<Call>(null);
+
+  const aInput = pool.find((p) => String(p.id) === aId) ?? pool[0];
+  const bInput = pool.find((p) => String(p.id) === bId) ?? pool[1];
+  const fight = buildFight(aInput, bInput);
+  if (!fight) return null;
   const { a, b, axes, ties } = fight;
+
+  // Changing the matchup clears a stale call.
+  const pick = (setter: (id: string) => void) => (id: string) => {
+    setter(id);
+    setCall(null);
+  };
 
   const callButton = (value: Exclude<Call, null>, label: string, accent: string) => {
     const active = call === value;
@@ -147,13 +207,27 @@ export default function PhenoFightNight({ fight, className }: PhenoFightNightPro
       aria-label="Fight night"
       className={cn("rounded-lg border border-border bg-card p-4", className)}
     >
-      {/* Two corners + VS */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <SideHeader side={a} align="left" />
-        <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      {/* Two corners (pickers) + VS */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3">
+        <SidePicker
+          pool={pool}
+          side={a}
+          value={aId}
+          otherValue={bId}
+          onChange={pick(setAId)}
+          align="left"
+        />
+        <span className="mt-1.5 rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           vs
         </span>
-        <SideHeader side={b} align="right" />
+        <SidePicker
+          pool={pool}
+          side={b}
+          value={bId}
+          otherValue={aId}
+          onChange={pick(setBId)}
+          align="right"
+        />
       </div>
 
       <div className="mt-3 space-y-0.5 border-t border-border/60 pt-3">
@@ -188,13 +262,13 @@ export default function PhenoFightNight({ fight, className }: PhenoFightNightPro
         <span className="text-[11px] font-medium text-muted-foreground">The call:</span>
         {callButton(
           "a",
-          `${a.name} ${CALL_LABEL.a}`,
+          `${a.name} wins`,
           "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
         )}
-        {callButton("tie", CALL_LABEL.tie, "border-border bg-secondary text-foreground")}
+        {callButton("tie", "Too close", "border-border bg-secondary text-foreground")}
         {callButton(
           "b",
-          `${b.name} ${CALL_LABEL.b}`,
+          `${b.name} wins`,
           "border-fuchsia-500/50 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300",
         )}
       </div>

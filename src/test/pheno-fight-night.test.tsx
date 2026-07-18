@@ -1,32 +1,35 @@
 import { afterEach, describe, it, expect } from "vitest";
 import { cleanup, render, screen, fireEvent, within } from "@testing-library/react";
 import PhenoFightNight from "@/components/PhenoFightNight";
-import { buildFight } from "@/lib/phenoFightViewModel";
 import type { ContenderInput } from "@/lib/phenoContendersViewModel";
 import { DEMO_CANDIDATES } from "@/lib/demo/phenoHuntDemoFixture";
 
-const toInput = (num: number): ContenderInput => {
-  const c = DEMO_CANDIDATES.find((x) => x.candidateNumber === num)!;
-  return { id: c.candidateNumber, name: c.name, verdict: c.verdict, aroma: c.aroma, axes: c.loud };
-};
-
-const fight = buildFight(toInput(3), toInput(7))!; // Gas Runtz vs Sherb Cake
+const pool: ContenderInput[] = DEMO_CANDIDATES.filter((c) => c.verdict !== "cull").map((c) => ({
+  id: c.candidateNumber,
+  name: c.name,
+  verdict: c.verdict,
+  aroma: c.aroma,
+  axes: c.loud,
+}));
 
 afterEach(cleanup);
 
 function renderFight() {
-  return render(<PhenoFightNight fight={fight} />);
+  // Default matchup: #3 Gas Runtz vs #7 Sherb Cake.
+  return render(<PhenoFightNight pool={pool} defaultAId={3} defaultBId={7} />);
 }
 
 describe("PhenoFightNight", () => {
-  it("renders both corners with their names", () => {
+  it("renders both corners with their selected names", () => {
     renderFight();
-    expect(
-      within(screen.getByTestId("pheno-fight-side-a")).getByText("Gas Runtz"),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("pheno-fight-side-b")).getByText("Sherb Cake"),
-    ).toBeInTheDocument();
+    const a = within(screen.getByTestId("pheno-fight-side-a")).getByRole(
+      "combobox",
+    ) as HTMLSelectElement;
+    const b = within(screen.getByTestId("pheno-fight-side-b")).getByRole(
+      "combobox",
+    ) as HTMLSelectElement;
+    expect(a.value).toBe("3");
+    expect(b.value).toBe("7");
   });
 
   it("renders a row for every trait", () => {
@@ -42,8 +45,17 @@ describe("PhenoFightNight", () => {
     expect(tally).toMatch(/Gas Runtz leads 2/);
     expect(tally).toMatch(/Sherb Cake leads 1/);
     expect(tally).toMatch(/2 ties/);
-    // No element declares an overall winner.
     expect(screen.queryByText(/overall winner/i)).toBeNull();
+  });
+
+  it("lets the grower change the matchup", () => {
+    renderFight();
+    const a = within(screen.getByTestId("pheno-fight-side-a")).getByRole(
+      "combobox",
+    ) as HTMLSelectElement;
+    fireEvent.change(a, { target: { value: "2" } }); // swap in Runtz #2
+    expect(a.value).toBe("2");
+    expect(screen.getByTestId("pheno-fight-tally").textContent).toMatch(/Runtz #2 leads/);
   });
 
   it("lets the grower record a call locally (and toggle it off)", () => {
@@ -52,9 +64,18 @@ describe("PhenoFightNight", () => {
     expect(aCall).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(aCall);
     expect(aCall).toHaveAttribute("aria-pressed", "true");
-    // Picking is exclusive-ish: clicking the same one again clears it.
     fireEvent.click(aCall);
     expect(aCall).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("clears a stale call when the matchup changes", () => {
+    renderFight();
+    const aCall = screen.getByTestId("pheno-fight-call-a");
+    fireEvent.click(aCall);
+    expect(aCall).toHaveAttribute("aria-pressed", "true");
+    const a = within(screen.getByTestId("pheno-fight-side-a")).getByRole("combobox");
+    fireEvent.change(a, { target: { value: "2" } });
+    expect(screen.getByTestId("pheno-fight-call-a")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("keeps the ethos caveat: it stages, the grower decides", () => {

@@ -59,9 +59,9 @@ describe("EcoWitt ingest endpoint — Option C wiring contract", () => {
   it("(13) edge function source contains no alert / action_queue / AI / device-control wiring", () => {
     const src = EDGE_FN_SRC.toLowerCase();
     for (const banned of [
-      "from(\"alerts\")",
+      'from("alerts")',
       "from('alerts')",
-      "from(\"action_queue\")",
+      'from("action_queue")',
       "from('action_queue')",
       "ai_doctor",
       "openai",
@@ -108,11 +108,10 @@ describe("EcoWitt ingest endpoint — Option C wiring contract", () => {
     }
   });
 
-  it("for bridge auth, eligible tents are scoped to the bridge tent (cross-tent fan-out only spans the bridge scope)", () => {
+  it("eligible tents are scoped to the authenticated bridge tent", () => {
     const fnSrc = EDGE_FN_SRC;
-    // The wiring uses `scopedTentId = auth.tentScope` when bridge, and then
-    // adds an `.eq("id", scopedTentId)` filter to the tents query.
-    expect(fnSrc).toMatch(/auth\.kind === "bridge"/);
+    expect(fnSrc).toMatch(/allowJwt:\s*false/);
+    expect(fnSrc).toMatch(/authRes\.auth\.kind !== "bridge"/);
     expect(fnSrc).toMatch(/scopedTentId = auth\.tentScope/);
     expect(fnSrc).toMatch(/\.eq\("id", scopedTentId\)/);
   });
@@ -161,11 +160,12 @@ describe("EcoWitt ingest endpoint — Option C wiring contract", () => {
     const tents = new Set(rows.map((r) => r.tent_id));
     expect(tents).toEqual(new Set([TENT_AIR, TENT_SOIL]));
     // Air tent gets temp + RH + derived VPD.
-    expect(rows.filter((r) => r.tent_id === TENT_AIR).map((r) => r.metric).sort()).toEqual([
-      "humidity_pct",
-      "temperature_c",
-      "vpd_kpa",
-    ]);
+    expect(
+      rows
+        .filter((r) => r.tent_id === TENT_AIR)
+        .map((r) => r.metric)
+        .sort(),
+    ).toEqual(["humidity_pct", "temperature_c", "vpd_kpa"]);
     expect(rows.filter((r) => r.tent_id === TENT_SOIL).map((r) => r.metric)).toEqual([
       "soil_moisture_pct",
     ]);

@@ -15,17 +15,17 @@ bridge did not supply.
 Every sensor ingest payload (regardless of transport) MUST be normalized into
 the following shape before it reaches the database:
 
-| Field          | Required | Notes |
-|----------------|----------|-------|
-| `source`       | yes      | One of the supported source values below. |
-| `vendor`       | no       | Vendor lineage string (e.g. `ecowitt`, `ecowitt-gw2000`, `home-assistant`, `mosquitto`). Drives display label when `source` alone is ambiguous. |
-| `captured_at`  | yes      | ISO-8601 UTC. The instant the sensor physically captured the reading. See §5. |
-| `tent_id`      | yes      | Verdant tent UUID. Ownership MUST be verified server-side. |
-| `plant_id`     | no       | Optional Verdant plant UUID when the reading is plant-scoped (e.g. soil probe). |
-| `metrics`      | yes      | Object of metric key → numeric value. See §4. |
-| `raw_payload`  | yes*     | Original vendor payload preserved verbatim where the schema column exists. Required for Ecowitt / MQTT / webhook. CSV may omit when row already _is_ the raw form. |
-| `confidence`   | no       | Float in `[0, 1]`. Bridges MAY supply; UI MUST treat missing as "unknown", not "high". |
-| `bridge_id` / `source_id` | conditional | Required for bridge-authenticated ingest (Pi bridge, MQTT bridge, Ecowitt gateway). Used for dedupe and provenance. |
+| Field                     | Required    | Notes                                                                                                                                                              |
+| ------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `source`                  | yes         | One of the supported source values below.                                                                                                                          |
+| `vendor`                  | no          | Vendor lineage string (e.g. `ecowitt`, `ecowitt-gw2000`, `home-assistant`, `mosquitto`). Drives display label when `source` alone is ambiguous.                    |
+| `captured_at`             | yes         | ISO-8601 UTC. The instant the sensor physically captured the reading. See §5.                                                                                      |
+| `tent_id`                 | yes         | Verdant tent UUID. Ownership MUST be verified server-side.                                                                                                         |
+| `plant_id`                | no          | Optional Verdant plant UUID when the reading is plant-scoped (e.g. soil probe).                                                                                    |
+| `metrics`                 | yes         | Object of metric key → numeric value. See §4.                                                                                                                      |
+| `raw_payload`             | yes\*       | Original vendor payload preserved verbatim where the schema column exists. Required for Ecowitt / MQTT / webhook. CSV may omit when row already _is_ the raw form. |
+| `confidence`              | no          | Float in `[0, 1]`. Bridges MAY supply; UI MUST treat missing as "unknown", not "high".                                                                             |
+| `bridge_id` / `source_id` | conditional | Required for bridge-authenticated ingest (Pi bridge, MQTT bridge, Ecowitt gateway). Used for dedupe and provenance.                                                |
 
 No other top-level fields are accepted. Unknown fields MUST be dropped before
 insert and MUST NOT be silently mapped onto canonical fields.
@@ -41,9 +41,9 @@ Initial allow-list:
 - `csv`
 - `mqtt`
 - `webhook`
-- `stale`     (computed; never accepted from a bridge)
-- `invalid`   (computed; never accepted from a bridge)
-- `unknown`   (fallback when lineage cannot be proven)
+- `stale` (computed; never accepted from a bridge)
+- `invalid` (computed; never accepted from a bridge)
+- `unknown` (fallback when lineage cannot be proven)
 
 `stale` and `invalid` are display/derived states only. A bridge MUST NOT
 submit `source: "stale"` or `source: "invalid"`. A bridge MUST NOT submit
@@ -66,18 +66,18 @@ source and is forbidden when the underlying source is `unknown`.
 
 Canonical metric keys (extensible, but new keys require a contract update):
 
-| Key                   | Unit            | Notes |
-|-----------------------|-----------------|-------|
-| `air_temp_f` or `temperature` | °F (when `_f`) / °C (`temperature`) | Bridges SHOULD prefer the unit-suffixed key. UI MUST NOT guess units. |
-| `humidity`            | % RH            | `0..100`. |
-| `vpd`                 | kPa             | Computed by bridge OR by Verdant from temp+RH. Never both. |
-| `co2_ppm`             | ppm             | Non-negative integer. |
-| `soil_water_content`  | % VWC           | `0..100`. |
-| `soil_temp`           | °C              | |
-| `soil_ec`             | mS/cm           | Non-negative. |
-| `reservoir_ph`        | pH              | `0..14`. |
-| `reservoir_ec`        | mS/cm           | Non-negative. |
-| `ppfd`                | µmol/m²/s       | MUST be a true PPFD measurement. MUST NOT be estimated from lux, watts, or a light-percentage slider. If only lux/watt/% is available, the bridge MUST omit `ppfd` rather than synthesize it. |
+| Key                           | Unit                                | Notes                                                                                                                                                                                         |
+| ----------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `air_temp_f` or `temperature` | °F (when `_f`) / °C (`temperature`) | Bridges SHOULD prefer the unit-suffixed key. UI MUST NOT guess units.                                                                                                                         |
+| `humidity`                    | % RH                                | `0..100`.                                                                                                                                                                                     |
+| `vpd`                         | kPa                                 | Computed by bridge OR by Verdant from temp+RH. Never both.                                                                                                                                    |
+| `co2_ppm`                     | ppm                                 | Non-negative integer.                                                                                                                                                                         |
+| `soil_water_content`          | % VWC                               | `0..100`.                                                                                                                                                                                     |
+| `soil_temp`                   | °C                                  |                                                                                                                                                                                               |
+| `soil_ec`                     | mS/cm                               | Non-negative.                                                                                                                                                                                 |
+| `reservoir_ph`                | pH                                  | `0..14`.                                                                                                                                                                                      |
+| `reservoir_ec`                | mS/cm                               | Non-negative.                                                                                                                                                                                 |
+| `ppfd`                        | µmol/m²/s                           | MUST be a true PPFD measurement. MUST NOT be estimated from lux, watts, or a light-percentage slider. If only lux/watt/% is available, the bridge MUST omit `ppfd` rather than synthesize it. |
 
 Any metric value that is `null`, `NaN`, `Infinity`, `-Infinity`, or outside
 its physical range MUST be dropped from `metrics` before insert and the
@@ -95,6 +95,11 @@ reading MUST be flagged so the UI can show `invalid` for that metric.
   MUST be rejected (or stored as `invalid` if the schema requires it).
 - Staleness checks (e.g. >30 min old) MUST use `captured_at`, never
   `created_at` / `received_at`.
+- The server re-derives this boundary from its own clock. A packet already
+  older than 30 minutes MUST NOT be persisted. Both the generic bridge path
+  and direct EcoWitt handler acknowledge it without a write as
+  `accepted: false` with reason `timestamp_stale`. This 2xx acknowledgement is
+  non-retryable.
 
 ---
 
@@ -124,14 +129,17 @@ A bridge / Edge Function MUST reject (HTTP 4xx, no insert) when:
    (the whole reading is rejected only if _every_ metric is invalid;
    otherwise the invalid metric is dropped and the reading is flagged).
 4. `ppfd` is present but was derived from lux / watts / light-%.
-5. `tent_id` is missing or not owned by the authenticated principal.
+5. `tent_id` is missing or not owned by the server-resolved bridge-token
+   principal. The separate manual/CSV import flow resolves its authenticated
+   user independently and does not use either live-ingest handler.
 6. `source` is not in the allow-list of §2, or is `stale` / `invalid` /
    `demo` / `live`.
 7. `raw_payload` is missing for a transport that supports it
    (Ecowitt, MQTT, webhook).
 8. The payload includes a client-supplied `user_id`. **Client-supplied
-   `user_id` MUST NEVER be trusted.** Ownership is resolved server-side
-   from the authenticated session or bridge credential.
+   `user_id` MUST NEVER be trusted.** Live-handler ownership is resolved
+   server-side from the verified tent-scoped bridge token. Authenticated-user
+   ownership applies only to the separate manual/CSV import flow.
 
 ---
 
@@ -139,8 +147,9 @@ A bridge / Edge Function MUST reject (HTTP 4xx, no insert) when:
 
 When the production ingest Edge Function is built, it MUST:
 
-1. **Authenticate first.** Verify the bridge credential or user session
-   _before_ reading the payload body for ownership decisions.
+1. **Authenticate first.** For live ingest, verify the tent-scoped bridge
+   token _before_ reading the payload body for ownership decisions. Ordinary
+   user sessions/JWTs are not accepted by either live-ingest handler.
 2. **Verify ownership.** Resolve `tent_id` → owning user via a
    security-definer function or join; reject on mismatch.
 3. **Validate before insert.** Run §7 rules. No partial inserts of
@@ -185,8 +194,9 @@ endpoint** for bridge clients (MQTT, Ecowitt, Home Assistant, generic
 webhook). The pi-specific HMAC path `pi-ingest-readings` remains in place
 for the Raspberry Pi bridge and is not affected by this contract.
 
-Authentication: `Authorization: Bearer <vbt_…>` (tent-scoped bridge token)
-or a user JWT.
+Authentication: `Authorization: Bearer <vbt_…>` using a tent-scoped bridge
+token. Ordinary user JWTs return `bridge_required` and cannot promote
+caller-asserted values into trusted live telemetry.
 
 ### Idempotency
 
@@ -202,15 +212,15 @@ authoritative dedupe guarantee — concurrent identical POSTs cannot create
 duplicate rows. The `Idempotency-Key` header is preserved in `raw_payload`
 for traceability and post-hoc reconciliation.
 
-Missing `Idempotency-Key` is not rejected (browser/JWT flows may omit it),
-but bridge integrations without it MUST be flagged in their integration
-review.
+Missing `Idempotency-Key` is not rejected for backward compatibility, but
+bridge integrations without a stable key MUST be flagged in their
+integration review.
 
 ### Error surface
 
 The endpoint returns terse JSON error bodies only:
 `unauthorized`, `forbidden_tent`, `invalid_json`, `invalid_payload`,
-`tent_lookup_failed`, `insert_failed`, `server_misconfigured`,
+`bridge_required`, `insert_failed`, `server_misconfigured`,
 `auth_lookup_failed`, `method_not_allowed`. It never echoes PG constraint
 messages, payload values, tokens, bridge ids, secrets, or internal table
 names.
@@ -234,8 +244,8 @@ The pure normalizer (`src/lib/sensorWebhookIngestRules.ts`) and the DB
 trigger `public.validate_sensor_reading()` both accept the four
 contract transports (`ecowitt`, `mqtt`, `csv`, `webhook`) in addition to
 the historical device-specific labels (`esp32_*`, `home_assistant_bridge`,
-`pi_bridge`, …). All examples below assume a server-issued bridge token
-(`Authorization: Bearer vbt_…`) or a user JWT.
+`pi_bridge`, …). All webhook examples below require a server-issued,
+tent-scoped bridge token (`Authorization: Bearer vbt_…`).
 
 ### 12.1 EcoWitt over MQTT (local broker → bridge → webhook)
 
@@ -262,7 +272,10 @@ Idempotency-Key: ecowitt-gw2000-2026-05-26T20:00:00Z
 ```
 
 Notes:
-- Row `source` is persisted as `"mqtt"`.
+
+- Fresh rows persist canonical `source = "live"`; already-old rows persist
+  `source = "stale"`. The submitted `mqtt` transport remains in
+  `raw_payload.metadata.transport_source`.
 - `vendor: "ecowitt"` is preserved verbatim in `raw_payload.vendor` and
   is **never** used for ownership, auth, or routing.
 
@@ -293,26 +306,21 @@ rest_command:
 ```
 
 Notes:
-- Row `source` is persisted as `"webhook"`.
+
+- Fresh rows persist canonical `source = "live"`; already-old rows persist
+  `source = "stale"`. The submitted `webhook` transport remains in
+  `raw_payload.metadata.transport_source`.
 - `vendor: "home_assistant"` is preserved in `raw_payload.vendor` only.
 - Bridge token is tent-scoped, hashed at rest, and revocable. HA cannot
   see other tents even if the token leaks.
 
 ### 12.3 Generic CSV import
 
-```json
-POST /functions/v1/sensor-ingest-webhook
-Authorization: Bearer <user JWT>
-Idempotency-Key: csv-2026-05-26-batch-7
-
-{
-  "tent_id": "11111111-1111-1111-1111-111111111111",
-  "source": "csv",
-  "vendor": "manual-export",
-  "captured_at": "2026-05-26T20:00:00Z",
-  "metrics": { "temp_c": 24.6, "humidity_pct": 58 }
-}
-```
+CSV history is not trusted live telemetry and does not use this webhook.
+Verdant's authenticated import flow writes `source = "csv"` through the
+owner-and-tent-scoped `sensor_readings` policy. The policy permits only
+`manual` and `csv` client inserts; live and transport provenance remains
+server-only.
 
 ### Vendor lineage rules (binding)
 
@@ -323,7 +331,8 @@ Idempotency-Key: csv-2026-05-26-batch-7
   authoritative lineage field for analytics / display.
 - `vendor` is NEVER an allow-list. Unknown vendors are accepted and
   preserved; the security boundary remains the `source` allow-list, the
-  JWT/bridge token, and tent ownership.
+  verified tent-scoped bridge token, and tent ownership. The separate
+  authenticated manual/CSV flow does not use either live-ingest handler.
 - `vendor` MUST NOT be used by any code path for authorization, ownership,
   alerting, Action Queue routing, or device control.
 

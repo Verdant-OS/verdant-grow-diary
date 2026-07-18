@@ -34,11 +34,20 @@
  */
 import { describe, expect, it } from "vitest";
 import { normalizeWebhookIngestPayload } from "../../supabase/functions/sensor-ingest-webhook/webhookIngest";
-import { buildStoredRow } from "../../supabase/functions/sensor-ingest-webhook/storageMapping";
+import { buildStoredRow as buildStoredRowRaw } from "../../supabase/functions/sensor-ingest-webhook/storageMapping";
 
 const TENT_ID = "11111111-2222-3333-4444-555555555555";
 const AUTH_USER_ID = "99999999-aaaa-4bbb-8ccc-dddddddddddd";
 const BODY_SPOOFED_USER_ID = "00000000-0000-0000-0000-000000000000";
+const FIXTURE_NOW = new Date("2026-06-17T05:45:30.000Z");
+
+function buildStoredRow<R extends Record<string, unknown>>(args: {
+  row: R;
+  userId: string;
+  idempotencyKey: string | null;
+}) {
+  return buildStoredRowRaw({ ...args, now: FIXTURE_NOW });
+}
 
 const PASSKEY = "DEVICESECRET-DO-NOT-LEAK";
 const FAKE_BRIDGE_TOKEN = "vbt_fake_should_never_appear_xyz";

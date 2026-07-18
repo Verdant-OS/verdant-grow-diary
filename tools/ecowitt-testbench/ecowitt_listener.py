@@ -15,14 +15,16 @@ Safety properties (must remain true):
   labeled ``source = "demo"``. Real LAN EcoWitt gateway uploads
   (non-loopback caller carrying at least two non-secret EcoWitt gateway
   marker fields such as ``stationtype`` / ``model`` / ``dateutc``) are
-  labeled ``source = "live"``. Header and environment modes cannot bypass
-  that physical-gateway proof.
+  labeled ``source = "live"`` only while their gateway timestamp is inside
+  the freshness window; delayed/replayed packets are labeled ``stale``.
+  Header and environment modes cannot bypass that physical-gateway proof.
   Unknown / spoofed ``source`` values from the payload normalize to
   ``invalid`` and are never silently treated as live or healthy.
 
-* Missing / malformed / stale values are never silently classified as
-  healthy — they are normalized to ``None`` and the raw payload is kept
-  in ``metadata.raw_payload`` for audit.
+* Missing / malformed metric values are never silently classified as healthy
+  — they are normalized to ``None`` and the raw payload is kept in
+  ``metadata.raw_payload`` for audit. Old gateway timestamps retain their
+  event time and downgrade the reading to ``stale``.
 * Bridge tokens are never printed in full. Only a masked preview
   (``vbt_abc...xyz``) is logged. Authorization headers are validated to
   be ASCII-only before any outbound request.
@@ -40,11 +42,13 @@ Endpoints:
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -76,6 +80,7 @@ except Exception:
 VENDOR = "ecowitt_windows_testbench"
 LOG_PATH = Path(__file__).with_name("ecowitt_raw_log.jsonl")
 PORT = int(os.environ.get("VERDANT_TESTBENCH_PORT", "8787"))
+ECOWITT_LIVE_FRESHNESS = timedelta(minutes=30)
 
 app = Flask(__name__)
 
@@ -123,6 +128,90 @@ def normalize_metrics(payload: Dict[str, Any]) -> Dict[str, Optional[float]]:
     return metrics
 
 
+def parse_ecowitt_dateutc(value: Any) -> Optional[str]:
+    """Parse EcoWitt's UTC gateway timestamp into canonical ISO-8601.
+
+    EcoWitt Customized Upload sends ``dateutc`` as
+    ``YYYY-MM-DD HH:MM:SS``. The field is already UTC; accepting only that
+    exact shape prevents local-time assumptions and keeps replays
+    deterministic. Missing or malformed timestamps fail closed as ``None``.
+    """
+    if not isinstance(value, str):
+        return None
+    raw = value.strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", raw):
+        return None
+    try:
+        parsed = datetime.strptime(raw, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=timezone.utc).isoformat(timespec="seconds").replace(
+        "+00:00",
+        "Z",
+    )
+
+
+def _payload_value_case_insensitive(
+    payload: Optional[Dict[str, Any]],
+    wanted_key: str,
+) -> Any:
+    if not isinstance(payload, dict):
+        return None
+    wanted = wanted_key.lower()
+    for key, value in payload.items():
+        if str(key).lower() == wanted:
+            return value
+    return None
+
+
+def validate_ecowitt_dateutc(
+    value: Any,
+    *,
+    now: Optional[datetime] = None,
+) -> Optional[str]:
+    """Return canonical gateway UTC only when it is safe for ingest.
+
+    Old timestamps remain valid and keep their original event time so normal
+    downstream freshness rules can label them stale. Clocks more than five
+    minutes ahead fail closed because the database rejects that boundary and
+    receive-time substitution would create fake-fresh telemetry.
+    """
+    canonical = parse_ecowitt_dateutc(value)
+    if canonical is None:
+        return None
+    parsed = datetime.fromisoformat(canonical.replace("Z", "+00:00"))
+    current = now or _utc_now()
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    else:
+        current = current.astimezone(timezone.utc)
+    if parsed > current + timedelta(minutes=5):
+        return None
+    return canonical
+
+
+def _utc_now() -> datetime:
+    """One patchable UTC clock for request-level freshness decisions."""
+    return datetime.now(timezone.utc)
+
+
+def is_ecowitt_dateutc_stale(
+    canonical: Optional[str],
+    *,
+    now: Optional[datetime] = None,
+) -> bool:
+    """Return true when a valid gateway timestamp is outside the live window."""
+    if canonical is None:
+        return False
+    parsed = datetime.fromisoformat(canonical.replace("Z", "+00:00"))
+    current = now or _utc_now()
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    else:
+        current = current.astimezone(timezone.utc)
+    return current - parsed > ECOWITT_LIVE_FRESHNESS
+
+
 def extract_payload() -> Dict[str, Any]:
     """Accept query params, form data, JSON, or raw body."""
     merged: Dict[str, Any] = {}
@@ -147,7 +236,7 @@ def extract_payload() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Source labeling — demo for loopback synthetic, live for real LAN gateway
+# Source labeling — demo for loopback, live/stale for real LAN gateway
 # ---------------------------------------------------------------------------
 
 # Canonical Verdant source labels. Anything outside this set is "invalid".
@@ -192,6 +281,8 @@ def looks_like_ecowitt_gateway(payload: Optional[Dict[str, Any]]) -> bool:
 def has_physical_gateway_evidence(
     payload: Optional[Dict[str, Any]],
     remote_addr: Optional[str],
+    *,
+    now: Optional[datetime] = None,
 ) -> bool:
     """True only for parse-time, non-loopback EcoWitt gateway evidence.
 
@@ -200,11 +291,29 @@ def has_physical_gateway_evidence(
     closed. Requiring at least two gateway markers avoids promoting a minimal
     browser/curl packet to physical sensor proof.
     """
+    canonical_gateway_time = validate_ecowitt_dateutc(
+        _payload_value_case_insensitive(payload, "dateutc"),
+        now=now,
+    )
+    return _has_physical_gateway_evidence_from_validated(
+        payload,
+        remote_addr,
+        canonical_gateway_time,
+    )
+
+
+def _has_physical_gateway_evidence_from_validated(
+    payload: Optional[Dict[str, Any]],
+    remote_addr: Optional[str],
+    canonical_gateway_time: Optional[str],
+) -> bool:
+    """Physical proof using a timestamp already validated for this request."""
     addr = (remote_addr or "").strip()
     return (
         bool(addr)
         and not _is_loopback_source_addr(addr)
         and looks_like_ecowitt_gateway(payload)
+        and canonical_gateway_time is not None
     )
 
 
@@ -213,18 +322,44 @@ def resolve_source(
     remote_addr: Optional[str] = None,
     header_mode: Optional[str] = None,
     env_mode: Optional[str] = None,
+    *,
+    now: Optional[datetime] = None,
 ) -> str:
     """Return a canonical Verdant source label.
 
     Rules:
       1. Explicit payload ``source`` is honored only when in ALLOWED_SOURCES.
          Unknown labels normalize to ``invalid`` (never silently "live").
-      2. Real LAN EcoWitt gateway uploads (non-loopback remote + gateway
-         marker fields) normalize to ``live``.
+      2. Fresh real LAN EcoWitt gateway uploads (non-loopback remote +
+         gateway marker fields) normalize to ``live``; old ones are ``stale``.
       3. Header/environment ``live`` requests cannot bypass physical gateway
          evidence; without it they downgrade to ``demo``.
       4. Everything else (loopback browser/curl, demo scripts) is ``demo``.
     """
+    canonical_gateway_time = validate_ecowitt_dateutc(
+        _payload_value_case_insensitive(payload, "dateutc"),
+        now=now,
+    )
+    return _resolve_source_from_validated(
+        payload=payload,
+        remote_addr=remote_addr,
+        canonical_gateway_time=canonical_gateway_time,
+        header_mode=header_mode,
+        env_mode=env_mode,
+        now=now,
+    )
+
+
+def _resolve_source_from_validated(
+    *,
+    payload: Optional[Dict[str, Any]],
+    remote_addr: Optional[str],
+    canonical_gateway_time: Optional[str],
+    header_mode: Optional[str],
+    env_mode: Optional[str],
+    now: Optional[datetime],
+) -> str:
+    """Resolve source using one request-level timestamp validation result."""
     if header_mode is None:
         header_mode = (request.headers.get("X-Verdant-Forward-Mode") or "").strip().lower()
     if env_mode is None:
@@ -241,19 +376,33 @@ def resolve_source(
                 # Unknown / spoofed label — never accept as live or healthy.
                 return "invalid"
 
-    physical_gateway_evidence = has_physical_gateway_evidence(payload, remote_addr)
+    # A gateway-shaped packet without a valid gateway UTC timestamp cannot
+    # establish live provenance. Do not replace it with listener receive time:
+    # that would make a delayed or replayed packet appear fresh.
+    if looks_like_ecowitt_gateway(payload) and canonical_gateway_time is None:
+        return "invalid"
+
+    physical_gateway_evidence = _has_physical_gateway_evidence_from_validated(
+        payload,
+        remote_addr,
+        canonical_gateway_time,
+    )
+    stale_gateway_evidence = physical_gateway_evidence and is_ecowitt_dateutc_stale(
+        canonical_gateway_time,
+        now=now,
+    )
 
     if explicit == "live":
         # Only honor explicit live when it actually looks like a real
         # gateway from a non-loopback caller. Otherwise downgrade.
         if physical_gateway_evidence:
-            return "live"
+            return "stale" if stale_gateway_evidence else "live"
         return "demo"
     if explicit in {"manual", "csv", "demo", "stale", "invalid"}:
         return explicit
 
     if physical_gateway_evidence:
-        return "live"
+        return "stale" if stale_gateway_evidence else "live"
 
     if header_mode == "live" or env_mode == "live":
         return "demo"
@@ -403,6 +552,31 @@ def _redact_raw_payload_for_forward(raw: Any) -> Any:
     return out
 
 
+def build_forward_idempotency_key(outbound: Dict[str, Any]) -> str:
+    """Return a stable key for one normalized EcoWitt reading.
+
+    This projection matches the downstream fingerprint inputs: tent, transport
+    source, gateway-captured timestamp, and canonical metrics. Replaying the
+    same gateway packet therefore produces the same trace key instead of a new
+    random UUID, while different tents or readings remain isolated.
+    """
+    projection = {
+        "tent_id": outbound.get("tent_id"),
+        "source": outbound.get("source"),
+        "captured_at": outbound.get("captured_at"),
+        "metrics": outbound.get("metrics") or {},
+    }
+    canonical = json.dumps(
+        projection,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        default=str,
+    )
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return f"ecowitt-{digest}"
+
+
 # Known sanitized error codes the sensor-ingest-webhook may return.
 # Used to classify the body so operators see meaningful guidance rather
 # than just an HTTP status.
@@ -410,6 +584,7 @@ _WEBHOOK_ERROR_CLASSIFICATIONS = {
     "invalid_payload": "payload_shape_mismatch",
     "invalid_json": "payload_shape_mismatch",
     "unauthorized": "auth_failed",
+    "bridge_required": "bridge_required",
     "token_revoked": "token_revoked",
     "token_expired": "token_expired",
     "auth_lookup_failed": "auth_lookup_failed",
@@ -704,7 +879,7 @@ def maybe_forward(reading: Dict[str, Any]) -> Dict[str, Any]:
     headers = {
         "Authorization": auth,
         "Content-Type": "application/json",
-        "Idempotency-Key": str(uuid.uuid4()),
+        "Idempotency-Key": build_forward_idempotency_key(outbound),
         "User-Agent": f"{VENDOR}/1.0",
         "x-verdant-tent-id": tent_id or "",
     }
@@ -828,12 +1003,33 @@ def health() -> Any:
 def ecowitt() -> Any:
     raw = extract_payload()
     metrics = normalize_metrics(raw)
-    source = resolve_source(payload=raw, remote_addr=request.remote_addr)
-    physical_gateway_evidence = has_physical_gateway_evidence(
-        raw,
-        request.remote_addr,
+    request_now = _utc_now()
+    gateway_shaped = looks_like_ecowitt_gateway(raw)
+    gateway_captured_at = validate_ecowitt_dateutc(
+        _payload_value_case_insensitive(raw, "dateutc"),
+        now=request_now,
     )
-    captured_at = datetime.now(timezone.utc).isoformat()
+    source = _resolve_source_from_validated(
+        payload=raw,
+        remote_addr=request.remote_addr,
+        canonical_gateway_time=gateway_captured_at,
+        header_mode=None,
+        env_mode=None,
+        now=request_now,
+    )
+    physical_gateway_evidence = _has_physical_gateway_evidence_from_validated(
+        raw, request.remote_addr, gateway_captured_at
+    )
+    # Physical gateway packets keep the device's UTC timestamp exactly (after
+    # canonical formatting). Never substitute listener receive time for a
+    # missing/malformed gateway timestamp, because that would make a stale or
+    # replayed packet appear current. Non-gateway demo requests keep their
+    # existing local receive timestamp behavior.
+    captured_at = (
+        gateway_captured_at
+        if gateway_shaped
+        else request_now.isoformat()
+    )
     safe_raw = _redact_raw_payload_for_forward(raw)
 
 
@@ -855,7 +1051,17 @@ def ecowitt() -> Any:
     }
 
     append_raw_log(reading)
-    forward_result = maybe_forward(reading)
+    if gateway_shaped and gateway_captured_at is None:
+        FORWARD_STATS["blocked_count"] += 1
+        FORWARD_STATS["last_status"] = None
+        FORWARD_STATS["last_at"] = request_now.isoformat()
+        FORWARD_STATS["last_error"] = "invalid_gateway_timestamp"
+        forward_result = {
+            "forwarded": False,
+            "reason": "invalid_gateway_timestamp",
+        }
+    else:
+        forward_result = maybe_forward(reading)
 
     # The gateway only needs an acknowledgement. Return the safe telemetry
     # summary, not local network details or the stored raw envelope.
@@ -1285,6 +1491,10 @@ _RECOMMENDED_NEXT_STEP: Dict[str, str] = {
     "auth_failed": (
         "Bridge token rejected. Re-check VERDANT_BRIDGE_TOKEN in .env "
         "(do not paste it anywhere) and restart the listener."
+    ),
+    "bridge_required": (
+        "Webhook requires a tent-scoped bridge token for live telemetry. "
+        "Replace any app-session credential with VERDANT_BRIDGE_TOKEN and restart."
     ),
     "token_revoked": (
         "Bridge token was revoked. Generate or paste a new active bridge token, "

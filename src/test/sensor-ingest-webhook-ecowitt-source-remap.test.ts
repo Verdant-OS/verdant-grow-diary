@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  buildStoredRow,
+  buildStoredRow as buildStoredRowRaw,
   CANONICAL_STORED_SOURCES,
   classifyInsertError,
   mapStoredSourceForTransport,
@@ -18,6 +18,15 @@ import {
 
 const TENT = "11111111-1111-4111-8111-111111111111";
 const USER = "22222222-2222-4222-8222-222222222222";
+const FIXTURE_NOW = new Date("2026-06-04T12:10:00.000Z");
+
+function buildStoredRow<R extends Record<string, unknown>>(args: {
+  row: R;
+  userId: string;
+  idempotencyKey: string | null;
+}) {
+  return buildStoredRowRaw({ ...args, now: FIXTURE_NOW });
+}
 
 interface BaseRow {
   tent_id: string;
@@ -97,6 +106,59 @@ describe("buildStoredRow — EcoWitt transport mapping", () => {
     });
     expect(stored.raw_payload.vendor).toBe("ecowitt");
     expect(stored.raw_payload.idempotency_key).toBe("idem-abc-12345678");
+  });
+
+  it("demotes an already-old transport packet to stale at the storage boundary", () => {
+    const stored = buildStoredRowRaw({
+      row: {
+        ...baseRow,
+        source: "ecowitt",
+        captured_at: "2026-06-04T11:39:59.999Z",
+        ts: "2026-06-04T11:39:59.999Z",
+        raw_payload: {
+          ...baseRow.raw_payload,
+          metadata: {
+            verdant_source: "live",
+          },
+        },
+      },
+      userId: USER,
+      idempotencyKey: null,
+      now: FIXTURE_NOW,
+    });
+
+    expect(stored.source).toBe("stale");
+    expect(stored.quality).toBe("stale");
+    expect(stored.raw_payload.metadata).toMatchObject({
+      transport_source: "ecowitt",
+      verdant_source: "stale",
+      reported_verdant_source: "live",
+    });
+  });
+
+  it("never preserves quality ok when listener provenance is already stale", () => {
+    const stored = buildStoredRow({
+      row: {
+        ...baseRow,
+        source: "ecowitt",
+        quality: "ok",
+        raw_payload: {
+          ...baseRow.raw_payload,
+          metadata: {
+            verdant_source: "stale",
+          },
+        },
+      },
+      userId: USER,
+      idempotencyKey: null,
+    });
+
+    expect(stored.source).toBe("stale");
+    expect(stored.quality).toBe("stale");
+    expect(stored.raw_payload.metadata).toMatchObject({
+      verdant_source: "stale",
+      reported_verdant_source: "stale",
+    });
   });
 
   it("preserves the listener's original live decision separately from the canonical mirror", () => {

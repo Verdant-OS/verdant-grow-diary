@@ -28,6 +28,9 @@ Hard rules for every bridge client:
 - **Bad or stale telemetry must never be treated as healthy.** When a
   reading fails validation or is stuck/old, Verdant labels it
   `invalid` / `stale` — bridge clients must not relabel it as `live`.
+- A 2xx response with `accepted: false` and `reason: "timestamp_stale"` is a
+  successful, non-retryable acknowledgement. The old packet was intentionally
+  not written; do not enqueue it again.
 
 ## 2. `source` vs `vendor`
 
@@ -35,12 +38,12 @@ Verdant validates `source` against an allow-list. `vendor` is **lineage
 only** and is never used for authorization, ownership, routing, or
 permissions.
 
-| Example | Meaning |
-|---|---|
-| `source: "ecowitt"` | Reading arrived via an EcoWitt-shaped transport (gateway/station bridge). |
-| `source: "mqtt"`, `vendor: "ecowitt"` | Reading was carried over MQTT; the originating ecosystem was EcoWitt. |
-| `source: "webhook"`, `vendor: "home_assistant"` | Generic webhook POST originating from a Home Assistant flow. |
-| `source: "csv"` | Bulk historical CSV import. |
+| Example                                         | Meaning                                                                                 |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `source: "ecowitt"`                             | Reading arrived via an EcoWitt-shaped transport (gateway/station bridge).               |
+| `source: "mqtt"`, `vendor: "ecowitt"`           | Reading was carried over MQTT; the originating ecosystem was EcoWitt.                   |
+| `source: "webhook"`, `vendor: "home_assistant"` | Generic webhook POST originating from a Home Assistant flow.                            |
+| `source: "csv"`                                 | Historical import through the separate authenticated CSV flow, not this bridge webhook. |
 
 Rules:
 
@@ -48,8 +51,9 @@ Rules:
 - `vendor` is **lineage only** — a non-empty string preserved in
   `raw_payload` for analytics and debugging.
 - `vendor` must **never** be used for auth, ownership, routing, or
-  permissions. Authorization is decided server-side by the JWT or bridge
-  token.
+  permissions. Bridge authorization is decided server-side from a verified,
+  tent-scoped bridge token. Ordinary user JWTs are not accepted by the live
+  ingest handlers.
 - Empty / non-string `vendor` values are dropped.
 
 ## 3. Required payload shape
@@ -86,9 +90,8 @@ Required / recommended:
 Forbidden:
 
 - Do **not** send `service_role` keys from a bridge client.
-- Do **not** send `user_id` from a bridge client unless the existing
-  contract explicitly requires it. Verdant derives ownership from the
-  authenticated principal (JWT / bridge token), not the body.
+- Do **not** send `user_id` from a bridge client. Verdant derives ownership
+  from the verified tent-scoped bridge token, not the body.
 - Do **not** send device commands. Verdant ingest is read-only.
 
 ## 4. Full Jitter retry guidance
@@ -136,7 +139,7 @@ import time
 import requests
 
 VERDANT_URL = os.environ["VERDANT_URL"]          # e.g. https://<project>.functions.supabase.co/sensor-ingest-webhook
-VERDANT_TOKEN = os.environ["VERDANT_TOKEN"]      # e.g. vbt_xxxxxxxxxxxxxxxx
+VERDANT_BRIDGE_TOKEN = os.environ["VERDANT_BRIDGE_TOKEN"]  # e.g. vbt_xxxxxxxxxxxxxxxx
 TENT_ID = os.environ["VERDANT_TENT_ID"]
 
 MAX_RETRIES = 4
@@ -165,7 +168,7 @@ def post_reading(payload: dict) -> bool:
                 VERDANT_URL,
                 json=payload,
                 headers={
-                    "Authorization": f"Bearer {VERDANT_TOKEN}",
+                    "Authorization": f"Bearer {VERDANT_BRIDGE_TOKEN}",
                     "Content-Type": "application/json",
                 },
                 timeout=TIMEOUT,
@@ -186,7 +189,7 @@ def post_reading(payload: dict) -> bool:
     return False
 
 def log_failure(payload, status, attempt, reason):
-    tok = VERDANT_TOKEN[:4] + "…" + VERDANT_TOKEN[-3:]
+    tok = VERDANT_BRIDGE_TOKEN[:4] + "…" + VERDANT_BRIDGE_TOKEN[-3:]
     print({
         "captured_at": payload.get("captured_at"),
         "source": payload.get("source"),
@@ -217,7 +220,7 @@ Notes: no real secrets, no device control, placeholder token format
 import urequests, ujson, utime, urandom
 
 URL = "https://<project>.functions.supabase.co/sensor-ingest-webhook"
-TOKEN = "vbt_xxxxxxxxxxxxxxxx"   # placeholder, load from secure storage
+BRIDGE_TOKEN = "vbt_xxxxxxxxxxxxxxxx"  # placeholder, load from secure storage
 MAX_RETRIES = 4
 BASE = 3
 CAP = 45
@@ -240,7 +243,7 @@ def send(payload):
                 URL,
                 data=ujson.dumps(payload),
                 headers={
-                    "Authorization": "Bearer " + TOKEN,
+                    "Authorization": "Bearer " + BRIDGE_TOKEN,
                     "Content-Type": "application/json",
                 },
                 timeout=TIMEOUT_S,
@@ -272,7 +275,7 @@ rest_command:
     method: POST
     timeout: 15
     headers:
-      Authorization: !secret verdant_bridge_token   # vbt_... in secrets.yaml
+      Authorization: !secret verdant_bridge_token # vbt_... in secrets.yaml
       Content-Type: application/json
     payload: >
       {
@@ -318,7 +321,8 @@ Suggested flow:
 - The bridge POSTs into Verdant with `source: "mqtt"`. `vendor` may
   identify the original device ecosystem, e.g. `"ecowitt"`.
 - MQTT **topic names are not auth.** Do not treat topic paths as
-  ownership. Authorization is the JWT / bridge token only.
+  ownership. Authorization requires the verified tent-scoped bridge token;
+  ordinary user JWTs are not accepted by the live ingest handlers.
 - Apply the same Full Jitter retry policy as HTTP clients. Do not
   republish to MQTT on Verdant failure unless you also dedupe by
   `captured_at`.
@@ -344,7 +348,8 @@ the first 4 and last 3 characters (e.g. `vbt_…abc`).
 - **Never put bridge tokens in frontend code.** They belong on the
   device / server only.
 - **Never paste the `service_role` key into a bridge client.** Bridge
-  clients use a bridge token (`vbt_…`) or a user JWT — nothing else.
+  clients use a tent-scoped bridge token (`vbt_…`) — ordinary user JWTs
+  cannot create trusted live telemetry.
 - **Rotate compromised tokens immediately** via the Tent Bridge Tokens
   panel.
 - Prefer environment variables or local secret files

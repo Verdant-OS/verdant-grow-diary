@@ -17,15 +17,12 @@
  *    the payload through `ecowittPayloadAdapter`'s credential suppression
  *    before persisting `raw_payload`.
  *  - NEVER fans out across tents the caller does not own. The caller
- *    pre-filters `eligibleTents` to the bridge-token's tent scope (or to
- *    the JWT user's tents for JWT auth). This helper trusts the list.
+ *    pre-filters `eligibleTents` to the authenticated bridge-token's tent
+ *    scope. This helper trusts the list.
  *  - NEVER emits alerts, Action Queue items, AI calls, or device commands.
  */
 
-export type EcoWittRouterMetric =
-  | "temperature_c"
-  | "humidity_pct"
-  | "soil_moisture_pct";
+export type EcoWittRouterMetric = "temperature_c" | "humidity_pct" | "soil_moisture_pct";
 
 export interface EcoWittRouterReading {
   metric: EcoWittRouterMetric;
@@ -122,9 +119,7 @@ function findTentForChannel(
   return null;
 }
 
-export function routeEcoWittPayloadToTents(
-  input: EcoWittRouterInput,
-): EcoWittRouterResult {
+export function routeEcoWittPayloadToTents(input: EcoWittRouterInput): EcoWittRouterResult {
   const dropped: EcoWittRouterDrop[] = [];
   const groupsByTent = new Map<string, EcoWittRouterReading[]>();
 

@@ -5,8 +5,8 @@
  *  1. VPD provenance — derived rows distinguishable from measured rows,
  *     and never computed from a dropped/invalid temperature.
  *  2. Timestamp handling — pins the edge function's strict parse of
- *     `dateutc` as UTC with safe `server_received_at` fallback, and the
- *     honest `timestamp_source` stamp on every row.
+ *     `dateutc` as UTC and fail-closed behavior when gateway time cannot be
+ *     trusted.
  *  3. Duplicate behavior — pins the edge function's reliance on the
  *     `sensor_readings_dedupe_uidx` unique index via `ignoreDuplicates`.
  *  4. Secret/log safety — function source never echoes raw PASSKEY/MAC/
@@ -82,13 +82,14 @@ describe("(1) VPD provenance — derived vs measured", () => {
   });
 });
 
-describe("(2) timestamp / dateutc handling — gateway-trusted UTC with safe fallback", () => {
-  it("edge function parses dateutc and falls back to server time when absent/malformed", () => {
-    // The edge function calls parseEcoWittDateUtc on payload.dateutc, then
-    // either uses the parsed ISO string or new Date().toISOString().
+describe("(2) timestamp / dateutc handling — gateway-trusted UTC, fail closed", () => {
+  it("edge function requires parsed gateway time and never substitutes receive time", () => {
     expect(EDGE_SRC).toMatch(/parseEcoWittDateUtc\(/);
-    expect(EDGE_SRC).toMatch(/new Date\(\)\.toISOString\(\)/);
-    expect(EDGE_SRC).toMatch(/timestampSource/);
+    expect(EDGE_SRC).toMatch(/extractPayloadValueCaseInsensitive\(payload, "dateutc"\)/);
+    expect(EDGE_SRC).toMatch(/reason:\s*"timestamp_invalid"/);
+    expect(EDGE_SRC).toMatch(/reason:\s*"timestamp_future"/);
+    expect(EDGE_SRC).toMatch(/const capturedAt = parsedDateUtc/);
+    expect(EDGE_SRC).not.toMatch(/parsedDateUtc\s*\?\?\s*new Date/);
   });
 
   it("captured_at is set deterministically from the caller-supplied capturedAt", () => {
@@ -152,21 +153,6 @@ describe("(2) timestamp / dateutc handling — gateway-trusted UTC with safe fal
     }
   });
 
-  it("stamps timestamp_source='server_received_at' when caller falls back to server time", () => {
-    const { rows } = buildEcoWittRoutedRows({
-      userId: USER,
-      payload: { temp1f: "77", humidity1: "50" },
-      payloadPasskeyFingerprint: FP_A,
-      eligibleTents: [tent],
-      capturedAt: NOW,
-      timestampSource: "server_received_at",
-    });
-    expect(rows.length).toBeGreaterThan(0);
-    for (const r of rows) {
-      expect(r.raw_payload.timestamp_source).toBe("server_received_at");
-    }
-  });
-
   it("rejects out-of-range dateutc: epoch-zero RTC and far-future clocks", async () => {
     const { parseEcoWittDateUtc } = await import("@/lib/ecowittRoutedRowBuilder");
     const now = new Date("2026-06-04T21:00:00.000Z");
@@ -187,35 +173,9 @@ describe("(2) timestamp / dateutc handling — gateway-trusted UTC with safe fal
     expect(parseEcoWittDateUtc("2019-12-31 23:59:59", now)).toBeNull();
   });
 
-  it("documents negative dedupe: payloads without valid dateutc may NOT dedupe", () => {
-    // When dateutc is missing/malformed/out-of-range, the edge function
-    // falls back to `new Date().toISOString()` at receive time. Two
-    // retries received at different instants will produce different
-    // captured_at values and therefore will NOT collide on the
-    // (user_id, tent_id, source, metric, captured_at) partial unique
-    // index. Duplicate protection is strongest only when the gateway
-    // sends a valid in-range `dateutc`.
-    const payload = { temp1f: "77", humidity1: "50" };
-    const a = buildEcoWittRoutedRows({
-      userId: USER,
-      payload,
-      payloadPasskeyFingerprint: FP_A,
-      eligibleTents: [tent],
-      capturedAt: "2026-06-04T21:00:00.000Z",
-      timestampSource: "server_received_at",
-    });
-    const b = buildEcoWittRoutedRows({
-      userId: USER,
-      payload,
-      payloadPasskeyFingerprint: FP_A,
-      eligibleTents: [tent],
-      capturedAt: "2026-06-04T21:00:05.000Z",
-      timestampSource: "server_received_at",
-    });
-    expect(a.rows[0].captured_at).not.toBe(b.rows[0].captured_at);
-    for (const r of [...a.rows, ...b.rows]) {
-      expect(r.raw_payload.timestamp_source).toBe("server_received_at");
-    }
+  it("does not retain a server-time fallback in the live handler", () => {
+    expect(EDGE_SRC).not.toContain('timestampSource: "server_received_at"');
+    expect(EDGE_SRC).not.toMatch(/const timestampSource[^;]*server_received_at/);
   });
 });
 

@@ -67,24 +67,21 @@ function pickArrayLen(obj: unknown, key: string): number {
 export const SANITIZED_WEBHOOK_ERROR_COPY: Record<string, string> = {
   unauthorized:
     "Bridge token or Authorization header was rejected. Recheck the token value in the local bridge .env; do not paste it into the browser.",
+  bridge_required:
+    "Trusted sensor ingest requires a tent-scoped bridge token from the local bridge; an ordinary app session cannot create live telemetry.",
   token_revoked:
     "Bridge token was revoked. Generate or paste a new active bridge token, update .env, restart the listener, and retry one forward.",
   token_expired:
     "Bridge token has expired. Generate a new active bridge token, update .env, restart the listener, and retry one forward.",
-  server_misconfigured:
-    "The ingest function is missing required server-side configuration.",
+  server_misconfigured: "The ingest function is missing required server-side configuration.",
   invalid_json: "The request body was not valid JSON.",
   invalid_payload: "The payload shape failed validation.",
   forbidden_tent: "The token is not authorized for that tent.",
   tent_lookup_failed: "The function could not verify the tent context.",
-  insert_failed:
-    "The function reached storage but could not save the reading.",
-  method_not_allowed:
-    "Use POST for ingest and OPTIONS for browser preflight.",
-  internal_error:
-    "The function failed unexpectedly; check sanitized server logs.",
-  auth_lookup_failed:
-    "The function could not verify the bridge token. Retry shortly.",
+  insert_failed: "The function reached storage but could not save the reading.",
+  method_not_allowed: "Use POST for ingest and OPTIONS for browser preflight.",
+  internal_error: "The function failed unexpectedly; check sanitized server logs.",
+  auth_lookup_failed: "The function could not verify the bridge token. Retry shortly.",
 };
 
 // Strip strings that look like Bearer headers, JWTs, vbt_* tokens, or
@@ -103,7 +100,6 @@ function sanitizeReasonForDisplay(raw: string): string {
   return s.slice(0, 200);
 }
 
-
 export function classifySensorIngestTestResult(
   input: ClassifyInput,
 ): SensorIngestTestClassification {
@@ -120,12 +116,10 @@ export function classifySensorIngestTestResult(
     };
   }
 
-
   const { status, body } = input;
   const rawReason = pickString(body, "error") ?? pickString(body, "reason");
   const reason = rawReason ? sanitizeReasonForDisplay(rawReason) : null;
   const codeCopy = rawReason ? SANITIZED_WEBHOOK_ERROR_COPY[rawReason] : undefined;
-
 
   if (status >= 200 && status < 300) {
     const inserted = pickNumber(body, "inserted") ?? 0;
@@ -162,13 +156,20 @@ export function classifySensorIngestTestResult(
     };
   }
 
-
   if (status === 403) {
+    if (rawReason === "bridge_required") {
+      return {
+        category: "auth_problem",
+        headline: "HTTP 403 — bridge token required",
+        detail: codeCopy ?? "Use a tent-scoped bridge token for sensor ingest.",
+        isSuccess: false,
+        corsWorking: true,
+      };
+    }
     return {
       category: "tent_token_mismatch",
       headline: "HTTP 403 — tent / token mismatch",
-      detail:
-        "Token is valid but not scoped to this tent. Mint a token from this tent's panel.",
+      detail: "Token is valid but not scoped to this tent. Mint a token from this tent's panel.",
       isSuccess: false,
       corsWorking: true,
     };
@@ -181,7 +182,6 @@ export function classifySensorIngestTestResult(
       detail: reason
         ? `Server rejected payload: ${reason}.`
         : "Server rejected payload. Check source, captured_at, and metric names.",
-
 
       isSuccess: false,
       corsWorking: true,
@@ -213,8 +213,7 @@ export function classifySensorIngestTestResult(
     return {
       category: "server_error",
       headline: `HTTP ${status} — server error`,
-      detail:
-        "Ingest function returned a server error. Check Edge Function logs.",
+      detail: "Ingest function returned a server error. Check Edge Function logs.",
       isSuccess: false,
       corsWorking: true,
     };
@@ -265,18 +264,14 @@ export function buildEnvMatchChecklist(input: EnvMatchInput): EnvMatchItem[] {
     hint: supabaseOk ? undefined : "VITE_SUPABASE_URL is not configured.",
   });
   const ingestOk =
-    !!input.ingestUrl &&
-    !!input.supabaseUrl &&
-    input.ingestUrl.startsWith(input.supabaseUrl);
+    !!input.ingestUrl && !!input.supabaseUrl && input.ingestUrl.startsWith(input.supabaseUrl);
   items.push({
     key: "ingest_url",
     ok: ingestOk,
     label: ingestOk
       ? `Ingest endpoint matches project`
       : "Ingest endpoint does not match project URL",
-    hint: ingestOk
-      ? undefined
-      : "Endpoint origin must equal VITE_SUPABASE_URL.",
+    hint: ingestOk ? undefined : "Endpoint origin must equal VITE_SUPABASE_URL.",
   });
   items.push({
     key: "tent_selected",
@@ -310,9 +305,7 @@ export function buildEnvMatchChecklist(input: EnvMatchInput): EnvMatchItem[] {
     label: input.lastIngestAtIso
       ? `Last ingest seen at ${input.lastIngestAtIso}`
       : "No ingest seen yet for this token/tent",
-    hint: input.lastIngestAtIso
-      ? undefined
-      : "Send a test payload or start the Windows listener.",
+    hint: input.lastIngestAtIso ? undefined : "Send a test payload or start the Windows listener.",
   });
   return items;
 }

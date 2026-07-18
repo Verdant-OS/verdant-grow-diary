@@ -13,15 +13,15 @@
 //   - Response bodies never echo bridge tokens, Bearer values, Authorization
 //     header values, service-role keys, JWT-shaped strings, or vbt_* tokens.
 //
-// Mocking limitation: Supabase DB-dependent paths (forbidden_tent,
-// tent_lookup_failed, insert_failed, idempotency duplicate) require
-// intercepting `createClient` from `npm:@supabase/supabase-js@2`, which the
-// current `index.ts` imports directly. Those paths are pinned by static
-// scans in `src/test/sensor-ingest-webhook-secret-leakage.test.ts` and the
-// runtime matrix tests in `src/test/sensor-ingest-webhook-matrix.test.ts`.
-// See "DB mocking blocker" comment at the bottom of this file.
+// Bridge auth, tent scope, and exact persistence-row provenance are exercised
+// separately through the handler's injected admin-client seam in
+// `handler_e2e_test.ts`.
 
-import { assert, assertEquals, assertStringIncludes } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import {
+  assert,
+  assertEquals,
+  assertStringIncludes,
+} from "https://deno.land/std@0.224.0/assert/mod.ts";
 
 // Stub env BEFORE the handler imports it.
 Deno.env.set("SUPABASE_URL", "https://test.supabase.co");
@@ -208,18 +208,11 @@ Deno.test({
 });
 
 // ---------------------------------------------------------------------------
-// DB mocking blocker
+// Related persistence coverage
 // ---------------------------------------------------------------------------
-// The following classifications require intercepting Supabase client calls:
-//   - forbidden_tent     (tent owned by a different user)
-//   - tent_lookup_failed (PG returned an error during tent SELECT)
-//   - insert_failed      (PG returned an error during sensor_readings upsert)
-//   - true idempotency duplicate (ignoreDuplicates returns 0 inserted rows)
-//
-// `supabase/functions/sensor-ingest-webhook/index.ts` imports `createClient`
-// directly from `npm:@supabase/supabase-js@2`, so these paths cannot be
-// reached from a pure Deno test without refactoring the function for
-// dependency injection. Coverage for those paths lives in:
+// Handler-level bridge success, revoked/expired credentials, forbidden_tent,
+// and captured upsert rows live in `handler_e2e_test.ts`. Additional pure and
+// static coverage lives in:
 //   - src/test/sensor-ingest-webhook-matrix.test.ts (Vitest, mocked client)
 //   - src/test/sensor-ingest-webhook-idempotency-race.test.ts
 //   - src/test/sensor-ingest-webhook-secret-leakage.test.ts (static scan)

@@ -91,7 +91,6 @@ Upload interval: 60 seconds (if available)
    ```
 
 2. Edit `.env` and fill in real values:
-
    - `VERDANT_INGEST_URL` — the deployed `sensor-ingest-webhook` URL.
    - `VERDANT_BRIDGE_TOKEN` — a real `vbt_…` bridge token.
    - `VERDANT_TENT_ID` — the target tent UUID.
@@ -116,9 +115,11 @@ network call.
 
 - It will not write to Supabase tables directly.
 - It will not bypass the validated ingest webhook.
-- It will not classify missing / stale / malformed sensor values as
-  healthy — those normalize to `null` and the raw payload is kept in
-  `metadata.raw_payload` for audit.
+- It will not classify missing / malformed sensor values as healthy — those
+  normalize to `null` and the raw payload is kept in `metadata.raw_payload`
+  for audit. A real gateway packet whose `dateutc` has aged past Verdant's
+  live window keeps its original timestamp and is forwarded as `stale`, never
+  as current `live` telemetry.
 - It will not print full tokens. Only masked previews appear in logs.
 - It will not trigger alerts, Action Queue writes, AI calls, or device
   control.
@@ -287,13 +288,14 @@ Fields:
 - `last_forward_status` — last HTTP status (or `null` on exception).
 - `last_forward_at` — ISO timestamp of the most recent attempt.
 - `last_forward_error` — short sanitized error summary (e.g. `http_400`).
-- `last_forward_response_error` — sanitized `error` field parsed from the webhook response body (e.g. `invalid_payload`, `forbidden_tent`, `tent_lookup_failed`, `insert_failed`, `unauthorized`, `non_json_response`). `null` on success or when no response was received.
+- `last_forward_response_error` — sanitized `error` field parsed from the webhook response body (e.g. `invalid_payload`, `forbidden_tent`, `bridge_required`, `insert_failed`, `unauthorized`, `non_json_response`). `null` on success or when no response was received.
 - `last_forward_response_classification` — operator-friendly classification of the response error:
   - `payload_shape_mismatch` — the forwarded payload did not match the `sensor-ingest-webhook` contract (likely the `source`, `tent_id`, `captured_at`, or `metrics` shape).
   - `tent_authorization_mismatch` — bridge token / tent pairing rejected (`forbidden_tent`).
   - `tent_lookup_failed` — webhook could not verify tent context server-side.
   - `storage_insert_failed` — webhook accepted the payload but the database insert failed (`insert_failed`).
   - `auth_failed` — bridge token rejected (`unauthorized`).
+  - `bridge_required` — an app-session credential was supplied where a tent-scoped bridge token is required.
   - `non_json_response` — webhook returned a non-JSON body (often an edge or gateway error page).
   - `unknown_webhook_error` — an unrecognized error string.
 - `last_forward_response_message` — sanitized short summary from the response body. Token-like substrings (`vbt_…`, JWT-shaped strings, `Bearer …`) are redacted inline. Never the full raw body.
@@ -350,6 +352,7 @@ payload, or `Authorization` header into any chat/issue/email.
 | `invalid_payload` (HTTP 400)          | Payload shape rejected              | `tent_id`, `source`, `captured_at`, or `metrics` mismatch | `curl http://localhost:8787/debug/forwarding-error-report` | No                                          | If `tent_id_configured: false`, set `VERDANT_TENT_ID`        | No                               |
 | `unauthorized` (HTTP 401)             | Bridge token rejected               | Wrong/expired `VERDANT_BRIDGE_TOKEN`                      | `curl http://localhost:8787/debug/forwarding-status`       | No                                          | Update `VERDANT_BRIDGE_TOKEN`, restart listener              | Only if token is known good      |
 | `forbidden_tent` (HTTP 403)           | Token cannot write this tent        | `VERDANT_TENT_ID` not authorized for this token           | `curl http://localhost:8787/debug/forwarding-error-report` | No                                          | Fix `VERDANT_TENT_ID` to a tent the token can write to       | Developer if pairing should work |
+| `bridge_required` (HTTP 403)          | Wrong credential class              | App-session credential used instead of a bridge token     | `curl http://localhost:8787/debug/forwarding-status`       | No                                          | Set `VERDANT_BRIDGE_TOKEN` to a tent-scoped bridge token     | No                               |
 | `tent_lookup_failed`                  | Webhook could not verify tent       | Tent UUID does not exist                                  | check the tent in Verdant UI                               | No                                          | Set `VERDANT_TENT_ID` to a real tent UUID                    | No                               |
 | `insert_failed`                       | Storage insert failed               | Transient DB issue                                        | `curl http://localhost:8787/debug/forwarding-error-report` | Listener already retried                    | No                                                           | Developer with sanitized report  |
 | `server_misconfigured`                | Webhook reported server misconfig   | Edge function env missing                                 | —                                                          | No                                          | No                                                           | Developer with sanitized report  |

@@ -225,6 +225,14 @@ function withoutDiagnosticSensorRows(rows) {
   return rows.filter((row) => !isDiagnosticSensorProvenanceRow(row));
 }
 
+// src/lib/sensorReadingNormalizationRules.ts
+var STALE_THRESHOLD_MS = 30 * 60 * 1e3;
+function isReadingStale(capturedAt, now = Date.now(), thresholdMs = STALE_THRESHOLD_MS) {
+  const t = new Date(capturedAt).getTime();
+  if (!Number.isFinite(t)) return true;
+  return now - t > thresholdMs;
+}
+
 // src/lib/mcp/tools/get-latest-sensor-snapshot.ts
 var KNOWN_METRICS = [
   "temperature_c",
@@ -242,6 +250,15 @@ var SENSOR_CANDIDATE_LIMIT = 25;
 function effectiveCaptureMs(row) {
   return Date.parse(row.captured_at ?? row.ts);
 }
+function deriveMcpFreshness(row, nowMs, staleAfterMs) {
+  const source = row.source.trim().toLowerCase();
+  const quality = row.quality.trim().toLowerCase();
+  if (source === "invalid" || quality === "invalid") return "invalid";
+  if (source === "stale" || quality === "stale") return "stale";
+  const capturedAt = row.captured_at ?? row.ts;
+  if (!Number.isFinite(Date.parse(capturedAt))) return "invalid";
+  return isReadingStale(capturedAt, nowMs, staleAfterMs) ? "stale" : "fresh";
+}
 function newerReading(a, b) {
   const ea = effectiveCaptureMs(a);
   const eb = effectiveCaptureMs(b);
@@ -251,7 +268,9 @@ function newerReading(a, b) {
   if (ta !== tb) return ta > tb ? a : b;
   return a.id > b.id ? a : b;
 }
-function selectLatestMcpSensorReadings(rows) {
+function selectLatestMcpSensorReadings(rows, options = {}) {
+  const nowMs = (options.now ?? /* @__PURE__ */ new Date()).getTime();
+  const staleAfterMs = options.staleAfterMs ?? STALE_THRESHOLD_MS;
   const selected = {};
   for (const row of withoutDiagnosticSensorRows(rows)) {
     if (!row || typeof row.metric !== "string" || row.metric.length === 0) continue;
@@ -259,26 +278,34 @@ function selectLatestMcpSensorReadings(rows) {
     selected[row.metric] = current ? newerReading(current, row) : row;
   }
   return Object.fromEntries(
-    Object.entries(selected).map(([metric, row]) => [
-      metric,
-      {
-        id: row.id,
-        tent_id: row.tent_id,
-        metric: row.metric,
-        value: row.value,
-        quality: row.quality,
-        source: row.source,
-        ts: row.ts,
-        captured_at: row.captured_at,
-      },
-    ]),
+    Object.entries(selected).map(([metric, row]) => {
+      const freshness = deriveMcpFreshness(row, nowMs, staleAfterMs);
+      return [
+        metric,
+        {
+          id: row.id,
+          tent_id: row.tent_id,
+          metric: row.metric,
+          value: row.value,
+          quality: row.quality,
+          source: row.source,
+          ts: row.ts,
+          captured_at: row.captured_at,
+          freshness,
+          current_live:
+            freshness === "fresh" &&
+            row.source.trim().toLowerCase() === "live" &&
+            row.quality.trim().toLowerCase() === "ok",
+        },
+      ];
+    }),
   );
 }
 var get_latest_sensor_snapshot_default = defineTool3({
   name: "get_latest_sensor_snapshot",
   title: "Get latest sensor snapshot",
   description:
-    "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading keeps its `source` and `quality` labels verbatim. `quality` is one of ok/degraded/stale/invalid. Canonical `source` labels are exactly live/manual/csv/demo/stale/invalid, where `live` means fresh validated connected telemetry; legacy rows may carry other ingest labels such as sim or vendor bridge names. Treat a reading as current live telemetry ONLY when its quality is `ok` AND its source is `live`. Every other source or quality keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. Read-only.",
+    "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading keeps its `source` and `quality` labels verbatim and adds a response-time `freshness` field (`fresh`, `stale`, or `invalid`) plus `current_live`. `quality` is one of ok/degraded/stale/invalid. Canonical `source` labels are exactly live/manual/csv/demo/stale/invalid, where `live` means fresh validated connected telemetry; legacy rows may carry other ingest labels such as sim or vendor bridge names. Treat a reading as current live telemetry ONLY when `current_live` is true: quality must be `ok`, source must be `live`, and freshness must be `fresh`. Every other source, quality, or freshness state keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. Read-only.",
   inputSchema: {
     tentId: z3.string().uuid().describe("Tent id to fetch the latest readings for."),
   },
@@ -346,7 +373,7 @@ var get_latest_sensor_snapshot_default = defineTool3({
     const summary = Object.values(readings)
       .map(
         (r) =>
-          `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, at: ${r.captured_at ?? r.ts})`,
+          `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, freshness: ${r.freshness}, current_live: ${r.current_live}, at: ${r.captured_at ?? r.ts})`,
       )
       .join("\n");
     return {

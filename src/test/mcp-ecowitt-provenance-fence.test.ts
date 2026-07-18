@@ -53,6 +53,9 @@ describe("MCP latest sensor snapshot — ECOWITT provenance fence", () => {
     );
     expect(mirror).toContain('vendor === "ecowitt_windows_testbench"');
     expect(mirror).toContain("var SENSOR_CANDIDATE_LIMIT = 25");
+    expect(mirror).toContain("var STALE_THRESHOLD_MS = 30 * 60 * 1e3");
+    expect(mirror).toContain("current_live:");
+    expect(mirror).toContain("freshness,");
     expect(mirror).not.toMatch(/import mcp from "npm:[A-Za-z]:\\/);
     expect(publicProjection).not.toContain("raw_payload");
   });
@@ -100,15 +103,40 @@ describe("MCP latest sensor snapshot — ECOWITT provenance fence", () => {
   });
 
   it("keeps a physical gateway row carried by the legacy listener vendor", () => {
-    const readings = selectLatestMcpSensorReadings([
-      row("physical", "humidity_pct", "2026-06-09T12:00:00Z", physicalGatewayPayload(), 55),
-    ]);
+    const readings = selectLatestMcpSensorReadings(
+      [row("physical", "humidity_pct", "2026-06-09T12:00:00Z", physicalGatewayPayload(), 55)],
+      { now: new Date("2026-06-09T12:05:00Z") },
+    );
 
     expect(readings.humidity_pct).toMatchObject({
       id: "physical",
       source: "live",
       quality: "ok",
+      freshness: "fresh",
+      current_live: true,
       value: 55,
+    });
+  });
+
+  it("marks an aged live/ok row stale at response time without rewriting provenance", () => {
+    const readings = selectLatestMcpSensorReadings(
+      [
+        row(
+          "aged-physical",
+          "temperature_c",
+          "2026-06-09T11:29:59.999Z",
+          physicalGatewayPayload(),
+          24.1,
+        ),
+      ],
+      { now: new Date("2026-06-09T12:00:00Z") },
+    );
+
+    expect(readings.temperature_c).toMatchObject({
+      source: "live",
+      quality: "ok",
+      freshness: "stale",
+      current_live: false,
     });
   });
 

@@ -30,7 +30,7 @@ export function usePlantTentLatestReadings(
       const { data, error } = await supabase
         .from("sensor_readings")
         .select("ts,captured_at,metric,value,source,created_at,device_id,raw_payload")
-        // Actual observation time leads: imported CSV rows preserve historical
+        // Actual observation time takes precedence: imported CSV rows preserve historical
         // `captured_at` while `ts` can be one shared import time.
         .eq("tent_id", tentId as string)
         .order("captured_at", { ascending: false, nullsFirst: false })

@@ -31,6 +31,21 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: () => ({ insert: async () => ({ error: null }) }) },
 }));
 
+vi.mock("@/hooks/useGrowData", () => ({
+  useGrowTents: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useGrowSensorReadings: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
+
 function buildRecord(overrides: { ppfd?: unknown } = {}): ManualSnapshotRecord {
   const validation = validateManualSnapshot({
     airTemp: "24",
@@ -104,10 +119,7 @@ describe("static safety: PPFD JSX wiring", () => {
     resolve(process.cwd(), "src/components/SensorChart.tsx"),
     "utf8",
   );
-  const sensorsPage = readFileSync(
-    resolve(process.cwd(), "src/pages/Sensors.tsx"),
-    "utf8",
-  );
+  const sensorsPage = readFileSync(resolve(process.cwd(), "src/pages/Sensors.tsx"), "utf8");
 
   it("ManualSnapshotTimelineCard does not inline a PPFD unit table", () => {
     expect(card).not.toMatch(/µmol\/m²\/s/);

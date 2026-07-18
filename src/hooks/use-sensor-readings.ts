@@ -26,7 +26,7 @@ export function useSensorReadings(
       let q = supabase
         .from("sensor_readings")
         .select("*")
-        // Actual observation time leads. CSV rows retain historical
+        // Actual observation time takes precedence. CSV rows retain historical
         // `captured_at` while `ts` can be one shared import time.
         .order("captured_at", { ascending: false, nullsFirst: false })
         .order("ts", { ascending: false })

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
+import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
 
 const okTarget = {
   ok: true as const,
@@ -132,5 +133,94 @@ describe("quickLogV2SavePayload", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) throw new Error("expected ok");
     expect(r.payload.p_details).toEqual(details);
+  });
+});
+
+describe("quickLogV2SavePayload — canonical sensor plausibility band", () => {
+  // The builder previously hand-rolled a humidity 0-100 check and applied
+  // NO bound to temperature or VPD, so a fat-fingered "240" (meant 24.0) or
+  // a physically impossible negative VPD wrote corrupt values into a
+  // permanent diary entry. This reconciles validation onto the single
+  // canonical band from sensorReadingNormalizationRules
+  // (isTemperatureValid: -10..60, isHumidityValid: 0..100, isVpdValid:
+  // 0..10; null always allowed = "not provided"). Reason codes route to
+  // per-metric operator copy, never a raw code.
+
+  function reason(over: Record<string, unknown>): string {
+    const r = buildQuickLogV2SavePayload(base(over));
+    // Explicit `=== true` comparison is what narrows r to the error branch
+    // under this repo's non-strict tsconfig (matches the idiom used by the
+    // "blocks photo action" test above); `if (r.ok)` alone does not.
+    if (r.ok === true) throw new Error("expected the build to fail");
+    return r.reason;
+  }
+
+  it("rejects a physically impossible negative VPD", () => {
+    expect(reason({ vpdKpa: "-0.5" })).toBe("vpd_out_of_range");
+  });
+
+  it("rejects VPD above the canonical maximum (10 kPa)", () => {
+    expect(reason({ vpdKpa: "12" })).toBe("vpd_out_of_range");
+  });
+
+  it("rejects a fat-fingered temperature above 60C (e.g. 24.0 typed as 240)", () => {
+    expect(reason({ temperatureC: "240" })).toBe("temperature_out_of_range");
+  });
+
+  it("rejects temperature below the canonical minimum (-10C)", () => {
+    expect(reason({ temperatureC: "-40" })).toBe("temperature_out_of_range");
+  });
+
+  it("still rejects humidity outside 0-100 with the same reason code", () => {
+    expect(reason({ humidityPct: "150" })).toBe("humidity_out_of_range");
+    expect(reason({ humidityPct: "-1" })).toBe("humidity_out_of_range");
+  });
+
+  it("accepts inclusive canonical boundary values", () => {
+    const r = buildQuickLogV2SavePayload(
+      base({ temperatureC: "-10", humidityPct: "0", vpdKpa: "10" }),
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.payload.p_temperature_c).toBe(-10);
+    expect(r.payload.p_humidity_pct).toBe(0);
+    expect(r.payload.p_vpd_kpa).toBe(10);
+  });
+
+  it("treats empty sensor fields as not-provided (null, still valid)", () => {
+    const r = buildQuickLogV2SavePayload(base({ note: "check-in" }));
+    expect(r.ok).toBe(true);
+  });
+
+  it("surfaces specific operator copy for the new reason codes (not the generic fallback)", () => {
+    const generic = quickLogReasonToOperatorMessage("some_unknown_code");
+    expect(quickLogReasonToOperatorMessage("temperature_out_of_range")).not.toBe(generic);
+    expect(quickLogReasonToOperatorMessage("vpd_out_of_range")).not.toBe(generic);
+    expect(quickLogReasonToOperatorMessage("temperature_out_of_range")).toMatch(/temperature/i);
+    expect(quickLogReasonToOperatorMessage("vpd_out_of_range")).toMatch(/vpd/i);
+  });
+
+  it("still validates sensor magnitude on a watering (volume check must not short-circuit the band)", () => {
+    // Volume is validated first and returns early on failure; a valid volume
+    // must NOT let an out-of-band sensor value slip through. Pins the check
+    // ordering so a future refactor cannot scope the band to note-only saves.
+    expect(reason({ action: "water", volumeMl: "500", temperatureC: "240" })).toBe(
+      "temperature_out_of_range",
+    );
+    expect(reason({ action: "water", volumeMl: "500", vpdKpa: "-0.5" })).toBe("vpd_out_of_range");
+  });
+
+  it("rejects just past the inclusive boundary (epsilon-level edge signal)", () => {
+    expect(reason({ temperatureC: "60.01" })).toBe("temperature_out_of_range");
+    expect(reason({ temperatureC: "-10.01" })).toBe("temperature_out_of_range");
+    expect(reason({ vpdKpa: "10.01" })).toBe("vpd_out_of_range");
+  });
+
+  it("accepts the upper canonical boundaries (60C, 100% RH)", () => {
+    const r = buildQuickLogV2SavePayload(base({ temperatureC: "60", humidityPct: "100" }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.payload.p_temperature_c).toBe(60);
+    expect(r.payload.p_humidity_pct).toBe(100);
   });
 });

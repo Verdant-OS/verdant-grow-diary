@@ -5,6 +5,7 @@
  */
 
 import type { QuickLogV2Action, ResolvedQuickLogV2Target } from "./quickLogV2Rules";
+import { isTemperatureValid, isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
 
 export interface QuickLogV2SavePayload {
   p_target_type: "tent" | "plant";
@@ -75,8 +76,19 @@ export function buildQuickLogV2SavePayload(
   if (t === "invalid" || h === "invalid" || v === "invalid") {
     return { ok: false, reason: "invalid_sensor_value" };
   }
-  if (h !== null && (h < 0 || h > 100)) {
+  // Reconcile plausibility against the single canonical band (temperature
+  // -10..60, humidity 0..100, VPD 0..10; null = not provided). Reusing the
+  // shared guards keeps a fat-fingered temperature or a physically
+  // impossible negative VPD out of the permanent diary entry, and stops
+  // this bound from drifting away from the rest of the sensor pipeline.
+  if (!isTemperatureValid(t)) {
+    return { ok: false, reason: "temperature_out_of_range" };
+  }
+  if (!isHumidityValid(h)) {
     return { ok: false, reason: "humidity_out_of_range" };
+  }
+  if (!isVpdValid(v)) {
+    return { ok: false, reason: "vpd_out_of_range" };
   }
 
   const note = (input.note ?? "").trim();

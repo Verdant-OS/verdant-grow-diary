@@ -14,7 +14,8 @@ describe("Founder static social document build contract", () => {
     expect(VITE).toContain("staticSocialRouteDocuments()");
     expect(VITE).toContain("STATIC_PUBLIC_SEO_DOCUMENTS");
     expect(VITE).toContain("for (const document of STATIC_PUBLIC_SEO_DOCUMENTS)");
-    expect(VITE).toContain("buildStaticSocialRouteHtml(indexAsset.source, document.metadata)");
+    expect(VITE).toContain("const metadataWithOg = { ...document.metadata, image: ogImageUrl }");
+    expect(VITE).toContain("buildStaticSocialRouteHtml(indexAsset.source, metadataWithOg)");
     expect(VITE).toContain("fileName: document.fileName");
     expect(VITE).toContain('apply: "build"');
   });

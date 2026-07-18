@@ -192,7 +192,7 @@ export function buildAiDoctorSessionInsert(
  * insert never prevents the Coach response from rendering.
  */
 export async function persistAiDoctorSession(
-  client: Pick<SupabaseClient, "from">,
+  client: Pick<SupabaseClient, "from"> & { auth?: SupabaseClient["auth"] },
   input: AiDoctorSessionInput,
 ): Promise<PersistAiDoctorSessionResult> {
   try {
@@ -201,9 +201,23 @@ export async function persistAiDoctorSession(
     if (!row.diagnosis && !row.analysis && !row.sensor_snapshot_status) {
       return { ok: false, error: "no_diagnosis_or_analysis_to_persist" };
     }
+    // Resolve the owner from the authenticated session and send `user_id`
+    // explicitly. RLS still enforces `auth.uid() = user_id`, so sending it
+    // never widens trust — it only prevents silent RLS rejections when the
+    // DB DEFAULT auth.uid() is not applied on the PostgREST insert path.
+    let userId: string | null = null;
+    if (client.auth && typeof client.auth.getUser === "function") {
+      try {
+        const { data } = await client.auth.getUser();
+        userId = data?.user?.id ?? null;
+      } catch {
+        // fall through — the insert will still attempt via the DB default
+      }
+    }
+    const rowToInsert = userId ? { ...row, user_id: userId } : row;
     const { data, error } = await client
       .from("ai_doctor_sessions" as never)
-      .insert(row as never)
+      .insert(rowToInsert as never)
       .select("id")
       .single();
     if (error) return { ok: false, error: error.message || "insert_failed" };

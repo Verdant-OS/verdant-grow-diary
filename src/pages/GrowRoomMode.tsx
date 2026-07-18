@@ -146,9 +146,13 @@ export default function GrowRoomMode() {
         // READ-ONLY: latest sensor_readings for these tents.
         const { data: readingRows } = await supabase
           .from("sensor_readings")
-          .select("tent_id,metric,value,ts,source,quality,raw_payload")
+          .select("tent_id,metric,value,ts,captured_at,created_at,source,quality,raw_payload")
           .in("tent_id", tentIds)
+          // Physical observation time leads: imported CSV rows retain their
+          // historical captured_at even when database ts is import time.
+          .order("captured_at", { ascending: false, nullsFirst: false })
           .order("ts", { ascending: false })
+          .order("created_at", { ascending: false })
           .limit(500);
 
         const byTent: Record<string, SensorSnapshot> = {};

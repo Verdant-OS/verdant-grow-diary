@@ -23,6 +23,7 @@ import SensorChart from "@/components/SensorChart";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
+import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 // Mock side-panel hooks intentionally removed — the Dashboard renders
 // honest empty states for Tasks and AI Insights until backed by real data.
 // See docs/qa/v0-demo-loop-checklist.md and docs/safety/static-safety-scans.md.
@@ -47,7 +48,7 @@ import { APPROVAL_QUEUE_EMPTY_COPY, mapRiskToSeverity } from "@/lib/dashboardAct
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useNowTick } from "@/hooks/useNowTick";
-import { isUuid } from "@/lib/growRepo";
+import { isUuid } from "@/lib/isUuid";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
@@ -132,11 +133,14 @@ export default function Dashboard() {
   // absent or invalid, hooks fetch the user's full set (legacy behavior).
   const { urlGrowId, scopedGrow, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const scopedGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : undefined;
-  const { data: tents = [] } = useGrowTents(scopedGrowId);
-  const { data: plants = [] } = useGrowPlants(undefined, scopedGrowId);
+  const tentsQuery = useGrowTents(scopedGrowId);
+  const plantsQuery = useGrowPlants(undefined, scopedGrowId);
+  const { data: tents = [] } = tentsQuery;
+  const { data: plants = [] } = plantsQuery;
   // Tasks: no real-data hook yet — render an honest empty state below.
   const tasks: { status: string }[] = [];
-  const { data: rawReadings = [] } = useSensorReadings();
+  const dashboardReadingsQuery = useSensorReadings();
+  const { data: rawReadings = [] } = dashboardReadingsQuery;
   // Diagnostic packets may be stored with a canonical `live` source. Keep
   // raw provenance only through this shared fence; charts/counts receive the
   // evidence-only rows and the grouped projection contains no raw payload.
@@ -230,6 +234,50 @@ export default function Dashboard() {
   });
 
   const recentAlerts = persistedAlertsState.alerts.slice(0, 3);
+
+  if (tentsQuery.isError || plantsQuery.isError) {
+    return (
+      <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
+        <GrowBreadcrumbs
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          current="Dashboard"
+          section="dashboard"
+        />
+        <PageHeader
+          title="Dashboard"
+          description="Track your tents, plants, sensors, and grow activity in one place."
+          icon={<Sparkles className="h-5 w-5" />}
+        />
+        <GrowDataLoadError
+          resource="Dashboard grow data"
+          testId="dashboard-grow-data-error"
+          onRetry={() => {
+            void Promise.all([tentsQuery.refetch(), plantsQuery.refetch()]);
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (tentsQuery.isLoading || plantsQuery.isLoading) {
+    return (
+      <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
+        <GrowBreadcrumbs
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          current="Dashboard"
+          section="dashboard"
+        />
+        <PageHeader
+          title="Dashboard"
+          description="Track your tents, plants, sensors, and grow activity in one place."
+          icon={<Sparkles className="h-5 w-5" />}
+        />
+        <GrowDataLoadingState resource="Dashboard grow data" testId="dashboard-grow-data-loading" />
+      </div>
+    );
+  }
 
   // Non-landmark container: AppShell already owns the <main> landmark around
   // the route Outlet, so the page root must not nest another.
@@ -363,6 +411,12 @@ export default function Dashboard() {
             </div>
             {(() => {
               const anyReading = latestPerTent.some((x) => !!x.last);
+              const hasPendingTentRead = tentIds.some(
+                (tentId) => sensorStatusByTent[tentId] === "loading",
+              );
+              const hasFailedTentRead = tentIds.some(
+                (tentId) => sensorStatusByTent[tentId] === "error",
+              );
               const snapshotQuality = sensorState.status === "ok" ? dashboardSensorQuality : null;
               const isStaleSnap =
                 sensorState.status === "ok" &&
@@ -374,6 +428,35 @@ export default function Dashboard() {
                 sensorState.status === "ok" &&
                 sensorState.snapshot.source !== "unavailable" &&
                 dashboardHealthSnapshot === null;
+              if (dashboardReadingsQuery.isLoading || (!anyReading && hasPendingTentRead)) {
+                return (
+                  <GrowDataLoadingState
+                    resource="Environment snapshots"
+                    testId="dashboard-environment-snapshot-loading"
+                  />
+                );
+              }
+              if (dashboardReadingsQuery.isError) {
+                return (
+                  <GrowDataLoadError
+                    resource="Dashboard sensor history"
+                    testId="dashboard-sensor-history-error"
+                    message="Sensor history couldn't be loaded. No empty-state or environment conclusion is shown until that read succeeds."
+                    onRetry={() => {
+                      void dashboardReadingsQuery.refetch();
+                    }}
+                  />
+                );
+              }
+              if (!anyReading && hasFailedTentRead) {
+                return (
+                  <GrowDataLoadError
+                    resource="Environment snapshots"
+                    testId="dashboard-environment-snapshot-error"
+                    message="One or more tent reads failed. We can't confirm that sensor history is empty."
+                  />
+                );
+              }
               if (!anyReading) {
                 return (
                   <div

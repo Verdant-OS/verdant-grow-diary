@@ -13,6 +13,17 @@ const operatorRoleState: {
   status: "loading" | "granted" | "denied" | "unauthenticated" | "error";
 } = { status: "denied" };
 
+const sensorPageState = {
+  tentId: "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f",
+  tentsLoading: false,
+  tentsError: false,
+  readingsLoading: false,
+  readingsError: false,
+  calibrationLoading: false,
+  calibrationError: false,
+  readings: [] as Array<Record<string, unknown>>,
+};
+
 vi.mock("@/hooks/useHasRole", () => ({
   useHasRole: () => ({
     status: operatorRoleState.status,
@@ -22,12 +33,32 @@ vi.mock("@/hooks/useHasRole", () => ({
 }));
 
 vi.mock("@/hooks/useGrowData", () => ({
-  useGrowTents: () => ({ data: [{ id: "t1", name: "Tent 1", growId: "g1" }] }),
-  useGrowSensorReadings: () => ({ data: [] }),
+  useGrowTents: () => ({
+    data: sensorPageState.tentsLoading
+      ? []
+      : [{ id: sensorPageState.tentId, name: "Tent 1", growId: "g1" }],
+    isLoading: sensorPageState.tentsLoading,
+    isError: sensorPageState.tentsError,
+    refetch: vi.fn(),
+  }),
+  useGrowSensorReadings: () => ({
+    data: sensorPageState.readings,
+    isLoading: sensorPageState.readingsLoading,
+    isError: sensorPageState.readingsError,
+    refetch: vi.fn(),
+  }),
+}));
+vi.mock("@/hooks/use-sensor-readings", () => ({
+  useSensorReadings: () => ({ data: [], isLoading: false, isError: false }),
 }));
 vi.mock("@/hooks/use-tents", () => ({ useTents: () => ({ data: [] }) }));
 vi.mock("@/hooks/useSoilMoistureCalibrations", () => ({
-  useSoilMoistureCalibrations: () => ({ data: [] }),
+  useSoilMoistureCalibrations: () => ({
+    data: [],
+    isLoading: sensorPageState.calibrationLoading,
+    isError: sensorPageState.calibrationError,
+    refetch: vi.fn(),
+  }),
 }));
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({ user: null, session: null, loading: false }),
@@ -53,6 +84,52 @@ function renderAt(url: string) {
 describe("Sensors page — operator diagnostics wiring", () => {
   beforeEach(() => {
     operatorRoleState.status = "denied";
+    sensorPageState.tentsLoading = false;
+    sensorPageState.tentsError = false;
+    sensorPageState.readingsLoading = false;
+    sensorPageState.readingsError = false;
+    sensorPageState.calibrationLoading = false;
+    sensorPageState.calibrationError = false;
+    sensorPageState.readings = [];
+  });
+
+  it("does not flash first-tent setup or unavailable metrics while tents are loading", () => {
+    sensorPageState.tentsLoading = true;
+    renderAt("/sensors");
+
+    expect(screen.getByTestId("sensors-grow-data-loading")).toHaveTextContent(
+      /Loading sensor data/,
+    );
+    expect(screen.queryByTestId("sensors-first-tent-setup")).toBeNull();
+    expect(screen.queryByTestId("sensors-empty-temp")).toBeNull();
+  });
+
+  it("labels a failed soil calibration read unavailable, never uncalibrated", async () => {
+    sensorPageState.calibrationError = true;
+    sensorPageState.readings = [
+      {
+        ts: new Date().toISOString(),
+        capturedAt: new Date().toISOString(),
+        tentId: sensorPageState.tentId,
+        temp: 0,
+        rh: 0,
+        vpd: 0,
+        co2: 0,
+        soil: 45,
+        observedMetrics: ["soil"],
+        source: "manual",
+        status: "usable",
+      },
+    ];
+    renderAt("/sensors");
+
+    expect(await screen.findByTestId("sensors-soil-moisture-calibration-error")).toHaveTextContent(
+      /Calibration records couldn't be loaded/,
+    );
+    expect(screen.getByTestId("sensors-soil-moisture-calibration-error-badge")).toHaveTextContent(
+      "Calibration unavailable",
+    );
+    expect(screen.queryByText(/Uncalibrated/i)).toBeNull();
   });
 
   it("does NOT render the operator diagnostics section by default", () => {

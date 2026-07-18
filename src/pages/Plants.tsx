@@ -1,5 +1,16 @@
 import { Link } from "react-router-dom";
-import { Sprout, Filter, Archive, GitMerge, Search, CheckCircle2, Circle, ArrowRight, Sparkles, Gauge } from "lucide-react";
+import {
+  Sprout,
+  Filter,
+  Archive,
+  GitMerge,
+  Search,
+  CheckCircle2,
+  Circle,
+  ArrowRight,
+  Sparkles,
+  Gauge,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
@@ -8,12 +19,14 @@ import CreatePlantDialog from "@/components/CreatePlantDialog";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import GrowDataSourceDisclosure from "@/components/GrowDataSourceDisclosure";
+import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 import PlantPhoto from "@/components/PlantPhoto";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import InfoPopover, { HELP_COPY } from "@/components/InfoPopover";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useGrowPlants, useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
+import { useAuth } from "@/store/auth";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
@@ -48,32 +61,51 @@ function formatPlantHealthAriaLabel(health: string | null | undefined): string {
 }
 
 export default function Plants() {
+  const { user } = useAuth();
   const { urlGrowId, scopedGrowName, isValidScopedGrow, backHref } = useScopedGrow();
   const navigate = useNavigate();
   const { grows } = useGrows();
-  const validGrowId = isValidScopedGrow ? urlGrowId ?? undefined : undefined;
+  const validGrowId = isValidScopedGrow ? (urlGrowId ?? undefined) : undefined;
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
-  const { data: activePlants = [] } = useGrowPlants(undefined, urlGrowId ?? undefined);
-  const { data: allPlants = [] } = useGrowPlants(
-    undefined,
-    urlGrowId ?? undefined,
-    { includeArchived: true },
-  );
+  const activePlantsQuery = useGrowPlants(undefined, urlGrowId ?? undefined);
+  const { data: activePlants = [] } = activePlantsQuery;
+  const allPlantsQuery = useGrowPlants(undefined, urlGrowId ?? undefined, {
+    includeArchived: true,
+  });
+  const { data: allPlants = [] } = allPlantsQuery;
   // Cross-grow plant list (for grow-filter option counts). Scoped to active
   // (non-archived/merged) plants — the grow filter intentionally only counts
   // plants growers normally work with.
-  const { data: allGrowsActivePlants = [] } = useGrowPlants(undefined, undefined);
-  const { data: tents = [] } = useGrowTents(urlGrowId ?? undefined);
-  const { data: rawDiary = [] } = useDiaryEntries();
-  const { data: rawReadings = [] } = useSensorReadings(undefined, 500);
-  const plantsMeta = getGrowDataMeta(["grow", "plants", "all", urlGrowId ?? "all"]);
-  const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"]);
+  const allGrowsActivePlantsQuery = useGrowPlants(undefined, undefined);
+  const { data: allGrowsActivePlants = [] } = allGrowsActivePlantsQuery;
+  const tentsQuery = useGrowTents(urlGrowId ?? undefined);
+  const { data: tents = [] } = tentsQuery;
+  const growDataQueries = [
+    activePlantsQuery,
+    allPlantsQuery,
+    allGrowsActivePlantsQuery,
+    tentsQuery,
+  ];
+  const growDataError = growDataQueries.some((query) => query.isError);
+  const growDataLoading = growDataQueries.some((query) => query.isLoading);
+  const rawDiaryQuery = useDiaryEntries();
+  const { data: rawDiary = [] } = rawDiaryQuery;
+  const rawReadingsQuery = useSensorReadings(undefined, 500);
+  const { data: rawReadings = [] } = rawReadingsQuery;
+  const dailyCheckEvidenceError = rawDiaryQuery.isError || rawReadingsQuery.isError;
+  const dailyCheckEvidenceLoading = rawDiaryQuery.isLoading || rawReadingsQuery.isLoading;
+  const dailyCheckEvidenceReady = !dailyCheckEvidenceError && !dailyCheckEvidenceLoading;
+  const plantsMeta = getGrowDataMeta(["grow", "plants", "all", urlGrowId ?? "all"], user?.id);
+  const tentsMeta = getGrowDataMeta(["grow", "tents", urlGrowId ?? "all"], user?.id);
   const [tentFilter, setTentFilter] = useState<string>("all");
 
   // Daily Grow Check: derive checked-today per plant using the same rules
   // module Dashboard and Plant Detail use. Read-only; never invents state.
   const dailyCheckByPlant = useMemo(() => {
+    if (!dailyCheckEvidenceReady) {
+      return new Map<string, { checkedToday: boolean; methodLabel: string | null }>();
+    }
     const panel = buildDashboardDailyGrowCheckPanel({
       now: new Date(),
       scopedGrowId: urlGrowId ?? null,
@@ -106,7 +138,7 @@ export default function Plants() {
     for (const row of panel.rows)
       map.set(row.plantId, { checkedToday: row.checkedToday, methodLabel: row.methodLabel });
     return map;
-  }, [allPlants, tents, rawReadings, rawDiary, urlGrowId]);
+  }, [allPlants, tents, rawReadings, rawDiary, urlGrowId, dailyCheckEvidenceReady]);
 
   // Grow filter — sourced from the workspace grows list + active plants.
   const growFilterOptions = useMemo(
@@ -115,9 +147,7 @@ export default function Plants() {
   );
 
   const hasArchived = shouldShowArchivedToggle(allPlants);
-  const archivedCount = allPlants.filter(
-    (p) => isArchivedPlant(p) || isMergedPlant(p),
-  ).length;
+  const archivedCount = allPlants.filter((p) => isArchivedPlant(p) || isMergedPlant(p)).length;
 
   // Pipeline: archived visibility → grow scope (already in query) →
   // tent tab → plant search. Each step is independent and labeled in the UI.
@@ -156,9 +186,43 @@ export default function Plants() {
     navigate(value ? plantsPath(value) : plantsPath());
   };
 
+  if (growDataError || growDataLoading) {
+    return (
+      <div>
+        <GrowBreadcrumbs
+          growId={urlGrowId}
+          growName={scopedGrowName}
+          current="Plants"
+          section="plants"
+        />
+        <PageHeader
+          title="Plants"
+          description="Every plant you're tracking, across every tent."
+          icon={<Sprout className="h-5 w-5" />}
+        />
+        {growDataError ? (
+          <GrowDataLoadError
+            resource="Plant data"
+            testId="plants-grow-data-error"
+            onRetry={() => {
+              void Promise.all(growDataQueries.map((query) => query.refetch()));
+            }}
+          />
+        ) : (
+          <GrowDataLoadingState resource="Plant data" testId="plants-grow-data-loading" />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div>
-      <GrowBreadcrumbs growId={urlGrowId} growName={scopedGrowName} current="Plants" section="plants" />
+      <GrowBreadcrumbs
+        growId={urlGrowId}
+        growName={scopedGrowName}
+        current="Plants"
+        section="plants"
+      />
       <PageHeader
         title="Plants"
         description="Every plant you're tracking, across every tent."
@@ -169,10 +233,7 @@ export default function Plants() {
       {/* Grow filter + plant search row — the two controls are deliberately
           labeled separately so the grow filter is not mistaken for a plant
           picker. */}
-      <div
-        className="mb-3 grid gap-3 sm:grid-cols-2"
-        data-testid="plants-filter-controls"
-      >
+      <div className="mb-3 grid gap-3 sm:grid-cols-2" data-testid="plants-filter-controls">
         <div data-testid="plants-grow-filter">
           <label
             htmlFor="plants-grow-filter-select"
@@ -241,10 +302,7 @@ export default function Plants() {
       >
         <span data-testid="plants-filter-summary">{summaryLine}</span>
         {summary.archivedHiddenCount > 0 && !showArchived && (
-          <span
-            className="text-muted-foreground/80"
-            data-testid="plants-archived-hidden-note"
-          >
+          <span className="text-muted-foreground/80" data-testid="plants-archived-hidden-note">
             · {summary.archivedHiddenCount} archived/merged hidden
           </span>
         )}
@@ -272,6 +330,22 @@ export default function Plants() {
         testId="plants-data-source-disclosure"
       />
 
+      {dailyCheckEvidenceError ? (
+        <GrowDataLoadError
+          resource="Daily check evidence"
+          testId="plants-daily-check-evidence-error"
+          message="Verdant could not load recent observations, so daily check status is unavailable rather than assumed empty."
+          onRetry={() => {
+            void Promise.all([rawDiaryQuery.refetch(), rawReadingsQuery.refetch()]);
+          }}
+        />
+      ) : dailyCheckEvidenceLoading ? (
+        <GrowDataLoadingState
+          resource="Daily check evidence"
+          testId="plants-daily-check-evidence-loading"
+        />
+      ) : null}
+
       {/* Contextual help cluster — click/tap popovers, never hover-only. */}
       <div
         className="mb-4 flex items-center gap-1.5 text-[11px] text-muted-foreground flex-wrap"
@@ -293,16 +367,8 @@ export default function Plants() {
           body={HELP_COPY.simulatedData}
           testKey="plants-simulated-data"
         />
-        <InfoPopover
-          title="Stale data"
-          body={HELP_COPY.staleData}
-          testKey="plants-stale-data"
-        />
-        <InfoPopover
-          title="Mixed data"
-          body={HELP_COPY.mixedData}
-          testKey="plants-mixed-data"
-        />
+        <InfoPopover title="Stale data" body={HELP_COPY.staleData} testKey="plants-stale-data" />
+        <InfoPopover title="Mixed data" body={HELP_COPY.mixedData} testKey="plants-mixed-data" />
         <InfoPopover
           title="Archived / merged plants"
           body={HELP_COPY.archivedMergedPlants}
@@ -378,8 +444,9 @@ export default function Plants() {
             const isInactive = archivedLabel.kind !== "active";
             const dailyCheckEntry = dailyCheckByPlant.get(p.id);
             const checkedToday = !isInactive && dailyCheckEntry?.checkedToday === true;
-            const showDailyCheckBadge = !isInactive && dailyCheckByPlant.has(p.id);
-            const methodLabel = checkedToday ? dailyCheckEntry?.methodLabel ?? null : null;
+            const showDailyCheckBadge =
+              !isInactive && dailyCheckEvidenceReady && dailyCheckByPlant.has(p.id);
+            const methodLabel = checkedToday ? (dailyCheckEntry?.methodLabel ?? null) : null;
             return (
               <div key={p.id} className="relative animate-fade-in">
                 <Link
@@ -476,11 +543,21 @@ export default function Plants() {
                           data-testid="plant-card-daily-check-action-note"
                           data-method="note"
                           aria-label={`Add note for ${p.name}`}
-                          data-href={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "note" })}
+                          data-href={buildDailyCheckEntryHref({
+                            plantId: p.id,
+                            source: "plants",
+                            method: "note",
+                          })}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            navigate(buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "note" }));
+                            navigate(
+                              buildDailyCheckEntryHref({
+                                plantId: p.id,
+                                source: "plants",
+                                method: "note",
+                              }),
+                            );
                           }}
                           className="inline-flex items-center gap-1 rounded-md border border-border bg-background/40 text-[10px] px-2 py-1 hover:bg-accent transition"
                         >
@@ -491,11 +568,21 @@ export default function Plants() {
                           data-testid="plant-card-daily-check-action-sensor"
                           data-method="sensor"
                           aria-label={`Add sensor snapshot for ${p.name}`}
-                          data-href={buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "sensor" })}
+                          data-href={buildDailyCheckEntryHref({
+                            plantId: p.id,
+                            source: "plants",
+                            method: "sensor",
+                          })}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            navigate(buildDailyCheckEntryHref({ plantId: p.id, source: "plants", method: "sensor" }));
+                            navigate(
+                              buildDailyCheckEntryHref({
+                                plantId: p.id,
+                                source: "plants",
+                                method: "sensor",
+                              }),
+                            );
                           }}
                           className="inline-flex items-center gap-1 rounded-md border border-border bg-background/40 text-[10px] px-2 py-1 hover:bg-accent transition"
                         >

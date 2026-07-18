@@ -8,6 +8,13 @@ function timestampMs(value: string | null | undefined): number {
 }
 
 function deterministicTieKey(reading: SensorReading): string {
+  const observedMetricSignature = Array.isArray(reading.observedMetrics)
+    ? [...new Set(reading.observedMetrics)].sort().join(",")
+    : "legacy-all";
+  const confidence =
+    typeof reading.confidence === "number" && Number.isFinite(reading.confidence)
+      ? reading.confidence
+      : "";
   return [
     reading.tentId,
     reading.capturedAt,
@@ -19,6 +26,8 @@ function deterministicTieKey(reading: SensorReading): string {
     reading.co2,
     reading.soil,
     reading.ppfd ?? "",
+    observedMetricSignature,
+    confidence,
   ].join("|");
 }
 
@@ -26,8 +35,10 @@ function deterministicTieKey(reading: SensorReading): string {
  * Return a defensive newest-first copy of grower-facing sensor snapshots.
  *
  * The repository already requests newest-first rows, but presenter code must
- * not depend on input position for the word "latest". Invalid timestamps sort
- * last and equal timestamps use captured time plus a stable content key.
+ * not depend on input position for the word "latest". Physical capture time
+ * is primary so a newly imported old CSV row cannot displace newer evidence;
+ * legacy `ts` is the fallback/tie-breaker. Invalid timestamps sort last and
+ * exact ties use a stable content key.
  */
 export function sortSensorReadingsNewestFirst(
   readings: readonly SensorReading[] | null | undefined,
@@ -35,13 +46,13 @@ export function sortSensorReadingsNewestFirst(
   if (!Array.isArray(readings) || readings.length === 0) return [];
 
   return [...readings].sort((left, right) => {
-    const leftTimestamp = timestampMs(left.ts);
-    const rightTimestamp = timestampMs(right.ts);
-    if (leftTimestamp !== rightTimestamp) return rightTimestamp > leftTimestamp ? 1 : -1;
-
     const leftCapturedAt = timestampMs(left.capturedAt);
     const rightCapturedAt = timestampMs(right.capturedAt);
     if (leftCapturedAt !== rightCapturedAt) return rightCapturedAt > leftCapturedAt ? 1 : -1;
+
+    const leftTimestamp = timestampMs(left.ts);
+    const rightTimestamp = timestampMs(right.ts);
+    if (leftTimestamp !== rightTimestamp) return rightTimestamp > leftTimestamp ? 1 : -1;
 
     return deterministicTieKey(left).localeCompare(deterministicTieKey(right));
   });
@@ -114,6 +125,10 @@ export interface TrustedVpdInputs {
   humidityPct: number;
 }
 
+export interface LatestTrustedVpdInputs extends TrustedVpdInputs {
+  reading: SensorReading;
+}
+
 /**
  * VPD may be derived only from a single usable snapshot that actually
  * observed both inputs. Compatibility zeroes, stale rows, invalid rows, and
@@ -133,6 +148,51 @@ export function readTrustedVpdInputs(
   const humidityPct = readObservedSensorMetric(reading, "rh");
   if (temperatureC === null || humidityPct === null) return null;
   return { temperatureC, humidityPct };
+}
+
+/** Find the newest physically captured usable live/manual temp+RH snapshot. */
+export function selectLatestTrustedVpdInputs(
+  readings: readonly SensorReading[] | null | undefined,
+): LatestTrustedVpdInputs | null {
+  for (const reading of sortSensorReadingsNewestFirst(readings)) {
+    const inputs = readTrustedVpdInputs(reading);
+    if (inputs) return { ...inputs, reading };
+  }
+  return null;
+}
+
+const SENSOR_METRIC_KEYS: readonly SensorReadingMetricKey[] = [
+  "temp",
+  "rh",
+  "vpd",
+  "co2",
+  "soil",
+  "ppfd",
+];
+
+export type SensorReadingsByObservedMetric = Record<SensorReadingMetricKey, SensorReading[]>;
+
+/**
+ * Sort once and index every observed metric. Presenters can memoize this map
+ * instead of sorting the same reading window once per metric card.
+ */
+export function indexSensorReadingsByObservedMetric(
+  readings: readonly SensorReading[] | null | undefined,
+): SensorReadingsByObservedMetric {
+  const byMetric: SensorReadingsByObservedMetric = {
+    temp: [],
+    rh: [],
+    vpd: [],
+    co2: [],
+    soil: [],
+    ppfd: [],
+  };
+  for (const reading of sortSensorReadingsNewestFirst(readings)) {
+    for (const metric of SENSOR_METRIC_KEYS) {
+      if (hasObservedSensorMetric(reading, metric)) byMetric[metric].push(reading);
+    }
+  }
+  return byMetric;
 }
 
 export function selectReadingsWithObservedMetric(

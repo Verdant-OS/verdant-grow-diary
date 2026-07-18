@@ -16,10 +16,7 @@ import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
-import {
-  deriveDailyGrowCheckStatus,
-  type DailyCheckStatus,
-} from "@/lib/dailyGrowCheckStatusRules";
+import { deriveDailyGrowCheckStatus, type DailyCheckStatus } from "@/lib/dailyGrowCheckStatusRules";
 
 interface Props {
   /** Compact strip variant (used inside the legacy operator view). */
@@ -41,12 +38,82 @@ export default function DailyGrowCheckStatusCard({
   tentIds = null,
   className,
 }: Props) {
-  const { data: rawReadings = [] } = useSensorReadings();
-  const { data: rawDiary = [] } = useDiaryEntries();
+  const readingsQuery = useSensorReadings();
+  const { data: rawReadings = [] } = readingsQuery;
+  const diaryQuery = useDiaryEntries();
+  const { data: rawDiary = [] } = diaryQuery;
   const { data: tents = [] } = useTents();
   const { data: plants = [] } = usePlants();
 
   const scoped = tentIds && tentIds.length > 0 ? new Set(tentIds) : null;
+  const evidenceError = readingsQuery.isError || diaryQuery.isError;
+  const evidenceLoading = readingsQuery.isLoading || diaryQuery.isLoading;
+
+  if (evidenceError) {
+    return (
+      <Card
+        data-testid="daily-grow-check-status-card"
+        data-kind="unavailable"
+        data-compact={compact ? "1" : "0"}
+        role="alert"
+        className={[
+          "p-4 space-y-3",
+          compact ? "md:flex md:items-center md:justify-between md:space-y-0 md:gap-4" : "",
+          className ?? "",
+        ].join(" ")}
+      >
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <ClipboardCheck className="h-4 w-4" />
+            <span>Daily Grow Check</span>
+            <Badge
+              variant="outline"
+              className="bg-destructive/10 text-destructive border-destructive/30"
+            >
+              Unavailable
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Recent observations could not be loaded, so today&apos;s check status is unknown.
+          </p>
+        </div>
+        <Button
+          type="button"
+          size={compact ? "sm" : "default"}
+          variant="outline"
+          className="shrink-0"
+          data-testid="daily-grow-check-status-retry"
+          onClick={() => {
+            void Promise.all([readingsQuery.refetch(), diaryQuery.refetch()]);
+          }}
+        >
+          Try again
+        </Button>
+      </Card>
+    );
+  }
+
+  if (evidenceLoading) {
+    return (
+      <Card
+        data-testid="daily-grow-check-status-card"
+        data-kind="loading"
+        data-compact={compact ? "1" : "0"}
+        role="status"
+        aria-live="polite"
+        className={[
+          "p-4",
+          compact ? "md:flex md:items-center md:justify-between" : "",
+          className ?? "",
+        ].join(" ")}
+      >
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <ClipboardCheck className="h-4 w-4" />
+          <span>Checking today&apos;s grow activity…</span>
+        </div>
+      </Card>
+    );
+  }
 
   const manualReadings = rawReadings
     .filter((r) => r.source === "manual")
@@ -75,14 +142,12 @@ export default function DailyGrowCheckStatusCard({
     diaryEntries,
   });
 
-  const tentName =
-    status.tentId
-      ? tents.find((t) => t.id === status.tentId)?.name ?? "Unknown tent"
-      : null;
-  const plantName =
-    status.plantId
-      ? plants.find((p) => p.id === status.plantId)?.name ?? "Unknown plant"
-      : null;
+  const tentName = status.tentId
+    ? (tents.find((t) => t.id === status.tentId)?.name ?? "Unknown tent")
+    : null;
+  const plantName = status.plantId
+    ? (plants.find((p) => p.id === status.plantId)?.name ?? "Unknown plant")
+    : null;
 
   const isEmpty = status.kind === "none";
   const tone =
@@ -107,11 +172,7 @@ export default function DailyGrowCheckStatusCard({
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <ClipboardCheck className="h-4 w-4" />
           <span>Daily Grow Check</span>
-          <Badge
-            variant="outline"
-            className={tone}
-            data-testid="daily-grow-check-status-label"
-          >
+          <Badge variant="outline" className={tone} data-testid="daily-grow-check-status-label">
             {status.label}
           </Badge>
         </div>
@@ -123,12 +184,8 @@ export default function DailyGrowCheckStatusCard({
                 Last check activity {relTime(status.lastActivityAt)}
               </span>
             </span>
-            {tentName && (
-              <span data-testid="daily-grow-check-tent-name">· {tentName}</span>
-            )}
-            {plantName && (
-              <span data-testid="daily-grow-check-plant-name">· {plantName}</span>
-            )}
+            {tentName && <span data-testid="daily-grow-check-tent-name">· {tentName}</span>}
+            {plantName && <span data-testid="daily-grow-check-plant-name">· {plantName}</span>}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">

@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/store/auth";
 import { GrowsProvider } from "@/store/grows";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
+import { clearGrowDataMeta } from "@/hooks/useGrowData";
 import RootErrorBoundary from "@/components/RootErrorBoundary";
 import PhenoTrackerUpgradeGate from "@/components/PhenoTrackerUpgradeGate";
 import RequireOperatorRole from "./components/RequireOperatorRole";
@@ -139,6 +140,16 @@ const HealthCheck = lazy(() => import("./pages/HealthCheck"));
 
 const queryClient = new QueryClient();
 
+function clearQueryCacheBeforeAuthIdentityChange() {
+  // Defense in depth for every private query family. Owner-suffixed keys stop
+  // cross-account reuse during render; clearing removes residual rows and
+  // cancels active observers before AuthProvider exposes the next identity.
+  // Source-disclosure metadata lives outside React Query and needs the same
+  // identity fence so one grower's status cannot flash for the next account.
+  queryClient.clear();
+  clearGrowDataMeta();
+}
+
 function AnalyticsShell() {
   useGoogleAnalyticsPageViews();
   return null;
@@ -176,7 +187,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AnalyticsShell />
-          <AuthProvider>
+          <AuthProvider onBeforeAuthIdentityChange={clearQueryCacheBeforeAuthIdentityChange}>
             <GrowsProvider>
               <PaymentTestModeBanner />
               <AgreementReconsentGate />

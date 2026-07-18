@@ -16,30 +16,22 @@ import {
   ONE_TENT_LOOP_HELPER_COPY,
   resolveOneTentLoopNextStep,
   type OneTentLoopIds,
-  type OneTentLoopLocalAction,
   type OneTentLoopStep,
 } from "@/lib/oneTentLoopNavigationRules";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 interface Props {
   current: OneTentLoopStep;
   ids?: OneTentLoopIds;
   className?: string;
   testId?: string;
-  onLocalAction?: (action: OneTentLoopLocalAction) => void;
 }
 
-export default function OneTentLoopNextStepCard({
-  current,
-  ids,
-  className,
-  testId,
-  onLocalAction,
-}: Props) {
+export default function OneTentLoopNextStepCard({ current, ids, className, testId }: Props) {
   const step = resolveOneTentLoopNextStep(current, ids);
   const resolvedTestId = testId ?? "one-tent-loop-next-step-card";
   const currentLabel = ONE_TENT_LOOP_STEP_LABEL[current];
   const nextLabel = step.next ? ONE_TENT_LOOP_STEP_LABEL[step.next] : null;
-  const localAction = step.localAction;
 
   return (
     <div
@@ -67,22 +59,28 @@ export default function OneTentLoopNextStepCard({
         <p className="text-xs text-muted-foreground" data-testid={`${resolvedTestId}-disabled`}>
           {step.disabledReason}
         </p>
+      ) : step.intent === "open_quick_log" && step.quickLogPrefill ? (
+        <Button
+          type="button"
+          size="sm"
+          data-testid={`${resolvedTestId}-cta`}
+          onClick={() => {
+            window.dispatchEvent(
+              new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
+                detail: step.quickLogPrefill,
+              }),
+            );
+          }}
+        >
+          {step.ctaLabel}
+          <ArrowRight className="ml-1 h-4 w-4" aria-hidden />
+        </Button>
       ) : step.href ? (
         <Button asChild size="sm" data-testid={`${resolvedTestId}-cta`}>
           <Link to={step.href}>
             {step.ctaLabel}
             <ArrowRight className="ml-1 h-4 w-4" aria-hidden />
           </Link>
-        </Button>
-      ) : localAction && onLocalAction ? (
-        <Button
-          type="button"
-          size="sm"
-          data-testid={`${resolvedTestId}-cta`}
-          onClick={() => onLocalAction(localAction)}
-        >
-          {step.ctaLabel}
-          <ArrowRight className="ml-1 h-4 w-4" aria-hidden />
         </Button>
       ) : (
         <Button size="sm" disabled data-testid={`${resolvedTestId}-cta-inert`}>

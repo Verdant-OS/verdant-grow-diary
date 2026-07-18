@@ -34,6 +34,8 @@ import {
   extractCanonicalLinks,
 } from "./validate-canonical-links.mjs";
 
+export { CANONICAL_ORIGIN };
+
 /** @typedef {{ message: string; detail?: string }} Issue */
 
 /**

@@ -26,6 +26,8 @@ test(`invalid deep-link ${INVALID_ROUTE} renders a safe read-only error state`, 
   const consoleErrors: string[] = [];
   const failedRequests: string[] = [];
   const forbiddenRequests: string[] = [];
+  const unexpectedRestRequests: string[] = [];
+  const restMutationRequests: string[] = [];
 
   page.on("console", (msg) => msg.type() === "error" && consoleErrors.push(msg.text()));
   page.on("pageerror", (err) => consoleErrors.push(err.message));
@@ -36,13 +38,25 @@ test(`invalid deep-link ${INVALID_ROUTE} renders a safe read-only error state`, 
     if (FORBIDDEN_HOST_RE.test(req.url())) forbiddenRequests.push(`${req.method()} ${req.url()}`);
   });
 
-  // Unknown hunt → maybeSingle returns no row.
-  await page.route(/\/rest\/v1\/pheno_hunts/i, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: "null" }),
-  );
-  await page.route(/\/rest\/v1\/(plants|grows|tents)/i, (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
-  );
+  // Unknown hunt → maybeSingle returns no row. A catch-all owns the REST
+  // boundary so a future read cannot silently escape to the real project.
+  await page.route(/\/rest\/v1\//i, async (route) => {
+    const request = route.request();
+    const requestLabel = `${request.method()} ${request.url()}`;
+    const table = new URL(request.url()).pathname.match(/\/rest\/v1\/([^/]+)/i)?.[1] ?? "";
+
+    if (request.method() !== "GET") {
+      restMutationRequests.push(requestLabel);
+      await route.abort("blockedbyclient");
+      return;
+    }
+    if (table !== "pheno_hunts") {
+      unexpectedRestRequests.push(requestLabel);
+      await route.abort("blockedbyclient");
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: "null" });
+  });
   await page.route(/\/auth\/v1\//i, (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
   );
@@ -52,8 +66,15 @@ test(`invalid deep-link ${INVALID_ROUTE} renders a safe read-only error state`, 
   // A clear read-only error/empty state is shown (never a crash, never fixtures).
   await expect(page.getByTestId("pheno-hunt-compare-error")).toBeVisible();
 
-  // No write controls — the surface is read-only by construction.
-  expect(await page.locator("button, form, input, textarea, select").count()).toBe(0);
+  // Retry is an explicit read-only refetch control. There are no data-entry
+  // controls, forms, or any additional buttons that could imply a write.
+  expect(await page.locator("form, input, textarea, select").count()).toBe(0);
+  const buttons = page.getByRole("button");
+  await expect(buttons).toHaveCount(1);
+  await expect(page.getByTestId("pheno-hunt-compare-error-retry")).toHaveAttribute(
+    "type",
+    "button",
+  );
 
   expect(consoleErrors, "console errors on invalid deep-link").toEqual([]);
   // Ignore favicon/sourcemap dev noise and third-party analytics (GA).
@@ -67,4 +88,6 @@ test(`invalid deep-link ${INVALID_ROUTE} renders a safe read-only error state`, 
     forbiddenRequests,
     "invalid deep-link must not call AI / Action Queue / device hosts",
   ).toEqual([]);
+  expect(unexpectedRestRequests, "unexpected Supabase REST reads must be blocked").toEqual([]);
+  expect(restMutationRequests, "invalid deep-link must not mutate Supabase REST").toEqual([]);
 });

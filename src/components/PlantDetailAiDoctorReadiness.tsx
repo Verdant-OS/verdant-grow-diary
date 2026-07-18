@@ -48,8 +48,7 @@ import {
   selectAiDoctorSensorEvidenceClassification,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { isUuid } from "@/lib/isUuid";
-import { PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
-import { plantDetailPath } from "@/lib/routes";
+import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
 import { classifyTimelineEntry } from "@/lib/timelineEntryClassification";
 import { Button } from "@/components/ui/button";
@@ -230,9 +229,7 @@ export default function PlantDetailAiDoctorReadiness({
     });
   }, [stage, signals, sensorSnapshot]);
 
-  const doctorHref = plantId
-    ? `${plantDetailPath(plantId)}#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`
-    : "/doctor";
+  const doctorHref = buildPlantAiDoctorReviewPath({ plantId, tentId }) ?? "/doctor";
 
   const sensor = result.sensorEvidence;
   const nextAction = nextActionForStatus(sensor.status);

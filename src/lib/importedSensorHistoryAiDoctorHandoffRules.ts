@@ -17,8 +17,7 @@ import {
 } from "@/lib/aiDoctorCsvHistoryContextRules";
 import { AI_DOCTOR_HISTORICAL_REVIEW_MIN_VALID_OBSERVATIONS } from "@/lib/aiDoctorReviewEligibilityRules";
 import { AI_DOCTOR_REVIEW_PACKET_CSV_ROW_CAP } from "@/lib/aiDoctorReviewRequestPacket";
-import { PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
-import { plantDetailPath } from "@/lib/routes";
+import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 
 export type ImportedHistoryAiDoctorHandoffReadStatus = "loading" | "error" | "success";
 
@@ -163,7 +162,7 @@ function buildChoices(
         plantId: plant.plantId,
         plantName: plant.plantName,
         label: `Review ${plant.plantName}`,
-        href: `${plantDetailPath(plant.plantId, { tentId })}#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`,
+        href: buildPlantAiDoctorReviewPath({ plantId: plant.plantId, tentId }) ?? "/doctor",
       }),
     ),
   );

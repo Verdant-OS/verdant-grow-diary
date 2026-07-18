@@ -45,7 +45,7 @@ const FAKE_USER = {
 const GROW_ID = "11111111-1111-4111-8111-111111111111";
 const TENT_ID = "22222222-2222-4222-8222-222222222222";
 const PLANT_ID = "33333333-3333-4333-8333-333333333333";
-const PLANT_REVIEW_HREF = `/plants/${PLANT_ID}#plant-ai-doctor-review`;
+const PLANT_REVIEW_HREF = `/plants/${PLANT_ID}?tentId=${TENT_ID}#plant-ai-doctor-review`;
 
 const GROW_ROW = {
   id: GROW_ID,

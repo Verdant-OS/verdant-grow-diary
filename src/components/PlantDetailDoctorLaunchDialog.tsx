@@ -63,8 +63,7 @@ import {
   AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
 } from "@/lib/aiDoctorReadinessGateViewModel";
 import { buildAiDoctorSnapshotStalenessExplanation } from "@/lib/aiDoctorSnapshotStalenessExplanationViewModel";
-import { PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
-import { plantDetailPath } from "@/lib/routes";
+import { buildPlantAiDoctorReviewPath } from "@/lib/aiDoctorEntryRules";
 
 interface Props {
   plantId: string | null | undefined;
@@ -288,7 +287,7 @@ export default function PlantDetailDoctorLaunchDialog({
 
   if (!plantId) return null;
 
-  const plantReviewHref = `${plantDetailPath(plantId)}#${PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID}`;
+  const plantReviewHref = buildPlantAiDoctorReviewPath({ plantId, tentId }) ?? "/doctor";
   const missingOrStale = preview.missingCount + preview.staleCount;
   const summaryNote =
     missingOrStale === 0

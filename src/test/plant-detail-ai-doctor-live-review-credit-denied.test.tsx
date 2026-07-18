@@ -126,7 +126,14 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
   async function mountAndDeny(planId: string | null) {
     itemsRef.current = strongTimeline();
     const invoke = vi.fn().mockResolvedValue(denial(planId));
-    render(<PlantDetailAiDoctorLiveReview plantId="p1" plant={strongPlant} invoke={invoke} />);
+    render(
+      <PlantDetailAiDoctorLiveReview
+        plantId="p1"
+        plant={strongPlant}
+        tentId="tent-1"
+        invoke={invoke}
+      />,
+    );
     fireEvent.click(await screen.findByTestId("plant-ai-doctor-live-review-start"));
     await waitFor(() =>
       expect(screen.getByTestId("plant-ai-doctor-live-review-credit-denied")).toBeTruthy(),
@@ -141,7 +148,10 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
     );
     expect(
       screen.getByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"),
-    ).toHaveAttribute("href", "/pricing?returnTo=%2Fplants%2Fp1");
+    ).toHaveAttribute(
+      "href",
+      "/pricing?returnTo=%2Fplants%2Fp1%3FtentId%3Dtent-1%23plant-ai-doctor-review",
+    );
     expect(trackFunnelEvent).toHaveBeenCalledTimes(1);
     expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_viewed", {
       surface: "ai_doctor_limit",
@@ -169,7 +179,10 @@ describe("PlantDetailAiDoctorLiveReview — credit_denied branch", () => {
     );
     expect(
       screen.getByTestId("plant-ai-doctor-live-review-credit-denied-paywall-link"),
-    ).toHaveAttribute("href", "/pricing?returnTo=%2Fplants%2Fp1");
+    ).toHaveAttribute(
+      "href",
+      "/pricing?returnTo=%2Fplants%2Fp1%3FtentId%3Dtent-1%23plant-ai-doctor-review",
+    );
     expect(trackFunnelEvent).toHaveBeenCalledTimes(1);
     expect(trackFunnelEvent).toHaveBeenCalledWith("paywall_viewed", {
       surface: "ai_doctor_limit",

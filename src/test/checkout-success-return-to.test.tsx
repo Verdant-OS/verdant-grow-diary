@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { resolveEntitlements } from "@/lib/entitlements/resolveEntitlements";
 import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
 
@@ -65,7 +65,14 @@ import CheckoutSuccess from "@/pages/CheckoutSuccess";
 
 function PlantDestination() {
   const { id } = useParams();
-  return <div data-testid="landed-plant">plant:{id}</div>;
+  const location = useLocation();
+  return (
+    <div data-testid="landed-plant">
+      plant:{id}|{location.pathname}
+      {location.search}
+      {location.hash}
+    </div>
+  );
 }
 
 function renderAt(url: string) {
@@ -121,9 +128,12 @@ describe("CheckoutSuccess returnTo handling", () => {
 
   it("returns an AI Doctor upgrade to the originating plant once entitlement is confirmed", async () => {
     mode.current = "confirmed";
-    renderAt("/checkout/success?returnTo=%2Fplants%2Fplant-123");
+    const returnTo = "/plants/plant-123?tentId=tent-1#plant-ai-doctor-review";
+    renderAt(`/checkout/success?returnTo=${encodeURIComponent(returnTo)}`);
     await waitFor(() => {
-      expect(screen.getByTestId("landed-plant")).toHaveTextContent("plant:plant-123");
+      expect(screen.getByTestId("landed-plant")).toHaveTextContent(
+        "plant:plant-123|/plants/plant-123?tentId=tent-1#plant-ai-doctor-review",
+      );
     });
   });
 

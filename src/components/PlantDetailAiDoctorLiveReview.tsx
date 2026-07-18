@@ -36,7 +36,7 @@ import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useImportedSensorHistory } from "@/hooks/useImportedSensorHistory";
-import { isUuid } from "@/lib/growRepo";
+import { isUuid } from "@/lib/isUuid";
 import { plantDetailPath } from "@/lib/routes";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";

@@ -209,6 +209,42 @@ describe("buildManualSensorTrendChartViewModel", () => {
     }
   });
 
+  it("keeps CSV history at captured_at when rows share an import timestamp", () => {
+    const importedAt = "2026-07-18T10:00:00.000Z";
+    const vm = buildManualSensorTrendChartViewModel({
+      readings: [
+        row({
+          metric: "ppfd",
+          value: 600,
+          source: "csv",
+          ts: importedAt,
+          captured_at: "2026-06-21T10:00:00.000Z",
+        }),
+        row({
+          metric: "ppfd",
+          value: 400,
+          source: "csv",
+          ts: importedAt,
+          captured_at: "2026-06-20T10:00:00.000Z",
+        }),
+        row({
+          metric: "temperature_c",
+          value: 24,
+          source: "csv",
+          ts: importedAt,
+          captured_at: "2026-06-20T10:00:00.000Z",
+        }),
+      ],
+    });
+
+    const ppfd = vm.series.find((series) => series.metric === "ppfd")?.points ?? [];
+    expect(ppfd.map((point) => point.value)).toEqual([400, 600]);
+    expect(ppfd.map((point) => point.capturedAt)).toEqual([
+      "2026-06-20T10:00:00.000Z",
+      "2026-06-21T10:00:00.000Z",
+    ]);
+  });
+
   it("is null-safe for missing/invalid fields and never crashes", () => {
     const vm = buildManualSensorTrendChartViewModel({
       readings: [

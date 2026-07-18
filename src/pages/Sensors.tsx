@@ -16,7 +16,7 @@ import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
 import SensorsTestbenchPanel from "@/components/SensorsTestbenchPanel";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
-import { useTents as useTentRows } from "@/hooks/use-tents";
+import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 import { useSoilMoistureCalibrations } from "@/hooks/useSoilMoistureCalibrations";
 import { classifyGrowDataSource } from "@/lib/growDataSourceLabelRules";
 import { VPD_STAGE_HELPER_TEXT, normalizeVpdStage } from "@/lib/vpdStageTargetRules";
@@ -53,10 +53,9 @@ import { canShowSensorOperatorDiagnostics } from "@/lib/sensorOperatorAccessRule
 import { resolveGrowTentSelection } from "@/lib/growTentSelectionRules";
 import {
   classifySensorReadingTrust,
+  indexSensorReadingsByObservedMetric,
   readObservedSensorMetric,
-  readTrustedVpdInputs,
-  selectReadingsWithObservedMetric,
-  selectRecentObservedSensorValues,
+  selectLatestTrustedVpdInputs,
   sortSensorReadingsNewestFirst,
 } from "@/lib/sensorReadingSelectionRules";
 
@@ -71,12 +70,13 @@ const METRICS = [
 
 export default function Sensors() {
   const location = useLocation();
-  const { data: tents = [] } = useGrowTents();
-  const { data: readings = [] } = useGrowSensorReadings();
-  // Real DB tents (uuid-backed) for the manual entry form — only these can
-  // be written to via RLS.
-  const { data: realTents = [] } = useTentRows();
+  const tentsQuery = useGrowTents();
+  const { data: tents = [] } = tentsQuery;
   const [tentId, setTentId] = useState<string | null>(null);
+  // Do not fetch the all-tents aggregate into the Sensors browser cache.
+  // `null` is an explicit no-scope sentinel until a persisted tent is chosen.
+  const readingsQuery = useGrowSensorReadings(tentId);
+  const { data: readings = [] } = readingsQuery;
   const [searchParams, setSearchParams] = useSearchParams();
   const operatorRole = useHasRole("operator");
 
@@ -104,25 +104,39 @@ export default function Sensors() {
     [readings, tentId],
   );
   const latest = filtered[0] ?? null;
+  const readingsByMetric = useMemo(() => indexSensorReadingsByObservedMetric(filtered), [filtered]);
   const recentSoilValues = useMemo(
-    () => selectRecentObservedSensorValues(filtered, "soil", 3),
-    [filtered],
+    () =>
+      readingsByMetric.soil
+        .map((reading) => readObservedSensorMetric(reading, "soil"))
+        .filter((value): value is number => value !== null)
+        .slice(0, 3),
+    [readingsByMetric],
   );
-  const vpdStabilityReadings = useMemo(
-    () => selectReadingsWithObservedMetric(filtered, "vpd"),
-    [filtered],
-  );
+  const vpdStabilityReadings = readingsByMetric.vpd;
   const selectedTent = tents.find((t) => t.id === tentId) ?? null;
   const selectedGrowId = selectedTent?.growId ?? null;
-  const { data: soilMoistureCalibrations = [] } = useSoilMoistureCalibrations({
+  const soilMoistureCalibrationsQuery = useSoilMoistureCalibrations({
     growId: selectedGrowId,
     tentId,
   });
+  const { data: soilMoistureCalibrations = [] } = soilMoistureCalibrationsQuery;
   const selectedTentStage =
     (selectedTent as unknown as { stage?: string | null } | null)?.stage ?? null;
   const latestObservedVpd = readObservedSensorMetric(vpdStabilityReadings[0] ?? null, "vpd");
+  const latestTrustedVpdInputs = useMemo(() => selectLatestTrustedVpdInputs(filtered), [filtered]);
+  const derivedVpdKpa = useMemo(() => {
+    if (latestObservedVpd !== null || !latestTrustedVpdInputs) return null;
+    const derived = deriveVpd({
+      temperature: latestTrustedVpdInputs.temperatureC,
+      humidity: latestTrustedVpdInputs.humidityPct,
+      temperatureUnit: "C",
+    });
+    return derived.kind === "derived" ? derived.vpdKpa : null;
+  }, [latestObservedVpd, latestTrustedVpdInputs]);
+  const displayedVpdKpa = latestObservedVpd ?? derivedVpdKpa;
   const vpdStageMissing =
-    latestObservedVpd !== null && normalizeVpdStage(selectedTentStage) === "unknown";
+    displayedVpdKpa !== null && normalizeVpdStage(selectedTentStage) === "unknown";
 
   // AUD-003 fix: classify based on the actual latest reading. If a reading
   // exists but is older than the freshness window, label it "Stale" and
@@ -144,7 +158,7 @@ export default function Sensors() {
 
   const hasReadings = filtered.length > 0;
 
-  const manualTents = realTents.map((t) => ({ id: t.id as string, name: t.name as string }));
+  const manualTents = tents.map((t) => ({ id: t.id as string, name: t.name as string }));
   // Only auto-default when the chip-selected tent exists as a real DB tent;
   // otherwise leave it undefined so the user must consciously pick from the
   // tent dropdown rather than silently writing to manualTents[0].
@@ -170,6 +184,42 @@ export default function Sensors() {
     tentId: defaultManualTentId ?? null,
     enabled: operatorMode && Boolean(defaultManualTentId),
   });
+
+  if (tentsQuery.isError || readingsQuery.isError) {
+    return (
+      <div>
+        <PageHeader
+          title="Sensor Data"
+          description="Environmental telemetry across tents."
+          icon={<Activity className="h-5 w-5" />}
+        />
+        <GrowDataLoadError
+          resource="Sensor data"
+          testId="sensors-grow-data-error"
+          onRetry={() => {
+            void Promise.all([tentsQuery.refetch(), readingsQuery.refetch()]);
+          }}
+        />
+      </div>
+    );
+  }
+
+  const sensorPageLoading =
+    tentsQuery.isLoading ||
+    (tents.length > 0 && (selectedTent === null || readingsQuery.isLoading));
+
+  if (sensorPageLoading) {
+    return (
+      <div>
+        <PageHeader
+          title="Sensor Data"
+          description="Environmental telemetry across tents."
+          icon={<Activity className="h-5 w-5" />}
+        />
+        <GrowDataLoadingState resource="Sensor data" testId="sensors-grow-data-loading" />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -213,7 +263,7 @@ export default function Sensors() {
           // Resolve each metric from its own latest actual observation. A
           // newer sparse temperature snapshot must not erase or relabel an
           // older soil observation, and compatibility zeroes are never read.
-          const metricReadings = selectReadingsWithObservedMetric(filtered, m.key);
+          const metricReadings = readingsByMetric[m.key];
           const latestMetricReading = metricReadings[0] ?? null;
           const rawValue = readObservedSensorMetric(latestMetricReading, m.key);
           const metricTrust = classifySensorReadingTrust(latestMetricReading);
@@ -226,21 +276,16 @@ export default function Sensors() {
           // Derive VPD from temp + RH when no VPD value is present.
           let value: number | null | undefined = rawValue;
           let isDerived = false;
-          if (m.key === "vpd" && (value == null || !Number.isFinite(value as number))) {
-            const trustedInputs = readTrustedVpdInputs(latest);
-            const derived = deriveVpd({
-              temperature: trustedInputs?.temperatureC ?? null,
-              humidity: trustedInputs?.humidityPct ?? null,
-              temperatureUnit: "C",
-            });
-            if (derived.kind === "derived") {
-              value = derived.vpdKpa;
-              isDerived = true;
-            }
+          if (
+            m.key === "vpd" &&
+            (value == null || !Number.isFinite(value as number)) &&
+            derivedVpdKpa !== null
+          ) {
+            value = derivedVpdKpa;
+            isDerived = true;
           }
           // Recent values for soil stuck-at-bound detection (newest 3).
-          const recentValues =
-            m.key === "soil" ? recentSoilValues : undefined;
+          const recentValues = m.key === "soil" ? recentSoilValues : undefined;
           const state = classifySensorMetricState({
             metric: m.key as SensorMetricKey,
             value: value ?? null,
@@ -252,7 +297,11 @@ export default function Sensors() {
             recentValues,
           });
           const soilMoistureView =
-            m.key === "soil" && latestMetricReading && rawValue !== null
+            m.key === "soil" &&
+            latestMetricReading &&
+            rawValue !== null &&
+            !soilMoistureCalibrationsQuery.isLoading &&
+            !soilMoistureCalibrationsQuery.isError
               ? buildSoilMoistureReadingViewModel({
                   rawSoilMoisture: rawValue,
                   rawSource: metricSource,
@@ -348,6 +397,22 @@ export default function Sensors() {
                       {soilMoistureView.calibrationBadgeLabel}
                     </span>
                   )}
+                  {m.key === "soil" && soilMoistureCalibrationsQuery.isLoading && (
+                    <span
+                      data-testid="sensors-soil-moisture-calibration-loading-badge"
+                      className="inline-flex items-center rounded-full border border-border/60 px-2 py-0.5 text-[10px] text-muted-foreground"
+                    >
+                      Checking calibration…
+                    </span>
+                  )}
+                  {m.key === "soil" && soilMoistureCalibrationsQuery.isError && (
+                    <span
+                      data-testid="sensors-soil-moisture-calibration-error-badge"
+                      className="inline-flex items-center rounded-full border border-destructive/60 px-2 py-0.5 text-[10px] text-destructive"
+                    >
+                      Calibration unavailable
+                    </span>
+                  )}
                 </div>
                 {state.tone === "caution" && (
                   <GrowDataSourceBadge classification={metricClassification} />
@@ -424,6 +489,35 @@ export default function Sensors() {
                       {soilMoistureView.calibrationSourceLine}
                     </p>
                   )}
+                </div>
+              )}
+              {m.key === "soil" && soilMoistureCalibrationsQuery.isLoading && (
+                <p
+                  className="mt-2 text-[11px] text-muted-foreground"
+                  data-testid="sensors-soil-moisture-calibration-loading"
+                >
+                  Checking calibration records before labeling this reading.
+                </p>
+              )}
+              {m.key === "soil" && soilMoistureCalibrationsQuery.isError && (
+                <div
+                  className="mt-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2 text-[11px] text-muted-foreground"
+                  role="alert"
+                  data-testid="sensors-soil-moisture-calibration-error"
+                >
+                  <p>
+                    Calibration records couldn't be loaded. Raw sensor history remains visible, but
+                    Verdant will not infer calibration status from a failed read.
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-1 font-medium text-foreground underline underline-offset-2"
+                    onClick={() => {
+                      void soilMoistureCalibrationsQuery.refetch();
+                    }}
+                  >
+                    Try calibration again
+                  </button>
                 </div>
               )}
               {m.key === "vpd" && (

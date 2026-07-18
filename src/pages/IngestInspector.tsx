@@ -1,6 +1,6 @@
 /**
  * Ingest Inspector — read-only operator/grower surface for recent
- * sensor webhook readings.
+ * sensor observations.
  *
  * Safety:
  *  - Read-only. No writes, no edits, no resend/replay, no delete.
@@ -163,7 +163,7 @@ export default function IngestInspector() {
     <div className="space-y-4">
       <PageHeader
         title="Ingest Inspector"
-        description="Read-only view of recent sensor webhook readings."
+        description="Read-only view of sensor observations captured within the last seven days."
       />
 
       <Card data-testid="ingest-inspector-disclosure">
@@ -232,7 +232,7 @@ export default function IngestInspector() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recent readings</CardTitle>
+          <CardTitle className="text-base">Recent sensor observations</CardTitle>
         </CardHeader>
         <CardContent>
           {query.isLoading && (
@@ -247,7 +247,7 @@ export default function IngestInspector() {
               data-testid="ingest-inspector-error"
               className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm"
             >
-              <p>Couldn’t load recent readings.</p>
+              <p>Couldn’t load recent sensor observations.</p>
               <Button
                 variant="outline"
                 size="sm"
@@ -261,8 +261,8 @@ export default function IngestInspector() {
           )}
           {!query.isLoading && !query.error && filtered.length === 0 && (
             <EmptyState
-              title="No recent ingest readings."
-              description="Once a bridge sends readings, they will appear here."
+              title="No recent sensor observations."
+              description="Recent means captured in the last seven days; legacy rows without capture time use their recorded timestamp."
             />
           )}
           {!query.isLoading && !query.error && filtered.length > 0 && (

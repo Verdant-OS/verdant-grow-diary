@@ -5,16 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import type { SensorReadingInsert } from "@/lib/db";
 import type { Tent, Plant, SensorReading } from "@/mock";
 import { mapTentRow, mapPlantRow, groupSensorReadingRows } from "./growAdapters";
+import { isUuid } from "./isUuid";
 
 function fail(scope: string, error: { message?: string } | null): never {
   throw new Error(`growRepo.${scope}: ${error?.message ?? "unknown error"}`);
 }
-
-// Guard against legacy/mock string ids (e.g. "t1", "p1") which would cause
-// Postgres UUID columns to 400. Non-UUID scopes fail closed as empty/null;
-// authenticated grow-data hooks never substitute mock fixtures.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export const isUuid = (v: string | undefined | null): v is string => !!v && UUID_RE.test(v);
 
 export async function fetchTents(growId?: string): Promise<Tent[]> {
   if (growId !== undefined && !isUuid(growId)) return [];
@@ -65,11 +60,19 @@ export async function fetchPlant(id: string): Promise<Plant | null> {
   return data ? mapPlantRow(data) : null;
 }
 
-export async function fetchSensorReadings(tentId?: string): Promise<SensorReading[]> {
+export async function fetchSensorReadings(tentId?: string | null): Promise<SensorReading[]> {
+  // `undefined` is the intentional aggregate read. `null` explicitly means
+  // the caller has no selected tent and must fail closed without a query.
+  if (tentId === null) return [];
   if (tentId !== undefined && !isUuid(tentId)) return [];
   let q = supabase.from("sensor_readings").select("*");
   if (tentId) q = q.eq("tent_id", tentId);
-  const { data, error } = await q.order("ts", { ascending: false }).limit(2000);
+  const { data, error } = await q
+    // Actual observation time leads: imported CSV rows preserve historical
+    // `captured_at` while `ts` can be one shared import time.
+    .order("captured_at", { ascending: false, nullsFirst: false })
+    .order("ts", { ascending: false })
+    .limit(2000);
   if (error) fail("fetchSensorReadings", error);
   return groupSensorReadingRows(data ?? []);
 }

@@ -8,11 +8,8 @@
  */
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import {
-  combineGrowDataMeta,
-  getGrowDataMeta,
-  type GrowDataSourceMeta,
-} from "@/hooks/useGrowData";
+import { combineGrowDataMeta, getGrowDataMeta, type GrowDataSourceMeta } from "@/hooks/useGrowData";
+import { useAuth } from "@/store/auth";
 import type { SnapshotSource } from "@/lib/sensorSnapshot";
 
 type Label = "Live" | "Demo" | "Mixed" | "Unavailable";
@@ -67,12 +64,13 @@ export default function DashboardDataSourceDisclosure({
   snapshotSource,
   className,
 }: Props) {
+  const { user } = useAuth();
   const resolved =
     metas && metas.length > 0
       ? metas
       : [
-          getGrowDataMeta(["grow", "tents", scopedGrowId ?? "all"]),
-          getGrowDataMeta(["grow", "plants", "all", scopedGrowId ?? "all"]),
+          getGrowDataMeta(["grow", "tents", scopedGrowId ?? "all"], user?.id),
+          getGrowDataMeta(["grow", "plants", "all", scopedGrowId ?? "all"], user?.id),
         ];
   const combined = combineGrowDataMeta(resolved);
   const label: Label = LABEL_BY_SOURCE[combined.dataSource];

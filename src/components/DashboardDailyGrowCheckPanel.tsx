@@ -39,22 +39,29 @@ import {
 } from "@/lib/dailyCheckRefreshRules";
 import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
 
-
 interface Props {
   scopedGrowId: string | null;
   className?: string;
 }
 
-export default function DashboardDailyGrowCheckPanel({
-  scopedGrowId,
-  className,
-}: Props) {
+export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }: Props) {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<DashboardDailyGrowCheckFilter>("all");
-  const { data: rawPlants = [] } = useGrowPlants(undefined, scopedGrowId ?? undefined);
-  const { data: rawTents = [] } = useGrowTents(scopedGrowId ?? undefined);
-  const { data: rawReadings = [] } = useSensorReadings(undefined, 500);
-  const { data: rawDiary = [] } = useDiaryEntries();
+  const plantsQuery = useGrowPlants(undefined, scopedGrowId ?? undefined);
+  const { data: rawPlants = [] } = plantsQuery;
+  const tentsQuery = useGrowTents(scopedGrowId ?? undefined);
+  const { data: rawTents = [] } = tentsQuery;
+  const readingsQuery = useSensorReadings(undefined, 500);
+  const { data: rawReadings = [] } = readingsQuery;
+  const diaryQuery = useDiaryEntries();
+  const { data: rawDiary = [] } = diaryQuery;
+  const dailyCheckEvidenceError =
+    plantsQuery.isError || tentsQuery.isError || readingsQuery.isError || diaryQuery.isError;
+  const dailyCheckEvidenceLoading =
+    plantsQuery.isLoading ||
+    tentsQuery.isLoading ||
+    readingsQuery.isLoading ||
+    diaryQuery.isLoading;
 
   // Belt-and-suspenders refresh: when QuickLog dispatches
   // `verdant:entry-created` OR the manual sensor reading hook dispatches
@@ -78,6 +85,56 @@ export default function DashboardDailyGrowCheckPanel({
       }
     };
   }, [queryClient]);
+
+  if (dailyCheckEvidenceError) {
+    return (
+      <Card
+        data-testid="dashboard-daily-grow-check-panel-evidence-error"
+        data-state="error"
+        role="alert"
+        className={`p-4 space-y-3 ${className ?? ""}`}
+      >
+        <div>
+          <h2 className="font-display font-semibold text-base">Today&apos;s Grow Checks</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Recent observations could not be loaded, so Verdant cannot confirm which plants need a
+            check.
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          data-testid="dashboard-daily-grow-check-panel-evidence-error-retry"
+          onClick={() => {
+            void Promise.all([
+              plantsQuery.refetch(),
+              tentsQuery.refetch(),
+              readingsQuery.refetch(),
+              diaryQuery.refetch(),
+            ]);
+          }}
+        >
+          Try again
+        </Button>
+      </Card>
+    );
+  }
+
+  if (dailyCheckEvidenceLoading) {
+    return (
+      <Card
+        data-testid="dashboard-daily-grow-check-panel-evidence-loading"
+        data-state="loading"
+        role="status"
+        aria-live="polite"
+        className={`p-4 space-y-1 ${className ?? ""}`}
+      >
+        <h2 className="font-display font-semibold text-base">Today&apos;s Grow Checks</h2>
+        <p className="text-sm text-muted-foreground">Checking recent observations…</p>
+      </Card>
+    );
+  }
 
   const plants: PanelPlantInput[] = rawPlants.map((p) => ({
     id: p.id,
@@ -112,8 +169,7 @@ export default function DashboardDailyGrowCheckPanel({
   });
 
   const visibleRows = filterDashboardDailyGrowCheckRows(panel.rows, filter);
-  const filterHasNoMatches =
-    !panel.isEmpty && panel.rows.length > 0 && visibleRows.length === 0;
+  const filterHasNoMatches = !panel.isEmpty && panel.rows.length > 0 && visibleRows.length === 0;
   // Chip counts are derived from the unfiltered row set so they always
   // reflect the whole grow regardless of the active filter.
   const methodChips = buildDashboardDailyGrowCheckMethodChips(panel.rows);
@@ -155,9 +211,7 @@ export default function DashboardDailyGrowCheckPanel({
         {!panel.isEmpty && (
           <Select
             value={filter}
-            onValueChange={(v) =>
-              setFilter(v as DashboardDailyGrowCheckFilter)
-            }
+            onValueChange={(v) => setFilter(v as DashboardDailyGrowCheckFilter)}
           >
             <SelectTrigger
               className="h-8 w-[180px] text-xs"
@@ -219,7 +273,6 @@ export default function DashboardDailyGrowCheckPanel({
         </div>
       )}
 
-
       {panel.isEmpty && (
         <div
           className="rounded-md border border-dashed border-border/50 p-4 text-center space-y-2"
@@ -240,10 +293,7 @@ export default function DashboardDailyGrowCheckPanel({
             {panel.emptyMessage}
           </p>
           <Button asChild size="sm" variant="outline">
-            <Link
-              to={panel.emptyCtaHref}
-              data-testid="dashboard-daily-grow-check-panel-empty-cta"
-            >
+            <Link to={panel.emptyCtaHref} data-testid="dashboard-daily-grow-check-panel-empty-cta">
               {panel.emptyCtaLabel}
             </Link>
           </Button>
@@ -360,7 +410,6 @@ export default function DashboardDailyGrowCheckPanel({
                   </Button>
                 </div>
               )}
-
             </li>
           ))}
         </ul>

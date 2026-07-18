@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface PlantTentReadingRow {
   ts: string;
+  /** Actual observation time when an imported row preserves it. */
+  captured_at?: string | null;
   metric: string;
   value: number | string | null;
   source: string | null;
@@ -27,11 +29,11 @@ export function usePlantTentLatestReadings(
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sensor_readings")
-        .select("ts,metric,value,source,created_at,device_id,raw_payload")
-        // Deterministic ordering: latest ts first, with created_at as a
-        // tie-breaker so the ≤5 metrics from a single manual entry (which
-        // share `ts`) come back in a stable, repeatable order.
+        .select("ts,captured_at,metric,value,source,created_at,device_id,raw_payload")
+        // Actual observation time leads: imported CSV rows preserve historical
+        // `captured_at` while `ts` can be one shared import time.
         .eq("tent_id", tentId as string)
+        .order("captured_at", { ascending: false, nullsFirst: false })
         .order("ts", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(50);

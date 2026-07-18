@@ -17,6 +17,7 @@ import {
   type SensorQualityResult,
 } from "@/lib/sensorQuality";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
 export interface DashboardSensorEvidenceRow extends SensorProvenanceRowLike {
   tent_id: string;
@@ -24,6 +25,7 @@ export interface DashboardSensorEvidenceRow extends SensorProvenanceRowLike {
   metric: string;
   value: unknown;
   quality?: string | null;
+  captured_at?: string | null;
 }
 
 export interface DashboardChartReading {
@@ -164,13 +166,14 @@ export function groupDashboardSensorReadings(
   const mixedSourceKeys = new Set<string>();
 
   for (const row of eligible) {
-    const key = `${row.tent_id}|${row.ts}`;
+    const capturedAt = resolveSensorObservationTime(row) ?? row.ts;
+    const key = `${row.tent_id}|${capturedAt}`;
     const source = canonicalDashboardSource(row.source ?? "");
     if (!source) continue;
     let reading = byKey.get(key);
     if (!reading) {
       reading = {
-        ts: row.ts,
+        ts: capturedAt,
         tentId: row.tent_id,
         temp: null,
         rh: null,
@@ -179,7 +182,7 @@ export function groupDashboardSensorReadings(
         soil: null,
         source,
         status: "usable",
-        capturedAt: row.ts,
+        capturedAt,
       };
       byKey.set(key, reading);
     } else if (reading.source !== source) {
@@ -216,7 +219,7 @@ export function buildDashboardStabilityReadings(
       const qualityFlag = quality?.trim().toLowerCase();
 
       return {
-        ts: row.ts,
+        ts: resolveSensorObservationTime(row) ?? row.ts,
         vpd: Number(row.value),
         source,
         stale: sourceFlag === "stale" || qualityFlag === "stale",

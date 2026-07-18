@@ -176,6 +176,28 @@ describe("sensorSourceHealthRules.buildSensorSourceHealth", () => {
     expect(buildSensorSourceHealth(rows, NOW)[0].status).toBe("active");
   });
 
+  it("does not freshen historical CSV health from a later import ts", () => {
+    const historicalCapture = new Date(NOW.getTime() - 48 * 60 * 60 * 1_000).toISOString();
+    const importedNow = NOW.toISOString();
+    const [csv] = buildSensorSourceHealth(
+      [
+        {
+          source: "csv",
+          metric: "temperature_c",
+          captured_at: historicalCapture,
+          ts: importedNow,
+        },
+      ],
+      NOW,
+    );
+
+    expect(csv).toMatchObject({
+      status: "no_recent_data",
+      lastReceivedAt: historicalCapture,
+      ageMinutes: 48 * 60,
+    });
+  });
+
   it("treats blank/missing source as 'unknown'", () => {
     const rows: SensorSourceHealthInput[] = [
       { source: "", metric: "temperature_c", captured_at: minutesAgo(2) },

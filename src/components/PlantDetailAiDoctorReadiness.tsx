@@ -47,7 +47,7 @@ import {
   classifyAiDoctorCurrentSensorEvidence,
   selectAiDoctorSensorEvidenceClassification,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
-import { isUuid } from "@/lib/growRepo";
+import { isUuid } from "@/lib/isUuid";
 import { PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
 import { plantDetailPath } from "@/lib/routes";
 import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
@@ -186,17 +186,23 @@ export default function PlantDetailAiDoctorReadiness({
 }: PlantDetailAiDoctorReadinessProps) {
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId ?? null);
   const { data: bridgeHealth } = useSensorBridgeHealth();
-  const { byTent: currentReadingsByTent, statusByTent: currentSensorStatusByTent } =
-    useSensorReadingsByTents(
-      isUuid(tentId) ? [tentId] : [],
-      AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
-      AI_DOCTOR_CURRENT_SENSOR_SOURCES,
-    );
+  const {
+    byTent: currentReadingsByTent,
+    statusByTent: currentSensorStatusByTent,
+    refetch: refetchCurrentSensorRows,
+  } = useSensorReadingsByTents(
+    isUuid(tentId) ? [tentId] : [],
+    AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
+    AI_DOCTOR_CURRENT_SENSOR_SOURCES,
+  );
   const currentSensorRows = tentId
     ? (currentReadingsByTent[tentId] ?? NO_CURRENT_SENSOR_ROWS)
     : NO_CURRENT_SENSOR_ROWS;
-  const currentSensorLoading =
-    isUuid(tentId) && (currentSensorStatusByTent[tentId] ?? "loading") === "loading";
+  const currentSensorStatus = isUuid(tentId)
+    ? (currentSensorStatusByTent[tentId] ?? "loading")
+    : "success";
+  const currentSensorLoading = currentSensorStatus === "loading";
+  const currentSensorError = currentSensorStatus === "error";
 
   const signals = useMemo(() => {
     return deriveSignals(plantId, hasPlantPhoto, rawRows ?? []);
@@ -245,7 +251,7 @@ export default function PlantDetailAiDoctorReadiness({
           <Stethoscope className="h-3.5 w-3.5 text-primary" />
           AI Doctor readiness
         </h2>
-        {!isLoading && !currentSensorLoading && (
+        {!isLoading && !currentSensorLoading && !currentSensorError && (
           <Badge
             variant="outline"
             className={`text-[10px] uppercase tracking-wide ${levelBadgeClass(result.level)}`}
@@ -267,6 +273,50 @@ export default function PlantDetailAiDoctorReadiness({
           <div className="h-8 rounded-lg bg-secondary/40 animate-pulse" aria-hidden />
           <div className="h-4 rounded-lg bg-secondary/40 animate-pulse w-3/4" aria-hidden />
           <span className="sr-only">Loading AI Doctor readiness…</span>
+        </div>
+      ) : currentSensorError ? (
+        <div
+          data-testid="plant-detail-ai-doctor-readiness-sensor-error"
+          role="alert"
+          className="space-y-2"
+        >
+          <div className="flex items-start gap-2">
+            <ShieldAlert className="h-4 w-4 text-destructive mt-0.5" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-medium text-foreground/90">
+                Current sensor evidence unavailable
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Verdant could not load this tent&apos;s current sensor rows, so it will not treat
+                the result as an empty snapshot.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7"
+            data-testid="plant-detail-ai-doctor-readiness-sensor-error-retry"
+            onClick={() => {
+              void refetchCurrentSensorRows();
+            }}
+          >
+            Try sensor read again
+          </Button>
+          {plantId ? (
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1"
+              data-testid="plant-detail-ai-doctor-readiness-history-only-cta"
+            >
+              <Link to={doctorHref}>
+                Ask Doctor with available history <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-2">

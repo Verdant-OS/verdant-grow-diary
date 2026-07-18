@@ -15,6 +15,7 @@ import {
   type SensorSnapshotStatus,
 } from "@/lib/sensorSnapshotStatusContract";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
 const VALID_SOURCES: readonly SensorReadingSource[] = [
   "live",
@@ -54,13 +55,16 @@ export function resolveSensorReadingSource(row: SensorReadingRow): SensorReading
 function deriveReadingStatus(
   capturedAt: string | null | undefined,
   source: SensorReadingSource,
+  quality: string | null | undefined,
   now: Date = new Date(),
 ): SensorReadingHealthStatus {
-  // Explicit non-live provenance can never become healthy merely because its
-  // timestamp is fresh. This is the legacy adapter's final trust boundary.
-  if (source === "demo") return "needs_review";
-  if (source === "invalid") return "invalid";
-  if (source === "stale") return "stale";
+  const normalizedQuality = (quality ?? "").trim().toLowerCase();
+  // Persisted source and quality are independent trust inputs. Their least
+  // trusted result wins before freshness is considered.
+  if (source === "invalid" || normalizedQuality === "invalid") return "invalid";
+  if (source === "demo" || normalizedQuality === "degraded") return "needs_review";
+  if (source === "stale" || normalizedQuality === "stale") return "stale";
+  if (normalizedQuality && normalizedQuality !== "ok") return "needs_review";
   const result = classifySensorSnapshotStatus({
     rowsReceived: 1,
     rowsAccepted: 1,
@@ -69,6 +73,43 @@ function deriveReadingStatus(
     now,
   });
   return result.status as SensorSnapshotStatus;
+}
+
+const STATUS_TRUST_RANK: Record<SensorReadingHealthStatus, number> = {
+  usable: 0,
+  stale: 1,
+  needs_review: 2,
+  no_data: 3,
+  invalid: 4,
+};
+
+/**
+ * Provenance trust is independent from freshness/quality status. A grouped
+ * snapshot must never retain `live` merely because that row happened to be
+ * encountered first. This explicit rank makes mixed persisted rows fail
+ * closed and keeps the result stable under input reordering.
+ */
+const SOURCE_TRUST_RANK: Record<SensorReadingSource, number> = {
+  live: 0,
+  manual: 1,
+  csv: 2,
+  stale: 3,
+  demo: 4,
+  invalid: 5,
+};
+
+function leastTrustedStatus(
+  left: SensorReadingHealthStatus,
+  right: SensorReadingHealthStatus,
+): SensorReadingHealthStatus {
+  return STATUS_TRUST_RANK[right] > STATUS_TRUST_RANK[left] ? right : left;
+}
+
+function leastTrustedSource(
+  left: SensorReadingSource,
+  right: SensorReadingSource,
+): SensorReadingSource {
+  return SOURCE_TRUST_RANK[right] > SOURCE_TRUST_RANK[left] ? right : left;
 }
 
 const VALID_STAGES: readonly Stage[] = ["seedling", "veg", "flower", "flush", "harvest", "cure"];
@@ -137,9 +178,9 @@ export function mapPlantRow(row: PlantRow): Plant {
  */
 export function mapSensorReadingRow(row: SensorReadingRow, now: Date = new Date()): SensorReading {
   const source = resolveSensorReadingSource(row);
-  const capturedAt = (row as { captured_at?: string | null }).captured_at ?? row.ts;
+  const capturedAt = resolveSensorObservationTime(row) ?? row.ts;
   const reading: SensorReading = {
-    ts: row.ts,
+    ts: capturedAt,
     tentId: row.tent_id,
     temp: 0,
     rh: 0,
@@ -148,7 +189,7 @@ export function mapSensorReadingRow(row: SensorReadingRow, now: Date = new Date(
     soil: 0,
     observedMetrics: [],
     source,
-    status: deriveReadingStatus(capturedAt, source, now),
+    status: deriveReadingStatus(capturedAt, source, row.quality, now),
     capturedAt,
   };
   const observedMetric = applyMetric(reading, row.metric, row.value);
@@ -159,8 +200,10 @@ export function mapSensorReadingRow(row: SensorReadingRow, now: Date = new Date(
 function applyMetric(
   reading: SensorReading,
   metric: string,
-  rawValue: number | string | null,
+  rawValue: number | string | null | undefined,
 ): SensorReadingMetricKey | null {
+  if (rawValue === null || rawValue === undefined) return null;
+  if (typeof rawValue === "string" && rawValue.trim().length === 0) return null;
   const v = Number(rawValue);
   if (!Number.isFinite(v)) return null;
   switch (metric) {
@@ -194,11 +237,10 @@ function applyMetric(
  * but `observedMetrics` preserves missingness so UI code cannot treat those
  * zeroes as measurements. Sorted by ts descending (newest first).
  *
- * Provenance starts from the first row encountered per (tent, ts) group; in
- * practice all per-metric rows from one ingest share source/captured_at. Any
- * invalid or diagnostic row in a mixed group downgrades the whole snapshot,
- * so ordering can never promote untrusted evidence. Status is derived from
- * the contract — never inline-classified.
+ * In practice all per-metric rows from one ingest share source/captured_at.
+ * If persisted rows are mixed, the explicitly least-trusted provenance and
+ * status win, so ordering can never promote untrusted evidence. Status is
+ * derived from the contract — never inline-classified.
  */
 export function groupSensorReadingRows(
   rows: SensorReadingRow[],
@@ -206,13 +248,14 @@ export function groupSensorReadingRows(
 ): SensorReading[] {
   const byKey = new Map<string, SensorReading>();
   for (const row of rows) {
-    const key = `${row.tent_id}|${row.ts}`;
+    const rowCapturedAt = resolveSensorObservationTime(row) ?? row.ts;
+    const key = `${row.tent_id}|${rowCapturedAt}`;
     const rowSource = resolveSensorReadingSource(row);
+    const rowStatus = deriveReadingStatus(rowCapturedAt, rowSource, row.quality, now);
     let reading = byKey.get(key);
     if (!reading) {
-      const capturedAt = (row as { captured_at?: string | null }).captured_at ?? row.ts;
       reading = {
-        ts: row.ts,
+        ts: rowCapturedAt,
         tentId: row.tent_id,
         temp: 0,
         rh: 0,
@@ -221,16 +264,16 @@ export function groupSensorReadingRows(
         soil: 0,
         observedMetrics: [],
         source: rowSource,
-        status: deriveReadingStatus(capturedAt, rowSource, now),
-        capturedAt,
+        status: rowStatus,
+        capturedAt: rowCapturedAt,
       };
       byKey.set(key, reading);
-    } else if (rowSource === "invalid" || (rowSource === "demo" && reading.source !== "invalid")) {
+    } else {
       // Mixed provenance at one timestamp fails closed. The normal ingest
-      // emits the same lineage for every metric, but a malformed/mixed group
-      // must never let its first physical-looking row promote diagnostics.
-      reading.source = rowSource;
-      reading.status = deriveReadingStatus(reading.capturedAt, rowSource, now);
+      // emits one lineage for every metric, but malformed/mixed persistence
+      // must never let the first physical-looking row promote the group.
+      reading.source = leastTrustedSource(reading.source, rowSource);
+      reading.status = leastTrustedStatus(reading.status, rowStatus);
     }
     const observedMetric = applyMetric(reading, row.metric, row.value);
     if (observedMetric && !reading.observedMetrics?.includes(observedMetric)) {

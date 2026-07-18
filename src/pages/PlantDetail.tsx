@@ -62,6 +62,7 @@ import {
 } from "@/lib/archivedPlantVisibilityRules";
 import { Button } from "@/components/ui/button";
 import { useGrowPlant, useGrowTent, getGrowDataMeta } from "@/hooks/useGrowData";
+import { useAuth } from "@/store/auth";
 import { format, formatDistanceToNow } from "date-fns";
 
 import PlantQuickLog from "@/components/PlantQuickLog";
@@ -227,6 +228,7 @@ function ArchivedTimelineReadOnlyView({
 }
 
 export default function PlantDetail() {
+  const { user } = useAuth();
   const [quickLogOpen, setQuickLogOpen] = useState(false);
   // Set only by the status-check CTAs (missed-log recovery / follow-up) so
   // Quick Log opens focused on the Better/Same/Worse chips. Reset on close.
@@ -242,8 +244,8 @@ export default function PlantDetail() {
   const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
   const { data: tent } = useGrowTent(plant?.tentId);
   const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null);
-  const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null]);
-  const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null]);
+  const plantMeta = getGrowDataMeta(["grow", "plant", id ?? null], user?.id);
+  const tentMeta = getGrowDataMeta(["grow", "tent", plant?.tentId ?? null], user?.id);
 
   // Bounded-loading guard: if the plant query never settles (slow network,
   // hung Supabase request, etc.) we must not leave the grower on a blank

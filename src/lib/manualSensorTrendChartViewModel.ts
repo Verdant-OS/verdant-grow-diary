@@ -18,6 +18,7 @@
  */
 
 import { isDiagnosticSensorProvenanceRow } from "@/lib/sensorProvenanceFenceRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 
 export type ManualSensorTrendMetric = "ppfd" | "temperature_c" | "humidity_pct" | "vpd_kpa";
 
@@ -34,6 +35,8 @@ export type ManualSensorTrendOmissionReason =
   | "unknown_metric";
 
 export interface ManualSensorTrendInputRow {
+  /** Physical observation time when available; `ts` is the legacy fallback. */
+  captured_at?: unknown;
   ts?: unknown;
   metric?: unknown;
   value?: unknown;
@@ -241,7 +244,7 @@ export function buildManualSensorTrendChartViewModel(
 
   for (const row of input?.readings ?? []) {
     const metric = normalizeMetric(row.metric);
-    const ts = normalizeTs(row.ts);
+    const ts = normalizeTs(resolveSensorObservationTime(row));
     const sourceResolution = resolveTrendSource(row);
     const source = sourceResolution.source;
     const value = normalizeValue(row.value);

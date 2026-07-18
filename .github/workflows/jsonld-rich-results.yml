@@ -1,0 +1,31 @@
+name: jsonld-rich-results
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "index.html"
+      - "scripts/validate-jsonld-rich-results.mjs"
+      - "vite.config.ts"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/jsonld-rich-results.yml"
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Build (runs postbuild JSON-LD validator)
+        run: bun run build
+      - name: Explicit JSON-LD Rich Results check
+        run: bun run check:jsonld
+      - name: Validator unit tests
+        run: bunx vitest run src/test/validate-jsonld-rich-results.test.ts --reporter=dot

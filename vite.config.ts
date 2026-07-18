@@ -179,6 +179,7 @@ function staticSocialRouteDocuments(): Plugin {
       rewriteMeta("property", "og:image:alt", "Verdant Grow Diary — Plant memory. Sensor truth.");
       rewriteMeta("name", "twitter:image", homeOgUrl);
       indexAsset.source = patchedIndex;
+    },
   };
 }
 

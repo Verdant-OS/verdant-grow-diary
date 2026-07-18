@@ -201,22 +201,12 @@ export default function PlantDetailPhotoStrip({
           data-testid="plant-detail-photo-strip-empty"
           className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-4 text-center"
         >
-          {hasPhotoReference ? (
-            <>
-              <p className="text-sm text-muted-foreground">Photo previews are not ready yet.</p>
-              <p className="text-[11px] text-muted-foreground/80 mt-1">
-                Your original photo record is unchanged. Try refreshing this section.
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-muted-foreground">No photos yet.</p>
-              <p className="text-[11px] text-muted-foreground/80 mt-1">
-                Add a photo to start building visual plant memory.
-              </p>
-            </>
-          )}
+          <p className="text-sm text-muted-foreground">No photos yet.</p>
+          <p className="text-[11px] text-muted-foreground/80 mt-1">
+            Add a photo to start building visual plant memory.
+          </p>
         </div>
+
       ) : (
         <ul
           data-testid="plant-detail-photo-strip-list"

@@ -30,6 +30,11 @@ describe("appRouteManifest — structural invariants", () => {
     expect(entry?.access).toBe("operator");
   });
 
+  it("preserves the authenticated dashboard alias and redirects legacy logs", () => {
+    expect(APP_ROUTES.find((route) => route.path === "/dashboard")?.access).toBe("auth");
+    expect(APP_ROUTES.find((route) => route.path === "/logs")?.access).toBe("redirect");
+  });
+
   it("every entry has a non-empty path and a valid access value", () => {
     for (const entry of APP_ROUTES) {
       expect(typeof entry.path).toBe("string");
@@ -46,14 +51,9 @@ describe("appRouteManifest — structural invariants", () => {
   });
 
   it("nav-visible entries (showInNav=true) have a label", () => {
-    const navVisible: AppRouteEntry[] = APP_ROUTES.filter(
-      (r) => r.showInNav === true,
-    );
+    const navVisible: AppRouteEntry[] = APP_ROUTES.filter((r) => r.showInNav === true);
     for (const entry of navVisible) {
-      expect(
-        entry.label,
-        `Entry ${entry.path} has showInNav=true but no label`,
-      ).toBeTruthy();
+      expect(entry.label, `Entry ${entry.path} has showInNav=true but no label`).toBeTruthy();
       expect(typeof entry.label).toBe("string");
     }
   });
@@ -91,10 +91,7 @@ describe("appRouteManifest — structural invariants", () => {
       for (const e of subset) expect(e.access).toBe(access);
     }
     // Sanity: partition is complete (sum of buckets = full manifest count).
-    const total = APP_ROUTE_ACCESS_VALUES.reduce(
-      (n, a) => n + getRoutesByAccess(a).length,
-      0,
-    );
+    const total = APP_ROUTE_ACCESS_VALUES.reduce((n, a) => n + getRoutesByAccess(a).length, 0);
     expect(total).toBe(APP_ROUTES.length);
   });
 });

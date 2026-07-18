@@ -151,6 +151,12 @@ describe("AppSidebar — operator user", () => {
     expect(screen.getByText("Release Readiness")).toBeInTheDocument();
   });
 
+  it("exposes the EcoWitt audit only after the operator role is granted", () => {
+    render(wrap(<AppSidebar />));
+    expect(hrefSet().has("/sensors/ecowitt-audit")).toBe(true);
+    expect(screen.getByText("EcoWitt Audit")).toBeInTheDocument();
+  });
+
   it("exposes the Operator Mode group label", () => {
     render(wrap(<AppSidebar />));
     const labels = Array.from(document.querySelectorAll('[data-sidebar="group-label"]')).map((el) =>
@@ -229,7 +235,7 @@ describe("UI Simplification Slice 1 — operator group placement", () => {
     roleState.status = "granted";
   });
 
-  it("places AI Doctor Results and Release Readiness inside the Operator Mode group", () => {
+  it("places AI Doctor Results, Release Readiness, and EcoWitt Audit inside the Operator Mode group", () => {
     render(wrap(<AppSidebar />));
     const heading = Array.from(document.querySelectorAll('[data-sidebar="group-label"]')).find(
       (el) => el.textContent?.trim() === "Operator Mode",
@@ -240,6 +246,7 @@ describe("UI Simplification Slice 1 — operator group placement", () => {
     const text = group?.textContent ?? "";
     expect(text).toContain("AI Doctor Results");
     expect(text).toContain("Release Readiness");
+    expect(text).toContain("EcoWitt Audit");
   });
 });
 

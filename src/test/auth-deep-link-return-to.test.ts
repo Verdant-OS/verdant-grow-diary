@@ -27,6 +27,7 @@ describe("isKnownAppRoutePath — manifest allowlist matching", () => {
     expect(isKnownAppRoutePath("/alerts")).toBe(true);
     expect(isKnownAppRoutePath("/reports")).toBe(true);
     expect(isKnownAppRoutePath("/welcome")).toBe(true);
+    expect(isKnownAppRoutePath("/dashboard")).toBe(true);
   });
 
   it("matches dynamic-segment routes with a concrete value", () => {
@@ -53,6 +54,7 @@ describe("resolveKnownRouteReturnTo — strict return-to resolver", () => {
     expect(resolveKnownRouteReturnTo("/plants")).toBe("/plants");
     expect(resolveKnownRouteReturnTo("/actions?filter=open")).toBe("/actions?filter=open");
     expect(resolveKnownRouteReturnTo("/pricing?plan=pro_annual")).toBe("/pricing?plan=pro_annual");
+    expect(resolveKnownRouteReturnTo("/dashboard?growId=g1")).toBe("/dashboard?growId=g1");
   });
 
   it("rejects off-origin and scheme vectors", () => {
@@ -82,6 +84,9 @@ describe("buildSignedOutRedirect — AppShell signed-out target", () => {
     expect(buildSignedOutRedirect("/alerts/42", "")).toBe("/welcome?redirectTo=%2Falerts%2F42");
     expect(buildSignedOutRedirect("/actions", "?filter=open")).toBe(
       "/welcome?redirectTo=%2Factions%3Ffilter%3Dopen",
+    );
+    expect(buildSignedOutRedirect("/dashboard", "?growId=g1")).toBe(
+      "/welcome?redirectTo=%2Fdashboard%3FgrowId%3Dg1",
     );
   });
 

@@ -111,6 +111,7 @@ const operatorGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { to: "/operator/release-readiness", label: "Release Readiness", icon: ClipboardList },
       { to: "/operator/ai-doctor-phase1", label: "AI Doctor Results", icon: Stethoscope },
+      { to: "/sensors/ecowitt-audit", label: "EcoWitt Audit", icon: Activity },
       { to: "/guides/cannabis-plant-care", label: "Help/Guides", icon: HelpCircle },
     ],
   },

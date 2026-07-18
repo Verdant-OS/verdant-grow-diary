@@ -48,6 +48,8 @@ import type { EcowittProofRow } from "@/lib/ecowittLiveProofRules";
 import { EcowittIngestAuditProofPanel } from "@/components/EcowittIngestAuditProofPanel";
 import { useEcowittIngestAuditProofRows } from "@/hooks/useEcowittIngestAuditProofRows";
 import { isUsableGrowSensorReading } from "@/lib/growSensorEvidenceRules";
+import { useHasRole } from "@/hooks/useHasRole";
+import { canShowSensorOperatorDiagnostics } from "@/lib/sensorOperatorAccessRules";
 
 const METRICS = [
   { key: "temp", label: "Temperature" },
@@ -67,6 +69,7 @@ export default function Sensors() {
   const { data: realTents = [] } = useTentRows();
   const [tentId, setTentId] = useState<string>(tents[0]?.id ?? "t1");
   const [searchParams, setSearchParams] = useSearchParams();
+  const operatorRole = useHasRole("operator");
 
   // React Router updates hashes without a full browser navigation, so make
   // the existing manual-reading deep link deterministic for same-page CSV
@@ -131,7 +134,10 @@ export default function Sensors() {
       ? "error"
       : "success";
 
-  const operatorMode = searchParams.get("operator") === "1";
+  const operatorMode = canShowSensorOperatorDiagnostics({
+    requested: searchParams.get("operator") === "1",
+    roleStatus: operatorRole.status,
+  });
   const ecowittIngestAuditProof = useEcowittIngestAuditProofRows({
     tentId: defaultManualTentId ?? null,
     enabled: operatorMode && Boolean(defaultManualTentId),
@@ -460,7 +466,7 @@ export default function Sensors() {
           <SensorsTestbenchPanel tentId={tentId} tentName={selectedTent?.name ?? null} />
         </div>
       )}
-      {searchParams.get("operator") === "1" && (
+      {operatorMode && (
         <section
           data-testid="sensors-operator-diagnostics"
           className="mt-6 max-w-3xl flex flex-col gap-3"

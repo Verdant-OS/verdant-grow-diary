@@ -50,6 +50,12 @@ async function mockAuth(page: Page) {
       body: JSON.stringify({}),
     });
   });
+  await page.route(/\/rest\/v1\//, (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+  );
+  await page.route(/\/functions\/v1\//, (route) =>
+    route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
+  );
 }
 
 async function signInWith(page: Page, redirectTo: string | null) {
@@ -76,18 +82,20 @@ test.describe("Auth redirect safety (mocked)", () => {
     expect(origin).toBe(new URL(baseURL!).origin);
   });
 
-  test("clean-looking but unknown path is not restored — stays on an internal surface", async ({
+  test("authenticated Dashboard alias is restored with grow scope intact", async ({
     page,
     baseURL,
   }) => {
-    // "/dashboard" is not a mounted route (the dashboard lives at "/").
-    // The manifest allowlist drops it and sign-in proceeds to the normal
-    // post-auth target instead of a 404 deep link.
-    await signInWith(page, "/dashboard");
-    await page.waitForTimeout(800);
+    await signInWith(page, "/dashboard?growId=grow-1");
+    await page.waitForURL(
+      (u) => u.pathname === "/dashboard" && u.searchParams.get("growId") === "grow-1",
+      { timeout: 8000 },
+    );
     const url = new URL(page.url());
     expect(url.origin).toBe(new URL(baseURL!).origin);
-    expect(url.pathname).not.toBe("/dashboard");
+    expect(url.pathname).toBe("/dashboard");
+    expect(url.searchParams.get("growId")).toBe("grow-1");
+    await expect(page.getByText("Oops! Page not found")).toHaveCount(0);
   });
 
   test("off-origin redirectTo is ignored — stays on app origin", async ({ page, baseURL }) => {

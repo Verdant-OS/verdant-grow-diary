@@ -616,13 +616,15 @@ Read-only follow-up to the One-Tent Loop Release Candidate audit. No
 schema, RLS, Edge Function, RPC, auth, AI, alerts, Action Queue,
 automation, or device-control changes.
 
-### 15.1 Operator Mode is a URL surface gate, not a role gate
+### 15.1 Operator Mode requires a server-verified role gate
 
 - `src/pages/Sensors.tsx` mounts the EcoWitt live-row proof and
-  ingest-audit proof panels behind the `?operator=1` query parameter.
-- `?operator=1` is a **URL surface gate** — it controls only whether
-  the operator diagnostics section renders. It is **not** a role check,
-  capability check, or privileged authorization gate.
+  ingest-audit proof panels only when `?operator=1` is requested and
+  `useHasRole("operator")` returns `granted` from the server-backed RPC.
+- `?operator=1` only requests the diagnostic surface. It cannot grant
+  operator access; loading, denied, unauthenticated, and role-check error
+  states all fail closed without rendering the panel or enabling its
+  diagnostic-only audit query.
 - Data access remains scoped by existing Supabase RLS:
   `useSensorReadings` only returns rows the current user can see, and
   `useEcowittIngestAuditProofRows` only returns rows allowed by the

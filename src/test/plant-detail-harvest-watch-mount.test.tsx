@@ -72,6 +72,13 @@ describe("Plant Detail Harvest Watch mount", () => {
     expect(occurrences.length).toBe(1);
   });
 
+  it("guards the card and evidence report behind the shared eligibility fence", () => {
+    expect(PLANT_DETAIL).toContain("isHarvestWatchEligible");
+    expect(PLANT_DETAIL).toMatch(
+      /harvestWatchEligible\s*&&[\s\S]*?<PlantDetailHarvestWatchCard[\s\S]*?<PlantDetailHarvestEvidenceReportMount/,
+    );
+  });
+
   it("mount passes only safe Plant Detail context props", () => {
     const mountMatch = PLANT_DETAIL.match(
       /<PlantDetailHarvestWatchCard[\s\S]*?\/>/,

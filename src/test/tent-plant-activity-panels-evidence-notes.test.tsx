@@ -11,7 +11,7 @@ function wrap(ui: React.ReactElement) {
 }
 
 const PLANTS = [
-  { id: "p1", name: "Blue Dream", strain: "Hybrid", stage: "veg", isArchived: false },
+  { id: "p1", name: "Blue Dream", strain: "Hybrid", stage: "flower", isArchived: false },
 ];
 const ACTIVITY = {
   p1: {

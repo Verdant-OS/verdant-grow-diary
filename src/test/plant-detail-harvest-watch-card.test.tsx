@@ -106,6 +106,22 @@ describe("PlantDetailHarvestWatchCard", () => {
     expect(screen.getByTestId("plant-detail-harvest-watch-card-loading")).toBeTruthy();
   });
 
+  it.each(["seedling", "veg", "flush", "harvest", "cure", null])(
+    "renders no Harvest Watch surface for ineligible stage %s",
+    (stage) => {
+      mocks.useGrowPlant.mockReturnValue({
+        data: { ...plant, stage },
+        isLoading: false,
+      });
+
+      const { container } = render(
+        <PlantDetailHarvestWatchCard plantId="p1" hasPlantPhoto />,
+      );
+
+      expect(container).toBeEmptyDOMElement();
+    },
+  );
+
   it("renders nothing without a plant id", () => {
     const { container } = render(<PlantDetailHarvestWatchCard plantId={null} />);
     expect(container.textContent).toBe("");
@@ -113,9 +129,8 @@ describe("PlantDetailHarvestWatchCard", () => {
 });
 
 describe("Plant Detail wiring", () => {
-  it("mounts Harvest Watch through the existing PlantDetailWhatsMissing slot", () => {
-    expect(WHATS_MISSING).toContain("PlantDetailHarvestWatchCard");
-    expect(WHATS_MISSING).toMatch(/PlantDetailHarvestWatchCard[\s\S]{0,120}plantId=\{plantId\}/);
+  it("does not duplicate Harvest Watch inside the What's Missing presenter", () => {
+    expect(WHATS_MISSING).not.toContain("PlantDetailHarvestWatchCard");
   });
 });
 

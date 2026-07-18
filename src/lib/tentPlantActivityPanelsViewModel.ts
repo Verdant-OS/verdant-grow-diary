@@ -20,6 +20,7 @@ import {
   PLANT_RELATIVE_TIMELINE_ANCHOR_ID,
   PLANT_PHOTOS_ANCHOR_ID,
 } from "@/lib/plantDetailQuickActions";
+import { isHarvestWatchEligible } from "@/lib/harvestWatchEligibilityRules";
 
 export interface TentPlantActivityPanelsPlantInput {
   id: string;
@@ -92,7 +93,7 @@ export interface TentPlantActivityPanelRow {
   latestPhotoEntryId: string | null;
   photoEmptyCopy: string | null;
 
-  harvestWatch: TentPlantActivityPanelHarvestWatch;
+  harvestWatch: TentPlantActivityPanelHarvestWatch | null;
 
   plantDetailHref: string;
   diaryHref: string;
@@ -337,7 +338,12 @@ export function buildTentPlantActivityPanelsViewModel(
         ? null
         : TENT_PLANT_ACTIVITY_NO_PHOTOS_COPY,
 
-      harvestWatch: harvestWatchFor(a.harvestWatchPublicState ?? null),
+      harvestWatch: isHarvestWatchEligible({
+        stage: p.stage,
+        isArchived: p.isArchived,
+      })
+        ? harvestWatchFor(a.harvestWatchPublicState ?? null)
+        : null,
 
       plantDetailHref,
       diaryHref,

@@ -173,6 +173,24 @@ describe("Quick Log Environment Check — save behavior", () => {
       vpd_kpa: 1.1,
     });
   });
+
+  it("blocks the save when an air-sensor value leaves the canonical band", async () => {
+    // Previously an out-of-band VPD was silently clamped to null and the save
+    // still went through with the reading discarded. It now blocks with the
+    // same per-metric copy Quick Log v2 shows, keeps the entered value, and
+    // never reaches the RPC.
+    const dialog = openEnvironmentForm();
+    const ta = dialog.querySelector("textarea") as HTMLTextAreaElement;
+    fireEvent.change(ta, { target: { value: "Reading." } });
+    const vpdField = within(dialog).getByTestId("quick-log-env-vpd") as HTMLInputElement;
+    fireEvent.change(vpdField, { target: { value: "12" } }); // above the 10 kPa ceiling
+    fireEvent.click(within(dialog).getByRole("button", { name: /save log/i }));
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(toastError.mock.calls[0]?.[0]).toMatch(/vpd/i);
+    // The grower's entered value is preserved for correction, not erased.
+    expect(vpdField.value).toBe("12");
+  });
 });
 
 describe("Quick Log Environment Check — read-only EC preview", () => {

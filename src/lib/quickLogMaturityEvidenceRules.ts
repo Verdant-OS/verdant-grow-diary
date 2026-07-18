@@ -38,6 +38,7 @@ export type QuickLogMaturityEvidenceReason =
   | "invalid_clear_pct"
   | "invalid_cloudy_pct"
   | "invalid_amber_pct"
+  | "maturity_pct_total_exceeds_100"
   | "maturity_note_too_long";
 
 export interface QuickLogMaturityEvidenceDetails {
@@ -144,6 +145,18 @@ export function buildQuickLogMaturityEvidenceDetails(
     if (parsed !== null) details[detailsField] = parsed;
   }
 
+  // clear/cloudy/amber are the three mutually-exclusive states of one
+  // trichome population, so their provided percentages are fractions of the
+  // same whole and cannot exceed 100% (the same ceiling already enforced per
+  // field). The 1e-9 epsilon only absorbs float summation error so a
+  // legitimate exact-100 total is never falsely rejected; partial totals and
+  // an exact 100 stay valid.
+  const providedPercentTotal =
+    (details.clear_pct ?? 0) + (details.cloudy_pct ?? 0) + (details.amber_pct ?? 0);
+  if (providedPercentTotal > 100 + 1e-9) {
+    return { ok: false, reason: "maturity_pct_total_exceeds_100" };
+  }
+
   for (const [formField, detailsField] of NOTE_FIELDS) {
     const value = trim(input.form[formField]);
     if (value.length > QUICK_LOG_MATURITY_NOTE_LIMIT) {
@@ -167,6 +180,8 @@ export function quickLogMaturityEvidenceReasonToMessage(
       return "Cloudy percentage must be between 0 and 100.";
     case "invalid_amber_pct":
       return "Amber percentage must be between 0 and 100.";
+    case "maturity_pct_total_exceeds_100":
+      return "Clear, cloudy, and amber percentages cannot total more than 100%.";
     case "maturity_note_too_long":
       return `Maturity notes must be ${QUICK_LOG_MATURITY_NOTE_LIMIT} characters or fewer.`;
     case "invalid_observed_at":

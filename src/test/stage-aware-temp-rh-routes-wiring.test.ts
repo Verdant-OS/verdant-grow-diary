@@ -71,10 +71,10 @@ describe("Sensors — stage-aware Temp/RH wiring", () => {
     expect(SENSORS).toMatch(IMPORT_RE);
   });
   it("uses classifyTempAgainstStage for the temperature pill", () => {
-    expect(SENSORS).toMatch(/classifyTempAgainstStage\(latest\.temp/);
+    expect(SENSORS).toMatch(/m\.key\s*===\s*["']temp["'][\s\S]*?isUsableGrowSensorReading\(latestMetricReading\)[\s\S]*?classifyTempAgainstStage\(rawValue/);
   });
   it("uses classifyRhAgainstStage for the humidity pill", () => {
-    expect(SENSORS).toMatch(/classifyRhAgainstStage\(latest\.rh/);
+    expect(SENSORS).toMatch(/m\.key\s*===\s*["']rh["'][\s\S]*?isUsableGrowSensorReading\(latestMetricReading\)[\s\S]*?classifyRhAgainstStage\(rawValue/);
   });
   it("uses environmentMetricChipStatus to map to chip status", () => {
     expect(SENSORS).toMatch(/environmentMetricChipStatus\(/);

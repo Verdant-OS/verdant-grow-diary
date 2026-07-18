@@ -7,6 +7,7 @@ import type {
   SensorReading,
   SensorReadingSource,
   SensorReadingHealthStatus,
+  SensorReadingMetricKey,
   Stage,
 } from "@/mock";
 import {
@@ -130,8 +131,9 @@ export function mapPlantRow(row: PlantRow): Plant {
 
 /**
  * Maps a single per-metric sensor_readings row into the legacy mock-shaped
- * SensorReading. Missing metrics default to 0. Prefer `groupSensorReadingRows`
- * for fetch results — a single row alone reports only one metric.
+ * SensorReading. Legacy numeric fields retain zero defaults for compatibility,
+ * while `observedMetrics` records the only values that are real evidence.
+ * Prefer `groupSensorReadingRows` for fetch results.
  */
 export function mapSensorReadingRow(row: SensorReadingRow, now: Date = new Date()): SensorReading {
   const source = resolveSensorReadingSource(row);
@@ -144,11 +146,13 @@ export function mapSensorReadingRow(row: SensorReadingRow, now: Date = new Date(
     vpd: 0,
     co2: 0,
     soil: 0,
+    observedMetrics: [],
     source,
     status: deriveReadingStatus(capturedAt, source, now),
     capturedAt,
   };
-  applyMetric(reading, row.metric, row.value);
+  const observedMetric = applyMetric(reading, row.metric, row.value);
+  if (observedMetric) reading.observedMetrics?.push(observedMetric);
   return reading;
 }
 
@@ -156,33 +160,39 @@ function applyMetric(
   reading: SensorReading,
   metric: string,
   rawValue: number | string | null,
-): void {
+): SensorReadingMetricKey | null {
   const v = Number(rawValue);
-  if (!Number.isFinite(v)) return;
+  if (!Number.isFinite(v)) return null;
   switch (metric) {
     case "temperature_c":
       reading.temp = v;
-      break;
+      return "temp";
     case "humidity_pct":
       reading.rh = v;
-      break;
+      return "rh";
     case "vpd_kpa":
       reading.vpd = v;
-      break;
+      return "vpd";
     case "co2_ppm":
       reading.co2 = v;
-      break;
+      return "co2";
     case "soil_moisture_pct":
       reading.soil = v;
-      break;
+      return "soil";
+    case "ppfd":
+    case "ppfd_umol_m2_s":
+      reading.ppfd = v;
+      return "ppfd";
+    default:
+      return null;
   }
 }
 
 /**
  * Groups long-form sensor_readings rows by (tent_id, ts) into the legacy
- * mock-shaped SensorReading objects. Missing metrics default to 0. Sorted by
- * ts descending (newest first); rows with the same ts keep insertion order
- * across distinct tents.
+ * mock-shaped SensorReading objects. Compatibility fields keep zero defaults,
+ * but `observedMetrics` preserves missingness so UI code cannot treat those
+ * zeroes as measurements. Sorted by ts descending (newest first).
  *
  * Provenance starts from the first row encountered per (tent, ts) group; in
  * practice all per-metric rows from one ingest share source/captured_at. Any
@@ -209,6 +219,7 @@ export function groupSensorReadingRows(
         vpd: 0,
         co2: 0,
         soil: 0,
+        observedMetrics: [],
         source: rowSource,
         status: deriveReadingStatus(capturedAt, rowSource, now),
         capturedAt,
@@ -221,7 +232,10 @@ export function groupSensorReadingRows(
       reading.source = rowSource;
       reading.status = deriveReadingStatus(reading.capturedAt, rowSource, now);
     }
-    applyMetric(reading, row.metric, row.value);
+    const observedMetric = applyMetric(reading, row.metric, row.value);
+    if (observedMetric && !reading.observedMetrics?.includes(observedMetric)) {
+      reading.observedMetrics?.push(observedMetric);
+    }
   }
   return Array.from(byKey.values()).sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
 }

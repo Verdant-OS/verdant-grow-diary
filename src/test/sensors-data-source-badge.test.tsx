@@ -89,12 +89,11 @@ describe("Sensors page wiring (source contract)", () => {
     );
   });
 
-  it("labels current mock-backed readings as demo (not live) when the real source is missing", () => {
-    // AUD-003: the page now classifies on the real reading's source when
-    // present, and falls back to "demo" only when none is known. It must
-    // never hard-label live/supabase/sensor when the data is mock.
-    expect(SENSORS).toMatch(/["']demo["']/);
-    expect(SENSORS).not.toMatch(/source:\s*["'](live|supabase|sensor)["']/);
+  it("keeps missing authenticated provenance unavailable instead of inventing demo or live", () => {
+    expect(SENSORS).toMatch(/const latestSourceRaw/);
+    expect(SENSORS).toMatch(/\{ source: null, value: null, timestamp: null \}/);
+    expect(SENSORS).not.toMatch(/fallback:\s*["']demo["']/);
+    expect(SENSORS).not.toMatch(/source:\s*["'](demo|live|supabase|sensor)["']/);
   });
 
   it("renders GrowDataSourceBadge near readings", () => {

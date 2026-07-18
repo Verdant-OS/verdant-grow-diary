@@ -37,46 +37,64 @@ beforeEach(() => {
 });
 
 describe("useGrowTents", () => {
-  it("returns supabase rows on happy path", async () => {
+  it("returns real Supabase rows on the happy path", async () => {
     const live = [{ ...tents[0], id: "live-1", name: "Live" }];
     vi.mocked(repo.fetchTents).mockResolvedValue(live);
     const { result } = renderHook(() => useGrowTents(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.[0].id).toBe("live-1");
+    expect(result.current.data).toEqual(live);
     expect(__growDataFallbacks.count).toBe(0);
   });
 
-  it("falls back to mock on supabase error", async () => {
-    vi.mocked(repo.fetchTents).mockRejectedValue(new Error("boom"));
-    const { result } = renderHook(() => useGrowTents(), { wrapper: wrapper() });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual(tents);
-    expect(result.current.isError).toBe(false);
-    expect(__growDataFallbacks.lastReason).toMatch(/tents:error/);
-  });
-
-  it("falls back to mock on empty result", async () => {
+  it("returns an honest empty list when Supabase has no tent rows", async () => {
     vi.mocked(repo.fetchTents).mockResolvedValue([]);
     const { result } = renderHook(() => useGrowTents(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual(tents);
+    expect(result.current.data).toEqual([]);
+    expect(result.current.data).not.toEqual(tents);
     expect(__growDataFallbacks.lastReason).toBe("tents:empty");
+  });
+
+  it("preserves a failed Supabase tent read as a query error", async () => {
+    const error = new Error("boom");
+    vi.mocked(repo.fetchTents).mockRejectedValue(error);
+    const { result } = renderHook(() => useGrowTents(), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.error).toBe(error);
+    expect(__growDataFallbacks.lastReason).toBe("tents:error");
   });
 });
 
 describe("useGrowPlants", () => {
-  it("filters mock by tentId on fallback", async () => {
-    vi.mocked(repo.fetchPlants).mockRejectedValue(new Error("nope"));
-    const { result } = renderHook(() => useGrowPlants("t1"), { wrapper: wrapper() });
+  it("returns real Supabase plant rows", async () => {
+    const live = [{ ...plants[0], id: "live-p1", name: "Live plant" }];
+    vi.mocked(repo.fetchPlants).mockResolvedValue(live);
+    const { result } = renderHook(() => useGrowPlants("tent-live"), {
+      wrapper: wrapper(),
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.every((p) => p.tentId === "t1")).toBe(true);
+    expect(result.current.data).toEqual(live);
   });
 
-  it("returns all mock plants when no tentId on fallback", async () => {
+  it("returns an honest empty list when Supabase has no plant rows", async () => {
     vi.mocked(repo.fetchPlants).mockResolvedValue([]);
     const { result } = renderHook(() => useGrowPlants(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual(plants);
+    expect(result.current.data).toEqual([]);
+    expect(result.current.data).not.toEqual(plants);
+  });
+
+  it("preserves a failed Supabase plant read as a query error", async () => {
+    const error = new Error("nope");
+    vi.mocked(repo.fetchPlants).mockRejectedValue(error);
+    const { result } = renderHook(() => useGrowPlants("tent-live"), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.error).toBe(error);
+    expect(__growDataFallbacks.lastReason).toBe("plants:error");
   });
 });
 
@@ -121,11 +139,34 @@ describe("useGrowSensorReadings", () => {
 });
 
 describe("useGrowTent / useGrowPlant", () => {
-  it("useGrowTent falls back to mock match on error", async () => {
-    vi.mocked(repo.fetchTent).mockRejectedValue(new Error("nope"));
-    const { result } = renderHook(() => useGrowTent("t1"), { wrapper: wrapper() });
+  it("useGrowTent returns a real Supabase row", async () => {
+    const live = { ...tents[0], id: "live-tent", name: "Live tent" };
+    vi.mocked(repo.fetchTent).mockResolvedValue(live);
+    const { result } = renderHook(() => useGrowTent("live-tent"), {
+      wrapper: wrapper(),
+    });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.id).toBe("t1");
+    expect(result.current.data).toEqual(live);
+  });
+
+  it("useGrowTent returns null when the row does not exist", async () => {
+    vi.mocked(repo.fetchTent).mockResolvedValue(null);
+    const { result } = renderHook(() => useGrowTent("missing-tent"), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toBeNull();
+  });
+
+  it("useGrowTent preserves a failed read as a query error", async () => {
+    const error = new Error("tent read failed");
+    vi.mocked(repo.fetchTent).mockRejectedValue(error);
+    const { result } = renderHook(() => useGrowTent("real-id"), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBe(error);
+    expect(result.current.data).toBeUndefined();
   });
 
   it("useGrowTent is disabled without id", () => {
@@ -134,8 +175,8 @@ describe("useGrowTent / useGrowPlant", () => {
     expect(repo.fetchTent).not.toHaveBeenCalled();
   });
 
-  it("useGrowPlant returns null fallback when id not in mock", async () => {
-    vi.mocked(repo.fetchPlant).mockRejectedValue(new Error("nope"));
+  it("useGrowPlant returns null when the row does not exist", async () => {
+    vi.mocked(repo.fetchPlant).mockResolvedValue(null);
     const { result } = renderHook(() => useGrowPlant("does-not-exist"), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toBeNull();
@@ -146,5 +187,16 @@ describe("useGrowTent / useGrowPlant", () => {
     const { result } = renderHook(() => useGrowPlant("live-p"), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.name).toBe("Live P");
+  });
+
+  it("useGrowPlant preserves a failed read as a query error", async () => {
+    const error = new Error("plant read failed");
+    vi.mocked(repo.fetchPlant).mockRejectedValue(error);
+    const { result } = renderHook(() => useGrowPlant("real-plant-id"), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBe(error);
+    expect(result.current.data).toBeUndefined();
   });
 });

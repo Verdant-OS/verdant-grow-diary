@@ -196,6 +196,16 @@ describe("mapSensorReadingRow", () => {
     expect(mapSensorReadingRow({ ...base, metric: "soil_moisture_pct", value: 40 })).toMatchObject({
       soil: 40,
     });
+    expect(mapSensorReadingRow({ ...base, metric: "ppfd", value: 640 })).toMatchObject({
+      ppfd: 640,
+      observedMetrics: ["ppfd"],
+    });
+    expect(
+      mapSensorReadingRow({ ...base, metric: "ppfd_umol_m2_s", value: 650 }),
+    ).toMatchObject({
+      ppfd: 650,
+      observedMetrics: ["ppfd"],
+    });
   });
   it("preserves ts and tentId", () => {
     const r = mapSensorReadingRow({ ...base, metric: "temperature_c", value: 22 });
@@ -204,7 +214,14 @@ describe("mapSensorReadingRow", () => {
   });
   it("treats unknown metric as zero values", () => {
     const r = mapSensorReadingRow({ ...base, metric: "unknown", value: 99 });
-    expect(r).toMatchObject({ temp: 0, rh: 0, vpd: 0, co2: 0, soil: 0 });
+    expect(r).toMatchObject({
+      temp: 0,
+      rh: 0,
+      vpd: 0,
+      co2: 0,
+      soil: 0,
+      observedMetrics: [],
+    });
   });
 });
 
@@ -238,6 +255,7 @@ describe("groupSensorReadingRows", () => {
     ]);
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ ts, tentId: "t1", temp: 24, rh: 55, vpd: 1.2, co2: 800, soil: 40 });
+    expect(out[0].observedMetrics).toEqual(["temp", "rh", "vpd", "co2", "soil"]);
     expect(out[0].source).toBe("manual");
     expect(out[0].capturedAt).toBeDefined();
     expect(out[0].status).toBeDefined();
@@ -255,9 +273,16 @@ describe("groupSensorReadingRows", () => {
     expect(out[1].ts).toBe(older);
   });
 
-  it("does not crash on sparse metrics; missing default to 0", () => {
+  it("preserves sparse-metric truth alongside legacy compatibility zeroes", () => {
     const out = groupSensorReadingRows([row("t1", "2026-05-01T12:00:00Z", "temperature_c", 22)]);
-    expect(out[0]).toMatchObject({ temp: 22, rh: 0, vpd: 0, co2: 0, soil: 0 });
+    expect(out[0]).toMatchObject({
+      temp: 22,
+      rh: 0,
+      vpd: 0,
+      co2: 0,
+      soil: 0,
+      observedMetrics: ["temp"],
+    });
   });
 
   it("does not merge rows from different tents at the same ts", () => {

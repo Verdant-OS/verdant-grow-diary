@@ -54,7 +54,7 @@ export interface EcowittSnapshotViewModel {
   derivedVpdKpa: number | null;
   /** Convenience: per-metric quick-access map for presenter. */
   metrics: Partial<Record<EcowittNormalizedReading["metric"], number>>;
-  /** True if the chosen snapshot was flagged invalid by suspicion rules. */
+  /** True if the chosen snapshot or its persisted provenance is invalid. */
   invalid: boolean;
   /** Calm copy describing why the snapshot is unavailable, or null. */
   unavailableReason: string | null;
@@ -143,9 +143,13 @@ export function buildEcowittSnapshotViewModel(
 
   entries.sort((a, b) => capturedAtMs(b.snap) - capturedAtMs(a.snap));
   const chosen = entries[0];
-  const effective: SensorReadingSource = chosen.snap.invalid
+  const invalidProvenance = chosen.source === "invalid";
+  const invalid = chosen.snap.invalid || invalidProvenance;
+  const effective: SensorReadingSource = invalid
     ? "invalid"
     : effectiveSource(chosen.source, chosen.snap.freshness);
+  const canSurfaceDerivedVpd =
+    chosen.snap.freshness === "fresh" && (effective === "live" || effective === "manual");
   const label = resolveSensorSourceLabel({
     source: effective,
     vendor: "ecowitt",
@@ -157,6 +161,7 @@ export function buildEcowittSnapshotViewModel(
   // separately so the presenter can read it alongside raw values without
   // having it labeled as a live reading.
   if (
+    canSurfaceDerivedVpd &&
     typeof chosen.snap.derivedVpdKpa === "number" &&
     Number.isFinite(chosen.snap.derivedVpdKpa)
   ) {
@@ -170,12 +175,14 @@ export function buildEcowittSnapshotViewModel(
     source: effective,
     sourceLabel: label,
     freshness: chosen.snap.freshness,
-    derivedVpdKpa: chosen.snap.derivedVpdKpa,
+    derivedVpdKpa: canSurfaceDerivedVpd ? chosen.snap.derivedVpdKpa : null,
     metrics,
-    invalid: chosen.snap.invalid,
-    unavailableReason: chosen.snap.invalid
-      ? (chosen.snap.suspicion.find((f) => f.severity === "invalid")?.message ??
-        "Reading marked unavailable.")
+    invalid,
+    unavailableReason: invalid
+      ? invalidProvenance
+        ? "Reading provenance is missing or unrecognized."
+        : (chosen.snap.suspicion.find((f) => f.severity === "invalid")?.message ??
+          "Reading marked unavailable.")
       : null,
   };
 }

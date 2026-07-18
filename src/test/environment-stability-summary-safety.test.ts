@@ -52,10 +52,13 @@ describe("Environment Stability Summary v1 — safety + wiring", () => {
     expect(SENSORS_SRC).toMatch(
       /import\s+EnvironmentStabilityCard\s+from\s+["']@\/components\/EnvironmentStabilityCard["']/,
     );
-    // The card must be wired to `filtered` (the selected-tent slice) and
-    // `selectedTentStage`, not the unfiltered global `readings`.
+    // The card must use the selected-tent slice narrowed to actual VPD
+    // observations, not compatibility zeroes or global readings.
     expect(SENSORS_SRC).toMatch(
-      /<EnvironmentStabilityCard[\s\S]*?testId=["']sensors-environment-stability["'][\s\S]*?computeEnvironmentStability\(\s*filtered\s*,\s*\{[\s\S]*?stage:\s*selectedTentStage/,
+      /selectReadingsWithObservedMetric\(filtered,\s*["']vpd["']\)/,
+    );
+    expect(SENSORS_SRC).toMatch(
+      /<EnvironmentStabilityCard[\s\S]*?testId=["']sensors-environment-stability["'][\s\S]*?computeEnvironmentStability\(\s*vpdStabilityReadings\s*,\s*\{[\s\S]*?stage:\s*selectedTentStage/,
     );
   });
 

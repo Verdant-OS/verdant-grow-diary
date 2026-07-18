@@ -11,10 +11,8 @@ function fail(scope: string, error: { message?: string } | null): never {
 }
 
 // Guard against legacy/mock string ids (e.g. "t1", "p1") which would cause
-// Postgres uuid columns to 400. When a non-UUID is passed, repo callers
-// short-circuit and let the useGrowData fallback layer serve mock data.
-// Exported for UI callers with the same problem (e.g. per-tent sensor
-// queries fed by the mock-fallback tent list).
+// Postgres UUID columns to 400. Non-UUID scopes fail closed as empty/null;
+// authenticated grow-data hooks never substitute mock fixtures.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v: string | undefined | null): v is string => !!v && UUID_RE.test(v);
 
@@ -47,8 +45,8 @@ export async function fetchPlants(
   growId?: string,
   opts: FetchPlantsOptions = {},
 ): Promise<Plant[]> {
-  // Non-UUID tentId (e.g. mock "t1") would 400 against a uuid column.
-  // Return empty so the hook falls back to mock-filtered plants.
+  // Non-UUID tentId (e.g. legacy mock "t1") would 400 against a UUID column.
+  // Return an honest empty list without querying or substituting fixtures.
   if (tentId !== undefined && !isUuid(tentId)) return [];
   if (growId !== undefined && !isUuid(growId)) return [];
   let q = supabase.from("plants").select("*");

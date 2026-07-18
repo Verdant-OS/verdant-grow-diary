@@ -79,6 +79,98 @@ describe("ecowittLatestSnapshotFilter", () => {
     expect(vm.sourceLabel?.label).toBe("Ecowitt");
   });
 
+  it.each([
+    ["live", "live"],
+    ["ecowitt", "live"],
+    ["manual", "manual"],
+    ["csv", "csv"],
+    ["demo", "demo"],
+    ["stale", "stale"],
+    ["invalid", "invalid"],
+    [null, "invalid"],
+    ["webhook", "invalid"],
+    ["mystery", "invalid"],
+  ] as const)(
+    "resolves persisted source %s to candidate source %s without vendor promotion",
+    (source, expectedSource) => {
+      const candidates = selectEcowittCandidates(
+        [
+          row(
+            { source },
+            {
+              vendor: "ecowitt",
+              temp1f: 77,
+              humidity1: 55,
+              dateutc: FRESH_AT,
+            },
+          ),
+        ],
+        { tentId: TENT_A },
+      );
+
+      expect(candidates).toHaveLength(1);
+      expect(candidates[0]?.source).toBe(expectedSource);
+    },
+  );
+
+  it.each([null, "webhook", "invalid"] as const)(
+    "fails closed for %s provenance and withholds derived VPD",
+    (source) => {
+      const vm = buildEcowittLatestSnapshot(
+        [
+          row(
+            { source },
+            {
+              vendor: "ecowitt",
+              temp1f: 77,
+              humidity1: 55,
+              dateutc: FRESH_AT,
+            },
+          ),
+        ],
+        { tentId: TENT_A },
+        { now: NOW },
+      );
+
+      expect(vm.hasReading).toBe(true);
+      expect(vm.source).toBe("invalid");
+      expect(vm.sourceLabel?.label).toBe("Invalid");
+      expect(vm.invalid).toBe(true);
+      expect(vm.unavailableReason).toBe(
+        "Reading provenance is missing or unrecognized.",
+      );
+      expect(vm.derivedVpdKpa).toBeNull();
+      expect(vm.metrics.vpd_kpa).toBeUndefined();
+    },
+  );
+
+  it.each([
+    ["csv", "CSV"],
+    ["stale", "Stale"],
+  ] as const)("keeps %s provenance in the snapshot view-model", (source, label) => {
+    const vm = buildEcowittLatestSnapshot(
+      [
+        row(
+          { source },
+          {
+            vendor: "ecowitt",
+            temp1f: 77,
+            humidity1: 55,
+            dateutc: FRESH_AT,
+          },
+        ),
+      ],
+      { tentId: TENT_A },
+      { now: NOW },
+    );
+
+    expect(vm.source).toBe(source);
+    expect(vm.sourceLabel?.label).toBe(label);
+    expect(vm.invalid).toBe(false);
+    expect(vm.derivedVpdKpa).toBeNull();
+    expect(vm.metrics.vpd_kpa).toBeUndefined();
+  });
+
   it("demotes stale listener readings to Stale (never Live)", () => {
     const vm = buildEcowittLatestSnapshot(
       [row({ captured_at: STALE_AT }, { temp1f: 77, humidity1: 55, dateutc: STALE_AT })],
@@ -104,6 +196,26 @@ describe("ecowittLatestSnapshotFilter", () => {
     );
     expect(vm.source).toBe("manual");
     expect(vm.sourceLabel?.label).toBe("Manual");
+  });
+
+  it("withholds derived VPD from an aged manual snapshot", () => {
+    const vm = buildEcowittLatestSnapshot(
+      [
+        {
+          tent_id: TENT_A,
+          source: "manual",
+          captured_at: STALE_AT,
+          raw_payload: { vendor: "ecowitt", temp1f: 77, humidity1: 55, dateutc: STALE_AT },
+        },
+      ],
+      { tentId: TENT_A },
+      { now: NOW },
+    );
+
+    expect(vm.source).toBe("manual");
+    expect(vm.freshness).toBe("stale");
+    expect(vm.derivedVpdKpa).toBeNull();
+    expect(vm.metrics.vpd_kpa).toBeUndefined();
   });
 
   it("recognises EcoWitt lineage via raw_payload.vendor when source label is generic", () => {

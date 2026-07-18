@@ -104,6 +104,7 @@ import {
   buildEnvironmentCheckDetails,
   hasAnyEnvironmentCheckMeasurement,
   resolvePreviewWaterTempC,
+  validateEnvironmentCheckSensorBand,
   type EnvironmentCheckWaterTempUnit,
 } from "@/lib/environmentCheckQuickLogRules";
 import {
@@ -805,6 +806,24 @@ export default function QuickLog({
         notes: earlyNotes,
         stage,
       });
+      // Block out-of-band air-sensor values before building the envelope so an
+      // implausible reading surfaces the same per-metric copy Quick Log v2
+      // shows — instead of the old silent clamp-to-null that discarded the
+      // grower's number. Reuses the single canonical band via the shared guard.
+      if (eventType === "environment") {
+        const bandCheck = validateEnvironmentCheckSensorBand({
+          roomTempF: envRoomTempF,
+          humidityPct: envHumidityPct,
+          vpdKpa: envVpdKpa,
+        });
+        if (bandCheck.ok !== true) {
+          const message = quickLogReasonToOperatorMessage(bandCheck.reason);
+          setSaveError(message);
+          // Allow-listed reason code only — never tokens, endpoints, or payload.
+          toast.error(`${message} [${bandCheck.reason}]`);
+          return;
+        }
+      }
       const environmentCheckEnvelope =
         eventType === "environment"
           ? buildEnvironmentCheckDetails({

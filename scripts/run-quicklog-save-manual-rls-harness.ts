@@ -373,6 +373,76 @@ async function main() {
         reason,
       );
     }
+
+    // 10. Canonical band guard (temperature): a fat-fingered 240 °C (24.0
+    //     mis-typed) exceeds the canonical 60 °C ceiling the extended
+    //     validate_environment_event trigger now enforces → safe save_failed,
+    //     no orphan companion rows.
+    {
+      const beforeGe = await countEvents(uidA);
+      const { data } = await call(cA, {
+        p_target_type: "plant",
+        p_target_id: seedA.plantId,
+        p_action: "note",
+        p_note: "trigger temperature range failure",
+        p_temperature_c: 240,
+      });
+      const afterGe = await countEvents(uidA);
+      check(
+        "temperature out-of-range returns safe save_failed envelope",
+        (data as { ok?: boolean; reason?: string })?.ok === false &&
+          (data as { reason?: string })?.reason === "save_failed",
+        JSON.stringify(data),
+      );
+      check(
+        "temperature save_failed leaves zero orphan grow_events",
+        afterGe === beforeGe,
+        `delta=${afterGe - beforeGe}`,
+      );
+    }
+
+    // 11. Canonical band guard (VPD reject): 12 kPa exceeds the canonical 10 kPa
+    //     ceiling → safe save_failed, no orphans.
+    {
+      const beforeGe = await countEvents(uidA);
+      const { data } = await call(cA, {
+        p_target_type: "plant",
+        p_target_id: seedA.plantId,
+        p_action: "note",
+        p_note: "trigger vpd range failure",
+        p_vpd_kpa: 12,
+      });
+      const afterGe = await countEvents(uidA);
+      check(
+        "vpd out-of-range returns safe save_failed envelope",
+        (data as { ok?: boolean; reason?: string })?.ok === false &&
+          (data as { reason?: string })?.reason === "save_failed",
+        JSON.stringify(data),
+      );
+      check(
+        "vpd save_failed leaves zero orphan grow_events",
+        afterGe === beforeGe,
+        `delta=${afterGe - beforeGe}`,
+      );
+    }
+
+    // 12. Canonical band guard (VPD accept): 8 kPa is inside the canonical
+    //     0..10 band and MUST persist. The retired v1 0..4 cap would have
+    //     dropped it — this proves the band widened, not just moved.
+    {
+      const { data } = await call(cA, {
+        p_target_type: "plant",
+        p_target_id: seedA.plantId,
+        p_action: "note",
+        p_note: "in-band vpd persists",
+        p_vpd_kpa: 8,
+      });
+      check(
+        "in-band VPD (8 kPa) saves successfully",
+        (data as { ok?: boolean })?.ok === true,
+        JSON.stringify(data),
+      );
+    }
   } finally {
     await teardown([uidA, uidB]);
   }

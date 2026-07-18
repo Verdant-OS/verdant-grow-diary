@@ -9,7 +9,7 @@ import {
   extractRobotsSitemapUrls,
   validateAbsoluteCanonicalUrl,
   checkSitemapCanonicalParity,
-  // @ts-expect-error — .mjs module, no d.ts
+  // @ts-ignore — .mjs module, no d.ts
 } from "../../scripts/check-sitemap-canonical-parity.mjs";
 
 function makeCanonicalHtml(path: string): string {

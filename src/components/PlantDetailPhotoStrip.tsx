@@ -66,8 +66,8 @@ export default function PlantDetailPhotoStrip({
     rows: diaryRowsForDisplay,
     isResolvingPrivatePhotos,
     hasPrivatePhotoError,
-    hasPhotoReference,
   } = useDiaryPhotoDisplayRows(rawDiary as ReadonlyArray<DiaryPhotoDisplayRow> | null | undefined);
+
 
   const latestReviewsByPhotoId = useMemo(
     () => projectLatestPhotoDiagnosisReviewsByPhoto(rawDiary),

@@ -139,6 +139,10 @@ export function buildAiDoctorImportedHistoryPromptFragment(
       s.noActionQueueFromHistoryAlone,
     );
     const dateRange = h.dateRange ? `${h.dateRange.earliest} → ${h.dateRange.latest}` : "unknown";
+    const excludedQualityCount =
+      Number.isInteger(h.excludedQualityCount) && h.excludedQualityCount >= 0
+        ? h.excludedQualityCount
+        : "unknown";
     importedHistoryBlock = [
       `[${s.sectionLabel}]`,
       `Source label: ${sanitizeAiDoctorPromptText(h.historicalLabel)}`,
@@ -146,6 +150,7 @@ export function buildAiDoctorImportedHistoryPromptFragment(
       `Vendors: ${formatVendors(h.vendors as never)}`,
       `Date range: ${dateRange}`,
       `Total readings: ${h.totalReadings}`,
+      `Excluded quality rows: ${excludedQualityCount}`,
       `Suspicious flags: ${h.suspiciousFlagCount}`,
       `Metric summaries: ${formatMetrics(h.metrics)}`,
     ].join("\n");

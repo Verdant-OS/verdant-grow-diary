@@ -1,10 +1,13 @@
 /**
- * PlantDetailAiDoctorLiveReview — grower-initiated, gated live AI Doctor
- * review entry point. Renders nothing for "insufficient" readiness.
+ * PlantDetailAiDoctorLiveReview — grower-initiated, gated AI Doctor review
+ * entry point.
  *
  * Hard constraints:
- *  - Reuses the readiness gate (insufficient blocked, partial/strong
- *    allowed with limited-confidence copy when partial).
+ *  - Reuses the readiness gate for ordinary reviews. Insufficient current
+ *    context stays blocked unless a separate pure rule finds enough
+ *    sanitized CSV history for a limited historical review.
+ *  - Historical eligibility never upgrades current-context readiness and
+ *    always preserves the missing-current-reading caveat.
  *  - Never writes DB rows. Never persists sessions, alerts, action queue,
  *    sensor readings. No approve/reject buttons. No device control.
  *  - Failure / timeout / invalid / missing-config all render the same
@@ -39,6 +42,7 @@ import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { buildAiCreditLimitNoticeViewModel } from "@/lib/aiCreditLimitNoticeViewModel";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import type { Classification } from "@/lib/sensorSnapshotStatusContract";
+import { evaluateAiDoctorReviewEligibility } from "@/lib/aiDoctorReviewEligibilityRules";
 
 /** Stable empty-array identity so the packet memo does not churn. */
 const NO_TENT_SENSOR_ROWS: never[] = [];
@@ -49,6 +53,8 @@ export const AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY =
 export const AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY =
   "Context is partial — review may have limited confidence.";
 export const AI_DOCTOR_LIVE_REVIEW_STRONG_COPY = "Context is strong enough for a cautious review.";
+export const AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY =
+  "Historical review only — this is imported CSV history, not live telemetry. It may show patterns, but it cannot establish current conditions.";
 export const AI_DOCTOR_LIVE_REVIEW_VALIDATED_LABEL = "Validated AI Doctor review.";
 export const AI_DOCTOR_LIVE_REVIEW_START_LABEL = "Run cautious AI Doctor review";
 export const AI_DOCTOR_LIVE_REVIEW_RETRY_LABEL = "Try once more";
@@ -115,8 +121,6 @@ export default function PlantDetailAiDoctorLiveReview({
     [plant, items],
   );
 
-  const allowed = context.readiness === "partial" || context.readiness === "strong";
-
   // Row-level, provenance-aware classification. The ingest audit only knows
   // counts/source transport and cannot distinguish a UI test packet from a
   // physical sensor, so it must never grant healthy evidence here.
@@ -127,23 +131,44 @@ export default function PlantDetailAiDoctorLiveReview({
     return classifyAiDoctorCurrentSensorEvidence(currentSensorRows);
   }, [currentSensorRows, sensorClassificationOverride]);
 
-  const packet = useMemo(
+  // Build the bounded, sanitized candidate before eligibility is resolved so
+  // the gate inspects the exact imported-history summary that would reach the
+  // server. This is pure and cannot trigger a model call or persistence.
+  const candidatePacket = useMemo(
     () =>
-      allowed
-        ? buildAiDoctorReviewRequestPacket({
-            plant,
-            timelineItems: items,
-            context,
-            csvHistoryRows: tentSensorRows,
-            currentSensorRows,
-            // This explicit signal is derived from the same filtered rows as
-            // the packet snapshot. Diagnostic/testbench packets, manual
-            // snapshots, and CSV history can never set it.
-            hasFreshLiveSensorReadings: sensorClassification?.status === "usable",
-          })
-        : null,
-    [allowed, plant, items, context, tentSensorRows, currentSensorRows, sensorClassification],
+      buildAiDoctorReviewRequestPacket({
+        plant,
+        timelineItems: items,
+        context,
+        csvHistoryRows: tentSensorRows,
+        currentSensorRows,
+        // This explicit signal is derived from the same filtered rows as
+        // the packet snapshot. Diagnostic/testbench packets, manual
+        // snapshots, and CSV history can never set it.
+        hasFreshLiveSensorReadings: sensorClassification?.status === "usable",
+      }),
+    [plant, items, context, tentSensorRows, currentSensorRows, sensorClassification],
   );
+
+  const eligibility = useMemo(
+    () =>
+      evaluateAiDoctorReviewEligibility({
+        context,
+        hasPlantProfile: plant !== null,
+        importedHistory: candidatePacket.imported_sensor_history,
+        historicalRows: tentSensorRows,
+        missingLiveSensorReadings: candidatePacket.missingLiveSensorReadings === true,
+      }),
+    [
+      candidatePacket.imported_sensor_history,
+      candidatePacket.missingLiveSensorReadings,
+      context,
+      plant,
+      tentSensorRows,
+    ],
+  );
+  const allowed = eligibility.allowed;
+  const packet = allowed ? candidatePacket : null;
 
   const review = useAiDoctorLiveReview({
     // Hold the gate while either sensor context read is in flight.
@@ -188,15 +213,18 @@ export default function PlantDetailAiDoctorLiveReview({
   if (!allowed) return null;
 
   const confidenceCopy =
-    context.readiness === "partial"
-      ? AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY
-      : AI_DOCTOR_LIVE_REVIEW_STRONG_COPY;
+    eligibility.mode === "historical_review"
+      ? AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY
+      : context.readiness === "partial"
+        ? AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY
+        : AI_DOCTOR_LIVE_REVIEW_STRONG_COPY;
 
   return (
     <section
       aria-labelledby="plant-ai-doctor-live-review-heading"
       data-testid="plant-ai-doctor-live-review"
       data-readiness={context.readiness}
+      data-review-mode={eligibility.mode}
       data-status={review.status}
       className="glass rounded-2xl p-4 my-3 space-y-3"
     >

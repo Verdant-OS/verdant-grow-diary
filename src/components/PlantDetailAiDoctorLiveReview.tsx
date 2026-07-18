@@ -8,12 +8,15 @@
  *    sanitized CSV history for a limited historical review.
  *  - Historical eligibility never upgrades current-context readiness and
  *    always preserves the missing-current-reading caveat.
- *  - Never writes DB rows. Never persists sessions, alerts, action queue,
- *    sensor readings. No approve/reject buttons. No device control.
+ *  - A successful review delegates one saved-session snapshot to the
+ *    existing ownership-checked persistence helper. It never writes alerts,
+ *    Action Queue rows, sensor readings, or device commands.
  *  - Failure / timeout / invalid / missing-config all render the same
  *    calm failure copy. Fail closed.
  */
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTimelineMemory, TIMELINE_MEMORY_DEFAULT_LIMIT } from "@/hooks/useTimelineMemory";
 import {
   evaluateAiDoctorContextFromSources,
@@ -58,6 +61,12 @@ export const AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY =
 export const AI_DOCTOR_LIVE_REVIEW_VALIDATED_LABEL = "Validated AI Doctor review.";
 export const AI_DOCTOR_LIVE_REVIEW_START_LABEL = "Run cautious AI Doctor review";
 export const AI_DOCTOR_LIVE_REVIEW_RETRY_LABEL = "Try once more";
+export const AI_DOCTOR_HISTORY_SAVING_COPY = "Saving this review to AI Doctor history…";
+export const AI_DOCTOR_HISTORY_SAVED_COPY = "Saved to AI Doctor history.";
+export const AI_DOCTOR_HISTORY_SAVE_FAILED_COPY =
+  "Review shown, but it could not be saved to history. Your result is still available below.";
+export const AI_DOCTOR_HISTORY_SAVE_SKIPPED_COPY =
+  "Review shown, but it could not be linked to history because grow context is missing.";
 
 export interface PlantDetailAiDoctorLiveReviewProps {
   plantId: string;
@@ -83,6 +92,14 @@ export default function PlantDetailAiDoctorLiveReview({
   sensorClassificationOverride,
 }: PlantDetailAiDoctorLiveReviewProps) {
   const historicalStartTrackedRef = useRef(false);
+  const queryClient = useQueryClient();
+  const handlePersisted = useCallback(
+    (_sessionId: string) => {
+      void queryClient.invalidateQueries({ queryKey: ["ai_doctor_sessions"] });
+      void queryClient.invalidateQueries({ queryKey: ["timeline_memory"] });
+    },
+    [queryClient],
+  );
   const { items } = useTimelineMemory({ kind: "plant", plantId }, TIMELINE_MEMORY_DEFAULT_LIMIT);
   // Dedicated bounded imported-history read. It filters permitted CSV source
   // identities before the cap and orders by historical `captured_at`, so the
@@ -181,6 +198,7 @@ export default function PlantDetailAiDoctorLiveReview({
     plantId,
     sensorClassification,
     persist,
+    onPersisted: handlePersisted,
   });
 
   const { entitlement } = useMyEntitlements();
@@ -317,6 +335,59 @@ export default function PlantDetailAiDoctorLiveReview({
           >
             {AI_DOCTOR_LIVE_REVIEW_VALIDATED_LABEL}
           </p>
+          {review.persistence.status === "saving" ? (
+            <p
+              className="mt-2 text-xs text-muted-foreground"
+              role="status"
+              aria-live="polite"
+              data-testid="plant-ai-doctor-history-saving"
+            >
+              {AI_DOCTOR_HISTORY_SAVING_COPY}
+            </p>
+          ) : review.persistence.status === "saved" ? (
+            <div
+              className="mt-2 flex flex-wrap items-center gap-2 text-xs text-emerald-200"
+              role="status"
+              aria-live="polite"
+              data-testid="plant-ai-doctor-history-saved"
+            >
+              <span>{AI_DOCTOR_HISTORY_SAVED_COPY}</span>
+              <Link
+                to={`/doctor/sessions/${review.persistence.sessionId}`}
+                className="font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                data-testid="plant-ai-doctor-history-saved-link"
+              >
+                View saved session
+              </Link>
+            </div>
+          ) : review.persistence.status === "failed" ? (
+            <div
+              className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-100"
+              role="alert"
+              data-testid="plant-ai-doctor-history-save-failed"
+              data-failure-category={review.persistence.diagnostic.category}
+            >
+              <p>{AI_DOCTOR_HISTORY_SAVE_FAILED_COPY}</p>
+              {review.canRetrySave ? (
+                <button
+                  type="button"
+                  onClick={review.retrySave}
+                  className="mt-2 rounded-md border border-amber-300/40 px-2 py-1 font-medium hover:bg-amber-500/10"
+                  data-testid="plant-ai-doctor-history-save-retry"
+                >
+                  Retry saving to history
+                </button>
+              ) : null}
+            </div>
+          ) : review.persistence.status === "skipped" ? (
+            <p
+              className="mt-2 text-xs text-amber-100"
+              role="status"
+              data-testid="plant-ai-doctor-history-save-skipped"
+            >
+              {AI_DOCTOR_HISTORY_SAVE_SKIPPED_COPY}
+            </p>
+          ) : null}
           {review.creditRemaining ? (
             <AiCreditRemainingBadge
               credit={review.creditRemaining}

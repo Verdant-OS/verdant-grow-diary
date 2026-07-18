@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-// @ts-expect-error - JS module without types
 import { validateCanonicalHref, EXPECTED_ORIGIN } from "../../scripts/validate-canonical-shape.mjs";
 
 describe("validateCanonicalHref", () => {
